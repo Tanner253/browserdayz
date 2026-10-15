@@ -2536,17 +2536,22 @@ export class Weapons {
       const set = HANDLED[item.id];
       const clip = empty ? 'reloadEmpty' : 'reload';
       // (at very nearly the pace it was drawn at: hurried, the hands stop looking like hands)
-      const dur = m.rig.seconds(clip) * (m.kind === 'pistol' ? 0.92 : 1);
-      audio.magOut(dur * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol', set);
-      audio.magIn(dur * (m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : m.kind === 'auto' ? (empty ? 0.5 : 0.66) : 0.62), m.kind !== 'pistol', set);
-      if (empty) audio.slideRack(dur * (m.kind === 'auto' ? 0.8 : 0.7), set);
+      const whole = m.rig.seconds(clip) * (m.kind === 'pistol' ? 0.92 : 1);
+      // A gun with no magazine in it has none to take out: the movement is begun where the hand goes for the fresh
+      // one (the owner, 2026-10-15: "when a gun doesnt have a magazine, and you press R to put a magazine in, the
+      // animation first plays a magazine being taken out ... we can skip the first part")
+      const from = fed && !item.mag ? (m.kind === 'pistol' ? 0.22 : 0.38) : 0;
+      const dur = whole * (1 - from), at = (part: number) => Math.max(0.02, whole * (part - from));
+      if (!from) audio.magOut(whole * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol', set);
+      audio.magIn(at(m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : m.kind === 'auto' ? (empty ? 0.5 : 0.66) : 0.62), m.kind !== 'pistol', set);
+      if (empty) audio.slideRack(at(m.kind === 'auto' ? 0.8 : 0.7), set);
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
         if (fed) feed();
         else item.loaded = free ? capacityOf(item) : (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         this.dry.delete(item);
         this.boltReady = true;
-      }, { empty: empty ? 1 : 0 });
+      }, { empty: empty ? 1 : 0, from });
       return;
     }
     if (m.kind === 'rifle' && !fed) {
@@ -3369,12 +3374,14 @@ export class Weapons {
         rig.pose('reload', part);
       }
       else if (a.name === 'magswap') {
-        rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', k);
+        // (begun part way in when there was no magazine to take out: see `reload`)
+        const from = a.data?.from ?? 0, kk = from + k * (1 - from);
+        rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', kk);
         // (the pack's plain reload has the slide back for the middle of it, as if the gun had
         // run dry; with a round still in the chamber it stays shut)
         if (!a.data?.empty && m.kind === 'pistol') rig.still(m.slideOn ? [m.slideOn] : ['slide', 'stopper']);
         // (run dry, its slide is back until the hand has worked it, late in the movement)
-        if (a.data?.empty && m.slideOn) rig.slide(m.slideOn, -SLIDE_LOCK * (1 - THREE.MathUtils.smoothstep(k, 0.7, 0.76)));
+        if (a.data?.empty && m.slideOn) rig.slide(m.slideOn, -SLIDE_LOCK * (1 - THREE.MathUtils.smoothstep(kk, 0.7, 0.76)));
       }
       else if (a.name === 'check' && this.checkDrawn(m)) rig.pose('check', k);
       else rig.rest();
