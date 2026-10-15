@@ -78,6 +78,24 @@ const _ORIGIN = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _eye = ne
  * camera's, not the light's, so a layer the view leaves out is left out of the shadows too.)
  */
 export const SHADOW_FRUSTA = new Set<THREE.Frustum | THREE.FrustumArray>();
+/** which of the sun's cascades each of SHADOW_FRUSTA is (see castsInto) */
+const CASCADE_OF = new Map<THREE.Frustum | THREE.FrustumArray, number>();
+/** the eye, the way it looks, how long the shadow of a man's height is now, and the depths each cascade is read at: kept by Atmosphere.update */
+const SEEN = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), long: 10, lo: [] as number[], hi: [] as number[] };
+
+/**
+ * Whether a thing `r` round `at` is to be drawn into this map of the sun's shadow: true for anything that is not one
+ * of the cascades; for a cascade, whether it is read anywhere the thing or its shadow can lie (the depths in the
+ * view the cascade is read at, its fade into the next included, as the shader reads them: CSMShader). The wider
+ * cascades are round the eye and hold what is near as well, and every body was drawn into all three: a body beside
+ * the eye is read from the nearest only (2026-10-15).
+ */
+export function castsInto(f: THREE.Frustum | THREE.FrustumArray, at: THREE.Vector3, r: number): boolean {
+  const i = CASCADE_OF.get(f);
+  if (i === undefined || !SEEN.hi.length) return true;
+  const z = (at.x - SEEN.eye.x) * SEEN.fwd.x + (at.y - SEEN.eye.y) * SEEN.fwd.y + (at.z - SEEN.eye.z) * SEEN.fwd.z, reach = r + SEEN.long;
+  return z + reach >= SEEN.lo[i] && z - reach <= SEEN.hi[i];
+}
 
 export class Atmosphere {
   sunDir = new THREE.Vector3(0.4, 0.7, 0.3).normalize(); // points toward the sun
@@ -228,12 +246,13 @@ export class Atmosphere {
       shadowBias: -0.00012,
     });
     this.csm.fade = true;
-    for (const l of this.csm.lights) {
+    this.csm.lights.forEach((l, i) => {
       l.color.copy(this.sunColor);
       l.shadow.camera.layers.enable(2);
       l.shadow.normalBias = 0.035;
       SHADOW_FRUSTA.add(l.shadow.getFrustum());
-    }
+      CASCADE_OF.set(l.shadow.getFrustum(), i);
+    });
     this.padCascades();
   }
 
@@ -780,6 +799,18 @@ export class Atmosphere {
     const csm = this.csm;
     csm.update();
     const cam = this.camera;
+    // (what castsInto reads: the depths are the shader's own, with the fade on either side of each and twice over)
+    {
+      cam.getWorldPosition(SEEN.eye);
+      cam.getWorldDirection(SEEN.fwd);
+      const d = csm.lightDirection, span = Math.min(cam.far, csm.maxFar) - cam.near;
+      SEEN.long = Math.min(60, (2.2 * Math.hypot(d.x, d.z)) / Math.max(Math.abs(d.y), 0.04));
+      for (let i = 0; i < csm.breaks.length; i++) {
+        const a = csm.breaks[i - 1] ?? 0, b = csm.breaks[i], m = 0.25 * b * b;
+        SEEN.lo[i] = (a - m) * span + cam.near;
+        SEEN.hi[i] = (b + m) * span + cam.near;
+      }
+    }
     // (the two wider ones set round the eye, square to the sun, on whole texels of their maps so that what they
     // show does not crawl as the eye goes: see padCascades. Three's own sun turned as it turns it.)
     _orient.lookAt(_ORIGIN, csm.lightDirection, _UP);

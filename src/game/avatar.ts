@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { restWhileHidden } from '../core/gltf-utils';
 import { breathe, Line } from '../core/breathe';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import type { Atmosphere } from '../world/atmosphere';
+import { castsInto, type Atmosphere } from '../world/atmosphere';
 import { type Curl, bent, type Grips, type HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, stainPatch, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
@@ -25,6 +25,8 @@ export const FP_BODY_LAYER = 4;
 
 /** the model stands 1.81 m with its eyes at 1.70 m; the game's eye height is 1.64 m */
 export const BODY_SCALE = 0.965;
+/** how far from its hips a body can reach, metres, however it is bent: what it is judged in sight by (see Avatar.make) */
+const BODY_REACH = 2.5;
 
 /** bones collapsed in the first-person body: the camera is the head, the viewmodel is the arms */
 const FP_HIDDEN = new Set(['Head', 'upperarm_l', 'upperarm_r']);
@@ -839,12 +841,24 @@ export class Avatar {
     // the suit, or the plain body the game had before it (the character build can still make either)
     const suit = !!model.getObjectByName('pads');
     const zombie = file !== 'survivor';
+    // (A bent body is not where its shapes say it is, and the library cannot tell whether it is in sight: it was
+    // drawn wherever it was, behind the eye as well, and into every map of the sun's shadow. Now it is judged by a
+    // ball round its hips that holds it however it is bent, lying or dancing, and drawn into the maps of the shadow
+    // its shadow is read from: 29 bodies were 5.8 ms of the card's frame, flying low over the middle (2026-10-15).)
+    const hips = bone('Hips') ?? this.root, ball = new THREE.Sphere(new THREE.Vector3(), BODY_REACH);
+    const inSight = (f: THREE.Frustum | THREE.FrustumArray) => {
+      // (development: every body drawn everywhere again, as it was, to measure the difference: assets-src/_wf/me/bodies-ab.js)
+      if (import.meta.env.DEV && (globalThis as { __bodiesEverywhere?: boolean }).__bodiesEverywhere) return true;
+      const e = hips.matrixWorld.elements;
+      ball.center.set(e[12], e[13], e[14]);
+      return castsInto(f, ball.center, ball.radius) && f.intersectsSphere(ball);
+    };
     model.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (m.isMesh) {
         m.castShadow = true;
         m.receiveShadow = true;
-        if (m.isSkinnedMesh) m.frustumCulled = false;
+        if (m.isSkinnedMesh) m.intersectsFrustum = inSight;
         const src = m.material as THREE.MeshStandardMaterial;
         if (zombie) {
           // one of the infected: painted as it came, and bloodied by what is done to it
