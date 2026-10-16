@@ -156,6 +156,12 @@ export const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
 export const HEADLAMP_CAR = { x: 0.68, y: -0.14, z: -2.6 };
 /**
+ * and the helicopter's searchlight, under its nose between the skids: tipped so far ahead of straight down (radians), as
+ * wide as so much of a flashlight's cone (a beam of some 17 degrees), its spot as bright as a flashlight's from so many
+ * metres at any height, how bright its lens is to whoever it is turned on, and how plain its shaft is in the air
+ */
+export const SEARCHLIGHT = { x: 0, y: -0.45, z: -1.45, tilt: 0.49, wide: 0.42, as: 4, lens: 1.2, haze: 0.08 };
+/**
  * The hot keys, 1 to 9 and then 0. Each brings up whatever was put on it (PlayerInventory.hot): anything carried,
  * on any key. Pressed, the thing is taken into the hands; pressed again, it is put away. What is in the hands is
  * then used by holding the left button down for as long as the using takes (see `handFire`), which is how

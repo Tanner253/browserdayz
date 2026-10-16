@@ -17,6 +17,7 @@ const POINTS = 5;
 /** over how many metres the furthest of the real lights dims before it is given to a nearer lamp */
 const FADE = 3;
 const GLARES = 96;
+const SHAFTS = 4;
 /** how strong a beam of power 1 is (candela, as three counts it), how far it carries, and how wide it is (radians, half) */
 const BEAM = { power: 170, reach: 75, half: 0.36, soft: 0.7 };
 
@@ -28,6 +29,7 @@ const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
+const _down = new THREE.Vector3(0, -1, 0);
 
 export class Lamps {
   /** the real lights: in the scene only while something is lit */
@@ -48,6 +50,9 @@ export class Lamps {
   private nFlares = 0;
   private glare: THREE.InstancedMesh;
   private glareColor: THREE.InstancedBufferAttribute;
+  private shafts: THREE.InstancedMesh;
+  private shaftPower: THREE.InstancedBufferAttribute;
+  private nShafts = 0;
   /** seconds the real lights are still kept in the scene after the last lamp went out (so that one flickering does not take them in and out) */
   private keep = 0;
   /** the light of all the lamps on what is at the eye itself: the hands and the gun are lit by it (they are drawn apart from the world) */
@@ -114,6 +119,52 @@ export class Lamps {
     this.glare.frustumCulled = false;
     this.glare.renderOrder = 8;
     scene.add(this.glare);
+
+    // the shafts: an open cone from the lamp to where its beam lands (point at the origin, mouth at y -1), brightest
+    // seen through its middle and near the lamp, and gone before its mouth so that no line is cut where it meets the ground
+    const cone = new THREE.ConeGeometry(1, 1, 24, 1, true).translate(0, -0.5, 0);
+    const shaftMat = new THREE.ShaderMaterial({
+      vertexShader: /* glsl */ `
+        attribute float iPower;
+        varying float vAlong;
+        varying float vPower;
+        varying vec3 vSide;
+        varying vec3 vView;
+        void main() {
+          vAlong = -position.y;
+          vPower = iPower;
+          mat3 m = mat3( instanceMatrix );
+          vSide = m * vec3( position.x, 0.0, position.z );
+          vec4 world = instanceMatrix * vec4( position, 1.0 );
+          vView = world.xyz - cameraPosition;
+          gl_Position = projectionMatrix * viewMatrix * world;
+        }`,
+      fragmentShader: /* glsl */ `
+        varying float vAlong;
+        varying float vPower;
+        varying vec3 vSide;
+        varying vec3 vView;
+        void main() {
+          float through = abs( dot( normalize( vSide ), normalize( vView ) ) );
+          float k = vPower * through * through * ( 0.15 + 0.85 * ( 1.0 - vAlong ) * ( 1.0 - vAlong ) );
+          k *= smoothstep( 0.0, 0.04, vAlong ) * smoothstep( 1.0, 0.8, vAlong );
+          gl_FragColor = vec4( vec3( 1.0, 0.96, 0.88 ) * k, 1.0 );
+        }`,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+      fog: false,
+    });
+    this.shaftPower = new THREE.InstancedBufferAttribute(new Float32Array(SHAFTS), 1);
+    this.shaftPower.setUsage(THREE.DynamicDrawUsage);
+    cone.setAttribute('iPower', this.shaftPower);
+    this.shafts = new THREE.InstancedMesh(cone, shaftMat, SHAFTS);
+    this.shafts.count = 0;
+    this.shafts.frustumCulled = false;
+    this.shafts.renderOrder = 7;
+    scene.add(this.shafts);
   }
 
   /**
@@ -156,6 +207,19 @@ export class Lamps {
     f.dir.copy(dir).normalize();
     f.power = power;
     this.nFlares++;
+  }
+
+  /**
+   * This frame, the beam itself as it is seen in the air, from the lamp to where it lands: a searchlight's, which is
+   * seen across the valley as a pale shaft (night air is never quite clear). @param wide as `beam`'s
+   * @param power how bright it is seen through its middle at the lamp's end
+   */
+  shaft(pos: THREE.Vector3, dir: THREE.Vector3, length: number, wide: number, power: number) {
+    if (this.nShafts >= SHAFTS) return;
+    const r = length * Math.tan(Math.min(1.2, BEAM.half * wide));
+    _q.setFromUnitVectors(_down, _v.copy(dir).normalize());
+    this.shafts.setMatrixAt(this.nShafts, _m.compose(pos, _q, _s.set(r, length, r)));
+    (this.shaftPower.array as Float32Array)[this.nShafts++] = power;
   }
 
   /** This frame, a lamp that shines all round: a street lamp, a bulb on a wall. @param power 1 is a street lamp */
@@ -253,7 +317,12 @@ export class Lamps {
     this.glare.count = n;
     this.glare.instanceMatrix.needsUpdate = true;
     this.glareColor.needsUpdate = true;
+    this.shafts.count = this.nShafts;
+    if (this.nShafts) {
+      this.shafts.instanceMatrix.needsUpdate = true;
+      this.shaftPower.needsUpdate = true;
+    }
 
-    this.nBeams = this.nGlows = this.nFlares = 0;
+    this.nBeams = this.nGlows = this.nFlares = this.nShafts = 0;
   }
 }
