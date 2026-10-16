@@ -48,10 +48,11 @@ const run = <T>(f: () => T): T => {
   return g as T;
 };
 
-// THE OLD SQUARE ONLY (2026-10-16): the world grew from a 1536 m square into a rectangle with two squares west of
-// it, and the square is to come out as it was. So what is laid on the ground's net is printed as the square's 769
-// by 769 samples, cut out of a bigger net wherever they stand in it, and what stands somewhere is printed for the
-// square only: the same prints from a tree before the rectangle and after it.
+// THE OLD SQUARE ONLY, with FP_SQUARE=1 (2026-10-16): the world grew from a 1536 m square into a rectangle with two
+// squares west of it, and the square was to come out as it was. So what is laid on the ground's net is printed as
+// the square's 769 by 769 samples, cut out of a bigger net wherever they stand in it, and what stands somewhere is
+// printed for the square only: the same prints from a tree before the rectangle and after it. Without it (for a
+// change meant to change nothing) the whole world is printed.
 const SQ = 769, SQ_HALF = 768;
 const net = WG as unknown as { WORLD_X0?: number; WORLD_Z0?: number; WORLD_NX?: number };
 function square<T extends Float32Array | Uint8Array>(a: T): T {
@@ -66,14 +67,15 @@ const inSquare = (v: unknown) => {
   const p = v as { x?: unknown; z?: unknown };
   return !(p && typeof p.x === 'number' && typeof p.z === 'number') || (Math.abs(p.x) <= SQ_HALF && Math.abs(p.z) <= SQ_HALF);
 };
+const SQUARE_ONLY = !!process.env.FP_SQUARE;
 const ofSquare = (v: unknown): unknown =>
-  v instanceof Float32Array || v instanceof Uint8Array ? (v.length >= SQ * SQ ? square(v) : v) : Array.isArray(v) ? v.filter(inSquare) : v;
+  !SQUARE_ONLY ? v : v instanceof Float32Array || v instanceof Uint8Array ? (v.length >= SQ * SQ ? square(v) : v) : Array.isArray(v) ? v.filter(inSquare) : v;
 
 // 1. the world, field by field
 const world = WG.generateWorld();
 for (const k of Object.keys(world).sort()) put('world.' + k, ofSquare((world as unknown as Record<string, unknown>)[k]));
 const seen = WG.seenGround(world);
-put('world.seenGround', { heights: square(seen.heights), open: seen.open && square(seen.open) });
+put('world.seenGround', SQUARE_ONLY ? { heights: square(seen.heights), open: seen.open && square(seen.open) } : seen);
 
 // 2. every constant the three world files export (a function is told by its name only; those are asked below)
 for (const [tag, M] of [['worldgen', WG], ['castle', C], ['castle-shape', CS]] as const) {
