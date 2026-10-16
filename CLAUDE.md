@@ -57,7 +57,6 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - `git index.lock` can appear while several hands work: retry.
 
 ## How the owner works (use they/them)
-- Hand off to save tokens, by yourself, WHERE IT HELPS (the owner, 2026-10-16: "i want you to utilize handoffs automatically to streamline developnment and save tokens where applicable"; "you shouldnt be running a random handoff chain right now for no reeason"). While real work is under way and the session is about half full, do not ask: update `HANDOFF.md` (what is live, what waits, the task in hand and exactly where it stands) and carry the task on in a fresh session (started AT ONCE, no delay: `create_scheduled_task` with no schedule, then `run_scheduled_task` on it straight away; the owner: "remove the delay why would you delay the new session"; its prompt says to work in `C:\Users\perci\source\repos\Zona`, read CLAUDE.md and HANDOFF.md and carry on), then tell the owner which session to open. Never when nothing is in hand, never to start new work nobody asked for, and no more than ten in a row for one task.
 - Short TL;DRs, not documents. Pictures of work as it goes (send them), and a plan picture before anything big is built: wait for their yes on a design, not on every step.
 - Do not over-test. When they say deploy, deploy.
 - Do not use Workflows unless they ask for one in that same message.

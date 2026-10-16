@@ -1,6 +1,6 @@
 # Where the work stands (handoff, 2026-10-16)
 
-Read `CLAUDE.md` first (it says when to hand off: by yourself, to save tokens, while real work is under way). The 2026-10-14 notes below are history.
+Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
 ## ANTI-BOT TASK (the owner, 2026-10-16, its own session; the trailer has a session of its own)
 The owner: "i think we need to make these chnages, develop the robust anti bot measures and hold deploy run tests and get it all ready to go". Also: "our bot course isn't good enough ... surely we can come up with a way to test users coming into the game that is accessibility frinedly an cant be bypassed by bots"; "can i ban this computr or browser at the source?"
