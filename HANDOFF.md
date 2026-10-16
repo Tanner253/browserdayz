@@ -1,6 +1,8 @@
 # Where the work stands (handoff, 2026-10-16)
 
-Read `CLAUDE.md` first (it now says: hand off at half the context). The 2026-10-14 notes below are history.
+Read `CLAUDE.md` first (it says: hand off at half the context, without asking, ten times at most). The 2026-10-14 notes below are history.
+
+**Automatic handoffs: 1 of 10** (raise it by one at each handoff; at 10, stop and tell the owner).
 
 ## THE TASK NOW: an impressive trailer that tells a story
 The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothing else is asked for now ("disregaurd everythin g besides the impressive trailer and handoff task").
