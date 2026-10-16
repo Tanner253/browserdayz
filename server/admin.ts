@@ -310,7 +310,11 @@ export async function command(c: Client, line: string) {
       const yaw = c.pose[3], ahead = e.kind === 'car' ? 6 : 5;
       const x = n.length >= 3 ? n[1] : c.pose[0] - Math.sin(yaw) * ahead;
       const z = n.length >= 3 ? n[n.length - 1] : c.pose[2] - Math.cos(yaw) * ahead;
-      const y = n.length === 4 ? n[2] : null;
+      // (in front of whoever asks while they stand on a roof or an upper floor: at their own height, not the ground's
+      // under the building; flown up there with noclip, the ground's. The owner, 2026-10-15: "when i spawn an entity it
+      // does not respect the collision of a bulding (spawn heli on roof doenst owk)")
+      const own = n.length < 3 && !c.power.clip && c.pose[1] > world.groundAt(x, z) + 0.5 ? c.pose[1] : null;
+      const y = n.length === 4 ? n[2] : own;
       if (Math.abs(x) > WORLD_SIZE / 2 - 6 || Math.abs(z) > WORLD_SIZE / 2 - 6 || (y !== null && Math.abs(y) > 400)) return void sys(c, 'That is off the map.');
       if (e.kind === 'car') {
         const standing = [...vehicles.values()].filter((v) => !v.goneAt).length;

@@ -19,6 +19,7 @@ import { lookFor } from '../look';
 import { RemotePlayer, CorpseBody } from '../remote';
 import { Stash } from '../loot';
 import { JEEP } from '../../sim/vehicles';
+import { Jeep } from '../vehicle';
 import { BACK_SHORT } from '../../ui/updates';
 import { renderDoll } from '../../ui/icons';
 import { INFECTED } from '../../sim/infected';
@@ -678,7 +679,13 @@ export const onlineMethods = {
     // Where somebody died is where their feet were, and that can be in the air (a jump, a fall, a roof's edge): the
     // body lies on whatever is under that place, and along it if it slopes. ("dead bodies somtimes hover above the
     // ground", 2026-10-12. Every game works this out the same, from the same ground.)
-    const under = physics.raycast({ x: c.x, y: c.y + 0.5, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
+    // (and not on the car or the helicopter they died in: it goes, and the body lay on nothing in the sky over a house,
+    // 2026-10-15. Looked through, on down to what is under it.)
+    let from = c.y + 0.5, under = physics.raycast({ x: c.x, y: from, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
+    for (let k = 0; k < 8 && under?.tag?.owner instanceof Jeep; k++) {
+      from = under.point.y - 0.02;
+      under = physics.raycast({ x: c.x, y: from, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
+    }
     const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
     if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);

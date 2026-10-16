@@ -48,7 +48,8 @@ export const handsMethods = {
     const fwd = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
     const x = p.x + (at ? Math.cos(a) * r : fwd.x * 0.7 + Math.cos(a) * 0.2);
     const z = p.z + (at ? Math.sin(a) * r : fwd.z * 0.7 + Math.sin(a) * 0.2);
-    const hit = physics.raycast({ x, y: p.y + 1.2, z }, { x: 0, y: -1, z: 0 }, 4, SOLID_GROUPS);
+    // (all the way down: flying, an admin's kit's spare things were left hanging in the sky where they were, 2026-10-15)
+    const hit = physics.raycast({ x, y: p.y + 1.2, z }, { x: 0, y: -1, z: 0 }, 600, SOLID_GROUPS);
     const y = hit && hit.toi > 1e-3 ? hit.point.y : p.y;
     // the loot manager then slides it clear of walls and furniture and lays it on the surface
     if (this.online) this.localDrops.add(item.uid);
