@@ -128,9 +128,9 @@ export type MatKey =
   | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'cold_steel' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
   | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
   | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage'
-  | 'boards_blue' | 'boards_green' | 'boards_pale';
+  | 'boards_blue' | 'boards_green' | 'boards_pale' | 'lime_brick';
 
-const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
+const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; /** its picture lightened so many times (a colour can only darken one) */ gain?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
   brick_ext: { tex: 'red_brick_plaster_patch_02', tile: 2.6, surface: 'concrete' },
   planks_ext: { tex: 'weathered_plank_siding', tile: 2.4, surface: 'wood' },
@@ -204,6 +204,8 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   boards_blue: { tex: 'blue_painted_planks', tile: 2.4, surface: 'wood' },
   boards_green: { tex: 'green_rough_planks', tile: 2.4, surface: 'wood' },
   boards_pale: { tex: 'distressed_painted_planks', tile: 2.4, surface: 'wood' },
+  // (the monastery's: old limewash on brick, fallen from it here and there. As the picture comes it reads grey stone in the light of the game, not a white wall)
+  lime_brick: { tex: 'white_bricks', tile: 2.6, gain: 1.45, surface: 'concrete' },
   // sheet iron not yet rusted through: bare, and painted
   roof_iron_clean: { tex: 'corrugated_iron', tile: 2, metal: true, surface: 'metal' },
   roof_iron_green: { tex: 'corrugated_iron', tile: 2, color: 0x7f9a7c, metal: true, surface: 'metal' },
@@ -482,6 +484,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
   switch (type) {
     // (the new towns', each drawn up for its place: see src/world/town-plans.ts)
     case 'cathedral': return town.cathedralPlan();
+    case 'cathedral_arm': return town.cathedralArmPlan();
+    case 'cathedral_apse': return town.cathedralApsePlan();
     case 'belfry': return town.belfryPlan();
     case 'cells': return town.cellsPlan();
     case 'refectory': return town.refectoryPlan();
@@ -3368,6 +3372,7 @@ export class Buildings {
         roughness: 1,
         color: def.color ?? 0xffffff,
       });
+      if (def.gain) (m as THREE.MeshStandardMaterial).color.multiplyScalar(def.gain);
     }
     // (Walls, floors and roofs are one picture each, laid over and over: on a wall forty metres long the same stain
     // came round every three, in rows. A slow change of tone across the world, different at every place, is put over

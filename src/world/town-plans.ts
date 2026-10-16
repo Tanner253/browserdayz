@@ -10,15 +10,18 @@ import { Floor, PI, Q, door, gap, inner, win } from './big-buildings';
 
 /** an opening with a sill and no glass: a belfry's arch, a shop's hatch */
 const arch = (a: number, b: number, bottom: number, top: number): Opening => ({ a, b, bottom, top, kind: 'gap' });
+/** where a part of a building opens into the next part of it (see Blueprint.joined): no door, no step */
+const join = (a: number, b: number, top: number): Opening => ({ a, b, bottom: 0, top, kind: 'gap', join: true });
 /** a rack whose boards hold things (see RACKS in buildings.ts: its places are made last) */
 const rack = (g: Floor, id: 'rack_wide' | 'rack_small', x: number, z: number, rot: number, on = [0, 1, 2]) => g.furniture.push({ id, x, z, rot, on });
 
 // ------------------------------------------------------------------------------------------------ the monastery
 
 /**
- * The cathedral: one tall nave, the door at its west end (the front), and across its east end the iconostasis with
- * the royal doors in its middle and a door each side; the sanctuary behind it has a door of its own to the outside.
- * Two ways in at the front (the west door, a side door) and one at the back: it is fought through, not held.
+ * The cathedral's nave: one tall hall, the door at its west end, and across its east end the iconostasis with the
+ * royal doors in its middle and a door each side; the sanctuary behind it runs on into the apse and has a door of
+ * its own to the outside. Its long walls open into the two arms of the cross, each with its own door out: five ways
+ * in, so it is fought through, not held. Limewashed brick, the lime fallen from it here and there.
  */
 export function cathedralPlan(): Blueprint {
   // (long along x, as a gable roof runs: the door in its west gable end, the left wall)
@@ -31,15 +34,57 @@ export function cathedralPlan(): Blueprint {
   g.top('painted_wooden_table', 9.6, 0, Q, 0.98, 2).top('painted_wooden_cabinet', 11.25, -5.2, -Q, 1.2).case('Shelf_01', 10.4, 5.95, PI, [0.66, 1.22, 1.75]).put('painted_wooden_chair_01', 9.2, 3.0, -0.4).floor([8.3, -3.6], [8.5, 3.3]);
   const tall = (x: number) => win(x - 0.6, x + 0.6, 3.4, 6.9);
   return {
-    w: HW * 2, d: HD * 2, h: 8.0, ext: 'trim_white', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 8.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
     walls: [
-      { side: 'left', ext: 'trim_white', int: 'int_painted', openings: [door(-1.1, 1.1, 3.4), win(-4.7, -3.5, 4.4, 6.8), win(3.5, 4.7, 4.4, 6.8), win(-0.6, 0.6, 4.6, 6.8)] },
-      { side: 'right', ext: 'trim_white', int: 'int_painted', openings: [win(-1.4, 1.4, 3.8, 7.0)] },
-      { side: 'front', ext: 'trim_white', int: 'int_painted', openings: [tall(-8), tall(-3), tall(2), win(8.6, 9.4, 3.4, 6.9), door(-10.6, -9.4, 2.4)] },
-      { side: 'back', ext: 'trim_white', int: 'int_painted', openings: [tall(-8), tall(-3), tall(2), door(9.9, 10.9)] },
+      { side: 'left', ext: 'lime_brick', int: 'int_painted', openings: [door(-1.1, 1.1, 3.4), win(-4.7, -3.5, 4.4, 6.8), win(3.5, 4.7, 4.4, 6.8), win(-0.6, 0.6, 4.6, 6.8)] },
+      // (the east gable opens into the apse, the long walls into the arms: see cathedralArmPlan, cathedralApsePlan)
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [join(-3.6, 3.6, 6.0)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [tall(-8), tall(-3), join(-1.6, 6.6, 6.0), win(8.6, 9.4, 3.4, 6.9), door(-10.6, -9.4, 2.4)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [tall(-8), tall(-3), join(-1.6, 6.6, 6.0), door(9.9, 10.9)] },
       // the iconostasis: the royal doors, and a deacon's door each side
       inner([I, -HD + 0.2], [I, HD - 0.2], [gap(-1.0, 1.0, 3.0), door(-4.2, -3.4), door(3.4, 4.2)], 'int_painted', 'int_painted'),
     ],
+    furniture: g.furniture, loot: g.loot,
+    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
+    usage: ['Town'],
+  };
+}
+
+/**
+ * An arm of the cathedral's cross: its own x runs out from the nave (which its left side opens into), its gable end
+ * with a door at the far end, so its roof's ridge crosses the nave's. Stood one each side.
+ */
+export function cathedralArmPlan(): Blueprint {
+  const HW = 2.5, HD = 4.5;
+  const g = new Floor();
+  g.put('painted_wooden_chair_01', 1.4, -3.9, 0).put('painted_wooden_chair_01', 1.4, 3.9, PI).top('painted_wooden_cabinet', HW - 0.35, -3.2, -Q, 1.2).floor([0.4, 2.4], [-0.8, -1.6]);
+  return {
+    w: HW * 2, d: HD * 2, h: 6.5, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    walls: [
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [door(-0.65, 0.65, 2.6), win(-0.45, 0.45, 3.6, 5.6)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.5, 0.5, 2.6, 5.0)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.5, 0.5, 2.6, 5.0)] },
+    ],
+    joined: ['left'],
+    furniture: g.furniture, loot: g.loot,
+    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
+    usage: ['Town'],
+  };
+}
+
+/** The apse: the sanctuary run on east of the nave (which its left side opens into), a tall window in its end. */
+export function cathedralApsePlan(): Blueprint {
+  const HW = 3, HD = 4;
+  const g = new Floor();
+  g.top('painted_wooden_table', 0.6, 0, Q, 0.98, 2).put('painted_wooden_chair_01', -1.2, 2.6, 2.6).floor([1.8, -2.4]);
+  return {
+    w: HW * 2, d: HD * 2, h: 6.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    walls: [
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 2.4, 5.2)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.45, 0.45, 2.8, 4.6)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.45, 0.45, 2.8, 4.6)] },
+    ],
+    joined: ['left'],
     furniture: g.furniture, loot: g.loot,
     dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
     usage: ['Town'],
@@ -55,7 +100,7 @@ export function belfryPlan(): Blueprint {
   const HW = 3, H = 3.1;
   const well = { x0: -2.6, x1: 0.4, land: 1.3, far: -2.6, upTo: 5 };
   const slit: Opening[] = [win(-0.35, 0.35, 1.1, 2.1)];
-  const sides = (o: Opening[], key: 'int_plaster' | 'int_painted' = 'int_plaster'): WallDef[] => (['front', 'back', 'left', 'right'] as const).map((side) => ({ side, ext: 'trim_white', int: key, openings: o }));
+  const sides = (o: Opening[], key: 'int_plaster' | 'int_painted' = 'int_plaster'): WallDef[] => (['front', 'back', 'left', 'right'] as const).map((side) => ({ side, ext: 'lime_brick', int: key, openings: o }));
   const levels = [1, 2, 3, 4].map((n) => {
     const f = new Floor().floor([1.7, -1.6], [1.8, 2.0]);
     if (n === 2) f.put('wooden_crate_01', 2.1, -2.3, 0.2);
@@ -67,12 +112,12 @@ export function belfryPlan(): Blueprint {
   const g = new Floor();
   g.put('Barrel_01', 2.2, -2.2).floor([1.8, 1.4]);
   return {
-    w: HW * 2, d: HW * 2, h: H, ext: 'trim_white', int: 'int_plaster', floor: 'floor_concrete', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HW * 2, h: H, ext: 'lime_brick', int: 'int_plaster', floor: 'floor_concrete', roof: 'roof_iron_green', roofType: 'gable',
     walls: [
-      { side: 'front', ext: 'trim_white', int: 'int_plaster', openings: [door(0.9, 2.0)] },
-      { side: 'back', ext: 'trim_white', int: 'int_plaster', openings: slit },
-      { side: 'left', ext: 'trim_white', int: 'int_plaster', openings: [] },
-      { side: 'right', ext: 'trim_white', int: 'int_plaster', openings: slit },
+      { side: 'front', ext: 'lime_brick', int: 'int_plaster', openings: [door(0.9, 2.0)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_plaster', openings: slit },
+      { side: 'left', ext: 'lime_brick', int: 'int_plaster', openings: [] },
+      { side: 'right', ext: 'lime_brick', int: 'int_plaster', openings: slit },
     ],
     furniture: g.furniture, loot: g.loot,
     levels, wells: [well],
@@ -100,10 +145,10 @@ export function cellsPlan(): Blueprint {
   };
   const doors = [...cells.map(([, b]) => door(b - 1.3, b - 0.5)), door(15.6, 16.4)];
   const walls = (front: Opening[]): WallDef[] => [
-    { side: 'front', ext: 'brick_white', int: 'int_plaster', openings: front },
-    { side: 'back', ext: 'brick_white', int: 'int_plaster', openings: cells.map(([a, b]) => win((a + b) / 2 - 0.4, (a + b) / 2 + 0.4, 1.3, 2.0)) },
-    { side: 'left', ext: 'brick_white', int: 'int_plaster', openings: [win(0.6, 1.6)] },
-    { side: 'right', ext: 'brick_white', int: 'int_plaster', openings: [win(-1.6, -0.6, 1.2, 2.0)] },
+    { side: 'front', ext: 'lime_brick', int: 'int_plaster', openings: front },
+    { side: 'back', ext: 'lime_brick', int: 'int_plaster', openings: cells.map(([a, b]) => win((a + b) / 2 - 0.4, (a + b) / 2 + 0.4, 1.3, 2.0)) },
+    { side: 'left', ext: 'lime_brick', int: 'int_plaster', openings: [win(0.6, 1.6)] },
+    { side: 'right', ext: 'lime_brick', int: 'int_plaster', openings: [win(-1.6, -0.6, 1.2, 2.0)] },
     inner([X0, C], [X1, C], doors, 'int_plaster', 'int_plaster'),
     ...parts.map((x) => inner([x, Z0], [x, C - 0.1], [], 'int_plaster', 'int_plaster')),
   ];
@@ -116,7 +161,7 @@ export function cellsPlan(): Blueprint {
   const u = lay(new Floor());
   u.floor([16.6, 3.2]);
   return {
-    w: HW * 2, d: HD * 2, h: 2.8, ext: 'brick_white', int: 'int_plaster', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 2.8, ext: 'lime_brick', int: 'int_plaster', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
     walls: walls(windowsFront(true)), furniture: g.furniture, loot: g.loot,
     stairs: { x0: 13.4, x1: 14.8, foot: 1.8, top: -3.4 },
     upper: { h: 2.7, int: 'int_plaster', floor: 'floor_wood', walls: walls(windowsFront(false)), furniture: u.furniture, loot: u.loot },
@@ -136,12 +181,12 @@ export function refectoryPlan(): Blueprint {
   // the kitchen
   g.put('wood_stove', 10.3, -4.0, 0).top('painted_wooden_cabinet', 8.0, -4.45, 0, 1.2).case('Shelf_01', 10.65, 2.4, -Q, [0.66, 1.22, 1.75]).put('Barrel_01', 10.2, 4.2).top('WoodenTable_01', 8.6, 0.4, Q, 0.57).floor([8.2, 3.6]);
   return {
-    w: HW * 2, d: HD * 2, h: 3.6, ext: 'brick_white', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 3.6, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
     walls: [
-      { side: 'front', ext: 'brick_white', int: 'int_painted', openings: [win(-8.6, -7.4, 1.0, 2.6), win(-5.1, -3.9, 1.0, 2.6), door(-1.0, 1.0, 2.5), win(3.4, 4.6, 1.0, 2.6), win(8.4, 9.4)] },
-      { side: 'back', ext: 'brick_white', int: 'int_painted', openings: [win(-8.6, -7.4, 1.0, 2.6), win(-5.1, -3.9, 1.0, 2.6), win(-1.6, -0.4, 1.0, 2.6), win(1.9, 3.1, 1.0, 2.6), door(8.6, 9.6)] },
-      { side: 'left', ext: 'brick_white', int: 'int_painted', openings: [win(-2.6, -1.4, 1.0, 2.6), win(1.4, 2.6, 1.0, 2.6)] },
-      { side: 'right', ext: 'brick_white', int: 'int_painted', openings: [win(-0.5, 0.5)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-8.6, -7.4, 1.0, 2.6), win(-5.1, -3.9, 1.0, 2.6), door(-1.0, 1.0, 2.5), win(3.4, 4.6, 1.0, 2.6), win(8.4, 9.4)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-8.6, -7.4, 1.0, 2.6), win(-5.1, -3.9, 1.0, 2.6), win(-1.6, -0.4, 1.0, 2.6), win(1.9, 3.1, 1.0, 2.6), door(8.6, 9.6)] },
+      { side: 'left', ext: 'lime_brick', int: 'int_painted', openings: [win(-2.6, -1.4, 1.0, 2.6), win(1.4, 2.6, 1.0, 2.6)] },
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.5, 0.5)] },
       inner([K, -HD + 0.2], [K, HD - 0.2], [door(1.6, 2.6)], 'int_painted', 'int_plaster'),
     ],
     furniture: g.furniture, loot: g.loot,

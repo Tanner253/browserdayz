@@ -26,8 +26,12 @@ const COME = 320, GO = 380;
 const FACE_COME = 80, FACE_GO = 100;
 /** and nothing of it is fetched until the eye is within this (past the longest draw distance, 1500 m): a player in the east never downloads it */
 const FACE_FETCH = 1700;
-/** white limewash on the walls' rubble, white brick on their dressed stone (pictures the buildings already use) */
-const SKIN: KitOptions['sets'] = { fort_wall: { set: 'painted_plaster_wall', repeat: 3 }, fort_trim: { set: 'white_bricks', repeat: 3 } };
+/**
+ * Old limewash on the walls' rubble, the brick showing where it has fallen; fresh white on their dressed stone
+ * (pictures the buildings already use). The first pass had them the other way: from the road the walls were flat white.
+ */
+const LIME = 1.45;
+const SKIN: KitOptions['sets'] = { fort_wall: { set: 'white_bricks', repeat: 3 }, fort_trim: { set: 'painted_plaster_wall', repeat: 3 } };
 
 /** a building that wears a facade: its kit's pieces, near (with frames) and far (panels only), as the walls are */
 interface Faced { kit: string; far: THREE.Group | null; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number; plot: BuildingPlot }
@@ -50,7 +54,11 @@ export class Towns {
     private plots: BuildingPlot[] = [],
   ) {}
 
-  private dress = (m: THREE.MeshStandardMaterial, name: string) => this.atmo.register(m, undefined, `town wall ${name}`) ?? m;
+  private dress = (m: THREE.MeshStandardMaterial, name: string) => {
+    // (the limewashed rubble lightened as the monastery's buildings are: see lime_brick in buildings.ts)
+    if (name === 'fort_wall') m.color.multiplyScalar(LIME);
+    return this.atmo.register(m, undefined, `town wall ${name}`) ?? m;
+  };
 
   private show(w: Walled) {
     w.far.visible = w.shown && !(w.close && w.near);
