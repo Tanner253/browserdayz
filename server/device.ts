@@ -28,6 +28,16 @@ import type { WebSocket } from 'ws';
 export const DEVICE = {
   need: process.env.DEVICE_NEED ? process.env.DEVICE_NEED !== 'off' : !!process.env.RENDER,
   mode: (process.env.DEVICE_RULES === 'watch' ? 'watch' : 'enforce') as 'watch' | 'enforce',
+  /**
+   * The two rules that read the device and nothing else (a farm: SPREAD games from as many addresses; full: LIVE
+   * games at once), applied unless DEVICE_FARM=watch (the owner, 2026-10-16: "i want it to be enforce ... we want to
+   * stop the bots thats the point"). Kept as a switch because a device is not one machine: every
+   * phone of one model on one version of its system, in one time zone and one language, says the same, and so do
+   * many desktops of the most common card at the most common screen. Three people on such a phone in an hour would
+   * be "a farm", kept off a day and put off with everybody else on it: if real players are caught so (/bans), set
+   * DEVICE_FARM=watch and /unban them. The device kept off for being sent back again and again is applied as `mode` says.
+   */
+  farm: (process.env.DEVICE_FARM === 'watch' ? 'watch' : 'enforce') as 'watch' | 'enforce',
   live: process.env.DEVICE_LIVE === undefined ? 2 : Math.max(0, Number(process.env.DEVICE_LIVE) || 0),
   spread: process.env.DEVICE_SPREAD === undefined ? 3 : Math.max(0, Number(process.env.DEVICE_SPREAD) || 0),
   within: 3600_000,

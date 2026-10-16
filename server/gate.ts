@@ -526,8 +526,10 @@ export function deviceRules(key: string, ip: string, fp: string, name: string): 
   if (!fp || ADMIN.state.roles[keyHash(key)]) return null;
   const now = Date.now();
   const seen = cameWith(fp, key, ip, publicIp(ip), now);
-  const watch = DEVICE.mode === 'watch';
+  const watch = DEVICE.mode === 'watch', farmWatch = watch || DEVICE.farm === 'watch';
   if (isFarm(seen) && !BANS.temp.has(deviceName(fp))) {
+    // (the device alone: watched unless DEVICE_FARM=enforce, see DEVICE.farm)
+    const watch = farmWatch;
     const why = `${seen.games} games on one device from ${seen.places} addresses inside an hour`;
     log(`[device${watch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${watch ? 'what would be ' : ''}kept off for ${DEVICE.hours} hours: ${why}`);
     if (!watch) {
@@ -554,8 +556,8 @@ export function deviceRules(key: string, ip: string, fp: string, name: string): 
     return null;
   }
   if (deviceFull(key, fp)) {
-    log(`[device${watch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${watch ? 'what would be ' : ''}not let in: ${DEVICE.live} already playing on their device`);
-    if (watch) return null;
+    log(`[device${farmWatch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${farmWatch ? 'what would be ' : ''}not let in: ${DEVICE.live} already playing on their device`);
+    if (farmWatch) return null;
     TURNED.device++;
     return DEVICE.live === 1 ? 'Somebody is already playing on this device: one player to a device.' : `There are already ${DEVICE.live} playing on this device.`;
   }

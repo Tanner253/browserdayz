@@ -56,7 +56,7 @@ const healthz = async () => (await (await fetch(`http://127.0.0.1:${PORT}/health
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-device-'));
 // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', BOTCHECK: 'off', RENDER: '', DEVICE_NEED: 'on', PER_ADDRESS: '0', FRESH_S: '0.2' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', BOTCHECK: 'off', RENDER: '', DEVICE_NEED: 'on', DEVICE_FARM: 'enforce', PER_ADDRESS: '0', FRESH_S: '0.2' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';
