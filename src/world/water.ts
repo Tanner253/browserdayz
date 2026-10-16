@@ -32,7 +32,34 @@ export const LAKE: Partial<OceanLook> = {
   foamDepth: 0.3,
   surf: { apart: 2.6, pace: 0.45, steep: 0.035, reach: 9, breaks: 4 },
   solid: 6,
+  dim: 0.35,
 };
+
+/**
+ * A swamp's look (the owner's investor, 2026-10-16, of a lake over a village's meadow: "a swamp area would be cool"):
+ * still, shallow, murky brown-green water the grass and reeds stand up through (the ground's own grass, left growing
+ * under it), duckweed in drifts, no foam to speak of, and a low mist over it at dusk and dawn (SWAMP_MIST).
+ */
+export const SWAMP: Partial<OceanLook> = {
+  layers: [
+    [6, 0, 0.12, 1],
+    [2.3, 0.9, 0.08, 0.5],
+    [21, -0.5, 0.2, 0.4],
+  ],
+  slope: 0.05,
+  shallow: [0.075, 0.07, 0.03],
+  deep: [0.022, 0.026, 0.012],
+  murk: 1.1,
+  foamDepth: 0.06,
+  surf: { apart: 2, pace: 0.1, steep: 0, reach: 1, breaks: 1 },
+  solid: 99,
+  weed: 0.7,
+  foam: 0.08,
+  dim: 0.7,
+};
+
+/** The mist on a swamp: its sheets' heights over the water and how thick each is, at its thickest (dusk and dawn). */
+export const SWAMP_MIST = { sheets: [0.25, 0.7, 1.3], thick: [0.55, 0.4, 0.22], day: 0.1 };
 
 /** A river's look and how it is laid. */
 export const RIVER = {
@@ -58,6 +85,7 @@ export class Waterways {
   readonly group = new THREE.Group();
   readonly lakes: Ocean[] = [];
   private pieces: { mesh: THREE.Mesh; c: THREE.Vector3; r: number }[] = [];
+  private mists: THREE.ShaderMaterial[] = [];
   private material: THREE.ShaderMaterial;
   private time = 0;
   private reachNow = Infinity;
@@ -78,9 +106,10 @@ export class Waterways {
           tile: 128,
           cell: 2,
           depthAt: (x, z) => (inside(lake.outline, x, z) ? lake.level - ground(x, z) : -1),
-          look: { ...LAKE, cut: true },
+          look: { ...(lake.swamp ? SWAMP : LAKE), cut: true },
         }),
       );
+      if (lake.swamp) this.mistOver(scene, lake.level, Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs));
     }
     const fog = scene.fog as THREE.FogExp2 | null, w = sharedWaves();
     this.material = new THREE.ShaderMaterial({
@@ -121,6 +150,66 @@ export class Waterways {
     scene.add(this.group);
   }
 
+  /**
+   * Mist over a swamp: sheets of it a little over the water, drifting, thickest at dusk and dawn, thinning toward the
+   * swamp's edge and away from an eye that is in it (it is seen as a haze, never as a sheet). Each sheet is one square.
+   */
+  private mistOver(scene: THREE.Scene, level: number, x0: number, x1: number, z0: number, z1: number) {
+    const fog = scene.fog as THREE.FogExp2 | null;
+    const mist = new THREE.ShaderMaterial({
+      uniforms: { uWaves: { value: sharedWaves().tex }, uTime: { value: 0 }, uMist: { value: 0 }, uBox: { value: new THREE.Vector4() }, fogColor: { value: fog ? fog.color : new THREE.Color(0.6, 0.65, 0.7) } },
+      vertexShader: /* glsl */ `
+        attribute float aThick;
+        varying vec3 vP;
+        varying float vThick;
+        void main() {
+          vP = position;
+          vThick = aThick;
+          gl_Position = projectionMatrix * viewMatrix * vec4( position, 1.0 );
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uWaves;
+        uniform float uTime;
+        uniform float uMist;
+        uniform vec4 uBox;
+        uniform vec3 fogColor;
+        varying vec3 vP;
+        varying float vThick;
+        void main() {
+          vec2 p = vP.xz;
+          float n = texture2D( uWaves, p * 0.006 + vec2( uTime * 0.0035, uTime * 0.002 ) ).b * 0.6 + texture2D( uWaves, p * 0.019 - vec2( uTime * 0.006, 0.0 ) ).b * 0.4;
+          float edge = smoothstep( 0.0, 30.0, min( min( p.x - uBox.x, uBox.z - p.x ), min( p.y - uBox.y, uBox.w - p.y ) ) );
+          float a = uMist * vThick * smoothstep( 0.3, 0.75, n ) * edge * smoothstep( 1.5, 9.0, distance( cameraPosition, vP ) );
+          gl_FragColor = vec4( fogColor * 1.15 * a, a );
+        }`,
+      transparent: true,
+      premultipliedAlpha: true,
+      depthWrite: false,
+      fog: false,
+    });
+    const quads: number[] = [], thick: number[] = [];
+    SWAMP_MIST.sheets.forEach((h, i) => {
+      const y = level + h;
+      for (const [x, z] of [[x0, z0], [x0, z1], [x1, z0], [x1, z0], [x0, z1], [x1, z1]]) {
+        quads.push(x, y, z);
+        thick.push(SWAMP_MIST.thick[i]);
+      }
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(quads, 3));
+    g.setAttribute('aThick', new THREE.Float32BufferAttribute(thick, 1));
+    g.computeBoundingSphere();
+    mist.uniforms.uBox.value.set(x0, z0, x1, z1);
+    this.mists.push(mist);
+    const mesh = new THREE.Mesh(g, mist);
+    mesh.name = 'swamp mist';
+    mesh.matrixAutoUpdate = false;
+    // (after the water it lies over)
+    mesh.renderOrder = 2;
+    this.group.add(mesh);
+    this.pieces.push({ mesh, c: g.boundingSphere!.center, r: g.boundingSphere!.radius });
+  }
+
   /** tiles and pieces further than this from the eye are not drawn: the draw distance */
   get reach() {
     return this.reachNow;
@@ -138,6 +227,12 @@ export class Waterways {
     u.uSun.value.copy(this.atmo.sunTint).multiplyScalar(this.atmo.sunNow);
     u.uSky.value = this.atmo.skyNow;
     if (!u.envMap.value) skyOf(this.atmo, this.material);
+    // (a swamp's mist is thickest as the light comes and goes: night is 0 by day, 1 at night, between at dusk and dawn)
+    const n = Math.min(1, Math.max(0, this.atmo.night)), thick = SWAMP_MIST.day + (1 - SWAMP_MIST.day) * Math.pow(Math.sin(Math.PI * Math.min(1, n * 1.25)), 0.7);
+    for (const m of this.mists) {
+      m.uniforms.uTime.value = this.time % 3600;
+      m.uniforms.uMist.value = thick;
+    }
     for (const p of this.pieces) p.mesh.visible = p.c.distanceTo(eye) - p.r < this.reachNow;
   }
 
@@ -146,6 +241,7 @@ export class Waterways {
     this.group.removeFromParent();
     for (const p of this.pieces) p.mesh.geometry.dispose();
     this.material.dispose();
+    for (const m of this.mists) m.dispose();
   }
 }
 

@@ -93,6 +93,11 @@ export const OCEAN = {
    * 2026-10-16: a shader of one flat colour cost the same as the whole sea), so this is where the cost is saved.
    */
   solid: 15,
+  /** duckweed and scum on still water, in patches and thickest by the edges (a swamp's: 0 on the sea) */
+  weed: 0,
+  /** how much of the foam there is (a swamp has next to none), and how much the low sky in it is dimmed (what still water in a wood shows low down is its banks, not the sky: they are not in the sky's picture) */
+  foam: 1,
+  dim: 0,
 };
 
 export type OceanLook = typeof OCEAN;
@@ -361,6 +366,7 @@ function fragment(most: number, L: OceanLook) {
     #else
       vec3 sky = fogColor * mix( 1.0, 0.75, R.y );
     #endif
+    ${L.dim > 0 ? `sky *= 1.0 - ${L.dim.toFixed(3)} * ( 1.0 - smoothstep( 0.0, 0.6, R.y ) );` : ''}
 
     // the sun's glint: sharp near, spread far off, never so bright that one point of the screen is a flash
     float tight = mix( 1400.0, 90.0, distant );
@@ -394,7 +400,7 @@ function fragment(most: number, L: OceanLook) {
     float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * 0.12 + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
     // (two sizes of the net drifting apart: one alone was a honeycomb)
     float net = texture2D( uWaves, p * 0.23 + vec2( uTime * 0.04, 0.0 ) ).a * 0.62 + texture2D( uWaves, p * 0.061 - vec2( 0.0, uTime * 0.013 ) ).a * 0.38;
-    float foam = smoothstep( 1.0 - cover, 1.2 - cover, net ) * sqrt( cover ) * 0.85 * smoothstep( -0.05, 0.05, depth ) * ( 1.0 - 0.6 * distant );
+    float foam = smoothstep( 1.0 - cover, 1.2 - cover, net ) * sqrt( cover ) * 0.85 * smoothstep( -0.05, 0.05, depth ) * ( 1.0 - 0.6 * distant ) * ${L.foam.toFixed(3)};
     vec3 white = vec3( 0.74, 0.77, 0.79 ) * ( fogColor * 1.1 + uSun * max( uSunDir.y, 0.0 ) * 0.4 );
 
     // laid over what is under it: premultiplied, so that what shows through is what is not covered
@@ -402,6 +408,15 @@ function fragment(most: number, L: OceanLook) {
     float a = F + ( 1.0 - F ) * murk;
     col = mix( col, white, foam );
     a = mix( a, 1.0, foam );
+    ${L.weed > 0 ? /* glsl */ `
+    // (duckweed and scum: in drifts the size of a pond, broken into bits, thickest where it is shallowest)
+    float drift = smoothstep( 0.42, 0.72, texture2D( uWaves, p * 0.013 + 0.31 ).b );
+    float bits = texture2D( uWaves, p * 0.37 ).a;
+    float weed = smoothstep( 0.4, 0.75, bits * 0.55 + drift * 0.5 + ( 1.0 - smoothstep( 0.0, 0.5, depth ) ) * 0.35 ) * ${L.weed.toFixed(3)};
+    weed *= smoothstep( -0.02, 0.03, depth );
+    vec3 green = vec3( 0.05, 0.085, 0.022 ) * ( fogColor * 1.2 + uSun * max( uSunDir.y, 0.0 ) * 0.35 );
+    col = mix( col, green, weed );
+    a = mix( a, 1.0, weed );` : ''}
 
     #ifdef USE_FOG
       vec3 rd = -V;

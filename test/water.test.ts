@@ -3,7 +3,7 @@
 //   npx tsx test/water.test.ts
 
 import assert from 'node:assert/strict';
-import { WADE, inside, tooDeep, waterAt, wading, type Waters } from '../src/sim/water';
+import { WADE, inside, riverBank, tooDeep, waterAt, wading, type Waters } from '../src/sim/water';
 
 // a bowl of ground, its floor 3 m under the lake's level at its middle; a river falling west along z = 300, a step in it
 const ground = (x: number, z: number) => (Math.abs(z - 300) < 10 ? -2 + Math.abs(z - 300) * 0.3 - x * 0.01 : Math.hypot(x, z) * 0.05 - 3);
@@ -40,5 +40,12 @@ const waters: Waters = {
   assert.ok(Math.abs(wading(WADE.waist) - WADE.slowest) < 1e-9, 'at the waist, the slowest');
   assert.ok(!tooDeep(1.0) && tooDeep(1.4), 'deep water stops a walker');
   console.log(`wading: knee ${wading(0.5).toFixed(2)}, waist ${wading(0.95).toFixed(2)} of the pace on land; stopped past ${WADE.deep} m`);
+}
+{
+  // the river's banks, for a green line through dry country: how far from its water's edge
+  const dry = riverBank(waters, 150, 300 + 4 + 10)!, wet = riverBank(waters, 150, 300)!;
+  assert.ok(Math.abs(dry - 10) < 1e-9 && wet < 0, 'distance from the edge of a river');
+  assert.equal(riverBank(waters, 150, 400), null, 'out of reach of any river');
+  console.log(`banks: 10 m out of the water read as ${dry.toFixed(1)}, its middle as ${wet.toFixed(1)}`);
 }
 console.log('water: all good');

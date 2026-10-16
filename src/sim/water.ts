@@ -11,6 +11,8 @@ export interface Lake {
   name?: string;
   level: number;
   outline: [number, number][];
+  /** a swamp: still, shallow, murky water with the grass standing in it (drawn as such: src/world/water.ts SWAMP) */
+  swamp?: boolean;
 }
 
 /**
@@ -144,6 +146,25 @@ export class WaterIndex {
     }
     return best;
   }
+}
+
+/**
+ * How far a point is from the edge of a river's water, across the ground (under 0 in it), if it is within `reach`
+ * of one: for the world's paint and planting, a river's green line of banks through dry country (grass and reeds a few
+ * metres out, a few trees further). By its middle line and width, not by the ground.
+ */
+export function riverBank(waters: Waters, x: number, z: number, reach = 40): number | null {
+  let best: number | null = null;
+  for (const river of waters.rivers) {
+    for (let k = 0; k + 1 < river.pts.length; k++) {
+      const [ax, az, , aw] = river.pts[k], [bx, bz, , bw] = river.pts[k + 1];
+      if (Math.max(Math.min(ax, bx) - x, x - Math.max(ax, bx), Math.min(az, bz) - z, z - Math.max(az, bz)) > reach + Math.max(aw, bw)) continue;
+      const ex = bx - ax, ez = bz - az, L = ex * ex + ez * ez || 1e-9, t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / L));
+      const d = Math.hypot(x - ax - ex * t, z - az - ez * t) - (aw + (bw - aw) * t) / 2;
+      if (d <= reach && (best === null || d < best)) best = d;
+    }
+  }
+  return best;
 }
 
 const indexes = new WeakMap<Waters, WaterIndex>();
