@@ -96,6 +96,8 @@ export interface World {
   trees: Instance[];
   rocks: Instance[];
   props: Instance[];
+  /** walls of concrete slabs a town has laid (src/sim/towns.ts): each from a to b, the slabs counted from a that are gone, and of those the ones lying on the ground. Stood by Buildings.plan. */
+  slabs?: { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }[];
   pois: POI[];
   sites: Site[];
   /** the chimney and the tanks of the works */

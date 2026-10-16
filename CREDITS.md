@@ -205,7 +205,9 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Metal Jerrycan Green](https://polyhaven.com/a/metal_jerrycan_green) | Ulan Cabanilla |
 | model | [Metal Office Desk](https://polyhaven.com/a/metal_office_desk) | Ulan Cabanilla |
 | model | [Metal Trash Can](https://polyhaven.com/a/metal_trash_can) | GurJas Studios |
+| model | [Modular Factory Facade](https://polyhaven.com/a/modular_factory_facade) | James Ray Cock |
 | model | [Modular Fort 01](https://polyhaven.com/a/modular_fort_01) | Rico Cilliers |
+| model | [Modular Urban Apartments Facade](https://polyhaven.com/a/modular_urban_apartments_facade) | James Ray Cock |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |

@@ -1128,4 +1128,25 @@ export const HAVEN_KITS = {
   },
   rock_face_01: { src: 'rock_face_01', name: (n) => n, mat: (n) => n, hi: { rock_face_01: [4096, 2048, 2048] }, far: { ratio: 0.125, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
   rock_face_02: { src: 'rock_face_02', name: (n) => n, mat: (n) => n, hi: { rock_face_02: [4096, 2048, 2048] }, far: { ratio: 0.1, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+  // (2026-10-16, the new land's towns: brick works and plaster flats dressed over the game's own buildings. Their
+  // pictures come at 2k, so the world copy is the one drawn close to. Their flat pieces came finely cut up, to the
+  // edges: thinned with their edges free, as a straight edge loses none of its line when its middle points go.)
+  factory_kit: {
+    src: 'modular_factory_facade',
+    name: (n) => n,
+    mat: (n) => n.replace('modular_factory_facade_', 'factory_'),
+    hi: null,
+    world: { ratio: 0.05, error: 0.003, open: true },
+    far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
+  flats_kit: {
+    src: 'modular_urban_apartments_facade',
+    name: (n) => n,
+    mat: (n) => n.replace('modular_urban_apartments_facade_', 'flats_'),
+    hi: null,
+    world: { ratio: 0.05, error: 0.003, open: true },
+    far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
 };

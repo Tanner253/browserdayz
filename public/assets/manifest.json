@@ -5560,6 +5560,4808 @@
     5.061
    ],
    "lods": []
+  },
+  "factory_kit": {
+   "url": "assets/models/factory_kit.glb",
+   "tags": [
+    "building",
+    "kit"
+   ],
+   "bytes": 2855316,
+   "srcTris": 175014,
+   "tris": 59389,
+   "min": [
+    -9,
+    -0.0247,
+    -3.1462
+   ],
+   "max": [
+    0.35,
+    3,
+    0.41
+   ],
+   "lods": [
+    {
+     "url": "assets/models/factory_kit_lod1.glb",
+     "tris": 53164
+    }
+   ],
+   "pieces": {
+    "cornice02_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      -0.116
+     ],
+     "max": [
+      0,
+      0.16,
+      0.057
+     ],
+     "tris": 10,
+     "far": 10
+    },
+    "cornice02_end_01": {
+     "min": [
+      -0.173,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      0.16,
+      0.057
+     ],
+     "tris": 50,
+     "far": 33
+    },
+    "cornice02_end_02": {
+     "min": [
+      0,
+      0,
+      -0.2
+     ],
+     "max": [
+      0.173,
+      0.16,
+      0.057
+     ],
+     "tris": 54,
+     "far": 36
+    },
+    "cornice02_standard_corner_small_01": {
+     "min": [
+      -2.057,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.16,
+      0.057
+     ],
+     "tris": 41,
+     "far": 40
+    },
+    "cornice02_standard_corner_large_01": {
+     "min": [
+      -3.057,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.16,
+      0.057
+     ],
+     "tris": 40,
+     "far": 40
+    },
+    "cornice02_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3.116
+     ],
+     "max": [
+      0.116,
+      0.16,
+      0
+     ],
+     "tris": 52,
+     "far": 52
+    },
+    "cornice02_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2.116
+     ],
+     "max": [
+      0.116,
+      0.16,
+      0
+     ],
+     "tris": 52,
+     "far": 52
+    },
+    "cornice02_pier_corner_01": {
+     "min": [
+      -0.115,
+      -0.018,
+      -0.255
+     ],
+     "max": [
+      0.255,
+      0.178,
+      0.115
+     ],
+     "tris": 187,
+     "far": 133
+    },
+    "cornice02_pier_corner_02": {
+     "min": [
+      -0.315,
+      -0.018,
+      -0.1
+     ],
+     "max": [
+      0.1,
+      0.178,
+      0.315
+     ],
+     "tris": 199,
+     "far": 139
+    },
+    "cornice02_pier_standard_01": {
+     "min": [
+      -0.185,
+      -0.018,
+      -0.1
+     ],
+     "max": [
+      0.185,
+      0.178,
+      0.115
+     ],
+     "tris": 108,
+     "far": 78
+    },
+    "window_centered_medium_03": {
+     "min": [
+      -2.28,
+      1.34,
+      -0.187
+     ],
+     "max": [
+      -0.72,
+      2.355,
+      0.03
+     ],
+     "tris": 382,
+     "far": 368
+    },
+    "window_centered_medium_02": {
+     "min": [
+      -2.2,
+      0.475,
+      -0.187
+     ],
+     "max": [
+      -0.8,
+      2.1,
+      0.03
+     ],
+     "tris": 576,
+     "far": 515
+    },
+    "window_centered_large_02": {
+     "min": [
+      -2.55,
+      0.475,
+      -0.187
+     ],
+     "max": [
+      -0.45,
+      2.1,
+      0.03
+     ],
+     "tris": 754,
+     "far": 726
+    },
+    "window_centered_large_03": {
+     "min": [
+      -2.61,
+      1.34,
+      -0.187
+     ],
+     "max": [
+      -0.39,
+      2.355,
+      0.03
+     ],
+     "tris": 487,
+     "far": 465
+    },
+    "window_centered_medium_04": {
+     "min": [
+      -2.2,
+      1.22,
+      -0.187
+     ],
+     "max": [
+      -0.8,
+      2.1,
+      0.03
+     ],
+     "tris": 357,
+     "far": 304
+    },
+    "window_centered_large_04": {
+     "min": [
+      -2.55,
+      1.22,
+      -0.187
+     ],
+     "max": [
+      -0.45,
+      2.1,
+      0.03
+     ],
+     "tris": 431,
+     "far": 408
+    },
+    "window_tall_large_01": {
+     "min": [
+      -2.918,
+      0.98,
+      -0.2
+     ],
+     "max": [
+      -0.082,
+      3,
+      0.068
+     ],
+     "tris": 1027,
+     "far": 1012
+    },
+    "window_tall_small_01": {
+     "min": [
+      -2.518,
+      0.98,
+      -0.2
+     ],
+     "max": [
+      -0.482,
+      3,
+      0.068
+     ],
+     "tris": 666,
+     "far": 634
+    },
+    "window_centered_small_03": {
+     "min": [
+      -1.96,
+      1.34,
+      -0.187
+     ],
+     "max": [
+      -1.05,
+      2.355,
+      0.03
+     ],
+     "tris": 275,
+     "far": 271
+    },
+    "window_centered_small_04": {
+     "min": [
+      -1.96,
+      1.698,
+      -0.187
+     ],
+     "max": [
+      -1.05,
+      2.355,
+      0.03
+     ],
+     "tris": 229,
+     "far": 224
+    },
+    "window_centered_small_01": {
+     "min": [
+      -1.96,
+      0.59,
+      -0.187
+     ],
+     "max": [
+      -1.05,
+      2.335,
+      0.03
+     ],
+     "tris": 376,
+     "far": 356
+    },
+    "window_centered_medium_01": {
+     "min": [
+      -2.28,
+      0.59,
+      -0.187
+     ],
+     "max": [
+      -0.72,
+      2.335,
+      0.03
+     ],
+     "tris": 592,
+     "far": 574
+    },
+    "window_centered_large_01": {
+     "min": [
+      -2.61,
+      0.59,
+      -0.187
+     ],
+     "max": [
+      -0.39,
+      2.335,
+      0.03
+     ],
+     "tris": 801,
+     "far": 775
+    },
+    "window_centered_small_02": {
+     "min": [
+      -1.96,
+      0.958,
+      -0.187
+     ],
+     "max": [
+      -1.05,
+      2.335,
+      0.03
+     ],
+     "tris": 328,
+     "far": 320
+    },
+    "window_tall_large_05": {
+     "min": [
+      -3,
+      0,
+      -0.252
+     ],
+     "max": [
+      0,
+      2.625,
+      -0.079
+     ],
+     "tris": 2679,
+     "far": 2448
+    },
+    "window_tall_large_010": {
+     "min": [
+      -3,
+      0,
+      -0.252
+     ],
+     "max": [
+      0,
+      0.75,
+      -0.079
+     ],
+     "tris": 30,
+     "far": 29
+    },
+    "window_tall_large_08": {
+     "min": [
+      -3,
+      0,
+      -0.252
+     ],
+     "max": [
+      0,
+      0.75,
+      -0.079
+     ],
+     "tris": 30,
+     "far": 29
+    },
+    "window_tall_large_03": {
+     "min": [
+      -3,
+      0,
+      -0.252
+     ],
+     "max": [
+      0,
+      3,
+      -0.079
+     ],
+     "tris": 2966,
+     "far": 2744
+    },
+    "window_tall_large_02": {
+     "min": [
+      -2.5,
+      0,
+      -0.187
+     ],
+     "max": [
+      -0.5,
+      3,
+      -0.12
+     ],
+     "tris": 1289,
+     "far": 1273
+    },
+    "window_tall_large_04": {
+     "min": [
+      -2.5,
+      0,
+      -0.187
+     ],
+     "max": [
+      -0.5,
+      2.625,
+      -0.12
+     ],
+     "tris": 1190,
+     "far": 1142
+    },
+    "window_tall_large_06": {
+     "min": [
+      -2.918,
+      0.98,
+      -0.2
+     ],
+     "max": [
+      -0.082,
+      1.132,
+      0.068
+     ],
+     "tris": 206,
+     "far": 195
+    },
+    "window_tall_small_05": {
+     "min": [
+      -2.5,
+      0,
+      -0.252
+     ],
+     "max": [
+      -0.5,
+      2.625,
+      -0.079
+     ],
+     "tris": 646,
+     "far": 583
+    },
+    "window_tall_small_010": {
+     "min": [
+      -2.5,
+      0,
+      -0.252
+     ],
+     "max": [
+      -0.5,
+      0.75,
+      -0.079
+     ],
+     "tris": 26,
+     "far": 22
+    },
+    "window_tall_small_03": {
+     "min": [
+      -2.5,
+      0,
+      -0.252
+     ],
+     "max": [
+      -0.5,
+      3,
+      -0.079
+     ],
+     "tris": 687,
+     "far": 665
+    },
+    "window_tall_small_08": {
+     "min": [
+      -2.5,
+      0,
+      -0.252
+     ],
+     "max": [
+      -0.5,
+      0.75,
+      -0.079
+     ],
+     "tris": 26,
+     "far": 22
+    },
+    "window_tall_small_02": {
+     "min": [
+      -2.173,
+      0,
+      -0.187
+     ],
+     "max": [
+      -0.827,
+      3,
+      -0.12
+     ],
+     "tris": 870,
+     "far": 854
+    },
+    "window_tall_small_04": {
+     "min": [
+      -2.173,
+      0,
+      -0.187
+     ],
+     "max": [
+      -0.827,
+      2.625,
+      -0.12
+     ],
+     "tris": 820,
+     "far": 764
+    },
+    "window_tall_small_06": {
+     "min": [
+      -2.518,
+      0.98,
+      -0.2
+     ],
+     "max": [
+      -0.482,
+      1.132,
+      0.068
+     ],
+     "tris": 112,
+     "far": 86
+    },
+    "window_centered_double_03": {
+     "min": [
+      -2.71,
+      1.34,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.355,
+      0.03
+     ],
+     "tris": 548,
+     "far": 506
+    },
+    "window_centered_double_04": {
+     "min": [
+      -2.71,
+      1.698,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.355,
+      0.03
+     ],
+     "tris": 451,
+     "far": 403
+    },
+    "window_centered_double_01": {
+     "min": [
+      -2.71,
+      0.59,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.335,
+      0.03
+     ],
+     "tris": 755,
+     "far": 711
+    },
+    "window_centered_double_02": {
+     "min": [
+      -2.71,
+      0.958,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.335,
+      0.03
+     ],
+     "tris": 650,
+     "far": 602
+    },
+    "window_offset_small_06": {
+     "min": [
+      -2.71,
+      1.34,
+      -0.187
+     ],
+     "max": [
+      -1.8,
+      2.355,
+      0.03
+     ],
+     "tris": 276,
+     "far": 272
+    },
+    "window_offset_small_08": {
+     "min": [
+      -2.71,
+      1.698,
+      -0.187
+     ],
+     "max": [
+      -1.8,
+      2.355,
+      0.03
+     ],
+     "tris": 227,
+     "far": 222
+    },
+    "window_offset_small_02": {
+     "min": [
+      -2.71,
+      0.59,
+      -0.187
+     ],
+     "max": [
+      -1.8,
+      2.335,
+      0.03
+     ],
+     "tris": 376,
+     "far": 356
+    },
+    "window_offset_small_04": {
+     "min": [
+      -2.71,
+      0.958,
+      -0.187
+     ],
+     "max": [
+      -1.8,
+      2.335,
+      0.03
+     ],
+     "tris": 326,
+     "far": 318
+    },
+    "window_offset_small_05": {
+     "min": [
+      -1.21,
+      1.34,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.355,
+      0.03
+     ],
+     "tris": 275,
+     "far": 271
+    },
+    "window_offset_small_07": {
+     "min": [
+      -1.21,
+      1.698,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.355,
+      0.03
+     ],
+     "tris": 229,
+     "far": 224
+    },
+    "window_offset_small_01": {
+     "min": [
+      -1.21,
+      0.59,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.335,
+      0.03
+     ],
+     "tris": 376,
+     "far": 356
+    },
+    "window_offset_small_03": {
+     "min": [
+      -1.21,
+      0.958,
+      -0.187
+     ],
+     "max": [
+      -0.3,
+      2.335,
+      0.03
+     ],
+     "tris": 328,
+     "far": 320
+    },
+    "dado_standard_corner_large_01": {
+     "min": [
+      -3.1,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 17,
+     "far": 15
+    },
+    "dado_end_02": {
+     "min": [
+      0,
+      0,
+      -0.36
+     ],
+     "max": [
+      0.1,
+      0.55,
+      0.1
+     ],
+     "tris": 20,
+     "far": 17
+    },
+    "dado_end_01": {
+     "min": [
+      -0.1,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 20,
+     "far": 17
+    },
+    "dado_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 6,
+     "far": 4
+    },
+    "dado_door_centered_large_01": {
+     "min": [
+      -3,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 46,
+     "far": 42
+    },
+    "dado_door_recessed_large_01": {
+     "min": [
+      -3,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 34,
+     "far": 30
+    },
+    "dado_garage_door_01": {
+     "min": [
+      -6,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 68,
+     "far": 62
+    },
+    "dado_garage_centered_01": {
+     "min": [
+      -6,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 66,
+     "far": 62
+    },
+    "dado_garage_door_02": {
+     "min": [
+      -6,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 68,
+     "far": 62
+    },
+    "dado_door_recessed_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 68,
+     "far": 64
+    },
+    "dado_garage_double_01": {
+     "min": [
+      -9,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 124,
+     "far": 110
+    },
+    "dado_door_centered_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.36
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 68,
+     "far": 64
+    },
+    "dado_standard_corner_small_01": {
+     "min": [
+      -2.1,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.55,
+      0.1
+     ],
+     "tris": 17,
+     "far": 15
+    },
+    "dado_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.55,
+      0
+     ],
+     "tris": 17,
+     "far": 15
+    },
+    "dado_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.55,
+      0
+     ],
+     "tris": 17,
+     "far": 15
+    },
+    "dado_pier_corner_01": {
+     "min": [
+      -0.13,
+      0,
+      -0.27
+     ],
+     "max": [
+      0.27,
+      0.75,
+      0.13
+     ],
+     "tris": 93,
+     "far": 68
+    },
+    "dado_pier_corner_02": {
+     "min": [
+      -0.33,
+      0,
+      -0.1
+     ],
+     "max": [
+      0.1,
+      0.75,
+      0.33
+     ],
+     "tris": 75,
+     "far": 45
+    },
+    "dado_pier_pedestal_01": {
+     "min": [
+      -0.2,
+      0,
+      -0.1
+     ],
+     "max": [
+      0.2,
+      0.75,
+      0.13
+     ],
+     "tris": 65,
+     "far": 51
+    },
+    "cornice03_standard_standard_01": {
+     "min": [
+      -3,
+      -0.025,
+      -0.146
+     ],
+     "max": [
+      0,
+      0.1,
+      0.03
+     ],
+     "tris": 141,
+     "far": 141
+    },
+    "cornice03_standard_corner_small_01": {
+     "min": [
+      -2.03,
+      -0.025,
+      -2
+     ],
+     "max": [
+      0,
+      0.1,
+      0.03
+     ],
+     "tris": 180,
+     "far": 180
+    },
+    "cornice03_standard_corner_large_01": {
+     "min": [
+      -3.03,
+      -0.025,
+      -3
+     ],
+     "max": [
+      0,
+      0.1,
+      0.03
+     ],
+     "tris": 180,
+     "far": 180
+    },
+    "cornice03_standard_corner_large_02": {
+     "min": [
+      -3,
+      -0.025,
+      -3.146
+     ],
+     "max": [
+      0.176,
+      0.1,
+      0
+     ],
+     "tris": 180,
+     "far": 180
+    },
+    "cornice03_standard_corner_small_02": {
+     "min": [
+      -2,
+      -0.025,
+      -2.146
+     ],
+     "max": [
+      0.176,
+      0.1,
+      0
+     ],
+     "tris": 180,
+     "far": 180
+    },
+    "base_standard_corner_large_01": {
+     "min": [
+      -3.2,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 32,
+     "far": 32
+    },
+    "base_end_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      0.2,
+      0.75,
+      0.2
+     ],
+     "tris": 29,
+     "far": 25
+    },
+    "base_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 4,
+     "far": 4
+    },
+    "base_end_01": {
+     "min": [
+      -0.2,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 29,
+     "far": 25
+    },
+    "base_standard_corner_small_01": {
+     "min": [
+      -2.2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 32,
+     "far": 32
+    },
+    "base_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0
+     ],
+     "tris": 24,
+     "far": 24
+    },
+    "base_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0
+     ],
+     "tris": 24,
+     "far": 24
+    },
+    "cornice01_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      -0.1
+     ],
+     "max": [
+      0,
+      0.152,
+      0.068
+     ],
+     "tris": 18,
+     "far": 8
+    },
+    "cornice01_standard_corner_large_01": {
+     "min": [
+      -3.068,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.152,
+      0.068
+     ],
+     "tris": 120,
+     "far": 118
+    },
+    "cornice01_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2.1
+     ],
+     "max": [
+      0.1,
+      0.152,
+      0
+     ],
+     "tris": 108,
+     "far": 104
+    },
+    "cornice01_pier_standard_01": {
+     "min": [
+      -0.218,
+      0,
+      -0.02
+     ],
+     "max": [
+      0.218,
+      0.152,
+      0.148
+     ],
+     "tris": 180,
+     "far": 176
+    },
+    "cornice01_pier_corner_02": {
+     "min": [
+      -0.348,
+      0,
+      -0.02
+     ],
+     "max": [
+      0.02,
+      0.139,
+      0.348
+     ],
+     "tris": 144,
+     "far": 134
+    },
+    "cornice01_end_01": {
+     "min": [
+      -0.218,
+      0,
+      -0.1
+     ],
+     "max": [
+      0,
+      0.152,
+      0.067
+     ],
+     "tris": 90,
+     "far": 90
+    },
+    "cornice01_end_02": {
+     "min": [
+      0,
+      0,
+      -0.1
+     ],
+     "max": [
+      0.218,
+      0.152,
+      0.067
+     ],
+     "tris": 90,
+     "far": 90
+    },
+    "cornice01_pier_corner_01": {
+     "min": [
+      -0.148,
+      0,
+      -0.288
+     ],
+     "max": [
+      0.288,
+      0.152,
+      0.148
+     ],
+     "tris": 275,
+     "far": 269
+    },
+    "cornice01_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3.1
+     ],
+     "max": [
+      0.1,
+      0.152,
+      0
+     ],
+     "tris": 122,
+     "far": 121
+    },
+    "cornice01_standard_corner_small_01": {
+     "min": [
+      -2.068,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.152,
+      0.068
+     ],
+     "tris": 120,
+     "far": 118
+    },
+    "crown_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.32,
+      0.13
+     ],
+     "tris": 30,
+     "far": 30
+    },
+    "crown_end_01": {
+     "min": [
+      -0.23,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      0.32,
+      0.13
+     ],
+     "tris": 114,
+     "far": 94
+    },
+    "crown_end_02": {
+     "min": [
+      0,
+      0,
+      -0.2
+     ],
+     "max": [
+      0.23,
+      0.32,
+      0.13
+     ],
+     "tris": 114,
+     "far": 94
+    },
+    "crown_standard_corner_small_01": {
+     "min": [
+      -2.13,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.32,
+      0.13
+     ],
+     "tris": 96,
+     "far": 94
+    },
+    "crown_standard_corner_large_01": {
+     "min": [
+      -3.13,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.32,
+      0.13
+     ],
+     "tris": 96,
+     "far": 94
+    },
+    "crown_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.32,
+      0
+     ],
+     "tris": 94,
+     "far": 94
+    },
+    "crown_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.32,
+      0
+     ],
+     "tris": 94,
+     "far": 94
+    },
+    "crown_pier_corner_01": {
+     "min": [
+      -0.21,
+      0,
+      -0.35
+     ],
+     "max": [
+      0.35,
+      0.323,
+      0.21
+     ],
+     "tris": 343,
+     "far": 319
+    },
+    "crown_pier_corner_02": {
+     "min": [
+      -0.41,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.323,
+      0.41
+     ],
+     "tris": 300,
+     "far": 295
+    },
+    "crown_pier_pedestal_01": {
+     "min": [
+      -0.28,
+      0,
+      0
+     ],
+     "max": [
+      0.28,
+      0.323,
+      0.21
+     ],
+     "tris": 190,
+     "far": 180
+    },
+    "wall_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 56,
+     "far": 33
+    },
+    "wall_door_centered_large_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 37,
+     "far": 22
+    },
+    "wall_window_tall_large_05": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 750,
+     "far": 692
+    },
+    "wall_window_centered_large_01": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 225,
+     "far": 203
+    },
+    "wall_window_centered_medium_01": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 114,
+     "far": 102
+    },
+    "wall_window_centered_large_02": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 389,
+     "far": 353
+    },
+    "wall_window_centered_medium_02": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 356,
+     "far": 315
+    },
+    "wall_window_centered_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 98,
+     "far": 84
+    },
+    "wall_window_centered_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 116,
+     "far": 98
+    },
+    "wall_door_recessed_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 175,
+     "far": 166
+    },
+    "wall_door_centered_small_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 43,
+     "far": 25
+    },
+    "wall_door_recessed_large_01": {
+     "min": [
+      -3,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 131,
+     "far": 131
+    },
+    "wall_window_centered_large_05": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 390,
+     "far": 355
+    },
+    "wall_window_centered_medium_05": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 376,
+     "far": 331
+    },
+    "wall_window_tall_large_06": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 366,
+     "far": 338
+    },
+    "wall_window_tall_large_010": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 806,
+     "far": 754
+    },
+    "wall_window_tall_large_08": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 367,
+     "far": 369
+    },
+    "wall_window_tall_large_07": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 334,
+     "far": 334
+    },
+    "wall_window_tall_large_01": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 399,
+     "far": 365
+    },
+    "wall_window_tall_large_03": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 459,
+     "far": 453
+    },
+    "wall_window_tall_large_02": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 396,
+     "far": 396
+    },
+    "wall_window_tall_large_04": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 849,
+     "far": 798
+    },
+    "wall_window_tall_large_09": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 764,
+     "far": 718
+    },
+    "wall_window_tall_small_05": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 858,
+     "far": 790
+    },
+    "wall_window_tall_small_010": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 850,
+     "far": 774
+    },
+    "wall_window_tall_small_03": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 546,
+     "far": 544
+    },
+    "wall_window_tall_small_08": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 549,
+     "far": 545
+    },
+    "wall_window_tall_small_06": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 371,
+     "far": 343
+    },
+    "wall_window_tall_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 384,
+     "far": 355
+    },
+    "wall_window_tall_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 550,
+     "far": 550
+    },
+    "wall_window_tall_small_07": {
+     "min": [
+      -3,
+      0,
+      -0.17
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 572,
+     "far": 571
+    },
+    "wall_window_tall_small_04": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 794,
+     "far": 719
+    },
+    "wall_window_tall_small_09": {
+     "min": [
+      -3,
+      0,
+      -0.285
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 816,
+     "far": 746
+    },
+    "wall_door_garage_door_02": {
+     "min": [
+      -6,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 278,
+     "far": 272
+    },
+    "wall_door_garage_door_01": {
+     "min": [
+      -6,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 344,
+     "far": 340
+    },
+    "wall_door_garage_centered_01": {
+     "min": [
+      -6,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 104,
+     "far": 103
+    },
+    "wall_window_centered_medium_03": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 98,
+     "far": 86
+    },
+    "wall_window_centered_large_03": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 114,
+     "far": 98
+    },
+    "wall_window_centered_medium_04": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 371,
+     "far": 336
+    },
+    "wall_window_centered_large_04": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 405,
+     "far": 369
+    },
+    "wall_window_centered_medium_06": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 412,
+     "far": 369
+    },
+    "wall_window_centered_large_06": {
+     "min": [
+      -3,
+      0,
+      -0.235
+     ],
+     "max": [
+      0,
+      3,
+      0.015
+     ],
+     "tris": 404,
+     "far": 373
+    },
+    "wall_window_centered_small_04": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 74,
+     "far": 68
+    },
+    "wall_window_centered_small_03": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 110,
+     "far": 82
+    },
+    "wall_window_centered_double_02": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 170,
+     "far": 146
+    },
+    "wall_window_centered_double_01": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 212,
+     "far": 184
+    },
+    "wall_window_centered_double_04": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 146,
+     "far": 106
+    },
+    "wall_window_centered_double_03": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 146,
+     "far": 118
+    },
+    "wall_window_offset_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 115,
+     "far": 101
+    },
+    "wall_window_offset_small_04": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 74,
+     "far": 70
+    },
+    "wall_window_offset_small_06": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 98,
+     "far": 78
+    },
+    "wall_window_offset_small_08": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 70,
+     "far": 54
+    },
+    "wall_window_offset_small_03": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 90,
+     "far": 78
+    },
+    "wall_window_offset_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 94,
+     "far": 84
+    },
+    "wall_window_offset_small_07": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 82,
+     "far": 64
+    },
+    "wall_window_offset_small_05": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 84,
+     "far": 74
+    },
+    "wall_door_centered_small_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 43,
+     "far": 25
+    },
+    "wall_door_garage_double_01": {
+     "min": [
+      -9,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 381,
+     "far": 372
+    },
+    "wall_door_window_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 120,
+     "far": 118
+    },
+    "wall_door_window_small_03": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 129,
+     "far": 124
+    },
+    "wall_door_window_small_05": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 138,
+     "far": 131
+    },
+    "wall_door_window_small_07": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 94,
+     "far": 90
+    },
+    "wall_door_window_small_04": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 126,
+     "far": 116
+    },
+    "wall_door_window_small_06": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 119,
+     "far": 115
+    },
+    "wall_door_window_small_08": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 90,
+     "far": 82
+    },
+    "wall_door_window_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 124,
+     "far": 120
+    },
+    "wall_door_recessed_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.26
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 179,
+     "far": 167
+    },
+    "wall_standard_corner_large_01": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 120,
+     "far": 72
+    },
+    "wall_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 120,
+     "far": 72
+    },
+    "wall_standard_corner_small_01": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 81,
+     "far": 48
+    },
+    "wall_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 80,
+     "far": 48
+    },
+    "wall_pier_corner_01": {
+     "min": [
+      -0.08,
+      0,
+      -0.22
+     ],
+     "max": [
+      0.22,
+      3,
+      0.08
+     ],
+     "tris": 96,
+     "far": 92
+    },
+    "wall_pier_corner_02": {
+     "min": [
+      -0.28,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0.28
+     ],
+     "tris": 249,
+     "far": 245
+    },
+    "wall_pier_standard_01": {
+     "min": [
+      -0.15,
+      0,
+      0
+     ],
+     "max": [
+      0.15,
+      3,
+      0.08
+     ],
+     "tris": 228,
+     "far": 224
+    },
+    "door_recessed_large_01": {
+     "min": [
+      -2.66,
+      0,
+      -0.5
+     ],
+     "max": [
+      -0.34,
+      2.74,
+      0.03
+     ],
+     "tris": 413,
+     "far": 248
+    },
+    "door_centered_large_01": {
+     "min": [
+      -2.4,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.6,
+      2.33,
+      0.03
+     ],
+     "tris": 304,
+     "far": 164
+    },
+    "door_recessed_small_01": {
+     "min": [
+      -2.16,
+      0,
+      -0.5
+     ],
+     "max": [
+      -0.84,
+      2.74,
+      0.03
+     ],
+     "tris": 461,
+     "far": 324
+    },
+    "door_centered_small_01": {
+     "min": [
+      -2.13,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.87,
+      2.33,
+      0.03
+     ],
+     "tris": 352,
+     "far": 228
+    },
+    "door_centered_small_02": {
+     "min": [
+      -2.13,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.87,
+      2.33,
+      0.03
+     ],
+     "tris": 261,
+     "far": 156
+    },
+    "door_garage_door_02": {
+     "min": [
+      -5.66,
+      0,
+      -0.5
+     ],
+     "max": [
+      -0.34,
+      2.74,
+      0.03
+     ],
+     "tris": 871,
+     "far": 538
+    },
+    "door_garage_door_01": {
+     "min": [
+      -5.66,
+      0,
+      -0.5
+     ],
+     "max": [
+      -0.34,
+      2.74,
+      0.03
+     ],
+     "tris": 877,
+     "far": 542
+    },
+    "door_garage_centered_01": {
+     "min": [
+      -4.66,
+      0,
+      -0.5
+     ],
+     "max": [
+      -1.34,
+      2.74,
+      0.03
+     ],
+     "tris": 418,
+     "far": 242
+    },
+    "door_garage_double_01": {
+     "min": [
+      -8.16,
+      0,
+      -0.5
+     ],
+     "max": [
+      -0.84,
+      2.74,
+      0.03
+     ],
+     "tris": 548,
+     "far": 482
+    },
+    "door_window_small_01": {
+     "min": [
+      -2.71,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.12,
+      2.335,
+      0.03
+     ],
+     "tris": 640,
+     "far": 492
+    },
+    "door_window_small_03": {
+     "min": [
+      -2.71,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.12,
+      2.335,
+      0.03
+     ],
+     "tris": 587,
+     "far": 441
+    },
+    "door_window_small_05": {
+     "min": [
+      -2.71,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.12,
+      2.355,
+      0.03
+     ],
+     "tris": 536,
+     "far": 386
+    },
+    "door_window_small_07": {
+     "min": [
+      -2.71,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.12,
+      2.355,
+      0.03
+     ],
+     "tris": 487,
+     "far": 340
+    },
+    "door_recessed_small_02": {
+     "min": [
+      -2.16,
+      0,
+      -0.5
+     ],
+     "max": [
+      -0.84,
+      2.74,
+      0.03
+     ],
+     "tris": 369,
+     "far": 252
+    },
+    "door_window_small_02": {
+     "min": [
+      -2.88,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.3,
+      2.335,
+      0.03
+     ],
+     "tris": 637,
+     "far": 492
+    },
+    "door_window_small_04": {
+     "min": [
+      -2.88,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.3,
+      2.335,
+      0.03
+     ],
+     "tris": 585,
+     "far": 442
+    },
+    "door_window_small_06": {
+     "min": [
+      -2.88,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.3,
+      2.355,
+      0.03
+     ],
+     "tris": 531,
+     "far": 388
+    },
+    "door_window_small_08": {
+     "min": [
+      -2.88,
+      0,
+      -0.205
+     ],
+     "max": [
+      -0.3,
+      2.355,
+      0.03
+     ],
+     "tris": 484,
+     "far": 338
+    }
+   }
+  },
+  "flats_kit": {
+   "url": "assets/models/flats_kit.glb",
+   "tags": [
+    "building",
+    "kit"
+   ],
+   "bytes": 1757272,
+   "srcTris": 270045,
+   "tris": 52523,
+   "min": [
+    -3.33,
+    -0.055,
+    -3.1
+   ],
+   "max": [
+    0.4461,
+    3,
+    0.53
+   ],
+   "lods": [
+    {
+     "url": "assets/models/flats_kit_lod1.glb",
+     "tris": 43955
+    }
+   ],
+   "pieces": {
+    "door_angled_small_01": {
+     "min": [
+      -2.162,
+      0,
+      -1.193
+     ],
+     "max": [
+      -0.807,
+      2.81,
+      0.162
+     ],
+     "tris": 698,
+     "far": 591
+    },
+    "door_centered_small_01": {
+     "min": [
+      -2.24,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.76,
+      2.81,
+      0.2
+     ],
+     "tris": 699,
+     "far": 587
+    },
+    "door_centered_large_01": {
+     "min": [
+      -2.54,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.46,
+      2.81,
+      0.2
+     ],
+     "tris": 896,
+     "far": 764
+    },
+    "door_angled_large_01": {
+     "min": [
+      -2.874,
+      0,
+      -1.905
+     ],
+     "max": [
+      -1.095,
+      2.81,
+      -0.126
+     ],
+     "tris": 1131,
+     "far": 1028
+    },
+    "door_offset_small_01": {
+     "min": [
+      -1.31,
+      0,
+      -0.2
+     ],
+     "max": [
+      -0.19,
+      2.26,
+      0.03
+     ],
+     "tris": 385,
+     "far": 316
+    },
+    "door_offset_small_02": {
+     "min": [
+      -2.81,
+      0,
+      -0.2
+     ],
+     "max": [
+      -1.69,
+      2.26,
+      0.03
+     ],
+     "tris": 383,
+     "far": 313
+    },
+    "door_centered_small_02": {
+     "min": [
+      -2.06,
+      0,
+      -0.2
+     ],
+     "max": [
+      -0.94,
+      2.26,
+      0.03
+     ],
+     "tris": 383,
+     "far": 313
+    },
+    "door_window_small_01": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 908,
+     "far": 784
+    },
+    "door_window_small_05": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 856,
+     "far": 734
+    },
+    "door_window_small_09": {
+     "min": [
+      -2.67,
+      0,
+      -0.214
+     ],
+     "max": [
+      -0.19,
+      2.26,
+      0.04
+     ],
+     "tris": 749,
+     "far": 684
+    },
+    "door_window_small_03": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.01,
+      2.81,
+      0.2
+     ],
+     "tris": 1224,
+     "far": 1057
+    },
+    "door_window_small_07": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.01,
+      2.81,
+      0.2
+     ],
+     "tris": 1181,
+     "far": 1010
+    },
+    "door_window_small_011": {
+     "min": [
+      -2.67,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.01,
+      2.81,
+      0.2
+     ],
+     "tris": 1067,
+     "far": 952
+    },
+    "door_offset_small_04": {
+     "min": [
+      -2.99,
+      0,
+      -0.24
+     ],
+     "max": [
+      -1.51,
+      2.81,
+      0.2
+     ],
+     "tris": 697,
+     "far": 587
+    },
+    "door_offset_small_03": {
+     "min": [
+      -1.49,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.01,
+      2.81,
+      0.2
+     ],
+     "tris": 699,
+     "far": 587
+    },
+    "door_window_small_02": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 913,
+     "far": 795
+    },
+    "door_window_small_04": {
+     "min": [
+      -2.99,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.81,
+      0.2
+     ],
+     "tris": 1225,
+     "far": 1057
+    },
+    "door_window_small_06": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 863,
+     "far": 745
+    },
+    "door_window_small_08": {
+     "min": [
+      -2.99,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.81,
+      0.2
+     ],
+     "tris": 1172,
+     "far": 1008
+    },
+    "door_window_small_010": {
+     "min": [
+      -2.81,
+      0,
+      -0.214
+     ],
+     "max": [
+      -0.33,
+      2.26,
+      0.04
+     ],
+     "tris": 743,
+     "far": 679
+    },
+    "door_window_small_012": {
+     "min": [
+      -2.99,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.33,
+      2.81,
+      0.2
+     ],
+     "tris": 1059,
+     "far": 949
+    },
+    "cornice_end_02": {
+     "min": [
+      0,
+      0,
+      -0.1
+     ],
+     "max": [
+      0.14,
+      0.2,
+      0.04
+     ],
+     "tris": 86,
+     "far": 68
+    },
+    "cornice_end_01": {
+     "min": [
+      -0.14,
+      0,
+      -0.1
+     ],
+     "max": [
+      0,
+      0.2,
+      0.04
+     ],
+     "tris": 86,
+     "far": 68
+    },
+    "cornice_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.2,
+      0.04
+     ],
+     "tris": 18,
+     "far": 8
+    },
+    "cornice_standard_angled_large_01": {
+     "min": [
+      -3.04,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.2,
+      0.04
+     ],
+     "tris": 122,
+     "far": 118
+    },
+    "cornice_standard_angled_small_01": {
+     "min": [
+      -2.04,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.2,
+      0.04
+     ],
+     "tris": 118,
+     "far": 113
+    },
+    "cornice_standard_corner_large_01": {
+     "min": [
+      -3.04,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.2,
+      0.04
+     ],
+     "tris": 68,
+     "far": 64
+    },
+    "cornice_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.2,
+      0
+     ],
+     "tris": 68,
+     "far": 64
+    },
+    "cornice_standard_corner_small_01": {
+     "min": [
+      -2.04,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.2,
+      0.04
+     ],
+     "tris": 68,
+     "far": 64
+    },
+    "cornice_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.2,
+      0
+     ],
+     "tris": 68,
+     "far": 64
+    },
+    "cornice_pier_angled_01": {
+     "min": [
+      -0.247,
+      0,
+      -0.177
+     ],
+     "max": [
+      0.25,
+      0.2,
+      0.1
+     ],
+     "tris": 56,
+     "far": 56
+    },
+    "cornice_pier_corner_01": {
+     "min": [
+      -0.1,
+      0,
+      -0.25
+     ],
+     "max": [
+      0.25,
+      0.2,
+      0.1
+     ],
+     "tris": 56,
+     "far": 56
+    },
+    "cornice_pier_standard_01": {
+     "min": [
+      -0.175,
+      0,
+      0
+     ],
+     "max": [
+      0.175,
+      0.2,
+      0.1
+     ],
+     "tris": 42,
+     "far": 42
+    },
+    "cornice_pier_corner_02": {
+     "min": [
+      -0.35,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.2,
+      0.35
+     ],
+     "tris": 98,
+     "far": 80
+    },
+    "crown_standard_angled_large_01": {
+     "min": [
+      -3.33,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0.33
+     ],
+     "tris": 1038,
+     "far": 968
+    },
+    "crown_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      -0.1
+     ],
+     "max": [
+      0,
+      0.75,
+      0.33
+     ],
+     "tris": 482,
+     "far": 436
+    },
+    "crown_standard_angled_small_01": {
+     "min": [
+      -2.33,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0.33
+     ],
+     "tris": 869,
+     "far": 781
+    },
+    "crown_end_02": {
+     "min": [
+      0,
+      0,
+      -0.1
+     ],
+     "max": [
+      0.43,
+      0.75,
+      0.33
+     ],
+     "tris": 343,
+     "far": 257
+    },
+    "crown_end_01": {
+     "min": [
+      -0.43,
+      0,
+      -0.1
+     ],
+     "max": [
+      0,
+      0.75,
+      0.33
+     ],
+     "tris": 341,
+     "far": 257
+    },
+    "crown_standard_corner_large_01": {
+     "min": [
+      -3.33,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0.33
+     ],
+     "tris": 1194,
+     "far": 1097
+    },
+    "crown_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3.1
+     ],
+     "max": [
+      0.1,
+      0.75,
+      0
+     ],
+     "tris": 1144,
+     "far": 1049
+    },
+    "crown_standard_corner_small_01": {
+     "min": [
+      -2.33,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0.33
+     ],
+     "tris": 961,
+     "far": 843
+    },
+    "crown_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2.1
+     ],
+     "max": [
+      0.1,
+      0.75,
+      0
+     ],
+     "tris": 895,
+     "far": 796
+    },
+    "crown_pier_pedestal_01": {
+     "min": [
+      -0.355,
+      -0.055,
+      -0.1
+     ],
+     "max": [
+      0.355,
+      0.78,
+      0.425
+     ],
+     "tris": 376,
+     "far": 376
+    },
+    "crown_pier_corner_01": {
+     "min": [
+      -0.425,
+      -0.055,
+      -0.43
+     ],
+     "max": [
+      0.43,
+      0.78,
+      0.425
+     ],
+     "tris": 470,
+     "far": 456
+    },
+    "crown_pier_angled_01": {
+     "min": [
+      -0.626,
+      -0.055,
+      -0.401
+     ],
+     "max": [
+      0.446,
+      0.78,
+      0.424
+     ],
+     "tris": 472,
+     "far": 468
+    },
+    "crown_pier_corner_02": {
+     "min": [
+      -0.53,
+      -0.055,
+      -0.1
+     ],
+     "max": [
+      0.1,
+      0.78,
+      0.53
+     ],
+     "tris": 478,
+     "far": 464
+    },
+    "dado_end_02": {
+     "min": [
+      0,
+      0,
+      -0.04
+     ],
+     "max": [
+      0.14,
+      0.5,
+      0.04
+     ],
+     "tris": 33,
+     "far": 32
+    },
+    "dado_end_01": {
+     "min": [
+      -0.14,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 33,
+     "far": 32
+    },
+    "dado_door_centered_large_01": {
+     "min": [
+      -3,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 48,
+     "far": 40
+    },
+    "dado_door_centered_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 48,
+     "far": 40
+    },
+    "dado_door_angled_large_01": {
+     "min": [
+      -3.04,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 48,
+     "far": 40
+    },
+    "dado_door_angled_small_01": {
+     "min": [
+      -2.04,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 56,
+     "far": 48
+    },
+    "dado_door_centered_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 48,
+     "far": 40
+    },
+    "dado_door_offset_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 40,
+     "far": 32
+    },
+    "dado_door_offset_small_02": {
+     "min": [
+      -3,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 40,
+     "far": 32
+    },
+    "dado_door_window_small_01": {
+     "min": [
+      -3,
+      0,
+      -0.04
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 64,
+     "far": 56
+    },
+    "dado_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 8,
+     "far": 4
+    },
+    "dado_standard_angled_large_01": {
+     "min": [
+      -3.04,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 48,
+     "far": 44
+    },
+    "dado_standard_angled_small_01": {
+     "min": [
+      -2.04,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 48,
+     "far": 44
+    },
+    "dado_standard_corner_large_01": {
+     "min": [
+      -3.04,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 32,
+     "far": 28
+    },
+    "dado_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.5,
+      0
+     ],
+     "tris": 32,
+     "far": 28
+    },
+    "dado_standard_corner_small_01": {
+     "min": [
+      -2.04,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.5,
+      0.04
+     ],
+     "tris": 32,
+     "far": 28
+    },
+    "dado_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.5,
+      0
+     ],
+     "tris": 32,
+     "far": 28
+    },
+    "dado_pier_pedestal_01": {
+     "min": [
+      -0.2,
+      0,
+      0
+     ],
+     "max": [
+      0.2,
+      0.54,
+      0.13
+     ],
+     "tris": 44,
+     "far": 44
+    },
+    "dado_pier_angled_01": {
+     "min": [
+      -0.29,
+      0,
+      -0.219
+     ],
+     "max": [
+      0.28,
+      0.54,
+      0.13
+     ],
+     "tris": 60,
+     "far": 60
+    },
+    "dado_pier_corner_01": {
+     "min": [
+      -0.13,
+      0,
+      -0.28
+     ],
+     "max": [
+      0.28,
+      0.54,
+      0.13
+     ],
+     "tris": 60,
+     "far": 60
+    },
+    "dado_pier_corner_02": {
+     "min": [
+      -0.38,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.54,
+      0.38
+     ],
+     "tris": 108,
+     "far": 96
+    },
+    "wall_door_centered_large_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 112,
+     "far": 67
+    },
+    "wall_door_angled_large_01": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 286,
+     "far": 172
+    },
+    "wall_door_angled_small_01": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 239,
+     "far": 144
+    },
+    "wall_window_angled_large_01": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 334,
+     "far": 200
+    },
+    "wall_window_angled_small_01": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 264,
+     "far": 159
+    },
+    "wall_window_centered_large_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 147,
+     "far": 88
+    },
+    "wall_window_centered_large_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 147,
+     "far": 88
+    },
+    "wall_window_angled_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 264,
+     "far": 159
+    },
+    "wall_window_angled_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 333,
+     "far": 199
+    },
+    "wall_window_centered_large_03": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 229,
+     "far": 137
+    },
+    "wall_window_centered_double_03": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 274,
+     "far": 165
+    },
+    "wall_window_centered_double_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 147,
+     "far": 88
+    },
+    "wall_window_centered_double_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 147,
+     "far": 88
+    },
+    "wall_door_centered_small_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 162,
+     "far": 97
+    },
+    "wall_door_centered_small_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 176,
+     "far": 105
+    },
+    "wall_window_centered_small_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 188,
+     "far": 113
+    },
+    "wall_window_centered_small_03": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 251,
+     "far": 151
+    },
+    "wall_window_centered_small_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 188,
+     "far": 113
+    },
+    "wall_window_offset_small_05": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 251,
+     "far": 150
+    },
+    "wall_window_offset_small_03": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 187,
+     "far": 113
+    },
+    "wall_window_offset_small_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 188,
+     "far": 112
+    },
+    "wall_window_offset_small_06": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 252,
+     "far": 151
+    },
+    "wall_window_offset_small_04": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 188,
+     "far": 112
+    },
+    "wall_window_offset_small_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 188,
+     "far": 113
+    },
+    "wall_door_offset_small_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 176,
+     "far": 105
+    },
+    "wall_door_offset_small_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 175,
+     "far": 104
+    },
+    "wall_door_window_small_010": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 197,
+     "far": 119
+    },
+    "wall_door_window_small_06": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 134,
+     "far": 80
+    },
+    "wall_door_window_small_02": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 134,
+     "far": 80
+    },
+    "wall_door_window_small_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 134,
+     "far": 80
+    },
+    "wall_door_window_small_05": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 134,
+     "far": 79
+    },
+    "wall_door_window_small_09": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 198,
+     "far": 119
+    },
+    "wall_door_window_small_013": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 185,
+     "far": 110
+    },
+    "wall_door_window_small_08": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 121,
+     "far": 72
+    },
+    "wall_door_window_small_04": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 121,
+     "far": 72
+    },
+    "wall_door_window_small_012": {
+     "min": [
+      -3,
+      0,
+      -0.18
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 185,
+     "far": 111
+    },
+    "wall_door_window_small_07": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 121,
+     "far": 72
+    },
+    "wall_door_window_small_03": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 120,
+     "far": 72
+    },
+    "wall_standard_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 230,
+     "far": 138
+    },
+    "wall_standard_angled_large_01": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 412,
+     "far": 246
+    },
+    "wall_standard_angled_small_01": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 306,
+     "far": 183
+    },
+    "wall_standard_corner_large_01": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 460,
+     "far": 275
+    },
+    "wall_standard_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 459,
+     "far": 275
+    },
+    "wall_standard_corner_small_01": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 306,
+     "far": 184
+    },
+    "wall_standard_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 307,
+     "far": 184
+    },
+    "wall_door_offset_small_04": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 163,
+     "far": 97
+    },
+    "wall_door_offset_small_03": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0
+     ],
+     "tris": 163,
+     "far": 97
+    },
+    "wall_pier_angled_01": {
+     "min": [
+      -0.173,
+      0,
+      -0.141
+     ],
+     "max": [
+      0.2,
+      3,
+      0.05
+     ],
+     "tris": 204,
+     "far": 200
+    },
+    "wall_pier_corner_01": {
+     "min": [
+      -0.05,
+      0,
+      -0.2
+     ],
+     "max": [
+      0.2,
+      3,
+      0.05
+     ],
+     "tris": 298,
+     "far": 294
+    },
+    "wall_pier_corner_02": {
+     "min": [
+      -0.3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      3,
+      0.3
+     ],
+     "tris": 233,
+     "far": 229
+    },
+    "wall_pier_standard_01": {
+     "min": [
+      -0.125,
+      0,
+      0
+     ],
+     "max": [
+      0.125,
+      3,
+      0.05
+     ],
+     "tris": 367,
+     "far": 363
+    },
+    "base_end_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      0.2,
+      0.75,
+      0.2
+     ],
+     "tris": 29,
+     "far": 25
+    },
+    "base_end_01": {
+     "min": [
+      -0.2,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 31,
+     "far": 27
+    },
+    "base_standard_01": {
+     "min": [
+      -3,
+      0,
+      0
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 4,
+     "far": 4
+    },
+    "base_angled_large_01": {
+     "min": [
+      -3.2,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 58,
+     "far": 58
+    },
+    "base_angled_small_01": {
+     "min": [
+      -2.2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 46,
+     "far": 46
+    },
+    "base_corner_large_02": {
+     "min": [
+      -3,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0
+     ],
+     "tris": 24,
+     "far": 24
+    },
+    "base_corner_large_01": {
+     "min": [
+      -3.2,
+      0,
+      -3
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 32,
+     "far": 32
+    },
+    "base_corner_small_02": {
+     "min": [
+      -2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0
+     ],
+     "tris": 24,
+     "far": 24
+    },
+    "base_corner_small_01": {
+     "min": [
+      -2.2,
+      0,
+      -2
+     ],
+     "max": [
+      0,
+      0.75,
+      0.2
+     ],
+     "tris": 32,
+     "far": 32
+    },
+    "window_centered_large_02": {
+     "min": [
+      -2.56,
+      0.3,
+      -0.24
+     ],
+     "max": [
+      -0.44,
+      2.3,
+      0.15
+     ],
+     "tris": 842,
+     "far": 754
+    },
+    "window_angled_small_02": {
+     "min": [
+      -2,
+      0.3,
+      -1.066
+     ],
+     "max": [
+      -0.934,
+      2.3,
+      0
+     ],
+     "tris": 483,
+     "far": 421
+    },
+    "window_angled_large_02": {
+     "min": [
+      -2.818,
+      0.3,
+      -1.884
+     ],
+     "max": [
+      -1.045,
+      2.3,
+      -0.111
+     ],
+     "tris": 846,
+     "far": 754
+    },
+    "window_centered_large_01": {
+     "min": [
+      -2.56,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.44,
+      2.3,
+      0.15
+     ],
+     "tris": 950,
+     "far": 860
+    },
+    "window_angled_small_01": {
+     "min": [
+      -2,
+      0,
+      -1.066
+     ],
+     "max": [
+      -0.934,
+      2.3,
+      0
+     ],
+     "tris": 533,
+     "far": 471
+    },
+    "window_angled_large_01": {
+     "min": [
+      -2.853,
+      0,
+      -1.919
+     ],
+     "max": [
+      -1.081,
+      2.3,
+      -0.147
+     ],
+     "tris": 948,
+     "far": 860
+    },
+    "window_centered_large_03": {
+     "min": [
+      -2.37,
+      0.453,
+      -0.164
+     ],
+     "max": [
+      -0.63,
+      2.138,
+      0.04
+     ],
+     "tris": 660,
+     "far": 660
+    },
+    "window_centered_double_02": {
+     "min": [
+      -2.81,
+      0.3,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 960,
+     "far": 842
+    },
+    "window_centered_double_01": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 1062,
+     "far": 942
+    },
+    "window_centered_double_03": {
+     "min": [
+      -2.67,
+      0.453,
+      -0.214
+     ],
+     "max": [
+      -0.33,
+      2.138,
+      0.04
+     ],
+     "tris": 724,
+     "far": 724
+    },
+    "window_offset_small_03": {
+     "min": [
+      -1.31,
+      0.3,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 487,
+     "far": 421
+    },
+    "window_offset_small_01": {
+     "min": [
+      -1.31,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.19,
+      2.3,
+      0.15
+     ],
+     "tris": 533,
+     "far": 471
+    },
+    "window_offset_small_05": {
+     "min": [
+      -1.17,
+      0.453,
+      -0.214
+     ],
+     "max": [
+      -0.33,
+      2.138,
+      0.04
+     ],
+     "tris": 362,
+     "far": 362
+    },
+    "window_offset_small_04": {
+     "min": [
+      -2.81,
+      0.3,
+      -0.24
+     ],
+     "max": [
+      -1.69,
+      2.3,
+      0.15
+     ],
+     "tris": 483,
+     "far": 421
+    },
+    "window_offset_small_02": {
+     "min": [
+      -2.81,
+      0,
+      -0.24
+     ],
+     "max": [
+      -1.69,
+      2.3,
+      0.15
+     ],
+     "tris": 533,
+     "far": 471
+    },
+    "window_offset_small_06": {
+     "min": [
+      -2.67,
+      0.453,
+      -0.214
+     ],
+     "max": [
+      -1.83,
+      2.138,
+      0.04
+     ],
+     "tris": 362,
+     "far": 362
+    },
+    "window_centered_small_02": {
+     "min": [
+      -2.06,
+      0.3,
+      -0.24
+     ],
+     "max": [
+      -0.94,
+      2.3,
+      0.15
+     ],
+     "tris": 485,
+     "far": 421
+    },
+    "window_centered_small_01": {
+     "min": [
+      -2.06,
+      0,
+      -0.24
+     ],
+     "max": [
+      -0.94,
+      2.3,
+      0.15
+     ],
+     "tris": 533,
+     "far": 471
+    },
+    "window_centered_small_03": {
+     "min": [
+      -1.92,
+      0.453,
+      -0.214
+     ],
+     "max": [
+      -1.08,
+      2.138,
+      0.04
+     ],
+     "tris": 362,
+     "far": 362
+    }
+   }
   }
  }
 }

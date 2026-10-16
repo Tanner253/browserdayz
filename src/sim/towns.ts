@@ -8,6 +8,7 @@
 
 import type { BuildingType } from '../world/worldgen/layout';
 import type { KitPiece } from './kit';
+import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
 
 export interface Town {
   name: string;
@@ -122,8 +123,34 @@ export interface PlacedTown { town: Town; padY: number }
 
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
-  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : [];
+  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : [];
 }
+
+/** what lies about a town (containers, crates, drums), in its frame */
+export function townThings(t: Town): TownThing[] {
+  return t.name === ZAVOD.name ? zavodThings() : [];
+}
+
+/**
+ * The ground a town has worn bare or laid down, in its frame: gravel yards (rectangles x0, z0, x1, z1) and trodden
+ * lanes (lines, how wide). For whoever sets the town down, to paint it so and keep the grass off it.
+ */
+export interface TownGround { yards: [number, number, number, number][]; lanes: { line: [number, number][]; w: number }[] }
+export function townGround(t: Town): TownGround {
+  return t.name === ZAVOD.name ? ZAVOD_GROUND : { yards: [], lanes: [] };
+}
+
+/** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */
+export interface SlabRun { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }
+
+/** a town's walls of concrete slabs in the world, its runs moved from its frame */
+export function placedSlabs(t: Town): SlabRun[] {
+  const runs = t.name === ZAVOD.name ? ZAVOD_WALL : [];
+  return runs.map((r) => ({ ...r, a: townPoint(t, ...r.a), b: townPoint(t, ...r.b) }));
+}
+
+/** every new town, as it is planned (where the world sets each down is the world's) */
+export const TOWNS: Town[] = [POKROV, LIPKI, ZAVOD];
 
 /** a town's walls in the world (only Pokrov has any) */
 export function placedWalls(p: PlacedTown): KitPiece[] {

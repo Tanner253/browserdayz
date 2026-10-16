@@ -1,6 +1,6 @@
 // `?towns` on a development build: a new town (src/sim/towns.ts) stood on level ground of its own in the north-west
 // corner of today's map, in the game as it is, to be walked and looked at before it has its place in the new land
-// (`?towns=lipki` for the hamlet; Pokrov otherwise). Never loaded in a built site.
+// (`?towns=<name>`: lipki, zavod; Pokrov otherwise). Never loaded in a built site.
 //
 // The corner is levelled to the height it mostly was, its trees and rocks taken away, the town's buildings added
 // to the world's as any building is (so their rooms, doors, stairs and places for things are the game's own), and
@@ -16,14 +16,16 @@ import { Towns } from '../world/towns';
 import { CELL, WORLD_SIZE, idx, type World } from '../world/worldgen';
 import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
 import type { KitPiece } from '../sim/kit';
-import { LIPKI, POKROV, placedWalls, townBuildings, townPoint, type Town } from '../sim/towns';
+import { POKROV, TOWNS, placedSlabs, placedWalls, townBuildings, townGround, townPoint, townThings, type Town } from '../sim/towns';
 
-const which = new URLSearchParams(location.search).get('towns') === 'lipki' ? 'lipki' : 'pokrov';
+const asked = (new URLSearchParams(location.search).get('towns') ?? '').toLowerCase();
 /** where it is stood for looking at: the north-west corner, which nothing of today's map uses */
 const HERE = { x: -448, z: -540 };
-let town: Town = { ...(which === 'lipki' ? LIPKI : POKROV), ...HERE };
+let town: Town = { ...(TOWNS.find((t) => t.name.toLowerCase() === asked) ?? POKROV), ...HERE };
 let padY = 0;
 let walls: KitPiece[] = [];
+/** the world's buildings, the town's among them (those that wear a facade are dressed by the towns' module) */
+let plots: World['buildings'] = [];
 
 /** The corner levelled and cleared, and the town's buildings added. Before anything is built from the world. */
 export function lay(world: World) {
@@ -56,12 +58,39 @@ export function lay(world: World) {
       if (Math.abs(dx * c - dz * sn) < fw / 2 + 1.5 && Math.abs(dx * sn + dz * c) < fd / 2 + 1.5) world.grass[idx(i, j)] = 0;
     }
   });
+  // its yards gravelled and its lanes trodden (the world's own paint: grass, forest floor, rock, gravel), no blades on them
+  const ground = townGround(town), c = Math.cos(town.rot), s = Math.sin(town.rot);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const wx = -half + i * CELL - town.x, wz = -half + j * CELL - town.z, lx = wx * c - wz * s, lz = wx * s + wz * c;
+    let out = 1e9;
+    for (const [x0, z0, x1, z1] of ground.yards) out = Math.min(out, Math.max(x0 - lx, lx - x1, z0 - lz, lz - z1));
+    for (const { line, w } of ground.lanes) for (let k = 0; k + 1 < line.length; k++) {
+      const [ax, az] = line[k], [bx, bz] = line[k + 1], ex = bx - ax, ez = bz - az;
+      const t = Math.max(0, Math.min(1, ((lx - ax) * ex + (lz - az) * ez) / (ex * ex + ez * ez)));
+      out = Math.min(out, Math.hypot(lx - ax - ex * t, lz - az - ez * t) - w / 2);
+    }
+    // (the edge ragged over a metre and a half)
+    const wob = Math.sin(lx * 0.7 + lz * 0.3) * 0.5 + Math.sin(lz * 1.3 - lx * 0.4) * 0.4;
+    const bare = 1 - Math.min(1, Math.max(0, (out + wob + 0.5) / 1.6));
+    if (bare <= 0) continue;
+    const k = idx(i, j), sp = world.splat;
+    for (let ch = 0; ch < 3; ch++) sp[k * 4 + ch] = Math.round(sp[k * 4 + ch] * (1 - bare));
+    sp[k * 4 + 3] = Math.round(sp[k * 4 + 3] * (1 - bare) + 255 * bare);
+    world.grass[k] = Math.round(world.grass[k] * (1 - bare));
+  }
+  // what lies about it (a container stacked on another stands on it: the planning of the buildings stands each)
+  for (const t of townThings(town)) {
+    const [x, z] = townPoint(town, t.x, t.z);
+    world.props.push({ kind: t.kind, x, y: padY + (t.up ?? 0), z, rot: town.rot + t.rot, scale: 1 });
+  }
+  (world.slabs ??= []).push(...placedSlabs(town));
   walls = placedWalls({ town, padY });
+  plots = world.buildings;
 }
 
 /** The town's walls and domes, drawn by the game's own module (src/world/towns.ts). After the ground and the buildings are built. */
 export async function stand(atmo: Atmosphere, r: Renderer, buildings: Buildings) {
-  const towns = new Towns(atmo, r.scene, [{ town, padY }], buildings, (o) => r.ready(o).then(() => r.send(o)));
+  const towns = new Towns(atmo, r.scene, [{ town, padY }], buildings, (o) => r.ready(o).then(() => r.send(o)), plots);
   await towns.build();
   // (the game has no hook for it yet: it is told where the eye is from here, as ?ruins does)
   setInterval(() => {
