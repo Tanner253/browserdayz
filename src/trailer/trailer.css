@@ -679,3 +679,21 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 body.tr-cut16 .hud-howto { display: none !important; }
 .x16-cap { top: auto; right: auto; }
 .x16-pad { top: auto; left: auto; }
+
+/* ---- the seventeenth film, "The man in the window": a story told in a card, lines over the picture, and boards */
+.x17-title { z-index: 3; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 0 15vh 7vw; text-transform: uppercase; opacity: var(--o, 1); background: linear-gradient(0deg, rgba(4, 6, 8, 0.78), rgba(4, 6, 8, 0) 55%); }
+.x17-title .t17-kick { font-size: 2.4vh; font-weight: 700; letter-spacing: 0.6em; color: #ffd35a; white-space: nowrap; }
+.x17-title .t17-name { margin-top: 0.8vh; font-size: 15vh; line-height: 0.92; font-weight: 800; font-stretch: condensed; letter-spacing: 0.06em; color: #fff3d6; text-shadow: 0 0.04em 0.5em #000; white-space: nowrap; }
+.x17-title .t17-name em { font-style: normal; color: #ffd35a; }
+.x17-line { z-index: 3; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 8vw; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(4, 6, 8, 0.3), rgba(4, 6, 8, 0.62)); }
+.x17-line span { font-size: 6vh; line-height: 1.25; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; text-transform: uppercase; color: #fff3d6; text-shadow: 0 0.04em 0.6em #000; }
+.x17-dark { z-index: 4; background: #000; opacity: var(--o, 0); }
+.x17-plan { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.4vh; text-transform: uppercase; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(4, 6, 8, 0.55), rgba(4, 6, 8, 0.86)); color: #f3efe6; }
+.x17-plan .p17-kick { font-size: 2.6vh; font-weight: 700; letter-spacing: 0.5em; color: #ffd35a; white-space: nowrap; }
+.x17-plan .p17-row { display: grid; grid-template-columns: auto auto; gap: 1.4vh 3vw; align-items: baseline; font-stretch: condensed; }
+.x17-plan .p17-row b { font-size: 6vh; line-height: 1; font-weight: 800; letter-spacing: 0.14em; color: #ffd35a; text-align: right; white-space: nowrap; }
+.x17-plan .p17-row span { font-size: 3.8vh; font-weight: 600; letter-spacing: 0.12em; color: #fff3d6; white-space: nowrap; }
+.x17-coming { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.2vh; text-transform: uppercase; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(4, 6, 8, 0.5), rgba(4, 6, 8, 0.86)); }
+.x17-coming .c17-kick { font-size: 2.6vh; font-weight: 700; letter-spacing: 0.5em; color: #ffd35a; white-space: nowrap; }
+.x17-coming .c17-list { display: grid; grid-template-columns: repeat(3, auto); gap: 1.8vh 3.4vw; font-size: 4.4vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.14em; color: #fff3d6; text-align: center; }
+.x17-coming .c17-note { font-size: 2.1vh; letter-spacing: 0.3em; color: #d8cfb8; white-space: nowrap; }
