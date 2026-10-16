@@ -2,32 +2,35 @@
 // (One part of worldgen.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 //
 // THE STAGES, in the order they run (line numbers in this file: read only the stage you need):
-//     76  base heightfield
-//    115  road
-//    124  outlying places
-//    170  soften settlements
-//    193  road
-//    264  building plots
-//    420  masks
-//    497  splat + grass
-//    548  vegetation
-//    674  what was built later
-//    858  the first expansion
-//   1020  the second expansion
-//   1131  the third expansion
-//   1452  a second clinic and a second shop in the village
-//   1523  the district hospital
-//   1634  the village laid out as a place is
-//   1884  the fourth expansion
+//     79  base heightfield
+//    118  road
+//    127  outlying places
+//    173  soften settlements
+//    196  road
+//    267  building plots
+//    423  masks
+//    500  splat + grass
+//    551  vegetation
+//    677  what was built later
+//    861  the first expansion
+//   1023  the second expansion
+//   1134  the third expansion
+//   1455  a second clinic and a second shop in the village
+//   1526  the district hospital
+//   1637  the village laid out as a place is
+//   1887  the fourth expansion
+//   2680  the west
 
 import { Simplex, RNG, smoothstep, lerp, clamp, hash2 } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
 import { type Bridge, wreckUnder } from '../../sim/bridge';
 import { type FortPlace, castleFoot, CASTLE, CASTLE_SCALE, castleAt, castleLocal, castleLoose, HOUSES, castleJeep, castleCuts, squareTouches, castleOpen, castleHides } from '../../sim/castle';
-import { BUNKER_AT, CELL, EDGE_ROUND, EXPANSION, KAMENKA, LOOP, MOUNTAIN, OLD_HALF, PASS, TOWN, WORLD_RES, WORLD_SEED, WORLD_SIZE, eastRoad, kamenkaQ } from './places';
+import { BUNKER_AT, CELL, EDGE_ROUND, EXPANSION, KAMENKA, LOOP, MOUNTAIN, OLD_HALF, PASS, SQUARE_HALF, SQUARE_RES, TOWN, WORLD_SEED, eastRoad, kamenkaQ } from './places';
 import { ARMY_CAMP, BUILDING_FOOTPRINT, HOSPITAL_AT, HOSPITAL_GROUNDS, NO_START, OLD_ROAD, OUTLYING, PEAK, POLICE_PARTS, SERVICES, SNOW, TRADE_AT, VILLAGE_STREETS, doorRoad, hospitalDrive, leftOut, loopLine, offLine, peakOf, type BuildingPlot, type BuildingType, type SiteKind } from './layout';
 import type { Instance, POI, Site, Solid, World, Worn } from './types';
-import { catmullRom, evenOut, heightAt, idx, slopeAt, soften } from './ground';
+// (the square is made on its own net, `idx` its numbering, and laid into the world's at the end: see `toWorld`)
+import { catmullRom, evenOut, heightAt, squareIdx as idx, slopeAt, soften } from './ground';
+import { toWorld } from './west';
 
 // ------------------------------------------------------------------ generation
 
@@ -55,8 +58,8 @@ export async function generateWorldSoftly(between: () => Promise<unknown>, seed 
 
 /** the map made from its seed, giving way between its stages (each named) */
 function* worldStages(seed: number): Generator<string, World, void> {
-  const N = WORLD_RES;
-  const half = WORLD_SIZE / 2;
+  const N = SQUARE_RES;
+  const half = SQUARE_HALF;
   const n1 = new Simplex(seed);
   const n2 = new Simplex(seed + 1);
   const n3 = new Simplex(seed + 2);
@@ -2671,11 +2674,16 @@ function* worldStages(seed: number): Generator<string, World, void> {
   // The ring itself is kept as it was first made (`spawnRing`), for whatever tells the old map by it.
   const starts = spawns.filter((sp) => Math.hypot(sp.x - BUNKER_AT.x, sp.z - BUNKER_AT.z) > NO_START.bunker && Math.hypot(sp.x - TOWN.gate.x, sp.z - TOWN.gate.z) > NO_START.gate && Math.hypot(sp.x - TOWN.x, sp.z - TOWN.z) > NO_START.town);
 
+  // The square laid into the world, and the ground west of it (src/world/worldgen/west.ts): last of all, so that
+  // nothing of the square is moved by it.
+  yield 'the west';
+  const world = toWorld({ heights, surface: surface ?? heights, splat, grass }, { seed, base, ringShape, forestMask, trees, noise: [n1, n2, n3] });
+
   return {
-    heights,
-    surface: surface ?? heights,
-    splat,
-    grass,
+    heights: world.heights,
+    surface: world.surface,
+    splat: world.splat,
+    grass: world.grass,
     road: { points: roadPts, width: ROAD_W },
     roads,
     bridges,

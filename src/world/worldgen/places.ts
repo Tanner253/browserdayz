@@ -15,11 +15,46 @@ export const WORLD_SEED = 1337;
  */
 export const OLD_HALF = 512;
 
-export const WORLD_SIZE = 1536; // metres, square, centred on the origin
+/**
+ * THE SQUARE: the map as it was until 2026-10-16, 1536 m and 769 samples a side about the origin. It is still made
+ * first and whole on a net of its own, exactly as it was (every stage of generateWorld reads this net), and only
+ * then laid into the world's.
+ */
+export const SQUARE_HALF = 768;
 
-export const WORLD_RES = 769; // height samples per side
+export const SQUARE_RES = 769;
 
-export const CELL = WORLD_SIZE / (WORLD_RES - 1); // 2 m
+export const CELL = 2; // metres between samples
+
+/**
+ * THE WORLD, 2026-10-16: a rectangle, the square at its east end and two squares more west of it (the owner: "from
+ * west to east itll be ocean, beach, desert, plains, mountains. We have the plains and mountains"). Its edges in
+ * metres and its samples across (x) and down (z). The square's samples stand where they stood: 3840 m is a whole
+ * number of cells, so its net is the world's own, moved along by 1536 samples.
+ */
+export const WORLD_X0 = -3840;
+
+export const WORLD_X1 = 768;
+
+export const WORLD_Z0 = -768;
+
+export const WORLD_Z1 = 768;
+
+export const WORLD_NX = (WORLD_X1 - WORLD_X0) / CELL + 1; // 2305
+
+export const WORLD_NZ = (WORLD_Z1 - WORLD_Z0) / CELL + 1; // 769
+
+/** whether a spot is on the world, `inside` metres in from its edge at least */
+export const onWorld = (x: number, z: number, inside = 0) => x >= WORLD_X0 + inside && x <= WORLD_X1 - inside && z >= WORLD_Z0 + inside && z <= WORLD_Z1 - inside;
+
+/** whether a spot is on the square (the map as it was), `inside` metres in from its edge at least */
+export const onSquare = (x: number, z: number, inside = 0) => Math.abs(x) <= SQUARE_HALF - inside && Math.abs(z) <= SQUARE_HALF - inside;
+
+/**
+ * the height of the sea: the new ground's coast is laid to it, and the water's surface is to be drawn at it. Below
+ * the lowest of the square (-11.6 m, in the valley), so that water at this height is nowhere to be seen on it.
+ */
+export const SEA_LEVEL = -16;
 
 /**
  * The ground smoothed, 2026-10-13 (the owner, of the map as it stood: "we will smooth out any terrain"; and of the

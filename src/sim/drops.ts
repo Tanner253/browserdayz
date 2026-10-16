@@ -6,7 +6,7 @@
 
 import { ITEMS, fitAtRandom, loadGun, makeItem, makeMag, plainMag } from './items';
 import type { Container } from './inventory';
-import { BUILDING_FOOTPRINT, WORLD_SIZE, heightAt, inPlay, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, SQUARE_HALF, heightAt, inPlay, type World } from '../world/worldgen';
 import { gasEdge, gasZone } from './gas';
 import { UNDER_GAS } from './crates';
 
@@ -201,8 +201,9 @@ export function pickDropSite(world: World, rnd: () => number = Math.random, insi
       x = 15 + Math.cos(a) * r;
       z = 5 + Math.sin(a) * r;
     } else {
-      // anywhere on the map that is outside the line, by not too little and not too much, and not at the very edge of the world
-      const edge = WORLD_SIZE / 2 - 45;
+      // anywhere on the map that is outside the line, by not too little and not too much, and not at the very edge of
+      // the square (the ground west of it is ground only as yet, 2026-10-16)
+      const edge = SQUARE_HALF - 45;
       x = (rnd() * 2 - 1) * edge;
       z = (rnd() * 2 - 1) * edge;
       if (inPlay(x, z, -DROP.out[0]) || !inPlay(x, z, -DROP.out[1])) continue;

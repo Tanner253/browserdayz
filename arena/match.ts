@@ -24,7 +24,7 @@ import { ITEMS, makeItem } from '../src/sim/items';
 import { KITS } from '../src/sim/kits';
 import { F_DEAD, PROTOCOL, type Pose, type S2C } from '../src/net/protocol';
 import { castleShapeIn } from '../src/world/castle-shape';
-import { WORLD_RES, WORLD_SIZE, heightAt, type World } from '../src/world/worldgen';
+import { groundField, heightAt, type World } from '../src/world/worldgen';
 
 interface Fighter {
   id: number;
@@ -94,9 +94,8 @@ async function buildWorld() {
   await RAPIER.init();
   const w = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   // the ground, as the game has it (column-major, rows along z)
-  const N = WORLD_RES, H = world.heights, hcm = new Float32Array(N * N);
-  for (let ix = 0; ix < N; ix++) for (let iz = 0; iz < N; iz++) hcm[iz + ix * N] = H[iz * N + ix];
-  w.createCollider(RAPIER.ColliderDesc.heightfield(N - 1, N - 1, hcm, { x: WORLD_SIZE, y: 1, z: WORLD_SIZE }));
+  const f = groundField(world.heights);
+  w.createCollider(RAPIER.ColliderDesc.heightfield(f.rows, f.cols, f.heights, f.scale).setTranslation(f.at.x, f.at.y, f.at.z));
   // the fort, as the game stands it (src/world/castle.ts, `solid`): its own measure turned and scaled into the world's
   const P = world.castle as FortPlace, c = Math.cos(P.rot / 2), s = Math.sin(P.rot / 2);
   const at = (x: number, y: number, z: number) => { const [wx, wy, wz] = castleAt(P, x, z, y); return { x: wx, y: wy, z: wz }; };

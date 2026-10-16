@@ -17,7 +17,7 @@ import type { Renderer } from '../core/renderer';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Buildings } from '../world/buildings';
 import type { Terrain } from '../world/terrain';
-import { CELL, WORLD_SIZE, heightAt, idx, type World } from '../world/worldgen';
+import { CELL, WORLD_X0, WORLD_Z0, heightAt, idx, type World } from '../world/worldgen';
 import { Ruins } from '../world/ruins';
 import * as shape from '../world/ruins-shape';
 import * as sim from '../sim/ruins';
@@ -42,7 +42,7 @@ const smooth = (a: number, b: number, v: number) => {
 /** The corner of the world made into the town's land: its heights, what it is painted with, and what stood on it. Before anything is built from the world. */
 export function lay(world: World) {
   const turn = Number(new URLSearchParams(location.search).get('ruins') || 0);
-  const half = WORLD_SIZE / 2, i0 = (PATCH.x0 + half) / CELL, i1 = (PATCH.x1 + half) / CELL, j0 = (PATCH.z0 + half) / CELL, j1 = (PATCH.z1 + half) / CELL;
+  const i0 = (PATCH.x0 - WORLD_X0) / CELL, i1 = (PATCH.x1 - WORLD_X0) / CELL, j0 = (PATCH.z0 - WORLD_Z0) / CELL, j1 = (PATCH.z1 - WORLD_Z0) / CELL;
   // the plain is at the height the corner mostly was, so that it meets what is round it without a cliff
   const was: number[] = [];
   for (let j = j0; j <= j1; j += 8) for (let i = i0; i <= i1; i += 8) was.push(world.heights[idx(i, j)]);
@@ -53,7 +53,7 @@ export function lay(world: World) {
   shares = new Uint8Array(w * h * 4);
   washes = new Uint8Array(w * h * 4);
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-    const x = -half + i * CELL, z = -half + j * CELL, [lx, lz] = sim.ruinLocal(site, x, 0, z), g = sim.ruinsGround(lx, lz);
+    const x = WORLD_X0 + i * CELL, z = WORLD_Z0 + j * CELL, [lx, lz] = sim.ruinLocal(site, x, 0, z), g = sim.ruinsGround(lx, lz);
     const k = idx(i, j), mix = smooth(0, PATCH.edge, Math.min(x - PATCH.x0, PATCH.x1 - x, z - PATCH.z0, PATCH.z1 - z));
     world.heights[k] = world.surface[k] = world.heights[k] * (1 - mix) + (site.y + g.y) * mix;
     world.splat.set([0, 0, 0, 255], k * 4);

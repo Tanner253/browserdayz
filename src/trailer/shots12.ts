@@ -19,7 +19,7 @@ import { HELI, heliSpots } from '../sim/heli';
 import { flightTimes, planFlight, type Flight } from '../sim/airdrop';
 import { F_AIM, F_LIGHT } from '../net/protocol';
 import { ArenaHud } from '../ui/arena-hud';
-import { WORLD_SIZE } from '../world/worldgen/places';
+import { SQUARE_HALF } from '../world/worldgen/places';
 
 /** how long the film is, seconds: said when its shots have been laid out */
 let total = 0;
@@ -547,7 +547,7 @@ export function buildShots(S: Stage): Shot[] {
     let best = 0, rise = Infinity;
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
-      if (Math.max(Math.abs(r.x + dx * 300), Math.abs(r.z + dz * 300)) > WORLD_SIZE / 2 - 40) continue;
+      if (Math.max(Math.abs(r.x + dx * 300), Math.abs(r.z + dz * 300)) > SQUARE_HALF - 40) continue;
       let top = -Infinity;
       for (let s = 20; s <= 250; s += 10) top = Math.max(top, S.ground(r.x + dx * s, r.z + dz * s) - r.y);
       if (top < rise) {

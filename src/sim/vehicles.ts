@@ -8,7 +8,7 @@
 // what state it is in; whoever is driving works out how it moves (as each player does for
 // their own two feet) and the server passes that on.
 
-import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, PLAY_RADIUS, SQUARE_HALF, heightAt, type World } from '../world/worldgen';
 
 /** What one hit takes off a car: a bullet's own harm up to `JEEP.shot`, a blast's `JEEP.blast` times over. The server's rule and the game's own, alone. */
 export function carDamage(rule: { damage: number; blast?: number; car?: number }): number {
@@ -216,7 +216,8 @@ export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outl
     })) return false;
     if (world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 4.5)) return false;
     if (world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4) || world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3)) return false;
-    return Math.max(Math.abs(x), Math.abs(z)) < WORLD_SIZE / 2 - 30;
+    // (on the square: the ground west of it has no ways as yet, 2026-10-16)
+    return Math.max(Math.abs(x), Math.abs(z)) < SQUARE_HALF - 30;
   };
   // (Not at the works, where it would stand under the gas, nor over the bunker. The two places out in the wild
   // country, outside the line, are places like any other: a car out there is the way back.)

@@ -16,7 +16,7 @@ import type { Actor, CamPose, Shot, Stage } from './director';
 import { scoreMusic14, type Kind14, type Row14 } from './music14';
 import { physics, SOLID_GROUPS } from '../core/physics';
 import { CASTLE, castleAt, type FortPlace } from '../sim/castle';
-import { WORLD_SIZE } from '../world/worldgen/places';
+import { SQUARE_HALF } from '../world/worldgen/places';
 import { HELI, heliSpots } from '../sim/heli';
 import { flightTimes, planFlight, type Flight } from '../sim/airdrop';
 import { ITEMS, makeItem } from '../sim/items';
@@ -352,7 +352,7 @@ export function buildShots(S: Stage): Shot[] {
     for (let r = 220; r <= 420; r += 20)
       for (let k = 0; k < 64; k++) {
         const a = (k / 64) * Math.PI * 2, x = d.x + Math.sin(a) * r, z = d.z + Math.cos(a) * r;
-        if (Math.max(Math.abs(x), Math.abs(z)) > WORLD_SIZE / 2 - 40) continue;
+        if (Math.max(Math.abs(x), Math.abs(z)) > SQUARE_HALF - 40) continue;
         const e = G(x, z, 1.6);
         if (Math.abs(S.ground(x + 4, z) - S.ground(x - 4, z)) > 1.6 || Math.abs(S.ground(x, z + 4) - S.ground(x, z - 4)) > 1.6) continue;
         if (!S.clearLine(e, sky) || !S.clearLine(e, low)) continue;
