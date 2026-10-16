@@ -52,6 +52,8 @@ export interface OceanOptions extends Rect {
    * as the coast needs: its depths are read finely. Only open-sea sides: what is beyond is drawn over nothing.
    */
   beyond?: { west?: number; east?: number; north?: number; south?: number };
+  /** another look than the sea's (a lake: LAKE in src/world/water.ts), and `cut`: no water where `depthAt` is under -0.4 */
+  look?: Partial<OceanLook> & { cut?: boolean };
 }
 
 /** metres a side of the tiles of open sea past the rectangle (few: what is drawn of them is a strip at the skyline) */
@@ -93,6 +95,46 @@ export const OCEAN = {
   solid: 15,
 };
 
+export type OceanLook = typeof OCEAN;
+
+let waves: { tex: THREE.DataTexture; slope: number } | null = null;
+/** The picture every water's waves are drawn from: made once (some 25 ms), the sea, lakes and rivers all reading it. */
+export function sharedWaves(anisotropy = 8) {
+  if (waves) return waves;
+  const w = waveMap(), tex = new THREE.DataTexture(w.data, w.res, w.res, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = anisotropy;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  return (waves = { tex, slope: w.slope });
+}
+
+/**
+ * Gives water materials the sky's own light to reflect, once the atmosphere has made it (in Atmosphere.init: water made
+ * before it waits for it): its picture, and what three works out for its own materials from the same picture
+ * (WebGLProgram generateCubeUVSize). The materials share one `envMap` uniform. Says whether it was done.
+ */
+export function skyOf(atmo: Atmosphere, ...mats: THREE.ShaderMaterial[]) {
+  const env = atmo.envMap as THREE.Texture | undefined;
+  if (!env || mats[0].uniforms.envMap.value === env) return !!env;
+  const h = (env.image as { height: number }).height, maxMip = Math.log2(h) - 2;
+  mats[0].uniforms.envMap.value = env;
+  for (const m of mats) {
+    Object.assign(m.defines, {
+      SEA_SKY: '',
+      ENVMAP_TYPE_CUBE_UV: '',
+      CUBEUV_TEXEL_WIDTH: (1 / (3 * Math.max(Math.pow(2, maxMip), 7 * 16))).toFixed(10),
+      CUBEUV_TEXEL_HEIGHT: (1 / h).toFixed(10),
+      CUBEUV_MAX_MIP: maxMip.toFixed(1),
+    });
+    m.needsUpdate = true;
+  }
+  return true;
+}
+
 const vec3 = (v: [number, number, number]) => `vec3(${v.map((n) => n.toFixed(5)).join(', ')})`;
 
 export class Ocean {
@@ -131,17 +173,10 @@ export class Ocean {
     this.depthTex.wrapS = this.depthTex.wrapT = THREE.ClampToEdgeWrapping;
     this.depthTex.needsUpdate = true;
 
-    const w = waveMap();
-    this.waves = new THREE.DataTexture(w.data, w.res, w.res, THREE.RGBAFormat);
-    this.waves.wrapS = this.waves.wrapT = THREE.RepeatWrapping;
-    this.waves.minFilter = THREE.LinearMipmapLinearFilter;
-    this.waves.magFilter = THREE.LinearFilter;
-    this.waves.generateMipmaps = true;
-    this.waves.anisotropy = o.anisotropy ?? 8;
-    this.waves.colorSpace = THREE.NoColorSpace;
-    this.waves.needsUpdate = true;
+    const w = sharedWaves(o.anisotropy);
+    this.waves = w.tex;
 
-    const fog = scene.fog as THREE.FogExp2 | null;
+    const fog = scene.fog as THREE.FogExp2 | null, L: OceanLook = { ...OCEAN, ...o.look };
     const uniforms = {
       uWaves: { value: this.waves },
       uDepth: { value: this.depthTex },
@@ -159,9 +194,9 @@ export class Ocean {
     const made = (solid: boolean) =>
       new THREE.ShaderMaterial({
         uniforms,
-        defines: { ...(fog ? { USE_FOG: '', FOG_EXP2: '' } : {}), ...(solid ? { SEA_SOLID: '' } : {}) },
+        defines: { ...(fog ? { USE_FOG: '', FOG_EXP2: '' } : {}), ...(solid ? { SEA_SOLID: '' } : {}), ...(o.look?.cut ? { SEA_CUT: '' } : {}) },
         vertexShader: VERTEX,
-        fragmentShader: fragment(w.slope),
+        fragmentShader: fragment(w.slope, L),
         transparent: !solid,
         premultipliedAlpha: true,
         depthWrite: true,
@@ -181,7 +216,7 @@ export class Ocean {
       b.north && { x0: rect.x0, x1: rect.x1, z0: Z0, z1: rect.z0 },
       b.south && { x0: rect.x0, x1: rect.x1, z0: rect.z1, z1: Z1 },
     ].filter((r): r is Rect => !!r);
-    const laid = [...oceanTiles(rect, o.tile ?? TILE).map((r) => ({ r, solid: shallowestIn(g, r) > OCEAN.solid })), ...open.flatMap((s) => oceanTiles(s, BEYOND_TILE).map((r) => ({ r, solid: true })))];
+    const laid = [...oceanTiles(rect, o.tile ?? TILE).map((r) => ({ r, solid: shallowestIn(g, r) > L.solid })), ...open.flatMap((s) => oceanTiles(s, BEYOND_TILE).map((r) => ({ r, solid: true })))];
     for (const { r, solid } of laid) {
       const mesh = new THREE.Mesh(square, solid ? this.solid : this.material);
       // (deep water before anything else solid: the ground under it is then hidden before it is painted)
@@ -200,21 +235,7 @@ export class Ocean {
 
   /** The sky's light, once the atmosphere has made it (it is made in Atmosphere.init: the sea made before it waits for it). */
   private useSky() {
-    const env = this.atmo.envMap as THREE.Texture | undefined;
-    if (!env || this.material.uniforms.envMap.value === env) return;
-    const h = (env.image as { height: number }).height, maxMip = Math.log2(h) - 2;
-    this.material.uniforms.envMap.value = env;
-    for (const m of [this.material, this.solid]) {
-      // (what three works out for its own materials from the same picture: WebGLProgram generateCubeUVSize)
-      Object.assign(m.defines, {
-        SEA_SKY: '',
-        ENVMAP_TYPE_CUBE_UV: '',
-        CUBEUV_TEXEL_WIDTH: (1 / (3 * Math.max(Math.pow(2, maxMip), 7 * 16))).toFixed(10),
-        CUBEUV_TEXEL_HEIGHT: (1 / h).toFixed(10),
-        CUBEUV_MAX_MIP: maxMip.toFixed(1),
-      });
-      m.needsUpdate = true;
-    }
+    skyOf(this.atmo, this.material, this.solid);
   }
 
   /**
@@ -243,7 +264,6 @@ export class Ocean {
     this.tiles[0]?.mesh.geometry.dispose();
     this.material.dispose();
     this.solid.dispose();
-    this.waves.dispose();
     this.depthTex.dispose();
   }
 }
@@ -260,16 +280,16 @@ const VERTEX = /* glsl */ `
     gl_Position = projectionMatrix * viewMatrix * w;
   }`;
 
-/** @param most the slope the wave picture's 127 stands for (ocean-waves.ts waveMap) */
-function fragment(most: number) {
-  const wind = new THREE.Vector2(...OCEAN.wind).normalize();
+/** @param most the slope the wave picture's 127 stands for (ocean-waves.ts waveMap); @param L the look (OCEAN, or a lake's) */
+function fragment(most: number, L: OceanLook) {
+  const wind = new THREE.Vector2(...L.wind).normalize();
   const layer = ([size, turn, pace]: [number, number, number, number]) => {
     const d = wind.clone().rotateAround(new THREE.Vector2(), turn);
     return `seaSlope( p, vec2( ${d.x.toFixed(5)}, ${d.y.toFixed(5)} ), ${(1 / size).toFixed(6)}, ${pace.toFixed(3)}, crest )`;
   };
-  const [l1, l2, l3] = OCEAN.layers, surf = OCEAN.surf;
-  // (the three at their highest together are OCEAN.slope)
-  const scale = OCEAN.slope / (most * (l1[3] + l2[3] + l3[3]));
+  const [l1, l2, l3] = L.layers, surf = L.surf;
+  // (the three at their highest together are L.slope)
+  const scale = L.slope / (most * (l1[3] + l2[3] + l3[3]));
   return /* glsl */ `
   uniform sampler2D uWaves;
   uniform sampler2D uDepth;
@@ -349,7 +369,7 @@ function fragment(most: number) {
 
     // the water itself, as seen into it: sea-green in the shallows, dark blue-green deep, lit by the hour's air and sun
     float deep = 1.0 - exp( -max( depth, 0.0 ) * 0.12 );
-    vec3 tint = mix( ${vec3(OCEAN.shallow)}, ${vec3(OCEAN.deep)}, deep );
+    vec3 tint = mix( ${vec3(L.shallow)}, ${vec3(L.deep)}, deep );
     vec3 body = tint * ( fogColor * 0.9 + uSun * max( uSunDir.y, 0.0 ) * 0.12 );
     // (light through the crest of a wave between the eye and a low sun; and green through a breaker's face, thinnest
     // just before it breaks)
@@ -357,7 +377,7 @@ function fragment(most: number) {
     body += tint * uSun * pow( max( dot( -V, uSunDir ), 0.0 ), 4.0 ) * ( c3 * 0.08 + face * 0.35 );
     body += ${vec3([0.02, 0.07, 0.055])} * face * ( fogColor.g + uSun.g * 0.15 );
     // how much of what is under it is hidden: by the water looked through to reach the ground
-    float murk = 1.0 - exp( -max( depth, 0.0 ) / max( V.y, 0.06 ) * ${OCEAN.murk.toFixed(4)} );
+    float murk = 1.0 - exp( -max( depth, 0.0 ) / max( V.y, 0.06 ) * ${L.murk.toFixed(4)} );
     #ifdef SEA_SOLID
       murk = 1.0;
     #endif
@@ -370,7 +390,7 @@ function fragment(most: number) {
     // (a breaker breaks white along its crest inside the breaking line, and leaves foam behind it as it goes in)
     float breaking = 1.0 - smoothstep( ${(surf.breaks * 0.5).toFixed(1)}, ${surf.breaks.toFixed(1)}, fromShore );
     float crestLine = smoothstep( 0.8, 0.98, swell ) + 0.45 * smoothstep( 0.2, 0.9, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 );
-    float shallows = 1.0 - smoothstep( 0.2, ${OCEAN.foamDepth.toFixed(3)}, depth );
+    float shallows = 1.0 - smoothstep( 0.2, ${L.foamDepth.toFixed(3)}, depth );
     float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * 0.12 + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
     // (two sizes of the net drifting apart: one alone was a honeycomb)
     float net = texture2D( uWaves, p * 0.23 + vec2( uTime * 0.04, 0.0 ) ).a * 0.62 + texture2D( uWaves, p * 0.061 - vec2( 0.0, uTime * 0.013 ) ).a * 0.38;
@@ -394,6 +414,10 @@ function fragment(most: number) {
     #endif
     #ifdef SEA_SOLID
       a = 1.0;
+    #endif
+    #ifdef SEA_CUT
+      // (a lake's box past its shore: the water is not there, whatever the ground)
+      if ( depth < -0.4 ) discard;
     #endif
     gl_FragColor = vec4( clamp( col, 0.0, 32.0 ), clamp( a, 0.0, 1.0 ) );
     if ( any( isnan( gl_FragColor ) ) ) gl_FragColor = vec4( 0.0 );
