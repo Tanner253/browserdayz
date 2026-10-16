@@ -1308,7 +1308,7 @@ export class AudioEngine {
   }
 
   /** @param carried weight on the player's back (own steps only): the kit shifts with each one */
-  footstep(surface: Surface | 'grass' | 'dirt' | 'gravel' | 'snow', speed: number, pos?: V3, carried = 0) {
+  footstep(surface: Surface | 'grass' | 'dirt' | 'gravel' | 'snow' | 'water', speed: number, pos?: V3, carried = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const vol = Math.min(1, 0.15 + speed * 0.07) * (pos ? 5.5 : 3.2);
@@ -1354,6 +1354,12 @@ export class AudioEngine {
         break;
       case 'dirt':
         layer('lowpass', 700, 1, 0.45, 0.006, 0.08);
+        break;
+      case 'water':
+        // (a foot going in and coming out: the slap of it, the slosh after, and the drops falling back)
+        layer('lowpass', 600, 0.8, 0.7, 0.004, 0.16);
+        layer('bandpass', 1500, 1.4, 0.45, 0.012, 0.22, 0.03);
+        for (let i = 0; i < 4; i++) layer('bandpass', 2600 + Math.random() * 2400, 6, 0.1, 0.001, 0.025, 0.12 + Math.random() * 0.18);
         break;
       default: // grass: soft swish + muffled thud
         layer('highpass', 2500, 0.6, 0.16, 0.02, 0.12);
