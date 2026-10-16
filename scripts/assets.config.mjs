@@ -43,6 +43,12 @@ export const TEXTURES = {
   sand_01: { res: '2k', tex: 1024 },
   sandy_gravel_02: { res: '2k', tex: 1024 },
   mud_cracked_dry_riverbed_002: { res: '2k', tex: 1024 },
+  // the coast and the desert west of the plains (2026-10-16, not yet laid: progress/map3/kit/terrain-hookup.md): wind-rippled
+  // sand, a beach's dry sand and its wet, and the layered rock of a canyon's walls. Cracked earth is the riverbed above.
+  aerial_beach_01: { res: '2k', tex: 1024 },
+  coast_sand_01: { res: '2k', tex: 1024 },
+  damp_beach_sand: { res: '2k', tex: 1024 },
+  cliff_side: { res: '2k', tex: 1024 },
   // the mountain's snow, close to (2026-10-13): smooth powdery snowfield. What lies on the ground far off is still colour alone.
   snow_02: { res: '2k', tex: 1024 },
   // the country's ground by what it is (2026-10-13: "spare no expense with textures so that it doesnt look like shit is
@@ -1088,6 +1094,22 @@ export const MODELS = {
   dead_tree_trunk: { res: '1k', tex: 1024, budget: 8000, far: 800, tags: ['nature'] },
   fern_02: { res: '1k', tex: 1024, budget: 3000, far: 300, tags: ['nature'] },
   dry_branches_medium_01: { res: '1k', tex: 1024, budget: 4000, far: 500, tags: ['nature'] },
+  // the desert and the coast (2026-10-16, not yet placed): Poly Haven's Namaqualand scans, built one at a time by
+  // scripts/haven-models.mjs. A canyon's walls and outcrops, boulders for its floor and the beach, a dead tree, a
+  // bleached branch for the tide line, dry bushes (five in the file). Pictures at the 2k they came at (tier-now keeps
+  // them in hi/). The scans came at 15,000 to 194,000 triangles; each is brought down only as far as keeps every point
+  // of it within 2 to 11 mm of where it was, by its size (`--probe`), its relief map carrying the rest; the scan as it
+  // came beside the copy: progress/map3/kit/pair-*.jpg (the rule for dense scans, 2026-10-13). The bush is whole, and
+  // `cutout`: its twigs' mask is a picture its glTF does not name, which only scripts/haven-models.mjs puts in.
+  namaqualand_cliff_01: { res: '2k', tex: 2048, budget: 52000, far: 4000, tags: ['nature'] },
+  namaqualand_cliff_02: { res: '2k', tex: 2048, budget: 45000, far: 6000, tags: ['nature'] },
+  namaqualand_boulder_02: { res: '2k', tex: 2048, budget: 34000, far: 2500, tags: ['nature'] },
+  namaqualand_boulder_03: { res: '2k', tex: 2048, budget: 30000, far: 2500, tags: ['nature'] },
+  namaqualand_boulder_04: { res: '2k', tex: 2048, budget: 44000, far: 2500, tags: ['nature'] },
+  namaqualand_boulder_05: { res: '2k', tex: 2048, budget: 20000, far: 1200, tags: ['nature'] },
+  dead_quiver_trunk: { res: '2k', tex: 2048, budget: 10500, far: 600, tags: ['nature'] },
+  dead_quiver_branch_01: { res: '2k', tex: 2048, budget: 9800, far: 500, tags: ['nature'] },
+  wild_rooibos_bush: { res: '2k', tex: 2048, far: 3000, cutout: true, tags: ['nature'] },
 };
 
 /**

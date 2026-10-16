@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-14T23:22:17.718Z",
+ "generated": "2026-10-16T18:09:24.750Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -259,6 +259,26 @@
    "diff": "assets/tex/mossy_rock_diff.webp",
    "nor": "assets/tex/mossy_rock_nor.webp",
    "arm": "assets/tex/mossy_rock_arm.webp"
+  },
+  "aerial_beach_01": {
+   "diff": "assets/tex/aerial_beach_01_diff.webp",
+   "nor": "assets/tex/aerial_beach_01_nor.webp",
+   "arm": "assets/tex/aerial_beach_01_arm.webp"
+  },
+  "coast_sand_01": {
+   "diff": "assets/tex/coast_sand_01_diff.webp",
+   "nor": "assets/tex/coast_sand_01_nor.webp",
+   "arm": "assets/tex/coast_sand_01_arm.webp"
+  },
+  "damp_beach_sand": {
+   "diff": "assets/tex/damp_beach_sand_diff.webp",
+   "nor": "assets/tex/damp_beach_sand_nor.webp",
+   "arm": "assets/tex/damp_beach_sand_arm.webp"
+  },
+  "cliff_side": {
+   "diff": "assets/tex/cliff_side_diff.webp",
+   "nor": "assets/tex/cliff_side_nor.webp",
+   "arm": "assets/tex/cliff_side_arm.webp"
   }
  },
  "models": {
@@ -5560,6 +5580,258 @@
     5.061
    ],
    "lods": []
+  },
+  "namaqualand_cliff_01": {
+   "url": "assets/models/namaqualand_cliff_01.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 754080,
+   "srcTris": 94369,
+   "tris": 51989,
+   "min": [
+    -3.8721,
+    -0.4192,
+    -3.6105
+   ],
+   "max": [
+    4.407,
+    4.5419,
+    0.7796
+   ],
+   "lods": [
+    {
+     "url": "assets/models/namaqualand_cliff_01_lod1.glb",
+     "tris": 3999
+    }
+   ],
+   "hi": "assets/models/hi/namaqualand_cliff_01.glb",
+   "hiBytes": 2746852,
+   "hiCard": 64
+  },
+  "namaqualand_cliff_02": {
+   "url": "assets/models/namaqualand_cliff_02.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 794444,
+   "srcTris": 194080,
+   "tris": 44982,
+   "min": [
+    -9.6811,
+    -0.1598,
+    -4.399
+   ],
+   "max": [
+    10.5464,
+    7.024,
+    2.1944
+   ],
+   "lods": [
+    {
+     "url": "assets/models/namaqualand_cliff_02_lod1.glb",
+     "tris": 6000
+    }
+   ],
+   "hi": "assets/models/hi/namaqualand_cliff_02.glb",
+   "hiBytes": 3013200,
+   "hiCard": 64
+  },
+  "namaqualand_boulder_02": {
+   "url": "assets/models/namaqualand_boulder_02.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 819172,
+   "srcTris": 97964,
+   "tris": 33992,
+   "min": [
+    -1.184,
+    -0.0595,
+    -0.6087
+   ],
+   "max": [
+    1.3481,
+    0.8232,
+    0.6256
+   ],
+   "lods": [
+    {
+     "url": "assets/models/namaqualand_boulder_02_lod1.glb",
+     "tris": 2498
+    }
+   ],
+   "hi": "assets/models/hi/namaqualand_boulder_02.glb",
+   "hiBytes": 3502616,
+   "hiCard": 64
+  },
+  "namaqualand_boulder_03": {
+   "url": "assets/models/namaqualand_boulder_03.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 652204,
+   "srcTris": 64826,
+   "tris": 29996,
+   "min": [
+    -1.0548,
+    -0.0147,
+    -1.3896
+   ],
+   "max": [
+    1.3523,
+    1.4585,
+    1.6758
+   ],
+   "lods": [
+    {
+     "url": "assets/models/namaqualand_boulder_03_lod1.glb",
+     "tris": 2500
+    }
+   ],
+   "hi": "assets/models/hi/namaqualand_boulder_03.glb",
+   "hiBytes": 2528368,
+   "hiCard": 64
+  },
+  "namaqualand_boulder_04": {
+   "url": "assets/models/namaqualand_boulder_04.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 777596,
+   "srcTris": 59066,
+   "tris": 44000,
+   "min": [
+    -1.3403,
+    -0.0294,
+    -1.031
+   ],
+   "max": [
+    1.1819,
+    1.8711,
+    1.4654
+   ],
+   "lods": [
+    {
+     "url": "assets/models/namaqualand_boulder_04_lod1.glb",
+     "tris": 2500
+    }
+   ],
+   "hi": "assets/models/hi/namaqualand_boulder_04.glb",
+   "hiBytes": 2763676,
+   "hiCard": 64
+  },
+  "namaqualand_boulder_05": {
+   "url": "assets/models/namaqualand_boulder_05.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 646824,
+   "srcTris": 89618,
+   "tris": 19992,
+   "min": [
+    -0.6351,
+    -0.0098,
+    -0.398
+   ],
+   "max": [
+    0.729,
+    0.5285,
+    0.35
+   ],
+   "lods": [
+    {
+     "url": "assets/models/namaqualand_boulder_05_lod1.glb",
+     "tris": 1200
+    }
+   ],
+   "hi": "assets/models/hi/namaqualand_boulder_05.glb",
+   "hiBytes": 3050500,
+   "hiCard": 64
+  },
+  "dead_quiver_trunk": {
+   "url": "assets/models/dead_quiver_trunk.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 407644,
+   "srcTris": 17978,
+   "tris": 10500,
+   "min": [
+    -0.1705,
+    0.0118,
+    -0.1311
+   ],
+   "max": [
+    0.136,
+    2.0059,
+    0.137
+   ],
+   "lods": [
+    {
+     "url": "assets/models/dead_quiver_trunk_lod1.glb",
+     "tris": 600
+    }
+   ],
+   "hi": "assets/models/hi/dead_quiver_trunk.glb",
+   "hiBytes": 1613132,
+   "hiCard": 64
+  },
+  "dead_quiver_branch_01": {
+   "url": "assets/models/dead_quiver_branch_01.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 417868,
+   "srcTris": 14834,
+   "tris": 9800,
+   "min": [
+    -0.1525,
+    0.0007,
+    -0.0972
+   ],
+   "max": [
+    0.1025,
+    0.4393,
+    0.1298
+   ],
+   "lods": [
+    {
+     "url": "assets/models/dead_quiver_branch_01_lod1.glb",
+     "tris": 500
+    }
+   ],
+   "hi": "assets/models/hi/dead_quiver_branch_01.glb",
+   "hiBytes": 2338040,
+   "hiCard": 64
+  },
+  "wild_rooibos_bush": {
+   "url": "assets/models/wild_rooibos_bush.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 664408,
+   "srcTris": 27519,
+   "tris": 27519,
+   "min": [
+    -0.3326,
+    -0.0024,
+    -0.537
+   ],
+   "max": [
+    1.9464,
+    0.5389,
+    0.3064
+   ],
+   "lods": [
+    {
+     "url": "assets/models/wild_rooibos_bush_lod1.glb",
+     "tris": 2813
+    }
+   ],
+   "hi": "assets/models/hi/wild_rooibos_bush.glb",
+   "hiBytes": 1780556,
+   "hiCard": 64
   }
  }
 }
