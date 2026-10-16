@@ -2,7 +2,9 @@
 // It starts this tree's server on a port of its own (8193, `.env.local-server`, a data folder of its own: as
 // join-check.ts does, and for the same reasons), then has play.mjs open the dev page (5173: it must be running)
 // pointed at that server, join, and stand in the world a few seconds. Any page error or console error fails it.
-// PLAY_GL=swiftshader draws on the processor instead of the card. PLAY_PORT defaults to 9361 here.
+// PLAY_GL=swiftshader draws on the processor instead of the card. PLAY_PORT defaults to 9361 here. From a worktree of
+// its own (which has no assets-src/ and its own dev page): DEV_PAGE=http://localhost:<its port> and ASSETS_SRC=<the
+// main checkout's assets-src>.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -12,8 +14,9 @@ import path from 'node:path';
 const PORT = 8193, SITE = 'http://127.0.0.1:9', out = process.argv[2] ?? path.join(os.tmpdir(), 'zp', 'split', 'online');
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 assert.match(readFileSync('.env.local-server', 'utf8'), /^SITE_URL=http:\/\/127\.0\.0\.1:9\s*$/m, '.env.local-server does not hold SITE_URL=http://127.0.0.1:9: not starting a server');
-const page = await fetch('http://localhost:5173/').then((r) => r.status).catch(() => 0);
-assert.equal(page, 200, 'the dev page is not running on 5173 (launch entry zona-dev)');
+const DEV = process.env.DEV_PAGE ?? 'http://localhost:5173', TOOLS = process.env.ASSETS_SRC ?? 'assets-src';
+const page = await fetch(`${DEV}/`).then((r) => r.status).catch(() => 0);
+assert.equal(page, 200, `the dev page is not running at ${DEV} (launch entry zona-dev)`);
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-online-'));
 const server = spawn(process.execPath, ['--env-file=.env.local-server', path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
@@ -32,8 +35,8 @@ let failed: unknown = null, said = '';
 try {
   for (let k = 0; k < 1200 && !logged.includes('listening'); k++) await sleep(100);
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-800)}`);
-  play = spawn(process.execPath, ['assets-src/_wf/me/play.mjs', 'scripts/split/online.js', out, '1280', '720', `http://localhost:5173/?server=http://127.0.0.1:${PORT}`], {
-    env: { ...process.env, PLAY_PORT: process.env.PLAY_PORT ?? '9361', PLAY_PRE: 'assets-src/_wf/me/still.js' },
+  play = spawn(process.execPath, [`${TOOLS}/_wf/me/play.mjs`, 'scripts/split/online.js', out, '1280', '720', `${DEV}/?server=http://127.0.0.1:${PORT}`], {
+    env: { ...process.env, PLAY_PORT: process.env.PLAY_PORT ?? '9361', PLAY_PRE: `${TOOLS}/_wf/me/still.js` },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   play.stdout!.on('data', (d) => (said += d));
