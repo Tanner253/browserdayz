@@ -6,7 +6,7 @@ import { Simplex } from '../core/noise';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { BELT, FORT_SNOW, RUTS, SNOW_LIFT, snowNet, snowOn, snowPicture, snowThinsGrass, snowUniforms, tellSnow } from './snow';
-import { CELL, SNOW, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, groundField, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
+import { CELL, SNOW, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, groundField, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
 import { frameToWorld, inWell, type Basement } from '../sim/basements';
 
 // The paint as it was: four layers, in the order of the splat's channels (grass, forest floor, rock, gravel), and
@@ -263,6 +263,48 @@ function macroNoiseTexture(): THREE.DataTexture {
 /** quads along one side of a ground tile */
 const TILE_QUADS = 64;
 
+/**
+ * FAR GROUND DRAWN COARSER, in the west (2026-10-16). The ground west of the square is 288 tiles more, and looked at
+ * from the village it was 0.9 million triangles more a frame, nearly all of them over a kilometre off, where a 2 m
+ * square is a pixel. So each of its tiles is also laid with squares of 4 m and of 8 m (`COARSE_AT` says from how far),
+ * its edges kept at 2 m whatever its middle is, so that tiles of any fineness meet without a crack. Its corners are
+ * the net's own points and keep their normals: from far off it is lit as it was. The square's tiles are as they were.
+ */
+const COARSE_AT = [400, 800];
+
+/**
+ * A tile's triangles with squares of `s` samples (2 or 4) inside and the net's own along its four edges: the middle
+ * in squares of `s`, and between it and each edge a strip zipped from the edge's points to the middle's. `v(i, j)` is
+ * the net's number of the tile's point (i, j); each triangle goes to `put` turned as the fine ground's are.
+ */
+export function coarseTile(q: number, s: number, v: (i: number, j: number) => number, put: (a: number, b: number, c: number) => void) {
+  const tri = (p: [number, number], r: [number, number], t: [number, number]) => {
+    const area = (r[0] - p[0]) * (t[1] - p[1]) - (r[1] - p[1]) * (t[0] - p[0]);
+    if (area === 0) return;
+    // (the fine ground's (a, c, b) has a turn less than nothing in (i, j): every one is laid so)
+    if (area < 0) put(v(...p), v(...r), v(...t));
+    else put(v(...p), v(...t), v(...r));
+  };
+  for (let j = s; j < q - s; j += s) for (let i = s; i < q - s; i += s) {
+    tri([i, j], [i, j + s], [i + s, j]);
+    tri([i + s, j], [i, j + s], [i + s, j + s]);
+  }
+  // (each strip: the edge's points, and the middle's nearest row of them, both along the strip from one corner to the other)
+  const zip = (outer: [number, number][], inner: [number, number][], along: (p: [number, number]) => number) => {
+    let a = 0, b = 0;
+    while (a < outer.length - 1 || b < inner.length - 1) {
+      if (b === inner.length - 1 || (a < outer.length - 1 && along(outer[a + 1]) <= along(inner[b + 1]))) tri(outer[a], outer[++a], inner[b]);
+      else tri(outer[a], inner[++b], inner[b - 1]);
+    }
+  };
+  const line = (n: number, f: (k: number) => [number, number]) => Array.from({ length: n }, (_, k) => f(k));
+  const fine = q + 1, mid = (q - 2 * s) / s + 1;
+  zip(line(fine, (k) => [k, 0]), line(mid, (k) => [s + k * s, s]), (p) => p[0]);
+  zip(line(fine, (k) => [k, q]), line(mid, (k) => [s + k * s, q - s]), (p) => p[0]);
+  zip(line(fine, (k) => [0, k]), line(mid, (k) => [s, s + k * s]), (p) => p[1]);
+  zip(line(fine, (k) => [q, k]), line(mid, (k) => [q - s, s + k * s]), (p) => p[1]);
+}
+
 /** the world's net as the ground's shaders read it: its north-west corner and size in metres, its samples across and down */
 export const worldUniforms = () => ({
   uWorld: { value: new THREE.Vector4(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0) },
@@ -412,7 +454,19 @@ export class Terrain {
       geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
       tiles.push(geo);
     }
-    const shared = new THREE.BufferAttribute(k < index.length ? index.slice(0, k) : index, 1);
+    // (the west's tiles laid again, coarser, after all of them: see COARSE_AT. In the same order, so that a run of
+    // them is a run of each; each tile's `lods` says where each of its three is)
+    const west = tiles.filter((geo) => X0 + (geo.userData.tile[0] + 1) * TILE_QUADS * CELL <= -SQUARE_HALF);
+    const per = (s: number) => { let n = 0; coarseTile(TILE_QUADS, s, () => 0, () => n++); return n * 3; };
+    const all = new Uint32Array(k + west.length * (per(2) + per(4)));
+    all.set(index.subarray(0, k));
+    for (const geo of tiles) geo.userData.lods = [[geo.drawRange.start, geo.drawRange.count]];
+    for (const s of [2, 4]) for (const geo of west) {
+      const [i, j] = geo.userData.tile as [number, number], tx = i * TILE_QUADS, tz = j * TILE_QUADS, from = k;
+      coarseTile(TILE_QUADS, s, (a, b) => idx(tx + a, tz + b), (a, b, c) => { all[k++] = a; all[k++] = b; all[k++] = c; });
+      geo.userData.lods.push([from, k - from]);
+    }
+    const shared = new THREE.BufferAttribute(all, 1);
     for (const geo of tiles) geo.setIndex(shared);
 
     // --- data textures shared with grass / vegetation shaders
@@ -558,6 +612,7 @@ export class Terrain {
       // (a tile drawn in a run is not drawn on its own in the view: the sun's shadow maps draw it as they did, see `update`)
       tile.intersectsFrustum = (f) => (!tile.userData.inRun || SHADOW_FRUSTA.has(f)) && f.intersectsObject(tile);
       at.set(String(geo.userData.tile), tile);
+      if (geo.userData.lods.length > 1) this.far.push(tile);
     }
     // the runs: four by four, and two by two inside each, where every tile of one is there to draw
     const run = (i0: number, j0: number, n: number): Run | null => {
@@ -571,8 +626,14 @@ export class Terrain {
       geo.setAttribute('position', posAttr);
       geo.setAttribute('normal', nrmAttr);
       geo.setIndex(shared);
-      const starts = of.map((t) => t.geometry.drawRange.start), ends = of.map((t) => t.geometry.drawRange.start + t.geometry.drawRange.count);
-      geo.setDrawRange(Math.min(...starts), Math.max(...ends) - Math.min(...starts));
+      // (each fineness of a run is a run of the index too: its tiles are laid one after another at each)
+      const most = Math.min(...of.map((t) => (t.geometry.userData.lods as [number, number][]).length));
+      const lods = Array.from({ length: most }, (_, L) => {
+        const starts = of.map((t) => t.geometry.userData.lods[L][0] as number), ends = of.map((t) => (t.geometry.userData.lods[L][0] + t.geometry.userData.lods[L][1]) as number);
+        return [Math.min(...starts), Math.max(...ends) - Math.min(...starts)];
+      });
+      geo.userData.lods = lods;
+      geo.setDrawRange(lods[0][0], lods[0][1]);
       geo.boundingBox = new THREE.Box3();
       for (const t of of) geo.boundingBox.union(t.geometry.boundingBox!);
       geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
@@ -600,6 +661,10 @@ export class Terrain {
 
   /** runs of tiles drawn at one go (see `update`) */
   private runs: Run[] = [];
+  /** the tiles that are also laid coarser (the west's: see COARSE_AT) */
+  private far: THREE.Mesh[] = [];
+  /** the west's far tiles drawn coarser (see COARSE_AT); false, every tile is drawn fine, as the square's are */
+  coarse = true;
 
   /**
    * The ground is a hundred and forty-four tiles, each its own thing to draw: seventy-seven of a frame's draws in the
@@ -612,6 +677,17 @@ export class Terrain {
     if (!this.runs.length) return;
     _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     _view.setFromProjectionMatrix(_pv);
+    // (how fine each of the west's tiles is drawn, by how far its nearest point is from the eye)
+    const c = camera.position;
+    for (const t of this.far) {
+      const b = t.geometry.boundingBox!;
+      const d = Math.hypot(Math.max(b.min.x - c.x, 0, c.x - b.max.x), Math.max(b.min.y - c.y, 0, c.y - b.max.y), Math.max(b.min.z - c.z, 0, c.z - b.max.z));
+      const L = !this.coarse ? 0 : d > COARSE_AT[1] ? 2 : d > COARSE_AT[0] ? 1 : 0;
+      if (t.userData.lod === L) continue;
+      t.userData.lod = L;
+      const [from, n] = t.geometry.userData.lods[L];
+      t.geometry.setDrawRange(from, n);
+    }
     for (const r of this.runs) this.choose(r);
   }
 
@@ -621,6 +697,14 @@ export class Terrain {
     if (r.parts.length) {
       for (const p of r.parts) if (!this.choose(p)) all = false;
     } else for (const t of r.of) if (!_view.intersectsSphere(t.geometry.boundingSphere!)) all = false;
+    // (at one go, a run is drawn as fine as the finest of its tiles: their edges are all fine, so tiles of any
+    // fineness meet, and it is one draw)
+    let L = 2;
+    for (const t of r.of) L = Math.min(L, (t.userData.lod as number | undefined) ?? 0);
+    if (all) {
+      const [from, n] = r.mesh.geometry.userData.lods[L];
+      r.mesh.geometry.setDrawRange(from, n);
+    }
     r.mesh.visible = all;
     if (all) for (const p of r.parts) p.mesh.visible = false;
     if (all || !r.parts.length) for (const t of r.of) t.userData.inRun = all;
