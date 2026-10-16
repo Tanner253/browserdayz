@@ -1829,7 +1829,9 @@ export class Buildings {
         return lx > y.x0 + 0.4 && lx < y.x1 - 0.4 && lz > y.z0 + 0.4 && lz < y.z1 - 0.4;
       });
     for (const plot of this.world.buildings) {
-      if (!['house_small', 'house_brick', 'house_two', 'flats'].includes(plot.type) || Math.hypot(plot.x - village.x, plot.z - village.z) > 175) continue;
+      // (and in the new towns, behind their houses: a log house's kitchen garden, the shops' back yards; see src/sim/towns.ts)
+      const town = /^(lipki|pokrov)_/.test(plot.id);
+      if (!(town ? ['izba', 'izba_two', 'merchant', 'tavern'] : ['house_small', 'house_brick', 'house_two', 'flats']).includes(plot.type) || (!town && Math.hypot(plot.x - village.x, plot.z - village.z) > 175)) continue;
       const [w, d] = BUILDING_FOOTPRINT[plot.type], c = Math.cos(plot.rot), s = Math.sin(plot.rot), dice = new RNG(plot.seed ^ 0x9a2d);
       const out = (lx: number, lz: number): [number, number] => [plot.x + lx * c + lz * s, plot.z - lx * s + lz * c];
       const deep = plot.type === 'flats' ? 9 : 7 + Math.floor(dice.next() * 3), x0 = -w / 2 - 1.0, x1 = w / 2 + 1.0, zb = -d / 2 - deep;
