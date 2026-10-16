@@ -302,6 +302,8 @@ export class Game {
   vicinitySig = '';
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   awaitClick = false;
+  /** the chat is open and the mouse let go for it (see frame) */
+  chatFree = false;
   /** the bot check's range, while the server has this game on it (see ./botcheck.ts): not yet anybody in the world */
   botCheck: BotCheck | null = null;
   rangeHeard = false;
@@ -1047,7 +1049,7 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
       // (an Arena match over: the mouse is let go for its result's card, which is no pause, and nothing takes it
       // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
       // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")

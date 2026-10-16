@@ -385,6 +385,10 @@ export class HUD {
     });
     chat.addEventListener('input', () => this.suggest());
     chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
+    // (a click on what is said, or its scroll bar, leaves the box being typed in: the chat stays open)
+    this.el.chat.addEventListener('mousedown', (e) => {
+      if (this.chatOpen && e.target !== chat) e.preventDefault();
+    });
     this.setChannel('global');
     // the contract address, copied
     const links = this.root.querySelector('.start-links') as HTMLElement;

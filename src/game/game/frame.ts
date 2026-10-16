@@ -97,6 +97,24 @@ export const frameMethods = {
     // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
     const uiOpen = panels || !!this.freecam;
     // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
+    // Typing in the chat, the mouse is let go, to point at what is said and scroll back through it (the owner, 2026-10-16:
+    // "when typing in chat the mouse should be unlocked from the character so they can hover over the chat/scroll up");
+    // taken again when it shuts, as after the inventory (and if the browser will not, the next click takes it).
+    if (this.hud.chatOpen !== this.chatFree && !input.touch && !input.pad) {
+      this.chatFree = this.hud.chatOpen;
+      if (this.chatFree) {
+        input.uiMode = true;
+        input.unlock();
+      } else if (!this.invUI.isOpen && !this.map.open && !this.adminUI.isOpen && !this.hud.emotes.isOpen) {
+        input.uiMode = false;
+        if (this.started && !this.paused && !this.player.dead) {
+          input.lock();
+          setTimeout(() => {
+            if (this.started && !this.paused && !this.hud.chatOpen && !input.locked && !this.player.dead) this.awaitClick = true;
+          }, 400);
+        }
+      }
+    }
     const order = input.pressed('Slash') || input.pressed('NumpadDivide');
     if ((order || input.pressed('Enter')) && playing && !panels && !this.hud.chatOpen) {
       input.releaseAll();
