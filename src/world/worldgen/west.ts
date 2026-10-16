@@ -181,7 +181,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
   // one onto the steppe. Its floor rises from just over the beach to the steppe's height; its walls stand 15 to 30 m
   // over it, in ledges, steep enough for a cave's mouth to be cut in them; the tableland they are the edges of goes
   // back into the land round it. (Its caves are a module of their own: they will open the ground where their mouths are.)
-  const C = PLAN.canyon, cl = C.line, cEnd = cl[cl.length - 1], cStart = cl[0];
+  const C = PLAN.canyon, cl = catmullRom(C.line, 6), cEnd = cl[cl.length - 1], cStart = cl[0];
   const steppeY = heightAt(heights, cEnd[0] + 40, cEnd[1] + 40), mouthY = heightAt(heights, cStart[0], cStart[1]);
   {
     const box = cl.reduce((b, [x, z]) => [Math.min(b[0], x), Math.max(b[1], x), Math.min(b[2], z), Math.max(b[3], z)], [Infinity, -Infinity, Infinity, -Infinity]);
@@ -198,8 +198,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
       const halfW = lerp(C.floor[0], C.floor[1], 0.5 + 0.5 * p4.noise(t * 9, 1.7));
       const wallH = lerp(C.walls[0], C.walls[1], 0.5 + 0.5 * p4.noise(t * 6 + 4, 2.3)) * (1 - open);
       const run = wallH / C.face, top = floorY + wallH + 2 * p4.fbm(x * 0.02, z * 0.02, 3);
-      // (the walls in steps where the rock is harder: a ledge every few metres, and a face between)
-      const u = clamp((d - halfW) / run, 0, 1), steps = u + 0.06 * Math.sin(u * Math.PI * 5);
+      // (the walls in steps where the rock is harder: a ledge or two, and a face between)
+      const u = clamp((d - halfW) / run, 0, 1), steps = u + 0.035 * Math.sin(u * Math.PI * 3);
       const cut = d <= halfW ? floorY : floorY + (top - floorY) * clamp(steps, 0, 1);
       // (and the tableland goes no further than the beach's inland edge: the sand runs on to the canyon's mouth)
       const beach = smoothstep(W.sand, W.sand + 90, x - shores[iz]);
@@ -299,7 +299,11 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
     gap[clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1)] < pad ||
     PLAN.plots.some((p) => Math.abs(x - p.x) < p.w / 2 + pad && Math.abs(z - p.z) < p.d / 2 + pad) ||
     outside(M.wall, x, z) < M.clear || Math.hypot(x - post.x, z - post.z) < 40 + pad ||
-    yard.some((y) => { const dx = x - y.x, dz = z - y.z, r = dx * Math.cos(y.rot) - dz * Math.sin(y.rot), f = dx * Math.sin(y.rot) + dz * Math.cos(y.rot); return Math.abs(r) < 30 && f > -36 && f < 60; });
+    // (of the bunker, as its first place had it: what grows there stays but on its roof, in its hut and in its way out)
+    yard.some((y) => {
+      const dx = x - y.x, dz = z - y.z, r = dx * Math.cos(y.rot) - dz * Math.sin(y.rot), f = dx * Math.sin(y.rot) + dz * Math.cos(y.rot), P = BUNKER.pad;
+      return (Math.abs(r) < P.r + 1 && f > P.back - 1 && f < P.front + 1) || (Math.abs(r) < 6.5 + pad && f > 7.5 && f < 23 + 40);
+    });
   for (const list of [tools.trees, tools.rocks, tools.props]) {
     for (let k = list.length - 1; k >= 0; k--) {
       const t = list[k];
@@ -328,8 +332,10 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
     let rock = slope < 0.39 ? 0 : clamp(smoothstep(0.5, 0.85, slope + 0.1 * n3.noise(x * 0.05, z * 0.05)), 0, 1);
     let forest = Math.max(smoothstep(-0.05, 0.25, rimWood(x, z)), pineWood(x, z), birchWood(x, z));
     const sand = c < W.sand - 25 ? 1 : c > W.sand + 27 ? 0 : 1 - smoothstep(W.sand - 25, W.sand + 15, c + 12 * p3.noise(x * 0.03, z * 0.03));
-    // (dry west of the green: the steppe's dry grass, then the desert's sand; their edges ragged)
-    const dry = x > B.green + 60 ? 0 : clamp(dryOf(x + 50 * p4.noise(x * 0.004, z * 0.004)), 0, 1);
+    // (dry west of the green: the steppe's dry grass, then the desert's sand, their edges ragged; and the canyon's
+    // tableland the desert's, whatever band it stands in)
+    const cd = x < -2900 && z < -100 ? nearLine(cl, x, z).d : Infinity;
+    const dry = x > B.green + 60 ? 0 : clamp(Math.max(dryOf(x + 50 * p4.noise(x * 0.004, z * 0.004)), 1 - smoothstep(60, 200, cd)), 0, 1);
     let bare = sand >= 1 || dry >= 1 ? 1 : Math.max(sand, dry, smoothstep(0.55, 0.75, n2.noise(x * 0.03, z * 0.03)) * 0.5 * (1 - forest) * (1 - dry));
     if (sand >= 1) rock = 0;
     forest *= (1 - rock) * (1 - dry);

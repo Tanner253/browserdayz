@@ -55,7 +55,7 @@ export const PLAN = {
   /** the canyon: its line from the mouth by the beach to the one onto the steppe; its floor's half width, its walls' height and run */
   canyon: {
     line: [[-3473, -635], [-3405, -600], [-3345, -530], [-3262, -488], [-3196, -400], [-3118, -318], [-3040, -235]] as P[],
-    floor: [12, 18] as const,
+    floor: [16, 26] as const,
     walls: [15, 30] as const,
     /** the walls' fall, to the metre across: steep enough for a cave's mouth to be cut in them */
     face: 1.9,
