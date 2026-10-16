@@ -1,10 +1,8 @@
 # Where the work stands (handoff, 2026-10-16)
 
-Read `CLAUDE.md` first (it says: hand off at half the context, without asking, ten times at most). The 2026-10-14 notes below are history.
+Read `CLAUDE.md` first (it says when to hand off: by yourself, to save tokens, while real work is under way). The 2026-10-14 notes below are history.
 
-**Automatic handoffs: 1 of 10** (raise it by one at each handoff; at 10, stop and tell the owner).
-
-## THE TASK NOW: an impressive trailer that tells a story
+## NEXT, when the owner starts it: an impressive trailer that tells a story
 The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothing else is asked for now ("disregaurd everythin g besides the impressive trailer and handoff task").
 - Read the memory note `trailer-project.md` whole (sixteen films: the method, the owner's decisions and corrections, the traps) and `feedback-film-motion.md` (judged in motion, `film.mjs --motion`; NOTHING sped up).
 - The machinery is all there: `src/trailer/director.ts` (actors are the game's own players, free camera, sound from logged events, MP4 in the page), `shots*.ts` (cut 16 is the latest), `music*.ts`, `scripts/film.mjs` (`--cut N`, `--draft`, `--stills N --no-video`, `--from/--to`). Reuse it; `borrow(cutN, names)` takes shots from earlier cuts, but the owner wants NEW scenes ("we want new scenes tho, not the same exact things. it should feel fressh").
