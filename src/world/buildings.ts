@@ -12,7 +12,7 @@ import { RNG } from '../core/noise';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
-import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
+import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
 import { castleLoot, castleProps } from '../sim/castle';
@@ -1856,11 +1856,11 @@ export class Buildings {
     this.containers.push(it);
     // No grass in it, nor at the foot of its walls. (The map of where grass grows is coarse, a point every two
     // metres and the blades thinned between points: cleared any less far out, blades stood up through the floor.)
-    const half = WORLD_SIZE / 2, reach = Math.hypot(hx, hz) + 3;
-    for (let ix = Math.floor((it.x - reach + half) / CELL); ix <= Math.ceil((it.x + reach + half) / CELL); ix++) {
-      for (let iz = Math.floor((it.z - reach + half) / CELL); iz <= Math.ceil((it.z + reach + half) / CELL); iz++) {
-        if (ix < 0 || iz < 0 || ix >= WORLD_RES || iz >= WORLD_RES) continue;
-        const dx = -half + ix * CELL - it.x, dz = -half + iz * CELL - it.z;
+    const reach = Math.hypot(hx, hz) + 3;
+    for (let ix = Math.floor((it.x - reach - WORLD_X0) / CELL); ix <= Math.ceil((it.x + reach - WORLD_X0) / CELL); ix++) {
+      for (let iz = Math.floor((it.z - reach - WORLD_Z0) / CELL); iz <= Math.ceil((it.z + reach - WORLD_Z0) / CELL); iz++) {
+        if (ix < 0 || iz < 0 || ix >= WORLD_NX || iz >= WORLD_NZ) continue;
+        const dx = WORLD_X0 + ix * CELL - it.x, dz = WORLD_Z0 + iz * CELL - it.z;
         if (Math.abs(dx * c - dz * sn) < hx + 2.7 && Math.abs(dx * sn + dz * c) < hz + 2.7) this.world.grass[idx(ix, iz)] = 0;
       }
     }
