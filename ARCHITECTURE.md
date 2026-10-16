@@ -217,6 +217,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `kits.ts` | 75 | Whole sets of gear an admin can hand out in one go (2026-10-11): |
 | `load.ts` | 70 | What a load does to whoever carries it (2026-10-13: |
 | `news.ts` | 202 | Hearts and comments on the entries of the changelog (2026-10-12: |
+| `pass.ts` | 443 | THE PASS through the ridge, and its caves, as a plan (plan v5, the owner, 2026-10-16: |
 | `placement.ts` | 28 | Whether an item can physically lie at a loot point. |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
 | `range.ts` | 359 | The bot check (2026-10-12: |
@@ -228,7 +229,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trade.ts` | 82 | The trader. A man stands behind the counter of the shop at the trading post, out east of the village. He buys what is brought to him and sells what a body needs to go on with: dressings, food, rounds, a light, a... |
 | `vehicles.ts` | 276 | Jeeps. A handful stand along the road and a few more out at the edge of the map, behind the outlying places; anybody can get in one and drive it, three more can ride, and it can be shot until it burns. It is the fast... |
 | `voice.ts` | 29 | Talking to whoever is near (src/game/voice.ts): what the server and the game both go by. |
-| `water.ts` | 156 | Lakes and rivers, as rules: where the water is, how deep, which way it runs, and what it does to whoever walks into it. |
+| `water.ts` | 177 | Lakes and rivers, as rules: where the water is, how deep, which way it runs, and what it does to whoever walks into it. |
 | `wells.ts` | 90 | Wells, and what hunger and thirst do before they kill. |
 | `wreck-fire.ts` | 103 | The jeep that burns before the fort's gate, for good (the owner, 2026-10-14: |
 
@@ -323,6 +324,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `castle.ts` | 680 | The fort on the mountain, as it is drawn and as it stops a body. |
+| `caves.ts` | 207 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
 | `cells.ts` | 89 |  |
 | `crest.ts` | 53 | What is set down on the crest the fort stands on that is neither ground, rock nor the fort itself (MOUNTAIN.crest in src/world/worldgen.ts). |
 | `foliage.ts` | 179 | Shader patches shared by every instanced foliage / prop material: - wind: whole-plant sway (height-weighted) + leaf flutter - LOD dithering: screen-space dissolve between LOD levels (no popping) - translucency:... |
@@ -333,7 +335,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `kit.ts` | 270 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
 | `load-world.ts` | 25 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
-| `ocean.ts` | 427 | THE SEA off the west coast (2026-10-16: |
+| `ocean.ts` | 442 | THE SEA off the west coast (2026-10-16: |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
 | `ruins-shape.ts` | 553 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
@@ -342,7 +344,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `snow.ts` | 661 | Where snow lies: by height, OR BY PLACE. |
 | `terrain.ts` | 1258 |  |
 | `vegetation.ts` | 1034 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
-| `water.ts` | 339 | Lakes and rivers, drawn (the owner, 2026-10-16: |
+| `water.ts` | 435 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
 | `world-cache.ts` | 77 |  |
