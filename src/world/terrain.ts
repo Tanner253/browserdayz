@@ -698,6 +698,16 @@ export class Terrain {
 
   /** whether every tile of a run is in sight: then it is drawn at one go (and its parts and tiles not), else each part is chosen for itself */
   private choose(r: Run): boolean {
+    // (far off in the west, a run is drawn whole wherever any of it is in sight: its tiles are at their coarsest, a
+    // four by four of them is eleven thousand triangles, and a draw of its own for each costs more than that)
+    if (this.coarse && r.of.every((t) => t.userData.lod === 2) && r.of.some((t) => _view.intersectsSphere(t.geometry.boundingSphere!))) {
+      const [from, n] = r.mesh.geometry.userData.lods[2];
+      r.mesh.geometry.setDrawRange(from, n);
+      r.mesh.visible = true;
+      for (const p of r.parts) p.mesh.visible = false;
+      for (const t of r.of) t.userData.inRun = true;
+      return true;
+    }
     let all = true;
     if (r.parts.length) {
       for (const p of r.parts) if (!this.choose(p)) all = false;
