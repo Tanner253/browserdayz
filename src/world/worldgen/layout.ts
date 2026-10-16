@@ -363,7 +363,9 @@ export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'ca
   // (the brick works by the river, its walls dressed in the factory and apartments facade kits: src/world/zavod-plans.ts)
   | 'works_hall' | 'works_office' | 'zavod_flats'
   // (the cathedral's cross: an arm each side of its nave, the apse at its east end)
-  | 'cathedral_arm' | 'cathedral_apse';
+  | 'cathedral_arm' | 'cathedral_apse'
+  // (the fishing village's: src/world/ozerki-plans.ts)
+  | 'boathouse' | 'smokehouse';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -409,6 +411,8 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   izba_two: [9, 8],
   chapel: [9, 6],
   sawmill: [20, 7],
+  boathouse: [7, 6],
+  smokehouse: [4.4, 3.6],
   cathedral_arm: [5, 9],
   cathedral_apse: [6, 8],
   works_hall: [36, 15],

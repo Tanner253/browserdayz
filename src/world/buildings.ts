@@ -21,6 +21,7 @@ import { buildBasement, roomVolume, type Kit } from './basement-build';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 import * as town from './town-plans';
 import * as zavod from './zavod-plans';
+import * as ozerki from './ozerki-plans';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 // (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
@@ -497,6 +498,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
     case 'izba_two': return town.izbaTwoPlan(rng);
     case 'chapel': return town.chapelPlan();
     case 'sawmill': return town.sawmillPlan();
+    case 'boathouse': return ozerki.boathousePlan();
+    case 'smokehouse': return ozerki.smokehousePlan();
     case 'works_hall': return zavod.hallPlan();
     case 'works_office': return zavod.officePlan();
     case 'zavod_flats': return zavod.flatsPlan();
@@ -1854,7 +1857,7 @@ export class Buildings {
       });
     for (const plot of this.world.buildings) {
       // (and in the new towns, behind their houses: a log house's kitchen garden, the shops' back yards; see src/sim/towns.ts)
-      const town = /^(lipki|pokrov)_/.test(plot.id);
+      const town = /^(lipki|pokrov|ozerki)_/.test(plot.id);
       if (!(town ? ['izba', 'izba_two', 'merchant', 'tavern'] : ['house_small', 'house_brick', 'house_two', 'flats']).includes(plot.type) || (!town && Math.hypot(plot.x - village.x, plot.z - village.z) > 175)) continue;
       const [w, d] = BUILDING_FOOTPRINT[plot.type], c = Math.cos(plot.rot), s = Math.sin(plot.rot), dice = new RNG(plot.seed ^ 0x9a2d);
       const out = (lx: number, lz: number): [number, number] => [plot.x + lx * c + lz * s, plot.z - lx * s + lz * c];

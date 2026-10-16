@@ -218,6 +218,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Modular Factory Facade](https://polyhaven.com/a/modular_factory_facade) | James Ray Cock |
 | model | [Modular Fort 01](https://polyhaven.com/a/modular_fort_01) | Rico Cilliers |
 | model | [Modular Urban Apartments Facade](https://polyhaven.com/a/modular_urban_apartments_facade) | James Ray Cock |
+| model | [Modular Wooden Pier](https://polyhaven.com/a/modular_wooden_pier) | Rico Cilliers |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |

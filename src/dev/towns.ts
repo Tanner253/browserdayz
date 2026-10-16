@@ -55,7 +55,7 @@ export function lay(world: World) {
   const spots = townBuildings(town);
   spots.forEach((s, n) => {
     const [x, z] = townPoint(town, s.x, s.z);
-    world.buildings.push({ id: `${town.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: town.rot + s.rot, floorY: padY + moundAt(town, s.x, s.z) + 0.3, seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
+    world.buildings.push({ id: `${town.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: town.rot + s.rot, floorY: padY + (s.up ?? moundAt(town, s.x, s.z) + 0.3), seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
     // (no grass through its floors: what the map's own planning does for every building)
     const [fw, fd] = BUILDING_FOOTPRINT[s.type], c = Math.cos(town.rot + s.rot), sn = Math.sin(town.rot + s.rot), reach = Math.hypot(fw, fd) / 2 + 2;
     for (let j = Math.floor((z - reach + half) / CELL); j <= Math.ceil((z + reach + half) / CELL); j++) for (let i = Math.floor((x - reach + half) / CELL); i <= Math.ceil((x + reach + half) / CELL); i++) {

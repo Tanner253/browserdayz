@@ -1197,4 +1197,15 @@ export const HAVEN_KITS = {
     far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
     tags: ['building', 'kit'],
   },
+  // (the fishing village's piers: sections on poles, a gateway, loose poles, a landing of planks. Each section came at
+  // twelve to twenty-three thousand triangles of bevelled planks.)
+  pier_kit: {
+    src: 'modular_wooden_pier',
+    name: (n) => n.replace('modular_wooden_pier_', 'pier_'),
+    mat: (n) => n.replace('modular_wooden_pier_', 'pier_'),
+    hi: null,
+    world: { ratio: 0.15, error: 0.004, open: true },
+    far: { ratio: 0.05, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
 };

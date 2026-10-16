@@ -9,6 +9,7 @@
 import type { BuildingType } from '../world/worldgen/layout';
 import type { KitPiece } from './kit';
 import { KNOLL, LIPKI, LIPKI_GROUND, lipkiBuildings, lipkiThings } from './lipki';
+import { OZERKI, OZERKI_GROUND, ozerkiBuildings, ozerkiDecks, ozerkiPiers, ozerkiThings } from './ozerki';
 import { POKROV_GROUND, POKROV_TERRACE, pokrovBuildings, pokrovThings } from './pokrov';
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
 
@@ -24,7 +25,7 @@ export interface Town {
   rot: number;
 }
 /** a building of a town, in the town's frame: `rot` turns its front (+z of its own) toward (sin, cos) */
-export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number }
+export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }
 
 
 /**
@@ -95,12 +96,12 @@ export interface PlacedTown { town: Town; padY: number }
 
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
-  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : [];
+  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : [];
 }
 
 /** what lies about a town (containers, crates, drums), in its frame */
 export function townThings(t: Town): TownThing[] {
-  return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : [];
+  return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : [];
 }
 
 /**
@@ -119,7 +120,7 @@ export interface TownGround {
   terraces?: { poly: [number, number][]; h: number; out: number }[];
 }
 export function townGround(t: Town): TownGround {
-  return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : { yards: [], lanes: [] };
+  return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : { yards: [], lanes: [] };
 }
 
 /** how far a point is outside a line round (0 inside it) */
@@ -159,7 +160,24 @@ export function placedSlabs(t: Town): SlabRun[] {
 }
 
 /** every new town, as it is planned (where the world sets each down is the world's) */
-export const TOWNS: Town[] = [POKROV, LIPKI, ZAVOD];
+export const TOWNS: Town[] = [POKROV, LIPKI, ZAVOD, OZERKI];
+
+/**
+ * A town's pieces of a kit other than the fort's, in the world (Ozerki's piers): which kit, the pieces, and what of them
+ * stops a body, as boxes [middle x, y, z, half x, y, z] turned with the town.
+ */
+export function placedKits(p: PlacedTown): { kit: string; pieces: KitPiece[]; boxes: { c: [number, number, number]; h: [number, number, number]; rot: number }[] }[] {
+  if (p.town.name !== OZERKI.name) return [];
+  const move = (k: KitPiece): KitPiece => {
+    const [x, z] = townPoint(p.town, k.at[0], k.at[2]);
+    return { ...k, at: [x, k.at[1], z], turn: (k.turn ?? 0) + p.town.rot };
+  };
+  const boxes = ozerkiDecks(p.padY).map(([x, y, z, hx, hy, hz]) => {
+    const [wx, wz] = townPoint(p.town, x, z);
+    return { c: [wx, y, wz] as [number, number, number], h: [hx, hy, hz] as [number, number, number], rot: p.town.rot };
+  });
+  return [{ kit: 'pier_kit', pieces: ozerkiPiers(p.padY).map(move), boxes }];
+}
 
 /** a town's walls in the world (only Pokrov has any) */
 export function placedWalls(p: PlacedTown): KitPiece[] {
