@@ -401,7 +401,7 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   flats: [13, 8.6],
   cathedral: [24, 13],
   belfry: [6, 6],
-  cells: [36, 9],
+  cells: [24, 9],
   refectory: [22, 10],
   abbot: [10, 8],
   tavern: [14, 10],

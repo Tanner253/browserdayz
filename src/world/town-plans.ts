@@ -7,6 +7,10 @@
 import type { RNG } from '../core/noise';
 import type { Blueprint, Dress, MatKey, Opening, WallDef } from './buildings';
 import { Floor, PI, Q, door, gap, inner, win } from './big-buildings';
+import { KIT_LEVELS } from '../sim/kit';
+
+/** how high the monastery's wall-walk is over the wall's foot (the cells' roof is level with it) */
+const WALK = KIT_LEVELS.walk;
 
 /** an opening with a sill and no glass: a belfry's arch, a shop's hatch */
 const arch = (a: number, b: number, bottom: number, top: number): Opening => ({ a, b, bottom, top, kind: 'gap' });
@@ -127,44 +131,53 @@ export function belfryPlan(): Blueprint {
 }
 
 /**
- * The monks' cells: a long block of small rooms on two floors along a corridor that looks onto the courtyard, a
- * door at its middle and one at its end, the stair in a room of its own at the end. Seven cells a floor, each a
- * bed, a table and a place on the floor: what is in the monastery is spread through many rooms.
+ * The monks' cells: a range of small rooms on two floors along a corridor that looks onto the courtyard, against the
+ * inside of the east wall, the stair in a room of its own at its north end. Four cells a floor, each a bed, a table
+ * and a place on the floor. Its roof is flat and as high as the wall-walk, and open on the wall's side: from the walk
+ * you step onto it, cross it, and drop into the court ("roofs to cross", on the board the owner was shown).
  */
 export function cellsPlan(): Blueprint {
-  const HW = 18, HD = 4.5, X0 = -HW + 0.2, X1 = HW - 0.2, Z0 = -HD + 0.2, C = 2.2;
-  const parts = [-13.4, -9.0, -4.6, -0.2, 4.2, 8.6, 13.0];
+  const HW = 12, HD = 4.5, X0 = -HW + 0.2, X1 = HW - 0.2, Z0 = -HD + 0.2, C = 2.2, STAIR = 7.0;
+  // (the ground floor's height, and the one above's: the roof at the walk's height over the wall's foot, the floor
+  // 0.3 over that foot, a slab of 0.2 over each storey)
+  const H0 = 3.2, H1 = WALK - 0.3 - H0 - 0.4;
+  const parts = [-7.1, -2.4, 2.3, STAIR];
   const cells: [number, number][] = [[X0, parts[0]], ...parts.slice(0, -1).map((x, i): [number, number] => [x, parts[i + 1]])];
   const lay = (f: Floor) => {
     for (const [a, b] of cells) {
       const cx = (a + b) / 2;
       f.bed(cx - 1.1, -3.15).top('WoodenTable_01', cx + 1.0, -3.85, 0, 0.57).put('painted_wooden_chair_01', cx + 1.0, -3.1, PI).floor([cx, 0.9]);
     }
-    f.floor([-8, 3.3], [9, 3.3]);
+    f.floor([-6, 3.3], [4, 3.3]);
     return f;
   };
-  const doors = [...cells.map(([, b]) => door(b - 1.3, b - 0.5)), door(15.6, 16.4)];
+  const doors = [...cells.map(([, b]) => door(b - 1.3, b - 0.5)), door(STAIR + 1.0, STAIR + 1.8)];
   const walls = (front: Opening[]): WallDef[] => [
     { side: 'front', ext: 'lime_brick', int: 'int_plaster', openings: front },
-    { side: 'back', ext: 'lime_brick', int: 'int_plaster', openings: cells.map(([a, b]) => win((a + b) / 2 - 0.4, (a + b) / 2 + 0.4, 1.3, 2.0)) },
+    { side: 'back', ext: 'lime_brick', int: 'int_plaster', openings: [] },
     { side: 'left', ext: 'lime_brick', int: 'int_plaster', openings: [win(0.6, 1.6)] },
     { side: 'right', ext: 'lime_brick', int: 'int_plaster', openings: [win(-1.6, -0.6, 1.2, 2.0)] },
     inner([X0, C], [X1, C], doors, 'int_plaster', 'int_plaster'),
     ...parts.map((x) => inner([x, Z0], [x, C - 0.1], [], 'int_plaster', 'int_plaster')),
   ];
-  const windowsFront = (door1: boolean) => [
-    ...cells.map(([a, b]) => win((a + b) / 2 - 0.5, (a + b) / 2 + 0.5)).filter((_, i) => i !== 3),
-    ...(door1 ? [door(-0.7, 0.3), door(15.4, 16.4)] : [win(-0.7, 0.3), win(15.4, 16.4)]),
+  const front = (ground: boolean) => [
+    ...cells.map(([a, b]) => win((a + b) / 2 - 0.5, (a + b) / 2 + 0.5)).filter((_, i) => i !== 2),
+    ...(ground ? [door(-0.4, 0.6), door(9.4, 10.4)] : [win(-0.4, 0.6), win(9.4, 10.4)]),
   ];
   const g = lay(new Floor());
-  g.put('Barrel_01', 16.8, -3.6);
+  g.put('Barrel_01', 10.9, -3.6);
   const u = lay(new Floor());
-  u.floor([16.6, 3.2]);
+  u.floor([10.6, 3.2]);
+  const r = new Floor();
+  r.put('wooden_crate_01', -4.0, -1.2, 0.3).floor([-8.0, 0.4], [3.4, -1.6]);
   return {
-    w: HW * 2, d: HD * 2, h: 2.8, ext: 'lime_brick', int: 'int_plaster', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
-    walls: walls(windowsFront(true)), furniture: g.furniture, loot: g.loot,
-    stairs: { x0: 13.4, x1: 14.8, foot: 1.8, top: -3.4 },
-    upper: { h: 2.7, int: 'int_plaster', floor: 'floor_wood', walls: walls(windowsFront(false)), furniture: u.furniture, loot: u.loot },
+    w: HW * 2, d: HD * 2, h: H0, ext: 'lime_brick', int: 'int_plaster', floor: 'floor_wood', roof: 'concrete', roofType: 'flat',
+    walls: walls(front(true)), furniture: g.furniture, loot: g.loot,
+    levels: [{ h: H1, int: 'int_plaster', floor: 'floor_wood', walls: walls(front(false)), furniture: u.furniture, loot: u.loot }],
+    wells: [{ x0: STAIR + 0.4, x1: X1 - 0.6, land: 1.8, far: -4.0, upTo: 1 }],
+    // (its parapet the wall's own over the walk, and none on the wall's side, where it meets the walk)
+    deck: { parapet: 0.68, h: 2.5, walls: [], roofs: [], boxes: [], furniture: r.furniture, loot: r.loot, open: [{ side: 'back', a: -HW, b: HW }] },
+    dress: { plinth: { h: 0.6, key: 'plinth' }, bands: 'trim_white' },
     usage: ['Village', 'Town'],
   };
 }

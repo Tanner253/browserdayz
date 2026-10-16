@@ -27,6 +27,19 @@ type Kind = keyof typeof DEEP;
 const north = (type: Kind, x: number): TownSpot => ({ type, x, z: NORTH - DEEP[type] / 2, rot: 0 });
 const south = (type: Kind, x: number): TownSpot => ({ type, x, z: SOUTH + DEEP[type] / 2, rot: PI });
 
+/**
+ * Where the cells stand: along the east side of the walls (POKROV_WALL's second side), 8 to 32 m from its south
+ * corner (south of the stair up to the walk, whose foot is at 32.6), their back against the wall's inside face (the
+ * kit's thin wall is 2.55 deep, inside the line the walls are said by), their front to the court.
+ */
+function cellsSpot(): TownSpot {
+  const [ax, az] = [70, 20], [bx, bz] = [75, -60], L = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / L, dz = (bz - az) / L;
+  // (inside is on the left of the way the side runs: (dz, -dx))
+  const along = 20, inward = 2.55 + 4.5 + 0.02, x = ax + dx * along + dz * inward, z = az + dz * along - dx * inward;
+  // (its front, its own +z, toward the court: the left of the way the side runs)
+  return { type: 'cells', x, z, rot: Math.atan2(dz, -dx) };
+}
+
 export function pokrovBuildings(): TownSpot[] {
   return [
     // on the terrace, inside the walls: the cathedral (its nave, door to the west; its two arms; its apse to the east), the belfry, the cells, the refectory, the abbot's house
@@ -36,7 +49,8 @@ export function pokrovBuildings(): TownSpot[] {
     { type: 'cathedral_arm', x: 12.5, z: -29, rot: -Q },
     { type: 'cathedral_apse', x: 25, z: -38, rot: 0 },
     { type: 'belfry', x: 18, z: -58, rot: 0 },
-    { type: 'cells', x: 58, z: -22, rot: -Q, arms: 1 },
+    // (the cells' back against the east wall's inside face, south of its stair: see cellsSpot)
+    cellsSpot(),
     { type: 'refectory', x: -40, z: 0, rot: 0 },
     { type: 'abbot', x: 30, z: 2, rot: 0 },
     // the town outside: the west lane, its north side (a man's width of alley after the tavern, then wall to wall), its south side
