@@ -36,7 +36,7 @@
 
 import { hash2 } from '../core/noise';
 import { castleFoot } from '../sim/castle';
-import { CELL, SNOW, WORLD_RES, WORLD_SIZE, catmullRom, heightAt, type World } from './worldgen';
+import { CELL, SNOW, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, catmullRom, heightAt, type World } from './worldgen';
 
 /**
  * What of a world the snow is told from. `worn`: ground worn bare that is no way of its own (where carts turned,
@@ -221,14 +221,14 @@ export function snowPlaces(world: SnowWorld): SnowPlaces {
     // THE TONGUE: up the hill behind it to the mountain's own snow (see SNOW_PLACE.tongue). The nearest ground
     // that is white by its own height whatever a ragged line takes off it; none within reach, no tongue.
     if (short(C.y) > 0) {
-      const T = P.tongue, N = WORLD_RES, half = WORLD_SIZE / 2;
+      const T = P.tongue, N = WORLD_NX;
       let best = T.seeks, tx = 0, tz = 0;
-      const ix0 = Math.max(0, Math.floor((C.x - T.seeks + half) / CELL)), ix1 = Math.min(N - 1, Math.ceil((C.x + T.seeks + half) / CELL));
-      const iz0 = Math.max(0, Math.floor((C.z - T.seeks + half) / CELL)), iz1 = Math.min(N - 1, Math.ceil((C.z + T.seeks + half) / CELL));
+      const ix0 = Math.max(0, Math.floor((C.x - T.seeks - WORLD_X0) / CELL)), ix1 = Math.min(N - 1, Math.ceil((C.x + T.seeks - WORLD_X0) / CELL));
+      const iz0 = Math.max(0, Math.floor((C.z - T.seeks - WORLD_Z0) / CELL)), iz1 = Math.min(WORLD_NZ - 1, Math.ceil((C.z + T.seeks - WORLD_Z0) / CELL));
       for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
         if (world.surface[iz * N + ix] < SNOW.full + P.over) continue;
-        const d = Math.hypot(-half + ix * CELL - C.x, -half + iz * CELL - C.z);
-        if (d < best) { best = d; tx = -half + ix * CELL; tz = -half + iz * CELL; }
+        const d = Math.hypot(WORLD_X0 + ix * CELL - C.x, WORLD_Z0 + iz * CELL - C.z);
+        if (d < best) { best = d; tx = WORLD_X0 + ix * CELL; tz = WORLD_Z0 + iz * CELL; }
       }
       if (best < T.seeks && best > 1) {
         const ux = (tx - C.x) / best, uz = (tz - C.z) / best, bx = tx + ux * T.into, bz = tz + uz * T.into;
@@ -358,10 +358,10 @@ export function snowOn(world: SnowWorld, x: number, y: number, z: number): numbe
 export function snowNet(world: SnowWorld): Float32Array | null {
   const P = snowPlaces(world);
   if (!P.patches.length) return null;
-  const N = WORLD_RES, half = WORLD_SIZE / 2, net = new Float32Array(N * N), { x, z, r } = P.bound;
-  const ix0 = Math.max(0, Math.floor((x - r + half) / CELL)), ix1 = Math.min(N - 1, Math.ceil((x + r + half) / CELL));
-  const iz0 = Math.max(0, Math.floor((z - r + half) / CELL)), iz1 = Math.min(N - 1, Math.ceil((z + r + half) / CELL));
-  for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) net[iz * N + ix] = snowLift(world, -half + ix * CELL, -half + iz * CELL);
+  const N = WORLD_NX, net = new Float32Array(N * WORLD_NZ), { x, z, r } = P.bound;
+  const ix0 = Math.max(0, Math.floor((x - r - WORLD_X0) / CELL)), ix1 = Math.min(N - 1, Math.ceil((x + r - WORLD_X0) / CELL));
+  const iz0 = Math.max(0, Math.floor((z - r - WORLD_Z0) / CELL)), iz1 = Math.min(WORLD_NZ - 1, Math.ceil((z + r - WORLD_Z0) / CELL));
+  for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) net[iz * N + ix] = snowLift(world, WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL);
   return net;
 }
 
@@ -517,13 +517,13 @@ function makePicture(world: SnowWorld): SnowPicture | null {
   // --- the hollows of the lifted ground: against the mean of the ground for twenty metres about each point
   let beltPart: Part = null;
   {
-    const N = WORLD_RES, half = WORLD_SIZE / 2, m = 12, { x, z, r } = P.bound;
-    const ix0 = Math.max(0, Math.floor((x - r + half) / CELL)), ix1 = Math.min(N - 1, Math.ceil((x + r + half) / CELL));
-    const iz0 = Math.max(0, Math.floor((z - r + half) / CELL)), iz1 = Math.min(N - 1, Math.ceil((z + r + half) / CELL));
+    const N = WORLD_NX, NZ = WORLD_NZ, m = 12, { x, z, r } = P.bound;
+    const ix0 = Math.max(0, Math.floor((x - r - WORLD_X0) / CELL)), ix1 = Math.min(N - 1, Math.ceil((x + r - WORLD_X0) / CELL));
+    const iz0 = Math.max(0, Math.floor((z - r - WORLD_Z0) / CELL)), iz1 = Math.min(NZ - 1, Math.ceil((z + r - WORLD_Z0) / CELL));
     const w = ix1 - ix0 + 1, h = iz1 - iz0 + 1, W = w + 2 * m, Hh = h + 2 * m;
     // (the ground there and a margin about it, the edge of the world held on beyond it)
     let cur = new Float32Array(W * Hh);
-    for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++) cur[j * W + i] = world.surface[Math.min(N - 1, Math.max(0, iz0 - m + j)) * N + Math.min(N - 1, Math.max(0, ix0 - m + i))];
+    for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++) cur[j * W + i] = world.surface[Math.min(NZ - 1, Math.max(0, iz0 - m + j)) * N + Math.min(N - 1, Math.max(0, ix0 - m + i))];
     const ground = cur;
     // (evened over six points either way, along the rows and down them, twice: a soft round mean)
     for (let pass = 0; pass < 4; pass++) {
@@ -547,7 +547,7 @@ function makePicture(world: SnowWorld): SnowPicture | null {
       data[(j * w + i) * 4] = Math.round(hollow * 127 + 128);
     }
     // (a point of the picture is a point of the net: its ground begins half a square before the first of them)
-    beltPart = { w, h, data, x: -half + (ix0 - 0.5) * CELL, z: -half + (iz0 - 0.5) * CELL, wide: w * CELL, deep: h * CELL };
+    beltPart = { w, h, data, x: WORLD_X0 + (ix0 - 0.5) * CELL, z: WORLD_Z0 + (iz0 - 0.5) * CELL, wide: w * CELL, deep: h * CELL };
   }
 
   // --- ground worn bare that is no way of its own, where the place's snow lies: how trampled each point is (all

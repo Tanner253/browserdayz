@@ -15,7 +15,7 @@ import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { type SerializedInventory, Container } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance } from '../src/sim/items';
-import { WORLD_SIZE } from '../src/world/worldgen';
+import { onWorld } from '../src/world/worldgen';
 import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK } from '../src/sim/crates';
 import { News } from '../src/sim/news';
@@ -41,8 +41,8 @@ import { seen } from './seen';
 import { TAG_PING_MS, nudge, tickDrops } from './drops';
 
 
-/** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
-export const EDGE = WORLD_SIZE / 2 + 8;
+/** whether a spot is where anything may say it is: on the ground, or a little beyond its edge (the walls stand 4 m inside it) */
+export const onMap = (x: number, z: number) => onWorld(x, z, -8);
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -171,7 +171,7 @@ export const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt 
 
 export const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
 
-export const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < EDGE && Math.abs(s[2]) < EDGE && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
+export const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && onMap(s[0], s[2]) && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
 
 /** the fireplaces, and which of them are alight */
 export const hearths = new Hearths(world.fires);
@@ -521,7 +521,7 @@ setInterval(() => {
     else if (v.goneAt && now >= v.goneAt) {
       vehicles.delete(v.i);
       broadcast({ t: 'v-', i: v.i });
-    } else if (!v.goneAt && (v.s[1] < JEEP.floor || Math.abs(v.s[0]) > EDGE || Math.abs(v.s[2]) > EDGE) && v.seats.every((s) => s === null)) {
+    } else if (!v.goneAt && (v.s[1] < JEEP.floor || !onMap(v.s[0], v.s[2])) && v.seats.every((s) => s === null)) {
       // off the edge of the world, or through the bottom of it: stood back where it started
       const p = PARKS[v.home];
       v.s = restState(p.x, p.y, p.z, p.yaw);

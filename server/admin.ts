@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { heldIn } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
-import { WORLD_SIZE } from '../src/world/worldgen';
+import { onWorld } from '../src/world/worldgen';
 import { comesFrom, flightTimes } from '../src/sim/airdrop';
 import { POLICE_CAR, restState } from '../src/sim/vehicles';
 import { HELI, skidGround } from '../src/sim/heli';
@@ -13,7 +13,7 @@ import type { S2C } from '../src/net/protocol';
 import { ORDERS, written, entityBy, ENTITIES, GROUND } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
 import { type CarryPower, refill, carriedOf, refilledWords, CARRY_POWERS } from '../src/sim/powers';
-import { BANS, EDGE, PARKS, boxes, economy, horde, invented, issue, locks, log, news, standJeep, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
+import { BANS, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log, news, standJeep, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
 import { ipOf, namesOf } from './tags';
 import { deviceOf, forgetDevice, shortDevice } from './device';
 import { CHECK, CHECKS } from './checks';
@@ -298,7 +298,7 @@ export async function command(c: Client, line: string) {
       const n = rest.map(Number);
       if ((n.length !== 0 && n.length !== 2) || n.some((v) => !Number.isFinite(v))) return void sys(c, 'After /airdrop: nothing (it comes to a few steps in front of you), or the map numbers x z.');
       const x = n.length ? n[0] : c.pose[0] - Math.sin(c.pose[3]) * 6, z = n.length ? n[1] : c.pose[2] - Math.cos(c.pose[3]) * 6;
-      if (Math.abs(x) > WORLD_SIZE / 2 - 6 || Math.abs(z) > WORLD_SIZE / 2 - 6) return void sys(c, 'That is off the map.');
+      if (!onWorld(x, z, 6)) return void sys(c, 'That is off the map.');
       const f = sendDrop({ x, y: world.groundAt(x, z), z });
       if (f) sys(c, `A helicopter is coming in from the ${comesFrom(f)}: the crate is down at ${Math.round(x)}, ${Math.round(z)} in ${Math.round(flightTimes(f).land)} s, and it is gone in ${Math.round(flightTimes(f).gone)}.`);
       return;
@@ -326,7 +326,7 @@ export async function command(c: Client, line: string) {
       // does not respect the collision of a bulding (spawn heli on roof doenst owk)")
       const own = n.length < 3 && !c.power.clip && c.pose[1] > world.groundAt(x, z) + 0.5 ? c.pose[1] : null;
       const y = n.length === 4 ? n[2] : own;
-      if (Math.abs(x) > WORLD_SIZE / 2 - 6 || Math.abs(z) > WORLD_SIZE / 2 - 6 || (y !== null && Math.abs(y) > 400)) return void sys(c, 'That is off the map.');
+      if (!onWorld(x, z, 6) || (y !== null && Math.abs(y) > 400)) return void sys(c, 'That is off the map.');
       if (e.kind === 'car') {
         const standing = [...vehicles.values()].filter((v) => !v.goneAt).length;
         if (standing + count > PARKS.length + 30) return void sys(c, `There are ${standing} cars standing already: take some away first (/delcar).`);
@@ -645,7 +645,7 @@ export async function command(c: Client, line: string) {
       if (!c.alive) return void sys(c, 'You are dead: the dead are not moved.');
       if (c.seatAt) return void sys(c, 'You are in a car: out of it first.');
       const [x, y, z] = n.length === 3 ? n : [n[0], null, n[1]];
-      if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) return void sys(c, 'That is off the map.');
+      if (!onMap(x, z)) return void sys(c, 'That is off the map.');
       place(c, x, y, z, c);
       return void sys(c, `You are at ${x.toFixed(0)}, ${z.toFixed(0)}.`);
     }

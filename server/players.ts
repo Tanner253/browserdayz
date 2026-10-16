@@ -10,7 +10,7 @@ import type { HitZone } from '../src/sim/combat';
 import { type Thrower, newThrower } from '../src/sim/grenades';
 import { BLOOD } from '../src/sim/blood';
 import { type Pose, type Slung, type Vitals, type S2C, type PlayerInfo, type StoredItem, type C2S, PROTOCOL, F_GROUND, MAX_STAMINA } from '../src/net/protocol';
-import { EDGE, MAX_PLAYERS, RECORD_LIFETIME, RESTART, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, vehInfo, vehicles, world } from './index';
+import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, vehInfo, vehicles, world } from './index';
 import { bunkerDoor, cardSeen, hitsBy, ipOf, tagSeen } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
@@ -185,7 +185,7 @@ export const num = (v: unknown): v is number => typeof v === 'number' && Number.
 
 export const isVec3 = (v: unknown): v is [number, number, number] => Array.isArray(v) && v.length === 3 && v.every(num);
 
-export const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && v.every(num) && Math.abs(v[0]) < EDGE && Math.abs(v[2]) < EDGE && Math.abs(v[1]) < 500;
+export const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && v.every(num) && onMap(v[0], v[2]) && Math.abs(v[1]) < 500;
 
 export const cleanName = (s: unknown) => (typeof s === 'string' ? s : '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Survivor';
 

@@ -4,7 +4,12 @@
 
 import assert from 'node:assert/strict';
 import { KINDS, KIND_AT, KIND_NAMES, layGround } from '../src/world/ground';
-import { CELL, WORLD_RES as N, generateWorld } from '../src/world/worldgen';
+import { CELL, SQUARE_HALF, WORLD_NX as N, WORLD_NZ as NZ, WORLD_X0, WORLD_Z0, generateWorld } from '../src/world/worldgen';
+
+// (the world's net is N across and NZ down; the kinds' shares are reckoned over the square, the map as it was, as
+// they always were: the ground west of it is ground only as yet, 2026-10-16)
+const OX = (-SQUARE_HALF - WORLD_X0) / CELL, OZ = (-SQUARE_HALF - WORLD_Z0) / CELL, SQ = (2 * SQUARE_HALF) / CELL + 1;
+const onSquare = (i: number) => { const ix = i % N, iz = (i - ix) / N; return ix >= OX && ix < OX + SQ && iz >= OZ && iz < OZ + SQ; };
 
 const world = generateWorld();
 const t0 = performance.now();
@@ -15,29 +20,30 @@ assert.equal(ground.weights.length, 3);
 
 const share = new Float64Array(KIND_NAMES.length);
 let worst = 0;
-for (let i = 0; i < N * N; i++) {
+for (let i = 0; i < N * NZ; i++) {
   let sum = 0, best = 0, most = -1;
+  const sq = onSquare(i);
   for (let k = 0; k < KIND_NAMES.length; k++) {
     const v = ground.weights[k >> 2][i * 4 + (k & 3)];
     sum += v;
-    share[k] += v / 255;
+    if (sq) share[k] += v / 255;
     if (v > most) { most = v; best = k; }
   }
   worst = Math.max(worst, Math.abs(sum - 255));
   assert.equal(ground.weights[ground.top[i] >> 2][i * 4 + (ground.top[i] & 3)], ground.weights[best >> 2][i * 4 + (best & 3)], 'the kind said to be most is');
 }
 assert.ok(worst <= 6, `the kinds add up to the whole at every point (the worst is ${worst} of 255 out)`);
-for (const [k, name] of KIND_NAMES.entries()) assert.ok(share[k] / (N * N) > 0.003, `${name} lies somewhere (${((share[k] / N / N) * 100).toFixed(2)}% of the map)`);
+for (const [k, name] of KIND_NAMES.entries()) assert.ok(share[k] / (SQ * SQ) > 0.003, `${name} lies somewhere (${((share[k] / SQ / SQ) * 100).toFixed(2)}% of the map)`);
 
 // a pine wood: the world says forest floor and nothing else, and pines stand within five metres
 let wood = 0, floor = 0, face = 0, rock = 0;
-const pines = new Uint8Array(N * N);
+const pines = new Uint8Array(N * NZ);
 for (const t of world.trees) {
   if (!t.kind.startsWith('pine')) continue;
-  const ix = Math.round((t.x + (N - 1)) / CELL), iz = Math.round((t.z + (N - 1)) / CELL);
-  for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) if (ix + a >= 0 && ix + a < N && iz + b >= 0 && iz + b < N) pines[(iz + b) * N + ix + a] = 1;
+  const ix = Math.round((t.x - WORLD_X0) / CELL), iz = Math.round((t.z - WORLD_Z0) / CELL);
+  for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) if (ix + a >= 0 && ix + a < N && iz + b >= 0 && iz + b < NZ) pines[(iz + b) * N + ix + a] = 1;
 }
-for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
+for (let iz = 1; iz < NZ - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
   const i = iz * N + ix, H = world.heights;
   if (world.splat[i * 4 + 1] === 255 && pines[i]) {
     wood++;
@@ -51,4 +57,4 @@ for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
 }
 assert.ok(wood > 1000 && floor / wood > 0.9, `a pine wood's floor is forest floor (${floor} of ${wood} points)`);
 assert.ok(face > 1000 && rock / face > 0.9, `a sheer face is rock (${rock} of ${face} points)`);
-console.log(`ok: ${KIND_NAMES.map((k, i) => `${k} ${((share[i] / N / N) * 100).toFixed(1)}%`).join(', ')}`);
+console.log(`ok: ${KIND_NAMES.map((k, i) => `${k} ${((share[i] / SQ / SQ) * 100).toFixed(1)}%`).join(', ')}`);

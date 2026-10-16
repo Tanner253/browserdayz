@@ -8,8 +8,8 @@ import * as THREE from 'three';
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { wind } from './foliage';
-import type { Terrain } from './terrain';
-import { CELL, WORLD_RES, WORLD_SIZE } from './worldgen';
+import { worldUniforms, type Terrain } from './terrain';
+import { CELL, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1 } from './worldgen';
 
 const PATCH = 4;
 const BLADES = 2400;
@@ -135,7 +135,7 @@ export class Grass {
       tHeight: { value: t.heightTex },
       tGrass: { value: t.grassTex },
       tMacro: { value: t.macroTex },
-      uWorld: { value: new THREE.Vector3(WORLD_SIZE, WORLD_RES, CELL) },
+      ...worldUniforms(),
       uWidthScale: { value: widthScale },
       uRadius: { value: this.radius },
     };
@@ -192,13 +192,12 @@ reflectedLight.indirectSpecular *= 0.35;`,
     const r = this.radius;
     const x0 = Math.floor((cx - r) / PATCH) * PATCH;
     const z0 = Math.floor((cz - r) / PATCH) * PATCH;
-    const half = WORLD_SIZE / 2;
     for (let pz = z0; pz <= cz + r; pz += PATCH) {
       for (let px = x0; px <= cx + r; px += PATCH) {
         const dx = Math.max(Math.abs(px + PATCH / 2 - cx) - PATCH / 2, 0);
         const dz = Math.max(Math.abs(pz + PATCH / 2 - cz) - PATCH / 2, 0);
         if (Math.hypot(dx, dz) > r) continue;
-        if (px < -half || pz < -half || px > half - PATCH || pz > half - PATCH) continue;
+        if (px < WORLD_X0 || pz < WORLD_Z0 || px > WORLD_X1 - PATCH || pz > WORLD_Z1 - PATCH) continue;
         const h = this.sampleH(px + PATCH / 2, pz + PATCH / 2);
         // (How far it is from the eye, up included: from a helicopter the grass under it was drawn as thick as round
         // a pair of feet, 3 to 5 ms of the card's frame at 140 m (2026-10-15). Standing, the eye's height moves each
@@ -244,18 +243,17 @@ reflectedLight.indirectSpecular *= 0.35;`,
    * points), is under the least that grows (the shader's smoothstep(0.05, ...)) at every point it is read between.
    */
   private bare(px: number, pz: number) {
-    const g = this.terrain.grassTex.image.data as Uint8Array, half = WORLD_SIZE / 2;
-    const i0 = Math.max(0, Math.floor((px + half) / CELL)), i1 = Math.min(WORLD_RES - 1, Math.ceil((px + PATCH + half) / CELL));
-    const j0 = Math.max(0, Math.floor((pz + half) / CELL)), j1 = Math.min(WORLD_RES - 1, Math.ceil((pz + PATCH + half) / CELL));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (g[j * WORLD_RES + i] > 12) return false;
+    const g = this.terrain.grassTex.image.data as Uint8Array;
+    const i0 = Math.max(0, Math.floor((px - WORLD_X0) / CELL)), i1 = Math.min(WORLD_NX - 1, Math.ceil((px + PATCH - WORLD_X0) / CELL));
+    const j0 = Math.max(0, Math.floor((pz - WORLD_Z0) / CELL)), j1 = Math.min(WORLD_NZ - 1, Math.ceil((pz + PATCH - WORLD_Z0) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (g[j * WORLD_NX + i] > 12) return false;
     return true;
   }
 
   private sampleH(x: number, z: number) {
-    const half = WORLD_SIZE / 2;
-    const ix = Math.min(WORLD_RES - 1, Math.max(0, Math.round((x + half) / CELL)));
-    const iz = Math.min(WORLD_RES - 1, Math.max(0, Math.round((z + half) / CELL)));
-    return this.heights[iz * WORLD_RES + ix];
+    const ix = Math.min(WORLD_NX - 1, Math.max(0, Math.round((x - WORLD_X0) / CELL)));
+    const iz = Math.min(WORLD_NZ - 1, Math.max(0, Math.round((z - WORLD_Z0) / CELL)));
+    return this.heights[iz * WORLD_NX + ix];
   }
 }
 
@@ -264,7 +262,10 @@ attribute vec4 aBlade;
 uniform sampler2D tHeight;
 uniform sampler2D tGrass;
 uniform sampler2D tMacro;
-uniform vec3 uWorld; // size, res, cell
+// (the world's north-west corner and size in metres; its samples across and down; metres between samples)
+uniform vec4 uWorld;
+uniform vec2 uWorldRes;
+#define GRASS_CELL ${CELL.toFixed(1)}
 uniform float uWidthScale;
 uniform float uRadius;
 uniform float uTime;
@@ -277,12 +278,12 @@ vec3 gWorld;
 vec3 gNormal;
 
 float hAt(ivec2 c) {
-  c = clamp(c, ivec2(0), ivec2(int(uWorld.y) - 1));
+  c = clamp(c, ivec2(0), ivec2(uWorldRes) - 1);
   return texelFetch(tHeight, c, 0).r;
 }
 // same triangulation as the terrain mesh / physics heightfield
 float terrainH(vec2 p) {
-  vec2 g = (p + uWorld.x * 0.5) / uWorld.z;
+  vec2 g = (p - uWorld.xy) / GRASS_CELL;
   vec2 i = floor(g);
   vec2 f = g - i;
   ivec2 c = ivec2(i);
@@ -306,8 +307,8 @@ vec3 transformed;
   float r1 = hash12(wp * 1.37 + aBlade.z * 17.0);
   float r2 = hash12(wp * 2.11 - 5.3);
   float ang = aBlade.w + r1 * 3.0;
-  vec2 uvW = (wp + uWorld.x * 0.5) / uWorld.x;
-  uvW = uvW * (uWorld.y - 1.0) / uWorld.y + 0.5 / uWorld.y;
+  vec2 uvW = (wp - uWorld.xy) / uWorld.zw;
+  uvW = uvW * (uWorldRes - 1.0) / uWorldRes + 0.5 / uWorldRes;
   float density = texture2D(tGrass, uvW).r;
   vec4 macro = texture2D(tMacro, wp / 190.0);
   vec4 macro2 = texture2D(tMacro, wp / 23.0);

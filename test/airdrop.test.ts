@@ -31,7 +31,7 @@ import { ORDERS } from '../src/net/orders';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { AIRDROP, EDGE, ROTOR, comesFrom, crateAt, flightTimes, heliAt, landed, lowest, planFlight, restAt, rotorAt, wayOut, ways, type Flight } from '../src/sim/airdrop';
 import { CALL, pickDropSite } from '../src/sim/drops';
-import { generateWorld, heightAt, WORLD_SIZE } from '../src/world/worldgen';
+import { generateWorld, heightAt } from '../src/world/worldgen';
 
 let n = 0;
 const failed: string[] = [];
@@ -81,7 +81,7 @@ ok(`it starts on the map's edge, a long way from the place (${flights.length} fl
   }
   const c = spread('the way in', (f) => ways(f).in, ' m');
   // (not across a corner: from every place there is a way in of at least this much of the map's width)
-  assert.ok(c[0] >= AIRDROP.wayIn * WORLD_SIZE, `a way in of only ${c[0].toFixed(0)} m`);
+  assert.ok(c[0] >= AIRDROP.wayIn * 2 * EDGE, `a way in of only ${c[0].toFixed(0)} m`);
 });
 
 ok('it is over the place when its distance and its speed say, and holds there', () => {

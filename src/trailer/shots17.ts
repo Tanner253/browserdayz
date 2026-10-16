@@ -29,7 +29,7 @@ import { EMOTE, EMOTE_SHIFT } from '../sim/emotes';
 import { F_LIMP, F_PRONE, F_SIT } from '../net/protocol';
 import { SEATS_OF } from '../game/garage';
 import { RIDE_HEIGHT } from '../sim/vehicles';
-import { TOWN, WORLD_SIZE } from '../world/worldgen';
+import { TOWN, SQUARE_HALF } from '../world/worldgen';
 
 /** how long the film is, seconds: said when its shots have been laid out */
 let total = 0;
@@ -214,16 +214,16 @@ export function buildShots(S: Stage): Shot[] {
     const dir = V(T.x, 0, T.z).normalize();
     const level = (x: number, z: number) => Math.abs(S.ground(x + 6, z) - S.ground(x - 6, z)) < 1.6 && Math.abs(S.ground(x, z + 6) - S.ground(x, z - 6)) < 1.6;
     const built = (x: number, z: number) => builds.some((b) => Math.hypot(b.x - x, b.z - z) < 24);
-    for (let r = WORLD_SIZE / 2 - 14; r > WORLD_SIZE / 2 - 90; r -= 4) {
+    for (let r = SQUARE_HALF - 14; r > SQUARE_HALF - 90; r -= 4) {
       for (let k = 0; k < 24; k++) {
         const a = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.03;
         const x = (dir.x * Math.cos(a) - dir.z * Math.sin(a)) * r, z = (dir.x * Math.sin(a) + dir.z * Math.cos(a)) * r;
-        if (Math.abs(x) > WORLD_SIZE / 2 - 6 || Math.abs(z) > WORLD_SIZE / 2 - 6) continue;
+        if (Math.abs(x) > SQUARE_HALF - 6 || Math.abs(z) > SQUARE_HALF - 6) continue;
         if (nearestTrunk(x, z) > 7 && level(x, z) && !built(x, z) && nearestTrunk(x - dir.x * 30, z - dir.z * 30) > 5) return S.at(x, z);
       }
     }
     say('no open ground at the edge: the edge itself taken');
-    return S.at(dir.x * (WORLD_SIZE / 2 - 20), dir.z * (WORLD_SIZE / 2 - 20));
+    return S.at(dir.x * (SQUARE_HALF - 20), dir.z * (SQUARE_HALF - 20));
   })();
   /** inward from the edge, toward the town */
   const IN = V(-EDGE.x, 0, -EDGE.z).normalize();

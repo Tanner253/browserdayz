@@ -18,7 +18,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import '../world/buildings';
 import type { Buildings } from '../world/buildings';
-import { WORLD_SIZE, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { SQUARE_HALF, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
@@ -906,7 +906,8 @@ export class Game {
       }
       for (const b of world.buildings) if (b.type === 'hospital') spots.push(at({ x: b.x, z: b.z, name: 'Hospital' }, 'Kamenka\'s district hospital: three floors and the roof. Casualty and the dispensary below, the wards above them, the theatres and the laboratory at the top. A stair at each end and steel stairs outside each end, from the roof down; a balcony over the doors; a wing behind with a stair of its own and a terrace on its roof.', 'clinic', 3, 'More dressings, stims and first aid kits than anywhere. On the roof somebody left a rifle, its scope and its suppressor.'));
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
-      this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gases);
+      // (the square: where everybody starts, 2026-10-16)
+      this.hud.setMenuMap(this.minimap.poster(), 2 * SQUARE_HALF, spots, atmo.gases);
       // (and the map opened in the game says the same of the same places)
       this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gases, () => this.minimap.live);
       this.map.ahead();
@@ -973,12 +974,12 @@ export class Game {
       beam: (pos, dir, power, wide) => this.lamps.beam(pos, dir, power, wide, 0),
     });
     // (its cast is sent for when the game is up: see `afterBoot`)
-    // The ground ends at the edge of the square, and there was nothing there to stop anybody walking or
+    // The ground ends at the edge of the world, and there was nothing there to stop anybody walking or
     // driving off it. Four walls that cannot be seen, a few paces in from the edge: the wild country round
     // the map is all there to be walked, and nobody falls out of the world.
     {
-      const edge = WORLD_SIZE / 2 - 4;
-      for (const [x, z, hx, hz] of [[0, edge, edge, 1], [0, -edge, edge, 1], [edge, 0, 1, edge], [-edge, 0, 1, edge]]) physics.addStatic(physics.R.ColliderDesc.cuboid(hx, 400, hz), 'rock', { x, y: 0, z });
+      const mx = (WORLD_X0 + WORLD_X1) / 2, mz = (WORLD_Z0 + WORLD_Z1) / 2, hx = (WORLD_X1 - WORLD_X0) / 2 - 4, hz = (WORLD_Z1 - WORLD_Z0) / 2 - 4;
+      for (const [x, z, ax, az] of [[mx, mz + hz, hx, 1], [mx, mz - hz, hx, 1], [mx + hx, mz, 1, hz], [mx - hx, mz, 1, hz]]) physics.addStatic(physics.R.ColliderDesc.cuboid(ax, 400, az), 'rock', { x, y: 0, z });
     }
     this.traders = new Traders(world);
     this.minimap.setTraders(this.traders.places);

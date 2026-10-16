@@ -4,7 +4,7 @@
 // seconds, every half minute (see ping). M opens the sheet itself, large: that is another thing (bigmap.ts).
 
 import { playEdge } from '../world/outline';
-import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import { gasClouds, type GasZone } from '../sim/gas';
 
 /** pixels of the drawn map per metre of world */
@@ -54,35 +54,57 @@ export class Minimap {
     return { jeeps: this.jeeps, wells: this.wells, traders: this.traders, drops: this.drops, pings: this.pings };
   }
 
-  /** the whole map as it was drawn once: for the menu's map sheet, which shows the same picture */
+  /**
+   * the square (the map as it was, where everybody starts) as it was drawn once: for the menu's map sheet, which
+   * shows the same picture. The ground west of it is ground only as yet (2026-10-16).
+   */
   poster(): HTMLCanvasElement {
-    return this.base;
+    if (this.square) return this.square;
+    const c = (this.square = document.createElement('canvas'));
+    c.width = c.height = Math.round(2 * SQUARE_HALF * SCALE);
+    c.getContext('2d')!.drawImage(this.base, (-SQUARE_HALF - WORLD_X0) * SCALE, (-SQUARE_HALF - WORLD_Z0) * SCALE, c.width, c.height, 0, 0, c.width, c.height);
+    return c;
   }
+  private square: HTMLCanvasElement | null = null;
 
   /** the whole map, drawn once */
   private draw(world: World): HTMLCanvasElement {
-    const N = Math.round(WORLD_SIZE * SCALE);
+    const NW = Math.round((WORLD_X1 - WORLD_X0) * SCALE), NH = Math.round((WORLD_Z1 - WORLD_Z0) * SCALE);
     const c = document.createElement('canvas');
-    c.width = c.height = N;
+    c.width = NW;
+    c.height = NH;
     const g = c.getContext('2d')!;
-    // the ground: lighter where it is high, shaded on the slopes that face away from the light
-    const img = g.createImageData(N, N);
-    const H = world.heights, R = WORLD_RES;
+    // the ground: lighter where it is high, shaded on the slopes that face away from the light; the sea blue, darker
+    // where it is deeper
+    const img = g.createImageData(NW, NH);
+    const H = world.heights, per = SCALE * CELL;
     const at = (px: number, py: number) => {
-      const gx = Math.min(R - 1, Math.max(0, Math.round((px / N) * (R - 1)))), gz = Math.min(R - 1, Math.max(0, Math.round((py / N) * (R - 1))));
-      return H[gz * R + gx];
+      const gx = Math.min(WORLD_NX - 1, Math.max(0, Math.round(px / per))), gz = Math.min(WORLD_NZ - 1, Math.max(0, Math.round(py / per)));
+      return H[gz * WORLD_NX + gx];
     };
+    // (how high and low the ground goes, read over the square, so that its colours are what they were before the
+    // world grew west)
     let lo = 1e9, hi = -1e9;
-    for (let i = 0; i < H.length; i += 7) {
-      lo = Math.min(lo, H[i]);
-      hi = Math.max(hi, H[i]);
+    const ox = (-SQUARE_HALF - WORLD_X0) / CELL, oz = (-SQUARE_HALF - WORLD_Z0) / CELL, side = (2 * SQUARE_HALF) / CELL + 1;
+    for (let i = 0; i < side * side; i += 7) {
+      const h = H[(oz + Math.floor(i / side)) * WORLD_NX + ox + (i % side)];
+      lo = Math.min(lo, h);
+      hi = Math.max(hi, h);
     }
-    for (let y = 0; y < N; y++) {
-      for (let x = 0; x < N; x++) {
+    for (let y = 0; y < NH; y++) {
+      for (let x = 0; x < NW; x++) {
         const h = at(x, y);
-        const k = (h - lo) / Math.max(1, hi - lo);
+        const i = (y * NW + x) * 4;
+        if (h < SEA_LEVEL) {
+          const deep = clamp((SEA_LEVEL - h) / 25, 0, 1);
+          img.data[i] = 64 - deep * 34;
+          img.data[i + 1] = 104 - deep * 44;
+          img.data[i + 2] = 118 - deep * 30;
+          img.data[i + 3] = 255;
+          continue;
+        }
+        const k = clamp((h - lo) / Math.max(1, hi - lo), 0, 1);
         const shade = clamp(0.5 + (at(x + 2, y + 2) - at(x - 2, y - 2)) * -0.06, 0.25, 0.85);
-        const i = (y * N + x) * 4;
         img.data[i] = (62 + k * 70) * (0.55 + shade * 0.8);
         img.data[i + 1] = (72 + k * 62) * (0.55 + shade * 0.8);
         img.data[i + 2] = (44 + k * 40) * (0.55 + shade * 0.8);
@@ -90,7 +112,7 @@ export class Minimap {
       }
     }
     g.putImageData(img, 0, 0);
-    const X = (wx: number) => (wx + WORLD_SIZE / 2) * SCALE, Y = (wz: number) => (wz + WORLD_SIZE / 2) * SCALE;
+    const X = (wx: number) => (wx - WORLD_X0) * SCALE, Y = (wz: number) => (wz - WORLD_Z0) * SCALE;
     // forest
     g.fillStyle = 'rgba(24, 44, 22, 0.5)';
     for (const t of world.trees) {
@@ -221,15 +243,15 @@ export class Minimap {
     l.yaw = yaw;
     l.big = this.big;
     const g = this.ctx, W = this.view.width;
-    const span = this.big ? WORLD_SIZE : SPAN;
+    const span = this.big ? Math.max(WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0) : SPAN;
     const k = W / span;
     // the middle of the picture: you, or (opened large) the middle of the map
-    const cx = this.big ? 0 : x, cz = this.big ? 0 : z;
+    const cx = this.big ? (WORLD_X0 + WORLD_X1) / 2 : x, cz = this.big ? (WORLD_Z0 + WORLD_Z1) / 2 : z;
     // (what is beyond the map's edge: the grey of the mountains that close it, not black. The fort stands sixty
     // metres from the east edge, and half of this was a black hole there.)
     g.fillStyle = '#6b685d';
     g.fillRect(0, 0, W, W);
-    const sx = (cx - span / 2 + WORLD_SIZE / 2) * SCALE, sz = (cz - span / 2 + WORLD_SIZE / 2) * SCALE;
+    const sx = (cx - span / 2 - WORLD_X0) * SCALE, sz = (cz - span / 2 - WORLD_Z0) * SCALE;
     g.imageSmoothingEnabled = true;
     g.drawImage(this.base, sx, sz, span * SCALE, span * SCALE, 0, 0, W, W);
     const px = (x - cx + span / 2) * k, pz = (z - cz + span / 2) * k;

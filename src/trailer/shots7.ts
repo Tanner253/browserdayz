@@ -13,7 +13,7 @@ import type { Arrangement, Level } from './music';
 import { BAR } from './shots';
 import { ITEMS } from '../sim/items';
 import { CRASH, pickDropSite } from '../sim/drops';
-import { TOWN, WORLD_SIZE, PASS, kamenkaQ } from '../world/worldgen';
+import { TOWN, SQUARE_HALF, PASS, kamenkaQ } from '../world/worldgen';
 import { SEAT_AT } from '../game/garage';
 import { CONTRACT, DISCORD, X_HANDLE } from '../ui/hud';
 
@@ -140,7 +140,7 @@ export function buildShots(S: Stage): Shot[] {
   const plate = (name: string, facts: string[]) => g7('card4', `<div class="c4-name">${name}</div><div class="c4-rows">${facts.map((f) => `<span>${f}</span>`).join('')}</div>`);
   const off = (id: string) => Math.round((1 - (ITEMS[id].wear?.armor ?? 1)) * 100);
   const PLATE = {
-    town: plate('KAMENKA', [`${inTown.length} buildings on one street`, 'a valley of its own', `the map is ${WORLD_SIZE} m across`]),
+    town: plate('KAMENKA', [`${inTown.length} buildings on one street`, 'a valley of its own', `the map is ${2 * SQUARE_HALF} m across`]),
     street: plate('EVERY DOOR OPENS', [`${kinds('townhouse')} brick houses of two floors`, `${kinds('shanty')} plank houses on piles`, `${kinds('hut')} long huts`]),
     pass: plate('THE ROAD OVER', [`${climb} m up from the old valley`, `a climb of ${steep} in a hundred`, 'a jeep takes it at speed']),
     trader: plate('THE TRADER', ['he buys what you bring', 'sells what you are short of', 'and has work every day']),

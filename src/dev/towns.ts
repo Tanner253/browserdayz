@@ -13,7 +13,7 @@ import type { Renderer } from '../core/renderer';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Buildings } from '../world/buildings';
 import { Towns } from '../world/towns';
-import { CELL, WORLD_SIZE, idx, type World } from '../world/worldgen';
+import { CELL, WORLD_X0, WORLD_Z0, idx, type World } from '../world/worldgen';
 import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
 import type { KitPiece } from '../sim/kit';
 import { LIPKI, POKROV, placedWalls, townBuildings, townPoint, type Town } from '../sim/towns';
@@ -27,15 +27,15 @@ let walls: KitPiece[] = [];
 
 /** The corner levelled and cleared, and the town's buildings added. Before anything is built from the world. */
 export function lay(world: World) {
-  const half = WORLD_SIZE / 2, [px, pz] = town.pad, edge = 40;
-  const i0 = Math.max(0, Math.floor((town.x - px - edge + half) / CELL)), i1 = Math.ceil((town.x + px + edge + half) / CELL);
-  const j0 = Math.max(0, Math.floor((town.z - pz - edge + half) / CELL)), j1 = Math.ceil((town.z + pz + edge + half) / CELL);
+  const [px, pz] = town.pad, edge = 40;
+  const i0 = Math.max(0, Math.floor((town.x - px - edge - WORLD_X0) / CELL)), i1 = Math.ceil((town.x + px + edge - WORLD_X0) / CELL);
+  const j0 = Math.max(0, Math.floor((town.z - pz - edge - WORLD_Z0) / CELL)), j1 = Math.ceil((town.z + pz + edge - WORLD_Z0) / CELL);
   const was: number[] = [];
   for (let j = j0; j <= j1; j += 6) for (let i = i0; i <= i1; i += 6) was.push(world.heights[idx(i, j)]);
   was.sort((a, b) => a - b);
   padY = was[was.length >> 1];
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-    const x = -half + i * CELL, z = -half + j * CELL;
+    const x = WORLD_X0 + i * CELL, z = WORLD_Z0 + j * CELL;
     const out = Math.max(Math.abs(x - town.x) - px, Math.abs(z - town.z) - pz, 0);
     const t = Math.min(1, out / edge), mix = 1 - t * t * (3 - 2 * t);
     const k = idx(i, j);
@@ -51,8 +51,8 @@ export function lay(world: World) {
     world.buildings.push({ id: `${town.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: town.rot + s.rot, floorY: padY + 0.3, seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
     // (no grass through its floors: what the map's own planning does for every building)
     const [fw, fd] = BUILDING_FOOTPRINT[s.type], c = Math.cos(town.rot + s.rot), sn = Math.sin(town.rot + s.rot), reach = Math.hypot(fw, fd) / 2 + 2;
-    for (let j = Math.floor((z - reach + half) / CELL); j <= Math.ceil((z + reach + half) / CELL); j++) for (let i = Math.floor((x - reach + half) / CELL); i <= Math.ceil((x + reach + half) / CELL); i++) {
-      const dx = -half + i * CELL - x, dz = -half + j * CELL - z;
+    for (let j = Math.floor((z - reach - WORLD_Z0) / CELL); j <= Math.ceil((z + reach - WORLD_Z0) / CELL); j++) for (let i = Math.floor((x - reach - WORLD_X0) / CELL); i <= Math.ceil((x + reach - WORLD_X0) / CELL); i++) {
+      const dx = WORLD_X0 + i * CELL - x, dz = WORLD_Z0 + j * CELL - z;
       if (Math.abs(dx * c - dz * sn) < fw / 2 + 1.5 && Math.abs(dx * sn + dz * c) < fd / 2 + 1.5) world.grass[idx(i, j)] = 0;
     }
   });
