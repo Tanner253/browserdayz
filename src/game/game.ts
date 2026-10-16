@@ -18,7 +18,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import '../world/buildings';
 import type { Buildings } from '../world/buildings';
-import { SQUARE_HALF, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { PLAN, SQUARE_HALF, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
@@ -970,9 +970,11 @@ export class Game {
     // (its cast is sent for when the game is up: see `afterBoot`)
     // The ground ends at the edge of the world, and there was nothing there to stop anybody walking or
     // driving off it. Four walls that cannot be seen, a few paces in from the edge: the wild country round
-    // the map is all there to be walked, and nobody falls out of the world.
+    // the map is all there to be walked, and nobody falls out of the world. In the west the wall stands on the
+    // beach (PLAN.barrier: the owner, "no need to go into it or swim can put barrier on beach").
     {
-      const mx = (WORLD_X0 + WORLD_X1) / 2, mz = (WORLD_Z0 + WORLD_Z1) / 2, hx = (WORLD_X1 - WORLD_X0) / 2 - 4, hz = (WORLD_Z1 - WORLD_Z0) / 2 - 4;
+      const west = Math.max(WORLD_X0 + 4, PLAN.barrier), east = WORLD_X1 - 4;
+      const mx = (west + east) / 2, mz = (WORLD_Z0 + WORLD_Z1) / 2, hx = (east - west) / 2, hz = (WORLD_Z1 - WORLD_Z0) / 2 - 4;
       for (const [x, z, ax, az] of [[mx, mz + hz, hx, 1], [mx, mz - hz, hx, 1], [mx + hx, mz, 1, hz], [mx - hx, mz, 1, hz]]) physics.addStatic(physics.R.ColliderDesc.cuboid(ax, 400, az), 'rock', { x, y: 0, z });
     }
     this.traders = new Traders(world);
