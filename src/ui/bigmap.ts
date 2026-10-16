@@ -1206,8 +1206,9 @@ export class BigMap {
     // the grid's letters and numbers, along the top and down the left of the picture
     if (this.shown.grid) {
       // (along the sheet's own edges where the whole of it is in the picture, and the picture's where it runs off it)
-      // (the square's, as it always was: the ground west of it has no letters as yet)
-      const half = SQUARE_HALF, x0 = Math.max(0, sx(-half)), x1 = Math.min(W, sx(half)), y0 = Math.max(0, sy(-half)), y1 = Math.min(Hh, sy(half));
+      // (the bands along the world's top and down its west edge; the letters and numbers the square's, as they always
+      // were: the ground west of it has none as yet)
+      const half = SQUARE_HALF, x0 = Math.max(0, sx(WORLD_X0)), x1 = Math.min(W, sx(WORLD_X1)), y0 = Math.max(0, sy(WORLD_Z0)), y1 = Math.min(Hh, sy(WORLD_Z1));
       g.fillStyle = 'rgba(21, 23, 15, 0.82)';
       g.fillRect(x0, y0, x1 - x0, 17 * u);
       g.fillRect(x0, y0, 19 * u, y1 - y0);
