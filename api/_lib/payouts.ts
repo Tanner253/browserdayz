@@ -211,7 +211,11 @@ export function config(env: Record<string, string | undefined> = process.env): C
   const from4 = MOMENT.test(said4) ? Date.parse(said4) : NaN;
   const said5 = (env.PAYOUT_RULES5_FROM?.trim() ? env.PAYOUT_RULES5_FROM : RULES5_FROM).trim();
   const from5 = MOMENT.test(said5) ? Date.parse(said5) : NaN;
-  const minTags = Math.round(num(env.PAYOUT_MIN_TAGS, 5, 1, 100));
+  // (each tag paid as it comes, as before the rule of five: the owner, 2026-10-15, "players no longer need to get 5 tags to
+  // cash out, we will go back to cahsing them out isntantly if theres fund in streasury". It was five. Everything else of
+  // the later rules holds: the holder bonus and its tiers, the five a wallet in twelve hours. What waits for a fifth in
+  // the book is due from now, and paid at the next look: see `needOf`.)
+  const minTags = Math.round(num(env.PAYOUT_MIN_TAGS, 1, 1, 100));
   return {
     mode,
     problem,
@@ -234,7 +238,9 @@ export function config(env: Record<string, string | undefined> = process.env): C
     // (never before the rules of 2026-10-13, whose limit it changes)
     rules3From: Number.isFinite(from3) ? Math.max(rulesFrom, from3) : Infinity,
     // (one lot: what is set outside for the old limit, if anything, holds for this one too)
-    walletTags24: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, minTags, 1, 1000)),
+    // (five a wallet, whatever a payout is made of: the owner, 2026-10-15, "players can cash 5 tags a day instead of just
+    // 3 now". It was the size of a payout, five, and would have gone down to one with it.)
+    walletTags24: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, 5, 1, 1000)),
     // (never before the third, whose window it shortens)
     rules4From: Number.isFinite(from4) && Number.isFinite(from3) ? Math.max(rulesFrom, from3, from4) : Infinity,
     // (never before the rule of five, whose flat pay it adds to)

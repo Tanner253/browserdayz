@@ -838,7 +838,8 @@ await test('the file store keeps its promises (the one in memory, here; the real
 // "we will pay .01 per tag now, but we wont pay out till the user is due for 5 tags" (the owner, 2026-10-13). Every
 // world above stands before that moment, and is paid as it was promised. These stand after it.
 
-const FIVE = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-02T00:00:00Z' };
+// (five, said outright: since 2026-10-15 a tag is paid as it comes unless a number is set, see `minTags`)
+const FIVE = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-02T00:00:00Z', PAYOUT_MIN_TAGS: '5' };
 /** (and with the wallet's three a day out of the way, where that is not what is being asked) */
 const FIVES = { ...FIVE, PAYOUT_WALLET_DAY_TAGS: '1000' };
 type W = ReturnType<typeof world>;
@@ -887,8 +888,8 @@ function everyAttempt(w: { store: MemoryStore }, es: Entry[], to: number) {
 }
 
 await test('the second cut-over, settings: 0.01 flat whatever the treasury holds, five at a time, and the moment', async () => {
-  const c = config({ PAYOUTS: 'on', TREASURY_SECRET_KEY: KEY, PAYOUT_RULES2_FROM: '2026-10-20T00:00:00Z' });
-  assert.deepEqual([c.minTags, c.rules2From], [5, Date.parse('2026-10-20T00:00:00Z')]);
+  const c = config({ PAYOUTS: 'on', TREASURY_SECRET_KEY: KEY, PAYOUT_RULES2_FROM: '2026-10-20T00:00:00Z' }); // (one at a time unless a number is set, since 2026-10-15)
+  assert.deepEqual([c.minTags, c.rules2From], [1, Date.parse('2026-10-20T00:00:00Z')]);
   // The moment is one named figure, RULES2_FROM, and what is set outside is asked before it. While neither is a
   // moment there is no second cut-over at all: a tag is paid as it was, whenever it is cashed in.
   const named = Date.parse(RULES2_FROM);
@@ -904,14 +905,14 @@ await test('the second cut-over, settings: 0.01 flat whatever the treasury holds
   // the moment before it: as it was promised
   assert.equal(price(SOL(100.01), termsOf(c, before)), SOL(2));
   // nothing that is set for the share, or for the most a tag may pay, can make a full treasury pay more
-  const greedy = config({ TAG_PAY_PERCENT: '25', TAG_PAY_MAX_SOL: '1000', PAYOUT_RULES2_FROM: '2026-10-20T00:00:00Z' });
+  const greedy = config({ TAG_PAY_PERCENT: '25', TAG_PAY_MAX_SOL: '1000', PAYOUT_MIN_TAGS: '5', PAYOUT_RULES2_FROM: '2026-10-20T00:00:00Z' });
   assert.equal(price(SOL(1000), termsOf(greedy, after)), SOL(0.01));
   assert.ok(price(SOL(1000), termsOf(greedy, before)) > SOL(200));
   // what can be set: the flat figure, how many, and the moment
   const set = config({ TAG_PAY_MIN_SOL: '0.02', PAYOUT_MIN_TAGS: '3', PAYOUT_RULES2_FROM: '2026-11-01T00:00:00Z' });
   assert.deepEqual([price(SOL(1000), termsOf(set, '2026-11-01T00:00:00.000Z')), set.minTags, set.rules2From], [SOL(0.02), 3, Date.parse('2026-11-01T00:00:00Z')]);
   // (never before the rules of 13 October, which it is built on)
-  assert.equal(config({ PAYOUT_RULES2_FROM: '2026-01-01T00:00:00Z' }).rules2From, config({}).rulesFrom);
+  assert.equal(config({ PAYOUT_MIN_TAGS: '5', PAYOUT_RULES2_FROM: '2026-01-01T00:00:00Z' }).rules2From, config({}).rulesFrom);
   // and the page is told what a tag cashed in now pays
   const s = await snapshot(world(100.01, FIVE));
   assert.deepEqual([s.fives, s.share, s.tagPays, s.floor, s.flatPay, s.minTags, s.rules2From], [true, 0, Number(SOL(0.01)), Number(SOL(0.01)), Number(SOL(0.01)), 5, '2026-10-02T00:00:00.000Z']);
@@ -997,7 +998,7 @@ await test('across the cut-over the old book is closed: what was cashed in befor
   // The owner, 2026-10-13: "i want to cancel all current pending payouts and move forward wihtour new payout
   // tracking system", and "all waiting and not paid tags on the payout screen will now be deleted entirely."
   // (the moment is half a day after this world begins. 0.025: one tag at the least, and what the treasury keeps back)
-  const w = world(0.025, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-09T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' });
+  const w = world(0.025, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_MIN_TAGS: '5', PAYOUT_RULES2_FROM: '2026-10-09T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' });
   const old = await cash(w, 403, 3);
   assert.deepEqual(old.map((x) => have(x.o)), [['paid'], ['funds', undefined, undefined], ['funds', undefined, undefined]]);
   assert.equal(got(w, 403), SOL(0.01));
@@ -1041,7 +1042,7 @@ await test('across the cut-over the old book is closed: what was cashed in befor
   assert.equal(got(w, 403), SOL(0.01) + SOL(0.05));
 
   // A payment of before that is on its way when the moment comes is followed to its end. If it arrives, the tag is paid.
-  const CUT = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-08T12:00:20Z', PAYOUT_WALLET_DAY_TAGS: '1000' };
+  const CUT = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_MIN_TAGS: '5', PAYOUT_RULES2_FROM: '2026-10-08T12:00:20Z', PAYOUT_WALLET_DAY_TAGS: '1000' };
   const u = world(1, CUT);
   u.chain.lose = true;
   const lands = tag(u, 411);
@@ -1525,7 +1526,7 @@ await test('five and more of one wallet, whatever goes wrong, in whatever order:
 });
 
 await test('what people are told: the page before and after the moment, one line a wallet until it is paid, and the game server not kept asking', async () => {
-  const w = world(1, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-09T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' });
+  const w = world(1, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_MIN_TAGS: '5', PAYOUT_RULES2_FROM: '2026-10-09T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' });
   const page = async () => (await show(new Request('https://site.test/payouts'), w)).text();
   const status = async () => (await (await show(new Request('https://site.test/payouts?format=status'), w)).json()) as { tagPays: number; share: number; floor: number; minTags: number; next: unknown };
   const says = (html: string, wants: string[]) => wants.forEach((want) => assert.ok(html.includes(want), `the page does not say "${want}"`));
@@ -1845,7 +1846,7 @@ await test('the rule of five put off after it has begun: what is owed under it i
   // The moment moved on to one that has not come yet is the rule put off, the same.
   const m = world(1, FIVES);
   await cash(m, 484, 2);
-  m.cfg = config({ ...ENV, PAYOUT_RULES2_FROM: '2027-06-01T00:00:00Z' });
+  m.cfg = config({ ...ENV, PAYOUT_MIN_TAGS: '5', PAYOUT_RULES2_FROM: '2027-06-01T00:00:00Z' });
   assert.deepEqual([(await sweep(m)).paid, got(m, 484)], [2, SOL(0.02)]);
 
   // And the other way there was before this one, with the rule left on: the count set to one. What waits is paid
