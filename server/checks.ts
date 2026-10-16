@@ -121,13 +121,14 @@ export function recheck(c: Client, why: string) {
   TURNED.recheck++;
   log(`[check] ${c.name} is sent back to the bot check, ${secs} s after coming in: ${why}`);
   shooters.delete(`${keyHash(c.key)}|${c.ip}`);
-  // Sent back again and again: kept off the server, by their key and where they play from (the owner, 2026-10-16:
-  // "can we ban these accounts who join and get kcicked multiple times?". That day a swarm with made-up names,
-  // Merric635, Brambl116 and the like, passed the course and was sent back from the world every half minute.)
+  // Sent back again and again: kept off the server, by their key, where they play from and the device they play on
+  // (the owner, 2026-10-16: "can we ban these accounts who join and get kcicked multiple times?". That day a swarm
+  // with made-up names, Merric635, Brambl116 and the like, passed the course and was sent back from the world every
+  // half minute, and took new names and keys every half hour: the device is what they all share.)
   const now = Date.now();
   let kept = false;
   if (roleOf(c) !== 'admin') {
-    for (const n of namesOf(c.key, c.ip)) {
+    for (const n of namesOf(c.key, c.ip, c.fp)) {
       const times = (BANS.strikes.get(`back:${n}`) ?? []).filter((t) => now - t < RECHECK_BAN.within);
       times.push(now);
       BANS.strikes.set(`back:${n}`, times);

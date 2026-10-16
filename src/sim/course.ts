@@ -293,6 +293,14 @@ const REWIND = [0, 120, 240];
 const SEEN_FIRST = 200;
 /** a figure that has gone out of sight is still shown this long (ms), so that it does not flicker at a wall's edge */
 const LINGER = 800;
+/**
+ * More shots in a go than anybody fires, and the go is over (the owner, 2026-10-16: "we need harder to hit shots").
+ * Six figures to bring down: the four people who passed on 2026-10-16 fired 9, 9, 22 and 45 rounds; the swarm's
+ * programs that hour fired 63 to 160 a go, spraying at the figures' places as the server told them. It was 180.
+ */
+const SHOTS = 90;
+/** shots landed by the course and refused by the judge in one go, and it carries the bot signature (see `signed`) */
+const REFUSED = 4;
 
 /**
  * The judge of one go at the course. It is told what the game says (where it stands and looks, and each shot), with
@@ -449,9 +457,17 @@ export class CourseJudge {
     return hit;
   }
 
-  /** the bot signature of 2026-10-15, as on the strip (RangeJudge.signed): '' when the go does not carry it */
+  /**
+   * The bot signature, as on the strip (RangeJudge.signed): '' when the go does not carry it. Two of its shapes:
+   * 2026-10-15's, shots landed and not counted with a body that turned far more than it walked; and 2026-10-16's,
+   * REFUSED and more shots landed by the course and not counted, whatever the body did. That day's swarm (Merric635,
+   * Brambl116 ...) walked and turned like anybody (8 to 24 degrees a metre) and landed 10 to 26 shots a go of which
+   * 4 to 20 were refused (the sights not on the figure before, or not fired the way they looked: a program aiming off
+   * the figures' places as the server tells them); the four people who passed in the same hour had none refused.
+   */
   get signed(): string {
     const refused = this.landed - this.down.size, per = (this.turned * 180) / Math.PI / Math.max(1, this.walked);
+    if (refused >= REFUSED) return `the bot signature (${refused} shots landed by the course and not counted)`;
     return refused >= 2 && per >= 25 ? `the bot signature (${refused} shots landed and not counted, ${per.toFixed(0)} degrees turned for every metre walked)` : '';
   }
 
@@ -468,6 +484,6 @@ export class CourseJudge {
 
   /** over, and not passed: the time is up, too much was said that could not be so, more was fired than anybody fires, or every figure is down with the bot signature */
   failed(now: number) {
-    return !this.passed && (now > this.course.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > 180 || (this.down.size >= this.course.need && this.sign === 'enforce' && !!this.signed));
+    return !this.passed && (now > this.course.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > SHOTS || (this.down.size >= this.course.need && this.sign === 'enforce' && !!this.signed));
   }
 }

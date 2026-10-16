@@ -876,6 +876,8 @@ export class AdminUI {
     if (p.kills) fact('skull', `${p.kills} kill${p.kills === 1 ? '' : 's'}`);
     if (p.tags) fact('star', `${p.tags} tag${p.tags === 1 ? '' : 's'} cashed`);
     if (p.flags) fact('flag', `${p.flags} flag${p.flags === 1 ? '' : 's'}`);
+    // (the device their game runs on: /same dev:... lists everybody on it, /ban dev:... bans it)
+    if (p.dev) fact('shield', `dev:${p.dev}`);
     const state = [p.alive ? '' : 'dead', p.asleep ? 'gone: body left behind' : p.away ? 'not answering (tabbed out)' : '', p.seat ? 'in a car' : '', p.muted ? 'muted' : ''].filter(Boolean).join(' · ');
     if (state) fact('warn', state);
     text.append(name, facts);

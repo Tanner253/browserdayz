@@ -99,8 +99,8 @@ export const ipOf = new WeakMap<WebSocket, string>();
 /** addresses only mean something while they tell players apart: if three or more are on and all seem to come from one place, the host is hiding them */
 export const ipsTellApart = () => clients.size < 3 || new Set([...clients.values()].map((x) => x.ip)).size > 1;
 
-/** the two names a player goes by here: their key, and (when it means anything) where they play from */
-export const namesOf = (key: string, ip: string) => (ip && ipsTellApart() ? [key, `ip:${ip}`] : [key]);
+/** the names a player goes by here: their key, (when it means anything) where they play from, and (when it was said) the device they play on */
+export const namesOf = (key: string, ip: string, fp = '') => [key, ...(ip && ipsTellApart() ? [`ip:${ip}`] : []), ...(fp ? [`fp:${fp}`] : [])];
 
 /** Why a tag earns nothing, or null if it does. */
 export function notEarned(c: Client, from: Looted, since: number | undefined, now: number): string | null {

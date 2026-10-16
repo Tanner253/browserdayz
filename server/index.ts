@@ -30,7 +30,8 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, standing } from './gate';
+import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, deviceRules, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, standing } from './gate';
+import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
 import { blowJeep, settleRiders, voice } from './acts';
@@ -961,11 +962,30 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         ws.close();
         return;
       }
-      const ip = ipOf.get(ws) ?? '', key = keyOf(m);
+      const ip = ipOf.get(ws) ?? '', key = keyOf(m), fp = cleanDevice(m.fp);
+      // (The device the game runs on, said with hello (src/net/device.ts). Not said, where it is needed: the game
+      // is not ours, or is one from before protocol 44, and is told what such a game is told. Said: the rules of
+      // the device (server/device.ts) are asked here, before anything of the course is spent on it.)
+      if (m.v === PROTOCOL && DEVICE.need && !fp) {
+        TURNED.device++;
+        log(`${cleanName(m.name)} is not let in: their game said nothing of the device it runs on (${agent})`);
+        ws.send(JSON.stringify({ t: 'kick', reason: 'This game was updated. Reload the page.', v: PROTOCOL } satisfies S2C));
+        ws.close();
+        return;
+      }
+      if (fp) {
+        deviceOf.set(ws, fp);
+        const told = m.v === PROTOCOL ? deviceRules(key || 'nobody', ip, fp, cleanName(m.name)) : null;
+        if (told) {
+          ws.send(JSON.stringify({ t: 'kick', reason: told } satisfies S2C));
+          ws.close();
+          return;
+        }
+      }
       // (Shown to be a person's browser, or not asked: now the range, for whoever has not lately passed it.
       // Not for somebody who is to be turned away whatever they shoot: they are told so at once, by `join`.)
       const enter = (h: Extract<C2S, { t: 'hello' }>) => {
-        if (h.v !== PROTOCOL || knownShooter(key, ip) || bannedFor(key || 'nobody', ip) || addressFull(key, ip)) return void letIn(h);
+        if (h.v !== PROTOCOL || knownShooter(key, ip) || bannedFor(key || 'nobody', ip, fp) || addressFull(key, ip)) return void letIn(h);
         const deal = (go: number) => {
           // (the server's own dice, from the system's: the game sees the yard's turn, and nothing it could work the
           // figures' walks out from)

@@ -55,7 +55,11 @@ try {
     assert.ok(heli, 'no helicopter where one stands');
     const [x, y, z] = heli.s;
     pilot.at(x + 1, y - 0.8, z);
-    watcher.at(watcherNear ? x + 300 : x - 1000, 60, watcherNear ? z : z - 400);
+    // (the near watcher 300 m off TOWARD THE MAP'S MIDDLE: the fort's pad stands by the map's east edge since the
+    // fort moved to the rim (2026-10-14), and a watcher 300 m east of it stood off the map, where the server takes
+    // no word of anybody's place (isPose), so nobody was near)
+    const mid = Math.hypot(x, z) || 1;
+    watcher.at(watcherNear ? x - (x / mid) * 300 : x - 1000, 60, watcherNear ? z - (z / mid) * 300 : z - 400);
     await sleep(400);
     pilot.send({ t: 'vin', i: heli.i, seat: 0 });
     await sleep(400);
