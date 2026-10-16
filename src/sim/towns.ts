@@ -117,6 +117,55 @@ export const POKROV_DOMES: { x: number; z: number; over: number; size: number; g
 /** and over Lipki's chapel */
 export const LIPKI_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [{ x: 0, z: 2, over: 5.9, size: 0.38, gilt: false }];
 
+/** a town as the world has set it down: where, and the height of its pad of level ground */
+export interface PlacedTown { town: Town; padY: number }
+
+/** the buildings of a town by its name */
+export function townBuildings(t: Town): TownSpot[] {
+  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : [];
+}
+
+/** a town's walls in the world (only Pokrov has any) */
+export function placedWalls(p: PlacedTown): KitPiece[] {
+  if (p.town.name !== POKROV.name) return [];
+  return pokrovWalls(p.padY).map((k) => {
+    const [x, z] = townPoint(p.town, k.at[0], k.at[2]);
+    return { ...k, at: [x, k.at[1], z], turn: (k.turn ?? 0) + p.town.rot };
+  });
+}
+
+/** a town's domes in the world: the foot of each drum, how big, whether gilt (heights over the pad: its buildings' floors are 0.3 over it) */
+export function placedDomes(p: PlacedTown): { x: number; y: number; z: number; size: number; gilt: boolean }[] {
+  const list = p.town.name === POKROV.name ? POKROV_DOMES : p.town.name === LIPKI.name ? LIPKI_DOMES : [];
+  return list.map((d) => {
+    const [x, z] = townPoint(p.town, d.x, d.z);
+    return { x, y: p.padY + 0.3 + d.over, z, size: d.size, gilt: d.gilt };
+  });
+}
+
+/**
+ * Whether somebody at a place is on the monastery's walls (on its walk, its parapet, its stairs) and so has
+ * something under them: for the server, which asks of anybody high off the ground what they stand on. Within the
+ * band from the wall's outer face to the inner edge of its stairs, and no higher than its merlons.
+ */
+export function onTownWall(placed: PlacedTown[] | undefined, x: number, y: number, z: number): boolean {
+  for (const p of placed ?? []) {
+    if (p.town.name !== POKROV.name || y < p.padY - 0.5 || y > p.padY + 9.5) continue;
+    const c = Math.cos(p.town.rot), s = Math.sin(p.town.rot), dx = x - p.town.x, dz = z - p.town.z;
+    const lx = dx * c - dz * s, lz = dx * s + dz * c, W = POKROV_WALL;
+    for (let i = 0; i < W.length; i++) {
+      const [ax, az] = W[i], [bx, bz] = W[(i + 1) % W.length], ex = bx - ax, ez = bz - az, L2 = ex * ex + ez * ez;
+      const t = Math.max(0, Math.min(1, ((lx - ax) * ex + (lz - az) * ez) / L2));
+      // (inside is on the left of the way a side runs, its outside on the right: how far in from the outer face; the band reaches the wall's depth and its stair's, and a little outside it)
+      const side = (ez * (lx - ax) - ex * (lz - az)) / Math.sqrt(L2);
+      if (Math.hypot(lx - ax - ex * t, lz - az - ez * t) < 8 && side > -1 && side < DEEP + 3.6 + 0.5) return true;
+    }
+    // (and the round towers at the corners, their tops)
+    for (const [ax, az] of W) if (Math.hypot(lx - ax, lz - az) < 8.2) return true;
+  }
+  return false;
+}
+
 /** a point of a town's own frame in the world */
 export function townPoint(t: Town, lx: number, lz: number): [number, number] {
   const c = Math.cos(t.rot), s = Math.sin(t.rot);

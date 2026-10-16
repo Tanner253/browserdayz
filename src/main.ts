@@ -187,7 +187,7 @@ async function boot() {
   buildings.multiDraw = r.renderer.extensions.has('WEBGL_multi_draw') && !new URLSearchParams(location.search).has('nobatch');
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
-  void towns?.stand(atmo, r);
+  void towns?.stand(atmo, r, buildings);
   // (the road and the works are far outside the fort's arena: not built for a wager)
   if (!arena) buildRoad(world, atmo, r.scene, (o) => r.ready(o));
   if (!arena) buildWorks(world, atmo, r.scene);

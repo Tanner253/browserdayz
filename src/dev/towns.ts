@@ -9,15 +9,14 @@
 // For whoever drives it by script: `window.TW` has the town, its buildings and the wall's pieces.
 
 import * as THREE from 'three';
-import { physics } from '../core/physics';
 import type { Renderer } from '../core/renderer';
 import type { Atmosphere } from '../world/atmosphere';
-import { kitMeshes } from '../world/kit';
-import { onionDome } from '../world/domes';
-import { CELL, WORLD_SIZE, heightAt, idx, type World } from '../world/worldgen';
+import type { Buildings } from '../world/buildings';
+import { Towns } from '../world/towns';
+import { CELL, WORLD_SIZE, idx, type World } from '../world/worldgen';
 import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
-import { kitSolids, type KitPiece } from '../sim/kit';
-import { LIPKI, LIPKI_DOMES, POKROV, POKROV_DOMES, lipkiBuildings, pokrovBuildings, pokrovWalls, townPoint, type Town } from '../sim/towns';
+import type { KitPiece } from '../sim/kit';
+import { LIPKI, POKROV, placedWalls, townBuildings, townPoint, type Town } from '../sim/towns';
 
 const which = new URLSearchParams(location.search).get('towns') === 'lipki' ? 'lipki' : 'pokrov';
 /** where it is stood for looking at: the north-west corner, which nothing of today's map uses */
@@ -46,7 +45,7 @@ export function lay(world: World) {
   world.trees = world.trees.filter(off);
   world.rocks = world.rocks.filter(off);
   world.props = world.props.filter(off);
-  const spots = which === 'lipki' ? lipkiBuildings() : pokrovBuildings();
+  const spots = townBuildings(town);
   spots.forEach((s, n) => {
     const [x, z] = townPoint(town, s.x, s.z);
     world.buildings.push({ id: `${town.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: town.rot + s.rot, floorY: padY + 0.3, seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
@@ -57,38 +56,18 @@ export function lay(world: World) {
       if (Math.abs(dx * c - dz * sn) < fw / 2 + 1.5 && Math.abs(dx * sn + dz * c) < fd / 2 + 1.5) world.grass[idx(i, j)] = 0;
     }
   });
-  walls = which === 'lipki' ? [] : pokrovWalls(padY).map((p) => {
-    const [x, z] = townPoint(town, p.at[0], p.at[2]);
-    return { ...p, at: [x, p.at[1], z], turn: (p.turn ?? 0) + town.rot };
-  });
+  walls = placedWalls({ town, padY });
 }
 
-/** The monastery's walls, in white limewashed brick, and what of them stops a body. After the ground and the buildings are built. */
-export async function stand(atmo: Atmosphere, r: Renderer) {
-  const box = new THREE.Box3();
-  if (walls.length) {
-    const { meshes, triangles } = await kitMeshes('fort_kit', walls, {
-      sets: { fort_wall: { set: 'painted_plaster_wall', repeat: 3 }, fort_trim: { set: 'white_bricks', repeat: 3 } },
-      dress: (m) => (atmo.register(m), m),
-    });
-    for (const m of meshes) {
-      m.castShadow = m.receiveShadow = true;
-      r.scene.add(m);
-      box.expandByObject(m);
-    }
-    for (const s of kitSolids(walls)) {
-      if (s.t === 'box') physics.addStaticQuat(physics.R.ColliderDesc.cuboid(s.h[0], s.h[1], s.h[2]), 'concrete', { x: s.c[0], y: s.c[1], z: s.c[2] }, { x: s.q[0], y: s.q[1], z: s.q[2], w: s.q[3] });
-      else {
-        const hull = physics.R.ColliderDesc.convexHull(new Float32Array(s.pts));
-        if (hull) physics.addStatic(hull, 'concrete', { x: 0, y: 0, z: 0 });
-      }
-    }
-    console.info(`[towns] ${town.name}: ${walls.length} wall pieces, ${triangles} triangles`);
-  }
-  for (const d of which === 'lipki' ? LIPKI_DOMES : POKROV_DOMES) {
-    const [x, z] = townPoint(town, d.x, d.z);
-    r.scene.add(onionDome(atmo, new THREE.Vector3(x, padY + 0.3 + d.over, z), d.size, d.gilt));
-  }
-  const ground = (x: number, z: number) => padY + 0 * x * z;
-  (window as unknown as Record<string, unknown>).TW = { town, padY, walls, box, ground, heightAt };
+/** The town's walls and domes, drawn by the game's own module (src/world/towns.ts). After the ground and the buildings are built. */
+export async function stand(atmo: Atmosphere, r: Renderer, buildings: Buildings) {
+  const towns = new Towns(atmo, r.scene, [{ town, padY }], buildings, (o) => r.ready(o).then(() => r.send(o)));
+  await towns.build();
+  // (the game has no hook for it yet: it is told where the eye is from here, as ?ruins does)
+  setInterval(() => {
+    const g = (window as unknown as { __game?: { s: { r: { camera: THREE.Camera } } } }).__game;
+    if (g) towns.update(g.s.r.camera.position);
+  }, 400);
+  console.info(`[towns] ${town.name}: ${walls.length} wall pieces, far copy ${towns.counts.far} triangles`);
+  (window as unknown as Record<string, unknown>).TW = { town, padY, walls, towns };
 }

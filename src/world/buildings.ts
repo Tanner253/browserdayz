@@ -3322,6 +3322,12 @@ export class Buildings {
     return m;
   }
 
+  /** Something else drawn or not by the draw distance as the buildings are (a town's walls, a dome), and counted as cover by `hides`: where it stands and how far it reaches. */
+  keepFar(show: (on: boolean) => void, x: number, z: number, r: number) {
+    this.far.push({ show, shown: true, x, z, r });
+    this.drawnFrom = null;
+  }
+
   /** The player's draw distance, metres (Settings: Video). */
   setDrawDistance(d: number) {
     this.drawDistance = d;
