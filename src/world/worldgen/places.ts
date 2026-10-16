@@ -85,8 +85,18 @@ export const PLAY_RADIUS = 400;
 export const EXPANSION = { name: 'Chemical Works', x: -368, z: 368, floor: 84, wall: 56, level: 12 };
 
 /** Where the map is played: the valley, and what has been added to it. */
-/** Where the bunker is (see src/sim/bunker.ts): straight across the map from the works, in the foot of the hills there. */
-export const BUNKER_AT = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out, z: (-EXPANSION.z / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out };
+/**
+ * Where the bunker was made (see src/sim/bunker.ts): straight across the map from the works, in the foot of the hills
+ * there. The square is still made with it there, to the last stone; the world's last stage gives that hillside back
+ * and puts the bunker at BUNKER_AT.
+ */
+export const BUNKER_WAS = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out, z: (-EXPANSION.z / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out };
+
+/**
+ * Where the bunker is (2026-10-16, plan v2): alone in the pine forest of the west, at the end of the way north out of
+ * Pokrov (the owner: "far enough to where it doesnt render with the castle"); `face`, the way its mouth looks.
+ */
+export const BUNKER_AT = { x: -1990, z: -495, face: [0.24, 0.97] as [number, number] };
 
 /**
  * The town built on the ground the map was grown by (2026-10-10): out of the valley by the road, which is carried

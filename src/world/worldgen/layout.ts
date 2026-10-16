@@ -3,7 +3,8 @@
 
 import { clamp, smoothstep } from '../../core/noise';
 import { BUNKER, type Place, bunkerAt } from '../../sim/bunker';
-import { BUNKER_AT, EXPANSION, LOOP, MOUNTAIN, PASS, PLAY_RADIUS, TOWN, WORLD_SEED, eastRoad } from './places';
+import { PLAN, westZona } from './west-plan';
+import { BUNKER_WAS, EXPANSION, LOOP, MOUNTAIN, PASS, PLAY_RADIUS, TOWN, WORLD_SEED, eastRoad } from './places';
 import type { World } from './types';
 import { catmullRom, heightAt } from './ground';
 import { generateWorld } from './generate';
@@ -126,10 +127,13 @@ export const PLAY_FIRST = 5;
 export const PLAY_AREAS: { x: number; z: number; r: number }[] = [
   { x: 0, z: 0, r: PLAY_RADIUS },
   { x: EXPANSION.x, z: EXPANSION.z, r: EXPANSION.floor + EXPANSION.wall },
-  { x: BUNKER_AT.x, z: BUNKER_AT.z, r: BUNKER.floor + BUNKER.wall },
+  // (the bunker's round where it was, and is no more: kept, so that the Zona's line over the east is as it was)
+  { x: BUNKER_WAS.x, z: BUNKER_WAS.z, r: BUNKER.floor + BUNKER.wall },
   TOWN.gate,
   { x: TOWN.x, z: TOWN.z, r: TOWN.r },
   ...loopRounds(),
+  // (and all the new land west of the valley, out to the barrier on the beach: plan v2, 2026-10-16)
+  ...westZona(),
 ];
 
 /**
@@ -413,7 +417,10 @@ export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' |
  * further than that from every other place. (Said, not looked for: the ground round it is counted out of the
  * check that nothing else on the map has moved.)
  */
-export const TRADE_AT = { x: 200, z: -40 };
+export const TRADE_WAS = { x: 200, z: -40 };
+
+/** Where the trading post is (2026-10-16, plan v2): beside the main west road, between the valley and Pokrov. Its buildings are the ones made at TRADE_WAS, moved (see src/world/worldgen/opening.ts). */
+export const TRADE_AT = PLAN.trade;
 
 /** The army's camp (2026-10-10): four tents and a watchtower in a clearing of the wood south of the west road, between the trapper's camp and the old sawmill. */
 export const ARMY_CAMP = { name: 'Army Camp', x: -240, z: 5 };
