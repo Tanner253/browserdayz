@@ -19,6 +19,7 @@ import { castleLoot, castleProps } from '../sim/castle';
 import { frameToWorld, planBasements, type RoomKind } from '../sim/basements';
 import { buildBasement, roomVolume, type Kit } from './basement-build';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
+import * as town from './town-plans';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 // (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
@@ -473,6 +474,19 @@ const gap = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, to
 function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
   const ext = rng.chance(0.5) ? 'plaster_ext' : 'brick_ext';
   switch (type) {
+    // (the new towns', each drawn up for its place: see src/world/town-plans.ts)
+    case 'cathedral': return town.cathedralPlan();
+    case 'belfry': return town.belfryPlan();
+    case 'cells': return town.cellsPlan();
+    case 'refectory': return town.refectoryPlan();
+    case 'abbot': return town.abbotPlan();
+    case 'tavern': return town.tavernPlan();
+    case 'merchant': return town.merchantPlan();
+    case 'smithy': return town.smithyPlan();
+    case 'izba': return town.izbaPlan();
+    case 'izba_two': return town.izbaTwoPlan();
+    case 'chapel': return town.chapelPlan();
+    case 'sawmill': return town.sawmillPlan();
     case 'house_small':
       return {
         w: 8, d: 6.5, h: 2.8, ext, int: 'int_painted', floor: rng.chance(0.5) ? 'floor_wood' : 'floor_lino',

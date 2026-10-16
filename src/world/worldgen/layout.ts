@@ -357,7 +357,9 @@ export const VILLAGE_STREETS = {
 /** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
 export const SERVICES = { from: 68, to: 116, out: 90 };
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage' | 'flats';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage' | 'flats'
+  // (2026-10-16: the new towns' own, see src/world/town-plans.ts)
+  | 'cathedral' | 'belfry' | 'cells' | 'refectory' | 'abbot' | 'tavern' | 'merchant' | 'smithy' | 'izba' | 'izba_two' | 'chapel' | 'sawmill';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -391,6 +393,18 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   police_hq: [30, 13],
   // (2026-10-12: a block of four flats, the village's new kind of house: see flatsPlan in big-buildings.ts)
   flats: [13, 8.6],
+  cathedral: [24, 13],
+  belfry: [6, 6],
+  cells: [36, 9],
+  refectory: [22, 10],
+  abbot: [10, 8],
+  tavern: [14, 10],
+  merchant: [11, 9],
+  smithy: [10, 7],
+  izba: [8, 6.5],
+  izba_two: [9, 8],
+  chapel: [9, 6],
+  sawmill: [20, 7],
 };
 
 export interface BuildingPlot {

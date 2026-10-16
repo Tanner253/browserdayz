@@ -158,6 +158,9 @@ async function boot() {
   // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
   const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
   ruins?.lay(world);
+  // (`?towns`: a new town of the map three times over stood on level ground in a corner of today's map: src/dev/towns.ts)
+  const towns = import.meta.env.DEV && new URLSearchParams(location.search).has('towns') ? await import('./dev/towns') : null;
+  towns?.lay(world);
   // (the Arena's page builds the arena and what is seen over its wall, and nothing else: arena/rules.ts)
   const arena = mode === 'arena' && !!world.castle;
   if (arena) cutToArena(world);
@@ -184,6 +187,7 @@ async function boot() {
   buildings.multiDraw = r.renderer.extensions.has('WEBGL_multi_draw') && !new URLSearchParams(location.search).has('nobatch');
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
+  void towns?.stand(atmo, r);
   // (the road and the works are far outside the fort's arena: not built for a wager)
   if (!arena) buildRoad(world, atmo, r.scene, (o) => r.ready(o));
   if (!arena) buildWorks(world, atmo, r.scene);

@@ -17,15 +17,15 @@
 
 import type { Blueprint, Deck, Fitting, Furn, Level, MatKey, Opening, WallDef } from './buildings';
 
-const win = (a: number, b: number, bottom = 0.9, top = 2.05): Opening => ({ a, b, bottom, top, kind: 'window' });
-const door = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, top, kind: 'door' });
-const gap = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, top, kind: 'gap' });
+export const win = (a: number, b: number, bottom = 0.9, top = 2.05): Opening => ({ a, b, bottom, top, kind: 'window' });
+export const door = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, top, kind: 'door' });
+export const gap = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, top, kind: 'gap' });
 
-const PI = Math.PI, Q = PI / 2;
+export const PI = Math.PI, Q = PI / 2;
 type P3 = [number, number, number];
 
 /** What stands on a floor and what is kept there, gathered a room at a time. */
-class Floor {
+export class Floor {
   furniture: Furn[] = [];
   loot: P3[] = [];
   /** a thing stood on the floor (`y`: or hung so high over it) */
@@ -66,7 +66,7 @@ class Floor {
 }
 
 /** an inside wall: both its faces painted (`a` the face to the left of the way it runs, `b` the other) */
-const inner = (from: [number, number], to: [number, number], openings: Opening[] = [], a: WallDef['ext'] = 'int_painted', b: WallDef['int'] = 'int_painted'): WallDef => ({ side: 'inner', from, to, ext: a, int: b, openings });
+export const inner = (from: [number, number], to: [number, number], openings: Opening[] = [], a: WallDef['ext'] = 'int_painted', b: WallDef['int'] = 'int_painted'): WallDef => ({ side: 'inner', from, to, ext: a, int: b, openings });
 
 // ------------------------------------------------------------------------------------------------ the hospital
 
