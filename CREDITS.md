@@ -186,7 +186,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Concrete Road Barrier](https://polyhaven.com/a/concrete_road_barrier) | Amal Kumar |
 | model | [Covered Car](https://polyhaven.com/a/covered_car) | MP |
 | model | [Crowbar 01](https://polyhaven.com/a/crowbar_01) | Alexander Otterbeck |
-| model | [Dandelion 01](https://polyhaven.com/a/dandelion_01) | Rob Tuytel, Rico Cilliers |
 | model | [Dead Quiver Branch 01](https://polyhaven.com/a/dead_quiver_branch_01) | Greg Zaal, Jenelle van Heerden |
 | model | [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk) | Rob Tuytel |
 | model | [Dead Tree Trunk 02](https://polyhaven.com/a/dead_tree_trunk_02) | Jenelle van Heerden, Rico Cilliers |
@@ -194,7 +193,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Dry Branches Medium 01](https://polyhaven.com/a/dry_branches_medium_01) | Rico Cilliers |
 | model | [Electric Stove](https://polyhaven.com/a/electric_stove) | Kuutti Siitonen |
 | model | [Fern 02](https://polyhaven.com/a/fern_02) | Rob Tuytel, Rico Cilliers |
-| model | [Fir Sapling](https://polyhaven.com/a/fir_sapling) | Rob Tuytel, Rico Cilliers |
 | model | [Fish Knife](https://polyhaven.com/a/fish_knife) | Mateusz Sadek |
 | model | [Fishermans Hat](https://polyhaven.com/a/fishermans_hat) | PierreB3D |
 | model | [Food Apple 01](https://polyhaven.com/a/food_apple_01) | Oliver Harries |
@@ -217,7 +215,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Namaqualand Boulder 05](https://polyhaven.com/a/namaqualand_boulder_05) | Jenelle van Heerden, Dario Barresi |
 | model | [Namaqualand Cliff 01](https://polyhaven.com/a/namaqualand_cliff_01) | Jenelle van Heerden, Rico Cilliers |
 | model | [Namaqualand Cliff 02](https://polyhaven.com/a/namaqualand_cliff_02) | Dario Barresi, Rico Cilliers |
-| model | [Nettle Plant](https://polyhaven.com/a/nettle_plant) | Rob Tuytel, Rico Cilliers |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |
@@ -225,8 +222,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Painted Wooden Cabinet](https://polyhaven.com/a/painted_wooden_cabinet) | Kirill Sannikov |
 | model | [Painted Wooden Chair 01](https://polyhaven.com/a/painted_wooden_chair_01) | Kuutti Siitonen |
 | model | [Painted Wooden Table](https://polyhaven.com/a/painted_wooden_table) | Kirill Sannikov |
-| model | [Periwinkle Plant](https://polyhaven.com/a/periwinkle_plant) | Amal Kumar |
-| model | [Pine Sapling Small](https://polyhaven.com/a/pine_sapling_small) | Rob Tuytel, Rico Cilliers |
 | model | [Plastic Bottle Gallon](https://polyhaven.com/a/plastic_bottle_gallon) | Rahul Chaudhary |
 | model | [Plastic Thermos](https://polyhaven.com/a/plastic_thermos) | PierreB3D |
 | model | [Rock Face 01](https://polyhaven.com/a/rock_face_01) | Dario Barresi |
@@ -241,8 +236,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Seadogs Compass](https://polyhaven.com/a/seadogs_compass) | Benny Weimer |
 | model | [Service Pistol](https://polyhaven.com/a/service_pistol) | Mateusz Sadek |
 | model | [Shelf 01](https://polyhaven.com/a/Shelf_01) | Gabriel Radić |
-| model | [Shrub 03](https://polyhaven.com/a/shrub_03) | Rico Cilliers |
-| model | [Shrub 04](https://polyhaven.com/a/shrub_04) | Rico Cilliers |
 | model | [Steel Frame Shelves 01](https://polyhaven.com/a/steel_frame_shelves_01) | James Ray Cock |
 | model | [Stick Grenade](https://polyhaven.com/a/stick_grenade) | singaii |
 | model | [Stone Fire Pit](https://polyhaven.com/a/stone_fire_pit) | Sebastian Platen |
@@ -255,7 +248,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Vintage Flashlight](https://polyhaven.com/a/vintage_flashlight) | Omar M. El-Safy |
 | model | [Vintage Radio Transceiver](https://polyhaven.com/a/vintage_radio_transceiver) | Mateusz Sadek |
 | model | [Vintage Suitcase](https://polyhaven.com/a/vintage_suitcase) | Maximilian Schuster |
-| model | [Wild Rooibos Bush](https://polyhaven.com/a/wild_rooibos_bush) | James Ray Cock, Jenelle van Heerden |
 | model | [Wooden Bookshelf Worn](https://polyhaven.com/a/wooden_bookshelf_worn) | Ulan Cabanilla |
 | model | [Wooden Crate 01](https://polyhaven.com/a/wooden_crate_01) | James Ray Cock |
 | model | [Wooden Ladder](https://polyhaven.com/a/wooden_ladder) | Miroslav Turura |

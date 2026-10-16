@@ -45,7 +45,17 @@ export interface OceanOptions extends Rect {
   cell?: number;
   /** of the picture the waves are drawn from: how much the card filters it at a slant (8) */
   anisotropy?: number;
+  /**
+   * Metres to carry the sea on past the rectangle's sides, as open deep water, so that from a hill the sea runs to the
+   * skyline and has no far edge (from 60 m up, 2.5 km of it had an edge the haze did not hide). Laid in tiles of
+   * BEYOND_TILE, always solid; its colour is the rectangle's edge's, carried on. The rectangle itself stays as narrow
+   * as the coast needs: its depths are read finely. Only open-sea sides: what is beyond is drawn over nothing.
+   */
+  beyond?: { west?: number; east?: number; north?: number; south?: number };
 }
+
+/** metres a side of the tiles of open sea past the rectangle (few: what is drawn of them is a strip at the skyline) */
+export const BEYOND_TILE = 2048;
 
 /** metres a side of a tile: big enough to be few, small enough that what is out of view is mostly left out */
 export const TILE = 256;
@@ -163,8 +173,16 @@ export class Ocean {
 
     // one flat square, laid in the plane of the ground; each tile is it, stretched to its own size
     const square = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    for (const r of oceanTiles(rect, o.tile ?? TILE)) {
-      const solid = shallowestIn(g, r) > OCEAN.solid;
+    // (the open sea past the rectangle: a strip each side it is asked for, the west and east ones the full length)
+    const b = o.beyond ?? {}, Z0 = rect.z0 - (b.north ?? 0), Z1 = rect.z1 + (b.south ?? 0);
+    const open = [
+      b.west && { x0: rect.x0 - b.west, x1: rect.x0, z0: Z0, z1: Z1 },
+      b.east && { x0: rect.x1, x1: rect.x1 + b.east, z0: Z0, z1: Z1 },
+      b.north && { x0: rect.x0, x1: rect.x1, z0: Z0, z1: rect.z0 },
+      b.south && { x0: rect.x0, x1: rect.x1, z0: rect.z1, z1: Z1 },
+    ].filter((r): r is Rect => !!r);
+    const laid = [...oceanTiles(rect, o.tile ?? TILE).map((r) => ({ r, solid: shallowestIn(g, r) > OCEAN.solid })), ...open.flatMap((s) => oceanTiles(s, BEYOND_TILE).map((r) => ({ r, solid: true })))];
+    for (const { r, solid } of laid) {
       const mesh = new THREE.Mesh(square, solid ? this.solid : this.material);
       // (deep water before anything else solid: the ground under it is then hidden before it is painted)
       if (solid) mesh.renderOrder = -1;
