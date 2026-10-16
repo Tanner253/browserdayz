@@ -11,6 +11,35 @@ export function reloadPage() {
 }
 
 /**
+ * Back in by itself after a connection that dropped (the owner, 2026-10-16: "random disconnects ... its bad UX to
+ * randomly get disconnected"): the page is loaded again and goes straight in, to the body that was left standing (the
+ * server keeps it five minutes). Three times in three minutes at most; after that it is the player's to press.
+ * @returns whether it is to be done now
+ */
+const REJOIN = 'zona:rejoin';
+export function rejoinSoon(): boolean {
+  try {
+    const times = (JSON.parse(sessionStorage.getItem(REJOIN) ?? '[]') as number[]).filter((t) => Date.now() - t < 180_000);
+    if (times.length >= 3) return false;
+    sessionStorage.setItem(REJOIN, JSON.stringify([...times, Date.now()]));
+    sessionStorage.setItem(`${REJOIN}:now`, String(Date.now()));
+    return true;
+  } catch {
+    return false;
+  }
+}
+/** this page was loaded again to go straight back in (see rejoinSoon) */
+export function rejoining(): boolean {
+  try {
+    const at = Number(sessionStorage.getItem(`${REJOIN}:now`) ?? 0);
+    sessionStorage.removeItem(`${REJOIN}:now`);
+    return Date.now() - at < 60_000;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * In full screen a page may keep keys for itself (the Keyboard Lock API, Chrome and Edge): there, Ctrl and W, N, T
  * and Tab never reach the browser. Called once: it follows the page in and out of full screen.
  */

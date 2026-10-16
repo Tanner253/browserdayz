@@ -3,7 +3,7 @@
 // Online, the server does, and this file mirrors it and reports what the player does.
 
 import * as THREE from 'three';
-import { keepKeysInFullScreen, leaving } from '../core/leave';
+import { keepKeysInFullScreen, leaving, rejoining } from '../core/leave';
 import type { Renderer } from '../core/renderer';
 import { physics } from '../core/physics';
 import { assets } from '../core/assets';
@@ -1054,6 +1054,11 @@ export class Game {
       // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
       // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")
     };
+    // (The browser lets the sound start only in a press of a key or a button. It was started by Deploy's alone: a game
+    // gone into another way (back in by itself after a dropped connection, see rejoining) was silent, and so, players
+    // said, until a setting was changed. In the game any press starts it, or wakes it where the browser has put it to
+    // sleep: "everytime i join the game or rejoin the game, i have to changethe audio in settins to get sound back".)
+    for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, () => this.started && audio.start(), { capture: true });
     // (and whoever is alive in a life is asked before the tab goes: Ctrl and W, the browser's own, is a helicopter
     // going down and forward. The game's own reloads are not asked about: src/core/leave.ts)
     window.addEventListener('beforeunload', (e) => {
@@ -1115,7 +1120,7 @@ export class Game {
    */
   loaded!: Promise<void>;
   isLoaded = false;
-  wantIn = false;
+  wantIn = rejoining();
   /** starts what is built behind the menu (called once the menu is shown) */
   buildBehind: () => void = () => {};
   /** the server's messages have their handlers (once a page: wireNet); and this game is leaving an Arena match itself, so its connection's going is no result to show */

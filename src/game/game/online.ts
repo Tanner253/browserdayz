@@ -3,7 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import * as THREE from 'three';
-import { reloadPage } from '../../core/leave';
+import { rejoinSoon, reloadPage } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
@@ -462,7 +462,15 @@ export const onlineMethods = {
       this.paused = true;
       this.input.unlock();
       const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
-      if (!said || this.net.refused) return void this.hud.fatal(reason);
+      if (!said || this.net.refused) {
+        // (dropped by itself, not ended by the server: the page loads again and goes straight back in, see rejoinSoon)
+        if (!said && !this.net.refused && reason === 'Connection to the server was lost.' && !this.player.dead && rejoinSoon()) {
+          this.hud.fatal('Connection lost. Getting you back in…');
+          window.setTimeout(reloadPage, 1200);
+          return;
+        }
+        return void this.hud.fatal(reason);
+      }
       this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);
       const remote = remoteServer() ?? location.origin, began = performance.now();
       const look = async () => {
