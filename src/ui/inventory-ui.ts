@@ -43,7 +43,8 @@ export interface InvActions {
   unload(item: ItemInstance): void;
   /** carried weapons this attachment can be fitted to right now */
   attachTargets(att: ItemInstance): ItemInstance[];
-  attach(att: ItemInstance, weapon: ItemInstance): void;
+  /** @param loose picked up off the ground to be fitted: held by nothing */
+  attach(att: ItemInstance, weapon: ItemInstance, loose?: boolean): void;
   /** @param loose the part is handed back, to be put where it was let go, and not put away in a pocket */
   detach(weapon: ItemInstance, mod: string, loose?: boolean): ItemInstance | null;
   /** push loose rounds into a magazine, one at a time, for as long as the hands are left to it */
@@ -2041,7 +2042,7 @@ export class InventoryUI {
     if (src.kind !== 'ground') return this.actions.attach(item, weapon);
     if (!this.materialize(src)) return void this.actions.note(GONE);
     this.removeFrom(src);
-    this.actions.attach(item, weapon);
+    this.actions.attach(item, weapon, true);
     if (!(ITEMS[item.id].mag ? weapon.mag === item.id : (weapon.mods ?? []).includes(item.id))) {
       const left = this.inv.add(item);
       if (left) this.spill(left);

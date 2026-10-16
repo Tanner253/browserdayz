@@ -672,7 +672,7 @@ export class Game {
       onGround: (w, how) => this.onGround(w, how),
       unload: (item) => this.unloadWeapon(item),
       attachTargets: (att) => this.attachTargets(att),
-      attach: (att, weapon) => this.attachMod(att, weapon),
+      attach: (att, weapon, loose) => this.attachMod(att, weapon, loose),
       detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
       fillMag: (mag) => this.fillMagazine(mag),
       emptyMag: (mag) => this.emptyMagazine(mag),
@@ -1456,6 +1456,7 @@ export interface Game {
   attachTargets: Methods<typeof gunsMethods>['attachTargets'];
   gunInHands: Methods<typeof gunsMethods>['gunInHands'];
   attachMod: Methods<typeof gunsMethods>['attachMod'];
+  pluck: Methods<typeof gunsMethods>['pluck'];
   detachMod: Methods<typeof gunsMethods>['detachMod'];
   handActs: Methods<typeof gunsMethods>['handActs'];
   magWork: Methods<typeof gunsMethods>['magWork'];

@@ -57,11 +57,13 @@ export const gunsMethods = {
     return false;
   },
 
-  attachMod(this: Game, att: ItemInstance, weapon: ItemInstance) {
+  /** @param loose the part is held by nothing (picked up off the ground to be fitted): there is nowhere to take it from */
+  attachMod(this: Game, att: ItemInstance, weapon: ItemInstance, loose = false) {
     if (!this.attachTargets(att).includes(weapon)) return;
     if (!this.gunInHands(weapon, () => this.attachMod(att, weapon)) || this.weapons.busy) return;
-    this.inv.remove(att);
-    this.openStash?.container.remove(att);
+    // (taken from wherever it is, and not fitted if it is nowhere: left in a bag in a pocket, a part was fitted and kept
+    // as well, "so you can have flash light on all of your guns with one item", a player, 2026-10-15)
+    if (!loose && !this.pluck(att)) return;
     if (ITEMS[att.id].mag) {
       // the one that was in it comes out, with what is left in it, and goes where there is room
       const out = swapMag(weapon, att);
@@ -79,6 +81,32 @@ export const gunsMethods = {
     audio.click(1900, 0.45, 0.05, 0.14);
     this.hud.note(`${ITEMS[att.id].name} fitted to ${ITEMS[weapon.id].name}`, 'good');
     this.inventoryChanged();
+  },
+
+  /**
+   * A thing taken out of wherever this player reaches it from: what they wear or hold, their pockets and whatever
+   * is in them however deep, the crate or body they have open, and a bag lying within reach (see openLying).
+   * @returns whether it was there
+   */
+  pluck(this: Game, item: ItemInstance): boolean {
+    const out = (list?: { item: ItemInstance }[]): boolean => {
+      if (!list) return false;
+      // (by its number: the thing asked for may be a copy of what is there now, the inventory made again since)
+      const i = list.findIndex((p) => p.item === item || p.item.uid === item.uid);
+      if (i >= 0) {
+        list.splice(i, 1);
+        return true;
+      }
+      return list.some((p) => out(p.item.cargo));
+    };
+    const worn = Object.values(this.inv.slots).find((w) => w?.uid === item.uid) ?? (this.inv.hand?.uid === item.uid ? this.inv.hand : null);
+    if (worn) {
+      this.inv.remove(worn);
+      return true;
+    }
+    if (this.inv.containers.some((c) => out(c.items))) return true;
+    if (this.openStash && out(this.openStash.container.items)) return true;
+    return this.around().some((w) => this.lying.get(w.loot.uid) !== 'busy' && out(w.loot.item.cargo));
   },
 
   /**
