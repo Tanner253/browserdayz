@@ -21,13 +21,18 @@
 //   foam    at the water's edge, rolling in in lines toward the beach, broken into a net; a few caps out to sea
 //   air     the game's own haze and gas over it (src/world/atmosphere.ts), as over everything else
 //
-// NOT DONE: walking into deep water and swimming (DayZ has swimming), boats, waves that move the surface itself (no
-// swell on the skyline, no breakers), the bend of what is seen through the water, shadows on it, the view from under
-// it (the surface is drawn from above only), lamps lighting it.
+//   surf    breakers rolling in to the beach, parallel to it wherever it runs (laid along each point's distance from
+//           the water's edge, ocean-waves.ts shoreField): their faces catch the light, the low sun shows green through
+//           them, they break white near the shore, and the wash runs up the sand as each one comes in
+//
+// It is only to be looked at (the owner, 2026-10-16: "we want pretty water, no need to go into it or swim can put
+// barrier on beach"; the sea's depth in play is for an ocean update later). So NOT DONE, on purpose: wading,
+// swimming, boats, the view from under it (it is drawn from above only). Nor: waves that move the surface itself (no
+// swell on the skyline), the bend of what is seen through the water, shadows on it, lamps lighting it.
 
 import * as THREE from 'three';
 import type { Atmosphere } from './atmosphere';
-import { depthGrid, depthIn, oceanTiles, shallowestIn, waveMap, type DepthGrid, type Rect } from './ocean-waves';
+import { depthGrid, oceanTiles, shallowestIn, shoreField, waveMap, type Rect } from './ocean-waves';
 
 export interface OceanOptions extends Rect {
   /** the height of the water's surface */
@@ -62,9 +67,13 @@ export const OCEAN = {
   deep: [0.004, 0.026, 0.06] as [number, number, number],
   /** how quickly the water hides what is under it, per metre looked through */
   murk: 0.3,
-  /** foam: down to how deep at the water's edge, and how fast its lines roll in (radians a second) */
+  /** foam: down to how deep at the water's edge */
   foamDepth: 1.6,
-  roll: 1.25,
+  /**
+   * The breakers: metres between them, metres a second they come in at, how steep their faces are, how far out from
+   * the water's edge they are seen, and where they break (metres from the edge): as a wind sea comes onto a beach.
+   */
+  surf: { apart: 11, pace: 2.4, steep: 0.16, reach: 90, breaks: 38 },
   /**
    * A tile all of whose water is deeper than this is drawn solid and before the ground: nothing of the sea floor shows
    * through that much water (looked straight down, 99 parts in 100 of it are hidden), and the floor under it is then
@@ -81,8 +90,6 @@ export class Ocean {
   readonly group = new THREE.Group();
   /** tiles further than this from the eye (across the ground) are not drawn: the draw distance */
   reach = Infinity;
-  /** how deep the water is everywhere over it, as it was read (for whatever asks: is this deep water?) */
-  readonly depths: DepthGrid;
   /** the shallows', seen through; and deep water's, solid (see OCEAN.solid). One set of uniforms between them. */
   readonly material: THREE.ShaderMaterial;
   readonly solid: THREE.ShaderMaterial;
@@ -99,11 +106,17 @@ export class Ocean {
     o: OceanOptions,
   ) {
     const rect: Rect = { x0: o.x0, x1: o.x1, z0: o.z0, z1: o.z1 };
-    this.depths = depthGrid(rect, o.cell ?? 4, o.depthAt);
-    // (the depth as half floats: read between points by the card, which it will do with these and not with whole floats)
-    const half = new Uint16Array(this.depths.data.length);
-    for (let i = 0; i < half.length; i++) half[i] = THREE.DataUtils.toHalfFloat(Math.max(-60, Math.min(60, this.depths.data[i])));
-    this.depthTex = new THREE.DataTexture(half, this.depths.nx, this.depths.nz, THREE.RedFormat, THREE.HalfFloatType);
+    const g = depthGrid(rect, o.cell ?? 4, o.depthAt), shore = shoreField(g);
+    // Each point: how deep, how far from the water's edge, and the way out from it (as half floats: read between points
+    // by the card, which it will do with these and not with whole floats).
+    const half = new Uint16Array(g.data.length * 4), H = THREE.DataUtils.toHalfFloat;
+    for (let i = 0; i < g.data.length; i++) {
+      half[i * 4] = H(Math.max(-60, Math.min(60, g.data[i])));
+      half[i * 4 + 1] = H(shore.dist[i]);
+      half[i * 4 + 2] = H(shore.ax[i]);
+      half[i * 4 + 3] = H(shore.az[i]);
+    }
+    this.depthTex = new THREE.DataTexture(half, g.nx, g.nz, THREE.RGBAFormat, THREE.HalfFloatType);
     this.depthTex.magFilter = this.depthTex.minFilter = THREE.LinearFilter;
     this.depthTex.wrapS = this.depthTex.wrapT = THREE.ClampToEdgeWrapping;
     this.depthTex.needsUpdate = true;
@@ -118,7 +131,7 @@ export class Ocean {
     this.waves.colorSpace = THREE.NoColorSpace;
     this.waves.needsUpdate = true;
 
-    const g = this.depths, fog = scene.fog as THREE.FogExp2 | null;
+    const fog = scene.fog as THREE.FogExp2 | null;
     const uniforms = {
       uWaves: { value: this.waves },
       uDepth: { value: this.depthTex },
@@ -151,7 +164,7 @@ export class Ocean {
     // one flat square, laid in the plane of the ground; each tile is it, stretched to its own size
     const square = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     for (const r of oceanTiles(rect, o.tile ?? TILE)) {
-      const solid = shallowestIn(this.depths, r) > OCEAN.solid;
+      const solid = shallowestIn(g, r) > OCEAN.solid;
       const mesh = new THREE.Mesh(square, solid ? this.solid : this.material);
       // (deep water before anything else solid: the ground under it is then hidden before it is painted)
       if (solid) mesh.renderOrder = -1;
@@ -184,11 +197,6 @@ export class Ocean {
       });
       m.needsUpdate = true;
     }
-  }
-
-  /** How deep the water is at a point, as the sea was drawn from (0 or less: dry land, or the edge of it). */
-  depth(x: number, z: number) {
-    return depthIn(this.depths, x, z);
   }
 
   /**
@@ -241,7 +249,7 @@ function fragment(most: number) {
     const d = wind.clone().rotateAround(new THREE.Vector2(), turn);
     return `seaSlope( p, vec2( ${d.x.toFixed(5)}, ${d.y.toFixed(5)} ), ${(1 / size).toFixed(6)}, ${pace.toFixed(3)}, crest )`;
   };
-  const [l1, l2, l3] = OCEAN.layers;
+  const [l1, l2, l3] = OCEAN.layers, surf = OCEAN.surf;
   // (the three at their highest together are OCEAN.slope)
   const scale = OCEAN.slope / (most * (l1[3] + l2[3] + l3[3]));
   return /* glsl */ `
@@ -279,7 +287,9 @@ function fragment(most: number) {
     float dist = length( toEye );
     vec3 V = toEye / max( dist, 1e-4 );
     vec2 p = world.xz;
-    float depth = texture2D( uDepth, ( p - uDepthMap.xy ) * uDepthMap.zw ).r;
+    vec4 here = texture2D( uDepth, ( p - uDepthMap.xy ) * uDepthMap.zw );
+    float depth = here.r, fromShore = here.g;
+    vec2 away = here.ba / max( length( here.ba ), 1e-3 );
     float distant = smoothstep( 40.0, 900.0, dist );
 
     // the waves: calmer in the shallows; the finest let go far off
@@ -291,6 +301,15 @@ function fragment(most: number) {
     s += ${layer(l3)} * ${l3[3].toFixed(3)};
     c3 = crest;
     s *= ${scale.toFixed(6)} * ( 0.4 + 0.6 * smoothstep( 0.0, 3.0, depth ) );
+
+    // The breakers: lines a set distance apart coming in to the edge, bent a little along the shore by the swell's own
+    // crests (so no two are straight), steeper and taller as they near it, a long back and a steep face, as a wave has.
+    float inSurf = ( 1.0 - smoothstep( ${(surf.reach * 0.55).toFixed(1)}, ${surf.reach.toFixed(1)}, fromShore ) ) * step( 0.01, fromShore ) * ( 1.0 - 0.8 * distant );
+    float bend = ( texture2D( uWaves, p * 0.0051 ).b - 0.5 ) * 9.0 + ( c3 - 0.5 ) * 2.0;
+    float phase = ( fromShore + bend ) * ${((2 * Math.PI) / surf.apart).toFixed(5)} + uTime * ${((2 * Math.PI * surf.pace) / surf.apart).toFixed(5)};
+    float swell = sin( phase ), lift = 0.55 + 0.45 * ( 1.0 - smoothstep( 4.0, ${surf.breaks.toFixed(1)}, fromShore ) );
+    // (the slope across the line: up its back toward the sea, down its face toward the shore)
+    s += away * cos( phase ) * ( 1.0 + 0.6 * swell ) * ${surf.steep.toFixed(4)} * inSurf * lift;
     vec3 N = normalize( vec3( -s.x, 1.0, -s.y ) );
 
     // the sky in it, more of it the flatter it is looked across
@@ -314,8 +333,11 @@ function fragment(most: number) {
     float deep = 1.0 - exp( -max( depth, 0.0 ) * 0.12 );
     vec3 tint = mix( ${vec3(OCEAN.shallow)}, ${vec3(OCEAN.deep)}, deep );
     vec3 body = tint * ( fogColor * 0.9 + uSun * max( uSunDir.y, 0.0 ) * 0.12 );
-    // (light through the crest of a wave between the eye and a low sun)
-    body += tint * uSun * pow( max( dot( -V, uSunDir ), 0.0 ), 4.0 ) * c3 * 0.08;
+    // (light through the crest of a wave between the eye and a low sun; and green through a breaker's face, thinnest
+    // just before it breaks)
+    float face = smoothstep( 0.2, 0.95, swell ) * inSurf * lift;
+    body += tint * uSun * pow( max( dot( -V, uSunDir ), 0.0 ), 4.0 ) * ( c3 * 0.08 + face * 0.35 );
+    body += ${vec3([0.02, 0.07, 0.055])} * face * ( fogColor.g + uSun.g * 0.15 );
     // how much of what is under it is hidden: by the water looked through to reach the ground
     float murk = 1.0 - exp( -max( depth, 0.0 ) / max( V.y, 0.06 ) * ${OCEAN.murk.toFixed(4)} );
     #ifdef SEA_SOLID
@@ -324,10 +346,14 @@ function fragment(most: number) {
 
     // foam: a line where the water ends, lines of surf rolling in toward it over the shallows (thin: on a flat shore
     // the shallows are wide, and foam over all of them was a sheet of ice), broken into a net; a few caps far out
-    float wash = 1.0 - smoothstep( 0.0, 0.3, depth );
-    float surf = 1.0 - smoothstep( 0.2, ${OCEAN.foamDepth.toFixed(3)}, depth );
-    float rolls = pow( sin( depth * 3.1 + uTime * ${OCEAN.roll.toFixed(3)} + c1 * 4.0 ) * 0.5 + 0.5, 5.0 );
-    float cover = wash * 0.7 + surf * rolls * 0.55 + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - surf );
+    // (the wash runs further up the sand as each breaker arrives, and drains back)
+    float arrive = 0.5 + 0.5 * sin( bend * ${((2 * Math.PI) / surf.apart).toFixed(5)} + uTime * ${((2 * Math.PI * surf.pace) / surf.apart).toFixed(5)} );
+    float wash = 1.0 - smoothstep( 0.0, 0.18 + 0.32 * arrive * arrive, depth );
+    // (a breaker breaks white along its crest inside the breaking line, and leaves foam behind it as it goes in)
+    float breaking = 1.0 - smoothstep( ${(surf.breaks * 0.5).toFixed(1)}, ${surf.breaks.toFixed(1)}, fromShore );
+    float crestLine = smoothstep( 0.8, 0.98, swell ) + 0.45 * smoothstep( 0.2, 0.9, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 );
+    float shallows = 1.0 - smoothstep( 0.2, ${OCEAN.foamDepth.toFixed(3)}, depth );
+    float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * 0.12 + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
     // (two sizes of the net drifting apart: one alone was a honeycomb)
     float net = texture2D( uWaves, p * 0.23 + vec2( uTime * 0.04, 0.0 ) ).a * 0.62 + texture2D( uWaves, p * 0.061 - vec2( 0.0, uTime * 0.013 ) ).a * 0.38;
     float foam = smoothstep( 1.0 - cover, 1.2 - cover, net ) * sqrt( cover ) * 0.85 * smoothstep( -0.05, 0.05, depth ) * ( 1.0 - 0.6 * distant );

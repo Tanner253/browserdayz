@@ -49,6 +49,14 @@ export const TEXTURES = {
   coast_sand_01: { res: '2k', tex: 1024 },
   damp_beach_sand: { res: '2k', tex: 1024 },
   cliff_side: { res: '2k', tex: 1024 },
+  // new woods and meadows (2026-10-16, not yet laid: progress/map3/kit/terrain-hookup.md): the pale sandy floor of a dry
+  // pine wood, the fresh leaf litter of a beech or oak wood, the dark wet ground of an alder hollow, the roots of an old
+  // wood, and thin short grass for a meadow or the steppe toward the desert. Each unlike today's kinds.
+  forrest_sand_01: { res: '2k', tex: 1024 },
+  leaves_forest_ground: { res: '2k', tex: 1024 },
+  mud_forest: { res: '2k', tex: 1024 },
+  roots: { res: '2k', tex: 1024 },
+  sparse_grass: { res: '2k', tex: 1024 },
   // the mountain's snow, close to (2026-10-13): smooth powdery snowfield. What lies on the ground far off is still colour alone.
   snow_02: { res: '2k', tex: 1024 },
   // the country's ground by what it is (2026-10-13: "spare no expense with textures so that it doesnt look like shit is
@@ -1095,8 +1103,8 @@ export const MODELS = {
   fern_02: { res: '1k', tex: 1024, budget: 3000, far: 300, tags: ['nature'] },
   dry_branches_medium_01: { res: '1k', tex: 1024, budget: 4000, far: 500, tags: ['nature'] },
   // the desert and the coast (2026-10-16, not yet placed): Poly Haven's Namaqualand scans, built one at a time by
-  // scripts/haven-models.mjs. A canyon's walls and outcrops, boulders for its floor and the beach, a dead tree, a
-  // bleached branch for the tide line, dry bushes (five in the file). Pictures at the 2k they came at (tier-now keeps
+  // scripts/haven-models.mjs. A canyon's walls and outcrops (its cave mouths: see below), boulders for its floor and the
+  // beach, a bleached branch for the tide line, dry bushes (five in the file). Pictures at the 2k they came at (tier-now keeps
   // them in hi/). The scans came at 15,000 to 194,000 triangles; each is brought down only as far as keeps every point
   // of it within 2 to 11 mm of where it was, by its size (`--probe`), its relief map carrying the rest; the scan as it
   // came beside the copy: progress/map3/kit/pair-*.jpg (the rule for dense scans, 2026-10-13). The bush is whole, and
@@ -1107,9 +1115,23 @@ export const MODELS = {
   namaqualand_boulder_03: { res: '2k', tex: 2048, budget: 30000, far: 2500, tags: ['nature'] },
   namaqualand_boulder_04: { res: '2k', tex: 2048, budget: 44000, far: 2500, tags: ['nature'] },
   namaqualand_boulder_05: { res: '2k', tex: 2048, budget: 20000, far: 1200, tags: ['nature'] },
-  dead_quiver_trunk: { res: '2k', tex: 2048, budget: 10500, far: 600, tags: ['nature'] },
   dead_quiver_branch_01: { res: '2k', tex: 2048, budget: 9800, far: 500, tags: ['nature'] },
   wild_rooibos_bush: { res: '2k', tex: 2048, far: 3000, cutout: true, tags: ['nature'] },
+  // green woods and meadows (2026-10-16, the owner: "desert is ugly the grass is prettier we can make new forests and
+  // biomes with the textures we get from that website"): saplings for a young wood, a mossy stump, a fallen trunk, a
+  // mound of roots for an old one, the green of an understorey, nettles at a wood's edge, the flowers of a meadow.
+  // And a cliff face ten metres high for the canyon's cave mouths and walls. Budgets as above.
+  pine_sapling_small: { res: '2k', tex: 2048, budget: 60000, far: 3000, tags: ['nature'] },
+  fir_sapling: { res: '2k', tex: 2048, budget: 60000, far: 4000, tags: ['nature'] },
+  tree_stump_02: { res: '2k', tex: 2048, budget: 19000, far: 1500, tags: ['nature'] },
+  dead_tree_trunk_02: { res: '2k', tex: 2048, budget: 16000, far: 1200, tags: ['nature'] },
+  root_cluster_01: { res: '2k', tex: 2048, budget: 40000, far: 3000, tags: ['nature'] },
+  shrub_04: { res: '2k', tex: 2048, far: 1500, cutout: true, tags: ['nature'] },
+  shrub_03: { res: '2k', tex: 2048, far: 800, cutout: true, tags: ['nature'] },
+  nettle_plant: { res: '2k', tex: 2048, far: 4000, cutout: true, tags: ['nature'] },
+  dandelion_01: { res: '2k', tex: 2048, budget: 42000, far: 4000, cutout: true, tags: ['nature'] },
+  periwinkle_plant: { res: '2k', tex: 2048, far: 7000, tags: ['nature'] },
+  mountainside: { res: '2k', tex: 2048, budget: 46000, far: 5000, tags: ['nature'] },
 };
 
 /**

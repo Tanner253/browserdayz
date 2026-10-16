@@ -175,12 +175,57 @@ export function depthGrid(r: Rect, cell: number, depthAt: (x: number, z: number)
   return { x0: r.x0, z0: r.z0, cell, nx, nz, data };
 }
 
-/** The depth anywhere over the grid, read between its points as the card reads it (and held at its edges). */
-export function depthIn(g: DepthGrid, x: number, z: number): number {
-  const u = Math.min(g.nx - 1, Math.max(0, (x - g.x0) / g.cell)), v = Math.min(g.nz - 1, Math.max(0, (z - g.z0) / g.cell));
-  const i = Math.min(g.nx - 2, Math.floor(u)), j = Math.min(g.nz - 2, Math.floor(v)), fu = u - i, fv = v - j, o = j * g.nx + i;
-  const a = g.data[o], b = g.data[o + 1], c = g.data[o + g.nx], d = g.data[o + g.nx + 1];
-  return (a + (b - a) * fu) * (1 - fv) + (c + (d - c) * fu) * fv;
+/** how far out from the shore the breakers are reckoned at all: past this the sea does not know the shore is there */
+export const SHORE_REACH = 400;
+
+/**
+ * How far each point of the grid is from the water's edge, through the water (0 on land), and the way out from the
+ * shore there (a unit x, z; nothing where there is no shore in reach): what the breakers are laid along, so that they
+ * come in parallel to whatever beach there is, a set distance apart however steep it is. Two passes over the grid,
+ * each point taking the nearest of its neighbours' distances and the step to them (a few milliseconds for a strip).
+ */
+export function shoreField(g: DepthGrid) {
+  const { nx, nz, cell } = g, n = nx * nz, far = SHORE_REACH;
+  const dist = new Float32Array(n);
+  for (let k = 0; k < n; k++) dist[k] = g.data[k] > 0 ? far : 0;
+  const diag = Math.SQRT2 * cell;
+  const take = (k: number, o: number, step: number) => {
+    if (dist[o] + step < dist[k]) dist[k] = dist[o] + step;
+  };
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i;
+    if (!dist[k]) continue;
+    if (i > 0) take(k, k - 1, cell);
+    if (j > 0) {
+      take(k, k - nx, cell);
+      if (i > 0) take(k, k - nx - 1, diag);
+      if (i < nx - 1) take(k, k - nx + 1, diag);
+    }
+  }
+  for (let j = nz - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) {
+    const k = j * nx + i;
+    if (!dist[k]) continue;
+    if (i < nx - 1) take(k, k + 1, cell);
+    if (j < nz - 1) {
+      take(k, k + nx, cell);
+      if (i < nx - 1) take(k, k + nx + 1, diag);
+      if (i > 0) take(k, k + nx - 1, diag);
+    }
+  }
+  // the way out from the shore: how the distance grows, across the points either side
+  const ax = new Float32Array(n), az = new Float32Array(n);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i;
+    if (dist[k] <= 0 || dist[k] >= far) continue;
+    const gx = dist[j * nx + Math.min(nx - 1, i + 1)] - dist[j * nx + Math.max(0, i - 1)];
+    const gz = dist[Math.min(nz - 1, j + 1) * nx + i] - dist[Math.max(0, j - 1) * nx + i];
+    const len = Math.hypot(gx, gz);
+    if (len > 1e-6) {
+      ax[k] = gx / len;
+      az[k] = gz / len;
+    }
+  }
+  return { dist, ax, az };
 }
 
 /** The shallowest the water is anywhere over a part of the grid (its points in it and one more all round). */

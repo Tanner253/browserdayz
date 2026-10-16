@@ -186,13 +186,15 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Concrete Road Barrier](https://polyhaven.com/a/concrete_road_barrier) | Amal Kumar |
 | model | [Covered Car](https://polyhaven.com/a/covered_car) | MP |
 | model | [Crowbar 01](https://polyhaven.com/a/crowbar_01) | Alexander Otterbeck |
+| model | [Dandelion 01](https://polyhaven.com/a/dandelion_01) | Rob Tuytel, Rico Cilliers |
 | model | [Dead Quiver Branch 01](https://polyhaven.com/a/dead_quiver_branch_01) | Greg Zaal, Jenelle van Heerden |
-| model | [Dead Quiver Trunk](https://polyhaven.com/a/dead_quiver_trunk) | James Ray Cock, Dario Barresi, Rico Cilliers |
 | model | [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk) | Rob Tuytel |
+| model | [Dead Tree Trunk 02](https://polyhaven.com/a/dead_tree_trunk_02) | Jenelle van Heerden, Rico Cilliers |
 | model | [Digital Wrist Watch](https://polyhaven.com/a/digital_wrist_watch) | Adrian C |
 | model | [Dry Branches Medium 01](https://polyhaven.com/a/dry_branches_medium_01) | Rico Cilliers |
 | model | [Electric Stove](https://polyhaven.com/a/electric_stove) | Kuutti Siitonen |
 | model | [Fern 02](https://polyhaven.com/a/fern_02) | Rob Tuytel, Rico Cilliers |
+| model | [Fir Sapling](https://polyhaven.com/a/fir_sapling) | Rob Tuytel, Rico Cilliers |
 | model | [Fish Knife](https://polyhaven.com/a/fish_knife) | Mateusz Sadek |
 | model | [Fishermans Hat](https://polyhaven.com/a/fishermans_hat) | PierreB3D |
 | model | [Food Apple 01](https://polyhaven.com/a/food_apple_01) | Oliver Harries |
@@ -208,12 +210,14 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Metal Office Desk](https://polyhaven.com/a/metal_office_desk) | Ulan Cabanilla |
 | model | [Metal Trash Can](https://polyhaven.com/a/metal_trash_can) | GurJas Studios |
 | model | [Modular Fort 01](https://polyhaven.com/a/modular_fort_01) | Rico Cilliers |
+| model | [Mountainside](https://polyhaven.com/a/mountainside) | Dario Barresi, Rico Cilliers |
 | model | [Namaqualand Boulder 02](https://polyhaven.com/a/namaqualand_boulder_02) | Greg Zaal, Rico Cilliers |
 | model | [Namaqualand Boulder 03](https://polyhaven.com/a/namaqualand_boulder_03) | Jenelle van Heerden, Dario Barresi |
 | model | [Namaqualand Boulder 04](https://polyhaven.com/a/namaqualand_boulder_04) | Jenelle van Heerden |
 | model | [Namaqualand Boulder 05](https://polyhaven.com/a/namaqualand_boulder_05) | Jenelle van Heerden, Dario Barresi |
 | model | [Namaqualand Cliff 01](https://polyhaven.com/a/namaqualand_cliff_01) | Jenelle van Heerden, Rico Cilliers |
 | model | [Namaqualand Cliff 02](https://polyhaven.com/a/namaqualand_cliff_02) | Dario Barresi, Rico Cilliers |
+| model | [Nettle Plant](https://polyhaven.com/a/nettle_plant) | Rob Tuytel, Rico Cilliers |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |
@@ -221,12 +225,15 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Painted Wooden Cabinet](https://polyhaven.com/a/painted_wooden_cabinet) | Kirill Sannikov |
 | model | [Painted Wooden Chair 01](https://polyhaven.com/a/painted_wooden_chair_01) | Kuutti Siitonen |
 | model | [Painted Wooden Table](https://polyhaven.com/a/painted_wooden_table) | Kirill Sannikov |
+| model | [Periwinkle Plant](https://polyhaven.com/a/periwinkle_plant) | Amal Kumar |
+| model | [Pine Sapling Small](https://polyhaven.com/a/pine_sapling_small) | Rob Tuytel, Rico Cilliers |
 | model | [Plastic Bottle Gallon](https://polyhaven.com/a/plastic_bottle_gallon) | Rahul Chaudhary |
 | model | [Plastic Thermos](https://polyhaven.com/a/plastic_thermos) | PierreB3D |
 | model | [Rock Face 01](https://polyhaven.com/a/rock_face_01) | Dario Barresi |
 | model | [Rock Face 02](https://polyhaven.com/a/rock_face_02) | Dario Barresi, Rico Cilliers |
 | model | [Rock Moss Set 01](https://polyhaven.com/a/rock_moss_set_01) | Kless Gyzen |
 | model | [Rock Moss Set 02](https://polyhaven.com/a/rock_moss_set_02) | Kless Gyzen |
+| model | [Root Cluster 01](https://polyhaven.com/a/root_cluster_01) | Jenelle van Heerden, Rico Cilliers |
 | model | [Rubber Boots](https://polyhaven.com/a/rubber_boots) | L |
 | model | [Russian Food Cans 01](https://polyhaven.com/a/russian_food_cans_01) | Kosan Aziz |
 | model | [Scandinavian Masonry Heater](https://polyhaven.com/a/scandinavian_masonry_heater) | Kuutti Siitonen |
@@ -234,6 +241,8 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Seadogs Compass](https://polyhaven.com/a/seadogs_compass) | Benny Weimer |
 | model | [Service Pistol](https://polyhaven.com/a/service_pistol) | Mateusz Sadek |
 | model | [Shelf 01](https://polyhaven.com/a/Shelf_01) | Gabriel Radić |
+| model | [Shrub 03](https://polyhaven.com/a/shrub_03) | Rico Cilliers |
+| model | [Shrub 04](https://polyhaven.com/a/shrub_04) | Rico Cilliers |
 | model | [Steel Frame Shelves 01](https://polyhaven.com/a/steel_frame_shelves_01) | James Ray Cock |
 | model | [Stick Grenade](https://polyhaven.com/a/stick_grenade) | singaii |
 | model | [Stone Fire Pit](https://polyhaven.com/a/stone_fire_pit) | Sebastian Platen |
@@ -241,6 +250,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Television 01](https://polyhaven.com/a/Television_01) | Gabriel Radić |
 | model | [Trashbag](https://polyhaven.com/a/trashbag) | Benny Weimer |
 | model | [Tree Stump 01](https://polyhaven.com/a/tree_stump_01) | Rob Tuytel |
+| model | [Tree Stump 02](https://polyhaven.com/a/tree_stump_02) | Rob Tuytel |
 | model | [Utility Box 01](https://polyhaven.com/a/utility_box_01) | James Ray Cock |
 | model | [Vintage Flashlight](https://polyhaven.com/a/vintage_flashlight) | Omar M. El-Safy |
 | model | [Vintage Radio Transceiver](https://polyhaven.com/a/vintage_radio_transceiver) | Mateusz Sadek |
@@ -277,14 +287,17 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Forest Ground 03](https://polyhaven.com/a/forrest_ground_03) | Rob Tuytel |
 | texture | [Forest Ground 06](https://polyhaven.com/a/forest_ground_06) | Charlotte Baglioni |
 | texture | [Forest Leaves 02](https://polyhaven.com/a/forest_leaves_02) | Rob Tuytel |
+| texture | [Forest Sand 01](https://polyhaven.com/a/forrest_sand_01) | Rob Tuytel |
 | texture | [Garage Floor](https://polyhaven.com/a/garage_floor) | Jenelle van Heerden |
 | texture | [Grass Ground](https://polyhaven.com/a/grass_ground) | Charlotte Baglioni |
 | texture | [Grey Plaster 02](https://polyhaven.com/a/grey_plaster_02) | Rob Tuytel |
 | texture | [Grey Roof Tiles 02](https://polyhaven.com/a/grey_roof_tiles_02) | Rob Tuytel |
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
+| texture | [Leaves Forest Ground](https://polyhaven.com/a/leaves_forest_ground) | Dario Barresi, Dimitrios Savva |
 | texture | [Medieval Blocks 06](https://polyhaven.com/a/medieval_blocks_06) | Rob Tuytel |
 | texture | [Mossy Rock](https://polyhaven.com/a/mossy_rock) | Rob Tuytel |
 | texture | [Mud Cracked Dry Riverbed 002](https://polyhaven.com/a/mud_cracked_dry_riverbed_002) | Dario Barresi, Dimitrios Savva |
+| texture | [Mud Forest](https://polyhaven.com/a/mud_forest) | eye-candy.xyz |
 | texture | [Old Linoleum Flooring 01](https://polyhaven.com/a/old_linoleum_flooring_01) | Charlotte Baglioni |
 | texture | [Painted Brick](https://polyhaven.com/a/painted_brick) | Amal Kumar |
 | texture | [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | Amal Kumar |
@@ -295,11 +308,13 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Rock Face 03](https://polyhaven.com/a/rock_face_03) | Dario Barresi, Rico Cilliers |
 | texture | [Rocks Ground 02](https://polyhaven.com/a/rocks_ground_02) | Rob Tuytel |
 | texture | [Rocky Trail](https://polyhaven.com/a/rocky_trail) | Amal Kumar |
+| texture | [Roots](https://polyhaven.com/a/roots) | Dario Barresi, Dimitrios Savva |
 | texture | [Rough Plaster Brick 02](https://polyhaven.com/a/rough_plaster_brick_02) | Rob Tuytel |
 | texture | [Rusty Corrugated Iron](https://polyhaven.com/a/rusty_corrugated_iron) | Charlotte Baglioni |
 | texture | [Sand 01](https://polyhaven.com/a/sand_01) | Rob Tuytel |
 | texture | [Sandy Gravel 02](https://polyhaven.com/a/sandy_gravel_02) | Dario Barresi |
 | texture | [Snow 02](https://polyhaven.com/a/snow_02) | Rob Tuytel |
+| texture | [Sparse Grass](https://polyhaven.com/a/sparse_grass) | Amal Kumar |
 | texture | [Weathered Plank Siding](https://polyhaven.com/a/weathered_plank_siding) | Dimitrios Savva |
 | texture | [Weathered Planks](https://polyhaven.com/a/weathered_planks) | Dario Barresi, Dimitrios Savva |
 | texture | [White Bricks](https://polyhaven.com/a/white_bricks) | Rob Tuytel |

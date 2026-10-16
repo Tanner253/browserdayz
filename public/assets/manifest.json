@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-16T18:09:24.750Z",
+ "generated": "2026-10-16T21:23:25.465Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -279,6 +279,31 @@
    "diff": "assets/tex/cliff_side_diff.webp",
    "nor": "assets/tex/cliff_side_nor.webp",
    "arm": "assets/tex/cliff_side_arm.webp"
+  },
+  "forrest_sand_01": {
+   "diff": "assets/tex/forrest_sand_01_diff.webp",
+   "nor": "assets/tex/forrest_sand_01_nor.webp",
+   "arm": "assets/tex/forrest_sand_01_arm.webp"
+  },
+  "leaves_forest_ground": {
+   "diff": "assets/tex/leaves_forest_ground_diff.webp",
+   "nor": "assets/tex/leaves_forest_ground_nor.webp",
+   "arm": "assets/tex/leaves_forest_ground_arm.webp"
+  },
+  "mud_forest": {
+   "diff": "assets/tex/mud_forest_diff.webp",
+   "nor": "assets/tex/mud_forest_nor.webp",
+   "arm": "assets/tex/mud_forest_arm.webp"
+  },
+  "roots": {
+   "diff": "assets/tex/roots_diff.webp",
+   "nor": "assets/tex/roots_nor.webp",
+   "arm": "assets/tex/roots_arm.webp"
+  },
+  "sparse_grass": {
+   "diff": "assets/tex/sparse_grass_diff.webp",
+   "nor": "assets/tex/sparse_grass_nor.webp",
+   "arm": "assets/tex/sparse_grass_arm.webp"
   }
  },
  "models": {
@@ -5749,34 +5774,6 @@
    "hiBytes": 3050500,
    "hiCard": 64
   },
-  "dead_quiver_trunk": {
-   "url": "assets/models/dead_quiver_trunk.glb",
-   "tags": [
-    "nature"
-   ],
-   "bytes": 407644,
-   "srcTris": 17978,
-   "tris": 10500,
-   "min": [
-    -0.1705,
-    0.0118,
-    -0.1311
-   ],
-   "max": [
-    0.136,
-    2.0059,
-    0.137
-   ],
-   "lods": [
-    {
-     "url": "assets/models/dead_quiver_trunk_lod1.glb",
-     "tris": 600
-    }
-   ],
-   "hi": "assets/models/hi/dead_quiver_trunk.glb",
-   "hiBytes": 1613132,
-   "hiCard": 64
-  },
   "dead_quiver_branch_01": {
    "url": "assets/models/dead_quiver_branch_01.glb",
    "tags": [
@@ -5831,6 +5828,314 @@
    ],
    "hi": "assets/models/hi/wild_rooibos_bush.glb",
    "hiBytes": 1780556,
+   "hiCard": 64
+  },
+  "pine_sapling_small": {
+   "url": "assets/models/pine_sapling_small.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 1990268,
+   "srcTris": 398144,
+   "tris": 59897,
+   "min": [
+    -0.3603,
+    -0.0155,
+    -0.3714
+   ],
+   "max": [
+    2.2818,
+    1.2835,
+    0.399
+   ],
+   "lods": [
+    {
+     "url": "assets/models/pine_sapling_small_lod1.glb",
+     "tris": 2997
+    }
+   ],
+   "hi": "assets/models/hi/pine_sapling_small.glb",
+   "hiBytes": 5043032,
+   "hiCard": 128
+  },
+  "fir_sapling": {
+   "url": "assets/models/fir_sapling.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 2834228,
+   "srcTris": 433021,
+   "tris": 59528,
+   "min": [
+    -0.437,
+    -0.0079,
+    -0.4304
+   ],
+   "max": [
+    2.3058,
+    1.2928,
+    0.396
+   ],
+   "lods": [
+    {
+     "url": "assets/models/fir_sapling_lod1.glb",
+     "tris": 3546
+    }
+   ],
+   "hi": "assets/models/hi/fir_sapling.glb",
+   "hiBytes": 5519692,
+   "hiCard": 128
+  },
+  "tree_stump_02": {
+   "url": "assets/models/tree_stump_02.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 667060,
+   "srcTris": 62345,
+   "tris": 19000,
+   "min": [
+    -0.7179,
+    -0.2335,
+    -0.6743
+   ],
+   "max": [
+    0.8038,
+    0.2886,
+    0.7182
+   ],
+   "lods": [
+    {
+     "url": "assets/models/tree_stump_02_lod1.glb",
+     "tris": 1497
+    }
+   ],
+   "hi": "assets/models/hi/tree_stump_02.glb",
+   "hiBytes": 3822024,
+   "hiCard": 64
+  },
+  "dead_tree_trunk_02": {
+   "url": "assets/models/dead_tree_trunk_02.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 639260,
+   "srcTris": 83128,
+   "tris": 15994,
+   "min": [
+    -1.9244,
+    -0.3284,
+    -0.5008
+   ],
+   "max": [
+    2.1269,
+    0.7267,
+    0.5553
+   ],
+   "lods": [
+    {
+     "url": "assets/models/dead_tree_trunk_02_lod1.glb",
+     "tris": 1198
+    }
+   ],
+   "hi": "assets/models/hi/dead_tree_trunk_02.glb",
+   "hiBytes": 3683668,
+   "hiCard": 64
+  },
+  "root_cluster_01": {
+   "url": "assets/models/root_cluster_01.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 764696,
+   "srcTris": 225261,
+   "tris": 39885,
+   "min": [
+    -2.0644,
+    -0.0454,
+    -0.9938
+   ],
+   "max": [
+    2.0583,
+    1.4639,
+    1.689
+   ],
+   "lods": [
+    {
+     "url": "assets/models/root_cluster_01_lod1.glb",
+     "tris": 2992
+    }
+   ],
+   "hi": "assets/models/hi/root_cluster_01.glb",
+   "hiBytes": 4068424,
+   "hiCard": 64
+  },
+  "shrub_04": {
+   "url": "assets/models/shrub_04.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 404572,
+   "srcTris": 27327,
+   "tris": 27327,
+   "min": [
+    -0.0244,
+    -0.0059,
+    -0.075
+   ],
+   "max": [
+    0.5592,
+    0.2133,
+    0.0711
+   ],
+   "lods": [
+    {
+     "url": "assets/models/shrub_04_lod1.glb",
+     "tris": 1389
+    }
+   ],
+   "hi": "assets/models/hi/shrub_04.glb",
+   "hiBytes": 889856,
+   "hiCard": 64
+  },
+  "shrub_03": {
+   "url": "assets/models/shrub_03.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 274496,
+   "srcTris": 8287,
+   "tris": 8287,
+   "min": [
+    -0.0735,
+    -0.0018,
+    -0.0727
+   ],
+   "max": [
+    1.2934,
+    0.401,
+    0.0785
+   ],
+   "lods": [
+    {
+     "url": "assets/models/shrub_03_lod1.glb",
+     "tris": 791
+    }
+   ],
+   "hi": "assets/models/hi/shrub_03.glb",
+   "hiBytes": 874716,
+   "hiCard": 64
+  },
+  "nettle_plant": {
+   "url": "assets/models/nettle_plant.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 633036,
+   "srcTris": 31304,
+   "tris": 31304,
+   "min": [
+    -0.0526,
+    -0.0056,
+    -0.0486
+   ],
+   "max": [
+    1.0302,
+    0.2128,
+    0.0461
+   ],
+   "lods": [
+    {
+     "url": "assets/models/nettle_plant_lod1.glb",
+     "tris": 4156
+    }
+   ],
+   "hi": "assets/models/hi/nettle_plant.glb",
+   "hiBytes": 1816380,
+   "hiCard": 64
+  },
+  "dandelion_01": {
+   "url": "assets/models/dandelion_01.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 775724,
+   "srcTris": 54764,
+   "tris": 41995,
+   "min": [
+    -4.1201,
+    -0.0084,
+    -0.1367
+   ],
+   "max": [
+    0.0941,
+    0.1618,
+    0.1209
+   ],
+   "lods": [
+    {
+     "url": "assets/models/dandelion_01_lod1.glb",
+     "tris": 3992
+    }
+   ],
+   "hi": "assets/models/hi/dandelion_01.glb",
+   "hiBytes": 1686152,
+   "hiCard": 64
+  },
+  "periwinkle_plant": {
+   "url": "assets/models/periwinkle_plant.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 674448,
+   "srcTris": 34350,
+   "tris": 34350,
+   "min": [
+    -0.5601,
+    0,
+    -0.1902
+   ],
+   "max": [
+    0.6752,
+    0.4107,
+    0.1305
+   ],
+   "lods": [
+    {
+     "url": "assets/models/periwinkle_plant_lod1.glb",
+     "tris": 7181
+    }
+   ],
+   "hi": "assets/models/hi/periwinkle_plant.glb",
+   "hiBytes": 1063920,
+   "hiCard": 64
+  },
+  "mountainside": {
+   "url": "assets/models/mountainside.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 913032,
+   "srcTris": 153472,
+   "tris": 46000,
+   "min": [
+    -5.0265,
+    -0.1998,
+    -3.6812
+   ],
+   "max": [
+    5.1828,
+    10.3224,
+    1.5657
+   ],
+   "lods": [
+    {
+     "url": "assets/models/mountainside_lod1.glb",
+     "tris": 5000
+    }
+   ],
+   "hi": "assets/models/hi/mountainside.glb",
+   "hiBytes": 3668068,
    "hiCard": 64
   }
  }

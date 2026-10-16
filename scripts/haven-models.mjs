@@ -130,7 +130,7 @@ for (const id of ids) {
     if (mask) {
       const alpha = await sharp(mask).greyscale().raw().toBuffer({ resolveWithObject: true });
       for (const m of doc.getRoot().listMaterials()) {
-        if (m.getAlphaMode() !== 'BLEND' || !m.getBaseColorTexture()) continue;
+        if (m.getAlphaMode() === 'OPAQUE' || !m.getBaseColorTexture()) continue;
         const t = m.getBaseColorTexture();
         if (!t.getExtras().cut) {
           // (the colour taken out bare first: sharp drops an alpha after joining one, whatever order it is asked in)

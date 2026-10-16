@@ -4,7 +4,7 @@
 //   npx tsx test/ocean.test.ts
 
 import assert from 'node:assert/strict';
-import { depthGrid, depthIn, foamNet, oceanTiles, shallowestIn, waveMap } from '../src/world/ocean-waves';
+import { depthGrid, foamNet, oceanTiles, shallowestIn, shoreField, waveMap } from '../src/world/ocean-waves';
 
 // ---- the wave picture: no seam where it repeats, the same from the same seed, slopes about nothing on the whole
 {
@@ -44,23 +44,28 @@ import { depthGrid, depthIn, foamNet, oceanTiles, shallowestIn, waveMap } from '
   console.log(`tiles: ${tiles.length} of 256 m over ${(r.x1 - r.x0) / 1000} by ${(r.z1 - r.z0) / 1000} km, each place once`);
 }
 
-// ---- the depths: the world's at the points read, between them as the card reads them, held at the edges
+// ---- the depths: the world's at the points read; and how far each is from the water's edge, and the way out
 {
   const r = { x0: -100, x1: 60, z0: -30, z1: 50 };
   const shelf = (x: number, z: number) => 4 - 0.05 * x + 0.02 * z;
   const g = depthGrid(r, 4, shelf);
   assert.equal(g.nx, 41);
   assert.equal(g.nz, 21);
-  for (const [x, z] of [[-100, -30], [60, 50], [-12, 6], [0, 0]]) assert.ok(Math.abs(depthIn(g, x, z) - shelf(x, z)) < 1e-5, `depth at ${x},${z}`);
-  // (a sloping floor is read between the points as it is: the reading is straight between them)
-  assert.ok(Math.abs(depthIn(g, -41.3, 17.9) - shelf(-41.3, 17.9)) < 1e-4, 'depth between the points');
-  assert.ok(Math.abs(depthIn(g, -500, 0) - shelf(-100, 0)) < 1e-5, 'depth off the edge is not the edge');
+  const at = (x: number, z: number) => g.data[Math.round((z - g.z0) / g.cell) * g.nx + Math.round((x - g.x0) / g.cell)];
+  for (const [x, z] of [[-100, -30], [60, 50], [-12, 6], [0, 2]]) assert.ok(Math.abs(at(x, z) - shelf(x, z)) < 1e-5, `depth at ${x},${z}: ${at(x, z)}`);
+  // a straight beach (the land east of x = 0, the sea deepening west): each point of the sea its distance from the
+  // edge, and the way out from it west, whatever the slope
+  const beach = depthGrid({ x0: -200, x1: 40, z0: -60, z1: 60 }, 4, (x) => -x / 25);
+  const shore = shoreField(beach), pt = (x: number, z: number) => Math.round((z + 60) / 4) * beach.nx + Math.round((x + 200) / 4);
+  for (const x of [-4, -40, -120]) assert.ok(Math.abs(shore.dist[pt(x, 0)] + x) < 4.01, `distance from the shore at ${x}: ${shore.dist[pt(x, 0)]}`);
+  assert.equal(shore.dist[pt(20, 0)], 0, 'land is not at sea');
+  assert.ok(shore.ax[pt(-60, 8)] < -0.99 && Math.abs(shore.az[pt(-60, 8)]) < 0.1, 'the way out from a straight beach is straight out');
   // a wide sea is read more coarsely, never more than the most points a side
   const wide = depthGrid({ x0: 0, x1: 20000, z0: 0, z1: 100 }, 4, () => 1, 2048);
   assert.ok(wide.nx <= 2048 && wide.cell > 4, 'a wide sea read finer than the card can hold');
   // a tile is drawn solid only if all of its water, to its edges, is deep (the shelf is shallowest at its east, x = 60)
   assert.ok(Math.abs(shallowestIn(g, { x0: -100, x1: 60, z0: -30, z1: 50 }) - shelf(60, -30)) < 1e-5, 'the shallowest of the whole');
   assert.ok(shallowestIn(g, { x0: -100, x1: -60, z0: -30, z1: 50 }) <= shelf(-60 + 4, -30) + 1e-5, 'a tile read short of its edge');
-  console.log(`depths: ${g.nx} by ${g.nz} points, read straight between; 20 km of sea read every ${wide.cell.toFixed(1)} m`);
+  console.log(`depths: ${g.nx} by ${g.nz} points; the shore's distance and way out right on a straight beach; 20 km of sea read every ${wide.cell.toFixed(1)} m`);
 }
 console.log('ocean: all good');
