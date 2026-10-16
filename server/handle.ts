@@ -289,7 +289,10 @@ export function handle(c: Client, m: C2S) {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
       const b = horde.bodies.get(m.i);
-      if (!b || !target?.alive || target.power.hidden) return;
+      // (Not somebody whose connection has gone, or who has said nothing for a while: the body left standing is there
+      // for whoever they were fighting, not for the infected another player's game moves about it. Players came back
+      // after a dropped connection to find themselves eaten, all they carried lost, 2026-10-16.)
+      if (!b || !target?.alive || target.power.hidden || away(target)) return;
       if (!horde.strikes(m.i, c.id, { id: target.id, x: target.pose[0], z: target.pose[2] }, Date.now())) return;
       // On guard (fists, or something in the hand to strike with), facing it, with the wind to
       // hold it off: nothing lands, and the one that threw it is stopped for a moment.

@@ -280,7 +280,8 @@ export function stayOn(c: Client, why: string) {
 }
 
 /** A connection has gone. Dead, or with nothing kept of bodies: out of the world. Alive: the body stays, sat where it stood. */
-export function gone(c: Client) {
+/** @param why how the connection ended, as the browser said (its code, and its reason if it gave one) */
+export function gone(c: Client, why = '') {
   if (!clients.has(c.id)) return;
   if (!c.alive || !LINGER_MS) return void drop(c);
   // (A body is left by somebody who was playing. A connection whose game never said where it stood, or one new to
@@ -295,7 +296,7 @@ export function gone(c: Client) {
   c.w = null;
   c.m = [];
   c.pose[5] = F_SIT | F_GROUND | (c.vitals?.bleeding ? F_BLEED : 0);
-  log(`~ ${c.name} (#${c.id}) went without logging out: their body stays ${Math.round(LINGER_MS / 1000)} s`);
+  log(`~ ${c.name} (#${c.id}) went without logging out${why ? ` (${why})` : ''}: their body stays ${Math.round(LINGER_MS / 1000)} s`);
 }
 
 /** Twice a second: whoever ought to have been dead for a while and has not said so. Enforcing, the server says it for them. */

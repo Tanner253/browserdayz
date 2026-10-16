@@ -1043,11 +1043,13 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       log('bad message from', c.name, m.t, (e as Error).message);
     }
   });
-  ws.on('close', () => {
+  ws.on('close', (code, reason) => {
     clearTimeout(hello);
     offRange();
     if (waiting) leaveQueue(ws);
-    if (c) gone(c);
+    // (how it ended, written down: the random drops of 2026-10-16 left nothing to say why. 1006 is the connection
+    // lost with no word, 1001 the page going away, 1000 a close asked for)
+    if (c) gone(c, `${code}${reason?.length ? ` ${String(reason).slice(0, 80)}` : ''}`);
   });
   ws.on('error', () => ws.close());
 });
