@@ -305,6 +305,11 @@ export function coarseTile(q: number, s: number, v: (i: number, j: number) => nu
   zip(line(fine, (k) => [q, k]), line(mid, (k) => [q - s, s + k * s]), (p) => p[1]);
 }
 
+/** a buffer's copy this side, let go once the card has it */
+function letGo(this: THREE.BufferAttribute) {
+  (this as unknown as { array: unknown }).array = null;
+}
+
 /** the world's net as the ground's shaders read it: its north-west corner and size in metres, its samples across and down */
 export const worldUniforms = () => ({
   uWorld: { value: new THREE.Vector4(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0) },
@@ -468,6 +473,9 @@ export class Terrain {
     }
     const shared = new THREE.BufferAttribute(all, 1);
     for (const geo of tiles) geo.setIndex(shared);
+    // (the ground's corners, normals and triangles are let go this side once the card has them: nothing reads them
+    // again, and a lost picture is a reload. Three times the ground, they were 94 MB of the page's memory kept for nothing.)
+    for (const a of [posAttr, nrmAttr, shared]) a.onUpload(letGo);
 
     // --- data textures shared with grass / vegetation shaders
     const hf = new Float32Array(NX * NZ);
