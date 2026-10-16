@@ -8,7 +8,10 @@
 
 import type { BuildingType } from '../world/worldgen/layout';
 import type { KitPiece } from './kit';
+import { KNOLL, LIPKI, LIPKI_GROUND, lipkiBuildings, lipkiThings } from './lipki';
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
+
+export { LIPKI };
 
 export interface Town {
   name: string;
@@ -29,8 +32,6 @@ const PI = Math.PI, Q = PI / 2;
  * at the Holy Gate and out at the north gate: whoever holds the monastery holds the way to Bunker 17.
  */
 export const POKROV: Town = { name: 'Pokrov', x: -1850, z: -30, pad: [135, 115], rot: 0 };
-/** Lipki: the woodcutters' hamlet in the birch woods, its log houses round a green. */
-export const LIPKI: Town = { name: 'Lipki', x: -1180, z: 350, pad: [80, 75], rot: 0 };
 
 /** the monastery's outer wall line, in Pokrov's frame, round the way the kit's walls run (their outside on the right) */
 export const POKROV_WALL: [number, number][] = [[-65, 20], [70, 20], [75, -60], [0, -95], [-80, -55]];
@@ -55,21 +56,6 @@ export function pokrovBuildings(): TownSpot[] {
     { type: 'izba_two', x: 62, z: 88, rot: PI },
     { type: 'izba', x: -62, z: 88, rot: Q },
     { type: 'merchant', x: 18, z: 90, rot: 0 },
-  ];
-}
-
-export function lipkiBuildings(): TownSpot[] {
-  // round the green, each facing its middle; the way in from the north is left open
-  const ring = (deg: number, type: BuildingType, r = 42): TownSpot => {
-    const t = (deg * PI) / 180;
-    return { type, x: r * Math.sin(t), z: -r * Math.cos(t), rot: -t };
-  };
-  return [
-    { type: 'chapel', x: 0, z: 2, rot: -Q },
-    ring(62, 'izba'), ring(118, 'izba'), ring(180, 'izba_two'), ring(242, 'izba'), ring(298, 'izba'),
-    { type: 'sawmill', x: 54, z: 52, rot: PI * 0.8 },
-    { type: 'tower', x: -72, z: -26, rot: Q },
-    { type: 'tower', x: 70, z: -30, rot: -Q },
   ];
 }
 
@@ -115,8 +101,8 @@ export const POKROV_DOMES: { x: number; z: number; over: number; size: number; g
   { x: 10, z: -38, over: 11.0, size: 1, gilt: false },
   { x: 18, z: -56, over: 21.4, size: 0.55, gilt: true },
 ];
-/** and over Lipki's chapel */
-export const LIPKI_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [{ x: 0, z: 2, over: 5.9, size: 0.38, gilt: false }];
+/** and over Lipki's chapel, on its knoll */
+export const LIPKI_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [{ x: KNOLL.x, z: KNOLL.z, over: 5.9 + KNOLL.h, size: 0.38, gilt: false }];
 
 /** a town as the world has set it down: where, and the height of its pad of level ground */
 export interface PlacedTown { town: Town; padY: number }
@@ -128,16 +114,34 @@ export function townBuildings(t: Town): TownSpot[] {
 
 /** what lies about a town (containers, crates, drums), in its frame */
 export function townThings(t: Town): TownThing[] {
-  return t.name === ZAVOD.name ? zavodThings() : [];
+  return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : [];
 }
 
 /**
- * The ground a town has worn bare or laid down, in its frame: gravel yards (rectangles x0, z0, x1, z1) and trodden
- * lanes (lines, how wide). For whoever sets the town down, to paint it so and keep the grass off it.
+ * The ground a town has worn bare, dug or raised, in its frame: gravel yards (rectangles x0, z0, x1, z1), trodden
+ * lanes (lines, how wide), garden beds, knolls. For whoever sets the town down, to shape and paint it so and keep the
+ * grass off it. (A building on a knoll stands on its top: its floor over the knoll's height, see moundAt.)
  */
-export interface TownGround { yards: [number, number, number, number][]; lanes: { line: [number, number][]; w: number }[] }
+export interface TownGround {
+  yards: [number, number, number, number][];
+  lanes: { line: [number, number][]; w: number }[];
+  /** gardens' beds, dug (rectangles as yards): painted earth, no grass */
+  beds?: [number, number, number, number][];
+  /** ground raised: a knoll's middle, how far its foot reaches, how high its top, how wide its level top (x, z, r, h, top) */
+  mounds?: [number, number, number, number, number][];
+}
 export function townGround(t: Town): TownGround {
-  return t.name === ZAVOD.name ? ZAVOD_GROUND : { yards: [], lanes: [] };
+  return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : { yards: [], lanes: [] };
+}
+
+/** how high a town's knolls raise its ground at a point of its frame, over its pad */
+export function moundAt(t: Town, lx: number, lz: number): number {
+  let up = 0;
+  for (const [x, z, r, h, top] of townGround(t).mounds ?? []) {
+    const d = Math.hypot(lx - x, lz - z), k = Math.min(1, Math.max(0, (r - d) / (r - top)));
+    up = Math.max(up, h * k * k * (3 - 2 * k));
+  }
+  return up;
 }
 
 /** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */

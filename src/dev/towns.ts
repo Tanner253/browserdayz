@@ -16,7 +16,7 @@ import { Towns } from '../world/towns';
 import { CELL, WORLD_SIZE, idx, type World } from '../world/worldgen';
 import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
 import type { KitPiece } from '../sim/kit';
-import { POKROV, TOWNS, placedSlabs, placedWalls, townBuildings, townGround, townPoint, townThings, type Town } from '../sim/towns';
+import { POKROV, TOWNS, moundAt, placedSlabs, placedWalls, townBuildings, townGround, townPoint, townThings, type Town } from '../sim/towns';
 
 const asked = (new URLSearchParams(location.search).get('towns') ?? '').toLowerCase();
 /** where it is stood for looking at: the north-west corner, which nothing of today's map uses */
@@ -34,14 +34,19 @@ export function lay(world: World) {
   const j0 = Math.max(0, Math.floor((town.z - pz - edge + half) / CELL)), j1 = Math.ceil((town.z + pz + edge + half) / CELL);
   const was: number[] = [];
   for (let j = j0; j <= j1; j += 6) for (let i = i0; i <= i1; i += 6) was.push(world.heights[idx(i, j)]);
+  /** a point of the world in the town's own frame */
+  const local = (x: number, z: number): [number, number] => {
+    const c = Math.cos(town.rot), s = Math.sin(town.rot), dx = x - town.x, dz = z - town.z;
+    return [dx * c - dz * s, dx * s + dz * c];
+  };
   was.sort((a, b) => a - b);
   padY = was[was.length >> 1];
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     const x = -half + i * CELL, z = -half + j * CELL;
     const out = Math.max(Math.abs(x - town.x) - px, Math.abs(z - town.z) - pz, 0);
     const t = Math.min(1, out / edge), mix = 1 - t * t * (3 - 2 * t);
-    const k = idx(i, j);
-    world.heights[k] = world.surface[k] = world.heights[k] * (1 - mix) + padY * mix;
+    const k = idx(i, j), [lx, lz] = local(x, z);
+    world.heights[k] = world.surface[k] = world.heights[k] * (1 - mix) + (padY + moundAt(town, lx, lz)) * mix;
   }
   const off = (q: { x: number; z: number }) => Math.abs(q.x - town.x) > px + 8 || Math.abs(q.z - town.z) > pz + 8;
   world.trees = world.trees.filter(off);
@@ -50,7 +55,7 @@ export function lay(world: World) {
   const spots = townBuildings(town);
   spots.forEach((s, n) => {
     const [x, z] = townPoint(town, s.x, s.z);
-    world.buildings.push({ id: `${town.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: town.rot + s.rot, floorY: padY + 0.3, seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
+    world.buildings.push({ id: `${town.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: town.rot + s.rot, floorY: padY + moundAt(town, s.x, s.z) + 0.3, seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
     // (no grass through its floors: what the map's own planning does for every building)
     const [fw, fd] = BUILDING_FOOTPRINT[s.type], c = Math.cos(town.rot + s.rot), sn = Math.sin(town.rot + s.rot), reach = Math.hypot(fw, fd) / 2 + 2;
     for (let j = Math.floor((z - reach + half) / CELL); j <= Math.ceil((z + reach + half) / CELL); j++) for (let i = Math.floor((x - reach + half) / CELL); i <= Math.ceil((x + reach + half) / CELL); i++) {
@@ -63,7 +68,7 @@ export function lay(world: World) {
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     const wx = -half + i * CELL - town.x, wz = -half + j * CELL - town.z, lx = wx * c - wz * s, lz = wx * s + wz * c;
     let out = 1e9;
-    for (const [x0, z0, x1, z1] of ground.yards) out = Math.min(out, Math.max(x0 - lx, lx - x1, z0 - lz, lz - z1));
+    for (const [x0, z0, x1, z1] of [...ground.yards, ...(ground.beds ?? [])]) out = Math.min(out, Math.max(x0 - lx, lx - x1, z0 - lz, lz - z1));
     for (const { line, w } of ground.lanes) for (let k = 0; k + 1 < line.length; k++) {
       const [ax, az] = line[k], [bx, bz] = line[k + 1], ex = bx - ax, ez = bz - az;
       const t = Math.max(0, Math.min(1, ((lx - ax) * ex + (lz - az) * ez) / (ex * ex + ez * ez)));
@@ -74,14 +79,17 @@ export function lay(world: World) {
     const bare = 1 - Math.min(1, Math.max(0, (out + wob + 0.5) / 1.6));
     if (bare <= 0) continue;
     const k = idx(i, j), sp = world.splat;
-    for (let ch = 0; ch < 3; ch++) sp[k * 4 + ch] = Math.round(sp[k * 4 + ch] * (1 - bare));
-    sp[k * 4 + 3] = Math.round(sp[k * 4 + 3] * (1 - bare) + 255 * bare);
+    // (a garden's bed is dug earth, the forest floor's paint; the rest gravel)
+    const dug = (ground.beds ?? []).some(([x0, z0, x1, z1]) => lx > x0 && lx < x1 && lz > z0 && lz < z1), to = dug ? 1 : 3;
+    for (let ch = 0; ch < 4; ch++) sp[k * 4 + ch] = Math.round(sp[k * 4 + ch] * (1 - bare) + (ch === to ? 255 * bare : 0));
     world.grass[k] = Math.round(world.grass[k] * (1 - bare));
   }
   // what lies about it (a container stacked on another stands on it: the planning of the buildings stands each)
   for (const t of townThings(town)) {
     const [x, z] = townPoint(town, t.x, t.z);
-    world.props.push({ kind: t.kind, x, y: padY + (t.up ?? 0), z, rot: town.rot + t.rot, scale: 1 });
+    // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
+    const near = t.kind === 'pumpkin' || t.kind === 'cabbage' ? { far: 40 } : t.kind === 'log_pile' ? { far: 150 } : {};
+    world.props.push({ kind: t.kind, x, y: padY + moundAt(town, t.x, t.z) + (t.up ?? 0), z, rot: town.rot + t.rot, scale: 1, ...near });
   }
   (world.slabs ??= []).push(...placedSlabs(town));
   walls = placedWalls({ town, padY });

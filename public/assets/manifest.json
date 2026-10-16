@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-14T23:22:17.718Z",
+ "generated": "2026-10-16T23:09:54.472Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -259,6 +259,21 @@
    "diff": "assets/tex/mossy_rock_diff.webp",
    "nor": "assets/tex/mossy_rock_nor.webp",
    "arm": "assets/tex/mossy_rock_arm.webp"
+  },
+  "blue_painted_planks": {
+   "diff": "assets/tex/blue_painted_planks_diff.webp",
+   "nor": "assets/tex/blue_painted_planks_nor.webp",
+   "arm": "assets/tex/blue_painted_planks_arm.webp"
+  },
+  "green_rough_planks": {
+   "diff": "assets/tex/green_rough_planks_diff.webp",
+   "nor": "assets/tex/green_rough_planks_nor.webp",
+   "arm": "assets/tex/green_rough_planks_arm.webp"
+  },
+  "distressed_painted_planks": {
+   "diff": "assets/tex/distressed_painted_planks_diff.webp",
+   "nor": "assets/tex/distressed_painted_planks_nor.webp",
+   "arm": "assets/tex/distressed_painted_planks_arm.webp"
   }
  },
  "models": {
@@ -10362,6 +10377,106 @@
      "far": 362
     }
    }
+  },
+  "log_pile": {
+   "url": "assets/models/log_pile.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 987832,
+   "srcTris": 8433,
+   "tris": 3291,
+   "min": [
+    -1.5094,
+    0,
+    -2.4959
+   ],
+   "max": [
+    1.5094,
+    1.45,
+    2.5
+   ],
+   "lods": []
+  },
+  "fence_white": {
+   "url": "assets/models/fence_white.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 69056,
+   "srcTris": 13384,
+   "tris": 216,
+   "min": [
+    -1,
+    0,
+    -0.0225
+   ],
+   "max": [
+    1,
+    1.1079,
+    0.0225
+   ],
+   "lods": []
+  },
+  "fence_grey": {
+   "url": "assets/models/fence_grey.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 79248,
+   "srcTris": 13384,
+   "tris": 360,
+   "min": [
+    -1,
+    0,
+    -0.0225
+   ],
+   "max": [
+    1,
+    1.0958,
+    0.0225
+   ],
+   "lods": []
+  },
+  "pumpkin": {
+   "url": "assets/models/pumpkin.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 95228,
+   "srcTris": 29288,
+   "tris": 1088,
+   "min": [
+    -0.1778,
+    0,
+    -0.1759
+   ],
+   "max": [
+    0.1778,
+    0.42,
+    0.1759
+   ],
+   "lods": []
+  },
+  "cabbage": {
+   "url": "assets/models/cabbage.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 175524,
+   "srcTris": 29288,
+   "tris": 900,
+   "min": [
+    -0.1641,
+    0.0006,
+    -0.17
+   ],
+   "max": [
+    0.1641,
+    0.2373,
+    0.17
+   ],
+   "lods": []
   }
  }
 }

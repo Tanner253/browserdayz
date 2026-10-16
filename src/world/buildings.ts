@@ -127,7 +127,8 @@ export type MatKey =
   | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall'
   | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'cold_steel' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
   | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
-  | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage';
+  | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage'
+  | 'boards_blue' | 'boards_green' | 'boards_pale';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -199,6 +200,10 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   planks_green: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9fb592, surface: 'wood' },
   planks_blue: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9db3c4, surface: 'wood' },
   planks_brown: { tex: 'weathered_plank_siding', tile: 2.4, color: 0xc49a72, surface: 'wood' },
+  // (2026-10-16, the new towns' log houses: boards painted as these villages paint them, and a shed's pale ones)
+  boards_blue: { tex: 'blue_painted_planks', tile: 2.4, surface: 'wood' },
+  boards_green: { tex: 'green_rough_planks', tile: 2.4, surface: 'wood' },
+  boards_pale: { tex: 'distressed_painted_planks', tile: 2.4, surface: 'wood' },
   // sheet iron not yet rusted through: bare, and painted
   roof_iron_clean: { tex: 'corrugated_iron', tile: 2, metal: true, surface: 'metal' },
   roof_iron_green: { tex: 'corrugated_iron', tile: 2, color: 0x7f9a7c, metal: true, surface: 'metal' },
@@ -484,8 +489,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
     case 'tavern': return town.tavernPlan();
     case 'merchant': return town.merchantPlan();
     case 'smithy': return town.smithyPlan();
-    case 'izba': return town.izbaPlan();
-    case 'izba_two': return town.izbaTwoPlan();
+    case 'izba': return town.izbaPlan(rng);
+    case 'izba_two': return town.izbaTwoPlan(rng);
     case 'chapel': return town.chapelPlan();
     case 'sawmill': return town.sawmillPlan();
     case 'works_hall': return zavod.hallPlan();

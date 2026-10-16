@@ -4,7 +4,8 @@
 // make boring houses. be creative". None of these is a downloaded building: walls, floors, stairs and roofs are the
 // game's own (src/world/buildings.ts), what stands in them is its furniture. Where they stand: src/sim/towns.ts.
 
-import type { Blueprint, Opening, WallDef } from './buildings';
+import type { RNG } from '../core/noise';
+import type { Blueprint, Dress, MatKey, Opening, WallDef } from './buildings';
 import { Floor, PI, Q, door, gap, inner, win } from './big-buildings';
 
 /** an opening with a sill and no glass: a belfry's arch, a shop's hatch */
@@ -280,19 +281,34 @@ export function smithyPlan(): Blueprint {
 
 // ------------------------------------------------------------------------------------------------ the hamlet
 
+/**
+ * A log house's paint, by its own number: its logs left to weather, or boarded and painted the blues and greens of
+ * these villages; an iron or tiled roof; white frames round its windows (the carved ones every house here has). The
+ * first pass's were all the dark weathered logs: from the green they read as black boxes.
+ */
+function izbaLook(rng?: RNG): { ext: MatKey; roof: MatKey; dress: Dress } {
+  const pick = <T,>(list: T[]) => list[rng ? Math.floor(rng.next() * list.length) % list.length : 0];
+  return {
+    ext: pick<MatKey>(['boards_blue', 'planks_ext', 'boards_green', 'planks_brown', 'boards_blue', 'boards_green']),
+    roof: pick<MatKey>(['roof_iron_red', 'roof_iron_green', 'roof_tiles', 'roof_iron', 'roof_slate']),
+    dress: { plinth: { h: 0.5, key: 'plinth' }, trim: 'trim_white' },
+  };
+}
+
 /** A log house: the big room with the stove that heats it, a bedroom through a door, a porch at the door. */
-export function izbaPlan(): Blueprint {
+export function izbaPlan(rng?: RNG): Blueprint {
+  const { ext: E, roof, dress } = izbaLook(rng);
   const HW = 4, HD = 3.25, M = 1.2;
   const g = new Floor();
   g.put('scandinavian_masonry_heater', -3.15, -2.4, 0).top('WoodenTable_01', -1.2, 1.7, 0, 0.57).put('painted_wooden_chair_01', -1.5, 2.4, PI).put('painted_wooden_chair_01', -0.8, 1.0, 0).top('painted_wooden_cabinet', 0.4, -2.75, 0, 1.2).floor([-1.6, -0.8]);
   g.bed(3.15, -2.0).case('Shelf_01', 3.62, 1.7, -Q, [0.66, 1.22]).floor([2.4, 0.8]);
   return {
-    w: HW * 2, d: HD * 2, h: 2.6, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_tiles', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 2.6, ext: E, int: 'planks', floor: 'floor_wood', roof, roofType: 'gable', dress,
     walls: [
-      { side: 'front', ext: 'planks_ext', int: 'planks', openings: [door(-2.4, -1.4), win(-0.2, 0.8), win(2.2, 3.1)] },
-      { side: 'back', ext: 'planks_ext', int: 'planks', openings: [win(-1.4, -0.5), win(2.0, 2.9)] },
-      { side: 'left', ext: 'planks_ext', int: 'planks', openings: [win(0.3, 1.2)] },
-      { side: 'right', ext: 'planks_ext', int: 'planks', openings: [win(-0.4, 0.5)] },
+      { side: 'front', ext: E, int: 'planks', openings: [door(-2.4, -1.4), win(-0.2, 0.8), win(2.2, 3.1)] },
+      { side: 'back', ext: E, int: 'planks', openings: [win(-1.4, -0.5), win(2.0, 2.9)] },
+      { side: 'left', ext: E, int: 'planks', openings: [win(0.3, 1.2)] },
+      { side: 'right', ext: E, int: 'planks', openings: [win(-0.4, 0.5)] },
       inner([M, -HD + 0.2], [M, HD - 0.2], [door(-0.1, 0.8)], 'planks', 'planks'),
     ],
     furniture: g.furniture, loot: g.loot,
@@ -303,8 +319,9 @@ export function izbaPlan(): Blueprint {
 }
 
 /** The bigger log house of the hamlet: kitchen and stair room below, two bedrooms above. */
-export function izbaTwoPlan(): Blueprint {
+export function izbaTwoPlan(rng?: RNG): Blueprint {
   const HW = 4.5, HD = 4, M = 0.6;
+  const { ext: E, roof, dress } = izbaLook(rng);
   const g = new Floor();
   g.put('scandinavian_masonry_heater', -3.6, -3.1, 0).top('WoodenTable_01', -2.2, 1.6, 0, 0.57).put('painted_wooden_chair_01', -2.6, 2.3, PI).put('painted_wooden_chair_01', -1.8, 0.9, 0).top('painted_wooden_cabinet', -1.0, -3.45, 0, 1.2).floor([-3.4, 3.0]);
   g.case('wooden_bookshelf_worn', 1.6, -3.5, 0, [0.67, 1.28]).floor([1.6, 2.6]);
@@ -312,13 +329,13 @@ export function izbaTwoPlan(): Blueprint {
   u.bed(-3.6, -2.6).top('painted_wooden_cabinet', -1.2, -3.45, 0, 1.2).floor([-2.0, 2.2]);
   u.bed(1.7, 2.2, PI).case('Shelf_01', 1.2, -3.55, 0, [0.66, 1.22]).floor([1.4, -0.6]);
   const outer = (front: Opening[]): WallDef[] => [
-    { side: 'front', ext: 'planks_ext', int: 'planks', openings: front },
-    { side: 'back', ext: 'planks_ext', int: 'planks', openings: [win(-2.6, -1.7), win(1.2, 2.1)] },
-    { side: 'left', ext: 'planks_ext', int: 'planks', openings: [win(-0.4, 0.5)] },
-    { side: 'right', ext: 'planks_ext', int: 'planks', openings: [win(0.2, 1.1)] },
+    { side: 'front', ext: E, int: 'planks', openings: front },
+    { side: 'back', ext: E, int: 'planks', openings: [win(-2.6, -1.7), win(1.2, 2.1)] },
+    { side: 'left', ext: E, int: 'planks', openings: [win(-0.4, 0.5)] },
+    { side: 'right', ext: E, int: 'planks', openings: [win(0.2, 1.1)] },
   ];
   return {
-    w: HW * 2, d: HD * 2, h: 2.7, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_iron', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 2.7, ext: E, int: 'planks', floor: 'floor_wood', roof, roofType: 'gable', dress,
     walls: [...outer([door(-1.6, -0.6), win(-3.6, -2.7), win(1.4, 2.3)]), inner([M, -HD + 0.2], [M, HD - 0.2], [door(1.6, 2.5)], 'planks', 'planks')],
     furniture: g.furniture, loot: g.loot,
     stairs: { x0: 2.6, x1: 4.0, foot: 2.8, top: -2.6 },
