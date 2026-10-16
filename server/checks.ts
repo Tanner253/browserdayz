@@ -6,7 +6,7 @@ import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
 import { BANS, SOAK, log, vehicles, world, type Box } from './index';
 import { carriedTags, lootedTags, namesOf, tagSeen, voided } from './tags';
-import { TURNED, keep, keyHash, roleOf, shooters, stayOn } from './gate';
+import { TURNED, keep, keyHash, roleOf, shooters, stayOn, turnedAway } from './gate';
 import { KEPT } from './keep';
 import { putOff } from './admin';
 import { clients, drop, send, type Client } from './players';
@@ -121,13 +121,14 @@ export function recheck(c: Client, why: string) {
   TURNED.recheck++;
   log(`[check] ${c.name} is sent back to the bot check, ${secs} s after coming in: ${why}`);
   shooters.delete(`${keyHash(c.key)}|${c.ip}`);
-  // Sent back again and again: kept off the server, by their key and where they play from (the owner, 2026-10-16:
-  // "can we ban these accounts who join and get kcicked multiple times?". That day a swarm with made-up names,
-  // Merric635, Brambl116 and the like, passed the course and was sent back from the world every half minute.)
+  // Sent back again and again: kept off the server, by their key, where they play from and the device they play on
+  // (the owner, 2026-10-16: "can we ban these accounts who join and get kcicked multiple times?". That day a swarm
+  // with made-up names, Merric635, Brambl116 and the like, passed the course and was sent back from the world every
+  // half minute, and took new names and keys every half hour: the device is what they all share.)
   const now = Date.now();
   let kept = false;
   if (roleOf(c) !== 'admin') {
-    for (const n of namesOf(c.key, c.ip)) {
+    for (const n of namesOf(c.key, c.ip, c.fp)) {
       const times = (BANS.strikes.get(`back:${n}`) ?? []).filter((t) => now - t < RECHECK_BAN.within);
       times.push(now);
       BANS.strikes.set(`back:${n}`, times);
@@ -139,6 +140,7 @@ export function recheck(c: Client, why: string) {
   }
   if (kept) {
     log(`[check] ${c.name} is kept off the server for ${RECHECK_BAN.hours} hours: sent back to the bot check ${RECHECK_BAN.times} times in ${Math.round(RECHECK_BAN.within / 60000)} minutes`);
+    turnedAway(c.name, c.key, c.ip, c.fp, `kept off ${RECHECK_BAN.hours} hours: sent back to the bot check ${RECHECK_BAN.times} times in ${Math.round(RECHECK_BAN.within / 60000)} minutes`);
     send(c, { t: 'kick', reason: 'Sent back to the bot check too many times. You are kept off the server for a while.' });
     drop(c);
     c.ws.close();

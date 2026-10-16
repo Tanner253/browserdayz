@@ -19,6 +19,7 @@ import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, h
 import { CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, tagSeen, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
+import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
 import { elite } from './elite';
 import { banId, command, login, offId } from './admin';
@@ -618,6 +619,7 @@ export function handle(c: Client, m: C2S) {
           ...(o.power.voidInv ? { voidInv: true as const } : {}), ...(o.power.voidTag ? { voidTag: true as const } : {}),
           ...(o.power.weightless ? { weightless: true as const } : {}), ...(o.power.endless ? { endless: true as const } : {}), ...(o.power.bottomless ? { bottomless: true as const } : {}),
           ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
+          ...(o.fp ? { dev: shortDevice(o.fp) } : {}),
         })),
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
         bans: admin
@@ -627,6 +629,8 @@ export function handle(c: Client, m: C2S) {
               ...keptOffNow(now).map((b, i) => ({ n: ADMIN.state.bans.length + i + 1, id: offId(b), name: b.name, why: `${b.why} (for ${Math.ceil((b.until - now) / 60000)} more minutes)`, by: b.why.startsWith('timed out') ? 'a timeout' : 'the checks', at: new Date(b.until).toISOString().slice(11, 16) + ' UTC' })),
             ]
           : [],
+        // (whoever was turned away at the door lately, newest first, for the Pardon button)
+        ...(admin ? { turned: [...ADMIN.turned].reverse().map((t) => ({ id: t.n, name: t.name, why: t.why, mins: Math.round((now - t.at) / 60000), ...(t.fp ? { dev: shortDevice(t.fp) } : {}) })) } : {}),
         roles: admin ? Object.values(ADMIN.state.roles).map((r) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10) })) : [],
         checks: CHECKS,
         stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length, cars: vehicles.size, wrecks: [...vehicles.values()].filter((v) => v.goneAt).length, infected: [...horde.bodies.values()].filter((b) => !b.diedAt).length },

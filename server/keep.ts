@@ -546,16 +546,50 @@ export function tellRoles() {
 }
 
 /** What an admin changed is written to the site. @returns whether it was */
+/**
+ * The lists changed: held here at once (a ban bites whether or not the site answers), and written to the site, which
+ * keeps them across restarts. The site cannot always take them the moment they are sent (its store serves an old
+ * copy for a while after any write, and answered 500 to every ban given within a hundred seconds of another until
+ * 2026-10-16): a save brings the mark of what was last written so the site need not read first, and one the site
+ * still could not take is tried again every so often until it is written (`keepSaving`). The owner, 2026-10-16:
+ * "when i ban someone in game the chat log says 'will take effect after server restart' is this false?" It was:
+ * the ban held from the first line; only the copy on the site was behind.
+ * @returns whether the site has it now
+ */
 export async function saveAdmin(next: AdminState): Promise<boolean> {
-  const was = ADMIN.state;
-  // (held here at once, so that it bites whether or not the site answers)
   ADMIN.state = next;
-  const r = await siteAdmin({ op: 'save', state: next });
-  if (r?.ok) return true;
-  if (ADMIN.state !== next) return true;
-  void was;
+  if (await trySaveAdmin()) return true;
+  keepSaving();
   return false;
 }
+
+async function trySaveAdmin(): Promise<boolean> {
+  const r = await siteAdmin({ op: 'save', state: ADMIN.state, mark: ADMIN.mark });
+  return !!r?.ok;
+}
+
+let saving: NodeJS.Timeout | null = null;
+
+/** the lists as they are here, tried on the site every so often until it takes them, for up to ten minutes */
+function keepSaving() {
+  if (saving) return;
+  let tries = 0;
+  saving = setInterval(async () => {
+    if (++tries > 40) {
+      clearInterval(saving!);
+      saving = null;
+      return void log('[admin] the lists could not be written to the site in ten minutes of trying: they hold here until this server restarts');
+    }
+    if (!(await trySaveAdmin())) return;
+    clearInterval(saving!);
+    saving = null;
+    log(`[admin] the lists were written to the site at the ${tries + 1}${tries === 1 ? 'nd' : tries === 2 ? 'rd' : 'th'} try`);
+  }, 15_000);
+  saving.unref();
+}
+
+/** what an admin is told after a change to the lists, where the site has not taken it yet */
+export const savedWords = (kept: boolean) => (kept ? '' : ' (The site could not take the lists this moment: they hold here now, and are written to the site again shortly.)');
 
 export const sys = (c: Client, ...lines: string[]) => lines.forEach((text) => send(c, { t: 'sys', text }));
 

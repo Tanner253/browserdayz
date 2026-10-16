@@ -78,7 +78,7 @@ class Conn {
    * wire: shown the figures only as the server shows them.
    * @param browser what its browser says of itself @returns whether it was welcomed into the world
    */
-  async shoot(browser: { wd: boolean; gl: string } = { wd: false, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti Direct3D11)' }): Promise<boolean> {
+  async shoot(browser: { wd: boolean; gl: string } = { wd: false, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti (0x00002482) Direct3D11 vs_5_0 ps_5_0, D3D11)' }): Promise<boolean> {
     const dealt = [...this.got].reverse().find((m) => m.t === 'range') as { turn: number; go: number; secs: number } | undefined;
     if (!dealt) return false;
     const g = dealt.go, send = (m: unknown) => this.ws.readyState === 1 && this.ws.send(JSON.stringify(m));
@@ -297,8 +297,15 @@ try {
     // the same shooting, in a browser that says a program is driving it
     const driven = new Conn(E, 'Driven', '8.8.8.3');
     assert.equal(await driven.hello(), 'range');
-    assert.ok(!(await driven.shoot({ wd: true, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti Direct3D11)' })), 'a browser driven by a program was let in');
+    assert.ok(!(await driven.shoot({ wd: true, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti (0x00002482) Direct3D11 vs_5_0 ps_5_0, D3D11)' })), 'a browser driven by a program was let in');
     assert.match(driven.why(), /driven by a program/);
+    // and one that names a Windows card without its id, as every one of the swarm of 2026-10-16 did (a real Chrome
+    // on Windows always names it: "RTX 3060 (0x00002504) Direct3D11")
+    const typed = new Conn(E, 'Typed', '8.8.8.6');
+    assert.equal(await typed.hello(), 'range');
+    assert.ok(!(await typed.shoot({ wd: false, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)' })), 'a browser naming a card without its id was let in');
+    assert.match(typed.why(), /names one that is not there/);
+    assert.match(e.log(), /Typed shot the course, in a browser that draws with "[^"]*", a Windows card named without its id: turned away/);
     // and one that draws with no graphics card, as a browser on a rented server does
     const blind = new Conn(E, 'Blind', '8.8.8.4');
     assert.equal(await blind.hello(), 'range');

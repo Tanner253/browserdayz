@@ -29,7 +29,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (42, 2026-10-15: the bot check is the 360-degree course (src/sim/course.ts): the server deals a turn of the yard,
 // not a number the whole range could be worked out from, and shows the figures as they come into sight ('rfig');
 // the game says the height it stands at.)
-export const PROTOCOL = 43;
+export const PROTOCOL = 44;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -142,8 +142,12 @@ export interface KillInfo {
 }
 
 export type C2S =
-  /** `proof`: the slip the check that this is a person gave (src/ui/person.ts), where the server has asked for one */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string }
+  /**
+   * `proof`: the slip the check that this is a person gave (src/ui/person.ts), where the server has asked for one.
+   * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
+   * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
+   */
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -462,7 +466,7 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** an admin's: their inventory never fills */ bottomless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** an admin's: their inventory never fills */ bottomless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true; /** the device their game runs on, its first eight characters (protocol 44): /ban dev:xxxxxxxx takes it */ dev?: string }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
   /**
@@ -472,6 +476,8 @@ export interface AdminLists {
    * server from before 2026-10-13.)
    */
   bans: { n: number; id?: string; name: string; why: string; by: string; at: string }[];
+  /** whoever was turned away at the door lately (newest first), for the panel's Pardon button (`/pardon p:<id>`): an admin's alone. Not said by a server from before protocol 44 */
+  turned?: { id: number; name: string; why: string; mins: number; dev?: string }[];
   roles: { name: string; role: 'admin' | 'mod'; by: string; at: string }[];
   /** what the server's own checks are set to */
   checks: string;

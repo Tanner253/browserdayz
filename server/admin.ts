@@ -15,9 +15,10 @@ import { KITS } from '../src/sim/kits';
 import { type CarryPower, refill, carriedOf, refilledWords, CARRY_POWERS } from '../src/sim/powers';
 import { BANS, EDGE, PARKS, boxes, economy, horde, invented, issue, locks, log, news, standJeep, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
 import { ipOf, namesOf } from './tags';
+import { deviceOf, forgetDevice, shortDevice } from './device';
 import { CHECK, CHECKS } from './checks';
-import { ADMIN, TURNED, bannedFor, ipHash, keptOffNow, keyHash, roleOf, shooters, siteAdmin, type AdminState, type Role } from './gate';
-import { KEPT, asAdmin, keepBefore, place, saveAdmin, sayRestart, setPower, sys, whoIs } from './keep';
+import { ADMIN, TURNED, bannedFor, ipHash, keptOffNow, keyHash, roleOf, shooters, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
+import { KEPT, asAdmin, keepBefore, place, saveAdmin, savedWords, sayRestart, setPower, sys, whoIs } from './keep';
 import { broadcast, cleanName, clients, drop, send, type Client } from './players';
 import { kill } from './acts';
 import { queue } from './queue';
@@ -155,14 +156,14 @@ function sweepKeptOff(but?: Client): string[] {
   const out: string[] = [];
   for (const o of [...clients.values()]) {
     if (o === but || !clients.has(o.id)) continue;
-    const why = bannedFor(o.key, o.ip);
+    const why = bannedFor(o.key, o.ip, o.fp);
     if (!why) continue;
     out.push(o.name);
     TURNED.banned++;
     eject(o, why === 'banned' ? 'You are banned from this server.' : 'You are kept off this server for now.');
   }
   for (const w of [...queue]) {
-    if (!bannedFor(w.key, ipOf.get(w.ws) ?? '')) continue;
+    if (!bannedFor(w.key, ipOf.get(w.ws) ?? '', deviceOf.get(w.ws) ?? '')) continue;
     out.push(cleanName(w.hello.name));
     TURNED.banned++;
     try {
@@ -230,7 +231,9 @@ export async function command(c: Client, line: string) {
   const admin = role === 'admin';
   const need = () => void sys(c, 'Only an admin can do that.');
   const who = rest[0] ?? '', why = rest.slice(1).join(' ').slice(0, 120);
-  const label = (o: Client) => `#${o.id} ${o.name}${roleOf(o) ? ` [${roleOf(o)}]` : ''}`;
+  const label = (o: Client) => `#${o.id} ${o.name}${roleOf(o) ? ` [${roleOf(o)}]` : ''}${o.fp ? `  dev:${shortDevice(o.fp)}` : ''}`;
+  /** a device named in an order (dev:xxxxxxxx, as /players shows it), or '' */
+  const devOf = (w: string) => (/^dev:[0-9a-f]{4,40}$/i.test(w) ? w.slice(4).toLowerCase() : '');
   switch (cmd) {
     case 'help':
       return void sys(c, `Orders: ${ORDERS.filter((o) => !o.admin).map(written).join(' · ')}`, ...(admin ? [`Admins: ${ORDERS.filter((o) => o.admin).map(written).join(' · ')}`] : []), '"who" is a name, part of one, or #number from /players.', ...(admin ? ['/ban also finds somebody who has just left (/recent).'] : []));
@@ -239,7 +242,15 @@ export async function command(c: Client, line: string) {
     case 'list':
       return void sys(c, `${clients.size} online:`, ...[...clients.values()].map((o) => `${label(o)}  at ${o.pose[0].toFixed(0)}, ${o.pose[2].toFixed(0)}${o.alive ? '' : ' (dead)'}${o.check.flags ? `  ${o.check.flags} flagged` : ''}`));
     case 'recent':
-      return void sys(c, ADMIN.gone.length ? 'Left lately (newest last):' : 'Nobody has left lately.', ...ADMIN.gone.slice(-15).map((g) => `${g.name}  ${Math.round((Date.now() - g.at) / 60000)} min ago`));
+      return void sys(c, ADMIN.gone.length ? 'Left lately (newest last):' : 'Nobody has left lately.', ...ADMIN.gone.slice(-15).map((g) => `${g.name}  ${Math.round((Date.now() - g.at) / 60000)} min ago${g.fp ? `  dev:${shortDevice(g.fp)}` : ''}`));
+    case 'same': {
+      // (everybody on one device: playing now, and gone lately. The swarm of 2026-10-16 was one device under a dozen names.)
+      const d = devOf(who), t = d ? null : whoIs(who);
+      const fp = d || t?.fp || '';
+      if (!fp) return void sys(c, d ? 'No device is that.' : t ? `${t.name}'s game said nothing of its device.` : `Nobody online is "${who}" (or more than one is): see /players, or give a device as dev:xxxxxxxx.`);
+      const on = [...clients.values()].filter((o) => o.fp.startsWith(fp)), gone = ADMIN.gone.filter((g) => g.fp.startsWith(fp) && !on.some((o) => o.key === g.key));
+      return void sys(c, `On device ${shortDevice(fp)}: ${on.length} playing, ${gone.length} gone lately.`, ...on.map((o) => `${label(o)}  playing`), ...gone.slice(-15).map((g) => `${g.name}  gone ${Math.round((Date.now() - g.at) / 60000)} min ago`));
+    }
     case 'flagged': {
       const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
       return void sys(c, list.length ? `Flagged by the checks (which are set to "${CHECKS}"):` : 'Nobody online has been flagged.', ...list.map((o) => `${label(o)}  ${o.check.flags} times`));
@@ -460,7 +471,7 @@ export async function command(c: Client, line: string) {
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (roleOf(t) === 'admin' && !admin) return need();
       const reason = rest.slice(2).join(' ').slice(0, 120);
-      for (const n of namesOf(t.key, t.ip)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}`, name: t.name });
+      for (const n of namesOf(t.key, t.ip, t.fp)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}`, name: t.name });
       log(`[admin] ${c.name} timed ${t.name} out for ${mins} minutes${reason ? `: ${reason}` : ''}`);
       eject(t, `You are kept off the server for ${mins} minutes${reason ? `: ${reason}` : '.'}`);
       const more = sweepKeptOff(c);
@@ -468,20 +479,27 @@ export async function command(c: Client, line: string) {
     }
     case 'ban': {
       if (!admin) return need();
-      const t = whoIs(who);
-      const left = t ? null : (/^#\d+$/.test(who) ? ADMIN.gone.find((g) => g.id === Number(who.slice(1))) : undefined) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
-      if (!t && !left) return void sys(c, `Nobody online or lately gone is "${who}": see /players and /recent.`);
+      // (a device, as /players and /same show it: whoever is on it now, else whoever was on it last)
+      const d = devOf(who);
+      const t = d ? [...clients.values()].find((o) => o.fp.startsWith(d) && o !== c) ?? null : whoIs(who);
+      const left = t ? null : d ? [...ADMIN.gone].reverse().find((g) => g.fp.startsWith(d)) : (/^#\d+$/.test(who) ? ADMIN.gone.find((g) => g.id === Number(who.slice(1))) : undefined) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
+      if (!t && !left) return void sys(c, d ? `Nobody online or lately gone is on device ${d}: see /players and /recent.` : `Nobody online or lately gone is "${who}": see /players and /recent.`);
       if (t === c) return void sys(c, 'That is you.');
-      const name = t ? t.name : left!.name, key = keyHash(t ? t.key : left!.key), ip = ipHash(t ? t.ip : left!.ip);
+      const name = t ? t.name : left!.name, key = keyHash(t ? t.key : left!.key), ip = ipHash(t ? t.ip : left!.ip), fp = t ? t.fp : left!.fp;
       if (ADMIN.state.roles[key]?.role === 'admin') return void sys(c, `${name} is an admin: /demote first.`);
-      const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, name, why, by: c.name, at: new Date().toISOString() }] };
-      log(`[admin] ${c.name} banned ${name}${why ? `: ${why}` : ''}${ip ? '' : ' (by key only: no address is known)'}`);
+      // (the owner, 2026-10-16: "can i ban this computr or browser at the source?": the device goes on the ban with the key and the address)
+      const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, ...(fp ? { fp } : {}), name, why, by: c.name, at: new Date().toISOString() }] };
+      log(`[admin] ${c.name} banned ${name}${why ? `: ${why}` : ''}${ip ? '' : ' (by key only: no address is known)'}${fp ? ` [dev ${shortDevice(fp)}]` : ''}`);
       if (t) eject(t, 'You are banned from this server.');
+      // (and off the panel's "Left lately": the owner, 2026-10-16, "when i ban someone their name should be removed")
+      const rawKey = t ? t.key : left!.key;
+      for (let i = ADMIN.gone.length - 1; i >= 0; i--) if (ADMIN.gone[i].key === rawKey) ADMIN.gone.splice(i, 1);
       // (it holds from this line on: see saveAdmin. And whoever else it covers goes now.)
       const saving = saveAdmin(next);
       const more = sweepKeptOff(c);
       const kept = await saving;
-      return void sys(c, `${name} is banned${ip ? ', by their game and by their address' : ' (by their game only: the address could not be told)'}, from now.${more.length ? ` Put out with them: ${more.join(', ')}.` : ''}${kept ? '' : ' It could NOT be written to the site: it holds until this server restarts. Give the order again in a minute.'}`);
+      const by = [ip ? 'their address' : '', fp ? `their device (${shortDevice(fp)})` : ''].filter(Boolean);
+      return void sys(c, `${name} is banned${by.length ? `, by their game, ${by.join(' and ')}` : ' (by their game only: the address could not be told)'}, from now.${more.length ? ` Put out with them: ${more.join(', ')}.` : ''}${savedWords(kept)}`);
     }
     case 'bans':
       if (!admin) return need();
@@ -490,7 +508,7 @@ export async function command(c: Client, line: string) {
       return void sys(
         c,
         ADMIN.state.bans.length ? 'Banned (/unban takes the id in brackets, or the number straight after this list):' : 'Nobody is banned.',
-        ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  [${banId(b)}]  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`),
+        ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  [${banId(b)}]  by ${b.by}, ${b.at.slice(0, 10)}${b.fp ? `, dev:${shortDevice(b.fp)}` : ''}${b.why ? `: ${b.why}` : ''}`),
         ...(off.length ? ['Kept off for a while (by the checks, or timed out):'] : []),
         ...off.map((b, i) => `${ADMIN.state.bans.length + i + 1}. ${b.name}  [${offId(b)}]  for ${Math.ceil((b.until - Date.now()) / 60000)} more minutes: ${b.why}`),
       );
@@ -521,7 +539,37 @@ export async function command(c: Client, line: string) {
       }
       log(`[admin] ${c.name} unbanned ${b.name}`);
       const kept = await saveAdmin({ roles: ADMIN.state.roles, bans: ADMIN.state.bans.filter((x) => x !== b) });
-      return void sys(c, `${b.name} is no longer banned.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
+      return void sys(c, `${b.name} is no longer banned.${savedWords(kept)}`);
+    }
+    case 'turned':
+      return void sys(c, ADMIN.turned.length ? 'Turned away at the door lately (newest last; /pardon p:number lets them straight back in):' : 'Nobody has been turned away at the door lately.', ...ADMIN.turned.slice(-20).map((t) => `p:${t.n}  ${t.name}  ${Math.round((Date.now() - t.at) / 60000)} min ago${t.fp ? `  dev:${shortDevice(t.fp)}` : ''}: ${t.why}`));
+    case 'pardon': {
+      // The owner, 2026-10-16: "admins need a way to handle when someone tries to join but is wrongly banned, or
+      // kicked or rejects. we need to have a 'pardon' button for these people". Everything on them is lifted at
+      // once: the bans and strikes on their game, their address and their device, an admin's ban of any of the
+      // three, and what their device had been seen to come with (so the farm rule starts afresh for it).
+      if (!admin) return need();
+      const w = rest.join(' ').trim(), lw = w.toLowerCase(), d = devOf(w);
+      const t = /^p:\d+$/.test(lw) ? ADMIN.turned.find((x) => x.n === Number(lw.slice(2))) : d ? [...ADMIN.turned].reverse().find((x) => x.fp.startsWith(d)) : [...ADMIN.turned].reverse().find((x) => x.name.toLowerCase() === lw) ?? [...ADMIN.turned].reverse().find((x) => lw.length > 1 && x.name.toLowerCase().includes(lw));
+      if (!t) return void sys(c, `Nobody turned away at the door lately is "${w}": see /turned (or the Bans page of the panel).`);
+      const names = [t.key, ...(t.ip ? [`ip:${t.ip}`] : []), ...(t.fp ? [`fp:${t.fp}`] : [])].filter(Boolean);
+      const lifted: string[] = [];
+      for (const n of names) {
+        if (BANS.temp.delete(n)) lifted.push(n.startsWith('ip:') ? 'kept off by address' : n.startsWith('fp:') ? 'kept off by device' : 'kept off by game');
+        BANS.strikes.delete(n);
+        BANS.strikes.delete(`back:${n}`);
+      }
+      if (t.fp) forgetDevice(t.fp);
+      const k = t.key ? keyHash(t.key) : '', a = ipHash(t.ip);
+      const bans = ADMIN.state.bans.filter((b) => !((k && b.key === k) || (a && b.ip === a) || (t.fp && b.fp === t.fp)));
+      let kept = true;
+      if (bans.length !== ADMIN.state.bans.length) {
+        lifted.push(`${ADMIN.state.bans.length - bans.length} ban${ADMIN.state.bans.length - bans.length === 1 ? '' : 's'} an admin wrote down`);
+        kept = await saveAdmin({ roles: ADMIN.state.roles, bans });
+      }
+      ADMIN.turned.splice(ADMIN.turned.indexOf(t), 1);
+      log(`[admin] ${c.name} pardoned ${t.name} (turned away: ${t.why}): ${lifted.length ? lifted.join(', ') : 'nothing was on them'}`);
+      return void sys(c, `${t.name} is pardoned and may come straight back in${lifted.length ? `: lifted ${lifted.join(', ')}` : ' (nothing was kept against them here: what turned them away was ${t.why})'}.${savedWords(kept)}`);
     }
     case 'admin':
     case 'op':
@@ -548,7 +596,7 @@ export async function command(c: Client, line: string) {
       send(t, { t: 'role', role: to });
       if (to === 'admin' && !was) asAdmin(t, true);
       if (to) sys(t, `${c.name} has made you ${to === 'admin' ? 'an admin' : 'a mod'}: /help says what you can do.`);
-      return void sys(c, `${t.name} is ${to ? (to === 'admin' ? 'an admin' : 'a mod') : 'no longer either'}.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
+      return void sys(c, `${t.name} is ${to ? (to === 'admin' ? 'an admin' : 'a mod') : 'no longer either'}.${savedWords(kept)}`);
     }
     case 'warn': {
       const t = whoIs(who), words = rest.slice(1).join(' ').slice(0, 160);
@@ -799,6 +847,7 @@ export function putOff(c: Client, why: string) {
   }
   shooters.delete(`${keyHash(c.key)}|${c.ip}`);
   log(`[check] ${c.name} is put off the server: ${why}${kept ? `; and kept off it for ${CHECK.ban} hours` : ''}`);
+  if (kept) turnedAway(c.name, c.key, c.ip, c.fp, `kept off ${CHECK.ban} hours: ${why}`);
   send(c, { t: 'kick', reason: kept ? 'The server could not make sense of what your game told it, more than once. You are kept off it for a while.' : 'The server could not make sense of what your game told it. Reconnect.' });
   c.ws.close();
   drop(c);

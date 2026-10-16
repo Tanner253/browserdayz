@@ -241,10 +241,25 @@ if (ALL) await withServer(async () => {
   await sleep(400);
   assert.match(await ann.order('/recent'), /Bob/);
   assert.match(await ann.order('/ban Bob gone but not forgotten'), /Bob is banned/);
+  // (banned, he is off the panel's "Left lately": the owner, 2026-10-16)
+  assert.doesNotMatch(await ann.order('/recent'), /Bob/, 'somebody banned was still on the list of those lately gone');
   assert.ok(!(await bob2.join()), 'somebody banned after leaving was let back in');
+  // Turned away at the door, he is on /turned, and a pardon lifts the ban and lets him straight in (the owner,
+  // 2026-10-16: "we need to have a 'pardon' button for these people")
+  const turned = await ann.order('/turned');
+  assert.match(turned, /p:\d+ {2}Bob .*banned/, `the one turned away is not listed: ${turned}`);
+  // (two Bobs were turned away, the first under his first key: the newest entry is this one's)
+  const bobs = turned.match(/p:\d+(?= {2}Bob )/g)!;
   const before = writes;
+  const pardoned = await ann.order(`/pardon ${bobs[bobs.length - 1]}`);
+  assert.match(pardoned, /Bob is pardoned[\s\S]*1 ban an admin wrote down/, pardoned);
+  assert.equal(writes, before + 1, 'a pardon was not one write');
+  assert.ok(await bob2.join(), `somebody pardoned was not let in: ${bob2.kicked}`);
+  assert.doesNotMatch(await ann.order('/turned'), new RegExp(`${bobs[bobs.length - 1]} `), 'somebody pardoned was still listed as turned away');
+  bob2.ws.close();
+  await sleep(400);
+  assert.match(await ann.order('/ban Bob once more'), /Bob is banned/);
   assert.match(await ann.order('/unban 1'), /no longer banned/);
-  assert.equal(writes, before + 1, 'an unban was not one write');
   assert.ok(await bob.join(), 'somebody unbanned was not let in');
   assert.match(await ann.order('/demote Cat'), /Nobody online is "Cat"/);
   checks++;

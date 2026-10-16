@@ -12,6 +12,7 @@ import { MAX_STAMINA, F_SIT, F_GROUND, F_BLEED } from '../src/net/protocol';
 import { BANS, LOCAL_ADMIN, economy, horde, invented, log, things, vehicles } from './index';
 import { SITE_URL, ipsTellApart } from './tags';
 import { CHECK, CHECKS, dealt, flag } from './checks';
+import { DEVICE, cameWith, deviceName, isFarm, shortDevice } from './device';
 import { broadcast, clients, drop, send, type Client } from './players';
 import { hurtJeep, kill, leaveSeat, releaseLock } from './acts';
 
@@ -60,7 +61,7 @@ export const awake = () => {
 };
 
 /** what has been turned away, for /healthz: by what */
-export const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0, agent: 0, recheck: 0 };
+export const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0, agent: 0, recheck: 0, device: 0 };
 
 /** when each connection lately said hello, by where it came from: see `flooding` */
 const hellos = new Map<string, number[]>();
@@ -414,25 +415,26 @@ export function keptOffNow(now = Date.now()): { name: string; why: string; until
 }
 
 /** what somebody turned away at the door is told: that they are kept off, for about how long, and what to do if it is wrong */
-export function doorWords(key: string, ip: string, off: string): string {
+export function doorWords(key: string, ip: string, off: string, fp = ''): string {
   if (off === 'banned') {
-    const k = keyHash(key);
-    const b = ADMIN.state.bans.find((x) => x.key === k) ?? ADMIN.state.bans.find((x) => !!ip && x.ip === ip);
+    const k = keyHash(key), a = ipHash(ip);
+    const b = ADMIN.state.bans.find((x) => x.key === k) ?? ADMIN.state.bans.find((x) => !!a && x.ip === a) ?? ADMIN.state.bans.find((x) => !!fp && x.fp === fp);
     return `You are banned from this server${b?.why ? `: ${b.why}` : '.'}`;
   }
   const now = Date.now();
-  const b = [key, ...(ip ? [`ip:${ip}`] : [])].map((n) => BANS.temp.get(n)).find((x) => x && x.until > now);
+  const b = [key, ...(ip ? [`ip:${ip}`] : []), ...(fp ? [deviceName(fp)] : [])].map((n) => BANS.temp.get(n)).find((x) => x && x.until > now);
   if (!b) return 'You are kept off this server for now.';
   const mins = Math.max(1, Math.ceil((b.until - now) / 60000));
   const long = mins >= 90 ? `${Math.round(mins / 60)} hours` : `${mins} minute${mins === 1 ? '' : 's'}`;
   return off.startsWith('timed out') ? `You are kept off this server for about ${long} more (${off}).` : `You are kept off this server for about ${long} more: its checks put you off it more than once. If you were only playing, tell an admin on the Discord and they can lift it.`;
 }
 
-export function bannedFor(key: string, ip: string): string | null {
+/** @param fp the device their game said it runs on ('' : none said): a device kept off keeps off every game on it */
+export function bannedFor(key: string, ip: string, fp = ''): string | null {
   if (BANS.keys.has(key) || (!!ip && BANS.ips.has(ip))) return 'kept off by name';
-  if (adminBan(key, ip)) return 'banned';
+  if (adminBan(key, ip, fp)) return 'banned';
   const now = Date.now();
-  for (const n of [key, ...(ip ? [`ip:${ip}`] : [])]) {
+  for (const n of [key, ...(ip ? [`ip:${ip}`] : []), ...(fp ? [deviceName(fp)] : [])]) {
     const b = BANS.temp.get(n);
     if (b && b.until > now) return b.why;
     if (b) BANS.temp.delete(n);
@@ -459,7 +461,8 @@ export type Role = 'admin' | 'mod';
 
 export interface AdminState {
   roles: Record<string, { role: Role; name: string; by: string; at: string }>;
-  bans: { key: string; ip: string; name: string; why: string; by: string; at: string }[];
+  /** `fp`: the device they played on, where their game said it (2026-10-16: "can i ban this computr or browser at the source?") */
+  bans: { key: string; ip: string; fp?: string; name: string; why: string; by: string; at: string }[];
 }
 
 export const ADMIN = {
@@ -474,7 +477,15 @@ export const ADMIN = {
   /** tries at the password: by key and by address, the times of them */
   tries: new Map<string, number[]>(),
   /** whoever has left lately (the newest last): somebody who does a thing and goes can still be banned */
-  gone: [] as { id: number; name: string; key: string; ip: string; at: number }[],
+  gone: [] as { id: number; name: string; key: string; ip: string; fp: string; at: number }[],
+  /**
+   * Whoever was turned away at the door lately (the newest last): banned, kept off, a full device, the bot check
+   * not passed, an out-of-date browser. For /pardon (the owner, 2026-10-16: "admins need a way to handle when
+   * someone tries to join but is wrongly banned, or kicked or rejects. we need to have a 'pardon' button").
+   */
+  turned: [] as { n: number; name: string; key: string; ip: string; fp: string; why: string; at: number }[],
+  /** the mark (the store's own) of the lists as the site last wrote them: a save that brings it is written without the site reading first (api/admin.ts) */
+  mark: '',
   /** until when what somebody types and says reaches nobody: by their key */
   muted: new Map<string, number>(),
   /** when each panel last asked for its lists */
@@ -487,6 +498,25 @@ export const ADMIN = {
 
 export const keyHash = (key: string) => createHash('sha256').update(`zona key ${key}`).digest('hex').slice(0, 40);
 
+let turnedN = 0;
+
+/** Somebody was turned away at the door: written down for /pardon (one line a person: by their game, else by where and what they play from; the newest forty). */
+export function turnedAway(name: string, key: string, ip: string, fp: string, why: string) {
+  const t = ADMIN.turned, now = Date.now();
+  const i = t.findIndex((x) => (key && x.key === key) || (!key && x.ip === ip && x.fp === fp));
+  if (i >= 0) t.splice(i, 1);
+  t.push({ n: ++turnedN, name, key, ip, fp, why, at: now });
+  if (t.length > 40) t.shift();
+}
+
+/**
+ * A Windows graphics card named without its id (2026-10-16). Every Direct3D11 renderer a real Chrome on Windows
+ * names carries the card's PCI id, "NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 ...": in 231 passes of the bot
+ * check over two and a half days of the live log, every real player's had it, and every one of the swarm's said
+ * "NVIDIA GeForce RTX 3060 Direct3D11 ..." with none. A string somebody typed, not a card.
+ */
+export const spoofedRenderer = (gl: string) => /Direct3D11/i.test(gl) && !/\(0x[0-9a-f]{4,8}\)/i.test(gl);
+
 /** Is this an address out in the world? (Not this machine's own, nor one of a private network: those are whatever stands in front of the server, and are everybody's.) */
 const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
 
@@ -494,12 +524,74 @@ export const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash
 
 export const roleOf = (c: Client): Role | null => (LOCAL_ADMIN ? 'admin' : ADMIN.state.roles[keyHash(c.key)]?.role ?? null);
 
-function adminBan(key: string, ip: string): boolean {
+function adminBan(key: string, ip: string, fp = ''): boolean {
   const k = keyHash(key), a = ipHash(ip);
-  // (Somebody with a role is never kept off by an address: an address is a household's, a café's, a whole
-  // phone network's, and an admin who banned somebody at their own would have banned themselves.)
+  // (Somebody with a role is never kept off by an address or a device: an address is a household's, a café's, a
+  // whole phone network's, and an admin who banned somebody at their own would have banned themselves.)
   const mine = !!ADMIN.state.roles[k];
-  return ADMIN.state.bans.some((b) => b.key === k || (!mine && !!a && b.ip === a && ipsTellApart()));
+  return ADMIN.state.bans.some((b) => b.key === k || (!mine && !!a && b.ip === a && ipsTellApart()) || (!mine && !!fp && b.fp === fp));
+}
+
+// ---- the device a game runs on (server/device.ts): what is asked of it at the door
+//
+// Three rules, all at `hello` and before the bot check (nothing of the course is spent on a farm): a device kept
+// off keeps off every game on it (bannedFor, above); a device that has come with DEVICE.spread games from as many
+// public addresses inside an hour is a farm, and is kept off for DEVICE.hours; and no more than DEVICE.live games
+// play on one device at once. Watching (DEVICE_RULES=watch), each is written down and not applied.
+
+/** Are DEVICE.live games already playing on this device? (not counting this game's own key, anybody with a role, or a body left behind) */
+export function deviceFull(key: string, fp: string): boolean {
+  if (!fp || !DEVICE.live || ADMIN.state.roles[keyHash(key)]) return false;
+  return [...clients.values()].filter((o) => o.fp === fp && o.key !== key && !roleOf(o) && !o.asleep).length >= DEVICE.live;
+}
+
+/**
+ * A game has said hello with a device. The farm rule is asked (and the device kept off if it is one), then
+ * whether the device is kept off at all, then whether it is full. @returns what the game is told, or null: in.
+ */
+export function deviceRules(key: string, ip: string, fp: string, name: string): string | null {
+  if (!fp || ADMIN.state.roles[keyHash(key)]) return null;
+  const now = Date.now();
+  const seen = cameWith(fp, key, ip, publicIp(ip), now);
+  const watch = DEVICE.mode === 'watch', farmWatch = watch || DEVICE.farm === 'watch';
+  if (isFarm(seen) && !BANS.temp.has(deviceName(fp))) {
+    // (the device alone: watched unless DEVICE_FARM=enforce, see DEVICE.farm)
+    const watch = farmWatch;
+    const why = `${seen.games} games on one device from ${seen.places} addresses inside an hour`;
+    log(`[device${watch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${watch ? 'what would be ' : ''}kept off for ${DEVICE.hours} hours: ${why}`);
+    if (!watch) {
+      BANS.temp.set(deviceName(fp), { until: now + DEVICE.hours * 3600000, why, name });
+      // (and the farm's games that are in the world go out with it, now)
+      for (const o of [...clients.values()]) {
+        if (o.fp !== fp || roleOf(o)) continue;
+        TURNED.device++;
+        turnedAway(o.name, o.key, o.ip, o.fp, `put out: ${why}`);
+        send(o, { t: 'kick', reason: doorWords(o.key, o.ip, why, fp) });
+        o.ws.close();
+        drop(o);
+      }
+    }
+  }
+  const off = bannedFor(key, ip, fp);
+  if (off) {
+    // (banned by their key or their address they would have been turned away without a device: `join` says why)
+    if (!bannedFor(key, ip)) {
+      log(`[device${watch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${watch ? 'what would be ' : ''}not let in: their device is ${off === 'banned' ? 'banned' : `kept off (${off})`}`);
+      if (watch) return null;
+      TURNED.device++;
+      turnedAway(name, key, ip, fp, `their device is ${off === 'banned' ? 'banned' : `kept off: ${off}`}`);
+      return doorWords(key, ip, off, fp);
+    }
+    return null;
+  }
+  if (deviceFull(key, fp)) {
+    log(`[device${farmWatch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${farmWatch ? 'what would be ' : ''}not let in: ${DEVICE.live} already playing on their device`);
+    if (farmWatch) return null;
+    TURNED.device++;
+    turnedAway(name, key, ip, fp, `${DEVICE.live} already playing on their device`);
+    return DEVICE.live === 1 ? 'Somebody is already playing on this device: one player to a device.' : `There are already ${DEVICE.live} playing on this device.`;
+  }
+  return null;
 }
 
 /**
@@ -527,10 +619,11 @@ export async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boo
   try {
     const r = await fetch(`${SITE_URL}/api/admin?n=${n}`, { method: 'POST', signal: AbortSignal.timeout(30_000) });
     if (!r.ok) return null;
-    const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean };
+    const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean; mark?: string };
     if (out.ok && out.state) {
       ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [] };
       if (out.pepper) ADMIN.pepper = out.pepper;
+      if (typeof out.mark === 'string') ADMIN.mark = out.mark;
       ADMIN.ready = true;
       ADMIN.onState?.();
     }

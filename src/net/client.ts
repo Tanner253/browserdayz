@@ -2,6 +2,7 @@
 // server configured, or the dev server running on its own) the game plays offline.
 
 import { PROTOCOL, type C2S, type S2C } from './protocol';
+import { deviceId } from './device';
 
 type Handler<T extends S2C['t']> = (m: Extract<S2C, { t: T }>) => void;
 type Welcome = Extract<S2C, { t: 'welcome' }>;
@@ -255,14 +256,16 @@ export class Net {
     }
     const timeout = remote ? 12_000 : 4000;
     this.left = false;
-    const first = await this.open(name, timeout, proof);
+    // (the device this game runs on, said with hello: made once, a few tens of ms the first time)
+    const fp = await deviceId();
+    const first = await this.open(name, timeout, proof, fp);
     if (first || this.kicked || this.left) return first;
     // one more try: a proxy or a server that has only just started can drop the first connection
     await new Promise((r) => setTimeout(r, 400));
-    return this.open(name, timeout, proof);
+    return this.open(name, timeout, proof, fp);
   }
 
-  private open(name: string, timeout: number, proof = ''): Promise<Welcome | null> {
+  private open(name: string, timeout: number, proof = '', fp = ''): Promise<Welcome | null> {
     return new Promise((resolve) => {
       let settled = false;
       const done = (v: Welcome | null) => {
@@ -287,7 +290,7 @@ export class Net {
         return;
       }
       this.ws = ws;
-      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}) });
+      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}) });
       ws.onerror = () => done(null);
       ws.onclose = () => {
         const was = this.online;

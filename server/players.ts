@@ -14,7 +14,8 @@ import { EDGE, MAX_PLAYERS, RECORD_LIFETIME, RESTART, barrelsGone, boxes, doors,
 import { bunkerDoor, cardSeen, hitsBy, ipOf, tagSeen } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
-import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, doorWords, keyHash, roleOf } from './gate';
+import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, turnedAway } from './gate';
+import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
 import { leaveSeat, releaseLock } from './acts';
@@ -84,6 +85,8 @@ export interface Client {
   /** where they connect from, and when the life they are living began (see notEarned) */
   ip: string;
   lifeAt: number;
+  /** the device their game said it runs on ('' : none said): server/device.ts */
+  fp: string;
   /** the role they were last told they have (see tellRoles in keep.ts) */
   roleTold?: string | null;
   msgCount: number;
@@ -220,17 +223,28 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     ws.close();
     return null;
   }
-  const key = keyOf(m) || `anon-${Math.random().toString(36).slice(2)}`;
-  const off = bannedFor(key, ipOf.get(ws) ?? '');
+  const key = keyOf(m) || `anon-${Math.random().toString(36).slice(2)}`, fp = deviceOf.get(ws) ?? '';
+  const off = bannedFor(key, ipOf.get(ws) ?? '', fp);
   if (off) {
     log(`${cleanName(m.name)} is not let in: ${off}`);
-    ws.send(JSON.stringify({ t: 'kick', reason: doorWords(key, ipOf.get(ws) ?? '', off) } satisfies S2C));
+    turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, off === 'banned' ? 'banned' : `kept off: ${off}`);
+    ws.send(JSON.stringify({ t: 'kick', reason: doorWords(key, ipOf.get(ws) ?? '', off, fp) } satisfies S2C));
+    ws.close();
+    return null;
+  }
+  // (asked at hello too; asked again here for whoever waited in line or shot the course meanwhile)
+  if (DEVICE.mode === 'enforce' && DEVICE.farm === 'enforce' && deviceFull(key, fp)) {
+    TURNED.device++;
+    log(`${cleanName(m.name)} (${shortDevice(fp)}) is not let in: ${DEVICE.live} already playing on their device`);
+    turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, `${DEVICE.live} already playing on their device`);
+    ws.send(JSON.stringify({ t: 'kick', reason: `There are already ${DEVICE.live} playing on this device.` } satisfies S2C));
     ws.close();
     return null;
   }
   if (addressFull(key, ipOf.get(ws) ?? '')) {
     TURNED.address++;
     log(`${cleanName(m.name)} is not let in: ${PER_ADDRESS} already playing from their address`);
+    turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, `${PER_ADDRESS} already playing from their address`);
     ws.send(JSON.stringify({ t: 'kick', reason: PER_ADDRESS === 1 ? 'Somebody is already playing from your connection: one player to a connection.' : `There are already ${PER_ADDRESS} playing from your connection.` } satisfies S2C));
     ws.close();
     return null;
@@ -265,7 +279,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     heardAt: Date.now(), hitAway: 0, kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), fp, msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
@@ -303,7 +317,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     had.name = c.name;
     sendBoard();
   } else sendBoard(c);
-  log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''} — ${clients.size} online`);
+  log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''}${fp ? ` [dev ${shortDevice(fp)}]` : ''} — ${clients.size} online`);
   // (somebody with a role is told so as they come in: their game shows them what they may do)
   c.roleTold = roleOf(c);
   if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
@@ -317,7 +331,7 @@ export function drop(c: Client) {
   if (!clients.delete(c.id)) return;
   hitsBy.delete(c.id);
   cardSeen.delete(c.id);
-  ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, at: Date.now() });
+  ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, fp: c.fp, at: Date.now() });
   ADMIN.asked.delete(c.id);
   ADMIN.tints.delete(c.id);
   if (ADMIN.gone.length > 60) ADMIN.gone.shift();
