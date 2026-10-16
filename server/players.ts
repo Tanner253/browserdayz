@@ -14,7 +14,7 @@ import { EDGE, MAX_PLAYERS, RECORD_LIFETIME, RESTART, barrelsGone, boxes, doors,
 import { bunkerDoor, cardSeen, hitsBy, ipOf, tagSeen } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
-import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf } from './gate';
+import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, turnedAway } from './gate';
 import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
@@ -227,14 +227,16 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   const off = bannedFor(key, ipOf.get(ws) ?? '', fp);
   if (off) {
     log(`${cleanName(m.name)} is not let in: ${off}`);
+    turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, off === 'banned' ? 'banned' : `kept off: ${off}`);
     ws.send(JSON.stringify({ t: 'kick', reason: doorWords(key, ipOf.get(ws) ?? '', off, fp) } satisfies S2C));
     ws.close();
     return null;
   }
   // (asked at hello too; asked again here for whoever waited in line or shot the course meanwhile)
-  if (DEVICE.mode === 'enforce' && deviceFull(key, fp)) {
+  if (DEVICE.mode === 'enforce' && DEVICE.farm === 'enforce' && deviceFull(key, fp)) {
     TURNED.device++;
     log(`${cleanName(m.name)} (${shortDevice(fp)}) is not let in: ${DEVICE.live} already playing on their device`);
+    turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, `${DEVICE.live} already playing on their device`);
     ws.send(JSON.stringify({ t: 'kick', reason: `There are already ${DEVICE.live} playing on this device.` } satisfies S2C));
     ws.close();
     return null;
@@ -242,6 +244,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   if (addressFull(key, ipOf.get(ws) ?? '')) {
     TURNED.address++;
     log(`${cleanName(m.name)} is not let in: ${PER_ADDRESS} already playing from their address`);
+    turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, `${PER_ADDRESS} already playing from their address`);
     ws.send(JSON.stringify({ t: 'kick', reason: PER_ADDRESS === 1 ? 'Somebody is already playing from your connection: one player to a connection.' : `There are already ${PER_ADDRESS} playing from your connection.` } satisfies S2C));
     ws.close();
     return null;

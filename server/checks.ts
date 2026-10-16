@@ -6,7 +6,7 @@ import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
 import { BANS, SOAK, log, vehicles, world, type Box } from './index';
 import { carriedTags, lootedTags, namesOf, tagSeen, voided } from './tags';
-import { TURNED, keep, keyHash, roleOf, shooters, stayOn } from './gate';
+import { TURNED, keep, keyHash, roleOf, shooters, stayOn, turnedAway } from './gate';
 import { KEPT } from './keep';
 import { putOff } from './admin';
 import { clients, drop, send, type Client } from './players';
@@ -140,6 +140,7 @@ export function recheck(c: Client, why: string) {
   }
   if (kept) {
     log(`[check] ${c.name} is kept off the server for ${RECHECK_BAN.hours} hours: sent back to the bot check ${RECHECK_BAN.times} times in ${Math.round(RECHECK_BAN.within / 60000)} minutes`);
+    turnedAway(c.name, c.key, c.ip, c.fp, `kept off ${RECHECK_BAN.hours} hours: sent back to the bot check ${RECHECK_BAN.times} times in ${Math.round(RECHECK_BAN.within / 60000)} minutes`);
     send(c, { t: 'kick', reason: 'Sent back to the bot check too many times. You are kept off the server for a while.' });
     drop(c);
     c.ws.close();

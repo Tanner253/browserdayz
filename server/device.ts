@@ -79,6 +79,11 @@ export function cameWith(fp: string, key: string, ip: string, isPublic: boolean,
 /** Is it a farm: this many games from this many addresses inside the hour? (DEVICE.spread; 0: never) */
 export const isFarm = (seen: { games: number; places: number }) => DEVICE.spread > 0 && seen.games >= DEVICE.spread && seen.places >= DEVICE.spread;
 
+/** what one device has come with is forgotten (a pardon: the farm rule starts afresh for it) */
+export function forgetDevice(fp: string) {
+  came.delete(fp);
+}
+
 /** forgotten (a test) */
 export function forgetDevices() {
   came.clear();

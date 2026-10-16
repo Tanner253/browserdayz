@@ -683,7 +683,7 @@ export class AdminUI {
     const base = `${this.view}|${this.sub}|${this.target}|${s.role}|${this.sure?.key ?? ''}`;
     if (this.view === 'entities') return `${base}|${this.spawnAt}|${JSON.stringify(this.spawnN)}|${JSON.stringify(this.looked ? [this.looked.what, Math.round(this.looked.x), Math.round(this.looked.z), Math.round(this.looked.dist)] : null)}|${JSON.stringify(this.lists.stats ?? {})}`;
     if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}`;
-    if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}`;
+    if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}|${JSON.stringify(this.lists.turned ?? [])}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
@@ -1509,9 +1509,33 @@ export class AdminUI {
     }
     if (!this.lists.bans.length) list.append(el('div', 'adm-none', 'Nobody is banned, and nobody is kept off by the checks or a timeout.'));
     sift();
+    // Whoever was turned away at the door lately, with a Pardon button: everything on them lifted and they are
+    // straight back in. (The owner, 2026-10-16: "admins need a way to handle when someone tries to join but is
+    // wrongly banned, or kicked or rejects. we need to have a 'pardon' button for these people".)
+    const turned = el('div', 'adm-table bans turned');
+    const th = el('div', 'adm-tr head');
+    for (const h of ['', 'Name', 'When', 'Device', 'Why', '']) th.append(el('span', '', h));
+    turned.append(th);
+    for (const t of this.lists.turned ?? []) {
+      const r = el('div', 'adm-tr off');
+      for (const c of [`p:${t.id}`, t.name, `${t.mins} min ago`, t.dev ? `dev:${t.dev}` : '', t.why]) {
+        const cell = el('span', '', c);
+        cell.title = c;
+        r.append(cell);
+      }
+      const p = this.grave(`pardon:${t.id}`, 'Pardon', () => this.send(`/pardon p:${t.id}`), 'check');
+      p.classList.add('small');
+      p.title = `Let ${t.name} straight back in: every ban and strike on their game, address and device lifted. Asks once more before it is done`;
+      r.append(p);
+      turned.append(r);
+    }
+    if (!this.lists.turned?.length) turned.append(el('div', 'adm-none', 'Nobody has been turned away at the door lately.'));
     return [
       find,
       list,
+      el('div', 'adm-group', `Turned away at the door  ${this.lists.turned?.length ?? 0}`),
+      turned,
+      el('div', 'dim', 'Turned away: banned, kept off, a full device, or the bot check not passed. Pardon lifts everything on that person at once (their game, their address and their device) and they can press Play again.'),
       el('div', 'dim', 'Kept off: the checks put somebody off twice in an hour (six hours), or an admin timed them out. It is in the server’s memory only: a restart lets everybody kept off back in. A ban is written down and stays.'),
       el('div', 'dim', 'To ban somebody: pick them on the left (somebody who has just left is at the foot of that list).'),
     ];

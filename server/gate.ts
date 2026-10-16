@@ -478,6 +478,14 @@ export const ADMIN = {
   tries: new Map<string, number[]>(),
   /** whoever has left lately (the newest last): somebody who does a thing and goes can still be banned */
   gone: [] as { id: number; name: string; key: string; ip: string; fp: string; at: number }[],
+  /**
+   * Whoever was turned away at the door lately (the newest last): banned, kept off, a full device, the bot check
+   * not passed, an out-of-date browser. For /pardon (the owner, 2026-10-16: "admins need a way to handle when
+   * someone tries to join but is wrongly banned, or kicked or rejects. we need to have a 'pardon' button").
+   */
+  turned: [] as { n: number; name: string; key: string; ip: string; fp: string; why: string; at: number }[],
+  /** the mark (the store's own) of the lists as the site last wrote them: a save that brings it is written without the site reading first (api/admin.ts) */
+  mark: '',
   /** until when what somebody types and says reaches nobody: by their key */
   muted: new Map<string, number>(),
   /** when each panel last asked for its lists */
@@ -489,6 +497,25 @@ export const ADMIN = {
 };
 
 export const keyHash = (key: string) => createHash('sha256').update(`zona key ${key}`).digest('hex').slice(0, 40);
+
+let turnedN = 0;
+
+/** Somebody was turned away at the door: written down for /pardon (one line a person: by their game, else by where and what they play from; the newest forty). */
+export function turnedAway(name: string, key: string, ip: string, fp: string, why: string) {
+  const t = ADMIN.turned, now = Date.now();
+  const i = t.findIndex((x) => (key && x.key === key) || (!key && x.ip === ip && x.fp === fp));
+  if (i >= 0) t.splice(i, 1);
+  t.push({ n: ++turnedN, name, key, ip, fp, why, at: now });
+  if (t.length > 40) t.shift();
+}
+
+/**
+ * A Windows graphics card named without its id (2026-10-16). Every Direct3D11 renderer a real Chrome on Windows
+ * names carries the card's PCI id, "NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 ...": in 231 passes of the bot
+ * check over two and a half days of the live log, every real player's had it, and every one of the swarm's said
+ * "NVIDIA GeForce RTX 3060 Direct3D11 ..." with none. A string somebody typed, not a card.
+ */
+export const spoofedRenderer = (gl: string) => /Direct3D11/i.test(gl) && !/\(0x[0-9a-f]{4,8}\)/i.test(gl);
 
 /** Is this an address out in the world? (Not this machine's own, nor one of a private network: those are whatever stands in front of the server, and are everybody's.) */
 const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
@@ -538,6 +565,7 @@ export function deviceRules(key: string, ip: string, fp: string, name: string): 
       for (const o of [...clients.values()]) {
         if (o.fp !== fp || roleOf(o)) continue;
         TURNED.device++;
+        turnedAway(o.name, o.key, o.ip, o.fp, `put out: ${why}`);
         send(o, { t: 'kick', reason: doorWords(o.key, o.ip, why, fp) });
         o.ws.close();
         drop(o);
@@ -551,6 +579,7 @@ export function deviceRules(key: string, ip: string, fp: string, name: string): 
       log(`[device${watch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${watch ? 'what would be ' : ''}not let in: their device is ${off === 'banned' ? 'banned' : `kept off (${off})`}`);
       if (watch) return null;
       TURNED.device++;
+      turnedAway(name, key, ip, fp, `their device is ${off === 'banned' ? 'banned' : `kept off: ${off}`}`);
       return doorWords(key, ip, off, fp);
     }
     return null;
@@ -559,6 +588,7 @@ export function deviceRules(key: string, ip: string, fp: string, name: string): 
     log(`[device${farmWatch ? ':watch' : ''}] ${name} (${shortDevice(fp)}) is ${farmWatch ? 'what would be ' : ''}not let in: ${DEVICE.live} already playing on their device`);
     if (farmWatch) return null;
     TURNED.device++;
+    turnedAway(name, key, ip, fp, `${DEVICE.live} already playing on their device`);
     return DEVICE.live === 1 ? 'Somebody is already playing on this device: one player to a device.' : `There are already ${DEVICE.live} playing on this device.`;
   }
   return null;
@@ -589,10 +619,11 @@ export async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boo
   try {
     const r = await fetch(`${SITE_URL}/api/admin?n=${n}`, { method: 'POST', signal: AbortSignal.timeout(30_000) });
     if (!r.ok) return null;
-    const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean };
+    const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean; mark?: string };
     if (out.ok && out.state) {
       ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [] };
       if (out.pepper) ADMIN.pepper = out.pepper;
+      if (typeof out.mark === 'string') ADMIN.mark = out.mark;
       ADMIN.ready = true;
       ADMIN.onState?.();
     }

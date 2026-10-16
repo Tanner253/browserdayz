@@ -95,6 +95,8 @@ export const ORDERS: Order[] = [
   { name: 'ban', args: ['who', '[why]'], does: 'Ban for good: their game, their address and their device (who may be dev:xxxxxxxx from /players)', admin: true },
   { name: 'bans', args: [], does: 'Who is banned, numbered for /unban', admin: true },
   { name: 'unban', args: ['id-number-or-name'], does: 'Lift a ban: by its id or its number from /bans, or by the name if only one ban has it', admin: true },
+  { name: 'turned', args: [], does: 'Who was turned away at the door lately (banned, kept off, a full device, the bot check not passed), and why' },
+  { name: 'pardon', args: ['who'], does: 'Let somebody turned away at the door straight back in: every ban and strike on their game, address and device lifted (who: a name or p:number from /turned, or dev:xxxxxxxx)', admin: true },
   { name: 'admin', args: ['who'], does: 'Make somebody an admin', admin: true },
   { name: 'mod', args: ['who'], does: 'Make somebody a mod: kick, timeout and say', admin: true },
   { name: 'demote', args: ['who'], does: 'Take somebody’s role away', admin: true },

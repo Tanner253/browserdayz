@@ -30,7 +30,7 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, deviceRules, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, standing } from './gate';
+import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, deviceRules, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
@@ -923,11 +923,13 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         const i = r.judge.shot(Number(m.n), m.o.map(Number), m.d.map(Number), at);
         if (process.env.RANGE_DEBUG) log(`[range] shot at ${m.n} (server ${at}) from ${m.o.map((v: number) => Number(v).toFixed(2)).join(',')} along ${m.d.map((v: number) => Number(v).toFixed(3)).join(',')}: ${i >= 0 ? `figure ${i} down` : r.judge.why || 'landed on nothing'}`);
         if (i >= 0) ws.send(JSON.stringify({ t: 'rhit', i } satisfies S2C));
-        if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl))) {
+        if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl) || spoofedRenderer(browser.gl))) {
           TURNED.range++;
-          log(`${cleanName(r.hello.name)} shot the course, in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : `draws with "${browser.gl}"`}: turned away`);
+          const spoofed = !!browser && !browser.wd && spoofedRenderer(browser.gl);
+          log(`${cleanName(r.hello.name)} shot the course, in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : `draws with "${browser.gl}"${spoofed ? ', a Windows card named without its id' : ''}`}: turned away`);
+          turnedAway(cleanName(r.hello.name), keyOf(r.hello), ipOf.get(ws) ?? '', deviceOf.get(ws) ?? '', `shot the course in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : spoofed ? 'names a card without its id' : 'draws with no card'}`);
           offRange();
-          ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed: this browser is being driven by a program, or has no graphics card to draw with.' } satisfies S2C));
+          ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed: this browser is being driven by a program, has no graphics card to draw with, or names one that is not there.' } satisfies S2C));
           ws.close();
           return;
         }
@@ -958,6 +960,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       if (old) {
         TURNED.agent++;
         log(`${cleanName(m.name)} is not let in: an out-of-date browser (${agent}, matched "${old}")`);
+        turnedAway(cleanName(m.name), keyOf(m), ipOf.get(ws) ?? '', cleanDevice(m.fp), `an out-of-date browser (${agent})`);
         ws.send(JSON.stringify({ t: 'kick', reason: 'Your browser is out of date. Update Chrome (Menu, Help, About Google Chrome) or play in another browser, then press Play again.' } satisfies S2C));
         ws.close();
         return;
@@ -1017,6 +1020,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           if (r.go >= BOTCHECK.goes) {
             TURNED.range++;
             log(`${cleanName(h.name)} did not pass the bot check in ${BOTCHECK.goes} goes: turned away`);
+            turnedAway(cleanName(h.name), key, ip, fp, `did not pass the bot check in ${BOTCHECK.goes} goes (the last: ${r.judge.report})`);
             offRange();
             ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed. Press Deploy to try again.' } satisfies S2C));
             ws.close();
