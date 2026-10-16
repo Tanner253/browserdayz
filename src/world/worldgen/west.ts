@@ -169,7 +169,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
     let rock = slope < 0.39 ? 0 : clamp(smoothstep(0.5, 0.85, slope + 0.1 * n3.noise(x * 0.05, z * 0.05)), 0, 1);
     let forest = smoothstep(-0.05, 0.25, woodAt(x, z));
     // (the beach and the sea floor, its edge a ragged one)
-    const sand = c < W.sand - 25 ? 1 : 1 - smoothstep(W.sand - 25, W.sand + 15, c + 12 * p3.noise(x * 0.03, z * 0.03));
+    const sand = c < W.sand - 25 ? 1 : c > W.sand + 27 ? 0 : 1 - smoothstep(W.sand - 25, W.sand + 15, c + 12 * p3.noise(x * 0.03, z * 0.03));
     let bare = sand >= 1 ? 1 : Math.max(sand, smoothstep(0.55, 0.75, n2.noise(x * 0.03, z * 0.03)) * 0.5 * (1 - forest));
     if (sand >= 1) rock = 0;
     forest *= 1 - rock;
