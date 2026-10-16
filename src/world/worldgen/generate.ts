@@ -2677,7 +2677,7 @@ function* worldStages(seed: number): Generator<string, World, void> {
   // The square laid into the world, and the ground west of it (src/world/worldgen/west.ts): last of all, so that
   // nothing of the square is moved by it.
   yield 'the west';
-  const world = toWorld({ heights, surface: surface ?? heights, splat, grass }, { seed, base, ringShape, forestMask, trees, noise: [n1, n2, n3] });
+  const world = toWorld({ heights, surface: surface ?? heights, splat, grass }, { seed, ringShape, forestMask, trees, noise: [n1, n2, n3] });
 
   return {
     heights: world.heights,

@@ -1,16 +1,18 @@
 // THE WEST (2026-10-16): the square laid into the world's rectangle, and the ground of the two squares west of it.
 // The owner: "from west to east itll be ocean, beach, desert, plains, mountains. We have the plains and mountains."
-// This is the ground only, a placeholder for what is to be built there (a desert, its canyon road and ruins, the
-// coast): from the square's west rim the hills fall away westward into a broad dry plain some thirty metres above
-// the sea, which comes down to a beach and a sea floor in the westmost seven hundred metres.
+// And then, of how: "it should blend in a lot ... pretty water, no need to go into it or swim can put barrier on
+// beach, but maybe dont give a lot of width of the map to the ocean ... we have a lot of room to expand the green land
+// too towards the ocean, desert is ugly the grass is prettier". So this is the ground only, a placeholder for what is
+// to be built there: from the square's west rim the hills fall away into green rolling country of the square's own
+// kind, which comes down to a beach and a thin strip of sea at the world's west edge. (A desert, smaller, comes later.)
 //
 // Nothing of the square is touched: its samples are copied as they are, its trees and everything else keep their
-// numbers, and the new ground has noise of its own. At the seam it is the square's own ground carried on (the same
-// base and rim, and the square's last column met exactly), so there is no step and no crease.
+// numbers, and what is new has noise of its own. At the seam it is the square's own ground carried on (the same
+// valley noise and rim, and the square's last column met exactly), so there is no step and no crease.
 
 import { Simplex, clamp, hash2, smoothstep } from '../../core/noise';
 import { SNOW } from './layout';
-import { CELL, SEA_LEVEL, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, WORLD_Z1 } from './places';
+import { CELL, SEA_LEVEL, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_SEED, WORLD_X0, WORLD_Z0, WORLD_Z1 } from './places';
 import { heightAt, slopeAt } from './ground';
 import type { Instance } from './types';
 
@@ -20,28 +22,40 @@ export const WEST = {
   seam: -SQUARE_HALF,
   /** the rim's mountain falls away over this, after a level top as wide as the square's own */
   fall: [10, 420] as const,
-  /** the square's base ground goes over into the plain over this */
-  plain: [0, 560] as const,
-  /** the plain's height over the sea (some fourteen metres over the valley's floor), and how much it rolls (long swells, and the lesser lie of it) */
-  level: 30,
-  swell: 8,
-  lie: 2.5,
-  /** the rims along the north and south edges are carried on into the plain, this much of them */
+  /** the square's high country (its outer hills stand 85 m up) settles into the green land over this */
+  settle: [0, 600] as const,
+  /** the green land's middle over the sea (about the square's valley floor, a little higher), and how much of the square's ridges it keeps */
+  level: 26,
+  ridges: 0.35,
+  /** the rims along the north and south edges are carried on across it, this much of them, and gone by the coast */
   rims: 0.45,
-  /** the shore's line (x) and how far it wanders either way, slow and quick */
-  shore: -3230,
-  wander: [70, 18] as const,
-  /** the beach's fall to the metre, and how far out it goes before the sea floor drops away */
-  beach: 0.04,
-  shelf: 60,
-  /** how deep the sea floor goes below the shelf's edge, and over how far */
-  deep: 24,
-  deepRun: 450,
-  /** the land comes down to the beach over this, inland of the shore */
-  coast: [40, 340] as const,
+  /** the shore's line (x) and how far it wanders either way, slow and quick: the sea is the westmost 250 m or so */
+  shore: -3590,
+  wander: [18, 6] as const,
+  /** the beach: its rise to the metre, how far it runs inland before the land rises off it, and how far it goes out under the water before the floor drops away */
+  beach: 0.035,
+  sand: 70,
+  shelf: 40,
+  /** how much deeper the floor goes past the shelf, and over how far */
+  deep: 10,
+  deepRun: 160,
+  /** the land comes up off the beach over this (from the shore, inland) */
+  coast: [70, 330] as const,
   /** the woods of the rim give out over this */
   woods: [30, 430] as const,
+  /**
+   * where a barrier would stand to keep players out of the sea (the owner: "no need to go into it or swim can put
+   * barrier on beach"): this many metres out from the shore line (`shoreLine`), where the water is about a metre deep
+   */
+  barrier: 30,
 };
+
+const q1 = new Simplex(WORLD_SEED + 301), q2 = new Simplex(WORLD_SEED + 302);
+/** the shore's line: the x at which the ground meets the sea, at a z (the world's own seed) */
+export function shoreLine(z: number, seed = WORLD_SEED) {
+  const [a, b] = seed === WORLD_SEED ? [q1, q2] : [new Simplex(seed + 301), new Simplex(seed + 302)];
+  return WEST.shore + WEST.wander[0] * a.noise(z * 0.0021, 3.1) + WEST.wander[1] * b.noise(z * 0.011, 7.7);
+}
 
 export interface SquareFields {
   heights: Float32Array;
@@ -52,14 +66,13 @@ export interface SquareFields {
 
 export interface WestTools {
   seed: number;
-  /** the square's base ground and its rim, as functions of a spot: carried on past the seam */
-  base: (x: number, z: number) => number;
+  /** the square's rim, as a function of a spot: carried on past the seam */
   ringShape: (x: number, z: number) => number;
   /** the square's woods (more than nothing: a wood), carried on past the seam and thinned out */
   forestMask: (x: number, z: number) => number;
   /** the trees: those of the rim's fall are added after all of the square's */
   trees: Instance[];
-  /** the square's three noises, for the paint's patches to run on across the seam */
+  /** the square's three noises: its valley's shape and its paint's patches run on across the seam */
   noise: [Simplex, Simplex, Simplex];
 }
 
@@ -81,78 +94,84 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
     splat.set(sq.splat.subarray(a * 4, (a + N) * 4), b * 4);
   }
 
-  const p1 = new Simplex(tools.seed + 301), p2 = new Simplex(tools.seed + 302), p3 = new Simplex(tools.seed + 303);
-  const W = WEST;
+  const W = WEST, [n1, n2, n3] = tools.noise, p3 = new Simplex(tools.seed + 303);
   /** how much of the rim's mountain a spot of the west is (`d` metres west of the seam) */
   const mountain = (d: number, z: number) => {
     const west = 1 - smoothstep(W.fall[0], W.fall[1], d);
-    // (the rims along the north and south edges, as the square has them, kept in part across the plain, and gone
-    // by the coast: the beach runs to the edge of the world)
+    // (the rims along the north and south edges, as the square has them, kept in part, and gone by the coast: the
+    // beach runs to the edge of the world)
     const ns = (1 - smoothstep(10, 185, SQUARE_HALF - Math.abs(z))) * (1 - (1 - W.rims) * smoothstep(0, 600, d)) * smoothstep(W.shore + 250, W.shore + 900, W.seam - d);
     return 1 - (1 - west) * (1 - ns);
   };
-  // (the plain's swells and lie are slow: reckoned every four metres and read between, a quarter of the work, and
-  // only its small roughness at every sample)
-  const PS = 4, PW = Math.ceil((W.seam - WORLD_X0) / PS) + 2, PH = Math.ceil((WORLD_Z1 - WORLD_Z0) / PS) + 2, swells = new Float32Array(PW * PH);
+  // The square's own valley noise, carried on: its slow swell and its outer ridges (`slow`), and its lesser lie and
+  // roughness (`quick`). At the seam this and the rim are exactly the square's ground as it was first laid. The slow
+  // part is reckoned every four metres and read between, a quarter of the work, but for the first 120 m.
+  const slow = (x: number, z: number, d: number) =>
+    16 * n1.fbm(x * 0.0024, z * 0.0024, 5) + 30 * n2.ridged(x * 0.0019 + 5, z * 0.0019 - 3, 4) * (1 - (1 - W.ridges) * smoothstep(W.settle[0], W.settle[1], d));
+  const quick = (x: number, z: number) => 5 * n2.fbm(x * 0.011 + 31.7, z * 0.011 - 12.1, 4) + 0.9 * n3.fbm(x * 0.06, z * 0.06, 3);
+  const PS = 4, PW = Math.ceil((W.seam - WORLD_X0) / PS) + 2, PH = Math.ceil((WORLD_Z1 - WORLD_Z0) / PS) + 2, slows = new Float32Array(PW * PH);
   for (let j = 0; j < PH; j++) for (let i = 0; i < PW; i++) {
     const x = WORLD_X0 + i * PS, z = WORLD_Z0 + j * PS;
-    swells[j * PW + i] = W.swell * p1.fbm(x * 0.0013, z * 0.0013, 3) + W.lie * p2.fbm(x * 0.006 + 17, z * 0.006 - 5, 3);
+    slows[j * PW + i] = slow(x, z, W.seam - x);
   }
-  const plain = (x: number, z: number) => {
+  const slowAt = (x: number, z: number, d: number) => {
+    if (d < 120) return slow(x, z, d);
     const gx = clamp((x - WORLD_X0) / PS, 0, PW - 1.001), gz = clamp((z - WORLD_Z0) / PS, 0, PH - 1.001), i = gx | 0, j = gz | 0, fx = gx - i, fz = gz - j, o = j * PW + i;
-    const s = (swells[o] * (1 - fx) + swells[o + 1] * fx) * (1 - fz) + (swells[o + PW] * (1 - fx) + swells[o + PW + 1] * fx) * fz;
-    return SEA_LEVEL + W.level + s + 0.25 * p3.noise(x * 0.05, z * 0.05);
+    return (slows[o] * (1 - fx) + slows[o + 1] * fx) * (1 - fz) + (slows[o + PW] * (1 - fx) + slows[o + PW + 1] * fx) * fz;
   };
-  // (the square's base and rim are dear to reckon, and a million and more samples are made here: each is asked
-  // only where it is some of the ground)
   const land = (x: number, z: number) => {
-    const d = W.seam - x, s = smoothstep(W.plain[0], W.plain[1], d), m = mountain(d, z);
-    return (s < 1 ? tools.base(x, z) * (1 - s) : 0) + plain(x, z) * s + (m > 0 ? tools.ringShape(x, z) * Math.pow(m, 1.15) : 0);
+    const d = W.seam - x, s = smoothstep(W.settle[0], W.settle[1], d), m = mountain(d, z);
+    return slowAt(x, z, d) + quick(x, z) + 85 * (1 - s) + (SEA_LEVEL + W.level) * s + (m > 0 ? tools.ringShape(x, z) * Math.pow(m, 1.15) : 0);
   };
-  const shoreAt = (z: number) => W.shore + W.wander[0] * p1.noise(z * 0.0021, 3.1) + W.wander[1] * p2.noise(z * 0.011, 7.7);
   /** the beach and the sea floor, by the distance from the shore (+ inland) */
   const shoreline = (c: number, x: number, z: number) => {
     if (c > -W.shelf) return SEA_LEVEL + W.beach * c;
     const out = -W.shelf - c;
-    return SEA_LEVEL - W.beach * W.shelf - W.deep * smoothstep(0, W.deepRun, out) + 1.2 * p3.noise(x * 0.004, z * 0.004) * smoothstep(0, 100, out);
+    return SEA_LEVEL - W.beach * W.shelf - W.deep * smoothstep(0, W.deepRun, out) + 0.6 * p3.noise(x * 0.01, z * 0.01) * smoothstep(0, 60, out);
   };
-  const ground = (x: number, z: number) => {
-    const c = x - shoreAt(z), on = smoothstep(W.coast[0], W.coast[1], c);
-    return on >= 1 ? land(x, z) : on <= 0 ? shoreline(c, x, z) : shoreline(c, x, z) * (1 - on) + land(x, z) * on;
-  };
+  const shores = Float64Array.from({ length: NZ }, (_, iz) => shoreLine(WORLD_Z0 + iz * CELL, tools.seed));
 
   // The ground, and the square's last column met: whatever the square's later stages did to it is taken up within
   // 80 m of the seam, so that the step is nothing and the slope carries on.
   for (let iz = 0; iz < NZ; iz++) {
-    const z = WORLD_Z0 + iz * CELL, off = heights[iz * NX + OX] - land(W.seam, z);
+    const z = WORLD_Z0 + iz * CELL, off = heights[iz * NX + OX] - land(W.seam, z), shore = shores[iz];
     for (let ix = 0; ix < OX; ix++) {
-      const x = WORLD_X0 + ix * CELL;
-      heights[iz * NX + ix] = ground(x, z) + off * (1 - smoothstep(0, 80, W.seam - x));
+      const x = WORLD_X0 + ix * CELL, c = x - shore, on = smoothstep(W.coast[0], W.coast[1], c);
+      const h = on >= 1 ? land(x, z) : on <= 0 ? shoreline(c, x, z) : shoreline(c, x, z) * (1 - on) + land(x, z) * on;
+      heights[iz * NX + ix] = h + off * (1 - smoothstep(0, 80, W.seam - x));
+    }
+  }
+  // The square's ridges have knife edges where an octave of the noise goes through nothing (the square's own are
+  // rounded off: see `soften`). Out here they are evened over the points about each, twice, from 60 m from the seam
+  // on, so that the seam is the square's ground and the green land's ridges have round backs.
+  for (let pass = 0; pass < 2; pass++) {
+    const was = heights.slice(0, NZ * NX);
+    for (let iz = 1; iz < NZ - 1; iz++) for (let ix = 1; ix < OX - 1; ix++) {
+      const w = 1 - smoothstep(60, 200, W.seam - (WORLD_X0 + ix * CELL));
+      if (w >= 1) continue;
+      const i = iz * NX + ix, mean = (was[i - 1] + was[i + 1] + was[i - NX] + was[i + NX]) * 0.125 + (was[i - NX - 1] + was[i - NX + 1] + was[i + NX - 1] + was[i + NX + 1]) * 0.0625 + was[i] * 0.25;
+      heights[i] = was[i] * w + mean * (1 - w);
     }
   }
   if (own) for (let iz = 0; iz < NZ; iz++) surface.set(heights.subarray(iz * NX, iz * NX + OX), iz * NX);
 
-  // The paint: the square's rule for rock by slope, its woods thinning out down the fall, and then bare dry earth
-  // (the paint's trodden ground, until the coast's own sand and the desert's pictures come), wholly so on the beach
-  // and under the sea. Grass as the square has it where the woods and meadows still are, by the square's own
-  // noises, so that its patches run on over the seam.
-  const [n1, n2, n3] = tools.noise;
+  // The paint: green, by the square's own rule (rock by slope, its woods thinning out down the fall and meadow
+  // beyond, the meadows' bald patches), and by its own noises, so that its patches run on over the seam. Bare on the
+  // beach and under the sea (the paint's trodden ground, until the coast's own sand comes).
   // (the woods give out wholly by the end of the fall: a wood out here is at most some 1.9, and two less is none)
   const woodAt = (x: number, z: number) => (W.seam - x > W.woods[1] ? -1 : tools.forestMask(x, z) - 2 * smoothstep(W.woods[0], W.woods[1], W.seam - x));
   for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < OX; ix++) {
-    const x = WORLD_X0 + ix * CELL, z = WORLD_Z0 + iz * CELL, i = iz * NX + ix, d = W.seam - x, h = heights[i];
+    const x = WORLD_X0 + ix * CELL, z = WORLD_Z0 + iz * CELL, i = iz * NX + ix, h = heights[i], c = x - shores[iz];
     // (the slope as `slopeAt` has it, read off the net's own samples: they are the heights it would read)
     const r = Math.min(ix + 1, NX - 1), l = Math.max(ix - 1, 0), u = Math.max(iz - 1, 0), dn = Math.min(iz + 1, NZ - 1);
     const slope = Math.hypot(heights[iz * NX + r] - heights[iz * NX + l], heights[dn * NX + ix] - heights[u * NX + ix]) / (2 * CELL);
-    // (each noise asked only where it can tell: rock on a slope near enough to steep, the ragged edge of the dry
-    // country only in the fall, the meadows' bald patches only where it is not all bare already)
+    // (each noise asked only where it can tell: rock on a slope near enough to steep)
     let rock = slope < 0.39 ? 0 : clamp(smoothstep(0.5, 0.85, slope + 0.1 * n3.noise(x * 0.05, z * 0.05)), 0, 1);
     let forest = smoothstep(-0.05, 0.25, woodAt(x, z));
-    const wet = h < SEA_LEVEL + 3 ? 1 : 0;
-    // (dry by the end of the fall, its edge a ragged one; the meadows' bald patches as the square has them, before)
-    const dry = d > 580 ? 1 : smoothstep(60, 520, d + 60 * p2.noise(x * 0.01, z * 0.01));
-    let bare = wet || dry >= 1 ? 1 : Math.max(dry, smoothstep(0.55, 0.75, n2.noise(x * 0.03, z * 0.03)) * 0.5 * (1 - forest));
-    if (wet) rock = 0;
+    // (the beach and the sea floor, its edge a ragged one)
+    const sand = c < W.sand - 25 ? 1 : 1 - smoothstep(W.sand - 25, W.sand + 15, c + 12 * p3.noise(x * 0.03, z * 0.03));
+    let bare = sand >= 1 ? 1 : Math.max(sand, smoothstep(0.55, 0.75, n2.noise(x * 0.03, z * 0.03)) * 0.5 * (1 - forest));
+    if (sand >= 1) rock = 0;
     forest *= 1 - rock;
     bare *= 1 - rock;
     const grassW = Math.max(0, 1 - rock - forest - bare), sum = grassW + forest + rock + bare || 1;

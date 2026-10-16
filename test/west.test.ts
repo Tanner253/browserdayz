@@ -84,50 +84,66 @@ for (let iz = 0; iz < NZ; iz++) {
 assert.ok(crease <= Math.max(0.6, inner * 1.25), `a crease at the seam: ${crease.toFixed(2)} m against ${inner.toFixed(2)} either side of it`);
 ok(`no step and no crease at the seam: the fall across it is within ${step.toFixed(2)} m of the square's own, its bend ${crease.toFixed(2)} m where the ground either side bends ${inner.toFixed(2)}`);
 
-// --- the shape: the rim falls away into the plain, the plain comes down to a beach, the beach to the sea
+// --- the shape: the rim falls away into green rolling land, which comes down to a beach, the beach to a thin sea
 const band = (x0: number, x1: number, zr: number) => {
   let lo = Infinity, hi = -Infinity, steep = 0;
+  const slopes: number[] = [];
   for (let x = x0; x <= x1; x += 8) for (let z = -zr; z <= zr; z += 8) {
-    const h = heightAt(H, x, z);
+    const h = heightAt(H, x, z), s = slopeAt(H, x, z);
     lo = Math.min(lo, h);
     hi = Math.max(hi, h);
-    steep = Math.max(steep, slopeAt(H, x, z));
+    steep = Math.max(steep, s);
+    slopes.push(s);
   }
-  return { lo, hi, steep };
+  slopes.sort((a, b) => a - b);
+  return { lo, hi, steep, most: slopes[Math.floor(slopes.length * 0.98)] };
 };
-const plain = band(-2900, -1350, 560);
-assert.ok(plain.lo >= SEA + 15 && plain.hi <= SEA + 45, `the plain runs ${plain.lo.toFixed(1)} to ${plain.hi.toFixed(1)} m`);
-assert.ok(plain.steep < 0.25, `the plain is not gentle: a slope of ${plain.steep.toFixed(2)}`);
-ok(`a broad plain west of the hills: ${(plain.lo - SEA).toFixed(0)} to ${(plain.hi - SEA).toFixed(0)} m over the sea, no slope over ${(Math.atan(plain.steep) * 57.3).toFixed(1)} degrees`);
-let shoreW = Infinity, shoreE = -Infinity, deepest = 0, beachSteep = 0;
+const green = band(-3200, -1400, 560);
+assert.ok(green.lo >= SEA + 5 && green.hi <= SEA + 80, `the green land runs ${(green.lo - SEA).toFixed(1)} to ${(green.hi - SEA).toFixed(1)} m over the sea`);
+// (the square's valley, measured so 2026-10-16: 2% of it steeper than 0.69, at most 1.52: the green land is to be no rougher)
+assert.ok(green.most < 0.5 && green.steep < 1.0, `the green land is not gentle: 2% of it steeper than ${green.most.toFixed(2)}, at most ${green.steep.toFixed(2)}`);
+ok(`green rolling land west of the hills: ${(green.lo - SEA).toFixed(0)} to ${(green.hi - SEA).toFixed(0)} m over the sea, 98% of it under ${(Math.atan(green.most) * 57.3).toFixed(0)} degrees, the steepest ${(Math.atan(green.steep) * 57.3).toFixed(0)}`);
+let shoreW = Infinity, shoreE = -Infinity, deepest = 0, shallowest = -Infinity, beachSteep = 0, wet = 0;
 for (let iz = 0; iz < NZ; iz++) {
   let last = X0;
   for (let ix = 0; ix < OX; ix++) if (at(ix, iz) < SEA) last = X0 + ix * CELL;
   shoreW = Math.min(shoreW, last);
   shoreE = Math.max(shoreE, last);
-  assert.ok(at(0, iz) < SEA - 15, `the sea at the west edge is shallow at z ${Z0 + iz * CELL}`);
+  // (nowhere is there sea but in the strip: no lake inland of it, the ground under the sea's height)
+  for (let ix = (last - X0) / CELL + 1; ix < OX; ix++) if (at(ix, iz) < SEA) wet++;
+  shallowest = Math.max(shallowest, at(0, iz));
   deepest = Math.min(deepest, at(0, iz));
-  for (let x = last - 40; x <= last + 60; x += 4) beachSteep = Math.max(beachSteep, slopeAt(H, x, Z0 + iz * CELL));
+  for (let x = last - 30; x <= last + WEST.sand; x += 4) beachSteep = Math.max(beachSteep, slopeAt(H, x, Z0 + iz * CELL));
+  const line = WG.shoreLine(Z0 + iz * CELL);
+  assert.ok(Math.abs(line - last) <= 2 * CELL + 1, `the shore line said is ${line.toFixed(1)}, the ground meets the sea at ${last}`);
 }
-assert.ok(shoreW > -3400 && shoreE < -3080, `the shore runs from ${shoreW} to ${shoreE}`);
-assert.ok(beachSteep < 0.15, `a beach that is no beach: a slope of ${beachSteep.toFixed(2)}`);
-ok(`the sea in the west: the shore between x ${shoreW} and ${shoreE}, the beach never steeper than ${(Math.atan(beachSteep) * 57.3).toFixed(1)} degrees, the floor ${(SEA - deepest).toFixed(0)} m deep at the edge`);
+assert.ok(shoreW >= -3640 && shoreE <= -3540, `the shore runs from ${shoreW} to ${shoreE}`);
+assert.ok(shallowest < SEA - 6, `the sea at the west edge is only ${(SEA - shallowest).toFixed(1)} m deep`);
+assert.ok(beachSteep < 0.1, `a beach that is no beach: a slope of ${beachSteep.toFixed(2)}`);
+assert.equal(wet, 0, 'ground under the sea\'s height inland of the shore');
+ok(`a thin sea in the west: the shore between x ${shoreW} and ${shoreE} (${shoreW - X0} to ${shoreE - X0} m of water), as shoreLine says it; the beach never steeper than ${(Math.atan(beachSteep) * 57.3).toFixed(1)} degrees; the floor ${(SEA - shallowest).toFixed(0)} to ${(SEA - deepest).toFixed(0)} m deep at the edge; no ground under the sea's height inland`);
 
-// --- the paint and the grass of the new ground
-let bare = 0, all = 0, worst = 0, grassy = 0;
-for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < OX; ix++) {
-  const i = iz * NX + ix, s = world.splat;
-  worst = Math.max(worst, Math.abs(s[i * 4] + s[i * 4 + 1] + s[i * 4 + 2] + s[i * 4 + 3] - 255));
-  const x = X0 + ix * CELL;
-  if (x < WEST.seam - 600) {
-    all++;
-    if (s[i * 4 + 3] > 200) bare++;
-    if (world.grass[i] > 0) grassy++;
+// --- the paint and the grass of the new ground: green, but on the beach and under the sea
+let bare = 0, all = 0, worst = 0, grassy = 0, beach = 0, beachBare = 0;
+for (let iz = 0; iz < NZ; iz++) {
+  const shore = WG.shoreLine(Z0 + iz * CELL);
+  for (let ix = 0; ix < OX; ix++) {
+    const i = iz * NX + ix, s = world.splat, x = X0 + ix * CELL;
+    worst = Math.max(worst, Math.abs(s[i * 4] + s[i * 4 + 1] + s[i * 4 + 2] + s[i * 4 + 3] - 255));
+    if (x < WEST.seam - 450 && x > shore + WEST.sand + 40) {
+      all++;
+      if (s[i * 4 + 3] > 200) bare++;
+      if (world.grass[i] > 0) grassy++;
+    } else if (x < shore + WEST.sand - 30) {
+      beach++;
+      if (s[i * 4 + 3] > 200) beachBare++;
+    }
   }
 }
 assert.ok(worst <= 2, `the paint does not add up: ${worst} of 255 out`);
-assert.ok(bare / all > 0.95 && grassy === 0, `the dry country is ${((bare / all) * 100).toFixed(1)}% bare, with grass at ${grassy} points`);
-ok(`the new ground painted: bare dry earth on ${((bare / all) * 100).toFixed(1)}% of all of it beyond 600 m from the seam, no grass there, the paint whole everywhere`);
+assert.ok(bare / all < 0.03 && grassy / all > 0.9, `the green land is ${((bare / all) * 100).toFixed(1)}% bare, with grass at ${((grassy / all) * 100).toFixed(1)}% of it`);
+assert.ok(beachBare / beach > 0.98, `the beach and the sea floor are only ${((beachBare / beach) * 100).toFixed(1)}% bare`);
+ok(`the new ground painted: grass growing on ${((grassy / all) * 100).toFixed(1)}% of the green land and bare earth on ${((bare / all) * 100).toFixed(1)}% of it; the beach and the sea floor bare (${((beachBare / beach) * 100).toFixed(1)}%); the paint whole everywhere`);
 
 // --- the woods of the rim carried on down the fall, and nothing planted on the square
 const west = world.trees.filter((t) => t.x < WEST.seam);
@@ -135,7 +151,7 @@ assert.ok(west.length > 500, `only ${west.length} trees on the rim's fall`);
 assert.ok(west.every((t) => t.x > WEST.seam - WEST.woods[1] - 30 && Math.abs(t.y - heightAt(H, t.x, t.z)) < 1e-3), 'a tree out in the plain, or off the ground');
 const near = west.filter((t) => t.x > WEST.seam - 100).length, far = west.filter((t) => t.x < WEST.seam - 300 && t.x > WEST.seam - 400).length;
 assert.ok(near > far * 2, `the woods do not thin out: ${near} in the first 100 m, ${far} from 300 to 400`);
-ok(`${west.length} trees on the rim's fall, thinning out (${near} in its first hundred metres, ${far} three hundred metres on), none on the plain`);
+ok(`${west.length} trees on the rim's fall, thinning out (${near} in its first hundred metres, ${far} three hundred metres on), none out in the green land beyond`);
 
 // --- the ground bodies stand on: Rapier's heightfield of the whole world where the game lays it
 await RAPIER.init();
