@@ -383,7 +383,28 @@ export function buildShots(S: Stage): Shot[] {
   scene.add(vaultLamp);
 
   // ------------------------------------------------------------ the police car
-  const car = (): Any => [...(g.garage.jeeps as Map<number, Any>).values()].find((j) => j.kind === 1) ?? null;
+  const car = (): Any => {
+    let best: Any = null, d = 1e9;
+    for (const j of (g.garage.jeeps as Map<number, Any>).values()) {
+      if (j.kind !== 1) continue;
+      const e = Math.hypot(j.pos.x - T.x, j.pos.z - T.z);
+      if (e < d) [best, d] = [j, e];
+    }
+    return best;
+  };
+  /** any other vehicle standing in Kamenka's street is stood well off it, out of the car's way and the pictures */
+  const clearStreet = () => {
+    const mine = car();
+    for (const j of (g.garage.jeeps as Map<number, Any>).values()) {
+      if (j === mine || j.kind === HELI.kind) continue;
+      const dx = j.pos.x - T.x, dz = j.pos.z - T.z, along = dx * ux + dz * uz, right = dx * uz - dz * ux;
+      if (along < -40 || along > 90 || Math.abs(right) > 5) continue;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.atan2(-ux, -uz), 0, 'YXZ'));
+      const to = K(along, -16);
+      j.place([to.x, to.y + RIDE_HEIGHT, to.z, q.x, q.y, q.z, q.w, 0, 0, 0, 0, 0]);
+      say(`a ${j.kind === 1 ? 'police car' : 'jeep'} stood in the street at ${along.toFixed(0)} m: put off it`);
+    }
+  };
   const carQ = new THREE.Quaternion();
   /** the car put where it is told, moving so, as another player's game would show it */
   const drive = (p: THREE.Vector3, yaw: number, v: THREE.Vector3, lights = 1) => {
@@ -435,6 +456,7 @@ export function buildShots(S: Stage): Shot[] {
       a.hide();
     }
     g.glass = null;
+    clearStreet();
     {
       const v = g.player?.vitals;
       if (v && 'blood' in v) v.blood = BLOOD.full;
@@ -1515,15 +1537,17 @@ export function buildShots(S: Stage): Shot[] {
       if (!pastDoor) aim(DOORWAY.clone().setY(p.y + 1.5), 5, dt);
       else if (v.alive) aim(v.chest(), 5, dt);
       else aim(v.pos.clone().setY(v.pos.y + 0.35), 3, dt);
-      S.key('KeyW', d > 1.6 && !swung);
+      S.key('KeyW', d > 1.1 && !swung);
       if (v.alive) turn(v, yawTo(v.pos, p), t > 0.4 ? 4 : 0, dt);
-      if (!swung && (d <= 1.65 || t > 3.0)) {
+      // (within arm's length, the game's own swing lands on him: the kill below is only in case it did not)
+      if (!swung && (d <= 1.15 || (t > 3.4 && d < 1.6))) {
         swung = true;
         swungAt = t;
         S.key('KeyW', false);
         S.tap('Mouse0', 60);
+        say(`the swing at ${d.toFixed(2)} m`);
       }
-      if (swung && v.alive && t > swungAt + 0.5) {
+      if (swung && v.alive && t > swungAt + 0.6) {
         const dir = v.pos.clone().sub(p).setY(0).normalize();
         v.hurt(200, dir, true);
         if (v.alive) v.die(dir);
