@@ -33,7 +33,8 @@ import { KEPT_ON_DEATH } from '../../sim/trade';
 import { inBunker, BUNKER, bunkerDark } from '../../sim/bunker';
 import { CRESSET } from '../../world/castle';
 import { castleDark } from '../../sim/castle';
-import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
+import { HELI } from '../../sim/heli';
+import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEARCHLIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
 
 export const dropsMethods = {
   // ------------------------------------------------------------ supply drops
@@ -440,6 +441,24 @@ export const dropsMethods = {
     // headlights: a jeep's lamps are on while it is driven, and after dark they light the road
     if (dark) {
       for (const j of this.garage.lit()) {
+        if (j.kind === HELI.kind) {
+          // The helicopter's searchlight (the owner, 2026-10-16: "shine a light on the ground like a police helicopter from
+          // at least 50m up"; it had the police car's headlight, level, which lit nothing below it). A Nightsun's narrow
+          // beam, held down and a little ahead of where it heads whatever the body does, as on a real one's steadied mount
+          // (tipping the nose to fly would throw it at the horizon). Its power is set for how far the ground is along it,
+          // so the spot is as bright at the 100 m ceiling as at 50 m, only wider; and its shaft is seen in the air.
+          const S = SEARCHLIGHT;
+          _lampDir.set(0, 0, -1).applyQuaternion(j.quat).setY(0);
+          if (_lampDir.lengthSq() < 0.01) _lampDir.set(0, 0, -1);
+          _lampDir.normalize().multiplyScalar(Math.sin(S.tilt)).setY(-Math.cos(S.tilt));
+          _lampPos.set(S.x, S.y, S.z).applyQuaternion(j.quat).add(j.pos);
+          let far = 50;
+          for (let k = 0; k < 3; k++) far = Math.max(0.5, (_lampPos.y - heightAt(this.s.world.surface, _lampPos.x + _lampDir.x * far, _lampPos.z + _lampDir.z * far)) / Math.cos(S.tilt));
+          this.lamps.beam(_lampPos, _lampDir, (far / S.as) ** 2, S.wide, 0);
+          this.lamps.flare(_lampPos, _lampDir, S.lens);
+          this.lamps.shaft(_lampPos, _lampDir, far, S.wide, S.haze);
+          continue;
+        }
         _lampDir.set(0, -0.07, -1).applyQuaternion(j.quat);
         // One light, thrown from between the two lamps at the front of the car and at their height, with no
         // disc of its own: each lens is a point of light to whoever is in front and some way off. (It was thrown
