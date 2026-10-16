@@ -57,6 +57,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - `git index.lock` can appear while several hands work: retry.
 
 ## How the owner works (use they/them)
+- Hand off at HALF the context (the owner, 2026-10-16: "at 50% do an auto handoff"): when a session is about half full, or a big new task begins in a long one, update `HANDOFF.md` (what is live, what waits, the task in hand with its brief) and tell the owner to hand off to a new session with the app's handoff.
 - Short TL;DRs, not documents. Pictures of work as it goes (send them), and a plan picture before anything big is built: wait for their yes on a design, not on every step.
 - Do not over-test. When they say deploy, deploy.
 - Do not use Workflows unless they ask for one in that same message.

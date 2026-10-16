@@ -1,4 +1,24 @@
-# Where the work stands (handoff, 2026-10-14)
+# Where the work stands (handoff, 2026-10-16)
+
+Read `CLAUDE.md` first (it now says: hand off at half the context). The 2026-10-14 notes below are history.
+
+## THE TASK NOW: an impressive trailer that tells a story
+The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothing else is asked for now ("disregaurd everythin g besides the impressive trailer and handoff task").
+- Read the memory note `trailer-project.md` whole (sixteen films: the method, the owner's decisions and corrections, the traps) and `feedback-film-motion.md` (judged in motion, `film.mjs --motion`; NOTHING sped up).
+- The machinery is all there: `src/trailer/director.ts` (actors are the game's own players, free camera, sound from logged events, MP4 in the page), `shots*.ts` (cut 16 is the latest), `music*.ts`, `scripts/film.mjs` (`--cut N`, `--draft`, `--stills N --no-video`, `--from/--to`). Reuse it; `borrow(cutN, names)` takes shots from earlier cuts, but the owner wants NEW scenes ("we want new scenes tho, not the same exact things. it should feel fressh").
+- A story, not a feature list: the third film ("the story": two survivors, the police station held, a backstab) and the fourteenth ("What goes up") were the story ones; read what the owner said of them in the note.
+- First a storyboard picture (a plan page, `marketing/plan-film-17.html` -> `node scripts/card.mjs plan-film-17`, kept in `progress/`) and the owner's yes; then build, draft, show stills, film.
+- What is new since cut 16 and can be in it: bags and clothes gone through where they lie, the Elite crown in chat, the stick grenade held as a club, smoother frames, the AR found at police and army places, Kamenka at dusk (`assets-src/_wf/me/cine.js` takes stills). No player counts; every number true.
+
+## Waiting for a server deploy (11 commits on `perf-aggressive` past `main`)
+- `3f13eb5` 5.56 by rate (TypeRule.per), `44fb433` /spawn at the admin's height on a roof, `4b99b50`-era fixes already live on the site, and the last two: the infected leave a dropped player's body alone ('iatk' refuses `away` targets) and the close code in "went without logging out". A changelog entry and `server/restart-note.json` are still to be written; a card for it is `marketing/fixes-1016.html` (`zona-fixes-1016.png`).
+- Live on the site already (site-only deploys of 2026-10-15/16): the T-pose fix, instant payouts (minTags 1, five a wallet), the attachment duplication fix, the automatic rejoin after a dropped connection, sound started by any press, the chat letting the mouse go, a car's or helicopter's own sound at the ears ("8D").
+
+## Open, after the trailer
+- Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
+- In-page reconnect (a drop as a blip, no reload); optimizations (the shadow-shader warm-up tried 2026-10-15 was reverted: unproven).
+
+# Where the work stood (handoff, 2026-10-14)
 
 Read `CLAUDE.md` first. This file says what is live, what is waiting, and what is next. Update it at every release.
 
