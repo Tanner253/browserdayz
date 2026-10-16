@@ -299,8 +299,14 @@ const LINGER = 800;
  * programs that hour fired 63 to 160 a go, spraying at the figures' places as the server told them. It was 180.
  */
 const SHOTS = 90;
-/** shots landed by the course and refused by the judge in one go, and it carries the bot signature (see `signed`) */
-const REFUSED = 4;
+/**
+ * Shots landed by the course and refused by the judge in one go, and it carries the bot signature (see `signed`).
+ * It was 4 for the two minutes after the release of 2026-10-16 15:43 UTC: Survivor955, a person on an RTX 5070 who
+ * had passed with 11 shots an hour before, failed a go with 21 shots, 10 landed, 6 counted and 4 refused (a quick
+ * hand flicks onto a figure faster than the sights-on-it rule allows). The four people of the sample had had none;
+ * the swarm's programs 4 to 20. Twelve: a third of the programs' goes, and no person seen yet.
+ */
+const REFUSED = 12;
 
 /**
  * The judge of one go at the course. It is told what the game says (where it stands and looks, and each shot), with
