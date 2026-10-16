@@ -180,6 +180,8 @@ async function boot() {
   buildings.plan();
   // (the basements' steps are open in the ground: the houses are planned after the ground is made)
   terrain.openWells(world.basements ?? []);
+  // (?nobatch: the walls drawn as before 2026-10-16, to compare the two)
+  buildings.multiDraw = r.renderer.extensions.has('WEBGL_multi_draw') && !new URLSearchParams(location.search).has('nobatch');
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
   // (the road and the works are far outside the fort's arena: not built for a wager)

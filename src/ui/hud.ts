@@ -21,7 +21,7 @@ import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
 import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
-import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
+import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 /**
  * The settings, a page at a time, as a game has them (2026-10-13: "tab the settings menu like a video game would be
@@ -1211,7 +1211,7 @@ export class HUD {
       return this.renderGraphics();
     }
     if (key === 'preset') Object.assign(g, PRESETS[value as PresetName]);
-    else if (key === 'scale' || key === 'msaa' || key === 'fpsLimit' || key === 'volume') g[key] = Number(value);
+    else if (key === 'scale' || key === 'msaa' || key === 'fpsLimit' || key === 'volume' || key === 'draw') g[key] = Number(value);
     else if (key === 'ao') g.ao = value as Graphics['ao'];
     else if (key === 'shadows' || key === 'foliage') g[key] = value as Graphics['shadows'];
     saveGraphics(g);
@@ -1280,6 +1280,7 @@ export class HUD {
         row('Ambient occlusion', 'ao', g.ao, AO_MODES.map((a) => [a, a === 'off' ? 'Off' : a === 'half' ? 'Standard' : 'High'])) +
         row('Shadows', 'shadows', g.shadows, LEVELS.map((l) => [l, cap(l)])) +
         row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
+        row('Draw distance', 'draw', g.draw, DRAWS.map((d) => [d, `${d} m`]), 'Buildings past it are not drawn. Loot: 55 m') +
         row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
         `<div class="gfx-info">${this.gfxInfo()}</div>`,
     };

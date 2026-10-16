@@ -77,6 +77,9 @@ export const SEARCHED_KINDS = new Set(['med_cabinet', 'steel_locker']);
  */
 const WALLS_FIRST = -20;
 
+/** What lies between buildings (yards, fences, the village's things) is drawn and hidden by squares this wide, metres. */
+const SQUARE = 48;
+
 /** how far in from the model's edge items may sit: [along, deep] in metres; shelves have posts and a back panel */
 const SURFACE_INSET: Record<string, [number, number]> = {
   Shelf_01: [0.07, 0.035],
@@ -1420,19 +1423,31 @@ export class Buildings {
   doors: Door[] = [];
   /** interior volumes (world space OBB as center, half extents, rotation) for indoor lighting */
   interiors: { x: number; z: number; hw: number; hd: number; rot: number; y0: number; y1: number }[] = [];
-  private geoms = new Map<MatKey, THREE.BufferGeometry[]>();
+  /** every piece laid, by paint, and whose it is: its building's number in world.buildings, or -1 (see `owner`) */
+  private geoms = new Map<MatKey, { g: THREE.BufferGeometry; owner: number }[]>();
+  /** the building whose pieces are being laid, or -1: what lies between buildings goes by the square it is in */
+  private owner = -1;
+  /** the browser draws a list of ranges in one go (WEBGL_multi_draw): each building is then hidden by itself (see build) */
+  multiDraw = false;
+  /** how far off buildings are drawn, metres: the player's own setting (Graphics.draw) */
+  drawDistance = 800;
+  /** what is drawn or not by its distance: a building's part in a batch, or a thing of its own; where it stands and how far it reaches */
+  private far: { show: (on: boolean) => void; shown: boolean; x: number; z: number; r: number }[] = [];
+  private drawnFrom: { x: number; z: number } | null = null;
 
   constructor(private world: World, private atmo: Atmosphere) {}
 
   /** Generates layouts; pushes furniture / yard props into world.props so they get instanced. */
   plan() {
-    for (const plot of this.world.buildings) {
+    for (const [i, plot] of this.world.buildings.entries()) {
       // (for scripts/overlap-audit.ts: every piece of the first building of each kind, as it is laid)
       if (this.pieces && !this.piecesOf.has(plot.type)) {
         this.piecesOf.add(plot.type);
         this.noting = { type: plot.type, x: plot.x, y: plot.floorY, z: plot.z, rot: plot.rot };
       }
+      this.owner = i;
       this.planBuilding(plot);
+      this.owner = -1;
       this.noting = null;
     }
     this.planVillageProps();
@@ -1952,7 +1967,7 @@ export class Buildings {
   private push(key: MatKey, g: THREE.BufferGeometry) {
     if (this.noting) this.pieces!.push({ ...this.noting, key, geo: g });
     if (!this.geoms.has(key)) this.geoms.set(key, []);
-    this.geoms.get(key)!.push(g);
+    this.geoms.get(key)!.push({ g, owner: this.owner });
   }
 
   private tile(key: MatKey) {
@@ -2933,8 +2948,90 @@ export class Buildings {
   build(scene: THREE.Scene) {
     const group = new THREE.Group();
     group.name = 'buildings';
+    if (this.multiDraw) this.batchWalls(group);
+    else this.mergeWalls(group);
+    scene.add(group);
+    this.buildRest(scene);
+  }
+
+  /**
+   * The walls, floors and roofs of the map, a building at a time (2026-10-16). Each paint was one mesh for the whole
+   * map, its ball the size of the map: every wall was drawn in every frame wherever the eye looked, and all of them
+   * again into the sun's shadow maps (538,000 triangles a frame into the shadows at the crossroads, for shadows that
+   * reach 70 m). Each paint is still one thing to draw, a BatchedMesh, but it holds each building as a part of its
+   * own: a part out of the view, out of a shadow map or past the draw distance is left out of that drawing.
+   */
+  private batchWalls(group: THREE.Group) {
+    // (whose a piece is: its building's, or the square its middle is in; a piece is in the world's own frame)
+    const box = new THREE.Box3(), mid = new THREE.Vector3();
+    const whose = (e: { g: THREE.BufferGeometry; owner: number }) => {
+      if (e.owner >= 0) return `b${e.owner}`;
+      box.setFromBufferAttribute(e.g.getAttribute('position') as THREE.BufferAttribute).getCenter(mid);
+      return `s${Math.floor(mid.x / SQUARE)},${Math.floor(mid.z / SQUARE)}`;
+    };
+    // One shape for the sun's shadow maps, as in mergeWalls: a shadow map takes no notice of paint.
+    const casters = new Map<string, { side: THREE.Side; shadowSide: THREE.Side | null; parts: Map<string, THREE.BufferGeometry[]> }>();
     for (const [key, list] of this.geoms) {
-      const merged = mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+      const mat = this.material(key);
+      const parts = new Map<string, THREE.BufferGeometry[]>();
+      for (const e of list) {
+        const k = whose(e);
+        if (!parts.has(k)) parts.set(k, []);
+        parts.get(k)!.push(e.g.index ? e.g.toNonIndexed() : e.g);
+      }
+      const mesh = this.batch(parts, mat);
+      if (!mesh) continue;
+      const casts = key !== 'glass' && !mat.transparent && !(mat.alphaTest > 0);
+      mesh.castShadow = key !== 'glass' && !casts;
+      mesh.receiveShadow = true;
+      mesh.name = `building:${key}`;
+      mesh.renderOrder = key === 'glass' ? 2 : WALLS_FIRST;
+      group.add(mesh);
+      if (!casts) continue;
+      const k = `${mat.side}|${mat.shadowSide}`;
+      if (!casters.has(k)) casters.set(k, { side: mat.side, shadowSide: mat.shadowSide, parts: new Map() });
+      const c = casters.get(k)!;
+      for (const [who, pieces] of parts) {
+        if (!c.parts.has(who)) c.parts.set(who, []);
+        c.parts.get(who)!.push(...pieces);
+      }
+    }
+    for (const c of casters.values()) {
+      const caster = this.batch(c.parts, new THREE.MeshBasicMaterial({ side: c.side, shadowSide: c.shadowSide }), true);
+      if (!caster) continue;
+      caster.castShadow = true;
+      caster.receiveShadow = false;
+      // (in the shadow maps and not in the view: three asks this of every pass it draws)
+      caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+      caster.name = 'buildings shadow';
+      group.add(caster);
+    }
+  }
+
+  /** One BatchedMesh of parts (each a list of pieces, unindexed, in the world's frame), each part kept in `far`. @param bare only where its points are (for a shadow) */
+  private batch(parts: Map<string, THREE.BufferGeometry[]>, mat: THREE.Material, bare = false): THREE.BatchedMesh | null {
+    const made: THREE.BufferGeometry[] = [];
+    for (const pieces of parts.values()) {
+      const g = mergeGeometries(bare ? pieces.map((p) => new THREE.BufferGeometry().setAttribute('position', p.getAttribute('position'))) : pieces, false);
+      if (g) made.push(g);
+    }
+    if (!made.length) return null;
+    const mesh = new THREE.BatchedMesh(made.length, made.reduce((n, g) => n + g.getAttribute('position').count, 0), 0, mat);
+    for (const g of made) {
+      g.computeBoundingSphere();
+      const id = mesh.addInstance(mesh.addGeometry(g)), s = g.boundingSphere!;
+      this.far.push({ show: (on) => mesh.setVisibleAt(id, on), shown: true, x: s.center.x, z: s.center.z, r: s.radius });
+      g.dispose();
+    }
+    mesh.sortObjects = false;
+    mesh.matrixAutoUpdate = false;
+    return mesh;
+  }
+
+  /** The walls as they were drawn before 2026-10-16, for a browser that cannot draw a list of ranges in one go: each paint one mesh for the map. */
+  private mergeWalls(group: THREE.Group) {
+    for (const [key, list] of this.geoms) {
+      const merged = mergeGeometries(list.map(({ g }) => (g.index ? g.toNonIndexed() : g)), false);
       if (!merged) continue;
       merged.computeBoundingSphere();
       const mesh = new THREE.Mesh(merged, this.material(key));
@@ -2976,8 +3073,10 @@ export class Buildings {
         for (const m of c.of) m.castShadow = false;
       }
     }
-    scene.add(group);
+  }
 
+  /** What else a building is drawn with: signs, doors, the containers' leaves, the outsides that are models. */
+  private buildRest(scene: THREE.Scene) {
     for (const sg of this.signs) {
       const c = document.createElement('canvas');
       c.width = 1024;
@@ -3073,6 +3172,8 @@ export class Buildings {
           const m = o as THREE.Mesh;
           if (!m.isMesh) return;
           const paint = this.paintShell(painted, m.material as THREE.Material);
+          if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+          const reach = (mx: THREE.Matrix4) => m.geometry.boundingSphere!.clone().applyMatrix4(mx);
           if (paint.transparent || list.length === 1) {
             for (const sh of list) {
               const one = new THREE.Mesh(m.geometry, paint);
@@ -3082,11 +3183,31 @@ export class Buildings {
               one.renderOrder = WALLS_FIRST;
               one.name = m.name;
               scene.add(one);
+              const s = reach(one.matrix);
+              this.far.push({ show: (on) => (one.visible = on), shown: true, x: s.center.x, z: s.center.z, r: s.radius });
             }
+            this.drawnFrom = null;
+            return;
+          }
+          // (each copy a part of one BatchedMesh: drawn only where it is in the view, or in a shadow map, and within the draw distance)
+          if (this.multiDraw) {
+            const g = m.geometry, many = new THREE.BatchedMesh(list.length, g.getAttribute('position').count, g.index?.count ?? 0, paint);
+            const shape = many.addGeometry(g);
+            for (const sh of list) {
+              const id = many.addInstance(shape), s = reach(at.multiplyMatrices(sh.m, m.matrixWorld));
+              many.setMatrixAt(id, at);
+              this.far.push({ show: (on) => many.setVisibleAt(id, on), shown: true, x: s.center.x, z: s.center.z, r: s.radius });
+            }
+            many.sortObjects = false;
+            many.matrixAutoUpdate = false;
+            many.castShadow = many.receiveShadow = true;
+            many.renderOrder = WALLS_FIRST;
+            many.name = m.name;
+            scene.add(many);
+            this.drawnFrom = null;
             return;
           }
           const many = new THREE.InstancedMesh(m.geometry, paint, list.length);
-          if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
           // (drawn into a view, or a shadow map, when one of the copies is in it: the copies stand all over the map,
           // and the ball round all of them is in every one)
           const balls = list.map((sh, i) => {
@@ -3187,8 +3308,39 @@ export class Buildings {
     return m;
   }
 
+  /** The player's draw distance, metres (Settings: Video). */
+  setDrawDistance(d: number) {
+    this.drawDistance = d;
+    this.drawnFrom = null;
+  }
+
+  /** Each building, and each copy of a model outside, drawn or not by how far its nearest edge is: looked at again every 16 m walked. */
+  private drawWithin(eye: { x: number; z: number }) {
+    const was = this.drawnFrom;
+    if (was && (eye.x - was.x) ** 2 + (eye.z - was.z) ** 2 < 16 * 16) return;
+    this.drawnFrom = { x: eye.x, z: eye.z };
+    for (const f of this.far) {
+      const on = Math.hypot(f.x - eye.x, f.z - eye.z) - f.r <= this.drawDistance;
+      if (on !== f.shown) f.show((f.shown = on));
+    }
+  }
+
+  /** Does a building this eye leaves undrawn stand between it and that point? A player there is then not drawn either (Avatar.veil). */
+  hides(eye: { x: number; z: number }, at: { x: number; z: number }): boolean {
+    const dx = at.x - eye.x, dz = at.z - eye.z, len2 = dx * dx + dz * dz;
+    if (len2 <= this.drawDistance * this.drawDistance) return false;
+    for (const f of this.far) {
+      if (f.shown) continue;
+      // (the nearest the line from the eye to it comes to the building's middle)
+      const t = Math.max(0, Math.min(1, ((f.x - eye.x) * dx + (f.z - eye.z) * dz) / len2));
+      if ((eye.x + dx * t - f.x) ** 2 + (eye.z + dz * t - f.z) ** 2 < f.r * f.r) return true;
+    }
+    return false;
+  }
+
   private handlesT = 0;
   update(dt: number, eye?: { x: number; z: number }) {
+    if (eye) this.drawWithin(eye);
     for (const d of this.doors) d.update(dt);
     // (a door's handle is drawn where it can be seen: from across the street it is less than a pixel, and it was one more thing to draw for every door in sight)
     if (eye && (this.handlesT += dt) > 0.4) {

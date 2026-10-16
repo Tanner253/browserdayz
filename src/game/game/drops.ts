@@ -393,7 +393,8 @@ export const dropsMethods = {
   /** Graphics options from the Esc menu: applied at once, nothing needs a reload. */
   applyGraphics(this: Game, g: Graphics) {
     this.gfx = g;
-    const { r, atmo, veg, grass } = this.s;
+    const { r, atmo, veg, grass, buildings } = this.s;
+    buildings.setDrawDistance(g.draw);
     r.applyQuality({ renderScale: g.scale, msaa: g.msaa, ao: g.ao !== 'off', aoHalfRes: g.ao === 'half' });
     // shadow map size per cascade, and how far from the camera shadows are drawn
     const [size, reach] = { low: [1024, 70], medium: [1024, 110], high: [2048, 160] }[g.shadows];
