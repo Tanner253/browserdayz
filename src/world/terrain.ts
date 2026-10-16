@@ -318,7 +318,7 @@ interface Run {
   of: THREE.Mesh[];
   parts: Run[];
 }
-const _pv = new THREE.Matrix4(), _view = new THREE.Frustum();
+const _pv = new THREE.Matrix4(), _view = new THREE.Frustum(), _wide = new THREE.Frustum();
 
 export class Terrain {
   /** the ground, as a group of tiles */
@@ -677,6 +677,11 @@ export class Terrain {
     if (!this.runs.length) return;
     _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     _view.setFromProjectionMatrix(_pv);
+    // (the view without its far end: a run of the west's tiles is drawn at one go wherever it is in sight but for
+    // going on past the end of the view, which the card cuts off; from the square's east the end of the view ran
+    // through the west's runs, and they were drawn tile by tile: 49 draws of the ground where there had been 16)
+    _wide.copy(_view);
+    _wide.planes[4].constant = Infinity;
     // (how fine each of the west's tiles is drawn, by how far its nearest point is from the eye)
     const c = camera.position;
     for (const t of this.far) {
@@ -696,7 +701,7 @@ export class Terrain {
     let all = true;
     if (r.parts.length) {
       for (const p of r.parts) if (!this.choose(p)) all = false;
-    } else for (const t of r.of) if (!_view.intersectsSphere(t.geometry.boundingSphere!)) all = false;
+    } else for (const t of r.of) if (!(t.geometry.userData.lods.length > 1 ? _wide : _view).intersectsSphere(t.geometry.boundingSphere!)) all = false;
     // (at one go, a run is drawn as fine as the finest of its tiles: their edges are all fine, so tiles of any
     // fineness meet, and it is one draw)
     let L = 2;
