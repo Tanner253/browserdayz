@@ -4,7 +4,7 @@
 // It was five log houses far apart round an empty green. Now: one muddy lane from the north, the houses tight along
 // both sides of it, each in a picket-fenced front garden with a gate on the lane (the fences make alleys, the
 // gardens cover, the lane a shooting alley); wood stacked behind each house; at the lane's end the sawmill's yard, its
-// log stacks laid out as the walls of a maze, some two high; the chapel on a knoll over the lane; three high seats at
+// log stacks laid end to end as the walls of a maze; the chapel on a knoll over the lane; three high seats at
 // the wood's edge watching the ways in.
 
 import type { SlabRun, Town, TownGround, TownSpot } from './towns';
@@ -79,12 +79,16 @@ export function lipkiThings(): TownThing[] {
     // wood stacked against the back wall
     out.push({ kind: 'log_pile', x: x + s * (k.d / 2 + 1.9), z: h.z + (n % 2 ? 1.2 : -1.2), rot: 0 });
   });
-  // the sawmill's yard: stacks of logs laid as walls, some two high, the ways between them turning
-  const pile = (x: number, z: number, rot: number, two = false) => [{ kind: 'log_pile', x, z, rot }, ...(two ? [{ kind: 'log_pile', x, z, rot, up: 1.45 }] : [])];
+  // the sawmill's yard: stacks of logs laid end to end as the walls of a maze, the ways between them turning. (Never
+  // one on another: the owner, of a stack laid on a stack, "stacked and dont look right": its top is round, the
+  // one on it floated.) A run of stacks from one end to the other, along x (`along`) or along z.
+  const run = (x0: number, z0: number, n: number, along: boolean) => {
+    for (let k = 0; k < n; k++) out.push({ kind: 'log_pile', x: x0 + (along ? k * 5 : 0), z: z0 + (along ? 0 : k * 5), rot: (along ? Q : 0) + ((k * 7) % 3 - 1) * 0.03 });
+  };
+  run(-13.5, 64, 2, true); run(6.5, 64.5, 2, true);
+  run(-18, 72.5, 2, false); run(-1.5, 75.5, 2, true); run(21, 72, 2, false);
+  run(-11.5, 86, 2, true); run(8.5, 85.5, 2, true); run(27, 84, 1, false);
   out.push(
-    ...pile(-14, 64, Q), ...pile(-7.6, 64, Q, true), ...pile(6, 65, Q), ...pile(12.6, 64.6, Q, true),
-    ...pile(-18, 76, 0, true), ...pile(-4, 75, Q, true), ...pile(3.4, 75.4, Q), ...pile(20, 74, 0, true),
-    ...pile(-11, 86, Q), ...pile(8, 85, Q, true), ...pile(25, 86, Q),
     { kind: 'dead_tree_trunk', x: -24, z: 60, rot: 0.3 }, { kind: 'dead_tree_trunk', x: 29, z: 66, rot: 1.9 }, { kind: 'tree_stump_01', x: 15, z: 92, rot: 0.8 },
     { kind: 'Barrel_01', x: 19.4, z: 57.4, rot: 0 }, { kind: 'wooden_crate_01', x: -2.2, z: 57.0, rot: 0.2 },
   );
