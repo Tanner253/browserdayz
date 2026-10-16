@@ -23,7 +23,7 @@ import type { Player } from './player';
 import type { RemotePlayer } from './remote';
 import { DRIVE, DRIVES, DRIVE_CAR, Jeep, groundOf, type Controls } from './vehicle';
 import { Heli } from './heli';
-import { Horns } from './horns';
+import { Horns, NEAR_EARS } from './horns';
 import { HELI, heliCrash, heliSpots, hpOf, seatsOf } from '../sim/heli';
 
 /**
@@ -127,6 +127,7 @@ interface Extra {
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
 
 export class Garage {
   readonly jeeps = new Map<number, Jeep>();
@@ -575,7 +576,19 @@ export class Garage {
     this.horns.drive(driving, input.held('KeyH'), input.pressedFixed('KeyJ'));
   }
 
+  /** where the ears are this frame (see `heardAt`) */
+  private ear = new THREE.Vector3();
+  /**
+   * Where a car's or a helicopter's own sound is put: where it is, but at the ears for whoever is in it or at it.
+   * Put at its middle, a metre or two from the head of whoever sat in it, every turn of the head swung it from one
+   * ear to the other and back (players, 2026-10-16: the sound is "8D", "everywhere").
+   */
+  private heardAt(j: Jeep) {
+    return j.pos.distanceTo(this.ear) < NEAR_EARS ? this.ear : j.pos;
+  }
+
   frame(dt: number, now: number, alpha: number, listener: THREE.Vector3) {
+    this.ear.copy(listener);
     const h = this.h, p = h.player, online = h.online();
     this.horns.frame(listener);
     if (this.flipDue?.mode === 'sim') {
@@ -872,7 +885,7 @@ export class Garage {
     const [lo, hi] = v < 7.5 ? [0, 9] : v < 14 ? [5, 16.5] : [10.5, 24];
     const rpm = 850 + 3300 * THREE.MathUtils.clamp((v - lo) / (hi - lo), 0, 1) + Math.abs(j.throttle) * (j.grounded ? 250 : 1400);
     x.rpm += (rpm - x.rpm) * (1 - Math.exp(-(rpm > x.rpm ? 6 : 3.5) * dt));
-    x.voice.set(j.pos, x.rpm, Math.abs(j.throttle), v, j.grounded ? j.slide : 0, j.ground === 'asphalt', this.ride?.jeep === j);
+    x.voice.set(this.heardAt(j), x.rpm, Math.abs(j.throttle), v, j.grounded ? j.slide : 0, j.ground === 'asphalt', this.ride?.jeep === j);
   }
 
   /** a helicopter's rotor, heard as the supply drop's is (by how far off it is, and coming or going), as loud and as high as it is turning fast */
@@ -888,7 +901,7 @@ export class Garage {
     if (!x.rotor) return;
     const closing = away > 1 ? -_a.copy(j.pos).sub(ear).dot(j.vel) / away : 0;
     const r = rotorAt(away, closing);
-    x.rotor.set(j.pos, r.gain * rpm * (0.6 + 0.4 * j.throttle), r.rate * (0.5 + 0.5 * rpm), r.cutoff);
+    x.rotor.set(this.heardAt(j), r.gain * rpm * (0.6 + 0.4 * j.throttle), r.rate * (0.5 + 0.5 * rpm), r.cutoff);
   }
 }
 

@@ -6,6 +6,9 @@ import { audio, type HornVoice } from '../core/audio';
 import { POLICE_CAR } from '../sim/vehicles';
 import type { Jeep } from './vehicle';
 
+/** how near the ears a car's or a helicopter's own sound is heard from the ears, metres (see Garage.heardAt) */
+export const NEAR_EARS = 3;
+
 /** somebody else's horn held longer than this is taken to have been let go (the word of it lost on the way), ms */
 const HELD_MOST = 8000;
 /** no horn or siren is sounded further off than this, metres */
@@ -76,7 +79,8 @@ export class Horns {
         if (!made) continue;
         this.voices.set(i, (voice = made));
       }
-      voice.set(j.pos, this.horn.has(i), this.siren.has(i));
+      // (at the ears for whoever is in it or at it: see Garage.heardAt)
+      voice.set(j.pos.distanceTo(listener) < NEAR_EARS ? listener : j.pos, this.horn.has(i), this.siren.has(i));
     }
   }
 }
