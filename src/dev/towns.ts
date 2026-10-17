@@ -1,6 +1,6 @@
 // `?towns` on a development build: a new town (src/sim/towns.ts) stood on level ground of its own in the north-west
 // corner of today's map, in the game as it is, to be walked and looked at before it has its place in the new land
-// (`?towns=<name>`: lipki, zavod; Pokrov otherwise). Never loaded in a built site.
+// (`?towns=<name>`: lipki, zavod, ozerki, mokroye; Pokrov otherwise). Never loaded in a built site.
 //
 // The corner is levelled to the height it mostly was, its trees and rocks taken away, the town's buildings added
 // to the world's as any building is (so their rooms, doors, stairs and places for things are the game's own), and
@@ -13,7 +13,8 @@ import type { Renderer } from '../core/renderer';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Buildings } from '../world/buildings';
 import { Towns } from '../world/towns';
-import { CELL, WORLD_X0, WORLD_Z0, idx, type World } from '../world/worldgen';
+import { CELL, WORLD_X0, WORLD_Z0, heightAt, idx, type World } from '../world/worldgen';
+import { Waterways } from '../world/water';
 import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
 import type { KitPiece } from '../sim/kit';
 import { POKROV, TOWNS, moundAt, placedSlabs, placedWalls, townBuildings, townGround, townPoint, townThings, type Town } from '../sim/towns';
@@ -26,6 +27,8 @@ let padY = 0;
 let walls: KitPiece[] = [];
 /** the world's buildings, the town's among them (those that wear a facade are dressed by the towns' module) */
 let plots: World['buildings'] = [];
+/** the world as laid (its ground, for the water drawn over a swamp's town) */
+let laid: World | null = null;
 
 /** The corner levelled and cleared, and the town's buildings added. Before anything is built from the world. */
 export function lay(world: World) {
@@ -94,6 +97,7 @@ export function lay(world: World) {
   (world.slabs ??= []).push(...placedSlabs(town));
   walls = placedWalls({ town, padY });
   plots = world.buildings;
+  laid = world;
 }
 
 /** The town's walls and domes, drawn by the game's own module (src/world/towns.ts). After the ground and the buildings are built. */
@@ -105,6 +109,21 @@ export async function stand(atmo: Atmosphere, r: Renderer, buildings: Buildings)
     const g = (window as unknown as { __game?: { s: { r: { camera: THREE.Camera } } } }).__game;
     if (g) towns.update(g.s.r.camera.position);
   }, 400);
+  // (a town in water: its water drawn over it as the world will draw the swamp's, until the world's own is hooked in)
+  const wet = townGround(town).water;
+  let water: Waterways | null = null;
+  if (wet && laid) {
+    const ground = laid.heights, outline = wet.outline.map(([x, z]) => townPoint(town, x, z));
+    water = new Waterways(r.scene, atmo, { lakes: [{ name: town.name, level: padY + wet.level, outline, swamp: wet.swamp }], rivers: [] }, (x, z) => heightAt(ground, x, z));
+    let last = performance.now();
+    const tick = () => {
+      const g = (window as unknown as { __game?: { s: { r: { camera: THREE.Camera } } } }).__game, now = performance.now();
+      if (g) water!.update((now - last) / 1000, g.s.r.camera.position, g.s.r.camera);
+      last = now;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
   console.info(`[towns] ${town.name}: ${walls.length} wall pieces, far copy ${towns.counts.far} triangles`);
-  (window as unknown as Record<string, unknown>).TW = { town, padY, walls, towns };
+  (window as unknown as Record<string, unknown>).TW = { town, padY, walls, towns, water };
 }

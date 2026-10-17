@@ -14,6 +14,17 @@ import { KNOLL } from '../src/sim/lipki';
 import { POKROV_TERRACE } from '../src/sim/pokrov';
 import { DECK, PIERS, SHORE } from '../src/sim/ozerki';
 import { ZAVOD, ZAVOD_WALL } from '../src/sim/zavod';
+import { MOKROYE_WALKS, SUNK_DEPTH, SUNK_FLOOR, WATER, WET_DEPTH, WET_FLOOR, mokroyeBuildings, mokroyePosts } from '../src/sim/mokroye';
+import { WADE } from '../src/sim/water';
+import { flooded } from '../src/world/mokroye-plans';
+import { izbaPlan } from '../src/world/town-plans';
+import { blueprintOf } from '../src/world/buildings';
+import { RNG } from '../src/core/noise';
+
+/** the village's barn as Buildings plans it */
+const barnPlan = () => blueprintOf('barn', new RNG(5));
+/** how deep water stops a walker */
+const WADE_STOP = WADE.deep;
 
 const manifest = JSON.parse(fs.readFileSync('public/assets/manifest.json', 'utf8'));
 let checks = 0;
@@ -99,18 +110,33 @@ for (const t of TOWNS) {
 // ---- Zavod's wall: moved with the town, the gate left open on the road
 const slabs = placedSlabs(ZAVOD);
 ok(slabs.length === ZAVOD_WALL.length, 'every run of the wall is laid');
-ok(slabs.every((r, k) => r.a[0] === ZAVOD.x + ZAVOD_WALL[k].a[0] && r.b[1] === ZAVOD.z + ZAVOD_WALL[k].b[1]), 'at its place in the world');
+ok(slabs.every((r, k) => [...townPoint(ZAVOD, ...ZAVOD_WALL[k].a), ...townPoint(ZAVOD, ...ZAVOD_WALL[k].b)].every((v, i) => Math.abs(v - [...r.a, ...r.b][i]) < 1e-9)), 'at its place in the world, turned with the town');
 const onSouth = ZAVOD_WALL.filter((r) => r.a[1] === 22 && r.b[1] === 22);
 ok(!onSouth.some((r) => Math.min(r.a[0], r.b[0]) < 20 && Math.max(r.a[0], r.b[0]) > 20), 'no slab across the gate on the road');
 
 // ---- Ozerki: a deck under every section of every pier, at the deck's height
-const oz = TOWNS.find((t) => t.name === 'Ozerki')!, [kit] = placedKits({ town: oz, padY: 100 });
-ok(kit.kit === 'pier_kit' && kit.boxes.length === PIERS.length, 'a deck for each pier');
+// (said in the village's own frame: unturned, the piers run toward -z)
+const oz = { ...TOWNS.find((t) => t.name === 'Ozerki')!, rot: 0 }, kits = placedKits({ town: oz, padY: 100 });
+ok(kits.every((k) => k.kit === 'pier_kit') && kits.length === PIERS.length && kits.every((k) => k.boxes.length === 1), 'a group and a deck for each pier');
 for (const [n, p] of PIERS.entries()) {
-  const b = kit.boxes[n], far = SHORE - p.n * 3.0;
+  const b = kits[n].boxes[0], far = SHORE - p.n * 3.0;
   ok(Math.abs(b.c[1] + b.h[1] - (100 + DECK)) < 1e-9, `pier ${n}: its deck's top at the deck's height`);
   ok(b.c[2] + b.h[2] >= oz.z + SHORE && b.c[2] - b.h[2] <= oz.z + far, `pier ${n}: from the shore to its end`);
 }
 ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boathouse's floor is the pier's deck");
+
+// ---- Mokroye: nothing kept under the water; the sunk barn waded, not swum; decks and the house on stilts over the water
+{
+  const rng = () => new RNG(77);
+  for (const [name, bp, depth] of [['a flooded log house', flooded(izbaPlan(rng()), WET_DEPTH), WET_DEPTH], ['the sunk barn', flooded(barnPlan(), SUNK_DEPTH), SUNK_DEPTH]] as const) {
+    ok(bp.loot.length > 0, `${name}: still something kept in it`);
+    for (const p of bp.loot) ok(p[1] > depth, `${name}: nothing kept under the water (${p[1]} over its floor, the water ${depth.toFixed(2)})`);
+    for (const fu of bp.furniture) for (const b of fu.on ?? []) ok([0.18, 0.72, 1.25, 1.82][b] > depth, `${name}: no rack board kept under the water`);
+  }
+  ok(SUNK_DEPTH < WADE_STOP, `the sunk barn's water (${SUNK_DEPTH.toFixed(2)} m) is waded, not a wall`);
+  ok(MOKROYE_WALKS.every((w) => w.deck > WATER + 0.2), 'the boardwalks stand over the water');
+  ok(mokroyeBuildings().every((s) => s.up === undefined || s.up === WET_FLOOR || s.up === SUNK_FLOOR || s.up > WATER), 'every floor is dry, or flooded on purpose');
+  ok(mokroyePosts(0).length === 4, 'four clusters of stilts');
+}
 
 console.log(`towns: ${checks} checks passed`);

@@ -228,6 +228,13 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Namaqualand Cliff 02](https://polyhaven.com/a/namaqualand_cliff_02) | Dario Barresi, Rico Cilliers |
 | model | [Modular Urban Apartments Facade](https://polyhaven.com/a/modular_urban_apartments_facade) | James Ray Cock |
 | model | [Modular Wooden Pier](https://polyhaven.com/a/modular_wooden_pier) | Rico Cilliers |
+| model | [Mountainside](https://polyhaven.com/a/mountainside) | Dario Barresi, Rico Cilliers |
+| model | [Namaqualand Boulder 02](https://polyhaven.com/a/namaqualand_boulder_02) | Greg Zaal, Rico Cilliers |
+| model | [Namaqualand Boulder 03](https://polyhaven.com/a/namaqualand_boulder_03) | Jenelle van Heerden, Dario Barresi |
+| model | [Namaqualand Boulder 04](https://polyhaven.com/a/namaqualand_boulder_04) | Jenelle van Heerden |
+| model | [Namaqualand Boulder 05](https://polyhaven.com/a/namaqualand_boulder_05) | Jenelle van Heerden, Dario Barresi |
+| model | [Namaqualand Cliff 01](https://polyhaven.com/a/namaqualand_cliff_01) | Jenelle van Heerden, Rico Cilliers |
+| model | [Namaqualand Cliff 02](https://polyhaven.com/a/namaqualand_cliff_02) | Dario Barresi, Rico Cilliers |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |

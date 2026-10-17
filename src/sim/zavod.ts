@@ -13,7 +13,12 @@ import type { SlabRun, Town, TownGround, TownSpot } from './towns';
 
 const PI = Math.PI, Q = PI / 2;
 
-export const ZAVOD: Town = { name: 'Zavod', x: -2550, z: 280, pad: [95, 75], rot: 0 };
+/**
+ * Where it is planned (plan v5): in the green river valley across the north, where it opens at its east end, on a
+ * bench over the river's south bank; turned half round, so that its own south (the river's side) is the world's north.
+ * The world's lane sets it down where its valley lets it.
+ */
+export const ZAVOD: Town = { name: 'Zavod', x: -1000, z: -560, pad: [95, 75], rot: Math.PI };
 
 export function zavodBuildings(): TownSpot[] {
   return [
