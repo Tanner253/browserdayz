@@ -63,7 +63,8 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 - Textures: 2048 the most for new models (CLAUDE.md).
 - Fixed on the way: a held gun went black once its magazine's inventory picture was made (`src/ui/icons.ts` freed card textures).
 - Parked: the shotgun set (a double barrel; its skin binds the gun at another scale than its arms): `progress/weapons/db12-config-parked.txt`.
-- Still to do: akimbo (dual SMGs, dual MAC-10 (no anims: borrow the dual SMGs'), sawn-offs; left click left gun, right click right gun); the M32 (admin only, 40 mm stacking to 50; needs an exploding projectile); making the OLD shared attachments exclusive (the holo fits 6 guns, the light 8: the owner's call, items players carry would change); the loot session's branch `refs/heads/claude/loot-world-6b02f8` (ruins T5, two east MD-500 pads, guns re-tiered) is NOT merged here: ask the owner first. Then LOOT_REV/PROTOCOL as needed, changelog, trailers.
+- Akimbo in (`twin` in packGun, `WeaponRig.layer`, `weapon.akimbo`): Dual SMGs and Dual MAC-10s (T3; the MAC-10s held in the Dual SMGs' movements, their suppressors MAC-only), Sawn-Offs (T2). Left button left gun, right button right gun, one round count for the pair.
+- Still to do: the M32 (admin only, 40 mm stacking to 50; needs an exploding projectile); making the OLD shared attachments exclusive (the holo fits 6 guns, the light 8: the owner's call, items players carry would change); the loot session's branch `refs/heads/claude/loot-world-6b02f8` (ruins T5, two east MD-500 pads, guns re-tiered) is NOT merged here: ask the owner first. Then LOOT_REV/PROTOCOL as needed, changelog, trailers.
 
 ## Open, after the trailer
 - Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
