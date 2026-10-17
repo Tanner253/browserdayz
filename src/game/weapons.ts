@@ -805,6 +805,12 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
   aks74u: { notch: [0.128, 0.1375, 0.0084], post: [0.368, 0.1344, 0.0085] },
 };
+/**
+ * The middle of a holographic sight's window, from the middle of the box of the whole sight (the eye's space: across,
+ * up; metres). The AR's mark stood a millimetre right of its window's middle and as much low: from the eye, the
+ * window was off to one side of it. A player: "holo scope on the ar is not in the middle its kinda off center".
+ */
+const GLASS: Record<string, [number, number]> = { ar15: [-0.0012, 0.0008] };
 /** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
 const IRON_NEAR = 0.02;
 
@@ -1862,12 +1868,14 @@ export class Weapons {
     }
     // (through a holographic sight: the eye on the lit mark, a hand and a half behind the glass)
     // (a gun in the rifle's hands with a holographic sight of its own: the mark is put in its glass, which is the upper part of it)
-    const glassY = THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7);
+    const glassY = THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7) + (GLASS[o.item]?.[1] ?? 0);
+    /** across: the middle of the glass, where the box of the whole sight, its knobs and its mount, is not that */
+    const glassX = c.x + (GLASS[o.item]?.[0] ?? 0);
     if (hung.has('sight') && this.reticle) {
       const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.014, 0.014), this.reticle);
       mark.name = 'reticle';
       mark.renderOrder = 20;
-      mark.position.set(c.x, glassY, (sight.min.z + sight.max.z) / 2);
+      mark.position.set(glassX, glassY, (sight.min.z + sight.max.z) / 2);
       const holder = hung.get('sight')!;
       holder.updateWorldMatrix(true, false);
       mark.applyMatrix4(new THREE.Matrix4().copy(holder.matrixWorld).invert());
@@ -1875,7 +1883,7 @@ export class Weapons {
       marks.push(mark);
     }
     // (a rifle with a holographic sight stood on it from another model: the eye on its mark, as a pistol's)
-    const through = squared(new THREE.Vector3(c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2));
+    const through = squared(new THREE.Vector3(hung.size ? glassX : c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2));
     const lit = dotAt ? squared(dotAt) : null;
     const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
