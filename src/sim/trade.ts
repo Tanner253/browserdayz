@@ -12,12 +12,12 @@ import { ITEMS, fittedOf, type ItemInstance } from './items';
 /** what one of a thing is worth to him, in credit (for a thing that stacks: each of the stack) */
 const WORTH: Record<string, number> = {
   // guns: he takes them, and does not sell them
-  colt: 14, m9: 16, mpa: 34, scorpion: 36, mp7a1: 44, aks74u: 48, dual_smg: 50, sniper50: 120, barrett: 140, vssk: 110, mosin: 28, deagle: 40, benelli: 45, ak: 55, ar15: 60,
+  colt: 14, m9: 16, mpa: 34, scorpion: 36, mp7a1: 44, aks74u: 48, dual_smg: 50, dual_mac10: 52, sniper50: 120, barrett: 140, vssk: 110, mosin: 28, deagle: 40, benelli: 45, ak: 55, ar15: 60,
   hatchet: 5, machete: 5, crowbar: 4, bat: 3, shovel: 4, knife: 3, pitchfork: 3,
   // rounds by the one (a sealed box is worth the rounds in it: see `worth`)
   ammo_9mm: 0.4, ammo_45: 0.5, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2, ammo_739: 0.7, ammo_556: 0.7,
   // fittings
-  red_dot: 20, gun_light: 10, pu_scope: 30, rifle_wrap: 8, suppressor_9: 22, suppressor_762: 28, suppressor_12: 28, suppressor_739: 30, suppressor_556: 30, foregrip: 12, mp7_suppressor: 26, mp7_sight: 22, elcan: 34,
+  red_dot: 20, gun_light: 10, pu_scope: 30, rifle_wrap: 8, suppressor_9: 22, suppressor_762: 28, suppressor_12: 28, suppressor_739: 30, suppressor_556: 30, foregrip: 12, mp7_suppressor: 26, mp7_sight: 22, elcan: 34, mac10_suppressor: 24,
   // magazines: the plain ones he sells as well (a gun with none is no gun)
   mag_colt: 5, mag_m9: 5, mag_sniper: 8, mag_deagle: 9, mag_m9_ext: 12, mag_deagle_ext: 14, mag_ak: 10, mag_ar: 10, mag_mpa: 8, drum_ak: 30, mag_ar_60: 24,
   // food, drink, medicine

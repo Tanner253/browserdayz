@@ -105,6 +105,7 @@ export const GUNS: Record<string, Gun> = {
   // shoulder. Each shot is little; there are a great many of them, and they walk.)
   mpa: { ammo: 'ammo_9mm', rpm: 780, auto: true, barrel: 1.08, moa: 6, hip: 2.3, up: 0.8, side: 0.5, lean: 0.15, first: 1.05, held: 0.85, stays: 0.34, back: 9.5, jump: 1.0, zero: [50, 100], reach: 260 },
   // (the pair's pace is both guns': each fires at half of it)
+  dual_mac10: { ammo: 'ammo_45', rpm: 1800, auto: true, barrel: 0.8, moa: 10, hip: 2.8, up: 0.9, side: 0.8, lean: 0.16, first: 1.1, held: 0.85, stays: 0.34, back: 9, jump: 1.1, zero: [50], reach: 120 },
   dual_smg: { ammo: 'ammo_9mm', rpm: 1500, auto: true, barrel: 0.9, moa: 9, hip: 2.6, up: 0.6, side: 0.6, lean: 0.14, first: 1.0, held: 0.82, stays: 0.32, back: 9, jump: 0.9, zero: [50], reach: 150 },
   aks74u: { ammo: 'ammo_739', rpm: 700, auto: true, barrel: 0.8, moa: 6, hip: 2.3, up: 1.7, side: 0.65, lean: 0.4, first: 1.4, held: 0.8, stays: 0.5, back: 8.5, jump: 2.2, zero: [100, 200], reach: 350 },
   mp7a1: { ammo: 'ammo_9mm', rpm: 950, auto: true, barrel: 1.0, moa: 5, hip: 1.9, up: 0.55, side: 0.35, lean: 0.12, first: 0.9, held: 0.78, stays: 0.3, back: 8, jump: 0.9, zero: [50, 100], reach: 260 },

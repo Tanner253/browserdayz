@@ -194,6 +194,13 @@ const D: ItemDef[] = [
     desc: 'Two submachine guns in 9 mm, one in each hand: left button for the left, right button for the right. Thirty rounds in each, never aimed down a sight.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 60, mag: 'mag_dual_smg', ergo: 55, modes: ['auto', 'semi'], akimbo: true, shows: { mag_dual_smg: ['mag'] } }, iconYaw: 0,
   },
+  // A pair of MAC-10s (2026-10-17), as the Dual SMGs: left button the left one, right button the right. .45, and a
+  // suppressor of their own that quiets both. Held in the Dual SMGs' movements.
+  {
+    id: 'dual_mac10', name: 'Dual MAC-10s', model: 'dualmac', w: 5, h: 3, weight: 5.6, category: 'weapon', slot: 'long',
+    desc: 'Two MAC-10s in .45 ACP, one in each hand: left button for the left, right button for the right. Thirty rounds in each and very fast. Never aimed down a sight.',
+    weapon: { kind: 'auto', ammo: 'ammo_45', capacity: 60, mag: 'mag_dual_mac10', ergo: 50, modes: ['auto', 'semi'], akimbo: true, shows: { mag_dual_mac10: ['mag'], mac10_suppressor: ['silencer'] } }, iconYaw: 0,
+  },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
   {
     id: 'aks74u', name: 'AKS-74U', model: 'aks74u', w: 6, h: 3, weight: 2.7, category: 'weapon', slot: 'long',
@@ -355,6 +362,11 @@ const D: ItemDef[] = [
     mag: { ammo: 'ammo_9mm', capacity: 60 }, attach: { fits: ['dual_smg'], slot: 'magazine' },
   },
   {
+    id: 'mag_dual_mac10', name: 'MAC-10 Magazine Pair', model: 'dualmac', nodeRe: '^mag', w: 1, h: 2, weight: 0.6, category: 'magazine',
+    desc: 'Two thirty-round .45 magazines taped together, one for each of the Dual MAC-10s.',
+    mag: { ammo: 'ammo_45', capacity: 60 }, attach: { fits: ['dual_mac10'], slot: 'magazine' },
+  },
+  {
     id: 'mag_mp7', name: 'MP7 Magazine', model: 'mp7a1', nodeRe: '^mag', w: 1, h: 2, weight: 0.25, category: 'magazine',
     desc: 'Forty rounds for the MP7A1.',
     mag: { ammo: 'ammo_9mm', capacity: 40 }, attach: { fits: ['mp7a1'], slot: 'magazine' },
@@ -426,6 +438,11 @@ const D: ItemDef[] = [
     id: 'elcan', name: 'Elcan Specter', model: 'elcan', w: 2, h: 1, weight: 0.65, category: 'attachment',
     desc: 'A magnifying combat sight for the AR-15, and no other gun takes it. Four times closer when aimed through; slower to bring up.',
     attach: { fits: ['ar15'], slot: 'optic', ergo: -4 },
+  },
+  {
+    id: 'mac10_suppressor', name: 'MAC-10 Suppressors', model: 'dualmac', nodeRe: '^silencer', w: 3, h: 1, weight: 0.5, category: 'attachment',
+    desc: 'A pair of suppressors for the Dual MAC-10s, and no other gun takes them. Both guns much quieter, no flash.',
+    attach: { fits: ['dual_mac10'], slot: 'muzzle', ergo: -6, recoil: 0.85, quiet: true },
   },
   {
     id: 'mp7_suppressor', name: 'MP7 Suppressor', model: 'mp7a1', nodeRe: '^silencer', w: 3, h: 1, weight: 0.35, category: 'attachment',

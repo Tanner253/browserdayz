@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T13:20:45.988Z",
+ "generated": "2026-10-17T13:46:48.691Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -11747,7 +11747,7 @@
      "url": "assets/models/dualsmg_lod1.glb",
      "tris": 2182,
      "far": 2,
-     "of": "361268:1792243246475"
+     "of": "361268:1792244809187"
     }
    ],
    "holds": {
@@ -11842,6 +11842,48 @@
      1
     ]
    }
+  },
+  "dualmac": {
+   "url": "assets/models/dualmac.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 542188,
+   "srcTris": 8809,
+   "tris": 8809,
+   "min": [
+    -0.0907,
+    -0.1393,
+    -0.0302
+   ],
+   "max": [
+    0.4239,
+    0.1072,
+    0.0294
+   ],
+   "lods": [
+    {
+     "url": "assets/models/dualmac_lod1.glb",
+     "tris": 1966,
+     "far": 2,
+     "of": "542188:1792244809417"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.08,
+     -0.02,
+     0.03
+    ],
+    "left": [
+     -0.08,
+     -0.02,
+     -0.28964
+    ]
+   },
+   "hi": "assets/models/hi/dualmac.glb",
+   "hiBytes": 1928972,
+   "hiCard": 84
   }
  }
 }

@@ -279,6 +279,7 @@ const HELD = {
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
   // (that maker's packs stand their camera half a metre behind where they are put: as the sniper's)
   dual_smg: new THREE.Vector3(0, -0.02, -0.36),
+  dual_mac10: new THREE.Vector3(0, -0.02, -0.36),
   sniper50: new THREE.Vector3(0.14, -0.22, -0.36),
   barrett: new THREE.Vector3(0.14, -0.22, -0.36),
   vssk: new THREE.Vector3(0.14, -0.22, -0.36),
@@ -1311,6 +1312,11 @@ export class Weapons {
       pack: 'dualsmg', item: 'dual_smg', gun: 'dualsmg', kind: 'auto', hands: true, hip: HELD.dual_smg, flashSize: 0.22, flash: mkFlash(), strip: [],
       ride: { base: 'base', bolt: 'bolt', trigger: 'trigger', mag: 'mag' },
       twin: { ride: { base: 'base_2', bolt: 'bolt_2', trigger: 'trigger_2', mag: 'mag_2' }, flash: mkFlash(), roots: { L: ['smg2Left', 'L_arm_01'], R: ['smg2Right', 'R_arm_025'] } },
+    }));
+    this.models.set('dual_mac10', await this.packGun({
+      pack: 'dualsmg', item: 'dual_mac10', gun: 'dualmac', kind: 'auto', hands: true, hip: HELD.dual_mac10, flashSize: 0.22, flash: mkFlash(), strip: [],
+      ride: { base: 'base', bolt: 'bolt', trigger: 'trigger', mag: 'mag', silencer: 'base' },
+      twin: { ride: { base: 'base_2', bolt: 'bolt_2', trigger: 'trigger_2', mag: 'mag_2', silencer: 'base_2' }, flash: mkFlash(), roots: { L: ['smg2Left', 'L_arm_01'], R: ['smg2Right', 'R_arm_025'] } },
     }));
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));

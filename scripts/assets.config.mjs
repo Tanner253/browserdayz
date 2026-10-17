@@ -1262,6 +1262,27 @@ export const WEAPON_PACKS = {
       changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
     },
   },
+  dualmac: {
+    dir: 'dualmac',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    scale: 1,
+    // (its muzzle, at the end of its suppressor, toward -z)
+    forward: [0, 0, -1],
+    up: [0, 1, 0],
+    // (it came with no movements: held in the dual submachine guns', each MAC-10 on one of theirs; the right one's
+    // pieces are the gun alone, its suppressor a piece of its own)
+    fit: { to: 'dualsmg', piece: 'base' },
+    parts: { mac10r_base: 'base', mac10r_magazine: 'mag', mac10r_bullet: 'mag', 'mac10r_outer frame_button': 'base', mac10r_bolt: 'bolt', 'mac10r_stock.': 'base', mac10r_stock_bars: 'base', mac10r_suppressor: 'silencer', mac10r_trigger: 'trigger', mac10r_ejector: 'base' },
+    credit: {
+      name: 'Dual Mac10 SMG - Animated',
+      url: 'https://sketchfab.com/3d-models/dual-mac10-smg-animated-9a98526e69894b80a99ef328e889080f',
+      author: 'user77',
+      line: 'This work is based on "Dual Mac10 SMG - Animated" (https://sketchfab.com/3d-models/dual-mac10-smg-animated-9a98526e69894b80a99ef328e889080f) by user77 (https://sketchfab.com/user77) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'set in rigid pieces and held in our own arms moved as the dual submachine guns pack moves its own, textures at 2048',
+    },
+  },
   aks74u: {
     dir: 'aks74u',
     file: 'scene.gltf',
