@@ -270,6 +270,8 @@ const HELD = {
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
   sniper50: new THREE.Vector3(0.14, -0.22, -0.36),
+  barrett: new THREE.Vector3(0.14, -0.22, -0.36),
+  vssk: new THREE.Vector3(0.14, -0.22, -0.36),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
 };
@@ -1235,6 +1237,9 @@ export class Weapons {
     // The CZ Scorpion (2026-10-17, the weapons pass): a pack on arms of its own, played as it came; the gun alone hung
     // on its joints as the AK's is, the pack's own drawing of it put away.
     this.models.set('sniper50', await this.packGun({ pack: 'sniper50', item: 'sniper50', gun: 'sniper50', kind: 'rifle', hands: true, hip: HELD.sniper50, flashSize: 0.4, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', boltrear: 'boltback', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'bullet' } }));
+    // (the Barrett and the VSSK came with no movements: held in the .50's, on its pieces' nodes; their own bolts stand still, they load themselves)
+    this.models.set('barrett', await this.packGun({ pack: 'sniper50', item: 'barrett', gun: 'barrett', kind: 'rifle', hands: true, hip: HELD.barrett, flashSize: 0.45, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bolt: 'base', trigger: 'trigger' } }));
+    this.models.set('vssk', await this.packGun({ pack: 'sniper50', item: 'vssk', gun: 'vssk', kind: 'rifle', hands: true, hip: HELD.vssk, flashSize: 0.2, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bullet: 'mag' } }));
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };

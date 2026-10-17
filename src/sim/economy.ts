@@ -172,6 +172,11 @@ export const TYPES: Record<string, TypeRule> = {
   // (in the village it is a policeman's and a soldier's, and not a householder's)
   mpa: { at: [0, 12, 14, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN } },
   // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
+  barrett: { at: [0, 0, 0, 0, 1], lifetime: 7200, restock: 1200, usage: [], loaded: [2, 10] },
+  mag_barrett: { at: [0, 0, 0, 0, 1], lifetime: 7200, restock: 1200, usage: [] },
+  vssk: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 900, usage: [], loaded: [1, 5] },
+  mag_vssk: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 900, usage: [] },
+  ammo_127x55: { at: [0, 0, 0, 0, 3], lifetime: 3600, restock: 600, usage: [], qty: [0.3, 0.8] },
   sniper50: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 900, usage: [], loaded: [1, 5] },
   mag_sniper50: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 900, usage: [] },
   ammo_50bmg: { at: [0, 0, 0, 0, 4], lifetime: 3600, restock: 600, usage: [], qty: [0.3, 0.8] },

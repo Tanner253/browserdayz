@@ -202,7 +202,10 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
         const of = s.lead.map((j) => (j in cfg.skinned.joints ? cfg.skinned.joints[j] : cfg.skinned.rest));
         pieces.push({ skin: s, of });
       }
-    } else {
+    }
+    // (rigid pieces: all of a gun that is not skinned, or, said in `parts` beside `skinned`, what of it is not: the
+    // Barrett's scope and magazine stand on nodes of their own beside its skinned body)
+    if (!stood || cfg.parts) {
       for (const n of root.listNodes()) {
         if (!n.getMesh() || n.getSkin()) continue;
         const piece = partOf(n);

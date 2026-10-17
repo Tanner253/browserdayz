@@ -172,6 +172,19 @@ const D: ItemDef[] = [
     desc: 'A bolt-action rifle in .50 BMG with a scope of its own. Five rounds. It reaches further and hits harder than anything else in the Zone.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, shows: { mag_sniper50: ['mag'] } }, iconYaw: 0,
   },
+  // The Barrett M82 (2026-10-17): the bunker's .50, loading itself, ten rounds, its scope part of it. No movements of
+  // its own: held as the .50 sniper rifle is.
+  {
+    id: 'barrett', name: 'Barrett M82', model: 'barrett', w: 10, h: 3, weight: 13.5, category: 'weapon', slot: 'long',
+    desc: 'A self-loading rifle in .50 BMG with a scope of its own. Ten rounds, as fast as the trigger, and it kicks like a mule.',
+    weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, shows: { mag_barrett: ['mag'] } }, iconYaw: 0,
+  },
+  // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the .50 sniper rifle is.
+  {
+    id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
+    desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading.',
+    weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, shows: { mag_vssk: ['mag', 'bullet'] } }, iconYaw: 0,
+  },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
   {
     id: 'aks74u', name: 'AKS-74U', model: 'aks74u', w: 6, h: 3, weight: 2.7, category: 'weapon', slot: 'long',
@@ -223,6 +236,10 @@ const D: ItemDef[] = [
   {
     id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'sniper50', nodeRe: '^bullet', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 3,
     desc: 'Loose .50 calibre cartridges, heavy as a fistful of bolts. They go into the .50 rifle magazine by hand.',
+  },
+  {
+    id: 'ammo_127x55', name: '12.7x55 Rounds', model: 'vssk', nodeRe: '^bullet', w: 1, h: 1, weight: 0.075, category: 'ammo', stack: 10, scale: 1, pile: 3,
+    desc: 'Heavy subsonic 12.7x55 cartridges for the VSSK Vykhlop. They go into its magazine by hand.',
   },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.009, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
@@ -312,6 +329,16 @@ const D: ItemDef[] = [
     id: 'mag_sniper50', name: '.50 Sniper Magazine', model: 'sniper50', nodeRe: '^mag', w: 1, h: 2, weight: 0.6, category: 'magazine',
     desc: 'Five rounds of .50 BMG for the .50 sniper rifle.',
     mag: { ammo: 'ammo_50bmg', capacity: 5 }, attach: { fits: ['sniper50'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_barrett', name: 'Barrett Magazine', model: 'barrett', nodeRe: '^mag', w: 1, h: 2, weight: 1.2, category: 'magazine',
+    desc: 'Ten rounds of .50 BMG for the Barrett M82.',
+    mag: { ammo: 'ammo_50bmg', capacity: 10 }, attach: { fits: ['barrett'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_vssk', name: 'VSSK Magazine', model: 'vssk', nodeRe: '^mag', w: 1, h: 2, weight: 0.5, category: 'magazine',
+    desc: 'Five rounds of 12.7x55 for the VSSK Vykhlop.',
+    mag: { ammo: 'ammo_127x55', capacity: 5 }, attach: { fits: ['vssk'], slot: 'magazine' },
   },
   {
     id: 'mag_mp7', name: 'MP7 Magazine', model: 'mp7a1', nodeRe: '^mag', w: 1, h: 2, weight: 0.25, category: 'magazine',

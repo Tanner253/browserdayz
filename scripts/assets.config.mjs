@@ -1148,6 +1148,54 @@ export const WEAPON_PACKS = {
       changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
     },
   },
+  barrett: {
+    dir: 'barrett',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    scale: 1,
+    // (its muzzle toward -z: its magazine and scope are by the end its butt is)
+    forward: [0, 0, -1],
+    up: [0, 1, 0],
+    fit: { to: 'sniper50', piece: 'base' },
+    // (its cartridges' names have a times sign in them that came through as nothing readable; and they lie beside
+    // the gun in its maker's scene: left out)
+    rename: { 'Cartridge$': 'round_lying', 'Cartridge \(Fired\)$': 'case_lying', 'NATO Bullet$': 'bullet_lying' },
+    skinned: {
+      mesh: ['Barrett M82 Gun_Barrett M82 Main Body_0', 'Barrett M82 Gun_Barrett M82 Rail, Grip, Stock and others_0', 'Barrett M82 Gun_Barrett M82 Bolt Carrier_0'],
+      joints: { 'M82 Bolt Carrier_09': 'bolt', 'M82 Trigger_05': 'trigger' },
+      rest: 'base',
+    },
+    parts: { 'NightForce Scope': 'scope', 'Barrett M82 Magazine': 'mag' },
+    credit: {
+      name: 'Barrett-M82 (Optimized)',
+      url: 'https://sketchfab.com/3d-models/barrett-m82-optimized-af16e974a47e463989311bcda6f51f87',
+      author: 'Gintoki1234',
+      line: 'This work is based on "Barrett-M82 (Optimized)" (https://sketchfab.com/3d-models/barrett-m82-optimized-af16e974a47e463989311bcda6f51f87) by Gintoki1234 (https://sketchfab.com/Gintoki1234) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
+    },
+  },
+  vssk: {
+    dir: 'vssk',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    scale: 1,
+    // (its barrel runs across its maker's scene, the muzzle at the end of its long can toward +x: it is a bullpup,
+    // its magazine behind its grip by the butt)
+    forward: [1, 0, 0],
+    up: [0, 1, 0],
+    fit: { to: 'sniper50', piece: 'base' },
+    // (its sling left out; its round a piece of its own, what its loose rounds are drawn as)
+    parts: { Object_2: 'base', Object_3: 'base', Object_5: 'mag', Object_8: 'bullet', Object_6: 'scope', Object_7: 'scope', Object_9: 'base', Object_10: 'base', Object_11: 'base', Object_12: 'base', Object_13: 'base' },
+    credit: {
+      name: 'VSSK Vykhlop',
+      url: 'https://sketchfab.com/Diamonddogkz',
+      author: 'Diamonddogkz',
+      line: 'VSSK Vykhlop by Diamonddogkz (https://sketchfab.com/Diamonddogkz), Sketchfab Standard licence',
+      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
+    },
+  },
   aks74u: {
     dir: 'aks74u',
     file: 'scene.gltf',
