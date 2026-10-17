@@ -937,6 +937,18 @@ const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
   mpa: { rate: 1.06, gain: 1.05, rec: 'shot_pistol' },
   // (a .45: the pistol's recording, lower and a little louder)
   colt: { rate: 0.9, gain: 1.2 },
+  // (the weapons pass's: the short AK its rifle's recording higher; the 9 mm and .45 guns the pistol's; the .50s and
+  // the 12.7 the rifle's, deep; the shotguns the shotgun's)
+  aks74u: { rate: 1.08, gain: 1.1, rec: 'shot_ak' },
+  mp7a1: { rate: 1.12, gain: 1, rec: 'shot_pistol' },
+  scorpion: { rate: 1.1, gain: 1, rec: 'shot_pistol' },
+  dual_smg: { rate: 1.06, gain: 1.05, rec: 'shot_pistol' },
+  dual_mac10: { rate: 0.92, gain: 1.15, rec: 'shot_pistol' },
+  sniper50: { rate: 0.78, gain: 1.6, rec: 'shot_rifle' },
+  barrett: { rate: 0.78, gain: 1.6, rec: 'shot_rifle' },
+  vssk: { rate: 0.82, gain: 1.3, rec: 'shot_rifle' },
+  db12: { rate: 0.9, gain: 1.5, rec: 'shot_shotgun' },
+  dual_sawnoff: { rate: 0.95, gain: 1.5, rec: 'shot_shotgun' },
 };
 /** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut) */
 const HANDLED: Record<string, 'ak' | 'ar'> = { ak: 'ak', ar15: 'ar' };

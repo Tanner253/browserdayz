@@ -940,10 +940,10 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
 
 /**
  * The things in a grid as somebody's game says they lie, each made safe.
- * @param most how many of them are read: 120, which is every cell of the biggest grid a body has (BODY_GRID); of an
+ * @param most how many of them are read: every cell of the biggest grid a body has (BODY_GRID); of an
  *   admin's hold, as many as a hold takes
  */
-export function cleanStored(list: unknown, name: (v: unknown) => string, most = 120): Stored[] {
+export function cleanStored(list: unknown, name: (v: unknown) => string, most = BODY_GRID[0] * BODY_GRID[1]): Stored[] {
   if (!Array.isArray(list)) return [];
   const out: Stored[] = [];
   for (const raw of list.slice(0, most)) {
@@ -992,17 +992,15 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
 
 /**
  * A body's grid: everything a person can have on and slung at once, with their own tag and a full pouch of tags
- * taken, lies in it. The worst there is, two AKs and the biggest thing for every place, is 120 cells, and this is
- * 120: laid biggest first (`layOnBody`) every set of things that can be worn goes in with none left over
- * (test/clothes.test.ts lays them out; all 230,400 sets were laid once by hand, and 8x14, which was proposed, left
- * tags over in 35 of them). It was 8x10: a geared body is 83 to 88 cells of worn things before a single thing out
- * of a pocket, and what found no room, pocket loot and taken tags, was thrown on the ground round it.
+ * taken, lies in it. The worst there is, two .50 rifles and the biggest thing for every place, is 121 cells, and this
+ * is 128 (it was 8x15 until the .50s came): laid biggest first (`layOnBody`) every set of things that can be worn
+ * goes in with none left over (test/clothes.test.ts lays them out). It was 8x10: a geared body is 83 to 88 cells of
+ * worn things before a single thing out of a pocket, and what found no room was thrown on the ground round it.
  *
- * (No bigger than it need be: the server reads no more than 120 things out of any grid it is sent, so a grid of
- * more cells than that could be filled with more single things than are kept. When something is made for the
- * eyes, the belt or the arm this has to grow a row, and that count with it: the test will say so.)
+ * (No bigger than it need be: the server reads no more things out of any grid it is sent than this has cells. When
+ * something bigger is made this has to grow a row: the test will say so.)
  */
-export const BODY_GRID: [number, number] = [8, 15];
+export const BODY_GRID: [number, number] = [8, 16];
 
 /**
  * Things laid in a body's grid, the biggest first so that the small ones fill what is left.

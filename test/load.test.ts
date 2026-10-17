@@ -208,8 +208,8 @@ ok('a gun weighs itself, what is fitted to it and what is in it', () => {
     assert.ok(near(itemWeight(gun), d.weight + parts + (gun.loaded ?? 0) * ITEMS[d.weapon!.ammo].weight), d.id);
     assert.ok(itemWeight(gun) > d.weight);
   }
-  // (a long gun outweighs a pistol, whatever the pistol)
-  const long = all.filter((x) => x.weapon && x.slot === 'long'), short = all.filter((x) => x.weapon && x.slot === 'holster');
+  // (a long gun outweighs a pistol, whatever the pistol: but the MP7, made to weigh what a big pistol does, 1.9 kg)
+  const long = all.filter((x) => x.weapon && x.slot === 'long' && x.id !== 'mp7a1'), short = all.filter((x) => x.weapon && x.slot === 'holster');
   assert.ok(Math.min(...long.map((x) => x.weight)) > Math.max(...short.map((x) => x.weight)));
 });
 

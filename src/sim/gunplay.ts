@@ -35,7 +35,7 @@ export const CARTRIDGES: Record<string, Cartridge> = {
   ammo_50: { name: '.50 AE', vel: 450, drag: 0.0019, damage: 58 },
   // .50 BMG, 750 grain: 860 m/s, and it keeps it (a ballistic coefficient near 1): 790 at three hundred yards
   // 40 mm grenade: 76 m/s from the M32's barrel; what it does is its blast's (WEAPON_RULES.ammo_40mm), not a bullet's
-  ammo_40mm: { name: '40 mm', vel: 76, drag: 0, damage: 0 },
+  ammo_40mm: { name: '40 mm', vel: 76, drag: 0.0005, damage: 0 },
   ammo_50bmg: { name: '.50 BMG', vel: 860, drag: 0.0003, damage: 150 },
   // 12.7x55 subsonic, 900 grain: 290 m/s, heavy enough to keep most of it: a slow round that drops, and hits hard
   ammo_127x55: { name: '12.7x55', vel: 290, drag: 0.0006, damage: 110 },
@@ -112,8 +112,8 @@ export const GUNS: Record<string, Gun> = {
   dual_mac10: { ammo: 'ammo_45', rpm: 1800, auto: true, barrel: 0.8, moa: 10, hip: 2.8, up: 0.9, side: 0.8, lean: 0.16, first: 1.1, held: 0.85, stays: 0.34, back: 9, jump: 1.1, zero: [50], reach: 120 },
   dual_smg: { ammo: 'ammo_9mm', rpm: 1500, auto: true, barrel: 0.9, moa: 9, hip: 2.6, up: 0.6, side: 0.6, lean: 0.14, first: 1.0, held: 0.82, stays: 0.32, back: 9, jump: 0.9, zero: [50], reach: 150 },
   db12: { ammo: 'ammo_12', rpm: 360, barrel: 1, moa: 8, hip: 1.4, up: 4.4, side: 1, lean: 0, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 4.6, heavy: true, zero: [25], reach: 60 },
-  aks74u: { ammo: 'ammo_739', rpm: 700, auto: true, barrel: 0.8, moa: 6, hip: 2.3, up: 1.7, side: 0.65, lean: 0.4, first: 1.4, held: 0.8, stays: 0.5, back: 8.5, jump: 2.2, zero: [100, 200], reach: 350 },
-  mp7a1: { ammo: 'ammo_9mm', rpm: 950, auto: true, barrel: 1.0, moa: 5, hip: 1.9, up: 0.55, side: 0.35, lean: 0.12, first: 0.9, held: 0.78, stays: 0.3, back: 8, jump: 0.9, zero: [50, 100], reach: 260 },
+  aks74u: { ammo: 'ammo_739', rpm: 700, auto: true, barrel: 0.8, moa: 6, hip: 2.3, up: 1.7, side: 0.65, lean: 0.4, first: 1.4, held: 0.8, stays: 0.48, back: 8.5, jump: 2.2, zero: [100, 200], reach: 350 },
+  mp7a1: { ammo: 'ammo_9mm', rpm: 950, auto: true, barrel: 1.0, moa: 5, hip: 1.9, up: 0.6, side: 0.35, lean: 0.12, first: 0.9, held: 0.78, stays: 0.3, back: 8, jump: 0.9, zero: [50, 100], reach: 260 },
   scorpion: { ammo: 'ammo_9mm', rpm: 1150, auto: true, barrel: 1.0, moa: 6, hip: 2.1, up: 0.7, side: 0.45, lean: 0.14, first: 1.0, held: 0.82, stays: 0.32, back: 9, jump: 0.95, zero: [50, 100], reach: 240 },
   ar15: { ammo: 'ammo_556', rpm: 700, auto: true, barrel: 0.94, moa: 2, hip: 1.9, up: 0.98, side: 0.32, lean: 0.1, first: 1.1, held: 0.7, stays: 0.42, back: 10.5, jump: 1.5, zero: [100, 200, 300], reach: 550 },
 };
@@ -183,8 +183,12 @@ export const speedAt = (drag: number, metres: number) => Math.exp(-drag * Math.m
 export function elevationFor(muzzleVel: number, drag: number, zero: number): number {
   const a = 2 * drag * zero;
   // (with next to no drag the same thing is g x / 2 v^2: said so, or it is nought over nought)
-  const fall = a < 1e-4 ? (GRAVITY * zero * zero) / (2 * muzzleVel * muzzleVel) : (GRAVITY * (Math.exp(a) - 1 - a)) / (4 * drag * drag * muzzleVel * muzzleVel);
-  return fall / zero;
+  const fall = (v: number) => (a < 1e-4 ? (GRAVITY * zero * zero) / (2 * v * v) : (GRAVITY * (Math.exp(a) - 1 - a)) / (4 * drag * drag * v * v));
+  let slope = fall(muzzleVel) / zero;
+  // (A slow round, the launcher's grenade, goes up steeply enough to cross the ground slower than it flies: said
+  // again at the speed it crosses it at. Every bullet's slope is under 0.02 and is as it was.)
+  for (let k = 0; k < 6 && slope > 0.02; k++) slope = fall(muzzleVel / Math.hypot(1, slope)) / zero;
+  return slope;
 }
 
 /** The range a gun's sights are set for: what its item says, if that is one of the ranges it has; else how it comes. */

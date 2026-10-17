@@ -135,6 +135,8 @@ const OPEN: Record<string, { rec: string; own: number; far: number; ref: number 
   m9: { rec: 'shot_pistol', own: 2.2, far: 2.2, ref: 8 },
   colt: { rec: 'shot_pistol', own: 2.2 * 1.2, far: 2.2 * 1.2, ref: 8 },
   deagle: { rec: 'shot_magnum', own: 2.2 * 1.5, far: 2.2 * 1.5, ref: 8 },
+  mp7a1: { rec: 'shot_pistol', own: 2.5 * 0.72, far: 2.5, ref: 12 },
+  dual_mac10: { rec: 'shot_pistol', own: 2.5 * 0.72 * 1.15, far: 2.5 * 1.15, ref: 12 },
 };
 /** how much of a sound placed in the world is left at a distance (`out` in the engine: the panner's own sum) */
 const placed = (ref: number, rolloff: number, d: number) => ref / (ref + rolloff * (Math.max(d, ref) - ref));
@@ -214,7 +216,7 @@ ok('a crack close by is the loudest thing whoever is shot at hears: louder than 
 });
 
 ok('through a suppressor a shot is still a shot: louder than it was, and never as loud as an open one', () => {
-  assert.deepEqual([...quieted].sort(), ['ak', 'ar15', 'benelli', 'colt', 'm9', 'mosin', 'mpa']);
+  assert.deepEqual([...quieted].sort(), ['ak', 'ar15', 'benelli', 'colt', 'dual_mac10', 'm9', 'mosin', 'mp7a1', 'mpa']);
   // (a 9 mm or a .45 from a pistol is slower than sound once quieted, and has no crack; a rifle's round has all of its own)
   assert.ok(sonicOf('m9') === 0 && sonicOf('colt') === 0 && sonicOf('mosin') === 1 && sonicOf('ak') === 1 && sonicOf('ar15') === 1);
   assert.ok(sonicOf('mpa') > 0 && sonicOf('mpa') < 0.2 && sonicOf('benelli') < 0.3);

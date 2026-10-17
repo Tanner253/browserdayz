@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { CARTRIDGES, GRAVITY, GUNS, MOA, PATTERNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, fly, intervalOf, kickOf, scatterOf, shotOf, speedAt, zeroOf, type Hold } from '../src/sim/gunplay';
 import { RIFLE_HITS, WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { ITEMS, sanitizeItem, makeItem } from '../src/sim/items';
+import { LAUNCHED } from '../src/sim/grenades';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -71,7 +72,8 @@ ok('down range each round has the speed its maker says it has', () => {
   assert.ok(Math.abs(shotOf('ar15').muzzleVel - 900 * 0.94) < 1e-9);
   assert.ok(flown('ar15', 300).speed > 343);
   // (and the sum the server does, which flies nothing, says the same as the flight does)
-  for (const id of Object.keys(GUNS)) {
+  // (a launched grenade is flown as a grenade is, not as a bullet)
+  for (const id of Object.keys(GUNS).filter((id) => !LAUNCHED[GUNS[id].ammo])) {
     const far = GUNS[id].reach * 0.5;
     const a = flown(id, far).speed / shotOf(id).muzzleVel, b = speedAt(shotOf(id).drag, far);
     assert.ok(Math.abs(a - b) < 0.02, `${id} at ${far} m: flown it keeps ${a.toFixed(3)} of its speed, by the sum ${b.toFixed(3)}`);
@@ -97,7 +99,8 @@ ok('sights set for a range put the round on the mark at that range, and over it 
     for (const z of g.zero) {
       const slope = elevationFor(s.muzzleVel, s.drag, z);
       const at = flown(id, z, slope).y;
-      assert.ok(Math.abs(at) < Math.max(0.012, z * 0.00012), `${id} set for ${z} m is ${(at * 100).toFixed(1)} cm off the mark there`);
+      // (a grenade lands within ten centimetres: its blast is seven metres)
+      assert.ok(Math.abs(at) < (LAUNCHED[g.ammo] ? 0.1 : Math.max(0.012, z * 0.00012)), `${id} set for ${z} m is ${(at * 100).toFixed(1)} cm off the mark there`);
       assert.ok(flown(id, z * 0.5, slope).y > 0, `${id} set for ${z} m is not above the line at half of it`);
       assert.ok(flown(id, z * 1.3, slope).y < 0, `${id} set for ${z} m is not under the line beyond it`);
     }
@@ -227,7 +230,7 @@ ok('a gun fires at its own rate, however fast the frames come', () => {
     return shots;
   };
   const autos = Object.keys(GUNS).filter((id) => GUNS[id].auto);
-  assert.deepEqual(autos.sort(), ['ak', 'ar15', 'mpa']);
+  assert.deepEqual(autos.sort(), ['ak', 'aks74u', 'ar15', 'dual_mac10', 'dual_smg', 'mp7a1', 'mpa', 'scorpion']);
   for (const id of autos) {
     for (const fps of [30, 60, 144, 240]) {
       const shots = held(id, fps, 10), rpm = GUNS[id].rpm;
@@ -306,7 +309,8 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
     const s = shotOf(id), r = WEAPON_RULES[id];
     assert.ok(Math.abs(r.interval - (GUNS[id].cycle ?? intervalOf(id))) < 1e-9, `${id}: the server's pace is not the gun's`);
     // (the sniper rifle has figures of its own, by where it lands and whether it is quieted: see below)
-    if (RIFLE_HITS[id]) continue;
+    // (and a launched grenade does what its blast does, wherever it lands)
+    if (RIFLE_HITS[id] || LAUNCHED[GUNS[id].ammo]) continue;
     assert.equal(hitDamage(id, 'torso', 0), s.damage, `${id} at the muzzle`);
     for (const share of [0.15, 0.5, 1]) {
       const d = GUNS[id].reach * share;

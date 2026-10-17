@@ -26,7 +26,10 @@ const rounds = (it: ItemInstance | null) => (it ? (it.loaded ?? 0) + (it.rounds 
 ok('loose rounds lie thirty to a place; a box is one place in a pocket and holds twenty-five', () => {
   const ammo = all.filter((d) => d.category === 'ammo' && d.stack);
   assert.ok(ammo.length >= 4);
-  for (const d of ammo) assert.equal(d.stack, 30, `${d.id} stacks to ${d.stack}`);
+  // (but the launcher's grenades, the owner: "ammo stack to 50 for the grenade launcher"; and the .50 and 12.7 mm
+  // rounds, a hand's length each and a tenth of a kilo, ten)
+  const STACK: Record<string, number> = { ammo_40mm: 50, ammo_50bmg: 10, ammo_127x55: 10 };
+  for (const d of ammo) assert.equal(d.stack, STACK[d.id] ?? 30, `${d.id} stacks to ${d.stack}`);
   const boxes = all.filter((d) => d.open);
   assert.ok(boxes.length >= 4);
   for (const d of boxes) {
@@ -34,15 +37,16 @@ ok('loose rounds lie thirty to a place; a box is one place in a pocket and holds
     assert.equal(d.open!.qty, 25, `${d.id} holds ${d.open!.qty}`);
     assert.ok(ITEMS[d.open!.gives]?.stack, `${d.id} gives ${d.open!.gives}`);
   }
-  // (and every kind of round a gun fires comes in a box)
-  for (const g of guns) assert.ok(boxes.some((b) => b.open!.gives === g.weapon!.ammo), `no box of what the ${g.id} fires`);
+  // (and every kind of round a gun fires comes in a box: but the big ones, which come loose)
+  for (const g of guns.filter((g) => !STACK[g.weapon!.ammo])) assert.ok(boxes.some((b) => b.open!.gives === g.weapon!.ammo), `no box of what the ${g.id} fires`);
 });
 
 ok('every gun is fed by a magazine of its own or by its own tube, and every magazine goes into a gun and holds what that gun fires', () => {
   for (const g of guns) {
     const w = g.weapon!;
     if (!w.mag) {
-      assert.ok(w.tube, `${g.id} has neither a magazine nor a tube`);
+      // (or loaded whole by hand: the broken-open shotguns, the launcher's cylinder)
+      assert.ok(w.tube || ['db12', 'dual_sawnoff', 'm32'].includes(g.id), `${g.id} has neither a magazine nor a tube`);
       continue;
     }
     const m = ITEMS[w.mag];
