@@ -143,4 +143,19 @@ ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boat
   ok(TOWNS.filter((t) => t !== mok).every((t) => placedRooms({ town: t, padY: 0 }, BUILDING_FOOTPRINT).length === 0), 'no rooms in the towns on dry land');
 }
 
+// ---- every building of a town of one kind, as test/loot.test.ts has it: no shop, clinic or hospital that is also a
+// house, and no shed's kind (where tools and things to hit with lie) that is also a house's, a shop's or the police's
+{
+  const HOUSE = ['Village', 'Town'], SHED = ['Farm', 'Industrial', 'Hunting'], SERVICE = ['Shop', 'Medic', 'Hospital', 'Police'];
+  for (const t of TOWNS) for (const s of townBuildings(t)) {
+    if (s.type === 'tower') continue;
+    const bp = blueprintOf(s.type, new RNG(1));
+    for (const u of [bp.usage, ...(bp.levels ?? []).map((l) => l.usage ?? bp.usage), ...(bp.deck ? [bp.deck.usage ?? bp.usage] : [])]) {
+      const has = (list: string[]) => u.some((k) => list.includes(k));
+      ok(!(has(['Shop', 'Medic', 'Hospital']) && has(HOUSE)), `${t.name} ${s.type}: a ${u.join(' and ')} is a service and a house`);
+      ok(!(has(SHED) && has([...HOUSE, ...SERVICE])), `${t.name} ${s.type}: a ${u.join(' and ')} is a shed and a house`);
+    }
+  }
+}
+
 console.log(`towns: ${checks} checks passed`);

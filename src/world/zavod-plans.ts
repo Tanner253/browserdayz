@@ -98,7 +98,7 @@ export function officePlan(): Blueprint {
   const levels: Level[] = [{
     h: STOREY_H, int: 'int_painted', floor: 'floor_lino',
     walls: [...facadeWalls(OFFICE, 1, 'brick_red', 'int_painted'), inner([1.0, -HD + 0.2], [1.0, HD - 0.2], [door(1.6, 2.6)], 'int_painted', 'office_wall')],
-    furniture: u.furniture, loot: u.loot, usage: ['Industrial', 'Town'],
+    furniture: u.furniture, loot: u.loot, usage: ['Town'],
   }];
   return {
     w: W, d: D, h: STOREY_H, ext: 'brick_red', int: 'int_painted', floor: 'floor_lino', roof: 'concrete', roofType: 'flat',

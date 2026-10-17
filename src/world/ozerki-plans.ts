@@ -24,7 +24,7 @@ export function boathousePlan(): Blueprint {
       { side: 'right', ext: 'boards_pale', int: 'planks', openings: [] },
     ],
     furniture: g.furniture, loot: g.loot,
-    usage: ['Village', 'Hunting'],
+    usage: ['Hunting'],
   };
 }
 
