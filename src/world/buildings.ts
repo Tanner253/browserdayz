@@ -1522,15 +1522,16 @@ export class Buildings {
       // and what is kept in Kamenka, the town in the east, is marked so too: it is stocked on its own (see `east` in the economy)
       for (const p of points) if (Math.hypot(p.x - TOWN.x, p.z - TOWN.z) < TOWN.stocked) p.usage = [...p.usage, 'East'];
       // And every place for a thing is told which step of the map it is on (src/sim/tiers.ts): the economy keeps each
-      // sort of thing on the steps it belongs to. The second step is the village, the checkpoint, and the army's and
-      // the trader's places; whatever is none of those, nor in Kamenka, nor under the gas, is the outskirts.
+      // sort of thing on the steps it belongs to. The village is the third step, as Kamenka is (the owner, 2026-10-17:
+      // "the village should become a T3 loot area as well it is currently T2"); the second the checkpoints and the
+      // army's and the trader's places; whatever is none of those, nor in Kamenka, nor under the gas, is the outskirts.
+      const village = { x: this.world.pois[0].x, z: this.world.pois[0].z, r: 125 };
       const second = [
-        { x: this.world.pois[0].x, z: this.world.pois[0].z, r: 125 },
         ...this.world.pois.filter((q) => /checkpoint/i.test(q.name)).map((q) => ({ x: q.x, z: q.z, r: 70 })),
         ...this.world.sites.filter((st) => st.kind === 'depot' || st.kind === 'market' || st.kind === 'tents').map((st) => ({ x: st.x, z: st.z, r: 60 })),
       ];
       // (and the new places of the west, by their own: towns mid, the hamlet as a village, ruins and caves high: westTier)
-      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : westTier(p.x, p.z) ?? (second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1);
+      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1);
     };
     mark(this.lootPoints);
     // The bunker: what stands in its rooms, and its places for things. After every other, so
