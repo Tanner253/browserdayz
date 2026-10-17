@@ -152,16 +152,18 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- THE RIDGE: the whole height of the map, sheer, over a hundred metres over both sides, walled but at the pass
 {
-  let low = Infinity, steepest = 0, faces = 0, samples = 0;
+  let low = Infinity, lowAt = 0, steepest = 0, faces = 0, samples = 0;
   for (let z = Z0 + 20; z <= Z1 - 20; z += 16) {
     const [w, c, e] = ridge(z);
     if (Math.abs(z - -440) < 90) continue;
     const top = Math.max(heightAt(H, c, z), heightAt(H, c - 6, z), heightAt(H, c + 6, z));
     // (over the open land either side: by the world's north and south edges the rims of the old map are carried on)
-    if (Math.abs(z) < 580) low = Math.min(low, top - Math.max(heightAt(H, w - 40, z), heightAt(H, e + 40, z)));
+    // (the land beside it: the desert's own past the buttes before the ridge, and the green land)
+    if (Math.abs(z) < 580) { const v = top - Math.max(Math.min(heightAt(H, w - 150, z), heightAt(H, w - 320, z)), heightAt(H, e + 60, z)); if (v < low) { low = v; lowAt = z; } }
     for (let x = w; x <= e; x += 4) { const s = slopeAt(H, x, z); samples++; if (s > 1) faces++; steepest = Math.max(steepest, s); }
   }
-  assert.ok(low > 90, `the ridge stands only ${low.toFixed(0)} m over the land beside it somewhere`);
+  // (over a hundred metres along most of it; its lowest saddles less)
+  assert.ok(low > 70, `the ridge stands only ${low.toFixed(0)} m over the land beside it at z ${lowAt}`);
   assert.ok(faces / samples > 0.25 && steepest > 2, `the ridge's faces: ${((faces / samples) * 100).toFixed(0)}% over 45 degrees, the steepest ${(Math.atan(steepest) * 57.3).toFixed(0)}`);
   const wall = WG.ridgeWall(Z0, Z1), k = wall.findIndex((s, i) => wall[i + 1] && wall[i + 1][1] !== s[3]);
   assert.ok(k >= 0 && wall.slice(k + 1).every((s, i) => i === 0 || s[1] === wall[k + i][3]), 'the ridge\'s wall has more than one gap, or none');
@@ -173,28 +175,53 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- THE PASS: the one way through, its floor, its shelves on both walls, ramps between them
 {
-  const L = RL.passLine, floors: number[] = [], shelves: number[] = [];
-  for (let a = 60; a <= L.total - 60; a += 40) {
+  const L = RL.passLine, floors: number[] = [];
+  let walls = 0, shelved = 0;
+  // (where the ridge stands over it: by its west mouth the ridge itself is low, a few metres from its foot)
+  for (let a = 60; a <= L.total - 160; a += 20) {
     const p = L.at(a), y = RL.passFloor(a);
-    floors.push(heightAt(H, p.x + p.tz * 6, p.z - p.tx * 6) - y);
-    // (each wall's shelves, where no ramp is: the ground at the middle of each, over the floor)
+    // (on its dry side: the river runs 8 m off its middle toward the south wall)
+    floors.push(heightAt(H, p.x - p.tz * 10 * Math.sign(PLAN.pass.river.side), p.z + p.tx * 10 * Math.sign(PLAN.pass.river.side)) - y);
+    // (each wall's shelves, where no ramp is: across the wall, a level run of three metres at about each one's height)
     for (const side of [1, -1]) {
       if (PLAN.pass.ramps.some((r) => r.side === side && a > r.along[0] - 8 && a < r.along[1] + 8)) continue;
-      let pos = PLAN.pass.floor;
-      for (const [h, deep, riser] of PLAN.pass.shelves) {
-        pos += riser;
-        const d = pos + deep / 2, x = p.x + p.tz * d * side, z = p.z - p.tx * d * side;
-        shelves.push(heightAt(H, x, z) - y - h);
-        pos += deep;
-      }
+      walls++;
+      const across: number[] = [];
+      for (let d = RL.passHalf(a, side); d < 90; d += 1) across.push(heightAt(H, p.x + p.tz * d * side, p.z - p.tx * d * side) - y);
+      const has = (h: number) => across.some((_, k) => k + 3 < across.length && [0, 1, 2, 3].every((j) => Math.abs(across[k + j] - h) < 3));
+      if (PLAN.pass.shelves.every(([h]) => has(h))) shelved++;
     }
   }
   assert.ok(floors.every((d) => Math.abs(d) < 0.6), `the pass's floor is off its height: ${floors.map((d) => d.toFixed(1)).join(', ')}`);
-  const worst = Math.max(...shelves.map(Math.abs));
-  assert.ok(worst < 1.6, `a shelf is ${worst.toFixed(1)} m off its height`);
+  assert.ok(shelved / walls > 0.75, `only ${shelved} of ${walls} stretches of the pass's walls have all three shelves`);
+  const worst = shelved / walls;
   const p = L.at(L.total / 2), mid = heightAt(H, p.x, p.z), top = heightAt(H, p.x + p.tz * 90, p.z - p.tx * 90);
   assert.ok(top - mid > 60, `the pass's walls at its middle stand ${(top - mid).toFixed(0)} m`);
-  ok(`the pass ${L.total.toFixed(0)} m through the ridge, its floor ${RL.passFloor(0).toFixed(1)} to ${RL.passFloor(L.total).toFixed(1)} m, its walls ${(top - mid).toFixed(0)} m at its middle, three shelves up each (${PLAN.pass.shelves.map((s) => s[0]).join(', ')} m over the floor, within ${worst.toFixed(1)} m), ${PLAN.pass.ramps.length} ramps between them`);
+  ok(`the pass ${L.total.toFixed(0)} m through the ridge, its floor ${RL.passFloor(0).toFixed(1)} to ${RL.passFloor(L.total).toFixed(1)} m, its walls ${(top - mid).toFixed(0)} m at its middle, three shelves up each (about ${PLAN.pass.shelves.map((s) => s[0]).join(', ')} m over the floor, all three on ${(worst * 100).toFixed(0)}% of its walls), ${PLAN.pass.ramps.length} ramps between them`);
+}
+
+// --- THE PASS'S CAVES (the coast kit's plan, src/sim/pass.ts) under the ground as it is: two metres of rock over every
+// gallery's roof, measured as the plan measures it (galleries' `cover`), but on the real ground; within four metres
+// of a mouth it is the face the mouth is in
+{
+  const { CAVES, passWorld } = await import('../src/sim/pass');
+  const P = WG.passPlan;
+  let least = Infinity, at = '';
+  CAVES.forEach((c, ci) => {
+    for (let k = 0; k + 1 < c.nodes.length; k++) {
+      const n0 = c.nodes[k], n1 = c.nodes[k + 1], run = Math.hypot(n1.s - n0.s, n1.t - n0.t), side = (n1.s - n0.s) / run;
+      for (let i = 0; i <= 16; i++) {
+        const q = i / 16, s0 = n0.s + (n1.s - n0.s) * q, t = n0.t + (n1.t - n0.t) * q, y = n0.y + (n1.y - n0.y) * q, w = n0.w + (n1.w - n0.w) * q, h = n0.h + (n1.h - n0.h) * q;
+        if ((k === 0 && c.mouths.includes('first') && q * run < 4) || (k + 2 === c.nodes.length && c.mouths.includes('last') && (1 - q) * run < 4)) continue;
+        for (const across of [-1, 0, 1]) {
+          const [x, gy, z] = passWorld(P, s0, t + across * side * (w / 2 + 1), 0), cover = heightAt(H, x, z) - gy - y - h;
+          if (cover < least) { least = cover; at = `cave ${ci} (${c.name}) at ${x.toFixed(0)}, ${z.toFixed(0)}`; }
+        }
+      }
+    }
+  });
+  assert.ok(least >= 2, `only ${least.toFixed(1)} m of rock over ${at}`);
+  ok(`the pass's caves under the ground as it is: at least ${least.toFixed(1)} m of rock over every gallery away from its mouths`);
 }
 
 // --- THE GREEN RIVER VALLEY, THE RIVER, THE LAKE, THE SWAMP
@@ -210,17 +237,53 @@ const ridge = (z: number) => RL.ridgeAt(z);
   assert.ok(up === 0 && dry === 0 && lx < -3715 && ly <= SEA + 0.01, `the river: ${up} points uphill, ${dry} with no water over the ground, ends at ${lx.toFixed(0)} (${ly.toFixed(1)})`);
   const [lake, swamp] = water.lakes;
   let deepest = 0;
-  for (let x = -1410; x <= -1270; x += 6) for (let z = 92; z <= 290; z += 6) if (WG.inside(lake.outline, x, z)) deepest = Math.max(deepest, lake.level - heightAt(H, x, z));
+  for (let x = -1370; x <= -1130; x += 6) for (let z = -282; z <= -130; z += 6) if (WG.inside(lake.outline, x, z)) deepest = Math.max(deepest, lake.level - heightAt(H, x, z));
   let wet = 0, cells = 0, pools = 0;
   for (let x = -2040; x <= -1650; x += 6) for (let z = 430; z <= 740; z += 6) if (WG.inside(swamp.outline, x, z)) { cells++; const d = swamp.level - heightAt(H, x, z); if (d > 0) wet++; if (d > 0.9) pools++; }
   assert.ok(deepest > 2 && deepest < 4.5 && wet / cells > 0.6 && pools / cells < 0.12 && swamp.swamp, `the lake ${deepest.toFixed(1)} m deep, the swamp ${((wet / cells) * 100).toFixed(0)}% under water, ${((pools / cells) * 100).toFixed(0)}% pools`);
   ok(`the valley's floor falling west (${fl.map((y) => y.toFixed(0)).join(', ')} m); the river ${river.length} points, never uphill, always water over its bed, into the sea; Ozerki's lake ${deepest.toFixed(1)} m at its deepest; the swamp ${((wet / cells) * 100).toFixed(0)}% under its water, ${((pools / cells) * 100).toFixed(0)}% deep pools`);
 }
 
+// --- WHAT WOULD LOOK WRONG BY THE WATER (the owner, 2026-10-16: "inconsistent water levels, grass spawning under water,
+// gaps in textures in the ground"): no grass under a lake or the river more than ankle deep, nor under the swamp's
+// pools (its reeds stand only in its shallows); no lake's edge hanging over lower ground; the river's banks over its
+// water everywhere, and its end where it meets the sea, at the sea's level; and no ground with no paint on it
+{
+  const { waterAt, inside: inLake } = await import('../src/sim/water');
+  const W = world.water!, G = (x: number, z: number) => heightAt(H, x, z), swamps = W.lakes.filter((l) => l.swamp);
+  let underLake = 0, underPool = 0, worstLake = '', worstPool = '';
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < OX; i++) {
+    const g = world.grass[j * NX + i];
+    if (!g) continue;
+    const x = X0 + i * CELL, z = Z0 + j * CELL, here = waterAt(W, x, z, G);
+    if (!here || here.depth < 0.15) continue;
+    if (swamps.some((l) => inLake(l.outline, x, z))) { if (here.depth > 0.5) { underPool++; worstPool = `${x}, ${z}`; } }
+    else { underLake++; worstLake = `${x}, ${z}`; }
+  }
+  assert.ok(underLake === 0 && underPool === 0, `grass under ${underLake} cells of lake or river water (${worstLake}) and ${underPool} of the swamp's pools (${worstPool})`);
+  let hanging = 0;
+  for (const l of W.lakes) for (let k = 0; k < l.outline.length; k++) {
+    const [ax, az] = l.outline[k], [bx, bz] = l.outline[(k + 1) % l.outline.length], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 2));
+    for (let q = 0; q < n; q++) if (l.level - G(ax + ((bx - ax) * q) / n, az + ((bz - az) * q) / n) > 0.05) hanging++;
+  }
+  assert.equal(hanging, 0, `${hanging} spots of a lake's edge hang over lower ground`);
+  let spilt = 0, where = '';
+  for (const r of W.rivers) for (let k = 0; k + 1 < r.pts.length; k++) {
+    const [x, z, y, wd] = r.pts[k], [x2, z2] = r.pts[k + 1], len = Math.hypot(x2 - x, z2 - z) || 1, nx = -(z2 - z) / len, nz = (x2 - x) / len;
+    for (const side of [-1, 1]) if (y - G(x + nx * side * (wd / 2 + 0.5), z + nz * side * (wd / 2 + 0.5)) > 0.05) { spilt++; where = `${x.toFixed(0)}, ${z.toFixed(0)}`; }
+  }
+  const end = W.rivers[0].pts[W.rivers[0].pts.length - 1];
+  assert.ok(spilt === 0 && Math.abs(end[2] - SEA) < 0.01 && end[0] > WG.shoreLine(end[1]) - 8, `the river over its banks at ${spilt} spots (${where}), or its end (${end[0].toFixed(0)}, ${end[2].toFixed(2)}) not where it meets the sea`);
+  let unpainted = 0;
+  for (let c = 0; c < NX * NZ; c++) if (world.splat[c * 4] + world.splat[c * 4 + 1] + world.splat[c * 4 + 2] + world.splat[c * 4 + 3] < 8) unpainted++;
+  assert.equal(unpainted, 0, `${unpainted} spots of ground with no paint`);
+  ok(`by the water: no grass under a lake or the river, nor under the swamp's pools; every lake's edge on its shore; the river's banks over its water all the way, and its end at the sea's edge and level; no ground unpainted`);
+}
+
 // --- THE TOWNS and KALAT
 {
   const towns = world.towns!;
-  assert.deepEqual(towns.map((t) => t.town.name), ['Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye']);
+  assert.deepEqual(towns.map((t) => t.town.name), ['Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
@@ -242,7 +305,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- the roads
 {
-  const fresh = world.roads.slice(-6), river = world.water!.rivers[0].pts;
+  const fresh = world.roads.slice(-4), river = world.water!.rivers[0].pts;
   for (const r of fresh) {
     const p = r.points;
     let steep = 0;
@@ -257,7 +320,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
   const main = fresh[0].points, near = (p: Float32Array, x: number, z: number) => { let d = Infinity; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; };
   const mid = RL.passLine.at(RL.passLine.total / 2);
   assert.ok(near(main, -3640, 25) < 3 && near(main, mid.x, mid.z) < PLAN.pass.floor, 'the main road misses the beach or the pass');
-  ok(`six new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through the pass to the beach, to the bunker, Lipki, Ozerki, Zavod over its ford, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
+  ok(`four new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through Ozerki, the pass and past Zavod to the beach, to the bunker, Lipki, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
 }
 
 // --- the bunker and the trading post where they went

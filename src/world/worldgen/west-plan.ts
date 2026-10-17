@@ -25,14 +25,37 @@ export const PLAN = {
   bands: { beach: -3645 },
   /** nobody walks or drives west of this (an invisible wall: see game.ts; the server holds poses to it too) */
   barrier: -3650,
-  /** the desert: its height over the sea at the beach's edge and at the ridge's foot, and how high its dunes stand */
-  desert: { beach: -13, foot: -3, dunes: 9 },
+  /**
+   * the desert: its height over the sea at the beach's edge and at the ridge's foot, how high its dunes stand; the
+   * buttes standing out of it before the ridge ([x, z, how far across their top, how high]); and how often a boulder
+   * lies on it, at the foot of a face, on a bench of the ridge and on the pass's floor (one in so many square metres)
+   */
+  desert: {
+    beach: -13, foot: -3, dunes: 9,
+    buttes: [
+      [-2560, -150, 40, 34], [-2650, 120, 28, 26], [-2580, 380, 55, 42], [-2780, 560, 35, 28], [-2700, -620, 45, 38], [-2880, 300, 22, 20], [-3050, -250, 30, 22], [-2520, 620, 25, 32],
+      // (and the temples, standing out from the ridge's foot nearly as high as it)
+      [-2475, -40, 26, 72], [-2490, 260, 30, 86], [-2470, 520, 22, 62], [-2480, -690, 28, 76],
+    ] as [number, number, number, number][],
+    boulders: { open: 20000, foot: 900, bench: 2500, pass: 1400 },
+    /** how far east of the ridge's foot the desert's dry fringe reaches, and round the pass's east mouth from so far to so far */
+    fringe: 130,
+    mouth: [170, 330] as P,
+  },
   /**
    * THE RIDGE between the green land and the desert, the whole height of the map: its feet and crest (x), how far
    * they wander (feet, crest), how high the crest stands and its peaks; an invisible wall along its crest but where
    * the pass goes through (`gap` either side of it), so nobody climbs over or walks round.
    */
-  ridge: { west: -2420, east: -2085, crest: -2250, jag: [24, 12] as P, top: 115, peaks: 8, gap: 46 },
+  ridge: {
+    west: -2420, east: -2085, crest: -2250, jag: [40, 18] as P, top: 110, peaks: 14, gap: 46,
+    /** how far back the deepest of its side canyons cut into it */
+    bays: 120,
+    /** its west foot pushed out round the pass, a spur, so that the canyon's walls and the caves in them have rock to the mouth: how far, over what z either side of the pass */
+    spur: [80, 70, 170] as [number, number, number],
+    /** the beds of its rock, level (the heights between them, over the sea): each a bench of scree and a cliff over it */
+    beds: [0, 13, 27, 40, 56, 70, 86, 100, 114, 132],
+  },
   /**
    * THE PASS, the one way through the ridge, from its east mouth (the valley's end) to its west (the desert): its
    * floor's half width and height at either end; up each wall a riser to each shelf ([height over the floor, how deep,
@@ -52,8 +75,11 @@ export const PLAN = {
       { side: -1, level: 0, along: [200, 235] as P }, { side: -1, level: 1, along: [290, 325] as P }, { side: -1, level: 2, along: [100, 135] as P },
       { side: -1, level: 2, along: [380, 415] as P },
     ],
-    river: { side: -15 },
-    road: 9,
+    // (coast-kit's plan, src/sim/pass.ts, whose `t` is our `s`: the river 8 m off the middle toward the south wall, the
+    // road beyond it on the dry floor before the hall's mouth at that wall's foot; the floor's loot cache on the other
+    // side, north of the middle)
+    river: { side: 8 },
+    road: 16,
     loot: [-2270, -440] as P,
   },
   /**
@@ -81,17 +107,19 @@ export const PLAN = {
    * about it (its floor's half width, its banks' run), and where it is forded ([x, z, how far]).
    */
   river: {
-    desert: [[-2600, -468], [-2760, -448], [-2940, -470], [-3120, -446], [-3300, -430], [-3480, -436], [-3640, -425], [-3790, -424]] as P[],
-    width: [3, 8, 9.5] as [number, number, number],
+    // (out of the pass's mouth down to the brick works' east end, along its quay, and on to the sea)
+    desert: [[-2570, -440], [-2610, -385], [-2632, -335], [-2655, -306], [-2720, -302], [-2815, -304], [-2900, -330], [-3050, -385], [-3250, -415], [-3450, -425], [-3640, -425], [-3790, -424]] as P[],
+    width: [5.5, 8, 9.5] as [number, number, number],
     depth: [0.45, 0.9] as P,
     under: 0.35,
     wander: 9,
     wadi: [16, 22] as P,
-    fords: [[-975, -503, 14], [-2238, -460, 12]] as [number, number, number][],
+    // (Zavod's own lane over to its quay; and in the pass where each ramp up its north wall starts, by `west-water.ts`)
+    fords: [[-2694, -302, 12]] as [number, number, number][],
   },
-  /** the forest lake Ozerki fishes, north of Lipki: its shore (straight along the village), how far under the village's bank its water lies, and its deepest */
+  /** the forest lake Ozerki fishes, north of it on the main road: its shore (straight along the village), how far under the village's bank its water lies, and its deepest */
   lake: {
-    outline: [[-1410, 128], [-1392, 104], [-1350, 92], [-1308, 100], [-1280, 128], [-1272, 170], [-1276, 220], [-1292, 262], [-1330, 288], [-1372, 290], [-1402, 276], [-1410, 262]] as P[],
+    outline: [[-1360, -150], [-1320, -132], [-1180, -132], [-1140, -150], [-1132, -200], [-1150, -250], [-1200, -275], [-1260, -280], [-1320, -268], [-1355, -235], [-1366, -190]] as P[],
     under: 0.7,
     deep: 3.6,
   },
@@ -109,25 +137,30 @@ export const PLAN = {
   },
   /** KALAT, the ruined town (src/sim/ruins.ts), set down whole: its frame (its long axis north and south), and its land eased into the desert from so far to so far out of its top */
   kalat: { name: 'Kalat', x: -3215, z: 230, rot: Math.PI / 2, blend: [130, 210] as P, reach: 440 },
-  /** the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts): the brick works on the river's north bank, its quay to the south */
-  towns: { Zavod: { rot: 0 } } as Record<string, { x?: number; z?: number; rot?: number }>,
+  /**
+   * the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts). Zastava, the post
+   * at the pass's east mouth, on the green river valley's floor just out of it, east enough that its pad and the 40 m
+   * its edge is eased over keep off the ridge's foot (~-2085: its plan's middle, -2040, levelled the pass's first shelves):
+   * the road comes down to the floor past its west end (clear of its watchtower's knoll) and turns into the pass, the river
+   * runs along its north side.
+   */
+  towns: { Zastava: { x: -1965, z: -452 } } as Record<string, { x?: number; z?: number; rot?: number }>,
   /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
-  tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2 } as Record<string, Tier>,
+  tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2, Zastava: 3 } as Record<string, Tier>,
   /**
    * The roads: the main one from the loop's west bend through the trader and Pokrov's lane, north-west to the pass's
    * mouth, through it beside the river (`pass`: so far south of its middle) and out across the desert past Kalat to the
    * beach; and its branches (each from a point of the main road, or the north gate's).
    */
   road: {
-    east: [[-680, -61], [-1173, -81], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
-    west: [[-2700, -330], [-2860, -170], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
+    // (along Ozerki's lane, past the trader, along Pokrov's lane; out of the pass south of the river, past Zavod's east end)
+    east: [[-680, -61], [-1100, -80], [-1170, -90], [-1330, -90], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
+    west: [[-2540, -390], [-2575, -330], [-2625, -280], [-2700, -240], [-2860, -150], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
     width: 6.5,
-    /** from Pokrov's north gate (outside it) to the bunker's yard */
-    bunker: [[-1908, -142], [-1870, -215], [-1760, -285], [-1640, -318], [-1517, -321]] as P[],
-    /** to the north end of Lipki's lane, of Ozerki's, the brick works' gate (over a ford), and Kalat's track */
-    lipki: [[-1173, -81], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
-    ozerki: [[-1450, -62], [-1450, 40], [-1450, 118]] as P[],
-    zavod: [[-1000, -77], [-985, -250], [-960, -400], [-945, -470], [-968, -494], [-980, -510], [-980, -538]] as P[],
+    /** from Pokrov's north gate (outside it) to the edge of the bunker's hollow, where its way out comes to it */
+    bunker: [[-1908, -142], [-1870, -205], [-1760, -255], [-1640, -275], [-1533, -272]] as P[],
+    /** to the north end of Lipki's lane, and Kalat's track */
+    lipki: [[-1170, -90], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
     kalat: [[-2985, -58], [-2975, 100], [-2968, 230], [-2965, 326]] as P[],
     branch: 5,
     /** the steepest a road climbs, to the metre (the jeep's own limit is well over this), and how far its bed is laid out */

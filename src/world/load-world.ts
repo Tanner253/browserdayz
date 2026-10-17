@@ -1,6 +1,7 @@
 // The map is the same deterministic data on a worker; older browsers retain the staged path.
 import type { World } from './worldgen';
 import { generateWorldSoftly } from './worldgen/generate';
+import { withCaves } from './caves-carved';
 
 export async function loadWorld(): Promise<World> {
   let worker: Worker | undefined;
@@ -17,7 +18,7 @@ export async function loadWorld(): Promise<World> {
     });
   } catch (error) {
     console.warn('world worker unavailable; using staged generation', error);
-    return generateWorldSoftly(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    return withCaves(await generateWorldSoftly(() => new Promise((resolve) => setTimeout(resolve, 0))));
   } finally {
     worker?.terminate();
   }

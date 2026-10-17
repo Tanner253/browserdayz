@@ -12,6 +12,7 @@ const BUNKER_WAS = (WGX.BUNKER_WAS ?? WG.BUNKER_AT) as { x: number; z: number },
 const SQUARE_HALF = (WGX.SQUARE_HALF ?? 768) as number, SQUARE_RES = (WGX.SQUARE_RES ?? 769) as number, WORLD_NX = (WGX.WORLD_NX ?? 769) as number;
 const WORLD_X0 = (WGX.WORLD_X0 ?? -768) as number, WORLD_Z0 = (WGX.WORLD_Z0 ?? -768) as number;
 import { buildWorldData } from '../server/world';
+import { TOWN_PLOT } from '../src/world/buildings';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
@@ -211,7 +212,8 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   // (the old six, and one each at the three places built in the east country)
   // (and one where the lane crosses in the army's camp)
   // (and two at the fort on the mountain, 2026-10-13: one in its keep, one in a ruined house on the way to it)
-  assert.equal(data.fires.length, WAS.fires + 4 + 2);
+  // (on today's map: the west's towns and Kalat have fireplaces of their own, plan v5)
+  assert.equal(data.fires.filter((f: { x: number }) => f.x > -SQUARE_HALF).length, WAS.fires + 4 + 2);
 });
 
 ok('it lies outside the ring the map used to end at, inside the ground there is, and the two are one place to play in', () => {
@@ -404,8 +406,8 @@ ok('the way over to the town can be driven: one even climb, level across, the gr
 ok('the east country: a town out of the valley by the road, two places far out, and woods, all on ground the old map did not have', () => {
   const town = world.sites.find((st) => st.kind === 'town')!;
   assert.ok(town && town.name === TOWN.name && !inOld(town.x, town.z), 'no town, or it is on the old map');
-  // (but the trading post's, gone west by the main road since plan v2, 2026-10-16)
-  const built = world.buildings.filter((b) => !inOld(b.x, b.z) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 60);
+  // (on the square: the trading post's went west by the main road, and the west's towns are their own, plan v5)
+  const built = world.buildings.filter((b) => !inOld(b.x, b.z) && b.x > -half && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 60);
   assert.ok(built.length >= 18, `${built.length} buildings out there`);
   for (const b of built) assert.ok(Math.abs(b.x) < half - 20 && Math.abs(b.z) < half - 20, `${b.id} is off the ground`);
   // every one of the downloaded buildings is used: the brick block four times in the town, the plank house far out, the long hut at both
@@ -447,7 +449,7 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   // (one road; what was laid after it is streets, the village's and the hospital's drive; and after those, the loop:
   // see the last check)
   assert.ok(!world.roads[0].side && world.roads.slice(1, 5).every((r) => r.side), 'a second road that is not a street');
-  // (and since plan v2, 2026-10-16, the west's: its main road and three branches)
+  // (and since plan v5, 2026-10-16, the west's: its main road and three branches)
   assert.equal(world.roads.length, 5 + 4 + 4);
   const p = world.roads[0].points, n = p.length / 3, last = world.road.points.length - 3;
   assert.ok(Math.hypot(p[0] - world.road.points[last], p[2] - world.road.points[last + 2]) < 0.01 && Math.abs(p[1] - world.road.points[last + 1]) < 0.01, 'the new road does not begin where the old one ends');
@@ -734,10 +736,10 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   const HELI = 5, heli = world.wreck!;
   const wreck = wreckUnder(b), ofFort = (q: { building: string }) => q.building === 'castle' || q.building === 'hamlet', end = data.lootPoints.findIndex(ofFort), last = data.lootPoints.slice(end - HELI - wreck.spots.length, end - HELI), about = data.lootPoints.slice(end - HELI, end);
   // (the fort's own, and its hamlet's before the gate, which are a place of their own to the map: 'hamlet')
-  // (the basements' come after the fort's since 2026-10-14, the newest lot last: `cellar`)
-  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar'), "the fort's places for things are not the last there are");
+  // (the basements' come after the fort's since 2026-10-14, the newest lot last: `cellar`; and Kalat's after all, plan v5: `ruins_`)
+  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "the fort's places for things are not the last there are");
   const cellarsAt = data.lootPoints.findIndex((q) => q.building === 'cellar');
-  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar'), "something after the basements' places that is not theirs");
+  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "something after the basements' places that is not theirs");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
   assert.ok(heli && inPlay(heli.x, heli.z, 15), 'no helicopter by the fort');

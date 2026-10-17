@@ -68,6 +68,16 @@ export const KINDS = {
   // wrong with it was that it was laid from above and smeared down anything steep: it is laid by the face now.
   // Moss grows on it: see CRAG_MOSS.
   crag: { tex: 'aerial_rocks_02', size: 6.0, tint: [0.95, 0.97, 0.93], sound: 'rock', sided: true },
+  // The coast and the desert of the west (2026-10-16, coast-kit's choice: progress/map3/kit/terrain-hookup.md): the
+  // dunes' wind-rippled sand, the beach's dry sand and its wet at the water, cracked dry earth on the floors of washes
+  // (the river's wadi, Kalat's flats); and the canyon country's layered red rock on its faces and the scree under them
+  // (the owner: "like the grand canyon"). Where the desert is, and which of its sands, is the world's to say (`World.sand`).
+  dune: { tex: 'aerial_beach_01', size: 8, tint: [1.3, 1.12, 0.86], sound: 'gravel' },
+  beach: { tex: 'coast_sand_01', size: 5, tint: [1.08, 1.04, 0.96], sound: 'gravel' },
+  wet: { tex: 'damp_beach_sand', size: 2, tint: [1, 1, 1], sound: 'gravel', quiet: true },
+  cracked: { tex: 'mud_cracked_dry_riverbed_002', size: 2, tint: [1.05, 1.0, 0.95], sound: 'gravel' },
+  canyon: { tex: 'cliff_side', size: 2.4, tint: [1.05, 0.9, 0.8], sound: 'rock', sided: true, far: 0.09 },
+  grit: { tex: 'sandy_gravel_02', size: 2.5, tint: [1.1, 1.0, 0.9], sound: 'gravel', sided: true, far: 0.13 },
 } satisfies Record<string, Kind>;
 
 /**
@@ -142,7 +152,7 @@ function slow(fn: (x: number, z: number) => number) {
 export function layGround(world: World): Ground {
   // (the world's net: `N` the length of a row, west to east; NZ rows, north to south)
   const N = NX, n = NX * NZ;
-  const H = world.heights, S = world.splat;
+  const H = world.heights, S = world.splat, sand = world.sand;
   const cellX = (x: number) => Math.round((x - X0) / CELL), cellZ = (z: number) => Math.round((z - Z0) / CELL);
   // (How high a point is reckoned to stand where the kinds of ground go by the snow line: the grass dries toward
   // it, and the moss of a wood's bank gives out under it. Its own height; and where snow lies by place and not by
@@ -304,6 +314,24 @@ export function layGround(world: World): Ground {
       w[K.needle] += bank * (1 - breaks) * (1 - mossOn) * wooded * pineShare;
       w[K.leaf] += bank * (1 - breaks) * (1 - mossOn) * wooded * (1 - pineShare);
       w[K.turf] += bank * (1 - breaks) * (1 - mossOn) * (1 - wooded);
+
+      // THE DESERT, as much of the point as the world says it is (`World.sand`: how much desert, and of it how much
+      // beach, wet sand and cracked earth): its rock the canyon's layered red, its stones scree, and all else of it sand.
+      if (sand && sand[i * 4] > 0) {
+        const o = i * 4, d = sand[o] / 255, beachy = sand[o + 1] / 255, wetted = sand[o + 2] / 255, washed = sand[o + 3] / 255;
+        w[K.canyon] += (w[K.rock] + w[K.crag]) * d;
+        w[K.grit] += w[K.stony] * d;
+        w[K.rock] *= 1 - d;
+        w[K.crag] *= 1 - d;
+        w[K.stony] *= 1 - d;
+        let soft = 0;
+        for (let k = 0; k < K.dune; k++) if (k !== K.rock && k !== K.crag && k !== K.stony) { soft += w[k] * d; w[k] *= 1 - d; }
+        const rest = Math.max(0, 1 - beachy - wetted - washed);
+        w[K.beach] += soft * beachy;
+        w[K.wet] += soft * wetted;
+        w[K.cracked] += soft * washed;
+        w[K.dune] += soft * rest;
+      }
 
       let sum = 0, best = 0;
       for (let k = 0; k < w.length; k++) {

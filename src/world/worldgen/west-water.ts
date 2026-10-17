@@ -75,6 +75,8 @@ export function riverWater(H: Float32Array, net: Net, shoreAt: (z: number) => nu
       y = x < shore ? SEA_LEVEL - 0.05 : lerp(from, SEA_LEVEL + 0.12, t);
     }
     if (k > 0) y = Math.min(y, out[k - 1][2] - 0.0015 * (run[k] - run[k - 1]));
+    // (and it ends where it meets the sea, at the sea's level: not out over the sea's floor)
+    if (part[k] === 2 && x < shoreAt(z) + 2) { out.push([x, z, SEA_LEVEL, width]); break; }
     out.push([x, z, y, width]);
   }
   return out;
@@ -85,8 +87,8 @@ export function riverWater(H: Float32Array, net: Net, shoreAt: (z: number) => nu
  * banks a slope up to the floor; in the desert a wadi about it as well, its floor a little over the water and its
  * sides easing up into the sand. (Cut again after the roads' beds, so that a ford is the river's and not the road's.)
  */
-export function carveRiver(H: Float32Array, net: Net, out: RiverPts) {
-  const R = PLAN.river, { part } = riverLine(), n = out.length, pts = out.map(([x, z]) => [x, z] as P);
+export function carveRiver(H: Float32Array, net: Net, out: RiverPts, water?: Float32Array) {
+  const R = PLAN.river, part = riverLine().part.slice(0, out.length), n = out.length, pts = out.map(([x, z]) => [x, z] as P);
   const run = [0];
   for (let k = 1; k < n; k++) run.push(run[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   const mouth = run[part.indexOf(2) - 1];
@@ -95,10 +97,17 @@ export function carveRiver(H: Float32Array, net: Net, out: RiverPts) {
   line.each(net, Math.max(W[0] + W[1], R.width[2] / 2 + 6), (i, x, z, a) => {
     const k = clamp(a.k, 0, n - 2), u = clamp((a.along - run[k]) / (run[k + 1] - run[k] || 1), 0, 1);
     const y = lerp(out[k][2], out[k + 1][2], u), w = lerp(out[k][3], out[k + 1][3], u), dp = lerp(depth(k), depth(k + 1), u) * (1 - fordAt(x, z));
-    // (its banks a few metres up to the floor it runs on: no further, so that it cuts nothing of the walls beside it)
-    let bed = a.d < w / 2 ? y - dp * (1 - 0.6 * (2 * a.d / w) ** 2) - 0.06 : a.d < w / 2 + 4 ? y - 0.1 + (a.d - w / 2) * 0.55 : Infinity;
+    // (its bed deepest in its middle, coming up to a shallow rim inside its edge, which meets the water at its line:
+    // its ground is a net of two metres, and a deep sample by the bank drags the bank under the water; then its banks a
+    // few metres up to the floor it runs on, no further, so that it cuts nothing of the walls beside it)
+    const ford = fordAt(x, z) > 0, rim = Math.min(1.2, w / 5), inner = w / 2 - rim;
+    let bed = a.d < inner ? y - dp * (1 - 0.6 * (a.d / inner) ** 2) - 0.06 : a.d < w / 2 + 4 ? (a.d < w / 2 ? y - 0.1 + 0.22 * ((a.d - inner) / rim) : y + 0.12 + (a.d - w / 2) * 0.55) : Infinity;
     if (part[k] === 2) bed = Math.min(bed, a.d < W[0] ? y + 0.45 + 0.15 * w2.noise(x * 0.05, z * 0.05) : y + 0.45 + (a.d - W[0]) * (2.4 / W[1]) + 0.05 * (a.d - W[0]) ** 1.5);
     if (bed < H[i]) H[i] = bed;
+    // (its rim and its banks held so, over its water all the way, the ground at its edge never under it: but where a road fords it)
+    if (!ford && a.d >= inner && a.d < w / 2 + 3) H[i] = Math.max(H[i], a.d < w / 2 ? bed : y + 0.12 + (a.d - w / 2) * 0.1);
+    // (where its water lies, for what grows: World's grass is not under it)
+    if (water && a.d < w / 2 + 0.4 && y > water[i]) water[i] = y;
   });
 }
 
@@ -117,10 +126,14 @@ export function riverMask(river: RiverPts, net: Net, more = 3) {
   return out;
 }
 
-/** where the river is forded (a part of its depth taken off): where a path crosses it, shallow enough to wade */
+/** where the river is forded (a part of its depth taken off): where a path crosses it, shallow enough to wade (and in the pass, before each ramp up its north wall from the floor) */
+const passFords: [number, number, number][] = PLAN.pass.ramps.filter((r) => r.side === Math.sign(PLAN.pass.river.side) && r.level === 0).map((r) => {
+  const a = passLine.at((r.along[0] + r.along[1]) / 2);
+  return [a.x - a.tz * PLAN.pass.river.side * -1, a.z + a.tx * PLAN.pass.river.side * -1, 14];
+});
 function fordAt(x: number, z: number) {
   let f = 0;
-  for (const [fx, fz, r] of PLAN.river.fords) f = Math.max(f, 1 - smoothstep(r * 0.5, r, Math.hypot(x - fx, z - fz)));
+  for (const [fx, fz, r] of [...PLAN.river.fords, ...passFords]) f = Math.max(f, 1 - smoothstep(r * 0.5, r, Math.hypot(x - fx, z - fz)));
   return f * 0.45;
 }
 
@@ -146,15 +159,31 @@ export function cutLake(H: Float32Array, net: Net, shore: P[], level: number, de
   for (let iz = Math.max(0, Math.floor((z0 - E - net.z0) / CELL)); iz <= Math.min(net.nz - 1, Math.ceil((z1 + E - net.z0) / CELL)); iz++)
     for (let ix = Math.max(0, Math.floor((x0 - E - net.x0) / CELL)); ix <= Math.min(net.nx - 1, Math.ceil((x1 + E - net.x0) / CELL)); ix++) {
       const x = net.x0 + ix * CELL, z = net.z0 + iz * CELL, i = iz * net.nx + ix;
+      // (its shore a gentle slope of mud and grass down into the water, a hand over the water at the edge itself; its
+      // bed shelving from there to its deepest; the land about it brought down to the shore or banked up to it gently)
       if (inside(shore, x, z)) {
         const e = edgeIn(shore, x, z);
-        H[i] = level - Math.min(deepest, 0.8 + e * 0.09) + 0.3 * w1.noise(x * 0.04, z * 0.04);
+        H[i] = level + 0.12 - Math.min(deepest + 0.12, 0.05 * e + 0.011 * e * e) + 0.2 * w1.noise(x * 0.04, z * 0.04) * smoothstep(6, 20, e);
       } else {
         const e = outside(shore, x, z);
-        if (e < E) H[i] = Math.max(H[i], lerp(level + 0.1, H[i], smoothstep(4, E, e)));
+        if (e < E) H[i] = clamp(H[i], level + 0.12 + 0.03 * e, level + 0.12 + 0.12 * e + 0.004 * e * e);
       }
     }
 }
+/**
+ * The shore held after the ground about it is done (a bunker's hillside, a road's bed may have moved it): a few metres
+ * either side of it over the water by a hand, rising gently.
+ */
+export function holdShore(H: Float32Array, net: Net, shore: P[], level: number) {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [x, z] of shore) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  for (let iz = Math.max(0, Math.floor((z0 - 8 - net.z0) / CELL)); iz <= Math.min(net.nz - 1, Math.ceil((z1 + 8 - net.z0) / CELL)); iz++)
+    for (let ix = Math.max(0, Math.floor((x0 - 8 - net.x0) / CELL)); ix <= Math.min(net.nx - 1, Math.ceil((x1 + 8 - net.x0) / CELL)); ix++) {
+      const x = net.x0 + ix * CELL, z = net.z0 + iz * CELL, i = iz * net.nx + ix;
+      if (!inside(shore, x, z) && outside(shore, x, z) < 6) H[i] = Math.max(H[i], level + 0.12 + 0.03 * outside(shore, x, z));
+    }
+}
+
 /** how far inside a shore a spot is */
 function edgeIn(shore: P[], x: number, z: number) {
   let d = Infinity;

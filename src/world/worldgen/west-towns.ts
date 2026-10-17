@@ -92,8 +92,13 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     for (let ch = 0; ch < 4; ch++) sp[k * 4 + ch] = Math.round(sp[k * 4 + ch] * (1 - bare) + (ch === to ? 255 * bare : 0));
     out.grass[k] = Math.round(out.grass[k] * (1 - bare));
   });
+  // (Two things stood one on the other, as crates are: the upper set a hand's breadth askew. What is searched is
+  // known by where it stands, to a tenth of a metre, and not by how high: two at one spot were one container.)
+  const stood = new Set<string>();
   for (const th of townThings(t)) {
-    const [x, z] = townPoint(t, th.x, th.z);
+    let [x, z] = townPoint(t, th.x, th.z);
+    while (stood.has(`${Math.round(x * 10)}_${Math.round(z * 10)}`)) x += 0.11;
+    stood.add(`${Math.round(x * 10)}_${Math.round(z * 10)}`);
     // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
     out.props.push({ kind: th.kind, x, y: padY + moundAt(t, th.x, th.z) + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
@@ -130,10 +135,11 @@ export function kalatShare(site: Place, x: number, z: number) {
 }
 /**
  * Kalat's land laid on the net: as it really stands, eased out into the desert about it. Gives back how much of each
- * sample of the net is its land (0 to 255), for whatever is asked of it after (paint, what grows).
+ * sample of the net is its land (0 to 255), for whatever is asked of it after (paint, what grows), and how much is
+ * its cracked earth.
  */
-export function layKalat(H: Float32Array, net: Net, site: Place): Uint8Array {
-  const share = new Uint8Array(net.nx * net.nz), K = PLAN.kalat;
+export function layKalat(H: Float32Array, net: Net, site: Place): { share: Uint8Array; wash: Uint8Array } {
+  const share = new Uint8Array(net.nx * net.nz), wash = new Uint8Array(net.nx * net.nz), K = PLAN.kalat;
   // (only over the box its land can reach, in its own frame)
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   for (const [x, z] of OUTLINE) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
@@ -146,7 +152,10 @@ export function layKalat(H: Float32Array, net: Net, site: Place): Uint8Array {
       if (mix <= 0) continue;
       const i = iz * net.nx + ix;
       share[i] = Math.round(mix * 255);
-      H[i] = lerp(H[i], site.y + ruinsGround(lx, lz).y, mix);
+      const g = ruinsGround(lx, lz);
+      H[i] = lerp(H[i], site.y + g.y, mix);
+      // (its flats, its moat and its dry river's bed are cracked earth)
+      if (g.kind === 'flats' || g.kind === 'moat' || g.kind === 'river') wash[i] = Math.round(mix * 255);
     }
-  return share;
+  return { share, wash };
 }

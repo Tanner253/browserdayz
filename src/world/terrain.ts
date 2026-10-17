@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { caveMouths, inMouth } from '../sim/pass';
 import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { physics } from '../core/physics';
@@ -344,15 +345,24 @@ export class Terrain {
     uWells: { value: 0 },
   };
 
-  /** the basements' open steps: not drawn, no grass within a metre of them, and the ground's collider open there (see physics.holes) */
-  openWells(list: Basement[]) {
+  /**
+   * the basements' open steps, and the mouths of the pass's caves (src/sim/pass.ts): not drawn, no grass within a
+   * metre of them, and the ground's collider open there (see physics.holes)
+   */
+  openWells(list: Basement[], mouths: ReturnType<typeof caveMouths> = []) {
     const n = Math.min(list.length, MAX_WELLS);
     for (let i = 0; i < n; i++) {
       const b = list[i], w = b.well, [cx, cz] = frameToWorld(b, (w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2);
       this.wells.uWellA.value[i].set(cx, cz, Math.cos(b.rot), Math.sin(b.rot));
       this.wells.uWellB.value[i].set((w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2, 0, 0);
     }
-    this.wells.uWells.value = n;
+    const m = Math.min(mouths.length, MAX_WELLS - n);
+    for (let k = 0; k < m; k++) {
+      const q = mouths[k];
+      this.wells.uWellA.value[n + k].set(q.x, q.z, Math.cos(q.rot), Math.sin(q.rot));
+      this.wells.uWellB.value[n + k].set(q.hx, q.hz, 0, 0);
+    }
+    this.wells.uWells.value = n + m;
     const g = this.grassTex.image.data as Uint8Array;
     for (const b of list) {
       const [x0, z0, x1, z1] = b.box;
@@ -360,8 +370,14 @@ export class Terrain {
         for (let ix = Math.max(0, Math.floor((x0 - WORLD_X0) / CELL) - 1); ix <= Math.min(WORLD_NX - 1, Math.ceil((x1 - WORLD_X0) / CELL) + 1); ix++)
           if (inWell([b], WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL, 1)) g[idx(ix, iz)] = 0;
     }
+    for (const q of mouths) {
+      const r = Math.hypot(q.hx, q.hz) + 2;
+      for (let iz = Math.max(0, Math.floor((q.z - r - WORLD_Z0) / CELL)); iz <= Math.min(WORLD_NZ - 1, Math.ceil((q.z + r - WORLD_Z0) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((q.x - r - WORLD_X0) / CELL)); ix <= Math.min(WORLD_NX - 1, Math.ceil((q.x + r - WORLD_X0) / CELL)); ix++)
+          if (inMouth([{ ...q, hx: q.hx + 1, hz: q.hz + 1 }], WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL)) g[idx(ix, iz)] = 0;
+    }
     this.grassTex.needsUpdate = true;
-    physics.holes = (x, z) => inWell(list, x, z);
+    physics.holes = (x, z) => inWell(list, x, z) || (mouths.length > 0 && inMouth(mouths, x, z));
   }
   splatTex!: THREE.DataTexture;
   grassTex!: THREE.DataTexture;
@@ -518,7 +534,7 @@ export class Terrain {
       };
     } else {
       // (the kinds of ground, and after them the one picture that is not a kind: the moss on the bank's slabs)
-      if (KIND_NAMES.length !== 12) throw new Error('the paint reads twelve kinds of ground, four to a picture of weights');
+      if (KIND_NAMES.length !== 18) throw new Error('the paint reads eighteen kinds of ground, four to a picture of weights');
       const kinds: Kind[] = [...KIND_NAMES.map((k) => KINDS[k]), CRAG_MOSS];
       const made = await buildGround(kinds, kinds.map((k) => t[k.tex]));
       const weights = this.ground.weights.map((w) => {
@@ -551,6 +567,8 @@ export class Terrain {
         tKindsA: { value: weights[0] },
         tKindsB: { value: weights[1] },
         tKindsC: { value: weights[2] },
+        tKindsD: { value: weights[3] },
+        tKindsE: { value: weights[4] },
         tMacro: { value: this.macroTex },
         tSnow: { value: null },
         uSnowIs: { value: snowIs },
@@ -920,6 +938,8 @@ uniform sampler2DArray tReliefQuiet;
 uniform sampler2D tKindsA;
 uniform sampler2D tKindsB;
 uniform sampler2D tKindsC;
+uniform sampler2D tKindsD;
+uniform sampler2D tKindsE;
 uniform sampler2D tMacro;
 uniform sampler2D tSnow;
 // (snow: its colour from far off; and whether its picture has come, which it does when somebody first goes near any)
@@ -1095,6 +1115,8 @@ vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.zw);
 vec4 wA = texture2D(tKindsA, splatUv + jitter);
 vec4 wB = texture2D(tKindsB, splatUv + jitter);
 vec4 wC = texture2D(tKindsC, splatUv + jitter);
+vec4 wD = texture2D(tKindsD, splatUv + jitter);
+vec2 wE = texture2D(tKindsE, splatUv + jitter).rg;
 
 float camDist = length(vTerrainPos - cameraPosition);
 vec3 dP3x = dFdx(vTerrainPos);
@@ -1114,12 +1136,14 @@ vec3 side = pow(abs(gN), vec3(6.0));
 side = max(side / (side.x + side.y + side.z) - 0.1, 0.0);
 side /= side.x + side.y + side.z;
 
-// There are a dozen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
+// There are eighteen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
 // looked at (the second if there is any of it to speak of, the third only if there is a good deal), the rest not.
 float kindW[GROUND_KINDS];
 kindW[0] = wA.r; kindW[1] = wA.g; kindW[2] = wA.b; kindW[3] = wA.a;
 kindW[4] = wB.r; kindW[5] = wB.g; kindW[6] = wB.b; kindW[7] = wB.a;
 kindW[8] = wC.r; kindW[9] = wC.g; kindW[10] = wC.b; kindW[11] = wC.a;
+kindW[12] = wD.r; kindW[13] = wD.g; kindW[14] = wD.b; kindW[15] = wD.a;
+kindW[16] = wE.r; kindW[17] = wE.g;
 int pick[3];
 float layerW[3];
 pick[0] = 0; pick[1] = 0; pick[2] = 0;

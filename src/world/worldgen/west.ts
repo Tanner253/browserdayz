@@ -23,9 +23,9 @@ import { CELL, SEA_LEVEL, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_SEE
 import { catmullRom, heightAt, slopeAt } from './ground';
 import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside } from './west-plan';
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
-import { carveRiver, cutLake, cutSwamp, lakeLevel, riverMask, riverWater } from './west-water';
+import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater } from './west-water';
 import { fillTown, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
-import { moundAt } from '../../sim/towns';
+import { moundAt, placedRooms } from '../../sim/towns';
 import type { Instance, POI, Site } from './types';
 
 /** the shape of the new ground, in metres west of the square's edge (`d`) or from the shore (`c`, + inland) */
@@ -85,6 +85,7 @@ export interface WestFields extends SquareFields {
   kalat: Place;
   slabs: SlabRun[];
   water: Waters;
+  sand: Uint8Array;
 }
 
 export interface WestTools {
@@ -217,6 +218,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
 
   // KALAT, on its own land in the desert
   const kalat = kalatSite(heights, net), kalatLand = layKalat(heights, net, kalat);
+  /** how far a spot is from the pass's middle line (far off it: Infinity) */
+  const passNear = (x: number, z: number) => (x > -2600 && x < -1950 && z > -560 && z < -340 ? passLine.near(x, z).d : Infinity);
 
   // THE TRADING POST'S YARD (its buildings were moved to it: opening.ts), levelled as its first place was.
   const post = movedPost();
@@ -243,8 +246,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   // cut into it as it was into the old hillside (src/world/worldgen/generate.ts, the second expansion, by the same rule).
   const bunker = tools.sites.find((s) => s.kind === 'bunker');
   const yard: { x: number; z: number; rot: number }[] = [];
-  // (its knoll is not let into the valley beside it)
-  if (bunker) cutBunker(heights, surface, bunker, tools, yard, (x, z) => smoothstep(70, 140, valleyLine.near(x, z).d));
+  // (its knoll is not let down into the valley beside it: it is the valley's rim, raised)
+  if (bunker) cutBunker(heights, surface, bunker, tools, yard, (x, z) => smoothstep(30, 80, valleyLine.near(x, z).d));
 
   // THE ROADS (PLAN.road): the main one from the loop's west bend through the trader and Pokrov, through the pass and
   // out across the desert to the beach, and its branches. Each lies on the ground evened out along it over fifty
@@ -294,10 +297,13 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const k = nearest(main.points, pts[0][0], pts[0][1]);
     return lay([[main.points[k], main.points[k + 2]], ...pts.slice(1)], main, R.branch, true);
   };
-  const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), branch(R.ozerki), branch(R.zavod), branch(R.kalat)];
+  const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), branch(R.kalat)];
   const preBed = heights.slice(), gap = new Float32Array(n).fill(1e9);
   // (the branches' beds first, and the main road's over them where they meet)
-  for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, () => 1, net, { fill: 0.35, cut: 0.6, gap });
+  // (but in the pass, where the road lies on its level floor: its shelves are the plan's, and the caves are under them)
+  // (its mouths are open ground the road comes down into: the caves begin some ninety metres in)
+  const outOfPass = (x: number, z: number) => { if (passNear(x, z) > 75) return 1; const a = passLine.near(x, z).along; return a > 60 && a < passLine.total - 60 ? 0 : 1; };
+  for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, outOfPass, net, { fill: 0.35, cut: 0.6, gap });
   // (and the loop's own over the main road's where it leaves it: the loop as the square laid it, about the junction only)
   {
     const jx = main.points[0], jz = main.points[2], lp = loop.points;
@@ -305,8 +311,10 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     for (let k = 0; k < lp.length / 3; k++) if (Math.hypot(lp[k * 3] - jx, lp[k * 3 + 2] - jz) < 120) { k0 = Math.min(k0, k); k1 = k; }
     if (k1 > k0) bed(heights, lp.subarray(k0 * 3, k1 * 3 + 3), loop.width, R.bed, (x, z) => 1 - smoothstep(50, 90, Math.hypot(x - jx, z - jz)), net);
   }
-  // (and the river's bed over the roads', where they ford it)
-  carveRiver(heights, net, river);
+  // (and the river's bed over the roads', where they ford it; and the lake's shore held, whatever moved it)
+  const riverWet = new Float32Array(n).fill(-1e9);
+  carveRiver(heights, net, river, riverWet);
+  holdShore(heights, net, PLAN.lake.outline, lake);
   // (the ground as it is seen moved as the ground was by the beds: in the square's opened west too)
   if (own) for (let i = 0; i < n; i++) if (heights[i] !== preBed[i]) surface[i] += heights[i] - preBed[i];
 
@@ -321,7 +329,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   const L = PLAN.lake.outline, S = PLAN.swamp.outline, LB = bounds(L), SB = bounds(S);
   const clear = (x: number, z: number, pad: number) =>
     gap[clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1)] < pad ||
-    PLACED.some((t) => offPad(t, x, z) < 8 + pad) || kalatLand[clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1)] > 76 ||
+    PLACED.some((t) => offPad(t, x, z) < 8 + pad) || kalatLand.share[clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1)] > 76 ||
     (inBounds(LB, x, z, 4) && outside(L, x, z) < 4) || (inBounds(SB, x, z, 0) && inside(S, x, z)) || inWater(x, z) || Math.hypot(x - post.x, z - post.z) < 40 + pad ||
     // (of the bunker, as its first place had it: what grows there stays but on its roof, in its hut and in its way out)
     yard.some((y) => {
@@ -343,9 +351,12 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   // woods' and the valley's slopes' floors; the swamp's mud; west of the ridge's crest the desert's bare sand, but for
   // the river's green line through it; bare on the beach and under the sea; the roads' verges bare.
   const rimWood = (x: number, z: number) => (W.seam - x > W.woods[1] ? -1 : tools.forestMask(x, z) - 2 * smoothstep(W.woods[0], W.woods[1], W.seam - x));
-  const banks = riverBanks(river, net);
+  const banks = riverBanks(river, net), sands = new Uint8Array(n * 4);
+  // (THE DESERT: all of the ridge, a dry fringe east of it, and the country about the pass's east mouth, the owner:
+  // "The canyon and surrounding area should be desert, like the grand canyon")
+  const mouth = passLine.at(0), M0 = PLAN.desert.mouth;
   for (let iz = 0; iz < NZ; iz++) {
-    const crest = ridgeAt(zOf(iz))[1];
+    const east = ridgeAt(zOf(iz))[2];
     for (let ix = 0; ix < OX; ix++) {
       const x = xOf(ix), z = zOf(iz), i = iz * NX + ix, h = heights[i], c = x - shores[iz];
       // (the slope as `slopeAt` has it, read off the net's own samples: they are the heights it would read)
@@ -353,7 +364,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       const slope = Math.hypot(heights[iz * NX + r] - heights[iz * NX + l], heights[dn * NX + ix] - heights[u * NX + ix]) / (2 * CELL);
       // (each noise asked only where it can tell)
       let rock = slope < 0.39 ? 0 : clamp(smoothstep(0.5, 0.85, slope + 0.1 * n3.noise(x * 0.05, z * 0.05)), 0, 1);
-      const desert = 1 - smoothstep(crest - 20, crest + 20, x), bank = banks[i] / 255;
+      const desert = x <= east ? 1 : Math.max(1 - smoothstep(east + 20, east + PLAN.desert.fringe + 40 * n2.noise(x * 0.006, z * 0.006), x), 1 - smoothstep(M0[0], M0[1] + 50 * n3.noise(x * 0.008, z * 0.008), Math.hypot(x - mouth.x, z - mouth.z))), bank = banks[i] / 255;
       let forest = desert >= 1 ? 0 : Math.max(smoothstep(-0.05, 0.25, rimWood(x, z)), pineWood(x, z), birchWood(x, z), walls[i] / 255 * 0.85);
       const marsh = inBounds(SB, x, z, 0) && inside(S, x, z) ? 1 : 0;
       forest = Math.max(forest, marsh * 0.55);
@@ -374,14 +385,44 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       if (g > 0) g *= 0.75 + 0.25 * n1.noise(x * 0.08, z * 0.08);
       g *= 1 - smoothstep(SNOW.from - 10, SNOW.from + 8, h);
       grass[i] = Math.round(clamp(g, 0, 1) * 255);
+      // (and which of the desert's grounds: the beach's sand, wet at the water; cracked earth on the wadi's floor by
+      // the river and on the pass's; the rest dune sand: World.sand)
+      const d = Math.max(desert * (1 - bank * (1 - rock)), sand);
+      if (d > 0) {
+        const o = i * 4, beach = 1 - smoothstep(W.sand - 10, W.sand + 25, c), wet = 1 - smoothstep(1, 9, c);
+        const wash = Math.max(smoothstep(0.15, 0.35, bank) * (1 - smoothstep(0.6, 0.8, bank)), desert * 0.65 * (1 - smoothstep(PLAN.pass.floor - 4, PLAN.pass.floor + 2, passNear(x, z))));
+        sands[o] = Math.round(d * 255);
+        sands[o + 2] = Math.round(wet * 255);
+        sands[o + 1] = Math.round(Math.max(0, beach - wet) * 255);
+        sands[o + 3] = Math.round(Math.min(1 - beach, wash) * 255);
+      }
     }
   }
+  // (NO GRASS UNDER WATER: none under the lake, nor under the river more than a hand deep; in the swamp, its reeds
+  // and grass through the water only where it is shallow, its pools clear)
+  {
+    const wetAt = (i: number, x: number, z: number) => {
+      let d = riverWet[i] - heights[i];
+      if (inBounds(LB, x, z, 0) && inside(L, x, z)) d = Math.max(d, lake - heights[i]);
+      return d;
+    };
+    for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < OX; ix++) {
+      const i = iz * NX + ix;
+      if (!grass[i]) continue;
+      const x = xOf(ix), z = zOf(iz);
+      if (inBounds(SB, x, z, 0) && inside(S, x, z)) { grass[i] = Math.round(grass[i] * (1 - smoothstep(0.3, 0.45, swamp - heights[i]))); continue; }
+      const d = wetAt(i, x, z);
+      if (d > 0) grass[i] = Math.round(grass[i] * (1 - smoothstep(0, 0.1, d)));
+    }
+  }
+  // (Kalat's flats, its moat and its dry river's bed cracked earth)
+  for (let i = 0; i < n; i++) if (kalatLand.wash[i]) sands[i * 4 + 3] = Math.max(sands[i * 4 + 3], kalatLand.wash[i]);
   // (the roads' verges, in the square's opened west too: the gravel of a road's edge, and no grass on it)
   for (const r of ways) verges(splat, grass, r.points, r.width, net, p3);
   // (the bunker's own floor, as the bunker's stage leaves it: no grass in its hut or its yard)
   for (const y of yard) clearYard(grass, y);
   // (Kalat's land bare, as the desert is)
-  for (let i = 0; i < n; i++) if (kalatLand[i] > 76) grass[i] = 0;
+  for (let i = 0; i < n; i++) if (kalatLand.share[i] > 76) grass[i] = 0;
 
   // ---- THE TOWNS: their buildings, things and slab walls, and their yards and lanes painted (west-towns.ts)
   const towns: PlacedTown[] = [], slabs: SlabRun[] = [];
@@ -451,6 +492,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
         if (b > 0.2 && b < 0.9 && hv < 0.05 && free(x, z)) tools.trees.push({ kind: s < 0.45 ? 'bush_a' : s < 0.7 ? 'bush_b' : s < 0.85 ? 'ash_a' : 'oak_a', x, y, z, rot, scale });
         continue;
       }
+      // (none in the desert's fringe east of the ridge, nor about the pass's mouth)
+      if (sands[i * 4] > 128) continue;
       const pw = pineWood(x, z), bw = birchWood(x, z), vw = walls[i] / 255;
       const meadow = x < MB.x0 - 70 || x > MB.x1 + 70 || z < MB.z0 - 70 || z > MB.z1 + 70 ? 0 : inBox(MB, x, z, 40, 20), lone = hv < 0.012 * (1 - meadow);
       const inPines = pw > 0.05 && hv < pw * 0.62, inBirches = !inPines && bw > 0.05 && hv < bw * 0.5, onSlope = !inPines && !inBirches && vw > 0.1 && hv < vw * 0.45;
@@ -464,9 +507,42 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       tools.trees.push({ kind, x, y, z, rot, scale });
     }
   }
+  // ---- THE BOULDERS of the canyon country (coast-kit's Namaqualand scans): fallen at the foot of the ridge's faces
+  // and the buttes', lying on the benches of its beds, strewn on the pass's floor (but off its road, its river and its
+  // best loot) and here and there on the open sand. On a grid of their own, by hashes of their own.
+  {
+    const B = PLAN.desert.boulders, G = 8, kinds = ['namaqualand_boulder_02', 'namaqualand_boulder_03', 'namaqualand_boulder_04', 'namaqualand_boulder_05'];
+    const L0 = PLAN.pass.loot;
+    for (let gz = WORLD_Z0 + 6; gz < WORLD_Z1 - 6; gz += G) {
+      const [wf, , ef] = ridgeAt(gz);
+      for (let gx = W.barrier + 40; gx < ef + 60; gx += G) {
+        const hx = hash2(Math.round(gx * 10), Math.round(gz * 10), seed + 81), hz = hash2(Math.round(gz * 10), Math.round(gx * 10), seed + 83);
+        const x = gx + (hx - 0.5) * G * 0.9, z = gz + (hz - 0.5) * G * 0.9, hv = hash2(Math.round(x * 7), Math.round(z * 7), seed + 85);
+        const i = clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1);
+        if (sands[i * 4] < 200 || sands[i * 4 + 1] > 40) continue;
+        const slope = slopeAt(heights, x, z), near = passNear(x, z) < 40 ? passLine.near(x, z) : null, onFloor = !!near && near.d < PLAN.pass.floor - 2 && near.along > 4 && near.along < passLine.total - 4;
+        let every = B.open;
+        if (near && onFloor) {
+          // (the floor's middle and its north side by the river's bank: not on the road, nor in the river, nor about the loot)
+          if ((near.s > PLAN.pass.road - 5 && near.s < PLAN.pass.road + 5) || Math.abs(near.s - PLAN.pass.river.side) < 7 || Math.hypot(x - L0[0], z - L0[1]) < 40) continue;
+          every = B.pass;
+        } else if (slope > 0.9) continue;
+        else if (slope > 0.3) every = B.foot;
+        else if (x > wf && x < ef) every = B.bench;
+        if (hv > (G * G) / every || clear(x, z, 3) || PLAN.starts.z.some((sz) => Math.hypot(x - PLAN.starts.x, z - sz) < 30)) continue;
+        const s = hash2(Math.round(x), Math.round(z), 87);
+        tools.rocks.push({ kind: kinds[Math.floor(s * 4.6) % 4], x, y: heightAt(heights, x, z), z, rot: hx * Math.PI * 2, scale: 0.6 + hz * 1.1 });
+      }
+    }
+  }
   return {
-    heights, surface, splat, grass, towns, kalat, slabs,
-    water: { lakes: [{ name: OZERKI.name, level: lake, outline: L }, { name: 'swamp', level: swamp, outline: S, swamp: true }], rivers: [{ name: 'the river', pts: river }] },
+    heights, surface, splat, grass, towns, kalat, slabs, sand: sands,
+    water: {
+      lakes: [{ name: OZERKI.name, level: lake, outline: L }, { name: 'swamp', level: swamp, outline: S, swamp: true }],
+      rivers: [{ name: 'the river', pts: river }],
+      // (the hamlet's houses with the swamp's water over their floors: drawn still and dark inside, src/sim/water.ts WaterRoom)
+      rooms: placedRooms(placed(hamlet, padY.get(MOKROYE.name)!), BUILDING_FOOTPRINT),
+    },
   };
 }
 
@@ -474,9 +550,9 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
 const bounds = (p: [number, number][]) => p.reduce((b, [x, z]) => [Math.min(b[0], x), Math.max(b[1], x), Math.min(b[2], z), Math.max(b[3], z)], [Infinity, -Infinity, Infinity, -Infinity]);
 const inBounds = (b: number[], x: number, z: number, m: number) => x >= b[0] - m && x <= b[1] + m && z >= b[2] - m && z <= b[3] + m;
 
-/** how near the river's water each sample is, as a green line through dry country: 255 at its edge, none 40 m out */
+/** how near the river's water each sample is, as a green line through dry country: 255 at its edge, none 18 m out */
 function riverBanks(river: [number, number, number, number][], net: { x0: number; z0: number; nx: number; nz: number }) {
-  const out = new Uint8Array(net.nx * net.nz), reach = 40;
+  const out = new Uint8Array(net.nx * net.nz), reach = 18;
   for (let k = 0; k + 1 < river.length; k++) {
     const [ax, az, , aw] = river[k], [bx, bz, , bw] = river[k + 1], ex = bx - ax, ez = bz - az, len2 = ex * ex + ez * ez || 1;
     const ix0 = Math.max(0, Math.floor((Math.min(ax, bx) - reach - 6 - net.x0) / CELL)), ix1 = Math.min(net.nx - 1, Math.ceil((Math.max(ax, bx) + reach + 6 - net.x0) / CELL));
@@ -484,7 +560,7 @@ function riverBanks(river: [number, number, number, number][], net: { x0: number
     for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
       const x = net.x0 + ix * CELL, z = net.z0 + iz * CELL, t = clamp(((x - ax) * ex + (z - az) * ez) / len2, 0, 1);
       const d = Math.hypot(x - ax - ex * t, z - az - ez * t) - lerp(aw, bw, t) / 2;
-      const v = Math.round(255 * (1 - smoothstep(6, reach, d)) * smoothstep(-1, 1.5, d));
+      const v = Math.round(255 * (1 - smoothstep(4, reach, d)) * smoothstep(-1, 1.5, d));
       const i = iz * net.nx + ix;
       if (v > out[i]) out[i] = v;
     }

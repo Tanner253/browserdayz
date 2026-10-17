@@ -78,7 +78,7 @@ export const SEAT = {
 
 /** which of those a thing set out by the world is, by the name of its model: null for what this rule does not seat (a tree is told by whoever knows the trees) */
 export function seatKind(id: string): keyof typeof SEAT | null {
-  if (id.startsWith('rock') || id.startsWith('boulder')) return 'rock';
+  if (id.startsWith('rock') || id.startsWith('boulder') || id.startsWith('namaqualand') || id.startsWith('mountainside')) return 'rock';
   if (id.startsWith('tree_stump')) return 'stump';
   if (id === 'dead_tree_trunk') return 'log';
   return null;

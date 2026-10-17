@@ -10,6 +10,7 @@ import { Simplex, clamp, lerp, smoothstep } from '../../core/noise';
 import { catmullRom } from './ground';
 import { CELL, WORLD_SEED } from './places';
 import { PLAN } from './west-plan';
+import { PASS_SHAPE, caveMouths, galleries, passEdges, passProfile, type Pass } from '../../sim/pass';
 
 type P = [number, number];
 export interface Net { x0: number; z0: number; nx: number; nz: number }
@@ -76,26 +77,64 @@ export class Line {
 
 // ------------------------------------------------------------------ the ridge
 
-/** the ridge at a z: its west foot, its crest and its east foot (x), each wandering as rock does */
+/** the ridge at a z: its west foot, its crest and its east foot (x), each wandering as worn rock does, in bays and spurs */
 export function ridgeAt(z: number): [number, number, number] {
-  const R = PLAN.ridge;
+  const R = PLAN.ridge, [out, inner, outer] = R.spur, spur = out * (1 - smoothstep(inner, outer, Math.abs(z - PASS_Z)));
   return [
-    R.west + R.jag[0] * r1.fbm(z * 0.006, 1.3, 3) + 6 * r2.noise(z * 0.05, 3.3),
-    R.crest + R.jag[1] * r1.fbm(z * 0.009, 7.1, 3),
-    R.east + R.jag[0] * r1.fbm(z * 0.006, 4.9, 3) + 6 * r2.noise(z * 0.05, 8.8),
+    R.west - spur + R.jag[0] * r1.fbm(z * 0.004, 1.3, 3) + 14 * r2.noise(z * 0.02, 3.3),
+    R.crest + R.jag[1] * r1.fbm(z * 0.006, 7.1, 3),
+    // (its east foot wanders less: Pokrov and the road north to the pass are close under it)
+    R.east + R.jag[0] * 0.6 * r1.fbm(z * 0.004, 4.9, 3) + 8 * r2.noise(z * 0.02, 8.8),
   ];
 }
-/** how high the crest stands at a z (and a little either way along it: its peaks) */
+/** the pass's middle z, about which the ridge's west foot stands out as a spur */
+const PASS_Z = (PLAN.pass.line[0][1] + PLAN.pass.line[PLAN.pass.line.length - 1][1]) / 2;
+/** how high the crest stands about a spot: a rough tableland, higher and lower along it */
 function crestY(x: number, z: number) {
   const R = PLAN.ridge;
-  return R.top + R.peaks * r2.fbm(z * 0.011, 3.3, 3) + 3.5 * r3.noise(x * 0.04, z * 0.04);
+  return R.top + R.peaks * r2.fbm(z * 0.004, 3.3, 3) + 0.5 * R.peaks * r1.fbm(x * 0.01, z * 0.012, 2) + 4 * r3.fbm(x * 0.02, z * 0.02, 2);
 }
 /**
- * The ridge's face from its foot (0) to its crest (1), as a part of its height: a scree apron, a cliff, a ledge, a
- * second cliff, and the crest's rounded back. Cliffs, not slopes: the first stands at about 65 degrees, the second 57.
+ * THE STRATA (the owner: "like the grand canyon"): the rock lies in level beds, the hard ones cliffs and the soft
+ * ones slopes and benches between, at the same heights wherever they show, a ridge's face, the pass's walls or a
+ * butte's. A height the land would have smooth is given back as it is with its beds weathered out: within each bed
+ * the lower part a bench of scree, the upper a cliff, the line between them worn in and out.
  */
-function face(u: number) {
-  return 0.06 * smoothstep(0, 0.03, u) + 0.44 * smoothstep(0.03, 0.17, u) + 0.06 * smoothstep(0.17, 0.27, u) + 0.34 * smoothstep(0.27, 0.42, u) + 0.1 * smoothstep(0.42, 1, u);
+export function strata(y: number, x: number, z: number) {
+  const B = PLAN.ridge.beds;
+  if (y <= B[0]) return y;
+  for (let k = 0; k + 1 < B.length; k++) {
+    const lo = B[k], hi = B[k + 1];
+    if (y > hi) continue;
+    // (each bed its own: some most of them cliff, some most of them a slope of scree, as hard and soft rock lie)
+    const t = (y - lo) / (hi - lo), worn = 0.2 * r3.fbm(x * 0.02 + k * 7.3, z * 0.02, 3), soft = 0.25 + 0.45 * ((k * 0.618 + 0.2) % 1);
+    return lo + (hi - lo) * (0.3 * t + 0.7 * smoothstep(soft + worn, Math.min(0.97, soft + 0.32 + worn), t));
+  }
+  return y;
+}
+/**
+ * How far the face is cut back into the ridge at a spot of it, metres: the gullies that run down every such face,
+ * a few deep enough to be a bay with spurs either side of it, narrow at their foot and opening up the face.
+ */
+function gully(x: number, z: number, side: number) {
+  const n = r2.ridged(z * 0.014 + 0.35 * r3.noise(x * 0.01, 3.1 + side), side > 0 ? 2.7 : 9.4, 3);
+  // (and every few hundred metres a side canyon, cut far back into the ridge, its walls the beds' cliffs)
+  const bay = r1.ridged(z * 0.0042 + 0.25 * r3.noise(x * 0.006, 8.8 + side), side > 0 ? 4.4 : 12.2, 2);
+  return 46 * n ** 5 + 10 * r1.noise(z * 0.05, x * 0.05 + side * 4) ** 2 + PLAN.ridge.bays * bay ** 7;
+}
+
+/** the buttes and mesas standing out in the desert before the ridge: its strata standing alone, worn round */
+function butte(x: number, z: number): number {
+  let best = -Infinity;
+  for (const [bx, bz, r, h] of PLAN.desert.buttes) {
+    const dx = x - bx, dz = z - bz, d0 = Math.hypot(dx, dz);
+    if (d0 > r * 2.6) continue;
+    const a = Math.atan2(dz, dx), edge = r * (1 + 0.22 * r1.noise(Math.cos(a) * 1.3 + bx * 0.01, Math.sin(a) * 1.3 + bz * 0.01) + 0.08 * r2.noise(a * 3, bz));
+    // (a flat top to its edge, its sides the beds' cliffs, and the scree it sheds round its foot)
+    const u = (d0 - edge) / (r * 1.4);
+    best = Math.max(best, h * (u <= 0 ? 1 : Math.max(0, 1 - u) ** 1.4) + 1.2 * r3.noise(x * 0.06, z * 0.06));
+  }
+  return best;
 }
 
 // ------------------------------------------------------------------ the pass
@@ -107,27 +146,49 @@ export function passFloor(along: number) {
   return lerp(F[0], F[1], clamp(along / passLine.total, 0, 1)) + 0.2 * r3.noise(along * 0.03, 4.4);
 }
 /**
+ * The pass as the coast kit's plan measures it (src/sim/pass.ts, with its caves): its middle line and its floor. Its
+ * walls are carved to that plan's terraces (`passProfile`) exactly, for the caves run under them: a cave's mouth opens
+ * in a riser, and its galleries keep two metres of rock over them.
+ */
+export const passPlan: Pass = { line: passLine.pts, floor: (s: number) => passFloor(s) };
+/**
+ * Which of our ramps are cut: none over a cave (a ramp takes the riser down, and the shelf's edge with it) nor by a
+ * mouth (which opens in a riser): each ramp's riser, sampled along it, kept 8 m off every gallery.
+ */
+const caveRuns = galleries(passPlan), mouths = caveMouths(passPlan);
+const rampsCut = PLAN.pass.ramps.filter((r) => {
+  const e = passEdges()[r.level], t = r.side * (e.foot + e.top) / 2;
+  for (let a = r.along[0] - 10; a <= r.along[1] + 10; a += 3) {
+    const p = passLine.at(a), x = p.x + p.tz * t, z = p.z - p.tx * t;
+    if (mouths.some((m) => Math.hypot(m.x - x, m.z - z) < 14)) return false;
+    for (const g of caveRuns) {
+      const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], u = clamp(((x - g.a[0]) * ex + (z - g.a[2]) * ez) / (ex * ex + ez * ez || 1), 0, 1);
+      if (Math.hypot(x - g.a[0] - ex * u, z - g.a[2] - ez * u) < Math.max(g.wa, g.wb) / 2 + 8) return false;
+    }
+  }
+  return true;
+});
+/** how far the pass's floor reaches either side of its line (the plan's) */
+export function passHalf(_along: number, _side: number) {
+  return PASS_SHAPE.floor;
+}
+/**
  * The pass's ground across it, over its floor at `a` metres out from the floor's edge, on a side (1: south, the left
- * going west; -1: north) and so far along: up a riser to each shelf in turn (PLAN.pass.shelves), then the ridge's face; and where a
- * ramp is (PLAN.pass.ramps), the riser at that height a slope from the shelf below to the one above.
+ * going west; -1: north) and so far along: the plan's terraces (`passProfile`); but where a ramp of ours is
+ * (PLAN.pass.ramps, kept clear of the caves' mouths) the riser at that height a slope from the shelf below to the one
+ * above. Past the plan's face (its crest) nothing is cut: the ridge's own beds stand there.
  */
 export function passRise(a: number, side: number, along: number): number {
-  const S = PLAN.pass.shelves;
   if (a <= 0) return 0;
-  let pos = 0, y = 0;
-  for (let k = 0; k < S.length; k++) {
-    const [h, deep, riser] = S[k];
-    if (a < pos + riser + 1.5) {
-      const ramp = PLAN.pass.ramps.find((r) => r.side === side && r.level === k && along >= r.along[0] - 0.5 && along <= r.along[1] + 0.5);
-      if (ramp && a >= pos) return lerp(y, h, clamp((along - ramp.along[0]) / (ramp.along[1] - ramp.along[0]), 0, 1));
-      if (a < pos + riser) return y + (h - y) * smoothstep(pos, pos + riser, a);
-    }
-    pos += riser;
-    y = h;
-    if (a < pos + deep) return y;
-    pos += deep;
+  const t = PASS_SHAPE.floor + a, E = passEdges();
+  for (let k = 0; k < E.length; k++) {
+    const e = E[k];
+    if (t < e.foot || t > e.top + 1.5) continue;
+    const ramp = rampsCut.find((r) => r.side === side && r.level === k && along >= r.along[0] - 0.5 && along <= r.along[1] + 0.5);
+    if (ramp) return lerp(e.from, e.to, clamp((along - ramp.along[0]) / (ramp.along[1] - ramp.along[0]), 0, 1));
   }
-  return y + (a - pos) * PLAN.pass.face + 2.5 * r3.fbm(a * 0.08, along * 0.04, 2) * smoothstep(0, 6, a - pos);
+  const y = passProfile(t);
+  return y >= PASS_SHAPE.crest - 0.01 ? Infinity : y;
 }
 
 // ------------------------------------------------------------------ the valley
@@ -182,7 +243,10 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
       const patch = 0.35 + 0.65 * smoothstep(-0.2, 0.5, r1.fbm(x * 0.002, z * 0.002, 2));
       const crest = r2.ridged(x * 0.011 + 0.6 * r3.noise(x * 0.003, z * 0.003), z * 0.0035, 3);
       const dunes = D.dunes * patch * (crest - 0.3) * smoothstep(0, 120, c - sand) * (1 - smoothstep(-170, -50, x - w));
-      const desert = lerp(beach(c), base + dunes, smoothstep(sand, sand + 80, c));
+      let desert = lerp(beach(c), base + dunes, smoothstep(sand, sand + 80, c));
+      // (and the buttes standing out of it, the ridge's beds alone: their strata the same heights as its)
+      const b = butte(x, z);
+      if (b > 0.5) desert = Math.max(desert, strata(base + b, x, z));
       const i = iz * nx + ix;
       // (under the ridge, the desert gives way to the green land it divides it from: hidden, but it is what the pass is cut through)
       H[i] = x <= w ? desert : lerp(desert, H[i], smoothstep(w, e, x));
@@ -219,7 +283,8 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
     }, seam);
   }
 
-  // THE RIDGE: from its foot on either side up its cliffs to its crest, over whatever was there, the whole height of the map.
+  // THE RIDGE: from its foot on either side up its beds of rock to its crest, cliffs and benches, cut back by its
+  // gullies into bays and spurs, over whatever was there, the whole height of the map.
   const footY = feet.map(([w, , e], iz) => {
     const row = iz * nx, at = (x: number) => H[row + clamp(Math.round((x - net.x0) / CELL), 0, nx - 1)];
     return [at(w), at(e)];
@@ -227,20 +292,24 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
   for (let iz = 0; iz < nz; iz++) {
     const z = zOf(iz), [w, cx, e] = feet[iz], [yw, ye] = footY[iz];
     for (let ix = Math.max(0, Math.floor((w - 4 - net.x0) / CELL)); ix <= Math.min(OX - 1, Math.ceil((e + 4 - net.x0) / CELL)); ix++) {
-      const x = xOf(ix), west = x < cx, u = west ? (x - w) / (cx - w) : (e - x) / (e - cx);
+      const x = xOf(ix), west = x < cx, span = west ? cx - w : e - cx;
+      // (how far into the ridge, from its foot to its crest: less where a gully cuts the face back)
+      // (no further back than half way to the crest: it stands whole along its length, its one way through the pass)
+      const u = ((west ? x - w : e - x) - Math.min(gully(x, z, west ? 1 : -1), 0.5 * span)) / span;
       if (u <= 0) continue;
-      const base = west ? yw : ye, top = crestY(x, z), rough = 3.5 * r3.fbm(x * 0.05, z * 0.05, 3) * smoothstep(0.02, 0.1, u);
+      const base = west ? yw : ye, top = crestY(x, z), raw = base + (top - base) * Math.pow(smoothstep(0, 0.62, Math.min(u, 1)), 0.9);
       const i = iz * nx + ix;
-      H[i] = Math.max(H[i], base + (top - base) * face(Math.min(u, 1)) + rough);
+      H[i] = Math.max(H[i], strata(raw, x, z) + 1.6 * r3.fbm(x * 0.07, z * 0.07, 2) * smoothstep(0.02, 0.1, u));
     }
   }
 
   // THE PASS: cut through the ridge on its line, its floor falling west, up each wall a riser to each of three shelves
   // and the ridge's face above them; no deeper than the ground is anywhere (past its mouths it is the valley's floor
   // and the desert's).
-  const P = PLAN.pass, reach = P.floor + P.shelves.reduce((s, [, deep, riser]) => s + deep + riser, 0) + (PLAN.ridge.top + PLAN.ridge.peaks + 10 - P.floorY[1] - P.shelves[P.shelves.length - 1][0]) / P.face;
+  // (out to where the plan's face meets its crest: past that the ridge's own beds)
+  const reach = PASS_SHAPE.floor + passEdges().reduce((w, e) => Math.max(w, e.back), 0) - PASS_SHAPE.floor + (PASS_SHAPE.crest - PASS_SHAPE.shelves[PASS_SHAPE.shelves.length - 1].up) * PASS_SHAPE.face + 6;
   passLine.each(net, reach, (i, _x, _z, a) => {
-    const y = passFloor(a.along) + passRise(Math.abs(a.s) - P.floor, a.s >= 0 ? 1 : -1, a.along);
+    const side = a.s >= 0 ? 1 : -1, y = passFloor(a.along) + passRise(Math.abs(a.s) - passHalf(a.along, side), side, a.along);
     if (y < H[i]) H[i] = y;
   });
   return walls;
@@ -274,7 +343,7 @@ export function onRidgeWall(x: number, z: number) {
   return Math.abs(x - ridgeAt(z)[1]) < 2.5 && Math.abs(z - passCrossing()) >= PLAN.ridge.gap;
 }
 
-/** the pass's middle line and its floor, for whoever dresses its walls and digs its caves (src/sim/pass.ts) */
+/** the pass's middle line and its floor, for whoever dresses its walls and digs its caves (src/sim/pass.ts); and the ramps cut between its shelves */
 export function passData() {
-  return { line: passLine.pts.map(([x, z], k) => [x, z, passFloor(passLine.run[k])] as [number, number, number]), floor: PLAN.pass.floor, shelves: PLAN.pass.shelves, ramps: PLAN.pass.ramps };
+  return { line: passLine.pts.map(([x, z], k) => [x, z, passFloor(passLine.run[k])] as [number, number, number]), floor: PLAN.pass.floor, shelves: PLAN.pass.shelves, ramps: rampsCut };
 }
