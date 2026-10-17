@@ -1926,6 +1926,23 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .hud-scope .ret { display: none; }
 .hud-scope[data-ret='pu'] .ret-pu, .hud-scope[data-ret='mildot'] .ret-mildot, .hud-scope[data-ret='pso'] .ret-pso, .hud-scope[data-ret='elcan'] .ret-elcan { display: inline; }
 .hud-scope.glass[data-ret] .ret { display: none; }
+/* the range and the turn under the ring, in the black: bright on it, to be read at a glance */
+.hud-scope .scope-read {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 40vmin);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3vmin;
+  align-items: baseline;
+  font: 700 3.4vmin/1 ui-monospace, Consolas, monospace;
+  color: #b8ff8a;
+  text-shadow: 0 0 1.2vmin rgba(150, 255, 110, 0.45);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.hud-scope .scope-read .sr-zoom { color: #e8e4d8; font-size: 2.6vmin; text-shadow: none; }
+.hud-scope.glass .scope-read { display: none; }
 
 /* the wheel (hold T): what to call out, and what to do with the body */
 .hud-wheel {

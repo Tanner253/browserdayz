@@ -798,6 +798,14 @@ const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32
 const AKIMBO_GAP = 0.32;
 /** whose mark is seen through a gun's own scope (see `.ret` in the HUD's scope): a mil-dot crosshair, the PSO-1's chevrons */
 const OWN_RETICLE: Record<string, string> = { sniper50: 'mildot', barrett: 'mildot', vssk: 'pso' };
+/**
+ * Scopes turned on the wheel while looked through, from and to, times (the owner, 2026-10-17: "make the vssk 6x scope
+ * with variable zoom", "make the ar15 elcan 6x scope with variable zoom"). Every other scope is as it was: a view 0.3
+ * of the eye's, about 3.7 times.
+ */
+const ZOOMS: Record<string, [number, number]> = { vssk: [2, 6], elcan: [2, 6] };
+/** scopes with a laser rangefinder: the range to what is under the cross, read out under it (the owner: "the scope barrett and the scope sniper50 we need to add a ranegfinder on") */
+const RANGED = new Set(['barrett', 'sniper50']);
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
 const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007], db12: [0.17, -0.041] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
@@ -2312,6 +2320,38 @@ export class Weapons {
     return this.action !== null;
   }
 
+  /** how far each turnable scope is turned, times (see ZOOMS) */
+  private zoomed = new Map<string, number>();
+  /** the range the rangefinder last read, metres (null: nothing within its reach), and when it reads next */
+  range: number | null = null;
+  private rangeAt = 0;
+
+  /** the turnable scope looked through, if any: the Elcan, or the gun's own */
+  private get zoomKey(): string | null {
+    const it = this.currentItem;
+    if (!it) return null;
+    if (hasMod(it, 'elcan')) return 'elcan';
+    return ITEMS[it.id]?.weapon?.ownScope && ZOOMS[it.id] ? it.id : null;
+  }
+
+  /** how far the scope looked through is turned, times; null for a scope that does not turn */
+  get zoom(): number | null {
+    const k = this.zoomKey;
+    return k ? (this.zoomed.get(k) ?? 4) : null;
+  }
+
+  /** the view through the scope, a share of the eye's (`base`, degrees, up and down): so many times for a scope that turns */
+  scopeFov(base: number): number {
+    const z = this.zoom;
+    const half = THREE.MathUtils.degToRad(base / 2);
+    return z ? (2 * Math.atan(Math.tan(half) / z)) / (2 * half) : 0.3;
+  }
+
+  /** whose scope has a rangefinder, looked through now */
+  get ranged(): boolean {
+    return this.scoped && !!this.currentItem && RANGED.has(this.currentItem.id);
+  }
+
   /** whose mark is in the scope looked through: the Elcan's, the gun's own scope's, or the PU scope's */
   get reticleKind(): string {
     const it = this.currentItem;
@@ -2513,6 +2553,13 @@ export class Weapons {
       if (input.pressed('KeyX')) this.take(null);
       // (the wheel breaks off a reload before it does anything else)
       if (input.wheel !== 0 && this.abortReload()) input.wheel = 0;
+      // (a scope that turns, looked through: the wheel turns it, a time a notch, up to bring it nearer)
+      const zk = this.scoped ? this.zoomKey : null;
+      if (zk && input.wheel !== 0) {
+        const [lo, hi] = ZOOMS[zk];
+        this.zoomed.set(zk, THREE.MathUtils.clamp((this.zoomed.get(zk) ?? 4) - Math.sign(input.wheel), lo, hi));
+        input.wheel = 0;
+      }
       if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);
       if (input.pressed('KeyB') && this.currentItem) this.toggleMode(this.currentItem);
       if (this.currentItem && (input.pressed('PageUp') || input.pressed('PageDown'))) this.setZero(this.currentItem, input.pressed('PageUp') ? 1 : -1);
@@ -2535,6 +2582,13 @@ export class Weapons {
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
     this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || !!ITEMS[this.currentItem!.id]?.weapon?.ownScope)) || hasMod(this.currentItem, 'elcan')) && this.adsT > 0.9 && this.aiming;
+    // (the rangefinder reads five times a second while it is looked through: to whatever is under the cross, out to two kilometres)
+    if (!this.ranged) this.range = null;
+    else if ((this.rangeAt -= dt) <= 0) {
+      this.rangeAt = 0.2;
+      const hit = physics.raycast(camera.position, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), 2000, SHOT_GROUPS, this.player.collider);
+      this.range = hit ? hit.toi : null;
+    }
     this.applyMods();
     this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;

@@ -378,7 +378,7 @@ export const frameMethods = {
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
-    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (this.weapons.equippedItem?.mods?.includes('red_dot') ? HOLO_ZOOM : kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
+    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? this.weapons.scopeFov(this.director.baseFov) : this.weapons.aiming ? (this.weapons.equippedItem?.mods?.includes('red_dot') ? HOLO_ZOOM : kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
     this.syncHeld();
 
     this.director.update(dt);
@@ -604,6 +604,8 @@ export const frameMethods = {
       ride: this.garage.ride && !p.dead ? { seats: this.garage.seatList(), kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / hpOf(this.garage.ride.jeep.kind), driver: this.garage.ride.seat === 0 } : null,
       scoped: this.weapons.scoped,
       reticle: this.weapons.reticleKind,
+      range: this.weapons.ranged ? this.weapons.range : undefined,
+      zoom: this.weapons.scoped ? this.weapons.zoom : null,
       sightless: this.weapons.sightless,
       glass: !!this.glass,
       hitMarker: this.weapons.hitMarker,

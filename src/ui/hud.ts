@@ -222,6 +222,7 @@ export class HUD {
             <circle r="1.3" fill="#e0301c"/>
           </g>
         </svg>
+        <div class="scope-read"><b class="sr-range"></b><span class="sr-zoom"></span></div>
       </div>
       <div class="hud-damage"></div>
       <div class="hud-bleedfx"></div>
@@ -1716,6 +1717,10 @@ export class HUD {
     scoped: boolean;
     /** whose mark is in the scope: see `.ret` in the scope's picture */
     reticle?: string;
+    /** the scope's rangefinder: metres to what is under the cross (null: nothing in its reach; undefined: it has none) */
+    range?: number | null;
+    /** how far a scope that turns is turned, times */
+    zoom?: number | null;
     /** aimed with a gun that has no sights: the mark stays on the screen */
     sightless?: boolean;
     hitMarker: number;
@@ -1765,6 +1770,13 @@ export class HUD {
     }
     this.toggle(e.scope, 'show', s.scoped || s.glass);
     if (e.scope.dataset.ret !== (s.reticle ?? 'pu')) e.scope.dataset.ret = s.reticle ?? 'pu';
+    // (under the ring, in the black: the range the scope's own rangefinder reads, and how far a scope that turns is turned)
+    const read = s.range === undefined ? '' : s.range === null ? '- - - m' : `${Math.round(s.range)} m`, zoom = s.zoom ? `${s.zoom}\u00d7` : '';
+    if (this.last.scopeRead !== read + zoom) {
+      this.last.scopeRead = read + zoom;
+      e.scope.querySelector('.sr-range')!.textContent = read;
+      e.scope.querySelector('.sr-zoom')!.textContent = zoom;
+    }
     this.toggle(e.scope, 'glass', s.glass && !s.scoped);
     this.toggle(e.hit, 'show', s.hitMarker > 0);
     this.toggle(e.hit, 'kill', s.kill);
