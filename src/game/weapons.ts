@@ -2605,9 +2605,13 @@ export class Weapons {
       // animation first plays a magazine being taken out ... we can skip the first part")
       const from = fed && !item.mag ? (m.kind === 'pistol' ? 0.22 : 0.38) : 0;
       const dur = whole * (1 - from), at = (part: number) => Math.max(0.02, whole * (part - from));
-      if (!from) audio.magOut(whole * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol', set);
-      audio.magIn(at(m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : m.kind === 'auto' ? (empty ? 0.5 : 0.66) : 0.62), m.kind !== 'pistol', set);
-      if (empty) audio.slideRack(at(m.kind === 'auto' ? 0.8 : 0.7), set);
+      // (one broken open and loaded by hand, the double barrel: its shells go in, there is no magazine to hear)
+      if (!fed) for (const part of [0.42, 0.56]) audio.shellIn(at(part));
+      else {
+        if (!from) audio.magOut(whole * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol', set);
+        audio.magIn(at(m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : m.kind === 'auto' ? (empty ? 0.5 : 0.66) : 0.62), m.kind !== 'pistol', set);
+        if (empty) audio.slideRack(at(m.kind === 'auto' ? 0.8 : 0.7), set);
+      }
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
         if (fed) feed();

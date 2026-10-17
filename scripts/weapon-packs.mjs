@@ -16,6 +16,14 @@ const mul = (a, b) => {
 };
 const move = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 const scaleBy = (s) => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1];
+/**
+ * `rename`: joints named in a way nothing here can read (the shotgun set's are Russian, written in a Windows code
+ * page, not UTF-8) given names by how their names end: { '_049$': 'stock_049' }.
+ */
+const renamed = (doc, cfg) => {
+  for (const [end, name] of Object.entries(cfg.rename ?? {})) for (const n of doc.getRoot().listNodes()) if (new RegExp(end).test(n.getName())) n.setName(name);
+  return doc;
+};
 const point = (m, p) => [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
 const turn = (m, v) => [0, 1, 2].map((r) => m[r] * v[0] + m[4 + r] * v[1] + m[8 + r] * v[2]);
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -109,11 +117,16 @@ function joinAnimations(doc, order, fps) {
 }
 
 /** A skinned shape as it stands on its skeleton now: [positions, normals, tangents, the joint each point mostly follows], per primitive. */
-function standSkin(node) {
+function standSkin(node, meshSpace = false) {
   const skin = node.getSkin();
   const joints = skin.listJoints();
   const ibm = skin.getInverseBindMatrices();
-  const J = joints.map((j, k) => mul(j.getWorldMatrix(), ibm.getElement(k, [])));
+  // (`meshSpace`: the shape's own node is laid on it first, as three.js lays it: the shotgun set's shapes are in
+  // centimetres on a node a sixtieth of that, and stood without it the gun was 142 metres long)
+  const J = joints.map((j, k) => {
+    const m = mul(j.getWorldMatrix(), ibm.getElement(k, []));
+    return meshSpace ? mul(m, node.getWorldMatrix()) : m;
+  });
   return node.getMesh().listPrimitives().map((prim) => {
     const pos = prim.getAttribute('POSITION'), nor = prim.getAttribute('NORMAL'), tan = prim.getAttribute('TANGENT');
     const ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0');
@@ -169,7 +182,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
   }
   if (!meta) {
     // ---- the gun alone, standing still
-    const doc = await io.read(gltfPath);
+    const doc = renamed(await io.read(gltfPath), cfg);
     await doc.transform(prune({ keepLeaves: true }), weld());
     // (a gun on a skeleton stands as its skeleton was bound: its first movement may begin with it half apart)
     if (!cfg.skinned) restPose(doc);
@@ -183,7 +196,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
     // (the skinned shape hangs on a node of its own: found by what it draws)
     // (a gun may be drawn as more than one shape on the one skeleton: its body, and a magazine by itself)
     const shapes = cfg.skinned ? [].concat(cfg.skinned.mesh) : [];
-    const stood = cfg.skinned ? root.listNodes().filter((n) => n.getSkin() && shapes.some((m) => n.getMesh()?.getName().includes(m))).flatMap((n) => standSkin(n)) : null;
+    const stood = cfg.skinned ? root.listNodes().filter((n) => n.getSkin() && shapes.some((m) => n.getMesh()?.getName().includes(m))).flatMap((n) => standSkin(n, cfg.meshSpace)) : null;
     if (stood) {
       for (const s of stood) {
         const of = s.lead.map((j) => (j in cfg.skinned.joints ? cfg.skinned.joints[j] : cfg.skinned.rest));
@@ -411,7 +424,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
 
     // ---- the pack as it came: arms, gun and every movement, for the one holding it
     if (fp) {
-      const whole = await io.read(gltfPath);
+      const whole = renamed(await io.read(gltfPath), cfg);
       // (The pack's own drawing of its gun is left out where the game hangs the gun alone on the pack's joints
       // instead, piece by piece: it was never drawn, and its pictures were fetched and unpacked all the same,
       // some hundreds of megabytes of them.)
