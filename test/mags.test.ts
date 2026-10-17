@@ -37,8 +37,8 @@ ok('loose rounds lie thirty to a place; a box is one place in a pocket and holds
     assert.equal(d.open!.qty, 25, `${d.id} holds ${d.open!.qty}`);
     assert.ok(ITEMS[d.open!.gives]?.stack, `${d.id} gives ${d.open!.gives}`);
   }
-  // (and every kind of round a gun fires comes in a box: but the big ones, which come loose)
-  for (const g of guns.filter((g) => !STACK[g.weapon!.ammo])) assert.ok(boxes.some((b) => b.open!.gives === g.weapon!.ammo), `no box of what the ${g.id} fires`);
+  // (and every kind of round a gun fires comes in a box: but the launcher's grenades)
+  for (const g of guns.filter((g) => g.weapon!.ammo !== 'ammo_40mm')) assert.ok(boxes.some((b) => b.open!.gives === g.weapon!.ammo), `no box of what the ${g.id} fires`);
 });
 
 ok('every gun is fed by a magazine of its own or by its own tube, and every magazine goes into a gun and holds what that gun fires', () => {

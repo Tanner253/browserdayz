@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T17:07:24.789Z",
+ "generated": "2026-10-17T19:32:34.840Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12168,6 +12168,27 @@
      1
     ]
    }
+  },
+  "round_50bmg": {
+   "url": "assets/models/round_50bmg.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 50860,
+   "srcTris": 6240,
+   "tris": 576,
+   "min": [
+    -0.0102,
+    0,
+    -0.0102
+   ],
+   "max": [
+    0.0102,
+    0.1384,
+    0.0102
+   ],
+   "lods": []
   }
  }
 }

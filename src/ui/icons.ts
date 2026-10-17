@@ -215,7 +215,8 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     // What is worn stands as it is worn, whatever the shape of its place in a pocket: a vest three cells wide and
     // two tall was laid on its side to fill them, and was a vest on its side in the vest's own slot.
     const worn = def.category === 'clothing';
-    if (def.mag) {
+    // (and the foregrip, the M32's vertical grip, stands as it is fitted: lying in its tall place it was a speck)
+    if (def.mag || id === 'foregrip') {
       // A magazine stands on its end, the end that goes into the gun uppermost, its broad side to the eye, whatever
       // the shape of its place in a pocket. It lies on its side in the world, and by the rules below was drawn on
       // its side, on its head, or across a tall picture, one magazine one way and the next another. Its longest

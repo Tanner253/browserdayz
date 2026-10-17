@@ -215,6 +215,15 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'ammo'],
     changes: 'Only its 5.56 cartridge is used here: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
   },
+  // (the .50 BMG of the .50s, out of the same download of eleven, 2026-10-17: it was the sniper rifle pack's own round)
+  round_50bmg: {
+    dir: 'cartridges',
+    only: /^_50bmg_low/,
+    scale: 0.001,
+    tex: 512,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its .50 BMG cartridge is used here: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
   round_762: {
     dir: 'cartridges',
     only: /^_762NATO_low/,

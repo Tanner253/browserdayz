@@ -280,7 +280,7 @@ const D: ItemDef[] = [
     desc: '40 mm high-explosive grenades for the M32. They go off where they strike. For admins.',
   },
   {
-    id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'sniper50', nodeRe: '^bullet', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 3,
+    id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'round_50bmg', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 3,
     desc: 'Loose .50 calibre cartridges, heavy as a fistful of bolts. They go into the .50 rifle magazine by hand.',
   },
   {
@@ -321,6 +321,18 @@ const D: ItemDef[] = [
     id: 'box_12', name: '12 Gauge Shell Box', model: 'ammo_box_12', w: 1, h: 1, weight: 0.73, category: 'ammo',
     desc: 'A sealed box of 25 buckshot shells. Hold it and unwrap it to get them out.',
     open: { gives: 'ammo_12', qty: 25, time: 2.2 },
+  },
+  {
+    // (the .50s' and the VSSK's rounds in a box too, the owner, 2026-10-17: "ensure ammo models and ammo boxes spawn
+    // properly for the new ammo types": a steel ammunition can, as such rounds are kept, small enough for a pocket)
+    id: 'box_50bmg', name: '.50 BMG Ammo Can', model: 'ammo_box', scale: 0.55, w: 1, h: 1, weight: 2.925, category: 'ammo',
+    desc: 'A small steel can of 25 .50 BMG cartridges, for the .50 rifles. Hold it and open it to get the rounds out.',
+    open: { gives: 'ammo_50bmg', qty: 25, time: 2.6 },
+  },
+  {
+    id: 'box_127x55', name: '12.7x55 Ammo Can', model: 'ammo_box', tint: 0x9a9a88, scale: 0.5, w: 1, h: 1, weight: 1.925, category: 'ammo',
+    desc: 'A small steel can of 25 subsonic 12.7x55 cartridges, for the VSSK. Hold it and open it to get the rounds out.',
+    open: { gives: 'ammo_127x55', qty: 25, time: 2.6 },
   },
   {
     id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box_762', w: 1, h: 1, weight: 0.255, category: 'ammo',
