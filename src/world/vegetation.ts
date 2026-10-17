@@ -11,6 +11,7 @@ import { physics, type Surface } from '../core/physics';
 import { boundsOf, extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind, snowUniforms, SNOW_LIES, SNOW_PAINT } from './foliage';
+import { blendPatch } from './rock-blend';
 import { SEAT, footOf, groundLine, seat, seatKind } from './seat';
 import { heightAt, type Instance, type World } from './worldgen';
 import { Cells, boxInside } from './cells';
@@ -722,7 +723,8 @@ export class Vegetation {
   /** the fuel drums, by number */
   barrels: Barrel[] = [];
 
-  constructor(private world: World, private atmo: Atmosphere) {}
+  /** `heightTex`: the terrain's heights as it draws them, for the desert's rocks to fade into the ground (src/world/rock-blend.ts) */
+  constructor(private world: World, private atmo: Atmosphere, private heightTex?: THREE.Texture) {}
 
   private barkTextures(type: 'pine' | 'birch' | 'oak') {
     if (type === 'birch') {
@@ -907,6 +909,10 @@ export class Vegetation {
           const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 }, kind);
           // (drawn a paint at a time, not a piece at a time: see joinByPaint. What it is solid as, below, is still its pieces.)
           const desertRock = id.startsWith('namaqualand') || id.startsWith('mountainside');
+          // (and they fade into the ground under them, its scree and the canyon's rock, as the pass's walls and the
+          // outcrops do; their foot not painted damp and dark as well: that stacked a dark band on the ground's picture,
+          // and the desert is dry)
+          const blend = desertRock && this.heightTex ? blendPatch(this.heightTex, 'grit') : null;
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
             joinByPaint(parts).map((p) => {
               const m = (p.material as THREE.MeshStandardMaterial).clone();
@@ -920,9 +926,10 @@ export class Vegetation {
               // the world: many of those are indoors, and a bed is not snowed on.)
               // (And on whatever is seated in the ground, a stump and a fallen trunk with the rocks: they lie out
               // of doors and nowhere else. Those are painted where they meet the ground too: see `foot` there.)
-              const fp = foliagePatch(isFern ? { height: 1, sway: 0.05, flutter: 0.01, translucency: 0.25, sunDir: this.atmo.sunDir, sunColor: this.atmo.sunColor, snow: 'leaf' } : how && foot ? { snow: 'solid', foot: [groundLine(foot, SEAT[how]), SEAT[how].drift] } : {});
+              const fp = foliagePatch(isFern ? { height: 1, sway: 0.05, flutter: 0.01, translucency: 0.25, sunDir: this.atmo.sunDir, sunColor: this.atmo.sunColor, snow: 'leaf' } : how && foot && !blend ? { snow: 'solid', foot: [groundLine(foot, SEAT[how]), SEAT[how].drift] } : {});
               setLodFade(fp.lod, fadeIn, fadeOut);
-              this.atmo.register(m, fp.patch, `${isFern ? 'fern' : how ? 'rock' : 'prop'}`);
+              if (blend) this.atmo.register(m, (sh) => { fp.patch(sh); blend.patch(sh); }, `prop+${blend.key}`);
+              else this.atmo.register(m, fp.patch, `${isFern ? 'fern' : how ? 'rock' : 'prop'}`);
               return { geometry: p.geometry, material: m as THREE.Material };
             });
           // Full detail up close, the far version (a few hundred triangles) beyond. How soon
