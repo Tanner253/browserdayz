@@ -27,9 +27,12 @@ export interface River {
 /**
  * A building's ground in or by the water, as the world sets it down: a turned box on the ground's plane (its middle,
  * turn, half sizes across and along, as the terrain's wells take them; a building's is its footprint, its turn the
- * building's). `dry`: the water keeps out of it (a raised floor, a room that is to stay dry): none drawn there, none
- * walked in. Not dry: the water stands in it under a roof (a flooded ground floor), drawn still and dark, with no sky
- * in it. Where the water meets its walls, either way, a line of scum and foam (src/world/ocean.ts).
+ * building's). Flooded (the usual): the water stands in it under a roof, drawn still and dark, with no sky in it.
+ * `dry`, with its `floor` given and that floor DRY_ABOVE or more over the water: the water keeps out of it (a raised
+ * floor over the water: none drawn under it, none waded in on it). A room called dry whose floor is under the water, or
+ * not given, is flooded whatever it is called: water does not stop at a door (the owner, 2026-10-16, of a garage
+ * standing in water with a dry floor at the same height: "i think the dry house is misplaced"). Where the water meets
+ * its walls, either way, a line of scum and foam (src/world/ocean.ts).
  */
 export interface WaterRoom {
   x: number;
@@ -38,7 +41,15 @@ export interface WaterRoom {
   hx: number;
   hz: number;
   dry?: boolean;
+  /** the height of its floor (the world's): what says whether it can be dry */
+  floor?: number;
 }
+
+/** how far over the water a room's floor must be for the room to be kept dry */
+export const DRY_ABOVE = 0.1;
+
+/** Whether a room keeps the water out, its water's surface being this high (see WaterRoom). */
+export const keptDry = (r: WaterRoom, surface: number) => !!r.dry && r.floor !== undefined && r.floor >= surface + DRY_ABOVE;
 
 export interface Waters {
   lakes: Lake[];
@@ -154,7 +165,7 @@ export class WaterIndex {
   /** The water over a point, if any: what its surface is, how deep, which way it runs. `ground` is the ground's height. */
   at(x: number, z: number, ground: (x: number, z: number) => number): WaterHere | null {
     const c = this.cells.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL));
-    if (!c || c.dry.some((r) => fromRoom(r, x, z) < 0)) return null;
+    if (!c) return null;
     let best: WaterHere | null = null;
     for (const lake of c.lakes) {
       if (!inside(lake.outline, x, z)) continue;
@@ -174,6 +185,8 @@ export class WaterIndex {
       const speed = s.speed * (1 - 0.6 * (d / half) * (d / half));
       best = { surface, depth, flow: [ex / s.len, ez / s.len, speed], kind: 'river' };
     }
+    // (none on a floor kept dry over it)
+    if (best && c.dry.some((r) => fromRoom(r, x, z) < 0 && keptDry(r, best!.surface))) return null;
     return best;
   }
 }

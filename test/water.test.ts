@@ -3,7 +3,7 @@
 //   npx tsx test/water.test.ts
 
 import assert from 'node:assert/strict';
-import { WADE, fromRoom, inside, riverBank, tooDeep, waterAt, wading, type Waters } from '../src/sim/water';
+import { WADE, fromRoom, inside, keptDry, riverBank, tooDeep, waterAt, wading, type Waters } from '../src/sim/water';
 
 // a bowl of ground, its floor 3 m under the lake's level at its middle; a river falling west along z = 300, a step in it
 const ground = (x: number, z: number) => (Math.abs(z - 300) < 10 ? -2 + Math.abs(z - 300) * 0.3 - x * 0.01 : Math.hypot(x, z) * 0.05 - 3);
@@ -55,8 +55,11 @@ const waters: Waters = {
     lakes: [{ name: 'flooded', level: 0, outline: [[-40, -40], [40, -40], [40, 40], [-40, 40]], swamp: true }],
     rivers: [],
     rooms: [
-      { x: 10, z: 5, rot: 0.5, hx: 4, hz: 3, dry: true },
+      { x: 10, z: 5, rot: 0.5, hx: 4, hz: 3, dry: true, floor: 0.4 },
       { x: -12, z: -8, rot: -0.3, hx: 5, hz: 3.25 },
+      // (called dry, its floor under the water, and one called dry with no floor given: both flooded)
+      { x: 25, z: -20, rot: 0, hx: 4, hz: 3, dry: true, floor: -0.3 },
+      { x: -25, z: 20, rot: 0, hx: 4, hz: 3, dry: true },
     ],
   };
   const dry = hamlet.rooms![0], wet = hamlet.rooms![1];
@@ -65,7 +68,10 @@ const waters: Waters = {
   assert.equal(waterAt(hamlet, 10 + Math.cos(0.5) * 3.8, 5 - Math.sin(0.5) * 3.8, ground), null, 'none in it up to its wall');
   assert.ok(waterAt(hamlet, 10 + Math.cos(0.5) * 4.3, 5 - Math.sin(0.5) * 4.3, ground)?.depth === 0.6, 'water outside its wall');
   assert.ok(waterAt(hamlet, -12, -8, ground)?.depth === 0.6, 'water in a flooded room');
+  assert.ok(waterAt(hamlet, 25, -20, ground)?.depth === 0.6, 'a room called dry with its floor under the water is flooded');
+  assert.ok(waterAt(hamlet, -25, 20, ground)?.depth === 0.6, 'and one called dry with no floor given');
+  assert.ok(keptDry(dry, 0) && !keptDry(dry, 0.35) && !keptDry(hamlet.rooms![2], 0) && !keptDry(hamlet.rooms![3], 0), 'dry only with its floor DRY_ABOVE over the water');
   void wet;
-  console.log('rooms: none in a dry room up to its wall, water outside it and in a flooded one');
+  console.log('rooms: none in a dry room (its floor over the water) up to its wall, water outside it, in a flooded one, and in one called dry with its floor under the water');
 }
 console.log('water: all good');

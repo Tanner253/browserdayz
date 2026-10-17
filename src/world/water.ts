@@ -151,7 +151,7 @@ export class Waterways {
    * swamp's edge and away from an eye that is in it (it is seen as a haze, never as a sheet). Each sheet is one square.
    */
   private mistOver(scene: THREE.Scene, level: number, x0: number, x1: number, z0: number, z1: number, rooms?: WaterRoom[]) {
-    const fog = scene.fog as THREE.FogExp2 | null, inRooms = roomsFor(rooms, { x0, x1, z0, z1 });
+    const fog = scene.fog as THREE.FogExp2 | null, inRooms = roomsFor(rooms, { x0, x1, z0, z1 }, level);
     const mist = new THREE.ShaderMaterial({
       defines: inRooms.defines,
       uniforms: { ...inRooms.uniforms, uWaves: { value: sharedWaves().tex }, uTime: { value: 0 }, uMist: { value: 0 }, uBox: { value: new THREE.Vector4() }, fogColor: { value: fog ? fog.color : new THREE.Color(0.6, 0.65, 0.7) } },

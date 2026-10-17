@@ -33,7 +33,7 @@
 import * as THREE from 'three';
 import type { Atmosphere } from './atmosphere';
 import { depthGrid, oceanTiles, shallowestIn, shoreField, waveMap, type Rect } from './ocean-waves';
-import type { WaterRoom } from '../sim/water';
+import { keptDry, type WaterRoom } from '../sim/water';
 
 export interface OceanOptions extends Rect {
   /** the height of the water's surface */
@@ -62,8 +62,8 @@ export interface OceanOptions extends Rect {
 /** the most rooms one water takes (a flooded hamlet's buildings, a room or a few each): the nearest to its middle */
 export const MOST_ROOMS = 32;
 
-/** A water's rooms within its box, as its shaders take them: their uniforms, and the define that turns them on. */
-export function roomsFor(rooms: WaterRoom[] | undefined, r: Rect) {
+/** A water's rooms within its box, as its shaders take them (dry or not, by their floors over its `level`). */
+export function roomsFor(rooms: WaterRoom[] | undefined, r: Rect, level: number) {
   const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
   const near = (rooms ?? [])
     .filter((q) => {
@@ -76,7 +76,7 @@ export function roomsFor(rooms: WaterRoom[] | undefined, r: Rect) {
     defines: near.length ? { SEA_ROOMS: String(near.length) } : {},
     uniforms: {
       uRoomA: { value: near.map((q) => new THREE.Vector4(q.x, q.z, Math.cos(q.rot), Math.sin(q.rot))) },
-      uRoomB: { value: near.map((q) => new THREE.Vector4(q.hx, q.hz, q.dry ? 1 : 0, 0)) },
+      uRoomB: { value: near.map((q) => new THREE.Vector4(q.hx, q.hz, keptDry(q, level) ? 1 : 0, 0)) },
     },
   };
 }
@@ -218,7 +218,7 @@ export class Ocean {
     const w = sharedWaves(o.anisotropy);
     this.waves = w.tex;
 
-    const fog = scene.fog as THREE.FogExp2 | null, L: OceanLook = { ...OCEAN, ...o.look }, rooms = roomsFor(o.rooms, rect);
+    const fog = scene.fog as THREE.FogExp2 | null, L: OceanLook = { ...OCEAN, ...o.look }, rooms = roomsFor(o.rooms, rect, o.seaLevel);
     const uniforms = {
       ...rooms.uniforms,
       uWaves: { value: this.waves },
