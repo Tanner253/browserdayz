@@ -1,6 +1,7 @@
 // Instanced vegetation + scatter props with distance LODs, dithered transitions,
 // baked tree impostors for the far field, and physics colliders.
 
+import { CANYON_ROCK_TINT } from './ground';
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { CONTAINER, CRATE_KINDS, SEARCHED_KINDS, paintBlue } from './buildings';
@@ -905,9 +906,12 @@ export class Vegetation {
           if (how && foot) for (const it of instances) it.lean = seat(ground, it, foot, SEAT[how]);
           const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 }, kind);
           // (drawn a paint at a time, not a piece at a time: see joinByPaint. What it is solid as, below, is still its pieces.)
+          const desertRock = id.startsWith('namaqualand') || id.startsWith('mountainside');
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
             joinByPaint(parts).map((p) => {
               const m = (p.material as THREE.MeshStandardMaterial).clone();
+              // (the canyon country's rocks washed with its beds' red: src/world/ground.ts)
+              if (desertRock) m.color.multiply(new THREE.Color(...CANYON_ROCK_TINT));
               if (isFern) {
                 m.side = THREE.DoubleSide;
                 m.alphaToCoverage = true;

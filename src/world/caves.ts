@@ -14,6 +14,7 @@
 // physics copy, scripts/phys-copies.mjs), made solid only within SOLID metres of the eye: the hull round a cliff face
 // stood up to 2.9 m in front of the rock seen, an invisible wall on one level ray in five along the shelves.
 
+import { CANYON_ROCK_TINT } from './ground';
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
@@ -202,6 +203,8 @@ export class PassCaves {
       const mesh = n as THREE.Mesh;
       if (!mesh.isMesh) return;
       const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+      // (washed with the pass's beds' red, so that a piece stands in the wall and not on it: src/world/ground.ts)
+      mat.color.multiply(new THREE.Color(...CANYON_ROCK_TINT));
       this.atmo.register(mat);
       out.push({ geo: mesh.geometry, mat, m: back.clone().multiply(mesh.matrixWorld) });
     });
