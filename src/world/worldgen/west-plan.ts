@@ -73,8 +73,10 @@ export const PLAN = {
       { side: -1, level: 0, along: [200, 235] as P }, { side: -1, level: 1, along: [290, 325] as P }, { side: -1, level: 2, along: [100, 135] as P },
       { side: -1, level: 2, along: [380, 415] as P },
     ],
-    river: { side: -15 },
-    road: 9,
+    // (coast-kit's plan, src/sim/pass.ts: the river a little off the north wall, dry floor before the hall's mouth at
+    // its foot; the floor's loot cache south of the middle, the road beyond it)
+    river: { side: -8 },
+    road: 14,
     loot: [-2270, -440] as P,
   },
   /**
@@ -102,17 +104,19 @@ export const PLAN = {
    * about it (its floor's half width, its banks' run), and where it is forded ([x, z, how far]).
    */
   river: {
-    desert: [[-2600, -468], [-2760, -448], [-2940, -470], [-3120, -446], [-3300, -430], [-3480, -436], [-3640, -425], [-3790, -424]] as P[],
+    // (out of the pass's mouth down to the brick works' east end, along its quay, and on to the sea)
+    desert: [[-2570, -440], [-2610, -385], [-2632, -335], [-2655, -306], [-2720, -302], [-2815, -304], [-2900, -330], [-3050, -385], [-3250, -415], [-3450, -425], [-3640, -425], [-3790, -424]] as P[],
     width: [3, 8, 9.5] as [number, number, number],
     depth: [0.45, 0.9] as P,
     under: 0.35,
     wander: 9,
     wadi: [16, 22] as P,
-    fords: [[-975, -503, 14], [-2238, -460, 12]] as [number, number, number][],
+    // (Zavod's own lane over to its quay; and in the pass where each ramp up its north wall starts, by `west-water.ts`)
+    fords: [[-2694, -302, 12]] as [number, number, number][],
   },
-  /** the forest lake Ozerki fishes, north of Lipki: its shore (straight along the village), how far under the village's bank its water lies, and its deepest */
+  /** the forest lake Ozerki fishes, north of it on the main road: its shore (straight along the village), how far under the village's bank its water lies, and its deepest */
   lake: {
-    outline: [[-1410, 128], [-1392, 104], [-1350, 92], [-1308, 100], [-1280, 128], [-1272, 170], [-1276, 220], [-1292, 262], [-1330, 288], [-1372, 290], [-1402, 276], [-1410, 262]] as P[],
+    outline: [[-1360, -150], [-1320, -132], [-1180, -132], [-1140, -150], [-1132, -200], [-1150, -250], [-1200, -275], [-1260, -280], [-1320, -268], [-1355, -235], [-1366, -190]] as P[],
     under: 0.7,
     deep: 3.6,
   },
@@ -130,8 +134,8 @@ export const PLAN = {
   },
   /** KALAT, the ruined town (src/sim/ruins.ts), set down whole: its frame (its long axis north and south), and its land eased into the desert from so far to so far out of its top */
   kalat: { name: 'Kalat', x: -3215, z: 230, rot: Math.PI / 2, blend: [130, 210] as P, reach: 440 },
-  /** the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts): the brick works on the river's north bank, its quay to the south */
-  towns: { Zavod: { rot: 0 } } as Record<string, { x?: number; z?: number; rot?: number }>,
+  /** the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts): none now */
+  towns: {} as Record<string, { x?: number; z?: number; rot?: number }>,
   /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
   tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2 } as Record<string, Tier>,
   /**
@@ -140,15 +144,14 @@ export const PLAN = {
    * beach; and its branches (each from a point of the main road, or the north gate's).
    */
   road: {
-    east: [[-680, -61], [-1173, -81], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
-    west: [[-2700, -330], [-2860, -170], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
+    // (along Ozerki's lane, past the trader, along Pokrov's lane; out of the pass south of the river, past Zavod's east end)
+    east: [[-680, -61], [-1100, -80], [-1170, -90], [-1330, -90], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
+    west: [[-2540, -390], [-2575, -330], [-2625, -280], [-2700, -240], [-2860, -150], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
     width: 6.5,
     /** from Pokrov's north gate (outside it) to the edge of the bunker's hollow, where its way out comes to it */
     bunker: [[-1908, -142], [-1870, -205], [-1760, -255], [-1640, -275], [-1533, -272]] as P[],
-    /** to the north end of Lipki's lane, of Ozerki's, the brick works' gate (over a ford), and Kalat's track */
-    lipki: [[-1173, -81], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
-    ozerki: [[-1450, -62], [-1450, 40], [-1450, 118]] as P[],
-    zavod: [[-1000, -77], [-985, -250], [-960, -400], [-945, -470], [-968, -494], [-980, -510], [-980, -538]] as P[],
+    /** to the north end of Lipki's lane, and Kalat's track */
+    lipki: [[-1170, -90], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
     kalat: [[-2985, -58], [-2975, 100], [-2968, 230], [-2965, 326]] as P[],
     branch: 5,
     /** the steepest a road climbs, to the metre (the jeep's own limit is well over this), and how far its bed is laid out */
@@ -193,7 +196,8 @@ export function westZona(): { x: number; z: number; r: number }[] {
 }
 
 /** the towns as the map has them: where their own data plans them, but where plan v5's ground asks otherwise (PLAN.towns) */
-export const PLACED: Town[] = TOWNS.map((t) => ({ ...t, ...PLAN.towns[t.name] }));
+// (but Zastava, at the pass's mouth, which the places lane sets down)
+export const PLACED: Town[] = TOWNS.filter((t) => t.name !== 'Zastava').map((t) => ({ ...t, ...PLAN.towns[t.name] }));
 /** the loot step of the new places: the towns by their own, the pass's floor high (Kalat's are its own): null outside them. For buildings.ts, which says each loot point's tier. */
 export function westTier(x: number, z: number): Tier | null {
   for (const t of PLACED) {

@@ -211,7 +211,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
   assert.ok(up === 0 && dry === 0 && lx < -3715 && ly <= SEA + 0.01, `the river: ${up} points uphill, ${dry} with no water over the ground, ends at ${lx.toFixed(0)} (${ly.toFixed(1)})`);
   const [lake, swamp] = water.lakes;
   let deepest = 0;
-  for (let x = -1410; x <= -1270; x += 6) for (let z = 92; z <= 290; z += 6) if (WG.inside(lake.outline, x, z)) deepest = Math.max(deepest, lake.level - heightAt(H, x, z));
+  for (let x = -1370; x <= -1130; x += 6) for (let z = -282; z <= -130; z += 6) if (WG.inside(lake.outline, x, z)) deepest = Math.max(deepest, lake.level - heightAt(H, x, z));
   let wet = 0, cells = 0, pools = 0;
   for (let x = -2040; x <= -1650; x += 6) for (let z = 430; z <= 740; z += 6) if (WG.inside(swamp.outline, x, z)) { cells++; const d = swamp.level - heightAt(H, x, z); if (d > 0) wet++; if (d > 0.9) pools++; }
   assert.ok(deepest > 2 && deepest < 4.5 && wet / cells > 0.6 && pools / cells < 0.12 && swamp.swamp, `the lake ${deepest.toFixed(1)} m deep, the swamp ${((wet / cells) * 100).toFixed(0)}% under water, ${((pools / cells) * 100).toFixed(0)}% pools`);
@@ -243,7 +243,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- the roads
 {
-  const fresh = world.roads.slice(-6), river = world.water!.rivers[0].pts;
+  const fresh = world.roads.slice(-4), river = world.water!.rivers[0].pts;
   for (const r of fresh) {
     const p = r.points;
     let steep = 0;
@@ -258,7 +258,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
   const main = fresh[0].points, near = (p: Float32Array, x: number, z: number) => { let d = Infinity; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; };
   const mid = RL.passLine.at(RL.passLine.total / 2);
   assert.ok(near(main, -3640, 25) < 3 && near(main, mid.x, mid.z) < PLAN.pass.floor, 'the main road misses the beach or the pass');
-  ok(`six new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through the pass to the beach, to the bunker, Lipki, Ozerki, Zavod over its ford, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
+  ok(`four new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through Ozerki, the pass and past Zavod to the beach, to the bunker, Lipki, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
 }
 
 // --- the bunker and the trading post where they went

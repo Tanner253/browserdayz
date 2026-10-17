@@ -117,10 +117,14 @@ export function riverMask(river: RiverPts, net: Net, more = 3) {
   return out;
 }
 
-/** where the river is forded (a part of its depth taken off): where a path crosses it, shallow enough to wade */
+/** where the river is forded (a part of its depth taken off): where a path crosses it, shallow enough to wade (and in the pass, before each ramp up its north wall from the floor) */
+const passFords: [number, number, number][] = PLAN.pass.ramps.filter((r) => r.side === -1 && r.level === 0).map((r) => {
+  const a = passLine.at((r.along[0] + r.along[1]) / 2);
+  return [a.x - a.tz * PLAN.pass.river.side * -1, a.z + a.tx * PLAN.pass.river.side * -1, 14];
+});
 function fordAt(x: number, z: number) {
   let f = 0;
-  for (const [fx, fz, r] of PLAN.river.fords) f = Math.max(f, 1 - smoothstep(r * 0.5, r, Math.hypot(x - fx, z - fz)));
+  for (const [fx, fz, r] of [...PLAN.river.fords, ...passFords]) f = Math.max(f, 1 - smoothstep(r * 0.5, r, Math.hypot(x - fx, z - fz)));
   return f * 0.45;
 }
 

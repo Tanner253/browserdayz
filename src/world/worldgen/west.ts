@@ -297,7 +297,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const k = nearest(main.points, pts[0][0], pts[0][1]);
     return lay([[main.points[k], main.points[k + 2]], ...pts.slice(1)], main, R.branch, true);
   };
-  const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), branch(R.ozerki), branch(R.zavod), branch(R.kalat)];
+  const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), branch(R.kalat)];
   const preBed = heights.slice(), gap = new Float32Array(n).fill(1e9);
   // (the branches' beds first, and the main road's over them where they meet)
   for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, () => 1, net, { fill: 0.35, cut: 0.6, gap });
@@ -502,7 +502,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
         let every = B.open;
         if (near && onFloor) {
           // (the floor's middle and its north side by the river's bank: not on the road, nor in the river, nor about the loot)
-          if ((near.s > 4 && near.s < 14) || (near.s < -9 && near.s > -21) || Math.hypot(x - L0[0], z - L0[1]) < 40) continue;
+          if ((near.s > PLAN.pass.road - 5 && near.s < PLAN.pass.road + 5) || Math.abs(near.s - PLAN.pass.river.side) < 7 || Math.hypot(x - L0[0], z - L0[1]) < 40) continue;
           every = B.pass;
         } else if (slope > 0.9) continue;
         else if (slope > 0.3) every = B.foot;
