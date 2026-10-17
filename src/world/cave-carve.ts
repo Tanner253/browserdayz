@@ -376,18 +376,3 @@ export function* carving(p: Pass, cave: number, ground: (x: number, z: number) =
   }
   return { cave, pos: P, nor: Nn, ao: A, index: Uint32Array.from(index, (q) => used[q]), face: Uint32Array.from(face, (q) => used[q]), samples, ms: ms + performance.now() - t };
 }
-
-/** Where on the pass a point is: how far along its middle line (s) and how far across, north positive (t). */
-export function passAt(p: Pass, x: number, z: number): { s: number; t: number } {
-  let best = Infinity, out = { s: 0, t: 0 }, sum = 0;
-  for (let i = 0; i + 1 < p.line.length; i++) {
-    const [ax, az] = p.line[i], [bx, bz] = p.line[i + 1], len = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / len, uz = (bz - az) / len;
-    const along = Math.max(0, Math.min(len, (x - ax) * ux + (z - az) * uz)), px = ax + ux * along, pz = az + uz * along, d = Math.hypot(x - px, z - pz);
-    if (d < best) {
-      best = d;
-      out = { s: sum + along, t: (x - px) * uz - (z - pz) * ux };
-    }
-    sum += len;
-  }
-  return out;
-}

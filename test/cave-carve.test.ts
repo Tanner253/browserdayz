@@ -4,11 +4,11 @@
 //   npx tsx test/cave-carve.test.ts
 
 import assert from 'node:assert/strict';
-import { CARVE, carveCave, caveField, passAt } from '../src/world/cave-carve';
-import { CAVES, caveMouths, galleries, passOf, passProfile, passWorld } from '../src/sim/pass';
+import { CARVE, carveCave, caveField } from '../src/world/cave-carve';
+import { CAVES, caveMouths, galleries, passAt, passGround, passOf, passWorld } from '../src/sim/pass';
 
 const pass = passOf(() => 40);
-const ground = (x: number, z: number) => 40 + passProfile(passAt(pass, x, z).t);
+const ground = (x: number, z: number) => passGround(pass, x, z);
 const mouths = caveMouths(pass);
 const nearMouth = (x: number, z: number, more: number) =>
   mouths.some((m) => {

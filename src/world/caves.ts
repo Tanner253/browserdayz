@@ -16,8 +16,8 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
-import { carving, passAt, type Carved } from './cave-carve';
-import { CAVES, caveDark, galleries, passProfile, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
+import { carving, type Carved } from './cave-carve';
+import { CAVES, caveDark, galleries, passGround, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
 
 /** metres from the eye within which a wall piece is drawn as the world's copy (its far copy beyond) */
 const NEAR = 70;
@@ -42,10 +42,7 @@ export class PassCaves {
     private atmo: Atmosphere,
     readonly pass: Pass,
     /** the ground's height (the terrain's); the plan's own terraces if not given */
-    private ground: (x: number, z: number) => number = (x, z) => {
-      const at = passAt(pass, x, z);
-      return pass.floor(at.s) + passProfile(at.t);
-    },
+    private ground: (x: number, z: number) => number = (x, z) => passGround(pass, x, z),
   ) {
     this.pieces = rockPieces(pass);
     this.gs = galleries(pass);
