@@ -277,6 +277,7 @@ const HELD = {
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
+  db12: new THREE.Vector3(0.05, -0.02, -0.05),
   // (that maker's packs stand their camera half a metre behind where they are put: as the sniper's)
   dual_smg: new THREE.Vector3(0, -0.02, -0.36),
   dual_mac10: new THREE.Vector3(0, -0.02, -0.36),
@@ -829,6 +830,8 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // runs over the middle of the folded rear ring and the folded front hood, scripts/sight-profile.mjs and
   // progress/weapons/sight-in-hands.js)
   mp7a1: { notch: [-0.0957, 0.1382, -0.0076], post: [0.137, 0.1356, -0.0067] },
+  // (the double barrel's: along the rib between its barrels, from over the breech to the bead at the muzzle)
+  db12: { notch: [0.3, 0.1135, -0.0094], post: [0.96, 0.113, -0.0094] },
   // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
   aks74u: { notch: [0.128, 0.1375, 0.0084], post: [0.368, 0.1344, 0.0085] },
 };
@@ -1328,6 +1331,19 @@ export class Weapons {
       ride: { base: 'base', trigger: 'trigger1', front: 'front', slug1: 'slug1', slug2: 'slug2' },
       twin: { ride: { base: 'base_2', trigger: 'trigger1_2', front: 'front_2', slug1: 'slug1_2', slug2: 'slug2_2' }, flash: mkFlash(), roots: { L: ['sawnoffL', 'L_arm_01'], R: ['sawnoffR', 'R_arm_025'] } },
     }));
+    this.models.set('db12', await this.packGun({ pack: 'db12', item: 'db12', gun: 'db12', kind: 'rifle', hands: true, hip: HELD.db12, flashSize: 0.34, flash: mkFlash(), square: true, strip: [], ride: { base: 'stock_049', barrels: 'barrels_050', shells: 'shells_052' } }));
+    this.models.get('db12')!.gait = true;
+    // (it came with no pictures, its one paint a bare colour nearly black: lifted as the dark guns are it was still a
+    // black cut-out. Painted a worn gunmetal here, its own paint and nobody else's: the name is Blender's default.)
+    for (const o of [this.models.get('db12')!.root, this.models.get('db12')!.world]) o?.traverse((n) => {
+      const mat = (n as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (!mat?.isMeshStandardMaterial || mat.map || mat.userData.lifted) return;
+      mat.userData.lifted = true;
+      mat.color.setScalar(0.17);
+      mat.metalness = 0.55;
+      mat.roughness = Math.max(mat.roughness, 0.48);
+      mat.envMapIntensity = 1.4;
+    });
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };

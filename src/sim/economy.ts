@@ -186,6 +186,7 @@ export const TYPES: Record<string, TypeRule> = {
   mac10_suppressor: { at: [0, 0, 1, 2, 1], lifetime: 7200, restock: 1800, usage: ARMY },
   dual_smg: { at: [0, 0, 4, 2, 0], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [10, 40], keep: SOON },
   mag_dual_smg: { at: [0, 0, 4, 2, 0], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON },
+  db12: { at: [0, 8, 3, 0, 0], lifetime: 7200, restock: 240, usage: ['Hunting', ...HOMES], loaded: [0, 2], keep: SOON },
   aks74u: { at: [0, 0, 0, 2, 0], lifetime: 7200, restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON },
   mp7a1: { at: [0, 0, 0, 4, 2], lifetime: 7200, restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON },
   scorpion: { at: [0, 0, 10, 3, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 3: IN_TOWN } },

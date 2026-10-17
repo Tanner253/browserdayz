@@ -220,6 +220,13 @@ const D: ItemDef[] = [
     desc: 'Two sawn-off 12 gauge shotguns, one in each hand: left button for the left, right button for the right. Two shells in each; murderous up close, nothing at range.',
     weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 4, ergo: 45, action: 'self', akimbo: true }, iconYaw: 0,
   },
+  // A double-barrelled shotgun (2026-10-17): two shells, broken open and both loaded at once. Common in the
+  // countryside (T2), as DayZ's double barrel is.
+  {
+    id: 'db12', name: 'Double-Barrel Shotgun', model: 'db12', w: 8, h: 2, weight: 3.2, category: 'weapon', slot: 'long',
+    desc: 'A side-by-side 12 gauge. Two shells, one in each barrel, both loaded at once when it is broken open.',
+    weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 2, ergo: 50, action: 'self' }, iconYaw: 0,
+  },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
   {
     id: 'aks74u', name: 'AKS-74U', model: 'aks74u', w: 6, h: 3, weight: 2.7, category: 'weapon', slot: 'long',

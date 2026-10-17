@@ -117,7 +117,7 @@ function joinAnimations(doc, order, fps) {
 }
 
 /** A skinned shape as it stands on its skeleton now: [positions, normals, tangents, the joint each point mostly follows], per primitive. */
-function standSkin(node, meshSpace = false) {
+function standSkin(node, meshSpace = false, meshScale = 1) {
   const skin = node.getSkin();
   const joints = skin.listJoints();
   const ibm = skin.getInverseBindMatrices();
@@ -144,18 +144,19 @@ function standSkin(node, meshSpace = false) {
         if (w[k] > 0) for (let e = 0; e < 16; e++) m[e] += J[a[k]][e] * w[k];
       }
       lead[i] = joints[a[best]].getName();
-      P.set(point(m, pos.getElement(i, b)), i * 3);
+      P.set(point(m, pos.getElement(i, b).map((x) => x * meshScale)), i * 3);
       if (N) {
-        const v = turn(m, nor.getElement(i, b)), l = Math.hypot(...v) || 1;
+        const v = turn(m, nor.getElement(i, b)), l = (Math.hypot(...v) || 1) * Math.sign(meshScale);
         N.set(v.map((x) => x / l), i * 3);
       }
       if (T) {
         tan.getElement(i, q);
-        const v = turn(m, q), l = Math.hypot(...v) || 1;
+        const v = turn(m, q), l = (Math.hypot(...v) || 1) * Math.sign(meshScale);
         T.set([v[0] / l, v[1] / l, v[2] / l, q[3]], i * 4);
       }
     }
-    return { prim, P, N, T, lead };
+    // (a shape stood through a scale below nought is turned inside out: its triangles are wound the other way)
+    return { prim, P, N, T, lead, flip: meshScale < 0 };
   });
 }
 
@@ -196,7 +197,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
     // (the skinned shape hangs on a node of its own: found by what it draws)
     // (a gun may be drawn as more than one shape on the one skeleton: its body, and a magazine by itself)
     const shapes = cfg.skinned ? [].concat(cfg.skinned.mesh) : [];
-    const stood = cfg.skinned ? root.listNodes().filter((n) => n.getSkin() && shapes.some((m) => n.getMesh()?.getName().includes(m))).flatMap((n) => standSkin(n, cfg.meshSpace)) : null;
+    const stood = cfg.skinned ? root.listNodes().filter((n) => n.getSkin() && shapes.some((m) => n.getMesh()?.getName().includes(m))).flatMap((n) => standSkin(n, cfg.meshSpace, cfg.meshScale ?? 1)) : null;
     if (stood) {
       for (const s of stood) {
         const of = s.lead.map((j) => (j in cfg.skinned.joints ? cfg.skinned.joints[j] : cfg.skinned.rest));
@@ -365,6 +366,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       const byPiece = new Map();
       for (let t = 0; t < count; t += 3) {
         const tri = [0, 1, 2].map((k) => (idx ? idx.getScalar(t + k) : t + k));
+        if (pc.skin.flip) [tri[1], tri[2]] = [tri[2], tri[1]];
         const piece = pc.of[tri[0]];
         if (!piece) continue;
         if (!byPiece.has(piece)) byPiece.set(piece, { remap: new Map(), order: [], index: [] });

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T16:52:01.617Z",
+ "generated": "2026-10-17T17:07:24.789Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12038,6 +12038,136 @@
    "hi": "assets/models/hi/m32.glb",
    "hiBytes": 3654496,
    "hiCard": 133
+  },
+  "db12": {
+   "url": "assets/models/db12.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 45868,
+   "srcTris": 5054,
+   "tris": 5054,
+   "min": [
+    -0.1774,
+    -0.0888,
+    -0.042
+   ],
+   "max": [
+    0.9726,
+    0.1112,
+    0.0233
+   ],
+   "lods": [
+    {
+     "url": "assets/models/db12_lod1.glb",
+     "tris": 1928,
+     "far": 2,
+     "of": "45868:1792256844690"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.06477,
+     -0.01619,
+     0.02429
+    ],
+    "left": [
+     0.3343,
+     -0.01208,
+     -0.06616
+    ]
+   }
+  },
+  "db12_fp": {
+   "url": "assets/models/db12_fp.glb",
+   "tags": [
+    "viewmodel"
+   ],
+   "bytes": 152060,
+   "srcTris": 10842,
+   "tris": 10842,
+   "min": [
+    -0.1774,
+    -0.0888,
+    -0.042
+   ],
+   "max": [
+    0.9726,
+    0.1112,
+    0.0233
+   ],
+   "lods": [],
+   "rig": {
+    "fps": 30,
+    "clips": {
+     "fire": [
+      0,
+      10
+     ],
+     "draw": [
+      12,
+      43
+     ],
+     "holster": [
+      45,
+      77.5
+     ],
+     "reload": [
+      79.5,
+      177
+     ],
+     "walk": [
+      179,
+      231.5
+     ],
+     "run": [
+      233.5,
+      303.5
+     ]
+    },
+    "skinned": true,
+    "eye": [
+     0,
+     0,
+     0
+    ],
+    "view": [
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     0,
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "frame": [
+     0,
+     0,
+     -0.8096517,
+     0,
+     0,
+     0.8096517,
+     0,
+     0,
+     0.8096517,
+     0,
+     0,
+     0,
+     -0.0687075,
+     0.1422778,
+     -0.1189769,
+     1
+    ]
+   }
   }
  }
 }

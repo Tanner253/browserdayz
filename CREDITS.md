@@ -120,6 +120,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048
 - M32 MGL (old version) by ardickasaretas (https://sketchfab.com/ardickasaretas), Sketchfab Standard licence
   Changes made: set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048
+- This work is based on "Shotgun animation set" (https://sketchfab.com/3d-models/shotgun-animation-set-c24e049dccfe4a1d837b1b0ae1461636) by Vlasov Daniil (https://sketchfab.com/dan741vlasov) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: held in our own arms (its own arms left out), its gun stood at the size and the turn its joints were bound in, its pieces parted by joint, textures at 2048
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
