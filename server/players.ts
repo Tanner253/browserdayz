@@ -2,7 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import type { WebSocket } from 'ws';
-import { type SerializedInventory, cleanItem as cleanThing, cleanInventory as cleanCarried } from '../src/sim/inventory';
+import { BODY_GRID, type SerializedInventory, cleanItem as cleanThing, cleanInventory as cleanCarried } from '../src/sim/inventory';
 import type { ItemInstance } from '../src/sim/items';
 import { bunkerDark } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
@@ -201,7 +201,8 @@ export function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
 export function cleanStored(list: unknown): StoredItem[] {
   if (!Array.isArray(list)) return [];
   const out: StoredItem[] = [];
-  for (const raw of list.slice(0, 120)) {
+  // (as many things as the biggest grid a body has has cells)
+  for (const raw of list.slice(0, BODY_GRID[0] * BODY_GRID[1])) {
     const it = cleanItem(raw);
     if (it && num(raw.x) && num(raw.y)) out.push({ ...it, x: raw.x, y: raw.y, rot: !!raw.rot });
   }

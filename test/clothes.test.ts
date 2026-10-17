@@ -596,10 +596,10 @@ ok('every set of things a person can have on at once, with their own tag and a f
     for (const off of fixed) lay([a, b, ...fixed.map((k) => (k === off ? null : biggest(k))), ...varied.map(biggest)]);
   }
   assert.ok(sets > 3000, `only ${sets} sets were laid out`);
-  assert.equal(most, 120, 'the most a person can have on is not what it was when the grid was sized: see BODY_GRID');
+  assert.equal(most, 132, 'the most a person can have on is not what it was when the grid was sized: see BODY_GRID');
   assert.ok(BODY_GRID[0] * BODY_GRID[1] >= most);
-  // (the server reads no more than 120 things out of a grid it is sent: a body of more cells could hold more single things than are kept)
-  assert.ok(BODY_GRID[0] * BODY_GRID[1] <= 120, 'the body has more cells than the server reads things out of a grid: raise that count with it (cleanStored in server/index.ts)');
+  // (a grid sent is read to as many things as a body has cells: here, and cleanStored in server/players.ts likewise)
+  assert.equal(cleanStored(Array.from({ length: 200 }, (_, i) => ({ id: 'bandage', uid: `b${i}`, x: 0, y: 0 })), (v) => String(v)).length, BODY_GRID[0] * BODY_GRID[1], 'the server reads fewer things out of a grid than a body has cells');
 });
 
 // ------------------------------------------------------------------ the two ends

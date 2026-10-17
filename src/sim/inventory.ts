@@ -992,15 +992,15 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
 
 /**
  * A body's grid: everything a person can have on and slung at once, with their own tag and a full pouch of tags
- * taken, lies in it. The worst there is, two .50 rifles and the biggest thing for every place, is 121 cells, and this
- * is 128 (it was 8x15 until the .50s came): laid biggest first (`layOnBody`) every set of things that can be worn
+ * taken, lies in it. The worst there is, two .50 rifles and the biggest thing for every place, is 132 cells, and this
+ * is 136 (it was 8x15 until the .50s came): laid biggest first (`layOnBody`) every set of things that can be worn
  * goes in with none left over (test/clothes.test.ts lays them out). It was 8x10: a geared body is 83 to 88 cells of
  * worn things before a single thing out of a pocket, and what found no room was thrown on the ground round it.
  *
  * (No bigger than it need be: the server reads no more things out of any grid it is sent than this has cells. When
  * something bigger is made this has to grow a row: the test will say so.)
  */
-export const BODY_GRID: [number, number] = [8, 16];
+export const BODY_GRID: [number, number] = [8, 17];
 
 /**
  * Things laid in a body's grid, the biggest first so that the small ones fill what is left.

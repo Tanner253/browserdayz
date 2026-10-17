@@ -539,7 +539,7 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     // (a jacket's pockets are what the smallest pack is, as they were, and well under the others)
     assert.ok(cells('field_jacket') <= cells('sack_pack') && cells('field_jacket') * 1.5 < cells('camping_pack') && cells('field_trousers') < cells('field_jacket'));
     // what is not worn is as it was: the cases, a body
-    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[8, 6], [6, 5], [5, 4], [8, 16]]);
+    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[8, 6], [6, 5], [5, 4], [8, 17]]);
   });
 
   ok('the biggest pack takes two AKs with a column and a row over, or three Mosins and a row; the middle pack takes an AR-15 and no AK', () => {

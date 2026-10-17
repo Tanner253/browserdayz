@@ -7,7 +7,7 @@ export type Tier = 1 | 2 | 3 | 4 | 5;
 
 export const TIERS: Record<Tier, { name: string; colour: string; where: string; finds: string }> = {
   1: { name: 'Tier 1', colour: '#cfc9ba', where: 'The outskirts: cabins, farms, yards, ranger posts', finds: 'Melee weapons, flashlights and tools, food and water, bandages, cloth hats, a day pack. No guns.' },
-  2: { name: 'Tier 2', colour: '#7fd4a0', where: 'The checkpoints, the army camp, the depot, the market', finds: 'Pistols and their magazines, and every calibre of ammunition where the army was, mostly 9 mm and .45. Soft vests, bandages and stims, and the shotguns of the countryside.' },
+  2: { name: 'Tier 2', colour: '#7fd4a0', where: 'The checkpoints, the army camp, the depot, the market', finds: 'Pistols and their magazines, and every calibre of ammunition where the army was, mostly 9 mm and .45. Soft vests, bandages and stims.' },
   3: { name: 'Tier 3', colour: '#6db3ff', where: 'Kamenka and the village', finds: 'Submachine guns, their magazines and 9 mm by the box. Armoured vests, suppressors and sights. The gas masks, at the police stations. The hospital: first aid kits and stims by the shelf. An AK or an AR-15 if you are very lucky, and luckier still if it has a magazine.' },
   4: { name: 'Tier 4', colour: '#c58cff', where: 'The Chemical Works, under the gas; a helicopter down; a supply drop', finds: 'The AK and the AR-15, sniper rifles and scopes, their magazines and rounds, plate carriers, field rucksacks, and the keycards that open the bunker.' },
   5: { name: 'Tier 5', colour: '#ffd35a', where: 'Bunker 17', finds: 'The best of everything, and plenty of it. The shotgun, the Desert Eagle, heavy armour and the K6-3 helmet, here and nowhere else; the AK\'s drum and the long magazines.' },
