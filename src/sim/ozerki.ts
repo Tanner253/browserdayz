@@ -7,9 +7,9 @@
 // metres of bare boards), the two short piers the only cover along an open shore; the watch tower on the hill
 // behind the lane covers all three; the houses are quiet looting for whoever came in from the woods.
 
-import type { KitPiece } from './kit';
 import type { Town, TownGround, TownSpot } from './towns';
 import type { TownThing } from './zavod';
+import { SECTION, type WalkRun } from './walkways';
 
 const PI = Math.PI;
 
@@ -30,9 +30,6 @@ const LANE = 30;
 export const DECK = 0.35;
 /** the piers: where along the shore each leaves it, how many 3 m sections it runs out, and whether the boathouse stands at its end */
 export const PIERS: { x: number; n: number; house?: boolean }[] = [{ x: -38, n: 5 }, { x: 0, n: 10, house: true }, { x: 34, n: 4 }];
-/** a pier section's own measures (the kit's, see the pier_kit pieces): its deck so high over its origin, so long, laid every so far, its middle so far across from its origin */
-const SECTION = { deck: 2.65, step: 3.0, mid: 0.98, gate: 1.22 };
-
 export function ozerkiBuildings(): TownSpot[] {
   const house = (type: 'izba' | 'izba_two', x: number): TownSpot => ({ type, x, z: LANE - 5 - (type === 'izba' ? 3.25 : 4), rot: 0 });
   const long = PIERS.find((p) => p.house)!, end = SHORE - long.n * SECTION.step;
@@ -47,28 +44,8 @@ export function ozerkiBuildings(): TownSpot[] {
   ];
 }
 
-/**
- * The piers as pieces of the pier kit, in Ozerki's frame on the pad at y: each a gateway where it leaves the shore,
- * then its sections out over the water (a section runs along its own +z: turned half round to run north), and a
- * cluster of old poles standing in the water beside it.
- */
-export function ozerkiPiers(y: number): KitPiece[] {
-  const out: KitPiece[] = [], foot = y + DECK - SECTION.deck;
-  for (const p of PIERS) {
-    out.push({ id: 'pier_section_05', at: [p.x + SECTION.gate, foot, SHORE], turn: PI, body: false, name: 'Ozerki pier gate' });
-    for (let k = 0; k < p.n; k++) out.push({ id: k % 3 === 2 ? 'pier_section_03' : k % 2 ? 'pier_section_02' : 'pier_section_01', at: [p.x + SECTION.mid, foot, SHORE - k * SECTION.step], turn: PI, body: false, name: 'Ozerki pier' });
-    out.push({ id: 'pier_poles', at: [p.x - 4.5, foot, SHORE - p.n * 1.4], turn: 0.4, body: false, name: 'Ozerki poles' });
-  }
-  return out;
-}
-
-/** what stops a body on the piers: a deck of boards over each section, as boxes [middle x, y, z, half x, y, z], in Ozerki's frame on the pad at y */
-export function ozerkiDecks(y: number): [number, number, number, number, number, number][] {
-  return PIERS.map((p) => {
-    const len = p.n * SECTION.step + 0.4, z = SHORE - (p.n * SECTION.step) / 2 + 0.2;
-    return [p.x, y + DECK - 0.06, z, 1.24, 0.06, len / 2] as [number, number, number, number, number, number];
-  });
-}
+/** the piers as runs of the pier kit's walkway (src/sim/walkways.ts): each from the shore out north over the water, through a gateway, old posts in the water beside it */
+export const OZERKI_WALKS: WalkRun[] = PIERS.map((p) => ({ a: [p.x, SHORE], b: [p.x, SHORE - p.n * SECTION.step], deck: DECK, gate: true, posts: true }));
 
 export function ozerkiThings(): TownThing[] {
   const out: TownThing[] = [];

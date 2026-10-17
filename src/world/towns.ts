@@ -26,6 +26,8 @@ const COME = 320, GO = 380;
 const FACE_COME = 80, FACE_GO = 100;
 /** and nothing of it is fetched until the eye is within this (past the longest draw distance, 1500 m): a player in the east never downloads it */
 const FACE_FETCH = 1700;
+/** a run of a walkway is drawn near within so many metres */
+const WALK_COME = 60, WALK_GO = 80;
 /**
  * Old limewash on the walls' rubble, the brick showing where it has fallen; fresh white on their dressed stone
  * (pictures the buildings already use). The first pass had them the other way: from the road the walls were flat white.
@@ -116,7 +118,8 @@ export class Towns {
     for (const t of this.placed) for (const k of placedKits(t)) {
       // (what stops a body is there from the start, as the walls')
       for (const b of k.boxes) physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.h[0], b.h[1], b.h[2]), 'wood', { x: b.c[0], y: b.c[1], z: b.c[2] }, { x: 0, y: Math.sin(b.rot / 2), z: 0, w: Math.cos(b.rot / 2) });
-      later((near) => this.pieces(k.kit, k.pieces, near, `${t.town.name} ${k.kit}`), COME, GO, t.town.x, t.town.z, Math.hypot(...t.town.pad));
+      // (each run of a walkway by itself: a section of boards is some 2,000 triangles near, 600 far, and a swamp has eighty of them)
+      later((near) => this.pieces(k.kit, k.pieces, near, `${t.town.name} ${k.kit}`), WALK_COME, WALK_GO, k.x, k.z, k.r);
     }
   }
 

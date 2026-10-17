@@ -22,6 +22,8 @@ import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCel
 import * as town from './town-plans';
 import * as zavod from './zavod-plans';
 import * as ozerki from './ozerki-plans';
+import { flooded, painted } from './mokroye-plans';
+import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 // (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
@@ -498,6 +500,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
     case 'izba_two': return town.izbaTwoPlan(rng);
     case 'chapel': return town.chapelPlan();
     case 'sawmill': return town.sawmillPlan();
+    case 'izba_wet': return flooded(town.izbaPlan(rng), WET_DEPTH);
+    case 'barn_sunk': return painted(flooded(blueprint('barn', rng), SUNK_DEPTH), 'boards_pale');
     case 'boathouse': return ozerki.boathousePlan();
     case 'smokehouse': return ozerki.smokehousePlan();
     case 'works_hall': return zavod.hallPlan();
@@ -3435,3 +3439,6 @@ export class Buildings {
 }
 
 export type { Instance };
+
+/** a kind of building's blueprint, as planning makes it (for whoever checks one: test/towns.test.ts) */
+export { blueprint as blueprintOf };

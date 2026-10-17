@@ -365,7 +365,9 @@ export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'ca
   // (the cathedral's cross: an arm each side of its nave, the apse at its east end)
   | 'cathedral_arm' | 'cathedral_apse'
   // (the fishing village's: src/world/ozerki-plans.ts)
-  | 'boathouse' | 'smokehouse';
+  | 'boathouse' | 'smokehouse'
+  // (the flooded hamlet's: a log house the water stands in, the barn sunk waist-deep: src/world/mokroye-plans.ts)
+  | 'izba_wet' | 'barn_sunk';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -411,6 +413,8 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   izba_two: [9, 8],
   chapel: [9, 6],
   sawmill: [20, 7],
+  izba_wet: [8, 6.5],
+  barn_sunk: [12, 8],
   boathouse: [7, 6],
   smokehouse: [4.4, 3.6],
   cathedral_arm: [5, 9],
