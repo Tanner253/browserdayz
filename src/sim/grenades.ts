@@ -158,7 +158,7 @@ export function launch(t: Thrower, w: string, o: Vec3, v: Vec3, feet: Vec3, now:
   if (!spec) return null;
   const speed = Math.hypot(v[0], v[1], v[2]);
   if (Math.hypot(o[0] - feet[0], o[2] - feet[2]) > NADE.from || Math.abs(o[1] - feet[1]) > NADE.up || speed > spec.speed * 1.1) return null;
-  if (now - (t.lastLaunch ?? -1e12) < 250) return null;
+  if (now - (t.lastLaunch ?? -1e12) < 200) return null;
   t.lastLaunch = now;
   const f: Flown = { w, due: now + spec.flight * 1000, thrownAt: now, from: o, speed, hand: false, impact: true, reached: new Set(), people: 0 };
   t.flown.push(f);

@@ -221,7 +221,7 @@ ok('the M32 and its 40 mm grenades: admin only (found nowhere, sold by nobody), 
   assert.ok(WEAPON_RULES.ammo_40mm?.blast, 'its blast has a rule');
 });
 
-ok('the server: a launched grenade leaves from where its player stands, no faster than its launcher fires, and not twice in a quarter of a second', () => {
+ok('the server: a launched grenade leaves from where its player stands, no faster than its launcher fires, and not twice in a fifth of a second', () => {
   const t = newThrower(), feet: Vec3 = [0, 0, 0], now = 1e6, v: Vec3 = [0, 0, -LAUNCHED.ammo_40mm.speed];
   assert.equal(launch(t, 'ammo_40mm', [9, 1.6, 0], v, feet, now), null, 'not from nine metres off');
   assert.equal(launch(t, 'ammo_40mm', [0, 1.6, 0], [0, 0, -200], feet, now), null, 'not faster than it fires');
