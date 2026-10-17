@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T11:59:20.061Z",
+ "generated": "2026-10-17T12:21:04.259Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -11381,6 +11381,125 @@
      -0.2096751,
      0.1900904,
      -0.1051202,
+     1
+    ]
+   }
+  },
+  "sniper50": {
+   "url": "assets/models/sniper50.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 464824,
+   "srcTris": 13195,
+   "tris": 13195,
+   "min": [
+    -0.3655,
+    -0.0867,
+    -0.037
+   ],
+   "max": [
+    1.1689,
+    0.208,
+    0.0654
+   ],
+   "lods": [
+    {
+     "url": "assets/models/sniper50_lod1.glb",
+     "tris": 3217,
+     "far": 2,
+     "of": "464824:1792239664762"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.08,
+     -0.02,
+     0.03
+    ],
+    "left": [
+     0.31975,
+     -0.00207,
+     -0.05353
+    ]
+   },
+   "hi": "assets/models/hi/sniper50.glb",
+   "hiBytes": 1760088,
+   "hiCard": 69
+  },
+  "sniper50_fp": {
+   "url": "assets/models/sniper50_fp.glb",
+   "tags": [
+    "viewmodel"
+   ],
+   "bytes": 55172,
+   "srcTris": 20747,
+   "tris": 20747,
+   "min": [
+    -0.3655,
+    -0.0867,
+    -0.037
+   ],
+   "max": [
+    1.1689,
+    0.208,
+    0.0654
+   ],
+   "lods": [],
+   "rig": {
+    "fps": 30,
+    "clips": {
+     "fire": [
+      0,
+      14
+     ],
+     "bolt": [
+      16,
+      50
+     ],
+     "reload": [
+      62,
+      118
+     ],
+     "check": [
+      120,
+      164
+     ]
+    },
+    "view": [
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0,
+     0,
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "frame": [
+     0,
+     0,
+     -0.01,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0,
+     0.1433733,
+     -0.0110513,
+     0.0008269,
      1
     ]
    }

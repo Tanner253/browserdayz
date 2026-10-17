@@ -90,6 +90,8 @@ export interface ItemDef {
     shows?: Record<string, string[]>;
     /** the sight of its own that it is aimed through when fitted (an attachment no other gun takes), where it is not the holographic one */
     optic?: string;
+    /** a scope that is part of the gun: aimed, it is looked through, as a rifle with the PU scope on */
+    ownScope?: boolean;
     never?: string[];
     /** and pieces that are taken off when an attachment goes on in their place (attachment -> pieces): a brake, for a suppressor */
     hides?: Record<string, string[]>;
@@ -164,6 +166,12 @@ const D: ItemDef[] = [
     desc: 'Submachine gun in 9x19mm. Thirty rounds in its magazine, light, quick to the shoulder and steady in a burst. B changes it to single shots.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_scorpion', ergo: 72, modes: ['auto', 'semi'], shows: { mag_scorpion: ['mag'] } }, iconYaw: 0,
   },
+  // A .50 calibre bolt-action sniper rifle (2026-10-17): the bunker's, its scope part of it.
+  {
+    id: 'sniper50', name: '.50 Sniper Rifle', model: 'sniper50', w: 10, h: 3, weight: 11.5, category: 'weapon', slot: 'long',
+    desc: 'A bolt-action rifle in .50 BMG with a scope of its own. Five rounds. It reaches further and hits harder than anything else in the Zone.',
+    weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, shows: { mag_sniper50: ['mag'] } }, iconYaw: 0,
+  },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
   {
     id: 'aks74u', name: 'AKS-74U', model: 'aks74u', w: 6, h: 3, weight: 2.7, category: 'weapon', slot: 'long',
@@ -211,6 +219,10 @@ const D: ItemDef[] = [
     id: 'box_556', name: '5.56x45 Ammo Box', model: 'ammo_box_556', w: 1, h: 1, weight: 0.13, category: 'ammo',
     desc: 'A sealed box of 25 cartridges for the AR-15. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_556', qty: 25, time: 2.2 },
+  },
+  {
+    id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'sniper50', nodeRe: '^bullet', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 3,
+    desc: 'Loose .50 calibre cartridges, heavy as a fistful of bolts. They go into the .50 rifle magazine by hand.',
   },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.009, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
@@ -295,6 +307,11 @@ const D: ItemDef[] = [
     id: 'mag_scorpion', name: 'Scorpion Magazine', model: 'scorpion', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'magazine',
     desc: 'Thirty rounds of 9 mm for the CZ Scorpion EVO.',
     mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['scorpion'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_sniper50', name: '.50 Sniper Magazine', model: 'sniper50', nodeRe: '^mag', w: 1, h: 2, weight: 0.6, category: 'magazine',
+    desc: 'Five rounds of .50 BMG for the .50 sniper rifle.',
+    mag: { ammo: 'ammo_50bmg', capacity: 5 }, attach: { fits: ['sniper50'], slot: 'magazine' },
   },
   {
     id: 'mag_mp7', name: 'MP7 Magazine', model: 'mp7a1', nodeRe: '^mag', w: 1, h: 2, weight: 0.25, category: 'magazine',

@@ -1124,6 +1124,30 @@ export const WEAPON_PACKS = {
       changes: 'held in our own arms (its own arms left out), its pieces parted by joint, textures at 2048',
     },
   },
+  sniper50: {
+    dir: 'sniper50',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 0.01,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (its rifle in rigid pieces moved by their own nodes, as the old sniper pack's, by the same maker; its round a
+    // piece of its own, which is what its loose rounds are drawn as)
+    parts: { base: 'base', release: 'base', scope: 'scope', boltback: 'boltrear', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'bullet' },
+    ourArms: true,
+    wrists: { right: 'R_wrist_027', left: 'L_wrist_03' },
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    // (one long animation: a shot, the bolt, a reload, and a look over it, by where its pieces move)
+    clips: { fire: [0, 14], bolt: [16, 50], reload: [62, 118], check: [120, 164] },
+    credit: {
+      name: 'sniper animated',
+      url: 'https://sketchfab.com/3d-models/sniper-animated-eae1ba5b43ae4bc89b0647fb5d8a2d27',
+      author: 'DJMaesen',
+      line: 'This work is based on "sniper animated" (https://sketchfab.com/3d-models/sniper-animated-eae1ba5b43ae4bc89b0647fb5d8a2d27) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
+    },
+  },
   aks74u: {
     dir: 'aks74u',
     file: 'scene.gltf',

@@ -269,6 +269,7 @@ const HELD = {
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
+  sniper50: new THREE.Vector3(0.14, -0.22, -0.36),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
 };
@@ -1227,6 +1228,7 @@ export class Weapons {
     this.models.set('mpa', mpa);
     // The CZ Scorpion (2026-10-17, the weapons pass): a pack on arms of its own, played as it came; the gun alone hung
     // on its joints as the AK's is, the pack's own drawing of it put away.
+    this.models.set('sniper50', await this.packGun({ pack: 'sniper50', item: 'sniper50', gun: 'sniper50', kind: 'rifle', hands: true, hip: HELD.sniper50, flashSize: 0.4, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', boltrear: 'boltback', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'bullet' } }));
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };
@@ -1998,7 +2000,7 @@ export class Weapons {
     if (m.world) return this.dressed(m, id, mods);
     const src = m.body ?? m.root.children[0];
     const wasVisible = [m.scope, m.wrap, m.suppressor, m.mag].map((o) => o?.visible);
-    if (m.scope) m.scope.visible = mods.includes('pu_scope');
+    if (m.scope) m.scope.visible = mods.includes('pu_scope') || !!ITEMS[id]?.weapon?.ownScope;
     if (m.wrap) m.wrap.visible = mods.includes('rifle_wrap');
     if (m.suppressor) m.suppressor.visible = mods.includes('suppressor_9');
     if (m.mag) m.mag.visible = true;
@@ -2240,7 +2242,7 @@ export class Weapons {
     const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
-    this.scoped = !!m && m.kind === 'rifle' && hasMod(this.currentItem, 'pu_scope') && this.adsT > 0.9 && this.aiming;
+    this.scoped = !!m && m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || !!ITEMS[this.currentItem!.id]?.weapon?.ownScope) && this.adsT > 0.9 && this.aiming;
     this.applyMods();
     this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;
@@ -2899,7 +2901,7 @@ export class Weapons {
     const m = this.current;
     if (!m) return;
     const it = this.currentItem;
-    if (m.scope) m.scope.visible = hasMod(it, 'pu_scope');
+    if (m.scope) m.scope.visible = hasMod(it, 'pu_scope') || !!(it && ITEMS[it.id]?.weapon?.ownScope);
     if (m.wrap) m.wrap.visible = hasMod(it, 'rifle_wrap');
     if (m.suppressor) m.suppressor.visible = hasMod(it, 'suppressor_9');
     // (a piece said with a `!` is there when the part is NOT fitted: the plain sights a scope stands in the place of)

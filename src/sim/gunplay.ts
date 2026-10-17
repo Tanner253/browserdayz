@@ -33,6 +33,8 @@ export const CARTRIDGES: Record<string, Cartridge> = {
   ammo_45: { name: '.45 ACP', vel: 255, drag: 0.0008, damage: 46 },
   // .50 Action Express, 300 grain: 450 m/s, 378 at a hundred yards
   ammo_50: { name: '.50 AE', vel: 450, drag: 0.0019, damage: 58 },
+  // .50 BMG, 750 grain: 860 m/s, and it keeps it (a ballistic coefficient near 1): 790 at three hundred yards
+  ammo_50bmg: { name: '.50 BMG', vel: 860, drag: 0.0003, damage: 150 },
   // 7.62x54R, 148 grain ball from a long barrel: 830 m/s, 622 at three hundred yards
   ammo_762: { name: '7.62x54R', vel: 830, drag: 0.00105, damage: 95 },
   // 7.62x39, 123 grain: 715 m/s, 480 at three hundred yards
@@ -83,6 +85,7 @@ export interface Gun {
 
 export const GUNS: Record<string, Gun> = {
   // (the bolt rifle: one hard shove, and a long way back to the target)
+  sniper50: { ammo: 'ammo_50bmg', rpm: 60, cycle: 1.1, barrel: 1, moa: 0.5, hip: 3.4, up: 4.2, side: 0.6, lean: 0.1, first: 1, held: 1, stays: 0.3, back: 9, jump: 4.4, heavy: true, zero: [100, 200, 300, 400, 500, 600, 800, 1000], reach: 1600 },
   mosin: { ammo: 'ammo_762', rpm: 300, cycle: 0.8, barrel: 1, moa: 1.6, hip: 1.3, up: 3.1, side: 0.5, lean: 0.15, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 3.2, heavy: true, zero: [100, 200, 300, 400, 500, 600], reach: 900 },
   // (the Colt: a heavier round than the 9 mm's and a harder shove with each, a little slower to come back)
   colt: { ammo: 'ammo_45', rpm: 380, barrel: 1, moa: 6, hip: 1.8, up: 2.1, side: 0.5, lean: 0, first: 1, held: 1, stays: 0.26, back: 9, jump: 1.9, zero: [25], reach: 200 },
