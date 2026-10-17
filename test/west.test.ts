@@ -362,7 +362,10 @@ for (let k = 0; k < 4000; k++) {
   const x = X0 + 1.37 + ((k * 2654435761) % 4606), z = Z0 + 1.21 + ((k * 40503) % 1534) + (k % 7) * 0.13;
   const hit = pw.castRay(new RAPIER.Ray({ x, y: 500, z }, { x: 0, y: -1, z: 0 }), 1000, true);
   assert.ok(hit, `no ground under ${x}, ${z}`);
-  off = Math.max(off, Math.abs(500 - hit!.timeOfImpact - heightAt(H, x, z)));
+  // (measured across the slope: on a riser of the pass's walls, a third of a millimetre of Rapier's single precision
+  // along the ground is a millimetre up it; the wrong diagonal of a cell would be centimetres to metres off)
+  const slope = Math.hypot(heightAt(H, x + 0.25, z) - heightAt(H, x - 0.25, z), heightAt(H, x, z + 0.25) - heightAt(H, x, z - 0.25)) / 0.5;
+  off = Math.max(off, Math.abs(500 - hit!.timeOfImpact - heightAt(H, x, z)) / Math.max(1, slope));
   n++;
 }
 assert.ok(off < 1e-3, `the ground bodies stand on is ${off.toFixed(4)} m off the ground's own`);
