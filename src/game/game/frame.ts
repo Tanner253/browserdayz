@@ -178,6 +178,24 @@ export const frameMethods = {
     // An admin's map, live while it is open (2026-10-13: "the admin map needs to have LIVE updates"): who is on
     // and how they are is asked of the server once a second, and twice a second every dot is put where this game
     // has that player now. (Not every frame: the sheet is drawn again each time.)
+    // (and the corner map too, for an admin with names on, while the sheet is shut: everybody else as a dot)
+    const cornerPeople = !this.map.open && this.role === 'admin' && this.online && this.namesWanted;
+    if (cornerPeople) {
+      if ((this.mapAskT -= dt) <= 0) {
+        this.mapAskT = 1;
+        this.net.send({ t: 'adm' });
+      }
+      if ((this.mapFeedT -= dt) <= 0) {
+        this.mapFeedT = 0.5;
+        const out: { x: number; z: number; name: string; dead?: boolean }[] = [];
+        for (const q of this.admPlayers.values()) {
+          if (q.id === this.net.id) continue;
+          const r = q.alive ? this.remotes.get(q.id) : undefined;
+          out.push({ x: r ? r.pos.x : q.x, z: r ? r.pos.z : q.z, name: q.name, dead: !q.alive });
+        }
+        this.minimap.setPeople(out);
+      }
+    } else this.minimap.setPeople([]);
     if (this.map.open && this.role === 'admin' && this.online) {
       if ((this.mapAskT -= dt) <= 0) {
         this.mapAskT = 1;

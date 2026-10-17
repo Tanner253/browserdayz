@@ -24,6 +24,7 @@ import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
 import { playEdge } from '../world/outline';
+import { swampShore } from '../world/worldgen/west-water';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
 
@@ -39,6 +40,20 @@ export interface MapLive {
 
 /** metres between the lines of the grid, and between contour lines (every fifth is drawn heavier) */
 const GRID = 100, CONTOUR = 5;
+/** the first column of the grid, counted from the square's corner (its lines are laid from there): the one the world's west edge falls in */
+const COL0 = Math.floor((WORLD_X0 + SQUARE_HALF) / GRID);
+/**
+ * A column's name, counted from the world's west edge: A to Z, then AA, AB... (the same on the band along the top and in
+ * each square's corner, so that whoever says "I'm in C12" is found there). `k`: its west line is -SQUARE_HALF + k * GRID.
+ */
+export function colName(k: number) {
+  let n = k - COL0, s = '';
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return s;
+}
 /** how near it can be brought: 1 is the whole sheet */
 const NEAREST = 9;
 /** a part of the world printed: its north-west corner, its south-east, and how many pixels to a metre */
@@ -972,7 +987,8 @@ export class BigMap {
     for (const lake of world.water?.lakes ?? []) {
       g.fillStyle = lake.swamp ? 'rgba(104, 150, 140, 0.6)' : 'rgba(98, 150, 196, 0.85)';
       g.beginPath();
-      lake.outline.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
+      // (the swamp by its own shore, as its ground is made: its water's outline is the plan's box, a rectangle on the sheet)
+      (lake.swamp ? swampShore : lake.outline).forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
       g.closePath();
       g.fill();
     }
@@ -989,9 +1005,10 @@ export class BigMap {
       }
     }
     yield;
-    // the grid: hundred-metre squares
-    g.strokeStyle = 'rgba(36, 58, 92, 0.3)';
-    g.lineWidth = Math.max(1, S * 0.5);
+    // the grid: hundred-metre squares, plain to see (the owner, 2026-10-16: "make the grid lines more prominent by default
+    // so its easier for people to tell where the grids are")
+    g.strokeStyle = 'rgba(36, 58, 92, 0.55)';
+    g.lineWidth = Math.max(1, S * 0.7);
     // (laid from the square's corner, wherever the part is: one grid the world over)
     const gx = (((-SQUARE_HALF - a.x0) % GRID) + GRID) % GRID, gz = (((-SQUARE_HALF - a.z0) % GRID) + GRID) % GRID;
     for (let m = gx; m <= a.x1 - a.x0; m += GRID) {
@@ -1006,6 +1023,20 @@ export class BigMap {
       g.lineTo(NW, m * S);
       g.stroke();
     }
+    // and each square's name faint in its top corner ("im in C12 for example is helpful to people")
+    g.fillStyle = 'rgba(29, 27, 22, 0.38)';
+    g.font = `600 ${Math.max(7, Math.round(GRID * S * 0.11))}px 'JetBrains Mono', ui-monospace, monospace`;
+    g.textAlign = 'left';
+    g.textBaseline = 'top';
+    for (let m = gx - GRID; m <= a.x1 - a.x0; m += GRID) {
+      const k = Math.round((a.x0 + m + SQUARE_HALF) / GRID);
+      for (let n = gz - GRID; n <= a.z1 - a.z0; n += GRID) {
+        const row = Math.round((a.z0 + n + SQUARE_HALF) / GRID) + 1;
+        if (row < 1 || a.x0 + m + GRID <= WORLD_X0) continue;
+        g.fillText(`${colName(k)}${row}`, Math.max(m, 0) * S + 3, Math.max(n, 0) * S + 3);
+      }
+    }
+    g.textBaseline = 'alphabetic';
     // the roads: cased in black, filled the orange of a made road
     g.lineJoin = g.lineCap = 'round';
     for (const [extra, colour] of [[3, INK], [0, '#d9963f']] as [number, string][]) {
@@ -1270,9 +1301,13 @@ export class BigMap {
       g.font = `700 ${Math.round(11 * u)}px 'JetBrains Mono', ui-monospace, monospace`;
       g.fillStyle = '#e9e4d8';
       g.textAlign = 'center';
+      // (the columns across the whole world, from its west edge: they were the square's alone, and the west had none)
+      for (let k = COL0; -half + (k + 0.5) * GRID < WORLD_X1; k++) {
+        const px = sx(-half + (k + 0.5) * GRID);
+        if (px > x0 + 24 * u && px < x1 - 6 * u) g.fillText(colName(k), px, y0 + 12.5 * u);
+      }
       for (let i = 0; (i + 0.5) * GRID < 2 * SQUARE_HALF; i++) {
-        const mid = -half + (i + 0.5) * GRID, px = sx(mid), py = sy(mid);
-        if (px > x0 + 24 * u && px < x1 - 6 * u) g.fillText(String.fromCharCode(65 + i), px, y0 + 12.5 * u);
+        const py = sy(-half + (i + 0.5) * GRID);
         if (py > y0 + 24 * u && py < y1 - 6 * u) g.fillText(String(i + 1), x0 + 9.5 * u, py + 4 * u);
       }
     }

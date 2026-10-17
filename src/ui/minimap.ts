@@ -49,6 +49,15 @@ export class Minimap {
     this.resize();
   }
 
+  /** everybody else, where an admin with names on is shown them (empty for anybody else) */
+  private people: { x: number; z: number; name: string; dead?: boolean }[] = [];
+  setPeople(list: { x: number; z: number; name: string; dead?: boolean }[]) {
+    if (!list.length && !this.people.length) return;
+    this.people = list;
+    // (drawn again at the next look, though the player has not moved)
+    this.last.x = 1e9;
+  }
+
   /** what stands about the world now, as this map has been told it: the sheet opened large (bigmap.ts) shows the same */
   get live() {
     return { jeeps: this.jeeps, wells: this.wells, traders: this.traders, drops: this.drops, pings: this.pings };
@@ -374,6 +383,28 @@ export class Minimap {
       g.lineTo(qx, qz + h * 0.8);
       g.lineWidth = Math.max(1, r0 * 0.14);
       g.stroke();
+    }
+    // everybody else, for an admin with names on (the owner, 2026-10-16: "for admins the minimap preview should show
+    // other players if nametags toggle is on, currently only shows in the main map"): a dot each, the dead grey
+    for (const q of this.people) {
+      const qx = (q.x - cx + span / 2) * k, qz = (q.z - cz + span / 2) * k;
+      if (qx < 0 || qz < 0 || qx > W || qz > W) continue;
+      const r = this.big ? W / 140 : W / 40;
+      g.beginPath();
+      g.arc(qx, qz, r, 0, Math.PI * 2);
+      g.fillStyle = q.dead ? '#8a8a82' : '#4f8fff';
+      g.fill();
+      g.lineWidth = Math.max(1, r * 0.35);
+      g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+      g.stroke();
+      if (this.big) {
+        g.font = `600 ${Math.round(W / 75)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+        g.textAlign = 'center';
+        g.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        g.fillText(q.name, qx + 1, qz - r * 1.6 + 1);
+        g.fillStyle = '#dfe8ff';
+        g.fillText(q.name, qx, qz - r * 1.6);
+      }
     }
     // tag carriers: a ring that beats, fading out; in the corner view one off the edge sits on the rim
     for (const p of this.pings) {
