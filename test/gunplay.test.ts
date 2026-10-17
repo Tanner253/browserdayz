@@ -322,22 +322,22 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
     assert.equal(hitDamage(id, 'arms', 50), hitDamage(id, 'legs', 50), `${id}: an arm is not hit as a leg is`);
     assert.ok(Math.abs(hitDamage(id, 'torso', 30, true) - hitDamage(id, 'torso', 30) * 0.9) < 1e-9, `${id}: quieted`);
   }
-  // ---- the sniper rifle, as it was asked for: one to the body with no suppressor; quieted, one to a bare head and
-  // not to a helmeted one; less to an arm or a leg
+  // ---- the sniper rifle, as it was asked for (2026-10-17): never one to the body; one to a bare head, loud or quiet,
+  // and not to a helmeted one; less to an arm or a leg
   {
     const worn = (id: string, k: 'armor' | 'head') => ITEMS[id].wear![k]!;
     const helmets = Object.values(ITEMS).filter((d) => d.slot === 'head' && d.wear?.head !== undefined && d.wear.head <= 0.75).map((d) => d.id);
     assert.ok(helmets.length >= 2, 'the helmets were not found');
     for (const d of [0, 100, 300, 600, 900]) {
-      assert.ok(hitDamage('mosin', 'torso', d) >= 100, `loud, to the body at ${d} m: ${hitDamage('mosin', 'torso', d).toFixed(0)}`);
-      assert.ok(hitDamage('mosin', 'torso', d, true) < 100, `quieted, one to the body was the end at ${d} m`);
-      assert.ok(hitDamage('mosin', 'head', d, true) >= 100, `quieted, to a bare head at ${d} m: ${hitDamage('mosin', 'head', d, true).toFixed(0)}`);
-      for (const h of helmets) assert.ok(hitDamage('mosin', 'head', d, true) * worn(h, 'head') < 100, `quieted, one to a head under the ${ITEMS[h].name} was the end at ${d} m`);
+      for (const sup of [false, true]) {
+        assert.ok(hitDamage('mosin', 'torso', d, sup) < 100, `one to the body was the end at ${d} m${sup ? ', quieted' : ''}`);
+        assert.ok(hitDamage('mosin', 'head', d, sup) >= 100, `to a bare head at ${d} m${sup ? ', quieted' : ''}: ${hitDamage('mosin', 'head', d, sup).toFixed(0)}`);
+        for (const h of helmets) assert.ok(hitDamage('mosin', 'head', d, sup) * worn(h, 'head') < 100, `one to a head under the ${ITEMS[h].name} was the end at ${d} m${sup ? ', quieted' : ''}`);
+      }
       for (const z of ['legs', 'arms'] as const) for (const sup of [false, true]) assert.ok(hitDamage('mosin', z, d, sup) < 100 && hitDamage('mosin', z, d, sup) < hitDamage('mosin', 'torso', d, sup), `one to the ${z} at ${d} m`);
     }
-    // (through every vest but the heaviest, a loud one to the body up close is the end; and a K6-3 still leaves its wearer standing after a loud one to the head, as it says it does)
-    for (const v of Object.values(ITEMS).filter((d) => d.wear?.armor !== undefined && d.id !== 'heavy_armor')) assert.ok(hitDamage('mosin', 'torso', 30) * v.wear!.armor! >= 100, `loud, to the body in the ${v.name}`);
-    assert.ok(hitDamage('mosin', 'head', 0) * worn('helmet_k63', 'head') < 100 && hitDamage('mosin', 'head', 0) * worn('boonie_hat', 'head') >= 100);
+    // (and the .50s are what kill with one to the body, up close)
+    for (const id of ['sniper50', 'barrett']) assert.ok(hitDamage(id, 'torso', 30) >= 100, `${id}: one to the body up close is not the end`);
   }
   // (a shell: no more pellets are believed than it has, and each is a pellet)
   assert.equal(hitDamage('benelli', 'torso', 0, false, 0, 20), CARTRIDGES.ammo_12.damage * 9);

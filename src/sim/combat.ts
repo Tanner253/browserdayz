@@ -76,20 +76,18 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
 const ZONE: Record<HitZone, [bullet: number, melee: number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
 
 /**
- * The sniper rifle's own figures, by where its round lands and whether the rifle is quieted, before armour
- * (2026-10-12: "the sniper with supressors should 1shot headshot a player with no helmet on but not 1 shot with a
- * helmet on, sniper should be 1 shot to body with no suppressor, less damage to legs and arms"). It was a round
- * of 95 like any other, times the part of the body: a hit to the chest left anybody with 5.
- *   loud, the body: 210. Nobody stands up from it but whoever is in the heaviest plates there are, at a distance
- *     (through Heavy Armour's half it is 105 at the muzzle and under a hundred from about fifty metres).
- *   loud, the head: 304, as it always was: the end of anybody but the wearer of a K6-3, who is left with 3.
- *   quiet, the head: 130. Bare, capped or masked it is the end; under a helmet (the Combat Helmet's 0.7) it is 91.
- *   quiet, the body: 80. Two of them.
- *   an arm or a leg: 60 loud, 42 quiet.
+ * The sniper rifle's own figures, by where its round lands and whether the rifle is quieted, before armour. No
+ * longer one to the body (the owner, 2026-10-17: "the regular sniper rifle should no longer 1 shot kill since we
+ * have better snipers now": the .50s are what kill with one); as in DayZ, a Mosin to a bare head is still the end.
+ *   loud, the body: 85; quiet, 65. Two of them.
+ *   loud, the head: 140. Bare, capped or masked it is the end; under a helmet (the Combat Helmet's 0.7) it is 98.
+ *   quiet, the head: 110: the end of a bare head, not of a helmeted one.
+ *   an arm or a leg: 50 loud, 36 quiet.
  * A head is a head at any distance; what the body and the limbs take falls with what speed the round has left.
+ * (It was 210 to the body and 304 to the head loud, 2026-10-12: "sniper should be 1 shot to body with no suppressor".)
  */
 export const RIFLE_HITS: Record<string, Record<'loud' | 'quiet', Record<HitZone, number>>> = {
-  mosin: { loud: { head: 304, torso: 210, legs: 60, arms: 60 }, quiet: { head: 130, torso: 80, legs: 42, arms: 42 } },
+  mosin: { loud: { head: 140, torso: 85, legs: 50, arms: 50 }, quiet: { head: 110, torso: 65, legs: 36, arms: 36 } },
 };
 /**
  * What a gun with figures of its own does where it landed, or null for a gun that has none.
