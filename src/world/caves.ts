@@ -9,27 +9,33 @@
 // Each cave is one carved surface of rock (src/world/cave-carve.ts), closed but for its mouths, its own collider the
 // same surface: nothing between pieces to see the sky through or walk through. It is painted with the scanned rock's
 // pictures from its three sides (no seams to stretch them) and the trail's gravel on its floors, shaded in its
-// crevices. The pass's walls are dressed with the scanned cliffs, one set of instances for each model: the world's
-// copy within NEAR metres of the eye, its far copy beyond. What stops a body at a wall piece is its own shape (its
-// physics copy, scripts/phys-copies.mjs), made solid only within SOLID metres of the eye: the hull round a cliff face
-// stood up to 2.9 m in front of the rock seen, an invisible wall on one level ray in five along the shelves.
+// crevices, and lit a few metres in by the day's light off the ground at its mouth. The pass's walls are dressed with
+// the scanned cliffs, rubble at their feet and on their lips, each mouth framed (src/sim/pass.ts rockPieces), drawn and
+// made solid by a RockField (src/world/rock-field.ts: each piece by its own shape, fading into the ground).
 
 import * as THREE from 'three';
-import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
 import { carving, type Carved } from './cave-carve';
-import { CAVES, caveDark, galleries, passGround, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
+import { CANYON_ROCK_TINT, KINDS } from './ground';
+import { GROUND_KNEE } from './rock-blend';
+import { RockField } from './rock-field';
+import { passData } from './worldgen';
+import { CAVES, caveDark, caveMouths, galleries, passGround, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
 
-/** metres from the eye within which a wall piece is drawn as the world's copy (its far copy beyond) */
-const NEAR = 70;
-/** metres the eye moves before the pieces are sorted again */
-const RESORT = 12;
-/** metres from the eye within which a wall piece is solid (and past which, with RESORT's margin, it is let go again) */
+/**
+ * metres from the eye within which a wall piece is drawn as its world copy (its far copy beyond: the world copies are
+ * 45,000 triangles, and with the walls dressed close a pass seen from its floor held some forty of them in 70 m)
+ */
+const NEAR = 45;
+/** metres from the eye within which a wall piece is solid */
 const SOLID = 60;
-/** the rock's pictures, and how many metres each covers: the walls and roofs, and the floors */
-const ROCK = { wall: 'cliff_side', wallSize: 3.4, floor: 'rocky_trail', floorSize: 2.2 };
+/**
+ * the rock's pictures: the walls and roofs the canyon's own rock, the floors the pass floor's grit, each as the ground
+ * lays it (its size, its tint), so that a mouth's rock and the ground round it are one rock
+ */
+const ROCK = { wall: KINDS.canyon, floor: KINDS.grit };
 /** milliseconds of carving to a frame, when it is carved here */
 const SLICE = 6;
 
@@ -38,12 +44,9 @@ export class PassCaves {
   readonly pieces: RockPiece[];
   /** the caves as carved (for numbers, and for the server or a cache to keep) */
   carved: Carved[] = [];
+  /** the walls' rock pieces, drawn and solid */
+  field: RockField | null = null;
   private gs: Gallery[];
-  private sets: { near: THREE.InstancedMesh[]; far: THREE.InstancedMesh[]; list: RockPiece[]; parts: { m: THREE.Matrix4 }[]; farParts: { m: THREE.Matrix4 }[] }[] = [];
-  private sortedAt = new THREE.Vector3(Infinity, 0, 0);
-  /** each model's physics copy (its corners and faces, as the model stands), and the pieces solid now */
-  private shapes = new Map<string, { pos: Float32Array; index: Uint32Array }>();
-  private solidNow = new Map<RockPiece, RAPIER.Collider>();
 
   constructor(
     private scene: THREE.Scene,
@@ -52,7 +55,8 @@ export class PassCaves {
     /** the ground's height (the terrain's); the plan's own terraces if not given */
     private ground: (x: number, z: number) => number = (x, z) => passGround(pass, x, z),
   ) {
-    this.pieces = rockPieces(pass);
+    // (nothing stood on a ramp the world keeps between its shelves)
+    this.pieces = rockPieces(pass, { ramps: passData().ramps, ground });
     this.gs = galleries(pass);
     this.group.name = 'pass caves';
   }
@@ -62,29 +66,18 @@ export class PassCaves {
     return caveDark(this.pass, x, y, z, this.gs);
   }
 
-  async build(o: { solid?: boolean; carved?: Carved[] } = {}) {
-    const byId = new Map<string, RockPiece[]>();
-    for (const p of this.pieces) (byId.get(p.id) ?? byId.set(p.id, []).get(p.id)!).push(p);
-    for (const [id, list] of byId) {
-      const [near, far] = await Promise.all([assets.model(id, 0), assets.model(id, 1)]);
-      const parts = this.partsOf(near), farParts = this.partsOf(far);
-      const mk = (ps: { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4 }[], shadow: boolean) =>
-        ps.map((q) => {
-          const mesh = new THREE.InstancedMesh(q.geo, q.mat, list.length);
-          mesh.count = 0;
-          mesh.castShadow = shadow;
-          mesh.receiveShadow = true;
-          mesh.name = `rock ${id}`;
-          this.group.add(mesh);
-          return mesh;
-        });
-      this.sets.push({ near: mk(parts, true), far: mk(farParts, false), list, parts, farParts });
-      if (o.solid !== false) this.shapes.set(id, this.shapeOf(await assets.model(id, 2)));
-    }
+  /** `heightTex`: the terrain's heights, for the rock to fade into the ground (src/world/rock-blend.ts) */
+  /**
+   * Done once the caves stand and are solid (their rock as carved): what opens their mouths in the ground waits for it,
+   * or a body there has no floor (main.ts). The walls' pieces follow, their models loaded first (`dressed`).
+   */
+  async build(o: { solid?: boolean; carved?: Carved[]; heightTex?: THREE.Texture } = {}) {
     this.carved = o.carved ?? (await this.carveAll());
     const mat = this.rockMaterial();
     for (const k of this.carved) {
       const pos = new THREE.BufferAttribute(k.pos, 3), nor = new THREE.BufferAttribute(k.nor, 3), ao = new THREE.BufferAttribute(k.ao, 1);
+      // (carved before the bounce was: none, the dark as it was)
+      const bounce = new THREE.BufferAttribute(k.bounce ?? new Float32Array(k.ao.length), 1);
       // (two meshes on the same points: the cave's own, which casts no shadow, the ground over it does; and the rock
       // round its mouths, which takes the ground's place there and so casts the ground's)
       for (const [index, casts] of [[k.index, false], [k.face, true]] as const) {
@@ -92,6 +85,7 @@ export class PassCaves {
         geo.setAttribute('position', pos);
         geo.setAttribute('normal', nor);
         geo.setAttribute('aAo', ao);
+        geo.setAttribute('aBounce', bounce);
         geo.setIndex(new THREE.BufferAttribute(index, 1));
         geo.computeBoundingSphere();
         const mesh = new THREE.Mesh(geo, mat);
@@ -108,7 +102,14 @@ export class PassCaves {
       }
     }
     this.scene.add(this.group);
+    // (the scans washed with the pass's beds' red, so that a piece stands in the wall and not on it: src/world/ground.ts)
+    // (its mouths' holes in the ground floored as the caves are: a block by a mouth reads the rock cut away there)
+    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: CANYON_ROCK_TINT, flat: 'grit', holes: caveMouths(this.pass) });
+    this.dressed = this.field.build({ solid: o.solid });
   }
+
+  /** done when the walls' pieces are drawn and solid near the eye (after `build`) */
+  dressed: Promise<void> = Promise.resolve();
 
   /** every cave carved here, a few milliseconds at a time between frames */
   private async carveAll() {
@@ -143,21 +144,25 @@ export class PassCaves {
       const t = assets.manifest.textures[id];
       return { diff: assets.texture(t.diff, { srgb: true, repeat: true }), nor: assets.texture(t.nor, { repeat: true }) };
     };
-    const wall = tex(ROCK.wall), floor = tex(ROCK.floor);
+    const wall = tex(ROCK.wall.tex), floor = tex(ROCK.floor.tex);
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
     this.atmo.register(mat, (shader) => {
       Object.assign(shader.uniforms, {
         tWall: { value: wall.diff }, tWallN: { value: wall.nor }, tFloor: { value: floor.diff }, tFloorN: { value: floor.nor },
-        uRockSize: { value: new THREE.Vector2(ROCK.wallSize, ROCK.floorSize) },
+        uRockSize: { value: new THREE.Vector2(ROCK.wall.size, ROCK.floor.size) },
+        uWallTint: { value: new THREE.Vector3(...ROCK.wall.tint) }, uFloorTint: { value: new THREE.Vector3(...ROCK.floor.tint) },
       });
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aAo;\nvarying float vAo;\nvarying vec3 vRockPos;\nvarying vec3 vRockNor;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAo = aAo;\nvRockPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRockNor = normalize(mat3(modelMatrix) * objectNormal);');
+        .replace('#include <common>', '#include <common>\nattribute float aAo;\nattribute float aBounce;\nvarying float vAo;\nvarying float vBounce;\nvarying vec3 vRockPos;\nvarying vec3 vRockNor;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAo = aAo;\nvBounce = aBounce;\nvRockPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRockNor = normalize(mat3(modelMatrix) * objectNormal);');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', /* glsl */ `#include <common>
           uniform sampler2D tWall, tWallN, tFloor, tFloorN;
           uniform vec2 uRockSize;
+          uniform vec3 uWallTint, uFloorTint;
+          ${GROUND_KNEE}
           varying float vAo;
+          varying float vBounce;
           varying vec3 vRockPos;
           varying vec3 vRockNor;
           // (a picture read with its slopes given, so that it may be read or not, point by point)
@@ -172,16 +177,16 @@ export class PassCaves {
           vec3 use = step(vec3(0.03), rB);
           rB = rB * use / max(dot(rB, use), 1e-4);
           vec3 rockCol = vec3(0.0), tX = vec3(0.0, 0.0, 1.0), tY = tX, tZ = tX;
-          if (use.x > 0.5) { rockCol += ROCK_READ(tWall, uX, dX).rgb * rB.x; tX = ROCK_READ(tWallN, uX, dX).xyz * 2.0 - 1.0; }
-          if (use.z > 0.5) { rockCol += ROCK_READ(tWall, uZ, dZ).rgb * rB.z; tZ = ROCK_READ(tWallN, uZ, dZ).xyz * 2.0 - 1.0; }
+          if (use.x > 0.5) { rockCol += ROCK_READ(tWall, uX, dX).rgb * uWallTint * rB.x; tX = ROCK_READ(tWallN, uX, dX).xyz * 2.0 - 1.0; }
+          if (use.z > 0.5) { rockCol += ROCK_READ(tWall, uZ, dZ).rgb * uWallTint * rB.z; tZ = ROCK_READ(tWallN, uZ, dZ).xyz * 2.0 - 1.0; }
           if (use.y > 0.5) {
             vec3 top = vec3(0.0), topN = vec3(0.0);
-            if (onFloor < 0.99) { top += ROCK_READ(tWall, uY, dY).rgb * (1.0 - onFloor); topN += (ROCK_READ(tWallN, uY, dY).xyz * 2.0 - 1.0) * (1.0 - onFloor); }
-            if (onFloor > 0.01) { top += ROCK_READ(tFloor, uF, dF).rgb * onFloor; topN += (ROCK_READ(tFloorN, uF, dF).xyz * 2.0 - 1.0) * onFloor; }
+            if (onFloor < 0.99) { top += ROCK_READ(tWall, uY, dY).rgb * uWallTint * (1.0 - onFloor); topN += (ROCK_READ(tWallN, uY, dY).xyz * 2.0 - 1.0) * (1.0 - onFloor); }
+            if (onFloor > 0.01) { top += ROCK_READ(tFloor, uF, dF).rgb * uFloorTint * onFloor; topN += (ROCK_READ(tFloorN, uF, dF).xyz * 2.0 - 1.0) * onFloor; }
             rockCol += top * rB.y;
             tY = topN;
           }
-          diffuseColor.rgb *= rockCol * mix(1.0, vAo, 0.6);`)
+          diffuseColor.rgb *= groundKnee(rockCol) * mix(1.0, vAo, 0.6);`)
         .replace('#include <normal_fragment_maps>', /* glsl */ `{
           // (each side's picture's bumps brought into the world and blended: the "whiteout" blend)
           tX = vec3(tX.xy + rN.zy, abs(tX.z) * rN.x);
@@ -189,93 +194,21 @@ export class PassCaves {
           tZ = vec3(tZ.xy + rN.xy, abs(tZ.z) * rN.z);
           normal = normalize((viewMatrix * vec4(normalize(tX.zyx * rB.x + tY.xzy * rB.y + tZ.xyz * rB.z), 0.0)).xyz);
         }`)
-        .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= vAo;\nreflectedLight.indirectSpecular *= vAo;');
+        .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= vAo;\nreflectedLight.indirectSpecular *= vAo;\n' +
+          // (the day's light come in at the mouth off the ground outside, warm, a few metres in and dying away: not the
+          // sky's, which the dark inside takes away, so that one step in is lit as a cave's mouth is)
+          'reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(1.0, 0.9, 0.78) * 0.85 * uDaylight * vBounce * vBounce * mix(0.6, 1.0, vAo);');
     }, 'cave-rock');
     return mat;
   }
 
-  /** a model's shapes, each with its place in the model, and its material made ready for the light */
-  private partsOf(root: THREE.Object3D) {
-    root.updateMatrixWorld(true);
-    const back = root.matrixWorld.clone().invert(), out: { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4 }[] = [];
-    root.traverse((n) => {
-      const mesh = n as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
-      this.atmo.register(mat);
-      out.push({ geo: mesh.geometry, mat, m: back.clone().multiply(mesh.matrixWorld) });
-    });
-    return out;
-  }
-
-  /** where a piece stands, as a matrix */
-  private placeOf(p: RockPiece) {
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt[0], p.turn, p.tilt[1], 'YXZ'));
-    return new THREE.Matrix4().compose(new THREE.Vector3(...p.at), q, new THREE.Vector3(p.scale, p.scale, p.scale));
-  }
-
-  /** a physics copy's corners and faces, as the model stands (its parts brought into the model's own frame) */
-  private shapeOf(root: THREE.Object3D) {
-    root.updateMatrixWorld(true);
-    const back = root.matrixWorld.clone().invert(), pos: number[] = [], index: number[] = [], v = new THREE.Vector3();
-    root.traverse((n) => {
-      const mesh = n as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const m = back.clone().multiply(mesh.matrixWorld), at = mesh.geometry.getAttribute('position'), o = pos.length / 3, ix = mesh.geometry.getIndex();
-      for (let i = 0; i < at.count; i++) {
-        v.fromBufferAttribute(at, i).applyMatrix4(m);
-        pos.push(v.x, v.y, v.z);
-      }
-      if (ix) for (let i = 0; i < ix.count; i++) index.push(o + ix.getX(i));
-      else for (let i = 0; i < at.count; i++) index.push(o + i);
-    });
-    return { pos: new Float32Array(pos), index: new Uint32Array(index) };
-  }
-
-  /** a wall piece made solid: its physics copy at its size, turned and stood where it is */
-  private solidify(p: RockPiece) {
-    const shape = this.shapes.get(p.id);
-    if (!shape) return;
-    const pos = shape.pos.map((v) => v * p.scale), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt[0], p.turn, p.tilt[1], 'YXZ'));
-    this.solidNow.set(p, physics.addStaticQuat(physics.R.ColliderDesc.trimesh(pos, shape.index), 'rock', { x: p.at[0], y: p.at[1], z: p.at[2] }, { x: q.x, y: q.y, z: q.z, w: q.w }));
-  }
-
-  /** Each frame: when the eye has moved on, which wall pieces are drawn near and which far, and which are solid. */
+  /** Each frame: which wall pieces are drawn near and which far, and which are solid (cheap: only as the eye moves on). */
   update(eye: THREE.Vector3) {
-    if (this.sortedAt.distanceToSquared(eye) < RESORT * RESORT) return;
-    this.sortedAt.copy(eye);
-    if (this.shapes.size) for (const p of this.pieces) {
-      const d = Math.hypot(p.at[0] - eye.x, p.at[1] - eye.y, p.at[2] - eye.z), c = this.solidNow.get(p);
-      if (!c && d < SOLID) this.solidify(p);
-      else if (c && d > SOLID + 2 * RESORT) {
-        physics.world.removeCollider(c, false);
-        this.solidNow.delete(p);
-      }
-    }
-    const m = new THREE.Matrix4();
-    for (const set of this.sets) {
-      let n = 0, f = 0;
-      for (const p of set.list) {
-        const place = this.placeOf(p);
-        if (Math.hypot(p.at[0] - eye.x, p.at[1] - eye.y, p.at[2] - eye.z) < NEAR) {
-          set.near.forEach((mesh, i) => mesh.setMatrixAt(n, m.multiplyMatrices(place, set.parts[i].m)));
-          n++;
-        } else {
-          set.far.forEach((mesh, i) => mesh.setMatrixAt(f, m.multiplyMatrices(place, set.farParts[i].m)));
-          f++;
-        }
-      }
-      for (const [meshes, count] of [[set.near, n], [set.far, f]] as const) for (const mesh of meshes) {
-        mesh.count = count;
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
-      }
-    }
+    this.field?.update(eye);
   }
 
   dispose() {
     this.group.removeFromParent();
-    for (const c of this.solidNow.values()) physics.world.removeCollider(c, false);
-    this.solidNow.clear();
+    this.field?.dispose();
   }
 }

@@ -185,7 +185,7 @@ export const num = (v: unknown): v is number => typeof v === 'number' && Number.
 
 export const isVec3 = (v: unknown): v is [number, number, number] => Array.isArray(v) && v.length === 3 && v.every(num);
 
-export const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && v.every(num) && onMap(v[0], v[2]) && Math.abs(v[1]) < 500;
+export const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && v.every(num) && onMap(v[0], v[2], v[1]) && Math.abs(v[1]) < 500;
 
 export const cleanName = (s: unknown) => (typeof s === 'string' ? s : '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Survivor';
 
