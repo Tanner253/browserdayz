@@ -18,7 +18,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import '../world/buildings';
 import type { Buildings } from '../world/buildings';
-import { PLAN, SQUARE_HALF, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { PLAN, SQUARE_HALF, ridgeWall, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
@@ -214,6 +214,8 @@ export class Game {
   menuOn = true;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
+  /** what is drawn beside the game and told each frame where the eye is (the west's towns, Kalat, the water: main.ts) */
+  readonly beside: ((dt: number, eye: THREE.Vector3, camera: THREE.Camera) => void)[] = [];
   /** the doors of the lockers that have them: swung open while one is searched, by anybody (see ./lockers.ts) */
   lockers!: Lockers;
   /** the bunker: what is built of it, its door and its lamps */
@@ -982,6 +984,12 @@ export class Game {
       const west = Math.max(WORLD_X0 + 4, PLAN.barrier), east = WORLD_X1 - 4;
       const mx = (west + east) / 2, mz = (WORLD_Z0 + WORLD_Z1) / 2, hx = (east - west) / 2, hz = (WORLD_Z1 - WORLD_Z0) / 2 - 4;
       for (const [x, z, ax, az] of [[mx, mz + hz, hx, 1], [mx, mz - hz, hx, 1], [mx + hx, mz, 1, hz], [mx - hx, mz, 1, hz]]) physics.addStatic(physics.R.ColliderDesc.cuboid(ax, 400, az), 'rock', { x, y: 0, z });
+      // And one along the ridge's crest, the whole height of the map, but where the pass goes through it (plan v5:
+      // "both sides of the map canyon walls stretching to the skybox so they cant be walked around")
+      for (const [ax, az, bx, bz] of ridgeWall(WORLD_Z0, WORLD_Z1)) {
+        const yaw = Math.atan2(-(bz - az), bx - ax);
+        physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2 + 0.6, 400, 0.6), 'rock', { x: (ax + bx) / 2, y: 0, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
+      }
     }
     this.traders = new Traders(world);
     this.minimap.setTraders(this.traders.places);

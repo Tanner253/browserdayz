@@ -1,14 +1,18 @@
-// THE WEST'S PLAN (plan v2, the owner's yes 2026-10-16: marketing/zona-plan-map3b.png): where everything of the
-// new ground goes, as numbers, and the questions only those numbers answer. The owner: "for the map i think it should
-// blend in a lot ... desert is ugly the grass is prettier we can make new forests and biomes ... good map design
-// common sense dynamic gameplay and unique is what we are looking for." West to east: a thin sea, the beach, a small
-// desert fading through steppe into green land, the green land with a pine forest, birch woods and flower meadows,
-// a monastery town and a hamlet on the main road, and today's valley opened onto it. Positions in world metres (x
-// east, z south). What is drawn of it is west.ts; what is done to the square for it, opening.ts.
+// THE WEST'S PLAN: where everything of the new ground goes, as numbers, and the questions only those numbers answer.
+// Plan v5 as the owner's client chose it (marketing/zona-plan-map3f.png), with the owner's "i think desert should be
+// 2x size atleast" (map3h, 2026-10-16). West to east: a thin sea and its beach; a desert of dunes about 1.3 km across,
+// a dry river's green line through it and the ruined town of Kalat; the RIDGE, sheer and the whole height of the map,
+// one canyon pass through it ("players should be forced to go through the canyon chokepouint"), terraced, the area's
+// best loot on its floor; the green land: the green river valley across its north running into the pass, Bunker 17
+// on its south rim, Pokrov and the trader on the main road, Lipki and Ozerki by the forest lake, the swamp and its
+// drowned hamlet in the low south-west; and today's valley opened onto it. Positions in world metres (x east, z
+// south). The ground is west.ts and its parts (west-relief, west-water, west-towns); what is done to the square for
+// it, opening.ts.
 
 import { Simplex, clamp, lerp, smoothstep } from '../../core/noise';
 import { CELL, SQUARE_HALF, SQUARE_RES, WORLD_SEED } from './places';
 import type { Tier } from '../../sim/tiers';
+import { TOWNS, type Town } from '../../sim/towns';
 
 type P = [number, number];
 
@@ -17,19 +21,114 @@ export const PLAN = {
   open: [-620, -460, 400, 560] as const,
   /** the opened green land rises from the valley's floor at the square's rim (west of this many metres, as -x) to its own level by the second */
   rise: [380, 1100] as const,
-  /** the bands of ground, by x: the beach's inland edge, the desert's, the steppe's, and where the green is whole */
-  bands: { beach: -3520, sand: -3230, steppe: -2920, green: -2610 },
+  /** the beach's inland edge (the shore is WEST.shore, about 125 m of sea: "make ocean take less map by 50%") */
+  bands: { beach: -3645 },
   /** nobody walks or drives west of this (an invisible wall: see game.ts; the server holds poses to it too) */
-  barrier: -3525,
-  /** the roads: the main one from the loop's west bend to the beach, and its branches (`via`: through the monastery's gates) */
+  barrier: -3650,
+  /** the desert: its height over the sea at the beach's edge and at the ridge's foot, and how high its dunes stand */
+  desert: { beach: -13, foot: -3, dunes: 9 },
+  /**
+   * THE RIDGE between the green land and the desert, the whole height of the map: its feet and crest (x), how far
+   * they wander (feet, crest), how high the crest stands and its peaks; an invisible wall along its crest but where
+   * the pass goes through (`gap` either side of it), so nobody climbs over or walks round.
+   */
+  ridge: { west: -2420, east: -2085, crest: -2250, jag: [24, 12] as P, top: 115, peaks: 8, gap: 46 },
+  /**
+   * THE PASS, the one way through the ridge, from its east mouth (the valley's end) to its west (the desert): its
+   * floor's half width and height at either end; up each wall a riser to each shelf ([height over the floor, how deep,
+   * how far the riser runs]), then the ridge's face (rise to the metre across); ramps between shelves (`side` 1: the
+   * south wall, the left going west; -1: the north; `level` the riser it replaces: 0 the floor's to the first); the
+   * river on the floor's north side, the road on its south; the area's best loot at the floor's middle.
+   */
+  pass: {
+    line: [[-2030, -470], [-2110, -440], [-2190, -470], [-2270, -425], [-2350, -455], [-2440, -432], [-2510, -446]] as P[],
+    floor: 20,
+    floorY: [-4, -6.5] as P,
+    shelves: [[8, 6, 2.5], [18, 6, 2.5], [30, 5, 3]] as [number, number, number][],
+    face: 3.4,
+    ramps: [
+      { side: 1, level: 0, along: [60, 95] as P }, { side: 1, level: 0, along: [330, 365] as P }, { side: 1, level: 1, along: [150, 185] as P },
+      { side: 1, level: 1, along: [420, 455] as P }, { side: 1, level: 2, along: [240, 275] as P },
+      { side: -1, level: 0, along: [200, 235] as P }, { side: -1, level: 1, along: [290, 325] as P }, { side: -1, level: 2, along: [100, 135] as P },
+      { side: -1, level: 2, along: [380, 415] as P },
+    ],
+    river: { side: -15 },
+    road: 9,
+    loot: [-2270, -440] as P,
+  },
+  /**
+   * THE GREEN RIVER VALLEY across the north of the green land, from a dip by today's map to the pass's mouth: its
+   * line (straight past the brick works' quay), its floor's half width and its walls' height (both let wander), the
+   * floor's height at the pass's mouth (it falls to it from its head), the land either side raised to its rims and let
+   * down again over `rim`, its walls' steepness (rise to the metre across: walkable, and the cliffs at its bends), and
+   * where it is wide enough for the brick works' bench ([x from, x to, half width]).
+   */
+  valley: {
+    line: [[-780, -380], [-850, -455], [-905, -497], [-1000, -503], [-1100, -507], [-1350, -430], [-1650, -560], [-1880, -500], [-2030, -470]] as P[],
+    floor: [20, 36] as P,
+    walls: [20, 45] as P,
+    mouth: -4,
+    rim: [40, 340] as P,
+    steep: [0.55, 2.1] as P,
+    wide: [-1110, -890, 30] as [number, number, number],
+    /** how far the brick works' bench stands over the river's floor */
+    bench: 1.6,
+  },
+  /**
+   * THE RIVER: down the valley, through the pass, and across the desert to the sea (`desert`, from the pass's west
+   * mouth). How wide (at its head, in the pass, in the desert), how deep (at its head, from the valley's middle on),
+   * how far its water lies under the floor it runs on, how far it wanders on the valley's floor, the desert's wadi
+   * about it (its floor's half width, its banks' run), and where it is forded ([x, z, how far]).
+   */
+  river: {
+    desert: [[-2600, -468], [-2760, -448], [-2940, -470], [-3120, -446], [-3300, -430], [-3480, -436], [-3640, -425], [-3790, -424]] as P[],
+    width: [3, 8, 9.5] as [number, number, number],
+    depth: [0.45, 0.9] as P,
+    under: 0.35,
+    wander: 9,
+    wadi: [16, 22] as P,
+    fords: [[-975, -503, 14], [-2238, -460, 12]] as [number, number, number][],
+  },
+  /** the forest lake Ozerki fishes, north of Lipki: its shore (straight along the village), how far under the village's bank its water lies, and its deepest */
+  lake: {
+    outline: [[-1410, 128], [-1392, 104], [-1350, 92], [-1308, 100], [-1280, 128], [-1272, 170], [-1276, 220], [-1292, 262], [-1330, 288], [-1372, 290], [-1402, 276], [-1410, 262]] as P[],
+    under: 0.7,
+    deep: 3.6,
+  },
+  /**
+   * THE SWAMP in the low south-west of the green land: its shore, how far it is dug under the land it lies in, how
+   * deep its water is over most of it, over its pools, and where the ground breaks the water (islands) or drops (pools).
+   */
+  swamp: {
+    outline: [[-2035, 470], [-1985, 438], [-1900, 430], [-1800, 445], [-1700, 440], [-1655, 500], [-1650, 580], [-1668, 660], [-1700, 725], [-1790, 742], [-1880, 735], [-1965, 740], [-2030, 705], [-2042, 620], [-2038, 540]] as P[],
+    dig: 0.6,
+    shallow: [0.05, 0.6] as P,
+    deep: 1.2,
+    isle: 0.34,
+    pool: 0.46,
+  },
+  /** KALAT, the ruined town (src/sim/ruins.ts), set down whole: its frame (its long axis north and south), and its land eased into the desert from so far to so far out of its top */
+  kalat: { name: 'Kalat', x: -3215, z: 230, rot: Math.PI / 2, blend: [130, 210] as P, reach: 440 },
+  /** the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts): the brick works on the river's north bank, its quay to the south */
+  towns: { Zavod: { rot: 0 } } as Record<string, { x?: number; z?: number; rot?: number }>,
+  /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
+  tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2 } as Record<string, Tier>,
+  /**
+   * The roads: the main one from the loop's west bend through the trader and Pokrov's lane, north-west to the pass's
+   * mouth, through it beside the river (`pass`: so far south of its middle) and out across the desert past Kalat to the
+   * beach; and its branches (each from a point of the main road, or the north gate's).
+   */
   road: {
-    main: [[-680, -61], [-1173, -81], [-1840, 5], [-2507, -28], [-3173, 32], [-3513, 25]] as P[],
+    east: [[-680, -61], [-1173, -81], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
+    west: [[-2700, -330], [-2860, -170], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
     width: 6.5,
-    /** the way to the bunker: off the main road, in by the monastery's south gate and out by its north, on to the bunker's yard */
-    bunker: [[-1845, 8], [-1845, -10], [-1868, -56], [-1894, -103], [-1925, -260], [-1966, -420]] as P[],
-    /** to the hamlet, and to the canyon's mouth (its first point joins the main road) */
-    hamlet: [[-1173, -81], [-1176, 120], [-1180, 290]] as P[],
-    canyon: [[-3007, 20], [-3007, -5], [-3022, -120], [-3040, -235]] as P[],
+    /** from Pokrov's north gate (outside it) to the bunker's yard */
+    bunker: [[-1908, -142], [-1870, -215], [-1760, -285], [-1640, -318], [-1517, -321]] as P[],
+    /** to the north end of Lipki's lane, of Ozerki's, the brick works' gate (over a ford), and Kalat's track */
+    lipki: [[-1173, -81], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
+    ozerki: [[-1450, -62], [-1450, 40], [-1450, 118]] as P[],
+    zavod: [[-1000, -77], [-985, -250], [-960, -400], [-945, -470], [-968, -494], [-980, -510], [-980, -538]] as P[],
+    kalat: [[-2985, -58], [-2975, 100], [-2968, 230], [-2965, 326]] as P[],
     branch: 5,
     /** the steepest a road climbs, to the metre (the jeep's own limit is well over this), and how far its bed is laid out */
     steep: 0.08,
@@ -38,36 +137,12 @@ export const PLAN = {
   /** the trading post (TRADE_AT): about here, beside the main road; it stands `post` metres south of the road's line, its yard to the road */
   trade: { x: -1507, z: -15 },
   post: 48,
-  /** ground kept level and clear for what is to be built (the parent's modules): middles, sizes (x, z) and what they are */
-  plots: [
-    { name: 'Pokrov', kind: 'town', x: -1850, z: -30, w: 260, d: 220, tier: 3 as Tier },
-    { name: 'hamlet', kind: 'hamlet', x: -1180, z: 350, w: 120, d: 120, tier: 2 as Tier },
-    { name: 'ruined town', kind: 'ruins', x: -3345, z: 180, w: 190, d: 180, tier: 4 as Tier },
-    { name: 'ruined village', kind: 'ruins', x: -3150, z: 450, w: 130, d: 130, tier: 4 as Tier },
-  ],
-  /** the monastery's outer wall (world, round it) and the town outside it: nothing grows or lies within 12 m of the wall, nor in the town */
-  monastery: {
-    wall: [[-1915, -10], [-1780, -10], [-1775, -90], [-1850, -125], [-1930, -85]] as P[],
-    gates: { south: [-1845, -10] as P, north: [-1894, -103] as P, wide: 3.5 },
-    clear: 12,
-    town: { x0: -1960, x1: -1740, z0: 15, z1: 80 },
-  },
-  /** the canyon: its line from the mouth by the beach to the one onto the steppe; its floor's half width, its walls' height and run */
-  canyon: {
-    line: [[-3473, -635], [-3405, -600], [-3345, -530], [-3262, -488], [-3196, -400], [-3118, -318], [-3040, -235]] as P[],
-    floor: [16, 26] as const,
-    walls: [15, 30] as const,
-    /** the walls' fall, to the metre across: steep enough for a cave's mouth to be cut in them */
-    face: 1.9,
-    /** how far out from the walls' top the tableland it is cut into reaches, and over how much it goes back into the land */
-    table: [70, 170] as const,
-  },
   /** the woods and the meadows: boxes (x0, x1, z0, z1), their edges let wander */
-  pines: { x0: -2373, x1: -1507, z0: -701, z1: -268 },
-  birches: { x0: -1440, x1: -823, z0: 199, z1: 699 },
-  meadows: { x0: -2107, x1: -1540, z0: 232, z1: 532 },
-  /** where fresh characters may also start: along the green land's west edge, facing into it (east) */
-  starts: { x: -2600, z: [-600, -360, -120, 120, 360, 600] },
+  pines: { x0: -2040, x1: -1550, z0: -430, z1: -250 },
+  birches: { x0: -1430, x1: -823, z0: 199, z1: 699 },
+  meadows: { x0: -1640, x1: -1450, z0: 232, z1: 620 },
+  /** where fresh characters may also start: in the desert, along the ridge's foot, facing it */
+  starts: { x: -2600, z: [-660, -200, 40, 280, 520, 700] },
 };
 
 /** how much of the square is opened at a z (0 to 1): see PLAN.open */
@@ -76,7 +151,7 @@ export function openness(z: number) {
   return smoothstep(o[0], o[1], z) * (1 - smoothstep(o[2], o[3], z));
 }
 
-/** the starts along the green land's west edge (after the square's own, which are as they were) */
+/** the starts in the desert (after the square's own, which are as they were) */
 export function westStarts() {
   return PLAN.starts.z.map((z) => ({ x: PLAN.starts.x, z, yaw: -Math.PI / 2 }));
 }
@@ -96,11 +171,15 @@ export function westZona(): { x: number; z: number; r: number }[] {
   return out;
 }
 
-/** the loot tier of the new places (towns mid, the hamlet as a village, ruins and caves high): null outside them. For buildings.ts, which says each loot point's tier. */
+/** the towns as the map has them: where their own data plans them, but where plan v5's ground asks otherwise (PLAN.towns) */
+export const PLACED: Town[] = TOWNS.map((t) => ({ ...t, ...PLAN.towns[t.name] }));
+/** the loot step of the new places: the towns by their own, the pass's floor high (Kalat's are its own): null outside them. For buildings.ts, which says each loot point's tier. */
 export function westTier(x: number, z: number): Tier | null {
-  for (const p of PLAN.plots) if (Math.abs(x - p.x) <= p.w / 2 + 10 && Math.abs(z - p.z) <= p.d / 2 + 10) return p.tier;
-  const C = PLAN.canyon;
-  if (nearLine(C.line, x, z).d < C.floor[1] + 30) return 4;
+  for (const t of PLACED) {
+    const c = Math.cos(t.rot), s = Math.sin(t.rot), dx = x - t.x, dz = z - t.z;
+    if (Math.abs(dx * c - dz * s) <= t.pad[0] + 10 && Math.abs(dx * s + dz * c) <= t.pad[1] + 10) return PLAN.tiers[t.name] ?? 2;
+  }
+  if (nearLine(PLAN.pass.line, x, z).d < PLAN.pass.floor + 30) return 4;
   return null;
 }
 
@@ -128,7 +207,7 @@ export function nearLine(line: P[], x: number, z: number) {
   return best;
 }
 
-/** whether a spot is inside a closed line (the monastery's wall) */
+/** whether a spot is inside a closed line */
 export function inside(poly: P[], x: number, z: number) {
   let n = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -154,7 +233,7 @@ export function inBox(b: { x0: number; x1: number; z0: number; z1: number }, x: 
 
 /** where the trading post goes, and which way it faces: on the south side of the main west road, its yard to the road */
 export function movedPost() {
-  const line = PLAN.road.main, x = PLAN.trade.x;
+  const line = PLAN.road.east, x = PLAN.trade.x;
   // (the road's line at the post's x, as straight lines between its points: near enough for where a yard goes)
   let z = PLAN.trade.z;
   for (let k = 0; k + 1 < line.length; k++) {

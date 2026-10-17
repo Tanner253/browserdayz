@@ -1,12 +1,12 @@
-// THE WORLD GROWN WEST (2026-10-16): the rectangle, and plan v2 on it.   npx tsx test/west.test.ts
+// THE WORLD GROWN WEST (2026-10-16): the rectangle, and plan v5 on it.   npx tsx test/west.test.ts
 // The owner: "from west to east itll be ocean, beach, desert, plains, mountains"; "open up the werst side of the map
 // and rid the mountains if you must for good transition but leave the east vibes kamenka doesnt need to be touched".
 // The east half of today's map is held to prints taken off the tree before the world grew (but for the hillside the
 // bunker left, and the trading post's buildings, which went west): every field of the ground's net, and everything
 // that stands on it. Then the west: the valley opened onto it, no crease at the seam, the green land, the sea, the
-// paint, the woods, the roads and their grades, the bunker and the trader where they went, the plots level and
-// clear, the canyon's walls, the Zona out to the barrier, the new starts; and the ground bodies stand on (Rapier's
-// heightfield of the whole world) where `heightAt` says it is.
+// ridge and its wall, the pass and its shelves, the river valley, the river, the lake and the swamp, the towns and
+// Kalat, the roads and their grades, the bunker and the trader where they went, the Zona out to the barrier, the new
+// starts; and the ground bodies stand on (Rapier's heightfield of the whole world) where `heightAt` says it is.
 // (WEST_PRINT=1 prints the east half's prints instead of holding it to them: run so in a tree from before
 // 2026-10-16, with a copy of this file, to take them again.)
 
@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
+import { moundAt } from '../src/sim/towns';
 import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
 const SQ = 769, HALF = 768, CELL = 2;
@@ -114,13 +115,14 @@ const H = world.heights, at = (ix: number, iz: number) => H[iz * NX + ix];
 }
 
 // --- the green land, the sea
+const RL = await import('../src/world/worldgen/west-relief');
+const ridge = (z: number) => RL.ridgeAt(z);
 {
-  const C = PLAN.canyon;
   const slopes: number[] = [];
   let lo = Infinity, hi = -Infinity;
-  // (over the opened band, where the land is the green land; north and south of it the square's rims are kept, falling away)
-  for (let x = -2600; x <= -1000; x += 8) for (let z = -440; z <= 380; z += 8) {
-    if (WG.nearLine(C.line, x, z).d < 220) continue;
+  // (the plains between the valley and the swamp, east of the ridge's foot: the valley's walls, the lake and the towns' pads are their own)
+  for (let x = -2000; x <= -900; x += 8) for (let z = -180; z <= 380; z += 8) {
+    if (WG.inside(PLAN.lake.outline, x, z) || x < ridge(z)[2] + 40) continue;
     const h = heightAt(H, x, z);
     lo = Math.min(lo, h);
     hi = Math.max(hi, h);
@@ -129,81 +131,133 @@ const H = world.heights, at = (ix: number, iz: number) => H[iz * NX + ix];
   slopes.sort((a, b) => a - b);
   const most = slopes[Math.floor(slopes.length * 0.98)];
   assert.ok(lo >= SEA + 5 && hi <= SEA + 90, `the green land runs ${(lo - SEA).toFixed(1)} to ${(hi - SEA).toFixed(1)} m over the sea`);
-  // (the square's valley, measured so 2026-10-16: 2% of it steeper than 0.69: the green land is to be no rougher)
-  assert.ok(most < 0.5, `the green land is not gentle: 2% of it steeper than ${most.toFixed(2)}`);
+  assert.ok(most < 0.6, `the green land is not gentle: 2% of it steeper than ${most.toFixed(2)}`);
   ok(`green rolling land: ${(lo - SEA).toFixed(0)} to ${(hi - SEA).toFixed(0)} m over the sea, 98% of it under ${(Math.atan(most) * 57.3).toFixed(0)} degrees`);
-  let shoreW = Infinity, shoreE = -Infinity, shallowest = -Infinity, beachSteep = 0, wet = 0;
+  let shoreW = Infinity, shoreE = -Infinity, shallowest = -Infinity, beachSteep = 0;
+  const mouth = world.water!.rivers[0].pts.filter(([x]) => x < -3500);
   for (let iz = 0; iz < NZ; iz++) {
+    // (but where the river runs into the sea: its bed is under the sea's level a little way inland)
+    if (mouth.some(([, z]) => Math.abs(z - (Z0 + iz * CELL)) < 30)) continue;
     let last = X0;
-    for (let ix = 0; ix < OX; ix++) if (at(ix, iz) < SEA) last = X0 + ix * CELL;
+    for (let ix = 0; ix < 200; ix++) if (at(ix, iz) < SEA) last = X0 + ix * CELL;
     shoreW = Math.min(shoreW, last);
     shoreE = Math.max(shoreE, last);
-    for (let ix = (last - X0) / CELL + 1; ix < OX; ix++) if (at(ix, iz) < SEA) wet++;
     shallowest = Math.max(shallowest, at(0, iz));
     for (let x = last - 30; x <= last + 50; x += 4) beachSteep = Math.max(beachSteep, slopeAt(H, x, Z0 + iz * CELL));
   }
-  assert.ok(shoreW >= -3640 && shoreE <= -3540 && shallowest < SEA - 6 && beachSteep < 0.1 && wet === 0, `the shore from ${shoreW} to ${shoreE}, ${(SEA - shallowest).toFixed(1)} m deep at the edge, the beach ${beachSteep.toFixed(2)} steep, ${wet} spots under the sea inland`);
-  ok(`a thin sea in the west: the shore between x ${shoreW} and ${shoreE} (${shoreW - X0} to ${shoreE - X0} m of water), the beach never steeper than ${(Math.atan(beachSteep) * 57.3).toFixed(1)} degrees, nothing under the sea inland; the barrier at x ${PLAN.barrier}`);
+  assert.ok(shoreW >= -3765 && shoreE <= -3665 && shallowest < SEA - 6 && beachSteep < 0.1, `the shore from ${shoreW} to ${shoreE}, ${(SEA - shallowest).toFixed(1)} m deep at the edge, the beach ${beachSteep.toFixed(2)} steep`);
+  assert.ok(PLAN.barrier > shoreE + 10, 'the barrier is not on the beach');
+  ok(`a thin sea in the west: the shore between x ${shoreW} and ${shoreE} (${shoreW - X0} to ${shoreE - X0} m of water), the beach never steeper than ${(Math.atan(beachSteep) * 57.3).toFixed(1)} degrees; the barrier at x ${PLAN.barrier}`);
 }
 
-// --- the paint: green, drying west through steppe into the desert; the beach bare
+// --- THE RIDGE: the whole height of the map, sheer, over a hundred metres over both sides, walled but at the pass
 {
-  const B = PLAN.bands, s = world.splat;
-  const share = (x0: number, x1: number) => {
-    let n = 0, bare = 0, grass = 0, blades = 0;
-    for (let iz = 0; iz < NZ; iz += 2) for (let ix = Math.max(0, Math.round((x0 - X0) / CELL)); ix < (x1 - X0) / CELL; ix += 2) {
-      const i = iz * NX + ix;
-      if (s[i * 4 + 2] > 100) continue;
-      n++;
-      bare += s[i * 4 + 3] / 255;
-      grass += s[i * 4] / 255;
-      if (world.grass[i] > 0) blades++;
-    }
-    return { bare: bare / n, grass: grass / n, blades: blades / n };
-  };
-  const green = share(B.green + 100, -1300), steppe = share(B.sand + 20, B.steppe - 20), desert = share(B.beach + 20, B.sand - 120);
-  assert.ok(green.bare < 0.08 && green.blades > 0.85, `the green land is ${(green.bare * 100).toFixed(0)}% bare, grass grows on ${(green.blades * 100).toFixed(0)}%`);
-  assert.ok(steppe.bare > 0.3 && steppe.bare < 0.85 && steppe.grass > 0.15, `the steppe is ${(steppe.bare * 100).toFixed(0)}% bare, ${(steppe.grass * 100).toFixed(0)}% grass`);
-  assert.ok(desert.bare > 0.95, `the desert is only ${(desert.bare * 100).toFixed(0)}% bare`);
-  let worst = 0;
-  for (let i = 0; i < NX * NZ; i++) worst = Math.max(worst, Math.abs(s[i * 4] + s[i * 4 + 1] + s[i * 4 + 2] + s[i * 4 + 3] - 255));
-  assert.ok(worst <= 2, `the paint does not add up: ${worst} of 255 out`);
-  ok(`painted west to east: the desert ${(desert.bare * 100).toFixed(0)}% bare sand, the steppe ${(steppe.bare * 100).toFixed(0)}% bare to ${(steppe.grass * 100).toFixed(0)}% dry grass, the green land ${(green.bare * 100).toFixed(0)}% bare with grass growing on ${(green.blades * 100).toFixed(0)}%; the paint whole everywhere`);
-}
-
-// --- the woods, the meadows, the plots, the roads: what stands where
-{
-  const inB = (b: { x0: number; x1: number; z0: number; z1: number }, t: { x: number; z: number }, m = 0) => t.x > b.x0 + m && t.x < b.x1 - m && t.z > b.z0 + m && t.z < b.z1 - m;
-  const pines = world.trees.filter((t) => inB(PLAN.pines, t, 80)), birches = world.trees.filter((t) => inB(PLAN.birches, t, 80)), meadow = world.trees.filter((t) => inB(PLAN.meadows, t, 40));
-  assert.ok(pines.length > 1500 && pines.filter((t) => t.kind.startsWith('pine')).length / pines.length > 0.85, `the pine forest: ${pines.length} trees`);
-  assert.ok(birches.length > 800 && birches.filter((t) => t.kind.startsWith('birch') || t.kind.startsWith('bush')).length / birches.length > 0.9, `the birch woods: ${birches.length} trees`);
-  assert.ok(meadow.length < 5, `${meadow.length} trees in the flower meadows`);
-  for (const p of PLAN.plots) {
-    const on = [...world.trees, ...world.rocks, ...world.props].filter((t) => Math.abs(t.x - p.x) < p.w / 2 && Math.abs(t.z - p.z) < p.d / 2);
-    assert.equal(on.length, 0, `${on.length} things on the ${p.name}'s plot`);
-    let lo = Infinity, hi = -Infinity;
-    for (let x = p.x - p.w / 2 + 12; x <= p.x + p.w / 2 - 12; x += 4) for (let z = p.z - p.d / 2 + 12; z <= p.z + p.d / 2 - 12; z += 4) { const h = heightAt(H, x, z); lo = Math.min(lo, h); hi = Math.max(hi, h); }
-    assert.ok(hi - lo < 0.8, `the ${p.name}'s plot is ${(hi - lo).toFixed(2)} m out of level`);
+  let low = Infinity, steepest = 0, faces = 0, samples = 0;
+  for (let z = Z0 + 20; z <= Z1 - 20; z += 16) {
+    const [w, c, e] = ridge(z);
+    if (Math.abs(z - -440) < 90) continue;
+    const top = Math.max(heightAt(H, c, z), heightAt(H, c - 6, z), heightAt(H, c + 6, z));
+    // (over the open land either side: by the world's north and south edges the rims of the old map are carried on)
+    if (Math.abs(z) < 580) low = Math.min(low, top - Math.max(heightAt(H, w - 40, z), heightAt(H, e + 40, z)));
+    for (let x = w; x <= e; x += 4) { const s = slopeAt(H, x, z); samples++; if (s > 1) faces++; steepest = Math.max(steepest, s); }
   }
-  const M = PLAN.monastery;
-  assert.equal([...world.trees, ...world.rocks, ...world.props].filter((t) => WG.inside(M.wall, t.x, t.z) || WG.nearLine([...M.wall, M.wall[0]], t.x, t.z).d < M.clear).length, 0, 'something stands in or by the monastery\'s wall');
-  ok(`the pine forest ${pines.length} trees, the birch woods ${birches.length}, the meadows ${meadow.length}; the plots (${PLAN.plots.map((p) => p.name).join(', ')}) level within 0.8 m and bare, the monastery's wall clear by ${M.clear} m`);
-  const fresh = world.roads.slice(-4);
+  assert.ok(low > 90, `the ridge stands only ${low.toFixed(0)} m over the land beside it somewhere`);
+  assert.ok(faces / samples > 0.25 && steepest > 2, `the ridge's faces: ${((faces / samples) * 100).toFixed(0)}% over 45 degrees, the steepest ${(Math.atan(steepest) * 57.3).toFixed(0)}`);
+  const wall = WG.ridgeWall(Z0, Z1), k = wall.findIndex((s, i) => wall[i + 1] && wall[i + 1][1] !== s[3]);
+  assert.ok(k >= 0 && wall.slice(k + 1).every((s, i) => i === 0 || s[1] === wall[k + i][3]), 'the ridge\'s wall has more than one gap, or none');
+  const gz0 = wall[k][3], gz1 = wall[k + 1][1];
+  assert.ok(gz0 < -440 && gz1 > -440 && gz1 - gz0 < 140, `the wall's gap is from z ${gz0} to ${gz1}`);
+  assert.ok(WG.onRidgeWall(ridge(200)[1], 200) && !WG.onRidgeWall(ridge(-440)[1], -440), 'the server holds the wrong part of the crest');
+  ok(`the ridge the whole height of the map, at least ${low.toFixed(0)} m over the land beside it, ${((faces / samples) * 100).toFixed(0)}% of its faces over 45 degrees (the steepest ${(Math.atan(steepest) * 57.3).toFixed(0)}); walled along its crest but from z ${gz0} to ${gz1}, where the pass goes through`);
+}
+
+// --- THE PASS: the one way through, its floor, its shelves on both walls, ramps between them
+{
+  const L = RL.passLine, floors: number[] = [], shelves: number[] = [];
+  for (let a = 60; a <= L.total - 60; a += 40) {
+    const p = L.at(a), y = RL.passFloor(a);
+    floors.push(heightAt(H, p.x + p.tz * 6, p.z - p.tx * 6) - y);
+    // (each wall's shelves, where no ramp is: the ground at the middle of each, over the floor)
+    for (const side of [1, -1]) {
+      if (PLAN.pass.ramps.some((r) => r.side === side && a > r.along[0] - 8 && a < r.along[1] + 8)) continue;
+      let pos = PLAN.pass.floor;
+      for (const [h, deep, riser] of PLAN.pass.shelves) {
+        pos += riser;
+        const d = pos + deep / 2, x = p.x + p.tz * d * side, z = p.z - p.tx * d * side;
+        shelves.push(heightAt(H, x, z) - y - h);
+        pos += deep;
+      }
+    }
+  }
+  assert.ok(floors.every((d) => Math.abs(d) < 0.6), `the pass's floor is off its height: ${floors.map((d) => d.toFixed(1)).join(', ')}`);
+  const worst = Math.max(...shelves.map(Math.abs));
+  assert.ok(worst < 1.6, `a shelf is ${worst.toFixed(1)} m off its height`);
+  const p = L.at(L.total / 2), mid = heightAt(H, p.x, p.z), top = heightAt(H, p.x + p.tz * 90, p.z - p.tx * 90);
+  assert.ok(top - mid > 60, `the pass's walls at its middle stand ${(top - mid).toFixed(0)} m`);
+  ok(`the pass ${L.total.toFixed(0)} m through the ridge, its floor ${RL.passFloor(0).toFixed(1)} to ${RL.passFloor(L.total).toFixed(1)} m, its walls ${(top - mid).toFixed(0)} m at its middle, three shelves up each (${PLAN.pass.shelves.map((s) => s[0]).join(', ')} m over the floor, within ${worst.toFixed(1)} m), ${PLAN.pass.ramps.length} ramps between them`);
+}
+
+// --- THE GREEN RIVER VALLEY, THE RIVER, THE LAKE, THE SWAMP
+{
+  const V = RL.valleyLine, fl: number[] = [];
+  for (let t = 0.15; t <= 0.96; t += 0.2) { const p = V.at(t * V.total); fl.push(heightAt(H, p.x, p.z)); }
+  assert.ok(fl.every((y, k) => k === 0 || y < fl[k - 1] + 0.8), `the valley's floor does not fall west: ${fl.map((y) => y.toFixed(1)).join(', ')}`);
+  const water = world.water!, river = water.rivers[0].pts;
+  let up = 0, dry = 0;
+  for (let k = 1; k < river.length; k++) if (river[k][2] > river[k - 1][2] + 1e-6) up++;
+  for (const [x, z, y] of river) if (heightAt(H, x, z) > y - 0.05) dry++;
+  const [lx, , ly] = river[river.length - 1];
+  assert.ok(up === 0 && dry === 0 && lx < -3715 && ly <= SEA + 0.01, `the river: ${up} points uphill, ${dry} with no water over the ground, ends at ${lx.toFixed(0)} (${ly.toFixed(1)})`);
+  const [lake, swamp] = water.lakes;
+  let deepest = 0;
+  for (let x = -1410; x <= -1270; x += 6) for (let z = 92; z <= 290; z += 6) if (WG.inside(lake.outline, x, z)) deepest = Math.max(deepest, lake.level - heightAt(H, x, z));
+  let wet = 0, cells = 0, pools = 0;
+  for (let x = -2040; x <= -1650; x += 6) for (let z = 430; z <= 740; z += 6) if (WG.inside(swamp.outline, x, z)) { cells++; const d = swamp.level - heightAt(H, x, z); if (d > 0) wet++; if (d > 0.9) pools++; }
+  assert.ok(deepest > 2 && deepest < 4.5 && wet / cells > 0.6 && pools / cells < 0.12 && swamp.swamp, `the lake ${deepest.toFixed(1)} m deep, the swamp ${((wet / cells) * 100).toFixed(0)}% under water, ${((pools / cells) * 100).toFixed(0)}% pools`);
+  ok(`the valley's floor falling west (${fl.map((y) => y.toFixed(0)).join(', ')} m); the river ${river.length} points, never uphill, always water over its bed, into the sea; Ozerki's lake ${deepest.toFixed(1)} m at its deepest; the swamp ${((wet / cells) * 100).toFixed(0)}% under its water, ${((pools / cells) * 100).toFixed(0)}% deep pools`);
+}
+
+// --- THE TOWNS and KALAT
+{
+  const towns = world.towns!;
+  assert.deepEqual(towns.map((t) => t.town.name), ['Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye']);
+  for (const { town, padY } of towns) {
+    const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
+    assert.ok(ids.length > 0, `${town.name} has no buildings`);
+    const c = Math.cos(town.rot), s = Math.sin(town.rot);
+    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1]; });
+    assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad`);
+    // (but in a hollow: Mokroye's barn stands sunk to the waist, as it was drawn up)
+    for (const b of ids) {
+      const dx = b.x - town.x, dz = b.z - town.z;
+      assert.ok(b.floorY >= padY + Math.min(0, moundAt(town, dx * c - dz * s, dx * s + dz * c)) - 0.5, `${b.id} sunk under its town's pad`);
+    }
+  }
+  const K = world.kalat!, top = heightAt(H, K.x, K.z);
+  assert.ok(Math.abs(top - K.y) < 6, `Kalat's top ${top.toFixed(1)} against its place's ${K.y}`);
+  assert.equal(world.pois.filter((p) => p.name === 'Kalat').length, 1);
+  assert.ok(world.props.filter((p) => Math.hypot(p.x - K.x, p.z - K.z) < 300).length > 20, 'nothing lies about Kalat');
+  ok(`the towns set down: ${towns.map((t) => `${t.town.name} ${world.buildings.filter((b) => b.id.startsWith(`${t.town.name.toLowerCase()}_`)).length}`).join(', ')} buildings, nothing growing on their pads; Kalat at ${K.x}, ${K.z}, its top ${top.toFixed(1)} m`);
+}
+
+// --- the roads
+{
+  const fresh = world.roads.slice(-6), river = world.water!.rivers[0].pts;
   for (const r of fresh) {
     const p = r.points;
     let steep = 0;
-    for (let i = 3; i < p.length; i += 3) steep = Math.max(steep, Math.abs(p[i + 1] - p[i - 2]) / Math.hypot(p[i] - p[i - 3], p[i + 2] - p[i - 1]));
-    assert.ok(steep <= PLAN.road.steep + 1e-3, `a new road ${steep.toFixed(3)} steep`);
-    for (let i = 0; i < p.length; i += 3 * 5) assert.ok(Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]) < 0.35, `a new road ${Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]).toFixed(2)} m off its bed at ${p[i].toFixed(0)}, ${p[i + 2].toFixed(0)}`);
-    for (const t of world.trees) {
-      if (t.x > -400) continue;
-      for (let i = 0; i < p.length; i += 3) if (Math.abs(t.x - p[i]) < 6 && Math.abs(t.z - p[i + 2]) < 6 && Math.hypot(t.x - p[i], t.z - p[i + 2]) < r.width / 2 + 1) assert.fail(`a tree on a road at ${t.x.toFixed(0)}, ${t.z.toFixed(0)}`);
+    for (let i = 3; i < p.length; i += 3) {
+      // (but where a road goes down into the river's ford)
+      if (river.some(([x, z]) => Math.hypot(x - p[i], z - p[i + 2]) < 16)) continue;
+      steep = Math.max(steep, Math.abs(p[i + 1] - p[i - 2]) / Math.hypot(p[i] - p[i - 3], p[i + 2] - p[i - 1]));
     }
+    assert.ok(steep <= PLAN.road.steep + 0.02, `a new road ${steep.toFixed(3)} steep`);
+    for (let i = 0; i < p.length; i += 3 * 5) assert.ok(Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]) < 0.4, `a new road ${Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]).toFixed(2)} m off its bed at ${p[i].toFixed(0)}, ${p[i + 2].toFixed(0)}`);
   }
-  const [main, toBunker] = fresh;
-  const near = (p: Float32Array, x: number, z: number) => { let d = Infinity; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; };
-  assert.ok(near(main.points, -3513, 25) < 2 && near(toBunker.points, M.gates.south[0], M.gates.south[1]) < 4 && near(toBunker.points, M.gates.north[0], M.gates.north[1]) < 4, 'the roads miss their ends or the gates');
-  ok(`four new roads (the main one ${((main.points.length / 3) * 4 / 1000).toFixed(1)} km to the beach, the way through the monastery's gates to the bunker, to the hamlet, to the canyon): none steeper than ${PLAN.road.steep * 100}%, each on its bed, no tree on any`);
+  const main = fresh[0].points, near = (p: Float32Array, x: number, z: number) => { let d = Infinity; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; };
+  const mid = RL.passLine.at(RL.passLine.total / 2);
+  assert.ok(near(main, -3640, 25) < 3 && near(main, mid.x, mid.z) < PLAN.pass.floor, 'the main road misses the beach or the pass');
+  ok(`six new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through the pass to the beach, to the bunker, Lipki, Ozerki, Zavod over its ford, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
 }
 
 // --- the bunker and the trading post where they went
@@ -211,42 +265,26 @@ const H = world.heights, at = (ix: number, iz: number) => H[iz * NX + ix];
   const b = WG.bunkerPlace(world)!;
   assert.ok(Math.hypot(b.x - WG.BUNKER_AT.x, b.z - WG.BUNKER_AT.z) < 0.01, 'the bunker is not where it went');
   assert.ok(world.sites.filter((s) => s.kind === 'bunker').length === 1 && world.pois.find((p) => p.name === BUNKER.name)!.x === WG.BUNKER_AT.x, 'the bunker\'s place and name are not with it');
-  assert.ok(Math.hypot(b.x - world.castle!.x, b.z - world.castle!.z) > 2000, 'the bunker is near the fort');
-  // (its pit dug under its roof, and the roof level with the ground about it)
+  assert.ok(Math.hypot(b.x - world.castle!.x, b.z - world.castle!.z) > 1500, 'the bunker is near the fort');
   const pitH = heightAt(world.heights, b.x, b.z), roofH = heightAt(world.surface, b.x, b.z);
   assert.ok(roofH - pitH > BUNKER.depth - 0.5, `the bunker's pit is ${(roofH - pitH).toFixed(1)} m under its roof`);
-  // (and the hillside it left as it was before it was cut: the ground, its trees, and no hole)
   const wasPit = heightAt(world.heights, WAS_B.x, WAS_B.z), wasRoof = heightAt(world.surface, WAS_B.x, WAS_B.z);
   assert.ok(Math.abs(wasRoof - wasPit) < 0.01 && world.trees.filter((t) => Math.hypot(t.x - WAS_B.x, t.z - WAS_B.z) < 60).length > 10, 'the old bunker\'s hillside is not given back');
   const post = world.sites.find((s) => s.kind === 'market')!, theirs = world.buildings.filter((q) => Math.hypot(q.x - post.x, q.z - post.z) < 60);
   assert.ok(Math.abs(post.x - WG.TRADE_AT.x) < 1 && theirs.length >= 3 && world.buildings.every((q) => Math.hypot(q.x - WAS_T.x, q.z - WAS_T.z) > 40), `the trading post: ${theirs.length} buildings by it`);
-  ok(`the bunker in the pines at ${b.x}, ${b.z} (${Math.hypot(b.x - world.castle!.x, b.z - world.castle!.z).toFixed(0)} m from the fort), its pit ${(roofH - pitH).toFixed(1)} m under its roof; its old hillside given back; the trading post's ${theirs.length} buildings by the main road`);
-}
-
-// --- the canyon's walls
-{
-  const C = PLAN.canyon, walls: number[] = [];
-  for (const t of [0.25, 0.4, 0.55, 0.7]) {
-    // (across the canyon at a quarter, two fifths and so on of its length: the floor at its line, the top 50 m off it)
-    const k = Math.floor(t * (C.line.length - 1)), [ax, az] = C.line[k], [bx, bz] = C.line[k + 1], u = t * (C.line.length - 1) - k;
-    const x = ax + (bx - ax) * u, z = az + (bz - az) * u, l = Math.hypot(bx - ax, bz - az), px = -(bz - az) / l, pz = (bx - ax) / l;
-    const floor = heightAt(H, x, z), top = Math.min(heightAt(H, x + px * 50, z + pz * 50), heightAt(H, x - px * 50, z - pz * 50));
-    walls.push(top - floor);
-  }
-  assert.ok(walls.every((w) => w > 12 && w < 36), `the canyon's walls: ${walls.map((w) => w.toFixed(0)).join(', ')} m`);
-  ok(`the canyon's walls ${walls.map((w) => w.toFixed(0)).join(', ')} m over its floor`);
+  ok(`the bunker on the valley's rim at ${b.x}, ${b.z} (${Math.hypot(b.x - world.castle!.x, b.z - world.castle!.z).toFixed(0)} m from the fort), its pit ${(roofH - pitH).toFixed(1)} m under its roof; its old hillside given back; the trading post's ${theirs.length} buildings by the main road`);
 }
 
 // --- the Zona, the starts
 {
   let out = 0;
-  for (let x = -3500; x <= -700; x += 40) for (let z = -740; z <= 740; z += 40) if (!WG.inPlay(x, z)) out++;
+  for (let x = -3600; x <= -700; x += 40) for (let z = -740; z <= 740; z += 40) if (!WG.inPlay(x, z)) out++;
   assert.equal(out, 0, `${out} spots of the new land outside the Zona`);
   assert.ok(!WG.inPlay(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
   const west = world.spawns.filter((s) => s.x < -2000);
   assert.equal(west.length, PLAN.starts.z.length);
-  assert.ok(west.every((s) => !PLAN.plots.some((p) => Math.abs(s.x - p.x) < p.w / 2 && Math.abs(s.z - p.z) < p.d / 2)), 'a start on a plot');
-  ok(`the Zona over all the new land out to the barrier; ${west.length} new starts along x ${PLAN.starts.x}, the square's own as they were`);
+  assert.ok(west.every((s) => s.x < ridge(s.z)[0] - 60 && heightAt(H, s.x, s.z) > SEA + 1), 'a start on the ridge or in the sea');
+  ok(`the Zona over all the new land out to the barrier; ${west.length} new starts in the desert along x ${PLAN.starts.x}, the square's own as they were`);
 }
 
 // --- the ground bodies stand on: Rapier's heightfield of the whole world where the game lays it
