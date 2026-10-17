@@ -242,8 +242,13 @@ export interface Gallery {
 }
 
 /** The galleries of every cave, in the world. */
+const laidOut = new WeakMap<Pass, Gallery[]>();
 export function galleries(p: Pass): Gallery[] {
+  // (worked out once for a pass: asked of every frame, by how dark it is, and of every point of the carved rock)
+  const known = laidOut.get(p);
+  if (known) return known;
   const out: Gallery[] = [];
+  laidOut.set(p, out);
   CAVES.forEach((c, ci) => {
     for (let k = 0; k + 1 < c.nodes.length; k++) {
       const n0 = c.nodes[k], n1 = c.nodes[k + 1];
@@ -270,13 +275,15 @@ function onGallery(g: Gallery, x: number, z: number) {
 }
 
 /** Whether a point is in a cave, and in which (its gallery's floor and ceiling there): null outside every cave. */
-export function caveAt(p: Pass, x: number, y: number, z: number, gs = galleries(p)): { cave: number; floor: number; ceiling: number; deep: number } | null {
+export function caveAt(p: Pass, x: number, y: number, z: number, gs = galleries(p), more = 0): { cave: number; floor: number; ceiling: number; deep: number } | null {
+  // (`more`: metres more either way to take in. The carved rock's walls stand out past a gallery's measure, a metre and
+  // a half in a hall: whatever holds nobody under the ground must not hold a body that stands in a hollow of them)
   let best: { cave: number; floor: number; ceiling: number; deep: number } | null = null;
   for (const g of gs) {
-    const { k, d } = onGallery(g, x, z), half = (g.wa + (g.wb - g.wa) * k) / 2 + 0.6;
+    const { k, d } = onGallery(g, x, z), half = (g.wa + (g.wb - g.wa) * k) / 2 + 0.6 + more;
     if (d > half) continue;
     const floor = g.a[1] + (g.b[1] - g.a[1]) * k, ceiling = floor + g.ha + (g.hb - g.ha) * k;
-    if (y < floor - 1 || y > ceiling + 0.5) continue;
+    if (y < floor - 1 - more || y > ceiling + 0.5 + more) continue;
     // how far in from the nearest mouth, along the way (for how dark it is)
     const deep = distanceIn(p, g, k);
     if (!best || deep > best.deep) best = { cave: g.cave, floor, ceiling, deep };
@@ -304,8 +311,15 @@ export function caveDark(p: Pass, x: number, y: number, z: number, gs?: Gallery[
 }
 
 /**
+ * metres out over the shelf in front of a riser's foot that a mouth opens the ground: the terrain's riser spreads its
+ * foot over a cell of its net (two metres), and opened a metre out, what was left of it stood in front of the mouth's
+ * set-back face up to 1.8 m high, sharp-edged where it was cut (2026-10-16)
+ */
+export const MOUTH_OUT = 2.5;
+
+/**
  * Where each mouth opens the ground: a rectangle on the ground's plane (its middle, its turn, its half sizes, as the
- * terrain's wells take them: src/world/terrain.ts openWells), from a metre out on the shelf in front of the riser to
+ * terrain's wells take them: src/world/terrain.ts openWells), from MOUTH_OUT out on the shelf in front of the riser to
  * the riser's top, a mouth's width across: only the riser's own face is opened (never the shelf above); the carved
  * rock (src/world/cave-carve.ts) is the face there, the opening in it and the shelf in front. Its floor is the cave's.
  */
@@ -315,13 +329,17 @@ export function caveMouths(p: Pass): { cave: number; x: number; z: number; rot: 
     for (const which of c.mouths) {
       const n = which === 'first' ? c.nodes[0] : c.nodes[c.nodes.length - 1], m = which === 'first' ? c.nodes[1] : c.nodes[c.nodes.length - 2];
       const a = passWorld(p, n.s, n.t, n.y), b = passWorld(p, m.s, m.t, m.y), ux = b[0] - a[0], uz = b[2] - a[2], len = Math.hypot(ux, uz);
-      // (from a metre out in front of it to just short of the riser's top, or three metres in where it is in the ridge's own face)
-      const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), back = 1, deep = k >= 0 ? Math.max(0.4, E[k].top - E[k].foot - 0.7) : 3, cx = a[0] + (ux / len) * ((deep - back) / 2), cz = a[2] + (uz / len) * ((deep - back) / 2);
-      out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: n.w / 2 + 0.4, hz: (deep + back) / 2, floor: a[1] });
+      // (from MOUTH_OUT in front of it to just short of the riser's top, or three metres in where it is in the ridge's own face)
+      const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), back = MOUTH_OUT, deep = k >= 0 ? Math.max(0.4, E[k].top - E[k].foot - 0.7) : 3, cx = a[0] + (ux / len) * ((deep - back) / 2), cz = a[2] + (uz / len) * ((deep - back) / 2);
+      // (as wide as the entrance is flared out, set back in the face: src/world/cave-carve.ts CARVE.flare)
+      out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: (n.w / 2) * MOUTH_FLARE + 0.5, hz: (deep + back) / 2, floor: a[1] });
     }
   });
   return out;
 }
+
+/** how much wider and taller than its gallery a cave's entrance is at the face, narrowing to it a few metres in: an alcove it is set back in */
+export const MOUTH_FLARE = 1.4;
 
 /** Whether the ground is open at a point (a mouth over it): for physics.holes, beside the basements' wells. */
 export function inMouth(mouths: ReturnType<typeof caveMouths>, x: number, z: number): boolean {
@@ -361,6 +379,8 @@ export interface RockPiece {
   turn: number;
   tilt: [number, number];
   scale: number;
+  /** rubble: drawn by its light copy, near only, and not solid (it is walked over) */
+  small?: boolean;
 }
 
 /**
@@ -372,6 +392,10 @@ export const ROCKS: Record<string, { tall: number; long: number; front: number; 
   namaqualand_cliff_02: { tall: 7.2, long: 20.2, front: 2.2, back: 4.4 },
   mountainside: { tall: 10.5, long: 10.2, front: 1.5, back: 3.7 },
   namaqualand_cliff_01: { tall: 5, long: 8.3, front: 0.8, back: 3.6 },
+  namaqualand_boulder_02: { tall: 0.9, long: 2.5, front: 0.6, back: 0.6 },
+  namaqualand_boulder_03: { tall: 1.5, long: 2.4, front: 1.5, back: 1.5 },
+  namaqualand_boulder_04: { tall: 1.9, long: 2.5, front: 1.2, back: 1.2 },
+  namaqualand_boulder_05: { tall: 0.5, long: 1.4, front: 0.35, back: 0.35 },
 };
 /** what dresses a riser and the ridge's face */
 const FACES = ['namaqualand_cliff_02', 'mountainside', 'namaqualand_cliff_01'].map((id) => ({ id, ...ROCKS[id] }));
@@ -388,8 +412,13 @@ const hash = (a: number, b: number) => {
  * across a cave's mouth (the mouth is the carved rock's own: src/world/cave-carve.ts). Past the third shelf, the
  * ridge's face, with the biggest.
  */
-export function rockPieces(p: Pass): RockPiece[] {
-  const out: RockPiece[] = [], L = passLength(p), mouths = caveMouths(p), gs = galleries(p);
+export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; along: V2 }[] } = {}): RockPiece[] {
+  const out: RockPiece[] = [], L = passLength(p), mouths = caveMouths(p), gs = galleries(p), ramps = o.ramps ?? [];
+  // (nothing stood on a ramp up a riser, the world's way from shelf to shelf (src/world/worldgen: passData().ramps),
+  // nor across its foot or its top: it is walked)
+  const onRamp = (side: number, level: number, s0: number, s1: number, more = 2) => ramps.some((r) => r.side === side && r.level === level && s1 + more > r.along[0] && s0 - more < r.along[1]);
+  // (nor in front of a mouth, whose frame is its own: below)
+  const atMouth = (x: number, z: number, more: number) => mouths.some((m) => Math.hypot(m.x - x, m.z - z) < m.hx + m.hz + more);
   // (a piece stood back into the rock is not to break into a cave behind it: its whole body, sampled, kept clear of
   // every gallery and the metre and more its walls are roughed by)
   const intoCave = (id: string, at: V3, turn: number, scale: number) => {
@@ -408,15 +437,34 @@ export function rockPieces(p: Pass): RockPiece[] {
     E.forEach((e, k) => {
       const tall = e.to - e.from;
       for (let s = 4, i = 0; s < L - 4; i++) {
-        const f = FACES[Math.floor(hash(s, side * (k + 1)) * FACES.length)], scale = (tall / f.tall) * (1.05 + hash(s, k) * 0.25);
-        const t = side * (e.foot + (e.top - e.foot) * 0.5 + 1.2);
-        const at = passWorld(p, s, t, e.from - 0.4), o = alongPass(p, s);
-        if (!mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + f.long * scale * 0.35 && Math.abs(m.floor - at[1] - 0.4) < tall)) {
+        const f = FACES[Math.floor(hash(s, side * (k + 1)) * FACES.length)], scale = (tall / f.tall) * (1.05 + hash(s, k) * 0.25), half = (f.long * scale) / 2;
+        // (stood a little further in or out, so that the faces do not run in a line; here and there a gap, as a wall
+        // weathers: clusters, never a lattice)
+        const t = side * (e.foot + (e.top - e.foot) * 0.5 + 0.7 + hash(k, s) * 1.2);
+        const at = passWorld(p, s, t, e.from - 0.4), o = alongPass(p, s), gap = hash(s * 0.7, side * 3 + k) < 0.12;
+        if (!gap && !onRamp(side, k, s - half, s + half) && !mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + f.long * scale * 0.35 + 3 && Math.abs(m.floor - at[1] - 0.4) < tall)) {
           // (its face toward the pass: the north wall's faces south, the south wall's north)
           const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-          if (!intoCave(f.id, at, turn, scale)) out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, 0], scale });
+          if (!intoCave(f.id, at, turn, scale)) out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, (hash(s, i) - 0.5) * 0.12], scale });
         }
-        s += f.long * scale * 0.62;
+        s += f.long * scale * (0.45 + hash(i, k + 7) * 0.3);
+      }
+      // Rubble and fallen blocks at the riser's foot and along its top's lip, in heaps where a face has shed them:
+      // close in to the face (the shelf's middle, and the floor's, are for walking), none on a ramp or by a mouth.
+      for (let s = 5, i = 0; s < L - 5; i++) {
+        s += 4 + hash(i, side * 11 + k) * 9;
+        if (hash(s * 0.31, k + side) < 0.45 || onRamp(side, k, s - 3, s + 3)) continue;
+        for (const lip of [false, true]) {
+          if (lip && (k === E.length - 1 || hash(s, k * 5 + 1) < 0.5)) continue;
+          const t0 = lip ? e.top + 0.6 : e.foot - 0.4, y0 = lip ? e.to : e.from, n = 2 + Math.floor(hash(s, i) * 4);
+          for (let j = 0; j < n; j++) {
+            const ds = (hash(j, s) - 0.5) * 5, dt = (lip ? 1 : -1) * hash(s, j + 3) * 1.1, big = j === 0 && hash(i, j + s) < 0.4;
+            const at = passWorld(p, s + ds, side * (t0 + dt), y0 - 0.15);
+            if (atMouth(at[0], at[2], 3)) continue;
+            const id = big ? (hash(j, i) < 0.5 ? 'namaqualand_boulder_03' : 'namaqualand_boulder_04') : hash(j, i) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02';
+            out.push({ id, at, turn: hash(s, j) * Math.PI * 2, tilt: [(hash(j, s + 1) - 0.5) * 0.4, (hash(s + 1, j) - 0.5) * 0.4], scale: big ? 0.9 + hash(i, j) * 0.7 : 0.35 + hash(j, i + 2) * 0.55, ...(big ? {} : { small: true }) });
+          }
+        }
       }
     });
     // the ridge's face over the third shelf: the biggest pieces, twice and three times their size
@@ -427,6 +475,27 @@ export function rockPieces(p: Pass): RockPiece[] {
       const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
       if (mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + ROCKS.mountainside.long * scale * 0.6 && Math.abs(m.floor - at[1]) < 12)) continue;
       if (!intoCave('mountainside', at, turn, scale)) out.push({ id: 'mountainside', at, turn, tilt: [0, 0], scale });
+    }
+  }
+  // Each mouth framed (the owner: the mouths "dont look right still or natural", holes punched in a wall): over it an
+  // overhang of rock jutting out of the face, a fallen block either side of its sill, rubble in front of it but off
+  // the way in; set back in its flared entrance (MOUTH_FLARE).
+  for (const [mi, m] of mouths.entries()) {
+    const c = CAVES[m.cave], n = Math.abs(passWorld(p, c.nodes[0].s, c.nodes[0].t, c.nodes[0].y)[0] - m.x) < 12 ? c.nodes[0] : c.nodes[c.nodes.length - 1];
+    // (the way out of the mouth, and across it; the face's foot, the hole's front less its metres out in front)
+    const ox = -Math.sin(m.rot), oz = -Math.cos(m.rot), ax = Math.cos(m.rot), az = -Math.sin(m.rot), w = n.w * MOUTH_FLARE, h = n.h * MOUTH_FLARE;
+    const fx = m.x + ox * (m.hz - MOUTH_OUT - 1.5), fz = m.z + oz * (m.hz - MOUTH_OUT - 1.5), outward = Math.atan2(ox, oz);
+    const R = ROCKS.namaqualand_cliff_01, rs = (w + 3) / R.long;
+    out.push({ id: 'namaqualand_cliff_01', at: [fx - ox * R.back * rs * 0.55, m.floor + h - 0.2, fz - oz * R.back * rs * 0.55], turn: outward, tilt: [0.32, (hash(mi, 1) - 0.5) * 0.2], scale: rs });
+    for (const sd of [-1, 1]) {
+      if (hash(mi, sd + 3) < 0.25) continue;
+      const d = w / 2 + 0.6 + hash(mi, sd) * 0.8, up = 0.8 + hash(sd, mi) * 1.6;
+      out.push({ id: hash(mi, sd + 5) < 0.5 ? 'namaqualand_boulder_04' : 'namaqualand_boulder_03', at: [fx + ax * sd * d + ox * up, m.floor - 0.3, fz + az * sd * d + oz * up], turn: hash(sd, mi + 2) * Math.PI * 2, tilt: [(hash(mi, sd + 9) - 0.5) * 0.3, (hash(sd + 9, mi) - 0.5) * 0.3], scale: 1.1 + hash(mi, sd + 7) * 0.8 });
+    }
+    for (let j = 0; j < 6; j++) {
+      // (to either side of the way in, never in it)
+      const sd = j % 2 ? 1 : -1, across = sd * (0.9 + hash(j, mi) * (w / 2 + 0.6)), outThere = 0.3 + hash(mi, j) * 2.6;
+      out.push({ id: hash(j, mi + 4) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02', at: [fx + ax * across + ox * outThere, m.floor - 0.12, fz + az * across + oz * outThere], turn: hash(j + 1, mi) * Math.PI * 2, tilt: [(hash(j, mi + 6) - 0.5) * 0.5, (hash(mi + 6, j) - 0.5) * 0.5], scale: 0.3 + hash(j, mi + 8) * 0.5, small: true });
     }
   }
   return out;

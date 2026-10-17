@@ -21,6 +21,8 @@ import { waterAt } from './sim/water';
 import { caveMouths } from './sim/pass';
 import { caveLootPoints } from './world/caves-carved';
 import { PassCaves } from './world/caves';
+import { RockField } from './world/rock-field';
+import { outcropPieces } from './world/outcrops';
 import { passPlan } from './world/worldgen';
 import { loadWorld } from './world/load-world';
 import { Atmosphere } from './world/atmosphere';
@@ -213,7 +215,10 @@ async function boot() {
   // (the pass's caves, carved where the world was made (World.caves), dressed with the coast kit's rock; their places
   // for things after Kalat's, as the server lays them)
   const caves = arena ? null : new PassCaves(r.scene, atmo, passPlan, ground);
-  if (caves) void caves.build({ carved: world.caves });
+  if (caves) void caves.build({ carved: world.caves, heightTex: terrain.heightTex });
+  // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
+  const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit' });
+  if (outcrops) void outcrops.build();
   if (caves) buildings.lootPoints.push(...caveLootPoints());
   const sea = arena ? null : new Ocean(r.scene, atmo, {
     seaLevel: SEA_LEVEL, x0: WORLD_X0 - 300, x1: -3560, z0: WORLD_Z0, z1: WORLD_Z1, beyond: { west: 16000, north: 6000, south: 6000 },
@@ -244,6 +249,7 @@ async function boot() {
   if (westTowns) game.beside.push((_dt, eye) => westTowns.update(eye));
   if (kalatRuins) game.beside.push((_dt, eye) => kalatRuins.update(eye));
   if (caves) game.beside.push((_dt, eye) => caves.update(eye));
+  if (outcrops) game.beside.push((_dt, eye) => outcrops.update(eye));
   if (caves) game.darkBeside.push((x, y, z) => caves.dark(x, y, z));
   if (sea) game.beside.push((dt, eye, camera) => sea.update(dt, eye, camera));
   if (waters) {

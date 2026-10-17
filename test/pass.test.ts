@@ -4,7 +4,7 @@
 //   npx tsx test/pass.test.ts
 
 import assert from 'node:assert/strict';
-import { CAVES, PASS_SHAPE, ROCKS, caveAt, caveDark, caveLoot, caveMouths, galleries, inMouth, passEdges, passOf, passProfile, passWorld, rockPieces } from '../src/sim/pass';
+import { CAVES, MOUTH_OUT, PASS_SHAPE, passAt, caveAt, caveDark, caveLoot, caveMouths, galleries, inMouth, passEdges, passOf, passProfile, passWorld, rockPieces } from '../src/sim/pass';
 
 const pass = passOf(() => 40), E = passEdges();
 
@@ -52,8 +52,8 @@ const pass = passOf(() => 40), E = passEdges();
   assert.equal(mouths.length, CAVES.reduce((n, c) => n + c.mouths.length, 0));
   for (const m of mouths) {
     assert.ok(inMouth(mouths, m.x, m.z), 'a mouth is open at its middle');
-    // (it opens a riser's face and a metre in front: never more than a few metres deep)
-    assert.ok(m.hz * 2 < 4.5, 'a mouth opens only its riser');
+    // (it opens a riser's face and MOUTH_OUT in front: never more than a few metres deep)
+    assert.ok(m.hz * 2 < MOUTH_OUT + 3.5, 'a mouth opens only its riser');
   }
   console.log(`caves: ${CAVES.length} (${CAVES.map((c) => c.name).join(', ')}), ${galleries(pass).length} galleries, ${mouths.length} mouths, all under the ground`);
 }
@@ -78,8 +78,25 @@ const pass = passOf(() => 40), E = passEdges();
   for (const l of loot.filter((q) => q.tier === 4)) assert.ok(caveAt(pass, l.x, l.y + 0.5, l.z), `${l.where}: its loot in the cave`);
   const rocks = rockPieces(pass);
   assert.ok(rocks.length > 100, 'the walls dressed');
-  // (none in front of a mouth: the carved rock is the face round it)
-  for (const m of caveMouths(pass)) assert.ok(!rocks.some((r) => Math.hypot(r.at[0] - m.x, r.at[2] - m.z) < m.hx + ROCKS[r.id].long * r.scale * 0.35 && Math.abs(r.at[1] - m.floor) < ROCKS[r.id].tall * r.scale), 'a mouth kept clear');
+  // (each mouth framed, and its way in clear: nothing, rubble neither, within 0.8 m of its middle line for 3 m out
+  // from the face, nor a big piece over its sill at a body's height)
+  let framed = 0;
+  for (const m of caveMouths(pass)) {
+    const ox = -Math.sin(m.rot), oz = -Math.cos(m.rot), ax = Math.cos(m.rot), az = -Math.sin(m.rot), fx = m.x + ox * (m.hz - MOUTH_OUT - 1.5), fz = m.z + oz * (m.hz - MOUTH_OUT - 1.5);
+    for (const r of rocks) {
+      const dx = r.at[0] - fx, dz = r.at[2] - fz, across = dx * ax + dz * az, out = dx * ox + dz * oz;
+      if (Math.abs(across) < 6 && out > -2 && out < 4 && Math.abs(r.at[1] - m.floor) < 6) framed++;
+      assert.ok(!(Math.abs(across) < 0.8 && out > -1 && out < 3 && r.at[1] < m.floor + 2), `${CAVES[m.cave].name}: a rock in its way in`);
+    }
+  }
+  assert.ok(framed >= caveMouths(pass).length * 5, `the mouths framed: ${framed} pieces round them`);
+  // (none on a ramp the world keeps)
+  const ramps = [{ side: 1, level: 0, along: [330, 365] as [number, number] }];
+  const onRamps = rockPieces(pass, { ramps }).filter((r) => {
+    const at = passAt(pass, r.at[0], r.at[2]);
+    return at.t > 18.5 && at.t < 24 && at.s > 331 && at.s < 364;
+  });
+  assert.equal(onRamps.length, 0, 'nothing stood on a ramp');
   console.log(`loot ${loot.length} (${loot.filter((l) => l.tier === 5).length} of the fifth tier on the floor), rock pieces ${rocks.length}`);
 }
 console.log('pass: all good');

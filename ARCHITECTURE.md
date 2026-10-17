@@ -156,7 +156,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 298 |  |
+| `main.ts` | 304 |  |
 
 ## src/net/
 
@@ -221,7 +221,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `mokroye.ts` | 112 | Mokroye, the flooded hamlet in the swamp (2026-10-16, new): where its houses, boardwalks and what the water left stand. |
 | `news.ts` | 202 | Hearts and comments on the entries of the changelog (2026-10-12: |
 | `ozerki.ts` | 75 | Ozerki, the fishing village on a lake in the north woods (2026-10-16, new): where its houses, piers and what lies about them stand. |
-| `pass.ts` | 434 | THE PASS through the ridge, and its caves, as a plan (plan v5, the owner, 2026-10-16: |
+| `pass.ts` | 503 | THE PASS through the ridge, and its caves, as a plan (plan v5, the owner, 2026-10-16: |
 | `placement.ts` | 28 | Whether an item can physically lie at a loot point. |
 | `pokrov.ts` | 102 | Pokrov, the white-walled monastery and the town outside its gate (2026-10-16, reworked): where its buildings and what lies about them stand, and the terrace it stands on. |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
@@ -333,9 +333,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `castle.ts` | 680 | The fort on the mountain, as it is drawn and as it stops a body. |
-| `cave-carve.ts` | 379 | The pass's caves carved out of the rock, each one closed surface: rock is what is under the ground and outside every gallery, and the surface between rock and air is found on a grid (surface nets). |
+| `cave-carve.ts` | 397 | The pass's caves carved out of the rock, each one closed surface: rock is what is under the ground and outside every gallery, and the surface between rock and air is found on a grid (surface nets). |
 | `caves-carved.ts` | 22 | The pass's caves carved under the world's ground (coast-kit's src/world/cave-carve.ts, to its plan, src/sim/pass.ts), once, where the world is made for the game: plain typed arrays, kept in the world's cache and sent... |
-| `caves.ts` | 282 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
+| `caves.ts` | 206 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
 | `cells.ts` | 89 |  |
 | `crest.ts` | 53 | What is set down on the crest the fort stands on that is neither ground, rock nor the fort itself (MOUNTAIN.crest in src/world/worldgen.ts). |
 | `domes.ts` | 48 | Onion domes on drums, with a cross, for the new towns' churches (2026-10-16): what tells a church of these lands from a barn at a kilometre. |
@@ -349,10 +349,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `load-world.ts` | 26 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `mokroye-plans.ts` | 30 | Mokroye, the flooded hamlet in the swamp (2026-10-16): its houses as the water has them. |
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
-| `ocean.ts` | 503 | THE SEA off the west coast (2026-10-16: |
+| `ocean.ts` | 533 | THE SEA off the west coast (2026-10-16: |
+| `outcrops.ts` | 166 | The canyon country's outcrops (the owner, 2026-10-16: |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 49 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
+| `rock-blend.ts` | 136 | Rock that meets the ground without a seam (the owner, 2026-10-16: |
+| `rock-field.ts` | 202 | A field of scanned rocks, drawn and made solid: the pass's walls and cave mouths (src/world/caves.ts) and the canyon country's outcrops (src/world/outcrops.ts). |
 | `ruins-shape.ts` | 553 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
 | `ruins.ts` | 226 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |
@@ -361,7 +364,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `town-plans.ts` | 454 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 210 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `vegetation.ts` | 1039 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
-| `water.ts` | 437 | Lakes and rivers, drawn (the owner, 2026-10-16: |
+| `water.ts` | 446 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
 | `world-cache.ts` | 77 |  |
