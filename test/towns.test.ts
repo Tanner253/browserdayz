@@ -18,7 +18,8 @@ import { MOKROYE_WALKS, SUNK_DEPTH, SUNK_FLOOR, WATER, WET_DEPTH, WET_FLOOR, mok
 import { WADE } from '../src/sim/water';
 import { flooded } from '../src/world/mokroye-plans';
 import { izbaPlan } from '../src/world/town-plans';
-import { blueprintOf } from '../src/world/buildings';
+import { CRATE_KINDS, blueprintOf } from '../src/world/buildings';
+import { crateId } from '../src/net/protocol';
 import { RNG } from '../src/core/noise';
 
 /** the village's barn as Buildings plans it */
@@ -154,6 +155,22 @@ ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boat
       const has = (list: string[]) => u.some((k) => list.includes(k));
       ok(!(has(['Shop', 'Medic', 'Hospital']) && has(HOUSE)), `${t.name} ${s.type}: a ${u.join(' and ')} is a service and a house`);
       ok(!(has(SHED) && has([...HOUSE, ...SERVICE])), `${t.name} ${s.type}: a ${u.join(' and ')} is a shed and a house`);
+    }
+  }
+}
+
+// ---- every crate of a town a container of its own: known by its place to a tenth of a metre (crateId), no two in one
+// place, on any floor (two stacked in one place were one container on the server)
+for (const t of TOWNS) {
+  const seen = new Map<string, string>();
+  for (const s of townBuildings(t)) {
+    if (s.type === 'tower') continue;
+    const bp = blueprintOf(s.type, new RNG(1)), [bx, bz] = townPoint(t, s.x, s.z), rot = t.rot + s.rot, c = Math.cos(rot), sn = Math.sin(rot);
+    for (const f of [bp.furniture, ...(bp.levels ?? []).map((l) => l.furniture), ...(bp.upper ? [bp.upper.furniture] : []), ...(bp.deck ? [bp.deck.furniture] : [])].flat()) {
+      if (!CRATE_KINDS.has(f.id)) continue;
+      const id = crateId(bx + f.x * c + f.z * sn, bz - f.x * sn + f.z * c), was = seen.get(id);
+      ok(!was, `${t.name}: a ${f.id} in its ${s.type} in the same place as one in its ${was}`);
+      seen.set(id, s.type);
     }
   }
 }
