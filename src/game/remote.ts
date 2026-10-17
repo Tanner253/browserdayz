@@ -88,6 +88,13 @@ export class RemotePlayer implements Damageable {
 
   constructor(public id: number, public name: string, private makeHeld: HeldFactory) {}
   /**
+   * A gun made ready to be drawn before it is put in somebody's hands: its shaders made and its pictures sent to the
+   * card a frame's spare time at a time (see game.ts). Put in their hands at once, the first player seen with a gun
+   * of a kind was that gun's shaders and its 2048 pictures in the one frame: the hitch of up to a fifth of a second
+   * as an enemy came into sight (the owner: "when i get into a fight i lag a lot").
+   */
+  static readyHeld: (obj: THREE.Object3D) => Promise<void> = async () => {};
+  /**
    * Gone (they left, or this game did) while the body was still being made: it is let go when it is done, and never
    * put in the world. It was put there all the same, posed by nothing and placed by nothing: a body standing in the
    * shape it was made in at the middle of the map, a hand over the ground, with a blocker and hit zones where they
@@ -179,7 +186,11 @@ export class RemotePlayer implements Damageable {
     this.weapon = id;
     this.mods = mods;
     const h = this.makeHeld(id, mods);
-    this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+    const put = () => {
+      if (this.heldKey === key) this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+    };
+    if (h?.obj) void RemotePlayer.readyHeld(h.obj).then(put, put);
+    else put();
   }
 
   /** where the physics was last told they are, and which way they faced */

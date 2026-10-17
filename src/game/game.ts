@@ -491,6 +491,8 @@ export class Game {
       });
       return Promise.race([all, new Promise<void>((done) => setTimeout(done, first ? 8000 : 2000))]);
     };
+    // (and a gun in another player's hands, likewise: see RemotePlayer.readyHeld)
+    RemotePlayer.readyHeld = (obj) => Promise.race([r.ready(obj).then(() => r.send(obj)), new Promise<void>((done) => setTimeout(done, 3000))]);
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
