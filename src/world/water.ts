@@ -114,7 +114,7 @@ export class Waterways {
           rooms: waters.rooms,
         }),
       );
-      if (lake.swamp) this.mistOver(scene, lake.level, Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs), waters.rooms);
+      if (lake.swamp) this.mistOver(scene, lake.level, lake.outline, waters.rooms);
     }
     const fog = scene.fog as THREE.FogExp2 | null, w = sharedWaves();
     this.material = new THREE.ShaderMaterial({
@@ -157,13 +157,17 @@ export class Waterways {
 
   /**
    * Mist over a swamp: sheets of it a little over the water, drifting, thickest at dusk and dawn, thinning toward the
-   * swamp's edge and away from an eye that is in it (it is seen as a haze, never as a sheet). Each sheet is one square.
+   * swamp's edge and away from an eye that is in it (it is seen as a haze, never as a sheet). Each sheet is laid on
+   * a grid of 10 m over the swamp, thinning over the 30 m in from its shore (as one square thinning to the square's
+   * sides it drew a rectangle on the swamp from the sky, the owner: "too ugly").
    */
-  private mistOver(scene: THREE.Scene, level: number, x0: number, x1: number, z0: number, z1: number, rooms?: WaterRoom[]) {
+  private mistOver(scene: THREE.Scene, level: number, shore: [number, number][], rooms?: WaterRoom[]) {
+    const xs = shore.map((p) => p[0]), zs = shore.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
     const fog = scene.fog as THREE.FogExp2 | null, inRooms = roomsFor(rooms, { x0, x1, z0, z1 }, level);
     const mist = new THREE.ShaderMaterial({
       defines: inRooms.defines,
-      uniforms: { ...inRooms.uniforms, uWaves: { value: sharedWaves().tex }, uTime: { value: 0 }, uMist: { value: 0 }, uBox: { value: new THREE.Vector4() }, fogColor: { value: fog ? fog.color : new THREE.Color(0.6, 0.65, 0.7) } },
+      uniforms: { ...inRooms.uniforms, uWaves: { value: sharedWaves().tex }, uTime: { value: 0 }, uMist: { value: 0 }, fogColor: { value: fog ? fog.color : new THREE.Color(0.6, 0.65, 0.7) } },
       vertexShader: /* glsl */ `
         attribute float aThick;
         varying vec3 vP;
@@ -177,7 +181,6 @@ export class Waterways {
         uniform sampler2D uWaves;
         uniform float uTime;
         uniform float uMist;
-        uniform vec4 uBox;
         uniform vec3 fogColor;
         varying vec3 vP;
         varying float vThick;
@@ -189,8 +192,7 @@ export class Waterways {
             for ( int i = 0; i < SEA_ROOMS; i++ ) if ( fromRoom( i, p ) < 0.0 ) discard;
           #endif
           float n = texture2D( uWaves, p * 0.006 + vec2( uTime * 0.0035, uTime * 0.002 ) ).b * 0.6 + texture2D( uWaves, p * 0.019 - vec2( uTime * 0.006, 0.0 ) ).b * 0.4;
-          float edge = smoothstep( 0.0, 30.0, min( min( p.x - uBox.x, uBox.z - p.x ), min( p.y - uBox.y, uBox.w - p.y ) ) );
-          float a = uMist * vThick * smoothstep( 0.3, 0.75, n ) * edge * smoothstep( 1.5, 9.0, distance( cameraPosition, vP ) );
+          float a = uMist * vThick * smoothstep( 0.3, 0.75, n ) * smoothstep( 1.5, 9.0, distance( cameraPosition, vP ) );
           gl_FragColor = vec4( fogColor * 1.15 * a, a );
         }`,
       transparent: true,
@@ -198,19 +200,35 @@ export class Waterways {
       depthWrite: false,
       fog: false,
     });
+    // (how far in from the shore each point of the grid is: nothing outside it)
+    const G = 10, nx = Math.ceil((x1 - x0) / G) + 1, nz = Math.ceil((z1 - z0) / G) + 1, edge = new Float32Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const x = x0 + i * G, z = z0 + j * G;
+      if (!inside(shore, x, z)) continue;
+      let d = Infinity;
+      for (let k = 0; k < shore.length; k++) {
+        const [ax, az] = shore[k], [bx, bz] = shore[(k + 1) % shore.length], ex = bx - ax, ez = bz - az, u = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez || 1)));
+        d = Math.min(d, Math.hypot(x - ax - ex * u, z - az - ez * u));
+      }
+      const t = Math.min(1, d / 30);
+      edge[j * nx + i] = t * t * (3 - 2 * t);
+    }
     const quads: number[] = [], thick: number[] = [];
-    SWAMP_MIST.sheets.forEach((h, i) => {
+    SWAMP_MIST.sheets.forEach((h, s) => {
       const y = level + h;
-      for (const [x, z] of [[x0, z0], [x0, z1], [x1, z0], [x1, z0], [x0, z1], [x1, z1]]) {
-        quads.push(x, y, z);
-        thick.push(SWAMP_MIST.thick[i]);
+      for (let j = 0; j + 1 < nz; j++) for (let i = 0; i + 1 < nx; i++) {
+        const c = [j * nx + i, j * nx + i + 1, (j + 1) * nx + i, (j + 1) * nx + i + 1];
+        if (c.every((k) => edge[k] === 0)) continue;
+        for (const k of [c[0], c[2], c[1], c[1], c[2], c[3]]) {
+          quads.push(x0 + (k % nx) * G, y, z0 + Math.floor(k / nx) * G);
+          thick.push(SWAMP_MIST.thick[s] * edge[k]);
+        }
       }
     });
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(quads, 3));
     g.setAttribute('aThick', new THREE.Float32BufferAttribute(thick, 1));
     g.computeBoundingSphere();
-    mist.uniforms.uBox.value.set(x0, z0, x1, z1);
     this.mists.push(mist);
     const mesh = new THREE.Mesh(g, mist);
     mesh.name = 'swamp mist';

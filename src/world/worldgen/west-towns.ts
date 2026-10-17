@@ -3,13 +3,13 @@
 // Kalat, the ruined town of src/sim/ruins.ts, set down whole in the desert on land shaped as it really stands
 // (`ruinsGround`: its top, its banks and moat, the dry river's flats), as src/dev/ruins.ts lays it on its test patch.
 
-import { lerp, smoothstep } from '../../core/noise';
+import { Simplex, lerp, smoothstep } from '../../core/noise';
 import { MOKROYE, WATER } from '../../sim/mokroye';
 import { OZERKI, SHORE } from '../../sim/ozerki';
 import { LAND, OUTLINE, outside as offTop, ruinLocal, ruinsGround, type Place } from '../../sim/ruins';
-import { moundAt, placedSlabs, townBuildings, townGround, townPoint, townThings, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
+import { moundAt, placedSlabs, townBuildings, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
 import { BUILDING_FOOTPRINT, type BuildingPlot } from './layout';
-import { CELL, SEA_LEVEL } from './places';
+import { CELL, SEA_LEVEL, WORLD_SEED } from './places';
 import { PLACED, PLAN } from './west-plan';
 import type { Net } from './west-relief';
 import type { Instance } from './types';
@@ -45,15 +45,31 @@ export function padLevel(H: Float32Array, net: Net, t: Town) {
   return was[was.length >> 1];
 }
 
+const h1 = new Simplex(WORLD_SEED + 351);
+/**
+ * How much of a spot is the swamp's hamlet's own ground (1) and how much the swamp's floor (0): its pad's edge let
+ * wander 14 m in and out (seen from the sky its straight edge drew a rectangle in the swamp, the owner: "too ugly"),
+ * eased into the floor over 16 m; the ground under its boardwalks always its own.
+ */
+export function hamletGround(t: Town, x: number, z: number) {
+  const [lx, lz] = townLocal(t, x, z), edge = Math.max(Math.abs(lx) - t.pad[0], Math.abs(lz) - t.pad[1]) + 14 * h1.noise(x * 0.022, z * 0.022) + 4 * h1.noise(x * 0.09 + 3, z * 0.09);
+  let walk = Infinity;
+  for (const { a, b } of townWalks(t)) {
+    const ex = b[0] - a[0], ez = b[1] - a[1], u = Math.max(0, Math.min(1, ((lx - a[0]) * ex + (lz - a[1]) * ez) / (ex * ex + ez * ez || 1)));
+    walk = Math.min(walk, Math.hypot(lx - a[0] - ex * u, lz - a[1] - ez * u));
+  }
+  return Math.max(1 - smoothstep(-6, 10, edge), 1 - smoothstep(4, 10, walk));
+}
+
 /**
  * A town's pad levelled at its height, its knolls and terraces raised on it (`moundAt`), and eased into the land
- * about it over 40 m (the swamp's hamlet over 10, into the swamp's own floor; Ozerki's not over its lake, where the
- * shore's shingle runs down from it into the water).
+ * about it over 40 m (the swamp's hamlet into the swamp's own floor, over an edge that wanders: `hamletGround`;
+ * Ozerki's not over its lake, where the shore's shingle runs down from it into the water).
  */
 export function layPad(H: Float32Array, net: Net, t: Town, padY: number, lake?: number) {
-  const E = t.name === MOKROYE.name ? 10 : 40;
-  overPad(net, t, E, (i, _x, _z, lx, lz, out) => {
-    const mix = 1 - smoothstep(0, E, out), y = padY + moundAt(t, lx, lz);
+  const E = t.name === MOKROYE.name ? 30 : 40;
+  overPad(net, t, E, (i, x, z, lx, lz, out) => {
+    const mix = t.name === MOKROYE.name ? hamletGround(t, x, z) : 1 - smoothstep(0, E, out), y = padY + moundAt(t, lx, lz);
     if (t.name === OZERKI.name && lake !== undefined) {
       if (lz < SHORE - 3) return;
       if (lz < SHORE + 2.5) return void (H[i] = lerp(H[i], lerp(lake - 0.3, padY, smoothstep(SHORE - 3, SHORE + 2.5, lz)), mix));
