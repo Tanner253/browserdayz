@@ -239,6 +239,8 @@ export const TYPES: Record<string, TypeRule> = {
   rifle_wrap: { at: [0, 0, 2, 3, 1], lifetime: 7200, restock: 1500, usage: ARMY },
   suppressor_762: { at: [0, 0, 0, 3, 2], lifetime: 7200, restock: 1800, usage: [] },
   suppressor_739: { at: [0, 0, 0, 1, 1], lifetime: 7200, restock: 1800, usage: [] },
+  mp7_suppressor: { at: [0, 0, 0, 3, 2], lifetime: 7200, restock: 1800, usage: ARMY },
+  mp7_sight: { at: [0, 0, 0, 3, 2], lifetime: 7200, restock: 1800, usage: ARMY },
   suppressor_556: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800, usage: [] },
   suppressor_12: { at: [0, 0, 0, 0, 3], lifetime: 7200, restock: 1200, usage: [] },
   // (what opens the bunker is kept under the gas: the one place is the way into the other)

@@ -217,6 +217,8 @@ interface VmModel {
   adsIron?: THREE.Vector3;
   /** how far the gun is turned as it comes to the eye, where its pack holds it turned in at the hip: the line of its sights made the line of sight */
   aimRot?: THREE.Euler;
+  /** the same with its own sight fitted, where that is squared another way (see `opticRot` in packGun) */
+  aimRotOptic?: THREE.Euler;
   /** the attachment that is its optic: with it on, `ads` is where the eye goes; without, `adsIron` */
   optic?: string;
   /** the front of its weapon light, in the body's space (the beam starts there) */
@@ -824,7 +826,51 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
  * up; metres). The AR's mark stood a millimetre right of its window's middle and as much low: from the eye, the
  * window was off to one side of it. A player: "holo scope on the ar is not in the middle its kinda off center".
  */
-const GLASS: Record<string, [number, number]> = { ar15: [-0.0012, 0.0008] };
+const GLASS: Record<string, [number, number]> = { ar15: [-0.0012, 0.0008], mp7a1: [-0.0035, -0.0009] };
+/** a gun whose own sight's lens is painted opaque into its picture: that piece's lens is cut away (see packGun) */
+const LENS: Record<string, string> = { mp7a1: 'sight' };
+/**
+ * The faces of a tube sight that look along the barrel (x, the gun's own space) inside its ring, taken out: its
+ * lens. The ring is found from those same faces over the lower two fifths of it (the mount under it has faces that
+ * look along the barrel too): its middle is the middle of them, and its lens three quarters of the way out to the
+ * furthest of them.
+ */
+function cutLens(geo: THREE.BufferGeometry): { at: THREE.Vector3; axis: THREE.Vector3 } | null {
+  const P = geo.getAttribute('position'), idx = geo.getIndex();
+  if (!idx) return null;
+  geo.computeBoundingBox();
+  const b = geo.boundingBox!, above = b.min.y + (b.max.y - b.min.y) * 0.4;
+  const a = new THREE.Vector3(), b2 = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3(), m = new THREE.Vector3();
+  const facing: { i: number; x: number; y: number; z: number; n: THREE.Vector3 }[] = [];
+  for (let i = 0; i < idx.count; i += 3) {
+    a.fromBufferAttribute(P, idx.getX(i));
+    b2.fromBufferAttribute(P, idx.getX(i + 1));
+    c.fromBufferAttribute(P, idx.getX(i + 2));
+    n.crossVectors(b2.clone().sub(a), c.clone().sub(a)).normalize();
+    m.copy(a).add(b2).add(c).divideScalar(3);
+    if (Math.abs(n.x) > 0.85 && m.y > above) facing.push({ i, x: m.x, y: m.y, z: m.z, n: n.clone().multiplyScalar(Math.sign(n.x)) });
+  }
+  if (facing.length < 6) return null;
+  let cy = facing.reduce((s, f) => s + f.y, 0) / facing.length, cz = facing.reduce((s, f) => s + f.z, 0) / facing.length;
+  const out = Math.max(...facing.map((f) => Math.hypot(f.y - cy, f.z - cz))), r = out * 0.75;
+  // (and the middle found again from the lens's own faces, twice: a knob on one side of the ring drew the first guess
+  // to that side, and the eye looked into the tube at a slant)
+  let lens = facing.filter((f) => Math.hypot(f.y - cy, f.z - cz) < r);
+  for (let k = 0; k < 2 && lens.length; k++) {
+    cy = lens.reduce((s, f) => s + f.y, 0) / lens.length;
+    cz = lens.reduce((s, f) => s + f.z, 0) / lens.length;
+    lens = facing.filter((f) => Math.hypot(f.y - cy, f.z - cz) < r * 0.9);
+  }
+  const gone = new Set(lens.map((f) => f.i));
+  const kept: number[] = [];
+  for (let i = 0; i < idx.count; i += 3) if (!gone.has(i)) kept.push(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2));
+  geo.setIndex(kept);
+  // (where the glass was: the middle of its ring, halfway along the tube; and which way the tube looks, by its glass)
+  return {
+    at: new THREE.Vector3(lens.reduce((s, f) => s + f.x, 0) / Math.max(1, lens.length), cy, cz),
+    axis: lens.reduce((s, f) => s.add(f.n), new THREE.Vector3()).normalize(),
+  };
+}
 /** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
 const IRON_NEAR = 0.02;
 
@@ -1552,6 +1598,12 @@ export class Weapons {
       if (piece === 'base' || piece === 'slide') span.union(p.geometry.boundingBox!);
       if (piece === 'slide' || (piece === 'base' && long)) top.union(p.geometry.boundingBox!);
     }
+    // A sight whose lens is painted into the gun's own picture, opaque (the MP7's: a solid orange disc in the middle of
+    // the picture when aimed through): the lens is cut out of its shape, the faces that look along the barrel inside
+    // the ring of its tube, front and back; the lit mark is put where it was, as in any other sight's glass.
+    const lensOf = LENS[o.item];
+    let lens: { at: THREE.Vector3; axis: THREE.Vector3 } | null = null;
+    for (const p of lensOf ? alone : []) if (p.name.replace(/_\d+$/, '') === lensOf) lens = cutLens(p.geometry) ?? lens;
     // the muzzle, in the gun's own space: the front of the barrel, at the height of the bore
     const bore = o.kind === 'pistol' ? top.max.y - (top.max.y - top.min.y) * (FIT[o.item]?.bore ?? 0.42) : THREE.MathUtils.lerp(span.min.y, span.max.y, 0.62);
     const mouth = new THREE.Vector3(span.max.x, bore, (span.min.z + span.max.z) / 2);
@@ -1850,6 +1902,18 @@ export class Weapons {
       aimRot.setFromRotationMatrix(new THREE.Matrix4().makeBasis(r, u, f.clone().negate()).transpose());
       if (notch) lineAt = notch.applyEuler(aimRot);
     }
+    // (and one that squares the tube of a sight of its own to the eye, for when that is fitted: the MP7's sight looks
+    // a degree off its folded irons, and squared to them the eye looked into the tube at a slant)
+    const opticRot = new THREE.Euler();
+    if (o.square && lens && hung.has('sight')) {
+      rig.rest();
+      rig.root.updateMatrixWorld(true);
+      const G = hung.get('sight')!.matrixWorld;
+      const f = lens.axis.clone().transformDirection(G), u = new THREE.Vector3(0, 1, 0).transformDirection(G);
+      const r = new THREE.Vector3().crossVectors(f, u).normalize();
+      u.crossVectors(r, f);
+      opticRot.setFromRotationMatrix(new THREE.Matrix4().makeBasis(r, u, f.clone().negate()).transpose());
+    }
     const squared = (v: THREE.Vector3) => v.clone().applyEuler(aimRot);
     const root = new THREE.Group();
     const body = new THREE.Group();
@@ -1893,9 +1957,11 @@ export class Weapons {
     }
     // (through a holographic sight: the eye on the lit mark, a hand and a half behind the glass)
     // (a gun in the rifle's hands with a holographic sight of its own: the mark is put in its glass, which is the upper part of it)
-    const glassY = THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7) + (GLASS[o.item]?.[1] ?? 0);
+    // (a sight whose lens was cut out: the middle of the ring it was in, as the gun holds it)
+    const lensRig = lens && hung.has('sight') ? lens.at.clone().add(nudge).applyMatrix4(hung.get('sight')!.matrixWorld) : null;
+    const glassY = (lensRig ? lensRig.y : THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7)) + (GLASS[o.item]?.[1] ?? 0);
     /** across: the middle of the glass, where the box of the whole sight, its knobs and its mount, is not that */
-    const glassX = c.x + (GLASS[o.item]?.[0] ?? 0);
+    const glassX = (lensRig ? lensRig.x : c.x) + (GLASS[o.item]?.[0] ?? 0);
     if (hung.has('sight') && this.reticle) {
       const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.014, 0.014), this.reticle);
       mark.name = 'reticle';
@@ -1908,7 +1974,8 @@ export class Weapons {
       marks.push(mark);
     }
     // (a rifle with a holographic sight stood on it from another model: the eye on its mark, as a pistol's)
-    const through = squared(new THREE.Vector3(hung.size ? glassX : c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2));
+    const glassAt = new THREE.Vector3(hung.size ? glassX : c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2);
+    const through = lensRig ? glassAt.clone().applyEuler(opticRot) : squared(glassAt);
     const lit = dotAt ? squared(dotAt) : null;
     const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
@@ -1929,6 +1996,7 @@ export class Weapons {
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
       adsIron: long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       aimRot: o.square ? aimRot : undefined,
+      aimRotOptic: lensRig && o.square ? opticRot : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
       muzzle: (long ? (hung.has('base') ? frontOf(hung.get('base')!) : rig.front('base')) : null) ?? new THREE.Vector3(fc.x, long ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
       // For whoever is seen holding it. The hands start where the pack's own hands are, and are
@@ -3424,9 +3492,10 @@ export class Weapons {
     }
     // (and one held turned in at the hip is squared to the eye as it comes up)
     if (m.aimRot) {
-      rot.x += m.aimRot.x * ads;
-      rot.y += m.aimRot.y * ads;
-      rot.z += m.aimRot.z * ads;
+      const turn = m.aimRotOptic && m.optic && hasMod(this.currentItem, m.optic) ? m.aimRotOptic : m.aimRot;
+      rot.x += turn.x * ads;
+      rot.y += turn.y * ads;
+      rot.z += turn.z * ads;
     }
 
     // recoil

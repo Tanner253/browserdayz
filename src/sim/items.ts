@@ -406,6 +406,18 @@ const D: ItemDef[] = [
     desc: 'A light clamped to the gun, switched with L. It shows you the dark, and shows the dark where you are. Fits every gun.',
     attach: { fits: ['mosin', 'colt', 'm9', 'deagle', 'mpa', 'benelli', 'ak', 'ar15'], slot: 'light', ergo: -2 },
   },
+  // (the MP7's own suppressor and sight: parts of its model, and fitting no other gun. The owner: "now that we have
+  // enough guns we can start to make attachments weapon exclusive")
+  {
+    id: 'mp7_suppressor', name: 'MP7 Suppressor', model: 'mp7a1', nodeRe: '^silencer', w: 3, h: 1, weight: 0.35, category: 'attachment',
+    desc: 'The MP7A1 suppressor, and no other gun takes it. Much quieter and no flash; a softer kick, and a longer gun to swing.',
+    attach: { fits: ['mp7a1'], slot: 'muzzle', ergo: -6, recoil: 0.86, quiet: true },
+  },
+  {
+    id: 'mp7_sight', name: 'MP7 Sight', model: 'mp7a1', nodeRe: '^sight', w: 2, h: 1, weight: 0.25, category: 'attachment',
+    desc: 'The MP7A1 reflex sight, and no other gun takes it: a lit dot over its rail.',
+    attach: { fits: ['mp7a1'], slot: 'optic', ergo: 3 },
+  },
   {
     id: 'suppressor_556', name: '5.56 Suppressor', model: 'ar15', nodeRe: '^silencer', w: 3, h: 1, weight: 0.45, category: 'attachment',
     desc: 'A suppressor for the AR-15, in place of its brake. Much quieter and no flash: a little less punch, a softer kick, and a longer rifle to swing.',
