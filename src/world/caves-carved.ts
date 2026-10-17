@@ -2,7 +2,7 @@
 // once, where the world is made for the game: plain typed arrays, kept in the world's cache and sent with it from the
 // worker. The server needs none of it (it asks the plan: caveAt).
 
-import { CAVES, caveAt, caveLoot, galleries } from '../sim/pass';
+import { CAVES, CAVE_MARGIN, caveAt, caveLoot, galleries } from '../sim/pass';
 import { carveCave } from './cave-carve';
 import { heightAt, passPlan, type World } from './worldgen';
 
@@ -18,4 +18,4 @@ export function caveLootPoints() {
 
 const gs = galleries(passPlan);
 /** whether a point is in one of the pass's caves: under the ground by right, as a basement is */
-export const inCave = (x: number, y: number, z: number) => !!caveAt(passPlan, x, y, z, gs);
+export const inCave = (x: number, y: number, z: number) => !!caveAt(passPlan, x, y, z, gs, CAVE_MARGIN);

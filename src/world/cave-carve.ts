@@ -6,7 +6,7 @@
 // and the loot know of a cave stays true. Pure, the same numbers on every machine.
 
 import { RNG } from '../core/noise';
-import { caveMouths, galleries, type Gallery, type Pass } from '../sim/pass';
+import { MOUTH_FLARE, caveAt, caveMouths, galleries, type Gallery, type Pass } from '../sim/pass';
 
 export const CARVE = {
   /** the grid, metres */
@@ -23,6 +23,8 @@ export const CARVE = {
   /** a mouth's gallery carried on out of the face, and how far in from a mouth its walls are not roughed (its hole is its width) */
   out: 1.5,
   smooth: 3,
+  /** metres in from a mouth over which its flared entrance narrows to the gallery (MOUTH_FLARE in src/sim/pass.ts) */
+  flareIn: 3.5,
   /** how round the meeting of two galleries */
   blend: 0.8,
   /** the carved ground (a mouth's face, its floor) lies this far under the true ground: the terrain is drawn over it */
@@ -93,7 +95,10 @@ function segField(s: Seg, x: number, y: number, z: number, fine: number, broad: 
   const dx = x - s.ax, dz = z - s.az, u = (dx * s.ex + dz * s.ez) / (s.run * s.run);
   const k = u < 0 ? 0 : u > 1 ? 1 : u, lo = -s.lo / s.run, hi = 1 + s.hi / s.run, uc = u < lo ? lo : u > hi ? hi : u;
   const axial = Math.abs(u - uc) * s.run, lat = Math.abs(dx * s.ez - dz * s.ex) / s.run;
-  const hw = (s.w0 + (s.w1 - s.w0) * k) / 2, h = s.h0 + (s.h1 - s.h0) * k, yf = s.ay + (s.by - s.ay) * k;
+  // (flared out toward a mouth, its entrance an alcove set back in the face: MOUTH_FLARE at the face, its own measure
+  // some metres in)
+  const along0 = u * s.run, flare = 1 + (MOUTH_FLARE - 1) * Math.max(s.m0 ? 1 - Math.min(1, Math.max(0, along0) / CARVE.flareIn) : 0, s.m1 ? 1 - Math.min(1, Math.max(0, s.run - along0) / CARVE.flareIn) : 0);
+  const hw = ((s.w0 + (s.w1 - s.w0) * k) / 2) * flare, h = (s.h0 + (s.h1 - s.h0) * k) * flare, yf = s.ay + (s.by - s.ay) * k;
   const up = h * 0.62, down = h * 0.38 + 0.8, vy = y - (yf + h * 0.38), ny = vy > 0 ? vy / up : -vy / down;
   // (a rounded box: the four-norm, its walls upright and its roof flat but for the roughing)
   const a = (lat / hw) ** 2, c = ny * ny, e = (axial / hw) ** 2, norm = Math.sqrt(Math.sqrt(a * a + c * c + e * e));
@@ -117,6 +122,13 @@ export interface Carved {
   nor: Float32Array;
   /** how open each point is (1) or shut in (toward 0): crevices and the roof's corners */
   ao: Float32Array;
+  /**
+   * How much of the day's light comes in to each point off the ground outside its mouth: none on the face outside (the
+   * sky lights that as it lights the ground round it: lit by this too, the face round each mouth glowed, a door frame),
+   * rising over the first two metres in and gone some ten metres in, so that one step in is not black (the owner,
+   * 2026-10-16: the caves "dont look right still or natural").
+   */
+  bounce: Float32Array;
   /** the cave's own faces, and the faces of the ground round its mouths (which cast the sun's shadow: the rock there is the face) */
   index: Uint32Array;
   face: Uint32Array;
@@ -175,6 +187,9 @@ export function caveField(p: Pass, cave: number, ground: (x: number, z: number) 
   const field = (x: number, y: number, z: number) => Math.min(groundIn(x, z) - y, caveAir(segs, x, y, z));
   return { segs, mouths, groundIn, column, caveAir, field };
 }
+
+/** metres in from a mouth that the day's light reaches by bouncing (see Carved.bounce) */
+const BOUNCE_REACH = 10;
 
 /** Carve one cave (see caveField), all at once. */
 export function carveCave(p: Pass, cave: number, ground: (x: number, z: number) => number): Carved {
@@ -366,13 +381,16 @@ export function* carving(p: Pass, cave: number, ground: (x: number, z: number) =
   let m = 0;
   for (const q of index) if (used[q] < 0) used[q] = m++;
   for (const q of face) if (used[q] < 0) used[q] = m++;
-  const P = new Float32Array(m * 3), Nn = new Float32Array(m * 3), A = new Float32Array(m);
+  const P = new Float32Array(m * 3), Nn = new Float32Array(m * 3), A = new Float32Array(m), L = new Float32Array(m), gs = galleries(p);
   for (let q = 0; q < nv; q++) {
     const to = used[q];
     if (to < 0) continue;
     P.set([pos[q * 3], pos[q * 3 + 1], pos[q * 3 + 2]], to * 3);
     Nn.set([nor[q * 3], nor[q * 3 + 1], nor[q * 3 + 2]], to * 3);
     A[to] = ao[q];
+    // (how far in along the way from the nearest mouth: past a gallery's measure, its nearest; out of the cave, none)
+    const deep = caveAt(p, pos[q * 3], pos[q * 3 + 1] + 0.3, pos[q * 3 + 2], gs, 2)?.deep ?? 0, k = Math.min(1, deep / BOUNCE_REACH), j = Math.min(1, deep / 2);
+    L[to] = (1 - k * k * (3 - 2 * k)) * j * j * (3 - 2 * j);
   }
-  return { cave, pos: P, nor: Nn, ao: A, index: Uint32Array.from(index, (q) => used[q]), face: Uint32Array.from(face, (q) => used[q]), samples, ms: ms + performance.now() - t };
+  return { cave, pos: P, nor: Nn, ao: A, bounce: L, index: Uint32Array.from(index, (q) => used[q]), face: Uint32Array.from(face, (q) => used[q]), samples, ms: ms + performance.now() - t };
 }

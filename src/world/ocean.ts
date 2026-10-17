@@ -476,9 +476,14 @@ function fragment(most: number, L: OceanLook) {
     // (a wave breaks where the water is about as shallow as it is high, and where the ground rises under it as a beach
     // does: not over a shoal at the river's mouth a hand's breadth a metre, where its lines ran into a strip of white)
     float breaking = ( 1.0 - smoothstep( ${(surf.breaks * 0.5).toFixed(1)}, ${surf.breaks.toFixed(1)}, fromShore ) ) * smoothstep( 0.2, 0.45, depth ) * ( 1.0 - smoothstep( 0.9, 1.6, depth ) ) * smoothstep( 0.015, 0.035, rise );
-    float crestLine = smoothstep( 0.86, 0.98, swell ) + 0.25 * smoothstep( 0.5, 0.95, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 );
+    // (the crest broken and seen through: streaks along it, gaps, and what it leaves behind thinning away; thinner where
+    // the beach is gentle, where a wave spills rather than plunges. A ribbon of white, it was snow: the polish pass)
+    float steep = smoothstep( 0.02, 0.08, rise );
+    vec2 alongCrest = vec2( -away.y, away.x );
+    float streak = texture2D( uWaves, vec2( dot( p, alongCrest ) * 0.031, dot( p, away ) * 0.19 ) + vec2( uTime * 0.008, 0.0 ) ).a;
+    float crestLine = ( smoothstep( mix( 0.94, 0.86, steep ), 0.985, swell ) + 0.16 * smoothstep( 0.6, 0.95, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 ) ) * ( 0.25 + 0.75 * smoothstep( 0.3, 0.75, streak ) );
     float shallows = 1.0 - smoothstep( 0.2, ${L.foamDepth.toFixed(3)}, depth );
-    float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * ${L.shallowFoam.toFixed(3)} + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
+    float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.55 + shallows * ${L.shallowFoam.toFixed(3)} + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
     // (a line of it where the water meets a wall, as along a shore: thinner indoors, where nothing stirs it)
     cover = min( 1.0, cover + atWall * ( 0.8 - 0.45 * indoor ) );
     // (two sizes of the net drifting apart: one alone was a honeycomb)

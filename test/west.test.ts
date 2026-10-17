@@ -201,20 +201,21 @@ const ridge = (z: number) => RL.ridgeAt(z);
 }
 
 // --- THE PASS'S CAVES (the coast kit's plan, src/sim/pass.ts) under the ground as it is: two metres of rock over every
-// gallery's roof, measured as the plan measures it (galleries' `cover`), but on the real ground; within four metres
-// of a mouth it is the face the mouth is in
+// gallery's roof, measured as the plan measures it (galleries' `cover`), but on the real ground; within six metres
+// of a mouth's middle it is the face the mouth is in (in the world's metres: the pass's own measure folds on the
+// inside of its bend, a metre of the world twenty of it by the long way's west mouth)
 {
-  const { CAVES, passWorld } = await import('../src/sim/pass');
-  const P = WG.passPlan;
+  const { CAVES, caveMouths, passWorld } = await import('../src/sim/pass');
+  const P = WG.passPlan, mouths = caveMouths(P);
   let least = Infinity, at = '';
   CAVES.forEach((c, ci) => {
     for (let k = 0; k + 1 < c.nodes.length; k++) {
       const n0 = c.nodes[k], n1 = c.nodes[k + 1], run = Math.hypot(n1.s - n0.s, n1.t - n0.t), side = (n1.s - n0.s) / run;
       for (let i = 0; i <= 16; i++) {
         const q = i / 16, s0 = n0.s + (n1.s - n0.s) * q, t = n0.t + (n1.t - n0.t) * q, y = n0.y + (n1.y - n0.y) * q, w = n0.w + (n1.w - n0.w) * q, h = n0.h + (n1.h - n0.h) * q;
-        if ((k === 0 && c.mouths.includes('first') && q * run < 4) || (k + 2 === c.nodes.length && c.mouths.includes('last') && (1 - q) * run < 4)) continue;
         for (const across of [-1, 0, 1]) {
           const [x, gy, z] = passWorld(P, s0, t + across * side * (w / 2 + 1), 0), cover = heightAt(H, x, z) - gy - y - h;
+          if (mouths.some((m) => m.cave === ci && Math.hypot(m.x - x, m.z - z) < 6)) continue;
           if (cover < least) { least = cover; at = `cave ${ci} (${c.name}) at ${x.toFixed(0)}, ${z.toFixed(0)}`; }
         }
       }

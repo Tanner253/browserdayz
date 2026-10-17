@@ -16,6 +16,7 @@ import { Economy, type WorldLoot } from '../src/sim/economy';
 import { type SerializedInventory, Container } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance } from '../src/sim/items';
 import { PLAN, onRidgeWall, onWorld } from '../src/world/worldgen';
+import { inCave } from '../src/world/caves-carved';
 import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK } from '../src/sim/crates';
 import { News } from '../src/sim/news';
@@ -45,8 +46,9 @@ import { TAG_PING_MS, nudge, tickDrops } from './drops';
  * whether a spot is where anything may say it is: on the ground, or a little beyond its edge (the walls stand 4 m
  * inside it); in the west, not past the barrier on the beach (PLAN.barrier) by more than that
  */
-// (and nobody on the ridge's crest but in the pass: the wall the game stands there, plan v5)
-export const onMap = (x: number, z: number) => onWorld(x, z, -8) && x >= PLAN.barrier - 8 && !onRidgeWall(x, z);
+// (and nobody on the ridge's crest but in the pass: the wall the game stands there, plan v5; or, given how high, under
+// it in a cave: the long way goes under the crest, and its wall stands over the caves' roofs, src/sim/pass.ts)
+export const onMap = (x: number, z: number, y?: number) => onWorld(x, z, -8) && x >= PLAN.barrier - 8 && (!onRidgeWall(x, z) || (y !== undefined && inCave(x, y, z)));
 
 const PORT = Number(process.env.PORT ?? 8080);
 
