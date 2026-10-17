@@ -416,6 +416,20 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       // instead, piece by piece: it was never drawn, and its pictures were fetched and unpacked all the same,
       // some hundreds of megabytes of them.)
       for (const name of cfg.fpDrop ?? []) named(whole, name)?.setMesh(null).setSkin(null);
+      // (`ourArms`: the pack is held in our own arms (src/game/hands-on.ts), its own are never drawn. Its skeleton and
+      // movements are all that is kept, and of the movements only what moves the arms, the hands, the gun and the
+      // camera, and what those hang from: the face and the legs of its maker's whole body moved too, 738 tracks of it.)
+      if (cfg.ourArms) {
+        for (const n of whole.getRoot().listNodes()) if (n.getMesh()) n.setMesh(null).setSkin(null);
+        const keep = new Set();
+        const wantNode = new RegExp(`upper_?arm|forearm|lower_?arm|hand|palm|thumb|index|middle|ring|pinky|^(${[...Object.keys(cfg.skinned?.joints ?? {}), cfg.eye].filter(Boolean).join('|')})$`, 'i');
+        const parentOf = new Map();
+        for (const n of whole.getRoot().listNodes()) for (const c of n.listChildren()) parentOf.set(c, n);
+        for (const n of whole.getRoot().listNodes()) if (wantNode.test(n.getName())) for (let p = n; p; p = parentOf.get(p)) keep.add(p);
+        let cut = 0;
+        for (const a of whole.getRoot().listAnimations()) for (const c of a.listChannels()) if (!keep.has(c.getTargetNode())) { c.getSampler()?.dispose(); c.dispose(); cut++; }
+        console.log(`  ${id}: held in our arms; its own arms left out, ${cut} tracks of what they do not need`);
+      }
       // (Arms that the game paints with another pack's pictures, the one pair every pack of that maker's is drawn
       // in: their own pictures would be fetched with the pack and never drawn, and are not kept in it.)
       if (cfg.fpBare) {
@@ -431,7 +445,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
         dedup(),
         resample(),
         // (arms left with no pictures of their own keep where each picture goes on them: it is another pack's that is drawn there)
-        prune(cfg.fpBare ? { keepAttributes: true } : {}),
+        prune(cfg.fpBare ? { keepAttributes: true } : cfg.ourArms ? { keepLeaves: true } : {}),
         ...(cfg.armsTex ? [textureCompress({ encoder: sharp, targetFormat: 'webp', pattern: /arms/i, resize: [cfg.armsTex, cfg.armsTex], quality: 86 })] : []),
         textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [cfg.tex, cfg.tex], quality: 88 }),
         meshopt({ encoder: MeshoptEncoder, level: 'medium' }),

@@ -64,6 +64,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - Keep what they loved: change only what was asked, and prove nothing else was lost.
 - When they ask for one change (turn it), make that change and solve what it costs; do not offer a different change because it is cheaper.
 - Real, downloaded models only, never shapes made by hand for real things; never lower a model's quality. Poly Haven (CC0) may be used freely; any other site needs their yes; nothing ripped or decompiled.
+- Textures of a model brought in from 2026-10-17 on: 2048 a side at most, set at the source (`tex: 2048`), held guns too (the owner: "2048 should be our max for new models").
 - DayZ is the rule for anything they have not said.
 - Every number on a page or in a film must be true and checkable; there is no player count anywhere.
 

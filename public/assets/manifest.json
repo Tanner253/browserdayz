@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T10:09:09.704Z",
+ "generated": "2026-10-17T11:37:06.490Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -10974,7 +10974,7 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 404792,
+   "bytes": 406680,
    "srcTris": 10712,
    "tris": 10712,
    "min": [
@@ -10992,7 +10992,7 @@
      "url": "assets/models/scorpion_lod1.glb",
      "tris": 5043,
      "far": 2,
-     "of": "404792:1792231750459"
+     "of": "406680:1792237027009"
     }
    ],
    "holds": {
@@ -11008,15 +11008,15 @@
     ]
    },
    "hi": "assets/models/hi/scorpion.glb",
-   "hiBytes": 5007508,
-   "hiCard": 256
+   "hiBytes": 1334516,
+   "hiCard": 64
   },
   "scorpion_fp": {
    "url": "assets/models/scorpion_fp.glb",
    "tags": [
     "viewmodel"
    ],
-   "bytes": 2997228,
+   "bytes": 1633784,
    "srcTris": 34053,
    "tris": 34053,
    "min": [
@@ -11112,10 +11112,7 @@
      -0.1482716,
      1
     ]
-   },
-   "hi": "assets/models/hi/scorpion_fp.glb",
-   "hiBytes": 10664996,
-   "hiCard": 224
+   }
   }
  }
 }

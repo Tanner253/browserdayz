@@ -815,6 +815,11 @@ export const LOCAL_MODELS = {
  *   level     – a piece that runs straight up and down the gun: the gun is rolled about its barrel until it does
  *   fit       – instead of `origin`: put it where another pack's gun is, one piece on the other's (and its
  *               holder's wrists are then that gun's)
+ *   atEye     – the pack's camera (`eye`) is made the eye: for a pack whose camera stands where a body's head is
+ *   ourArms   – held in our own arms (src/game/hands-on.ts): the pack's own arms are left out of its file
+ *
+ * `tex` is 2048 at most for a model brought in from 2026-10-17 on (the owner: "2048 should be our max for new
+ * models"): a gun at 4096 was 256 MB on the card in the hands, at 2048 64, and the two could not be told apart.
  */
 export const WEAPON_PACKS = {
   sniper: {
@@ -1070,7 +1075,7 @@ export const WEAPON_PACKS = {
   scorpion: {
     dir: 'scorpion',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     scale: 1,
     forward: [0, 0, 1],
     up: [0, 1, 0],
@@ -1078,7 +1083,7 @@ export const WEAPON_PACKS = {
     // 3.1 to the left across its width, measured off the file by scripts/sight-profile.mjs. The gun alone is made straight.)
     trim: { pitch: 2.86, yaw: -2.11, roll: 3.1 },
     skinned: { mesh: ['CZScorpion_CZScorpion_0'], joints: { Weapon_0725: 'base', Changing_handle_0726: 'bolt', Firemode_0727: 'safety', Trigger_0728: 'trigger', Mag_Release_0729: 'base', Magazine_0730: 'mag', Magazine_2_0732: null }, rest: 'base' },
-    eye: 'Camera_0733', atEye: true,
+    eye: 'Camera_0733', atEye: true, ourArms: true,
     wrists: { right: 'DEF-hand.R_0583', left: 'DEF-hand.L_0458' },
     // (the gun alone is hung on the joints; the pack's sky ball is not kept either)
     fpDrop: ['Object_11', 'Object_19'],

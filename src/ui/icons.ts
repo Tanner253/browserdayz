@@ -319,7 +319,10 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     rt.dispose();
   }
   renderer.setRenderTarget(prevTarget);
-  for (const t of used) t.dispose();
+  // (Only what can go back from the page's own copy: not a full-size picture on the card, sent there in strips or
+  // with its page copy let go of, which the gun in the hands is painted with. Taken off, it came back blank: the
+  // Scorpion in the hands was drawn black from the moment its magazine's picture was made, 2026-10-17.)
+  for (const t of used) if (!(t as THREE.FramebufferTexture).isFramebufferTexture && (t.image as { width?: number } | null)?.width) t.dispose();
   for (const c of copies) c.dispose();
   return out;
 }
