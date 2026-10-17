@@ -163,6 +163,26 @@ export function moundAt(t: Town, lx: number, lz: number): number {
 /** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */
 export interface SlabRun { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }
 
+/** a room of a building the water stands in (coast-kit's Waters.rooms): its middle, its turn, half its size each way; `dry` for one the water must stay out of */
+export interface WaterRoom { x: number; z: number; rot: number; hx: number; hz: number; dry?: boolean }
+
+/**
+ * The rooms of a town in water where the water stands inside (Mokroye's flooded houses and its sunk barn): each a
+ * building whose floor lies under the town's water, its footprint (from `sizes`, the world's BUILDING_FOOTPRINT, given
+ * by the caller: the footprints' file is the world's generator's and imports this one) turned with it. A building on
+ * stilts or an island, its floor over the water, is none: marked dry, it would leave a hole in the water under it.
+ */
+export function placedRooms(p: PlacedTown, sizes: Partial<Record<BuildingType, [number, number]>>): WaterRoom[] {
+  const water = townGround(p.town).water;
+  if (!water) return [];
+  return townBuildings(p.town).flatMap((s) => {
+    const size = sizes[s.type], floor = s.up ?? moundAt(p.town, s.x, s.z) + 0.3;
+    if (!size || floor >= water.level) return [];
+    const [x, z] = townPoint(p.town, s.x, s.z);
+    return [{ x, z, rot: p.town.rot + s.rot, hx: size[0] / 2, hz: size[1] / 2 }];
+  });
+}
+
 /** a town's walls of concrete slabs in the world, its runs moved from its frame */
 export function placedSlabs(t: Town): SlabRun[] {
   const runs = t.name === ZAVOD.name ? ZAVOD_WALL : t.name === ZASTAVA.name ? ZASTAVA_SLABS : [];
