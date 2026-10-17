@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { HandsOn } from './hands-on';
 
 export interface RigInfo {
   fps: number;
@@ -242,6 +243,19 @@ export class WeaponRig {
       n.position.copy(r.p);
       n.quaternion.copy(r.q);
     }
+  }
+
+  private hands: HandsOn | null = null;
+  /** Our own arms on this pack, posed after its own, which are no longer drawn (./hands-on.ts). */
+  wear(arms: GLTF, info: RigInfo, shift: THREE.Vector3, shoulders: Record<'L' | 'R', THREE.Vector3>, paint: (m: THREE.Material) => THREE.Material) {
+    this.rest();
+    this.root.updateMatrixWorld(true);
+    this.hands = new HandsOn(this.scene, this.root, arms, info, shift, shoulders, paint);
+  }
+
+  /** Our arms put after the pack's: once the frame's movement is set. */
+  follow() {
+    this.hands?.follow();
   }
 
   node(name: string): THREE.Object3D | null {

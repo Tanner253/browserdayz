@@ -94,6 +94,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Also: One panel of the pack (the grey railed pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Game Ready Fruit & Vegetable Asset Pack" (https://sketchfab.com/3d-models/game-ready-fruit-vegetable-asset-pack-9846beef2c6b46caadc4a547a4dcd144) by Meerschaum Digital (https://sketchfab.com/meerschaumdigital) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: One piece of the pack, brought to life size and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Scorpion | First Person Animations (2026 Remake)" (https://sketchfab.com/3d-models/scorpion-first-person-animations-2026-remake-f2bdfac775344004ad38d0318f0664a4) by 1Matzh (https://sketchfab.com/1Matzh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: The gun taken off its skeleton and set in rigid pieces; its animations played as they came; its sky ball left out. Textures re-encoded as WebP; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

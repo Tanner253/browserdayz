@@ -12,7 +12,7 @@ import { ITEMS, fittedOf, type ItemInstance } from './items';
 /** what one of a thing is worth to him, in credit (for a thing that stacks: each of the stack) */
 const WORTH: Record<string, number> = {
   // guns: he takes them, and does not sell them
-  colt: 14, m9: 16, mpa: 34, mosin: 28, deagle: 40, benelli: 45, ak: 55, ar15: 60,
+  colt: 14, m9: 16, mpa: 34, scorpion: 36, mosin: 28, deagle: 40, benelli: 45, ak: 55, ar15: 60,
   hatchet: 5, machete: 5, crowbar: 4, bat: 3, shovel: 4, knife: 3,
   // rounds by the one (a sealed box is worth the rounds in it: see `worth`)
   ammo_9mm: 0.4, ammo_45: 0.5, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2, ammo_739: 0.7, ammo_556: 0.7,

@@ -264,6 +264,9 @@ const HELD = {
   smg: new THREE.Vector3(0.05, -0.17, -0.12),
   // (a pistol in those hands: a little nearer the middle and higher, where a pistol is held out)
   smgPistol: new THREE.Vector3(0.035, -0.16, -0.12),
+  // (the Scorpion's pack, on arms of its own, its camera at its eye: held as the submachine gun is to begin with)
+  // (nearer than the submachine gun's pack holds its gun: our arms, not the pack's, reach for it, and from where they hold the MPA)
+  scorpion: new THREE.Vector3(0.05, -0.02, 0),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
 };
@@ -785,10 +788,13 @@ const PLAIN_SIGHTS = new Set(['mosin', 'ar15']);
  * back edge of it, and a post between two ears, its tip 3 mm lower than the leaf: as on the rifle itself, the
  * sights look a little down on the barrel.) A gun aimed by this line has its eye put on it, and is turned to it.
  */
-const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [number, number, number] }> = {
+const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [number, number, number]; /** nearer the eye than IRON_NEAR, aimed: a ring sight seen from where a notch is was a speck */ near?: number }> = {
   ak: { notch: [-0.0005, 0.1187, 0.00125], post: [0.3625, 0.1156, 0.001] },
   // (the submachine gun's: a block with a notch in it between two ears on the back of the receiver, and a post between two more at the front of it)
   mpa: { notch: [-0.046, 0.085, -0.0025], post: [0.122, 0.084, -0.003] },
+  // (the Scorpion's: the middle of the ring of its rear drum, and the tip of the post between the ears of its hood,
+  // level with each other; read off the file looking down its barrel, scripts/sight-profile.mjs)
+  scorpion: { notch: [0.017, 0.1316, -0.0081], post: [0.258, 0.1316, -0.0083], near: 0.07 },
 };
 /** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
 const IRON_NEAR = 0.02;
@@ -1211,6 +1217,13 @@ export class Weapons {
       mpa.grips.stand = SMG_STAND;
     }
     this.models.set('mpa', mpa);
+    // The CZ Scorpion (2026-10-17, the weapons pass): a pack on arms of its own, played as it came; the gun alone hung
+    // on its joints as the AK's is, the pack's own drawing of it put away.
+    const scorpRide = { base: 'Weapon_0725', bolt: 'Changing_handle_0726', trigger: 'Trigger_0728', safety: 'Firemode_0727', mag: 'Magazine_0730' };
+    const scorpion = await this.packGun({ pack: 'scorpion', item: 'scorpion', gun: 'scorpion', kind: 'auto', hands: true, hip: HELD.scorpion, flashSize: 0.24, flash: mkFlash(), square: true, strip: ['Object_11', 'Object_19'], ride: scorpRide, spare: ['Magazine_2_0732', scorpRide.mag] });
+    // (its own walk and run, and its own look over the gun on I)
+    scorpion.gait = true;
+    this.models.set('scorpion', scorpion);
     const smgMark = magMark(extractParts(await assets.model('smg')));
     const inSmg = async (item: string, gun: string, flashSize: number, more: Record<string, string> = {}) => {
       const mark = magMark(extractParts(await assets.model(gun)));
@@ -1445,7 +1458,7 @@ export class Weapons {
    * @param o.ride which of the pack's pieces each piece of that gun rides on (so: moves with)
    * @param o.nudge where that gun sits in the pack's hands, from where the fitting of one gun to the other left it (the gun's own space)
    */
-  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number; strip?: string[]; ride?: Record<string, string>; nudge?: THREE.Vector3; /** the pack's arms are its own, and not the one pair every other gun is held in */ ownArms?: boolean; /** the pack holds its gun turned in to the middle of the picture: at the eye it is squared to the line of sight */ square?: boolean; /** a second magazine: [the piece it is hung on, the piece it is hung by] */ spare?: [string, string]; /** where it sits in the pack's hands, from where the pack's own gun does (the gun's own space): only in the hands, the gun as others see it is not moved */ seat?: { move: THREE.Vector3; turn?: THREE.Euler; size?: number } }): Promise<VmModel> {
+  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; /** held in our own arms (the AK's pair), the pack's own not drawn: ./hands-on.ts */ hands?: boolean; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number; strip?: string[]; ride?: Record<string, string>; nudge?: THREE.Vector3; /** the pack's arms are its own, and not the one pair every other gun is held in */ ownArms?: boolean; /** the pack holds its gun turned in to the middle of the picture: at the eye it is squared to the line of sight */ square?: boolean; /** a second magazine: [the piece it is hung on, the piece it is hung by] */ spare?: [string, string]; /** where it sits in the pack's hands, from where the pack's own gun does (the gun's own space): only in the hands, the gun as others see it is not moved */ seat?: { move: THREE.Vector3; turn?: THREE.Euler; size?: number } }): Promise<VmModel> {
     /** a gun held at the shoulder in both hands (anything that is not a pistol) */
     const long = o.kind !== 'pistol';
     /** what the gun's own body is hung on in the pack (and so what is fitted to it) */
@@ -1464,6 +1477,8 @@ export class Weapons {
       else if (sleeves) this.sleevesOwn = sleeves;
     } else if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
     else if (sleeves) this.sleeves = sleeves;
+    // (the owner, 2026-10-17: "the hands should not change depending on the gun")
+    if (o.hands) rig.wear(await assets.gltfOf('smg_fp'), assets.manifest.models.smg_fp.rig!, HELD.smg.clone().sub(o.hip), SMG_SHOULDERS, (m) => this.sleevesOwn ?? packMaterial(m));
     const aloneId = o.gun ?? o.pack;
     const holds = assets.manifest.models[aloneId].holds!;
     // the gun alone (x along the barrel, y up): what is seen of it in everybody else's hands
@@ -1863,7 +1878,7 @@ export class Weapons {
       ownSights: !!post,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
-      adsIron: long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + IRON_NEAR) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      adsIron: long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       aimRot: o.square ? aimRot : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
       muzzle: (long ? (hung.has('base') ? frontOf(hung.get('base')!) : rig.front('base')) : null) ?? new THREE.Vector3(fc.x, long ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
@@ -3461,12 +3476,14 @@ export class Weapons {
     h.piece.position.copy(h.at).applyQuaternion(h.piece.quaternion).negate().add(h.at);
   }
 
-  /** the pack's hands put where this gun has something for them to hold (see WeaponRig.reseat): after the movement of the frame is set */
+  /** the pack's hands put where this gun has something for them to hold (see WeaponRig.reseat), and our own arms after a pack's (WeaponRig.wear): after the movement of the frame is set */
   private reseat(m: VmModel) {
     const r = m.reseat;
-    if (!r || !m.rig) return;
-    if (r.L) m.rig.reseat('L', r.body, r.L);
-    if (r.R) m.rig.reseat('R', r.body, r.R);
+    if (r && m.rig) {
+      if (r.L) m.rig.reseat('L', r.body, r.L);
+      if (r.R) m.rig.reseat('R', r.body, r.R);
+    }
+    m.rig?.follow();
   }
 
   /**

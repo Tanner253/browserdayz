@@ -97,6 +97,7 @@ export const GUNS: Record<string, Gun> = {
   // (The submachine gun: a pistol's round out of a barrel half as long again, fast, with nothing against the
   // shoulder. Each shot is little; there are a great many of them, and they walk.)
   mpa: { ammo: 'ammo_9mm', rpm: 780, auto: true, barrel: 1.08, moa: 6, hip: 2.3, up: 0.8, side: 0.5, lean: 0.15, first: 1.05, held: 0.85, stays: 0.34, back: 9.5, jump: 1.0, zero: [50, 100], reach: 260 },
+  scorpion: { ammo: 'ammo_9mm', rpm: 1150, auto: true, barrel: 1.0, moa: 6, hip: 2.1, up: 0.7, side: 0.45, lean: 0.14, first: 1.0, held: 0.82, stays: 0.32, back: 9, jump: 0.95, zero: [50, 100], reach: 240 },
   ar15: { ammo: 'ammo_556', rpm: 700, auto: true, barrel: 0.94, moa: 2, hip: 1.9, up: 0.98, side: 0.32, lean: 0.1, first: 1.1, held: 0.7, stays: 0.42, back: 10.5, jump: 1.5, zero: [100, 200, 300], reach: 550 },
 };
 

@@ -155,6 +155,13 @@ const D: ItemDef[] = [
     desc: 'Submachine gun in 9x19mm. Thirty rounds in the magazine up its grip, and it empties it in under three seconds: a great deal of fire across a room, and a pistol\'s round past the end of the street. B changes it to single shots. Takes a holographic sight, the 9 mm suppressor, a foregrip and a light.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_mpa', ergo: 68, modes: ['auto', 'semi'], shows: { mag_mpa: ['mag'] } }, iconYaw: 0,
   },
+  // The CZ Scorpion EVO (2026-10-17, the weapons pass): a 9 mm submachine gun of the newer kind, light and quick to
+  // the shoulder, its magazine in front of its trigger guard. Its own hands and movements (scorpion pack).
+  {
+    id: 'scorpion', name: 'CZ Scorpion EVO', model: 'scorpion', w: 5, h: 3, weight: 2.8, category: 'weapon', slot: 'long',
+    desc: 'Submachine gun in 9x19mm. Thirty rounds in its magazine, light, quick to the shoulder and steady in a burst. B changes it to single shots.',
+    weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_scorpion', ergo: 72, modes: ['auto', 'semi'], shows: { mag_scorpion: ['mag'] } }, iconYaw: 0,
+  },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,
   // and holds twenty-five: it is unwrapped in the hands, and what was in it is loose rounds. Rounds go into a
   // magazine by hand, and a magazine into a gun: nothing goes from a pocket into a gun but through one of those,
@@ -268,6 +275,11 @@ const D: ItemDef[] = [
     id: 'mag_mpa', name: 'MPA30 Magazine', model: 'smg', nodeRe: '^mag', w: 1, h: 2, weight: 0.22, category: 'magazine',
     desc: 'Thirty rounds of 9 mm for the MPA30.',
     mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['mpa'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_scorpion', name: 'Scorpion Magazine', model: 'scorpion', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'magazine',
+    desc: 'Thirty rounds of 9 mm for the CZ Scorpion EVO.',
+    mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['scorpion'], slot: 'magazine' },
   },
   {
     id: 'mag_colt', name: 'Colt 1911 Magazine', model: 'colt_1911', nodeRe: '^mag', w: 1, h: 1, weight: 0.07, category: 'magazine',

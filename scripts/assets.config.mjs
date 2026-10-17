@@ -1063,6 +1063,36 @@ export const WEAPON_PACKS = {
       changes: 'Set in rigid pieces (the gun, its fore-end, its sight, the can on its muzzle) and laid along the barrel; its shell is a model of its own. Textures re-encoded as WebP; geometry compressed.',
     },
   },
+  // The CZ Scorpion EVO (2026-10-17, the weapons pass: "we need to part out their attachments per gun like all the
+  // rest of the guns ... be thorough we want high quality"). A first-person pack on arms of its own (Rigify, in
+  // metres), with a movement to an animation: equip, idle, walk, run, fire, two reloads, an inspect and putting it
+  // away. As with the AK, the pack's own drawing of the gun is put away and the gun alone is hung on its joints.
+  scorpion: {
+    dir: 'scorpion',
+    file: 'scene.gltf',
+    tex: 4096,
+    scale: 1,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (Bound as it is held, like the AK: its rail rises 2.9 degrees to the muzzle, turns 2.1 to the left and leans
+    // 3.1 to the left across its width, measured off the file by scripts/sight-profile.mjs. The gun alone is made straight.)
+    trim: { pitch: 2.86, yaw: -2.11, roll: 3.1 },
+    skinned: { mesh: ['CZScorpion_CZScorpion_0'], joints: { Weapon_0725: 'base', Changing_handle_0726: 'bolt', Firemode_0727: 'safety', Trigger_0728: 'trigger', Mag_Release_0729: 'base', Magazine_0730: 'mag', Magazine_2_0732: null }, rest: 'base' },
+    eye: 'Camera_0733', atEye: true,
+    wrists: { right: 'DEF-hand.R_0583', left: 'DEF-hand.L_0458' },
+    // (the gun alone is hung on the joints; the pack's sky ball is not kept either)
+    fpDrop: ['Object_11', 'Object_19'],
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    clips: { idle: 'rig|Idle', draw: 'rig|Equip', fire: 'rig|Fire', reload: 'rig|Reload', reloadEmpty: 'rig|Reload_Empty', check: 'rig|Inspect', walk: 'rig|Walk', run: 'rig|Run', holster: 'rig|Unequip' },
+    credit: {
+      name: 'Scorpion | First Person Animations (2026 Remake)',
+      url: 'https://sketchfab.com/3d-models/scorpion-first-person-animations-2026-remake-f2bdfac775344004ad38d0318f0664a4',
+      author: '1Matzh',
+      line: 'This work is based on "Scorpion | First Person Animations (2026 Remake)" (https://sketchfab.com/3d-models/scorpion-first-person-animations-2026-remake-f2bdfac775344004ad38d0318f0664a4) by 1Matzh (https://sketchfab.com/1Matzh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'The gun taken off its skeleton and set in rigid pieces; its animations played as they came; its sky ball left out. Textures re-encoded as WebP; geometry compressed.',
+    },
+  },
 };
 
 export const MODELS = {

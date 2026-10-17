@@ -297,8 +297,9 @@ async function boot() {
     if (game.wantIn) game.hud.showStart(true, false, `Loading ${Math.min(99, Math.round((d / Math.max(t, 1)) * 100))}%`);
   };
   game.afterBoot();
-  // (the Zone's how to play, once, on a browser's first visit)
-  if (!arena) game.hud.howTo(false);
+  // (the Zone's how to play, once, on a browser's first visit; never on this machine's own runs, where every fresh
+  // headless browser is a first visit: the owner, "when running locally simply disable the how to play modal")
+  if (!arena && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) game.hud.howTo(false);
   B.done = true;
   B.stage = 'up';
   bootDone();

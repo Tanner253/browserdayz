@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-16T23:09:54.472Z",
+ "generated": "2026-10-17T10:09:09.704Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -10968,6 +10968,154 @@
      "far": 727
     }
    }
+  },
+  "scorpion": {
+   "url": "assets/models/scorpion.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 404792,
+   "srcTris": 10712,
+   "tris": 10712,
+   "min": [
+    -0.2638,
+    -0.143,
+    -0.0397
+   ],
+   "max": [
+    0.3957,
+    0.1365,
+    0.0185
+   ],
+   "lods": [
+    {
+     "url": "assets/models/scorpion_lod1.glb",
+     "tris": 5043,
+     "far": 2,
+     "of": "404792:1792231750459"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.08,
+     -0.02,
+     0.03
+    ],
+    "left": [
+     0.17281,
+     0.02283,
+     -0.0637
+    ]
+   },
+   "hi": "assets/models/hi/scorpion.glb",
+   "hiBytes": 5007508,
+   "hiCard": 256
+  },
+  "scorpion_fp": {
+   "url": "assets/models/scorpion_fp.glb",
+   "tags": [
+    "viewmodel"
+   ],
+   "bytes": 2997228,
+   "srcTris": 34053,
+   "tris": 34053,
+   "min": [
+    -0.2638,
+    -0.143,
+    -0.0397
+   ],
+   "max": [
+    0.3957,
+    0.1365,
+    0.0185
+   ],
+   "lods": [],
+   "rig": {
+    "fps": 30,
+    "clips": {
+     "idle": [
+      0,
+      208.9
+     ],
+     "draw": [
+      210.9,
+      310.8
+     ],
+     "fire": [
+      312.8,
+      325.7
+     ],
+     "reload": [
+      327.7,
+      432.6
+     ],
+     "reloadEmpty": [
+      434.6,
+      555.5
+     ],
+     "check": [
+      557.5,
+      857.4
+     ],
+     "walk": [
+      859.4,
+      890.3
+     ],
+     "run": [
+      892.3,
+      915.2
+     ],
+     "holster": [
+      917.2,
+      940.1
+     ]
+    },
+    "skinned": true,
+    "eye": [
+     0,
+     0,
+     0
+    ],
+    "view": [
+     -1,
+     0,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     0,
+     -1,
+     0,
+     0,
+     -1.5942093,
+     0.022107,
+     1
+    ],
+    "frame": [
+     0.0367723,
+     0.0540062,
+     -0.9978633,
+     0,
+     0.0498619,
+     0.9971957,
+     0.0558075,
+     0,
+     0.9980789,
+     -0.0518076,
+     0.0339764,
+     0,
+     -0.3201873,
+     -1.4299187,
+     -0.1482716,
+     1
+    ]
+   },
+   "hi": "assets/models/hi/scorpion_fp.glb",
+   "hiBytes": 10664996,
+   "hiCard": 224
   }
  }
 }

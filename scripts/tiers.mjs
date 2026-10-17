@@ -111,8 +111,9 @@ export async function tierModels(entries, { SRC, OUT }) {
     }
     entry.bytes = st.size;
     world += st.size;
-    if (seen[id].parted) {
-      const hs = await fs.stat(hi);
+    // (a world's copy whose copy as it came was never kept, as the factory kit's from the towns' lane: the world's is all there is)
+    const hs = seen[id].parted ? await fs.stat(hi).catch(() => null) : null;
+    if (seen[id].parted && hs) {
       entry.hi = `assets/models/hi/${id}.glb`;
       entry.hiBytes = hs.size;
       // (what it weighs on the card, for the game's budget of what is sharp at once: src/game/near.ts. Worked out

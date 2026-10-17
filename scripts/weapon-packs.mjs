@@ -382,11 +382,19 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
         nodes.push(put(piece, doc.createMesh(piece).addPrimitive(np)));
       }
     }
-    for (const a of root.listAnimations()) a.dispose();
+    // (an animation let go of keeps its samplers, and they the data: each let go of first)
+    for (const a of root.listAnimations()) {
+      for (const c of a.listChannels()) c.dispose();
+      for (const sm of a.listSamplers()) sm.dispose();
+      a.dispose();
+    }
     for (const child of scene.listChildren()) scene.removeChild(child);
     for (const n of root.listNodes()) if (!nodes.includes(n)) n.setMesh(null).setSkin(null);
     for (const sk of root.listSkins()) sk.dispose();
     for (const n of nodes) scene.addChild(n);
+    // (what the animations and the skeleton were made of, held by nothing now: the Scorpion's, 1,069 joints in nine
+    // movements, were 13,000 pieces of data and 50 MB left in a gun of 13,500 points, which prune let stand)
+    for (const a of root.listAccessors()) if (a.listParents().every((p) => p === root)) a.dispose();
     await doc.transform(prune());
     const bounds = getBounds(scene);
     const tris = countTris(doc);
@@ -434,6 +442,12 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       // `look` says the second by itself; `forward` and `up` are then only how the thing alone is laid.)
       const vf = cfg.look?.forward ?? f, vu = cfg.look?.up ?? u, vr = cross(vf, vu);
       const view = mul(scaleBy(s), [vr[0], vu[0], -vf[0], 0, vr[1], vu[1], -vf[1], 0, vr[2], vu[2], -vf[2], 0, 0, 0, 0, 1]);
+      // (`atEye`: a pack whose camera stands where its maker's character's head was, a metre and a half up, is
+      // moved so that camera is the eye. The AK's and the submachine gun's stand within a hand of it and are left.)
+      if (cfg.atEye) {
+        const e = point(view, named(whole, cfg.eye).getWorldTranslation());
+        for (let k = 0; k < 3; k++) view[12 + k] -= e[k];
+      }
       meta.rig = {
         tris: all,
         fps: cfg.fps,
