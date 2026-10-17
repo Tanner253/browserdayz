@@ -4,6 +4,9 @@
 import type { Bridge } from '../../sim/bridge';
 import type { FortPlace } from '../../sim/castle';
 import type { Basement } from '../../sim/basements';
+import type { Place } from '../../sim/ruins';
+import type { PlacedTown } from '../../sim/towns';
+import type { Waters } from '../../sim/water';
 import type { BuildingPlot, SiteKind } from './layout';
 
 /** A small place away from the village: a couple of buildings in a clearing. */
@@ -98,6 +101,14 @@ export interface World {
   props: Instance[];
   /** walls of concrete slabs a town has laid (src/sim/towns.ts): each from a to b, the slabs counted from a that are gone, and of those the ones lying on the ground. Stood by Buildings.plan. */
   slabs?: { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }[];
+  /** the new towns where they are set down, each with its pad's height (src/sim/towns.ts): drawn by src/world/towns.ts, their walls asked by the server */
+  towns?: PlacedTown[];
+  /** where the ruined town of Kalat stands (src/sim/ruins.ts): drawn by src/world/ruins.ts, its walls solid in the game and to the server */
+  kalat?: Place;
+  /** the desert at each point of the net, four to a point, 0 to 255: how much of it is desert, and of that how much is the beach's dry sand, wet sand and cracked earth (the rest dune sand; its rock the canyon's): src/world/ground.ts */
+  sand?: Uint8Array;
+  /** the lakes and rivers (src/sim/water.ts): drawn by src/world/water.ts, waded in by the player */
+  water?: Waters;
   pois: POI[];
   sites: Site[];
   /** the chimney and the tanks of the works */

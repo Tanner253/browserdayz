@@ -251,6 +251,7 @@ export const frameMethods = {
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
     this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
+    for (const f of this.beside) f(dt, this.s.r.camera.position, this.s.r.camera);
     // (Resting by a fire, mending or only warm; a broken leg; the air breathed: each was a word at the top of the
     // screen, and is a badge beside the survivor's health now, for as long as it is so. Why a fire is doing no good,
     // when it is not, is said beside its badge in the inventory: src/ui/status.ts.)

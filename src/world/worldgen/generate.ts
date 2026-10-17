@@ -25,12 +25,14 @@ import { Simplex, RNG, smoothstep, lerp, clamp, hash2 } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
 import { type Bridge, wreckUnder } from '../../sim/bridge';
 import { type FortPlace, castleFoot, CASTLE, CASTLE_SCALE, castleAt, castleLocal, castleLoose, HOUSES, castleJeep, castleCuts, squareTouches, castleOpen, castleHides } from '../../sim/castle';
-import { BUNKER_AT, CELL, EDGE_ROUND, EXPANSION, KAMENKA, LOOP, MOUNTAIN, OLD_HALF, PASS, SQUARE_HALF, SQUARE_RES, TOWN, WORLD_SEED, eastRoad, kamenkaQ } from './places';
-import { ARMY_CAMP, BUILDING_FOOTPRINT, HOSPITAL_AT, HOSPITAL_GROUNDS, NO_START, OLD_ROAD, OUTLYING, PEAK, POLICE_PARTS, SERVICES, SNOW, TRADE_AT, VILLAGE_STREETS, doorRoad, hospitalDrive, leftOut, loopLine, offLine, peakOf, type BuildingPlot, type BuildingType, type SiteKind } from './layout';
+import { BUNKER_WAS, CELL, EDGE_ROUND, EXPANSION, KAMENKA, LOOP, MOUNTAIN, OLD_HALF, PASS, SQUARE_HALF, SQUARE_RES, TOWN, WORLD_SEED, eastRoad, kamenkaQ } from './places';
+import { ARMY_CAMP, BUILDING_FOOTPRINT, HOSPITAL_AT, HOSPITAL_GROUNDS, NO_START, OLD_ROAD, OUTLYING, PEAK, POLICE_PARTS, SERVICES, SNOW, TRADE_WAS, VILLAGE_STREETS, doorRoad, hospitalDrive, leftOut, loopLine, offLine, peakOf, type BuildingPlot, type BuildingType, type SiteKind } from './layout';
 import type { Instance, POI, Site, Solid, World, Worn } from './types';
 // (the square is made on its own net, `idx` its numbering, and laid into the world's at the end: see `toWorld`)
 import { catmullRom, evenOut, heightAt, squareIdx as idx, slopeAt, soften } from './ground';
 import { toWorld } from './west';
+import { openSquare, type Kept } from './opening';
+import { westStarts } from './west-plan';
 
 // ------------------------------------------------------------------ generation
 
@@ -64,6 +66,9 @@ function* worldStages(seed: number): Generator<string, World, void> {
   const n2 = new Simplex(seed + 1);
   const n3 = new Simplex(seed + 2);
   const rng = new RNG(seed + 99);
+
+  // (what the world's last stage needs of how the square was made: see src/world/worldgen/opening.ts)
+  const kept: Kept = { trade: [0, 0], bunker: { before: null, after: null, reach: 0, taken: [] } };
 
   const VILLAGE = { x: 30, z: 10 };
   const CAMP = { x: -175, z: 175 };
@@ -778,11 +783,13 @@ function* worldStages(seed: number): Generator<string, World, void> {
     // after every building there was, so that none of them is renumbered.
     {
       const first = sites.length;
-      place('Trading Post', 'market', 0, [], 0, true, TRADE_AT);
+      kept.trade[0] = buildings.length;
+      place('Trading Post', 'market', 0, [], 0, true, TRADE_WAS);
       for (const st of sites.slice(first)) {
         lay(st);
         laterSites.push(st);
       }
+      kept.trade[1] = buildings.length;
     }
     // And the long huts (see `hut` in buildings.ts), where men were quartered: one behind the depot's barracks,
     // its door to the shed, and one beside the track from the checkpoint up to the works, its door to the
@@ -1029,7 +1036,8 @@ function* worldStages(seed: number): Generator<string, World, void> {
   {
     const B = BUNKER;
     const before = heights.slice();
-    const bx = BUNKER_AT.x, bz = BUNKER_AT.z, bl = Math.hypot(bx, bz);
+    kept.bunker.before = before;
+    const bx = BUNKER_WAS.x, bz = BUNKER_WAS.z, bl = Math.hypot(bx, bz);
     // the way out of it: back toward the middle of the map
     const ux = -bx / bl, uz = -bz / bl;
     const rot = Math.atan2(ux, uz);
@@ -1105,7 +1113,7 @@ function* worldStages(seed: number): Generator<string, World, void> {
         const d = Math.hypot(t.x - bx, t.z - bz);
         if (d > Math.max(R + 2, B.reach)) continue;
         const [r, f] = local(t.x, t.z);
-        if ((Math.abs(r) < 6.5 && f > 7.5 && f < 23) || slopeAt(heights, t.x, t.z) > 1.05) list.splice(k, 1);
+        if ((Math.abs(r) < 6.5 && f > 7.5 && f < 23) || slopeAt(heights, t.x, t.z) > 1.05) kept.bunker.taken.push(...list.splice(k, 1).map((q) => [list, q] as [Instance[], Instance]));
         else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
       }
     }
@@ -1128,6 +1136,8 @@ function* worldStages(seed: number): Generator<string, World, void> {
         const [r, f] = local(-half + ix * CELL, -half + iz * CELL);
         if (Math.abs(r) <= B.pit.r && f >= B.pit.back && f <= B.pit.front) heights[idx(ix, iz)] = floorY - B.depth - 0.3;
       }
+    kept.bunker.after = heights.slice();
+    kept.bunker.reach = Math.max(R, B.reach) + 6;
   }
 
   yield 'the third expansion';
@@ -2672,12 +2682,15 @@ function* worldStages(seed: number): Generator<string, World, void> {
   // Where anybody starts. The ring of starts was laid before there was a bunker, or a town in the east: nobody
   // is now set down by the bunker (the last place on the map and the best), nor between the valley and the town.
   // The ring itself is kept as it was first made (`spawnRing`), for whatever tells the old map by it.
-  const starts = spawns.filter((sp) => Math.hypot(sp.x - BUNKER_AT.x, sp.z - BUNKER_AT.z) > NO_START.bunker && Math.hypot(sp.x - TOWN.gate.x, sp.z - TOWN.gate.z) > NO_START.gate && Math.hypot(sp.x - TOWN.x, sp.z - TOWN.z) > NO_START.town);
+  const starts = spawns.filter((sp) => Math.hypot(sp.x - BUNKER_WAS.x, sp.z - BUNKER_WAS.z) > NO_START.bunker && Math.hypot(sp.x - TOWN.gate.x, sp.z - TOWN.gate.z) > NO_START.gate && Math.hypot(sp.x - TOWN.x, sp.z - TOWN.z) > NO_START.town);
 
   // The square laid into the world, and the ground west of it (src/world/worldgen/west.ts): last of all, so that
   // nothing of the square is moved by it.
   yield 'the west';
-  const world = toWorld({ heights, surface: surface ?? heights, splat, grass }, { seed, ringShape, forestMask, trees, noise: [n1, n2, n3] });
+  // (the square opened to the west, its bunker and trading post moved there: plan v2, src/world/worldgen/opening.ts)
+  const seen = surface ?? heights;
+  openSquare({ heights, surface: seen, splat, grass, roadDist, roadWidth: ROAD_W, trees, rocks, props, sites, pois, buildings, roads: [{ points: roadPts, width: ROAD_W }, ...roads], paint, noise: [n1, n2, n3], kept });
+  const world = toWorld({ heights, surface: seen, splat, grass }, { seed, ringShape, forestMask, trees, rocks, props, sites, pois, post: buildings.slice(kept.trade[0], kept.trade[1]), buildings, roads, noise: [n1, n2, n3] });
 
   return {
     heights: world.heights,
@@ -2701,7 +2714,14 @@ function* worldStages(seed: number): Generator<string, World, void> {
     sites,
     solids,
     spawn: starts[0],
-    spawns: starts,
+    // (and along the green land's west edge, after the square's own: plan v2)
+    spawns: [...starts, ...westStarts()],
     spawnRing: spawns,
+    // (the west's towns, Kalat, the towns' slab walls and the water: plan v5)
+    towns: world.towns,
+    kalat: world.kalat,
+    slabs: world.slabs,
+    water: world.water,
+    sand: world.sand,
   };
 }

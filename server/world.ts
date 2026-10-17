@@ -19,6 +19,23 @@ import { standAt } from '../src/sim/bridge';
 import { castleUnder, inCastle } from '../src/sim/castle';
 import { basementDeep, basementUnder } from '../src/sim/basements';
 import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
+import { onTownWall, placedKits, placedWalls } from '../src/sim/towns';
+import { ruinFoot, ruinLocal, ruinLoot, ruinsPlan, inside as inRuin, outside as offRuin, type Piece, type Place } from '../src/sim/ruins';
+
+/**
+ * Whether somebody at a place is on what is left of Kalat (src/sim/ruins.ts): within a piece's footprint or a couple
+ * of metres off it, and no higher over the ground than its tallest stands. For the server, which asks of anybody high
+ * off the ground what they stand on, as it asks of the fort's.
+ */
+function onRuins(plan: { piece: Piece; place: Place }[], ground: number, x: number, y: number, z: number) {
+  if (y > ground + 26) return false;
+  for (const { piece, place } of plan) {
+    if (Math.hypot(x - place.x, z - place.z) > 160) continue;
+    const [lx, lz] = ruinLocal(place, x, y, z), foot = ruinFoot(piece);
+    if (inRuin(lx, lz, foot) || offRuin(lx, lz, foot) < 2) return true;
+  }
+  return false;
+}
 
 export interface CrateSpot {
   cid: string;
@@ -53,6 +70,15 @@ function supports(world: ReturnType<typeof generateWorld>, crates: { x: number; 
   // (a wall as a ring round its middle that takes in its whole length: more than it reaches, never less)
   for (const w of world.walls) add(w.x, w.z, w.long / 2 + REACH);
   for (const p of world.props) add(p.x, p.z, 1 + REACH);
+  // (the west's: the monastery's walls, the piers and boardwalks, and Kalat's every piece)
+  for (const t of world.towns ?? []) {
+    for (const k of placedWalls(t)) add(k.at[0], k.at[2], 6 + REACH);
+    for (const g of placedKits(t)) add(g.x, g.z, g.r + REACH);
+  }
+  if (world.kalat) for (const { piece, place } of ruinsPlan(world.kalat)) {
+    const foot = ruinFoot(piece);
+    add(place.x, place.z, Math.max(...foot.map(([fx, fz]) => Math.hypot(fx, fz))) + REACH);
+  }
   for (const c of crates) add(c.x, c.z, 1.5 + REACH);
   if (world.wreck) add(world.wreck.x, world.wreck.z, 3 + REACH);
   return (x: number, z: number) => (cells.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? []).some(([px, pz, r]) => (px - x) ** 2 + (pz - z) ** 2 <= r * r);
@@ -69,6 +95,9 @@ export function buildWorldData(root: string) {
   const world = generateWorld();
   const buildings = new Buildings(world, null as never);
   buildings.plan();
+  // (and Kalat's places for things, after every other one, so that nothing is renumbered: as the game adds them, main.ts)
+  const kalat = world.kalat ? ruinsPlan(world.kalat) : [];
+  for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, (x, z) => heightAt(world.heights, x, z)));
   const crates: CrateSpot[] = world.props
     .map((p) => ({ p, kind: p.kind.split(/[#@]/)[0] }))
     .filter(({ kind }) => CRATE_KINDS.has(kind) || SEARCHED_KINDS.has(kind))
@@ -128,6 +157,8 @@ export function buildWorldData(root: string) {
       // (and in the fort a body is on its terrace, a floor of its keep, a tower or a wall: whoever is within its walls
       // and no higher than its keep has something under them)
       if (inCastle(world.castle, x, y, z)) return Math.max(ground, y);
+      // (and on the monastery's walls in Pokrov, a pier, and what is left of Kalat: plan v5)
+      if (onTownWall(world.towns, x, y, z) || onRuins(kalat, ground, x, y, z)) return Math.max(ground, y);
       return standAt(world.bridges, ground, x, y, z);
     },
     /** where the fort stands (null: the world has none) */

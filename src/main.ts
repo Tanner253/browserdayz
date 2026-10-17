@@ -1,5 +1,6 @@
 import './ui/style.css';
 import './ui/hud.css';
+import * as THREE from 'three';
 import { Renderer } from './core/renderer';
 import { assets } from './core/assets';
 import { Strips } from './core/strips';
@@ -10,7 +11,13 @@ import { modeOf, openDoor } from './ui/door';
 import { startAds } from './ui/ads';
 import { ArenaMenu } from './ui/arena-menu';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
-import { heightAt } from './world/worldgen';
+import { SEA_LEVEL, WORLD_X0, WORLD_Z0, WORLD_Z1, heightAt } from './world/worldgen';
+import { Towns } from './world/towns';
+import { Ruins } from './world/ruins';
+import { ruinLoot, ruinsPlan } from './sim/ruins';
+import { Ocean } from './world/ocean';
+import { Waterways } from './world/water';
+import { waterAt } from './sim/water';
 import { loadWorld } from './world/load-world';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
@@ -188,6 +195,21 @@ async function boot() {
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
   void towns?.stand(atmo, r, buildings);
+  // THE WEST (plan v5): the towns' walls, domes, facades and piers (src/world/towns.ts); Kalat's ruins
+  // (src/world/ruins.ts), and its places for things after every other one, so that nothing is renumbered; the sea and
+  // the lakes and the river (src/world/ocean.ts, water.ts). Each told every frame where the eye is (Game.beside).
+  const ready = (o: THREE.Object3D) => r.ready(o).then(() => r.send(o));
+  const ground = (x: number, z: number) => heightAt(world.heights, x, z);
+  const westTowns = !arena && world.towns?.length ? new Towns(atmo, r.scene, world.towns, buildings, ready, world.buildings) : null;
+  void westTowns?.build();
+  const kalat = !arena && world.kalat ? ruinsPlan(world.kalat) : [];
+  const kalatRuins = kalat.length ? new Ruins(atmo, r.scene, kalat, ready) : null;
+  for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, ground));
+  const sea = arena ? null : new Ocean(r.scene, atmo, {
+    seaLevel: SEA_LEVEL, x0: WORLD_X0 - 300, x1: -3560, z0: WORLD_Z0, z1: WORLD_Z1, beyond: { west: 16000, north: 6000, south: 6000 },
+    depthAt: (x, z) => SEA_LEVEL - heightAt(world.heights, Math.max(x, WORLD_X0), Math.min(WORLD_Z1, Math.max(WORLD_Z0, z))),
+  });
+  const waters = !arena && world.water ? new Waterways(r.scene, atmo, world.water, ground, { seaLevel: SEA_LEVEL }) : null;
   // (the road and the works are far outside the fort's arena: not built for a wager)
   if (!arena) buildRoad(world, atmo, r.scene, (o) => r.ready(o));
   if (!arena) buildWorks(world, atmo, r.scene);
@@ -209,6 +231,15 @@ async function boot() {
 
   stage('game');
   const game = new Game({ r, world, atmo, terrain, veg, grass, buildings });
+  if (westTowns) game.beside.push((_dt, eye) => westTowns.update(eye));
+  if (kalatRuins) game.beside.push((_dt, eye) => kalatRuins.update(eye));
+  if (sea) game.beside.push((dt, eye, camera) => sea.update(dt, eye, camera));
+  if (waters) {
+    game.beside.push((dt, eye, camera) => waters.update(dt, eye, camera));
+    const W = world.water!;
+    game.player.water = (x, z) => waterAt(W, x, z, ground);
+    game.player.onWade = (x, y, z, depth) => game.effects?.splash(new THREE.Vector3(x, y, z), depth);
+  }
   await game.init((l) => stage(l, l));
   // (a wager's arena: its fort made whole now, not as somebody comes near it; and the Arena's own menu over it)
   if (arena && game.castle) {

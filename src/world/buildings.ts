@@ -12,7 +12,7 @@ import { RNG } from '../core/noise';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
-import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
+import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
 import { castleLoot, castleProps } from '../sim/castle';
@@ -1510,7 +1510,8 @@ export class Buildings {
         ...this.world.pois.filter((q) => /checkpoint/i.test(q.name)).map((q) => ({ x: q.x, z: q.z, r: 70 })),
         ...this.world.sites.filter((st) => st.kind === 'depot' || st.kind === 'market' || st.kind === 'tents').map((st) => ({ x: st.x, z: st.z, r: 60 })),
       ];
-      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1;
+      // (and the new places of the west, by their own: towns mid, the hamlet as a village, ruins and caves high: westTier)
+      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : westTier(p.x, p.z) ?? (second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1);
     };
     mark(this.lootPoints);
     // The bunker: what stands in its rooms, and its places for things. After every other, so

@@ -51,7 +51,8 @@ try {
     await pilot.join();
     await watcher.join();
     // (the first time the one on the hospital's roof, the second the one by the fort: the first is a wreck by then)
-    const heli = pilot.welcome!.vehicles.filter((v) => v.k === HELI.kind).find((v) => v.hp > 0 && (watcherNear ? v.s[1] < 85 : v.s[1] > 85))!;
+    // (the fort's in the north of the map, the hospital's in the south)
+    const heli = pilot.welcome!.vehicles.filter((v) => v.k === HELI.kind).find((v) => v.hp > 0 && (watcherNear ? v.s[2] < 0 : v.s[2] > 0))!;
     assert.ok(heli, 'no helicopter where one stands');
     const [x, y, z] = heli.s;
     pilot.at(x + 1, y - 0.8, z);
