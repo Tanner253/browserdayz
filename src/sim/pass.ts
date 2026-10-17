@@ -92,6 +92,30 @@ export function passWorld(p: Pass, s: number, t: number, y: number): V3 {
   return [o.x + o.uz * t, p.floor(s) + y, o.z - o.ux * t];
 }
 
+/** Where on the pass a point is: how far along its middle line (s) and how far across, north positive (t). */
+export function passAt(p: Pass, x: number, z: number): { s: number; t: number } {
+  let best = Infinity, out = { s: 0, t: 0 }, sum = 0;
+  for (let i = 0; i + 1 < p.line.length; i++) {
+    const [ax, az] = p.line[i], [bx, bz] = p.line[i + 1], len = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / len, uz = (bz - az) / len;
+    const along = Math.max(0, Math.min(len, (x - ax) * ux + (z - az) * uz)), px = ax + ux * along, pz = az + uz * along, d = Math.hypot(x - px, z - pz);
+    if (d < best) {
+      best = d;
+      out = { s: sum + along, t: (x - px) * uz - (z - pz) * ux };
+    }
+    sum += len;
+  }
+  return out;
+}
+
+/**
+ * The ground over the pass at a world point, as the plan has it: the pass's floor where it is along, and its terraces
+ * across (passProfile). What the world's ground is to be carved to, and what the caves are carved under.
+ */
+export function passGround(p: Pass, x: number, z: number): number {
+  const at = passAt(p, x, z);
+  return p.floor(at.s) + passProfile(at.t);
+}
+
 /** How long the pass's middle line is. */
 export const passLength = (p: Pass) => p.line.reduce((sum, q, i) => (i ? sum + Math.hypot(q[0] - p.line[i - 1][0], q[1] - p.line[i - 1][1]) : 0), 0);
 

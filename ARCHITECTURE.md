@@ -221,7 +221,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `mokroye.ts` | 112 | Mokroye, the flooded hamlet in the swamp (2026-10-16, new): where its houses, boardwalks and what the water left stand. |
 | `news.ts` | 202 | Hearts and comments on the entries of the changelog (2026-10-12: |
 | `ozerki.ts` | 75 | Ozerki, the fishing village on a lake in the north woods (2026-10-16, new): where its houses, piers and what lies about them stand. |
-| `pass.ts` | 410 | THE PASS through the ridge, and its caves, as a plan (plan v5, the owner, 2026-10-16: |
+| `pass.ts` | 434 | THE PASS through the ridge, and its caves, as a plan (plan v5, the owner, 2026-10-16: |
 | `placement.ts` | 28 | Whether an item can physically lie at a loot point. |
 | `pokrov.ts` | 102 | Pokrov, the white-walled monastery and the town outside its gate (2026-10-16, reworked): where its buildings and what lies about them stand, and the terrace it stands on. |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
@@ -236,7 +236,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `vehicles.ts` | 277 | Jeeps. A handful stand along the road and a few more out at the edge of the map, behind the outlying places; anybody can get in one and drive it, three more can ride, and it can be shot until it burns. It is the fast... |
 | `voice.ts` | 29 | Talking to whoever is near (src/game/voice.ts): what the server and the game both go by. |
 | `walkways.ts` | 44 | Walkways of boards on posts, from the pier kit (Poly Haven's modular wooden pier, src/world: pier_kit): a fishing village's piers, a swamp's boardwalks (2026-10-16). |
-| `water.ts` | 177 | Lakes and rivers, as rules: where the water is, how deep, which way it runs, and what it does to whoever walks into it. |
+| `water.ts` | 207 | Lakes and rivers, as rules: where the water is, how deep, which way it runs, and what it does to whoever walks into it. |
 | `wells.ts` | 90 | Wells, and what hunger and thirst do before they kill. |
 | `wreck-fire.ts` | 103 | The jeep that burns before the fort's gate, for good (the owner, 2026-10-14: |
 | `zastava.ts` | 68 | Zastava, the post at the pass's east mouth (2026-10-16, new, plan v5): where its buildings and what lies about them stand. |
@@ -333,8 +333,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `castle.ts` | 680 | The fort on the mountain, as it is drawn and as it stops a body. |
-| `cave-carve.ts` | 394 | The pass's caves carved out of the rock, each one closed surface: rock is what is under the ground and outside every gallery, and the surface between rock and air is found on a grid (surface nets). |
-| `caves.ts` | 247 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
+| `cave-carve.ts` | 379 | The pass's caves carved out of the rock, each one closed surface: rock is what is under the ground and outside every gallery, and the surface between rock and air is found on a grid (surface nets). |
+| `caves.ts` | 244 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
 | `cells.ts` | 89 |  |
 | `crest.ts` | 53 | What is set down on the crest the fort stands on that is neither ground, rock nor the fort itself (MOUNTAIN.crest in src/world/worldgen.ts). |
 | `domes.ts` | 48 | Onion domes on drums, with a cross, for the new towns' churches (2026-10-16): what tells a church of these lands from a barn at a kilometre. |
@@ -348,7 +348,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `load-world.ts` | 25 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `mokroye-plans.ts` | 30 | Mokroye, the flooded hamlet in the swamp (2026-10-16): its houses as the water has them. |
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
-| `ocean.ts` | 442 | THE SEA off the west coast (2026-10-16: |
+| `ocean.ts` | 503 | THE SEA off the west coast (2026-10-16: |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 48 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
@@ -360,7 +360,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `town-plans.ts` | 447 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 210 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `vegetation.ts` | 1038 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
-| `water.ts` | 435 | Lakes and rivers, drawn (the owner, 2026-10-16: |
+| `water.ts` | 437 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
 | `world-cache.ts` | 77 |  |

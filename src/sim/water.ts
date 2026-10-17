@@ -24,9 +24,34 @@ export interface River {
   pts: [x: number, z: number, surface: number, width: number][];
 }
 
+/**
+ * A building's ground in or by the water, as the world sets it down: a turned box on the ground's plane (its middle,
+ * turn, half sizes across and along, as the terrain's wells take them; a building's is its footprint, its turn the
+ * building's). `dry`: the water keeps out of it (a raised floor, a room that is to stay dry): none drawn there, none
+ * walked in. Not dry: the water stands in it under a roof (a flooded ground floor), drawn still and dark, with no sky
+ * in it. Where the water meets its walls, either way, a line of scum and foam (src/world/ocean.ts).
+ */
+export interface WaterRoom {
+  x: number;
+  z: number;
+  rot: number;
+  hx: number;
+  hz: number;
+  dry?: boolean;
+}
+
 export interface Waters {
   lakes: Lake[];
   rivers: River[];
+  /** the buildings and rooms in the water (see WaterRoom) */
+  rooms?: WaterRoom[];
+}
+
+/** How far a point is outside a room's walls (under 0 inside), on the ground's plane. */
+export function fromRoom(r: WaterRoom, x: number, z: number): number {
+  const dx = x - r.x, dz = z - r.z, c = Math.cos(r.rot), sn = Math.sin(r.rot);
+  const qx = Math.abs(dx * c - dz * sn) - r.hx, qz = Math.abs(dx * sn + dz * c) - r.hz;
+  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
 }
 
 /** What there is at a point that has water over it. */
@@ -94,21 +119,26 @@ interface Stretch {
 
 /** The waters laid out in cells, to be found quickly: made once for a set of waters (see waterAt). */
 export class WaterIndex {
-  private cells = new Map<number, { lakes: Lake[]; stretches: Stretch[] }>();
+  private cells = new Map<number, { lakes: Lake[]; stretches: Stretch[]; dry: WaterRoom[] }>();
 
   constructor(readonly waters: Waters) {
     const cellOf = (i: number, j: number) => {
       const k = i * 100003 + j;
       let c = this.cells.get(k);
-      if (!c) this.cells.set(k, (c = { lakes: [], stretches: [] }));
+      if (!c) this.cells.set(k, (c = { lakes: [], stretches: [], dry: [] }));
       return c;
     };
-    const over = (x0: number, x1: number, z0: number, z1: number, put: (c: { lakes: Lake[]; stretches: Stretch[] }) => void) => {
+    const over = (x0: number, x1: number, z0: number, z1: number, put: (c: { lakes: Lake[]; stretches: Stretch[]; dry: WaterRoom[] }) => void) => {
       for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) put(cellOf(i, j));
     };
     for (const lake of waters.lakes) {
       const xs = lake.outline.map((p) => p[0]), zs = lake.outline.map((p) => p[1]);
       over(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs), (c) => c.lakes.push(lake));
+    }
+    for (const r of waters.rooms ?? []) {
+      if (!r.dry) continue;
+      const reach = Math.hypot(r.hx, r.hz);
+      over(r.x - reach, r.x + reach, r.z - reach, r.z + reach, (c) => c.dry.push(r));
     }
     for (const river of waters.rivers) {
       for (let k = 0; k + 1 < river.pts.length; k++) {
@@ -124,7 +154,7 @@ export class WaterIndex {
   /** The water over a point, if any: what its surface is, how deep, which way it runs. `ground` is the ground's height. */
   at(x: number, z: number, ground: (x: number, z: number) => number): WaterHere | null {
     const c = this.cells.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL));
-    if (!c) return null;
+    if (!c || c.dry.some((r) => fromRoom(r, x, z) < 0)) return null;
     let best: WaterHere | null = null;
     for (const lake of c.lakes) {
       if (!inside(lake.outline, x, z)) continue;
