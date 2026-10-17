@@ -118,7 +118,7 @@ export function riverMask(river: RiverPts, net: Net, more = 3) {
 }
 
 /** where the river is forded (a part of its depth taken off): where a path crosses it, shallow enough to wade (and in the pass, before each ramp up its north wall from the floor) */
-const passFords: [number, number, number][] = PLAN.pass.ramps.filter((r) => r.side === -1 && r.level === 0).map((r) => {
+const passFords: [number, number, number][] = PLAN.pass.ramps.filter((r) => r.side === Math.sign(PLAN.pass.river.side) && r.level === 0).map((r) => {
   const a = passLine.at((r.along[0] + r.along[1]) / 2);
   return [a.x - a.tz * PLAN.pass.river.side * -1, a.z + a.tx * PLAN.pass.river.side * -1, 14];
 });

@@ -1,6 +1,7 @@
 // Only plain world data crosses the worker boundary; its typed-array storage is transferred once.
 import { generateWorld } from './worldgen';
 import { cachedWorld } from './world-cache';
+import { withCaves } from './caves-carved';
 
 const endpoint = globalThis as unknown as {
   onmessage: (() => void) | null;
@@ -13,7 +14,7 @@ async function make() {
   try {
     // Vite's content-hashed worker URL changes with the generator and its dependencies. Development never caches.
     const key = import.meta.env.PROD && typeof location !== 'undefined' ? location.href : undefined;
-    const world = await cachedWorld(key, generateWorld);
+    const world = await cachedWorld(key, () => withCaves(generateWorld()));
     const buffers = new Set<ArrayBuffer>();
     const seen = new Set<object>();
     const collect = (value: unknown) => {

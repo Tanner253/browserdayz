@@ -20,6 +20,9 @@ import { castleUnder, inCastle } from '../src/sim/castle';
 import { basementDeep, basementUnder } from '../src/sim/basements';
 import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 import { onTownWall, placedKits, placedWalls } from '../src/sim/towns';
+import { ROCKS, rockPieces } from '../src/sim/pass';
+import { caveLootPoints, inCave } from '../src/world/caves-carved';
+import { passPlan } from '../src/world/worldgen';
 import { ruinFoot, ruinLocal, ruinLoot, ruinsPlan, inside as inRuin, outside as offRuin, type Piece, type Place } from '../src/sim/ruins';
 
 /**
@@ -75,6 +78,8 @@ function supports(world: ReturnType<typeof generateWorld>, crates: { x: number; 
     for (const k of placedWalls(t)) add(k.at[0], k.at[2], 6 + REACH);
     for (const g of placedKits(t)) add(g.x, g.z, g.r + REACH);
   }
+  // (the rock that dresses the pass's walls and lines its caves)
+  for (const r of rockPieces(passPlan)) { const m = ROCKS[r.id]; add(r.at[0], r.at[2], (m ? Math.max(m.long, m.tall) / 2 : 4) * r.scale + REACH); }
   if (world.kalat) for (const { piece, place } of ruinsPlan(world.kalat)) {
     const foot = ruinFoot(piece);
     add(place.x, place.z, Math.max(...foot.map(([fx, fz]) => Math.hypot(fx, fz))) + REACH);
@@ -98,6 +103,8 @@ export function buildWorldData(root: string) {
   // (and Kalat's places for things, after every other one, so that nothing is renumbered: as the game adds them, main.ts)
   const kalat = world.kalat ? ruinsPlan(world.kalat) : [];
   for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, (x, z) => heightAt(world.heights, x, z)));
+  // (and the pass's caves' and its floor's cache, after those: src/sim/pass.ts)
+  buildings.lootPoints.push(...caveLootPoints());
   const crates: CrateSpot[] = world.props
     .map((p) => ({ p, kind: p.kind.split(/[#@]/)[0] }))
     .filter(({ kind }) => CRATE_KINDS.has(kind) || SEARCHED_KINDS.has(kind))
@@ -167,6 +174,8 @@ export function buildWorldData(root: string) {
     castleUnder: (x: number, y: number, z: number) => castleUnder(world.castle, x, y, z, (gx, gz) => heightAt(world.surface, gx, gz)),
     /** whether a place is down a basement (src/sim/basements.ts: said by the plan of the houses above): under the ground by right, as the bunker is */
     basementUnder: (x: number, y: number, z: number) => basementUnder(world.basements, x, y, z),
+    /** whether a place is in one of the pass's caves (src/sim/pass.ts): under the ground by right, as a basement is */
+    caveUnder: (x: number, y: number, z: number) => inCave(x, y, z),
     /** whether a place is on a basement's second level: what is kept there is the best kept under a house */
     basementDeep: (x: number, y: number, z: number) => basementDeep(world.basements, x, y, z),
     /** the bridges the road goes over */

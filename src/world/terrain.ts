@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { caveMouths, inMouth } from '../sim/pass';
 import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { physics } from '../core/physics';
@@ -344,15 +345,24 @@ export class Terrain {
     uWells: { value: 0 },
   };
 
-  /** the basements' open steps: not drawn, no grass within a metre of them, and the ground's collider open there (see physics.holes) */
-  openWells(list: Basement[]) {
+  /**
+   * the basements' open steps, and the mouths of the pass's caves (src/sim/pass.ts): not drawn, no grass within a
+   * metre of them, and the ground's collider open there (see physics.holes)
+   */
+  openWells(list: Basement[], mouths: ReturnType<typeof caveMouths> = []) {
     const n = Math.min(list.length, MAX_WELLS);
     for (let i = 0; i < n; i++) {
       const b = list[i], w = b.well, [cx, cz] = frameToWorld(b, (w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2);
       this.wells.uWellA.value[i].set(cx, cz, Math.cos(b.rot), Math.sin(b.rot));
       this.wells.uWellB.value[i].set((w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2, 0, 0);
     }
-    this.wells.uWells.value = n;
+    const m = Math.min(mouths.length, MAX_WELLS - n);
+    for (let k = 0; k < m; k++) {
+      const q = mouths[k];
+      this.wells.uWellA.value[n + k].set(q.x, q.z, Math.cos(q.rot), Math.sin(q.rot));
+      this.wells.uWellB.value[n + k].set(q.hx, q.hz, 0, 0);
+    }
+    this.wells.uWells.value = n + m;
     const g = this.grassTex.image.data as Uint8Array;
     for (const b of list) {
       const [x0, z0, x1, z1] = b.box;
@@ -360,8 +370,14 @@ export class Terrain {
         for (let ix = Math.max(0, Math.floor((x0 - WORLD_X0) / CELL) - 1); ix <= Math.min(WORLD_NX - 1, Math.ceil((x1 - WORLD_X0) / CELL) + 1); ix++)
           if (inWell([b], WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL, 1)) g[idx(ix, iz)] = 0;
     }
+    for (const q of mouths) {
+      const r = Math.hypot(q.hx, q.hz) + 2;
+      for (let iz = Math.max(0, Math.floor((q.z - r - WORLD_Z0) / CELL)); iz <= Math.min(WORLD_NZ - 1, Math.ceil((q.z + r - WORLD_Z0) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((q.x - r - WORLD_X0) / CELL)); ix <= Math.min(WORLD_NX - 1, Math.ceil((q.x + r - WORLD_X0) / CELL)); ix++)
+          if (inMouth([{ ...q, hx: q.hx + 1, hz: q.hz + 1 }], WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL)) g[idx(ix, iz)] = 0;
+    }
     this.grassTex.needsUpdate = true;
-    physics.holes = (x, z) => inWell(list, x, z);
+    physics.holes = (x, z) => inWell(list, x, z) || (mouths.length > 0 && inMouth(mouths, x, z));
   }
   splatTex!: THREE.DataTexture;
   grassTex!: THREE.DataTexture;

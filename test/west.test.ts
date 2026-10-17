@@ -177,9 +177,11 @@ const ridge = (z: number) => RL.ridgeAt(z);
 {
   const L = RL.passLine, floors: number[] = [];
   let walls = 0, shelved = 0;
-  for (let a = 60; a <= L.total - 60; a += 20) {
+  // (where the ridge stands over it: by its west mouth the ridge itself is low, a few metres from its foot)
+  for (let a = 60; a <= L.total - 160; a += 20) {
     const p = L.at(a), y = RL.passFloor(a);
-    floors.push(heightAt(H, p.x + p.tz * 6, p.z - p.tx * 6) - y);
+    // (on its dry side: the river runs 8 m off its middle toward the south wall)
+    floors.push(heightAt(H, p.x - p.tz * 10 * Math.sign(PLAN.pass.river.side), p.z + p.tx * 10 * Math.sign(PLAN.pass.river.side)) - y);
     // (each wall's shelves, where no ramp is: across the wall, a level run of three metres at about each one's height)
     for (const side of [1, -1]) {
       if (PLAN.pass.ramps.some((r) => r.side === side && a > r.along[0] - 8 && a < r.along[1] + 8)) continue;
@@ -196,6 +198,30 @@ const ridge = (z: number) => RL.ridgeAt(z);
   const p = L.at(L.total / 2), mid = heightAt(H, p.x, p.z), top = heightAt(H, p.x + p.tz * 90, p.z - p.tx * 90);
   assert.ok(top - mid > 60, `the pass's walls at its middle stand ${(top - mid).toFixed(0)} m`);
   ok(`the pass ${L.total.toFixed(0)} m through the ridge, its floor ${RL.passFloor(0).toFixed(1)} to ${RL.passFloor(L.total).toFixed(1)} m, its walls ${(top - mid).toFixed(0)} m at its middle, three shelves up each (about ${PLAN.pass.shelves.map((s) => s[0]).join(', ')} m over the floor, all three on ${(worst * 100).toFixed(0)}% of its walls), ${PLAN.pass.ramps.length} ramps between them`);
+}
+
+// --- THE PASS'S CAVES (the coast kit's plan, src/sim/pass.ts) under the ground as it is: two metres of rock over every
+// gallery's roof, measured as the plan measures it (galleries' `cover`), but on the real ground; within four metres
+// of a mouth it is the face the mouth is in
+{
+  const { CAVES, passWorld } = await import('../src/sim/pass');
+  const P = WG.passPlan;
+  let least = Infinity, at = '';
+  CAVES.forEach((c, ci) => {
+    for (let k = 0; k + 1 < c.nodes.length; k++) {
+      const n0 = c.nodes[k], n1 = c.nodes[k + 1], run = Math.hypot(n1.s - n0.s, n1.t - n0.t), side = (n1.s - n0.s) / run;
+      for (let i = 0; i <= 16; i++) {
+        const q = i / 16, s0 = n0.s + (n1.s - n0.s) * q, t = n0.t + (n1.t - n0.t) * q, y = n0.y + (n1.y - n0.y) * q, w = n0.w + (n1.w - n0.w) * q, h = n0.h + (n1.h - n0.h) * q;
+        if ((k === 0 && c.mouths.includes('first') && q * run < 4) || (k + 2 === c.nodes.length && c.mouths.includes('last') && (1 - q) * run < 4)) continue;
+        for (const across of [-1, 0, 1]) {
+          const [x, gy, z] = passWorld(P, s0, t + across * side * (w / 2 + 1), 0), cover = heightAt(H, x, z) - gy - y - h;
+          if (cover < least) { least = cover; at = `cave ${ci} (${c.name}) at ${x.toFixed(0)}, ${z.toFixed(0)}`; }
+        }
+      }
+    }
+  });
+  assert.ok(least >= 2, `only ${least.toFixed(1)} m of rock over ${at}`);
+  ok(`the pass's caves under the ground as it is: at least ${least.toFixed(1)} m of rock over every gallery away from its mouths`);
 }
 
 // --- THE GREEN RIVER VALLEY, THE RIVER, THE LAKE, THE SWAMP

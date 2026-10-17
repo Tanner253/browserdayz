@@ -7,6 +7,7 @@ import type { Basement } from '../../sim/basements';
 import type { Place } from '../../sim/ruins';
 import type { PlacedTown } from '../../sim/towns';
 import type { Waters } from '../../sim/water';
+import type { Carved } from '../cave-carve';
 import type { BuildingPlot, SiteKind } from './layout';
 
 /** A small place away from the village: a couple of buildings in a clearing. */
@@ -107,6 +108,8 @@ export interface World {
   kalat?: Place;
   /** the desert at each point of the net, four to a point, 0 to 255: how much of it is desert, and of that how much is the beach's dry sand, wet sand and cracked earth (the rest dune sand; its rock the canyon's): src/world/ground.ts */
   sand?: Uint8Array;
+  /** the pass's caves as carved under the ground (src/world/cave-carve.ts): made where the world is made for the game (src/world/caves-carved.ts), not on the server */
+  caves?: Carved[];
   /** the lakes and rivers (src/sim/water.ts): drawn by src/world/water.ts, waded in by the player */
   water?: Waters;
   pois: POI[];

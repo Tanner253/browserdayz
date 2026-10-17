@@ -397,11 +397,14 @@ export interface EconomyEvents {
 // name: their places are `ruins_<piece>`'s and `<town>_<n>`'s. Of their steps, they took those steps' things from the
 // old map: Kalat the gas works' share of the fourth step's, the towns on the third Kamenka's. See OWN: stocked as
 // their steps are.)
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', ...TOWNS.map((t) => t.name.toLowerCase())]);
-/** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`), or null: the map's own */
+// ('pass', the canyon pass's caves and the cache on its floor, `cave_<where>`: part of the fifth step they took the
+// bunker's own things; apart, stocked as the fort is, as the owner's "best loot in the center of the bottom of the canyon")
+export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', ...TOWNS.map((t) => t.name.toLowerCase())]);
+/** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`), or null: the map's own */
 export function apartOf(building: string): string | null {
   if (APART.has(building)) return building;
   if (building.startsWith('ruins_')) return 'kalat';
+  if (building.startsWith('cave_')) return 'pass';
   const town = building.replace(/_\d+$/, '');
   return town !== building && APART.has(town) ? town : null;
 }
