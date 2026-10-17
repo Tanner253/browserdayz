@@ -16,7 +16,7 @@ import { TRADE_WAS } from './layout';
 import { BUNKER_AT, BUNKER_WAS, CELL, EXPANSION, SQUARE_HALF, SQUARE_RES } from './places';
 import { SNOW } from './layout';
 import { openGround } from './west';
-import { bed, movedPost, openness } from './west-plan';
+import { bed, movedPost, onLine, openness } from './west-plan';
 import type { BuildingPlot } from './layout';
 import type { Instance, POI, Site } from './types';
 
@@ -80,7 +80,7 @@ export function openingAt(x: number, z: number) {
 }
 
 export function openSquare(sq: Square): void {
-  const N = SQUARE_RES, half = SQUARE_HALF, H = sq.heights, was = H.slice();
+  const N = SQUARE_RES, half = SQUARE_HALF, H = sq.heights, was = H.slice(), seenWas = sq.surface === H ? was : sq.surface.slice();
   const at = (ix: number, iz: number) => [-half + ix * CELL, -half + iz * CELL] as const;
 
   // 1. THE BUNKER'S HILLSIDE, as it was before the bunker was cut into it: what the bunker's own stage did to the
@@ -128,8 +128,9 @@ export function openSquare(sq: Square): void {
   }
   // The roads over it laid again: the ground's own height along each, evened out over fifty metres of it, as much of
   // that as the ground was brought down there, nowhere steeper than OPENING.steep; and their beds brought to them. A
-  // point of one that lies on another (the old road's first points are the loop's last) is given the other's height.
-  const done: Float32Array[] = [];
+  // road where it leaves one laid before it (the old road's first points are the loop's last) is that one's height,
+  // across that one's own bed and a little more, as its bed will be: a shorter road's bed is laid over a longer's.
+  const done: { points: Float32Array; width: number }[] = [];
   const order = sq.roads.filter((r) => { for (let i = 0; i < r.points.length; i += 3) if (openingAt(r.points[i], r.points[i + 2]) > 0) return true; return false; })
     .sort((a, b) => b.points.length - a.points.length);
   for (const r of order) {
@@ -141,21 +142,26 @@ export function openSquare(sq: Square): void {
       for (let j = -12; j <= 12; j++) { const q = 1 - Math.abs(j) / 13; sum += raw[clamp(k + j, 0, n - 1)] * q; c += q; }
       return lerp(p[k * 3 + 1], sum / c, w[k]);
     });
+    const held = w.map((wk, k) => {
+      if (wk <= 0) return false;
+      for (const q of done) { const [d, y] = onLine(q.points, p[k * 3], p[k * 3 + 2]); if (d <= q.width / 2 + 6) { ys[k] = y; return true; } }
+      return false;
+    });
     for (let pass = 0; pass < 3; pass++) {
-      for (let k = 1; k < n; k++) if (w[k] > 0) { const m = OPENING.steep * Math.hypot(p[k * 3] - p[k * 3 - 3], p[k * 3 + 2] - p[k * 3 - 1]); ys[k] = clamp(ys[k], ys[k - 1] - m, ys[k - 1] + m); }
-      for (let k = n - 2; k >= 0; k--) if (w[k] > 0) { const m = OPENING.steep * Math.hypot(p[k * 3] - p[k * 3 + 3], p[k * 3 + 2] - p[k * 3 + 5]); ys[k] = clamp(ys[k], ys[k + 1] - m, ys[k + 1] + m); }
+      for (let k = 1; k < n; k++) if (w[k] > 0 && !held[k]) { const m = OPENING.steep * Math.hypot(p[k * 3] - p[k * 3 - 3], p[k * 3 + 2] - p[k * 3 - 1]); ys[k] = clamp(ys[k], ys[k - 1] - m, ys[k - 1] + m); }
+      for (let k = n - 2; k >= 0; k--) if (w[k] > 0 && !held[k]) { const m = OPENING.steep * Math.hypot(p[k * 3] - p[k * 3 + 3], p[k * 3 + 2] - p[k * 3 + 5]); ys[k] = clamp(ys[k], ys[k + 1] - m, ys[k + 1] + m); }
     }
-    for (let k = 0; k < n; k++) {
-      if (w[k] <= 0) continue;
-      let y = ys[k];
-      for (const q of done) for (let j = 0; j < q.length; j += 3) if (Math.abs(q[j] - p[k * 3]) < 0.05 && Math.abs(q[j + 2] - p[k * 3 + 2]) < 0.05) y = q[j + 1];
-      p[k * 3 + 1] = y;
-    }
-    done.push(p);
+    for (let k = 0; k < n; k++) if (w[k] > 0) p[k * 3 + 1] = ys[k];
+    done.push(r);
   }
   // (the beds: level with the road across it and its verges, eased into the ground over OPENING.bed beyond them; a spur
-  // under the road where it stands over the lowered ground, but no higher than the ground was; banks taken back)
-  for (const r of order) bed(H, r.points, r.width, OPENING.bed, openingAt, undefined, { fill: OPENING.fill, cut: OPENING.cut, cap: was });
+  // under the road where it stands over the lowered ground, but no higher than the ground was; banks taken back. Laid
+  // whole wherever the road was laid again: a point the opening barely reaches is still brought down by its neighbours'
+  // grade, and its bed with it.)
+  const regraded = (x: number, z: number) => (openingAt(x, z) > 0 ? 1 : 0);
+  for (const r of order) bed(H, r.points, r.width, OPENING.bed, regraded, undefined, { fill: OPENING.fill, cut: OPENING.cut, cap: was });
+  // (and each road's own width at its own height, the longest's last: a shorter one's bed eases out over a longer's)
+  for (const r of [...order].reverse()) bed(H, r.points, r.width, 1, regraded);
 
   // 4. Painted again wherever the ground was moved: where the bunker was, by the square's own rule whole; on the lowered
   // west, by its rule for rock (by the slope as it is now: the old rim's faces are hillsides), the rest of what was
@@ -179,14 +185,29 @@ export function openSquare(sq: Square): void {
     G[i] = Math.round(clamp(g, 0, 1) * 255);
   }
   for (const i of near) sq.paint(i % N, Math.floor(i / N));
+  // (the ground as it is seen moved as the ground was, wherever it was: it stands apart from it, by a little or a
+  // lot, in many places; at the bunker it is the hillside given back)
+  if (sq.surface !== H) {
+    const own = new Uint8Array(N * N);
+    for (const i of near) own[i] = 1;
+    for (let i = 0; i < N * N; i++) if (own[i]) sq.surface[i] = H[i]; else if (H[i] !== was[i]) sq.surface[i] += H[i] - was[i];
+  }
+  // (and what stands on it set on it again: by the ground as it is seen, which is what it stands on)
   for (const list of [sq.trees, sq.rocks, sq.props]) for (const t of list) {
     if (t.x > half || t.x < -half) continue;
-    const d = heightAt(H, t.x, t.z) - heightAt(was, t.x, t.z);
+    const d = heightAt(sq.surface, t.x, t.z) - heightAt(seenWas, t.x, t.z);
     if (d !== 0) t.y += d;
   }
-  if (sq.surface !== H) for (let i = 0; i < N * N; i++) if (H[i] !== was[i] && sq.surface[i] === was[i]) sq.surface[i] = H[i];
-  // (and what the bunker took away put back, where it stood on the ground as it was: as it is again)
-  for (const [list, t] of B.taken) list.push(t);
+  // (and what the bunker took away put back, standing on the ground as it is now as it stood on the ground before the
+  // bunker: later stages moved the ground there too)
+  // (those of the hollow it was cut into: further out, on the hillside it cut back as far as BUNKER.reach, the stages
+  // after it would have cleared some (the fort's field of fire is felled there), and they stay away as they always were)
+  const hollow = BUNKER.floor + BUNKER.wall + 20;
+  for (const [list, t] of B.taken) {
+    if (Math.hypot(t.x - BUNKER_WAS.x, t.z - BUNKER_WAS.z) > hollow) continue;
+    if (B.before) t.y += heightAt(sq.surface, t.x, t.z) - heightAt(B.before, t.x, t.z);
+    list.push(t);
+  }
 
   // 5. THE CLUTTER of the west half thinned: of fern, branches, stumps, dead trunks and old tyres west of x 0 a little
   // under half is kept, and all of it at and about every named place.

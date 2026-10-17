@@ -50,8 +50,8 @@ try {
   const pilot = new Player('Pilot'), friend = new Player('Friend');
   await pilot.join();
   await friend.join();
-  // (the one by the fort, on the ground)
-  const heli = pilot.welcome!.vehicles.find((v) => v.k === HELI.kind && v.s[1] < 85)!;
+  // (the one by the fort, on the ground: in the north of the map, the hospital's in the south)
+  const heli = pilot.welcome!.vehicles.find((v) => v.k === HELI.kind && v.s[2] < 0)!;
   assert.ok(heli, 'no helicopter by the fort');
   const [x, y, z] = heli.s;
   pilot.at(x + 1, y - 0.8, z);

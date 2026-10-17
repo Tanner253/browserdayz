@@ -91,6 +91,8 @@ export function westZona(): { x: number; z: number; r: number }[] {
   const R = 260;
   for (let z = -780; z <= 780; z += 130) out.push({ x: PLAN.barrier + R, z, r: R });
   for (const x of [-1250, -2050, -2850]) for (const z of [-390, 390]) out.push({ x, z, r: 700 });
+  // (and the opened west of the square, where the old map's rounds and these meet)
+  out.push({ x: -640, z: -80, r: 300 });
   return out;
 }
 
@@ -100,6 +102,17 @@ export function westTier(x: number, z: number): Tier | null {
   const C = PLAN.canyon;
   if (nearLine(C.line, x, z).d < C.floor[1] + 30) return 4;
   return null;
+}
+
+/** how far a spot is from a road's line (its points x, y, z), and the road's height there */
+export function onLine(p: Float32Array, x: number, z: number): [number, number] {
+  let d = Infinity, y = 0;
+  for (let j = 0; j + 3 < p.length; j += 3) {
+    const ex = p[j + 3] - p[j], ez = p[j + 5] - p[j + 2], t = clamp(((x - p[j]) * ex + (z - p[j + 2]) * ez) / (ex * ex + ez * ez || 1), 0, 1);
+    const e = Math.hypot(x - p[j] - ex * t, z - p[j + 2] - ez * t);
+    if (e < d) { d = e; y = p[j + 1] + (p[j + 4] - p[j + 1]) * t; }
+  }
+  return [d, y];
 }
 
 /** how far a spot is from a line of points, and how far along it (0 at its first point, 1 at its last) */

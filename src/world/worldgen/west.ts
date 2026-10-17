@@ -13,10 +13,10 @@
 
 import { Simplex, clamp, hash2, lerp, smoothstep } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
-import { SNOW } from './layout';
+import { BUILDING_FOOTPRINT, SNOW, type BuildingPlot } from './layout';
 import { CELL, SEA_LEVEL, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_SEED, WORLD_X0, WORLD_Z0, WORLD_Z1 } from './places';
 import { catmullRom, heightAt, slopeAt } from './ground';
-import { PLAN, bed, inBox, movedPost, nearLine, openness, outside } from './west-plan';
+import { PLAN, bed, inBox, movedPost, nearLine, onLine, openness, outside } from './west-plan';
 import type { Instance, Site } from './types';
 
 /** the shape of the new ground, in metres west of the square's edge (`d`) or from the shore (`c`, + inland) */
@@ -83,6 +83,8 @@ export interface WestTools {
   props: Instance[];
   /** the places (the bunker's is already where it is now: see opening.ts) */
   sites: Site[];
+  /** the trading post's own buildings, moved to its new place by opening.ts and set on its yard here */
+  post: BuildingPlot[];
   /** the roads there are: the new ones are added */
   roads: { points: Float32Array; width: number; side?: boolean }[];
   /** the square's three noises: its valley's shape and its paint's patches run on across the seam */
@@ -258,15 +260,16 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
   };
   // (a road through a plot lies exactly at the plot's own level, its gateways and all: those points are held there)
   const onPlot = (x: number, z: number) => PLAN.plots.findIndex((p) => Math.abs(x - p.x) < p.w / 2 - 10 && Math.abs(z - p.z) < p.d / 2 - 10);
-  const lay = (pts: [number, number][], first: number | null, width: number, side: boolean) => {
+  const lay = (pts: [number, number][], from: { points: Float32Array; width: number }, width: number, side: boolean) => {
     const line = catmullRom(pts, 4), raw = line.map(([x, z]) => heightAt(heights, x, z)), nL = line.length;
     const ys = raw.map((_, k) => { let s = 0, c = 0; for (let j = -12; j <= 12; j++) { const q = 1 - Math.abs(j) / 13; s += raw[clamp(k + j, 0, nL - 1)] * q; c += q; } return s / c; });
-    // (and a branch leaves the main road level with it, across the main road's own bed and a little more)
+    // (and a road leaves the one it leaves level with it: across that one's own bed and a little more, it is that
+    // one's height, as its bed will be, laid after it)
     const held = line.map(([x, z], k) => {
       const q = onPlot(x, z);
       if (q >= 0) ys[k] = plotY[q];
-      const flat = first !== null && Math.hypot(x - line[0][0], z - line[0][1]) <= (k === 0 || side ? PLAN.road.width / 2 + 6 : 0);
-      if (flat) ys[k] = first!;
+      const [d, y] = onLine(from.points, x, z), flat = k === 0 || d <= from.width / 2 + 6;
+      if (flat) ys[k] = y;
       return q >= 0 || flat;
     });
     for (let pass = 0; pass < 3; pass++) {
@@ -280,17 +283,30 @@ export function toWorld(sq: SquareFields, tools: WestTools): SquareFields {
     return road;
   };
   const start = nearest(loop.points, PLAN.road.main[0][0], PLAN.road.main[0][1]);
-  const main = lay([[loop.points[start], loop.points[start + 2]], ...PLAN.road.main.slice(1)], loop.points[start + 1], PLAN.road.width, false);
+  const main = lay([[loop.points[start], loop.points[start + 2]], ...PLAN.road.main.slice(1)], loop, PLAN.road.width, false);
   const branch = (pts: [number, number][]) => {
     const k = nearest(main.points, pts[0][0], pts[0][1]);
-    return lay([[main.points[k], main.points[k + 2]], ...pts.slice(1)], main.points[k + 1], PLAN.road.branch, true);
+    return lay([[main.points[k], main.points[k + 2]], ...pts.slice(1)], main, PLAN.road.branch, true);
   };
   const ways = [main, branch(PLAN.road.bunker), branch(PLAN.road.hamlet), branch(PLAN.road.canyon)];
   const preBed = heights.slice(), gap = new Float32Array(n).fill(1e9);
   // (the branches' beds first, and the main road's over them where they meet)
   for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, PLAN.road.bed, () => 1, net, { fill: 0.35, cut: 0.6, gap });
+  // (and the loop's own over the main road's where it leaves it: the loop as the square laid it, about the junction only)
+  {
+    const jx = main.points[0], jz = main.points[2], lp = loop.points;
+    let k0 = Infinity, k1 = -1;
+    for (let k = 0; k < lp.length / 3; k++) if (Math.hypot(lp[k * 3] - jx, lp[k * 3 + 2] - jz) < 120) { k0 = Math.min(k0, k); k1 = k; }
+    if (k1 > k0) bed(heights, lp.subarray(k0 * 3, k1 * 3 + 3), loop.width, PLAN.road.bed, (x, z) => 1 - smoothstep(50, 90, Math.hypot(x - jx, z - jz)), net);
+  }
   // (the ground as it is seen moved as the ground was by the beds: in the square's opened west too)
   if (own) for (let i = 0; i < n; i++) if (heights[i] !== preBed[i]) surface[i] += heights[i] - preBed[i];
+
+  // THE TRADING POST'S BUILDINGS on their yard, by the rule they were first set by (generate.ts: `seat`, then `pad`):
+  // each floor a little over the ground it covers, the ground under it and a pace round it brought to just below it,
+  // and each building's own the last word a pace round it
+  for (const b of tools.post) seatOn(heights, own ? surface : null, b);
+  for (const b of tools.post) padOn(heights, own ? surface : null, b, 3.2, 2.2);
 
   // ---- WHAT STANDS IN THE WAY: of the square's own trees, rocks and props, those on a new road or plot go (and
   // anything on ground moved under it is set on it again)
@@ -445,6 +461,35 @@ function verges(splat: Uint8Array, grass: Uint8Array, p: Float32Array, width: nu
       if (d < width / 2 + 0.6) grass[i] = 0;
       else grass[i] = Math.round(grass[i] * (1 - smoothstep(0.2, 0.5, g)));
     }
+  }
+}
+
+/** a building's floor set over the world's ground as generate.ts sets one over the square's, and its pad laid */
+function seatOn(heights: Float32Array, surface: Float32Array | null, b: BuildingPlot) {
+  const [w, d] = BUILDING_FOOTPRINT[b.type], c = Math.cos(b.rot), s = Math.sin(b.rot);
+  let maxH = -1e9, sum = 0, cnt = 0;
+  for (let lz = -d / 2; lz <= d / 2; lz += 1) for (let lx = -w / 2; lx <= w / 2; lx += 1) {
+    const h = heightAt(heights, b.x + lx * c + lz * s, b.z - lx * s + lz * c);
+    maxH = Math.max(maxH, h); sum += h; cnt++;
+  }
+  const avg = sum / cnt;
+  b.floorY = Math.max(avg + 0.35, Math.min(maxH + 0.12, avg + 0.9));
+  padOn(heights, surface, b, 6, 0.3);
+}
+
+/** the ground under a building and `margin` round it brought to a hand's breadth below its floor (generate.ts, `pad`) */
+function padOn(heights: Float32Array, surface: Float32Array | null, b: BuildingPlot, margin: number, inner: number) {
+  const [w, d] = BUILDING_FOOTPRINT[b.type], c = Math.cos(b.rot), s = Math.sin(b.rot), padY = b.floorY - 0.08;
+  const R = Math.hypot(w, d) / 2 + margin + 2;
+  const ix0 = Math.max(0, Math.floor((b.x - R - WORLD_X0) / CELL)), ix1 = Math.min(WORLD_NX - 1, Math.ceil((b.x + R - WORLD_X0) / CELL));
+  const iz0 = Math.max(0, Math.floor((b.z - R - WORLD_Z0) / CELL)), iz1 = Math.min(WORLD_NZ - 1, Math.ceil((b.z + R - WORLD_Z0) / CELL));
+  for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
+    const x = WORLD_X0 + ix * CELL - b.x, z = WORLD_Z0 + iz * CELL - b.z;
+    const lx = x * c - z * s, lz = x * s + z * c;
+    const e = Math.hypot(Math.max(0, Math.abs(lx) - w / 2), Math.max(0, Math.abs(lz) - d / 2));
+    const i = iz * WORLD_NX + ix, was = heights[i];
+    heights[i] = lerp(was, padY, 1 - smoothstep(inner, margin, e));
+    if (surface) surface[i] += heights[i] - was;
   }
 }
 

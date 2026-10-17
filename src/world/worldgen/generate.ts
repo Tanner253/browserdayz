@@ -2690,7 +2690,7 @@ function* worldStages(seed: number): Generator<string, World, void> {
   // (the square opened to the west, its bunker and trading post moved there: plan v2, src/world/worldgen/opening.ts)
   const seen = surface ?? heights;
   openSquare({ heights, surface: seen, splat, grass, roadDist, roadWidth: ROAD_W, trees, rocks, props, sites, pois, buildings, roads: [{ points: roadPts, width: ROAD_W }, ...roads], paint, noise: [n1, n2, n3], kept });
-  const world = toWorld({ heights, surface: seen, splat, grass }, { seed, ringShape, forestMask, trees, rocks, props, sites, roads, noise: [n1, n2, n3] });
+  const world = toWorld({ heights, surface: seen, splat, grass }, { seed, ringShape, forestMask, trees, rocks, props, sites, post: buildings.slice(kept.trade[0], kept.trade[1]), roads, noise: [n1, n2, n3] });
 
   return {
     heights: world.heights,
