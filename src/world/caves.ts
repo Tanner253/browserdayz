@@ -56,7 +56,7 @@ export class PassCaves {
     private ground: (x: number, z: number) => number = (x, z) => passGround(pass, x, z),
   ) {
     // (nothing stood on a ramp the world keeps between its shelves)
-    this.pieces = rockPieces(pass, { ramps: passData().ramps });
+    this.pieces = rockPieces(pass, { ramps: passData().ramps, ground });
     this.gs = galleries(pass);
     this.group.name = 'pass caves';
   }

@@ -26,7 +26,8 @@ let tris = 0, ms = 0;
 for (const [ci, c] of CAVES.entries()) {
   const carved = carveCave(pass, ci, ground), f = caveField(pass, ci, ground), k = { ...carved, index: Uint32Array.from([...carved.index, ...carved.face]) };
   const n = k.pos.length / 3, nt = k.index.length / 3;
-  assert.ok(carved.face.length > 0 && carved.face.length < carved.index.length / 4, `${c.name}: its mouths' faces apart`);
+  // (a short cave's mouths are a third of it: each opens its riser 2.5 m out and a metre past its flare either side)
+  assert.ok(carved.face.length > 0 && carved.face.length < carved.index.length / 3, `${c.name}: its mouths' faces apart`);
   tris += nt;
   ms += k.ms;
   assert.ok(nt > 500, `${c.name}: carved`);

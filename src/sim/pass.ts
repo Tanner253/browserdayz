@@ -271,6 +271,9 @@ export function galleries(p: Pass): Gallery[] {
   return out;
 }
 
+/** a world point's x and z */
+const xzOf = (v: V3): [number, number] => [v[0], v[2]];
+
 /** Where along a gallery a point is (0 to 1) and how far off its middle line, on the ground's plane. */
 function onGallery(g: Gallery, x: number, z: number) {
   const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], L = ex * ex + ez * ez || 1e-9;
@@ -392,9 +395,9 @@ export function caveMouths(p: Pass): { cave: number; x: number; z: number; rot: 
       const a = passWorld(p, n.s, n.t, n.y), b = passWorld(p, m.s, m.t, m.y), ux = b[0] - a[0], uz = b[2] - a[2], len = Math.hypot(ux, uz);
       // (from MOUTH_OUT in front of it to just short of the riser's top, or three metres in where it is in the ridge's own face)
       const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), back = MOUTH_OUT, deep = k >= 0 ? Math.max(0.4, E[k].top - E[k].foot - 0.7) : 3, cx = a[0] + (ux / len) * ((deep - back) / 2), cz = a[2] + (uz / len) * ((deep - back) / 2);
-      // (as wide as the entrance is flared out, set back in the face (src/world/cave-carve.ts CARVE.flare), and 1.5 m more:
+      // (as wide as the entrance is flared out, set back in the face (src/world/cave-carve.ts CARVE.flare), and a metre more:
       // the carving rounds and roughs the flare a little past it, and at 0.5 the riser beside it stood proud, a wedge)
-      out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: (n.w / 2) * MOUTH_FLARE + 1.5, hz: (deep + back) / 2, floor: a[1] });
+      out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: (n.w / 2) * MOUTH_FLARE + 1, hz: (deep + back) / 2, floor: a[1] });
     }
   });
   return out;
@@ -474,8 +477,28 @@ const hash = (a: number, b: number) => {
  * across a cave's mouth (the mouth is the carved rock's own: src/world/cave-carve.ts). Past the third shelf, the
  * ridge's face, with the biggest.
  */
-export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; along: V2 }[] } = {}): RockPiece[] {
+export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; along: V2 }[]; ground?: (x: number, z: number) => number } = {}): RockPiece[] {
   const out: RockPiece[] = [], L = passLength(p), mouths = caveMouths(p), gs = galleries(p), ramps = o.ramps ?? [];
+  // (the walls as the world built them, when it is given: it rounds each riser, sets it back up the wall and lets it
+  // wander (src/world/worldgen/west-relief.ts passWall), and a face stood by the plan's riser stood off the real one by
+  // up to 3.5 m. So each riser is found where the ground crosses its middle height, near the plan's, and a face stood
+  // there, its foot on the shelf in front; rubble on the ground where it falls)
+  const G = o.ground, overFloor = (s: number, t: number) => (G ? G(...xzOf(passWorld(p, s, t, 0))) - passWorld(p, s, t, 0)[1] : 0);
+  const crossing = (side: number, s: number, h: number, t0: number, t1: number) => {
+    for (let t = t0; t <= t1; t += 0.25) if (overFloor(s, side * t) >= h) return t;
+    return null;
+  };
+  const riserShift = (side: number, k: number, s: number) => {
+    const e = E[k], plan = (e.foot + e.top) / 2, at = G ? crossing(side, s, (e.from + e.to) / 2, e.foot - 4, e.top + 6) : null;
+    return at === null ? 0 : Math.max(-5, Math.min(5, at - plan));
+  };
+  // (the lowest ground three to six metres in front of a riser's middle: the shelf a face stands on)
+  const shelfUnder = (side: number, k: number, s: number, dt: number) => {
+    const e = E[k], mid = (e.foot + e.top) / 2 + dt;
+    let low = Infinity;
+    for (let u = 3; u <= 6; u += 1) low = Math.min(low, G!(...xzOf(passWorld(p, s, side * (mid - u), 0))));
+    return low;
+  };
   // (nothing stood on a ramp up a riser, the world's way from shelf to shelf (src/world/worldgen: passData().ramps),
   // nor across its foot or its top: it is walked)
   const onRamp = (side: number, level: number, s0: number, s1: number, more = 2) => ramps.some((r) => r.side === side && r.level === level && s1 + more > r.along[0] && s0 - more < r.along[1]);
@@ -502,9 +525,13 @@ export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; 
         const f = FACES[Math.floor(hash(s, side * (k + 1)) * FACES.length)], scale = (tall / f.tall) * (1.05 + hash(s, k) * 0.25), half = (f.long * scale) / 2;
         // (stood a little further in or out, so that the faces do not run in a line; here and there a gap, as a wall
         // weathers: clusters, never a lattice)
-        const t = side * (e.foot + (e.top - e.foot) * 0.5 + 0.7 + hash(k, s) * 1.2);
+        const dt = riserShift(side, k, s), t = side * (e.foot + (e.top - e.foot) * 0.5 + 0.7 + hash(k, s) * 1.2 + dt);
         const at = passWorld(p, s, t, e.from - 0.4), o = alongPass(p, s), gap = hash(s * 0.7, side * 3 + k) < 0.12;
-        if (!gap && !onRamp(side, k, s - half, s + half) && !mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + f.long * scale * 0.35 + 3 && Math.abs(m.floor - at[1] - 0.4) < tall)) {
+        if (G) at[1] = shelfUnder(side, k, s, dt) - 0.4;
+        // (and only where the world's riser stands as high as most of the plan's: at the pass's two ends its walls fall
+        // away into the valley and the desert, and a face stood there stood free, its back in the air)
+        const short = G && G(...xzOf(passWorld(p, s, side * (e.top + dt + 3), 0))) - at[1] < 0.6 * tall;
+        if (!gap && !short && !onRamp(side, k, s - half, s + half) && !mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + f.long * scale * 0.35 + 3 && Math.abs(m.floor - at[1] - 0.4) < tall)) {
           // (its face toward the pass: the north wall's faces south, the south wall's north)
           const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
           if (!intoCave(f.id, at, turn, scale)) out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, (hash(s, i) - 0.5) * 0.12], scale });
@@ -518,10 +545,11 @@ export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; 
         if (hash(s * 0.31, k + side) < 0.45 || onRamp(side, k, s - 3, s + 3)) continue;
         for (const lip of [false, true]) {
           if (lip && (k === E.length - 1 || hash(s, k * 5 + 1) < 0.5)) continue;
-          const t0 = lip ? e.top + 0.6 : e.foot - 0.4, y0 = lip ? e.to : e.from, n = 2 + Math.floor(hash(s, i) * 4);
+          const t0 = (lip ? e.top + 0.6 : e.foot - 0.4) + riserShift(side, k, s), y0 = lip ? e.to : e.from, n = 2 + Math.floor(hash(s, i) * 4);
           for (let j = 0; j < n; j++) {
             const ds = (hash(j, s) - 0.5) * 5, dt = (lip ? 1 : -1) * hash(s, j + 3) * 1.1, big = j === 0 && hash(i, j + s) < 0.4;
             const at = passWorld(p, s + ds, side * (t0 + dt), y0 - 0.15);
+            if (G) at[1] = G(at[0], at[2]) - 0.15;
             if (atMouth(at[0], at[2], 3)) continue;
             const id = big ? (hash(j, i) < 0.5 ? 'namaqualand_boulder_03' : 'namaqualand_boulder_04') : hash(j, i) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02';
             out.push({ id, at, turn: hash(s, j) * Math.PI * 2, tilt: [(hash(j, s + 1) - 0.5) * 0.4, (hash(s + 1, j) - 0.5) * 0.4], scale: big ? 0.9 + hash(i, j) * 0.7 : 0.35 + hash(j, i + 2) * 0.55, ...(big ? {} : { small: true }) });
@@ -532,7 +560,11 @@ export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; 
     // the ridge's face over the third shelf: the biggest pieces, twice and three times their size
     const last = E[E.length - 1];
     for (let s = 6; s < L - 6; s += 26) {
-      const at = passWorld(p, s, side * (last.back + 4), last.to - 1), o = alongPass(p, s), scale = 2.4 + hash(s, side) * 0.8;
+      // (the face, too, stands back where the world built it: found where the ground is three metres over its foot)
+      const face = G ? crossing(side, s, last.to + 3, last.back - 2, last.back + 12) : null, dt = face === null ? 0 : face - (last.back + 3 * PASS_SHAPE.face);
+      if (G && face === null) continue;
+      const at = passWorld(p, s, side * (last.back + 4 + dt), last.to - 1), o = alongPass(p, s), scale = 2.4 + hash(s, side) * 0.8;
+      if (G) at[1] = Math.min(at[1], G(at[0], at[2]) - 1);
       // (none over a mouth in the face: its rock is the carved rock's there)
       const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
       if (mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + ROCKS.mountainside.long * scale * 0.6 && Math.abs(m.floor - at[1]) < 12)) continue;
