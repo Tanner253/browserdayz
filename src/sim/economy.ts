@@ -172,6 +172,7 @@ export const TYPES: Record<string, TypeRule> = {
   // (in the village it is a policeman's and a soldier's, and not a householder's)
   mpa: { at: [0, 12, 14, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN } },
   // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
+  aks74u: { at: [0, 0, 0, 2, 0], lifetime: 7200, restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON },
   mp7a1: { at: [0, 0, 0, 4, 2], lifetime: 7200, restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON },
   scorpion: { at: [0, 0, 10, 3, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 3: IN_TOWN } },
   // The two assault rifles: the gas's, and the bunker's racks and lockers (see crates.ts). In Kamenka one of each,

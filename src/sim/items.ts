@@ -164,6 +164,12 @@ const D: ItemDef[] = [
     desc: 'Submachine gun in 9x19mm. Thirty rounds in its magazine, light, quick to the shoulder and steady in a burst. B changes it to single shots.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_scorpion', ergo: 72, modes: ['auto', 'semi'], shows: { mag_scorpion: ['mag'] } }, iconYaw: 0,
   },
+  // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
+  {
+    id: 'aks74u', name: 'AKS-74U', model: 'aks74u', w: 6, h: 3, weight: 2.7, category: 'weapon', slot: 'long',
+    desc: 'The AK cut short. Takes AK magazines. Fast and loud, it climbs in a burst and is no rifle past a hundred metres. B changes it to single shots.',
+    weapon: { kind: 'auto', ammo: 'ammo_739', capacity: 30, mag: 'mag_ak', ergo: 66, modes: ['auto', 'semi'], shows: { mag_ak: ['mag'] } }, iconYaw: 0,
+  },
   // The MP7A1 (2026-10-17): the small personal defence weapon, rare. Its own suppressor and sight are its own parts,
   // seen only when fitted. Fed 9 mm here, as every submachine gun in the Zone is.
   {
@@ -263,7 +269,7 @@ const D: ItemDef[] = [
   {
     id: 'mag_ak', name: 'AK Magazine', model: 'ak', nodeRe: '^mag', w: 1, h: 3, weight: 0.33, category: 'magazine',
     desc: 'Thirty rounds of 7.62x39 for the AK.',
-    mag: { ammo: 'ammo_739', capacity: 30 }, attach: { fits: ['ak'], slot: 'magazine' },
+    mag: { ammo: 'ammo_739', capacity: 30 }, attach: { fits: ['ak', 'aks74u'], slot: 'magazine' },
   },
   {
     id: 'drum_ak', name: 'AK Drum Magazine', model: 'ak_drum', w: 2, h: 3, weight: 0.9, category: 'magazine',

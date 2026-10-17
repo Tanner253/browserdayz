@@ -126,10 +126,18 @@ export class HandsOn {
   private arm(s: Side, ours: (re: RegExp) => THREE.Object3D | null, theirs: (re: RegExp) => THREE.Object3D | null): Arm | null {
     // (names as three.js has them: the dots of the files' names are taken out)
     const upper = ours(new RegExp(`^UpArm_${s}_`)), fore = ours(new RegExp(`^Forearm_${s}_`)), hand = ours(new RegExp(`^Hand_${s}_`));
-    // (the pack's skeleton as Blender's Rigify names it, DEF-hand.R, or as Unreal's mannequin does, hand_r)
-    const rigify = !!theirs(/^DEF-hand/);
+    // The pack's skeleton as Blender's Rigify names it (DEF-hand.R, DEF-f_index.01.R), as Unreal's mannequin does
+    // (hand_r, index_01_r), or by numbers (hand_r, palm_2_r, finger_21_r: the thumb the first, of two joints).
+    const rigify = !!theirs(/^DEF-hand/), numbered = !rigify && !!theirs(new RegExp(`^palm_\\d_${s.toLowerCase()}_`));
     const T = (rig: string, ue: string) => theirs(new RegExp(rigify ? `^DEF-${rig}\\.?${s}_` : `^${ue}_${s.toLowerCase()}_\\d`));
-    const tU = T('upper_arm', 'upperarm'), tF = T('forearm', 'lowerarm'), tH = T('hand', 'hand'), tM = T('f_middle\\.?01', 'middle_01');
+    const N = (name: string) => theirs(new RegExp(`^${name}_${s.toLowerCase()}_\\d`));
+    const tU = T('upper_arm', 'upperarm'), tF = numbered ? N('forearm') : T('forearm', 'lowerarm'), tH = T('hand', 'hand');
+    // (numbered fingers: which is the first and which the little one by where their knuckles are, as ours below)
+    let byNumber: (THREE.Object3D | null)[][] = [];
+    const thumbAt = numbered ? N('finger_11') : null;
+    if (numbered) byNumber = [2, 3, 4, 5].map((n) => [N(`palm_${n}`), N(`finger_${n}1`), N(`finger_${n}2`), N(`finger_${n}3`)]);
+    if (thumbAt) byNumber.sort((x, y) => (x[1] && y[1] ? at(x[1], _d).distanceTo(at(thumbAt, _w)) - at(y[1], _e).distanceTo(at(thumbAt, _w)) : 0));
+    const tM = numbered ? byNumber[1]?.[1] ?? null : T('f_middle\\.?01', 'middle_01');
     if (!upper || !fore || !hand || !tU || !tF || !tH || !tM) return null;
     const twist = [3, 2, 1].map((k) => ours(new RegExp(`^BoneTwist_0${k}\\.?${s}_\\d`))).filter((n): n is THREE.Object3D => !!n);
     const wristEnd = ours(new RegExp(`^BoneTwist_01\\.?${s}_end`)) ?? hand;
@@ -142,8 +150,8 @@ export class HandsOn {
     const base = at(thumb[0]!, new THREE.Vector3());
     four.sort((x, y) => at(x[1]!, _d).distanceTo(base) - at(y[1]!, _e).distanceTo(base));
     const names = ['index', 'middle', 'ring', 'pinky'];
-    const theirsFingers = names.map((f, k) => [T(`palm\\.?0${k + 1}`, `${f}_metacarpal`), T(`f_${f}\\.?01`, `${f}_01`), T(`f_${f}\\.?02`, `${f}_02`), T(`f_${f}\\.?03`, `${f}_03`)]);
-    const theirThumb = [1, 2, 3].map((k) => T(`thumb\\.?0${k}`, `thumb_0${k}`));
+    const theirsFingers = numbered ? byNumber : names.map((f, k) => [T(`palm\\.?0${k + 1}`, `${f}_metacarpal`), T(`f_${f}\\.?01`, `${f}_01`), T(`f_${f}\\.?02`, `${f}_02`), T(`f_${f}\\.?03`, `${f}_03`)]);
+    const theirThumb = numbered ? [N('palm_1'), N('finger_11'), N('finger_12')] : [1, 2, 3].map((k) => T(`thumb\\.?0${k}`, `thumb_0${k}`));
     // the hand's breadth, ours and theirs, from the first finger's knuckle to the little one's: the second way each joint is laid by
     const latO = at(four[0][1]!, new THREE.Vector3()).sub(at(four[3][1]!, _d));
     const latT = at(theirsFingers[0][1]!, new THREE.Vector3()).sub(at(theirsFingers[3][1]!, _d));

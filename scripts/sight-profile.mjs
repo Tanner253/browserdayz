@@ -24,6 +24,17 @@ for (const n of doc.getRoot().listNodes()) {
 let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
 for (const p of pts) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p[k]); hi[k] = Math.max(hi[k], p[k]); }
 const zc = (lo[2] + hi[2]) / 2, step = +stepMm / 1000;
+// (`x0:x1` in place of a step: the stretch from x0 to x1 looked at down the barrel, half a millimetre a character)
+if (stepMm.includes(':')) {
+  const [x0, x1] = stepMm.split(':').map(Number);
+  const s = pts.filter((p) => p[0] >= x0 && p[0] <= x1);
+  const zs = s.map((p) => p[2]), top = Math.max(...s.map((p) => p[1])), W = 90, H = 60, z0 = (Math.min(...zs) + Math.max(...zs)) / 2 - (W / 2) * 0.0005;
+  const grid = Array.from({ length: H }, () => Array(W).fill(' '));
+  for (const p of s) { const c = Math.round((p[2] - z0) / 0.0005), r = Math.round((top - p[1]) / 0.0005); if (c >= 0 && c < W && r >= 0 && r < H) grid[r][c] = '#'; }
+  console.log(`x ${x0}..${x1}: columns from z ${z0.toFixed(4)}, rows down from y ${top.toFixed(4)}, 0.5 mm each`);
+  console.log(grid.map((r) => '|' + r.join('')).join(String.fromCharCode(10)));
+  process.exit(0);
+}
 console.log(`${id}/${piece}: ${pts.length} points, x ${lo[0].toFixed(3)}..${hi[0].toFixed(3)} y ${lo[1].toFixed(3)}..${hi[1].toFixed(3)} z ${lo[2].toFixed(4)}..${hi[2].toFixed(4)} (middle ${zc.toFixed(4)})`);
 for (let x = lo[0]; x < hi[0]; x += step) {
   const s = pts.filter((p) => p[0] >= x && p[0] < x + step);

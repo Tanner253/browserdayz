@@ -1124,6 +1124,35 @@ export const WEAPON_PACKS = {
       changes: 'held in our own arms (its own arms left out), its pieces parted by joint, textures at 2048',
     },
   },
+  aks74u: {
+    dir: 'aks74u',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 1,
+    forward: [0, 0, -1],
+    up: [0, 1, 0],
+    // (filed as held, as the AK's pack is: its sights rise 2.7 degrees to the muzzle and turn 3.6 to the left, and the
+    // ears of its front sight lean it over to the left about six. The gun alone is made straight.)
+    trim: { pitch: 2.7, yaw: -3.6, roll: 6 },
+    skinned: {
+      mesh: ['arms_aks74u_0', 'arms_aks74u.wood_0', 'arms_bullet_0'],
+      joints: { wpn_body_068: 'base', wpn_zatvor_069: 'bolt', wpn_trigger_070: 'trigger', wpn_magazine_lock_071: 'base', wpn_magazine_072: 'mag', wpn_bullets_073: 'mag', wpn_magazine_2_074: null, wpn_bullets_2_075: null, wpn_magazine_rig_076: null, wpn_bullets_rig_077: null, wpn_magazine_rig_2_078: null, 'wpn_bullets_rig.001_079': null },
+      rest: 'base',
+    },
+    eye: 'Camera', atEye: true, ourArms: true,
+    wrists: { right: 'hand_r_016', left: 'hand_l_042' },
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    // (no movement of its own for standing still, walking or looking it over: the first frame of a shot is how it is held)
+    clips: { fire: 'armature|Fire_single', draw: 'armature|Put_in', holster: 'armature|Put_out', reload: 'armature|Reload_t', reloadEmpty: 'armature|Reload_f' },
+    credit: {
+      name: 'Animated AKs-74u',
+      url: 'https://sketchfab.com/3d-models/animated-aks-74u-34220aaa62e44b34b7d5ac30701f2b5f',
+      author: 'Vlasov Daniil',
+      line: 'This work is based on "Animated AKs-74u" (https://sketchfab.com/3d-models/animated-aks-74u-34220aaa62e44b34b7d5ac30701f2b5f) by Vlasov Daniil (https://sketchfab.com/dan741vlasov) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its pieces parted by joint, textures at 2048',
+    },
+  },
 };
 
 export const MODELS = {

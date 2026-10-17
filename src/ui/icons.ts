@@ -41,7 +41,7 @@ const headUp = (id: string) => HEAD_UP.has(id);
  * four ways on one sheet and the one with its grip down and its muzzle to the right taken. A new gun is looked at
  * the same way (`__GUN_VIEW` below is how the sheet is made).
  */
-const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], mosin: [true, false], mpa: [true, false], scorpion: [true, false], mp7a1: [true, false], colt: [true, false], deagle: [true, false], m9: [true, false], benelli: [false, false] };
+const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], mosin: [true, false], mpa: [true, false], scorpion: [true, false], mp7a1: [true, false], aks74u: [true, false], colt: [true, false], deagle: [true, false], m9: [true, false], benelli: [false, false] };
 const gunView = (id: string): [boolean, boolean] => (globalThis as { __GUN_VIEW?: Record<string, [boolean, boolean]> }).__GUN_VIEW?.[id] ?? GUN_VIEW[id] ?? [false, false];
 /**
  * What is built lying on its back, its face to the sky, and is stood up to look out of its picture. (The gas mask's

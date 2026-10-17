@@ -268,6 +268,7 @@ const HELD = {
   // (nearer than the submachine gun's pack holds its gun: our arms, not the pack's, reach for it, and from where they hold the MPA)
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
+  aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
 };
@@ -800,6 +801,8 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // runs over the middle of the folded rear ring and the folded front hood, scripts/sight-profile.mjs and
   // progress/weapons/sight-in-hands.js)
   mp7a1: { notch: [-0.0957, 0.1382, -0.0076], post: [0.137, 0.1356, -0.0067] },
+  // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
+  aks74u: { notch: [0.128, 0.1375, 0.0084], post: [0.368, 0.1344, 0.0085] },
 };
 /** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
 const IRON_NEAR = 0.02;
@@ -1224,6 +1227,8 @@ export class Weapons {
     this.models.set('mpa', mpa);
     // The CZ Scorpion (2026-10-17, the weapons pass): a pack on arms of its own, played as it came; the gun alone hung
     // on its joints as the AK's is, the pack's own drawing of it put away.
+    const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
+    this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };
     const mp7 = await this.packGun({ pack: 'mp7a1', item: 'mp7a1', gun: 'mp7a1', kind: 'auto', hands: true, hip: HELD.mp7a1, flashSize: 0.22, flash: mkFlash(), square: true, strip: [], ride: mp7Ride });
     mp7.gait = true;
