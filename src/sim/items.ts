@@ -175,7 +175,7 @@ const D: ItemDef[] = [
   // A .50 calibre bolt-action sniper rifle (2026-10-17): the bunker's, its scope part of it.
   {
     id: 'sniper50', name: '.50 Sniper Rifle', model: 'sniper50', w: 10, h: 3, weight: 11.5, category: 'weapon', slot: 'long',
-    desc: 'A bolt-action rifle in .50 BMG with a scope of its own, mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it. Five rounds. It reaches further and hits harder than anything else in the Zone.',
+    desc: 'A bolt-action rifle in .50 BMG with a scope of its own that turns from four to twelve times on the mouse wheel, mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it. Five rounds. It reaches further and hits harder than anything else in the Zone.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, shows: { mag_sniper50: ['mag'] } }, iconYaw: 0,
   },
   // The M32 MGL (2026-10-17): a six-shot 40 mm grenade launcher, for admins only (the owner: "the grenade launcher
@@ -190,7 +190,7 @@ const D: ItemDef[] = [
   // its own: held as the .50 sniper rifle is.
   {
     id: 'barrett', name: 'Barrett M82', model: 'barrett', w: 10, h: 3, weight: 13.5, category: 'weapon', slot: 'long',
-    desc: 'A self-loading rifle in .50 BMG with a scope of its own, mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it. Ten rounds, as fast as the trigger, and it kicks like a mule.',
+    desc: 'A self-loading rifle in .50 BMG with a scope of its own that turns from four to twelve times on the mouse wheel, mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it. Ten rounds, as fast as the trigger, and it kicks like a mule.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, shows: { mag_barrett: ['mag'] } }, iconYaw: 0,
   },
   // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the .50 sniper rifle is.

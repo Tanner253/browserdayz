@@ -803,7 +803,8 @@ const OWN_RETICLE: Record<string, string> = { sniper50: 'mildot', barrett: 'mild
  * with variable zoom", "make the ar15 elcan 6x scope with variable zoom"). Every other scope is as it was: a view 0.3
  * of the eye's, about 3.7 times.
  */
-const ZOOMS: Record<string, [number, number]> = { vssk: [2, 6], elcan: [2, 6] };
+// (and the .50s' own, 4x to 12x, the owner: "the .50 scopes should have variable zoom as well")
+const ZOOMS: Record<string, [number, number]> = { vssk: [2, 6], elcan: [2, 6], sniper50: [4, 12], barrett: [4, 12] };
 /** scopes with a laser rangefinder: the range to what is under the cross, read out under it (the owner: "the scope barrett and the scope sniper50 we need to add a ranegfinder on") */
 const RANGED = new Set(['barrett', 'sniper50']);
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
@@ -884,7 +885,9 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the double barrel's: along the rib between its barrels, from over the breech to the bead at the muzzle)
   db12: { notch: [0.3, 0.1135, -0.0094], post: [0.96, 0.113, -0.0094] },
   // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
-  aks74u: { notch: [0.128, 0.1375, 0.0084], post: [0.368, 0.1344, 0.0085] },
+  // (the AKS-74U's rear notch stands 6 mm left of its front post in its model: the eye behind the notch, not the post,
+  // or the notch sat off to one side of the post when aimed, the owner: "aks iron sights are off")
+  aks74u: { notch: [0.128, 0.1375, 0.0022], post: [0.368, 0.1344, 0.0085] },
 };
 /**
  * The middle of a holographic sight's window, from the middle of the box of the whole sight (the eye's space: across,
@@ -2352,7 +2355,7 @@ export class Weapons {
   /** how far the scope looked through is turned, times; null for a scope that does not turn */
   get zoom(): number | null {
     const k = this.zoomKey;
-    return k ? (this.zoomed.get(k) ?? 4) : null;
+    return k ? (this.zoomed.get(k) ?? Math.max(4, ZOOMS[k][0])) : null;
   }
 
   /** the view through the scope, a share of the eye's (`base`, degrees, up and down): so many times for a scope that turns */
@@ -2572,7 +2575,7 @@ export class Weapons {
       const zk = this.scoped ? this.zoomKey : null;
       if (zk && input.wheel !== 0) {
         const [lo, hi] = ZOOMS[zk];
-        this.zoomed.set(zk, THREE.MathUtils.clamp((this.zoomed.get(zk) ?? 4) - Math.sign(input.wheel), lo, hi));
+        this.zoomed.set(zk, THREE.MathUtils.clamp((this.zoom ?? lo) - Math.sign(input.wheel), lo, hi));
         input.wheel = 0;
       }
       if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);
