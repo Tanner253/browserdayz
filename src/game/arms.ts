@@ -73,6 +73,8 @@ export interface Grips {
   carry?: { p: [number, number, number]; r: [number, number, number]; free?: boolean };
   /** and how it is stood with and aimed, likewise (a long gun with no stock is not held with its butt in the shoulder) */
   stand?: { ready: { p: [number, number, number]; r: [number, number, number] }; aim: { p: [number, number, number]; r: [number, number, number] } };
+  /** the forward hand closed round the foregrip, when one is fitted (the AR-15's) */
+  foregrip?: HandGrip;
 }
 
 interface Arm {

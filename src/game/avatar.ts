@@ -2350,7 +2350,8 @@ export class Avatar {
           // the gun hand of a long gun (whose other hand slides), are on it with a bend left in the elbow.
           for (let pass = 0; pass < 3; pass++) {
             const far = (grip: HandGrip | null, r: ArmRig) => (grip ? _a.copy(grip.pos).applyMatrix4(obj.matrixWorld).distanceTo(r.arm.getWorldPosition(_b)) - (r.la + r.lb) * POSE.hold.within : 0);
-            const over = Math.max(far(grips.right, this.armR), long ? 0 : far(grips.left, this.armL));
+            // (and of a long gun, its forward hand too, by up to 15 cm: the hand on the fore-end, not slid back to the magazine)
+            const over = Math.max(far(grips.right, this.armR), long ? Math.min(0.15, far(gripL, this.armL)) : far(grips.left, this.armL));
             if (over <= 0.001) break;
             const back = this.armL.arm.getWorldPosition(_a).add(this.armR.arm.getWorldPosition(_b)).multiplyScalar(0.5).sub(obj.getWorldPosition(_w));
             // (aimed, hardly downward at all: the sights stay at the eye)

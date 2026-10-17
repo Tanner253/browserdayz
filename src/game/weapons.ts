@@ -756,7 +756,7 @@ function stanceQuat(s: Stance, out: THREE.Quaternion) {
 
 /** What seats the body's hands on a pack's gun (see `grips` in packGun), in the gun's own space: x toward the muzzle, y up. */
 const SEAT = {
-  rifle: new THREE.Vector3(0.05, 0.004, 0),
+  rifle: new THREE.Vector3(0.06, 0.039, 0),
   /**
    * The hand under a rifle. The pack's own left hand holds it hard up against the magazine
    * (seen from its own eyes, that is where a hand is in the picture); on a body seen from
@@ -765,6 +765,36 @@ const SEAT = {
    */
   fore: new THREE.Vector3(0.074, -0.006, 0.004),
 };
+/**
+ * Where the forward hand holds each long gun, seen from outside (the owner, 2026-10-17: "the forward hand should be
+ * holding the grip on applicable weapons", and of the AK: "the left hand is too far right and the thumb is clipping
+ * through the other side of the gun"). A number: how far ahead of the gun hand's wrist the palm goes under the
+ * fore-end, ahead of the magazine (the gun's own metres; the fore-end's underside there is found from its shape).
+ * `post`: the middle of a vertical grip of its own (x, y), which the hand closes round. From each gun's own pieces.
+ * (It was the pack's own left hand a hand's breadth on: two fists together under the action, slid back to the
+ * magazine where the body's arms were too short, and its thumb through the far side.)
+ */
+const FORE: Record<string, number | { post: [number, number] }> = {
+  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.215, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  // (the owner: "the 40mm gun has a vertical grip for us to use, like the ar15")
+  m32: { post: [0.368, -0.078] }, mp7a1: { post: [0.16, 0] },
+};
+/**
+ * The gun hand of the weapons pass's guns, seen from outside: its wrist where the AK's is from the middle of the
+ * trigger (whose hold was looked at), so that the first finger lies on the trigger (the owner, 2026-10-17: "many are
+ * off the trigger"). Found from the gun's own trigger; where it has none of its own, where it is (x, y). It was the
+ * pack's own right hand, which on the M32, the Barrett and the MP7 was 5 to 8 cm ahead of the trigger.
+ */
+const TRIGGER_WRIST = new THREE.Vector3(-0.095, -0.005, 0.028);
+const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
+/** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
+const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.028] };
+/** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
+function foreHold(at: THREE.Vector3, post: boolean): HandGrip {
+  return post
+    ? { pos: at.clone().add(new THREE.Vector3(-0.05, 0.014, -0.02)), fingers: new THREE.Vector3(0.9, -0.3, 0.3).normalize(), palm: new THREE.Vector3(0.15, -0.1, 1).normalize(), curl: [1.2, 1.25, 1.3, 1.3], thumb: 1 }
+    : { pos: at.clone().add(new THREE.Vector3(-0.02, -0.032, -0.05)), fingers: new THREE.Vector3(0.35, 0.1, 0.93).normalize(), palm: new THREE.Vector3(0, 1, 0.1).normalize(), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 };
+}
 /**
  * How a body's two hands hold a pistol, seen from outside: where each wrist is on the gun (the M9's own measure:
  * x toward the muzzle, y up, z out to the right; metres) and how each finger is laid round it, joint by joint.
@@ -2054,6 +2084,28 @@ export class Weapons {
     const tip = post ? squared(post as THREE.Vector3) : null;
     const mouthAt = long && hung.has('base') ? frontOf(hung.get('base')!) : null;
     if (suppressor) shown.push([suppressor, 'suppressor_9']);
+    // the forward hand's place for whoever is seen holding it (see FORE): the fore-end's underside is looked for
+    // straight up from under the gun, through every piece always on it (not the magazine, nor what comes with an attachment)
+    const fore = long ? FORE[o.item] : undefined;
+    let foreAt: THREE.Vector3 | null = null, foreOn: 'under' | 'post' = 'under';
+    if (typeof fore === 'number') {
+      const x = holds.right[0] + SEAT.rifle.x + fore;
+      const up = new THREE.Raycaster(new THREE.Vector3(x, span.min.y - 1, mouth.z), new THREE.Vector3(0, 1, 0));
+      let low = Infinity;
+      for (const p of alone) {
+        const piece = p.name.replace(/_\d+$/, '');
+        if (modOf(piece) || /^(mag|bullet|shell)/.test(piece)) continue;
+        for (const h of up.intersectObject(new THREE.Mesh(p.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })))) low = Math.min(low, h.point.y);
+      }
+      if (low < Infinity) foreAt = new THREE.Vector3(x, low, mouth.z);
+    } else if (fore) [foreAt, foreOn] = [new THREE.Vector3(...fore.post, mouth.z), 'post'];
+    const byTrigger = long ? BY_TRIGGER[o.item] : undefined;
+    let triggerAt: THREE.Vector3 | null = Array.isArray(byTrigger) ? new THREE.Vector3(...byTrigger, mouth.z) : null;
+    if (byTrigger === true) {
+      const t = new THREE.Box3();
+      for (const p of alone) if (p.name.replace(/_\d+$/, '') === 'trigger') t.union(p.geometry.boundingBox!);
+      if (!t.isEmpty()) triggerAt = t.getCenter(new THREE.Vector3());
+    }
     const m: VmModel = {
       root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown, marks,
       hammer: HAMMER[o.item] && hung.has('hammer') ? { piece: hung.get('hammer')!, at: new THREE.Vector3(HAMMER[o.item].at[0], HAMMER[o.item].at[1], 0).add(nudge), down: HAMMER[o.item].down } : undefined,
@@ -2078,8 +2130,9 @@ export class Weapons {
       // behind its trigger. The first finger is kept nearly straight: it lies in the guard.
       grips: long
         ? {
-            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.rifle).add(seen), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.25, 1.2, 1.25, 1.3], thumb: 0.5 },
-            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.fore).add(seen), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
+            right: { pos: (triggerAt ? triggerAt.clone().add(TRIGGER_WRIST) : new THREE.Vector3(...holds.right).add(SEAT.rifle)).add(seen), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.25, 1.2, 1.25, 1.3], thumb: 0.5 },
+            left: foreAt ? foreHold(foreAt.clone().add(seen), foreOn === 'post') : { pos: new THREE.Vector3(...holds.left).add(SEAT.fore).add(seen), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
+            foregrip: FOREGRIP_POST[o.item] ? foreHold(new THREE.Vector3(...FOREGRIP_POST[o.item], mouth.z).add(seen), true) : undefined,
             work: WORK_ON[o.item],
           }
         : {
@@ -2202,8 +2255,9 @@ export class Weapons {
   }
 
   /** grip points of a weapon model (same ones the first-person arms use) */
-  gripsOf(id: string): Grips | null {
-    return this.models.get(id)?.grips ?? null;
+  gripsOf(id: string, mods: string[] = []): Grips | null {
+    const g = this.models.get(id)?.grips ?? null;
+    return g?.foregrip && mods.includes('foregrip') ? { ...g, left: g.foregrip } : g;
   }
 
   private modes = new Map<string, FireMode>();

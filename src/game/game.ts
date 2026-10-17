@@ -1197,7 +1197,7 @@ export class Game {
     if (!id) return null;
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
-    const grips = this.weapons.gripsOf(id);
+    const grips = this.weapons.gripsOf(id, mods);
     if (!obj || !grips) return null;
     if (def?.weapon) return { obj, grips, kind: def.weapon.kind };
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
