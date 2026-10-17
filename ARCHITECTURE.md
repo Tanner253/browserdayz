@@ -108,13 +108,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `effects.ts` | 957 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `fires.ts` | 297 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1522 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1524 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
 | file | lines | what it is |
 |---|---:|---|
-| `drops.ts` | 562 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
+| `drops.ts` | 563 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 653 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 659 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 505 | The game: attachments and magazines. |
@@ -156,7 +156,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 297 |  |
+| `main.ts` | 298 |  |
 
 ## src/net/
 
@@ -172,7 +172,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `airdrop.ts` | 479 | The supply drop comes by helicopter (2026-10-13: |
+| `airdrop.ts` | 484 | The supply drop comes by helicopter (2026-10-13: |
 | `barrels.ts` | 31 | Fuel drums. The red barrels standing about the yards and sheds go up when a bullet finds them, and take whoever is standing near with them: a thing to shoot at instead of the man behind it, and a reason to look at... |
 | `basements.ts` | 545 | Basements (2026-10-14). |
 | `blood.ts` | 96 | Blood, which is not health (2026-10-13). |
@@ -201,7 +201,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `crates.ts` | 183 | Searchable crates that are part of the map (military crates at the checkpoint, wooden crates in barns, sheds and yards). |
 | `daynight.ts` | 82 | Day and night. The Zone has a day of thirty-two minutes: three quarters of it light (first light, a long day, dusk) and one quarter, eight minutes, night. The night is kept shorter than the time a dog tag has to be... |
 | `drops.ts` | 256 | Supply drops. Every few minutes, while anybody is playing, a crate of the best things on the map is set down somewhere in the open and everyone is told where. It is there for a few minutes, or until somebody has... |
-| `economy.ts` | 885 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
+| `economy.ts` | 888 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
 | `emotes.ts` | 126 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
 | `fires.ts` | 84 | Campfires. The rings of stones at the lodges, the cabins and the hamlet can be lit. A fire is somewhere to mend: resting beside one puts health back far faster than it comes back on its own, and what is eaten beside... |
 | `gas.ts` | 154 | The gas. One place on the map is sunk in it (the Chemical Works, in the cirque behind the checkpoint: the map's first expansion). A low dome of it lies over the place, thickest at the middle and thinning to nothing... |
@@ -335,7 +335,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `castle.ts` | 680 | The fort on the mountain, as it is drawn and as it stops a body. |
 | `cave-carve.ts` | 379 | The pass's caves carved out of the rock, each one closed surface: rock is what is under the ground and outside every gallery, and the surface between rock and air is found on a grid (surface nets). |
 | `caves-carved.ts` | 22 | The pass's caves carved under the world's ground (coast-kit's src/world/cave-carve.ts, to its plan, src/sim/pass.ts), once, where the world is made for the game: plain typed arrays, kept in the world's cache and sent... |
-| `caves.ts` | 282 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
+| `caves.ts` | 285 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
 | `cells.ts` | 89 |  |
 | `crest.ts` | 53 | What is set down on the crest the fort stands on that is neither ground, rock nor the fort itself (MOUNTAIN.crest in src/world/worldgen.ts). |
 | `domes.ts` | 48 | Onion domes on drums, with a cross, for the new towns' churches (2026-10-16): what tells a church of these lands from a barn at a kilometre. |
@@ -343,13 +343,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `foliage.ts` | 179 | Shader patches shared by every instanced foliage / prop material: - wind: whole-plant sway (height-weighted) + leaf flutter - LOD dithering: screen-space dissolve between LOD levels (no popping) - translucency:... |
 | `gatehouse.ts` | 686 | The ruined gatehouse at the end of the mountain road (MOUNTAIN in src/world/worldgen.ts; 2026-10-13: |
 | `grass.ts` | 381 | GPU grass. The field is tiled into 4 m patches; every patch shares one geometry of ~1000 randomly ordered blades. Blades are placed on the exact terrain triangles in the vertex shader (height texture), culled by the... |
-| `ground.ts` | 348 | What the ground is, place by place: the kinds of ground there are, and how much of each lies at every point of the world's net. |
+| `ground.ts` | 354 | What the ground is, place by place: the kinds of ground there are, and how much of each lies at every point of the world's net. |
 | `helipad.ts` | 68 | The pads the helicopters stand on (src/sim/heli.ts: on the hospital's roof, and by the fort): a painted circle and an H, as every pad has. |
 | `kit.ts` | 270 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
 | `load-world.ts` | 26 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `mokroye-plans.ts` | 30 | Mokroye, the flooded hamlet in the swamp (2026-10-16): its houses as the water has them. |
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
-| `ocean.ts` | 503 | THE SEA off the west coast (2026-10-16: |
+| `ocean.ts` | 528 | THE SEA off the west coast (2026-10-16: |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 49 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
@@ -357,11 +357,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ruins.ts` | 226 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |
 | `snow.ts` | 661 | Where snow lies: by height, OR BY PLACE. |
-| `terrain.ts` | 1397 |  |
+| `terrain.ts` | 1411 |  |
 | `town-plans.ts` | 454 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 210 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
-| `vegetation.ts` | 1039 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
-| `water.ts` | 437 | Lakes and rivers, drawn (the owner, 2026-10-16: |
+| `vegetation.ts` | 1043 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
+| `water.ts` | 446 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
 | `world-cache.ts` | 77 |  |
@@ -381,8 +381,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `west-plan.ts` | 328 | THE WEST'S PLAN: where everything of the new ground goes, as numbers, and the questions only those numbers answer. |
 | `west-relief.ts` | 350 | THE WEST'S RELIEF (plan v5 as the owner's client chose it, the desert made twice as big: |
 | `west-towns.ts` | 162 | THE WEST'S TOWNS (2026-10-16): the new towns set down where plan v5 has them, each on level ground of its own, as their own data says (src/sim/towns.ts: the reference is lay() in src/dev/towns.ts, at the town's real... |
-| `west-water.ts` | 203 | THE WEST'S WATER (2026-10-16): the owner, "i want lakes and rivers as well in natural spots in the map since we now have water". |
-| `west.ts` | 690 | THE WEST (2026-10-16): the square laid into the world's rectangle, and the ground of the two squares west of it. |
+| `west-water.ts` | 228 | THE WEST'S WATER (2026-10-16): the owner, "i want lakes and rivers as well in natural spots in the map since we now have water". |
+| `west.ts` | 709 | THE WEST (2026-10-16): the square laid into the world's rectangle, and the ground of the two squares west of it. |
 
 ## src/world/
 

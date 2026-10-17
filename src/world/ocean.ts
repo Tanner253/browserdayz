@@ -135,6 +135,18 @@ export const OCEAN = {
   /** how much of the foam there is (a swamp has next to none), and how much the low sky in it is dimmed (what still water in a wood shows low down is its banks, not the sky: they are not in the sky's picture) */
   foam: 1,
   dim: 0,
+  /**
+   * The wash at the water's edge: how many metres out from the edge it reaches as each wave arrives (a thin line that
+   * runs up and back). Out to so far, not to so deep: laid by how shallow the water was, on a flat beach it was a band
+   * of white tens of metres wide, snow on the sand (the polish survey, 2026-10-16).
+   */
+  wash: 2.4,
+  /** foam on the shallows as such, out past the wash (a share): little, or a flat is one sheet of it */
+  shallowFoam: 0.03,
+  /** what is seen through thin water near the edge, darkened as wet sand is (a share at the edge, gone six metres out) */
+  wet: 0.35,
+  /** the foam's colour, as a share of white each way (the sea's is white; a swamp's scum is dirty) */
+  foamTint: [1, 1, 1] as [number, number, number],
 };
 
 export type OceanLook = typeof OCEAN;
@@ -450,22 +462,35 @@ function fragment(most: number, L: OceanLook) {
     // the shallows are wide, and foam over all of them was a sheet of ice), broken into a net; a few caps far out
     // (the wash runs further up the sand as each breaker arrives, and drains back)
     float arrive = 0.5 + 0.5 * sin( bend * ${((2 * Math.PI) / surf.apart).toFixed(5)} + uTime * ${((2 * Math.PI * surf.pace) / surf.apart).toFixed(5)} );
-    float wash = 1.0 - smoothstep( 0.0, 0.18 + 0.32 * arrive * arrive, depth );
+    // (as deep as the ground rises over the wash's width: on a beach a line some metres wide, on a flat at the water's
+    // level, where it was a sheet of white, next to none. The ground's rise from the depths a cell either way)
+    vec2 cellUV = 1.0 / vec2( textureSize( uDepth, 0 ) );
+    float rise = length( vec2(
+      texture2D( uDepth, ( p - uDepthMap.xy ) * uDepthMap.zw + vec2( cellUV.x, 0.0 ) ).r - texture2D( uDepth, ( p - uDepthMap.xy ) * uDepthMap.zw - vec2( cellUV.x, 0.0 ) ).r,
+      texture2D( uDepth, ( p - uDepthMap.xy ) * uDepthMap.zw + vec2( 0.0, cellUV.y ) ).r - texture2D( uDepth, ( p - uDepthMap.xy ) * uDepthMap.zw - vec2( 0.0, cellUV.y ) ).r
+    ) ) / ( 2.0 * cellUV.x / uDepthMap.z );
+    // (and only by the water's edge, where it meets the ground: not along a channel's banks under a flat's water)
+    float reach = ${L.wash.toFixed(3)} * ( 0.45 + 0.55 * arrive * arrive );
+    float wash = ( 1.0 - smoothstep( 0.0, reach * clamp( rise, 0.002, 1.0 ), depth ) ) * ( 1.0 - smoothstep( 0.0, reach + 2.0, fromShore ) ) * smoothstep( -0.05, 0.02, depth );
     // (a breaker breaks white along its crest inside the breaking line, and leaves foam behind it as it goes in)
-    float breaking = 1.0 - smoothstep( ${(surf.breaks * 0.5).toFixed(1)}, ${surf.breaks.toFixed(1)}, fromShore );
-    float crestLine = smoothstep( 0.8, 0.98, swell ) + 0.45 * smoothstep( 0.2, 0.9, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 );
+    // (a wave breaks where the water is about as shallow as it is high, and where the ground rises under it as a beach
+    // does: not over a shoal at the river's mouth a hand's breadth a metre, where its lines ran into a strip of white)
+    float breaking = ( 1.0 - smoothstep( ${(surf.breaks * 0.5).toFixed(1)}, ${surf.breaks.toFixed(1)}, fromShore ) ) * smoothstep( 0.2, 0.45, depth ) * ( 1.0 - smoothstep( 0.9, 1.6, depth ) ) * smoothstep( 0.015, 0.035, rise );
+    float crestLine = smoothstep( 0.86, 0.98, swell ) + 0.25 * smoothstep( 0.5, 0.95, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 );
     float shallows = 1.0 - smoothstep( 0.2, ${L.foamDepth.toFixed(3)}, depth );
-    float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * 0.12 + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
+    float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * ${L.shallowFoam.toFixed(3)} + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
     // (a line of it where the water meets a wall, as along a shore: thinner indoors, where nothing stirs it)
     cover = min( 1.0, cover + atWall * ( 0.8 - 0.45 * indoor ) );
     // (two sizes of the net drifting apart: one alone was a honeycomb)
     float net = texture2D( uWaves, p * 0.23 + vec2( uTime * 0.04, 0.0 ) ).a * 0.62 + texture2D( uWaves, p * 0.061 - vec2( 0.0, uTime * 0.013 ) ).a * 0.38;
     float foam = smoothstep( 1.0 - cover, 1.2 - cover, net ) * sqrt( cover ) * 0.85 * smoothstep( -0.05, 0.05, depth ) * ( 1.0 - 0.6 * distant ) * ${L.foam.toFixed(3)};
-    vec3 white = vec3( 0.74, 0.77, 0.79 ) * ( fogColor * 1.1 + uSun * max( uSunDir.y, 0.0 ) * 0.4 ) * ( 1.0 - 0.75 * indoor );
+    vec3 white = vec3( 0.74, 0.77, 0.79 ) * ${vec3(L.foamTint)} * ( fogColor * 1.1 + uSun * max( uSunDir.y, 0.0 ) * 0.4 ) * ( 1.0 - 0.75 * indoor );
 
     // laid over what is under it: premultiplied, so that what shows through is what is not covered
     vec3 col = F * sky + spec + ( 1.0 - F ) * murk * body;
     float a = F + ( 1.0 - F ) * murk;
+    // (thin water by the edge: what is under it wet and darker, and the sky in it)
+    a += ( 1.0 - a ) * ${L.wet.toFixed(3)} * ( 1.0 - smoothstep( 0.0, 6.0, fromShore ) ) * smoothstep( -0.05, 0.02, depth ) * ( 1.0 - indoor );
     col = mix( col, white, foam );
     a = mix( a, 1.0, foam );
     ${L.weed > 0 ? /* glsl */ `

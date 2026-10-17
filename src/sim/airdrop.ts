@@ -10,7 +10,7 @@
 // Rules and numbers only: the server keeps the clock in multiplayer, the game itself when playing alone; what is
 // drawn and what is heard is src/game/airdrop.ts.
 
-import { SQUARE_HALF } from '../world/worldgen';
+import { SQUARE_HALF, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1 } from '../world/worldgen';
 
 /** every figure of the flight and of the crate's fall */
 export const AIRDROP = {
@@ -99,11 +99,16 @@ export const ROTOR = {
   under: [0.05, 200] as [number, number],
 };
 
-/**
- * the edge it comes in over and goes out by: this far from the map's middle, east, west, north and south. The
- * square's (2026-10-16): drops fall on it, and the ground west of it is ground only as yet.
- */
+/** the old square's half: how long a way in counts as long (AIRDROP.wayIn) */
 export const EDGE = SQUARE_HALF;
+/**
+ * It comes in over the map's edge and goes out by it (the whole rectangle of the map three times over: held to the
+ * old square's, it popped out of the sky over the green west), but from no further off than this: across the desert
+ * a way in took a minute and more. The farthest a way in ever was on the square, corner to corner.
+ */
+export const FAR_MOST = 2 * SQUARE_HALF * Math.SQRT2;
+const onMap = (x: number, z: number) => x > WORLD_X0 && x < WORLD_X1 && z > WORLD_Z0 && z < WORLD_Z1;
+const clampX = (x: number) => Math.max(WORLD_X0, Math.min(WORLD_X1, x)), clampZ = (z: number) => Math.max(WORLD_Z0, Math.min(WORLD_Z1, z));
 
 /** one flight, as the server says it: all a game needs to put the helicopter and the crate where they are */
 export interface Flight {
@@ -188,11 +193,11 @@ const smooth = (t: number) => {
   return k * k * (3 - 2 * k);
 };
 
-/** how far along a way that begins at (x, z) and goes toward (dx, dz) the map's edge is */
+/** how far along a way that begins at (x, z) and goes toward (dx, dz) the map's edge is (FAR_MOST at the most) */
 function toEdge(x: number, z: number, dx: number, dz: number): number {
-  const ax = dx > 1e-9 ? (EDGE - x) / dx : dx < -1e-9 ? (-EDGE - x) / dx : Infinity;
-  const az = dz > 1e-9 ? (EDGE - z) / dz : dz < -1e-9 ? (-EDGE - z) / dz : Infinity;
-  return Math.max(0, Math.min(ax, az));
+  const ax = dx > 1e-9 ? (WORLD_X1 - x) / dx : dx < -1e-9 ? (WORLD_X0 - x) / dx : Infinity;
+  const az = dz > 1e-9 ? (WORLD_Z1 - z) / dz : dz < -1e-9 ? (WORLD_Z0 - z) / dz : Infinity;
+  return Math.max(0, Math.min(ax, az, FAR_MOST));
 }
 
 interface Shape {
@@ -227,7 +232,7 @@ function shapeOf(f: Flight): Shape {
   // how long the way out is: round the turn, and on to the edge (or to where the turn itself crosses the edge)
   const inside = (along: number) => {
     const [x, z] = outAt(f, s!, along);
-    return Math.abs(x) < EDGE && Math.abs(z) < EDGE;
+    return onMap(x, z);
   };
   let crossed = -1;
   for (let a = 0; a < s.arc && crossed < 0; a += 2) if (!inside(Math.min(a + 2, s.arc))) crossed = a;
@@ -394,7 +399,7 @@ export function lowest(f: Flight, ground: (x: number, z: number) => number): num
   for (let a = 0; a <= s.d; a += 8) least = Math.min(least, heightAt(f, s.d - a) - ground(f.fx + s.ux * a, f.fz + s.uz * a));
   for (let a = 0; a <= s.out; a += 8) {
     const [x, z] = outAt(f, s, a);
-    least = Math.min(least, heightAt(f, a) - ground(Math.max(-EDGE, Math.min(EDGE, x)), Math.max(-EDGE, Math.min(EDGE, z))));
+    least = Math.min(least, heightAt(f, a) - ground(clampX(x), clampZ(z)));
   }
   return least;
 }
@@ -434,7 +439,7 @@ function lift(f: Flight, ground: (x: number, z: number) => number) {
   for (let pass = 0; pass < 12; pass++) {
     let short = false;
     const ask = (off: number, x: number, z: number) => {
-      const need = ground(Math.max(-EDGE, Math.min(EDGE, x)), Math.max(-EDGE, Math.min(EDGE, z))) + AIRDROP.clear;
+      const need = ground(clampX(x), clampZ(z)) + AIRDROP.clear;
       if (heightAt(f, off) >= need - 1e-6) return;
       short = true;
       const k = smooth(off / AIRDROP.blend);

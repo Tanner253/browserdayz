@@ -194,6 +194,9 @@ try {
 
   // ---- the new server is started while the old one is still the one being reached: it lets nobody in
   young = start(B, 'bbbbbbb2');
+  // (her game keeps sending where she stands, as a game does: the map three times over takes the new server longer
+  // to make, and a minute of silence is a player tabbed out, taken off before the handover)
+  const playing = setInterval(() => ann.send(pose()), 5000);
   await up(young);
   // (waited for well past the forty seconds below: by the clock of a machine whose timers are fine it ran out as the old server went)
   const waiting = bob.join(B, 120_000);
@@ -218,8 +221,9 @@ try {
   lag = 9000;
   reached = B;
   for (let k = 0; k < 200 && old.server.exitCode === null; k++) await sleep(100);
+  clearInterval(playing);
   assert.notEqual(old.server.exitCode, null, `the old server did not go when it had been replaced:\n${old.log.slice(-500)}`);
-  assert.ok(ann.got.filter((m) => m.t === 'restart').length > before && ann.last('restart')!.in === 0, 'whoever was on was not told the server was stopping');
+  assert.ok(ann.got.filter((m) => m.t === 'restart').length > before && ann.last('restart')!.in === 0, `whoever was on was not told the server was stopping:\n${old.log.slice(-900)}`);
   assert.ok(/another server has taken over: \d+ characters .*\(the last word\)/.test(old.log), `the old server did not say its last word:\n${old.log.slice(-500)}`);
   assert.ok(kept()?.final, 'the site does not hold a last word');
   const lastWord = kept()!.at;
