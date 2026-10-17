@@ -6,7 +6,7 @@
 // and the loot know of a cave stays true. Pure, the same numbers on every machine.
 
 import { RNG } from '../core/noise';
-import { MOUTH_FLARE, caveAt, caveMouths, galleries, type Gallery, type Pass } from '../sim/pass';
+import { MOUTH_FLARE, MOUTH_OUT, caveAt, caveMouths, galleries, type Gallery, type Pass } from '../sim/pass';
 
 export const CARVE = {
   /** the grid, metres */
@@ -154,10 +154,24 @@ export function caveField(p: Pass, cave: number, ground: (x: number, z: number) 
   // The ground under the skin, the skin pushed in along the ground's slope (so that on a riser too it is behind the
   // face): looked up once a column of the grid (the grid is the world's, from its origin), in proportion between.
   const C = CARVE.cell, raw = new Map<number, number>(), under = new Map<number, number>();
+  // (the sill in front of each mouth, from its opening's front edge to the riser's foot, the mouth's own floor: the
+  // terrain's 2 m net reads part of the riser into it, a lip up to a metre high across the way in. Eased back to the
+  // terrain's over the opening's last metre either side and its first half metre, where the terrain is drawn again)
+  const sill = (x: number, z: number, g: number) => {
+    for (const m of mouths) {
+      // (a lip, not a hill: a mouth with ground metres over it in front is in a face, or buried, and is not cut down)
+      if (g <= m.floor || g > m.floor + 5) continue;
+      const dx = x - m.x, dz = z - m.z, c = Math.cos(m.rot), sn = Math.sin(m.rot), across = Math.abs(dx * c - dz * sn), v = dx * sn + dz * c;
+      if (across > m.hx || v < -m.hz || v > -m.hz + MOUTH_OUT + 0.3) continue;
+      const k = smooth01((m.hx - across) / 1) * smooth01((v + m.hz) / 0.5);
+      g -= (g - m.floor) * k;
+    }
+    return g;
+  };
   const at = (i: number, k: number) => {
     const key = i + 32768 + (k + 32768) * 65536;
     let g = raw.get(key);
-    if (g === undefined) raw.set(key, (g = ground(i * C, k * C)));
+    if (g === undefined) raw.set(key, (g = sill(i * C, k * C, ground(i * C, k * C))));
     return g;
   };
   const column = (i: number, k: number) => {
@@ -190,6 +204,9 @@ export function caveField(p: Pass, cave: number, ground: (x: number, z: number) 
 
 /** metres in from a mouth that the day's light reaches by bouncing (see Carved.bounce) */
 const BOUNCE_REACH = 10;
+
+/** 0 to 1 over 0 to 1, smoothly (and held either side) */
+const smooth01 = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
 /** Carve one cave (see caveField), all at once. */
 export function carveCave(p: Pass, cave: number, ground: (x: number, z: number) => number): Carved {
