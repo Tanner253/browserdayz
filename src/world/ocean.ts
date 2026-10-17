@@ -33,6 +33,7 @@
 import * as THREE from 'three';
 import type { Atmosphere } from './atmosphere';
 import { depthGrid, oceanTiles, shallowestIn, shoreField, waveMap, type Rect } from './ocean-waves';
+import type { WaterRoom } from '../sim/water';
 
 export interface OceanOptions extends Rect {
   /** the height of the water's surface */
@@ -54,7 +55,43 @@ export interface OceanOptions extends Rect {
   beyond?: { west?: number; east?: number; north?: number; south?: number };
   /** another look than the sea's (a lake: LAKE in src/world/water.ts), and `cut`: no water where `depthAt` is under -0.4 */
   look?: Partial<OceanLook> & { cut?: boolean };
+  /** the buildings and rooms standing in it (see WaterRoom): none drawn in a dry one, still and dark under a roof */
+  rooms?: WaterRoom[];
 }
+
+/** the most rooms one water takes (a flooded hamlet's buildings, a room or a few each): the nearest to its middle */
+export const MOST_ROOMS = 32;
+
+/** A water's rooms within its box, as its shaders take them: their uniforms, and the define that turns them on. */
+export function roomsFor(rooms: WaterRoom[] | undefined, r: Rect) {
+  const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+  const near = (rooms ?? [])
+    .filter((q) => {
+      const reach = Math.hypot(q.hx, q.hz);
+      return q.x + reach > r.x0 && q.x - reach < r.x1 && q.z + reach > r.z0 && q.z - reach < r.z1;
+    })
+    .sort((a, b) => Math.hypot(a.x - cx, a.z - cz) - Math.hypot(b.x - cx, b.z - cz))
+    .slice(0, MOST_ROOMS);
+  return {
+    defines: near.length ? { SEA_ROOMS: String(near.length) } : {},
+    uniforms: {
+      uRoomA: { value: near.map((q) => new THREE.Vector4(q.x, q.z, Math.cos(q.rot), Math.sin(q.rot))) },
+      uRoomB: { value: near.map((q) => new THREE.Vector4(q.hx, q.hz, q.dry ? 1 : 0, 0)) },
+    },
+  };
+}
+
+/** The rooms in a shader: how far outside room i's walls a point is (under 0 inside), as fromRoom in src/sim/water.ts. */
+export const ROOMS_GLSL = /* glsl */ `
+  #ifdef SEA_ROOMS
+    uniform vec4 uRoomA[ SEA_ROOMS ];
+    uniform vec4 uRoomB[ SEA_ROOMS ];
+    float fromRoom( int i, vec2 p ) {
+      vec2 d = p - uRoomA[ i ].xy;
+      vec2 q = abs( vec2( d.x * uRoomA[ i ].z - d.y * uRoomA[ i ].w, d.x * uRoomA[ i ].w + d.y * uRoomA[ i ].z ) ) - uRoomB[ i ].xy;
+      return length( max( q, 0.0 ) ) + min( max( q.x, q.y ), 0.0 );
+    }
+  #endif`;
 
 /** metres a side of the tiles of open sea past the rectangle (few: what is drawn of them is a strip at the skyline) */
 export const BEYOND_TILE = 2048;
@@ -181,8 +218,9 @@ export class Ocean {
     const w = sharedWaves(o.anisotropy);
     this.waves = w.tex;
 
-    const fog = scene.fog as THREE.FogExp2 | null, L: OceanLook = { ...OCEAN, ...o.look };
+    const fog = scene.fog as THREE.FogExp2 | null, L: OceanLook = { ...OCEAN, ...o.look }, rooms = roomsFor(o.rooms, rect);
     const uniforms = {
+      ...rooms.uniforms,
       uWaves: { value: this.waves },
       uDepth: { value: this.depthTex },
       // (where the depth grid's first point is, less half a cell, and one over its width and length: a point's place in it)
@@ -199,7 +237,7 @@ export class Ocean {
     const made = (solid: boolean) =>
       new THREE.ShaderMaterial({
         uniforms,
-        defines: { ...(fog ? { USE_FOG: '', FOG_EXP2: '' } : {}), ...(solid ? { SEA_SOLID: '' } : {}), ...(o.look?.cut ? { SEA_CUT: '' } : {}) },
+        defines: { ...(fog ? { USE_FOG: '', FOG_EXP2: '' } : {}), ...(solid ? { SEA_SOLID: '' } : {}), ...(o.look?.cut ? { SEA_CUT: '' } : {}), ...rooms.defines },
         vertexShader: VERTEX,
         fragmentShader: fragment(w.slope, L),
         transparent: !solid,
@@ -312,6 +350,7 @@ function fragment(most: number, L: OceanLook) {
   #ifndef USE_FOG
     uniform vec3 fogColor;
   #endif
+  ${ROOMS_GLSL}
 
   // One layer of waves: the picture laid along the way it runs, scrolled along it, and its slopes turned back to the
   // world's. Its crests (how high it is, 0 to 1) are kept as well.
@@ -335,6 +374,19 @@ function fragment(most: number, L: OceanLook) {
     vec2 away = here.ba / max( length( here.ba ), 1e-3 );
     float distant = smoothstep( 40.0, 900.0, dist );
 
+    // The rooms standing in it: none of it in a dry one; under a roof, still and dark (\`indoor\`); and how near the
+    // nearest wall is, on whichever side of it (\`wall\`: inside, from the wall's inner face, a hand's breadth in).
+    float indoor = 0.0, wall = 1e3;
+    #ifdef SEA_ROOMS
+      for ( int i = 0; i < SEA_ROOMS; i++ ) {
+        float sd = fromRoom( i, p );
+        if ( uRoomB[ i ].z > 0.5 && sd < 0.0 ) discard;
+        if ( uRoomB[ i ].z < 0.5 ) indoor = max( indoor, 1.0 - smoothstep( -0.3, 0.0, sd ) );
+        wall = min( wall, sd >= 0.0 ? sd : max( -sd - 0.22, 0.0 ) );
+      }
+    #endif
+    float atWall = 1.0 - smoothstep( 0.03, 0.45, wall );
+
     // the waves: calmer in the shallows; the finest let go far off
     float crest = 0.0, c1 = 0.0, c3 = 0.0;
     vec2 s = ${layer(l1)} * ${l1[3].toFixed(3)};
@@ -343,7 +395,7 @@ function fragment(most: number, L: OceanLook) {
     crest = 0.0;
     s += ${layer(l3)} * ${l3[3].toFixed(3)};
     c3 = crest;
-    s *= ${scale.toFixed(6)} * ( 0.4 + 0.6 * smoothstep( 0.0, 3.0, depth ) );
+    s *= ${scale.toFixed(6)} * ( 0.4 + 0.6 * smoothstep( 0.0, 3.0, depth ) ) * ( 1.0 - 0.85 * indoor );
 
     // The breakers: lines a set distance apart coming in to the edge, bent a little along the shore by the swell's own
     // crests (so no two are straight), steeper and taller as they near it, a long back and a steep face, as a wave has.
@@ -367,11 +419,13 @@ function fragment(most: number, L: OceanLook) {
       vec3 sky = fogColor * mix( 1.0, 0.75, R.y );
     #endif
     ${L.dim > 0 ? `sky *= 1.0 - ${L.dim.toFixed(3)} * ( 1.0 - smoothstep( 0.0, 0.6, R.y ) );` : ''}
+    // (under a roof what it shows is the room's dark, not the sky)
+    sky = mix( sky, fogColor * 0.04, indoor );
 
     // the sun's glint: sharp near, spread far off, never so bright that one point of the screen is a flash
     float tight = mix( 1400.0, 90.0, distant );
     float glint = pow( max( dot( R, uSunDir ), 0.0 ), tight ) * ( tight + 2.0 ) * 0.159;
-    vec3 spec = uSun * min( glint * F, 12.0 ) * step( 0.0, uSunDir.y );
+    vec3 spec = uSun * min( glint * F, 12.0 ) * step( 0.0, uSunDir.y ) * ( 1.0 - indoor );
 
     // the water itself, as seen into it: sea-green in the shallows, dark blue-green deep, lit by the hour's air and sun
     float deep = 1.0 - exp( -max( depth, 0.0 ) * 0.12 );
@@ -382,11 +436,15 @@ function fragment(most: number, L: OceanLook) {
     float face = smoothstep( 0.2, 0.95, swell ) * inSurf * lift;
     body += tint * uSun * pow( max( dot( -V, uSunDir ), 0.0 ), 4.0 ) * ( c3 * 0.08 + face * 0.35 );
     body += ${vec3([0.02, 0.07, 0.055])} * face * ( fogColor.g + uSun.g * 0.15 );
+    body *= 1.0 - 0.75 * indoor;
     // how much of what is under it is hidden: by the water looked through to reach the ground
     float murk = 1.0 - exp( -max( depth, 0.0 ) / max( V.y, 0.06 ) * ${L.murk.toFixed(4)} );
     #ifdef SEA_SOLID
       murk = 1.0;
     #endif
+    // (flood water standing in a room is brown and thick with what it has soaked: the floor seen through it dimly)
+    murk = max( murk, indoor * ( 0.62 + 0.2 * smoothstep( 0.1, 0.6, depth ) ) );
+    body = mix( body, ${vec3([0.05, 0.038, 0.022])} * ( fogColor * 0.5 + 0.02 ), indoor * 0.7 );
 
     // foam: a line where the water ends, lines of surf rolling in toward it over the shallows (thin: on a flat shore
     // the shallows are wide, and foam over all of them was a sheet of ice), broken into a net; a few caps far out
@@ -398,10 +456,12 @@ function fragment(most: number, L: OceanLook) {
     float crestLine = smoothstep( 0.8, 0.98, swell ) + 0.45 * smoothstep( 0.2, 0.9, sin( phase + 0.9 ) ) * smoothstep( 0.0, 0.6, swell + 0.3 );
     float shallows = 1.0 - smoothstep( 0.2, ${L.foamDepth.toFixed(3)}, depth );
     float cover = wash * 0.75 + crestLine * breaking * inSurf * 0.7 + shallows * 0.12 + smoothstep( 0.82, 0.97, c1 * c3 ) * 0.3 * ( 1.0 - inSurf );
+    // (a line of it where the water meets a wall, as along a shore: thinner indoors, where nothing stirs it)
+    cover = min( 1.0, cover + atWall * ( 0.8 - 0.45 * indoor ) );
     // (two sizes of the net drifting apart: one alone was a honeycomb)
     float net = texture2D( uWaves, p * 0.23 + vec2( uTime * 0.04, 0.0 ) ).a * 0.62 + texture2D( uWaves, p * 0.061 - vec2( 0.0, uTime * 0.013 ) ).a * 0.38;
     float foam = smoothstep( 1.0 - cover, 1.2 - cover, net ) * sqrt( cover ) * 0.85 * smoothstep( -0.05, 0.05, depth ) * ( 1.0 - 0.6 * distant ) * ${L.foam.toFixed(3)};
-    vec3 white = vec3( 0.74, 0.77, 0.79 ) * ( fogColor * 1.1 + uSun * max( uSunDir.y, 0.0 ) * 0.4 );
+    vec3 white = vec3( 0.74, 0.77, 0.79 ) * ( fogColor * 1.1 + uSun * max( uSunDir.y, 0.0 ) * 0.4 ) * ( 1.0 - 0.75 * indoor );
 
     // laid over what is under it: premultiplied, so that what shows through is what is not covered
     vec3 col = F * sky + spec + ( 1.0 - F ) * murk * body;
@@ -412,9 +472,10 @@ function fragment(most: number, L: OceanLook) {
     // (duckweed and scum: in drifts the size of a pond, broken into bits, thickest where it is shallowest)
     float drift = smoothstep( 0.42, 0.72, texture2D( uWaves, p * 0.013 + 0.31 ).b );
     float bits = texture2D( uWaves, p * 0.37 ).a;
-    float weed = smoothstep( 0.4, 0.75, bits * 0.55 + drift * 0.5 + ( 1.0 - smoothstep( 0.0, 0.5, depth ) ) * 0.35 ) * ${L.weed.toFixed(3)};
+    // (and against a wall, where it drifts and gathers)
+    float weed = smoothstep( 0.4, 0.75, bits * 0.55 + drift * 0.5 + ( 1.0 - smoothstep( 0.0, 0.5, depth ) ) * 0.35 + atWall * 0.3 ) * ${L.weed.toFixed(3)};
     weed *= smoothstep( -0.02, 0.03, depth );
-    vec3 green = vec3( 0.05, 0.085, 0.022 ) * ( fogColor * 1.2 + uSun * max( uSunDir.y, 0.0 ) * 0.35 );
+    vec3 green = vec3( 0.05, 0.085, 0.022 ) * ( fogColor * 1.2 + uSun * max( uSunDir.y, 0.0 ) * 0.35 ) * ( 1.0 - 0.75 * indoor );
     col = mix( col, green, weed );
     a = mix( a, 1.0, weed );` : ''}
 

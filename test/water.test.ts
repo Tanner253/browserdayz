@@ -3,7 +3,7 @@
 //   npx tsx test/water.test.ts
 
 import assert from 'node:assert/strict';
-import { WADE, inside, riverBank, tooDeep, waterAt, wading, type Waters } from '../src/sim/water';
+import { WADE, fromRoom, inside, riverBank, tooDeep, waterAt, wading, type Waters } from '../src/sim/water';
 
 // a bowl of ground, its floor 3 m under the lake's level at its middle; a river falling west along z = 300, a step in it
 const ground = (x: number, z: number) => (Math.abs(z - 300) < 10 ? -2 + Math.abs(z - 300) * 0.3 - x * 0.01 : Math.hypot(x, z) * 0.05 - 3);
@@ -47,5 +47,25 @@ const waters: Waters = {
   assert.ok(Math.abs(dry - 10) < 1e-9 && wet < 0, 'distance from the edge of a river');
   assert.equal(riverBank(waters, 150, 400), null, 'out of reach of any river');
   console.log(`banks: 10 m out of the water read as ${dry.toFixed(1)}, its middle as ${wet.toFixed(1)}`);
+}
+// ---- rooms in the water: a dry one keeps it out, a flooded one under a roof keeps it
+{
+  const ground = () => -0.6;
+  const hamlet: Waters = {
+    lakes: [{ name: 'flooded', level: 0, outline: [[-40, -40], [40, -40], [40, 40], [-40, 40]], swamp: true }],
+    rivers: [],
+    rooms: [
+      { x: 10, z: 5, rot: 0.5, hx: 4, hz: 3, dry: true },
+      { x: -12, z: -8, rot: -0.3, hx: 5, hz: 3.25 },
+    ],
+  };
+  const dry = hamlet.rooms![0], wet = hamlet.rooms![1];
+  assert.ok(fromRoom(dry, 10, 5) < 0 && Math.abs(fromRoom(dry, 10 + Math.cos(0.5) * 4, 5 - Math.sin(0.5) * 4)) < 1e-9, 'a room measured from its walls, turned as the wells are');
+  assert.equal(waterAt(hamlet, 10, 5, ground), null, 'no water in a dry room');
+  assert.equal(waterAt(hamlet, 10 + Math.cos(0.5) * 3.8, 5 - Math.sin(0.5) * 3.8, ground), null, 'none in it up to its wall');
+  assert.ok(waterAt(hamlet, 10 + Math.cos(0.5) * 4.3, 5 - Math.sin(0.5) * 4.3, ground)?.depth === 0.6, 'water outside its wall');
+  assert.ok(waterAt(hamlet, -12, -8, ground)?.depth === 0.6, 'water in a flooded room');
+  void wet;
+  console.log('rooms: none in a dry room up to its wall, water outside it and in a flooded one');
 }
 console.log('water: all good');
