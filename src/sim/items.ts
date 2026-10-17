@@ -88,6 +88,8 @@ export interface ItemDef {
     modes?: ('semi' | 'auto')[];
     /** pieces of its model that are only there with an attachment on it (attachment -> pieces), and pieces that never are */
     shows?: Record<string, string[]>;
+    /** the sight of its own that it is aimed through when fitted (an attachment no other gun takes), where it is not the holographic one */
+    optic?: string;
     never?: string[];
     /** and pieces that are taken off when an attachment goes on in their place (attachment -> pieces): a brake, for a suppressor */
     hides?: Record<string, string[]>;
@@ -161,6 +163,13 @@ const D: ItemDef[] = [
     id: 'scorpion', name: 'CZ Scorpion EVO', model: 'scorpion', w: 5, h: 3, weight: 2.8, category: 'weapon', slot: 'long',
     desc: 'Submachine gun in 9x19mm. Thirty rounds in its magazine, light, quick to the shoulder and steady in a burst. B changes it to single shots.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_scorpion', ergo: 72, modes: ['auto', 'semi'], shows: { mag_scorpion: ['mag'] } }, iconYaw: 0,
+  },
+  // The MP7A1 (2026-10-17): the small personal defence weapon, rare. Its own suppressor and sight are its own parts,
+  // seen only when fitted. Fed 9 mm here, as every submachine gun in the Zone is.
+  {
+    id: 'mp7a1', name: 'MP7A1', model: 'mp7a1', w: 5, h: 3, weight: 1.9, category: 'weapon', slot: 'long',
+    desc: 'Compact personal defence weapon. Forty rounds in its long magazine, very fast and very steady. B changes it to single shots.',
+    weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 40, mag: 'mag_mp7', ergo: 78, modes: ['auto', 'semi'], shows: { mag_mp7: ['mag'], mp7_suppressor: ['silencer'], mp7_sight: ['sight'] }, optic: 'mp7_sight' }, iconYaw: 0,
   },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,
   // and holds twenty-five: it is unwrapped in the hands, and what was in it is loose rounds. Rounds go into a
@@ -280,6 +289,11 @@ const D: ItemDef[] = [
     id: 'mag_scorpion', name: 'Scorpion Magazine', model: 'scorpion', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'magazine',
     desc: 'Thirty rounds of 9 mm for the CZ Scorpion EVO.',
     mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['scorpion'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_mp7', name: 'MP7 Magazine', model: 'mp7a1', nodeRe: '^mag', w: 1, h: 2, weight: 0.25, category: 'magazine',
+    desc: 'Forty rounds for the MP7A1.',
+    mag: { ammo: 'ammo_9mm', capacity: 40 }, attach: { fits: ['mp7a1'], slot: 'magazine' },
   },
   {
     id: 'mag_colt', name: 'Colt 1911 Magazine', model: 'colt_1911', nodeRe: '^mag', w: 1, h: 1, weight: 0.07, category: 'magazine',

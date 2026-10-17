@@ -267,6 +267,7 @@ const HELD = {
   // (the Scorpion's pack, on arms of its own, its camera at its eye: held as the submachine gun is to begin with)
   // (nearer than the submachine gun's pack holds its gun: our arms, not the pack's, reach for it, and from where they hold the MPA)
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
+  mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
 };
@@ -795,6 +796,10 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the Scorpion's: the middle of the ring of its rear drum, and the tip of the post between the ears of its hood,
   // level with each other; read off the file looking down its barrel, scripts/sight-profile.mjs)
   scorpion: { notch: [0.017, 0.1316, -0.0081], post: [0.258, 0.1316, -0.0083], near: 0.07 },
+  // (the MP7's sights stay folded flat in its pack's hands, as on the gun itself until they are flipped up: the line
+  // runs over the middle of the folded rear ring and the folded front hood, scripts/sight-profile.mjs and
+  // progress/weapons/sight-in-hands.js)
+  mp7a1: { notch: [-0.0957, 0.1382, -0.0076], post: [0.137, 0.1356, -0.0067] },
 };
 /** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
 const IRON_NEAR = 0.02;
@@ -1219,6 +1224,10 @@ export class Weapons {
     this.models.set('mpa', mpa);
     // The CZ Scorpion (2026-10-17, the weapons pass): a pack on arms of its own, played as it came; the gun alone hung
     // on its joints as the AK's is, the pack's own drawing of it put away.
+    const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };
+    const mp7 = await this.packGun({ pack: 'mp7a1', item: 'mp7a1', gun: 'mp7a1', kind: 'auto', hands: true, hip: HELD.mp7a1, flashSize: 0.22, flash: mkFlash(), square: true, strip: [], ride: mp7Ride });
+    mp7.gait = true;
+    this.models.set('mp7a1', mp7);
     const scorpRide = { base: 'Weapon_0725', bolt: 'Changing_handle_0726', trigger: 'Trigger_0728', safety: 'Firemode_0727', mag: 'Magazine_0730' };
     const scorpion = await this.packGun({ pack: 'scorpion', item: 'scorpion', gun: 'scorpion', kind: 'auto', hands: true, hip: HELD.scorpion, flashSize: 0.24, flash: mkFlash(), square: true, strip: ['Object_11', 'Object_19'], ride: scorpRide, spare: ['Magazine_2_0732', scorpRide.mag] });
     // (its own walk and run, and its own look over the gun on I)
@@ -1478,7 +1487,7 @@ export class Weapons {
     } else if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
     else if (sleeves) this.sleeves = sleeves;
     // (the owner, 2026-10-17: "the hands should not change depending on the gun")
-    if (o.hands) rig.wear(await assets.gltfOf('smg_fp'), assets.manifest.models.smg_fp.rig!, HELD.smg.clone().sub(o.hip), SMG_SHOULDERS, (m) => this.sleevesOwn ?? packMaterial(m));
+    if (o.hands) rig.wear(await assets.gltfOf('smg_fp'), assets.manifest.models.smg_fp.rig!, HELD.smg.clone().sub(o.hip), SMG_SHOULDERS, o.hip, (m) => this.sleevesOwn ?? packMaterial(m));
     const aloneId = o.gun ?? o.pack;
     const holds = assets.manifest.models[aloneId].holds!;
     // the gun alone (x along the barrel, y up): what is seen of it in everybody else's hands
@@ -1874,7 +1883,7 @@ export class Weapons {
       hip: o.hip.clone(),
       hipRot: new THREE.Euler(0, 0, 0),
       ads,
-      optic: long ? (hung.size ? 'red_dot' : 'pu_scope') : dotAt ? 'red_dot' : undefined,
+      optic: ITEMS[o.item].weapon?.optic ?? (long ? (hung.size ? 'red_dot' : 'pu_scope') : dotAt ? 'red_dot' : undefined),
       ownSights: !!post,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)

@@ -21,8 +21,8 @@ interface Arm {
   twist: { n: THREE.Object3D; w: number; q0: THREE.Quaternion }[];
   theirs: { upper: THREE.Object3D; fore: THREE.Object3D; hand: THREE.Object3D; middle: THREE.Object3D };
   handPair: Pair; fingers: Pair[];
-  /** at rest: our shoulder (in what it hangs on), the two bones' lengths, the world turns of upper arm, forearm, hand */
-  shoulder: THREE.Vector3; up: number; low: number; qU: THREE.Quaternion; qF: THREE.Quaternion; qH: THREE.Quaternion;
+  /** at rest: our shoulder (in what it hangs on, and in the space of the whole), the two bones' lengths, the world turns of upper arm, forearm, hand */
+  shoulder: THREE.Vector3; shoulderAt: THREE.Vector3; up: number; low: number; qU: THREE.Quaternion; qF: THREE.Quaternion; qH: THREE.Quaternion;
   /** at rest: which way each bone lies and the side the elbow bends to */
   dU: THREE.Vector3; dF: THREE.Vector3; n: THREE.Vector3;
   /** the middle of our palm, in our hand's own space */
@@ -57,6 +57,9 @@ export class HandsOn {
   private arms: Arm[] = [];
   private ours: THREE.Object3D;
   private all: THREE.Object3D;
+  private hip: THREE.Vector3;
+  /** the eye the gun is drawn for: our shoulders stand still in its space (see `follow`) */
+  private eye: THREE.Object3D | null = null;
 
   /**
    * @param pack the pack's scene, posed as it stands at rest, its world matrices current
@@ -66,9 +69,11 @@ export class HandsOn {
    * submachine gun has them, wherever this pack holds its gun (the owner: "we have our own for our AR's and
    * submachine guns")
    * @param shoulders how far the tops of our arms are let down out of the picture, as on the submachine gun (the eye's space)
+   * @param hip where `root` stands from the eye with the gun at the hip
    */
-  constructor(pack: THREE.Object3D, root: THREE.Object3D, arms: GLTF, info: RigInfo, shift: THREE.Vector3, shoulders: Record<Side, THREE.Vector3>, paint: (m: THREE.Material) => THREE.Material) {
+  constructor(pack: THREE.Object3D, root: THREE.Object3D, arms: GLTF, info: RigInfo, shift: THREE.Vector3, shoulders: Record<Side, THREE.Vector3>, hip: THREE.Vector3, paint: (m: THREE.Material) => THREE.Material) {
     this.all = root;
+    this.hip = hip.clone();
     pack.traverse((o) => {
       if ((o as THREE.SkinnedMesh).isSkinnedMesh) o.visible = false;
     });
@@ -121,8 +126,10 @@ export class HandsOn {
   private arm(s: Side, ours: (re: RegExp) => THREE.Object3D | null, theirs: (re: RegExp) => THREE.Object3D | null): Arm | null {
     // (names as three.js has them: the dots of the files' names are taken out)
     const upper = ours(new RegExp(`^UpArm_${s}_`)), fore = ours(new RegExp(`^Forearm_${s}_`)), hand = ours(new RegExp(`^Hand_${s}_`));
-    const T = (name: string) => theirs(new RegExp(`^DEF-${name}\\.?${s}_`));
-    const tU = T('upper_arm'), tF = T('forearm'), tH = T('hand'), tM = T('f_middle\\.?01');
+    // (the pack's skeleton as Blender's Rigify names it, DEF-hand.R, or as Unreal's mannequin does, hand_r)
+    const rigify = !!theirs(/^DEF-hand/);
+    const T = (rig: string, ue: string) => theirs(new RegExp(rigify ? `^DEF-${rig}\\.?${s}_` : `^${ue}_${s.toLowerCase()}_\\d`));
+    const tU = T('upper_arm', 'upperarm'), tF = T('forearm', 'lowerarm'), tH = T('hand', 'hand'), tM = T('f_middle\\.?01', 'middle_01');
     if (!upper || !fore || !hand || !tU || !tF || !tH || !tM) return null;
     const twist = [3, 2, 1].map((k) => ours(new RegExp(`^BoneTwist_0${k}\\.?${s}_\\d`))).filter((n): n is THREE.Object3D => !!n);
     const wristEnd = ours(new RegExp(`^BoneTwist_01\\.?${s}_end`)) ?? hand;
@@ -135,15 +142,15 @@ export class HandsOn {
     const base = at(thumb[0]!, new THREE.Vector3());
     four.sort((x, y) => at(x[1]!, _d).distanceTo(base) - at(y[1]!, _e).distanceTo(base));
     const names = ['index', 'middle', 'ring', 'pinky'];
-    const theirsFingers = names.map((f, k) => [T(`palm\\.?0${k + 1}`), T(`f_${f}\\.?01`), T(`f_${f}\\.?02`), T(`f_${f}\\.?03`)]);
-    const theirThumb = [T('thumb\\.?01'), T('thumb\\.?02'), T('thumb\\.?03')];
+    const theirsFingers = names.map((f, k) => [T(`palm\\.?0${k + 1}`, `${f}_metacarpal`), T(`f_${f}\\.?01`, `${f}_01`), T(`f_${f}\\.?02`, `${f}_02`), T(`f_${f}\\.?03`, `${f}_03`)]);
+    const theirThumb = [1, 2, 3].map((k) => T(`thumb\\.?0${k}`, `thumb_0${k}`));
     // the hand's breadth, ours and theirs, from the first finger's knuckle to the little one's: the second way each joint is laid by
     const latO = at(four[0][1]!, new THREE.Vector3()).sub(at(four[3][1]!, _d));
     const latT = at(theirsFingers[0][1]!, new THREE.Vector3()).sub(at(theirsFingers[3][1]!, _d));
-    /** where a joint points: to its first child joint */
+    /** where a joint points: to its first child joint (a fingertip with none: on from the joint before it) */
     const lies = (o: THREE.Object3D, v: THREE.Vector3) => {
       const c = kids(o)[0];
-      return c ? at(c, v).sub(at(o, _w)) : null;
+      return c ? at(c, v).sub(at(o, _w)) : o.parent ? at(o, v).sub(at(o.parent, _w)) : null;
     };
     const pair = (o: THREE.Object3D, t: THREE.Object3D, dO: THREE.Vector3 | null, dT: THREE.Vector3 | null): Pair | null => {
       if (!dO || !dT) return null;
@@ -176,7 +183,7 @@ export class HandsOn {
       upper, fore, hand, twist: twist.map((t, k) => ({ n: t, w: (k + 1) / twist.length, q0: turnOf(t) })),
       theirs: { upper: tU, fore: tF, hand: tH, middle: tM },
       handPair, fingers,
-      shoulder: upper.position.clone(), up: E.distanceTo(S), low: W.distanceTo(E),
+      shoulder: upper.position.clone(), shoulderAt: this.all.worldToLocal(S.clone()), up: E.distanceTo(S), low: W.distanceTo(E),
       qU: turnOf(upper), qF: turnOf(fore), qH: turnOf(hand),
       dU: E.clone().sub(S).normalize(), dF: W.clone().sub(E).normalize(), n: n.clone().normalize(),
       palm: hand.worldToLocal(at(hand, new THREE.Vector3()).lerp(at(four[1][1]!, _d), 0.5)),
@@ -187,6 +194,7 @@ export class HandsOn {
   /** Ours posed after the pack's as it stands this frame. Call once the frame's movement is set. */
   follow() {
     if (!this.arms.length) return;
+    if (!this.eye) for (let p = this.all.parent; p && !this.eye; p = p.parent) if ((p as THREE.Camera).isCamera) this.eye = p;
     this.all.updateMatrixWorld(true);
     for (const a of this.arms) {
       // the hand: turned as theirs is, the middle of the palm on the middle of theirs
@@ -201,6 +209,9 @@ export class HandsOn {
       // the arm: our shoulder where it rests, brought forward only as far as an arm too short to reach needs
       a.upper.position.copy(a.shoulder);
       a.upper.updateWorldMatrix(false, false);
+      // (and where it rests with the gun at the hip it stays, in the eye's space, whatever the gun does: brought up to
+      // the eye, the gun took our shoulders up with it into the picture. The arms reach for it from where they are.)
+      if (this.eye) setAt(a.upper, _p.copy(a.shoulderAt).add(this.hip).applyMatrix4(this.eye.matrixWorld));
       const S = at(a.upper, new THREE.Vector3()), W = at(a.hand, new THREE.Vector3());
       const reach = _c.copy(W).sub(S);
       const long = a.up + a.low - 1e-4;

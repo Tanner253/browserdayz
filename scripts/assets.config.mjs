@@ -1098,6 +1098,32 @@ export const WEAPON_PACKS = {
       changes: 'The gun taken off its skeleton and set in rigid pieces; its animations played as they came; its sky ball left out. Textures re-encoded as WebP; geometry compressed.',
     },
   },
+  mp7a1: {
+    dir: 'mp7a1',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 1,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (its sights flip up, its suppressor and its sight come off: each a piece of its own, on its own joint)
+    skinned: {
+      mesh: ['mp7a1_Object_slot_3_0', 'mp7a1_Object_Slot_1_0', 'mp7a1_Object_slot_2_0'],
+      joints: { body_0161: 'base', stock_0162: 'stock', stock_lock_0176: 'stock', slide_lock_0163: 'base', trigger_0164: 'trigger', trigger_p2_0165: 'trigger', mag_lock_0166: 'base', mag_0167: 'mag', bullet_2_0168: 'mag', bullet_1_0169: 'mag', foregrip_0170: 'foregrip', foregrip_lock_0171: 'foregrip', bolt_handle_0172: 'bolt', silencer_0173: 'silencer', front_scope_0174: 'sightF', back_scope_0175: 'sightR', fire_switch_0156: 'safety', scope_0177: 'sight' },
+      rest: 'base',
+    },
+    eye: 'Camera', atEye: true, ourArms: true,
+    wrists: { right: 'hand_r_067', left: 'hand_l_021' },
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    clips: { idle: 'root|MC_MP7_idle', draw: 'root|MC_MP7_show', fire: 'root|MC_MP7_shoot', reload: 'root|MC_MP7_reload', reloadEmpty: 'root|MC_MP7_full_reload', check: 'root|MC_MP7_inspect', walk: 'root|MC_MP7_walk_fwd_loop', run: 'root|MC_MP7_run_loop', holster: 'root|MC_MP7_hide' },
+    credit: {
+      name: 'MP7A1 Animations',
+      url: 'https://sketchfab.com/3d-models/mp7a1-animations-0a55689855594f2496c2debdb7e6f5bc',
+      author: 'TheParaziT',
+      line: 'This work is based on "MP7A1 Animations" (https://sketchfab.com/3d-models/mp7a1-animations-0a55689855594f2496c2debdb7e6f5bc) by TheParaziT (https://sketchfab.com/TheParaziT) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its pieces parted by joint, textures at 2048',
+    },
+  },
 };
 
 export const MODELS = {

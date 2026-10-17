@@ -247,10 +247,10 @@ export class WeaponRig {
 
   private hands: HandsOn | null = null;
   /** Our own arms on this pack, posed after its own, which are no longer drawn (./hands-on.ts). */
-  wear(arms: GLTF, info: RigInfo, shift: THREE.Vector3, shoulders: Record<'L' | 'R', THREE.Vector3>, paint: (m: THREE.Material) => THREE.Material) {
+  wear(arms: GLTF, info: RigInfo, shift: THREE.Vector3, shoulders: Record<'L' | 'R', THREE.Vector3>, hip: THREE.Vector3, paint: (m: THREE.Material) => THREE.Material) {
     this.rest();
     this.root.updateMatrixWorld(true);
-    this.hands = new HandsOn(this.scene, this.root, arms, info, shift, shoulders, paint);
+    this.hands = new HandsOn(this.scene, this.root, arms, info, shift, shoulders, hip, paint);
   }
 
   /** Our arms put after the pack's: once the frame's movement is set. */

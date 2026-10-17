@@ -172,6 +172,7 @@ export const TYPES: Record<string, TypeRule> = {
   // (in the village it is a policeman's and a soldier's, and not a householder's)
   mpa: { at: [0, 12, 14, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN } },
   // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
+  mp7a1: { at: [0, 0, 0, 4, 2], lifetime: 7200, restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON },
   scorpion: { at: [0, 0, 10, 3, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 3: IN_TOWN } },
   // The two assault rifles: the gas's, and the bunker's racks and lockers (see crates.ts). In Kamenka one of each,
   // where the army and the police kept things, seldom with a magazine in it, and a long time coming back.
@@ -208,6 +209,7 @@ export const TYPES: Record<string, TypeRule> = {
   mag_m9: { at: [0, 13, 6, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON, on: { 3: IN_TOWN } },
   mag_m9_ext: { at: [0, 2, 2, 0, 0], lifetime: 7200, restock: 1200, usage: ['Military'] },
   mag_mpa: { at: [0, 12, 14, 0, 2], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN } },
+  mag_mp7: { at: [0, 0, 0, 4, 2], lifetime: 7200, restock: 300, usage: [...ARMY], favour: ARMOURY, keep: SOON },
   mag_scorpion: { at: [0, 0, 10, 3, 1], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON, on: { 3: IN_TOWN } },
   mag_sniper: { at: [0, 0, 1, 4, 2], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON, on: { 3: { restock: 1500 } } },
   // (in Kamenka one of each, and as long coming back as the rifle: a rifle that fires is put together there
