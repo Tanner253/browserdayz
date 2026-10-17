@@ -7,7 +7,7 @@
 
 import { Simplex, clamp, lerp, smoothstep } from '../../core/noise';
 import { catmullRom } from './ground';
-import { CELL, SEA_LEVEL, WORLD_SEED } from './places';
+import { CELL, SEA_LEVEL, WORLD_SEED, WORLD_X0, WORLD_Z0, WORLD_Z1 } from './places';
 import { PLAN, inside, outside } from './west-plan';
 import { Line, passLine, valleyLine, type Net } from './west-relief';
 
@@ -195,32 +195,103 @@ function edgeIn(shore: P[], x: number, z: number) {
 }
 
 /**
+ * THE SWAMP'S SHORE as it is laid (the owner, 2026-10-16: "from the sky the ground of the swamp looks like a big
+ * rectangle on the ground too ugly"): PLAN's outline made round and let wander, out in lobes and in in bays at two
+ * sizes, with fingers of water reaching out into the meadow here and there; a point every 5 m or so. Its basin, its
+ * water, its mud, its reeds, its trees and its mist all go by it.
+ */
+export const swampShore: P[] = (() => {
+  const O = PLAN.swamp.outline as P[], n = O.length, round: P[] = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = O[(i + n - 1) % n], p1 = O[i], p2 = O[(i + 1) % n], p3 = O[(i + 2) % n], m = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 5));
+    for (let k = 0; k < m; k++) {
+      const t = k / m, f = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+      round.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  // (its length, and which way is out: the way the outline turns)
+  let turn = 0, len = 0;
+  const run = round.map((p, k) => {
+    const q = round[(k + 1) % round.length];
+    turn += p[0] * q[1] - q[0] * p[1];
+    return (len += Math.hypot(q[0] - p[0], q[1] - p[1])) - Math.hypot(q[0] - p[0], q[1] - p[1]);
+  });
+  // (the noise read round a circle, so that the shore closes on itself)
+  const ring = (u: number, wave: number, seed: number) => {
+    const r = len / (2 * Math.PI * wave), a = u * 2 * Math.PI;
+    return w1.noise(Math.cos(a) * r + seed, Math.sin(a) * r - seed);
+  };
+  const out = round.map(([x, z], k): P => {
+    const a = round[(k + round.length - 1) % round.length], b = round[(k + 1) % round.length], tl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, u = run[k] / len;
+    const nx = (Math.sign(turn) * (b[1] - a[1])) / tl, nz = (-Math.sign(turn) * (b[0] - a[0])) / tl;
+    let d = 26 * ring(u, 110, 3.1) + 9 * ring(u, 30, 8.7) + 44 * Math.max(0, ring(u, 34, 15.2)) ** 3;
+    // (no further out toward the map's south edge than 20 m short of it: eased, not cut straight)
+    const room = WORLD_Z1 - 20 - z;
+    if (d > 0 && nz > 0.2) d = Math.min(d, (room / nz) * Math.tanh((d * nz) / Math.max(room, 1)));
+    return [x + nx * d, z + nz * d];
+  });
+  // (eased once, so that no finger ends in a point)
+  return out.map((p, k): P => {
+    const a = out[(k + out.length - 1) % out.length], b = out[(k + 1) % out.length];
+    return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4];
+  });
+})();
+
+/** how far off the swamp's shore its field is kept, metres */
+const SWAMP_REACH = 50;
+let swampField: { x0: number; z0: number; nx: number; nz: number; d: Float32Array } | null = null;
+/**
+ * How far inside the swamp's shore a spot is, metres (outside it, less than nothing; past 50 m off it, -50): read off
+ * the world's own net, made once.
+ */
+export function swampIn(x: number, z: number): number {
+  if (!swampField) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [px, pz] of swampShore) { x0 = Math.min(x0, px); x1 = Math.max(x1, px); z0 = Math.min(z0, pz); z1 = Math.max(z1, pz); }
+    const gx = WORLD_X0 + Math.floor((x0 - SWAMP_REACH - WORLD_X0) / CELL) * CELL, gz = WORLD_Z0 + Math.floor((z0 - SWAMP_REACH - WORLD_Z0) / CELL) * CELL;
+    const nx = Math.ceil((x1 + SWAMP_REACH - gx) / CELL) + 1, nz = Math.ceil((z1 + SWAMP_REACH - gz) / CELL) + 1, d = new Float32Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const x = gx + i * CELL, z = gz + j * CELL, e = Math.min(SWAMP_REACH, edgeIn(swampShore, x, z));
+      d[j * nx + i] = inside(swampShore, x, z) ? e : -e;
+    }
+    swampField = { x0: gx, z0: gz, nx, nz, d };
+  }
+  const F = swampField, i = Math.round((x - F.x0) / CELL), j = Math.round((z - F.z0) / CELL);
+  return i < 0 || j < 0 || i >= F.nx || j >= F.nz ? -SWAMP_REACH : F.d[j * F.nx + i];
+}
+/** the box the swamp and the 50 m of land about it lie in */
+export function swampBox() {
+  swampIn(0, 0);
+  const F = swampField!;
+  return { x0: F.x0, z0: F.z0, x1: F.x0 + (F.nx - 1) * CELL, z1: F.z0 + (F.nz - 1) * CELL };
+}
+
+/**
  * The swamp: a shallow basin dug a little under the land about it, water over nearly all of it at one level (a few
  * centimetres to a hand over the knee), hummocks and islands just over the water, a few deeper pools nobody needs to
- * cross; its banks easing up into the land. `keep`: a spot left to whoever sets the hamlet down there (its own islands
- * and hollows). Gives back the water's level.
+ * cross; its banks easing up into the land over 20 to 40 m. All of it to its shore, the hamlet's pad too: the pad is
+ * laid after, and eased into the floor dug here (west-towns.ts layPad). Gives back the water's level.
  */
-export function cutSwamp(H: Float32Array, net: Net, keep: (x: number, z: number) => boolean): number {
-  const S = PLAN.swamp, shore = S.outline as P[];
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  for (const [x, z] of shore) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+export function cutSwamp(H: Float32Array, net: Net): number {
+  const S = PLAN.swamp, B = swampBox();
   // (its level: a little under the land it lies in, on the whole)
   let sum = 0, c = 0;
-  for (let x = x0; x <= x1; x += 8) for (let z = z0; z <= z1; z += 8) if (inside(shore, x, z)) { sum += sample(H, net, x, z); c++; }
-  const level = sum / c - S.dig, E = 35;
-  for (let iz = Math.max(0, Math.floor((z0 - E - net.z0) / CELL)); iz <= Math.min(net.nz - 1, Math.ceil((z1 + E - net.z0) / CELL)); iz++)
-    for (let ix = Math.max(0, Math.floor((x0 - E - net.x0) / CELL)); ix <= Math.min(net.nx - 1, Math.ceil((x1 + E - net.x0) / CELL)); ix++) {
-      const x = net.x0 + ix * CELL, z = net.z0 + iz * CELL, i = iz * net.nx + ix;
-      if (inside(shore, x, z)) {
-        if (keep(x, z)) continue;
-        const e = edgeIn(shore, x, z), n = w2.fbm(x * 0.028, z * 0.028, 3);
+  for (let x = B.x0; x <= B.x1; x += 8) for (let z = B.z0; z <= B.z1; z += 8) if (swampIn(x, z) > 0) { sum += sample(H, net, x, z); c++; }
+  const level = sum / c - S.dig;
+  for (let iz = Math.max(0, Math.round((B.z0 - net.z0) / CELL)); iz <= Math.min(net.nz - 1, Math.round((B.z1 - net.z0) / CELL)); iz++)
+    for (let ix = Math.max(0, Math.round((B.x0 - net.x0) / CELL)); ix <= Math.min(net.nx - 1, Math.round((B.x1 - net.x0) / CELL)); ix++) {
+      const x = net.x0 + ix * CELL, z = net.z0 + iz * CELL, i = iz * net.nx + ix, e = swampIn(x, z);
+      if (e > 0) {
+        const n = w2.fbm(x * 0.028, z * 0.028, 3);
         let y = level - lerp(S.shallow[0], S.shallow[1], smoothstep(-0.3, 0.4, w1.fbm(x * 0.05 + 3, z * 0.05, 2)));
         if (n > S.isle) y = level + lerp(0.1, 0.55, smoothstep(S.isle, S.isle + 0.25, n));
         else if (n < -S.pool) y = level - lerp(S.shallow[1], S.deep, smoothstep(S.pool, S.pool + 0.2, -n));
         H[i] = lerp(level - 0.04, y, smoothstep(0, 12, e));
       } else {
-        const e = outside(shore, x, z);
-        if (e < E) H[i] = H[i] > level ? lerp(level + 0.06, H[i], smoothstep(0, E, e)) : level + 0.06 + e * 0.02;
+        // (the land eased down to it, or where it is lower, a bank a hand over the water at the shore easing down
+        // into it: banked up the whole way, its outer foot was a step in a ring round the swamp seen from the sky)
+        const E = 30 + 10 * w1.noise(x * 0.011 + 5, z * 0.011);
+        if (-e < E) H[i] = lerp(level + 0.06, H[i], smoothstep(0, E, -e));
       }
     }
   return level;
