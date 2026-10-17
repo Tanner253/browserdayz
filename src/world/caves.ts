@@ -19,7 +19,8 @@ import { physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
 import { carving, type Carved } from './cave-carve';
 import { CANYON_ROCK_TINT, KINDS } from './ground';
-import { GROUND_KNEE } from './rock-blend';
+import { CANYON_BEDS_GLSL, canyonBedsUniforms } from './canyon-beds';
+import { CANYON_FACE_GLSL, GROUND_KNEE } from './rock-blend';
 import { RockField } from './rock-field';
 import { passData } from './worldgen';
 import { CAVES, caveDark, caveMouths, galleries, passGround, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
@@ -142,25 +143,31 @@ export class PassCaves {
   private rockMaterial() {
     const tex = (id: string) => {
       const t = assets.manifest.textures[id];
-      return { diff: assets.texture(t.diff, { srgb: true, repeat: true }), nor: assets.texture(t.nor, { repeat: true }) };
+      return { diff: assets.texture(t.diff, { srgb: true, repeat: true }), nor: assets.texture(t.nor, { repeat: true }), arm: assets.texture(t.arm, { repeat: true }) };
     };
     const wall = tex(ROCK.wall.tex), floor = tex(ROCK.floor.tex);
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
     this.atmo.register(mat, (shader) => {
       Object.assign(shader.uniforms, {
-        tWall: { value: wall.diff }, tWallN: { value: wall.nor }, tFloor: { value: floor.diff }, tFloorN: { value: floor.nor },
+        tWall: { value: wall.diff }, tWallN: { value: wall.nor }, tWallArm: { value: wall.arm }, tFloor: { value: floor.diff }, tFloorN: { value: floor.nor },
         uRockSize: { value: new THREE.Vector2(ROCK.wall.size, ROCK.floor.size) },
         uWallTint: { value: new THREE.Vector3(...ROCK.wall.tint) }, uFloorTint: { value: new THREE.Vector3(...ROCK.floor.tint) },
+        ...canyonBedsUniforms(),
       });
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nattribute float aAo;\nattribute float aBounce;\nvarying float vAo;\nvarying float vBounce;\nvarying vec3 vRockPos;\nvarying vec3 vRockNor;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAo = aAo;\nvBounce = aBounce;\nvRockPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRockNor = normalize(mat3(modelMatrix) * objectNormal);');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', /* glsl */ `#include <common>
-          uniform sampler2D tWall, tWallN, tFloor, tFloorN;
+          uniform sampler2D tWall, tWallN, tWallArm, tFloor, tFloorN;
+          // (how shut in each point of the rock's picture is, the cracks dark: the terrain shades its own sky light by
+          // it, 85%, and the walls in shadow are that light; without it the carved rock round a mouth was flat, a patch)
+          float rockShade;
           uniform vec2 uRockSize;
           uniform vec3 uWallTint, uFloorTint;
           ${GROUND_KNEE}
+          ${CANYON_BEDS_GLSL}
+          ${CANYON_FACE_GLSL}
           varying float vAo;
           varying float vBounce;
           varying vec3 vRockPos;
@@ -170,20 +177,28 @@ export class PassCaves {
         .replace('#include <map_fragment>', /* glsl */ `
           vec3 rN = normalize(vRockNor), rB = pow(abs(rN), vec3(4.0));
           rB /= rB.x + rB.y + rB.z;
-          vec2 uX = vRockPos.zy / uRockSize.x, uY = vRockPos.xz / uRockSize.x, uZ = vRockPos.xy / uRockSize.x, uF = vRockPos.xz / uRockSize.y;
+          // (the canyon's beds, and its picture on a face read as the terrain reads it there, bowed with them: the rock
+          // round a mouth runs on into the wall's beds in the same colours at the same heights, never a paler patch)
+          float bow;
+          vec3 beds = canyonBeds(vRockPos, bow);
+          vec2 uX = canyonFaceUv(vRockPos, vec3(1.0, 0.0, 0.0), bow) / uRockSize.x, uY = vRockPos.xz / uRockSize.x, uZ = canyonFaceUv(vRockPos, vec3(0.0, 0.0, 1.0), bow) / uRockSize.x, uF = vRockPos.xz / uRockSize.y;
           vec4 dX = vec4(dFdx(uX), dFdy(uX)), dY = vec4(dFdx(uY), dFdy(uY)), dZ = vec4(dFdx(uZ), dFdy(uZ)), dF = vec4(dFdx(uF), dFdy(uF));
           float onFloor = smoothstep(0.55, 0.85, rN.y);
           // (the sides that show: under 3 in 100 of the blend, not read, and the rest made whole again)
           vec3 use = step(vec3(0.03), rB);
           rB = rB * use / max(dot(rB, use), 1e-4);
           vec3 rockCol = vec3(0.0), tX = vec3(0.0, 0.0, 1.0), tY = tX, tZ = tX;
-          if (use.x > 0.5) { rockCol += ROCK_READ(tWall, uX, dX).rgb * uWallTint * rB.x; tX = ROCK_READ(tWallN, uX, dX).xyz * 2.0 - 1.0; }
-          if (use.z > 0.5) { rockCol += ROCK_READ(tWall, uZ, dZ).rgb * uWallTint * rB.z; tZ = ROCK_READ(tWallN, uZ, dZ).xyz * 2.0 - 1.0; }
+          rockShade = 0.0;
+          // (read down the face, as the terrain reads it: the bumps' up the other way; and their relief held to 60%,
+          // as the terrain's is seen from across the pass: at full the cracks stood out, a grain the wall round it had not)
+          if (use.x > 0.5) { rockCol += canyonFace(tWall, uX, dX.xy, dX.zw, ${KINDS.canyon.far.toFixed(3)}, vRockPos) * uWallTint * beds * rB.x; tX = ROCK_READ(tWallN, uX, dX).xyz * 2.0 - 1.0; tX.xy *= vec2(0.6, -0.6); rockShade += ROCK_READ(tWallArm, uX, dX).r * rB.x; }
+          if (use.z > 0.5) { rockCol += canyonFace(tWall, uZ, dZ.xy, dZ.zw, ${KINDS.canyon.far.toFixed(3)}, vRockPos) * uWallTint * beds * rB.z; tZ = ROCK_READ(tWallN, uZ, dZ).xyz * 2.0 - 1.0; tZ.xy *= vec2(0.6, -0.6); rockShade += ROCK_READ(tWallArm, uZ, dZ).r * rB.z; }
           if (use.y > 0.5) {
             vec3 top = vec3(0.0), topN = vec3(0.0);
-            if (onFloor < 0.99) { top += ROCK_READ(tWall, uY, dY).rgb * uWallTint * (1.0 - onFloor); topN += (ROCK_READ(tWallN, uY, dY).xyz * 2.0 - 1.0) * (1.0 - onFloor); }
+            if (onFloor < 0.99) { top += ROCK_READ(tWall, uY, dY).rgb * uWallTint * beds * (1.0 - onFloor); topN += (ROCK_READ(tWallN, uY, dY).xyz * 2.0 - 1.0) * (1.0 - onFloor); }
             if (onFloor > 0.01) { top += ROCK_READ(tFloor, uF, dF).rgb * uFloorTint * onFloor; topN += (ROCK_READ(tFloorN, uF, dF).xyz * 2.0 - 1.0) * onFloor; }
             rockCol += top * rB.y;
+            rockShade += rB.y;
             tY = topN;
           }
           diffuseColor.rgb *= groundKnee(rockCol) * mix(1.0, vAo, 0.6);`)
@@ -194,7 +209,7 @@ export class PassCaves {
           tZ = vec3(tZ.xy + rN.xy, abs(tZ.z) * rN.z);
           normal = normalize((viewMatrix * vec4(normalize(tX.zyx * rB.x + tY.xzy * rB.y + tZ.xyz * rB.z), 0.0)).xyz);
         }`)
-        .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= vAo;\nreflectedLight.indirectSpecular *= vAo;\n' +
+        .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= vAo * mix(1.0, rockShade, 0.85);\nreflectedLight.indirectSpecular *= vAo;\n' +
           // (the day's light come in at the mouth off the ground outside, warm, a few metres in and dying away: not the
           // sky's, which the dark inside takes away, so that one step in is lit as a cave's mouth is)
           'reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(1.0, 0.9, 0.78) * 0.85 * uDaylight * vBounce * vBounce * mix(0.6, 1.0, vAo);');

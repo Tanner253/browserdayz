@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import type { Atmosphere, ShaderPatch } from './atmosphere';
+import { CANYON_BEDS_GLSL, canyonBedsUniforms } from './canyon-beds';
 import { KINDS } from './ground';
 import { worldUniforms } from './terrain';
 import { CELL } from './worldgen';
@@ -36,6 +37,7 @@ function uniformsFor(heightTex: THREE.Texture, flat: Flat) {
   const face = KINDS.canyon, level = KINDS[flat];
   u = {
     ...worldUniforms(),
+    ...canyonBedsUniforms(),
     tBlendH: { value: heightTex },
     tBlendFace: { value: tex(face.tex) },
     tBlendLevel: { value: tex(level.tex) },
@@ -107,8 +109,11 @@ export function blendPatch(heightTex: THREE.Texture, flat: Flat = 'grit', holes:
           float bK = ( 1.0 - smoothstep( 0.0, uBlendSize.z, vBlendPos.y - bGround + bBreak ) ) * step( -4.0, vBlendPos.y - bGround );
           // (the ground's own picture there: the canyon's rock on a face of more than some 44 degrees, laid along the
           // face as the ground lays it; else the level's, laid from above)
-          vec2 bAlong = abs( bN.x ) > abs( bN.z ) ? vBlendPos.zy : vBlendPos.xy;
-          vec3 bFace = texture2D( tBlendFace, bAlong / uBlendSize.x ).rgb * uBlendFaceTint;
+          // (in its beds, read as the terrain reads the canyon on a face: src/world/canyon-beds.ts)
+          float bBow;
+          vec3 bBeds = canyonBeds( vBlendPos, bBow );
+          vec2 bUv = canyonFaceUv( vBlendPos, bN, bBow ) / uBlendSize.x;
+          vec3 bFace = canyonFace( tBlendFace, bUv, dFdx( bUv ), dFdy( bUv ), ${KINDS.canyon.far.toFixed(3)}, vBlendPos ) * uBlendFaceTint * bBeds;
           vec3 bLevel = texture2D( tBlendLevel, vBlendPos.xz / uBlendSize.y ).rgb * uBlendLevelTint;
           diffuseColor.rgb = mix( diffuseColor.rgb, groundKnee( mix( bLevel, bFace, smoothstep( 0.76, 0.66, bN.y ) ) ), bK );`,
         )
@@ -164,8 +169,27 @@ const holesGlsl = (n: number, stage: 'vertex' | 'fragment') =>
     return vBlendHole.x > 0.5 ? min( h, vBlendHole.y / vBlendHole.x ) : h;
   }`;
 
+/**
+ * The canyon's picture on a face as the terrain lays it at a distance (src/world/terrain.ts groundKind): from 18 to 70 m
+ * off a copy KINDS.canyon.far as large comes in, up to 55% of it, its light and dark drawn out about the picture's own
+ * mean; past 100 m the near copy goes to that mean. Read only at its near size, the carved rock round a mouth was the
+ * same rock at a finer grain, a rectangle on the wall seen from across the pass. `far`: the far copy's share of the size.
+ */
+export const CANYON_FACE_GLSL = /* glsl */ `
+  vec3 canyonFace( sampler2D t, vec2 uv, vec2 gx, vec2 gy, float far, vec3 P ) {
+    float d = length( P - cameraPosition ), farBlend = smoothstep( 18.0, 70.0, d ), nearKeep = 1.0 - smoothstep( 100.0, 170.0, d );
+    float farShare = 0.55 * farBlend + 0.3 * ( 1.0 - nearKeep );
+    vec3 mean = textureLod( t, vec2( 0.5 ), 12.0 ).rgb, c = mean;
+    if ( nearKeep > 0.0 ) c = mix( mean, textureGrad( t, uv, gx, gy ).rgb, nearKeep );
+    if ( farShare > 0.0 ) c = mix( c, max( mean + ( textureGrad( t, uv * far, gx * far, gy * far ).rgb - mean ) * 1.8, 0.0 ), farShare );
+    return c;
+  }
+`;
+
 const BLEND_GLSL = /* glsl */ `
   ${GROUND_KNEE}
+  ${CANYON_BEDS_GLSL}
+  ${CANYON_FACE_GLSL}
   uniform sampler2D tBlendH, tBlendFace, tBlendLevel;
   uniform vec4 uWorld;
   uniform vec2 uWorldRes;
