@@ -571,7 +571,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 17) {
+  if (CUT === 18 || CUT === 19) {
+    // (the map three times over, two films of 15 seconds on the sixteenth's band: see shots18.ts, shots19.ts)
+    const cut = CUT === 18 ? await import('./shots18') : await import('./shots19');
+    shots = cut.buildShots(S);
+    seconds = 'seconds18' in cut ? cut.seconds18() : cut.seconds19();
+    ownScore = cut.score;
+  } else if (CUT === 17) {
     // (the seventeenth is the story 'The man in the window', with a score of its own: see shots17.ts)
     const cut = await import('./shots17');
     shots = cut.buildShots(S);

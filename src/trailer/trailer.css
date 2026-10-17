@@ -697,3 +697,14 @@ body.tr-cut16 .hud-howto { display: none !important; }
 .x17-coming .c17-kick { font-size: 2.6vh; font-weight: 700; letter-spacing: 0.5em; color: #ffd35a; white-space: nowrap; }
 .x17-coming .c17-list { display: grid; grid-template-columns: repeat(3, auto); gap: 1.8vh 3.4vw; font-size: 4.4vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.14em; color: #fff3d6; text-align: center; }
 .x17-coming .c17-note { font-size: 2.1vh; letter-spacing: 0.3em; color: #d8cfb8; white-space: nowrap; }
+/* the eighteenth and nineteenth films: the title, and the map growing from the old square to the whole world */
+.x18-title b { font-size: 132px; }
+.x18-map { position: absolute; inset: 0; background: #0b0d0a; display: grid; place-items: center; padding-top: 250px; box-sizing: border-box; }
+.x18-map .sheet { position: relative; width: calc(28% + var(--k) * 66%); aspect-ratio: 4600 / 1533; overflow: hidden; border: 2px solid #ffd35a; box-shadow: 0 10px 60px rgba(0, 0, 0, 0.8); }
+.x18-map .sheet img { position: absolute; top: 0; height: 100%; width: auto; right: calc((1 - var(--k)) * 0%); }
+.x18-map .old { position: absolute; top: 0; bottom: 0; right: 0; width: calc(100% / (1 + var(--k) * 2)); border-left: 3px dashed rgba(255, 211, 90, calc(0.3 + var(--k) * 0.7)); }
+.x18-map .words { position: absolute; left: 72px; top: 118px; }
+.x18-map .words i { display: inline-block; padding: 5px 14px; font: 700 20px var(--trailer-font); font-style: normal; letter-spacing: 0.3em; color: #141109; background: #ffd35a; }
+.x18-map .words b { display: block; margin-top: 10px; font: 800 110px/0.95 var(--trailer-font); color: #f2ede2; }
+.x18-map .words b em { font-style: normal; color: #ffd35a; }
+.x18-map .words span { display: block; margin-top: 8px; font: 600 30px var(--trailer-font); color: #d8d3c4; letter-spacing: 0.04em; }
