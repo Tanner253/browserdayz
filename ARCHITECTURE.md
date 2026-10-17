@@ -349,7 +349,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `load-world.ts` | 26 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `mokroye-plans.ts` | 30 | Mokroye, the flooded hamlet in the swamp (2026-10-16): its houses as the water has them. |
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
-| `ocean.ts` | 503 | THE SEA off the west coast (2026-10-16: |
+| `ocean.ts` | 528 | THE SEA off the west coast (2026-10-16: |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 49 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
@@ -361,7 +361,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `town-plans.ts` | 454 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 210 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `vegetation.ts` | 1043 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
-| `water.ts` | 437 | Lakes and rivers, drawn (the owner, 2026-10-16: |
+| `water.ts` | 446 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
 | `world-cache.ts` | 77 |  |
