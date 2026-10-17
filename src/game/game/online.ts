@@ -9,7 +9,7 @@ import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
 import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
-import { THROWN } from '../../sim/grenades';
+import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
 import { playerName, remoteServer } from '../../net/client';
 import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
@@ -157,6 +157,11 @@ export const onlineMethods = {
       this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), left, false, id);
       // the arm that threw it (one that went off in the hand was not thrown, nor was one that fell from a dead hand: neither is moving)
       if (left > 0 && Math.hypot(...m.v) > 1) this.remotes.get(m.id)?.avatar.swing(true);
+    });
+    // (a grenade from somebody's launcher: flown here too, and it goes off where it strikes; what it did is that game's to say)
+    net.on('launch', (m) => {
+      const spec = LAUNCHED[m.w];
+      if (spec) this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), spec.flight, false, m.w, true);
     });
     net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
     net.on('emote', (m) => {

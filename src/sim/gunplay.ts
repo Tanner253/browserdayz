@@ -34,6 +34,8 @@ export const CARTRIDGES: Record<string, Cartridge> = {
   // .50 Action Express, 300 grain: 450 m/s, 378 at a hundred yards
   ammo_50: { name: '.50 AE', vel: 450, drag: 0.0019, damage: 58 },
   // .50 BMG, 750 grain: 860 m/s, and it keeps it (a ballistic coefficient near 1): 790 at three hundred yards
+  // 40 mm grenade: 76 m/s from the M32's barrel; what it does is its blast's (WEAPON_RULES.ammo_40mm), not a bullet's
+  ammo_40mm: { name: '40 mm', vel: 76, drag: 0, damage: 0 },
   ammo_50bmg: { name: '.50 BMG', vel: 860, drag: 0.0003, damage: 150 },
   // 12.7x55 subsonic, 900 grain: 290 m/s, heavy enough to keep most of it: a slow round that drops, and hits hard
   ammo_127x55: { name: '12.7x55', vel: 290, drag: 0.0006, damage: 110 },
@@ -87,6 +89,7 @@ export interface Gun {
 
 export const GUNS: Record<string, Gun> = {
   // (the bolt rifle: one hard shove, and a long way back to the target)
+  m32: { ammo: 'ammo_40mm', rpm: 120, barrel: 1, moa: 3, hip: 2, up: 3.2, side: 0.6, lean: 0, first: 1, held: 1, stays: 0.3, back: 9, jump: 3.6, heavy: true, zero: [50, 100, 150, 200], reach: 400 },
   barrett: { ammo: 'ammo_50bmg', rpm: 150, barrel: 1, moa: 1.2, hip: 3.6, up: 3.8, side: 0.7, lean: 0.1, first: 1, held: 1, stays: 0.32, back: 9, jump: 4, heavy: true, zero: [100, 200, 300, 400, 500, 600, 800, 1000], reach: 1400 },
   vssk: { ammo: 'ammo_127x55', rpm: 180, barrel: 1, moa: 2.5, hip: 2.4, up: 2.6, side: 0.6, lean: 0.12, first: 1, held: 1, stays: 0.3, back: 8.5, jump: 3, heavy: true, zero: [100, 200, 300, 400], reach: 450 },
   sniper50: { ammo: 'ammo_50bmg', rpm: 60, cycle: 1.1, barrel: 1, moa: 0.5, hip: 3.4, up: 4.2, side: 0.6, lean: 0.1, first: 1, held: 1, stays: 0.3, back: 9, jump: 4.4, heavy: true, zero: [100, 200, 300, 400, 500, 600, 800, 1000], reach: 1600 },

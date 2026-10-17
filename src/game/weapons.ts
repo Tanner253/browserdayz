@@ -284,6 +284,7 @@ const HELD = {
   sniper50: new THREE.Vector3(0.14, -0.22, -0.36),
   barrett: new THREE.Vector3(0.14, -0.22, -0.36),
   vssk: new THREE.Vector3(0.14, -0.22, -0.36),
+  m32: new THREE.Vector3(0.14, -0.22, -0.36),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
   pitchfork: new THREE.Vector3(0.05, -0.02, -0.05),
@@ -838,7 +839,7 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
  */
 const GLASS: Record<string, [number, number]> = { ar15: [-0.0012, 0.0008], mp7a1: [-0.0035, -0.0009] };
 /** a gun whose own sight's lens is painted opaque into its picture: that piece's lens is cut away (see packGun) */
-const LENS: Record<string, string> = { mp7a1: 'sight' };
+const LENS: Record<string, string> = { mp7a1: 'sight', m32: 'sight' };
 /**
  * The faces of a tube sight that look along the barrel (x, the gun's own space) inside its ring, taken out: its
  * lens. The ring is found from those same faces over the lower two fifths of it (the mount under it has faces that
@@ -1177,6 +1178,8 @@ export class Weapons {
   headMarker = false;
   onHit: (info: HitInfo) => void = () => {};
   onShot: (info: ShotInfo) => void = () => {};
+  /** a grenade fired from a launcher (the M32): from the eye, along the way the gun points, which grenade */
+  onLaunch: (origin: THREE.Vector3, dir: THREE.Vector3, w: string) => void = () => {};
   /** the hands started on something others can see: working the bolt, reloading (seconds it takes) */
   onAct: (act: 'bolt' | 'reload' | 'check' | 'stop', dur: number) => void = () => {};
   /** something the player is told: why R did nothing */
@@ -1307,6 +1310,7 @@ export class Weapons {
     this.models.set('sniper50', await this.packGun({ pack: 'sniper50', item: 'sniper50', gun: 'sniper50', kind: 'rifle', hands: true, hip: HELD.sniper50, flashSize: 0.4, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', boltrear: 'boltback', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'bullet' } }));
     // (the Barrett and the VSSK came with no movements: held in the .50's, on its pieces' nodes; their own bolts stand still, they load themselves)
     this.models.set('barrett', await this.packGun({ pack: 'sniper50', item: 'barrett', gun: 'barrett', kind: 'rifle', hands: true, hip: HELD.barrett, flashSize: 0.45, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bolt: 'base', trigger: 'trigger' } }));
+    this.models.set('m32', await this.packGun({ pack: 'sniper50', item: 'm32', gun: 'm32', kind: 'rifle', hands: true, hip: HELD.m32, flashSize: 0.3, flash: mkFlash(), strip: [], ride: { base: 'base', cylinder: 'base', sight: 'base', trigger: 'trigger' } }));
     this.models.set('vssk', await this.packGun({ pack: 'sniper50', item: 'vssk', gun: 'vssk', kind: 'rifle', hands: true, hip: HELD.vssk, flashSize: 0.2, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bullet: 'mag' } }));
     // (a pair: the right hand's gun on its own nodes, the left's on the _2 nodes; each hand and its gun fire by themselves)
     this.models.set('dual_smg', await this.packGun({
@@ -2034,7 +2038,7 @@ export class Weapons {
       ownSights: !!post,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
-      adsIron: long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      adsIron: ITEMS[o.item].weapon?.fixedSight ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       aimRot: o.square ? aimRot : undefined,
       aimRotOptic: lensRig && o.square ? opticRot : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
@@ -2567,9 +2571,11 @@ export class Weapons {
     const spread = this.spreadNow(item.id);
     const off = scatterOf(item.id, spread, Math.random(), Math.random()), round = Math.random() * Math.PI * 2;
     dir.addScaledVector(right, Math.cos(round) * off).addScaledVector(up, Math.sin(round) * off).normalize();
-    this.onShot({ origin: camera.position.clone(), dir: dir.clone(), weapon: item.id, suppressed });
+    // (a launcher fires a grenade, not a bullet: it is flown and goes off where it strikes, see game.ts `onLaunch`)
+    if (def.weapon.launches) this.onLaunch(camera.position.clone(), dir.clone(), def.weapon.launches);
+    else this.onShot({ origin: camera.position.clone(), dir: dir.clone(), weapon: item.id, suppressed });
     // (a shell's pellets go out round the line of the shot, each its own way)
-    for (let k = 0; k < b.pellets; k++) {
+    for (let k = 0; k < (def.weapon.launches ? 0 : b.pellets); k++) {
       const d = b.cone ? strewn(dir, b.cone) : dir.clone();
       this.bullets.push({ pos: camera.position.clone(), vel: d.multiplyScalar(v0), drag: b.drag, damage: b.damage * (suppressed ? 0.9 : 1), v0, life: 4, travelled: 0, weapon: item.id, quiet: suppressed });
     }

@@ -13,7 +13,7 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
-import { NADE, THROWN, fallen, fuseLeft, inHandDamage, judge, letGo, lyingBlast, newThrower, overdue, pullPin, travel, type Vec3 } from '../src/sim/grenades';
+import { LAUNCHED, NADE, THROWN, fallen, fuseLeft, inHandDamage, judge, launch, letGo, lyingBlast, newThrower, overdue, pullPin, travel, type Vec3 } from '../src/sim/grenades';
 import { ITEMS } from '../src/sim/items';
 import { TYPES } from '../src/sim/economy';
 import { STOCK, worth } from '../src/sim/trade';
@@ -210,6 +210,36 @@ ok('the server: a blast is no further from the hand than the grenade can have fl
   pullPin(tap, 'frag', T0);
   letGo(tap, HAND, [14, 5, 0], FEET, T0 + 30);
   assert.equal(judge(tap, 'frag', 'p2', chest(30), 0, T0 + FUSE), 0);
+});
+
+ok('the M32 and its 40 mm grenades: admin only (found nowhere, sold by nobody), fired not thrown, a stack of fifty', () => {
+  const m32 = ITEMS.m32, round = ITEMS.ammo_40mm;
+  assert.ok(m32?.weapon?.launches === 'ammo_40mm' && LAUNCHED.ammo_40mm, 'the M32 fires 40 mm grenades');
+  assert.equal(round.stack, 50, '"ammo stack to 50 for the grenade launcher"');
+  assert.ok(!TYPES.m32 && !TYPES.ammo_40mm, 'neither is loot anywhere');
+  assert.ok(!STOCK.includes('m32') && !STOCK.includes('ammo_40mm'), 'nor sold');
+  assert.ok(WEAPON_RULES.ammo_40mm?.blast, 'its blast has a rule');
+});
+
+ok('the server: a launched grenade leaves from where its player stands, no faster than its launcher fires, and not twice in a quarter of a second', () => {
+  const t = newThrower(), feet: Vec3 = [0, 0, 0], now = 1e6, v: Vec3 = [0, 0, -LAUNCHED.ammo_40mm.speed];
+  assert.equal(launch(t, 'ammo_40mm', [9, 1.6, 0], v, feet, now), null, 'not from nine metres off');
+  assert.equal(launch(t, 'ammo_40mm', [0, 1.6, 0], [0, 0, -200], feet, now), null, 'not faster than it fires');
+  assert.equal(launch(t, 'frag', [0, 1.6, 0], v, feet, now), null, 'a frag is thrown, not launched');
+  assert.ok(launch(t, 'ammo_40mm', [0, 1.6, 0], v, feet, now), 'from the shoulder, at its speed');
+  assert.equal(launch(t, 'ammo_40mm', [0, 1.6, 0], v, feet, now + 100), null, 'not a tenth of a second after the last');
+  assert.ok(launch(t, 'ammo_40mm', [0, 1.6, 0], v, feet, now + 300), 'a third of a second after');
+});
+
+ok('the server: the blast of a launched grenade is believed when it strikes, no further than it can have flown by then, and of each body once', () => {
+  const t = newThrower(), now = 2e6, speed = LAUNCHED.ammo_40mm.speed;
+  launch(t, 'ammo_40mm', [0, 1.6, 0], [0, 0, -speed], [0, 0, 0], now);
+  // (half a second on, with a quarter more for the line, it can be some sixty metres away: a body eighty off is not reached, one forty off is)
+  assert.equal(judge(t, 'ammo_40mm', 'p1', [0, 1.1, -80], 2, now + 500), null, 'not eighty metres off half a second on');
+  const far = judge(t, 'ammo_40mm', 'p2', [0, 1.1, -38], 2, now + 500);
+  assert.ok(far !== null && far >= 2, 'believed forty metres off half a second on: ' + far);
+  assert.equal(judge(t, 'ammo_40mm', 'p2', [0, 1.1, -38], 2, now + 520), null, 'and not twice of the one body');
+  assert.equal(judge(t, 'ammo_40mm', 'p3', [0, 1.1, -38], 2, now + (LAUNCHED.ammo_40mm.flight + 4) * 1000), null, 'nor long after it can have been in the air');
 });
 
 ok('the server: a pin out and a fuse run down with nothing thrown is a grenade that went off in the hand, where its holder stands', () => {

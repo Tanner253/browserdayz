@@ -94,6 +94,10 @@ export interface ItemDef {
     ownScope?: boolean;
     /** two of it, one in each hand: the left button fires the left one, the right button the right; not aimed down sights */
     akimbo?: boolean;
+    /** what it fires in place of bullets: a grenade that flies and goes off where it strikes (src/sim/grenades.ts LAUNCHED) */
+    launches?: string;
+    /** a sight that is part of it: aimed, it is looked through, never along irons */
+    fixedSight?: boolean;
     never?: string[];
     /** and pieces that are taken off when an attachment goes on in their place (attachment -> pieces): a brake, for a suppressor */
     hides?: Record<string, string[]>;
@@ -173,6 +177,14 @@ const D: ItemDef[] = [
     id: 'sniper50', name: '.50 Sniper Rifle', model: 'sniper50', w: 10, h: 3, weight: 11.5, category: 'weapon', slot: 'long',
     desc: 'A bolt-action rifle in .50 BMG with a scope of its own. Five rounds. It reaches further and hits harder than anything else in the Zone.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, shows: { mag_sniper50: ['mag'] } }, iconYaw: 0,
+  },
+  // The M32 MGL (2026-10-17): a six-shot 40 mm grenade launcher, for admins only (the owner: "the grenade launcher
+  // and its ammo is an admin only weapon"): found nowhere, sold by nobody, and its grenades believed by the server
+  // from an admin alone. Held in the .50 sniper rifle's movements.
+  {
+    id: 'm32', name: 'M32 MGL', model: 'm32', w: 6, h: 3, weight: 5.3, category: 'weapon', slot: 'long',
+    desc: 'A six-shot 40 mm grenade launcher, loaded by hand. Its grenades fly in an arc and go off where they strike. For admins.',
+    weapon: { kind: 'rifle', ammo: 'ammo_40mm', capacity: 6, ergo: 35, action: 'self', launches: 'ammo_40mm', fixedSight: true, ownScope: true }, iconYaw: 0,
   },
   // The Barrett M82 (2026-10-17): the bunker's .50, loading itself, ten rounds, its scope part of it. No movements of
   // its own: held as the .50 sniper rifle is.
@@ -255,6 +267,10 @@ const D: ItemDef[] = [
     id: 'box_556', name: '5.56x45 Ammo Box', model: 'ammo_box_556', w: 1, h: 1, weight: 0.13, category: 'ammo',
     desc: 'A sealed box of 25 cartridges for the AR-15. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_556', qty: 25, time: 2.2 },
+  },
+  {
+    id: 'ammo_40mm', name: '40 mm Grenades', model: 'm32', nodeRe: '^cylinder_[23]$', w: 1, h: 1, weight: 0.23, category: 'ammo', stack: 50, scale: 1, pile: 1,
+    desc: '40 mm high-explosive grenades for the M32. They go off where they strike. For admins.',
   },
   {
     id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'sniper50', nodeRe: '^bullet', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 3,

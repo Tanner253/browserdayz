@@ -24,6 +24,8 @@ interface Flying {
   /** thrown by this player: its damage to others is this game's to report */
   mine: boolean;
   resting: boolean;
+  /** fired from a launcher: it goes off where it first strikes */
+  impact: boolean;
 }
 
 const RADIUS = 0.06;
@@ -44,20 +46,37 @@ export class Grenades {
    * @param fuse seconds until it goes off: what is left of its fuse as it leaves the hand
    * @param id which grenade (the stick grenade, where it is not said)
    */
-  throw(origin: THREE.Vector3, velocity: THREE.Vector3, fuse: number, mine: boolean, id = 'grenade') {
+  throw(origin: THREE.Vector3, velocity: THREE.Vector3, fuse: number, mine: boolean, id = 'grenade', impact = false) {
     // (It is in the air from this moment whether or not its model has come: whoever threw it has had it in the
     // hand, and has the model; anybody else may see nothing of it for the moment its file takes.)
     const obj = new THREE.Group();
     obj.position.copy(origin);
     this.scene.add(obj);
-    void this.models.get(id).then((tpl) => obj.add(tpl.group.clone()), () => {});
-    this.list.push({ id, obj, pos: origin.clone(), vel: velocity.clone(), spin: new THREE.Vector3(9, 3, 6), fuse, mine, resting: false });
+    // (a launcher's grenade is a streak at seventy-six metres a second: no model is drawn for it)
+    if (!impact) void this.models.get(id).then((tpl) => obj.add(tpl.group.clone()), () => {});
+    this.list.push({ id, obj, pos: origin.clone(), vel: velocity.clone(), spin: new THREE.Vector3(9, 3, 6), fuse, mine, resting: false, impact });
   }
 
   update(dt: number) {
     for (let i = this.list.length - 1; i >= 0; i--) {
       const g = this.list[i];
       g.fuse -= dt;
+      // (a launcher's: flown first, and it goes off the moment it strikes something)
+      if (g.impact && g.fuse > 0) {
+        let left = dt;
+        while (left > 0 && g.fuse > 0) {
+          const h = Math.min(left, 1 / 240);
+          left -= h;
+          g.vel.y -= NADE.fall * h;
+          const step = g.vel.clone().multiplyScalar(h), len = step.length(), dir = step.clone().divideScalar(len || 1);
+          const hit = physics.raycast(g.pos, dir, len + RADIUS, SOLID_GROUPS);
+          if (hit) {
+            g.pos.addScaledVector(dir, Math.max(0, hit.toi - RADIUS)).add(new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z).multiplyScalar(0.1));
+            g.fuse = 0;
+          } else g.pos.add(step);
+        }
+        g.obj.position.copy(g.pos);
+      }
       if (g.fuse <= 0) {
         g.obj.removeFromParent();
         this.list.splice(i, 1);
@@ -79,6 +98,12 @@ export class Grenades {
         if (hit) {
           const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
           g.pos.addScaledVector(dir, Math.max(0, hit.toi - RADIUS));
+          // (a launcher's goes off where it strikes, a hand's breadth off the surface)
+          if (g.impact) {
+            g.fuse = 0;
+            g.pos.addScaledVector(n, 0.1);
+            break;
+          }
           // off the surface: most of the speed along it kept, a third of the speed into it returned
           // (it never comes off anything faster than it struck it: what the server believes of how far a grenade
           // can have gone rests on that. See `travel` in src/sim/grenades.ts.)

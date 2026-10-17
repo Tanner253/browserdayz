@@ -520,7 +520,7 @@ export const itemsMethods = {
    * @param skip what went up, if it is still standing in the way of its own blast
    * @param inHand a grenade of this player's own that was never thrown: it went off in the hand that held it
    */
-  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' = 'grenade', skip?: Barrel['collider'], inHand = false) {
+  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' = 'grenade', skip?: Barrel['collider'], inHand = false) {
     // (a jeep goes up as a drum of fuel does; online the server says who it reached)
     const jeep = what === 'jeep';
     const drum = what === 'barrel' || jeep;

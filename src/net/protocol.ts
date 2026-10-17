@@ -31,7 +31,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // the game says the height it stands at.)
 // (45, 2026-10-16: the map three times over: the world's ground and its loot points are new, and the pass's caves
 // count as under the ground by right; a page from before would stand on ground the server does not have.)
-export const PROTOCOL = 45;
+export const PROTOCOL = 46;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -163,6 +163,8 @@ export type C2S =
    */
   | { t: 'pin'; w: string }
   | { t: 'nade'; o: [number, number, number]; v: [number, number, number] }
+  /** a grenade fired from a launcher: from where, how fast, which (believed from an admin alone) */
+  | { t: 'launch'; o: [number, number, number]; v: [number, number, number]; w: string }
   | { t: 'act'; a: Act; d: number }
   /** something called out, with the movement that goes with it (an id from src/sim/emotes.ts) */
   | { t: 'emote'; e: string }
@@ -291,6 +293,7 @@ export type S2C =
   | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number]; w: string; f: number }
+  | { t: 'launch'; id: number; o: [number, number, number]; v: [number, number, number]; w: string }
   | { t: 'act'; id: number; a: Act; d: number }
   | { t: 'emote'; id: number; e: string }
   /** fuel drum number i went up, set off by this player; and a new one has been stood in its place */

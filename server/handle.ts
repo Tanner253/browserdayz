@@ -6,7 +6,7 @@ import { ITEMS, GEAR_SLOTS, holds, makeItem, TAG_HOLD, type ItemInstance } from 
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
-import { THROWN, pullPin, letGo, judge } from '../src/sim/grenades';
+import { THROWN, LAUNCHED, pullPin, letGo, judge, launch } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
 import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
@@ -103,6 +103,14 @@ export function handle(c: Client, m: C2S) {
       if (!out) return;
       if (out.hand) handBlast(c, out.w, out.o);
       else broadcast({ t: 'nade', id: c.id, o: out.o, v: m.v, w: out.w, f: out.left }, c);
+      return;
+    }
+    case 'launch': {
+      // A grenade fired from a launcher. The launcher is for admins only (the owner: "the grenade launcher and its
+      // ammo is an admin only weapon"): from anybody else it is not believed, nor anything its blast is said to reach.
+      if (!c.alive || roleOf(c) !== 'admin' || !isVec3(m.o) || !isVec3(m.v) || typeof m.w !== 'string' || !LAUNCHED[m.w]) return;
+      if (!launch(c.nades, m.w, m.o, m.v, [c.pose[0], c.pose[1], c.pose[2]], Date.now())) return;
+      broadcast({ t: 'launch', id: c.id, o: m.o, v: m.v, w: m.w }, c);
       return;
     }
     case 'bunker': {

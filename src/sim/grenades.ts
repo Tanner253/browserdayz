@@ -77,6 +77,16 @@ export const NADE = {
   lies: 0.15,
 } as const;
 
+/**
+ * A grenade fired from a launcher, the M32's (2026-10-17, the owner: "the grenade launcher and its ammo is an admin
+ * only weapon"): how fast it leaves the muzzle, m/s, and the longest it is believed to be in the air, seconds. It
+ * goes off where it strikes, so it has no fuse for the server to count: its blast is believed from the moment it
+ * leaves to the end of that, no further from where it left than it can have flown by then (see `judge`).
+ */
+export const LAUNCHED: Record<string, { speed: number; flight: number }> = {
+  ammo_40mm: { speed: 76, flight: 8 },
+};
+
 /** a thing that is thrown: how long the hands take to get its pin out, and how long its fuse then runs, seconds */
 export interface Thrown {
   id: string;
@@ -121,6 +131,8 @@ export interface Flown {
   speed: number;
   /** it never left the hand */
   hand: boolean;
+  /** fired from a launcher: it goes off where it strikes, whenever that is before `due` */
+  impact?: boolean;
   /** whom and what its blast has been said to reach (see `judge`), and how many of those were players */
   reached: Set<string>;
   people: number;
@@ -130,8 +142,28 @@ export interface Thrower {
   held: Held | null;
   flown: Flown[];
   lastPin: number;
+  /** when the last grenade left a launcher (ms) */
+  lastLaunch?: number;
 }
 export const newThrower = (): Thrower => ({ held: null, flown: [], lastPin: -1e12 });
+
+/**
+ * A game says a grenade left its player's launcher: from `o`, at `v`, its player standing at `feet`. Believed if it
+ * leaves from where they stand, no faster than that launcher fires, and not sooner after the last than the launcher
+ * can be fired again (who may fire one at all is the server's to say: an admin).
+ * @returns what is kept of it for `judge`; null if it is not believed
+ */
+export function launch(t: Thrower, w: string, o: Vec3, v: Vec3, feet: Vec3, now: number): Flown | null {
+  const spec = LAUNCHED[w];
+  if (!spec) return null;
+  const speed = Math.hypot(v[0], v[1], v[2]);
+  if (Math.hypot(o[0] - feet[0], o[2] - feet[2]) > NADE.from || Math.abs(o[1] - feet[1]) > NADE.up || speed > spec.speed * 1.1) return null;
+  if (now - (t.lastLaunch ?? -1e12) < 250) return null;
+  t.lastLaunch = now;
+  const f: Flown = { w, due: now + spec.flight * 1000, thrownAt: now, from: o, speed, hand: false, impact: true, reached: new Set(), people: 0 };
+  t.flown.push(f);
+  return f;
+}
 
 /**
  * A game says the pin of a grenade is out.
@@ -229,14 +261,15 @@ export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROW
  */
 export function judge(t: Thrower, w: string, key: string, at: Vec3, said: number, now: number, within?: number): number | null {
   const rule = WEAPON_RULES[w];
-  if (!THROWN[w] || !rule?.blast || !Number.isFinite(said)) return null;
+  if ((!THROWN[w] && !LAUNCHED[w]) || !rule?.blast || !Number.isFinite(said)) return null;
   // (what went off long enough ago is forgotten)
   if (t.flown.length) t.flown = t.flown.filter((f) => now <= f.due + NADE.late);
   let best: { f: Flown; least: number } | null = null;
   for (const f of t.flown) {
-    if (f.w !== w || now < f.due - NADE.early || f.reached.has(key)) continue;
+    // (one from a launcher goes off where it strikes: believed from when it left, not about the end of a fuse)
+    if (f.w !== w || (!f.impact && now < f.due - NADE.early) || f.reached.has(key)) continue;
     if (key.startsWith('p') && f.people >= NADE.people) continue;
-    const flown = (Math.max(0, f.due - f.thrownAt) + NADE.lag) / 1000;
+    const flown = (Math.max(0, (f.impact ? Math.min(now, f.due) : f.due) - f.thrownAt) + NADE.lag) / 1000;
     const least = Math.max(0, Math.hypot(at[0] - f.from[0], at[1] - f.from[1], at[2] - f.from[2]) - travel(f.speed, flown));
     if (least > (within ?? rule.blast) + NADE.slack) continue;
     if (!best || least < best.least) best = { f, least };

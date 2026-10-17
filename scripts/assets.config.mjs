@@ -1211,6 +1211,37 @@ export const WEAPON_PACKS = {
       changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
     },
   },
+  m32: {
+    dir: 'm32',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    length: 0.81,
+    // (its barrel runs across its maker's scene, the muzzle toward -x: its stock at the other end, its sight on top)
+    forward: [-1, 0, 0],
+    up: [0, 1, 0],
+    // (it came with no movements: held in the .50 sniper rifle's, fitted by its stock. Its cylinder and the six
+    // grenades in it are one piece; its speedloader, which only a reload of its own would have moved, is left out)
+    fit: { to: 'sniper50', piece: 'base' },
+    skinned: {
+      mesh: ['mike32_barrel', 'mike32_frame', 'mike32_cylinder', 'grip_vert03', 'mike32_scope', 'att_lens_scope', 'stocktac02', 'grenades_heads', 'grenades_shells'],
+      joints: {
+        j_cylinder_06: 'cylinder', j_speed_loader_07: 'cylinder', j_speed_loader_cylinder_08: 'cylinder', grenades_09: 'cylinder',
+        grenadeA_main_010: 'cylinder', grenadeB_main_013: 'cylinder', grenadeC_main_016: 'cylinder', grenadeD_main_025: 'cylinder', grenadeE_main_022: 'cylinder', grenadeF_main_019: 'cylinder',
+        j_speed_loader_nade00_011: 'cylinder', j_speed_loader_nade01_014: 'cylinder', j_speed_loader_nade02_017: 'cylinder', j_speed_loader_nade03_020: 'cylinder', j_speed_loader_nade04_023: 'cylinder', j_speed_loader_nade05_026: 'cylinder',
+        j_speed_loader_nade00_shell_012: 'cylinder', j_speed_loader_nade01_shell_015: 'cylinder', j_speed_loader_nade02_shell_018: 'cylinder', j_speed_loader_nade03_shell_021: 'cylinder', j_speed_loader_nade04_shell_024: 'cylinder', j_speed_loader_nade05_shell_027: 'cylinder',
+        sight_scope_02: 'sight', zoom_wheelA_03: 'sight', zoom_wheelB_04: 'sight', j_trigger_029: 'trigger',
+      },
+      rest: 'base',
+    },
+    credit: {
+      name: 'M32 MGL (old version)',
+      url: 'https://sketchfab.com/ardickasaretas',
+      author: 'ardickasaretas',
+      line: 'M32 MGL (old version) by ardickasaretas (https://sketchfab.com/ardickasaretas), Sketchfab Standard licence',
+      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
+    },
+  },
   pitchfork: {
     dir: 'pitchfork',
     file: 'scene.gltf',

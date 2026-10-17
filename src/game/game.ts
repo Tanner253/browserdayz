@@ -26,7 +26,7 @@ import '../sim/powers';
 import { Economy } from '../sim/economy';
 import { CRATE_SPECS } from '../sim/crates';
 import '../sim/combat';
-import '../sim/grenades';
+import { LAUNCHED } from '../sim/grenades';
 import '../sim/gunplay';
 import '../sim/barrels';
 import '../sim/emotes';
@@ -494,7 +494,7 @@ export class Game {
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
-    this.grenades.onExplode = (at, mine, id) => this.explode(at, mine, id === 'frag' ? 'frag' : 'grenade');
+    this.grenades.onExplode = (at, mine, id) => this.explode(at, mine, id === 'frag' ? 'frag' : id === 'ammo_40mm' ? 'ammo_40mm' : 'grenade');
     this.garage = new Garage({
       scene: r.scene,
       atmo,
@@ -578,6 +578,15 @@ export class Game {
       if (power < 0.4) return;
       const body = owner instanceof RemotePlayer || owner instanceof Dummy || owner instanceof Infected ? owner.avatar : owner === this.player ? this.avatar : null;
       body?.wound(pt, dir, 0.05 + power * 0.04, power > 0.58);
+    };
+    // a grenade from a launcher (the M32): flown here and told to the server, which believes it from an admin alone
+    this.weapons.onLaunch = (o, dir, w) => {
+      const spec = LAUNCHED[w];
+      if (!spec) return;
+      const from = o.clone().addScaledVector(dir, 0.7), v = dir.clone().multiplyScalar(spec.speed);
+      this.grenades.throw(from, v, spec.flight, true, w, true);
+      if (this.online) this.net.send({ t: 'launch', o: from.toArray() as [number, number, number], v: v.toArray() as [number, number, number], w });
+      this.horde.noise(o.x, o.z, INFECTED.hearShot);
     };
     this.weapons.onShot = (s) => {
       // (on the bot check's range the server is told of it as the range's own, and nobody else of anything)
