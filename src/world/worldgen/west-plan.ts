@@ -109,7 +109,7 @@ export const PLAN = {
   river: {
     // (out of the pass's mouth down to the brick works' east end, along its quay, and on to the sea)
     desert: [[-2570, -440], [-2610, -385], [-2632, -335], [-2655, -306], [-2720, -302], [-2815, -304], [-2900, -330], [-3050, -385], [-3250, -415], [-3450, -425], [-3640, -425], [-3790, -424]] as P[],
-    width: [3, 8, 9.5] as [number, number, number],
+    width: [5.5, 8, 9.5] as [number, number, number],
     depth: [0.45, 0.9] as P,
     under: 0.35,
     wander: 9,
