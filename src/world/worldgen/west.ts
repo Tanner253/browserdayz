@@ -23,8 +23,8 @@ import { CELL, SEA_LEVEL, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_SEE
 import { catmullRom, heightAt, slopeAt } from './ground';
 import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside } from './west-plan';
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
-import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater } from './west-water';
-import { fillTown, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
+import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
+import { fillTown, hamletGround, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
 import { moundAt, placedRooms } from '../../sim/towns';
 import type { Instance, POI, Site } from './types';
 
@@ -212,7 +212,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   const lake = lakeLevel(heights, net, PLAN.lake.outline);
   padY.set(OZERKI.name, lake + PLAN.lake.under);
   cutLake(heights, net, PLAN.lake.outline, lake, PLAN.lake.deep);
-  const hamlet = placedTown(MOKROYE.name), swamp = cutSwamp(heights, net, (x, z) => offPad(hamlet, x, z) < 4);
+  const hamlet = placedTown(MOKROYE.name), swamp = cutSwamp(heights, net);
   padY.set(MOKROYE.name, swampPad(swamp));
   for (const t of PLACED) layPad(heights, net, t, padY.get(t.name)!, t.name === OZERKI.name ? lake : undefined);
 
@@ -326,7 +326,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
 
   // ---- WHAT STANDS IN THE WAY: of the square's own trees, rocks and props, those on a new road, a town's pad,
   // Kalat's land or under water go (and anything on ground moved under it is set on it again)
-  const L = PLAN.lake.outline, S = PLAN.swamp.outline, LB = bounds(L), SB = bounds(S);
+  const L = PLAN.lake.outline, S = swampShore, LB = bounds(L), SB = bounds(S);
   const clear = (x: number, z: number, pad: number) =>
     gap[clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1)] < pad ||
     PLACED.some((t) => offPad(t, x, z) < 8 + pad) || kalatLand.share[clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1)] > 76 ||
@@ -366,7 +366,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       let rock = slope < 0.39 ? 0 : clamp(smoothstep(0.5, 0.85, slope + 0.1 * n3.noise(x * 0.05, z * 0.05)), 0, 1);
       const desert = x <= east ? 1 : Math.max(1 - smoothstep(east + 20, east + PLAN.desert.fringe + 40 * n2.noise(x * 0.006, z * 0.006), x), 1 - smoothstep(M0[0], M0[1] + 50 * n3.noise(x * 0.008, z * 0.008), Math.hypot(x - mouth.x, z - mouth.z))), bank = banks[i] / 255;
       let forest = desert >= 1 ? 0 : Math.max(smoothstep(-0.05, 0.25, rimWood(x, z)), pineWood(x, z), birchWood(x, z), walls[i] / 255 * 0.85);
-      const marsh = inBounds(SB, x, z, 0) && inside(S, x, z) ? 1 : 0;
+      // (the swamp's mud and reeds, and fading out into the land over 20 to 40 m)
+      const sIn = inBounds(SB, x, z, 50) ? swampIn(x, z) : -50, marsh = sIn > 0 ? 1 : 1 - smoothstep(0, 30 + 10 * n2.noise(x * 0.02 + 7, z * 0.02), -sIn);
       forest = Math.max(forest, marsh * 0.55);
       const sand = c < W.sand - 25 ? 1 : c > W.sand + 27 ? 0 : 1 - smoothstep(W.sand - 25, W.sand + 15, c + 12 * p3.noise(x * 0.03, z * 0.03));
       // (the desert's sand, but for the river's banks: grass a few metres out from the water, and the floor of its trees)
@@ -410,7 +411,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       const i = iz * NX + ix;
       if (!grass[i]) continue;
       const x = xOf(ix), z = zOf(iz);
-      if (inBounds(SB, x, z, 0) && inside(S, x, z)) { grass[i] = Math.round(grass[i] * (1 - smoothstep(0.3, 0.45, swamp - heights[i]))); continue; }
+      if (inBounds(SB, x, z, 0) && swampIn(x, z) > 0) { grass[i] = Math.round(grass[i] * (1 - smoothstep(0.3, 0.45, swamp - heights[i]))); continue; }
       const d = wetAt(i, x, z);
       if (d > 0) grass[i] = Math.round(grass[i] * (1 - smoothstep(0, 0.1, d)));
     }
@@ -479,9 +480,10 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       const x = gx + (hx - 0.5) * STEP * 0.9, z = gz + (hz - 0.5) * STEP * 0.9;
       const hv = hash2(Math.round(x * 7), Math.round(z * 7), seed + 63), s = hash2(Math.round(x), Math.round(z), 5), i = clamp(Math.round((z - WORLD_Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.round((x - WORLD_X0) / CELL), 0, NX - 1);
       const y = heightAt(heights, x, z), rot = hx * Math.PI * 2, scale = 0.85 + hz * 0.35;
-      if (inBounds(SB, x, z, 0) && inside(S, x, z)) {
+      const sIn = inBounds(SB, x, z, 50) ? swampIn(x, z) : -50;
+      if (sIn > 0) {
         // (the swamp: none on the hamlet's ground, which is its own)
-        if (offPad(hamlet, x, z) < 6) continue;
+        if (hamletGround(hamlet, x, z) > 0.2) continue;
         if (y < swamp - 0.05 && hv < 0.035) tools.props.push({ kind: 'dead_tree_trunk', x, y: y - 0.1, z, rot, scale: 0.9 + hz * 0.5 });
         else if (y > swamp + 0.08 && hv < 0.12) tools.trees.push({ kind: s < 0.5 ? 'bush_a' : s < 0.8 ? 'bush_b' : 'birch_a', x, y, z, rot, scale });
         continue;
@@ -494,6 +496,12 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       }
       // (none in the desert's fringe east of the ridge, nor about the pass's mouth)
       if (sands[i * 4] > 128) continue;
+      // (the wet meadow round the swamp: the trees thinning out toward its shore, a bush here and there)
+      if (sIn > -35) {
+        const wet = 1 - smoothstep(0, 35, -sIn);
+        if (hv < 0.04 * wet && free(x, z)) { tools.trees.push({ kind: s < 0.5 ? 'bush_a' : 'bush_b', x, y, z, rot, scale }); continue; }
+        if (hash2(Math.round(x * 3), Math.round(z * 3), seed + 71) < wet * 0.85) continue;
+      }
       const pw = pineWood(x, z), bw = birchWood(x, z), vw = walls[i] / 255;
       const meadow = x < MB.x0 - 70 || x > MB.x1 + 70 || z < MB.z0 - 70 || z > MB.z1 + 70 ? 0 : inBox(MB, x, z, 40, 20), lone = hv < 0.012 * (1 - meadow);
       const inPines = pw > 0.05 && hv < pw * 0.62, inBirches = !inPines && bw > 0.05 && hv < bw * 0.5, onSlope = !inPines && !inBirches && vw > 0.1 && hv < vw * 0.45;
