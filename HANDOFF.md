@@ -48,6 +48,7 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 
 ## NEXT, RIGHT AFTER THE MAP DEPLOY (the owner, 2026-10-16, in their words)
 - "i have added a bunch of new weapons and guns for us to use with animations baked in. we need to part out their attachments per gun like all the rest of the guns and bring them in. We should not downscale the models when held in first person when possible, ensure proper rotation inventory icons and in the world. Make sure properly rigged and animated, be thorough we want high quality." Most come with their own attachments.
+- "some weapons have inspect animations and draw animations etc.. some dont. we will have to do our best."
 - "akimbo weapons are shot with left and right click controlling their respective hands".
 - "the grenade launcher and its ammo is an admin only weapon. ammo stack to 50 for the grenade launcher."
 - Tiers: "use common sense when tiering the loot. T4 should have weaker AR's that are rare, bunker should have all the best weapons"; the new melee weapon and new low-tier weapons into T2; "we can put some pistols in T1 now".

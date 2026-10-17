@@ -32,7 +32,6 @@ import type { Instance, POI, Site, Solid, World, Worn } from './types';
 import { catmullRom, evenOut, heightAt, squareIdx as idx, slopeAt, soften } from './ground';
 import { toWorld } from './west';
 import { openSquare, type Kept } from './opening';
-import { westStarts } from './west-plan';
 
 // ------------------------------------------------------------------ generation
 
@@ -2715,7 +2714,9 @@ function* worldStages(seed: number): Generator<string, World, void> {
     solids,
     spawn: starts[0],
     // (and along the green land's west edge, after the square's own: plan v2)
-    spawns: [...starts, ...westStarts()],
+    // (the ring round the old valley only: started on the beach, players were kilometres from anywhere. The owner,
+    // 2026-10-17: "people are complaining on the server about spawning too far. we need to revert the spawn locations back to the village")
+    spawns: starts,
     spawnRing: spawns,
     // (the west's towns, Kalat, the towns' slab walls and the water: plan v5)
     towns: world.towns,

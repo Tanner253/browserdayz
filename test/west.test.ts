@@ -16,7 +16,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
 import { moundAt } from '../src/sim/towns';
-import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
+import { SQUARE_HALF, generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
 const SQ = 769, HALF = 768, CELL = 2;
 const W = WG as unknown as Record<string, number> & typeof WG;
@@ -345,10 +345,9 @@ const ridge = (z: number) => RL.ridgeAt(z);
   for (let x = -3600; x <= -700; x += 40) for (let z = -740; z <= 740; z += 40) if (!WG.inPlay(x, z)) out++;
   assert.equal(out, 0, `${out} spots of the new land outside the Zona`);
   assert.ok(!WG.inPlay(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
-  const west = world.spawns.filter((s) => s.x < -2000);
-  assert.equal(west.length, PLAN.starts.z.length);
-  assert.ok(west.every((s) => s.x < ridge(s.z)[0] - 60 && heightAt(H, s.x, s.z) > SEA + 1), 'a start on the ridge or in the sea');
-  ok(`the Zona over all the new land out to the barrier; ${west.length} new starts in the desert along x ${PLAN.starts.x}, the square's own as they were`);
+  // (no start in the west: on the beach, players began kilometres from anywhere; 2026-10-17, "revert the spawn locations back to the village")
+  assert.equal(world.spawns.filter((s) => s.x < -SQUARE_HALF).length, 0, 'a start in the west');
+  ok(`the Zona over all the new land out to the barrier; the starts the square's own, round the village (${world.spawns.length})`);
 }
 
 // --- the ground bodies stand on: Rapier's heightfield of the whole world where the game lays it
