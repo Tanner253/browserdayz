@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { BUNKER, bunkerAt, bunkerDark, bunkerLocal, bunkerPlan, bunkerWays, inBunker, lampBurns, levelY } from '../src/sim/bunker';
-import { BUNKER_AT, EXPANSION, PLAY_RADIUS, bunkerPlace, generateWorld, heightAt, inPlay } from '../src/world/worldgen';
+import { BUNKER_AT, BUNKER_WAS, bunkerPlace, generateWorld, heightAt, inPlay } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 
 let n = 0;
@@ -20,17 +20,20 @@ const ground = (r: number, f: number) => {
   return heightAt(world.heights, x, z);
 };
 
-ok('it is straight across the map from the works, at the foot of the hills, and is part of where the game is played', () => {
+ok('it stands alone in the pines of the west, far from the fort, at the foot of a knoll, its way out to the road, in the Zona', () => {
+  // (plan v2, 2026-10-16: it was straight across the map from the works, in the foot of the hills there: BUNKER_WAS)
   assert.ok(P, 'the world has no bunker');
-  const cos = (BUNKER_AT.x * EXPANSION.x + BUNKER_AT.z * EXPANSION.z) / (Math.hypot(BUNKER_AT.x, BUNKER_AT.z) * Math.hypot(EXPANSION.x, EXPANSION.z));
-  assert.ok(cos < -0.999, 'it is not opposite the works');
-  assert.ok(Math.hypot(P.x, P.z) > PLAY_RADIUS && inPlay(P.x, P.z));
-  // its way out is toward the middle of the map, and the valley floor is level with it there
-  const [mx, , mz] = bunkerAt(P, 0, BUNKER.floor + BUNKER.wall - 4);
-  assert.ok(Math.hypot(mx, mz) < Math.hypot(P.x, P.z) && Math.hypot(mx, mz) < PLAY_RADIUS);
+  assert.ok(Math.hypot(P.x - BUNKER_AT.x, P.z - BUNKER_AT.z) < 0.01, 'it is not where it was put');
+  assert.ok(Math.hypot(P.x - world.castle!.x, P.z - world.castle!.z) > 2000 && inPlay(P.x, P.z), 'it is near the fort, or out of the Zona');
+  // its way out looks along BUNKER_AT.face, to the road, and the ground there is level with it
+  const [mx, , mz] = bunkerAt(P, 0, BUNKER.floor + BUNKER.wall - 4), l = Math.hypot(mx - P.x, mz - P.z);
+  assert.ok(((mx - P.x) * BUNKER_AT.face[0] + (mz - P.z) * BUNKER_AT.face[1]) / l > 0.99, 'its way out does not look to the road');
   assert.ok(Math.abs(heightAt(world.heights, mx, mz) - P.y) < 1.5, 'a step up or down at its mouth');
-  // and the hill stands over it behind
-  assert.ok(ground(0, -(BUNKER.floor + BUNKER.wall - 4)) > P.y + 15, 'no hillside behind it');
+  // and a knoll stands over it behind, and the pines about it
+  assert.ok(ground(0, -(BUNKER.floor + BUNKER.wall - 4)) > P.y + 5, 'no knoll behind it');
+  assert.ok(world.trees.filter((t) => t.kind.startsWith('pine') && Math.hypot(t.x - P.x, t.z - P.z) < 150).length > 80, 'no pines about it');
+  // (and where it was is the hillside again: no hole, no pad)
+  assert.ok(Math.abs(heightAt(world.heights, BUNKER_WAS.x, BUNKER_WAS.z) - heightAt(world.surface, BUNKER_WAS.x, BUNKER_WAS.z)) < 0.01);
 });
 
 ok('the ground round the pad is level, and under the pad it is dug out for the first level', () => {
