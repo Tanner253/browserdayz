@@ -484,8 +484,6 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   position: absolute;
   inset: 0;
   opacity: 0;
-  /* (a layer of its own: its beat and its fade are then the card's, and the page is not drawn again for them) */
-  will-change: opacity;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 0, 0, 0.55) 100%);
 }
 /* An open wound. Blood lands on the glass and runs; the edges of the view beat, faintly for a wound in a limb and
@@ -496,13 +494,14 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   inset: 0;
   opacity: 0;
   transition: opacity 0.5s;
-  will-change: opacity;
   background:
     radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(120, 0, 0, 0.36) 100%),
     radial-gradient(circle at 0% 100%, rgba(100, 0, 0, 0.4), transparent 30%),
     radial-gradient(circle at 100% 100%, rgba(100, 0, 0, 0.4), transparent 30%);
 }
-.hud-bleedfx.show { animation: bleedfx 1.15s ease-in-out infinite; }
+/* (a layer of its own only while it beats: as one always, over the whole screen and the game's picture under it, it cost
+   every frame, hurt or not, the fps players lost with the fight-stutter fix of 2026-10-17) */
+.hud-bleedfx.show { animation: bleedfx 1.15s ease-in-out infinite; will-change: opacity; }
 .hud-bleedfx.show[data-lvl="1"] { animation-name: bleedfx1; animation-duration: 1.5s; }
 .hud-bleedfx.show[data-lvl="3"] { animation-duration: 0.85s; }
 @keyframes bleedfx { 0%, 100% { opacity: 0.3; } 10% { opacity: 0.85; } 26% { opacity: 0.45; } 38% { opacity: 0.75; } 60% { opacity: 0.3; } }
