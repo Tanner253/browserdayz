@@ -280,7 +280,7 @@ export function tavernPlan(): Blueprint {
     },
     sign: { x: 1.4, y: 2.75, text: 'ТРАКТИР', sub: 'TAVERN' },
     dress: { plinth: { h: 0.5, key: 'plinth' }, trim: 'trim_white' },
-    usage: ['Town', 'Shop'],
+    usage: ['Town'],
   };
 }
 
@@ -314,7 +314,7 @@ export function merchantPlan(): Blueprint {
     upper: { h: 2.6, int: 'int_painted', floor: 'floor_wood', walls: [...outer([win(-4.2, -3.0), win(-1.2, 0.0), win(2.6, 3.8)]), inner([-0.5, -HD + 0.2], [-0.5, HD - 0.2], [door(1.6, 2.5)], 'int_painted', 'int_painted')], furniture: u.furniture, loot: u.loot },
     sign: { x: -1.1, y: 2.65, text: 'ЛАВКА', sub: 'SHOP' },
     dress: { plinth: { h: 0.5, key: 'plinth' }, trim: 'trim_white' },
-    usage: ['Shop', 'Town'],
+    usage: ['Shop'],
   };
 }
 
