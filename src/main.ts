@@ -244,6 +244,7 @@ async function boot() {
   if (westTowns) game.beside.push((_dt, eye) => westTowns.update(eye));
   if (kalatRuins) game.beside.push((_dt, eye) => kalatRuins.update(eye));
   if (caves) game.beside.push((_dt, eye) => caves.update(eye));
+  if (caves) game.darkBeside.push((x, y, z) => caves.dark(x, y, z));
   if (sea) game.beside.push((dt, eye, camera) => sea.update(dt, eye, camera));
   if (waters) {
     game.beside.push((dt, eye, camera) => waters.update(dt, eye, camera));

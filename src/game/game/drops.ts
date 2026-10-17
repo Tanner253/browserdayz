@@ -486,7 +486,8 @@ export const dropsMethods = {
     this.wreck?.update(dt, cam.position);
     // the basements: the bulbs near the eye, and the dark down them
     this.cellars.update(cam.position, this.lamps);
-    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cam.position.x, cam.position.y, cam.position.z));
+    const { x: cx, y: cy, z: cz } = cam.position;
+    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cx, cy, cz), castleDark(this.s.world.castle, cx, cy, cz, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cx, cy, cz), ...this.darkBeside.map((d) => d(cx, cy, cz)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
     // well so i can see in the dark without flashlight", 2026-10-13. Under a roof the day's light is the little

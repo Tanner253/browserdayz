@@ -216,6 +216,8 @@ export class Game {
   fires!: Fires;
   /** what is drawn beside the game and told each frame where the eye is (the west's towns, Kalat, the water: main.ts) */
   readonly beside: ((dt: number, eye: THREE.Vector3, camera: THREE.Camera) => void)[] = [];
+  /** and how dark it is under whatever of theirs covers a point, 0 to 1 (the pass's caves), with the bunker's and the cellars' dark */
+  readonly darkBeside: ((x: number, y: number, z: number) => number)[] = [];
   /** the doors of the lockers that have them: swung open while one is searched, by anybody (see ./lockers.ts) */
   lockers!: Lockers;
   /** the bunker: what is built of it, its door and its lamps */
