@@ -14,6 +14,12 @@ const WALK = KIT_LEVELS.walk;
 
 /** an opening with a sill and no glass: a belfry's arch, a shop's hatch */
 const arch = (a: number, b: number, bottom: number, top: number): Opening => ({ a, b, bottom, top, kind: 'gap' });
+/**
+ * How far a crate laid on another is set askew, along both of its building's ways: a crate is known by its place to a
+ * tenth of a metre (crateId in src/net/protocol.ts), and so far off along both is a tenth off along one of the world's
+ * ways however the building is turned. Two in one place were one container on the server.
+ */
+export const STACK = 0.15;
 /** where a part of a building opens into the next part of it (see Blueprint.joined): no door, no step */
 const join = (a: number, b: number, top: number): Opening => ({ a, b, bottom: 0, top, kind: 'gap', join: true });
 /** a rack whose boards hold things (see RACKS in buildings.ts: its places are made last) */
@@ -291,7 +297,8 @@ export function merchantPlan(): Blueprint {
   rack(g, 'rack_wide', -4.0, -3.95, 0);
   rack(g, 'rack_wide', -1.6, -3.95, 0);
   g.floor([-2.6, 2.6], [0.6, -1.6]);
-  g.put('wooden_military_crate', 3.0, -3.8, 0).put('wooden_crate_01', 3.0, -3.8, 0, 0.5).put('Barrel_01', 2.8, 3.8).floor([3.0, 1.4]);
+  // (a crate on a crate set askew: a crate is known by its place to a tenth of a metre, and two in one place were one: STACK)
+  g.put('wooden_military_crate', 3.0, -3.8, 0).put('wooden_crate_01', 3.0 + STACK, -3.8 + STACK, 0.06, 0.5).put('Barrel_01', 2.8, 3.8).floor([3.0, 1.4]);
   const u = new Floor();
   u.top('WoodenTable_01', -3.0, 0.6, 0, 0.57).put('painted_wooden_chair_01', -3.4, 1.3, PI).put('painted_wooden_chair_01', -2.6, -0.1, 0).put('scandinavian_masonry_heater', -4.6, -3.4, 0).floor([-1.2, 2.8]);
   u.bed(3.9, -2.9).top('painted_wooden_cabinet', 1.6, -3.95, 0, 1.2).case('Shelf_01', 1.0, 4.1, PI, [0.66, 1.22]).floor([2.4, 1.0]);
@@ -429,7 +436,7 @@ export function sawmillPlan(): Blueprint {
   const HW = 10, HD = 3.5;
   const g = new Floor();
   g.top('painted_wooden_table', -1.5, -0.9, 0, 0.98, 2);
-  for (const [x, z] of [[-7.6, -2.4], [-7.6, -0.9], [4.2, -2.6]] as [number, number][]) g.put('old_military_crate', x, z, 0).put('old_military_crate', x, z, 0.04, 0.3).put('old_military_crate', x, z, -0.03, 0.6);
+  for (const [x, z] of [[-7.6, -2.4], [-7.6, -0.9], [4.2, -2.6]] as [number, number][]) g.put('old_military_crate', x, z, 0).put('old_military_crate', x + STACK, z + STACK, 0.04, 0.3).put('old_military_crate', x + 2 * STACK, z, -0.03, 0.6);
   g.put('Barrel_01', 8.6, 2.6).put('wooden_ladder', 9.45, 0.4, -Q).floor([-5.0, 1.6], [1.6, 1.8], [6.4, -0.4]);
   rack(g, 'rack_small', 8.7, -2.9, 0);
   return {
