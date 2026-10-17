@@ -721,14 +721,19 @@ export class BigMap {
 
   // ------------------------------------------------------------------ opened and shut
 
-  /** @param x,z where the player stands: the sheet opens whole, and is brought near about there */
+  /**
+   * @param x,z where the player stands: the sheet opens about them, as near as the old square was whole (it opened on
+   * the square wherever they were, and in the west they were off it: the owner, 2026-10-17, "when i open the map it
+   * shows it only on the old map ... zoomed in on the player by default")
+   */
   show(x: number, z: number) {
     this.open = true;
     this.root.hidden = false;
     this.me.x = x;
     this.me.z = z;
     this.zoom = 1;
-    this.at = { x: 0, z: 0 };
+    this.at = { x, z };
+    if (this.view.width > 2) this.clamp();
     this.down.clear();
     this.tip.hidden = true;
     this.whoBox.hidden = true;

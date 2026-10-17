@@ -153,6 +153,8 @@ export interface TimedAction {
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
 // (24, 2026-10-16: the map three times over)
 export const LOOT_REV = 24;
+/** how far over the ridge's crest its invisible wall stands, metres: past it a helicopter flies over */
+const RIDGE_OVER = 18;
 /** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */
 const WEST_PLACES: Record<string, [string, MenuSpot['kind'], Tier]> = {
   Pokrov: ['A monastery town in the green west: the cathedral and its belfry inside white walls, the monks\' cells and refectory, and below the walls a street of a tavern, merchants\' houses and a smithy.', 'town', 3],
@@ -1006,11 +1008,17 @@ export class Game {
       // And one along the ridge's crest, the whole height of the map, but where the pass goes through it (plan v5:
       // "both sides of the map canyon walls stretching to the skybox so they cant be walked around"); over a cave, from
       // over its roof (the long way goes under it: src/sim/pass.ts caveSpansUnder), only that stretch of it raised.
+      // (Up to RIDGE_OVER over the crest, no higher: a helicopter flies over it (the owner, 2026-10-17: "can we make it
+      // so you can fly the heli over the desert wall"); nobody climbs or jumps that much.)
       for (const [ax, az, bx, bz] of ridgeWall(WORLD_Z0, WORLD_Z1)) {
         const yaw = Math.atan2(-(bz - az), bx - ax), L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
+        let crest = -Infinity;
+        for (let t = 0; t <= 1; t += 0.125) crest = Math.max(crest, heightAt(world.heights, ax + (bx - ax) * t, az + (bz - az) * t));
+        const top = crest + RIDGE_OVER;
         for (const { from, to, foot } of wallParts(L, caveSpansUnder(passPlan, ax, az, bx, bz), -400, 0.6)) {
+          if (top - foot < 1) continue;
           const m = (from + to) / 2;
-          physics.addStaticQuat(physics.R.ColliderDesc.cuboid((to - from) / 2, (400 - foot) / 2, 0.6), 'rock', { x: ax + ux * m, y: (400 + foot) / 2, z: az + uz * m }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
+          physics.addStaticQuat(physics.R.ColliderDesc.cuboid((to - from) / 2, (top - foot) / 2, 0.6), 'rock', { x: ax + ux * m, y: (top + foot) / 2, z: az + uz * m }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
         }
       }
     }
