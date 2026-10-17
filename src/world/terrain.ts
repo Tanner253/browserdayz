@@ -931,6 +931,8 @@ precision highp sampler2DArray;
 #define GROUND_LAYERS ${KIND_NAMES.length + 1}
 #define GROUND_TRODDEN ${KIND_AT.trodden}
 #define GROUND_CRAG ${KIND_AT.crag}
+#define GROUND_DUNE ${KIND_AT.dune}
+#define GROUND_CANYON ${KIND_AT.canyon}
 #define GROUND_CRAG_MOSS ${KIND_NAMES.length}
 uniform sampler2DArray tColour;
 uniform sampler2DArray tRelief;
@@ -1144,6 +1146,18 @@ kindW[4] = wB.r; kindW[5] = wB.g; kindW[6] = wB.b; kindW[7] = wB.a;
 kindW[8] = wC.r; kindW[9] = wC.g; kindW[10] = wC.b; kindW[11] = wC.a;
 kindW[12] = wD.r; kindW[13] = wD.g; kindW[14] = wD.b; kindW[15] = wD.a;
 kindW[16] = wE.r; kindW[17] = wE.g;
+// (In the desert's canyon country a face is its layered rock, whatever the paint at its foot or its top: the paint is
+// laid on a net of two metres, and a shelf's sand ran up the riser under it in pale teeth. By the pixel's own slope,
+// from about 44 degrees, and only where any of the desert's kinds are: the green land's faces are as they were.)
+{
+  float sandy = 0.0;
+  for (int k = GROUND_DUNE; k < GROUND_KINDS; k++) sandy += kindW[k];
+  float sheer = smoothstep(0.72, 0.6, gN.y) * min(1.0, sandy * 4.0);
+  if (sheer > 0.0) {
+    for (int k = 0; k < GROUND_KINDS; k++) kindW[k] *= 1.0 - sheer;
+    kindW[GROUND_CANYON] += sheer;
+  }
+}
 int pick[3];
 float layerW[3];
 pick[0] = 0; pick[1] = 0; pick[2] = 0;

@@ -81,6 +81,12 @@ export const KINDS = {
 } satisfies Record<string, Kind>;
 
 /**
+ * The scanned rocks of the canyon country (coast-kit's Namaqualand boulders and cliffs, the mountainside, the rock
+ * faces that dress the pass): grey as they came, they are washed with the beds' red to stand in them, not on them.
+ */
+export const CANYON_ROCK_TINT: [number, number, number] = [1.28, 0.9, 0.64];
+
+/**
  * The moss on a bank's slabs: not a kind of ground with a place of its own, but a picture the paint lays over the
  * crag where moss would grow (in the slabs' joints, on what of them faces up, more of it on the side of a hill the
  * sun does not reach). A mossy, lichened rock photographed close: on the slabs it is the moss and not the rock.
