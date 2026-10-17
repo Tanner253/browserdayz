@@ -196,7 +196,7 @@ const D: ItemDef[] = [
   // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the .50 sniper rifle is.
   {
     id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
-    desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. Its scope turns from two to six times on the mouse wheel, with a PSO's chevrons and range lines.',
+    desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. Its scope turns from two to six times on the mouse wheel, with the chevrons and range lines of a PSO.',
     weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, shows: { mag_vssk: ['mag', 'bullet'] } }, iconYaw: 0,
   },
   // A pair of submachine guns, one in each hand (2026-10-17): the left button fires the left one, the right button the
