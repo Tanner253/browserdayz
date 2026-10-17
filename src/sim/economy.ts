@@ -180,6 +180,7 @@ export const TYPES: Record<string, TypeRule> = {
   sniper50: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 900, usage: [], loaded: [1, 5] },
   mag_sniper50: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 900, usage: [] },
   ammo_50bmg: { at: [0, 0, 0, 0, 4], lifetime: 3600, restock: 600, usage: [], qty: [0.3, 0.8] },
+  dual_sawnoff: { at: [0, 6, 3, 0, 0], lifetime: 7200, restock: 240, usage: ['Hunting', ...HOMES], loaded: [0, 4], keep: SOON },
   dual_mac10: { at: [0, 0, 3, 2, 0], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [10, 40], keep: SOON },
   mag_dual_mac10: { at: [0, 0, 3, 2, 0], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON },
   mac10_suppressor: { at: [0, 0, 1, 2, 1], lifetime: 7200, restock: 1800, usage: ARMY },

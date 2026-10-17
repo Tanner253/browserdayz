@@ -280,6 +280,7 @@ const HELD = {
   // (that maker's packs stand their camera half a metre behind where they are put: as the sniper's)
   dual_smg: new THREE.Vector3(0, -0.02, -0.36),
   dual_mac10: new THREE.Vector3(0, -0.02, -0.36),
+  dual_sawnoff: new THREE.Vector3(0, -0.04, -0.38),
   sniper50: new THREE.Vector3(0.14, -0.22, -0.36),
   barrett: new THREE.Vector3(0.14, -0.22, -0.36),
   vssk: new THREE.Vector3(0.14, -0.22, -0.36),
@@ -1317,6 +1318,11 @@ export class Weapons {
       pack: 'dualsmg', item: 'dual_mac10', gun: 'dualmac', kind: 'auto', hands: true, hip: HELD.dual_mac10, flashSize: 0.22, flash: mkFlash(), strip: [],
       ride: { base: 'base', bolt: 'bolt', trigger: 'trigger', mag: 'mag', silencer: 'base' },
       twin: { ride: { base: 'base_2', bolt: 'bolt_2', trigger: 'trigger_2', mag: 'mag_2', silencer: 'base_2' }, flash: mkFlash(), roots: { L: ['smg2Left', 'L_arm_01'], R: ['smg2Right', 'R_arm_025'] } },
+    }));
+    this.models.set('dual_sawnoff', await this.packGun({
+      pack: 'sawnoffs', item: 'dual_sawnoff', gun: 'sawnoffs', kind: 'rifle', hands: true, hip: HELD.dual_sawnoff, flashSize: 0.32, flash: mkFlash(), strip: [],
+      ride: { base: 'base', trigger: 'trigger1', front: 'front', slug1: 'slug1', slug2: 'slug2' },
+      twin: { ride: { base: 'base_2', trigger: 'trigger1_2', front: 'front_2', slug1: 'slug1_2', slug2: 'slug2_2' }, flash: mkFlash(), roots: { L: ['sawnoffL', 'L_arm_01'], R: ['sawnoffR', 'R_arm_025'] } },
     }));
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
@@ -3647,7 +3653,9 @@ export class Weapons {
     if (m.twin) {
       for (const s of ['L', 'R'] as const) {
         m.twin.shotT[s] += dt;
-        if (m.twin.shotT[s] < len) rig.layer(shot, m.twin.shotT[s] / len, m.twin.roots[s]);
+        // (a pack that draws each hand's shot by itself, the sawn-offs: `fireL`, `fireR`; one that draws both at once: `fire`)
+        const own = rig.has(`fire${s}`) ? `fire${s}` : shot, ownLen = rig.seconds(own);
+        if (m.twin.shotT[s] < ownLen) rig.layer(own, m.twin.shotT[s] / ownLen, m.twin.roots[s]);
       }
     }
     // (a pistol on a pack with no drawing of a last shot: run dry, its slide stays back)

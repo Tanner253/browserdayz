@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T13:46:48.691Z",
+ "generated": "2026-10-17T13:52:49.159Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -11884,6 +11884,118 @@
    "hi": "assets/models/hi/dualmac.glb",
    "hiBytes": 1928972,
    "hiCard": 84
+  },
+  "sawnoffs": {
+   "url": "assets/models/sawnoffs.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 321596,
+   "srcTris": 4724,
+   "tris": 4724,
+   "min": [
+    -0.0584,
+    -0.0967,
+    -0.0307
+   ],
+   "max": [
+    0.462,
+    0.0315,
+    0.0307
+   ],
+   "lods": [],
+   "holds": {
+    "right": [
+     -0.08,
+     -0.02,
+     0.03
+    ],
+    "left": [
+     -0.08,
+     -0.02,
+     -0.26994
+    ]
+   },
+   "hi": "assets/models/hi/sawnoffs.glb",
+   "hiBytes": 1825824,
+   "hiCard": 64
+  },
+  "sawnoffs_fp": {
+   "url": "assets/models/sawnoffs_fp.glb",
+   "tags": [
+    "viewmodel"
+   ],
+   "bytes": 52720,
+   "srcTris": 17000,
+   "tris": 17000,
+   "min": [
+    -0.0584,
+    -0.0967,
+    -0.0307
+   ],
+   "max": [
+    0.462,
+    0.0315,
+    0.0307
+   ],
+   "lods": [],
+   "rig": {
+    "fps": 30,
+    "clips": {
+     "fire": [
+      0,
+      10
+     ],
+     "fireR": [
+      0,
+      10
+     ],
+     "fireL": [
+      12,
+      22
+     ],
+     "reload": [
+      32,
+      66
+     ]
+    },
+    "view": [
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0,
+     0,
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "frame": [
+     0,
+     0,
+     -0.01,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0,
+     -0.039051,
+     -0.03774,
+     -0.11997,
+     1
+    ]
+   }
   }
  }
 }

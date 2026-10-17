@@ -201,6 +201,13 @@ const D: ItemDef[] = [
     desc: 'Two MAC-10s in .45 ACP, one in each hand: left button for the left, right button for the right. Thirty rounds in each and very fast. Never aimed down a sight.',
     weapon: { kind: 'auto', ammo: 'ammo_45', capacity: 60, mag: 'mag_dual_mac10', ergo: 50, modes: ['auto', 'semi'], akimbo: true, shows: { mag_dual_mac10: ['mag'], mac10_suppressor: ['silencer'] } }, iconYaw: 0,
   },
+  // A pair of sawn-off shotguns (2026-10-17), one in each hand: left button the left, right button the right. Two
+  // shells in each, both broken open and loaded together. Common in the countryside (T2).
+  {
+    id: 'dual_sawnoff', name: 'Sawn-Offs', model: 'sawnoffs', w: 5, h: 3, weight: 4.2, category: 'weapon', slot: 'long',
+    desc: 'Two sawn-off 12 gauge shotguns, one in each hand: left button for the left, right button for the right. Two shells in each; murderous up close, nothing at range.',
+    weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 4, ergo: 45, action: 'self', akimbo: true }, iconYaw: 0,
+  },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
   {
     id: 'aks74u', name: 'AKS-74U', model: 'aks74u', w: 6, h: 3, weight: 2.7, category: 'weapon', slot: 'long',

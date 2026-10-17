@@ -1283,6 +1283,30 @@ export const WEAPON_PACKS = {
       changes: 'set in rigid pieces and held in our own arms moved as the dual submachine guns pack moves its own, textures at 2048',
     },
   },
+  sawnoffs: {
+    dir: 'sawnoffs',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 0.01,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (a sawn-off in each hand: the right one's pieces are the gun alone, the left one's (_2) a second copy in the game)
+    parts: { base: 'base', release: 'base', trigger1: 'trigger', trigger2: 'trigger', front: 'front', unloader: 'front', slug1: 'slug1', slug2: 'slug2' },
+    keep: ['sawnoffL', 'sawnoffR', 'base_2', 'release_2', 'trigger1_2', 'trigger2_2', 'front_2', 'unloader_2', 'slug1_2', 'slug2_2'],
+    ourArms: true,
+    wrists: { right: 'R_wrist_027', left: 'L_wrist_03' },
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    // (the right one fires, then the left, then both are broken open and loaded, by where their pieces move)
+    clips: { fire: [0, 10], fireR: [0, 10], fireL: [12, 22], reload: [32, 66] },
+    credit: {
+      name: 'sawnoffs Animated',
+      url: 'https://sketchfab.com/3d-models/sawnoffs-animated-001bec4277414a62bb8ad9b2a1a7abcb',
+      author: 'DJMaesen',
+      line: 'This work is based on "sawnoffs Animated" (https://sketchfab.com/3d-models/sawnoffs-animated-001bec4277414a62bb8ad9b2a1a7abcb) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
+    },
+  },
   aks74u: {
     dir: 'aks74u',
     file: 'scene.gltf',
