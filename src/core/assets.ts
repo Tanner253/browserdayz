@@ -3,7 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { LEAN, TOUCH } from './device';
-import { Strips } from './strips';
+import { STRIP_OVER, Strips } from './strips';
 import { breathe } from './breathe';
 
 export interface ModelEntry {
@@ -111,8 +111,6 @@ function thin(t: THREE.Texture, over = THIN_OVER) {
 const KEEP_SHARP = 10;
 /** one picture goes onto the card at a time, this many milliseconds apart: each is a frame's worth of work for it, and a gun's nine at once were half a second of nothing */
 const SHARPEN_EVERY = 45;
-/** a picture bigger than this a side is more than a frame's worth however it is spaced: it goes a strip at a time (see ./strips.ts) */
-const STRIP_OVER = 1024;
 
 /** as many pictures waiting to go on as this, and the next model's are not unpacked yet: each one waiting is up to 64 MB of the page's memory */
 const SHARP_BACKLOG = 3;

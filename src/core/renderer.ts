@@ -785,6 +785,8 @@ export class Renderer {
         }
       }
     });
+    // (Not in strips, as the sharp pictures go: tried 2026-10-16, a thing waited for its strips before it was drawn
+    // ahead, the loot's six seconds ran out first, and each new thing of loot was half a second in its first frame.)
     for (const t of pictures) {
       await breathe();
       this.renderer.initTexture(t);

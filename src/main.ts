@@ -224,13 +224,19 @@ async function boot() {
   }
   // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
   const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
-  if (outcrops) void outcrops.build();
+  if (outcrops) void outcrops.build().then(() => ready(outcrops.group));
   if (caves) buildings.lootPoints.push(...caveLootPoints());
+  // (the sea's, the lakes' and the river's water and the swamp's mist got ready as they are made: hidden at the start
+  // (the mist by day) they were a shader made in the frame they were first shown. Only these few: everything the west
+  // made, got ready at once, held the loot's own getting ready past its six seconds, and each new thing of loot was
+  // half a second in the frame it was first drawn.)
+  const beforeWater = new Set(r.scene.children);
   const sea = arena ? null : new Ocean(r.scene, atmo, {
     seaLevel: SEA_LEVEL, x0: WORLD_X0 - 300, x1: -3560, z0: WORLD_Z0, z1: WORLD_Z1, beyond: { west: 16000, north: 6000, south: 6000 },
     depthAt: (x, z) => SEA_LEVEL - heightAt(world.heights, Math.max(x, WORLD_X0), Math.min(WORLD_Z1, Math.max(WORLD_Z0, z))),
   });
   const waters = !arena && world.water ? new Waterways(r.scene, atmo, world.water, ground, { seaLevel: SEA_LEVEL }) : null;
+  void r.ready(r.scene.children.filter((o) => !beforeWater.has(o)));
   // (the road and the works are far outside the fort's arena: not built for a wager)
   if (!arena) buildRoad(world, atmo, r.scene, (o) => r.ready(o));
   if (!arena) buildWorks(world, atmo, r.scene);

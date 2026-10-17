@@ -16,6 +16,13 @@ import { steady } from './breathe';
  * one call would have put there, pixel for pixel: the same call, the same picture, in parts.
  */
 
+/**
+ * A picture bigger than this a side is more than a frame's worth however it is spaced, and goes a strip at a time
+ * (assets.ts `sharpen`, Renderer.send). It was 1024, and the 1024s, most pictures of all, went whole: 20 to 27 ms each
+ * on the owner's laptop, one every SHARPEN_EVERY while walking through a town (2026-10-16: "drops from 100 fps to 30
+ * fps"); a 512 was 19.
+ */
+export const STRIP_OVER = 256;
 /** what a frame gives to this: so many milliseconds, or this share of the frame where frames are long (a slow computer is not kept waiting a minute for its pictures) */
 const BUDGET_MS = 2, BUDGET_OF_FRAME = 0.12, BUDGET_MOST = 40;
 /** and what one strip is sized to take: what is over when a strip runs long is no more than this */
