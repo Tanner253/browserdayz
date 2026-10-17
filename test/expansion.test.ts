@@ -12,6 +12,7 @@ const BUNKER_WAS = (WGX.BUNKER_WAS ?? WG.BUNKER_AT) as { x: number; z: number },
 const SQUARE_HALF = (WGX.SQUARE_HALF ?? 768) as number, SQUARE_RES = (WGX.SQUARE_RES ?? 769) as number, WORLD_NX = (WGX.WORLD_NX ?? 769) as number;
 const WORLD_X0 = (WGX.WORLD_X0 ?? -768) as number, WORLD_Z0 = (WGX.WORLD_Z0 ?? -768) as number;
 import { buildWorldData } from '../server/world';
+import { TOWN_PLOT } from '../src/world/buildings';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
@@ -736,9 +737,9 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   const wreck = wreckUnder(b), ofFort = (q: { building: string }) => q.building === 'castle' || q.building === 'hamlet', end = data.lootPoints.findIndex(ofFort), last = data.lootPoints.slice(end - HELI - wreck.spots.length, end - HELI), about = data.lootPoints.slice(end - HELI, end);
   // (the fort's own, and its hamlet's before the gate, which are a place of their own to the map: 'hamlet')
   // (the basements' come after the fort's since 2026-10-14, the newest lot last: `cellar`; and Kalat's after all, plan v5: `ruins_`)
-  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.building.startsWith('ruins_') || q.building.startsWith('cave_')), "the fort's places for things are not the last there are");
+  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "the fort's places for things are not the last there are");
   const cellarsAt = data.lootPoints.findIndex((q) => q.building === 'cellar');
-  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.building.startsWith('ruins_') || q.building.startsWith('cave_')), "something after the basements' places that is not theirs");
+  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "something after the basements' places that is not theirs");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
   assert.ok(heli && inPlay(heli.x, heli.z, 15), 'no helicopter by the fort');

@@ -137,10 +137,16 @@ export const PLAN = {
   },
   /** KALAT, the ruined town (src/sim/ruins.ts), set down whole: its frame (its long axis north and south), and its land eased into the desert from so far to so far out of its top */
   kalat: { name: 'Kalat', x: -3215, z: 230, rot: Math.PI / 2, blend: [130, 210] as P, reach: 440 },
-  /** the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts): none now */
-  towns: {} as Record<string, { x?: number; z?: number; rot?: number }>,
+  /**
+   * the towns where plan v5's ground sets them otherwise than their own data does (src/sim/towns.ts). Zastava, the post
+   * at the pass's east mouth, on the green river valley's floor just out of it, east enough that its pad and the 40 m
+   * its edge is eased over keep off the ridge's foot (~-2085: its plan's middle, -2040, levelled the pass's first shelves):
+   * the road comes down to the floor past its west end (clear of its watchtower's knoll) and turns into the pass, the river
+   * runs along its north side.
+   */
+  towns: { Zastava: { x: -1965, z: -452 } } as Record<string, { x?: number; z?: number; rot?: number }>,
   /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
-  tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2 } as Record<string, Tier>,
+  tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2, Zastava: 3 } as Record<string, Tier>,
   /**
    * The roads: the main one from the loop's west bend through the trader and Pokrov's lane, north-west to the pass's
    * mouth, through it beside the river (`pass`: so far south of its middle) and out across the desert past Kalat to the
@@ -199,8 +205,7 @@ export function westZona(): { x: number; z: number; r: number }[] {
 }
 
 /** the towns as the map has them: where their own data plans them, but where plan v5's ground asks otherwise (PLAN.towns) */
-// (but Zastava, at the pass's mouth, which the places lane sets down)
-export const PLACED: Town[] = TOWNS.filter((t) => t.name !== 'Zastava').map((t) => ({ ...t, ...PLAN.towns[t.name] }));
+export const PLACED: Town[] = TOWNS.map((t) => ({ ...t, ...PLAN.towns[t.name] }));
 /** the loot step of the new places: the towns by their own, the pass's floor high (Kalat's are its own): null outside them. For buildings.ts, which says each loot point's tier. */
 export function westTier(x: number, z: number): Tier | null {
   for (const t of PLACED) {
