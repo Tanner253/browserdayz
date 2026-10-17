@@ -878,7 +878,9 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the MP7's sights stay folded flat in its pack's hands, as on the gun itself until they are flipped up: the line
   // runs over the middle of the folded rear ring and the folded front hood, scripts/sight-profile.mjs and
   // progress/weapons/sight-in-hands.js)
-  mp7a1: { notch: [-0.0957, 0.1382, -0.0076], post: [0.137, 0.1356, -0.0067] },
+  // (the MP7's rear: a notch between two ears on its drum. The eye was over the ears, where the front post stood hidden
+  // behind them: through the notch, the post's tip in it)
+  mp7a1: { notch: [-0.089, 0.1338, -0.0076], post: [0.137, 0.1352, -0.0067] },
   // (the double barrel's: along the rib between its barrels, from over the breech to the bead at the muzzle)
   db12: { notch: [0.3, 0.1135, -0.0094], post: [0.96, 0.113, -0.0094] },
   // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
@@ -1374,7 +1376,9 @@ export class Weapons {
     this.models.set('sniper50', await this.packGun({ pack: 'sniper50', item: 'sniper50', gun: 'sniper50', kind: 'rifle', hands: true, hip: HELD.sniper50, flashSize: 0.4, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', boltrear: 'boltback', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'bullet' } }));
     // (the Barrett and the VSSK came with no movements: held in the .50's, on its pieces' nodes; their own bolts stand still, they load themselves)
     this.models.set('barrett', await this.packGun({ pack: 'sniper50', item: 'barrett', gun: 'barrett', kind: 'rifle', hands: true, hip: HELD.barrett, flashSize: 0.45, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bolt: 'base', trigger: 'trigger' } }));
-    this.models.set('m32', await this.packGun({ pack: 'sniper50', item: 'm32', gun: 'm32', kind: 'rifle', hands: true, hip: HELD.m32, flashSize: 0.3, flash: mkFlash(), strip: [], ride: { base: 'base', cylinder: 'base', sight: 'base', trigger: 'trigger' } }));
+    // (squared to the eye when aimed, its sight's tube along the eye's line: held as the pack holds its own rifle, the
+    // tube looked down at a slant, its far end low in its window)
+    this.models.set('m32', await this.packGun({ pack: 'sniper50', item: 'm32', gun: 'm32', kind: 'rifle', hands: true, hip: HELD.m32, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: { base: 'base', cylinder: 'base', sight: 'base', trigger: 'trigger' } }));
     this.models.set('vssk', await this.packGun({ pack: 'sniper50', item: 'vssk', gun: 'vssk', kind: 'rifle', hands: true, hip: HELD.vssk, flashSize: 0.2, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bullet: 'mag' } }));
     // (a pair: the right hand's gun on its own nodes, the left's on the _2 nodes; each hand and its gun fire by themselves)
     this.models.set('dual_smg', await this.packGun({
@@ -1714,7 +1718,14 @@ export class Weapons {
     // the ring of its tube, front and back; the lit mark is put where it was, as in any other sight's glass.
     const lensOf = LENS[o.item];
     let lens: { at: THREE.Vector3; axis: THREE.Vector3 } | null = null;
-    for (const p of lensOf ? alone : []) if (p.name.replace(/_\d+$/, '') === lensOf) lens = cutLens(p.geometry) ?? lens;
+    // (A sight whose glass is a piece of its own, the M32's: the middle of that glass is the middle of its tube, and the
+    // glass is not in the hands (see the hung pieces); its rings guessed from their faces put the eye over the tube's
+    // middle, its far end low in its window.)
+    const glass = lensOf ? alone.find((p) => p.name.replace(/_\d+$/, '') === lensOf && /lens/i.test((p.material as THREE.Material).name)) : undefined;
+    if (glass) {
+      glass.geometry.computeBoundingBox();
+      lens = { at: glass.geometry.boundingBox!.getCenter(new THREE.Vector3()), axis: new THREE.Vector3(1, 0, 0) };
+    } else for (const p of lensOf ? alone : []) if (p.name.replace(/_\d+$/, '') === lensOf) lens = cutLens(p.geometry) ?? lens;
     // the muzzle, in the gun's own space: the front of the barrel, at the height of the bore
     const bore = o.kind === 'pistol' ? top.max.y - (top.max.y - top.min.y) * (FIT[o.item]?.bore ?? 0.42) : THREE.MathUtils.lerp(span.min.y, span.max.y, 0.62);
     const mouth = new THREE.Vector3(span.max.x, bore, (span.min.z + span.max.z) / 2);
@@ -2053,14 +2064,16 @@ export class Weapons {
     // aimed: the sights on the middle of the picture, a hand's width nearer than from the hip.
     // (A pistol's: the eye level with the top of them, so that what is aimed at sits on the front
     // post. A centimetre higher and the shot went into the air over the gun, with nothing to say where.)
-    let irons = long ? null : new THREE.Vector3(-c.x, -sight.max.y - 0.002, o.hip.z + 0.07);
+    // (the eye 2 mm over the top of a pistol's sights; the Colt's level with them: over them its front sight was hidden behind its rear)
+    const over = o.item === 'colt' ? 0 : 0.002;
+    let irons = long ? null : new THREE.Vector3(-c.x, -sight.max.y - over, o.hip.z + 0.07);
     if (!long && o.square && hung.has('slide')) {
       // (A pistol in a pack that holds its gun turned in and leaning: the back of the top of its slide, where its
       // notch is, as it stands once it is squared to the eye. The box of a slide that leans is not its top.)
       const sb = new THREE.Box3();
       for (const p of alone) if (p.name.replace(/_\d+$/, '') === 'slide') sb.union(p.geometry.boundingBox!);
       const rear = squared(new THREE.Vector3(sb.min.x, sb.max.y, (sb.min.z + sb.max.z) / 2).add(nudge).applyMatrix4(hung.get('slide')!.matrixWorld));
-      irons = new THREE.Vector3(-rear.x, -rear.y - 0.002, o.hip.z + 0.07);
+      irons = new THREE.Vector3(-rear.x, -rear.y - over, o.hip.z + 0.07);
     }
     // A gun in the rifle's hands with sights of its own (the shotgun: a post at the muzzle, a notch on the action)
     // is aimed along them as a pistol is: the eye level with the top of the post, and in line with it. (It was
@@ -2108,7 +2121,9 @@ export class Weapons {
     const glassAt = new THREE.Vector3(hung.size ? glassX : c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2);
     const through = lensRig ? glassAt.clone().applyEuler(opticRot) : squared(glassAt);
     const lit = dotAt ? squared(dotAt) : null;
-    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
+    // (a sight of its own looked through, the M32's: as near the eye as a holographic sight stood on a gun is, 10 cm
+    // behind it, its window round its mark. At 20 cm it was a small ring in the middle of the view, off the gun.)
+    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig && o.item === 'm32' ? 0.1 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
     const tip = post ? squared(post as THREE.Vector3) : null;
     const mouthAt = long && hung.has('base') ? frontOf(hung.get('base')!) : null;
