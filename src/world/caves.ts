@@ -18,7 +18,7 @@ import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
 import { carving, type Carved } from './cave-carve';
-import { KINDS } from './ground';
+import { CANYON_ROCK_TINT, KINDS } from './ground';
 import { GROUND_KNEE } from './rock-blend';
 import { RockField } from './rock-field';
 import { passData } from './worldgen';
@@ -66,9 +66,10 @@ export class PassCaves {
     return caveDark(this.pass, x, y, z, this.gs);
   }
 
-  /** `heightTex`: the terrain's heights, for the rock to fade into the ground (src/world/rock-blend.ts); `tint` a wash */
-  async build(o: { solid?: boolean; carved?: Carved[]; heightTex?: THREE.Texture; tint?: [number, number, number] } = {}) {
-    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: o.tint, flat: 'grit' });
+  /** `heightTex`: the terrain's heights, for the rock to fade into the ground (src/world/rock-blend.ts) */
+  async build(o: { solid?: boolean; carved?: Carved[]; heightTex?: THREE.Texture } = {}) {
+    // (the scans washed with the pass's beds' red, so that a piece stands in the wall and not on it: src/world/ground.ts)
+    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: CANYON_ROCK_TINT, flat: 'grit' });
     await this.field.build({ solid: o.solid });
     this.carved = o.carved ?? (await this.carveAll());
     const mat = this.rockMaterial();

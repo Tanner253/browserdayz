@@ -22,6 +22,7 @@ import { caveMouths } from './sim/pass';
 import { caveLootPoints } from './world/caves-carved';
 import { PassCaves } from './world/caves';
 import { RockField } from './world/rock-field';
+import { CANYON_ROCK_TINT } from './world/ground';
 import { outcropPieces } from './world/outcrops';
 import { passPlan } from './world/worldgen';
 import { loadWorld } from './world/load-world';
@@ -217,7 +218,7 @@ async function boot() {
   const caves = arena ? null : new PassCaves(r.scene, atmo, passPlan, ground);
   if (caves) void caves.build({ carved: world.caves, heightTex: terrain.heightTex });
   // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
-  const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit' });
+  const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
   if (outcrops) void outcrops.build();
   if (caves) buildings.lootPoints.push(...caveLootPoints());
   const sea = arena ? null : new Ocean(r.scene, atmo, {
