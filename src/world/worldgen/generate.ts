@@ -2722,5 +2722,6 @@ function* worldStages(seed: number): Generator<string, World, void> {
     kalat: world.kalat,
     slabs: world.slabs,
     water: world.water,
+    sand: world.sand,
   };
 }

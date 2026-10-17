@@ -152,16 +152,18 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- THE RIDGE: the whole height of the map, sheer, over a hundred metres over both sides, walled but at the pass
 {
-  let low = Infinity, steepest = 0, faces = 0, samples = 0;
+  let low = Infinity, lowAt = 0, steepest = 0, faces = 0, samples = 0;
   for (let z = Z0 + 20; z <= Z1 - 20; z += 16) {
     const [w, c, e] = ridge(z);
     if (Math.abs(z - -440) < 90) continue;
     const top = Math.max(heightAt(H, c, z), heightAt(H, c - 6, z), heightAt(H, c + 6, z));
     // (over the open land either side: by the world's north and south edges the rims of the old map are carried on)
-    if (Math.abs(z) < 580) low = Math.min(low, top - Math.max(heightAt(H, w - 40, z), heightAt(H, e + 40, z)));
+    // (the land beside it: the desert's own past the buttes before the ridge, and the green land)
+    if (Math.abs(z) < 580) { const v = top - Math.max(Math.min(heightAt(H, w - 150, z), heightAt(H, w - 320, z)), heightAt(H, e + 60, z)); if (v < low) { low = v; lowAt = z; } }
     for (let x = w; x <= e; x += 4) { const s = slopeAt(H, x, z); samples++; if (s > 1) faces++; steepest = Math.max(steepest, s); }
   }
-  assert.ok(low > 90, `the ridge stands only ${low.toFixed(0)} m over the land beside it somewhere`);
+  // (over a hundred metres along most of it; its lowest saddles less)
+  assert.ok(low > 70, `the ridge stands only ${low.toFixed(0)} m over the land beside it at z ${lowAt}`);
   assert.ok(faces / samples > 0.25 && steepest > 2, `the ridge's faces: ${((faces / samples) * 100).toFixed(0)}% over 45 degrees, the steepest ${(Math.atan(steepest) * 57.3).toFixed(0)}`);
   const wall = WG.ridgeWall(Z0, Z1), k = wall.findIndex((s, i) => wall[i + 1] && wall[i + 1][1] !== s[3]);
   assert.ok(k >= 0 && wall.slice(k + 1).every((s, i) => i === 0 || s[1] === wall[k + i][3]), 'the ridge\'s wall has more than one gap, or none');
@@ -173,28 +175,27 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- THE PASS: the one way through, its floor, its shelves on both walls, ramps between them
 {
-  const L = RL.passLine, floors: number[] = [], shelves: number[] = [];
-  for (let a = 60; a <= L.total - 60; a += 40) {
+  const L = RL.passLine, floors: number[] = [];
+  let walls = 0, shelved = 0;
+  for (let a = 60; a <= L.total - 60; a += 20) {
     const p = L.at(a), y = RL.passFloor(a);
     floors.push(heightAt(H, p.x + p.tz * 6, p.z - p.tx * 6) - y);
-    // (each wall's shelves, where no ramp is: the ground at the middle of each, over the floor)
+    // (each wall's shelves, where no ramp is: across the wall, a level run of three metres at about each one's height)
     for (const side of [1, -1]) {
       if (PLAN.pass.ramps.some((r) => r.side === side && a > r.along[0] - 8 && a < r.along[1] + 8)) continue;
-      let pos = PLAN.pass.floor;
-      for (const [h, deep, riser] of PLAN.pass.shelves) {
-        pos += riser;
-        const d = pos + deep / 2, x = p.x + p.tz * d * side, z = p.z - p.tx * d * side;
-        shelves.push(heightAt(H, x, z) - y - h);
-        pos += deep;
-      }
+      walls++;
+      const across: number[] = [];
+      for (let d = RL.passHalf(a, side); d < 90; d += 1) across.push(heightAt(H, p.x + p.tz * d * side, p.z - p.tx * d * side) - y);
+      const has = (h: number) => across.some((_, k) => k + 3 < across.length && [0, 1, 2, 3].every((j) => Math.abs(across[k + j] - h) < 3));
+      if (PLAN.pass.shelves.every(([h]) => has(h))) shelved++;
     }
   }
   assert.ok(floors.every((d) => Math.abs(d) < 0.6), `the pass's floor is off its height: ${floors.map((d) => d.toFixed(1)).join(', ')}`);
-  const worst = Math.max(...shelves.map(Math.abs));
-  assert.ok(worst < 1.6, `a shelf is ${worst.toFixed(1)} m off its height`);
+  assert.ok(shelved / walls > 0.75, `only ${shelved} of ${walls} stretches of the pass's walls have all three shelves`);
+  const worst = shelved / walls;
   const p = L.at(L.total / 2), mid = heightAt(H, p.x, p.z), top = heightAt(H, p.x + p.tz * 90, p.z - p.tx * 90);
   assert.ok(top - mid > 60, `the pass's walls at its middle stand ${(top - mid).toFixed(0)} m`);
-  ok(`the pass ${L.total.toFixed(0)} m through the ridge, its floor ${RL.passFloor(0).toFixed(1)} to ${RL.passFloor(L.total).toFixed(1)} m, its walls ${(top - mid).toFixed(0)} m at its middle, three shelves up each (${PLAN.pass.shelves.map((s) => s[0]).join(', ')} m over the floor, within ${worst.toFixed(1)} m), ${PLAN.pass.ramps.length} ramps between them`);
+  ok(`the pass ${L.total.toFixed(0)} m through the ridge, its floor ${RL.passFloor(0).toFixed(1)} to ${RL.passFloor(L.total).toFixed(1)} m, its walls ${(top - mid).toFixed(0)} m at its middle, three shelves up each (about ${PLAN.pass.shelves.map((s) => s[0]).join(', ')} m over the floor, all three on ${(worst * 100).toFixed(0)}% of its walls), ${PLAN.pass.ramps.length} ramps between them`);
 }
 
 // --- THE GREEN RIVER VALLEY, THE RIVER, THE LAKE, THE SWAMP

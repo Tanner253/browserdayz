@@ -10,5 +10,5 @@ export type { Site, Instance, Solid, POI, Way, Worn, World } from './worldgen/ty
 export { idx, sampleOf, groundField, heightAt, seenGround, slopeAt, catmullRom } from './worldgen/ground';
 export { WEST, shoreLine } from './worldgen/west';
 export { PLAN, nearLine, inside, westTier, westZona } from './worldgen/west-plan';
-export { onRidgeWall, ridgeWall, passData } from './worldgen/west-relief';
+export { onRidgeWall, ridgeWall, passData, passLine, passFloor, passHalf, passRise, ridgeAt, strata } from './worldgen/west-relief';
 export { generateWorld, generateWorldSoftly } from './worldgen/generate';

@@ -25,14 +25,35 @@ export const PLAN = {
   bands: { beach: -3645 },
   /** nobody walks or drives west of this (an invisible wall: see game.ts; the server holds poses to it too) */
   barrier: -3650,
-  /** the desert: its height over the sea at the beach's edge and at the ridge's foot, and how high its dunes stand */
-  desert: { beach: -13, foot: -3, dunes: 9 },
+  /**
+   * the desert: its height over the sea at the beach's edge and at the ridge's foot, how high its dunes stand; the
+   * buttes standing out of it before the ridge ([x, z, how far across their top, how high]); and how often a boulder
+   * lies on it, at the foot of a face, on a bench of the ridge and on the pass's floor (one in so many square metres)
+   */
+  desert: {
+    beach: -13, foot: -3, dunes: 9,
+    buttes: [
+      [-2560, -150, 40, 34], [-2650, 120, 28, 26], [-2580, 380, 55, 42], [-2780, 560, 35, 28], [-2700, -620, 45, 38], [-2880, 300, 22, 20], [-3050, -250, 30, 22], [-2520, 620, 25, 32],
+      // (and the temples, standing out from the ridge's foot nearly as high as it)
+      [-2475, -40, 26, 72], [-2490, 260, 30, 86], [-2470, 520, 22, 62], [-2480, -690, 28, 76],
+    ] as [number, number, number, number][],
+    boulders: { open: 20000, foot: 900, bench: 2500, pass: 1400 },
+    /** how far east of the ridge's foot the desert's dry fringe reaches, and round the pass's east mouth from so far to so far */
+    fringe: 130,
+    mouth: [170, 330] as P,
+  },
   /**
    * THE RIDGE between the green land and the desert, the whole height of the map: its feet and crest (x), how far
    * they wander (feet, crest), how high the crest stands and its peaks; an invisible wall along its crest but where
    * the pass goes through (`gap` either side of it), so nobody climbs over or walks round.
    */
-  ridge: { west: -2420, east: -2085, crest: -2250, jag: [24, 12] as P, top: 115, peaks: 8, gap: 46 },
+  ridge: {
+    west: -2420, east: -2085, crest: -2250, jag: [40, 18] as P, top: 110, peaks: 14, gap: 46,
+    /** how far back the deepest of its side canyons cut into it */
+    bays: 120,
+    /** the beds of its rock, level (the heights between them, over the sea): each a bench of scree and a cliff over it */
+    beds: [0, 13, 27, 40, 56, 70, 86, 100, 114, 132],
+  },
   /**
    * THE PASS, the one way through the ridge, from its east mouth (the valley's end) to its west (the desert): its
    * floor's half width and height at either end; up each wall a riser to each shelf ([height over the floor, how deep,
@@ -122,8 +143,8 @@ export const PLAN = {
     east: [[-680, -61], [-1173, -81], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
     west: [[-2700, -330], [-2860, -170], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
     width: 6.5,
-    /** from Pokrov's north gate (outside it) to the bunker's yard */
-    bunker: [[-1908, -142], [-1870, -215], [-1760, -285], [-1640, -318], [-1517, -321]] as P[],
+    /** from Pokrov's north gate (outside it) to the edge of the bunker's hollow, where its way out comes to it */
+    bunker: [[-1908, -142], [-1870, -205], [-1760, -255], [-1640, -275], [-1533, -272]] as P[],
     /** to the north end of Lipki's lane, of Ozerki's, the brick works' gate (over a ford), and Kalat's track */
     lipki: [[-1173, -81], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
     ozerki: [[-1450, -62], [-1450, 40], [-1450, 118]] as P[],

@@ -97,7 +97,7 @@ export const BUNKER_WAS = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION
  * out of Pokrov's north gate (the owner: "far enough to where it doesnt render with the castle"); `face`, the way its
  * mouth looks (toward the road, and Pokrov).
  */
-export const BUNKER_AT = { x: -1450, z: -360, face: [-0.865, 0.501] as [number, number] };
+export const BUNKER_AT = { x: -1450, z: -320, face: [-0.865, 0.501] as [number, number] };
 
 /**
  * The town built on the ground the map was grown by (2026-10-10): out of the valley by the road, which is carried

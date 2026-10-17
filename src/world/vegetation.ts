@@ -893,7 +893,8 @@ export class Vegetation {
           }
           const instances = byKind.get(kind)!;
           const size = box.getSize(new THREE.Vector3());
-          const isRock = id.startsWith('rock') || id.startsWith('boulder');
+          // (and the desert's scanned rocks: coast-kit's Namaqualand boulders and cliffs, progress/map3/kit/hookup.md)
+          const isRock = id.startsWith('rock') || id.startsWith('boulder') || id.startsWith('namaqualand') || id.startsWith('mountainside');
           const isFern = id.startsWith('fern') || id.startsWith('dry_branches');
           if (ON_ITS_WHEELS.has(id)) for (const it of instances) it.lean = leanOn(this.world, it, size.x / 2, size.z / 2);
           // SEATED IN THE GROUND (src/world/seat.ts): a stone, a stump and a fallen trunk are laid to the ground under

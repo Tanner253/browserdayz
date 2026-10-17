@@ -518,7 +518,7 @@ export class Terrain {
       };
     } else {
       // (the kinds of ground, and after them the one picture that is not a kind: the moss on the bank's slabs)
-      if (KIND_NAMES.length !== 12) throw new Error('the paint reads twelve kinds of ground, four to a picture of weights');
+      if (KIND_NAMES.length !== 18) throw new Error('the paint reads eighteen kinds of ground, four to a picture of weights');
       const kinds: Kind[] = [...KIND_NAMES.map((k) => KINDS[k]), CRAG_MOSS];
       const made = await buildGround(kinds, kinds.map((k) => t[k.tex]));
       const weights = this.ground.weights.map((w) => {
@@ -551,6 +551,8 @@ export class Terrain {
         tKindsA: { value: weights[0] },
         tKindsB: { value: weights[1] },
         tKindsC: { value: weights[2] },
+        tKindsD: { value: weights[3] },
+        tKindsE: { value: weights[4] },
         tMacro: { value: this.macroTex },
         tSnow: { value: null },
         uSnowIs: { value: snowIs },
@@ -920,6 +922,8 @@ uniform sampler2DArray tReliefQuiet;
 uniform sampler2D tKindsA;
 uniform sampler2D tKindsB;
 uniform sampler2D tKindsC;
+uniform sampler2D tKindsD;
+uniform sampler2D tKindsE;
 uniform sampler2D tMacro;
 uniform sampler2D tSnow;
 // (snow: its colour from far off; and whether its picture has come, which it does when somebody first goes near any)
@@ -1095,6 +1099,8 @@ vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.zw);
 vec4 wA = texture2D(tKindsA, splatUv + jitter);
 vec4 wB = texture2D(tKindsB, splatUv + jitter);
 vec4 wC = texture2D(tKindsC, splatUv + jitter);
+vec4 wD = texture2D(tKindsD, splatUv + jitter);
+vec2 wE = texture2D(tKindsE, splatUv + jitter).rg;
 
 float camDist = length(vTerrainPos - cameraPosition);
 vec3 dP3x = dFdx(vTerrainPos);
@@ -1114,12 +1120,14 @@ vec3 side = pow(abs(gN), vec3(6.0));
 side = max(side / (side.x + side.y + side.z) - 0.1, 0.0);
 side /= side.x + side.y + side.z;
 
-// There are a dozen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
+// There are eighteen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
 // looked at (the second if there is any of it to speak of, the third only if there is a good deal), the rest not.
 float kindW[GROUND_KINDS];
 kindW[0] = wA.r; kindW[1] = wA.g; kindW[2] = wA.b; kindW[3] = wA.a;
 kindW[4] = wB.r; kindW[5] = wB.g; kindW[6] = wB.b; kindW[7] = wB.a;
 kindW[8] = wC.r; kindW[9] = wC.g; kindW[10] = wC.b; kindW[11] = wC.a;
+kindW[12] = wD.r; kindW[13] = wD.g; kindW[14] = wD.b; kindW[15] = wD.a;
+kindW[16] = wE.r; kindW[17] = wE.g;
 int pick[3];
 float layerW[3];
 pick[0] = 0; pick[1] = 0; pick[2] = 0;

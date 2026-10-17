@@ -105,6 +105,8 @@ export interface World {
   towns?: PlacedTown[];
   /** where the ruined town of Kalat stands (src/sim/ruins.ts): drawn by src/world/ruins.ts, its walls solid in the game and to the server */
   kalat?: Place;
+  /** the desert at each point of the net, four to a point, 0 to 255: how much of it is desert, and of that how much is the beach's dry sand, wet sand and cracked earth (the rest dune sand; its rock the canyon's): src/world/ground.ts */
+  sand?: Uint8Array;
   /** the lakes and rivers (src/sim/water.ts): drawn by src/world/water.ts, waded in by the player */
   water?: Waters;
   pois: POI[];
