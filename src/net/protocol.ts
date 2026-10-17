@@ -29,7 +29,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (42, 2026-10-15: the bot check is the 360-degree course (src/sim/course.ts): the server deals a turn of the yard,
 // not a number the whole range could be worked out from, and shows the figures as they come into sight ('rfig');
 // the game says the height it stands at.)
-export const PROTOCOL = 44;
+// (45, 2026-10-16: the map three times over: the world's ground and its loot points are new, and the pass's caves
+// count as under the ground by right; a page from before would stand on ground the server does not have.)
+export const PROTOCOL = 45;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */

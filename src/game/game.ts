@@ -151,7 +151,8 @@ export interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-export const LOOT_REV = 23;
+// (24, 2026-10-16: the map three times over)
+export const LOOT_REV = 24;
 /** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */
 const WEST_PLACES: Record<string, [string, MenuSpot['kind'], Tier]> = {
   Pokrov: ['A monastery town in the green west: the cathedral and its belfry inside white walls, the monks\' cells and refectory, and below the walls a street of a tavern, merchants\' houses and a smithy.', 'town', 3],

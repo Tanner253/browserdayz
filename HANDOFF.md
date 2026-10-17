@@ -46,6 +46,16 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 ## Shipped with the anti-bot release (no longer waiting)
 - 5.56 by rate (TypeRule.per), /spawn at the admin's height on a roof, the infected leave a dropped player's body alone, the close code in "went without logging out", sent back 4 times in 30 minutes -> kept off 24 h. Earlier site-only deploys: the T-pose fix, instant payouts (minTags 1, five a wallet), the attachment duplication fix, the automatic rejoin after a dropped connection, sound started by any press, the chat letting the mouse go, a car's or helicopter's own sound at the ears ("8D"), the Google tag AW-7844801690.
 
+## NEXT, RIGHT AFTER THE MAP DEPLOY (the owner, 2026-10-16, in their words)
+- "i have added a bunch of new weapons and guns for us to use with animations baked in. we need to part out their attachments per gun like all the rest of the guns and bring them in. We should not downscale the models when held in first person when possible, ensure proper rotation inventory icons and in the world. Make sure properly rigged and animated, be thorough we want high quality." Most come with their own attachments.
+- "akimbo weapons are shot with left and right click controlling their respective hands".
+- "the grenade launcher and its ammo is an admin only weapon. ammo stack to 50 for the grenade launcher."
+- Tiers: "use common sense when tiering the loot. T4 should have weaker AR's that are rare, bunker should have all the best weapons"; the new melee weapon and new low-tier weapons into T2; "we can put some pistols in T1 now".
+- "we should make the ruins T5 for now to incentivize exploration since the new map does not change spawns for the player."
+- "we should add 2 more helicopter spawns in the far east in spots that make sense."
+- Then: update the changelog, and "produce the 2 15 second trailers i asked for showing off the new content for marketing purposes".
+- After the weapons pass: offline-mode UX. "when people are in offline mode we need to explain to them that only 2 devices from the same WIFI ip can be connected to the game at once. some people forget to close tabs on their phone and try to play on their ipad to be not able to play etc... we need better ux on this as well".
+
 ## Open, after the trailer
 - Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
 - In-page reconnect (a drop as a blip, no reload); optimizations (the shadow-shader warm-up tried 2026-10-15 was reverted: unproven).

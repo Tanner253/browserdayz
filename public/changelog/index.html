@@ -58,6 +58,13 @@
       figure.tall img { aspect-ratio: auto; }
       figure:hover img, figure:hover video { transform: scale(1.02); }
       figure.own { cursor: default; border-color: var(--brand); }
+      /* the map that is moved and zoomed: the game's own map sheet, the whole world on it */
+      .mapzoom { position: relative; aspect-ratio: 3 / 1; overflow: hidden; background: #6f8f9e; cursor: grab; touch-action: none; }
+      .mapzoom.dragging { cursor: grabbing; }
+      .mapzoom img { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: auto; transform-origin: 0 0; transition: none; max-width: none; }
+      figure:hover .mapzoom img { transform: none; }
+      .mapzoom .zoomkeys { position: absolute; right: 10px; top: 10px; display: flex; gap: 6px; }
+      .mapzoom .zoomkeys button { width: 34px; height: 34px; font: 600 18px var(--mono); color: var(--ink); background: rgba(8, 10, 8, 0.75); border: 1px solid var(--line); cursor: pointer; }
       figure.own:hover video { transform: none; }
       figure .film { position: absolute; left: 10px; top: 10px; padding: 2px 7px 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); background: rgba(8, 10, 8, 0.72); border: 1px solid var(--line); }
       figcaption { padding: 9px 12px 10px; font-size: 16px; line-height: 1.3; color: var(--dim); border-top: 1px solid var(--line); background: rgba(8, 10, 8, 0.6); }
@@ -175,8 +182,40 @@
         </div>
       </section>
 
+      <article class="entry" id="map-three-times">
+        <div class="when"><time datetime="2026-10-17">17 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>The map, three times bigger</h2>
+          <p class="lead">The Zone now runs 4.6 km west to east, three times the old 1.5 km square. Past the old valley lies a green west of rivers, a lake and a swamp, with five new towns. Beyond it a red canyon ridge closes the whole map, crossed by one pass. Past that is a desert with the ruins of Kalat, a beach and the sea. Everybody starts again at the map's edge with what they carried.</p>
+          <div class="media">
+            <figure class="wide own"><div class="mapzoom"><img src="/changelog/media/map3-whole.jpg" alt="The whole map as the game's own map draws it: the sea and a beach on the left, a sand desert with buttes and the walled ruins of Kalat, a red ridge running top to bottom crossed by one pass, a green west with a river, a lake, a swamp and five towns, and on the right the old valley with Kamenka and the fort; a grid of hundred-metre squares lettered A to AT across and numbered 1 to 15 down" /><div class="zoomkeys"><button type="button" data-zoom="1" aria-label="Nearer">+</button><button type="button" data-zoom="-1" aria-label="Further">−</button></div></div><figcaption><b>The whole map, as the game's map (M) draws it.</b> Drag it, and zoom with the wheel, two fingers or the keys. Every building is outlined in the colour of its loot tier.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-pass.jpg" alt="Looking along the canyon pass from a shelf high on its south wall: red walls banded in beds of rock, three shelves stepping up each side, the river and the road along the floor" /><figcaption><b>The pass,</b> the one way through the ridge, from a shelf on its wall.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-cave.jpg" alt="A cave mouth in the pass's red wall, recessed into the rock, a fallen block beside it and the way in clear" /><figcaption><b>A cave mouth</b> in the pass's wall. The caves are dark inside: bring a light.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-pokrov.jpg" alt="The cathedral at Pokrov: white stone walls, a green onion dome over its apse, its belfry behind" /><figcaption><b>Pokrov,</b> the monastery town, its cathedral inside white walls.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-lipki.jpg" alt="Two blue log houses at Lipki behind a picket fence, woods on the hill behind" /><figcaption><b>Lipki,</b> a log village on a knoll.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-mokroye.jpg" alt="The swamp from 25 m up: shallow water over a drowned meadow, grassy islands, the houses of Mokroye standing in the water, the red ridge behind" /><figcaption><b>Mokroye,</b> a hamlet the swamp has drowned. Some houses have water over their floors.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-swamp.jpg" alt="The swamp from 150 m up, its shore winding in lobes and bays into the meadow round it" /><figcaption><b>The swamp</b> from 150 m up.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-kalat.jpg" alt="Inside the ruins of Kalat: a broken citadel of mud brick, walls of rooms down to their footings, the desert round it" /><figcaption><b>Kalat,</b> a ruined walled town on its own hill in the desert.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-zavod.jpg" alt="The brick works at Zavod in the desert: a two-storey brick hall with an iron stair outside, barrels in the yard" /><figcaption><b>Zavod,</b> the brick works by the desert river.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-canyon.jpg" alt="The canyon country from 80 m up: red cliffs in layered beds, rock fallen at their feet, the road below" /><figcaption><b>The canyon country</b> from 80 m up.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/map3-beach.jpg" alt="The beach at the map's west edge: flat sand down to the sea" /><figcaption><b>The beach</b> at the map's west edge. The sea is not swum.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>The green west:</b> farmland, woods and a river valley between the old valley and the ridge. Ozerki's lake and the swamp are in it, and you can wade in the water.</li>
+            <li><b>Five new towns:</b> Pokrov (22 buildings), Lipki (13), Ozerki (8), Mokroye (7), and Zavod, the brick works (3). Zastava, the post at the pass's east mouth, adds 5 more. Loot runs up to tier 3 in Pokrov, Zavod and Zastava, and tier 2 in Lipki, Ozerki and Mokroye.</li>
+            <li><b>The pass:</b> the ridge cannot be crossed anywhere else. The pass is 517 m long, with shelves up both walls at about 8, 18 and 30 m. Six caves run through those walls, and the best of the pass is cached on its floor at the middle. The caves hold tier-4 loot, the cache tier 5.</li>
+            <li><b>The desert:</b> dunes and buttes, the river running through it to the sea, and the ruins of Kalat: tier-3 loot in its streets and walls, tier 4 in its citadel.</li>
+            <li><b>Moved:</b> Bunker 17 and its gas now sit on the river valley's south rim, well away from the fort. The trader has moved to the main road.</li>
+            <li><b>The map (M):</b> the land is in colour now: green country, desert sand, red cliffs, snow, blue water. Every hundred-metre square has its name in its corner, A to AT across and 1 to 15 down, so you can say "I'm in C12". The grid lines are stronger.</li>
+            <li><b>Draw distance:</b> a new setting from 300 to 1,500 m (800 by default) for how far buildings are drawn. Loot is drawn within 55 m whatever it is set to.</li>
+            <li><b>Smoother walking:</b> pictures of things you walk past now go onto the graphics card a little each frame, not all at once in one frame.</li>
+            <li><b>Fixed:</b> a player shot out of a helicopter no longer hangs in the sky. The body rides in its seat until the helicopter lands or crashes, then lies beside it to be searched. The airdrop's helicopter now flies in over the map's real edge.</li>
+          </ul>
+        </div>
+      </article>
+
       <article class="entry" id="heli-searchlight">
-        <div class="when"><time datetime="2026-10-16">16 Oct 2026</time><span class="tag">Latest</span></div>
+        <div class="when"><time datetime="2026-10-16">16 Oct 2026</time></div>
         <div>
           <h2>The helicopter's searchlight reaches the ground</h2>
           <p class="lead">The helicopter's light was a car's headlight pointed straight ahead: from the air it lit nothing below. It is a police helicopter's searchlight now, a narrow beam from under the nose that throws a pool of light on the ground from 50 m up all the way to the 100 m ceiling, and the beam itself shows in the night air.</p>
@@ -1517,6 +1556,66 @@
     </main>
     <div class="box" role="dialog" aria-label="Enlarged picture"></div>
     <script>
+      // the map that is moved and zoomed: dragged by the mouse or a finger, zoomed by the wheel, two fingers or its keys,
+      // put back by a double click; never off its own edges
+      for (const box of document.querySelectorAll('.mapzoom')) {
+        const img = box.querySelector('img');
+        let k = 1, x = 0, y = 0;
+        const fit = () => {
+          const W = box.clientWidth, H = box.clientHeight, w = W * k, h = (W * k * img.naturalHeight) / (img.naturalWidth || 3);
+          x = Math.min(0, Math.max(W - w, x));
+          y = h <= H ? (H - h) / 2 : Math.min(0, Math.max(H - h, y));
+          img.style.transform = `translate(${x}px, ${y}px) scale(${k})`;
+        };
+        const zoom = (by, px, py) => {
+          const k2 = Math.min(8, Math.max(1, k * by));
+          x = px - ((px - x) * k2) / k;
+          y = py - ((py - y) * k2) / k;
+          k = k2;
+          fit();
+        };
+        box.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const r = box.getBoundingClientRect();
+          zoom(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - r.left, e.clientY - r.top);
+        }, { passive: false });
+        const down = new Map();
+        let pinch = 0;
+        box.addEventListener('pointerdown', (e) => {
+          if (e.target.closest('button')) return;
+          box.setPointerCapture(e.pointerId);
+          down.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          box.classList.add('dragging');
+        });
+        box.addEventListener('pointermove', (e) => {
+          const was = down.get(e.pointerId);
+          if (!was) return;
+          if (down.size === 2) {
+            const [a, b] = [...down.values()], d0 = Math.hypot(a.x - b.x, a.y - b.y);
+            down.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            const [c, d] = [...down.values()], d1 = Math.hypot(c.x - d.x, c.y - d.y), r = box.getBoundingClientRect();
+            if (pinch && d0) zoom(d1 / d0, (c.x + d.x) / 2 - r.left, (c.y + d.y) / 2 - r.top);
+            pinch = 1;
+            return;
+          }
+          x += e.clientX - was.x;
+          y += e.clientY - was.y;
+          down.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          fit();
+        });
+        const up = (e) => {
+          down.delete(e.pointerId);
+          if (down.size < 2) pinch = 0;
+          if (!down.size) box.classList.remove('dragging');
+        };
+        box.addEventListener('pointerup', up);
+        box.addEventListener('pointercancel', up);
+        box.addEventListener('dblclick', () => { k = 1; x = 0; y = 0; fit(); });
+        for (const b of box.querySelectorAll('[data-zoom]')) b.addEventListener('click', () => zoom(Number(b.dataset.zoom) > 0 ? 1.5 : 1 / 1.5, box.clientWidth / 2, box.clientHeight / 2));
+        img.addEventListener('load', fit);
+        window.addEventListener('resize', fit);
+        fit();
+      }
       // a film is fetched and played when it comes into view, and stopped when it leaves
       const films = [...document.querySelectorAll('video[data-src]')];
       const see = new IntersectionObserver((seen) => {
