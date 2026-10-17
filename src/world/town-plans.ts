@@ -372,7 +372,7 @@ export function izbaPlan(rng?: RNG): Blueprint {
     furniture: g.furniture, loot: g.loot,
     // (the porch: boards before the door, a step down from the floor)
     fittings: [{ level: 0, list: [{ key: 'planks', x0: -3.1, x1: -0.7, y0: -0.3, y1: -0.04, z0: HD, z1: HD + 1.3 }] }],
-    usage: ['Village', 'Farm'],
+    usage: ['Village'],
   };
 }
 
@@ -399,7 +399,7 @@ export function izbaTwoPlan(rng?: RNG): Blueprint {
     stairs: { x0: 2.6, x1: 4.0, foot: 2.8, top: -2.6 },
     upper: { h: 2.5, int: 'planks', floor: 'floor_wood', walls: [...outer([win(-3.4, -2.5), win(-1.0, -0.1), win(1.6, 2.5)]), inner([M, -HD + 0.2], [M, HD - 0.2], [door(-3.0, -2.2)], 'planks', 'planks')], furniture: u.furniture, loot: u.loot },
     fittings: [{ level: 0, list: [{ key: 'planks', x0: -2.3, x1: 0.1, y0: -0.3, y1: -0.04, z0: HD, z1: HD + 1.4 }] }],
-    usage: ['Village', 'Farm', 'Hunting'],
+    usage: ['Village'],
   };
 }
 
@@ -441,6 +441,6 @@ export function sawmillPlan(): Blueprint {
       { side: 'right', ext: 'planks_ext', int: 'planks', openings: [] },
     ],
     furniture: g.furniture, loot: g.loot,
-    usage: ['Industrial', 'Village'],
+    usage: ['Industrial'],
   };
 }
