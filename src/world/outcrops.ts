@@ -115,9 +115,15 @@ export function outcropPieces(world: World, pass: Pass): RockPiece[] {
       }
       const inCluster = (c - (1 - O.cluster)) / O.cluster, pick = r(x, z, 7);
       // a steep face: now and then a cliff jutting from it, its face downhill, a third of it in the slope
-      if (slope > 1.1 && pick < 0.05 + 0.1 * inCluster && grade('big')) {
+      if (slope > 1.1 && pick < 0.05 + 0.1 * inCluster) {
         const relief = Math.min(14, Math.max(4, hi - lo)), ids = ['namaqualand_cliff_02', 'namaqualand_cliff_01'], id = ids[Math.floor(r(x, z, 9) * 2)];
-        stand(id, x, z, Math.atan2(-gxs, -gzs), (relief / SIZE[id].tall) * (0.7 + r(z, x, 11) * 0.4), 0.33, [(r(x, z, 13) - 0.5) * 0.15, (r(z, x, 13) - 0.5) * 0.15]);
+        const turn = Math.atan2(-gxs, -gzs), scale = (relief / SIZE[id].tall) * (0.7 + r(z, x, 11) * 0.4);
+        // (A cliff is a scan of a face: its back and its cut edges are unscanned, and stood where the slope does not
+        // take them in, at its middle and at both its ends, they showed: the owner, 2026-10-16, "half the protruding
+        // rock are missing textures altogether". So the ground two metres behind each of those stands over half its height.)
+        const ax = Math.cos(turn), az = -Math.sin(turn), bx = -Math.sin(turn) * 2, bz = -Math.cos(turn) * 2, half = (SIZE[id].long * scale) / 2;
+        const backed = [-0.9, 0, 0.9].every((k) => h(x + ax * half * k + bx, z + az * half * k + bz) >= y0 + SIZE[id].tall * scale * 0.5);
+        if (backed && grade('big')) stand(id, x, z, turn, scale, 0.33, [(r(x, z, 13) - 0.5) * 0.15, (r(z, x, 13) - 0.5) * 0.15]);
         continue;
       }
       if (slope > 0.45) {
@@ -149,11 +155,11 @@ export function outcropPieces(world: World, pass: Pass): RockPiece[] {
         }
         continue;
       }
-      // a lip (level ground, a drop close by): a ledge of rock leaning out over it, or boulders sat on its edge
+      // a lip (level ground, a drop close by): boulders sat on its edge. (A ledge of cliff leaning out over the drop
+      // showed its unscanned underside to everybody below it: 2026-10-16.)
       if (y0 - lo > 3.5 && pick < 0.2 + 0.35 * inCluster) {
         const ox = Math.cos(loA), oz = Math.sin(loA);
-        if (r(x, z, 34) < 0.35 && grade('big')) stand('namaqualand_cliff_01', x + ox * 2, z + oz * 2, Math.atan2(ox, oz), 0.55 + r(z, x, 35) * 0.5, 0.45, [0.25 + r(x, z, 36) * 0.2, (r(z, x, 36) - 0.5) * 0.2]);
-        else for (let k = 0; k < 1 + Math.floor(r(x, z, 37) * 3); k++) {
+        for (let k = 0; k < 1 + Math.floor(r(x, z, 37) * 3); k++) {
           if (!grade('medium')) break;
           stand(r(k, x, 38) < 0.5 ? 'namaqualand_boulder_03' : 'namaqualand_boulder_02', x + ox * (1 + r(k, z, 39) * 2) + (r(x, k, 40) - 0.5) * 3, z + oz * (1 + r(k, z, 39) * 2) + (r(k, x, 40) - 0.5) * 3, r(k, z, 41) * 6.28, 0.7 + r(z, k, 42) * 1, 0.2, [(r(k, x, 43) - 0.5) * 0.4, (r(x, k, 43) - 0.5) * 0.4]);
         }

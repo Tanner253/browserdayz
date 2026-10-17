@@ -543,7 +543,15 @@ export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; 
         if (!gap && !short && !onRamp(side, k, s - half, s + half) && !mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + f.long * scale * 0.35 + 3 && Math.abs(m.floor - at[1] - 0.4) < tall)) {
           // (its face toward the pass: the north wall's faces south, the south wall's north)
           const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-          if (!intoCave(f.id, at, turn, scale)) out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, (hash(s, i) - 0.5) * 0.12], scale });
+          // (A face is a scan of a cliff, its back and its cut edges unscanned. Stood straight along a bend's inside,
+          // where the wall curves away from it, its two ends stood out in front of the wall with them showing: the
+          // owner, 2026-10-16, "half the protruding rock are missing textures altogether". So each end is where the
+          // wall is, or the face is not stood.)
+          const standsOut = !!G && [-1, 1].some((d) => {
+            const q = passAt(p, at[0] + o.ux * half * 0.9 * d, at[2] + o.uz * half * 0.9 * d), tc = crossing(side, q.s, (e.from + e.to) / 2, e.foot - 4, e.top + 6);
+            return tc === null || Math.abs(q.t) < tc - 0.3;
+          });
+          if (!standsOut && !intoCave(f.id, at, turn, scale)) out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, (hash(s, i) - 0.5) * 0.12], scale });
         }
         s += f.long * scale * (0.45 + hash(i, k + 7) * 0.3);
       }
