@@ -33,6 +33,9 @@ export const LAKE: Partial<OceanLook> = {
   surf: { apart: 2.6, pace: 0.45, steep: 0.035, reach: 9, breaks: 4 },
   solid: 6,
   dim: 0.35,
+  wash: 1.6,
+  shallowFoam: 0.02,
+  wet: 0.25,
 };
 
 /**
@@ -49,7 +52,13 @@ export const SWAMP: Partial<OceanLook> = {
   deep: [0.02, 0.028, 0.014],
   murk: 0.75,
   weed: 0.35,
-  foam: 0.8,
+  // (its scum a thin broken line round what stands out of it, brown and green: white, from 25 m up a swamp's many
+  // shallow edges were sheets of it, snow (the polish survey, 2026-10-16))
+  foam: 0.55,
+  wash: 0.8,
+  shallowFoam: 0,
+  wet: 0.12,
+  foamTint: [0.42, 0.4, 0.29],
   dim: 0.45,
 };
 
