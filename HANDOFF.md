@@ -57,6 +57,14 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 - Then: update the changelog, and "produce the 2 15 second trailers i asked for showing off the new content for marketing purposes".
 - After the weapons pass: offline-mode UX. "when people are in offline mode we need to explain to them that only 2 devices from the same WIFI ip can be connected to the game at once. some people forget to close tabs on their phone and try to play on their ipad to be not able to play etc... we need better ux on this as well".
 
+### Weapons pass: where it stands (2026-10-17, branch `perf-aggressive`, all committed, NOTHING deployed)
+- In, each in OUR OWN arms (the owner: "the hand models we are using should not change ... the hands should not change depending on the gun"): Scorpion EVO (T3/T4), MP7A1 (T4, its own suppressor and sight as MP7-only attachments), AKS-74U (T4, takes AK mags), .50 sniper (T5, `ammo_50bmg`), Barrett M82 and VSSK (T5, no anims of their own: held in the .50's movements), pitchfork (T2 melee). The Elcan: AR-15-only scope (T4). The AR-15's holo now centred in its window (a player's complaint).
+- How: `src/game/hands-on.ts` poses our arms (the AK/SMG pair) after any pack's skeleton every frame (Rigify, Unreal, numbered or keyword-named joints); `WeaponRig.wear`. Pack build options in `scripts/assets.config.mjs` (head of WEAPON_PACKS): `atEye`, `ourArms`, `rename`, `meshSpace`, skinned + `parts` together. Sight lines measured off the files with `scripts/sight-profile.mjs` (`x0:x1` looks down the barrel); `scripts/pack-look.mjs <dir>` lists a pack. Checks: `progress/weapons/*.js` (gun-look, hands-cmp, frames, sight-in-hands).
+- Textures: 2048 the most for new models (CLAUDE.md).
+- Fixed on the way: a held gun went black once its magazine's inventory picture was made (`src/ui/icons.ts` freed card textures).
+- Parked: the shotgun set (a double barrel; its skin binds the gun at another scale than its arms): `progress/weapons/db12-config-parked.txt`.
+- Still to do: akimbo (dual SMGs, dual MAC-10 (no anims: borrow the dual SMGs'), sawn-offs; left click left gun, right click right gun); the M32 (admin only, 40 mm stacking to 50; needs an exploding projectile); making the OLD shared attachments exclusive (the holo fits 6 guns, the light 8: the owner's call, items players carry would change); the loot session's branch `refs/heads/claude/loot-world-6b02f8` (ruins T5, two east MD-500 pads, guns re-tiered) is NOT merged here: ask the owner first. Then LOOT_REV/PROTOCOL as needed, changelog, trailers.
+
 ## Open, after the trailer
 - Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
 - In-page reconnect (a drop as a blip, no reload); optimizations (the shadow-shader warm-up tried 2026-10-15 was reverted: unproven).
