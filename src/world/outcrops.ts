@@ -116,7 +116,7 @@ export function outcropPieces(world: World, pass: Pass): RockPiece[] {
       const inCluster = (c - (1 - O.cluster)) / O.cluster, pick = r(x, z, 7);
       // a steep face: now and then a cliff jutting from it, its face downhill, a third of it in the slope
       if (slope > 1.1 && pick < 0.05 + 0.1 * inCluster && grade('big')) {
-        const relief = Math.min(14, Math.max(4, hi - lo)), ids = ['namaqualand_cliff_02', 'namaqualand_cliff_01', 'mountainside'], id = ids[Math.floor(r(x, z, 9) * 3)];
+        const relief = Math.min(14, Math.max(4, hi - lo)), ids = ['namaqualand_cliff_02', 'namaqualand_cliff_01'], id = ids[Math.floor(r(x, z, 9) * 2)];
         stand(id, x, z, Math.atan2(-gxs, -gzs), (relief / SIZE[id].tall) * (0.7 + r(z, x, 11) * 0.4), 0.33, [(r(x, z, 13) - 0.5) * 0.15, (r(z, x, 13) - 0.5) * 0.15]);
         continue;
       }

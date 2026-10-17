@@ -463,7 +463,8 @@ export const ROCKS: Record<string, { tall: number; long: number; front: number; 
   namaqualand_boulder_05: { tall: 0.5, long: 1.4, front: 0.35, back: 0.35 },
 };
 /** what dresses a riser and the ridge's face */
-const FACES = ['namaqualand_cliff_02', 'mountainside', 'namaqualand_cliff_01'].map((id) => ({ id, ...ROCKS[id] }));
+// (not the mountainside scan: its own grey and moss, washed with the canyon's red, stood dark on the beds, 2026-10-16)
+const FACES = ['namaqualand_cliff_02', 'namaqualand_cliff_01'].map((id) => ({ id, ...ROCKS[id] }));
 
 /** A small number that is the same every time for the same place (so the walls are laid the same in every game). */
 const hash = (a: number, b: number) => {
@@ -491,6 +492,14 @@ export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; 
   const riserShift = (side: number, k: number, s: number) => {
     const e = E[k], plan = (e.foot + e.top) / 2, at = G ? crossing(side, s, (e.from + e.to) / 2, e.foot - 4, e.top + 6) : null;
     return at === null ? 0 : Math.max(-5, Math.min(5, at - plan));
+  };
+  // (a piece sat by the lowest ground under it, sunk a share of its height: sat by the ground at its middle, a boulder on
+  // a slope hung its downhill side in the air; and how far that lowest ground falls below a level, for a lip)
+  const seat = (id: string, x: number, z: number, scale: number, sink: number) => {
+    const r = ROCKS[id], rad = r.long * scale * 0.35;
+    let low = G!(x, z);
+    for (let a = 0; a < 6; a++) low = Math.min(low, G!(x + Math.cos(a * 1.047) * rad, z + Math.sin(a * 1.047) * rad));
+    return { y: low - sink * r.tall * scale, low };
   };
   // (the lowest ground three to six metres in front of a riser's middle: the shelf a face stands on)
   const shelfUnder = (side: number, k: number, s: number, dt: number) => {
@@ -549,47 +558,40 @@ export function rockPieces(p: Pass, o: { ramps?: { side: number; level: number; 
           for (let j = 0; j < n; j++) {
             const ds = (hash(j, s) - 0.5) * 5, dt = (lip ? 1 : -1) * hash(s, j + 3) * 1.1, big = j === 0 && hash(i, j + s) < 0.4;
             const at = passWorld(p, s + ds, side * (t0 + dt), y0 - 0.15);
-            if (G) at[1] = G(at[0], at[2]) - 0.15;
             if (atMouth(at[0], at[2], 3)) continue;
-            const id = big ? (hash(j, i) < 0.5 ? 'namaqualand_boulder_03' : 'namaqualand_boulder_04') : hash(j, i) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02';
-            out.push({ id, at, turn: hash(s, j) * Math.PI * 2, tilt: [(hash(j, s + 1) - 0.5) * 0.4, (hash(s + 1, j) - 0.5) * 0.4], scale: big ? 0.9 + hash(i, j) * 0.7 : 0.35 + hash(j, i + 2) * 0.55, ...(big ? {} : { small: true }) });
+            const id = big ? (hash(j, i) < 0.5 ? 'namaqualand_boulder_03' : 'namaqualand_boulder_04') : hash(j, i) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02', scale = big ? 0.9 + hash(i, j) * 0.7 : 0.35 + hash(j, i + 2) * 0.55;
+            if (G) at[1] = seat(id, at[0], at[2], scale, big ? 0.15 : 0.12).y;
+            out.push({ id, at, turn: hash(s, j) * Math.PI * 2, tilt: [(hash(j, s + 1) - 0.5) * 0.4, (hash(s + 1, j) - 0.5) * 0.4], scale, ...(big ? {} : { small: true }) });
           }
         }
       }
     });
-    // the ridge's face over the third shelf: the biggest pieces, twice and three times their size
-    const last = E[E.length - 1];
-    for (let s = 6; s < L - 6; s += 26) {
-      // (the face, too, stands back where the world built it: found where the ground is three metres over its foot)
-      const face = G ? crossing(side, s, last.to + 3, last.back - 2, last.back + 12) : null, dt = face === null ? 0 : face - (last.back + 3 * PASS_SHAPE.face);
-      if (G && face === null) continue;
-      const at = passWorld(p, s, side * (last.back + 4 + dt), last.to - 1), o = alongPass(p, s), scale = 2.4 + hash(s, side) * 0.8;
-      if (G) at[1] = Math.min(at[1], G(at[0], at[2]) - 1);
-      // (none over a mouth in the face: its rock is the carved rock's there)
-      const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
-      if (mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + ROCKS.mountainside.long * scale * 0.6 && Math.abs(m.floor - at[1]) < 12)) continue;
-      if (!intoCave('mountainside', at, turn, scale)) out.push({ id: 'mountainside', at, turn, tilt: [0, 0], scale });
-    }
   }
-  // Each mouth framed (the owner: the mouths "dont look right still or natural", holes punched in a wall): over it an
-  // overhang of rock jutting out of the face, a fallen block either side of its sill, rubble in front of it but off
-  // the way in; set back in its flared entrance (MOUTH_FLARE).
+  // Each mouth framed (the owner: the mouths "dont look right still or natural", holes punched in a wall): by the wall's
+  // own rock, the carved face round its flared entrance (MOUTH_FLARE); one big fallen block to a side of its sill, sat
+  // on the shelf, never over its lip; rubble in front of it but off the way in. (A scan stood over a mouth for an
+  // overhang read as boulders stacked into an arch, a cairn: built, not fallen, 2026-10-16.)
   for (const [mi, m] of mouths.entries()) {
     const c = CAVES[m.cave], n = Math.abs(passWorld(p, c.nodes[0].s, c.nodes[0].t, c.nodes[0].y)[0] - m.x) < 12 ? c.nodes[0] : c.nodes[c.nodes.length - 1];
     // (the way out of the mouth, and across it; the face's foot, the hole's front less its metres out in front)
-    const ox = -Math.sin(m.rot), oz = -Math.cos(m.rot), ax = Math.cos(m.rot), az = -Math.sin(m.rot), w = n.w * MOUTH_FLARE, h = n.h * MOUTH_FLARE;
-    const fx = m.x + ox * (m.hz - MOUTH_OUT - 1.5), fz = m.z + oz * (m.hz - MOUTH_OUT - 1.5), outward = Math.atan2(ox, oz);
-    const R = ROCKS.namaqualand_cliff_01, rs = (w + 3) / R.long;
-    out.push({ id: 'namaqualand_cliff_01', at: [fx - ox * R.back * rs * 0.55, m.floor + h - 0.2, fz - oz * R.back * rs * 0.55], turn: outward, tilt: [0.32, (hash(mi, 1) - 0.5) * 0.2], scale: rs });
-    for (const sd of [-1, 1]) {
-      if (hash(mi, sd + 3) < 0.25) continue;
-      const d = w / 2 + 0.6 + hash(mi, sd) * 0.8, up = 0.8 + hash(sd, mi) * 1.6;
-      out.push({ id: hash(mi, sd + 5) < 0.5 ? 'namaqualand_boulder_04' : 'namaqualand_boulder_03', at: [fx + ax * sd * d + ox * up, m.floor - 0.3, fz + az * sd * d + oz * up], turn: hash(sd, mi + 2) * Math.PI * 2, tilt: [(hash(mi, sd + 9) - 0.5) * 0.3, (hash(sd + 9, mi) - 0.5) * 0.3], scale: 1.1 + hash(mi, sd + 7) * 0.8 });
+    const ox = -Math.sin(m.rot), oz = -Math.cos(m.rot), ax = Math.cos(m.rot), az = -Math.sin(m.rot), w = n.w * MOUTH_FLARE;
+    const fx = m.x + ox * (m.hz - MOUTH_OUT - 1.5), fz = m.z + oz * (m.hz - MOUTH_OUT - 1.5);
+    const sd = hash(mi, 3) < 0.5 ? -1 : 1, id = hash(mi, 5) < 0.5 ? 'namaqualand_boulder_04' : 'namaqualand_boulder_03', scale = 1.5 + hash(mi, 7) * 0.6;
+    // (as far out from the face as the shelf holds it whole: a block whose lowest ground is a metre under the sill is
+    // over its lip)
+    for (let up = 2.4; up >= 0.6; up -= 0.3) {
+      const d = w / 2 + 0.8 + hash(mi, sd) * 0.6, x = fx + ax * sd * d + ox * up, z = fz + az * sd * d + oz * up;
+      const st = G ? seat(id, x, z, scale, 0.18) : { y: m.floor - 0.3, low: m.floor };
+      if (st.low < m.floor - 1) continue;
+      out.push({ id, at: [x, st.y, z], turn: hash(sd, mi + 2) * Math.PI * 2, tilt: [(hash(mi, sd + 9) - 0.5) * 0.3, (hash(sd + 9, mi) - 0.5) * 0.3], scale });
+      break;
     }
     for (let j = 0; j < 6; j++) {
-      // (to either side of the way in, never in it)
-      const sd = j % 2 ? 1 : -1, across = sd * (0.9 + hash(j, mi) * (w / 2 + 0.6)), outThere = 0.3 + hash(mi, j) * 2.6;
-      out.push({ id: hash(j, mi + 4) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02', at: [fx + ax * across + ox * outThere, m.floor - 0.12, fz + az * across + oz * outThere], turn: hash(j + 1, mi) * Math.PI * 2, tilt: [(hash(j, mi + 6) - 0.5) * 0.5, (hash(mi + 6, j) - 0.5) * 0.5], scale: 0.3 + hash(j, mi + 8) * 0.5, small: true });
+      // (to either side of the way in, never in it; none over the lip)
+      const sd = j % 2 ? 1 : -1, across = sd * (0.9 + hash(j, mi) * (w / 2 + 0.6)), outThere = 0.3 + hash(mi, j) * 2.6, rid = hash(j, mi + 4) < 0.6 ? 'namaqualand_boulder_05' : 'namaqualand_boulder_02', scale = 0.3 + hash(j, mi + 8) * 0.5;
+      const x = fx + ax * across + ox * outThere, z = fz + az * across + oz * outThere, st = G ? seat(rid, x, z, scale, 0.12) : { y: m.floor - 0.12, low: m.floor };
+      if (st.low < m.floor - 0.8) continue;
+      out.push({ id: rid, at: [x, st.y, z], turn: hash(j + 1, mi) * Math.PI * 2, tilt: [(hash(j, mi + 6) - 0.5) * 0.5, (hash(mi + 6, j) - 0.5) * 0.5], scale, small: true });
     }
   }
   return out;
