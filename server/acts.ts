@@ -155,7 +155,11 @@ export function leaveSeat(c: Client, gone = false) {
   }
   // The game that was moving it goes on doing so until it has rolled to a stop (see 'vrest'):
   // unless that game is gone, and then it stops where it was last seen (a helicopter in the air: see orphanHeli).
-  if (gone && v.sim === c.id && orphanHeli(v, c)) return;
+  // (A solo pilot shot dead in the air is gone from its controls as surely: their game flies it no more, and it hung
+  // where they died with their body sat in it, never "down" for `riders` to lay them out. The owner, 2026-10-16: "when
+  // a player is shot out of a helicopter their body remains floating in the sky, it should be stuck in the helicopter
+  // till the helicopter lands or crashes then spawn on the ground".)
+  if ((gone || !c.alive) && v.sim === c.id && orphanHeli(v, c)) return;
   if (gone && v.sim === c.id) {
     v.sim = null;
     v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];

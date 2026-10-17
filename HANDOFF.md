@@ -2,6 +2,11 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## BUG LIST (this build: the map three times over, on `perf-aggressive`, not deployed)
+The owner, 2026-10-16: "we need to add a buglist to this build". Each line: the bug, then its state.
+- **A player shot out of a helicopter: their body floated in the sky.** The owner: "it should be stuck in the helicopter till the helicopter lands or crashes then spawn on the ground". FIXED, server only (server/acts.ts `leaveSeat`): a solo pilot killed in the air left the helicopter to their own dead game, which flew it no more, so it hung where they died and `riders` never laid the body out. Now the nearest player's game takes it over and it falls (its rotor runs down), or with nobody near the server sets it down wrecked; the body rides in its seat until then and is laid beside it. test/heli-body.test.ts (6 checks; the new ones fail on the old code), test/heli-orphan.test.ts. Goes live with the next server deploy.
+- **The Edge "no graphics card" bot-check loop** (players drawing on the processor were turned away after the whole course with a message that named no cure): the fix is parked in `git stash` ("PARKED Edge no-card bot-check fix"), the owner: "forget it dont push for now".
+
 ## START HERE (2026-10-16, ~16:00 UTC)
 - **Live:** everything through `37c11d2` (site and server, PROTOCOL 44; `main` = `37c11d2`). The branch `perf-aggressive` is the working branch (only handoff notes past `main`). Check `/healthz` and `/version.json` before trusting this line.
 - **Two tasks had sessions of their own today:** the anti-bot work (section below: LIVE, with round 2: pardon at the door, banned names off "Recently left", ban saving, the missing-PCI-id tell) and the story trailer, film 17 (section below: storyboard approved, cut built and drafted; see its WHERE IT STANDS line for what is left before the final take).
