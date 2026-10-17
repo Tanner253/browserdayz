@@ -307,6 +307,16 @@ export class ItemModels {
       }
       box = await groundPartsSlowly(parts);
     }
+    // A pair, one gun for each hand: two of it, the one lying on the other a little turned and along, as a pair of
+    // gloves lies (the owner: "akimbo weapons and icons and 3d models in game should have the akimbos stacked like
+    // the gloves are"). On the ground and in its picture alike, which are drawn from this.
+    if (ITEMS[id]?.weapon?.akimbo) {
+      const sz = box.getSize(new THREE.Vector3());
+      const on = new THREE.Matrix4().makeRotationY(0.22).setPosition(sz.x * 0.07, sz.y * 0.9, sz.z * 0.2);
+      for (const p of parts) p.geometry = mergeGeometries([p.geometry, p.geometry.clone().applyMatrix4(on)], false)!;
+      await breathe();
+      box = await groundPartsSlowly(parts);
+    }
     // The pieces of it that are painted with the one paint are made one piece: a box of rounds came as fifty-three
     // (every round of it its own), a rifle as twenty-nine, and each piece is a thing for the card to be told of
     // on every frame it is in sight, and again for every shadow it casts. (Pieces that cannot be made one, having
