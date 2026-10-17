@@ -23,7 +23,7 @@ import { CELL, SEA_LEVEL, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_SEE
 import { catmullRom, heightAt, slopeAt } from './ground';
 import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside } from './west-plan';
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
-import { carveRiver, cutLake, cutSwamp, lakeLevel, riverMask, riverWater } from './west-water';
+import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater } from './west-water';
 import { fillTown, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
 import { moundAt, placedRooms } from '../../sim/towns';
 import type { Instance, POI, Site } from './types';
@@ -311,8 +311,10 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     for (let k = 0; k < lp.length / 3; k++) if (Math.hypot(lp[k * 3] - jx, lp[k * 3 + 2] - jz) < 120) { k0 = Math.min(k0, k); k1 = k; }
     if (k1 > k0) bed(heights, lp.subarray(k0 * 3, k1 * 3 + 3), loop.width, R.bed, (x, z) => 1 - smoothstep(50, 90, Math.hypot(x - jx, z - jz)), net);
   }
-  // (and the river's bed over the roads', where they ford it)
-  carveRiver(heights, net, river);
+  // (and the river's bed over the roads', where they ford it; and the lake's shore held, whatever moved it)
+  const riverWet = new Float32Array(n).fill(-1e9);
+  carveRiver(heights, net, river, riverWet);
+  holdShore(heights, net, PLAN.lake.outline, lake);
   // (the ground as it is seen moved as the ground was by the beds: in the square's opened west too)
   if (own) for (let i = 0; i < n; i++) if (heights[i] !== preBed[i]) surface[i] += heights[i] - preBed[i];
 
@@ -394,6 +396,23 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
         sands[o + 1] = Math.round(Math.max(0, beach - wet) * 255);
         sands[o + 3] = Math.round(Math.min(1 - beach, wash) * 255);
       }
+    }
+  }
+  // (NO GRASS UNDER WATER: none under the lake, nor under the river more than a hand deep; in the swamp, its reeds
+  // and grass through the water only where it is shallow, its pools clear)
+  {
+    const wetAt = (i: number, x: number, z: number) => {
+      let d = riverWet[i] - heights[i];
+      if (inBounds(LB, x, z, 0) && inside(L, x, z)) d = Math.max(d, lake - heights[i]);
+      return d;
+    };
+    for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < OX; ix++) {
+      const i = iz * NX + ix;
+      if (!grass[i]) continue;
+      const x = xOf(ix), z = zOf(iz);
+      if (inBounds(SB, x, z, 0) && inside(S, x, z)) { grass[i] = Math.round(grass[i] * (1 - smoothstep(0.3, 0.45, swamp - heights[i]))); continue; }
+      const d = wetAt(i, x, z);
+      if (d > 0) grass[i] = Math.round(grass[i] * (1 - smoothstep(0, 0.1, d)));
     }
   }
   // (Kalat's flats, its moat and its dry river's bed cracked earth)

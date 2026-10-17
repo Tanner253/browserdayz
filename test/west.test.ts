@@ -244,6 +244,42 @@ const ridge = (z: number) => RL.ridgeAt(z);
   ok(`the valley's floor falling west (${fl.map((y) => y.toFixed(0)).join(', ')} m); the river ${river.length} points, never uphill, always water over its bed, into the sea; Ozerki's lake ${deepest.toFixed(1)} m at its deepest; the swamp ${((wet / cells) * 100).toFixed(0)}% under its water, ${((pools / cells) * 100).toFixed(0)}% deep pools`);
 }
 
+// --- WHAT WOULD LOOK WRONG BY THE WATER (the owner, 2026-10-16: "inconsistent water levels, grass spawning under water,
+// gaps in textures in the ground"): no grass under a lake or the river more than ankle deep, nor under the swamp's
+// pools (its reeds stand only in its shallows); no lake's edge hanging over lower ground; the river's banks over its
+// water everywhere, and its end where it meets the sea, at the sea's level; and no ground with no paint on it
+{
+  const { waterAt, inside: inLake } = await import('../src/sim/water');
+  const W = world.water!, G = (x: number, z: number) => heightAt(H, x, z), swamps = W.lakes.filter((l) => l.swamp);
+  let underLake = 0, underPool = 0, worstLake = '', worstPool = '';
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < OX; i++) {
+    const g = world.grass[j * NX + i];
+    if (!g) continue;
+    const x = X0 + i * CELL, z = Z0 + j * CELL, here = waterAt(W, x, z, G);
+    if (!here || here.depth < 0.15) continue;
+    if (swamps.some((l) => inLake(l.outline, x, z))) { if (here.depth > 0.5) { underPool++; worstPool = `${x}, ${z}`; } }
+    else { underLake++; worstLake = `${x}, ${z}`; }
+  }
+  assert.ok(underLake === 0 && underPool === 0, `grass under ${underLake} cells of lake or river water (${worstLake}) and ${underPool} of the swamp's pools (${worstPool})`);
+  let hanging = 0;
+  for (const l of W.lakes) for (let k = 0; k < l.outline.length; k++) {
+    const [ax, az] = l.outline[k], [bx, bz] = l.outline[(k + 1) % l.outline.length], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 2));
+    for (let q = 0; q < n; q++) if (l.level - G(ax + ((bx - ax) * q) / n, az + ((bz - az) * q) / n) > 0.05) hanging++;
+  }
+  assert.equal(hanging, 0, `${hanging} spots of a lake's edge hang over lower ground`);
+  let spilt = 0, where = '';
+  for (const r of W.rivers) for (let k = 0; k + 1 < r.pts.length; k++) {
+    const [x, z, y, wd] = r.pts[k], [x2, z2] = r.pts[k + 1], len = Math.hypot(x2 - x, z2 - z) || 1, nx = -(z2 - z) / len, nz = (x2 - x) / len;
+    for (const side of [-1, 1]) if (y - G(x + nx * side * (wd / 2 + 0.5), z + nz * side * (wd / 2 + 0.5)) > 0.05) { spilt++; where = `${x.toFixed(0)}, ${z.toFixed(0)}`; }
+  }
+  const end = W.rivers[0].pts[W.rivers[0].pts.length - 1];
+  assert.ok(spilt === 0 && Math.abs(end[2] - SEA) < 0.01 && end[0] > WG.shoreLine(end[1]) - 8, `the river over its banks at ${spilt} spots (${where}), or its end (${end[0].toFixed(0)}, ${end[2].toFixed(2)}) not where it meets the sea`);
+  let unpainted = 0;
+  for (let c = 0; c < NX * NZ; c++) if (world.splat[c * 4] + world.splat[c * 4 + 1] + world.splat[c * 4 + 2] + world.splat[c * 4 + 3] < 8) unpainted++;
+  assert.equal(unpainted, 0, `${unpainted} spots of ground with no paint`);
+  ok(`by the water: no grass under a lake or the river, nor under the swamp's pools; every lake's edge on its shore; the river's banks over its water all the way, and its end at the sea's edge and level; no ground unpainted`);
+}
+
 // --- THE TOWNS and KALAT
 {
   const towns = world.towns!;
