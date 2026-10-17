@@ -7,10 +7,12 @@
 //
 //   rockBlend(atmo, terrain.heightTex, material)           // instead of atmo.register(material)
 //   rockBlend(atmo, terrain.heightTex, material, 'dune')   // a piece on sand: the level ground is the dunes' picture
+//   const b = blendPatch(terrain.heightTex, 'dune')        // or laid after a patch of one's own (one patch a material):
+//   atmo.register(material, (sh) => { mine(sh); b.patch(sh); }, `mine+${b.key}`)
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
-import type { Atmosphere } from './atmosphere';
+import type { Atmosphere, ShaderPatch } from './atmosphere';
 import { KINDS } from './ground';
 import { worldUniforms } from './terrain';
 import { CELL } from './worldgen';
@@ -47,10 +49,17 @@ function uniformsFor(heightTex: THREE.Texture, flat: Flat) {
 
 /** A rock's material made to fade into the ground where it meets it (see the head of this file). Returns it. */
 export function rockBlend(atmo: Atmosphere, heightTex: THREE.Texture, mat: THREE.MeshStandardMaterial, flat: Flat = 'grit') {
+  const b = blendPatch(heightTex, flat);
+  atmo.register(mat, b.patch, b.key);
+  return mat;
+}
+
+/** The fade as a patch of its own and the key its programs are kept by, to be laid after another patch (see the head of this file). */
+export function blendPatch(heightTex: THREE.Texture, flat: Flat = 'grit'): { patch: ShaderPatch; key: string } {
   const u = uniformsFor(heightTex, flat);
-  atmo.register(
-    mat,
-    (shader) => {
+  return {
+    key: `rock-blend:${flat}`,
+    patch: (shader) => {
       Object.assign(shader.uniforms, u);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vBlendPos;')
@@ -88,9 +97,7 @@ export function rockBlend(atmo: Atmosphere, heightTex: THREE.Texture, mat: THREE
           '#include <normal_fragment_maps>\nnormal = normalize( mix( normal, normalize( ( viewMatrix * vec4( bN, 0.0 ) ).xyz ), bK * 0.85 ) );',
         );
     },
-    `rock-blend:${flat}`,
-  );
-  return mat;
+  };
 }
 
 /**
