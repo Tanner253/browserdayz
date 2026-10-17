@@ -136,6 +136,31 @@ const splash = (seed: number, pool: string, flecks: string, run: string) =>
   `url("data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 150'><defs><filter id='f' x='-30%' y='-30%' width='160%' height='160%'><feTurbulence type='fractalNoise' baseFrequency='0.05' numOctaves='2' seed='${seed}' result='n'/><feDisplacementMap in='SourceGraphic' in2='n' scale='18'/><feGaussianBlur stdDeviation='1.7' result='b'/><feColorMatrix in='b' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -5.5'/></filter><radialGradient id='g' cx='42%' cy='26%' r='80%'><stop offset='0' stop-color='#8e0e09'/><stop offset='.5' stop-color='#5e0402'/><stop offset='1' stop-color='#330100'/></radialGradient></defs><g filter='url(#f)' fill='url(#g)' opacity='.88'>${pool}${flecks}${run}</g></svg>`,
   )}")`;
+/**
+ * Each splash drawn once into a plain picture, as soon as the HUD is made (2026-10-17, the stutter players felt in a
+ * fight, "when i get into a fight i lag a lot"): its noise, warp and blur are among the dearest things a browser draws,
+ * and drawn as an SVG it was drawn again on the first drop of a fight (a frame of 100 ms) and as each drop grew. The
+ * SVG is what is shown until its picture is ready.
+ */
+const bakeSplashes = (): Promise<string[]> =>
+  Promise.all(
+    SPLASHES.map(
+      (svg) =>
+        new Promise<string>((done) => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            // (as sharp as the biggest drop, 110 by 165, on a screen of two pixels to a point)
+            c.width = 240;
+            c.height = 360;
+            c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+            done(`url("${c.toDataURL('image/png')}")`);
+          };
+          img.onerror = () => done(svg);
+          img.src = svg.slice(5, -2);
+        }),
+    ),
+  );
 const SPLASHES = [
   splash(3, "<ellipse cx='50' cy='42' rx='27' ry='23'/>", "<circle cx='18' cy='24' r='5'/><circle cx='86' cy='52' r='4.5'/><circle cx='72' cy='12' r='3.5'/><circle cx='12' cy='58' r='3'/><circle cx='88' cy='22' r='2.5'/>", "<path d='M45 56 Q47 104 49 136 Q50 142 52 136 Q54 104 56 56 Z'/>"),
   splash(11, "<ellipse cx='48' cy='38' rx='22' ry='27'/>", "<circle cx='80' cy='30' r='6'/><circle cx='16' cy='40' r='4'/><circle cx='30' cy='8' r='3'/><circle cx='84' cy='64' r='3'/>", "<path d='M40 58 Q41 88 42 110 Q43 115 45 110 Q46 88 47 58 Z'/><path d='M54 56 Q56 76 57 92 Q58 96 60 92 Q60 76 61 56 Z'/>"),
@@ -152,7 +177,11 @@ export class HUD {
   /** the survivor's state: the symbols in the corner, and the same in words for the inventory (src/ui/status-view.ts) */
   private status: StatusView;
 
+  /** the splashes as plain pictures, once drawn (see bakeSplashes) */
+  private splashes: string[] | null = null;
+
   constructor(private icons: Record<string, string> = {}) {
+    void bakeSplashes().then((s) => (this.splashes = s));
     this.root = document.createElement('div');
     this.root.id = 'hud';
     this.root.innerHTML = `
@@ -1075,7 +1104,9 @@ export class HUD {
         const size = 46 + ((k * 37) % 5) * 16;
         d.style.width = `${size}px`;
         d.style.height = `${Math.round(size * 1.5)}px`;
-        d.style.backgroundImage = SPLASHES[k % SPLASHES.length];
+        d.style.backgroundImage = (this.splashes ?? SPLASHES)[k % SPLASHES.length];
+        // (its run over, it is let go of: a drop on the glass is a layer of its own only while it runs)
+        d.addEventListener('animationend', () => d.classList.remove('on'));
         d.style.setProperty('--turn', `${((k * 53) % 9) * 5 - 20}deg`);
         d.style.setProperty('--flip', k % 2 ? '-1' : '1');
         this.drops.push(d);
@@ -1091,9 +1122,10 @@ export class HUD {
       d.style.top = `${y.toFixed(1)}%`;
       d.style.setProperty('--run', `${(18 + Math.random() * 46).toFixed(0)}px`);
       d.style.setProperty('--life', `${(3 + Math.random() * 2).toFixed(2)}s`);
+      // (started again on the next frame, not by asking the page to lay itself out there and then: four drops at a new
+      // wound were four layouts of the whole page in one frame)
       d.classList.remove('on');
-      void d.offsetWidth;
-      d.classList.add('on');
+      requestAnimationFrame(() => d.classList.add('on'));
     };
     if (rate > this.bledAt + 0.5) for (let k = 0; k < 4; k++) land();
     this.bledAt = rate;

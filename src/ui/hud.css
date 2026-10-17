@@ -484,6 +484,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   position: absolute;
   inset: 0;
   opacity: 0;
+  /* (a layer of its own: its beat and its fade are then the card's, and the page is not drawn again for them) */
+  will-change: opacity;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 0, 0, 0.55) 100%);
 }
 /* An open wound. Blood lands on the glass and runs; the edges of the view beat, faintly for a wound in a limb and
@@ -494,6 +496,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   inset: 0;
   opacity: 0;
   transition: opacity 0.5s;
+  will-change: opacity;
   background:
     radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(120, 0, 0, 0.36) 100%),
     radial-gradient(circle at 0% 100%, rgba(100, 0, 0, 0.4), transparent 30%),
@@ -510,9 +513,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   opacity: 0;
   background: center / contain no-repeat;
   transform: rotate(var(--turn)) scaleX(var(--flip));
-  will-change: transform, opacity;
 }
-.hud-blooddrops i.on { animation: blooddrop var(--life) cubic-bezier(0.25, 0, 0.6, 1) forwards; }
+.hud-blooddrops i.on { animation: blooddrop var(--life) cubic-bezier(0.25, 0, 0.6, 1) forwards; will-change: transform, opacity; }
 /* (it lands, spreads a little, hangs, and runs down the glass as it thins) */
 @keyframes blooddrop {
   0% { opacity: 0; transform: translateY(0) rotate(var(--turn)) scale(calc(0.4 * var(--flip)), 0.4); }
