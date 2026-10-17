@@ -57,6 +57,10 @@ const SOLID: Record<string, [Surface, number]> = {
   uaz_469: ['metal', 0.86],
   concrete_road_barrier: ['concrete', 0.95],
   crate_big: ['wood', 0.98],
+  // (2026-10-16, the new towns: a woodcutter's stack of logs, as tall as a man; the picket fences of the front gardens)
+  log_pile: ['wood', 0.92],
+  fence_white: ['wood', 1],
+  fence_grey: ['wood', 1],
   wooden_military_crate: ['wood', 0.95],
   old_military_crate: ['wood', 0.95],
   weapons_case: ['metal', 0.95],

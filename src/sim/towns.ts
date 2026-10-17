@@ -8,6 +8,12 @@
 
 import type { BuildingType } from '../world/worldgen/layout';
 import type { KitPiece } from './kit';
+import { KNOLL, LIPKI, LIPKI_GROUND, lipkiBuildings, lipkiThings } from './lipki';
+import { OZERKI, OZERKI_GROUND, ozerkiBuildings, ozerkiDecks, ozerkiPiers, ozerkiThings } from './ozerki';
+import { POKROV_GROUND, POKROV_TERRACE, pokrovBuildings, pokrovThings } from './pokrov';
+import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
+
+export { LIPKI };
 
 export interface Town {
   name: string;
@@ -19,17 +25,14 @@ export interface Town {
   rot: number;
 }
 /** a building of a town, in the town's frame: `rot` turns its front (+z of its own) toward (sin, cos) */
-export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number }
+export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }
 
-const PI = Math.PI, Q = PI / 2;
 
 /**
  * Pokrov: the white-walled monastery on the main west road, and the town outside its gate. The bunker road runs in
  * at the Holy Gate and out at the north gate: whoever holds the monastery holds the way to Bunker 17.
  */
 export const POKROV: Town = { name: 'Pokrov', x: -1850, z: -30, pad: [135, 115], rot: 0 };
-/** Lipki: the woodcutters' hamlet in the birch woods, its log houses round a green. */
-export const LIPKI: Town = { name: 'Lipki', x: -1180, z: 350, pad: [80, 75], rot: 0 };
 
 /** the monastery's outer wall line, in Pokrov's frame, round the way the kit's walls run (their outside on the right) */
 export const POKROV_WALL: [number, number][] = [[-65, 20], [70, 20], [75, -60], [0, -95], [-80, -55]];
@@ -37,40 +40,6 @@ export const POKROV_WALL: [number, number][] = [[-65, 20], [70, 20], [75, -60], 
 const POKROV_GATES: { side: number; at: number }[] = [{ side: 0, at: 70 }, { side: 3, at: 49 }];
 /** the sides whose middle a stair climbs to the wall-walk, from inside */
 const POKROV_STAIRS = [1, 4];
-
-export function pokrovBuildings(): TownSpot[] {
-  return [
-    // inside the walls: the cathedral's door to the west, the belfry beside it, the cells along the east wall
-    { type: 'cathedral', x: 10, z: -38, rot: 0 },
-    { type: 'belfry', x: 18, z: -56, rot: 0 },
-    { type: 'cells', x: 58, z: -22, rot: -Q, arms: 1 },
-    { type: 'refectory', x: -40, z: 0, rot: 0 },
-    { type: 'abbot', x: 30, z: 2, rot: 0 },
-    // outside: the tavern and the shops facing the road and the market at the gate
-    { type: 'tavern', x: -28, z: 55, rot: PI },
-    { type: 'merchant', x: 32, z: 54, rot: PI },
-    { type: 'merchant', x: 50, z: 57, rot: PI },
-    { type: 'smithy', x: -58, z: 58, rot: PI },
-    { type: 'izba_two', x: 62, z: 88, rot: PI },
-    { type: 'izba', x: -62, z: 88, rot: Q },
-    { type: 'merchant', x: 18, z: 90, rot: 0 },
-  ];
-}
-
-export function lipkiBuildings(): TownSpot[] {
-  // round the green, each facing its middle; the way in from the north is left open
-  const ring = (deg: number, type: BuildingType, r = 42): TownSpot => {
-    const t = (deg * PI) / 180;
-    return { type, x: r * Math.sin(t), z: -r * Math.cos(t), rot: -t };
-  };
-  return [
-    { type: 'chapel', x: 0, z: 2, rot: -Q },
-    ring(62, 'izba'), ring(118, 'izba'), ring(180, 'izba_two'), ring(242, 'izba'), ring(298, 'izba'),
-    { type: 'sawmill', x: 54, z: 52, rot: PI * 0.8 },
-    { type: 'tower', x: -72, z: -26, rot: Q },
-    { type: 'tower', x: 70, z: -30, rot: -Q },
-  ];
-}
 
 /** the kit's lengths (see progress/intake/CATALOGUE.md): a thin straight, its half, the gate, how deep a thin wall is */
 const THIN = 14.82, HALF = 7.41, DEEP = 2.55, GATE_MID = 3.7;
@@ -111,24 +80,109 @@ export function pokrovWalls(y: number): KitPiece[] {
  * it is gilt. The cathedral's great dome; the belfry's little one over its bells.
  */
 export const POKROV_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [
-  { x: 10, z: -38, over: 11.0, size: 1, gilt: false },
-  { x: 18, z: -56, over: 21.4, size: 0.55, gilt: true },
+  // (the great one over the crossing, a small one along the nave's ridge to the west, one over each arm and the apse)
+  { x: 12.5, z: -38, over: 11.4, size: 1, gilt: false },
+  { x: 1.5, z: -38, over: 11.6, size: 0.5, gilt: false },
+  { x: 12.5, z: -47, over: 7.6, size: 0.45, gilt: false },
+  { x: 12.5, z: -29, over: 7.6, size: 0.45, gilt: false },
+  { x: 25, z: -38, over: 7.4, size: 0.45, gilt: true },
+  { x: 18, z: -58, over: 21.4, size: 0.55, gilt: true },
 ];
-/** and over Lipki's chapel */
-export const LIPKI_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [{ x: 0, z: 2, over: 5.9, size: 0.38, gilt: false }];
+/** and over Lipki's chapel, on its knoll */
+export const LIPKI_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [{ x: KNOLL.x, z: KNOLL.z, over: 5.9, size: 0.38, gilt: false }];
 
 /** a town as the world has set it down: where, and the height of its pad of level ground */
 export interface PlacedTown { town: Town; padY: number }
 
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
-  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : [];
+  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : [];
+}
+
+/** what lies about a town (containers, crates, drums), in its frame */
+export function townThings(t: Town): TownThing[] {
+  return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : [];
+}
+
+/**
+ * The ground a town has worn bare, dug or raised, in its frame: gravel yards (rectangles x0, z0, x1, z1), trodden
+ * lanes (lines, how wide), garden beds, knolls. For whoever sets the town down, to shape and paint it so and keep the
+ * grass off it. (A building on a knoll stands on its top: its floor over the knoll's height, see moundAt.)
+ */
+export interface TownGround {
+  yards: [number, number, number, number][];
+  lanes: { line: [number, number][]; w: number }[];
+  /** gardens' beds, dug (rectangles as yards): painted earth, no grass */
+  beds?: [number, number, number, number][];
+  /** ground raised: a knoll's middle, how far its foot reaches, how high its top, how wide its level top (x, z, r, h, top) */
+  mounds?: [number, number, number, number, number][];
+  /** ground raised level inside a line (x, z points), so high, its bank falling away over `out` metres round it */
+  terraces?: { poly: [number, number][]; h: number; out: number }[];
+}
+export function townGround(t: Town): TownGround {
+  return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : { yards: [], lanes: [] };
+}
+
+/** how far a point is outside a line round (0 inside it) */
+function outside(poly: [number, number][], x: number, z: number): number {
+  let inside = false, best = 1e9;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, az] = poly[j], [bx, bz] = poly[i];
+    if ((az > z) !== (bz > z) && x < ((bx - ax) * (z - az)) / (bz - az) + ax) inside = !inside;
+    const ex = bx - ax, ez = bz - az, u = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez)));
+    best = Math.min(best, Math.hypot(x - ax - ex * u, z - az - ez * u));
+  }
+  return inside ? 0 : best;
+}
+
+/** how high a town's knolls and terraces raise its ground at a point of its frame, over its pad */
+export function moundAt(t: Town, lx: number, lz: number): number {
+  let up = 0;
+  const g = townGround(t);
+  for (const [x, z, r, h, top] of g.mounds ?? []) {
+    const d = Math.hypot(lx - x, lz - z), k = Math.min(1, Math.max(0, (r - d) / (r - top)));
+    up = Math.max(up, h * k * k * (3 - 2 * k));
+  }
+  for (const { poly, h, out } of g.terraces ?? []) {
+    const d = outside(poly, lx, lz), k = Math.min(1, Math.max(0, 1 - d / out));
+    up = Math.max(up, h * k * k * (3 - 2 * k));
+  }
+  return up;
+}
+
+/** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */
+export interface SlabRun { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }
+
+/** a town's walls of concrete slabs in the world, its runs moved from its frame */
+export function placedSlabs(t: Town): SlabRun[] {
+  const runs = t.name === ZAVOD.name ? ZAVOD_WALL : [];
+  return runs.map((r) => ({ ...r, a: townPoint(t, ...r.a), b: townPoint(t, ...r.b) }));
+}
+
+/** every new town, as it is planned (where the world sets each down is the world's) */
+export const TOWNS: Town[] = [POKROV, LIPKI, ZAVOD, OZERKI];
+
+/**
+ * A town's pieces of a kit other than the fort's, in the world (Ozerki's piers): which kit, the pieces, and what of them
+ * stops a body, as boxes [middle x, y, z, half x, y, z] turned with the town.
+ */
+export function placedKits(p: PlacedTown): { kit: string; pieces: KitPiece[]; boxes: { c: [number, number, number]; h: [number, number, number]; rot: number }[] }[] {
+  if (p.town.name !== OZERKI.name) return [];
+  const move = (k: KitPiece): KitPiece => {
+    const [x, z] = townPoint(p.town, k.at[0], k.at[2]);
+    return { ...k, at: [x, k.at[1], z], turn: (k.turn ?? 0) + p.town.rot };
+  };
+  const boxes = ozerkiDecks(p.padY).map(([x, y, z, hx, hy, hz]) => {
+    const [wx, wz] = townPoint(p.town, x, z);
+    return { c: [wx, y, wz] as [number, number, number], h: [hx, hy, hz] as [number, number, number], rot: p.town.rot };
+  });
+  return [{ kit: 'pier_kit', pieces: ozerkiPiers(p.padY).map(move), boxes }];
 }
 
 /** a town's walls in the world (only Pokrov has any) */
 export function placedWalls(p: PlacedTown): KitPiece[] {
   if (p.town.name !== POKROV.name) return [];
-  return pokrovWalls(p.padY).map((k) => {
+  return pokrovWalls(p.padY + POKROV_TERRACE.h).map((k) => {
     const [x, z] = townPoint(p.town, k.at[0], k.at[2]);
     return { ...k, at: [x, k.at[1], z], turn: (k.turn ?? 0) + p.town.rot };
   });
@@ -139,7 +193,7 @@ export function placedDomes(p: PlacedTown): { x: number; y: number; z: number; s
   const list = p.town.name === POKROV.name ? POKROV_DOMES : p.town.name === LIPKI.name ? LIPKI_DOMES : [];
   return list.map((d) => {
     const [x, z] = townPoint(p.town, d.x, d.z);
-    return { x, y: p.padY + 0.3 + d.over, z, size: d.size, gilt: d.gilt };
+    return { x, y: p.padY + moundAt(p.town, d.x, d.z) + 0.3 + d.over, z, size: d.size, gilt: d.gilt };
   });
 }
 
@@ -150,7 +204,8 @@ export function placedDomes(p: PlacedTown): { x: number; y: number; z: number; s
  */
 export function onTownWall(placed: PlacedTown[] | undefined, x: number, y: number, z: number): boolean {
   for (const p of placed ?? []) {
-    if (p.town.name !== POKROV.name || y < p.padY - 0.5 || y > p.padY + 9.5) continue;
+    const foot = p.padY + POKROV_TERRACE.h;
+    if (p.town.name !== POKROV.name || y < foot - 0.5 || y > foot + 9.5) continue;
     const c = Math.cos(p.town.rot), s = Math.sin(p.town.rot), dx = x - p.town.x, dz = z - p.town.z;
     const lx = dx * c - dz * s, lz = dx * s + dz * c, W = POKROV_WALL;
     for (let i = 0; i < W.length; i++) {

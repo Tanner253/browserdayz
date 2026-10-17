@@ -17,7 +17,8 @@ const ids = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 if (!ids.length) throw new Error('name what to build: ' + [...Object.keys(LOCAL_MODELS), ...Object.keys(WEAPON_PACKS)].join(', '));
 const FORCE = process.argv.includes('--force');
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const SRC = path.join(ROOT, 'assets-src'), OUT = path.join(ROOT, 'public', 'assets');
+// (ASSETS_SRC: the sources elsewhere, as for a worktree, which has no assets-src of its own)
+const SRC = process.env.ASSETS_SRC ?? path.join(ROOT, 'assets-src'), OUT = path.join(ROOT, 'public', 'assets');
 const exists = (p) => fs.access(p).then(() => true, () => false);
 const countTris = (doc) => {
   let tris = 0;

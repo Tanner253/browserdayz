@@ -20,6 +20,8 @@ import { frameToWorld, planBasements, type RoomKind } from '../sim/basements';
 import { buildBasement, roomVolume, type Kit } from './basement-build';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 import * as town from './town-plans';
+import * as zavod from './zavod-plans';
+import * as ozerki from './ozerki-plans';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 // (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
@@ -126,9 +128,10 @@ export type MatKey =
   | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall'
   | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'cold_steel' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
   | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
-  | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage';
+  | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage'
+  | 'boards_blue' | 'boards_green' | 'boards_pale' | 'lime_brick';
 
-const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
+const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; /** its picture lightened so many times (a colour can only darken one) */ gain?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
   brick_ext: { tex: 'red_brick_plaster_patch_02', tile: 2.6, surface: 'concrete' },
   planks_ext: { tex: 'weathered_plank_siding', tile: 2.4, surface: 'wood' },
@@ -198,6 +201,12 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   planks_green: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9fb592, surface: 'wood' },
   planks_blue: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9db3c4, surface: 'wood' },
   planks_brown: { tex: 'weathered_plank_siding', tile: 2.4, color: 0xc49a72, surface: 'wood' },
+  // (2026-10-16, the new towns' log houses: boards painted as these villages paint them, and a shed's pale ones)
+  boards_blue: { tex: 'blue_painted_planks', tile: 2.4, surface: 'wood' },
+  boards_green: { tex: 'green_rough_planks', tile: 2.4, surface: 'wood' },
+  boards_pale: { tex: 'distressed_painted_planks', tile: 2.4, surface: 'wood' },
+  // (the monastery's: old limewash on brick, fallen from it here and there. As the picture comes it reads grey stone in the light of the game, not a white wall)
+  lime_brick: { tex: 'white_bricks', tile: 2.6, gain: 1.45, surface: 'concrete' },
   // sheet iron not yet rusted through: bare, and painted
   roof_iron_clean: { tex: 'corrugated_iron', tile: 2, metal: true, surface: 'metal' },
   roof_iron_green: { tex: 'corrugated_iron', tile: 2, color: 0x7f9a7c, metal: true, surface: 'metal' },
@@ -476,6 +485,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
   switch (type) {
     // (the new towns', each drawn up for its place: see src/world/town-plans.ts)
     case 'cathedral': return town.cathedralPlan();
+    case 'cathedral_arm': return town.cathedralArmPlan();
+    case 'cathedral_apse': return town.cathedralApsePlan();
     case 'belfry': return town.belfryPlan();
     case 'cells': return town.cellsPlan();
     case 'refectory': return town.refectoryPlan();
@@ -483,10 +494,15 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
     case 'tavern': return town.tavernPlan();
     case 'merchant': return town.merchantPlan();
     case 'smithy': return town.smithyPlan();
-    case 'izba': return town.izbaPlan();
-    case 'izba_two': return town.izbaTwoPlan();
+    case 'izba': return town.izbaPlan(rng);
+    case 'izba_two': return town.izbaTwoPlan(rng);
     case 'chapel': return town.chapelPlan();
     case 'sawmill': return town.sawmillPlan();
+    case 'boathouse': return ozerki.boathousePlan();
+    case 'smokehouse': return ozerki.smokehousePlan();
+    case 'works_hall': return zavod.hallPlan();
+    case 'works_office': return zavod.officePlan();
+    case 'zavod_flats': return zavod.flatsPlan();
     case 'house_small':
       return {
         w: 8, d: 6.5, h: 2.8, ext, int: 'int_painted', floor: rng.chance(0.5) ? 'floor_wood' : 'floor_lino',
@@ -1466,6 +1482,15 @@ export class Buildings {
     }
     this.planVillageProps();
     this.planSiteProps();
+    // (the new towns' containers, laid among the props with the rest of a town's things: stood after the sites', so
+    // no door before them is renumbered. One whose foot is well over the ground is stacked on another, and stands level where it is put.)
+    for (const it of this.world.props) {
+      if (!it.kind.startsWith(CONTAINER.id) || it.lean) continue;
+      if (it.y > heightAt(this.world.heights, it.x, it.z) + 1) {
+        it.lean = [0, 0, it.y];
+        this.containers.push(it);
+      } else this.standContainer(it);
+    }
     // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
     const gas = gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
     /** (said of the places every building has made, here; and of the racks' places, which come last of all, below) */
@@ -1538,6 +1563,8 @@ export class Buildings {
     this.planGrounds();
     // (and the fences of the village's back yards: shapes only, after everything)
     this.planYards();
+    // (and the new towns' walls of slabs: shapes and what stops a body, after everything)
+    this.planSlabs();
     // And what lies about the jeep that went off the bridge (see `wreckUnder` in src/sim/bridge.ts): places for
     // things on the ground of the cleft, after every other place on the map, so that none of those is renumbered.
     // What an army's jeep carried, on the step of the map the town beside it is on.
@@ -1830,7 +1857,7 @@ export class Buildings {
       });
     for (const plot of this.world.buildings) {
       // (and in the new towns, behind their houses: a log house's kitchen garden, the shops' back yards; see src/sim/towns.ts)
-      const town = /^(lipki|pokrov)_/.test(plot.id);
+      const town = /^(lipki|pokrov|ozerki)_/.test(plot.id);
       if (!(town ? ['izba', 'izba_two', 'merchant', 'tavern'] : ['house_small', 'house_brick', 'house_two', 'flats']).includes(plot.type) || (!town && Math.hypot(plot.x - village.x, plot.z - village.z) > 175)) continue;
       const [w, d] = BUILDING_FOOTPRINT[plot.type], c = Math.cos(plot.rot), s = Math.sin(plot.rot), dice = new RNG(plot.seed ^ 0x9a2d);
       const out = (lx: number, lz: number): [number, number] => [plot.x + lx * c + lz * s, plot.z - lx * s + lz * c];
@@ -1899,6 +1926,40 @@ export class Buildings {
     const deep = e ? e.max[2] - e.min[2] : 0.41, long = e ? e.max[0] - e.min[0] : 0.83;
     const p = new THREE.Vector3(hx - 0.04 - deep / 2 - 0.05, 0.02, hz - 0.05 - long / 2 - 0.5).applyMatrix4(containerMatrix(it));
     this.world.props.push({ kind: 'wooden_crate_01', x: p.x, y: p.y, z: p.z, rot: it.rot + Math.PI / 2, scale: 1 });
+  }
+
+  /**
+   * The walls of concrete slabs the new towns have laid (World.slabs), as the hospital's is made (see `wall` in
+   * planGrounds): a slab every two and a half metres between posts, each on two feet, each stood on the ground where it is.
+   */
+  private planSlabs() {
+    const H = this.world.heights, UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
+    const frame = (x: number, z: number, turn: number, y: number) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, turn), ONE);
+    const box = (M: THREE.Matrix4, key: Exclude<MatKey, 'glass'>, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, solid = true) => {
+      this.push(key, boxGeo(x0, x1, y0, y1, z0, z1, this.tile(key), M));
+      if (solid) this.collider((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2, M.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)), MATS[key].surface);
+    };
+    for (const { a: [ax, az], b: [bx, bz], gone = [], down = [] } of this.world.slabs ?? []) {
+      const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 2.5)), w = len / n, dx = (bx - ax) / len, dz = (bz - az) / len;
+      const turn = Math.atan2(-dz, dx);
+      for (let k = 0; k < n; k++) {
+        const mx = ax + dx * w * (k + 0.5), mz = az + dz * w * (k + 0.5);
+        const y = Math.min(heightAt(H, mx, mz), heightAt(H, mx - dx * w * 0.5, mz - dz * w * 0.5), heightAt(H, mx + dx * w * 0.5, mz + dz * w * 0.5)) - 0.1;
+        const M = frame(mx, mz, turn, y);
+        box(M, 'concrete', -w / 2 - 0.1, -w / 2 + 0.1, 0, 2.5, -0.1, 0.1);
+        if (k === n - 1) box(M, 'concrete', w / 2 - 0.1, w / 2 + 0.1, 0, 2.46, -0.1, 0.1);
+        if (gone.includes(k)) {
+          // (flat on the ground beside its place, on the left of the way the wall runs)
+          if (down.includes(k)) {
+            const fx = mx - dz * 1.5, fz = mz + dx * 1.5;
+            this.push('slab', boxGeo(-w / 2 + 0.25, w / 2 - 0.05, 0, 0.1, -1.1, 1.1, this.tile('slab'), frame(fx, fz, turn + 0.14 * (k % 2 ? 1 : -1), heightAt(H, fx, fz) + 0.02)));
+          }
+          continue;
+        }
+        for (const fx of [-w * 0.3, w * 0.3]) box(M, 'concrete', fx - 0.16, fx + 0.16, 0, 0.24, -0.17, 0.17, false);
+        box(M, 'slab', -w / 2 + 0.03, w / 2 - 0.03, 0.2, 2.38, -0.045, 0.045);
+      }
+    }
   }
 
   /** What stands in the yard of each outlying place: crates to search, and what makes it look lived in. */
@@ -3314,6 +3375,7 @@ export class Buildings {
         roughness: 1,
         color: def.color ?? 0xffffff,
       });
+      if (def.gain) (m as THREE.MeshStandardMaterial).color.multiplyScalar(def.gain);
     }
     // (Walls, floors and roofs are one picture each, laid over and over: on a wall forty metres long the same stain
     // came round every three, in rows. A slow change of tone across the world, different at every place, is put over

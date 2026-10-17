@@ -359,7 +359,13 @@ export const SERVICES = { from: 68, to: 116, out: 90 };
 
 export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage' | 'flats'
   // (2026-10-16: the new towns' own, see src/world/town-plans.ts)
-  | 'cathedral' | 'belfry' | 'cells' | 'refectory' | 'abbot' | 'tavern' | 'merchant' | 'smithy' | 'izba' | 'izba_two' | 'chapel' | 'sawmill';
+  | 'cathedral' | 'belfry' | 'cells' | 'refectory' | 'abbot' | 'tavern' | 'merchant' | 'smithy' | 'izba' | 'izba_two' | 'chapel' | 'sawmill'
+  // (the brick works by the river, its walls dressed in the factory and apartments facade kits: src/world/zavod-plans.ts)
+  | 'works_hall' | 'works_office' | 'zavod_flats'
+  // (the cathedral's cross: an arm each side of its nave, the apse at its east end)
+  | 'cathedral_arm' | 'cathedral_apse'
+  // (the fishing village's: src/world/ozerki-plans.ts)
+  | 'boathouse' | 'smokehouse';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -395,7 +401,7 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   flats: [13, 8.6],
   cathedral: [24, 13],
   belfry: [6, 6],
-  cells: [36, 9],
+  cells: [24, 9],
   refectory: [22, 10],
   abbot: [10, 8],
   tavern: [14, 10],
@@ -405,6 +411,13 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   izba_two: [9, 8],
   chapel: [9, 6],
   sawmill: [20, 7],
+  boathouse: [7, 6],
+  smokehouse: [4.4, 3.6],
+  cathedral_arm: [5, 9],
+  cathedral_apse: [6, 8],
+  works_hall: [36, 15],
+  works_office: [18, 12],
+  zavod_flats: [24, 9],
 };
 
 export interface BuildingPlot {

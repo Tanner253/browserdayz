@@ -83,6 +83,10 @@ export const TEXTURES = {
   beige_wall_001: { res: '2k', tex: 1024 },
   concrete_block_wall_02: { res: '2k', tex: 1024 },
   concrete_panels: { res: '2k', tex: 1024 },
+  // (2026-10-16, the new land's log houses: boards painted the blues and greens of these villages, a shed's pale ones)
+  blue_painted_planks: { res: '2k', tex: 1024 },
+  green_rough_planks: { res: '2k', tex: 1024 },
+  distressed_painted_planks: { res: '2k', tex: 1024 },
   // roofs
   corrugated_iron: { res: '2k', tex: 1024 },
   grey_roof_tiles_02: { res: '2k', tex: 1024 },
@@ -547,6 +551,50 @@ export const LOCAL_MODELS = {
     tex: 1024,
     tags: ['prop'],
     changes: 'One piece of the pack, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  // (2026-10-16, the new land's towns: a woodcutter's stack of logs, the picket fences of front gardens, what grows in them)
+  log_pile: {
+    dir: 'log_pile',
+    size: 5.0,
+    tex: 1024,
+    // (stacked a dozen to a sawmill's yard: its 8,400 triangles were too many. Its log ends are blocks as it came: at
+    // 5,600 they looked no rounder than at this.)
+    budget: 2400,
+    tags: ['prop'],
+    changes: 'Brought to 5 m long, its triangles thinned to about 3,300 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  fence_white: {
+    dir: 'fence_pack',
+    only: /^FenceStyle1Long_White_Wash_T_0 /,
+    size: 2.0,
+    tex: 512,
+    tags: ['prop'],
+    changes: 'One panel of the pack (the white pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  fence_grey: {
+    dir: 'fence_pack',
+    only: /^FenceStyle2Long_Gray_T_0 /,
+    size: 2.0,
+    tex: 512,
+    tags: ['prop'],
+    changes: 'One panel of the pack (the grey railed pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  pumpkin: {
+    dir: 'fruit_veg',
+    only: /^Pumpkin_Pumpkin_0 /,
+    size: 0.42,
+    tex: 512,
+    tags: ['prop'],
+    changes: 'One piece of the pack, brought to life size and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  cabbage: {
+    dir: 'fruit_veg',
+    only: /^Cabbage_Cabbage_0 /,
+    size: 0.34,
+    tex: 512,
+    budget: 900,
+    tags: ['prop'],
+    changes: 'One piece of the pack, brought to life size, its triangles thinned to about 900 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
   shanty_mansion: {
     dir: 'shanty_mansion',
@@ -1163,4 +1211,36 @@ export const HAVEN_KITS = {
   },
   rock_face_01: { src: 'rock_face_01', name: (n) => n, mat: (n) => n, hi: { rock_face_01: [4096, 2048, 2048] }, far: { ratio: 0.125, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
   rock_face_02: { src: 'rock_face_02', name: (n) => n, mat: (n) => n, hi: { rock_face_02: [4096, 2048, 2048] }, far: { ratio: 0.1, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+  // (2026-10-16, the new land's towns: brick works and plaster flats dressed over the game's own buildings. Their
+  // pictures come at 2k, so the world copy is the one drawn close to. Their flat pieces came finely cut up, to the
+  // edges: thinned with their edges free, as a straight edge loses none of its line when its middle points go.)
+  factory_kit: {
+    src: 'modular_factory_facade',
+    name: (n) => n,
+    mat: (n) => n.replace('modular_factory_facade_', 'factory_'),
+    hi: null,
+    world: { ratio: 0.05, error: 0.003, open: true },
+    far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
+  flats_kit: {
+    src: 'modular_urban_apartments_facade',
+    name: (n) => n,
+    mat: (n) => n.replace('modular_urban_apartments_facade_', 'flats_'),
+    hi: null,
+    world: { ratio: 0.05, error: 0.003, open: true },
+    far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
+  // (the fishing village's piers: sections on poles, a gateway, loose poles, a landing of planks. Each section came at
+  // twelve to twenty-three thousand triangles of bevelled planks.)
+  pier_kit: {
+    src: 'modular_wooden_pier',
+    name: (n) => n.replace('modular_wooden_pier_', 'pier_'),
+    mat: (n) => n.replace('modular_wooden_pier_', 'pier_'),
+    hi: null,
+    world: { ratio: 0.15, error: 0.004, open: true },
+    far: { ratio: 0.05, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
 };
