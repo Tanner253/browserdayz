@@ -195,9 +195,9 @@ async function boot() {
   stage('buildings');
   const buildings = new Buildings(world, atmo);
   buildings.plan();
-  // (the basements' steps are open in the ground: the houses are planned after the ground is made)
-  // (and the mouths of the pass's caves, src/sim/pass.ts: the ground open there)
-  terrain.openWells(world.basements ?? [], arena ? [] : caveMouths(passPlan));
+  // (the basements' steps are open in the ground: the houses are planned after the ground is made; the caves' mouths
+  // once the caves stand, below)
+  terrain.openWells(world.basements ?? []);
   // (?nobatch: the walls drawn as before 2026-10-16, to compare the two)
   buildings.multiDraw = r.renderer.extensions.has('WEBGL_multi_draw') && !new URLSearchParams(location.search).has('nobatch');
   buildings.build(r.scene);
@@ -216,7 +216,12 @@ async function boot() {
   // (the pass's caves, carved where the world was made (World.caves), dressed with the coast kit's rock; their places
   // for things after Kalat's, as the server lays them)
   const caves = arena ? null : new PassCaves(r.scene, atmo, passPlan, ground);
-  if (caves) void caves.build({ carved: world.caves, heightTex: terrain.heightTex });
+  // (the mouths opened in the ground once the caves are built and solid: opened first, a body at a mouth, or one come
+  // back to a cave, had no floor until the rock models had loaded)
+  if (caves) {
+    await caves.build({ carved: world.caves, heightTex: terrain.heightTex });
+    terrain.openWells(world.basements ?? [], caveMouths(passPlan));
+  }
   // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
   const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
   if (outcrops) void outcrops.build();

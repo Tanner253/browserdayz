@@ -67,10 +67,11 @@ export class PassCaves {
   }
 
   /** `heightTex`: the terrain's heights, for the rock to fade into the ground (src/world/rock-blend.ts) */
+  /**
+   * Done once the caves stand and are solid (their rock as carved): what opens their mouths in the ground waits for it,
+   * or a body there has no floor (main.ts). The walls' pieces follow, their models loaded first (`dressed`).
+   */
   async build(o: { solid?: boolean; carved?: Carved[]; heightTex?: THREE.Texture } = {}) {
-    // (the scans washed with the pass's beds' red, so that a piece stands in the wall and not on it: src/world/ground.ts)
-    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: CANYON_ROCK_TINT, flat: 'grit' });
-    await this.field.build({ solid: o.solid });
     this.carved = o.carved ?? (await this.carveAll());
     const mat = this.rockMaterial();
     for (const k of this.carved) {
@@ -101,7 +102,13 @@ export class PassCaves {
       }
     }
     this.scene.add(this.group);
+    // (the scans washed with the pass's beds' red, so that a piece stands in the wall and not on it: src/world/ground.ts)
+    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: CANYON_ROCK_TINT, flat: 'grit' });
+    this.dressed = this.field.build({ solid: o.solid });
   }
+
+  /** done when the walls' pieces are drawn and solid near the eye (after `build`) */
+  dressed: Promise<void> = Promise.resolve();
 
   /** every cave carved here, a few milliseconds at a time between frames */
   private async carveAll() {

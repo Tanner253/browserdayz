@@ -199,11 +199,15 @@ export const CAVES: Cave[] = [
     nodes: [
       { s: 200, t: -(E[2].back - 0.2), y: 30, w: 3.6, h: 3.4 },
       { s: 200, t: -57, y: 30, w: 4, h: 3.6 },
-      { s: 260, t: -64, y: 28, w: 3.6, h: 3.4 },
-      { s: 300, t: -66, y: 27, w: 10, h: 6 },
+      // (straight across the pass's sharp bend, 225 to 330 along: this far out on its inside the pass's measure folds,
+      // and a way laid by it, at 260 and 300, turned back 173 degrees under itself)
+      { s: 225, t: -62, y: 28.5, w: 3.6, h: 3.4 },
+      { s: 330, t: -67, y: 26, w: 10, h: 6 },
       { s: 350, t: -70, y: 24.5, w: 3.6, h: 3.4 },
       { s: 392, t: -74, y: 22, w: 3.6, h: 3.4 },
-      { s: 400, t: -74, y: 22, w: 3.6, h: 3.4 },
+      // (out where the ridge's face is at its floor, over a ledge and the desert: at 400 along the face stood 24 m on,
+      // and the mouth was a hole 38 m down in its rock)
+      { s: 432, t: -74, y: 21.8, w: 3.6, h: 3.4 },
     ],
     mouths: ['first', 'last'],
     loot: [{ at: 3, n: 3 }],
@@ -272,6 +276,63 @@ function onGallery(g: Gallery, x: number, z: number) {
   const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], L = ex * ex + ez * ez || 1e-9;
   const k = Math.max(0, Math.min(1, ((x - g.a[0]) * ex + (z - g.a[2]) * ez) / L));
   return { k, d: Math.hypot(x - g.a[0] - ex * k, z - g.a[2] - ez * k) };
+}
+
+/**
+ * metres more round each gallery that whatever holds nobody under the ground takes in (caveAt's `more`): the carved
+ * rock stands out up to 1.7 m past a gallery's measure in the hall (src/world/cave-carve.ts: its roughing, its flared
+ * mouths), and at 0.6 a body in a hollow of it was "under the ground", lifted out after 2 s and its tags voided
+ */
+export const CAVE_MARGIN = 1.6;
+
+/**
+ * Where a line on the ground's plane (ax, az to bx, bz) passes over a cave: the stretches of it (shares of the way
+ * along, 0 to 1) within a gallery's half width and two metres of one, each with the highest roof under it, as high as
+ * its rock may be carved (1.5 m over the plan's, a mouth's flare taken in). For whatever stands down into the rock
+ * along that line and is to stop over the caves: the ridge's wall that cannot be seen (src/game/game.ts), which cut
+ * down through the long way and stopped a body at its first mouth (2026-10-16).
+ */
+export function caveSpansUnder(p: Pass, ax: number, az: number, bx: number, bz: number, gs = galleries(p)): { from: number; to: number; roof: number }[] {
+  const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5)), out: { from: number; to: number; roof: number }[] = [];
+  let run: { from: number; to: number; roof: number } | null = null;
+  for (let i = 0; i <= n; i++) {
+    const q = i / n, x = ax + (bx - ax) * q, z = az + (bz - az) * q;
+    let roof = -Infinity;
+    for (const g of gs) {
+      const { k, d } = onGallery(g, x, z);
+      if (d > (g.wa + (g.wb - g.wa) * k) / 2 + 2) continue;
+      const fa = g.aMouth ? MOUTH_FLARE : 1, fb = g.bMouth ? MOUTH_FLARE : 1;
+      roof = Math.max(roof, g.a[1] + g.ha * fa + 1.5, g.b[1] + g.hb * fb + 1.5);
+    }
+    if (roof === -Infinity) {
+      run = null;
+      continue;
+    }
+    // (each stretch reaching half a step past its last point either way)
+    if (!run) out.push((run = { from: Math.max(0, q - 0.5 / n), to: q, roof }));
+    run.to = Math.min(1, q + 0.5 / n);
+    run.roof = Math.max(run.roof, roof);
+  }
+  return out;
+}
+
+/**
+ * A wall along a line `L` metres long standing down into the rock, cut where caves pass under it (caveSpansUnder): each
+ * part's metres along the line and how low it reaches (`deep` where no cave is under it; a metre over the roof where
+ * one is). Its two ends reach `join` metres on, to meet the next line's wall; its parts meet each other end to end.
+ */
+export function wallParts(L: number, spans: { from: number; to: number; roof: number }[], deep: number, join: number): { from: number; to: number; foot: number }[] {
+  const out: { from: number; to: number; foot: number }[] = [];
+  let at = 0;
+  for (const sp of spans) {
+    if (sp.from > at) out.push({ from: at * L, to: sp.from * L, foot: deep });
+    out.push({ from: sp.from * L, to: sp.to * L, foot: sp.roof + 1 });
+    at = sp.to;
+  }
+  if (at < 1) out.push({ from: at * L, to: L, foot: deep });
+  out[0].from -= join;
+  out[out.length - 1].to += join;
+  return out;
 }
 
 /** Whether a point is in a cave, and in which (its gallery's floor and ceiling there): null outside every cave. */

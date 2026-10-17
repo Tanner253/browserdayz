@@ -4,7 +4,8 @@
 //   npx tsx test/pass.test.ts
 
 import assert from 'node:assert/strict';
-import { CAVES, MOUTH_OUT, PASS_SHAPE, passAt, caveAt, caveDark, caveLoot, caveMouths, galleries, inMouth, passEdges, passOf, passProfile, passWorld, rockPieces } from '../src/sim/pass';
+import { CAVES, MOUTH_OUT, PASS_SHAPE, passAt, caveAt, caveDark, caveLoot, caveMouths, galleries, inMouth, passEdges, passOf, passProfile, passWorld, rockPieces, type Pass } from '../src/sim/pass';
+import { passPlan } from '../src/world/worldgen';
 
 const pass = passOf(() => 40), E = passEdges();
 
@@ -98,5 +99,35 @@ const pass = passOf(() => 40), E = passEdges();
   });
   assert.equal(onRamps.length, 0, 'nothing stood on a ramp');
   console.log(`loot ${loot.length} (${loot.filter((l) => l.tier === 5).length} of the fifth tier on the floor), rock pieces ${rocks.length}`);
+}
+// ---- on the pass the world carves (its sharp bend, which the stand-in above has not): no two galleries come near one
+// another but where they meet at a bend; no cave folds back on itself (a way laid by the pass's measure far out on the
+// inside of its bend did: the long way, 2026-10-16, two tunnels over one another, a body fell 1.8 m) and none runs
+// into another
+for (const [name, p] of [['the stand-in', pass], ['the world', passPlan]] as [string, Pass][]) {
+  const gs = galleries(p), run = (g: (typeof gs)[number]) => Math.hypot(g.b[0] - g.a[0], g.b[2] - g.a[2]);
+  const apart = (a: (typeof gs)[number], b: (typeof gs)[number]) => {
+    let d = Infinity;
+    for (let i = 0; i <= 20; i++)
+      for (let j = 0; j <= 20; j++) {
+        const u = [0, 1, 2].map((k) => a.a[k] + (a.b[k] - a.a[k]) * (i / 20)), v = [0, 1, 2].map((k) => b.a[k] + (b.b[k] - b.a[k]) * (j / 20));
+        d = Math.min(d, Math.hypot(u[0] - v[0], (u[1] - v[1]) * 0.5, u[2] - v[2]));
+      }
+    return d;
+  };
+  for (let i = 0; i < gs.length; i++)
+    for (let j = i + 1; j < gs.length; j++) {
+      const a = gs[i], b = gs[j];
+      if (a.cave === b.cave && j === i + 1) {
+        // (one after the other: never turning back by more than a right angle and a bit)
+        const turn = Math.acos(((a.b[0] - a.a[0]) * (b.b[0] - b.a[0]) + (a.b[2] - a.a[2]) * (b.b[2] - b.a[2])) / (run(a) * run(b)));
+        assert.ok(turn < (110 * Math.PI) / 180, `${name}: ${CAVES[a.cave].name} turns back ${((turn * 180) / Math.PI).toFixed(0)} degrees`);
+        continue;
+      }
+      // (of one cave, no nearer than the way round between them; of two, never near)
+      const between = a.cave === b.cave ? gs.slice(i + 1, j).reduce((sum, g) => sum + run(g), 0) * 0.7 : Infinity;
+      const room = Math.min(between, Math.max(a.wa, a.wb) / 2 + Math.max(b.wa, b.wb) / 2 + 3);
+      assert.ok(apart(a, b) > room, `${name}: ${CAVES[a.cave].name} and ${CAVES[b.cave].name}: two galleries ${apart(a, b).toFixed(1)} m apart`);
+    }
 }
 console.log('pass: all good');

@@ -18,7 +18,8 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import '../world/buildings';
 import type { Buildings } from '../world/buildings';
-import { PLAN, SQUARE_HALF, ridgeWall, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { PLAN, SQUARE_HALF, passPlan, ridgeWall, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { caveSpansUnder, wallParts } from '../sim/pass';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
@@ -987,10 +988,14 @@ export class Game {
       const mx = (west + east) / 2, mz = (WORLD_Z0 + WORLD_Z1) / 2, hx = (east - west) / 2, hz = (WORLD_Z1 - WORLD_Z0) / 2 - 4;
       for (const [x, z, ax, az] of [[mx, mz + hz, hx, 1], [mx, mz - hz, hx, 1], [mx + hx, mz, 1, hz], [mx - hx, mz, 1, hz]]) physics.addStatic(physics.R.ColliderDesc.cuboid(ax, 400, az), 'rock', { x, y: 0, z });
       // And one along the ridge's crest, the whole height of the map, but where the pass goes through it (plan v5:
-      // "both sides of the map canyon walls stretching to the skybox so they cant be walked around")
+      // "both sides of the map canyon walls stretching to the skybox so they cant be walked around"); over a cave, from
+      // over its roof (the long way goes under it: src/sim/pass.ts caveSpansUnder), only that stretch of it raised.
       for (const [ax, az, bx, bz] of ridgeWall(WORLD_Z0, WORLD_Z1)) {
-        const yaw = Math.atan2(-(bz - az), bx - ax);
-        physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2 + 0.6, 400, 0.6), 'rock', { x: (ax + bx) / 2, y: 0, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
+        const yaw = Math.atan2(-(bz - az), bx - ax), L = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / L, uz = (bz - az) / L;
+        for (const { from, to, foot } of wallParts(L, caveSpansUnder(passPlan, ax, az, bx, bz), -400, 0.6)) {
+          const m = (from + to) / 2;
+          physics.addStaticQuat(physics.R.ColliderDesc.cuboid((to - from) / 2, (400 - foot) / 2, 0.6), 'rock', { x: ax + ux * m, y: (400 + foot) / 2, z: az + uz * m }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
+        }
       }
     }
     this.traders = new Traders(world);

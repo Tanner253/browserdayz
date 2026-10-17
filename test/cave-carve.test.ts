@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { CARVE, carveCave, caveField } from '../src/world/cave-carve';
-import { CAVES, caveMouths, galleries, passAt, passGround, passOf, passWorld } from '../src/sim/pass';
+import { CAVES, CAVE_MARGIN, caveAt, caveMouths, galleries, passAt, passGround, passOf, passWorld } from '../src/sim/pass';
 
 const pass = passOf(() => 40);
 const ground = (x: number, z: number) => passGround(pass, x, z);
@@ -70,6 +70,19 @@ for (const [ci, c] of CAVES.entries()) {
     if (!nearMouth(x, z, CARVE.margin + 1) && y > ground(x, z) - 0.5) out++;
   }
   assert.equal(out, 0, `${c.name}: ${out} points of it at the ground away from its mouths`);
+  // every hollow of it a body may stand in is in the cave for whatever holds nobody under the ground (CAVE_MARGIN):
+  // each point of its own rock, 0.3 m out into the air, under the ground there and within a body's height of the floor
+  // (at 0.6 m the hall's carved walls stood 1.7 m past it, and a body in a hollow of them was lifted out after 2 s and
+  // its tags voided; up by the roof, where a high gallery meets a lower, nobody stands)
+  let lost = 0;
+  const gs = galleries(pass);
+  for (const q of new Set(carved.index)) {
+    const x = k.pos[q * 3], y = k.pos[q * 3 + 1], z = k.pos[q * 3 + 2], nx = k.nor[q * 3], ny = k.nor[q * 3 + 1], nz = k.nor[q * 3 + 2];
+    const s = f.field(x + nx * 0.3, y + ny * 0.3, z + nz * 0.3) < 0 ? 0.3 : -0.3, ax = x + nx * s, ay = y + ny * s, az = z + nz * s;
+    const under = caveAt(pass, ax, ay, az, gs, 12);
+    if (ay < ground(ax, az) - 1.1 && (!under || ay - under.floor < 2.2) && !caveAt(pass, ax, ay, az, gs, CAVE_MARGIN)) lost++;
+  }
+  assert.equal(lost, 0, `${c.name}: ${lost} points of its air out of the cave's measure`);
   assert.ok([...k.ao].every((a) => a >= 0.15 && a <= 1), 'shading in range');
   console.log(`${c.name}: ${nt} faces, ${n} points, ${open} open edges round its mouths, ${many} shared by more than two, ${wrong} turned, ${k.samples} samples, ${k.ms.toFixed(0)} ms`);
 }
