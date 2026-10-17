@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 import { STOREY, facadeOpenings, facadePieces, facadeSize, movePieces, type FacadeSpec } from '../src/world/facade';
 import { FACADES, flatsPlan, hallPlan } from '../src/world/zavod-plans';
-import { TOWNS, moundAt, placedKits, placedSlabs, townBuildings, townPoint, townThings, type Town, type TownSpot } from '../src/sim/towns';
+import { TOWNS, moundAt, placedKits, placedRooms, placedSlabs, townBuildings, townPoint, townThings, type Town, type TownSpot } from '../src/sim/towns';
 import { KNOLL } from '../src/sim/lipki';
 import { POKROV_TERRACE } from '../src/sim/pokrov';
 import { DECK, PIERS, SHORE } from '../src/sim/ozerki';
@@ -137,6 +137,10 @@ ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boat
   ok(MOKROYE_WALKS.every((w) => w.deck > WATER + 0.2), 'the boardwalks stand over the water');
   ok(mokroyeBuildings().every((s) => s.up === undefined || s.up === WET_FLOOR || s.up === SUNK_FLOOR || s.up > WATER), 'every floor is dry, or flooded on purpose');
   ok(mokroyePosts(0).length === 4, 'four clusters of stilts');
+  // (the water stands in the houses whose floors are under it, and nowhere else: not under the stilts, not on the islands)
+  const mok = TOWNS.find((t) => t.name === 'Mokroye')!, rooms = placedRooms({ town: mok, padY: 50 }, BUILDING_FOOTPRINT);
+  ok(rooms.length === 3 && rooms.every((q) => !q.dry), `the water stands in the two flooded houses and the barn (${rooms.length} rooms)`);
+  ok(TOWNS.filter((t) => t !== mok).every((t) => placedRooms({ town: t, padY: 0 }, BUILDING_FOOTPRINT).length === 0), 'no rooms in the towns on dry land');
 }
 
 console.log(`towns: ${checks} checks passed`);
