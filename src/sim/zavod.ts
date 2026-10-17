@@ -14,11 +14,11 @@ import type { SlabRun, Town, TownGround, TownSpot } from './towns';
 const PI = Math.PI, Q = PI / 2;
 
 /**
- * Where it is planned (plan v5): in the green river valley across the north, where it opens at its east end, on a
- * bench over the river's south bank; turned half round, so that its own south (the river's side) is the world's north.
- * The world's lane sets it down where its valley lets it.
+ * Where it is planned (plan v5 with the desert doubled, as the world's lane put it): just west of the pass's west
+ * mouth, the river running west across the desert along its south side, the road crossing it at its south-east corner
+ * (its bridge). Beyond the only way west: a works worth the pass.
  */
-export const ZAVOD: Town = { name: 'Zavod', x: -1000, z: -560, pad: [95, 75], rot: Math.PI };
+export const ZAVOD: Town = { name: 'Zavod', x: -2720, z: -360, pad: [95, 75], rot: 0 };
 
 export function zavodBuildings(): TownSpot[] {
   return [
