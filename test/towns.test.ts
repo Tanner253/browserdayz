@@ -99,12 +99,13 @@ for (const t of TOWNS) {
 // ---- Zavod's wall: moved with the town, the gate left open on the road
 const slabs = placedSlabs(ZAVOD);
 ok(slabs.length === ZAVOD_WALL.length, 'every run of the wall is laid');
-ok(slabs.every((r, k) => r.a[0] === ZAVOD.x + ZAVOD_WALL[k].a[0] && r.b[1] === ZAVOD.z + ZAVOD_WALL[k].b[1]), 'at its place in the world');
+ok(slabs.every((r, k) => [...townPoint(ZAVOD, ...ZAVOD_WALL[k].a), ...townPoint(ZAVOD, ...ZAVOD_WALL[k].b)].every((v, i) => Math.abs(v - [...r.a, ...r.b][i]) < 1e-9)), 'at its place in the world, turned with the town');
 const onSouth = ZAVOD_WALL.filter((r) => r.a[1] === 22 && r.b[1] === 22);
 ok(!onSouth.some((r) => Math.min(r.a[0], r.b[0]) < 20 && Math.max(r.a[0], r.b[0]) > 20), 'no slab across the gate on the road');
 
 // ---- Ozerki: a deck under every section of every pier, at the deck's height
-const oz = TOWNS.find((t) => t.name === 'Ozerki')!, [kit] = placedKits({ town: oz, padY: 100 });
+// (said in the village's own frame: unturned, the piers run toward -z)
+const oz = { ...TOWNS.find((t) => t.name === 'Ozerki')!, rot: 0 }, [kit] = placedKits({ town: oz, padY: 100 });
 ok(kit.kit === 'pier_kit' && kit.boxes.length === PIERS.length, 'a deck for each pier');
 for (const [n, p] of PIERS.entries()) {
   const b = kit.boxes[n], far = SHORE - p.n * 3.0;

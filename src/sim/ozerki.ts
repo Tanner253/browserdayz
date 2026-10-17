@@ -13,7 +13,12 @@ import type { TownThing } from './zavod';
 
 const PI = Math.PI;
 
-export const OZERKI: Town = { name: 'Ozerki', x: -2300, z: -470, pad: [70, 60], rot: 0 };
+/**
+ * Where it is planned (plan v5): on the west shore of the forest lake north of Lipki (about -1250, 200), turned a
+ * quarter round so that its own north (the lake's side) is the world's east: the lane runs north and south, the piers
+ * out east over the water. The world's lane sets it down where the lake's shore is.
+ */
+export const OZERKI: Town = { name: 'Ozerki', x: -1420, z: 200, pad: [70, 60], rot: -Math.PI / 2 };
 
 /** the water's edge and the lane, along z */
 export const SHORE = -10;
