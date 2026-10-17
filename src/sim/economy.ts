@@ -252,6 +252,7 @@ export const TYPES: Record<string, TypeRule> = {
   bat: { at: [13, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, 'Farm'] },
   // (a tool of yards and sheds: it lies on a floor, being as long as a rifle is)
   shovel: { at: [11, 3, 2, 0, 0], lifetime: 3600, restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2, Industrial: 2 }, on: IN_SHEDS },
+  pitchfork: { at: [6, 8, 2, 0, 0], lifetime: 3600, restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 3 }, on: IN_SHEDS },
   knife: { at: [18, 4, 3, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, ...SHEDS], on: IN_SHEDS },
   // ------------------------------------------------------------ food and drink: the shop before anywhere, then kitchens
   sprats: { at: [8, 16, 7, 0, 0], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },

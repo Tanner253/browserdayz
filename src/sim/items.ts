@@ -432,6 +432,7 @@ const D: ItemDef[] = [
   { id: 'shovel', name: 'Shovel', model: 'shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'long', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 } },
   // (2026-10-13: the Fish Knife is gone and this is in its place, under the same id: an army bayonet-knife out of a
   // pack with hands and movements of its own, see `knife` in WEAPON_PACKS. What it does is as it was.)
+  { id: 'pitchfork', name: 'Pitchfork', model: 'pitchfork', w: 2, h: 7, weight: 2.0, category: 'melee', slot: 'long', desc: 'A farm pitchfork, four long tines. Held in both hands: the longest reach of anything you can swing, and slow.', melee: { damage: 40, range: 2.4, rate: 0.85 } },
   { id: 'knife', name: 'Combat Knife', model: 'knife', w: 1, h: 2, weight: 0.4, category: 'melee', desc: 'An army bayonet-knife with a saw-back: clip point, steel cross guard, ribbed grip. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 } },
   // ---------------------------------------------------------------- food & drink
   { id: 'sprats', name: 'Tinned Sprats', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_fish', scale: 2.2, w: 1, h: 1, weight: 0.24, category: 'food', desc: 'Smoked sprats in oil. Шпроты.', use: { verb: 'Eat', time: 2.5, energy: 28, water: -2, sound: 'eat' } },

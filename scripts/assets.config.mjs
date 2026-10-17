@@ -1196,6 +1196,31 @@ export const WEAPON_PACKS = {
       changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
     },
   },
+  pitchfork: {
+    dir: 'pitchfork',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 0.01,
+    // (the fork alone laid along its own shaft, its tines flat)
+    forward: [0.09, 0.276, 0.957],
+    up: [-0.593, -0.757, 0.274],
+    look: { forward: [0, 0, 1], up: [0, 1, 0] },
+    parts: { pitchfork: 'base' },
+    ourArms: true,
+    wrists: { right: 'R_wrist_027', left: 'L_wrist_04' },
+    origin: [0, 0, 0],
+    fps: 30,
+    // (held; a sweep to the right; a thrust from the shaft drawn back; a sweep to the left; held again: seen frame by
+    // frame, progress/weapons/fork. It has no drawing of its coming up: the game lifts it into the picture.)
+    clips: { idle: [96, 114], cutA: [14, 34], thrust: [40, 62], cutB: [64, 90] },
+    credit: {
+      name: 'pitchfork Animated',
+      url: 'https://sketchfab.com/3d-models/pitchfork-animated-54ea2a82f7d74e8fabbc7245bec7be14',
+      author: 'DJMaesen',
+      line: 'This work is based on "pitchfork Animated" (https://sketchfab.com/3d-models/pitchfork-animated-54ea2a82f7d74e8fabbc7245bec7be14) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
+    },
+  },
   aks74u: {
     dir: 'aks74u',
     file: 'scene.gltf',

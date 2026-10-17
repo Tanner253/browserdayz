@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T12:37:04.990Z",
+ "generated": "2026-10-17T12:46:33.268Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -11587,6 +11587,118 @@
    "hi": "assets/models/hi/vssk.glb",
    "hiBytes": 7912468,
    "hiCard": 452
+  },
+  "pitchfork": {
+   "url": "assets/models/pitchfork.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 178908,
+   "srcTris": 986,
+   "tris": 986,
+   "min": [
+    -0.2823,
+    0.0141,
+    -0.0582
+   ],
+   "max": [
+    0.8971,
+    0.0473,
+    0.1554
+   ],
+   "lods": [],
+   "holds": {
+    "right": [
+     0,
+     0,
+     0
+    ],
+    "left": [
+     0.20445,
+     -0.00091,
+     0.09241
+    ]
+   },
+   "hi": "assets/models/hi/pitchfork.glb",
+   "hiBytes": 1160396,
+   "hiCard": 64
+  },
+  "pitchfork_fp": {
+   "url": "assets/models/pitchfork_fp.glb",
+   "tags": [
+    "viewmodel"
+   ],
+   "bytes": 31456,
+   "srcTris": 8538,
+   "tris": 8538,
+   "min": [
+    -0.2823,
+    0.0141,
+    -0.0582
+   ],
+   "max": [
+    0.8971,
+    0.0473,
+    0.1554
+   ],
+   "lods": [],
+   "rig": {
+    "fps": 30,
+    "clips": {
+     "idle": [
+      96,
+      114
+     ],
+     "cutA": [
+      14,
+      34
+     ],
+     "thrust": [
+      40,
+      62
+     ],
+     "cutB": [
+      64,
+      90
+     ]
+    },
+    "view": [
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0,
+     0,
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "frame": [
+     0.0009,
+     -0.00593,
+     0.0080007,
+     0,
+     0.00276,
+     -0.00757,
+     -0.0059216,
+     0,
+     0.00957,
+     0.00274,
+     0.0009554,
+     0,
+     0.177418,
+     -0.0401998,
+     -0.0087578,
+     1
+    ]
+   }
   }
  }
 }

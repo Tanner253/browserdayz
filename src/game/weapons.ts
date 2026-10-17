@@ -274,6 +274,7 @@ const HELD = {
   vssk: new THREE.Vector3(0.14, -0.22, -0.36),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
+  pitchfork: new THREE.Vector3(0.05, -0.02, -0.05),
 };
 
 /**
@@ -661,6 +662,15 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     // (the left hand above the knob, the right a hand's width up the tape)
     grip: 0.175,
   },
+  // (as everybody else sees it: in both hands, as the bat, held up the shaft)
+  pitchfork: {
+    idle: { p: [0.13, -0.15, -0.4], tip: [-0.42, 0.84, -0.34], edge: [-0.3, -0.45, -0.84] },
+    guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
+    strokes: [CUT, BACK],
+    elbow: [0.34, -0.36, -0.18],
+    two: true,
+    grip: 0.3,
+  },
   knife: {
     idle: { p: [0.15, -0.12, -0.42], tip: [-0.2, 0.62, -0.76], edge: [-0.1, -0.75, -0.65] },
     guard: { p: [0.1, -0.05, -0.38], tip: [-0.8, 0.55, -0.2], edge: [0, -0.3, -0.95] },
@@ -716,6 +726,8 @@ const BLADE = {
   every: 3.6,
   guard: { p: [-0.03, 0.09, 0.04] as [number, number, number], r: [0.05, 0.12, -0.4] as [number, number, number] },
   run: { p: [0.03, -0.09, 0.02] as [number, number, number], r: [-0.35, 0.25, 0.3] as [number, number, number] },
+  /** a thing in its own pack whose guard is not the knife's: the pitchfork's shaft, turned as the knife is, swung across the whole picture */
+  own: { pitchfork: { guard: { p: [0, 0.05, 0.03] as [number, number, number], r: [0.04, 0, -0.08] as [number, number, number] } } } as Record<string, { guard: { p: [number, number, number]; r: [number, number, number] } }>,
 };
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
@@ -1292,7 +1304,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork']) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();
@@ -1432,6 +1444,14 @@ export class Weapons {
       blade.root.add(rig.root);
       blade.rig = rig;
       blade.hip = HELD.knife;
+    }
+    // ---- the pitchfork, for whoever holds it: its pack's movements in our own arms, the fork hung on its node
+    const fork = this.models.get('pitchfork');
+    if (fork && assets.manifest.models.pitchfork_fp?.rig) {
+      const m = await this.packGun({ pack: 'pitchfork', item: 'pitchfork', gun: 'pitchfork', kind: 'rifle', hands: true, hip: HELD.pitchfork, flashSize: 0.01, flash: mkFlash(), strip: [], ride: { base: 'pitchfork' } });
+      fork.root = m.root;
+      fork.rig = m.rig;
+      fork.hip = HELD.pitchfork;
     }
   }
 
@@ -3686,7 +3706,7 @@ export class Weapons {
     const sp = busy ? 0 : this.sprintT * (1 - g);
     const kick = this.kick.step(dt);
     const kr = this.kickRot.step(dt);
-    const G = BLADE.guard, R = BLADE.run;
+    const G = (this.currentItem && BLADE.own[this.currentItem.id]?.guard) || BLADE.guard, R = BLADE.run;
     m.root.position.set(
       m.hip.x + Math.cos(ph) * 0.012 * amp + R.p[0] * sp + G.p[0] * g - p.strafe * 0.006,
       m.hip.y - Math.abs(Math.sin(ph)) * 0.016 * amp + R.p[1] * sp + G.p[1] * g + kick.y * 0.02 - this.lowerT * 0.4,
