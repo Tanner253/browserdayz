@@ -1,4 +1,5 @@
-// The map, opened large (M): a sheet as an army prints one. Pale paper, the ground's shape in brown contour
+// The map, opened large (M): a sheet as an army prints one. The land tinted by what it is (green country, desert
+// sand, red cliffs, snow, blue water: LAND), the ground's shape in brown contour
 // lines every five metres (every fifth one heavier), the woods tinted green, the roads and every building in
 // black, a grid of hundred-metre squares lettered across and numbered down, a scale and a north point.
 //
@@ -23,7 +24,7 @@ import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
 import { playEdge } from '../world/outline';
-import { BUILDING_FOOTPRINT, CELL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
 
 type Pt = { x: number; z: number };
@@ -44,7 +45,11 @@ const NEAREST = 9;
 interface Area { x0: number; z0: number; x1: number; z1: number; S: number }
 /** a part printed: its picture, where its corner is, and its pixels to a metre */
 interface Sheet { c: HTMLCanvasElement; x0: number; z0: number; S: number }
-const PAPER = [218, 212, 188], INK = '#1d1b16';
+const INK = '#1d1b16';
+/** the land's colours on the sheet, as a tinted army map has them, pale enough for the brown contours and the ink to read on */
+const LAND = { green: [190, 206, 156], sand: [228, 205, 156], rock: [190, 120, 86], snow: [236, 236, 232], sea: [126, 168, 196] };
+/** where the peak's snow lies, metres (the ridge's crest, 95 to 128 m, is under it) */
+const SNOW_ON = 132;
 const TIER_IDS: Tier[] = [1, 2, 3, 4, 5];
 const KEPT = 'zona.map';
 /** a tier's colour on the sheet: its own, but for the first, which is a pale one made for a dark ground */
@@ -53,6 +58,10 @@ const onPaper = (t: Tier) => (t === 1 ? '#8d846c' : TIERS[t].colour);
 const CALLED: Record<string, string> = {
   house_small: 'House', house_brick: 'Brick house', house_two: 'Two-floor house', townhouse: 'Brick townhouse', shanty: 'Plank house', cabin: 'Cabin', hut: 'Long hut',
   barn: 'Barn', shed: 'Shed', garage: 'Workshop', store: 'Shop', clinic: 'Clinic', police: 'Police station', police_hq: 'Police headquarters', hospital: 'Hospital', barracks: 'Barracks', guardpost: 'Guard post', tower: 'Watchtower', tent: 'Army tent',
+  // (the new towns', 2026-10-16)
+  cathedral: 'Cathedral', cathedral_arm: 'Cathedral', cathedral_apse: 'Cathedral', belfry: 'Belfry', cells: "Monks' cells", refectory: 'Refectory', abbot: "Abbot's house",
+  tavern: 'Tavern', merchant: "Merchant's house", smithy: 'Smithy', izba: 'Log house', izba_two: 'Two-floor log house', izba_wet: 'Flooded log house', chapel: 'Chapel', sawmill: 'Sawmill',
+  works_hall: 'Works hall', works_office: 'Works office', zavod_flats: "Workers' flats", boathouse: 'Boathouse', smokehouse: 'Smokehouse', barn_sunk: 'Sunken barn',
 };
 /** the kinds of thing kept in a place, by what the place is said to be used for (what is not here says where a place is, not what is in it) */
 const KIND: Record<string, string> = { Village: 'Residential', Town: 'Residential', Farm: 'Farm', Industrial: 'Industrial', Military: 'Military', Hunting: 'Hunting', Medic: 'Medical', Hospital: 'Medical', Police: 'Police', Shop: 'Food and supplies', Bunker: 'Military' };
@@ -538,6 +547,22 @@ export class BigMap {
         this.held.push({ name: 'A wreck', x, z, rot: 0, w: 9, d: 9, tier: most(g.map((q) => q.tier ?? 1))[0], kinds: kinds(g), gas: false });
       }
     }
+    // (Kalat's pieces, each cave of the pass and the cache on its floor, the ruined houses before the fort: each its own
+    // mark where its places lie, of the step they are on. Until 2026-10-16 all of them were counted into the bunker's
+    // box below. The basements' places are under houses that are marked already.)
+    inside.delete('cellar');
+    const own = (key: string, name: (k: string) => string) => {
+      for (const k of [...inside.keys()].filter((q) => q === key || q.startsWith(key + '_'))) {
+        const list = inside.get(k)!;
+        inside.delete(k);
+        const x = list.reduce((m, q) => m + q.x, 0) / list.length, z = list.reduce((m, q) => m + q.z, 0) / list.length;
+        const off = list.map((q) => Math.hypot(q.x - x, q.z - z)).sort((m, n) => m - n), wide = Math.min(60, Math.max(10, 2 * (off[Math.floor(off.length * 0.9)] ?? 4) + 6));
+        this.held.push({ name: name(k), x, z, rot: 0, w: wide, d: wide, tier: most(list.map((q) => q.tier ?? 1))[0], kinds: kinds(list), gas: false });
+      }
+    };
+    own('ruins', () => 'Kalat');
+    own('cave', (k) => (/floor/.test(k) ? 'The pass: its cache' : `Cave: ${k.slice(5)}`));
+    own('hamlet', () => 'Ruined houses');
     // (and what is in no building on the sheet, which is the bunker under its hill: marked where its way in is)
     const rest = [...inside.values()].flat();
     if (rest.length) {
@@ -888,15 +913,24 @@ export class BigMap {
       }
     };
     let cur = new Float32Array(NW + 1), next = new Float32Array(NW + 1);
+    const sand = world.sand;
     row(0, cur);
     for (let y = 0; y < NH; y++) {
       row(y + 1, next);
       for (let x = 0; x < NW; x++) {
         const h = cur[x], hr = cur[x + 1], hd = next[x];
-        // paper, a little lighter where the ground is high, and lit from the north-west so that its shape reads
+        // the land in its colour (the owner, 2026-10-16: "the minimap is all white it would be great if we could give it
+        // some color"): green country, the desert's sand, its cliffs red rock, snow on the peak, the sea blue; a little
+        // lighter where the ground is high, and lit from the north-west so that its shape reads
         const k = (h - lo) / Math.max(1, hi - lo);
         const lit = Math.min(1.1, Math.max(0.8, 1 + (hr - h + (hd - h)) * S * 0.16)) * (0.93 + k * 0.09);
-        let r = PAPER[0] * lit, gr = PAPER[1] * lit, b = PAPER[2] * lit;
+        const si = sand ? ((oz + Math.round((Math.min(NH - 1, y) / (NH - 1)) * (nz - 1))) * R + ox + Math.round((x / (NW - 1)) * (nx - 1))) * 4 : -1;
+        const desert = si >= 0 ? sand![si] / 255 : 0, steep = Math.hypot(hr - h, hd - h) * S;
+        let c = LAND.green.map((v, j) => v + (LAND.sand[j] - v) * desert);
+        if (desert > 0.3 && steep > 0.8) c = c.map((v, j) => v + (LAND.rock[j] - v) * Math.min(1, (steep - 0.8) * 2));
+        if (h > SNOW_ON) c = c.map((v, j) => v + (LAND.snow[j] - v) * Math.min(1, (h - SNOW_ON) / 12));
+        if (h < SEA_LEVEL) c = LAND.sea.map((v, j) => v * (1 - Math.min(0.35, (SEA_LEVEL - h) / 40)) + (j === 2 ? 10 : 0));
+        let r = c[0] * lit, gr = c[1] * lit, b = c[2] * lit;
         // a contour: where the height passes a multiple of five metres between this point and the next
         const a = Math.floor(h / CONTOUR), ar = Math.floor(hr / CONTOUR), ad = Math.floor(hd / CONTOUR);
         if (a !== ar || a !== ad) {
@@ -932,6 +966,27 @@ export class BigMap {
       g.arc(X(t.x), Y(t.z), 3.4 * S, 0, Math.PI * 2);
       g.fill();
       if (++trees % 400 === 0) yield;
+    }
+    yield;
+    // the lakes, the swamp and the river, blue (the swamp's water greener, as its reeds are through it)
+    for (const lake of world.water?.lakes ?? []) {
+      g.fillStyle = lake.swamp ? 'rgba(104, 150, 140, 0.6)' : 'rgba(98, 150, 196, 0.85)';
+      g.beginPath();
+      lake.outline.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
+      g.closePath();
+      g.fill();
+    }
+    g.strokeStyle = 'rgba(98, 150, 196, 0.9)';
+    g.lineJoin = g.lineCap = 'round';
+    for (const river of world.water?.rivers ?? []) {
+      for (let i = 1; i < river.pts.length; i++) {
+        const [ax, az, , aw] = river.pts[i - 1], [bx, bz] = river.pts[i];
+        g.lineWidth = Math.max(1.5, aw * S);
+        g.beginPath();
+        g.moveTo(X(ax), Y(az));
+        g.lineTo(X(bx), Y(bz));
+        g.stroke();
+      }
     }
     yield;
     // the grid: hundred-metre squares

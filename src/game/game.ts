@@ -19,7 +19,7 @@ import type { Grass } from '../world/grass';
 import '../world/buildings';
 import type { Buildings } from '../world/buildings';
 import { PLAN, SQUARE_HALF, passPlan, ridgeWall, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
-import { caveSpansUnder, wallParts } from '../sim/pass';
+import { FLOOR_CACHE, caveSpansUnder, passWorld, wallParts } from '../sim/pass';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
@@ -152,6 +152,16 @@ export interface TimedAction {
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
 export const LOOT_REV = 23;
+/** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */
+const WEST_PLACES: Record<string, [string, MenuSpot['kind'], Tier]> = {
+  Pokrov: ['A monastery town in the green west: the cathedral and its belfry inside white walls, the monks\' cells and refectory, and below the walls a street of a tavern, merchants\' houses and a smithy.', 'town', 3],
+  Lipki: ['A log village on a knoll: houses behind picket fences, a chapel on the hill, the sawmill and its log yard.', 'town', 2],
+  Ozerki: ['A fishing village on the forest lake: log houses along the road, a smokehouse, a boathouse on piers over the water.', 'town', 2],
+  Mokroye: ['A hamlet the swamp has drowned: houses standing in the water, boardwalks between them, a dry house and its smokehouse on an island.', 'town', 2],
+  Zastava: ['The post at the pass\'s east mouth: slabs across the road, a booth, the barracks, a roadhouse over the road and a watchtower over the canyon. Whoever goes west comes through here.', 'army', 3],
+  Zavod: ['The brick works by the desert river, west of the pass: the works hall, its office and the workers\' flats.', 'site', 3],
+  Kalat: ['A ruined walled town on its own hill in the desert: the citadel, the curtain wall and its gate, the honeycomb of houses.', 'site', 4],
+};
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 export const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
@@ -899,8 +909,13 @@ export class Game {
         else if (world.castle && q.x === world.castle.x && q.z === world.castle.z) spots.push(at(q, "The Eagle's Nest: an old fort on the east rim of the valley, in the snow under the mountain, held to the last as the army's signals post. A cart track leaves the end of the mountain road, passes the ruined houses and goes round under its walls to the ramp at its gate. Its vaults are dark.", 'army', 4, undefined, true));
         else if (site) spots.push(at(q, SITE[site.kind][0], site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' || site.kind === 'tents' ? 'army' : 'site', SITE[site.kind][1], SITE[site.kind][2], site.kind === 'tents'));
         else if (/checkpoint/i.test(q.name)) spots.push(at(q, 'Guard posts, a barracks and a watchtower. The track to the works starts here.', 'army', 2, 'Pistols and 9 mm, soft vests, grenades, the army\'s cases. Now and then an armoured vest or a helmet.', true));
+        // (the places of the map three times over, each on its step: PLAN.tiers; they were marked as cabins of the first)
+        else if (WEST_PLACES[q.name]) spots.push(at(q, WEST_PLACES[q.name][0], WEST_PLACES[q.name][1], (PLAN.tiers[q.name] ?? WEST_PLACES[q.name][2]) as Tier, undefined, true));
         else spots.push(at(q, 'A cabin in the hills, with a fire ring to rest by. Something to fight with is always left here.', 'site', 1));
       }
+      // (the pass through the ridge: its caves, and the cache at the middle of its floor)
+      const [cx, , cz] = passWorld(passPlan, FLOOR_CACHE.s, 0, 0);
+      spots.push(at({ x: cx, z: cz, name: 'The pass' }, 'The one way through the ridge: a canyon with shelves up both walls and caves in them, and the best of it cached on the floor at its middle.', 'army', 4, 'The caves hold the fourth step\'s things; the cache on the floor at the middle, the fifth\'s.', true));
       spots.push(at({ x: town.x, z: town.z + 46, name: town.name }, 'The village: police station, clinic, shop, workshop. The first place to go from the edge, and the most people after it.', 'town', 2, undefined, true));
       const inTown = (b: { x: number; z: number }) => Math.hypot(b.x - town.x, b.z - town.z) < town.radius;
       for (const b of world.buildings.filter(inTown)) {
