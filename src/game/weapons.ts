@@ -75,7 +75,7 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the AR-15's own taken off its rifle: where the middle of its top meets the rail under this gun */ grip?: { at: [number, number, number]; size: number }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the M32's own vertical grip taken off it: where the middle of its top meets the rail under this gun, and the node it rides on in the hands where that is not the gun's body (the double-barrel's barrels, which drop open) */ grip?: { at: [number, number, number]; size: number; on?: string }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
@@ -92,14 +92,16 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // hand that holds the rifle up has the fore-end itself.)
   ak: { dot: { at: [-0.095, 0.1062, 0.0012], size: 0.85 }, light: { at: [0.27, 0, 0.001], size: 0.85 }, mags: { drum_ak: { model: 'ak_drum', at: [-0.035, 0.0678, 0.0015], size: 1, turn: Math.PI / 2 } }, can: { model: 'rifle_suppressor', size: 1 } },
   // (the long magazine lies across its file, its foot to the back: turned a quarter, to hang along the gun with its foot forward)
-  ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 } },
   // (The submachine gun: the sight on the rail along its top. Its light is on the rail down the right side of its
   // fore-end, high and well forward: hung under the fore-end, where it was first put by the figures alone, it was
   // inside the left hand, which holds the gun there. Looked at 2026-10-11.)
   // (And a foregrip, 2026-10-11, asked: "it can handle a grip and flashlight too since it has rails". It is on the
   // rail under the fore-end at its very front, ahead of the left hand, which holds the fore-end itself: a stop for
   // that hand, as is put on a gun this short. Further back it was inside the fist.)
-  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.65 } },
+  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.6 } },
+  // (the M32's grip under the AR-15's rail where its own stood, and under the double-barrel's fore-end, on its barrels)
+  ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 }, grip: { at: [0.126, 0.056, 0.008], size: 0.75 } },
+  db12: { grip: { at: [0.17, 0.008, -0.009], size: 0.75, on: 'barrels_050' } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
@@ -797,7 +799,7 @@ const AKIMBO_GAP = 0.32;
 /** whose mark is seen through a gun's own scope (see `.ret` in the HUD's scope): a mil-dot crosshair, the PSO-1's chevrons */
 const OWN_RETICLE: Record<string, string> = { sniper50: 'mildot', barrett: 'mildot', vssk: 'pso' };
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
-const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.028] };
+const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007], db12: [0.17, -0.041] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
 function foreHold(at: THREE.Vector3, post: boolean): HandGrip {
   return post
@@ -1386,14 +1388,16 @@ export class Weapons {
     this.models.get('db12')!.gait = true;
     // (it came with no pictures, its one paint a bare colour nearly black: lifted as the dark guns are it was still a
     // black cut-out. Painted a worn gunmetal here, its own paint and nobody else's: the name is Blender's default.)
+    // (As others see it, out in the sky's light, the same paint was nearly white: there it is darker and gives back less of the sky.)
     for (const o of [this.models.get('db12')!.root, this.models.get('db12')!.world]) o?.traverse((n) => {
       const mat = (n as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
       if (!mat?.isMeshStandardMaterial || mat.map || mat.userData.lifted) return;
+      const theirs = o === this.models.get('db12')!.world;
       mat.userData.lifted = true;
-      mat.color.setScalar(0.17);
-      mat.metalness = 0.55;
+      mat.color.setScalar(theirs ? 0.07 : 0.17);
+      mat.metalness = theirs ? 0.5 : 0.55;
       mat.roughness = Math.max(mat.roughness, 0.48);
-      mat.envMapIntensity = 1.4;
+      mat.envMapIntensity = theirs ? 0.7 : 1.4;
     });
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
@@ -1952,11 +1956,11 @@ export class Weapons {
     }
     if (fit?.grip) {
       // (the piece lies where it hung on its own rifle: it is brought here by the middle of its top)
-      await fitted('foregrip', 'ar15', fit.grip.at, fit.grip.size, onBody, (obj, box) => {
+      await fitted('foregrip', 'm32', fit.grip.at, fit.grip.size, fit.grip.on ?? onBody, (obj, box) => {
         obj.position.x -= (box.min.x + box.max.x) / 2;
         obj.position.y -= box.max.y;
         obj.position.z -= (box.min.z + box.max.z) / 2;
-      }, undefined, /^foregrip/);
+      }, undefined, /^base_3$/);
     }
     // A magazine that is a model of its own (a drum, a long one): hung where the gun's own magazine hangs, by its
     // top, and there when it is the one in the gun.

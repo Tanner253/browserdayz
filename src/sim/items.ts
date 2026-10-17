@@ -255,7 +255,7 @@ const D: ItemDef[] = [
   {
     id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
     desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
-    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
+    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] }, never: ['foregrip'] }, iconYaw: 0,
   },
   {
     id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.008, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
@@ -495,9 +495,11 @@ const D: ItemDef[] = [
     attach: { fits: ['ak'], slot: 'muzzle', ergo: -9, recoil: 0.88, quiet: true },
   },
   {
-    id: 'foregrip', name: 'Foregrip', model: 'ar15', nodeRe: '^foregrip', w: 1, h: 2, weight: 0.12, category: 'attachment',
-    desc: 'A grip for the forward hand, clamped to the rail under the AR-15 or the MPA30. It holds the gun down when it fires: a fifth less kick, and it comes up a little faster.',
-    attach: { fits: ['ar15', 'mpa'], slot: 'grip', ergo: 4, recoil: 0.8 },
+    // (the M32's own vertical grip, the owner, 2026-10-17: "I like the 40mm foregrip model it should also work for the
+    // ar15", and "for the db12 can we put the foregrip from the 40mm on it?". It was the AR-15's own stub of a grip.)
+    id: 'foregrip', name: 'Foregrip', model: 'm32', nodeRe: '^base_3$', w: 1, h: 2, weight: 0.12, category: 'attachment',
+    desc: 'A vertical grip for the forward hand, clamped under the AR-15, the MPA30 or the double-barrel shotgun. It holds the gun down when it fires: a fifth less kick, and it comes up a little faster.',
+    attach: { fits: ['ar15', 'mpa', 'db12'], slot: 'grip', ergo: 4, recoil: 0.8 },
   },
   // ---------------------------------------------------------------- melee
   // (The long ones are carried slung on the back, in either of its two places, or in a pack that is tall enough;
