@@ -2223,6 +2223,13 @@ export class Weapons {
       o.twin.flash.root.position.copy(at);
       body.add(o.twin.flash.root);
       m.twin = { flash: o.twin.flash, muzzle: at, roots: o.twin.roots, shotT: { L: 9, R: 9 } };
+      // (each gun of a pair kicks by itself in its pack's drawing of its shot: its flash rides on that gun, not on the
+      // pair's body, where the right gun's stood off in the air beside it once the gun had jumped)
+      for (const [flash, gun] of [[o.flash, hung.get('base')], [o.twin.flash, tb]] as const) {
+        if (!gun) continue;
+        body.updateMatrixWorld(true);
+        gun.attach(flash.root);
+      }
     }
     return m;
   }
@@ -2809,6 +2816,9 @@ export class Weapons {
     const feel = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     // (steadied by the sights when they are at the eye, not from the moment their button goes down: it was the button)
     const kick = kickOf(item.id, { shot: this.burst, crouched: this.player.crouched, prone: this.player.prone, aimed: this.adsT > SIGHTS_UP, arms: this.armStamina, ergo: feel.ergo, fitted: feel.recoil }, Math.random);
+    // (a pair's kick is in two hands held out apart, neither at the eye: two fifths of it reaches the view, or with
+    // both buttons held the view climbed half the sky in a second)
+    if (side) for (const k of ['up', 'across', 'stayUp', 'stayAcross'] as const) kick[k] *= 0.4;
     this.aimRecoil.k = kick.back * kick.back;
     this.aimRecoil.d = 2 * Weapons.RECOIL.damp * kick.back;
     this.aimRecoil.v.y += (kick.up * kick.back) / Weapons.RECOIL.peak;
@@ -2816,8 +2826,10 @@ export class Weapons {
     // (the part that stays is owed to the view, and paid over the next twentieth of a second: see `rise`)
     this.rise.x += kick.stayAcross;
     this.rise.y += kick.stayUp;
-    // (a pack's hands take the shot themselves: on top of that, half the kick the game gives a still model)
-    const own = m.rig ? 0.5 : 1;
+    // (a pack's hands take the shot themselves: on top of that, half the kick the game gives a still model; a pair's
+    // guns each take their own shot in their pack's drawing of it, and nothing more: with both held the two hands
+    // climbed together up the picture, the owner: "this also happens to akimbo weapons when shooting")
+    const own = side ? 0 : m.rig ? 0.5 : 1;
     this.kick.v.z += (gun?.jump ?? 1.6) * own;
     this.kick.v.y += (big ? 0.25 : 0.4) * own;
     this.kickRot.v.x += (big ? 9 : kind === 'auto' ? 5.5 : 7) * own;
