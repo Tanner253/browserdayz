@@ -22,7 +22,7 @@ import { CANYON_ROCK_TINT, KINDS } from './ground';
 import { GROUND_KNEE } from './rock-blend';
 import { RockField } from './rock-field';
 import { passData } from './worldgen';
-import { CAVES, caveDark, galleries, passGround, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
+import { CAVES, caveDark, caveMouths, galleries, passGround, rockPieces, type Gallery, type Pass, type RockPiece } from '../sim/pass';
 
 /**
  * metres from the eye within which a wall piece is drawn as its world copy (its far copy beyond: the world copies are
@@ -103,7 +103,8 @@ export class PassCaves {
     }
     this.scene.add(this.group);
     // (the scans washed with the pass's beds' red, so that a piece stands in the wall and not on it: src/world/ground.ts)
-    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: CANYON_ROCK_TINT, flat: 'grit' });
+    // (its mouths' holes in the ground floored as the caves are: a block by a mouth reads the rock cut away there)
+    this.field = new RockField(this.scene, this.atmo, this.pieces, { name: 'pass walls', near: NEAR, solid: SOLID, heightTex: o.heightTex, tint: CANYON_ROCK_TINT, flat: 'grit', holes: caveMouths(this.pass) });
     this.dressed = this.field.build({ solid: o.solid });
   }
 

@@ -392,8 +392,9 @@ export function caveMouths(p: Pass): { cave: number; x: number; z: number; rot: 
       const a = passWorld(p, n.s, n.t, n.y), b = passWorld(p, m.s, m.t, m.y), ux = b[0] - a[0], uz = b[2] - a[2], len = Math.hypot(ux, uz);
       // (from MOUTH_OUT in front of it to just short of the riser's top, or three metres in where it is in the ridge's own face)
       const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), back = MOUTH_OUT, deep = k >= 0 ? Math.max(0.4, E[k].top - E[k].foot - 0.7) : 3, cx = a[0] + (ux / len) * ((deep - back) / 2), cz = a[2] + (uz / len) * ((deep - back) / 2);
-      // (as wide as the entrance is flared out, set back in the face: src/world/cave-carve.ts CARVE.flare)
-      out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: (n.w / 2) * MOUTH_FLARE + 0.5, hz: (deep + back) / 2, floor: a[1] });
+      // (as wide as the entrance is flared out, set back in the face (src/world/cave-carve.ts CARVE.flare), and 1.5 m more:
+      // the carving rounds and roughs the flare a little past it, and at 0.5 the riser beside it stood proud, a wedge)
+      out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: (n.w / 2) * MOUTH_FLARE + 1.5, hz: (deep + back) / 2, floor: a[1] });
     }
   });
   return out;

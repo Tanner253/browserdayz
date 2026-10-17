@@ -47,22 +47,42 @@ function uniformsFor(heightTex: THREE.Texture, flat: Flat) {
   return u;
 }
 
+/**
+ * A hole opened in the ground (a cave's mouth: src/sim/pass.ts caveMouths), as the terrain's wells take it: its middle,
+ * its turn, its half sizes, and its floor. In it the ground's heights are of the rock cut away, metres over the floor
+ * there, and a rock stood in it read them: painted as the ground up to them, a block by a mouth was a wedge of sand.
+ */
+export interface BlendHole {
+  x: number;
+  z: number;
+  rot: number;
+  hx: number;
+  hz: number;
+  floor: number;
+}
+
 /** A rock's material made to fade into the ground where it meets it (see the head of this file). Returns it. */
-export function rockBlend(atmo: Atmosphere, heightTex: THREE.Texture, mat: THREE.MeshStandardMaterial, flat: Flat = 'grit') {
-  const b = blendPatch(heightTex, flat);
+export function rockBlend(atmo: Atmosphere, heightTex: THREE.Texture, mat: THREE.MeshStandardMaterial, flat: Flat = 'grit', holes: BlendHole[] = []) {
+  const b = blendPatch(heightTex, flat, holes);
   atmo.register(mat, b.patch, b.key);
   return mat;
 }
 
 /** The fade as a patch of its own and the key its programs are kept by, to be laid after another patch (see the head of this file). */
-export function blendPatch(heightTex: THREE.Texture, flat: Flat = 'grit'): { patch: ShaderPatch; key: string } {
-  const u = uniformsFor(heightTex, flat);
+export function blendPatch(heightTex: THREE.Texture, flat: Flat = 'grit', holes: BlendHole[] = []): { patch: ShaderPatch; key: string } {
+  const u = uniformsFor(heightTex, flat), n = holes.length;
+  const hole = n
+    ? {
+        uBlendHoleA: { value: holes.map((h) => new THREE.Vector4(h.x, h.z, Math.cos(h.rot), Math.sin(h.rot))) },
+        uBlendHoleB: { value: holes.map((h) => new THREE.Vector4(h.hx, h.hz, h.floor, 0)) },
+      }
+    : {};
   return {
-    key: `rock-blend:${flat}`,
+    key: `rock-blend:${flat}:${n}`,
     patch: (shader) => {
-      Object.assign(shader.uniforms, u);
+      Object.assign(shader.uniforms, u, hole);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vBlendPos;')
+        .replace('#include <common>', `#include <common>\nvarying vec3 vBlendPos;\n${holesGlsl(n, 'vertex')}`)
         .replace(
           '#include <begin_vertex>',
           /* glsl */ `#include <begin_vertex>
@@ -72,16 +92,17 @@ export function blendPatch(heightTex: THREE.Texture, flat: Flat = 'grit'): { pat
               bp = instanceMatrix * bp;
             #endif
             vBlendPos = ( modelMatrix * bp ).xyz;
+            ${n ? 'blendHoleAt( vBlendPos.xz );' : ''}
           }`,
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\n${BLEND_GLSL}`)
+        .replace('#include <common>', `#include <common>\n${BLEND_GLSL}\n${holesGlsl(n, 'fragment')}`)
         .replace(
           '#include <map_fragment>',
           /* glsl */ `#include <map_fragment>
           // the ground under the point, which way it faces, and how far over it the point is (its edge broken)
-          float bGround = blendGround( vBlendPos.xz );
-          vec3 bN = normalize( vec3( blendGround( vBlendPos.xz - vec2( 1.0, 0.0 ) ) - blendGround( vBlendPos.xz + vec2( 1.0, 0.0 ) ), 2.0, blendGround( vBlendPos.xz - vec2( 0.0, 1.0 ) ) - blendGround( vBlendPos.xz + vec2( 0.0, 1.0 ) ) ) );
+          float bGround = blendSurface( vBlendPos.xz );
+          vec3 bN = normalize( vec3( blendSurface( vBlendPos.xz - vec2( 1.0, 0.0 ) ) - blendSurface( vBlendPos.xz + vec2( 1.0, 0.0 ) ), 2.0, blendSurface( vBlendPos.xz - vec2( 0.0, 1.0 ) ) - blendSurface( vBlendPos.xz + vec2( 0.0, 1.0 ) ) ) );
           float bBreak = ( blendNoise( vBlendPos.xz * 1.3 + vBlendPos.y * 0.7 ) * 0.65 + blendNoise( vBlendPos.xz * 4.1 - vBlendPos.y ) * 0.35 - 0.5 ) * 2.0 * uBlendSize.w;
           float bK = ( 1.0 - smoothstep( 0.0, uBlendSize.z, vBlendPos.y - bGround + bBreak ) ) * step( -4.0, vBlendPos.y - bGround );
           // (the ground's own picture there: the canyon's rock on a face of more than some 44 degrees, laid along the
@@ -111,6 +132,37 @@ export const GROUND_KNEE = /* glsl */ `
     return c * ( l < 0.34 ? 1.0 : ( 0.34 + ( l - 0.34 ) * 0.22 ) / max( l, 1e-4 ) );
   }
 `;
+
+/**
+ * the ground's height, or a hole's floor in a hole (BlendHole: in the frame the terrain's wells are read in). Which
+ * hole a point is in is asked of each corner of the rock (`blendHoleAt`), not of each pixel: five readings of the ground
+ * to a pixel, nine holes to each, was the pass's walls' whole frame over again.
+ */
+const holesGlsl = (n: number, stage: 'vertex' | 'fragment') =>
+  !n
+    ? stage === 'vertex'
+      ? ''
+      : 'float blendSurface( vec2 p ) { return blendGround( p ); }'
+    : stage === 'vertex'
+      ? /* glsl */ `
+  uniform vec4 uBlendHoleA[${n}];
+  uniform vec4 uBlendHoleB[${n}];
+  varying vec2 vBlendHole;
+  void blendHoleAt( vec2 p ) {
+    vBlendHole = vec2( 0.0, 0.0 );
+    for ( int i = 0; i < ${n}; i++ ) {
+      vec2 d = p - uBlendHoleA[i].xy;
+      vec2 l = vec2( d.x * uBlendHoleA[i].z - d.y * uBlendHoleA[i].w, d.x * uBlendHoleA[i].w + d.y * uBlendHoleA[i].z );
+      if ( abs( l.x ) < uBlendHoleB[i].x && abs( l.y ) < uBlendHoleB[i].y ) vBlendHole = vec2( 1.0, uBlendHoleB[i].z );
+    }
+  }`
+      : /* glsl */ `
+  varying vec2 vBlendHole;
+  float blendSurface( vec2 p ) {
+    float h = blendGround( p );
+    // (the floor carried with how much of a corner is in a hole, and so read back whole between corners)
+    return vBlendHole.x > 0.5 ? min( h, vBlendHole.y / vBlendHole.x ) : h;
+  }`;
 
 const BLEND_GLSL = /* glsl */ `
   ${GROUND_KNEE}

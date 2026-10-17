@@ -2,17 +2,19 @@
 // country's outcrops (src/world/outcrops.ts). One set of instances for each model: its world copy within `near` metres
 // of the eye and its far copy beyond, a small piece always its far copy (rubble a pace across is not the 30,000
 // triangles of a boulder's world copy) and none past `smallReach`, any other none past `seen` times its size (the far
-// copies are 1,200 to 6,000 triangles, and with every one drawn the rock was 4.2 million triangles of a frame in the
-// pass, 2026-10-16: a boulder three metres long is 15 pixels high at 270 m). Each piece solid only within `solid` metres of the
-// eye: a cliff by its physics copy (scripts/phys-copies.mjs), a boulder by the hull of its far copy, rubble not at all
-// (it is walked over, as in DayZ). Its material fades into the ground where it meets it (src/world/rock-blend.ts).
+// copies are 1,200 to 6,000 triangles, and with all drawn the rock was 5.5 million triangles of a frame in the pass,
+// 2026-10-16: a boulder three metres long is 20 pixels high at 210 m), each shrunk away over the last fifth of its
+// reach so that none pops. Each piece solid only within `solid` metres of the eye: a cliff by its physics copy
+// (scripts/phys-copies.mjs), a boulder by the hull of its far copy, rubble not at all (it is walked over, as in DayZ).
+// Its material fades into the ground where it meets it (src/world/rock-blend.ts).
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
-import { rockBlend } from './rock-blend';
+import { blendPatch, type BlendHole } from './rock-blend';
+import type { ShaderPatch } from './atmosphere';
 import type { RockPiece } from '../sim/pass';
 
 /** a piece of a field: `small`, rubble (its far copy always, drawn only near, never solid) */
@@ -32,9 +34,11 @@ export interface FieldOptions {
   solid?: number;
   /** the terrain's heights, for the rock to fade into the ground (src/world/rock-blend.ts); and the level ground's kind */
   heightTex?: THREE.Texture;
-  flat?: Parameters<typeof rockBlend>[3];
+  flat?: Parameters<typeof blendPatch>[1];
   /** a wash over the rock's own colour (the canyon's red: src/world/ground.ts CANYON_ROCK_TINT) */
   tint?: [number, number, number];
+  /** holes opened in the ground among the pieces, floored lower than it (the caves' mouths: see BlendHole) */
+  holes?: BlendHole[];
 }
 
 /** metres the eye moves before the pieces are sorted again */
@@ -63,7 +67,7 @@ export class RockField {
   private shapes = new Map<string, { pos: Float32Array; index?: Uint32Array }>();
   private solidNow = new Map<FieldPiece, RAPIER.Collider>();
   private sortedAt = new THREE.Vector3(Infinity, 0, 0);
-  private o: Required<Omit<FieldOptions, 'heightTex' | 'tint' | 'flat'>> & FieldOptions;
+  private o: Required<Omit<FieldOptions, 'heightTex' | 'tint' | 'flat' | 'holes'>> & FieldOptions;
 
   constructor(
     private scene: THREE.Scene,
@@ -71,7 +75,7 @@ export class RockField {
     readonly pieces: FieldPiece[],
     o: FieldOptions,
   ) {
-    this.o = { near: 70, smallReach: 160, seen: 90, solid: 60, ...o };
+    this.o = { near: 70, smallReach: 160, seen: 70, solid: 60, ...o };
     this.group.name = o.name;
   }
 
@@ -81,7 +85,8 @@ export class RockField {
     for (const [id, list] of byId) {
       const entry = assets.manifest.models[id], big = list.some((p) => !p.small);
       const [near, far] = await Promise.all([big ? assets.model(id, 0) : Promise.resolve(null), assets.model(id, 1)]);
-      const parts = near ? this.partsOf(near) : [], farParts = this.partsOf(far);
+      const size = Math.max(...entry.max.map((v, i) => v - entry.min[i]));
+      const parts = near ? this.partsOf(near, size) : [], farParts = this.partsOf(far, size);
       const mk = (ps: { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4 }[], shadow: boolean) =>
         ps.map((q) => {
           const mesh = new THREE.InstancedMesh(q.geo, q.mat, list.length);
@@ -93,7 +98,6 @@ export class RockField {
           return mesh;
         });
       const tris = (ps: { geo: THREE.BufferGeometry }[]) => ps.reduce((s, q) => s + (q.geo.index ? q.geo.index.count : q.geo.getAttribute('position').count) / 3, 0);
-      const size = Math.max(...entry.max.map((v, i) => v - entry.min[i]));
       this.sets.push({ id, list, near: mk(parts, true), far: mk(farParts, false), parts, farParts, nearTris: tris(parts), farTris: tris(farParts), size });
       if (o.solid !== false && list.some((p) => !p.small)) {
         // (a cliff by its physics copy: a hull round one stood metres in front of the rock seen; a boulder is round enough for its hull)
@@ -104,7 +108,7 @@ export class RockField {
   }
 
   /** a model's shapes, each with its place in the model, and its material made ready (washed, fading into the ground) */
-  private partsOf(root: THREE.Object3D) {
+  private partsOf(root: THREE.Object3D, size: number) {
     root.updateMatrixWorld(true);
     const back = root.matrixWorld.clone().invert(), out: { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4 }[] = [];
     root.traverse((n) => {
@@ -112,8 +116,11 @@ export class RockField {
       if (!mesh.isMesh) return;
       const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
       if (this.o.tint) mat.color.multiply(new THREE.Color(...this.o.tint));
-      if (this.o.heightTex) rockBlend(this.atmo, this.o.heightTex, mat, this.o.flat);
-      else this.atmo.register(mat);
+      const fade = fadePatch(size * this.o.seen, this.o.smallReach);
+      if (this.o.heightTex) {
+        const b = blendPatch(this.o.heightTex, this.o.flat, this.o.holes);
+        this.atmo.register(mat, (sh) => (b.patch(sh), fade(sh)), `${b.key}+fade`);
+      } else this.atmo.register(mat, fade, 'rock-fade');
       out.push({ geo: mesh.geometry, mat, m: back.clone().multiply(mesh.matrixWorld) });
     });
     return out;
@@ -198,4 +205,26 @@ export class RockField {
     for (const c of this.solidNow.values()) physics.world.removeCollider(c, false);
     this.solidNow.clear();
   }
+}
+
+/**
+ * A piece shrunk away toward the end of its reach (as RockField.update reckons it: `perMetre` times its size, its scale
+ * read off its instance, and never short of `least`), over the last fifth, into its own foot: let go there at once, it
+ * popped. Shrunk, not dithered: a shader that may throw a pixel away costs every pixel of it the card's early test of
+ * what is nearer, and the pass's walls fill the screen.
+ */
+function fadePatch(perMetre: number, least: number): ShaderPatch {
+  return (shader) => {
+    shader.uniforms.uFieldReach = { value: new THREE.Vector2(perMetre, least) };
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform vec2 uFieldReach;').replace(
+      '#include <begin_vertex>',
+      /* glsl */ `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        {
+          float reach = max( uFieldReach.y, uFieldReach.x * length( instanceMatrix[0].xyz ) );
+          transformed *= smoothstep( reach, reach * 0.8, distance( ( modelMatrix * instanceMatrix[3] ).xyz, cameraPosition ) );
+        }
+      #endif`,
+    );
+  };
 }
