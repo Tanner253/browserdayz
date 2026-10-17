@@ -25,7 +25,7 @@ import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside 
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
 import { carveRiver, cutLake, cutSwamp, lakeLevel, riverMask, riverWater } from './west-water';
 import { fillTown, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
-import { moundAt } from '../../sim/towns';
+import { moundAt, placedRooms } from '../../sim/towns';
 import type { Instance, POI, Site } from './types';
 
 /** the shape of the new ground, in metres west of the square's edge (`d`) or from the shore (`c`, + inland) */
@@ -515,7 +515,12 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   }
   return {
     heights, surface, splat, grass, towns, kalat, slabs, sand: sands,
-    water: { lakes: [{ name: OZERKI.name, level: lake, outline: L }, { name: 'swamp', level: swamp, outline: S, swamp: true }], rivers: [{ name: 'the river', pts: river }] },
+    water: {
+      lakes: [{ name: OZERKI.name, level: lake, outline: L }, { name: 'swamp', level: swamp, outline: S, swamp: true }],
+      rivers: [{ name: 'the river', pts: river }],
+      // (the hamlet's houses with the swamp's water over their floors: drawn still and dark inside, src/sim/water.ts WaterRoom)
+      rooms: placedRooms(placed(hamlet, padY.get(MOKROYE.name)!), BUILDING_FOOTPRINT),
+    },
   };
 }
 
