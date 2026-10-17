@@ -78,12 +78,17 @@ try {
   assert.equal(friend.heard('cdata'), undefined, 'searched while still in the air');
   console.log(`  ok  ${++n}. killed sixty metres up: the body stays in its seat, not to be searched, while the helicopter hangs there`);
 
-  // it comes down (the dead pilot's game moves it until it is at rest, as it would a car they got out of)
+  // The dead pilot's game flies it no more: the game of whoever is nearest takes it over and it falls there, its rotor
+  // running down (2026-10-16: left with the dead pilot's game it hung where they died, and so did their body: "when a
+  // player is shot out of a helicopter their body remains floating in the sky").
+  const handed = friend.got.filter((m) => m.t === 'vseat' && (m as { i: number }).i === heli.i).pop() as { sim: number | null } | undefined;
+  assert.equal(handed?.sim, friend.welcome!.you, `the helicopter was left to the dead pilot's game: ${JSON.stringify(handed)}`);
+  console.log(`  ok  ${++n}. its dead pilot's game flies it no more: the nearest player's game takes it over`);
   for (let k = 1; k <= 10; k++) {
-    pilot.send({ t: 'v', i: heli.i, s: [x, y + 60 - 6 * k, z, ...heli.s.slice(3, 7), 0, -12, 0, 0, 0], at: Date.now() });
+    friend.send({ t: 'v', i: heli.i, s: [x, y + 60 - 6 * k, z, ...heli.s.slice(3, 7), 0, -12, 0, 0, 0], at: Date.now() });
     await sleep(60);
   }
-  pilot.send({ t: 'vrest', i: heli.i, s: [x, y, z, ...heli.s.slice(3, 7), 0, 0, 0, 0, 0] });
+  friend.send({ t: 'vrest', i: heli.i, s: [x, y, z, ...heli.s.slice(3, 7), 0, 0, 0, 0, 0] });
   for (let k = 0; k < 40 && !friend.heard('corpse@'); k++) await sleep(100);
   const down = friend.heard<{ corpse: CorpseInfo }>('corpse@');
   assert.ok(down, 'the body was not laid on the ground when the helicopter came down');
@@ -109,7 +114,30 @@ try {
   const told = (late.welcome as unknown as { corpses: CorpseInfo[] }).corpses.find((c) => c.uid === uid);
   assert.ok(told && !told.ride && Math.abs(told.y - down.corpse.y) < 0.01, 'a newcomer is told of it in the air');
   console.log(`  ok  ${++n}. somebody who comes later finds it on the ground`);
-  for (const p of [pilot, friend, late]) p.ws.close();
+
+  // A solo pilot shot dead sixty metres up with nobody near: no game is left to fly it, and the server sets it down
+  // where it falls, as wrecked as that fall wrecks one, and lays the body beside it (never left hanging in the sky).
+  const solo = new Player('Solo');
+  await solo.join();
+  const roof = solo.welcome!.vehicles.find((v) => v.k === HELI.kind && v.s[1] > 85 && v.hp > 0)!;
+  assert.ok(roof, 'no helicopter on the hospital roof');
+  const [hx, hy, hz] = roof.s;
+  for (const p of [friend, late]) p.at(hx - 1000, 60, hz);
+  solo.at(hx + 1, hy - 0.8, hz);
+  solo.send({ t: 'me', inv: { slots: { primary: { uid: 'heli-body-rifle-2', id: 'ak', qty: 1, loaded: 0, mag: null } }, active: null, containers: [] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
+  await sleep(400);
+  solo.send({ t: 'vin', i: roof.i, seat: 0 });
+  await sleep(400);
+  const up2 = [hx, hy + 60, hz, ...roof.s.slice(3, 7), 0, 0, 0, 0, 0.6];
+  for (let k = 0; k < 5; k++) { solo.send({ t: 'v', i: roof.i, s: up2, at: Date.now() }); await sleep(60); }
+  friend.got.length = 0;
+  solo.send({ t: 'died', cause: 'shot', v: 0 });
+  for (let k = 0; k < 50 && !friend.heard('corpse@'); k++) await sleep(100);
+  const fell = friend.heard<{ corpse: CorpseInfo }>('corpse@');
+  assert.ok(fell, `nobody near: the body was not laid on the ground (heard: ${friend.got.map((m) => m.t).join(' ')})`);
+  assert.ok(fell.corpse.y < hy + 30, `laid at ${fell.corpse.y.toFixed(1)}, where it died was ${(hy + 60).toFixed(1)}`);
+  console.log(`  ok  ${++n}. a solo pilot shot dead with nobody near: the helicopter is set down, the body laid beside it (y ${fell.corpse.y.toFixed(1)})`);
+  for (const p of [pilot, friend, late, solo]) p.ws.close();
 } catch (e) {
   failed = e;
 } finally {

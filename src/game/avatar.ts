@@ -728,6 +728,8 @@ export class Avatar {
   private sunk = 0;
   private backing = false;
   private layerMask = 1;
+  /** the mask it is drawn in when it is seen: layerMask is 0 while it is veiled */
+  private seenMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
   private heldPivot = new THREE.Group();
   private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion; butt: THREE.Vector3 | null; sight: [number, number] } | null = null;
@@ -900,7 +902,9 @@ export class Avatar {
       }
       o.layers.set(layer);
     });
-    this.layerMask = model.layers.mask;
+    this.seenMask = model.layers.mask;
+    if (this.layerMask === 0) model.traverse((o) => (o.layers.mask = 0));
+    else this.layerMask = this.seenMask;
     if (this.skin) {
       // A file's shapes are each packed into a box of their own, and the unpacking is folded
       // into where each one's bones are said to have been bound. From one shape's numbers to
@@ -1056,6 +1060,18 @@ export class Avatar {
   }
 
   /** Dresses the body: jacket and trouser colours, skin tone, hair. */
+  /**
+   * Not drawn, nor its shadow, for this eye (2026-10-16): a player past a short draw distance, behind a building it
+   * leaves undrawn, would be seen through the building (the owner: "lower draw options too for potatoe players").
+   * Whatever is put on it meanwhile goes on in the same mask; what stops a shot is not this (the hit zones are).
+   */
+  veil(on: boolean) {
+    const mask = on ? 0 : this.seenMask;
+    if (mask === this.layerMask) return;
+    this.layerMask = mask;
+    this.root.traverse((o) => (o.layers.mask = mask));
+  }
+
   setLook(look: Look) {
     if (this.uniforms) setLookUniforms(this.uniforms, look);
     this.hair.forEach((h, i) => h && (h.visible = i === look.hair));

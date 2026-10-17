@@ -84,6 +84,16 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Also: Its loose missile left out; its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; scaled to 28 m over all; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "MD-500 Defender Helicopter" (https://sketchfab.com/3d-models/md-500-defender-helicopter-da5daae0fe354269895b58c2ed72e2b8) by Duane's Mind (https://sketchfab.com/duanesmind) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; kept at the size it came; textures re-encoded as WebP at the size they came; geometry compressed.
+- This work is based on "Low Poly Log Pile Game Ready" (https://sketchfab.com/3d-models/low-poly-log-pile-game-ready-e14ba140b38140acbc22093aca5ce0ff) by -Arthur- (https://sketchfab.com/.arthur) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Brought to 5 m long and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+  Also: Brought to 5 m long, its triangles thinned to about 3,300 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+  Also: Brought to 5 m long, its triangles thinned to about 5,600 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+  Also: Brought to 5 m long, its triangles thinned to about 2,400 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Fence pack - (low poly, game ready)" (https://sketchfab.com/3d-models/fence-pack-low-poly-game-ready-f2ed9f555ff64eae95b408409cbff602) by TampaJoey (https://sketchfab.com/TampaJoey) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: One panel of the pack (the white pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+  Also: One panel of the pack (the grey railed pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Game Ready Fruit & Vegetable Asset Pack" (https://sketchfab.com/3d-models/game-ready-fruit-vegetable-asset-pack-9846beef2c6b46caadc4a547a4dcd144) by Meerschaum Digital (https://sketchfab.com/meerschaumdigital) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: One piece of the pack, brought to life size and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -186,7 +196,9 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Concrete Road Barrier](https://polyhaven.com/a/concrete_road_barrier) | Amal Kumar |
 | model | [Covered Car](https://polyhaven.com/a/covered_car) | MP |
 | model | [Crowbar 01](https://polyhaven.com/a/crowbar_01) | Alexander Otterbeck |
+| model | [Dead Quiver Branch 01](https://polyhaven.com/a/dead_quiver_branch_01) | Greg Zaal, Jenelle van Heerden |
 | model | [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk) | Rob Tuytel |
+| model | [Dead Tree Trunk 02](https://polyhaven.com/a/dead_tree_trunk_02) | Jenelle van Heerden, Rico Cilliers |
 | model | [Digital Wrist Watch](https://polyhaven.com/a/digital_wrist_watch) | Adrian C |
 | model | [Dry Branches Medium 01](https://polyhaven.com/a/dry_branches_medium_01) | Rico Cilliers |
 | model | [Electric Stove](https://polyhaven.com/a/electric_stove) | Kuutti Siitonen |
@@ -205,7 +217,24 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Metal Jerrycan Green](https://polyhaven.com/a/metal_jerrycan_green) | Ulan Cabanilla |
 | model | [Metal Office Desk](https://polyhaven.com/a/metal_office_desk) | Ulan Cabanilla |
 | model | [Metal Trash Can](https://polyhaven.com/a/metal_trash_can) | GurJas Studios |
+| model | [Modular Factory Facade](https://polyhaven.com/a/modular_factory_facade) | James Ray Cock |
 | model | [Modular Fort 01](https://polyhaven.com/a/modular_fort_01) | Rico Cilliers |
+| model | [Mountainside](https://polyhaven.com/a/mountainside) | Dario Barresi, Rico Cilliers |
+| model | [Namaqualand Boulder 02](https://polyhaven.com/a/namaqualand_boulder_02) | Greg Zaal, Rico Cilliers |
+| model | [Namaqualand Boulder 03](https://polyhaven.com/a/namaqualand_boulder_03) | Jenelle van Heerden, Dario Barresi |
+| model | [Namaqualand Boulder 04](https://polyhaven.com/a/namaqualand_boulder_04) | Jenelle van Heerden |
+| model | [Namaqualand Boulder 05](https://polyhaven.com/a/namaqualand_boulder_05) | Jenelle van Heerden, Dario Barresi |
+| model | [Namaqualand Cliff 01](https://polyhaven.com/a/namaqualand_cliff_01) | Jenelle van Heerden, Rico Cilliers |
+| model | [Namaqualand Cliff 02](https://polyhaven.com/a/namaqualand_cliff_02) | Dario Barresi, Rico Cilliers |
+| model | [Modular Urban Apartments Facade](https://polyhaven.com/a/modular_urban_apartments_facade) | James Ray Cock |
+| model | [Modular Wooden Pier](https://polyhaven.com/a/modular_wooden_pier) | Rico Cilliers |
+| model | [Mountainside](https://polyhaven.com/a/mountainside) | Dario Barresi, Rico Cilliers |
+| model | [Namaqualand Boulder 02](https://polyhaven.com/a/namaqualand_boulder_02) | Greg Zaal, Rico Cilliers |
+| model | [Namaqualand Boulder 03](https://polyhaven.com/a/namaqualand_boulder_03) | Jenelle van Heerden, Dario Barresi |
+| model | [Namaqualand Boulder 04](https://polyhaven.com/a/namaqualand_boulder_04) | Jenelle van Heerden |
+| model | [Namaqualand Boulder 05](https://polyhaven.com/a/namaqualand_boulder_05) | Jenelle van Heerden, Dario Barresi |
+| model | [Namaqualand Cliff 01](https://polyhaven.com/a/namaqualand_cliff_01) | Jenelle van Heerden, Rico Cilliers |
+| model | [Namaqualand Cliff 02](https://polyhaven.com/a/namaqualand_cliff_02) | Dario Barresi, Rico Cilliers |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |
@@ -219,6 +248,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Rock Face 02](https://polyhaven.com/a/rock_face_02) | Dario Barresi, Rico Cilliers |
 | model | [Rock Moss Set 01](https://polyhaven.com/a/rock_moss_set_01) | Kless Gyzen |
 | model | [Rock Moss Set 02](https://polyhaven.com/a/rock_moss_set_02) | Kless Gyzen |
+| model | [Root Cluster 01](https://polyhaven.com/a/root_cluster_01) | Jenelle van Heerden, Rico Cilliers |
 | model | [Rubber Boots](https://polyhaven.com/a/rubber_boots) | L |
 | model | [Russian Food Cans 01](https://polyhaven.com/a/russian_food_cans_01) | Kosan Aziz |
 | model | [Scandinavian Masonry Heater](https://polyhaven.com/a/scandinavian_masonry_heater) | Kuutti Siitonen |
@@ -233,6 +263,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Television 01](https://polyhaven.com/a/Television_01) | Gabriel Radić |
 | model | [Trashbag](https://polyhaven.com/a/trashbag) | Benny Weimer |
 | model | [Tree Stump 01](https://polyhaven.com/a/tree_stump_01) | Rob Tuytel |
+| model | [Tree Stump 02](https://polyhaven.com/a/tree_stump_02) | Rob Tuytel |
 | model | [Utility Box 01](https://polyhaven.com/a/utility_box_01) | James Ray Cock |
 | model | [Vintage Flashlight](https://polyhaven.com/a/vintage_flashlight) | Omar M. El-Safy |
 | model | [Vintage Radio Transceiver](https://polyhaven.com/a/vintage_radio_transceiver) | Mateusz Sadek |
@@ -242,36 +273,46 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Wooden Ladder](https://polyhaven.com/a/wooden_ladder) | Miroslav Turura |
 | model | [Wooden Military Crate](https://polyhaven.com/a/wooden_military_crate) | Prabhjinder Singh |
 | model | [Wooden Table 01](https://polyhaven.com/a/WoodenTable_01) | Ethan Place |
+| texture | [Aerial Beach 01](https://polyhaven.com/a/aerial_beach_01) | Rob Tuytel |
 | texture | [Aerial Rocks 02](https://polyhaven.com/a/aerial_rocks_02) | Rob Tuytel |
 | texture | [Asphalt 02](https://polyhaven.com/a/asphalt_02) | Rob Tuytel |
 | texture | [Bark Brown 02](https://polyhaven.com/a/bark_brown_02) | Rob Tuytel |
 | texture | [Beige Wall 001](https://polyhaven.com/a/beige_wall_001) | Dimitrios Savva, Rico Cilliers |
 | texture | [Bitumen](https://polyhaven.com/a/bitumen) | Rob Tuytel |
+| texture | [Blue Painted Planks](https://polyhaven.com/a/blue_painted_planks) | Rob Tuytel |
 | texture | [Brown Mud Leaves 01](https://polyhaven.com/a/brown_mud_leaves_01) | Rob Tuytel |
 | texture | [Castle Wall Slates](https://polyhaven.com/a/castle_wall_slates) | Rob Tuytel |
 | texture | [Clay Roof Tiles 02](https://polyhaven.com/a/clay_roof_tiles_02) | Amal Kumar |
+| texture | [Cliff Side](https://polyhaven.com/a/cliff_side) | James Ray Cock, Jenelle van Heerden, Dario Barresi |
+| texture | [Coast Sand 01](https://polyhaven.com/a/coast_sand_01) | Rob Tuytel |
 | texture | [Concrete Block Wall 02](https://polyhaven.com/a/concrete_block_wall_02) | Charlotte Baglioni |
 | texture | [Concrete Floor Worn 001](https://polyhaven.com/a/concrete_floor_worn_001) | Dimitrios Savva, Rico Cilliers |
 | texture | [Concrete Panels](https://polyhaven.com/a/concrete_panels) | Amal Kumar |
 | texture | [Concrete Tiles 02](https://polyhaven.com/a/concrete_tiles_02) | Charlotte Baglioni |
 | texture | [Corrugated Iron](https://polyhaven.com/a/corrugated_iron) | Jenelle van Heerden, Dimitrios Savva |
 | texture | [Damaged Plaster](https://polyhaven.com/a/damaged_plaster) | Amal Kumar |
+| texture | [Damp Beach Sand](https://polyhaven.com/a/damp_beach_sand) | Dimitrios Savva |
 | texture | [Defense Wall](https://polyhaven.com/a/defense_wall) | Rob Tuytel |
 | texture | [Dirty Concrete](https://polyhaven.com/a/dirty_concrete) | Rob Tuytel |
+| texture | [Distressed Painted Planks](https://polyhaven.com/a/distressed_painted_planks) | Rob Tuytel |
 | texture | [Dry Decay Leaves](https://polyhaven.com/a/dry_decay_leaves) | Amal Kumar |
 | texture | [Dry Mud Field 001](https://polyhaven.com/a/dry_mud_field_001) | Rob Tuytel, Rico Cilliers |
 | texture | [Forest Ground 01](https://polyhaven.com/a/forrest_ground_01) | Rob Tuytel |
 | texture | [Forest Ground 03](https://polyhaven.com/a/forrest_ground_03) | Rob Tuytel |
 | texture | [Forest Ground 06](https://polyhaven.com/a/forest_ground_06) | Charlotte Baglioni |
 | texture | [Forest Leaves 02](https://polyhaven.com/a/forest_leaves_02) | Rob Tuytel |
+| texture | [Forest Sand 01](https://polyhaven.com/a/forrest_sand_01) | Rob Tuytel |
 | texture | [Garage Floor](https://polyhaven.com/a/garage_floor) | Jenelle van Heerden |
 | texture | [Grass Ground](https://polyhaven.com/a/grass_ground) | Charlotte Baglioni |
+| texture | [Green Rough Planks](https://polyhaven.com/a/green_rough_planks) | Rob Tuytel |
 | texture | [Grey Plaster 02](https://polyhaven.com/a/grey_plaster_02) | Rob Tuytel |
 | texture | [Grey Roof Tiles 02](https://polyhaven.com/a/grey_roof_tiles_02) | Rob Tuytel |
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
+| texture | [Leaves Forest Ground](https://polyhaven.com/a/leaves_forest_ground) | Dario Barresi, Dimitrios Savva |
 | texture | [Medieval Blocks 06](https://polyhaven.com/a/medieval_blocks_06) | Rob Tuytel |
 | texture | [Mossy Rock](https://polyhaven.com/a/mossy_rock) | Rob Tuytel |
 | texture | [Mud Cracked Dry Riverbed 002](https://polyhaven.com/a/mud_cracked_dry_riverbed_002) | Dario Barresi, Dimitrios Savva |
+| texture | [Mud Forest](https://polyhaven.com/a/mud_forest) | eye-candy.xyz |
 | texture | [Old Linoleum Flooring 01](https://polyhaven.com/a/old_linoleum_flooring_01) | Charlotte Baglioni |
 | texture | [Painted Brick](https://polyhaven.com/a/painted_brick) | Amal Kumar |
 | texture | [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | Amal Kumar |
@@ -282,11 +323,13 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Rock Face 03](https://polyhaven.com/a/rock_face_03) | Dario Barresi, Rico Cilliers |
 | texture | [Rocks Ground 02](https://polyhaven.com/a/rocks_ground_02) | Rob Tuytel |
 | texture | [Rocky Trail](https://polyhaven.com/a/rocky_trail) | Amal Kumar |
+| texture | [Roots](https://polyhaven.com/a/roots) | Dario Barresi, Dimitrios Savva |
 | texture | [Rough Plaster Brick 02](https://polyhaven.com/a/rough_plaster_brick_02) | Rob Tuytel |
 | texture | [Rusty Corrugated Iron](https://polyhaven.com/a/rusty_corrugated_iron) | Charlotte Baglioni |
 | texture | [Sand 01](https://polyhaven.com/a/sand_01) | Rob Tuytel |
 | texture | [Sandy Gravel 02](https://polyhaven.com/a/sandy_gravel_02) | Dario Barresi |
 | texture | [Snow 02](https://polyhaven.com/a/snow_02) | Rob Tuytel |
+| texture | [Sparse Grass](https://polyhaven.com/a/sparse_grass) | Amal Kumar |
 | texture | [Weathered Plank Siding](https://polyhaven.com/a/weathered_plank_siding) | Dimitrios Savva |
 | texture | [Weathered Planks](https://polyhaven.com/a/weathered_planks) | Dario Barresi, Dimitrios Savva |
 | texture | [White Bricks](https://polyhaven.com/a/white_bricks) | Rob Tuytel |

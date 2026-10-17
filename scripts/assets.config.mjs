@@ -43,6 +43,20 @@ export const TEXTURES = {
   sand_01: { res: '2k', tex: 1024 },
   sandy_gravel_02: { res: '2k', tex: 1024 },
   mud_cracked_dry_riverbed_002: { res: '2k', tex: 1024 },
+  // the coast and the desert west of the plains (2026-10-16, not yet laid: progress/map3/kit/terrain-hookup.md): wind-rippled
+  // sand, a beach's dry sand and its wet, and the layered rock of a canyon's walls. Cracked earth is the riverbed above.
+  aerial_beach_01: { res: '2k', tex: 1024 },
+  coast_sand_01: { res: '2k', tex: 1024 },
+  damp_beach_sand: { res: '2k', tex: 1024 },
+  cliff_side: { res: '2k', tex: 1024 },
+  // new woods and meadows (2026-10-16, not yet laid: progress/map3/kit/terrain-hookup.md): the pale sandy floor of a dry
+  // pine wood, the fresh leaf litter of a beech or oak wood, the dark wet ground of an alder hollow, the roots of an old
+  // wood, and thin short grass for a meadow or the steppe toward the desert. Each unlike today's kinds.
+  forrest_sand_01: { res: '2k', tex: 1024 },
+  leaves_forest_ground: { res: '2k', tex: 1024 },
+  mud_forest: { res: '2k', tex: 1024 },
+  roots: { res: '2k', tex: 1024 },
+  sparse_grass: { res: '2k', tex: 1024 },
   // the mountain's snow, close to (2026-10-13): smooth powdery snowfield. What lies on the ground far off is still colour alone.
   snow_02: { res: '2k', tex: 1024 },
   // the country's ground by what it is (2026-10-13: "spare no expense with textures so that it doesnt look like shit is
@@ -69,6 +83,10 @@ export const TEXTURES = {
   beige_wall_001: { res: '2k', tex: 1024 },
   concrete_block_wall_02: { res: '2k', tex: 1024 },
   concrete_panels: { res: '2k', tex: 1024 },
+  // (2026-10-16, the new land's log houses: boards painted the blues and greens of these villages, a shed's pale ones)
+  blue_painted_planks: { res: '2k', tex: 1024 },
+  green_rough_planks: { res: '2k', tex: 1024 },
+  distressed_painted_planks: { res: '2k', tex: 1024 },
   // roofs
   corrugated_iron: { res: '2k', tex: 1024 },
   grey_roof_tiles_02: { res: '2k', tex: 1024 },
@@ -533,6 +551,50 @@ export const LOCAL_MODELS = {
     tex: 1024,
     tags: ['prop'],
     changes: 'One piece of the pack, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  // (2026-10-16, the new land's towns: a woodcutter's stack of logs, the picket fences of front gardens, what grows in them)
+  log_pile: {
+    dir: 'log_pile',
+    size: 5.0,
+    tex: 1024,
+    // (stacked a dozen to a sawmill's yard: its 8,400 triangles were too many. Its log ends are blocks as it came: at
+    // 5,600 they looked no rounder than at this.)
+    budget: 2400,
+    tags: ['prop'],
+    changes: 'Brought to 5 m long, its triangles thinned to about 3,300 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  fence_white: {
+    dir: 'fence_pack',
+    only: /^FenceStyle1Long_White_Wash_T_0 /,
+    size: 2.0,
+    tex: 512,
+    tags: ['prop'],
+    changes: 'One panel of the pack (the white pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  fence_grey: {
+    dir: 'fence_pack',
+    only: /^FenceStyle2Long_Gray_T_0 /,
+    size: 2.0,
+    tex: 512,
+    tags: ['prop'],
+    changes: 'One panel of the pack (the grey railed pickets, 2 m), stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  pumpkin: {
+    dir: 'fruit_veg',
+    only: /^Pumpkin_Pumpkin_0 /,
+    size: 0.42,
+    tex: 512,
+    tags: ['prop'],
+    changes: 'One piece of the pack, brought to life size and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  cabbage: {
+    dir: 'fruit_veg',
+    only: /^Cabbage_Cabbage_0 /,
+    size: 0.34,
+    tex: 512,
+    budget: 900,
+    tags: ['prop'],
+    changes: 'One piece of the pack, brought to life size, its triangles thinned to about 900 and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
   shanty_mansion: {
     dir: 'shanty_mansion',
@@ -1088,6 +1150,27 @@ export const MODELS = {
   dead_tree_trunk: { res: '1k', tex: 1024, budget: 8000, far: 800, tags: ['nature'] },
   fern_02: { res: '1k', tex: 1024, budget: 3000, far: 300, tags: ['nature'] },
   dry_branches_medium_01: { res: '1k', tex: 1024, budget: 4000, far: 500, tags: ['nature'] },
+  // the desert and the coast (2026-10-16, not yet placed): Poly Haven's Namaqualand scans, built one at a time by
+  // scripts/haven-models.mjs. A canyon's walls and outcrops (its cave mouths: see below), boulders for its floor and the
+  // beach, a bleached branch for the tide line. Pictures at the 2k they came at (tier-now keeps
+  // them in hi/). The scans came at 15,000 to 194,000 triangles; each is brought down only as far as keeps every point
+  // of it within 2 to 11 mm of where it was, by its size (`--probe`), its relief map carrying the rest; the scan as it
+  // came beside the copy: progress/map3/kit/pair-*.jpg (the rule for dense scans, 2026-10-13).
+  namaqualand_cliff_01: { res: '2k', tex: 2048, budget: 52000, far: 4000, tags: ['nature'] },
+  namaqualand_cliff_02: { res: '2k', tex: 2048, budget: 45000, far: 6000, tags: ['nature'] },
+  namaqualand_boulder_02: { res: '2k', tex: 2048, budget: 34000, far: 2500, tags: ['nature'] },
+  namaqualand_boulder_03: { res: '2k', tex: 2048, budget: 30000, far: 2500, tags: ['nature'] },
+  namaqualand_boulder_04: { res: '2k', tex: 2048, budget: 44000, far: 2500, tags: ['nature'] },
+  namaqualand_boulder_05: { res: '2k', tex: 2048, budget: 20000, far: 1200, tags: ['nature'] },
+  dead_quiver_branch_01: { res: '2k', tex: 2048, budget: 9800, far: 500, tags: ['nature'] },
+  // green woods and meadows (2026-10-16, the owner: "desert is ugly the grass is prettier we can make new forests and
+  // biomes with the textures we get from that website"): a mossy stump, a fallen trunk, a mound of roots for an old wood;
+  // and a cliff face ten metres high for the canyon's cave mouths and walls. Budgets as above. (Saplings, bushes and
+  // meadow flowers were tried and taken out again, the owner: "i dont think the plants will give us much to work with in game".)
+  tree_stump_02: { res: '2k', tex: 2048, budget: 19000, far: 1500, tags: ['nature'] },
+  dead_tree_trunk_02: { res: '2k', tex: 2048, budget: 16000, far: 1200, tags: ['nature'] },
+  root_cluster_01: { res: '2k', tex: 2048, budget: 40000, far: 3000, tags: ['nature'] },
+  mountainside: { res: '2k', tex: 2048, budget: 46000, far: 5000, tags: ['nature'] },
 };
 
 /**
@@ -1128,4 +1211,36 @@ export const HAVEN_KITS = {
   },
   rock_face_01: { src: 'rock_face_01', name: (n) => n, mat: (n) => n, hi: { rock_face_01: [4096, 2048, 2048] }, far: { ratio: 0.125, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
   rock_face_02: { src: 'rock_face_02', name: (n) => n, mat: (n) => n, hi: { rock_face_02: [4096, 2048, 2048] }, far: { ratio: 0.1, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+  // (2026-10-16, the new land's towns: brick works and plaster flats dressed over the game's own buildings. Their
+  // pictures come at 2k, so the world copy is the one drawn close to. Their flat pieces came finely cut up, to the
+  // edges: thinned with their edges free, as a straight edge loses none of its line when its middle points go.)
+  factory_kit: {
+    src: 'modular_factory_facade',
+    name: (n) => n,
+    mat: (n) => n.replace('modular_factory_facade_', 'factory_'),
+    hi: null,
+    world: { ratio: 0.05, error: 0.003, open: true },
+    far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
+  flats_kit: {
+    src: 'modular_urban_apartments_facade',
+    name: (n) => n,
+    mat: (n) => n.replace('modular_urban_apartments_facade_', 'flats_'),
+    hi: null,
+    world: { ratio: 0.05, error: 0.003, open: true },
+    far: { ratio: 0.03, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
+  // (the fishing village's piers: sections on poles, a gateway, loose poles, a landing of planks. Each section came at
+  // twelve to twenty-three thousand triangles of bevelled planks.)
+  pier_kit: {
+    src: 'modular_wooden_pier',
+    name: (n) => n.replace('modular_wooden_pier_', 'pier_'),
+    mat: (n) => n.replace('modular_wooden_pier_', 'pier_'),
+    hi: null,
+    world: { ratio: 0.15, error: 0.004, open: true },
+    far: { ratio: 0.05, error: 0.03, open: true, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
 };

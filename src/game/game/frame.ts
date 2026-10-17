@@ -410,6 +410,7 @@ export const frameMethods = {
     this.horde.update(dt, now, cam.position);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);
+      rp.avatar.veil(this.s.buildings.hides(cam.position, rp.pos));
       if (rp.bleeding && rp.alive && (rp.dripT -= dt) <= 0) {
         rp.dripT = 0.3 + Math.random() * 0.35;
         if (rp.pos.distanceToSquared(cam.position) < 90 * 90) this.effects.drip(_drip.set(rp.pos.x, rp.pos.y + (rp.crouched ? 0.55 : 0.95), rp.pos.z));

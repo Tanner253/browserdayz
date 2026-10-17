@@ -523,6 +523,17 @@ export class Effects {
     if (decal && surface !== 'foliage' && surface !== 'glass') this.decal(point, n, HOLE_OF[surface] ?? 'masonry', attachTo);
   }
 
+  /** A foot coming down in water `depth` deep, the water's surface at `at`: drops thrown up and a ring of spray. */
+  splash(at: THREE.Vector3, depth: number) {
+    const k = Math.min(1, 0.4 + depth), rand = () => (Math.random() - 0.5) * 2;
+    for (let i = 0; i < 8; i++) {
+      this.spawn({ p: at.clone(), v: new THREE.Vector3(rand() * 0.9, 1.4 + Math.random() * 1.6 * k, rand() * 0.9), max: 0.35 + Math.random() * 0.25, size: 0.018, grow: 0, color: new THREE.Color(0.75, 0.8, 0.82), alpha: 0.9, gravity: 9.8, drag: 0.3 });
+    }
+    for (let i = 0; i < 3; i++) {
+      this.spawn({ p: at.clone(), v: new THREE.Vector3(rand() * 0.6, 0.25, rand() * 0.6), max: 0.5 + Math.random() * 0.3, size: 0.12 * k, grow: 0.9, color: new THREE.Color(0.7, 0.75, 0.78), alpha: 0.35, gravity: 0, drag: 3 });
+    }
+  }
+
   /**
    * A body was hit. A puff of red at the wound, drops thrown on through with the bullet and
    * a few back toward the shooter, and whatever was behind (and the ground underneath) spattered.
