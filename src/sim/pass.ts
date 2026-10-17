@@ -136,6 +136,7 @@ export const CAVES: Cave[] = [
       { s: 150, t: mouthT(0, -1), y: 0, w: 4, h: 3.6 },
       { s: 151, t: -31, y: 0.3, w: 4.5, h: 4 },
       { s: 172, t: -34, y: 7.6, w: 4, h: 3.6 },
+      { s: 179, t: -32.5, y: 8, w: 4, h: 3.6 },
       { s: 179, t: mouthT(1, -1), y: 8, w: 4, h: 3.6 },
     ],
     mouths: ['first', 'last'],
@@ -159,7 +160,10 @@ export const CAVES: Cave[] = [
     nodes: [
       { s: 92, t: mouthT(1, 1), y: 8, w: 4, h: 3.6 },
       { s: 92, t: 34, y: 8, w: 4.5, h: 4 },
-      { s: 116, t: 41, y: 17.5, w: 4, h: 3.6 },
+      // (in under the third shelf before it climbs: climbing under the second, its roof would break out onto it)
+      { s: 98, t: 44, y: 8.5, w: 4, h: 3.6 },
+      { s: 116, t: 44, y: 17.5, w: 4, h: 3.6 },
+      { s: 121, t: 44, y: 18, w: 4, h: 3.6 },
       { s: 121, t: mouthT(2, 1), y: 18, w: 4, h: 3.6 },
     ],
     mouths: ['first', 'last'],
@@ -170,7 +174,7 @@ export const CAVES: Cave[] = [
     what: 'from the third shelf of the south wall through the ridge to its west face over the desert: the way round the pass',
     nodes: [
       { s: 200, t: -(E[2].back - 0.2), y: 30, w: 3.6, h: 3.4 },
-      { s: 204, t: -57, y: 30, w: 4, h: 3.6 },
+      { s: 200, t: -57, y: 30, w: 4, h: 3.6 },
       { s: 260, t: -64, y: 28, w: 3.6, h: 3.4 },
       { s: 300, t: -66, y: 27, w: 10, h: 6 },
       { s: 350, t: -70, y: 24.5, w: 3.6, h: 3.4 },
@@ -206,6 +210,11 @@ export interface Gallery {
   wb: number;
   ha: number;
   hb: number;
+  /** whether its first or last end is a cave's mouth */
+  aMouth: boolean;
+  bMouth: boolean;
+  /** how much rock there is over its roof: the least, along it and across all its width, under the plan's terraces */
+  cover: number;
 }
 
 /** The galleries of every cave, in the world. */
@@ -214,7 +223,16 @@ export function galleries(p: Pass): Gallery[] {
   CAVES.forEach((c, ci) => {
     for (let k = 0; k + 1 < c.nodes.length; k++) {
       const n0 = c.nodes[k], n1 = c.nodes[k + 1];
-      out.push({ cave: ci, a: passWorld(p, n0.s, n0.t, n0.y), b: passWorld(p, n1.s, n1.t, n1.y), wa: n0.w, wb: n1.w, ha: n0.h, hb: n1.h });
+      // (the rock over it, across all its width and a metre past, from a few metres in from a mouth: what is over a
+      // mouth is the face it is in)
+      let cover = Infinity;
+      const run = Math.hypot(n1.s - n0.s, n1.t - n0.t), side = (n1.s - n0.s) / run;
+      for (let i = 0; i <= 16; i++) {
+        const q = i / 16, t = n0.t + (n1.t - n0.t) * q, y = n0.y + (n1.y - n0.y) * q, w = n0.w + (n1.w - n0.w) * q, h = n0.h + (n1.h - n0.h) * q;
+        if ((k === 0 && c.mouths.includes('first') && q * run < 4) || (k + 2 === c.nodes.length && c.mouths.includes('last') && (1 - q) * run < 4)) continue;
+        for (const across of [-1, 0, 1]) cover = Math.min(cover, passProfile(t + across * side * (w / 2 + 1)) - y - h);
+      }
+      out.push({ cave: ci, a: passWorld(p, n0.s, n0.t, n0.y), b: passWorld(p, n1.s, n1.t, n1.y), wa: n0.w, wb: n1.w, ha: n0.h, hb: n1.h, aMouth: k === 0 && c.mouths.includes('first'), bMouth: k + 2 === c.nodes.length && c.mouths.includes('last'), cover });
     }
   });
   return out;
@@ -261,63 +279,11 @@ export function caveDark(p: Pass, x: number, y: number, z: number, gs?: Gallery[
   return t * t * (3 - 2 * t);
 }
 
-/** A box that stops a body and a shot: its middle, its half sizes, its turn about the upright. */
-export interface CaveBox {
-  c: V3;
-  h: V3;
-  rot: number;
-  /** its tilt about its own across, radians (a gallery that climbs) */
-  pitch?: number;
-}
-
-/**
- * What stops a body in the caves: each gallery's floor and ceiling (tilted with it where it climbs) and its two walls;
- * and at every bend a ring of walls round the node, left open toward the galleries that meet there (a wall straight
- * across where a gallery would have gone on).
- */
-export function caveSolids(p: Pass): CaveBox[] {
-  const out: CaveBox[] = [], T = 0.6;
-  const gs = galleries(p);
-  for (const g of gs) {
-    const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], run = Math.hypot(ex, ez), rise = g.b[1] - g.a[1];
-    const rot = Math.atan2(ex, ez), pitch = -Math.atan2(rise, run), len = Math.hypot(run, rise), w = Math.max(g.wa, g.wb), h = Math.min(g.ha, g.hb);
-    const mid: V3 = [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2, (g.a[2] + g.b[2]) / 2];
-    const side: V2 = [ez / run, -ex / run];
-    out.push({ c: [mid[0], mid[1] - T, mid[2]], h: [w / 2 + T, T, len / 2], rot, pitch });
-    out.push({ c: [mid[0], mid[1] + h + T, mid[2]], h: [w / 2 + T, T, len / 2], rot, pitch });
-    for (const k of [-1, 1]) {
-      const off = (Math.min(g.wa, g.wb) / 2 + T) * k;
-      out.push({ c: [mid[0] + side[0] * off, mid[1] + h / 2 + 0.2, mid[2] + side[1] * off], h: [T, h / 2 + 0.8, len / 2], rot, pitch });
-    }
-  }
-  // the bends: a ring of eight walls round each node, open toward its galleries (and at a mouth toward the outside)
-  CAVES.forEach((c, ci) => c.nodes.forEach((n, k) => {
-    const here = passWorld(p, n.s, n.t, n.y), ways: number[] = [];
-    for (const j of [k - 1, k + 1]) if (j >= 0 && j < c.nodes.length) {
-      const q = passWorld(p, c.nodes[j].s, c.nodes[j].t, c.nodes[j].y);
-      ways.push(Math.atan2(q[0] - here[0], q[2] - here[2]));
-    }
-    // (a mouth is open outward, away from the gallery it begins)
-    if ((k === 0 && c.mouths.includes('first')) || (k === c.nodes.length - 1 && c.mouths.includes('last'))) ways.push(ways[0] + Math.PI);
-    const r = n.w / 2 + T;
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2, open = ways.some((w) => Math.abs(Math.atan2(Math.sin(a - w), Math.cos(a - w))) < 0.55);
-      if (open) continue;
-      // (a plank along the ring: its length across the way out from the node, its thickness along it)
-      out.push({ c: [here[0] + Math.sin(a) * r, here[1] + n.h / 2, here[2] + Math.cos(a) * r], h: [r * 0.42, n.h / 2 + 0.8, T], rot: a });
-    }
-    out.push({ c: [here[0], here[1] + n.h + T, here[2]], h: [r, T, r], rot: 0 });
-    out.push({ c: [here[0], here[1] - T, here[2]], h: [r, T, r], rot: 0 });
-    void ci;
-  }));
-  return out;
-}
-
 /**
  * Where each mouth opens the ground: a rectangle on the ground's plane (its middle, its turn, its half sizes, as the
  * terrain's wells take them: src/world/terrain.ts openWells), from a metre out on the shelf in front of the riser to
- * the riser's top, a mouth's width across: only the riser's own face is opened (never the shelf above), and a lintel
- * of rock over the cave's roof closes the riser above the opening (see rockPieces). Its floor is the cave's at the mouth.
+ * the riser's top, a mouth's width across: only the riser's own face is opened (never the shelf above); the carved
+ * rock (src/world/cave-carve.ts) is the face there, the opening in it and the shelf in front. Its floor is the cave's.
  */
 export function caveMouths(p: Pass): { cave: number; x: number; z: number; rot: number; hx: number; hz: number; floor: number }[] {
   const out: { cave: number; x: number; z: number; rot: number; hx: number; hz: number; floor: number }[] = [];
@@ -325,8 +291,8 @@ export function caveMouths(p: Pass): { cave: number; x: number; z: number; rot: 
     for (const which of c.mouths) {
       const n = which === 'first' ? c.nodes[0] : c.nodes[c.nodes.length - 1], m = which === 'first' ? c.nodes[1] : c.nodes[c.nodes.length - 2];
       const a = passWorld(p, n.s, n.t, n.y), b = passWorld(p, m.s, m.t, m.y), ux = b[0] - a[0], uz = b[2] - a[2], len = Math.hypot(ux, uz);
-      // (from a metre out in front of it to the riser's top, or three metres in where it is in the ridge's own face)
-      const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), back = 1, deep = k >= 0 ? E[k].top - E[k].foot + 0.3 : 3, cx = a[0] + (ux / len) * ((deep - back) / 2), cz = a[2] + (uz / len) * ((deep - back) / 2);
+      // (from a metre out in front of it to just short of the riser's top, or three metres in where it is in the ridge's own face)
+      const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), back = 1, deep = k >= 0 ? Math.max(0.4, E[k].top - E[k].foot - 0.7) : 3, cx = a[0] + (ux / len) * ((deep - back) / 2), cz = a[2] + (uz / len) * ((deep - back) / 2);
       out.push({ cave: ci, x: cx, z: cz, rot: Math.atan2(ux, uz), hx: n.w / 2 + 0.4, hz: (deep + back) / 2, floor: a[1] });
     }
   });
@@ -371,16 +337,20 @@ export interface RockPiece {
   turn: number;
   tilt: [number, number];
   scale: number;
-  /** a cave's lining (drawn only near), not the pass's walls */
-  inside?: boolean;
 }
 
-/** what dresses a riser and the ridge's face: these pieces, each with its height and length as it came (metres) */
-const FACES: { id: string; tall: number; long: number }[] = [
-  { id: 'namaqualand_cliff_02', tall: 7.2, long: 20.2 },
-  { id: 'mountainside', tall: 10.5, long: 10.2 },
-  { id: 'namaqualand_cliff_01', tall: 5, long: 8.3 },
-];
+/**
+ * The rock pieces as they came, metres: how tall and how long each is, and how far in front of its origin its face
+ * stands (its origin is at its foot; its face looks along its own +z), and how far its rock goes back behind it.
+ * Measured on the models.
+ */
+export const ROCKS: Record<string, { tall: number; long: number; front: number; back: number }> = {
+  namaqualand_cliff_02: { tall: 7.2, long: 20.2, front: 2.2, back: 4.4 },
+  mountainside: { tall: 10.5, long: 10.2, front: 1.5, back: 3.7 },
+  namaqualand_cliff_01: { tall: 5, long: 8.3, front: 0.8, back: 3.6 },
+};
+/** what dresses a riser and the ridge's face */
+const FACES = ['namaqualand_cliff_02', 'mountainside', 'namaqualand_cliff_01'].map((id) => ({ id, ...ROCKS[id] }));
 
 /** A small number that is the same every time for the same place (so the walls are laid the same in every game). */
 const hash = (a: number, b: number) => {
@@ -391,11 +361,25 @@ const hash = (a: number, b: number) => {
 /**
  * The pass's walls, dressed: every riser on both walls faced with cliff pieces along its length, each tall enough to
  * reach the shelf above and stood a little back into it, its face toward the pass, the pieces overlapping; none
- * across a cave's mouth (the mouth has its own). Past the third shelf, the ridge's face, with the biggest. And the
- * rocks lining each cave's galleries (its walls and its roof) and framing each mouth.
+ * across a cave's mouth (the mouth is the carved rock's own: src/world/cave-carve.ts). Past the third shelf, the
+ * ridge's face, with the biggest.
  */
 export function rockPieces(p: Pass): RockPiece[] {
-  const out: RockPiece[] = [], L = passLength(p), mouths = caveMouths(p);
+  const out: RockPiece[] = [], L = passLength(p), mouths = caveMouths(p), gs = galleries(p);
+  // (a piece stood back into the rock is not to break into a cave behind it: its whole body, sampled, kept clear of
+  // every gallery and the metre and more its walls are roughed by)
+  const intoCave = (id: string, at: V3, turn: number, scale: number) => {
+    const r = ROCKS[id], c = Math.cos(turn), sn = Math.sin(turn);
+    for (let i = 0; i <= 4; i++) for (let j = 0; j <= 3; j++) for (let k = 0; k <= 4; k++) {
+      const lx = (i / 4 - 0.5) * r.long * scale, lz = (-r.back + (j / 3) * (r.back + r.front)) * scale, y = at[1] + (k / 4) * r.tall * scale;
+      const x = at[0] + lx * c + lz * sn, z = at[2] - lx * sn + lz * c;
+      for (const g of gs) {
+        const o = onGallery(g, x, z), w = g.wa + (g.wb - g.wa) * o.k, h = g.ha + (g.hb - g.ha) * o.k, floor = g.a[1] + (g.b[1] - g.a[1]) * o.k;
+        if (o.d < w / 2 + 1.6 && y > floor - 0.8 && y < floor + h + 1.8) return true;
+      }
+    }
+    return false;
+  };
   for (const side of [1, -1] as const) {
     E.forEach((e, k) => {
       const tall = e.to - e.from;
@@ -404,9 +388,9 @@ export function rockPieces(p: Pass): RockPiece[] {
         const t = side * (e.foot + (e.top - e.foot) * 0.5 + 1.2);
         const at = passWorld(p, s, t, e.from - 0.4), o = alongPass(p, s);
         if (!mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + f.long * scale * 0.35 && Math.abs(m.floor - at[1] - 0.4) < tall)) {
-          // (its face toward the pass: north wall faces south, south wall faces north)
-          const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? Math.PI / 2 : -Math.PI / 2);
-          out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, 0], scale });
+          // (its face toward the pass: the north wall's faces south, the south wall's north)
+          const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+          if (!intoCave(f.id, at, turn, scale)) out.push({ id: f.id, at, turn, tilt: [(hash(i, s) - 0.5) * 0.08, 0], scale });
         }
         s += f.long * scale * 0.62;
       }
@@ -414,28 +398,11 @@ export function rockPieces(p: Pass): RockPiece[] {
     // the ridge's face over the third shelf: the biggest pieces, twice and three times their size
     const last = E[E.length - 1];
     for (let s = 6; s < L - 6; s += 26) {
-      const at = passWorld(p, s, side * (last.back + 4), last.to - 1), o = alongPass(p, s);
-      out.push({ id: 'mountainside', at, turn: Math.atan2(o.ux, o.uz) + (side > 0 ? Math.PI / 2 : -Math.PI / 2), tilt: [0, 0], scale: 2.4 + hash(s, side) * 0.8 });
-    }
-  }
-  // each mouth's lintel: a cliff across the riser over the cave's roof, up to the shelf above
-  for (const m of mouths) {
-    const c = CAVES[m.cave], n = Math.abs(passWorld(p, c.nodes[0].s, c.nodes[0].t, c.nodes[0].y)[0] - m.x) < 8 ? c.nodes[0] : c.nodes[c.nodes.length - 1];
-    const k = E.findIndex((e) => Math.abs(Math.abs(n.t) - e.foot) < 1), over = k >= 0 ? E[k].to - n.y - n.h : 6;
-    if (over > 0.5) out.push({ id: 'namaqualand_cliff_01', at: [m.x, m.floor + n.h - 0.3, m.z], turn: m.rot + Math.PI, tilt: [0, 0], scale: Math.max(0.6, (over + 0.6) / 5), inside: false });
-  }
-  // the caves: rocks along both walls of every gallery, turned in, and laid over it for its roof
-  for (const g of galleries(p)) {
-    const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], run = Math.hypot(ex, ez), n = Math.max(1, Math.round(run / 5));
-    for (let i = 0; i < n; i++) {
-      const k = (i + 0.5) / n, w = g.wa + (g.wb - g.wa) * k, h = g.ha + (g.hb - g.ha) * k;
-      const c: V3 = [g.a[0] + ex * k, g.a[1] + (g.b[1] - g.a[1]) * k, g.a[2] + ez * k], dir = Math.atan2(ex, ez);
-      for (const side of [-1, 1]) {
-        const sx = (ez / run) * side, sz = (-ex / run) * side, off = w / 2 + 0.9;
-        out.push({ id: h > 5 ? 'mountainside' : 'rock_face_02', at: [c[0] + sx * off, c[1] - 0.6, c[2] + sz * off], turn: dir + (side > 0 ? -Math.PI / 2 : Math.PI / 2), tilt: [0, 0], scale: h > 5 ? h / 9 : Math.max(0.6, h / 4.2), inside: true });
-      }
-      // the roof: a cliff laid upside down over it
-      out.push({ id: 'namaqualand_cliff_01', at: [c[0], c[1] + h + 2.6 * Math.max(0.5, w / 7), c[2]], turn: dir, tilt: [Math.PI, 0], scale: Math.max(0.5, w / 7), inside: true });
+      const at = passWorld(p, s, side * (last.back + 4), last.to - 1), o = alongPass(p, s), scale = 2.4 + hash(s, side) * 0.8;
+      // (none over a mouth in the face: its rock is the carved rock's there)
+      const turn = Math.atan2(o.ux, o.uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      if (mouths.some((m) => Math.hypot(m.x - at[0], m.z - at[2]) < m.hx + ROCKS.mountainside.long * scale * 0.6 && Math.abs(m.floor - at[1]) < 12)) continue;
+      if (!intoCave('mountainside', at, turn, scale)) out.push({ id: 'mountainside', at, turn, tilt: [0, 0], scale });
     }
   }
   return out;

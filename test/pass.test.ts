@@ -4,7 +4,7 @@
 //   npx tsx test/pass.test.ts
 
 import assert from 'node:assert/strict';
-import { CAVES, PASS_SHAPE, caveAt, caveDark, caveLoot, caveMouths, caveSolids, galleries, inMouth, passEdges, passOf, passProfile, passWorld, rockPieces } from '../src/sim/pass';
+import { CAVES, PASS_SHAPE, ROCKS, caveAt, caveDark, caveLoot, caveMouths, galleries, inMouth, passEdges, passOf, passProfile, passWorld, rockPieces } from '../src/sim/pass';
 
 const pass = passOf(() => 40), E = passEdges();
 
@@ -31,12 +31,17 @@ const pass = passOf(() => 40), E = passEdges();
         // (in a riser at the foot of it, its floor the shelf's before it: or, past the last shelf, in the ridge's face)
         const e = E.findIndex((q) => Math.abs(Math.abs(n.t) - q.foot) < 1);
         if (e >= 0) assert.equal(n.y, e === 0 ? 0 : E[e - 1].to, `${c.name}: a mouth on the shelf before its riser`);
+        // (its gallery straight into the riser for its first metres: at a slant its side would graze the face, and break it)
+        const m = c.nodes[k === 0 ? 1 : k - 1];
+        if (e >= 0) assert.ok(Math.abs(m.t - n.t) / Math.hypot(m.t - n.t, m.s - n.s) > 0.95 && Math.abs(m.t - n.t) >= 3, `${c.name}: its mouth meets the riser head on`);
         continue;
       }
       // a node within the wall: the ground over it stands over its roof, with rock between
       const over = passProfile(n.t) - (n.y + n.h);
       assert.ok(over > 1.5, `${c.name}, node ${k}: ${over.toFixed(1)} m of rock over its roof`);
     }
+    // every gallery under the ground across all its width, with rock over its roof (its walls are roughed up to a metre)
+    for (const g of galleries(pass).filter((q) => q.cave === ci)) assert.ok(g.cover > 2, `${c.name}: ${g.cover.toFixed(1)} m of rock over a gallery`);
     for (let k = 0; k + 1 < c.nodes.length; k++) {
       const a = c.nodes[k], b = c.nodes[k + 1], run = Math.hypot(b.s - a.s, b.t - a.t);
       assert.ok(Math.abs(b.y - a.y) / run < 0.62, `${c.name}: a climb of ${((Math.abs(b.y - a.y) / run) * 100).toFixed(0)} in 100`);
@@ -66,15 +71,15 @@ const pass = passOf(() => 40), E = passEdges();
   console.log(`dark: ${caveDark(pass, inHall[0], inHall[1], inHall[2]).toFixed(2)} in the hall, ${caveDark(pass, lip[0], lip[1], lip[2]).toFixed(2)} at its mouth`);
 }
 
-// ---- what stops a body, the loot, the rocks
+// ---- the loot, the rocks on the walls
 {
-  const solids = caveSolids(pass);
-  assert.ok(solids.length > 100 && solids.every((b) => b.c.every(Number.isFinite) && b.h.every((v) => v > 0)), 'solid boxes');
   const loot = caveLoot(pass);
   assert.ok(loot.filter((l) => l.tier === 5).length >= 4 && loot.filter((l) => l.tier === 4).length >= 12, 'loot in the caves and the best on the floor');
   for (const l of loot.filter((q) => q.tier === 4)) assert.ok(caveAt(pass, l.x, l.y + 0.5, l.z), `${l.where}: its loot in the cave`);
   const rocks = rockPieces(pass);
-  assert.ok(rocks.filter((r) => !r.inside).length > 100 && rocks.some((r) => r.inside), 'the walls dressed and the caves lined');
-  console.log(`solids ${solids.length}, loot ${loot.length} (${loot.filter((l) => l.tier === 5).length} of the fifth tier on the floor), rock pieces ${rocks.length} (${rocks.filter((r) => r.inside).length} lining caves)`);
+  assert.ok(rocks.length > 100, 'the walls dressed');
+  // (none in front of a mouth: the carved rock is the face round it)
+  for (const m of caveMouths(pass)) assert.ok(!rocks.some((r) => Math.hypot(r.at[0] - m.x, r.at[2] - m.z) < m.hx + ROCKS[r.id].long * r.scale * 0.35 && Math.abs(r.at[1] - m.floor) < ROCKS[r.id].tall * r.scale), 'a mouth kept clear');
+  console.log(`loot ${loot.length} (${loot.filter((l) => l.tier === 5).length} of the fifth tier on the floor), rock pieces ${rocks.length}`);
 }
 console.log('pass: all good');
