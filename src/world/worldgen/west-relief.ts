@@ -200,9 +200,14 @@ function passKeep(x: number, z: number) {
 }
 /**
  * The least the ground may be cut to over a cave's gallery, standing back from the plan's: three metres of
- * rock over its roof, falling away either side no steeper than a riser (but by a mouth, where the plan's own wall is).
+ * rock over its roof, falling away either side no steeper than a riser. But never by a mouth, where the plan's own
+ * wall is: within 4.5 m of any mouth's middle nothing, and less of it out to 6.5 m (a gallery beside a mouth, not its
+ * own, stood a lip of ground across the sill: coast-kit measured 3.5 m at the climb's upper mouth).
  */
 function overCaves(x: number, z: number) {
+  let near = Infinity;
+  for (const m of mouths) near = Math.min(near, Math.hypot(m.x - x, m.z - z));
+  if (near < 4.5) return -Infinity;
   let need = -Infinity;
   for (const g of caveRuns) {
     const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], l2 = ex * ex + ez * ez || 1, len = Math.sqrt(l2), k = clamp(((x - g.a[0]) * ex + (z - g.a[2]) * ez) / l2, 0, 1);
@@ -210,7 +215,7 @@ function overCaves(x: number, z: number) {
     const d = Math.hypot(x - g.a[0] - ex * k, z - g.a[2] - ez * k), roof = lerp(g.a[1], g.b[1], k) + lerp(g.ha, g.hb, k);
     need = Math.max(need, roof + 3 - Math.max(0, d - lerp(g.wa, g.wb, k) / 2 - 3.5) * WALL.steep);
   }
-  return need;
+  return need - 30 * (1 - smoothstep(4.5, 6.5, near));
 }
 /**
  * One wall's risers at so far along, on a side (1: south, the left going west; -1: north): where each starts to rise

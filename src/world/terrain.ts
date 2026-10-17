@@ -3,8 +3,9 @@ import { caveMouths, inMouth } from '../sim/pass';
 import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { physics } from '../core/physics';
-import { Simplex } from '../core/noise';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
+import { canyonBedsGlsl } from './canyon-beds';
+import { macroTexture } from './macro';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { BELT, FORT_SNOW, RUTS, SNOW_LIFT, snowNet, snowOn, snowPicture, snowThinsGrass, snowUniforms, tellSnow } from './snow';
 import { CELL, SNOW, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, groundField, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
@@ -225,40 +226,6 @@ async function buildArray(urls: string[], srgb: boolean): Promise<THREE.DataArra
     (tex.image as { data: Uint8Array | null }).data = null;
   };
   return tex;
-}
-
-function macroNoiseTexture(): THREE.DataTexture {
-  const S = 256;
-  const n = new Simplex(4242), patch = new Simplex(9117);
-  const data = new Uint8Array(S * S * 4);
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      // tileable via 4D-ish torus mapping in 2D simplex
-      const a = (x / S) * Math.PI * 2;
-      const b = (y / S) * Math.PI * 2;
-      const nx = Math.cos(a) * 2, ny = Math.sin(a) * 2, nz = Math.cos(b) * 2, nw = Math.sin(b) * 2;
-      const v1 = n.fbm(nx + nz * 0.7, ny + nw * 0.7, 4);
-      const v2 = n.fbm(nx * 3 + 11 + nw, ny * 3 - 7 + nz, 4);
-      const v3 = n.fbm(nz * 5 - 3 + nx, nw * 5 + 9 + ny, 3);
-      const i = (y * S + x) * 4;
-      data[i] = Math.round((v1 * 0.5 + 0.5) * 255);
-      data[i + 1] = Math.round((v2 * 0.5 + 0.5) * 255);
-      data[i + 2] = Math.round((v3 * 0.5 + 0.5) * 255);
-      // In the fourth place, a pattern of another kind: slow and smooth, of one size. It is what deals out a ground
-      // picture's shifted copies (see groundTap), and the patches it marks out must be about a picture wide and not
-      // a speckle. (Nothing else reads this place.)
-      const pu = Math.cos(a) * 1.7 + Math.cos(b) * 1.2, pv = Math.sin(a) * 1.7 + Math.sin(b) * 1.2;
-      const deal = (patch.noise(pu, pv) + 0.35 * patch.noise(pu * 2.1 + 5.3, pv * 2.1 - 3.1)) / 1.35;
-      data[i + 3] = Math.round(Math.min(1, Math.max(0, deal * 0.5 + 0.5)) * 255);
-    }
-  }
-  const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.magFilter = THREE.LinearFilter;
-  t.minFilter = THREE.LinearMipmapLinearFilter;
-  t.generateMipmaps = true;
-  t.needsUpdate = true;
-  return t;
 }
 
 /** quads along one side of a ground tile */
@@ -505,7 +472,7 @@ export class Terrain {
     this.grassTex = new THREE.DataTexture(grass, NX, NZ, THREE.RedFormat);
     this.grassTex.magFilter = this.grassTex.minFilter = THREE.LinearFilter;
     this.grassTex.needsUpdate = true;
-    this.macroTex = macroNoiseTexture();
+    this.macroTex = macroTexture();
 
     const t = assets.manifest.textures;
     const tint = [new THREE.Vector3(0.78, 0.96, 0.62), new THREE.Vector3(0.9, 0.92, 0.85), new THREE.Vector3(0.95, 0.97, 0.93), new THREE.Vector3(0.86, 0.84, 0.8)];
@@ -1001,27 +968,7 @@ vec4 snowPic(int k, vec2 uv) {
 
 vec2 tRot(vec2 uv, float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c) * uv; }
 
-// THE CANYON'S BEDS (the owner: "like the grand canyon"; and of the first walls, "does not look natural"): its rock
-// banded by height as sandstone lies, red, rust, buff and chocolate, each bed its own thickness and tone; the beds
-// bowed by the large grain and the small, thicker in one stretch of wall than the next, so that no two cliffs show
-// the same stripes and the rock's picture never reads as a wallpaper's repeat. A tint about 1 on the rock's own colour.
-// The bow is the bowing, which the picture's own layers follow on a face. Fading out far off, where a bed is a pixel.
-vec3 bedTone(float h) {
-  return h < 0.3 ? vec3(1.14, 0.84, 0.72) : (h < 0.55 ? vec3(1.2, 1.0, 0.8) : (h < 0.78 ? vec3(1.16, 1.12, 1.04) : vec3(0.78, 0.66, 0.6)));
-}
-vec3 canyonBeds(vec3 P, out float bow) {
-  // (the noise's slow swell only, read from its coarse copies: its finer octaves bent the rock picture's layers into
-  // wood grain, a metre's bend every few metres)
-  vec4 m1 = textureLod(tMacro, P.xz / 400.0 + 0.17, 4.0);
-  float m2 = textureLod(tMacro, P.zx / 120.0 + 0.53, 3.0).r;
-  bow = (m1.r - 0.5) * 18.0 + (m2 - 0.5) * 3.0 + P.x * 0.015;
-  float thick = 2.6 + 3.6 * m1.g;
-  float t = (P.y + bow) / thick, k = floor(t), f = t - k;
-  vec3 a = bedTone(fract(sin(k * 12.9898) * 43758.5453)), b = bedTone(fract(sin((k + 1.0) * 12.9898) * 43758.5453));
-  // (a bed's foot in the shade of the one over it, where a soft bed is worn back)
-  vec3 c = mix(a, b, smoothstep(0.84, 1.0, f)) * (0.86 + 0.14 * smoothstep(0.0, 0.2, f));
-  return mix(vec3(1.0), c, 1.0 - smoothstep(500.0, 1400.0, length(P - cameraPosition)));
-}
+${canyonBedsGlsl('tMacro')}
 
 // One look at one layer, with its repeat broken. The picture is thought of as laid eight times over, each time
 // shifted by an amount of its own. A slow noise says which two of the eight a place lies between, and so the ground
