@@ -933,6 +933,7 @@ precision highp sampler2DArray;
 #define GROUND_CRAG ${KIND_AT.crag}
 #define GROUND_DUNE ${KIND_AT.dune}
 #define GROUND_CANYON ${KIND_AT.canyon}
+#define GROUND_GRIT ${KIND_AT.grit}
 #define GROUND_CRAG_MOSS ${KIND_NAMES.length}
 uniform sampler2DArray tColour;
 uniform sampler2DArray tRelief;
@@ -1000,6 +1001,28 @@ vec4 snowPic(int k, vec2 uv) {
 
 vec2 tRot(vec2 uv, float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c) * uv; }
 
+// THE CANYON'S BEDS (the owner: "like the grand canyon"; and of the first walls, "does not look natural"): its rock
+// banded by height as sandstone lies, red, rust, buff and chocolate, each bed its own thickness and tone; the beds
+// bowed by the large grain and the small, thicker in one stretch of wall than the next, so that no two cliffs show
+// the same stripes and the rock's picture never reads as a wallpaper's repeat. A tint about 1 on the rock's own colour.
+// The bow is the bowing, which the picture's own layers follow on a face. Fading out far off, where a bed is a pixel.
+vec3 bedTone(float h) {
+  return h < 0.3 ? vec3(1.14, 0.84, 0.72) : (h < 0.55 ? vec3(1.2, 1.0, 0.8) : (h < 0.78 ? vec3(1.16, 1.12, 1.04) : vec3(0.78, 0.66, 0.6)));
+}
+vec3 canyonBeds(vec3 P, out float bow) {
+  // (the noise's slow swell only, read from its coarse copies: its finer octaves bent the rock picture's layers into
+  // wood grain, a metre's bend every few metres)
+  vec4 m1 = textureLod(tMacro, P.xz / 400.0 + 0.17, 4.0);
+  float m2 = textureLod(tMacro, P.zx / 120.0 + 0.53, 3.0).r;
+  bow = (m1.r - 0.5) * 18.0 + (m2 - 0.5) * 3.0 + P.x * 0.015;
+  float thick = 2.6 + 3.6 * m1.g;
+  float t = (P.y + bow) / thick, k = floor(t), f = t - k;
+  vec3 a = bedTone(fract(sin(k * 12.9898) * 43758.5453)), b = bedTone(fract(sin((k + 1.0) * 12.9898) * 43758.5453));
+  // (a bed's foot in the shade of the one over it, where a soft bed is worn back)
+  vec3 c = mix(a, b, smoothstep(0.84, 1.0, f)) * (0.86 + 0.14 * smoothstep(0.0, 0.2, f));
+  return mix(vec3(1.0), c, 1.0 - smoothstep(500.0, 1400.0, length(P - cameraPosition)));
+}
+
 // One look at one layer, with its repeat broken. The picture is thought of as laid eight times over, each time
 // shifted by an amount of its own. A slow noise says which two of the eight a place lies between, and so the ground
 // is cut into patches about a picture wide, no two neighbours shifted alike: nowhere is the picture laid twice running,
@@ -1014,6 +1037,8 @@ void groundTap(int i, vec2 uv, vec2 gx, vec2 gy, bool form, out vec4 colour, out
   float n = floor(l), f = l - n;
   vec2 oa = sin(vec2(3.0, 7.0) * n + layer * 1.7);
   vec2 ob = sin(vec2(3.0, 7.0) * (n + 1.0) + layer * 1.7);
+  // (the canyon's rock is layered: its copies shifted along its beds only, or every seam breaks every bed in a swirl)
+  if (i == GROUND_CANYON) { oa.y = 0.0; ob.y = 0.0; }
   // (how far across the seam this is by the noise alone, -1 to 1: the seam is the middle half of the way from one patch to the next)
   float e = (f - 0.5) * 4.0;
   float t = step(0.0, e);
@@ -1049,6 +1074,8 @@ void groundTap(int i, vec2 uv, vec2 gx, vec2 gy, bool form, out vec4 colour, out
 void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKeep, float farBlend, float farShare, out vec4 colour, out vec3 lean, out float rough) {
   vec4 lay = uLay[i];
   vec3 pw = mod(lay.z, 2.0) > 0.5 ? side : vec3(0.0, 1.0, 0.0);
+  float bow = 0.0;
+  vec3 beds = i == GROUND_CANYON ? canyonBeds(P, bow) : vec3(1.0);
   colour = vec4(0.0);
   lean = vec3(0.0);
   rough = 0.0;
@@ -1061,6 +1088,7 @@ void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKe
     if (p == 0) { uv = P.xz; gx = dx.xz; gy = dy.xz; T = vec3(1.0, 0.0, 0.0); B = vec3(0.0, 0.0, -1.0); }
     else if (p == 1) { uv = vec2(P.z, -P.y); gx = vec2(dx.z, -dx.y); gy = vec2(dy.z, -dy.y); T = vec3(0.0, 0.0, 1.0); B = vec3(0.0, 1.0, 0.0); }
     else { uv = vec2(P.x, -P.y); gx = vec2(dx.x, -dx.y); gy = vec2(dy.x, -dy.y); T = vec3(1.0, 0.0, 0.0); B = vec3(0.0, 1.0, 0.0); }
+    if (p != 0) uv.y -= bow;
     vec4 c = vec4(uMean[i], uFlat[i].y);
     vec3 r = vec3(0.5, 0.5, uFlat[i].x);
     if (nearKeep > 0.0) {
@@ -1072,7 +1100,9 @@ void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKe
     if (farBlend > 0.0) {
       float wide = lay.x * lay.y;
       vec4 fc; vec3 fr;
-      groundTap(i, tRot(uv * wide, 0.9), tRot(gx * wide, 0.9), tRot(gy * wide, 0.9), false, fc, fr);
+      // (turned, but the canyon's rock on a face: its beds turned would run aslant across every riser, in teeth)
+      float turn = i == GROUND_CANYON && p != 0 ? 0.0 : 0.9;
+      groundTap(i, tRot(uv * wide, turn), tRot(gx * wide, turn), tRot(gy * wide, turn), false, fc, fr);
       // (a face from across the valley is its crags: what is laid by the face has the large copy's light and dark drawn out)
       fc.rgb = max(uMean[i] + (fc.rgb - uMean[i]) * (1.0 + 0.8 * step(0.5, mod(lay.z, 2.0))), 0.0);
       c = mix(c, fc, farShare);
@@ -1102,7 +1132,7 @@ void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKe
     lean += (T / max(length(T), 0.001) * n.x + B / max(length(B), 0.001) * n.y) * k;
     rough += r.z * k;
   }
-  colour.rgb *= uTint[i];
+  colour.rgb *= uTint[i] * beds;
 }
 `;
 
@@ -1146,16 +1176,30 @@ kindW[4] = wB.r; kindW[5] = wB.g; kindW[6] = wB.b; kindW[7] = wB.a;
 kindW[8] = wC.r; kindW[9] = wC.g; kindW[10] = wC.b; kindW[11] = wC.a;
 kindW[12] = wD.r; kindW[13] = wD.g; kindW[14] = wD.b; kindW[15] = wD.a;
 kindW[16] = wE.r; kindW[17] = wE.g;
-// (In the desert's canyon country a face is its layered rock, whatever the paint at its foot or its top: the paint is
-// laid on a net of two metres, and a shelf's sand ran up the riser under it in pale teeth. By the pixel's own slope,
-// from about 44 degrees, and only where any of the desert's kinds are: the green land's faces are as they were.)
+// (THE DESERT BY ITS SLOPE: its paint is laid on a net of two metres, and along a shelf of the canyon its sand ran up
+// the riser in pale teeth and its rock out over the shelf. So where any of the desert's kinds are, its rock and scree
+// go by the pixel's own slope: rock from about 40 degrees, scree from about 20, on what is between that and the level (the
+// rounded foot and lip of a riser, the fans under it), and what the net said was rock on level ground scree; the
+// slopes they change at wandering with the large grain, so that no line of paint runs level along a shelf. The green
+// land's faces are as they were.)
 {
   float sandy = 0.0;
   for (int k = GROUND_DUNE; k < GROUND_KINDS; k++) sandy += kindW[k];
-  float sheer = smoothstep(0.72, 0.6, gN.y) * min(1.0, sandy * 4.0);
-  if (sheer > 0.0) {
-    for (int k = 0; k < GROUND_KINDS; k++) kindW[k] *= 1.0 - sheer;
-    kindW[GROUND_CANYON] += sheer;
+  float share = min(1.0, sandy * 4.0);
+  if (share > 0.0) {
+    // (where one gives way to the next drawn by the noise's grain, a metre and more across: the rock picture's own
+    // relief, which drew it when the change was spread wide, repeats every few metres along a wall in teeth. All that
+    // in the canyon country only, where the net laid rock or scree about: level ground and the dunes' sand as they were)
+    float rocky = smoothstep(0.2, 0.6, kindW[GROUND_CANYON] + kindW[GROUND_GRIT]), s0 = 1.0 - gN.y;
+    float steep = s0 + ((macro2.b - 0.5) * 0.34 + (macro.g - 0.5) * 0.14) * smoothstep(0.03, 0.12, s0) * rocky;
+    float rockF = smoothstep(mix(0.28, 0.2, rocky), mix(0.4, 0.28, rocky), steep), screeF = smoothstep(0.04, 0.12, steep) * (1.0 - rockF) * rocky;
+    float wasRock = kindW[GROUND_CANYON] * share * (1.0 - rockF) * rocky;
+    kindW[GROUND_CANYON] -= wasRock;
+    kindW[GROUND_GRIT] += wasRock;
+    float rockW = rockF * share, screeW = screeF * share;
+    for (int k = 0; k < GROUND_KINDS; k++) kindW[k] *= 1.0 - rockW - screeW;
+    kindW[GROUND_CANYON] += rockW;
+    kindW[GROUND_GRIT] += screeW;
   }
 }
 int pick[3];

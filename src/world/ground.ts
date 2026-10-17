@@ -76,8 +76,8 @@ export const KINDS = {
   beach: { tex: 'coast_sand_01', size: 5, tint: [1.08, 1.04, 0.96], sound: 'gravel' },
   wet: { tex: 'damp_beach_sand', size: 2, tint: [1, 1, 1], sound: 'gravel', quiet: true },
   cracked: { tex: 'mud_cracked_dry_riverbed_002', size: 2, tint: [1.05, 1.0, 0.95], sound: 'gravel' },
-  canyon: { tex: 'cliff_side', size: 2.4, tint: [1.05, 0.9, 0.8], sound: 'rock', sided: true, far: 0.09 },
-  grit: { tex: 'sandy_gravel_02', size: 2.5, tint: [1.1, 1.0, 0.9], sound: 'gravel', sided: true, far: 0.13 },
+  canyon: { tex: 'cliff_side', size: 3.4, tint: [1.05, 0.9, 0.8], sound: 'rock', sided: true, far: 0.09 },
+  grit: { tex: 'sandy_gravel_02', size: 2.5, tint: [1.18, 0.94, 0.8], sound: 'gravel', sided: true, far: 0.13 },
 } satisfies Record<string, Kind>;
 
 /**

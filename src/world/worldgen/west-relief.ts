@@ -10,7 +10,7 @@ import { Simplex, clamp, lerp, smoothstep } from '../../core/noise';
 import { catmullRom } from './ground';
 import { CELL, WORLD_SEED } from './places';
 import { PLAN } from './west-plan';
-import { PASS_SHAPE, caveMouths, galleries, passEdges, passProfile, type Pass } from '../../sim/pass';
+import { PASS_SHAPE, caveMouths, galleries, passEdges, type Pass } from '../../sim/pass';
 
 type P = [number, number];
 export interface Net { x0: number; z0: number; nx: number; nz: number }
@@ -147,8 +147,8 @@ export function passFloor(along: number) {
 }
 /**
  * The pass as the coast kit's plan measures it (src/sim/pass.ts, with its caves): its middle line and its floor. Its
- * walls are carved to that plan's terraces (`passProfile`) exactly, for the caves run under them: a cave's mouth opens
- * in a riser, and its galleries keep two metres of rock over them.
+ * walls are carved to that plan's terraces (`passProfile`) by every cave's mouth (which opens in a riser) and stand
+ * back from them elsewhere (`passWall`), its galleries kept under two metres of rock.
  */
 export const passPlan: Pass = { line: passLine.pts, floor: (s: number) => passFloor(s) };
 /**
@@ -173,21 +173,85 @@ export function passHalf(_along: number, _side: number) {
   return PASS_SHAPE.floor;
 }
 /**
- * The pass's ground across it, over its floor at `a` metres out from the floor's edge, on a side (1: south, the left
- * going west; -1: north) and so far along: the plan's terraces (`passProfile`); but where a ramp of ours is
- * (PLAN.pass.ramps, kept clear of the caves' mouths) the riser at that height a slope from the shelf below to the one
- * above. Past the plan's face (its crest) nothing is cut: the ridge's own beds stand there.
+ * THE WALLS AS BUILT (the owner, 2026-10-16, of the first: "i really appreciate the concept but you have to admit this
+ * does not look natural and needs some serious help and smoothing"). The plan's terraces on a 2 m net are a step a
+ * cell wide, its lip and foot a saw along every shelf. So each riser is a ramp no steeper than `steep`, its slope
+ * coming in and going out smoothly over `round` metres at its foot and lip (smooth enough that the net's samples of
+ * it do not zigzag along a wall that runs across them); the risers stand where the plan's do (the coast kit's rock
+ * faces stand on them), a little further back up the wall to leave each shelf a flat between its rounded edges, and
+ * wander across and the shelves up and down along the pass. The floor's edge on the south, where the road runs by
+ * it, only ever back from it. By a cave's mouth (`keep`, 1) the wall is the plan's exactly, for each mouth opens in
+ * the plan's riser and the carved rock round it is cut to that.
  */
-export function passRise(a: number, side: number, along: number): number {
-  if (a <= 0) return 0;
-  const t = PASS_SHAPE.floor + a, E = passEdges();
-  for (let k = 0; k < E.length; k++) {
-    const e = E[k];
-    if (t < e.foot || t > e.top + 1.5) continue;
-    const ramp = rampsCut.find((r) => r.side === side && r.level === k && along >= r.along[0] - 0.5 && along <= r.along[1] + 0.5);
-    if (ramp) return lerp(e.from, e.to, clamp((along - ramp.along[0]) / (ramp.along[1] - ramp.along[0]), 0, 1));
+const WALL = { round: 4.4, steep: 3, back: [0, 1.2, 2.2, 2.2], roadSide: 19.5, wander: 1.3, lift: 0.6, tread: 3.5 };
+/** the rise under a slope coming in as smootherstep does, from 0 to 1 over u from 0 to 1 (and 1 on past it) */
+const easedRise = (u: number) => (u <= 0 ? 0 : u >= 1 ? u - 0.5 : u * u * u * u * (u * (u - 3) + 2.5));
+/** the rise of a ramp of run `r` whose slope comes in and goes out over `b`, 0 to 1, at `x` metres from where it starts (it is up at r + b) */
+function rounded(x: number, r: number, b: number) {
+  if (x <= 0) return 0;
+  if (x >= r + b) return 1;
+  return (b * (easedRise(x / b) - easedRise((x - r) / b))) / r;
+}
+/** how near the plan the walls are at a point (1 by a cave's mouth, nothing 11 m off) */
+function passKeep(x: number, z: number) {
+  let d = Infinity;
+  for (const m of mouths) d = Math.min(d, Math.hypot(m.x - x, m.z - z));
+  return 1 - smoothstep(5, 11, d);
+}
+/**
+ * The least the ground may be cut to over a cave's gallery, standing back from the plan's: three metres of
+ * rock over its roof, falling away either side no steeper than a riser (but by a mouth, where the plan's own wall is).
+ */
+function overCaves(x: number, z: number) {
+  let need = -Infinity;
+  for (const g of caveRuns) {
+    const ex = g.b[0] - g.a[0], ez = g.b[2] - g.a[2], l2 = ex * ex + ez * ez || 1, len = Math.sqrt(l2), k = clamp(((x - g.a[0]) * ex + (z - g.a[2]) * ez) / l2, 0, 1);
+    if ((g.aMouth && k * len < 6) || (g.bMouth && (1 - k) * len < 6)) continue;
+    const d = Math.hypot(x - g.a[0] - ex * k, z - g.a[2] - ez * k), roof = lerp(g.a[1], g.b[1], k) + lerp(g.ha, g.hb, k);
+    need = Math.max(need, roof + 3 - Math.max(0, d - lerp(g.wa, g.wb, k) / 2 - 3.5) * WALL.steep);
   }
-  const y = passProfile(t);
+  return need;
+}
+/**
+ * One wall's risers at so far along, on a side (1: south, the left going west; -1: north): where each starts to rise
+ * (metres across from the middle), its run, its rise, and the shelves' heights over the floor; then the face's start.
+ */
+export function passWall(side: number, along: number, keep = 0) {
+  const E = passEdges(), b = lerp(WALL.round, 0.05, keep), out: { start: number; run: number; from: number; to: number }[] = [];
+  const swing = (k: number) => WALL.wander * (0.75 * r2.noise(along / 30, k * 5.1 + side * 2.7) + 0.25 * r3.noise(along / 9, k * 3.3 + side * 1.9));
+  let from = 0, end = -Infinity;
+  for (let k = 0; k < E.length; k++) {
+    const e = E[k], to = lerp(e.to + WALL.lift * r1.noise(along / 46, k * 7.3 + side * 3.1), e.to, keep);
+    const run = lerp((to - from) / WALL.steep, e.top - e.foot, keep);
+    let start = (e.foot + e.top) / 2 + WALL.back[k] + swing(k) - (run + b) / 2;
+    if (k === 0 && side > 0) start = Math.max(start, WALL.roadSide);
+    start = lerp(Math.max(start, end + 0.3), e.foot, keep);
+    out.push({ start, run, from, to });
+    end = start + run + b;
+    from = to;
+  }
+  const last = E[E.length - 1];
+  return { risers: out, round: b, face: lerp(Math.max(last.back + WALL.back[3] + swing(3) - b / 2, end + 0.3), last.back, keep) };
+}
+/**
+ * The pass's ground across it, over its floor at `a` metres out from the floor's edge, on a side and so far along: the
+ * walls as built (`passWall`); where a ramp of ours is (PLAN.pass.ramps, kept clear of the caves' mouths) a riser is
+ * two, a tread between them climbing from the shelf below to the one above. Past the face's crest nothing is cut:
+ * the ridge's own beds stand there.
+ */
+export function passRise(a: number, side: number, along: number, keep = 0): number {
+  // (from the middle out: the lowest riser's rounded foot may begin on the floor)
+  const t = PASS_SHAPE.floor + a, W = passWall(side, along, keep), b = W.round;
+  let y = 0;
+  W.risers.forEach((r, k) => {
+    const rise = r.to - r.from, ramp = rampsCut.find((q) => q.side === side && q.level === k && along >= q.along[0] && along <= q.along[1]);
+    if (!ramp) { y += rise * rounded(t - r.start, r.run, b); return; }
+    // (the tread up the riser: its height along the ramp, its width coming in from nothing at either end)
+    const u = (along - ramp.along[0]) / (ramp.along[1] - ramp.along[0]), lo = rise * u, tw = WALL.tread * smoothstep(0, 0.2, u) * smoothstep(1, 0.8, u);
+    const s0 = r.start - (k ? tw / 2 : 0), rl = (r.run * lo) / rise;
+    y += lo * rounded(t - s0, Math.max(rl, 0.05), b) + (rise - lo) * rounded(t - s0 - rl - tw, Math.max(r.run - rl, 0.05), b);
+  });
+  y += (b * easedRise((t - W.face) / b)) / PASS_SHAPE.face;
   return y >= PASS_SHAPE.crest - 0.01 ? Infinity : y;
 }
 
@@ -307,10 +371,12 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
   // and the ridge's face above them; no deeper than the ground is anywhere (past its mouths it is the valley's floor
   // and the desert's).
   // (out to where the plan's face meets its crest: past that the ridge's own beds)
-  const reach = PASS_SHAPE.floor + passEdges().reduce((w, e) => Math.max(w, e.back), 0) - PASS_SHAPE.floor + (PASS_SHAPE.crest - PASS_SHAPE.shelves[PASS_SHAPE.shelves.length - 1].up) * PASS_SHAPE.face + 6;
-  passLine.each(net, reach, (i, _x, _z, a) => {
-    const side = a.s >= 0 ? 1 : -1, y = passFloor(a.along) + passRise(Math.abs(a.s) - passHalf(a.along, side), side, a.along);
-    if (y < H[i]) H[i] = y;
+  // (out to where the walls' face meets its crest: past that the ridge's own beds)
+  const reach = passEdges().reduce((w, e) => Math.max(w, e.back), 0) + 10 + (PASS_SHAPE.crest - PASS_SHAPE.shelves[PASS_SHAPE.shelves.length - 1].up) * PASS_SHAPE.face + 6;
+  passLine.each(net, reach, (i, x, z, a) => {
+    const side = a.s >= 0 ? 1 : -1, y = passFloor(a.along) + passRise(Math.abs(a.s) - passHalf(a.along, side), side, a.along, passKeep(x, z));
+    const cut = Math.max(y, overCaves(x, z));
+    if (cut < H[i]) H[i] = cut;
   });
   return walls;
 }
