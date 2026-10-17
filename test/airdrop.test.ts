@@ -29,9 +29,9 @@ import WebSocket from 'ws';
 import { BUS, madeUp } from '../src/core/audio';
 import { ORDERS } from '../src/net/orders';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
-import { AIRDROP, EDGE, ROTOR, comesFrom, crateAt, flightTimes, heliAt, landed, lowest, planFlight, restAt, rotorAt, wayOut, ways, type Flight } from '../src/sim/airdrop';
+import { AIRDROP, EDGE, FAR_MOST, ROTOR, comesFrom, crateAt, flightTimes, heliAt, landed, lowest, planFlight, restAt, rotorAt, wayOut, ways, type Flight } from '../src/sim/airdrop';
 import { CALL, pickDropSite } from '../src/sim/drops';
-import { generateWorld, heightAt } from '../src/world/worldgen';
+import { generateWorld, heightAt, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1 } from '../src/world/worldgen';
 
 let n = 0;
 const failed: string[] = [];
@@ -63,7 +63,9 @@ for (let i = 0; i < 300; i++) {
   const at = i % 3 === 2 ? anywhere() : pickDropSite(world, rnd);
   if (at) flights.push(planFlight(ground, at, `drop-${i}`, rnd));
 }
-const onEdge = (x: number, z: number) => Math.abs(Math.max(Math.abs(x), Math.abs(z)) - EDGE) < 0.01 && Math.abs(x) <= EDGE + 0.01 && Math.abs(z) <= EDGE + 0.01;
+// (the map three times over: on the edge of its rectangle, or as far off as a way ever went on the old square)
+const onRim = (x: number, z: number) => Math.min(Math.abs(x - WORLD_X0), Math.abs(x - WORLD_X1), Math.abs(z - WORLD_Z0), Math.abs(z - WORLD_Z1)) < 0.01 && x >= WORLD_X0 - 0.01 && x <= WORLD_X1 + 0.01 && z >= WORLD_Z0 - 0.01 && z <= WORLD_Z1 + 0.01;
+const onEdge = (x: number, z: number, f: Flight, from: 'in' | 'out') => onRim(x, z) || (from === 'in' ? Math.abs(Math.hypot(x - f.x, z - f.z) - FAR_MOST) < 0.05 : Math.hypot(x - f.x, z - f.z) > FAR_MOST * 0.5);
 const spread = (name: string, of: (f: Flight) => number, unit = '') => {
   const c = flights.map(of).sort((a, b) => a - b);
   console.log(`      ${name.padEnd(46)} least ${c[0].toFixed(1)}${unit}, middle ${c[c.length >> 1].toFixed(1)}${unit}, most ${c[c.length - 1].toFixed(1)}${unit}`);
@@ -72,7 +74,7 @@ const spread = (name: string, of: (f: Flight) => number, unit = '') => {
 
 ok(`it starts on the map's edge, a long way from the place (${flights.length} flights over the real map)`, () => {
   for (const f of flights) {
-    assert.ok(onEdge(f.fx, f.fz), `${f.uid} appears at ${f.fx.toFixed(1)}, ${f.fz.toFixed(1)}, which is not on the edge`);
+    assert.ok(onEdge(f.fx, f.fz, f, 'in'), `${f.uid} appears at ${f.fx.toFixed(1)}, ${f.fz.toFixed(1)}, which is not on the edge`);
     const at0 = heliAt(f, 0);
     near(at0.x, f.fx, 1e-6, 'where it is at the start');
     near(at0.z, f.fz, 1e-6, 'where it is at the start');
@@ -154,7 +156,7 @@ ok('it stays a while after the crate has gone, then leaves another way and ends 
     near(T.leave - T.release, AIRDROP.stay, 1e-9, 'how long it stays');
     assert.ok(T.leave > T.land || flightTimes(f).land - T.release > AIRDROP.stay, 'it leaves before the crate is down');
     const out = wayOut(f);
-    assert.ok(onEdge(out.x, out.z), `${f.uid} leaves the map at ${out.x.toFixed(1)}, ${out.z.toFixed(1)}, which is not on the edge`);
+    assert.ok(onEdge(out.x, out.z, f, 'out'), `${f.uid} leaves the map at ${out.x.toFixed(1)}, ${out.z.toFixed(1)}, which is not on the edge`);
     const end = heliAt(f, T.gone);
     assert.equal(end.phase, 'gone');
     near(end.x, out.x, 0.01, 'where it is when it is gone');
