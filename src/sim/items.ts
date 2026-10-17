@@ -409,6 +409,11 @@ const D: ItemDef[] = [
   // (the MP7's own suppressor and sight: parts of its model, and fitting no other gun. The owner: "now that we have
   // enough guns we can start to make attachments weapon exclusive")
   {
+    id: 'elcan', name: 'Elcan Specter', model: 'elcan', w: 2, h: 1, weight: 0.65, category: 'attachment',
+    desc: 'A magnifying combat sight for the AR-15, and no other gun takes it. Four times closer when aimed through; slower to bring up.',
+    attach: { fits: ['ar15'], slot: 'optic', ergo: -4 },
+  },
+  {
     id: 'mp7_suppressor', name: 'MP7 Suppressor', model: 'mp7a1', nodeRe: '^silencer', w: 3, h: 1, weight: 0.35, category: 'attachment',
     desc: 'The MP7A1 suppressor, and no other gun takes it. Much quieter and no flash; a softer kick, and a longer gun to swing.',
     attach: { fits: ['mp7a1'], slot: 'muzzle', ergo: -6, recoil: 0.86, quiet: true },

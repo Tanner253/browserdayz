@@ -135,6 +135,21 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'attachment'],
     changes: 'Only its suppressor is used here: laid along the barrel, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
+  // (the AR-15's own magnified sight, fitted to no other gun: 2026-10-17)
+  elcan: {
+    dir: 'elcan',
+    scale: 1,
+    tex: 2048,
+    tags: ['loot', 'attachment'],
+    changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 2048; geometry compressed.',
+    credit: {
+      name: 'Elcan Specter TR',
+      url: 'https://sketchfab.com/Diamonddogkz',
+      author: 'Diamonddogkz',
+      line: 'Elcan Specter TR by Diamonddogkz (https://sketchfab.com/Diamonddogkz), Sketchfab Standard licence',
+      changes: 'stood on the ground about its own middle, fitted to the AR-15 alone, textures at 2048',
+    },
+  },
   holo_sight: {
     dir: 'eotech_exps3',
     scale: 0.01,

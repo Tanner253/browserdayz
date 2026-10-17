@@ -75,7 +75,7 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the AR-15's own taken off its rifle: where the middle of its top meets the rail under this gun */ grip?: { at: [number, number, number]; size: number }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the AR-15's own taken off its rifle: where the middle of its top meets the rail under this gun */ grip?: { at: [number, number, number]; size: number }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
@@ -92,7 +92,7 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // hand that holds the rifle up has the fore-end itself.)
   ak: { dot: { at: [-0.095, 0.1062, 0.0012], size: 0.85 }, light: { at: [0.27, 0, 0.001], size: 0.85 }, mags: { drum_ak: { model: 'ak_drum', at: [-0.035, 0.0678, 0.0015], size: 1, turn: Math.PI / 2 } }, can: { model: 'rifle_suppressor', size: 1 } },
   // (the long magazine lies across its file, its foot to the back: turned a quarter, to hang along the gun with its foot forward)
-  ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } } },
+  ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 } },
   // (The submachine gun: the sight on the rail along its top. Its light is on the rail down the right side of its
   // fore-end, high and well forward: hung under the fore-end, where it was first put by the figures alone, it was
   // inside the left hand, which holds the gun there. Looked at 2026-10-11.)
@@ -1794,6 +1794,8 @@ export class Weapons {
         dotAt = new THREE.Box3().setFromObject(ret).getCenter(new THREE.Vector3());
       }
     }
+    // (the Elcan stands on its foot on the rail, as the holographic sight does: looked through, it is a scope)
+    if (fit?.elcan) await fitted('elcan', 'elcan', fit.elcan.at, fit.elcan.size, onBody, () => {});
     if (fit?.light) {
       // the underside of the gun where the light goes: the lowest of its body within a finger's width of that place along it
       let under = Infinity;
@@ -2343,7 +2345,7 @@ export class Weapons {
     const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
-    this.scoped = !!m && m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || !!ITEMS[this.currentItem!.id]?.weapon?.ownScope) && this.adsT > 0.9 && this.aiming;
+    this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || !!ITEMS[this.currentItem!.id]?.weapon?.ownScope)) || hasMod(this.currentItem, 'elcan')) && this.adsT > 0.9 && this.aiming;
     this.applyMods();
     this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;

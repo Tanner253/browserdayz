@@ -290,7 +290,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const dir = path.join(SRC, 'models', cfg.dir ?? id);
   const gltfPath = path.join(dir, cfg.file ?? 'scene.gltf');
   if (!(await exists(gltfPath))) throw new Error(`${id}: put its glTF download in assets-src/models/${cfg.dir ?? id}/ (${cfg.file ?? 'scene.gltf'} is not there)`);
-  const credit = { id, ...(await creditOf(dir)), changes: cfg.changes };
+  // (a licence that asks for no credit line, Sketchfab's own: the model's settings give the one it is credited with)
+  const credit = { id, ...(await creditOf(dir)), changes: cfg.changes, ...(cfg.credit ?? {}) };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
   const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, hung: cfg.hung && Object.entries(cfg.hung).map(([name, re]) => `${name}: ${re.source}`).join(), cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, isles: cfg.isles ? JSON.stringify(cfg.isles, (_k, v) => (typeof v === 'function' ? String(v) : v)) : undefined, v: 6 });
