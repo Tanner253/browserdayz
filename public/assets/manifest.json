@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T19:32:34.840Z",
+ "generated": "2026-10-17T20:40:09.393Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -11403,14 +11403,7 @@
     0.208,
     0.0654
    ],
-   "lods": [
-    {
-     "url": "assets/models/sniper50_lod1.glb",
-     "tris": 3217,
-     "far": 2,
-     "of": "464824:1792255922251"
-    }
-   ],
+   "lods": [],
    "holds": {
     "right": [
      -0.08,
@@ -11509,25 +11502,25 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 1097300,
+   "bytes": 1104484,
    "srcTris": 48637,
    "tris": 48637,
    "min": [
     -0.3655,
     -0.1733,
-    -0.1711
+    -0.1699
    ],
    "max": [
     1.103,
     0.1869,
-    0.1738
+    0.1751
    ],
    "lods": [
     {
      "url": "assets/models/barrett_lod1.glb",
-     "tris": 12543,
+     "tris": 12544,
      "far": 2,
-     "of": "1097300:1792240625835"
+     "of": "1104484:1792269616496"
     }
    ],
    "holds": {
@@ -11543,7 +11536,7 @@
     ]
    },
    "hi": "assets/models/hi/barrett.glb",
-   "hiBytes": 2624132,
+   "hiBytes": 2631320,
    "hiCard": 320
   },
   "vssk": {

@@ -227,6 +227,8 @@ interface VmModel {
    * and `muzzle`), what of the pack moves with each hand as it fires, and how long since each fired.
    */
   twin?: { flash: MuzzleFlash; muzzle: THREE.Vector3; roots: { L: string[]; R: string[] }; shotT: { L: number; R: number } };
+  /** a bipod's legs in the hands, each on its hinge (see `hinged`), and how far down they are, 0 folded to 1 standing */
+  bipod?: { hinges: THREE.Object3D[]; t: number };
   /** the attachment that is its optic: with it on, `ads` is where the eye goes; without, `adsIron` */
   optic?: string;
   /** the front of its weapon light, in the body's space (the beam starts there) */
@@ -807,6 +809,36 @@ const OWN_RETICLE: Record<string, string> = { sniper50: 'mildot', barrett: 'mild
 const ZOOMS: Record<string, [number, number]> = { vssk: [2, 6], elcan: [2, 6], sniper50: [4, 12], barrett: [4, 12] };
 /** scopes with a laser rangefinder: the range to what is under the cross, read out under it (the owner: "the scope barrett and the scope sniper50 we need to add a ranegfinder on") */
 const RANGED = new Set(['barrett', 'sniper50']);
+/**
+ * A bipod's leg put on a hinge of its own at the top of it, which turns it from standing down (as it came) to lying
+ * folded along under the barrel, its foot toward the muzzle (`userData.fold`, the hinge's turn folded). The hinge is
+ * the middle of its points at its top, its foot the middle of those at its bottom.
+ */
+function hinged(leg: THREE.Mesh): THREE.Object3D {
+  const P = leg.geometry.getAttribute('position');
+  leg.geometry.computeBoundingBox();
+  const b = leg.geometry.boundingBox!, top = new THREE.Vector3(), foot = new THREE.Vector3(), v = new THREE.Vector3();
+  let nt = 0, nf = 0;
+  for (let i = 0; i < P.count; i++) {
+    v.fromBufferAttribute(P, i);
+    if (v.y > b.max.y - 0.012) (top.add(v), nt++);
+    if (v.y < b.min.y + 0.012) (foot.add(v), nf++);
+  }
+  top.divideScalar(Math.max(1, nt)).applyMatrix4(leg.matrix);
+  foot.divideScalar(Math.max(1, nf)).applyMatrix4(leg.matrix);
+  const hinge = new THREE.Group();
+  hinge.name = `${leg.name}_hinge`;
+  hinge.position.copy(top);
+  leg.parent!.add(hinge);
+  hinge.updateMatrixWorld(true);
+  hinge.attach(leg);
+  // (folded: the leg, from its hinge to its foot, turned onto the gun's own line toward the muzzle, a little under it)
+  hinge.userData.fold = new THREE.Quaternion().setFromUnitVectors(foot.sub(top).normalize(), new THREE.Vector3(1, -0.08, 0).normalize());
+  return hinge;
+}
+const UNFOLDED = new THREE.Quaternion();
+/** the guns whose bipod is let down and folded on the fire-mode key, theirs being one mode (the owner, 2026-10-17: "for the barrett .50 cal add a button to toggle the bipod, its cool and it should be animated") */
+const BIPODS = new Set(['barrett']);
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
 const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007], db12: [0.17, -0.041] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
@@ -1378,7 +1410,7 @@ export class Weapons {
     // on its joints as the AK's is, the pack's own drawing of it put away.
     this.models.set('sniper50', await this.packGun({ pack: 'sniper50', item: 'sniper50', gun: 'sniper50', kind: 'rifle', hands: true, hip: HELD.sniper50, flashSize: 0.4, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', boltrear: 'boltback', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'bullet' } }));
     // (the Barrett and the VSSK came with no movements: held in the .50's, on its pieces' nodes; their own bolts stand still, they load themselves)
-    this.models.set('barrett', await this.packGun({ pack: 'sniper50', item: 'barrett', gun: 'barrett', kind: 'rifle', hands: true, hip: HELD.barrett, flashSize: 0.45, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bolt: 'base', trigger: 'trigger' } }));
+    this.models.set('barrett', await this.packGun({ pack: 'sniper50', item: 'barrett', gun: 'barrett', kind: 'rifle', hands: true, hip: HELD.barrett, flashSize: 0.45, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bolt: 'base', trigger: 'trigger', bipodR: 'base', bipodL: 'base' } }));
     // (squared to the eye when aimed, its sight's tube along the eye's line: held as the pack holds its own rifle, the
     // tube looked down at a slant, its far end low in its window)
     this.models.set('m32', await this.packGun({ pack: 'sniper50', item: 'm32', gun: 'm32', kind: 'rifle', hands: true, hip: HELD.m32, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: { base: 'base', cylinder: 'base', sight: 'base', trigger: 'trigger' } }));
@@ -1830,6 +1862,7 @@ export class Weapons {
     /** the gun's own pieces as they are in the hands: by the name each has in its own file */
     const hung = new Map<string, THREE.Object3D>();
     const twinHung = new Map<string, THREE.Object3D>();
+    const hinges: THREE.Object3D[] = [];
     if (o.gun) {
       rig.strip(o.strip ?? ['base', 'slide', 'mag', 'hammer', 'trigger', 'stopper', 'shell_1']);
       for (const [piece, on] of Object.entries(o.ride ?? { base: 'base', slide: 'slide', mag: 'mag' })) {
@@ -1843,6 +1876,17 @@ export class Weapons {
         // (and a piece that comes off when something goes on in its place)
         const off = Object.keys(hides).find((m) => hides[m].includes(piece));
         if (off) shown.push([g, `!${off}`]);
+      }
+      // (a bipod's legs, each on its hinge, in the hands and on the copy others see; folded as the gun is first held)
+      if (BIPODS.has(o.item)) {
+        for (const leg of ['bipodR', 'bipodL']) {
+          for (const c of [...(hung.get(leg)?.children ?? [])]) if ((c as THREE.Mesh).isMesh) hinges.push(hinged(c as THREE.Mesh));
+          for (const c of [...world.children]) if (c.name === leg && (c as THREE.Mesh).isMesh) {
+            const h = hinged(c as THREE.Mesh);
+            h.quaternion.copy(h.userData.fold);
+          }
+        }
+        for (const h of hinges) h.quaternion.copy(h.userData.fold);
       }
       // A sight looked through whose glass is a piece of its own, painted dark (the M32's): in the hands the glass is
       // not there, and the eye sees through the sight to its mark (the owner, 2026-10-17, of our scope's picture put
@@ -2169,6 +2213,7 @@ export class Weapons {
     }
     const m: VmModel = {
       root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown, marks,
+      bipod: hinges.length ? { hinges, t: 0 } : undefined,
       hammer: HAMMER[o.item] && hung.has('hammer') ? { piece: hung.get('hammer')!, at: new THREE.Vector3(HAMMER[o.item].at[0], HAMMER[o.item].at[1], 0).add(nudge), down: HAMMER[o.item].down } : undefined,
       scope: rig.node('scope') ?? undefined,
       wrap: rig.node('cheekrest') ?? undefined,
@@ -2550,6 +2595,21 @@ export class Weapons {
 
   private selectorT = 0;
 
+  /** which guns of a bipod have it let down, by the item (folded when not said) */
+  private bipodDown = new Map<string, boolean>();
+
+  /** a bipod let down or folded (the fire-mode key, on a gun with one mode): two clicks of its legs locking */
+  toggleBipod(item: ItemInstance) {
+    this.bipodDown.set(item.uid, !this.bipodDown.get(item.uid));
+    audio.click(1900, 0.4, 0.02);
+    audio.click(1300, 0.35, 0.03, 0.12);
+  }
+
+  /** whether the gun in the hands has its bipod down */
+  bipodIsDown(item: ItemInstance | null): boolean {
+    return !!item && !!this.bipodDown.get(item.uid);
+  }
+
   /**
    * The sights set for a longer range or a shorter (Page Up, Page Down, as it is done in DayZ): a click of the
    * drum, and the barrel points that much higher for the round to come down onto the mark at that distance. A
@@ -2601,7 +2661,10 @@ export class Weapons {
         input.wheel = 0;
       }
       if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);
-      if (input.pressed('KeyB') && this.currentItem) this.toggleMode(this.currentItem);
+      if (input.pressed('KeyB') && this.currentItem) {
+        if (BIPODS.has(this.currentItem.id)) this.toggleBipod(this.currentItem);
+        else this.toggleMode(this.currentItem);
+      }
       if (this.currentItem && (input.pressed('PageUp') || input.pressed('PageDown'))) this.setZero(this.currentItem, input.pressed('PageUp') ? 1 : -1);
     }
 
@@ -2630,6 +2693,13 @@ export class Weapons {
       this.range = hit ? hit.toi : null;
     }
     this.applyMods();
+    // (a bipod's legs swing down or up over 0.45 s, eased at both ends)
+    if (m?.bipod) {
+      const want = this.bipodDown.get(this.currentItem?.uid ?? '') ? 1 : 0;
+      m.bipod.t = THREE.MathUtils.clamp(m.bipod.t + Math.sign(want - m.bipod.t) * (1 / 0.45) * Math.min(dt, 0.05), 0, 1);
+      const k = m.bipod.t * m.bipod.t * (3 - 2 * m.bipod.t);
+      for (const h of m.bipod.hinges) h.quaternion.slerpQuaternions(h.userData.fold, UNFOLDED, k);
+    }
     this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;
 

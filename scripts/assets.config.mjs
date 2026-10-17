@@ -1187,7 +1187,9 @@ export const WEAPON_PACKS = {
     rename: { 'Cartridge$': 'round_lying', 'Cartridge \(Fired\)$': 'case_lying', 'NATO Bullet$': 'bullet_lying' },
     skinned: {
       mesh: ['Barrett M82 Gun_Barrett M82 Main Body_0', 'Barrett M82 Gun_Barrett M82 Rail, Grip, Stock and others_0', 'Barrett M82 Gun_Barrett M82 Bolt Carrier_0'],
-      joints: { 'M82 Bolt Carrier_09': 'bolt', 'M82 Trigger_05': 'trigger' },
+      // (and its bipod's two legs, each a piece of its own, to be folded and let down, the owner, 2026-10-17: "for the
+      // barrett .50 cal add a button to toggle the bipod")
+      joints: { 'M82 Bolt Carrier_09': 'bolt', 'M82 Trigger_05': 'trigger', 'M82 Bipod Handle Right_011': 'bipodR', 'M82 Bipod Handle Left_012': 'bipodL' },
       rest: 'base',
     },
     parts: { 'NightForce Scope': 'scope', 'Barrett M82 Magazine': 'mag' },
