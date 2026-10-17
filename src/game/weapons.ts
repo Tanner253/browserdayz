@@ -794,6 +794,8 @@ const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32
  * was the one gun in the right hand and the left hand at its side.
  */
 const AKIMBO_GAP = 0.32;
+/** whose mark is seen through a gun's own scope (see `.ret` in the HUD's scope): a mil-dot crosshair, the PSO-1's chevrons */
+const OWN_RETICLE: Record<string, string> = { sniper50: 'mildot', barrett: 'mildot', vssk: 'pso' };
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
 const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.028] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
@@ -1688,6 +1690,8 @@ export class Weapons {
       const mesh = new THREE.Mesh(p.geometry, packMaterial(p.material));
       mesh.name = piece;
       mesh.castShadow = false;
+      // (the dark glass of a sight looked through: see LENS)
+      if (LENS[o.item] && /lens/i.test((p.material as THREE.Material).name)) mesh.userData.lens = true;
       world.add(mesh);
       p.geometry.computeBoundingBox();
       if (piece === 'base' || piece === 'slide') span.union(p.geometry.boundingBox!);
@@ -1814,6 +1818,12 @@ export class Weapons {
         const off = Object.keys(hides).find((m) => hides[m].includes(piece));
         if (off) shown.push([g, `!${off}`]);
       }
+      // A sight looked through whose glass is a piece of its own, painted dark (the M32's): in the hands the glass is
+      // not there, and the eye sees through the sight to its mark (the owner, 2026-10-17, of our scope's picture put
+      // over its own sight: "guns should use their own attachments"). Others still see the glass.
+      hung.get(LENS[o.item] ?? '')?.traverse((c) => {
+        if (c.userData.lens) c.visible = false;
+      });
       // (the left hand's gun of a pair: the same pieces again, on that gun's own nodes, hung by where the right one's
       // stand: they are the right gun's pieces, put where the left gun is)
       for (const [piece, on] of Object.entries(o.twin?.ride ?? {})) {
@@ -2296,6 +2306,13 @@ export class Weapons {
 
   get busy() {
     return this.action !== null;
+  }
+
+  /** whose mark is in the scope looked through: the Elcan's, the gun's own scope's, or the PU scope's */
+  get reticleKind(): string {
+    const it = this.currentItem;
+    if (!it) return 'pu';
+    return hasMod(it, 'elcan') ? 'elcan' : ITEMS[it.id]?.weapon?.ownScope ? (OWN_RETICLE[it.id] ?? 'pu') : 'pu';
   }
 
   /** the hands are in the middle of something that has to be seen through: a reload, a blow */

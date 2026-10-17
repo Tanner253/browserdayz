@@ -184,7 +184,7 @@ const D: ItemDef[] = [
   {
     id: 'm32', name: 'M32 MGL', model: 'm32', w: 6, h: 3, weight: 5.3, category: 'weapon', slot: 'long',
     desc: 'A six-shot 40 mm grenade launcher, loaded by hand. Its grenades fly in an arc and go off where they strike. For admins.',
-    weapon: { kind: 'rifle', ammo: 'ammo_40mm', capacity: 6, ergo: 35, action: 'self', launches: 'ammo_40mm', fixedSight: true, ownScope: true }, iconYaw: 0,
+    weapon: { kind: 'rifle', ammo: 'ammo_40mm', capacity: 6, ergo: 35, action: 'self', launches: 'ammo_40mm', fixedSight: true }, iconYaw: 0,
   },
   // The Barrett M82 (2026-10-17): the bunker's .50, loading itself, ten rounds, its scope part of it. No movements of
   // its own: held as the .50 sniper rifle is.

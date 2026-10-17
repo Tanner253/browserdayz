@@ -603,6 +603,7 @@ export const frameMethods = {
       arms: this.weapons.armStamina,
       ride: this.garage.ride && !p.dead ? { seats: this.garage.seatList(), kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / hpOf(this.garage.ride.jeep.kind), driver: this.garage.ride.seat === 0 } : null,
       scoped: this.weapons.scoped,
+      reticle: this.weapons.reticleKind,
       sightless: this.weapons.sightless,
       glass: !!this.glass,
       hitMarker: this.weapons.hitMarker,

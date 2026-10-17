@@ -184,6 +184,10 @@ export class HUD {
         <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
           <defs><radialGradient id="sv" r="1"><stop offset="0.82" stop-color="#000" stop-opacity="0"/><stop offset="0.97" stop-color="#000" stop-opacity="0.85"/></radialGradient></defs>
           <circle r="96" fill="url(#sv)"/>
+          <!-- each scope its own mark (the owner, 2026-10-17: "guns should use their own attachments ... the mismatch
+               does not work"): the PU scope's; a mil-dot crosshair for the .50s' own scopes; the PSO-1's chevrons for the
+               VSSK's; the Elcan's, lit in its middle -->
+          <g class="ret ret-pu">
           <g stroke="#0c0b0a" fill="#0c0b0a">
             <rect x="-1.1" y="0" width="2.2" height="96"/>
             <polygon points="-1.6,0 1.6,0 0,-4"/>
@@ -197,6 +201,25 @@ export class HUD {
           </g>
           <g stroke="#0c0b0a" stroke-width="0.8">
             <line x1="-3" y1="12" x2="0" y2="12"/><line x1="-3" y1="24" x2="0" y2="24"/><line x1="-3" y1="38" x2="0" y2="38"/><line x1="-3" y1="54" x2="0" y2="54"/>
+          </g>
+          </g>
+          <g class="ret ret-mildot" fill="#0c0b0a">
+            <rect x="-96" y="-1.5" width="56" height="3"/><rect x="40" y="-1.5" width="56" height="3"/><rect x="-1.5" y="40" width="3" height="56"/><rect x="-1.5" y="-96" width="3" height="56"/>
+            <rect x="-40" y="-0.25" width="80" height="0.5"/><rect x="-0.25" y="-40" width="0.5" height="80"/>
+            <circle cx="-32" cy="0" r="0.9"/><circle cx="0" cy="-32" r="0.9"/><circle cx="-24" cy="0" r="0.9"/><circle cx="0" cy="-24" r="0.9"/><circle cx="-16" cy="0" r="0.9"/><circle cx="0" cy="-16" r="0.9"/><circle cx="-8" cy="0" r="0.9"/><circle cx="0" cy="-8" r="0.9"/><circle cx="8" cy="0" r="0.9"/><circle cx="0" cy="8" r="0.9"/><circle cx="16" cy="0" r="0.9"/><circle cx="0" cy="16" r="0.9"/><circle cx="24" cy="0" r="0.9"/><circle cx="0" cy="24" r="0.9"/><circle cx="32" cy="0" r="0.9"/><circle cx="0" cy="32" r="0.9"/>
+          </g>
+          <g class="ret ret-pso" fill="#0c0b0a">
+            <polygon points="-3.2,5.4 0,0 3.2,5.4 2.2,5.4 0,1.9 -2.2,5.4"/>
+            <polygon points="-2.2,13.8 0,10 2.2,13.8 1.5,13.8 0,11.4 -1.5,13.8"/><polygon points="-2.2,20.8 0,17 2.2,20.8 1.5,20.8 0,18.4 -1.5,20.8"/><polygon points="-2.2,27.8 0,24 2.2,27.8 1.5,27.8 0,25.4 -1.5,27.8"/>
+            <rect x="-36" y="-0.3" width="30" height="0.6"/><rect x="6" y="-0.3" width="30" height="0.6"/><rect x="-36.3" y="-2.2" width="0.6" height="2.2"/><rect x="-30.3" y="-2.2" width="0.6" height="2.2"/><rect x="-24.3" y="-2.2" width="0.6" height="2.2"/><rect x="-18.3" y="-2.2" width="0.6" height="2.2"/><rect x="-12.3" y="-2.2" width="0.6" height="2.2"/><rect x="11.7" y="-2.2" width="0.6" height="2.2"/><rect x="17.7" y="-2.2" width="0.6" height="2.2"/><rect x="23.7" y="-2.2" width="0.6" height="2.2"/><rect x="29.7" y="-2.2" width="0.6" height="2.2"/><rect x="35.7" y="-2.2" width="0.6" height="2.2"/>
+            <path d="M -42 27 Q -27 31 -12 36" fill="none" stroke="#0c0b0a" stroke-width="0.6"/><rect x="-42" y="35.7" width="30" height="0.6"/>
+            <g font-family="monospace" font-size="3.6"><text x="-41" y="25">2</text><text x="-34" y="26.6">4</text><text x="-27" y="28.6">6</text><text x="-20" y="31">8</text><text x="-14" y="33.4">10</text></g>
+          </g>
+          <g class="ret ret-elcan" fill="#0c0b0a">
+            <rect x="-96" y="-1.2" width="66" height="2.4"/><rect x="30" y="-1.2" width="66" height="2.4"/><rect x="-1.2" y="30" width="2.4" height="66"/><rect x="-1.2" y="-96" width="2.4" height="66"/>
+            <rect x="-30" y="-0.3" width="60" height="0.6"/><rect x="-0.3" y="-30" width="0.6" height="60"/>
+            <rect x="-3" y="7.7" width="6" height="0.6"/><rect x="-2.5" y="13.7" width="5" height="0.6"/><rect x="-2" y="19.7" width="4" height="0.6"/><rect x="-1.5" y="25.7" width="3" height="0.6"/>
+            <circle r="1.3" fill="#e0301c"/>
           </g>
         </svg>
       </div>
@@ -1691,6 +1714,8 @@ export class HUD {
     /** sat in a jeep: how fast it is going, and what it has left in the tank and in itself (0..1) */
     ride?: { kmh: number; fuel: number; hp: number; driver: boolean; seats?: { name: string; who: string | null; me: boolean }[] | null } | null;
     scoped: boolean;
+    /** whose mark is in the scope: see `.ret` in the scope's picture */
+    reticle?: string;
     /** aimed with a gun that has no sights: the mark stays on the screen */
     sightless?: boolean;
     hitMarker: number;
@@ -1739,6 +1764,7 @@ export class HUD {
       e.cross.style.setProperty('--gap', gap + 'px');
     }
     this.toggle(e.scope, 'show', s.scoped || s.glass);
+    if (e.scope.dataset.ret !== (s.reticle ?? 'pu')) e.scope.dataset.ret = s.reticle ?? 'pu';
     this.toggle(e.scope, 'glass', s.glass && !s.scoped);
     this.toggle(e.hit, 'show', s.hitMarker > 0);
     this.toggle(e.hit, 'kill', s.kill);

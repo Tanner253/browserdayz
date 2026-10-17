@@ -1923,6 +1923,9 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 
 /* binoculars: the scope's dark surround, without its reticle */
 .hud-scope.glass svg g { display: none; }
+.hud-scope .ret { display: none; }
+.hud-scope[data-ret='pu'] .ret-pu, .hud-scope[data-ret='mildot'] .ret-mildot, .hud-scope[data-ret='pso'] .ret-pso, .hud-scope[data-ret='elcan'] .ret-elcan { display: inline; }
+.hud-scope.glass[data-ret] .ret { display: none; }
 
 /* the wheel (hold T): what to call out, and what to do with the body */
 .hud-wheel {
