@@ -787,6 +787,13 @@ const FORE: Record<string, number | { post: [number, number] }> = {
  */
 const TRIGGER_WRIST = new THREE.Vector3(-0.095, -0.005, 0.028);
 const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
+/**
+ * A pair as everybody else sees it held: the gun twice, side by side this far apart (the gun's own metres, as far as
+ * its pack's two hands are), each in its own fist, held out in front as two cans would be (the owner, 2026-10-17:
+ * "gun in each hand, it would be like both hands are holding a can of soup or something, make it simple"). It
+ * was the one gun in the right hand and the left hand at its side.
+ */
+const AKIMBO_GAP = 0.32;
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
 const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.028] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
@@ -2140,6 +2147,16 @@ export class Weapons {
             left: { pos: PISTOL_HOLD.left.clone().add(SEAT_ON[o.item] ?? NO_SEAT).add(new THREE.Vector3(0, 0, APART_ON[o.item]?.[1] ?? 0)), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: PISTOL_HOLD.curl.left, thumb: 1.2 },
           },
     };
+    // (a pair: each fist round its own gun's grip, the left the right's mirror; see AKIMBO_GAP)
+    if (ITEMS[o.item].weapon?.akimbo && m.grips?.right) {
+      const r = m.grips.right, half = AKIMBO_GAP / 2;
+      m.grips = {
+        right: { ...r, pos: r.pos.clone().setZ(r.pos.z + half) },
+        left: { ...r, pos: r.pos.clone().setZ(2 * mouth.z - r.pos.z - half), fingers: r.fingers.clone().setZ(-r.fingers.z), palm: r.palm.clone().setZ(-r.palm.z) },
+        // (out in front, pointing ahead, not a pistol's low ready with the muzzle at the ground: at the waist, and at the chest aimed)
+        stand: { ready: { p: [0.03, -0.3, -0.42], r: [-0.15, 0, 0] }, aim: { p: [0.03, -0.08, -0.42], r: [0, 0, 0] } },
+      };
+    }
     // (the flash rides on the gun, so it goes where the barrel goes in the kick)
     o.flash.root.position.copy(m.muzzle);
     body.add(o.flash.root);
@@ -2232,7 +2249,18 @@ export class Weapons {
   worldModel(id: string, mods: string[] = []): THREE.Object3D | null {
     const m = this.models.get(id);
     if (!m) return null;
-    if (m.world) return this.dressed(m, id, mods);
+    if (m.world) {
+      const c = this.dressed(m, id, mods);
+      if (ITEMS[id]?.weapon?.akimbo) {
+        const left = c.clone();
+        for (const p of c.children) p.position.z += AKIMBO_GAP / 2;
+        for (const p of [...left.children]) {
+          p.position.z -= AKIMBO_GAP / 2;
+          c.add(p);
+        }
+      }
+      return c;
+    }
     const src = m.body ?? m.root.children[0];
     const wasVisible = [m.scope, m.wrap, m.suppressor, m.mag].map((o) => o?.visible);
     if (m.scope) m.scope.visible = mods.includes('pu_scope') || !!ITEMS[id]?.weapon?.ownScope;
@@ -2453,7 +2481,11 @@ export class Weapons {
     this.hitMarker = Math.max(0, this.hitMarker - dt);
     this.updateBullets(dt);
     this.updateBrass(dt);
-    for (const m of this.models.values()) m.flash.update(dt);
+    // (and a pair's other gun's: it was never let go out, the owner: "the left hand gun does not clean up the fire muzzle")
+    for (const m of this.models.values()) {
+      m.flash.update(dt);
+      m.twin?.flash.update(dt);
+    }
 
     if (enabled && !this.player.dead) {
       // (which thing each number key brings up is the game's to say: the keys are bound to things, see game.ts)

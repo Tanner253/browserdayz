@@ -1199,7 +1199,8 @@ export class Game {
     const obj = this.weapons.worldModel(id, mods);
     const grips = this.weapons.gripsOf(id, mods);
     if (!obj || !grips) return null;
-    if (def?.weapon) return { obj, grips, kind: def.weapon.kind };
+    // (a pair is held out as two pistols are, one in each hand)
+    if (def?.weapon) return { obj, grips, kind: def.weapon.akimbo ? ('pistol' as const) : def.weapon.kind };
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
   };
 
