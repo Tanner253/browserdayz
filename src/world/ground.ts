@@ -13,7 +13,7 @@
 
 import { Simplex } from '../core/noise';
 import { snowNet } from './snow';
-import { CELL, SNOW, WORLD_RES, WORLD_SIZE, type World } from './worldgen';
+import { CELL, SNOW, WORLD_NX as NX, WORLD_NZ as NZ, WORLD_X0 as X0, WORLD_Z0 as Z0, type World } from './worldgen';
 
 /** what a footstep or a bullet is told the ground is (the four the game has sounds for) */
 export type Sound = 'grass' | 'dirt' | 'rock' | 'gravel';
@@ -104,21 +104,20 @@ const smooth = (a: number, b: number, v: number) => {
 
 /** A field of the net evened out over `reach` points either way, twice over (near enough a soft round blur). */
 function evened(field: Float32Array, reach: number): Float32Array {
-  const N = WORLD_RES;
   let cur = field;
   for (let pass = 0; pass < 4; pass++) {
-    const next = new Float32Array(N * N);
-    // (a running sum along each row, then along each column: `step` is one point on along it)
-    const step = pass % 2 === 0 ? 1 : N, row = pass % 2 === 0 ? N : 1;
-    for (let a = 0; a < N; a++) {
+    const next = new Float32Array(NX * NZ);
+    // (a running sum along each row, then along each column: `step` is one point on along it, `len` how many there are)
+    const rows = pass % 2 === 0, step = rows ? 1 : NX, row = rows ? NX : 1, lines = rows ? NZ : NX, len = rows ? NX : NZ;
+    for (let a = 0; a < lines; a++) {
       const o = a * row;
       let sum = 0, count = 0;
-      for (let b = 0; b <= Math.min(reach, N - 1); b++) { sum += cur[o + b * step]; count++; }
-      for (let b = 0; b < N; b++) {
+      for (let b = 0; b <= Math.min(reach, len - 1); b++) { sum += cur[o + b * step]; count++; }
+      for (let b = 0; b < len; b++) {
         next[o + b * step] = sum / count;
         const out = b - reach, come = b + reach + 1;
         if (out >= 0) { sum -= cur[o + out * step]; count--; }
-        if (come < N) { sum += cur[o + come * step]; count++; }
+        if (come < len) { sum += cur[o + come * step]; count++; }
       }
     }
     cur = next;
@@ -130,8 +129,8 @@ function evened(field: Float32Array, reach: number): Float32Array {
 const COARSE = 4;
 /** A slow pattern over the whole net, reckoned at every fourth point each way: `at` reads it anywhere between. */
 function slow(fn: (x: number, z: number) => number) {
-  const M = Math.ceil((WORLD_RES - 1) / COARSE) + 1, half = WORLD_SIZE / 2, data = new Float32Array(M * M);
-  for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) data[j * M + i] = fn(-half + i * COARSE * CELL, -half + j * COARSE * CELL);
+  const M = Math.ceil((NX - 1) / COARSE) + 1, MZ = Math.ceil((NZ - 1) / COARSE) + 1, data = new Float32Array(M * MZ);
+  for (let j = 0; j < MZ; j++) for (let i = 0; i < M; i++) data[j * M + i] = fn(X0 + i * COARSE * CELL, Z0 + j * COARSE * CELL);
   return (ix: number, iz: number) => {
     const i = ix >> 2, j = iz >> 2, fx = (ix & 3) / COARSE, fz = (iz & 3) / COARSE, o = j * M + i;
     const a = data[o], b = data[o + 1] ?? a, c = data[o + M] ?? a, d = data[o + M + 1] ?? a;
@@ -141,9 +140,10 @@ function slow(fn: (x: number, z: number) => number) {
 
 /** The ground of a world, kind by kind. A quarter of a second's reckoning or so, done once when the ground is built. */
 export function layGround(world: World): Ground {
-  const N = WORLD_RES, n = N * N, half = WORLD_SIZE / 2;
+  // (the world's net: `N` the length of a row, west to east; NZ rows, north to south)
+  const N = NX, n = NX * NZ;
   const H = world.heights, S = world.splat;
-  const cell = (x: number) => Math.round((x + half) / CELL);
+  const cellX = (x: number) => Math.round((x - X0) / CELL), cellZ = (z: number) => Math.round((z - Z0) / CELL);
   // (How high a point is reckoned to stand where the kinds of ground go by the snow line: the grass dries toward
   // it, and the moss of a wood's bank gives out under it. Its own height; and where snow lies by place and not by
   // height, about the fort and along its track, as much higher as the snow reckons it: src/world/snow.ts.)
@@ -158,9 +158,9 @@ export function layGround(world: World): Ground {
   for (const t of world.trees) {
     const isPine = t.kind.startsWith('pine'), bush = t.kind.startsWith('bush');
     const R = (bush ? 2.2 : isPine ? 5.2 : 5.6) * t.scale, amount = bush ? 0.5 : 1, field = isPine ? pine : broad;
-    const x0 = Math.max(0, cell(t.x - R)), x1 = Math.min(N - 1, cell(t.x + R)), z0 = Math.max(0, cell(t.z - R)), z1 = Math.min(N - 1, cell(t.z + R));
+    const x0 = Math.max(0, cellX(t.x - R)), x1 = Math.min(N - 1, cellX(t.x + R)), z0 = Math.max(0, cellZ(t.z - R)), z1 = Math.min(NZ - 1, cellZ(t.z + R));
     for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) {
-      const dx = -half + ix * CELL - t.x, dz = -half + iz * CELL - t.z, q = 1 - (dx * dx + dz * dz) / (R * R);
+      const dx = X0 + ix * CELL - t.x, dz = Z0 + iz * CELL - t.z, q = 1 - (dx * dx + dz * dz) / (R * R);
       if (q > 0) field[iz * N + ix] += amount * q * q;
     }
   }
@@ -173,10 +173,10 @@ export function layGround(world: World): Ground {
     const p = r.points, reach = r.width / 2 + 5;
     for (let k = 0; k + 1 < p.length / 3; k++) {
       const ax = p[k * 3], az = p[k * 3 + 2], bx = p[k * 3 + 3], bz = p[k * 3 + 5], ex = bx - ax, ez = bz - az, len2 = ex * ex + ez * ez || 1;
-      const x0 = Math.max(0, cell(Math.min(ax, bx) - reach)), x1 = Math.min(N - 1, cell(Math.max(ax, bx) + reach));
-      const z0 = Math.max(0, cell(Math.min(az, bz) - reach)), z1 = Math.min(N - 1, cell(Math.max(az, bz) + reach));
+      const x0 = Math.max(0, cellX(Math.min(ax, bx) - reach)), x1 = Math.min(N - 1, cellX(Math.max(ax, bx) + reach));
+      const z0 = Math.max(0, cellZ(Math.min(az, bz) - reach)), z1 = Math.min(NZ - 1, cellZ(Math.max(az, bz) + reach));
       for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) {
-        const x = -half + ix * CELL, z = -half + iz * CELL, t = Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / len2));
+        const x = X0 + ix * CELL, z = Z0 + iz * CELL, t = Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / len2));
         const qx = x - ax - ex * t, qz = z - az - ez * t, d = Math.sqrt(qx * qx + qz * qz) - r.width / 2;
         if (d < road[iz * N + ix]) road[iz * N + ix] = d;
       }
@@ -192,7 +192,7 @@ export function layGround(world: World): Ground {
   // in the open it is bare face. What comes down off a bare face lies under it (`nearFace`), and nowhere else is
   // there scree; the foot of a mossy bank (`nearCrag`) is dark and damp.
   const mossyAt = new Float32Array(n), faces = new Float32Array(n), crags = new Float32Array(n);
-  for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
+  for (let iz = 1; iz < NZ - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
     const i = iz * N + ix, gx = (H[i + 1] - H[i - 1]) / (2 * CELL), gz = (H[i + N] - H[i - N]) / (2 * CELL), slope = Math.sqrt(gx * gx + gz * gz);
     const shade = Math.min(1, Math.max(0, (gx * sunX + gz * sunZ) * 2.2)), wooded = smooth(0.04, 0.25, pineWood[i] + broadWood[i]);
     const m = Math.min(1, Math.max(wooded, shade * 0.8)) * (1 - smooth(SNOW.from - 70, SNOW.from - 25, toSnow(i)));
@@ -209,13 +209,13 @@ export function layGround(world: World): Ground {
   const patch = slow((x, z) => n3.noise(x * 0.021, z * 0.021) * 0.5 + 0.5);
   const weights = Array.from({ length: Math.ceil(KIND_NAMES.length / 4) }, () => new Uint8Array(n * 4)), top = new Uint8Array(n);
   const K = KIND_AT, w = new Float32Array(KIND_NAMES.length);
-  for (let iz = 0; iz < N; iz++) {
+  for (let iz = 0; iz < NZ; iz++) {
     for (let ix = 0; ix < N; ix++) {
-      const i = iz * N + ix, x = -half + ix * CELL, z = -half + iz * CELL;
+      const i = iz * N + ix, x = X0 + ix * CELL, z = Z0 + iz * CELL;
       const g = S[i * 4] / 255, f = S[i * 4 + 1] / 255, r = S[i * 4 + 2] / 255, v = S[i * 4 + 3] / 255;
       const h = H[i];
       const gx = (H[iz * N + Math.min(ix + 1, N - 1)] - H[iz * N + Math.max(ix - 1, 0)]) / (2 * CELL);
-      const gz = (H[Math.min(iz + 1, N - 1) * N + ix] - H[Math.max(iz - 1, 0) * N + ix]) / (2 * CELL);
+      const gz = (H[Math.min(iz + 1, NZ - 1) * N + ix] - H[Math.max(iz - 1, 0) * N + ix]) / (2 * CELL);
       const slope = Math.sqrt(gx * gx + gz * gz);
       // (a hollow or a knoll is a couple of metres under or over the mean about it)
       const hollow = Math.min(1, Math.max(0, (mean[i] - h) / 2.2)), knoll = Math.min(1, Math.max(0, (h - mean[i]) / 2.2));

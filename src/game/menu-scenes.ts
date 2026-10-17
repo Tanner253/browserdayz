@@ -52,7 +52,7 @@ import { ITEMS } from '../sim/items';
 import { BURY, noBurying } from '../sim/stash';
 import type { Atmosphere } from '../world/atmosphere';
 import { hospitalPlan } from '../world/big-buildings';
-import { CELL, SNOW, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type BuildingType, type World } from '../world/worldgen';
+import { SNOW, bunkerPlace, heightAt, idx, sampleOf, type BuildingPlot, type BuildingType, type World } from '../world/worldgen';
 import { Avatar } from './avatar';
 import type { Effects } from './effects';
 import type { Grips } from './arms';
@@ -430,8 +430,7 @@ export class MenuScenes {
   }
   /** how thick the grass is at a place, 0..1 (a case lying in a meadow's grass is not seen from beside it) */
   private grass(x: number, z: number) {
-    const half = WORLD_SIZE / 2;
-    return this.h.world.grass[idx(Math.round((x + half) / CELL), Math.round((z + half) / CELL))] / 255;
+    return this.h.world.grass[idx(...sampleOf(x, z))] / 255;
   }
   /** a road within so far of a place */
   private byRoad(x: number, z: number, r: number) {

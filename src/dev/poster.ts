@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { proceduralParts } from '../game/procedural';
 import { playEdge } from '../world/outline';
-import { BUILDING_FOOTPRINT, WORLD_SIZE, generateWorld, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, SQUARE_HALF, generateWorld, heightAt, type World } from '../world/worldgen';
 
 const q = new URLSearchParams(location.search);
 const W = +(q.get('w') ?? 1920), H = +(q.get('h') ?? 1080);
@@ -50,8 +50,8 @@ const sheetOf = (w: number, h: number) => {
 // ------------------------------------------------------------------ the sheet
 
 /** the sheet in pixels; the valley printed on it from (OX, OY), N across: three pixels to the metre */
-const PW = 3400, PH = 3560, OX = 164, OY = 150, N = 3072, S = N / WORLD_SIZE;
-const X = (wx: number) => OX + (wx + WORLD_SIZE / 2) * S, Y = (wz: number) => OY + (wz + WORLD_SIZE / 2) * S;
+const PW = 3400, PH = 3560, OX = 164, OY = 150, N = 3072, S = N / (2 * SQUARE_HALF);
+const X = (wx: number) => OX + (wx + SQUARE_HALF) * S, Y = (wz: number) => OY + (wz + SQUARE_HALF) * S;
 /** the sheet on the table, metres */
 const PAPER_W = 0.95, PAPER_H = (PAPER_W * PH) / PW, PAPER_YAW = 0.045;
 
@@ -69,7 +69,7 @@ function printSheet(world: World): HTMLCanvasElement {
   const R = 1024, hs = new Float32Array(R * R);
   let lo = 1e9, hi = -1e9;
   for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
-    const h = heightAt(world.surface, -WORLD_SIZE / 2 + x + 0.5, -WORLD_SIZE / 2 + y + 0.5);
+    const h = heightAt(world.surface, -SQUARE_HALF + x + 0.5, -SQUARE_HALF + y + 0.5);
     hs[y * R + x] = h;
     lo = Math.min(lo, h);
     hi = Math.max(hi, h);

@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, seenGround, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, generateWorld, heightAt, inPlay, playOutline, seenGround, slopeAt, BUILDING_FOOTPRINT, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_X0, WORLD_Z0 } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -95,15 +95,17 @@ const FORT_FENCE = { x0: 438, z0: -452, z1: -262 };
 
 const world = generateWorld();
 /** the map as it was first made: 513 samples a side, 1024 m, in the middle of whatever the grid is now */
-const OLD_RES = 513, OLD_HALF = 512, OFF = (WORLD_RES - OLD_RES) / 2;
+const OLD_RES = 513, OLD_HALF = 512, OFF = (SQUARE_RES - OLD_RES) / 2;
+/** a sample of the square (the map until 2026-10-16, which is still made first and whole) in the world's net: (ix, iz) from the square's own corner */
+const sq = (ix: number, iz: number) => (iz + (-SQUARE_HALF - WORLD_Z0) / CELL) * WORLD_NX + ix + (-SQUARE_HALF - WORLD_X0) / CELL;
 const oldGround = (keep: (x: number, z: number) => boolean) => {
   const hs: number[] = [];
-  for (let iz = 0; iz < OLD_RES; iz++) for (let ix = 0; ix < OLD_RES; ix++) if (keep(-OLD_HALF + ix * CELL, -OLD_HALF + iz * CELL)) hs.push(world.heights[(iz + OFF) * WORLD_RES + ix + OFF]);
+  for (let iz = 0; iz < OLD_RES; iz++) for (let ix = 0; ix < OLD_RES; ix++) if (keep(-OLD_HALF + ix * CELL, -OLD_HALF + iz * CELL)) hs.push(world.heights[sq(ix + OFF, iz + OFF)]);
   return hs;
 };
 const inOld = (x: number, z: number) => Math.abs(x) <= OLD_HALF && Math.abs(z) <= OLD_HALF;
 const data = buildWorldData(process.cwd());
-const half = WORLD_SIZE / 2;
+const half = SQUARE_HALF;
 const camp = world.pois.find((p) => p.name === 'Military Checkpoint')!;
 const ground = (x: number, z: number) => heightAt(world.heights, x, z);
 /** the old road from where its climb out of the valley begins (see PASS), and the first of the road on from it */
@@ -519,7 +521,7 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   }
   for (const o of OUTLYING) assert.ok(!inPlay(o.x, o.z, -LOOP.clear + 6), `${o.name} is in the Zona, or all but`);
   {
-    const S = 8, M = Math.floor(WORLD_SIZE / S) + 1, out = new Uint8Array(M * M), stack: number[] = [];
+    const S = 8, M = Math.floor((2 * SQUARE_HALF) / S) + 1, out = new Uint8Array(M * M), stack: number[] = [];
     const inZona = (k: number) => inPlay(-half + (k % M) * S, -half + Math.floor(k / M) * S);
     for (let i = 0; i < M; i++) for (const k of [i, (M - 1) * M + i, i * M, i * M + M - 1]) if (!out[k] && !inZona(k)) (out[k] = 1), stack.push(k);
     while (stack.length) {
@@ -593,8 +595,8 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   // step (the ground as every step before it leaves it):
   const base = worldWithoutMountain();
   // (the old crest, and the rim raised behind it along the map's north edge: every height the ground's own again)
-  for (let iz = 0; iz < WORLD_RES; iz++) for (let ix = 0; ix < WORLD_RES; ix++) {
-    const x = -half + ix * CELL, z = -half + iz * CELL, i = iz * WORLD_RES + ix;
+  for (let iz = 0; iz < SQUARE_RES; iz++) for (let ix = 0; ix < SQUARE_RES; ix++) {
+    const x = -half + ix * CELL, z = -half + iz * CELL, i = sq(ix, iz);
     // (from twenty paces east of where the track goes round behind the fort, under the hill's foot: the fort stands 40 m further east than it did, and the line was at 560)
     if ((x >= 584 && z <= -400) || z <= -700) assert.ok(world.heights[i] === base.heights[i] && world.surface[i] === base.surface[i], `something of the old crest is left in the ground at ${x}, ${z}`);
   }
@@ -611,10 +613,10 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   {
     const SH = MOUNTAIN.shoulder;
     let level = 0, raised = 0, most = 0;
-    for (let iz = 1; iz < WORLD_RES - 1; iz++) for (let ix = 1; ix < WORLD_RES - 1; ix++) {
+    for (let iz = 1; iz < SQUARE_RES - 1; iz++) for (let ix = 1; ix < SQUARE_RES - 1; ix++) {
       const x = -half + ix * CELL, z = -half + iz * CELL;
       if (Math.hypot(x - fort.x, z - fort.z) > 200 || z > -226) continue;
-      const i = iz * WORLD_RES + ix, d = world.surface[i] - base.surface[i], out = footOf(x, z), [lx] = castleLocal(fort, x, 0, z);
+      const i = sq(ix, iz), d = world.surface[i] - base.surface[i], out = footOf(x, z), [lx] = castleLocal(fort, x, 0, z);
       if (!d) continue;
       const off = offTrack(x, z);
       assert.ok(off <= SH.reach + 2, `the ground is moved ${off.toFixed(0)} m from the way in, at ${x}, ${z}`);
@@ -761,7 +763,7 @@ ok('the fort is no trap for tags and no window on the end of the map: the line t
   // (the owner's rule for such places holds here: nobody is set down within 250 m of it)
   for (const s of world.spawns) assert.ok(Math.hypot(s.x - fort.x, s.z - fort.z) > 250, 'somebody starts by the fort');
   // (from the top of a tower, wherever an edge of the map is near, some ground on the way to it stands over the eye)
-  const eye = fort.y + 13.5 * 1.2 + 2.3, near = 420, half = WORLD_SIZE / 2;
+  const eye = fort.y + 13.5 * 1.2 + 2.3, near = 420, half = SQUARE_HALF;
   for (let b = 0; b < 720; b++) {
     const ux = Math.sin((b / 720) * 6.283), uz = -Math.cos((b / 720) * 6.283);
     let top = -Infinity, s = 4;
@@ -781,7 +783,7 @@ ok('over the fort\'s passage there is one ground: one sheet drawn at every spot,
   // drawn, 382 had a top that stops a body standing over the ground that is seen (by up to 10.2 m: a lid over a
   // trench), and under the lid at 189 spots there was half a metre and more of room (up to 6 m) that is no room of
   // the plan. Now the ground draws itself there (`seenGround`) and the fort stands solid earth under it.
-  const fort = world.castle!, N = WORLD_RES, half = WORLD_SIZE / 2, S = CASTLE_SCALE;
+  const fort = world.castle!, N = WORLD_NX, S = CASTLE_SCALE;
   const was = (x: number, z: number) => heightAt(world.surface, x, z), { heights: drawn, open } = seenGround(world);
   assert.ok(fort.lid && fort.lid.squares.length > 40 && open, 'the world tells the fort of no ground over its cuts');
   // (all of the fort is made, as the game makes it: the passage's own blocks are what is under the earth over it)
@@ -840,7 +842,7 @@ ok('over the fort\'s passage there is one ground: one sheet drawn at every spot,
     const foot = castleFoot(fort, x, z);
     if (foot <= 0 || (foot > 25 && offWay(x, z) > 25) || wells.some((w) => over(w.map(([wx, wz]) => [wx, 0, wz]), x, z) !== null)) continue;
     spots++;
-    const at = `${x.toFixed(2)}, ${z.toFixed(2)}`, own = !open![Math.floor((z + half) / CELL) * N + Math.floor((x + half) / CELL)];
+    const at = `${x.toFixed(2)}, ${z.toFixed(2)}`, own = !open![Math.floor((z - WORLD_Z0) / CELL) * N + Math.floor((x - WORLD_X0) / CELL)];
     const laid = lids.map((t) => over(t, x, z)).filter((y): y is number => y !== null), sheets = (own ? 1 : 0) + laid.length;
     if (sheets > 1) two.push(at);
     if (sheets < 1) none.push(at);
@@ -881,7 +883,7 @@ ok('over the fort\'s passage there is one ground: one sheet drawn at every spot,
   // the underside of their floor: of the stair's slot, in the slot), and never in the passage or on its stair.
   const U = UNDER;
   for (let x = fort.x - 45; x < fort.x + 45; x += 0.25) for (let z = fort.z - 45; z < fort.z + 45; z += 0.25) {
-    if (open![Math.floor((z + half) / CELL) * N + Math.floor((x + half) / CELL)] || Math.hypot(x - hatch.x, z - hatch.z) < 7) continue;
+    if (open![Math.floor((z - WORLD_Z0) / CELL) * N + Math.floor((x - WORLD_X0) / CELL)] || Math.hypot(x - hatch.x, z - hatch.z) < 7) continue;
     const y = heightAt(drawn, x, z), [lx, lz, ly] = castleLocal(fort, x, y, z), where = `${lx.toFixed(2)}, ${ly.toFixed(2)}, ${lz.toFixed(2)}`;
     if (Math.abs(lx) < U.x + 0.45 && Math.abs(lz) < U.z + 0.45) {
       const slot = lx > U.postern.x0 && lz > U.postern.head && lz < U.postern.end + 0.25;

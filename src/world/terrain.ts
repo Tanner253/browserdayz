@@ -6,7 +6,7 @@ import { Simplex } from '../core/noise';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { BELT, FORT_SNOW, RUTS, SNOW_LIFT, snowNet, snowOn, snowPicture, snowThinsGrass, snowUniforms, tellSnow } from './snow';
-import { CELL, SNOW, WORLD_RES, WORLD_SIZE, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
+import { CELL, SNOW, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, groundField, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
 import { frameToWorld, inWell, type Basement } from '../sim/basements';
 
 // The paint as it was: four layers, in the order of the splat's channels (grass, forest floor, rock, gravel), and
@@ -263,13 +263,67 @@ function macroNoiseTexture(): THREE.DataTexture {
 /** quads along one side of a ground tile */
 const TILE_QUADS = 64;
 
+/**
+ * FAR GROUND DRAWN COARSER, in the west (2026-10-16). The ground west of the square is 288 tiles more, and looked at
+ * from the village it was 0.9 million triangles more a frame, nearly all of them over a kilometre off, where a 2 m
+ * square is a pixel. So each of its tiles is also laid with squares of 4 m and of 8 m (`COARSE_AT` says from how far),
+ * its edges kept at 2 m whatever its middle is, so that tiles of any fineness meet without a crack. Its corners are
+ * the net's own points and keep their normals: from far off it is lit as it was. The square's tiles are as they were.
+ */
+const COARSE_AT = [400, 800];
+
+/**
+ * A tile's triangles with squares of `s` samples (2 or 4) inside and the net's own along its four edges: the middle
+ * in squares of `s`, and between it and each edge a strip zipped from the edge's points to the middle's. `v(i, j)` is
+ * the net's number of the tile's point (i, j); each triangle goes to `put` turned as the fine ground's are.
+ */
+export function coarseTile(q: number, s: number, v: (i: number, j: number) => number, put: (a: number, b: number, c: number) => void) {
+  const tri = (p: [number, number], r: [number, number], t: [number, number]) => {
+    const area = (r[0] - p[0]) * (t[1] - p[1]) - (r[1] - p[1]) * (t[0] - p[0]);
+    if (area === 0) return;
+    // (the fine ground's (a, c, b) has a turn less than nothing in (i, j): every one is laid so)
+    if (area < 0) put(v(...p), v(...r), v(...t));
+    else put(v(...p), v(...t), v(...r));
+  };
+  for (let j = s; j < q - s; j += s) for (let i = s; i < q - s; i += s) {
+    tri([i, j], [i, j + s], [i + s, j]);
+    tri([i + s, j], [i, j + s], [i + s, j + s]);
+  }
+  // (each strip: the edge's points, and the middle's nearest row of them, both along the strip from one corner to the other)
+  const zip = (outer: [number, number][], inner: [number, number][], along: (p: [number, number]) => number) => {
+    let a = 0, b = 0;
+    while (a < outer.length - 1 || b < inner.length - 1) {
+      if (b === inner.length - 1 || (a < outer.length - 1 && along(outer[a + 1]) <= along(inner[b + 1]))) tri(outer[a], outer[++a], inner[b]);
+      else tri(outer[a], inner[++b], inner[b - 1]);
+    }
+  };
+  const line = (n: number, f: (k: number) => [number, number]) => Array.from({ length: n }, (_, k) => f(k));
+  const fine = q + 1, mid = (q - 2 * s) / s + 1;
+  zip(line(fine, (k) => [k, 0]), line(mid, (k) => [s + k * s, s]), (p) => p[0]);
+  zip(line(fine, (k) => [k, q]), line(mid, (k) => [s + k * s, q - s]), (p) => p[0]);
+  zip(line(fine, (k) => [0, k]), line(mid, (k) => [s, s + k * s]), (p) => p[1]);
+  zip(line(fine, (k) => [q, k]), line(mid, (k) => [q - s, s + k * s]), (p) => p[1]);
+}
+
+/** a buffer's copy this side, let go once the card has it */
+function letGo(this: THREE.BufferAttribute) {
+  (this as unknown as { array: unknown }).array = null;
+}
+
+/** the world's net as the ground's shaders read it: its north-west corner and size in metres, its samples across and down */
+export const worldUniforms = () => ({
+  uWorld: { value: new THREE.Vector4(WORLD_X0, WORLD_Z0, WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0) },
+  uWorldRes: { value: new THREE.Vector2(WORLD_NX, WORLD_NZ) },
+});
+
+
 /** tiles drawn at one go (see Terrain.update): the run's own mesh, its tiles, and the smaller runs inside it */
 interface Run {
   mesh: THREE.Mesh;
   of: THREE.Mesh[];
   parts: Run[];
 }
-const _pv = new THREE.Matrix4(), _view = new THREE.Frustum();
+const _pv = new THREE.Matrix4(), _view = new THREE.Frustum(), _wide = new THREE.Frustum();
 
 export class Terrain {
   /** the ground, as a group of tiles */
@@ -299,12 +353,12 @@ export class Terrain {
       this.wells.uWellB.value[i].set((w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2, 0, 0);
     }
     this.wells.uWells.value = n;
-    const g = this.grassTex.image.data as Uint8Array, N = WORLD_RES, half = WORLD_SIZE / 2;
+    const g = this.grassTex.image.data as Uint8Array;
     for (const b of list) {
       const [x0, z0, x1, z1] = b.box;
-      for (let iz = Math.max(0, Math.floor((z0 + half) / CELL) - 1); iz <= Math.min(N - 1, Math.ceil((z1 + half) / CELL) + 1); iz++)
-        for (let ix = Math.max(0, Math.floor((x0 + half) / CELL) - 1); ix <= Math.min(N - 1, Math.ceil((x1 + half) / CELL) + 1); ix++)
-          if (inWell([b], -half + ix * CELL, -half + iz * CELL, 1)) g[idx(ix, iz)] = 0;
+      for (let iz = Math.max(0, Math.floor((z0 - WORLD_Z0) / CELL) - 1); iz <= Math.min(WORLD_NZ - 1, Math.ceil((z1 - WORLD_Z0) / CELL) + 1); iz++)
+        for (let ix = Math.max(0, Math.floor((x0 - WORLD_X0) / CELL) - 1); ix <= Math.min(WORLD_NX - 1, Math.ceil((x1 - WORLD_X0) / CELL) + 1); ix++)
+          if (inWell([b], WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL, 1)) g[idx(ix, iz)] = 0;
     }
     this.grassTex.needsUpdate = true;
     physics.holes = (x, z) => inWell(list, x, z);
@@ -322,8 +376,8 @@ export class Terrain {
   constructor(private world: World, private atmo: Atmosphere) {}
 
   async build(scene: THREE.Scene) {
-    const N = WORLD_RES;
-    const half = WORLD_SIZE / 2;
+    // (the world's net: NX samples across, west to east, and NZ down, north to south; X0 and Z0 its north-west corner)
+    const NX = WORLD_NX, NZ = WORLD_NZ, X0 = WORLD_X0, Z0 = WORLD_Z0;
     const { heights, splat, grass } = this.world;
     // Where snow lies by place and not by height (src/world/snow.ts: about the fort and along its track, wherever
     // the world has them): told to every shader that asks where snow lies, before any of them is made; and no
@@ -339,18 +393,18 @@ export class Terrain {
     // it; and a few squares are not drawn at all (a hatch's stairwell opens in them, or they are inside the fort's
     // own stone). See `seenGround`.
     const { heights: drawn, open } = seenGround(this.world);
-    const pos = new Float32Array(N * N * 3);
-    const nrm = new Float32Array(N * N * 3);
-    for (let iz = 0; iz < N; iz++) {
-      for (let ix = 0; ix < N; ix++) {
+    const pos = new Float32Array(NX * NZ * 3);
+    const nrm = new Float32Array(NX * NZ * 3);
+    for (let iz = 0; iz < NZ; iz++) {
+      for (let ix = 0; ix < NX; ix++) {
         const i = idx(ix, iz);
-        pos[i * 3] = -half + ix * CELL;
+        pos[i * 3] = X0 + ix * CELL;
         pos[i * 3 + 1] = drawn[i];
-        pos[i * 3 + 2] = -half + iz * CELL;
+        pos[i * 3 + 2] = Z0 + iz * CELL;
         const hl = drawn[idx(Math.max(ix - 1, 0), iz)];
-        const hr = drawn[idx(Math.min(ix + 1, N - 1), iz)];
+        const hr = drawn[idx(Math.min(ix + 1, NX - 1), iz)];
         const hd = drawn[idx(ix, Math.max(iz - 1, 0))];
-        const hu = drawn[idx(ix, Math.min(iz + 1, N - 1))];
+        const hu = drawn[idx(ix, Math.min(iz + 1, NZ - 1))];
         const nx = hl - hr, ny = 2 * CELL, nz = hd - hu;
         const l = Math.hypot(nx, ny, nz);
         nrm[i * 3] = nx / l;
@@ -366,16 +420,16 @@ export class Terrain {
     const tiles: THREE.BufferGeometry[] = [];
     // (Every tile's triangles are in one list, laid so that each tile, each two by two of them and each four by four
     // is a run of it: a run is drawn at one go wherever all of it is in sight (see `update`), with nothing kept twice.)
-    const side = Math.ceil((N - 1) / TILE_QUADS), laid: [number, number][] = [];
-    for (let bz = 0; bz < side; bz += 4) for (let bx = 0; bx < side; bx += 4)
-      for (let sz = bz; sz < Math.min(bz + 4, side); sz += 2) for (let sx = bx; sx < Math.min(bx + 4, side); sx += 2)
-        for (let tz = sz; tz < Math.min(sz + 2, side); tz++) for (let tx = sx; tx < Math.min(sx + 2, side); tx++) laid.push([tx, tz]);
-    const index = new Uint32Array((N - 1) * (N - 1) * 6);
+    const sideX = Math.ceil((NX - 1) / TILE_QUADS), sideZ = Math.ceil((NZ - 1) / TILE_QUADS), laid: [number, number][] = [];
+    for (let bz = 0; bz < sideZ; bz += 4) for (let bx = 0; bx < sideX; bx += 4)
+      for (let sz = bz; sz < Math.min(bz + 4, sideZ); sz += 2) for (let sx = bx; sx < Math.min(bx + 4, sideX); sx += 2)
+        for (let tz = sz; tz < Math.min(sz + 2, sideZ); tz++) for (let tx = sx; tx < Math.min(sx + 2, sideX); tx++) laid.push([tx, tz]);
+    const index = new Uint32Array((NX - 1) * (NZ - 1) * 6);
     let k = 0;
     for (const [i, j] of laid) {
       const tx = i * TILE_QUADS, tz = j * TILE_QUADS;
-      const x1 = Math.min(tx + TILE_QUADS, N - 1), z1 = Math.min(tz + TILE_QUADS, N - 1);
-      if (this.only && !this.only(-half + tx * CELL, -half + tz * CELL, -half + x1 * CELL, -half + z1 * CELL)) continue;
+      const x1 = Math.min(tx + TILE_QUADS, NX - 1), z1 = Math.min(tz + TILE_QUADS, NZ - 1);
+      if (this.only && !this.only(X0 + tx * CELL, Z0 + tz * CELL, X0 + x1 * CELL, Z0 + z1 * CELL)) continue;
       const from = k;
       let lo = Infinity, hi = -Infinity, snowTop = -Infinity;
       for (let iz = tz; iz < z1; iz++) {
@@ -399,25 +453,40 @@ export class Terrain {
       geo.setAttribute('normal', nrmAttr);
       geo.setDrawRange(from, k - from);
       geo.boundingBox = new THREE.Box3(
-        new THREE.Vector3(-half + tx * CELL, lo, -half + tz * CELL),
-        new THREE.Vector3(-half + x1 * CELL, hi, -half + z1 * CELL),
+        new THREE.Vector3(X0 + tx * CELL, lo, Z0 + tz * CELL),
+        new THREE.Vector3(X0 + x1 * CELL, hi, Z0 + z1 * CELL),
       );
       geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
       tiles.push(geo);
     }
-    const shared = new THREE.BufferAttribute(k < index.length ? index.slice(0, k) : index, 1);
+    // (the west's tiles laid again, coarser, after all of them: see COARSE_AT. In the same order, so that a run of
+    // them is a run of each; each tile's `lods` says where each of its three is)
+    const west = tiles.filter((geo) => X0 + (geo.userData.tile[0] + 1) * TILE_QUADS * CELL <= -SQUARE_HALF);
+    const per = (s: number) => { let n = 0; coarseTile(TILE_QUADS, s, () => 0, () => n++); return n * 3; };
+    const all = new Uint32Array(k + west.length * (per(2) + per(4)));
+    all.set(index.subarray(0, k));
+    for (const geo of tiles) geo.userData.lods = [[geo.drawRange.start, geo.drawRange.count]];
+    for (const s of [2, 4]) for (const geo of west) {
+      const [i, j] = geo.userData.tile as [number, number], tx = i * TILE_QUADS, tz = j * TILE_QUADS, from = k;
+      coarseTile(TILE_QUADS, s, (a, b) => idx(tx + a, tz + b), (a, b, c) => { all[k++] = a; all[k++] = b; all[k++] = c; });
+      geo.userData.lods.push([from, k - from]);
+    }
+    const shared = new THREE.BufferAttribute(all, 1);
     for (const geo of tiles) geo.setIndex(shared);
+    // (the ground's corners, normals and triangles are let go this side once the card has them: nothing reads them
+    // again, and a lost picture is a reload. Three times the ground, they were 94 MB of the page's memory kept for nothing.)
+    for (const a of [posAttr, nrmAttr, shared]) a.onUpload(letGo);
 
     // --- data textures shared with grass / vegetation shaders
-    const hf = new Float32Array(N * N);
+    const hf = new Float32Array(NX * NZ);
     hf.set(this.world.surface);
-    this.heightTex = new THREE.DataTexture(hf, N, N, THREE.RedFormat, THREE.FloatType);
+    this.heightTex = new THREE.DataTexture(hf, NX, NZ, THREE.RedFormat, THREE.FloatType);
     this.heightTex.magFilter = this.heightTex.minFilter = THREE.LinearFilter;
     this.heightTex.needsUpdate = true;
-    this.splatTex = new THREE.DataTexture(splat, N, N, THREE.RGBAFormat);
+    this.splatTex = new THREE.DataTexture(splat, NX, NZ, THREE.RGBAFormat);
     this.splatTex.magFilter = this.splatTex.minFilter = THREE.LinearFilter;
     this.splatTex.needsUpdate = true;
-    this.grassTex = new THREE.DataTexture(grass, N, N, THREE.RedFormat);
+    this.grassTex = new THREE.DataTexture(grass, NX, NZ, THREE.RedFormat);
     this.grassTex.magFilter = this.grassTex.minFilter = THREE.LinearFilter;
     this.grassTex.needsUpdate = true;
     this.macroTex = macroNoiseTexture();
@@ -443,7 +512,7 @@ export class Terrain {
         tSplat: { value: this.splatTex },
         tMacro: { value: this.macroTex },
         uTile: { value: new THREE.Vector4(...TILE.map((v) => 1 / v)) },
-        uWorld: { value: new THREE.Vector2(WORLD_SIZE, WORLD_RES) },
+        ...worldUniforms(),
         uTint: { value: tint },
         ...snowUniforms,
       };
@@ -453,7 +522,7 @@ export class Terrain {
       const kinds: Kind[] = [...KIND_NAMES.map((k) => KINDS[k]), CRAG_MOSS];
       const made = await buildGround(kinds, kinds.map((k) => t[k.tex]));
       const weights = this.ground.weights.map((w) => {
-        const tex = new THREE.DataTexture(w, N, N, THREE.RGBAFormat);
+        const tex = new THREE.DataTexture(w, NX, NZ, THREE.RGBAFormat);
         tex.magFilter = tex.minFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
         return tex;
@@ -486,7 +555,7 @@ export class Terrain {
         tSnow: { value: null },
         uSnowIs: { value: snowIs },
         uLay: { value: kinds.map((k, l) => new THREE.Vector4(1 / k.size, k.far ?? 0.27, (k.sided ? 1 : 0) + (made.quiet[l] ? 2 : 0), made.place[l])) },
-        uWorld: { value: new THREE.Vector2(WORLD_SIZE, WORLD_RES) },
+        ...worldUniforms(),
         uTint: { value: kinds.map((k) => new THREE.Vector3(...k.tint)) },
         uMean: { value: made.mean },
         uFlat: { value: made.flat },
@@ -551,6 +620,7 @@ export class Terrain {
       // (a tile drawn in a run is not drawn on its own in the view: the sun's shadow maps draw it as they did, see `update`)
       tile.intersectsFrustum = (f) => (!tile.userData.inRun || SHADOW_FRUSTA.has(f)) && f.intersectsObject(tile);
       at.set(String(geo.userData.tile), tile);
+      if (geo.userData.lods.length > 1) this.far.push(tile);
     }
     // the runs: four by four, and two by two inside each, where every tile of one is there to draw
     const run = (i0: number, j0: number, n: number): Run | null => {
@@ -564,8 +634,14 @@ export class Terrain {
       geo.setAttribute('position', posAttr);
       geo.setAttribute('normal', nrmAttr);
       geo.setIndex(shared);
-      const starts = of.map((t) => t.geometry.drawRange.start), ends = of.map((t) => t.geometry.drawRange.start + t.geometry.drawRange.count);
-      geo.setDrawRange(Math.min(...starts), Math.max(...ends) - Math.min(...starts));
+      // (each fineness of a run is a run of the index too: its tiles are laid one after another at each)
+      const most = Math.min(...of.map((t) => (t.geometry.userData.lods as [number, number][]).length));
+      const lods = Array.from({ length: most }, (_, L) => {
+        const starts = of.map((t) => t.geometry.userData.lods[L][0] as number), ends = of.map((t) => (t.geometry.userData.lods[L][0] + t.geometry.userData.lods[L][1]) as number);
+        return [Math.min(...starts), Math.max(...ends) - Math.min(...starts)];
+      });
+      geo.userData.lods = lods;
+      geo.setDrawRange(lods[0][0], lods[0][1]);
       geo.boundingBox = new THREE.Box3();
       for (const t of of) geo.boundingBox.union(t.geometry.boundingBox!);
       geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
@@ -575,7 +651,7 @@ export class Terrain {
       mesh.visible = false;
       return { mesh, of, parts: [] };
     };
-    for (let bj = 0; bj < side; bj += 4) for (let bi = 0; bi < side; bi += 4) {
+    for (let bj = 0; bj < sideZ; bj += 4) for (let bi = 0; bi < sideX; bi += 4) {
       const big = run(bi, bj, 4);
       for (let sj = bj; sj < bj + 4; sj += 2) for (let si = bi; si < bi + 4; si += 2) {
         const small = run(si, sj, 2);
@@ -587,14 +663,16 @@ export class Terrain {
 
     // --- physics heightfield (column-major, rows along Z)
     const R = physics.R;
-    const hcm = new Float32Array(N * N);
-    for (let ix = 0; ix < N; ix++) for (let iz = 0; iz < N; iz++) hcm[iz + ix * N] = heights[idx(ix, iz)];
-    const desc = R.ColliderDesc.heightfield(N - 1, N - 1, hcm, { x: WORLD_SIZE, y: 1, z: WORLD_SIZE });
-    physics.ground = physics.addStatic(desc, 'grass', { x: 0, y: 0, z: 0 });
+    const f = groundField(heights);
+    physics.ground = physics.addStatic(R.ColliderDesc.heightfield(f.rows, f.cols, f.heights, f.scale), 'grass', f.at);
   }
 
   /** runs of tiles drawn at one go (see `update`) */
   private runs: Run[] = [];
+  /** the tiles that are also laid coarser (the west's: see COARSE_AT) */
+  private far: THREE.Mesh[] = [];
+  /** the west's far tiles drawn coarser (see COARSE_AT); false, every tile is drawn fine, as the square's are */
+  coarse = true;
 
   /**
    * The ground is a hundred and forty-four tiles, each its own thing to draw: seventy-seven of a frame's draws in the
@@ -607,15 +685,49 @@ export class Terrain {
     if (!this.runs.length) return;
     _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     _view.setFromProjectionMatrix(_pv);
+    // (the view without its far end: a run of the west's tiles is drawn at one go wherever it is in sight but for
+    // going on past the end of the view, which the card cuts off; from the square's east the end of the view ran
+    // through the west's runs, and they were drawn tile by tile: 49 draws of the ground where there had been 16)
+    _wide.copy(_view);
+    _wide.planes[4].constant = Infinity;
+    // (how fine each of the west's tiles is drawn, by how far its nearest point is from the eye)
+    const c = camera.position;
+    for (const t of this.far) {
+      const b = t.geometry.boundingBox!;
+      const d = Math.hypot(Math.max(b.min.x - c.x, 0, c.x - b.max.x), Math.max(b.min.y - c.y, 0, c.y - b.max.y), Math.max(b.min.z - c.z, 0, c.z - b.max.z));
+      const L = !this.coarse ? 0 : d > COARSE_AT[1] ? 2 : d > COARSE_AT[0] ? 1 : 0;
+      if (t.userData.lod === L) continue;
+      t.userData.lod = L;
+      const [from, n] = t.geometry.userData.lods[L];
+      t.geometry.setDrawRange(from, n);
+    }
     for (const r of this.runs) this.choose(r);
   }
 
   /** whether every tile of a run is in sight: then it is drawn at one go (and its parts and tiles not), else each part is chosen for itself */
   private choose(r: Run): boolean {
+    // (far off in the west, a run is drawn whole wherever any of it is in sight: its tiles are at their coarsest, a
+    // four by four of them is eleven thousand triangles, and a draw of its own for each costs more than that)
+    if (this.coarse && r.of.every((t) => t.userData.lod === 2) && r.of.some((t) => _view.intersectsSphere(t.geometry.boundingSphere!))) {
+      const [from, n] = r.mesh.geometry.userData.lods[2];
+      r.mesh.geometry.setDrawRange(from, n);
+      r.mesh.visible = true;
+      for (const p of r.parts) p.mesh.visible = false;
+      for (const t of r.of) t.userData.inRun = true;
+      return true;
+    }
     let all = true;
     if (r.parts.length) {
       for (const p of r.parts) if (!this.choose(p)) all = false;
-    } else for (const t of r.of) if (!_view.intersectsSphere(t.geometry.boundingSphere!)) all = false;
+    } else for (const t of r.of) if (!(t.geometry.userData.lods.length > 1 ? _wide : _view).intersectsSphere(t.geometry.boundingSphere!)) all = false;
+    // (at one go, a run is drawn as fine as the finest of its tiles: their edges are all fine, so tiles of any
+    // fineness meet, and it is one draw)
+    let L = 2;
+    for (const t of r.of) L = Math.min(L, (t.userData.lod as number | undefined) ?? 0);
+    if (all) {
+      const [from, n] = r.mesh.geometry.userData.lods[L];
+      r.mesh.geometry.setDrawRange(from, n);
+    }
     r.mesh.visible = all;
     if (all) for (const p of r.parts) p.mesh.visible = false;
     if (all || !r.parts.length) for (const t of r.of) t.userData.inRun = all;
@@ -624,10 +736,9 @@ export class Terrain {
 
   /** dominant surface for footsteps / bullet impacts */
   surfaceAt(x: number, z: number): 'grass' | 'dirt' | 'rock' | 'gravel' {
-    const half = WORLD_SIZE / 2;
-    const ix = Math.round((x + half) / CELL);
-    const iz = Math.round((z + half) / CELL);
-    if (ix < 0 || iz < 0 || ix >= WORLD_RES || iz >= WORLD_RES) return 'grass';
+    const ix = Math.round((x - WORLD_X0) / CELL);
+    const iz = Math.round((z - WORLD_Z0) / CELL);
+    if (ix < 0 || iz < 0 || ix >= WORLD_NX || iz >= WORLD_NZ) return 'grass';
     // (by the kind of ground there is most of there: each kind answers as one of the four the game has sounds for)
     if (this.ground) return KINDS[KIND_NAMES[this.ground.top[idx(ix, iz)]]].sound;
     const i = idx(ix, iz) * 4;
@@ -673,7 +784,9 @@ uniform sampler2DArray tArm;
 uniform sampler2D tSplat;
 uniform sampler2D tMacro;
 uniform vec4 uTile;
-uniform vec2 uWorld;
+// (the world's north-west corner and its size in metres; its samples across and down)
+uniform vec4 uWorld;
+uniform vec2 uWorldRes;
 uniform vec3 uTint[4];
 varying vec3 vTerrainPos;
 varying vec3 vTerrainNormal;
@@ -690,12 +803,12 @@ vec2 tRot(vec2 uv, float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s
 
 // Height-blended splat with dual-scale sampling to hide repetition.
 const TERRAIN_SAMPLE = /* glsl */ `
-vec2 splatUv = (vTerrainPos.xz + uWorld.x * 0.5) / uWorld.x;
-splatUv = splatUv * (uWorld.y - 1.0) / uWorld.y + 0.5 / uWorld.y;
+vec2 splatUv = (vTerrainPos.xz - uWorld.xy) / uWorld.zw;
+splatUv = splatUv * (uWorldRes - 1.0) / uWorldRes + 0.5 / uWorldRes;
 vec4 macro = texture2D(tMacro, vTerrainPos.xz / 190.0);
 vec4 macro2 = texture2D(tMacro, vTerrainPos.xz / 37.0);
 // jitter the splat lookup so layer boundaries are organic instead of grid-aligned
-vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.x);
+vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.zw);
 vec4 w = texture2D(tSplat, splatUv + jitter);
 
 float camDist = length(vTerrainPos - cameraPosition);
@@ -814,7 +927,9 @@ uniform vec4 uSnowIs;
 // (of each kind: one over its size in metres; how large its far copy is laid, as a share; 1 if it is laid by a steep
 // face's own direction, and 2 more if its relief is in the small array; its place in the array its relief is in)
 uniform vec4 uLay[GROUND_LAYERS];
-uniform vec2 uWorld;
+// (the world's north-west corner and its size in metres; its samples across and down)
+uniform vec4 uWorld;
+uniform vec2 uWorldRes;
 uniform vec3 uTint[GROUND_LAYERS];
 uniform vec3 uMean[GROUND_LAYERS];
 uniform vec2 uFlat[GROUND_LAYERS];
@@ -970,13 +1085,13 @@ void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKe
 `;
 
 const GROUND_SAMPLE = /* glsl */ `
-vec2 splatUv = (vTerrainPos.xz + uWorld.x * 0.5) / uWorld.x;
-splatUv = splatUv * (uWorld.y - 1.0) / uWorld.y + 0.5 / uWorld.y;
+vec2 splatUv = (vTerrainPos.xz - uWorld.xy) / uWorld.zw;
+splatUv = splatUv * (uWorldRes - 1.0) / uWorldRes + 0.5 / uWorldRes;
 vec4 macro = texture2D(tMacro, vTerrainPos.xz / 190.0);
 vec4 macro2 = texture2D(tMacro, vTerrainPos.xz / 37.0);
 vec4 macro3 = texture2D(tMacro, vTerrainPos.zx / 410.0 + 0.31);
 // jitter the lookup of what the ground is, so that the edges between kinds are organic instead of grid-aligned
-vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.x);
+vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.zw);
 vec4 wA = texture2D(tKindsA, splatUv + jitter);
 vec4 wB = texture2D(tKindsB, splatUv + jitter);
 vec4 wC = texture2D(tKindsC, splatUv + jitter);

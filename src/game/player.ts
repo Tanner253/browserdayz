@@ -13,6 +13,7 @@ import { BLOOD, bloodBack, greyOf, mendsOn, withWound, woundOf } from '../sim/bl
 import { LEG, breaksOnLanding } from '../sim/injury';
 import { paceOf, runCost } from '../sim/load';
 import { LEGS, SLIDE, SLOPE, degOf, legs, riseOf, slideFall, slideGoesOn, slideJolt, slideOn, type Footing, type Legs } from '../sim/slopes';
+import { WADE, tooDeep, wading, type WaterHere } from '../sim/water';
 
 const STAND_HALF = 0.56;
 const CROUCH_HALF = 0.26;
@@ -224,6 +225,15 @@ export class Player {
   onClot: () => void = () => {};
   onDamage: (amount: number, cause: string) => void = () => {};
   onFootstep: (surface: string) => void = () => {};
+  /**
+   * The water over a point, if any (src/sim/water.ts): given by whoever lays the world's waters in. In it the body
+   * goes slower the deeper it is, its feet are heard in water, and deep water it does not go into at all.
+   */
+  water: (x: number, z: number) => WaterHere | null = () => null;
+  /** a foot has come down in water (the splash: the game gives it to the effects) */
+  onWade: (x: number, y: number, z: number, depth: number) => void = () => {};
+  /** how deep the water is where the body stands (0: dry) */
+  wet = 0;
   /** touched down after a fall or a jump, at this speed (m/s) */
   onLand: (speed: number) => void = () => {};
 
@@ -516,6 +526,9 @@ export class Player {
     if (fwd < 0) speed *= 0.75;
     // (on the level what is carried takes breath, not pace, until it is past all running with: src/sim/load.ts)
     speed *= paceOf(this.weightKg) * (v.health < 30 ? 0.8 : 1);
+    // (in water, slower the deeper: under half at the waist, as in DayZ)
+    this.wet = this.water(this.pos.x, this.pos.z)?.depth ?? 0;
+    speed *= wading(this.wet);
     if (this.stumble > 0) {
       this.stumble = Math.max(0, this.stumble - h);
       speed *= 1 - Math.min(0.6, this.stumble * 1.6);
@@ -595,6 +608,16 @@ export class Player {
     const pace = { x: this.vel.x * h, z: this.vel.z * h }, wasOnGround = this.grounded;
     // (over a basement's open steps the ground is not there: see physics.through)
     const at = this.collider.translation(), through = physics.through(at.x, at.z);
+    // (Deep water is not gone into: a step that would take the body into it is not taken, along whichever way it
+    // would, so that it slides along the edge. From deep water, as a body put down in it would be, it walks out and
+    // never further in.)
+    const here = this.water(at.x, at.z)?.depth ?? 0;
+    const deeper = (x: number, z: number) => {
+      const d = this.water(x, z)?.depth ?? 0;
+      return tooDeep(d) && d > here;
+    };
+    if (deeper(at.x + pace.x, at.z)) pace.x = 0;
+    if (deeper(at.x, at.z + pace.z)) pace.z = 0;
     const desired = { x: pace.x, y: this.vel.y * h, z: pace.z };
     // On steep open ground the controller is told it may climb what is under the feet and stand on it without
     // slipping: its own two limits are what made a wall of fifty degrees and a chute of fifty-eight, and what the
@@ -689,6 +712,12 @@ export class Player {
     if (land || other) this.built = other;
     const t = this.body.translation();
     const next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
+    // (and whatever moved it, a step or the slope of the bed under it, it is not taken further into deep water)
+    const after = this.water(next.x, next.z)?.depth ?? 0;
+    if (tooDeep(after) && after > here) {
+      next.x = t.x;
+      next.z = t.z;
+    }
     this.body.setNextKinematicTranslation(next);
     const wasGrounded = this.grounded;
     this.grounded = landed;
@@ -820,6 +849,12 @@ export class Player {
   footfall() {
     // (on hands and feet, or sliding, what is heard is not steps: see `heard`)
     if (!this.grounded || this.dead || this.groundSpeed <= 0.5 || this.footing !== 'firm') return;
+    if (this.wet > WADE.ankle * 0.3) {
+      audio.footstep('water', this.groundSpeed * (this.crouched ? 0.4 : 1), undefined, this.weightKg);
+      this.onWade(this.pos.x, this.pos.y + this.wet, this.pos.z, this.wet);
+      this.onFootstep('water');
+      return;
+    }
     const s = this.surface();
     audio.footstep(s as Surface, this.groundSpeed * (this.crouched ? 0.4 : 1), undefined, this.weightKg);
     this.onFootstep(s);

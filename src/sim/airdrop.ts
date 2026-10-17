@@ -10,7 +10,7 @@
 // Rules and numbers only: the server keeps the clock in multiplayer, the game itself when playing alone; what is
 // drawn and what is heard is src/game/airdrop.ts.
 
-import { WORLD_SIZE } from '../world/worldgen';
+import { SQUARE_HALF } from '../world/worldgen';
 
 /** every figure of the flight and of the crate's fall */
 export const AIRDROP = {
@@ -99,8 +99,11 @@ export const ROTOR = {
   under: [0.05, 200] as [number, number],
 };
 
-/** the map's edge: this far from its middle, east, west, north and south */
-export const EDGE = WORLD_SIZE / 2;
+/**
+ * the edge it comes in over and goes out by: this far from the map's middle, east, west, north and south. The
+ * square's (2026-10-16): drops fall on it, and the ground west of it is ground only as yet.
+ */
+export const EDGE = SQUARE_HALF;
 
 /** one flight, as the server says it: all a game needs to put the helicopter and the crate where they are */
 export interface Flight {
@@ -417,7 +420,7 @@ export function planFlight(ground: (x: number, z: number) => number, place: { x:
   }
   // (the long ways in; from a place so near a corner that there are few, the longest there are)
   all.sort((p, q) => shapeOf(q).d - shapeOf(p).d);
-  const long = all.filter((f) => shapeOf(f).d >= AIRDROP.wayIn * WORLD_SIZE);
+  const long = all.filter((f) => shapeOf(f).d >= AIRDROP.wayIn * 2 * EDGE);
   const picks = long.length >= 8 ? long : all.slice(0, 8);
   for (const f of picks) lift(f, ground);
   const least = Math.min(...picks.map((f) => f.hold));

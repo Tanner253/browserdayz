@@ -55,7 +55,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `assets.ts` | 855 |  |
-| `audio.ts` | 2376 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
+| `audio.ts` | 2382 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `breathe.ts` | 103 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `device.ts` | 69 | What kind of device this is. |
 | `gamepad.ts` | 275 | A controller (PlayStation, Xbox, any the browser calls "standard"), read each frame, pressing the game's own controls by their names as the keyboard and the phone's buttons do (src/core/input.ts). |
@@ -105,10 +105,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `cellars.ts` | 53 | The basements as the game has them (src/sim/basements.ts): a bulb hung in each of their rooms and over the foot of their steps, lit for whoever is near enough to see by it, and how dark it is down there for the eye. |
 | `character.ts` | 93 | A character other than the local player: body, hit zones (head / torso / legs) and health. |
 | `doll.ts` | 1054 | The survivor in the middle of the inventory, alive. |
-| `effects.ts` | 946 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
+| `effects.ts` | 957 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `fires.ts` | 297 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1511 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1512 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -138,10 +138,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
 | `loot.ts` | 1119 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
 | `menu-order.ts` | 90 | Which of the menu's scenes are shown first, which are said to be new, and what a browser remembers of having been shown. |
-| `menu-scenes.ts` | 1712 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
+| `menu-scenes.ts` | 1711 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
 | `muzzle.ts` | 131 | The flash at a muzzle: burning gas, seen for two or three frames. |
 | `near.ts` | 152 | What is near is drawn with its pictures at the size they came; what is far, with the world's copies. |
-| `player.ts` | 1272 | First-person survivor: kinematic character controller (Rapier), movement model, stamina / vitals, camera feel (bob, lean, landing dip) and footsteps. |
+| `player.ts` | 1307 | First-person survivor: kinematic character controller (Rapier), movement model, stamina / vitals, camera feel (bob, lean, landing dip) and footsteps. |
 | `procedural.ts` | 266 | The few meshes that have no scanned model: small machined parts built from a lathe profile, with a parkerised-steel material, and the stamped dog tag. |
 | `remote.ts` | 520 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
 | `riders.ts` | 62 | The dead who ride on (2026-10-14). |
@@ -172,7 +172,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `airdrop.ts` | 476 | The supply drop comes by helicopter (2026-10-13: |
+| `airdrop.ts` | 479 | The supply drop comes by helicopter (2026-10-13: |
 | `barrels.ts` | 31 | Fuel drums. The red barrels standing about the yards and sheds go up when a bullet finds them, and take whoever is standing near with them: a thing to shoot at instead of the man behind it, and a reason to look at... |
 | `basements.ts` | 545 | Basements (2026-10-14). |
 | `blood.ts` | 96 | Blood, which is not health (2026-10-13). |
@@ -200,7 +200,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `course.ts` | 496 | The bot check's 360-degree course: the yard, the six figures the server walks and shows, and the judge of a go. |
 | `crates.ts` | 183 | Searchable crates that are part of the map (military crates at the checkpoint, wooden crates in barns, sheds and yards). |
 | `daynight.ts` | 82 | Day and night. The Zone has a day of thirty-two minutes: three quarters of it light (first light, a long day, dusk) and one quarter, eight minutes, night. The night is kept shorter than the time a dog tag has to be... |
-| `drops.ts` | 255 | Supply drops. Every few minutes, while anybody is playing, a crate of the best things on the map is set down somewhere in the open and everyone is told where. It is there for a few minutes, or until somebody has... |
+| `drops.ts` | 256 | Supply drops. Every few minutes, while anybody is playing, a crate of the best things on the map is set down somewhere in the open and everyone is told where. It is there for a few minutes, or until somebody has... |
 | `economy.ts` | 869 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
 | `emotes.ts` | 126 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
 | `fires.ts` | 84 | Campfires. The rings of stones at the lodges, the cabins and the hamlet can be lit. A fire is somewhere to mend: resting beside one puts health back far faster than it comes back on its own, and what is eaten beside... |
@@ -209,7 +209,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gunplay.ts` | 335 | How the guns shoot. One place for what each cartridge does in the air and what each gun does with it, read by the game (a bullet's flight, the kick, the cone a shot can land in, what its sights are set for) and by... |
 | `heli.ts` | 171 | The helicopter a player flies (2026-10-14), its rules shared by the game and the server: what it is, how it flies (src/game/heli.ts flies it by these numbers), and where it stands when the world is new. |
 | `hitclock.ts` | 24 | How often a shooter's hits on one body are believed (server/tags.ts, mayHit): no oftener than the gun fires, over a run of them, with one allowed a gap early when the one before came late. |
-| `infected.ts` | 440 | The infected: the people who lived here, and did not leave. |
+| `infected.ts` | 439 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
 | `inventory.ts` | 1020 | Grid inventory (DayZ / Tarkov style). |
 | `items.ts` | 932 |  |
@@ -221,7 +221,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `news.ts` | 202 | Hearts and comments on the entries of the changelog (2026-10-12: |
 | `ozerki.ts` | 93 | Ozerki, the fishing village on a lake in the north woods (2026-10-16, new): where its houses, piers and what lies about them stand. |
 | `placement.ts` | 28 | Whether an item can physically lie at a loot point. |
-| `pokrov.ts` | 88 | Pokrov, the white-walled monastery and the town outside its gate (2026-10-16, reworked): where its buildings and what lies about them stand, and the terrace it stands on. |
+| `pokrov.ts` | 102 | Pokrov, the white-walled monastery and the town outside its gate (2026-10-16, reworked): where its buildings and what lies about them stand, and the terrace it stands on. |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
 | `range.ts` | 359 | The bot check (2026-10-12: |
 | `ruins.ts` | 1256 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
@@ -231,8 +231,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `tiers.ts` | 24 | The steps of the map. Every place a thing can lie is on one of five, and every sort of thing is kept on the steps it belongs to (src/sim/economy.ts): what a new arrival finds at the edge is not what is kept down the... |
 | `towns.ts` | 229 | The new towns of the map three times over (2026-10-16): where each building stands, and the monastery's walls as pieces of the fort kit. |
 | `trade.ts` | 82 | The trader. A man stands behind the counter of the shop at the trading post, out east of the village. He buys what is brought to him and sells what a body needs to go on with: dressings, food, rounds, a light, a... |
-| `vehicles.ts` | 276 | Jeeps. A handful stand along the road and a few more out at the edge of the map, behind the outlying places; anybody can get in one and drive it, three more can ride, and it can be shot until it burns. It is the fast... |
+| `vehicles.ts` | 277 | Jeeps. A handful stand along the road and a few more out at the edge of the map, behind the outlying places; anybody can get in one and drive it, three more can ride, and it can be shot until it burns. It is the fast... |
 | `voice.ts` | 29 | Talking to whoever is near (src/game/voice.ts): what the server and the game both go by. |
+| `water.ts` | 177 | Lakes and rivers, as rules: where the water is, how deep, which way it runs, and what it does to whoever walks into it. |
 | `wells.ts` | 90 | Wells, and what hunger and thirst do before they kill. |
 | `wreck-fire.ts` | 103 | The jeep that burns before the fort's gate, for good (the owner, 2026-10-14: |
 | `zavod.ts` | 78 | Zavod, the brick works by the river (2026-10-16): where its buildings and what lies about them stand. |
@@ -278,7 +279,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ads.ts` | 48 | Google Ads: its tag on the site, and one conversion when a visitor first goes into a game, the Zone or the Arena (the owner, 2026-10-14: |
 | `arena-hud.ts` | 172 | The arena's own screen (2026-10-14). |
 | `arena-menu.ts` | 216 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
-| `bigmap.ts` | 1247 | The map, opened large (M): a sheet as an army prints one. |
+| `bigmap.ts` | 1290 | The map, opened large (M): a sheet as an army prints one. |
 | `dogtag.ts` | 166 | The dog tag on the menu: two steel tags on a ball chain, the player's name stamped into the front one as it is typed. |
 | `door.ts` | 155 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
 | `elite-crown.ts` | 37 | The Elite's crown by a name in chat, and a word about them with the pointer on it (the owner, 2026-10-15: |
@@ -286,7 +287,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hud.ts` | 1860 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 467 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inventory-ui.ts` | 2135 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
-| `minimap.ts` | 411 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
+| `minimap.ts` | 433 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
 | `person.ts` | 104 | The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a program came by the dozen, and stood in the world as players). |
 | `platform.ts` | 33 | ZONA PvP, the platform both games stand under (2026-10-14). |
 | `rewards.ts` | 290 | Dog tags and creator rewards: the illustrated explanation a player sees on entering the site, and the wallet address they give. |
@@ -334,11 +335,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `facade.ts` | 188 | Facades of the downloaded modular kits laid over the game's own buildings (2026-10-16, the new land's towns). |
 | `foliage.ts` | 179 | Shader patches shared by every instanced foliage / prop material: - wind: whole-plant sway (height-weighted) + leaf flutter - LOD dithering: screen-space dissolve between LOD levels (no popping) - translucency:... |
 | `gatehouse.ts` | 686 | The ruined gatehouse at the end of the mountain road (MOUNTAIN in src/world/worldgen.ts; 2026-10-13: |
-| `grass.ts` | 380 | GPU grass. The field is tiled into 4 m patches; every patch shares one geometry of ~1000 randomly ordered blades. Blades are placed on the exact terrain triangles in the vertex shader (height texture), culled by the... |
+| `grass.ts` | 381 | GPU grass. The field is tiled into 4 m patches; every patch shares one geometry of ~1000 randomly ordered blades. Blades are placed on the exact terrain triangles in the vertex shader (height texture), culled by the... |
 | `ground.ts` | 320 | What the ground is, place by place: the kinds of ground there are, and how much of each lies at every point of the world's net. |
 | `helipad.ts` | 68 | The pads the helicopters stand on (src/sim/heli.ts: on the hospital's roof, and by the fort): a painted circle and an H, as every pad has. |
 | `kit.ts` | 270 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
 | `load-world.ts` | 25 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
+| `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
+| `ocean.ts` | 442 | THE SEA off the west coast (2026-10-16: |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 48 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
@@ -346,25 +349,27 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ruins.ts` | 226 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |
 | `snow.ts` | 661 | Where snow lies: by height, OR BY PLACE. |
-| `terrain.ts` | 1258 |  |
-| `town-plans.ts` | 434 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
+| `terrain.ts` | 1373 |  |
+| `town-plans.ts` | 447 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 207 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `vegetation.ts` | 1038 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
+| `water.ts` | 435 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
 | `world-cache.ts` | 77 |  |
 | `world.worker.ts` | 31 | Only plain world data crosses the worker boundary; its typed-array storage is transferred once. |
-| `worldgen.ts` | 12 | Deterministic world generation. |
+| `worldgen.ts` | 13 | Deterministic world generation. |
 
 ## src/world/worldgen/
 
 | file | lines | what it is |
 |---|---:|---|
-| `generate.ts` | 2700 | generateWorld: the whole map made from its seed, stage by stage (see the index below). |
-| `ground.ts` | 169 | Questions of the ground's net: the height and slope at a point, the ground as it is drawn over the fort's cuts, a curve through points, and the evening and softening of a field. |
+| `generate.ts` | 2708 | generateWorld: the whole map made from its seed, stage by stage (see the index below). |
+| `ground.ts` | 208 | Questions of the ground's net: the height and slope at a point, the ground as it is drawn over the fort's cuts, a curve through points, and the evening and softening of a field. |
 | `layout.ts` | 447 | The map's lines and areas: the mountain's and the loop road's lines, snow by height, the outlying places, where the play is, the hospital's grounds and the village's streets, the kinds of building and their footprints. |
-| `places.ts` | 433 | The map's measures and its places as numbers: its size and seed, the expansions (the Chemical Works, the bunker, Kamenka), the loop road (LOOP) and the mountain with its fort (MOUNTAIN). |
+| `places.ts` | 468 | The map's measures and its places as numbers: its size and seed, the expansions (the Chemical Works, the bunker, Kamenka), the loop road (LOOP) and the mountain with its fort (MOUNTAIN). |
 | `types.ts` | 112 | What a world is made of (World, Site, Instance, Solid, POI, Way, Worn): the types every part of the game reads it by. |
+| `west.ts` | 220 | THE WEST (2026-10-16): the square laid into the world's rectangle, and the ground of the two squares west of it. |
 
 ## src/world/
 

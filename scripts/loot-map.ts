@@ -10,11 +10,12 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { buildWorldData } from '../server/world';
 import { TIERS, type Tier } from '../src/sim/tiers';
-import { PLAY_AREAS, WORLD_SIZE, generateWorld, heightAt } from '../src/world/worldgen';
+import { PLAY_AREAS, SQUARE_HALF, generateWorld, heightAt } from '../src/world/worldgen';
 
 const world = generateWorld();
 const points = buildWorldData(process.cwd()).lootPoints;
-const N = 1000, W = 1600, per = N / WORLD_SIZE, half = WORLD_SIZE / 2;
+// (the square, where the loot is: the ground west of it is ground only as yet, 2026-10-16)
+const N = 1000, W = 1600, half = SQUARE_HALF, per = N / (2 * half);
 const px = (x: number) => (x + half) * per, pz = (z: number) => (z + half) * per;
 
 // the ground: dark, lit a little from the west so that its shape reads

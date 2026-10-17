@@ -23,7 +23,7 @@ import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
 import { playEdge } from '../world/outline';
-import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, CELL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
 
 type Pt = { x: number; z: number };
@@ -40,6 +40,10 @@ export interface MapLive {
 const GRID = 100, CONTOUR = 5;
 /** how near it can be brought: 1 is the whole sheet */
 const NEAREST = 9;
+/** a part of the world printed: its north-west corner, its south-east, and how many pixels to a metre */
+interface Area { x0: number; z0: number; x1: number; z1: number; S: number }
+/** a part printed: its picture, where its corner is, and its pixels to a metre */
+interface Sheet { c: HTMLCanvasElement; x0: number; z0: number; S: number }
 const PAPER = [218, 212, 188], INK = '#1d1b16';
 const TIER_IDS: Tier[] = [1, 2, 3, 4, 5];
 const KEPT = 'zona.map';
@@ -465,7 +469,7 @@ export class BigMap {
   }
   /** a place on the sheet right-clicked (an admin goes there): null, and a right-click is nothing */
   onPick: ((x: number, z: number) => void) | null = null;
-  private sheet: HTMLCanvasElement | null = null;
+  private sheet: Sheet[] | null = null;
   /** pixels of the sheet to a metre: finer on a computer, which has the memory for it and looks closer */
   private S = TOUCH ? 1 : 2;
   private view: HTMLCanvasElement;
@@ -726,14 +730,20 @@ export class BigMap {
 
   /** pixels of the picture to a metre, as near as it is now */
   private perMetre() {
-    return (Math.min(this.view.width, this.view.height) / WORLD_SIZE) * this.zoom;
+    return (Math.min(this.view.width, this.view.height) / (2 * SQUARE_HALF)) * this.zoom;
+  }
+
+  /** how far off it can be put: 1 is the square (the map as it was, where it opens), less the whole world, the ground west of the square in it */
+  private farthest() {
+    const W = this.view.width, H = this.view.height;
+    return Math.min(1, Math.min(W / (WORLD_X1 - WORLD_X0), H / (WORLD_Z1 - WORLD_Z0)) / (Math.min(W, H) / (2 * SQUARE_HALF)));
   }
 
   /** brought nearer (or further) about a point of the picture, 0..1 each way */
   private nearer(by: number, u = 0.5, w = 0.5) {
     const W = this.view.width, H = this.view.height, k0 = this.perMetre();
     const wx = this.at.x + ((u - 0.5) * W) / k0, wz = this.at.z + ((w - 0.5) * H) / k0;
-    this.zoom = Math.min(NEAREST, Math.max(1, this.zoom * by));
+    this.zoom = Math.min(NEAREST, Math.max(this.farthest(), this.zoom * by));
     this.whoBox.hidden = true;
     const k = this.perMetre();
     this.at.x = wx - ((u - 0.5) * W) / k;
@@ -741,11 +751,19 @@ export class BigMap {
     this.clamp();
   }
 
-  /** the sheet is not dragged off the picture */
+  /**
+   * The sheet is not dragged off the picture: not off the world, and no further than the square would let it (it
+   * opens on the square, as it did before the world grew west, and stays put there).
+   */
   private clamp() {
-    const k = this.perMetre(), halfW = this.view.width / 2 / k, halfH = this.view.height / 2 / k, edge = WORLD_SIZE / 2;
-    this.at.x = halfW >= edge ? 0 : Math.min(edge - halfW, Math.max(-edge + halfW, this.at.x));
-    this.at.z = halfH >= edge ? 0 : Math.min(edge - halfH, Math.max(-edge + halfH, this.at.z));
+    const k = this.perMetre(), halfW = this.view.width / 2 / k, halfH = this.view.height / 2 / k, edge = SQUARE_HALF;
+    const keep = (v: number, half: number, lo: number, hi: number) => {
+      const was = half >= edge ? [0, 0] : [-edge + half, edge - half];
+      if (half >= (hi - lo) / 2) return (lo + hi) / 2;
+      return Math.min(Math.max(hi - half, was[1]), Math.max(Math.min(lo + half, was[0]), v));
+    };
+    this.at.x = keep(this.at.x, halfW, WORLD_X0, WORLD_X1);
+    this.at.z = keep(this.at.z, halfH, WORLD_Z0, WORLD_Z1);
     this.dirty = true;
   }
 
@@ -801,7 +819,7 @@ export class BigMap {
   // ------------------------------------------------------------------ the sheet, printed once
 
   /** the sheet as it is being printed ahead of the first time it is asked for (see `ahead`) */
-  private press: Generator<void, HTMLCanvasElement> | null = null;
+  private press: Generator<void, Sheet[]> | null = null;
 
   /**
    * The sheet is printed before anybody opens the map, a strip of it in each frame's spare time. Printed whole
@@ -826,7 +844,7 @@ export class BigMap {
   }
 
   /** the sheet whole, now: what is left of it, if it was being printed ahead */
-  private print(): HTMLCanvasElement {
+  private print(): Sheet[] {
     const press = this.press ?? this.printing();
     for (;;) {
       const step = press.next();
@@ -834,31 +852,46 @@ export class BigMap {
     }
   }
 
-  private *printing(): Generator<void, HTMLCanvasElement> {
-    const world = this.world, S = this.S, N = Math.round(WORLD_SIZE * S);
+  /**
+   * The square at the sheet's own fineness, as it was printed before the world grew west; and the ground west of it
+   * (ground only, as yet: 2026-10-16) at half that, which is half the memory again and not a third of it.
+   */
+  private *printing(): Generator<void, Sheet[]> {
+    const square = yield* this.printed({ x0: -SQUARE_HALF, z0: -SQUARE_HALF, x1: SQUARE_HALF, z1: SQUARE_HALF, S: this.S });
+    const west = yield* this.printed({ x0: WORLD_X0, z0: WORLD_Z0, x1: -SQUARE_HALF, z1: WORLD_Z1, S: this.S / 2 });
+    return [west, square];
+  }
+
+  private *printed(a: Area): Generator<void, Sheet> {
+    const world = this.world, S = a.S, NW = Math.round((a.x1 - a.x0) * S), NH = Math.round((a.z1 - a.z0) * S);
     const c = document.createElement('canvas');
-    c.width = c.height = N;
+    c.width = NW;
+    c.height = NH;
     const g = c.getContext('2d')!;
-    const img = g.createImageData(N, N), D = img.data;
-    const H = world.heights, R = WORLD_RES;
+    const img = g.createImageData(NW, NH), D = img.data;
+    // (the samples of the world's net the part covers: `nx` across from column `ox`, `nz` down from row `oz`)
+    const H = world.heights, R = WORLD_NX, ox = (a.x0 - WORLD_X0) / CELL, oz = (a.z0 - WORLD_Z0) / CELL, nx = (a.x1 - a.x0) / CELL + 1, nz = (a.z1 - a.z0) / CELL + 1;
+    // (how high and low the ground goes, read over the square as it always was, so that every part is coloured alike)
     let lo = 1e9, hi = -1e9;
-    for (let i = 0; i < H.length; i += 5) {
-      lo = Math.min(lo, H[i]);
-      hi = Math.max(hi, H[i]);
+    const side = (2 * SQUARE_HALF) / CELL + 1, sx0 = (-SQUARE_HALF - WORLD_X0) / CELL, sz0 = (-SQUARE_HALF - WORLD_Z0) / CELL;
+    for (let i = 0; i < side * side; i += 5) {
+      const h = H[(sz0 + Math.floor(i / side)) * R + sx0 + (i % side)];
+      lo = Math.min(lo, h);
+      hi = Math.max(hi, h);
     }
     // the ground's height under every point of a row of the sheet
     const row = (py: number, out: Float32Array) => {
-      const fz = (Math.min(N - 1, py) / (N - 1)) * (R - 1), z0 = Math.min(R - 2, fz | 0), tz = fz - z0;
-      for (let px = 0; px <= N; px++) {
-        const fx = (Math.min(N - 1, px) / (N - 1)) * (R - 1), x0 = Math.min(R - 2, fx | 0), tx = fx - x0, i = z0 * R + x0;
+      const fz = (Math.min(NH - 1, py) / (NH - 1)) * (nz - 1), z0 = Math.min(nz - 2, fz | 0), tz = fz - z0;
+      for (let px = 0; px <= NW; px++) {
+        const fx = (Math.min(NW - 1, px) / (NW - 1)) * (nx - 1), x0 = Math.min(nx - 2, fx | 0), tx = fx - x0, i = (oz + z0) * R + ox + x0;
         out[px] = (H[i] * (1 - tx) + H[i + 1] * tx) * (1 - tz) + (H[i + R] * (1 - tx) + H[i + R + 1] * tx) * tz;
       }
     };
-    let cur = new Float32Array(N + 1), next = new Float32Array(N + 1);
+    let cur = new Float32Array(NW + 1), next = new Float32Array(NW + 1);
     row(0, cur);
-    for (let y = 0; y < N; y++) {
+    for (let y = 0; y < NH; y++) {
       row(y + 1, next);
-      for (let x = 0; x < N; x++) {
+      for (let x = 0; x < NW; x++) {
         const h = cur[x], hr = cur[x + 1], hd = next[x];
         // paper, a little lighter where the ground is high, and lit from the north-west so that its shape reads
         const k = (h - lo) / Math.max(1, hi - lo);
@@ -873,7 +906,7 @@ export class BigMap {
           gr += (92 - gr) * w;
           b += (52 - b) * w;
         }
-        const i = (y * N + x) * 4;
+        const i = (y * NW + x) * 4;
         D[i] = r;
         D[i + 1] = gr;
         D[i + 2] = b;
@@ -883,13 +916,13 @@ export class BigMap {
       cur = next;
       next = t;
       // (a strip of sixteen rows put down, and a pause)
-      if ((y & 15) === 15 || y === N - 1) {
+      if ((y & 15) === 15 || y === NH - 1) {
         const from = y - (y & 15);
-        g.putImageData(img, 0, 0, 0, from, N, y - from + 1);
+        g.putImageData(img, 0, 0, 0, from, NW, y - from + 1);
         yield;
       }
     }
-    const X = (wx: number) => (wx + WORLD_SIZE / 2) * S, Y = (wz: number) => (wz + WORLD_SIZE / 2) * S;
+    const X = (wx: number) => (wx - a.x0) * S, Y = (wz: number) => (wz - a.z0) * S;
     // the woods: green, deeper where the trees stand close
     g.fillStyle = 'rgba(92, 132, 66, 0.2)';
     let trees = 0;
@@ -904,12 +937,18 @@ export class BigMap {
     // the grid: hundred-metre squares
     g.strokeStyle = 'rgba(36, 58, 92, 0.3)';
     g.lineWidth = Math.max(1, S * 0.5);
-    for (let m = 0; m <= WORLD_SIZE; m += GRID) {
+    // (laid from the square's corner, wherever the part is: one grid the world over)
+    const gx = (((-SQUARE_HALF - a.x0) % GRID) + GRID) % GRID, gz = (((-SQUARE_HALF - a.z0) % GRID) + GRID) % GRID;
+    for (let m = gx; m <= a.x1 - a.x0; m += GRID) {
       g.beginPath();
       g.moveTo(m * S, 0);
-      g.lineTo(m * S, N);
+      g.lineTo(m * S, NH);
+      g.stroke();
+    }
+    for (let m = gz; m <= a.z1 - a.z0; m += GRID) {
+      g.beginPath();
       g.moveTo(0, m * S);
-      g.lineTo(N, m * S);
+      g.lineTo(NW, m * S);
       g.stroke();
     }
     // the roads: cased in black, filled the orange of a made road
@@ -977,7 +1016,7 @@ export class BigMap {
     g.strokeStyle = 'rgba(150, 38, 28, 0.9)';
     g.lineWidth = 1.4 * S;
     g.stroke();
-    return c;
+    return { c, x0: a.x0, z0: a.z0, S };
   }
 
   // ------------------------------------------------------------------ each frame it is open
@@ -999,7 +1038,7 @@ export class BigMap {
     }
     if (!this.dirty && !live.pings.length) return;
     this.dirty = false;
-    const g = this.g, k = this.perMetre(), S = this.S, u = dpr;
+    const g = this.g, k = this.perMetre(), u = dpr;
     const sx = (wx: number) => W / 2 + (wx - this.at.x) * k, sy = (wz: number) => Hh / 2 + (wz - this.at.z) * k;
     const on = (px: number, py: number, r = 0) => px > -r && py > -r && px < W + r && py < Hh + r;
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -1007,8 +1046,10 @@ export class BigMap {
     g.fillRect(0, 0, W, Hh);
     g.imageSmoothingEnabled = true;
     g.imageSmoothingQuality = 'high';
-    g.setTransform(k / S, 0, 0, k / S, sx(-WORLD_SIZE / 2), sy(-WORLD_SIZE / 2));
-    g.drawImage(this.sheet, 0, 0);
+    for (const s of this.sheet) {
+      g.setTransform(k / s.S, 0, 0, k / s.S, sx(s.x0), sy(s.z0));
+      g.drawImage(s.c, 0, 0);
+    }
     g.setTransform(1, 0, 0, 1, 0, 0);
     const text = (s: string, px: number, py: number, size: number, colour = INK, weight = 700) => {
       g.font = `${weight} ${Math.round(size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
@@ -1165,14 +1206,16 @@ export class BigMap {
     // the grid's letters and numbers, along the top and down the left of the picture
     if (this.shown.grid) {
       // (along the sheet's own edges where the whole of it is in the picture, and the picture's where it runs off it)
-      const half = WORLD_SIZE / 2, x0 = Math.max(0, sx(-half)), x1 = Math.min(W, sx(half)), y0 = Math.max(0, sy(-half)), y1 = Math.min(Hh, sy(half));
+      // (the bands along the world's top and down its west edge; the letters and numbers the square's, as they always
+      // were: the ground west of it has none as yet)
+      const half = SQUARE_HALF, x0 = Math.max(0, sx(WORLD_X0)), x1 = Math.min(W, sx(WORLD_X1)), y0 = Math.max(0, sy(WORLD_Z0)), y1 = Math.min(Hh, sy(WORLD_Z1));
       g.fillStyle = 'rgba(21, 23, 15, 0.82)';
       g.fillRect(x0, y0, x1 - x0, 17 * u);
       g.fillRect(x0, y0, 19 * u, y1 - y0);
       g.font = `700 ${Math.round(11 * u)}px 'JetBrains Mono', ui-monospace, monospace`;
       g.fillStyle = '#e9e4d8';
       g.textAlign = 'center';
-      for (let i = 0; (i + 0.5) * GRID < WORLD_SIZE; i++) {
+      for (let i = 0; (i + 0.5) * GRID < 2 * SQUARE_HALF; i++) {
         const mid = -half + (i + 0.5) * GRID, px = sx(mid), py = sy(mid);
         if (px > x0 + 24 * u && px < x1 - 6 * u) g.fillText(String.fromCharCode(65 + i), px, y0 + 12.5 * u);
         if (py > y0 + 24 * u && py < y1 - 6 * u) g.fillText(String(i + 1), x0 + 9.5 * u, py + 4 * u);
