@@ -49,6 +49,7 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 ## Open, after the trailer
 - Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
 - In-page reconnect (a drop as a blip, no reload); optimizations (the shadow-shader warm-up tried 2026-10-15 was reverted: unproven).
+- LATER, real recorded audio (the owner, 2026-10-16: "our generated audio and low effort patch work is less than desirable, we cant take this on now but its worth documenting for later"). Their reference for bullets flying by: https://www.youtube.com/watch?v=VTuuOiWgVZ0 ("amazing fly by sound"). It is the target to match, not a source: audio taken off a video is a rip (CLAUDE.md: nothing ripped). Find recordings of the same kind (supersonic crack + whizz, near and far) with a licence that allows a game: CC0 on Freesound, the free Sonniss GDC bundles (royalty-free), or a bought pack; then a pass over every generated or patched sound, judged side by side with the reference.
 
 # Where the work stood (handoff, 2026-10-14)
 
