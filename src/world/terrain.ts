@@ -1190,7 +1190,10 @@ kindW[16] = wE.r; kindW[17] = wE.g;
     // (where one gives way to the next drawn by the noise's grain, a metre and more across: the rock picture's own
     // relief, which drew it when the change was spread wide, repeats every few metres along a wall in teeth. All that
     // in the canyon country only, where the net laid rock or scree about: level ground and the dunes' sand as they were)
-    float rocky = smoothstep(0.2, 0.6, kindW[GROUND_CANYON] + kindW[GROUND_GRIT]), s0 = 1.0 - gN.y;
+    // (and the slope the steeper of the drawn normal's and the triangle's own: at a shelf's lip and a riser's foot a
+    // steep triangle whose corners take the shelf's normal is drawn level, and took sand in pale teeth)
+    float facet = 1.0 - abs(normalize(cross(dP3x, dP3y)).y);
+    float rocky = smoothstep(0.2, 0.6, kindW[GROUND_CANYON] + kindW[GROUND_GRIT]), s0 = max(1.0 - gN.y, facet);
     float steep = s0 + ((macro2.b - 0.5) * 0.34 + (macro.g - 0.5) * 0.14) * smoothstep(0.03, 0.12, s0) * rocky;
     float rockF = smoothstep(mix(0.28, 0.2, rocky), mix(0.4, 0.28, rocky), steep), screeF = smoothstep(0.04, 0.12, steep) * (1.0 - rockF) * rocky;
     float wasRock = kindW[GROUND_CANYON] * share * (1.0 - rockF) * rocky;
