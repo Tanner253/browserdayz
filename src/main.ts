@@ -18,6 +18,10 @@ import { ruinLoot, ruinsPlan } from './sim/ruins';
 import { Ocean } from './world/ocean';
 import { Waterways } from './world/water';
 import { waterAt } from './sim/water';
+import { caveMouths } from './sim/pass';
+import { caveLootPoints } from './world/caves-carved';
+import { PassCaves } from './world/caves';
+import { passPlan } from './world/worldgen';
 import { loadWorld } from './world/load-world';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
@@ -189,7 +193,8 @@ async function boot() {
   const buildings = new Buildings(world, atmo);
   buildings.plan();
   // (the basements' steps are open in the ground: the houses are planned after the ground is made)
-  terrain.openWells(world.basements ?? []);
+  // (and the mouths of the pass's caves, src/sim/pass.ts: the ground open there)
+  terrain.openWells(world.basements ?? [], arena ? [] : caveMouths(passPlan));
   // (?nobatch: the walls drawn as before 2026-10-16, to compare the two)
   buildings.multiDraw = r.renderer.extensions.has('WEBGL_multi_draw') && !new URLSearchParams(location.search).has('nobatch');
   buildings.build(r.scene);
@@ -205,6 +210,11 @@ async function boot() {
   const kalat = !arena && world.kalat ? ruinsPlan(world.kalat) : [];
   const kalatRuins = kalat.length ? new Ruins(atmo, r.scene, kalat, ready) : null;
   for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, ground));
+  // (the pass's caves, carved where the world was made (World.caves), dressed with the coast kit's rock; their places
+  // for things after Kalat's, as the server lays them)
+  const caves = arena ? null : new PassCaves(r.scene, atmo, passPlan, ground);
+  if (caves) void caves.build({ carved: world.caves });
+  if (caves) buildings.lootPoints.push(...caveLootPoints());
   const sea = arena ? null : new Ocean(r.scene, atmo, {
     seaLevel: SEA_LEVEL, x0: WORLD_X0 - 300, x1: -3560, z0: WORLD_Z0, z1: WORLD_Z1, beyond: { west: 16000, north: 6000, south: 6000 },
     depthAt: (x, z) => SEA_LEVEL - heightAt(world.heights, Math.max(x, WORLD_X0), Math.min(WORLD_Z1, Math.max(WORLD_Z0, z))),
@@ -233,6 +243,7 @@ async function boot() {
   const game = new Game({ r, world, atmo, terrain, veg, grass, buildings });
   if (westTowns) game.beside.push((_dt, eye) => westTowns.update(eye));
   if (kalatRuins) game.beside.push((_dt, eye) => kalatRuins.update(eye));
+  if (caves) game.beside.push((_dt, eye) => caves.update(eye));
   if (sea) game.beside.push((dt, eye, camera) => sea.update(dt, eye, camera));
   if (waters) {
     game.beside.push((dt, eye, camera) => waters.update(dt, eye, camera));

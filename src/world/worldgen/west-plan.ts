@@ -51,6 +51,8 @@ export const PLAN = {
     west: -2420, east: -2085, crest: -2250, jag: [40, 18] as P, top: 110, peaks: 14, gap: 46,
     /** how far back the deepest of its side canyons cut into it */
     bays: 120,
+    /** its west foot pushed out round the pass, a spur, so that the canyon's walls and the caves in them have rock to the mouth: how far, over what z either side of the pass */
+    spur: [80, 70, 170] as [number, number, number],
     /** the beds of its rock, level (the heights between them, over the sea): each a bench of scree and a cliff over it */
     beds: [0, 13, 27, 40, 56, 70, 86, 100, 114, 132],
   },
@@ -73,10 +75,11 @@ export const PLAN = {
       { side: -1, level: 0, along: [200, 235] as P }, { side: -1, level: 1, along: [290, 325] as P }, { side: -1, level: 2, along: [100, 135] as P },
       { side: -1, level: 2, along: [380, 415] as P },
     ],
-    // (coast-kit's plan, src/sim/pass.ts: the river a little off the north wall, dry floor before the hall's mouth at
-    // its foot; the floor's loot cache south of the middle, the road beyond it)
-    river: { side: -8 },
-    road: 14,
+    // (coast-kit's plan, src/sim/pass.ts, whose `t` is our `s`: the river 8 m off the middle toward the south wall, the
+    // road beyond it on the dry floor before the hall's mouth at that wall's foot; the floor's loot cache on the other
+    // side, north of the middle)
+    river: { side: 8 },
+    road: 16,
     loot: [-2270, -440] as P,
   },
   /**

@@ -300,7 +300,10 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), branch(R.kalat)];
   const preBed = heights.slice(), gap = new Float32Array(n).fill(1e9);
   // (the branches' beds first, and the main road's over them where they meet)
-  for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, () => 1, net, { fill: 0.35, cut: 0.6, gap });
+  // (but in the pass, where the road lies on its level floor: its shelves are the plan's, and the caves are under them)
+  // (its mouths are open ground the road comes down into: the caves begin some ninety metres in)
+  const outOfPass = (x: number, z: number) => { if (passNear(x, z) > 75) return 1; const a = passLine.near(x, z).along; return a > 60 && a < passLine.total - 60 ? 0 : 1; };
+  for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, outOfPass, net, { fill: 0.35, cut: 0.6, gap });
   // (and the loop's own over the main road's where it leaves it: the loop as the square laid it, about the junction only)
   {
     const jx = main.points[0], jz = main.points[2], lp = loop.points;
