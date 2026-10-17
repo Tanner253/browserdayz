@@ -92,6 +92,8 @@ export interface ItemDef {
     optic?: string;
     /** a scope that is part of the gun: aimed, it is looked through, as a rifle with the PU scope on */
     ownScope?: boolean;
+    /** two of it, one in each hand: the left button fires the left one, the right button the right; not aimed down sights */
+    akimbo?: boolean;
     never?: string[];
     /** and pieces that are taken off when an attachment goes on in their place (attachment -> pieces): a brake, for a suppressor */
     hides?: Record<string, string[]>;
@@ -184,6 +186,13 @@ const D: ItemDef[] = [
     id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
     desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading.',
     weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, shows: { mag_vssk: ['mag', 'bullet'] } }, iconYaw: 0,
+  },
+  // A pair of submachine guns, one in each hand (2026-10-17): the left button fires the left one, the right button the
+  // right ("akimbo weapons are shot with left and right click controlling their respective hands"). Never aimed.
+  {
+    id: 'dual_smg', name: 'Dual SMGs', model: 'dualsmg', w: 6, h: 3, weight: 4.4, category: 'weapon', slot: 'long',
+    desc: 'Two submachine guns in 9 mm, one in each hand: left button for the left, right button for the right. Thirty rounds in each, never aimed down a sight.',
+    weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 60, mag: 'mag_dual_smg', ergo: 55, modes: ['auto', 'semi'], akimbo: true, shows: { mag_dual_smg: ['mag'] } }, iconYaw: 0,
   },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
   {
@@ -341,6 +350,11 @@ const D: ItemDef[] = [
     mag: { ammo: 'ammo_127x55', capacity: 5 }, attach: { fits: ['vssk'], slot: 'magazine' },
   },
   {
+    id: 'mag_dual_smg', name: 'SMG Magazine Pair', model: 'dualsmg', nodeRe: '^mag', w: 1, h: 3, weight: 0.5, category: 'magazine',
+    desc: 'Two thirty-round magazines taped together, one for each of the Dual SMGs.',
+    mag: { ammo: 'ammo_9mm', capacity: 60 }, attach: { fits: ['dual_smg'], slot: 'magazine' },
+  },
+  {
     id: 'mag_mp7', name: 'MP7 Magazine', model: 'mp7a1', nodeRe: '^mag', w: 1, h: 2, weight: 0.25, category: 'magazine',
     desc: 'Forty rounds for the MP7A1.',
     mag: { ammo: 'ammo_9mm', capacity: 40 }, attach: { fits: ['mp7a1'], slot: 'magazine' },
@@ -419,7 +433,7 @@ const D: ItemDef[] = [
     attach: { fits: ['mp7a1'], slot: 'muzzle', ergo: -6, recoil: 0.86, quiet: true },
   },
   {
-    id: 'mp7_sight', name: 'MP7 Sight', model: 'mp7a1', nodeRe: '^sight', w: 2, h: 1, weight: 0.25, category: 'attachment',
+    id: 'mp7_sight', name: 'MP7 Sight', model: 'mp7a1', nodeRe: '^sight(_\\d+)?$', w: 2, h: 1, weight: 0.25, category: 'attachment',
     desc: 'The MP7A1 reflex sight, and no other gun takes it: a lit dot over its rail.',
     attach: { fits: ['mp7a1'], slot: 'optic', ergo: 3 },
   },

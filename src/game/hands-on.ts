@@ -51,7 +51,8 @@ const setAt = (o: THREE.Object3D, v: THREE.Vector3) => {
   o.position.copy(_e.copy(v).applyMatrix4(_m.copy(o.parent!.matrixWorld).invert()));
   o.updateWorldMatrix(false, false);
 };
-const kids = (o: THREE.Object3D) => o.children.filter((c) => (c as THREE.Bone).isBone);
+/** a joint's child joints: bones, or plain nodes where the pack's skin was left out with its arms (`ourArms`), not what is hung on them */
+const kids = (o: THREE.Object3D) => o.children.filter((c) => (c as THREE.Bone).isBone || c.type === 'Object3D');
 
 export class HandsOn {
   private arms: Arm[] = [];

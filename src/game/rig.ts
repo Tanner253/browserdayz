@@ -253,6 +253,24 @@ export class WeaponRig {
     this.hands = new HandsOn(this.scene, this.root, arms, info, shift, shoulders, hip, paint);
   }
 
+  /**
+   * One movement played over another for what hangs under these nodes only, `k` of the way through it: one hand and
+   * its gun firing while the other stands as it was (the akimbo packs draw both guns firing at once). Call after
+   * `pose` and `mix`.
+   */
+  layer(clip: string, k: number, roots: string[]) {
+    const keep = new Map<THREE.Object3D, [THREE.Vector3, THREE.Quaternion]>();
+    this.scene.traverse((o) => void keep.set(o, [o.position.clone(), o.quaternion.clone()]));
+    this.pose(clip, k);
+    const under = new Set<THREE.Object3D>();
+    for (const r of roots) this.node(r)?.traverse((o) => void under.add(o));
+    for (const [o, [p, q]] of keep) {
+      if (under.has(o)) continue;
+      o.position.copy(p);
+      o.quaternion.copy(q);
+    }
+  }
+
   /** Our arms put after the pack's: once the frame's movement is set. */
   follow() {
     this.hands?.follow();

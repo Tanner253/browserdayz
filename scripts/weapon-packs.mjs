@@ -438,7 +438,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       if (cfg.ourArms) {
         for (const n of whole.getRoot().listNodes()) if (n.getMesh()) n.setMesh(null).setSkin(null);
         const keep = new Set();
-        const wantNode = new RegExp(`upper_?arm|forearm|lower_?arm|hand|palm|thumb|index|middle|ring|pinky|^(${[...Object.keys(cfg.skinned?.joints ?? {}), ...Object.keys(cfg.parts ?? {}), cfg.eye].filter(Boolean).join('|')})$`, 'i');
+        const wantNode = new RegExp(`upper_?arm|forearm|lower_?arm|hand|palm|thumb|index|middle|ring|pinky|^(${[...Object.keys(cfg.skinned?.joints ?? {}), ...Object.keys(cfg.parts ?? {}), ...(cfg.keep ?? []), cfg.eye].filter(Boolean).join('|')})$`, 'i');
         const parentOf = new Map();
         for (const n of whole.getRoot().listNodes()) for (const c of n.listChildren()) parentOf.set(c, n);
         for (const n of whole.getRoot().listNodes()) if (wantNode.test(n.getName())) for (let p = n; p; p = parentOf.get(p)) keep.add(p);

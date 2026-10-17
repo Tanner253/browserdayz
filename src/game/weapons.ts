@@ -219,6 +219,12 @@ interface VmModel {
   aimRot?: THREE.Euler;
   /** the same with its own sight fitted, where that is squared another way (see `opticRot` in packGun) */
   aimRotOptic?: THREE.Euler;
+  /**
+   * Two guns, one in each hand (the akimbo packs: the owner, "akimbo weapons are shot with left and right click
+   * controlling their respective hands"): the left one's flash and where its muzzle is (the right one's are `flash`
+   * and `muzzle`), what of the pack moves with each hand as it fires, and how long since each fired.
+   */
+  twin?: { flash: MuzzleFlash; muzzle: THREE.Vector3; roots: { L: string[]; R: string[] }; shotT: { L: number; R: number } };
   /** the attachment that is its optic: with it on, `ads` is where the eye goes; without, `adsIron` */
   optic?: string;
   /** the front of its weapon light, in the body's space (the beam starts there) */
@@ -271,6 +277,8 @@ const HELD = {
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
+  // (that maker's packs stand their camera half a metre behind where they are put: as the sniper's)
+  dual_smg: new THREE.Vector3(0, -0.02, -0.36),
   sniper50: new THREE.Vector3(0.14, -0.22, -0.36),
   barrett: new THREE.Vector3(0.14, -0.22, -0.36),
   vssk: new THREE.Vector3(0.14, -0.22, -0.36),
@@ -1298,6 +1306,12 @@ export class Weapons {
     // (the Barrett and the VSSK came with no movements: held in the .50's, on its pieces' nodes; their own bolts stand still, they load themselves)
     this.models.set('barrett', await this.packGun({ pack: 'sniper50', item: 'barrett', gun: 'barrett', kind: 'rifle', hands: true, hip: HELD.barrett, flashSize: 0.45, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bolt: 'base', trigger: 'trigger' } }));
     this.models.set('vssk', await this.packGun({ pack: 'sniper50', item: 'vssk', gun: 'vssk', kind: 'rifle', hands: true, hip: HELD.vssk, flashSize: 0.2, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bullet: 'mag' } }));
+    // (a pair: the right hand's gun on its own nodes, the left's on the _2 nodes; each hand and its gun fire by themselves)
+    this.models.set('dual_smg', await this.packGun({
+      pack: 'dualsmg', item: 'dual_smg', gun: 'dualsmg', kind: 'auto', hands: true, hip: HELD.dual_smg, flashSize: 0.22, flash: mkFlash(), strip: [],
+      ride: { base: 'base', bolt: 'bolt', trigger: 'trigger', mag: 'mag' },
+      twin: { ride: { base: 'base_2', bolt: 'bolt_2', trigger: 'trigger_2', mag: 'mag_2' }, flash: mkFlash(), roots: { L: ['smg2Left', 'L_arm_01'], R: ['smg2Right', 'R_arm_025'] } },
+    }));
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };
@@ -1551,7 +1565,7 @@ export class Weapons {
    * @param o.ride which of the pack's pieces each piece of that gun rides on (so: moves with)
    * @param o.nudge where that gun sits in the pack's hands, from where the fitting of one gun to the other left it (the gun's own space)
    */
-  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; /** held in our own arms (the AK's pair), the pack's own not drawn: ./hands-on.ts */ hands?: boolean; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number; strip?: string[]; ride?: Record<string, string>; nudge?: THREE.Vector3; /** the pack's arms are its own, and not the one pair every other gun is held in */ ownArms?: boolean; /** the pack holds its gun turned in to the middle of the picture: at the eye it is squared to the line of sight */ square?: boolean; /** a second magazine: [the piece it is hung on, the piece it is hung by] */ spare?: [string, string]; /** where it sits in the pack's hands, from where the pack's own gun does (the gun's own space): only in the hands, the gun as others see it is not moved */ seat?: { move: THREE.Vector3; turn?: THREE.Euler; size?: number } }): Promise<VmModel> {
+  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; /** held in our own arms (the AK's pair), the pack's own not drawn: ./hands-on.ts */ hands?: boolean; /** a second of the gun, in the left hand: its pieces on these nodes, its flash, and what of the pack moves with each hand */ twin?: { ride: Record<string, string>; flash: MuzzleFlash; roots: { L: string[]; R: string[] } }; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number; strip?: string[]; ride?: Record<string, string>; nudge?: THREE.Vector3; /** the pack's arms are its own, and not the one pair every other gun is held in */ ownArms?: boolean; /** the pack holds its gun turned in to the middle of the picture: at the eye it is squared to the line of sight */ square?: boolean; /** a second magazine: [the piece it is hung on, the piece it is hung by] */ spare?: [string, string]; /** where it sits in the pack's hands, from where the pack's own gun does (the gun's own space): only in the hands, the gun as others see it is not moved */ seat?: { move: THREE.Vector3; turn?: THREE.Euler; size?: number } }): Promise<VmModel> {
     /** a gun held at the shoulder in both hands (anything that is not a pistol) */
     const long = o.kind !== 'pistol';
     /** what the gun's own body is hung on in the pack (and so what is fitted to it) */
@@ -1704,6 +1718,7 @@ export class Weapons {
     for (const c of world.children) if (c.name === 'suppressor') c.position.copy(mouth);
     /** the gun's own pieces as they are in the hands: by the name each has in its own file */
     const hung = new Map<string, THREE.Object3D>();
+    const twinHung = new Map<string, THREE.Object3D>();
     if (o.gun) {
       rig.strip(o.strip ?? ['base', 'slide', 'mag', 'hammer', 'trigger', 'stopper', 'shell_1']);
       for (const [piece, on] of Object.entries(o.ride ?? { base: 'base', slide: 'slide', mag: 'mag' })) {
@@ -1717,6 +1732,17 @@ export class Weapons {
         // (and a piece that comes off when something goes on in its place)
         const off = Object.keys(hides).find((m) => hides[m].includes(piece));
         if (off) shown.push([g, `!${off}`]);
+      }
+      // (the left hand's gun of a pair: the same pieces again, on that gun's own nodes, hung by where the right one's
+      // stand: they are the right gun's pieces, put where the left gun is)
+      for (const [piece, on] of Object.entries(o.twin?.ride ?? {})) {
+        const g = new THREE.Group();
+        for (const c of world.children) if (c.name === piece) g.add(c.clone());
+        if (!g.children.length) continue;
+        rig.hang(g, on, o.ride?.[piece] ?? on);
+        twinHung.set(piece, g);
+        const mod = modOf(piece);
+        if (mod) shown.push([g, mod]);
       }
       // a second magazine, the fresh one of a reload: the same magazine, hung on its own joint as the first is on its
       // (there when the first is: with a drum in the gun, the fresh one is a drum, made below)
@@ -2020,6 +2046,15 @@ export class Weapons {
     // (the flash rides on the gun, so it goes where the barrel goes in the kick)
     o.flash.root.position.copy(m.muzzle);
     body.add(o.flash.root);
+    if (o.twin) {
+      rig.rest();
+      rig.root.updateMatrixWorld(true);
+      const tb = twinHung.get('base');
+      const at = (tb ? frontOf(tb) : null) ?? m.muzzle.clone();
+      o.twin.flash.root.position.copy(at);
+      body.add(o.twin.flash.root);
+      m.twin = { flash: o.twin.flash, muzzle: at, roots: o.twin.roots, shotT: { L: 9, R: 9 } };
+    }
     return m;
   }
 
@@ -2315,6 +2350,8 @@ export class Weapons {
     this.selectorT = Math.max(0, this.selectorT - dt);
     // (what is left of the frame a gun comes ready in is kept for its next shot: see `cooled`)
     this.fireCooldown = cooled(this.fireCooldown, dt);
+    this.twinCool.L = cooled(this.twinCool.L, dt);
+    this.twinCool.R = cooled(this.twinCool.R, dt);
     this.hitMarker = Math.max(0, this.hitMarker - dt);
     this.updateBullets(dt);
     this.updateBrass(dt);
@@ -2338,7 +2375,8 @@ export class Weapons {
     // ----- aiming
     // (nor on hands and feet up a steep face: see Player.handsBusy)
     const canAim = enabled && !this.held && !!m && !p.sprinting && !p.handsBusy && (!this.action || this.action.name === 'bolt') && !p.dead;
-    this.aiming = canAim && input.held('Mouse2');
+    // (a pair is not aimed down sights: its right button is its right hand's trigger)
+    this.aiming = canAim && input.held('Mouse2') && !def?.weapon?.akimbo;
     this.spread = def?.weapon && item ? this.spreadNow(item.id) : 0;
     p.aiming = this.aiming;
     // a handy gun is at the eye in a fifth of a second; a long heavy one takes twice that
@@ -2376,7 +2414,13 @@ export class Weapons {
         // breaking back into a sprint between shots.
         const up = this.sprintT < SPRINT_OUT.up;
         if (input.held('Mouse0') || input.held('Mouse2')) p.sprintLock = Math.max(p.sprintLock, SPRINT_OUT.lock);
-        if (input.pressed('Mouse0')) {
+        if (m.twin) {
+          // (a pair: the left button the left hand's gun, the right button the right's, each at its own pace)
+          for (const [s, button] of [['L', 'Mouse0'], ['R', 'Mouse2']] as const) {
+            if (input.pressed(button) && up) this.tryFire(m, item, camera, true, s);
+            else if (auto && input.held(button) && up) this.tryFire(m, item, camera, false, s);
+          }
+        } else if (input.pressed('Mouse0')) {
           if (up) this.tryFire(m, item, camera, true);
           else this.wantShot = SPRINT_OUT.keep;
         } else if (this.wantShot > 0 && up) {
@@ -2469,15 +2513,19 @@ export class Weapons {
     return coneOf(id, { aimed: this.adsT, moving: p.movingSmooth, air: !p.grounded || p.footing === 'slide', crouched: p.crouched, prone: p.prone, heat: this.burst });
   }
 
-  private tryFire(m: VmModel, item: ItemInstance, camera: THREE.PerspectiveCamera, trigger: boolean) {
-    if (this.action || this.fireCooldown > 0) return;
+  /** how long until each gun of a pair can fire again (its own pace: half the pair's) */
+  private twinCool = { L: 0, R: 0 };
+  /** @param side the hand whose gun of a pair fires */
+  private tryFire(m: VmModel, item: ItemInstance, camera: THREE.PerspectiveCamera, trigger: boolean, side?: 'L' | 'R') {
+    if (this.action || (side ? this.twinCool[side] > 0 : this.fireCooldown > 0)) return;
     const def = ITEMS[item.id];
     if (!def.weapon) return;
     if ((item.loaded ?? 0) <= 0 || !this.boltReady) {
       // (in the arena an empty gun is reloaded at the trigger, as in CS:GO)
       if (this.freeReload && (item.loaded ?? 0) <= 0) return this.reload(m, item);
       if (trigger) audio.dryFire();
-      this.fireCooldown = 0.25;
+      if (side) this.twinCool[side] = 0.25;
+      else this.fireCooldown = 0.25;
       return;
     }
     item.loaded = (item.loaded ?? 0) - roundsSpent(this.endless);
@@ -2535,11 +2583,12 @@ export class Weapons {
     this.kickRot.v.x += (big ? 9 : kind === 'auto' ? 5.5 : 7) * own;
     this.kickRot.v.z += (Math.random() - 0.5) * (big ? 3 : 2) * own;
     // (the light and the smoke of it are in the world: they come from where the barrel's end is seen to be)
-    const muzzleWorld = m.flash.root.parent
-      ? this.toWorld(this.vmCamera.worldToLocal(m.flash.root.getWorldPosition(new THREE.Vector3())), camera)
+    const flash = side === 'L' && m.twin ? m.twin.flash : m.flash;
+    const muzzleWorld = flash.root.parent
+      ? this.toWorld(this.vmCamera.worldToLocal(flash.root.getWorldPosition(new THREE.Vector3())), camera)
       : camera.position.clone().add(new THREE.Vector3(0.12, -0.1, -0.9).applyQuaternion(camera.quaternion));
     if (!suppressed) {
-      m.flash.fire(FLAME[kind]);
+      flash.fire(FLAME[kind]);
     }
     // The smoke of one's own shot: a breath of it, thrown well ahead and gone in under a second. (It was what a
     // shot seen from across a field gives, five puffs that hang two seconds: held open, a rifle stood a bank of
@@ -2551,6 +2600,12 @@ export class Weapons {
     this.fx.muzzle(suppressed ? muzzleWorld.addScaledVector(ahead, kind === 'pistol' ? 0.13 : 0.19) : muzzleWorld, ahead, big || kind === 'auto', suppressed, 0, thin);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed, VOICE[item.id], crackOf(v0));
 
+    // (a pair: the hand that fired takes the shot by itself, at the pace of one gun of the two)
+    if (side && m.twin) {
+      m.twin.shotT[side] = 0;
+      this.twinCool[side] += interval * 2;
+      return;
+    }
     m.shotT = 0;
     m.shotClip = m.rig?.has('fireLast') && (item.loaded ?? 0) === 0 ? 'fireLast' : 'fire';
     if (boltAction(item.id)) {
@@ -3581,6 +3636,13 @@ export class Weapons {
       const going = p.movingSmooth * (p.grounded ? 1 : 0);
       rig.mix('walk', stride, going * (1 - this.sprintT) * (1 - this.adsT * 0.85), m.fast);
       rig.mix('run', stride, this.sprintT, m.fast);
+    }
+    // (a pair: each hand and its gun fire by themselves, over the other standing as it was)
+    if (m.twin) {
+      for (const s of ['L', 'R'] as const) {
+        m.twin.shotT[s] += dt;
+        if (m.twin.shotT[s] < len) rig.layer(shot, m.twin.shotT[s] / len, m.twin.roots[s]);
+      }
     }
     // (a pistol on a pack with no drawing of a last shot: run dry, its slide stays back)
     if (m.slideOn && this.chamberEmpty && m.shotT >= len) rig.slide(m.slideOn, -SLIDE_LOCK);

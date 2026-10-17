@@ -1236,6 +1236,32 @@ export const WEAPON_PACKS = {
       changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
     },
   },
+  dualsmg: {
+    dir: 'dualsmg',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 0.01,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (two of the one gun, one in each hand: the right one's pieces are the gun alone; the left one's, named _2, are
+    // hung with a second copy of it in the game)
+    parts: { base: 'base', ejector: 'base', bolt: 'bolt', trigger: 'trigger', mag: 'mag', bullet: 'mag' },
+    keep: ['smg2Left', 'smg2Right', 'base_2', 'ejector_2', 'bolt_2', 'trigger_2', 'mag_2', 'bullet_2'],
+    ourArms: true,
+    wrists: { right: 'R_wrist_027', left: 'L_wrist_03' },
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    // (both fire at once, both are reloaded at once, then held and looked over: by where their pieces move. The game
+    // plays the shot for one hand and its gun at a time.)
+    clips: { fire: [0, 9], reload: [15, 42], idle: [44, 70], check: [70, 122] },
+    credit: {
+      name: 'dual smgs',
+      url: 'https://sketchfab.com/3d-models/dual-smgs-faf517bf83fd4029b4814f28f09881bb',
+      author: 'DJMaesen',
+      line: 'This work is based on "dual smgs" (https://sketchfab.com/3d-models/dual-smgs-faf517bf83fd4029b4814f28f09881bb) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its one animation cut into movements, textures at 2048',
+    },
+  },
   aks74u: {
     dir: 'aks74u',
     file: 'scene.gltf',
