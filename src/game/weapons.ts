@@ -2020,8 +2020,11 @@ export class Weapons {
     for (const [obj] of fittedOn) obj.removeFromParent();
     rig.root.updateMatrixWorld(true);
     const boxOf = (piece: string, fallback: string) => (hung.has(piece) ? new THREE.Box3().setFromObject(hung.get(piece)!) : rig.box(fallback));
-    // (a rifle with no sight piece of its own is measured by its body)
-    const sight = long ? (hung.has('sight') ? boxOf('sight', 'base') : hung.has('base') ? boxOf('base', 'base') : rig.box('glass')) : boxOf('slide', 'slide');
+    // (a rifle with no sight piece of its own is measured by its body; one with a scope of its own, by that scope: by
+    // its body, bipod and all, the eye was put low on it, and the .50s and the VSSK came up to the eye too high, the
+    // owner: "the ads animation places the sniper too high during the transition from rest to ADS")
+    const ownScope = long && !!ITEMS[o.item].weapon?.ownScope && hung.has('scope');
+    const sight = long ? (hung.has('sight') ? boxOf('sight', 'base') : ownScope ? boxOf('scope', 'base') : hung.has('base') ? boxOf('base', 'base') : rig.box('glass')) : boxOf('slide', 'slide');
     const frame = boxOf('base', 'base');
     for (const [obj, parent] of fittedOn) parent!.add(obj);
     rig.root.updateMatrixWorld(true);
@@ -2106,9 +2109,20 @@ export class Weapons {
     // (a gun in the rifle's hands with a holographic sight of its own: the mark is put in its glass, which is the upper part of it)
     // (a sight whose lens was cut out: the middle of the ring it was in, as the gun holds it)
     const lensRig = lens && hung.has('sight') ? lens.at.clone().add(nudge).applyMatrix4(hung.get('sight')!.matrixWorld) : null;
-    const glassY = (lensRig ? lensRig.y : THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7)) + (GLASS[o.item]?.[1] ?? 0);
+    // (a scope of its own: the middle of its eyepiece, the ring of its points nearest the eye; its knobs are not that)
+    let eyepiece: THREE.Vector3 | null = null;
+    if (ownScope) {
+      const pts: THREE.Vector3[] = [];
+      hung.get('scope')!.traverse((n) => {
+        const P = (n as THREE.Mesh).isMesh ? (n as THREE.Mesh).geometry.getAttribute('position') : null;
+        for (let i = 0; P && i < P.count; i++) pts.push(new THREE.Vector3().fromBufferAttribute(P, i).applyMatrix4(n.matrixWorld));
+      });
+      const back = Math.max(...pts.map((p) => p.z)), ring = pts.filter((p) => p.z > back - 0.01);
+      if (ring.length) eyepiece = ring.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(ring.length);
+    }
+    const glassY = (eyepiece ? eyepiece.y : lensRig ? lensRig.y : THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7)) + (GLASS[o.item]?.[1] ?? 0);
     /** across: the middle of the glass, where the box of the whole sight, its knobs and its mount, is not that */
-    const glassX = (lensRig ? lensRig.x : c.x) + (GLASS[o.item]?.[0] ?? 0);
+    const glassX = (eyepiece ? eyepiece.x : lensRig ? lensRig.x : c.x) + (GLASS[o.item]?.[0] ?? 0);
     if (hung.has('sight') && this.reticle) {
       const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.014, 0.014), this.reticle);
       mark.name = 'reticle';
@@ -2126,7 +2140,7 @@ export class Weapons {
     const lit = dotAt ? squared(dotAt) : null;
     // (a sight of its own looked through, the M32's: as near the eye as a holographic sight stood on a gun is, 10 cm
     // behind it, its window round its mark. At 20 cm it was a small ring in the middle of the view, off the gun.)
-    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig && o.item === 'm32' ? 0.1 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
+    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig && o.item === 'm32' ? 0.1 : ownScope ? 0.09 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
     const tip = post ? squared(post as THREE.Vector3) : null;
     const mouthAt = long && hung.has('base') ? frontOf(hung.get('base')!) : null;
@@ -2165,7 +2179,8 @@ export class Weapons {
       ownSights: !!post,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
-      adsIron: ITEMS[o.item].weapon?.fixedSight ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      // (a gun with a scope of its own has no line over its irons: it came up on one, 2 cm over its receiver and under its scope)
+      adsIron: ITEMS[o.item].weapon?.fixedSight || ownScope ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       aimRot: o.square ? aimRot : undefined,
       aimRotOptic: lensRig && o.square ? opticRot : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
