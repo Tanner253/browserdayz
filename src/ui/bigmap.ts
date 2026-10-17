@@ -1,7 +1,9 @@
-// The map, opened large (M): a sheet as an army prints one. The land tinted by what it is (green country, desert
-// sand, red cliffs, snow, blue water: LAND), the ground's shape in brown contour
-// lines every five metres (every fifth one heavier), the woods tinted green, the roads and every building in
-// black, a grid of hundred-metre squares lettered across and numbered down, a scale and a north point.
+// The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: "can we make our map like better?"):
+// the land in its own colours (PAPER: deep green country varying with height and wet ground, golden desert, the
+// canyon's banded red rock, snow, deep water), lit from the north-west so its shape stands up off the sheet, every
+// tree a canopy, cream roads cased in dark, dark roofs, a grid of hundred-metre squares lettered across and numbered
+// down; big names for the regions and an icon by each place; a title, a compass, a legend, a scale and the square
+// under the pointer, round a worn edge.
 //
 // It can be looked into: the wheel (or two fingers) brings it nearer about wherever it is pointed at, a drag
 // moves it, and there are buttons for both and one that goes back to where you stand. It has a way out that can
@@ -39,7 +41,7 @@ export interface MapLive {
 }
 
 /** metres between the lines of the grid, and between contour lines (every fifth is drawn heavier) */
-const GRID = 100, CONTOUR = 5;
+const GRID = 100, CONTOUR = 25;
 /** the first column of the grid, counted from the square's corner (its lines are laid from there): the one the world's west edge falls in */
 const COL0 = Math.floor((WORLD_X0 + SQUARE_HALF) / GRID);
 /**
@@ -61,8 +63,33 @@ interface Area { x0: number; z0: number; x1: number; z1: number; S: number }
 /** a part printed: its picture, where its corner is, and its pixels to a metre */
 interface Sheet { c: HTMLCanvasElement; x0: number; z0: number; S: number }
 const INK = '#1d1b16';
-/** the land's colours on the sheet, as a tinted army map has them, pale enough for the brown contours and the ink to read on */
-const LAND = { green: [190, 206, 156], sand: [228, 205, 156], rock: [190, 120, 86], snow: [236, 236, 232], sea: [126, 168, 196] };
+/** the land's colours, as the owner's picture has them: deep, before the light and shade are laid over them */
+const PAPER = {
+  lush: [74, 118, 50], dry: [132, 140, 76], field: [104, 132, 58],
+  sand: [214, 172, 104], dune: [230, 198, 136], red: [168, 80, 48], stone: [124, 112, 94],
+  snow: [234, 237, 240], shallow: [72, 128, 160], deep: [30, 70, 108],
+};
+/** a smooth noise of the world's own, 0 to 1, over squares `cell` metres across: what the country's colour varies by */
+function vnoise(x: number, z: number, cell: number): number {
+  const fx = x / cell, fz = z / cell, ix = Math.floor(fx), iz = Math.floor(fz), tx = fx - ix, tz = fz - iz;
+  const at = (a: number, b: number) => {
+    let n = Math.imul(a, 374761393) ^ Math.imul(b, 668265263);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  };
+  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
+  return (at(ix, iz) * (1 - sx) + at(ix + 1, iz) * sx) * (1 - sz) + (at(ix, iz + 1) * (1 - sx) + at(ix + 1, iz + 1) * sx) * sz;
+}
+const mix = (a: number[], b: number[], t: number) => a.map((v, j) => v + (b[j] - v) * t);
+/** the regions, named large across the land they are (the owner's picture: SAND DUNES, RED CANYON), world metres */
+const REGIONS: { name: string; x: number; z: number; colour: string }[] = [
+  { name: 'THE DESERT', x: -3150, z: -520, colour: '#f3dfb0' },
+  { name: 'RED CANYON', x: -2380, z: 120, colour: '#f2c0a0' },
+  { name: 'THE GREEN WEST', x: -1250, z: -600, colour: '#d6ecc0' },
+  { name: 'THE VALLEY', x: 120, z: -560, colour: '#d6ecc0' },
+];
+/** the mark by a place's name, by its kind */
+const ICON: Partial<Record<MenuSpot['kind'], string>> = { town: '⌂', police: '★', clinic: '✚', shop: '◆', trader: '$', army: '✦', site: '▲', gas: '☣' };
 /** where the peak's snow lies, metres (the ridge's crest, 95 to 128 m, is under it) */
 const SNOW_ON = 132;
 const TIER_IDS: Tier[] = [1, 2, 3, 4, 5];
@@ -596,7 +623,7 @@ export class BigMap {
     this.root.innerHTML = `
       <div class="hm-sheet">
         <div class="hm-bar">
-          <div class="hm-title"><b>ZONA</b><span>SHEET 1 · GRID ${GRID} M · CONTOURS ${CONTOUR} M</span></div>
+          <div class="hm-title"><b>MAP</b><span>GRID ${GRID} M · CONTOURS ${CONTOUR} M</span></div>
           <div class="hm-tiers">${TIER_IDS.map((t) => `<button type="button" data-tier="${t}" style="--c:${TIERS[t].colour}"><i></i><span class="hm-long">Tier&nbsp;</span><span class="hm-short">T</span>${t}</button>`).join('')}</div>
           <div class="hm-show">
             <button type="button" data-show="names">Names</button>
@@ -611,7 +638,14 @@ export class BigMap {
           </div>
           <button type="button" class="hm-x" aria-label="Close the map">✕</button>
         </div>
-        <div class="hm-view"><canvas></canvas><div class="hm-tip" hidden></div></div>
+        <div class="hm-view"><canvas></canvas>
+          <div class="hm-frame" aria-hidden="true">
+            <div class="hm-cart"><b>ZONA</b><span>SURVIVE · LOOT · EXTRACT</span></div>
+            <svg class="hm-rose" viewBox="-60 -60 120 120"><circle r="44" class="o"/><circle r="36" class="d"/><polygon points="0,-40 6,0 0,40 -6,0" class="ns"/><polygon points="-40,0 0,-6 40,0 0,6" class="ew"/><polygon points="0,-40 6,0 -6,0" class="n"/><text y="-47">N</text><text y="57" class="s">S</text><text x="53" y="4" class="s">E</text><text x="-53" y="4" class="s">W</text></svg>
+            <div class="hm-legend"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div><div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div></div>
+            <div class="hm-sector"><span>SECTOR</span><b>—</b></div>
+          </div>
+          <div class="hm-tip" hidden></div></div>
         <div class="hm-key"></div>
       </div>`;
     this.view = this.root.querySelector('canvas')!;
@@ -731,9 +765,10 @@ export class BigMap {
     this.root.hidden = false;
     this.me.x = x;
     this.me.z = z;
-    this.zoom = 1;
-    this.at = { x, z };
-    if (this.view.width > 2) this.clamp();
+    // (opened on the whole map, as far out as it goes, the owner, 2026-10-17: "the map by default should be completely
+    // zoomed out"; nought until the picture's size is known, see `update`)
+    this.zoom = 0;
+    this.at = { x: (WORLD_X0 + WORLD_X1) / 2, z: (WORLD_Z0 + WORLD_Z1) / 2 };
     this.down.clear();
     this.tip.hidden = true;
     this.whoBox.hidden = true;
@@ -816,6 +851,12 @@ export class BigMap {
   private point(u: number, w: number, left: number, top: number) {
     const W = this.view.width, H = this.view.height, k = this.perMetre();
     const wx = this.at.x + ((u - 0.5) * W) / k, wz = this.at.z + ((w - 0.5) * H) / k;
+    // (the square under the pointer, as its corner names it, and where in the world that is)
+    const sector = this.root.querySelector('.hm-sector b');
+    if (sector) {
+      const col = Math.floor((wx + SQUARE_HALF) / GRID), row = Math.floor((wz + SQUARE_HALF) / GRID) + 1;
+      sector.textContent = wx >= WORLD_X0 && wx <= WORLD_X1 && wz >= WORLD_Z0 && wz <= WORLD_Z1 ? `${colName(col)}${row}` : '—';
+    }
     // (within a finger's width of it on the screen, whatever that is in metres just now)
     const reach = (TOUCH ? 26 : 16) * (W / Math.max(1, this.view.clientWidth)) / k;
     // a building first: the one the point is in (or all but in), if its tier is being shown
@@ -932,41 +973,56 @@ export class BigMap {
         out[px] = (H[i] * (1 - tx) + H[i + 1] * tx) * (1 - tz) + (H[i + R] * (1 - tx) + H[i + R + 1] * tx) * tz;
       }
     };
-    let cur = new Float32Array(NW + 1), next = new Float32Array(NW + 1);
+    let prev = new Float32Array(NW + 1), cur = new Float32Array(NW + 1), next = new Float32Array(NW + 1);
     const sand = world.sand;
     row(0, cur);
+    prev.set(cur);
     for (let y = 0; y < NH; y++) {
       row(y + 1, next);
+      const wz = a.z0 + (y + 0.5) / S;
       for (let x = 0; x < NW; x++) {
-        const h = cur[x], hr = cur[x + 1], hd = next[x];
-        // the land in its colour (the owner, 2026-10-16: "the minimap is all white it would be great if we could give it
-        // some color"): green country, the desert's sand, its cliffs red rock, snow on the peak, the sea blue; a little
-        // lighter where the ground is high, and lit from the north-west so that its shape reads
-        const k = (h - lo) / Math.max(1, hi - lo);
-        const lit = Math.min(1.1, Math.max(0.8, 1 + (hr - h + (hd - h)) * S * 0.16)) * (0.93 + k * 0.09);
+        const h = cur[x], wx = a.x0 + (x + 0.5) / S;
+        // how steep, metres in a metre, across and down the sheet
+        const dx = (cur[x + 1] - cur[x > 0 ? x - 1 : 0]) * 0.5 * S, dz = (next[x] - prev[x]) * 0.5 * S;
+        // The light: from the north-west and high, on ground made 2.6 times as steep as it is, so that the valley's low
+        // hills read as well as the ridge and the dunes (the owner's picture: the land stands up off the sheet).
+        const ux = -dx * 2.6, uz = -dz * 2.6, lam = Math.max(0, (-0.58 * ux + 0.67 - 0.58 * uz) / Math.hypot(ux, 1, uz));
+        const lit = Math.min(1.28, Math.max(0.42, 0.32 + lam * 1.0));
+        const steep = Math.hypot(dx, dz), k = (h - lo) / Math.max(1, hi - lo);
         const si = sand ? ((oz + Math.round((Math.min(NH - 1, y) / (NH - 1)) * (nz - 1))) * R + ox + Math.round((x / (NW - 1)) * (nx - 1))) * 4 : -1;
-        const desert = si >= 0 ? sand![si] / 255 : 0, steep = Math.hypot(hr - h, hd - h) * S;
-        let c = LAND.green.map((v, j) => v + (LAND.sand[j] - v) * desert);
-        if (desert > 0.3 && steep > 0.8) c = c.map((v, j) => v + (LAND.rock[j] - v) * Math.min(1, (steep - 0.8) * 2));
-        if (h > SNOW_ON) c = c.map((v, j) => v + (LAND.snow[j] - v) * Math.min(1, (h - SNOW_ON) / 12));
-        if (h < SEA_LEVEL) c = LAND.sea.map((v, j) => v * (1 - Math.min(0.35, (SEA_LEVEL - h) / 40)) + (j === 2 ? 10 : 0));
-        let r = c[0] * lit, gr = c[1] * lit, b = c[2] * lit;
-        // a contour: where the height passes a multiple of five metres between this point and the next
-        const a = Math.floor(h / CONTOUR), ar = Math.floor(hr / CONTOUR), ad = Math.floor(hd / CONTOUR);
-        if (a !== ar || a !== ad) {
-          const level = Math.max(a, ar, ad) * CONTOUR;
-          const w = level % (CONTOUR * 5) === 0 ? 0.82 : 0.4;
-          r += (132 - r) * w;
-          gr += (92 - gr) * w;
-          b += (52 - b) * w;
+        const desert = si >= 0 ? sand![si] / 255 : 0;
+        const n1 = vnoise(wx, wz, 90), n2 = vnoise(wx + 913, wz - 377, 23);
+        // the country: lush low down and in the wet, olive and drier up the hills, in patches as fields and meadows are
+        let c = mix(mix(PAPER.lush, PAPER.dry, Math.min(1, Math.max(0, k * 1.1 + (n1 - 0.5) * 0.7))), PAPER.field, n2 > 0.72 ? (n2 - 0.72) * 2 : 0);
+        c = mix(c, mix(PAPER.sand, PAPER.dune, n1), desert);
+        // rock where it is steep: the desert's and the canyon's red, in beds a metre or so thick; elsewhere grey stone
+        if (steep > 0.7) {
+          const band = 0.94 + 0.07 * Math.sin(h * 0.85 + n2 * 2.4);
+          c = mix(c, desert > 0.3 ? PAPER.red.map((v) => v * band) : PAPER.stone, Math.min(1, (steep - 0.7) * 1.4));
+        }
+        if (h > SNOW_ON) c = mix(c, PAPER.snow, Math.min(1, (h - SNOW_ON) / 12));
+        let shade = lit * (0.94 + k * 0.1);
+        // the sea: deeper further out, and no light or shade on it
+        if (h < SEA_LEVEL) {
+          c = mix(PAPER.shallow, PAPER.deep, Math.min(1, (SEA_LEVEL - h) / 10));
+          shade = 1;
+        }
+        let r = c[0] * shade, gr = c[1] * shade, bl = c[2] * shade;
+        // a contour every twenty-five metres, faint: the light and shade say the rest
+        const a0 = Math.floor(h / CONTOUR), ar = Math.floor(cur[x + 1] / CONTOUR), ad = Math.floor(next[x] / CONTOUR);
+        if (h >= SEA_LEVEL && steep < 0.45 && (a0 !== ar || a0 !== ad)) {
+          r += (40 - r) * 0.22;
+          gr += (32 - gr) * 0.22;
+          bl += (20 - bl) * 0.22;
         }
         const i = (y * NW + x) * 4;
         D[i] = r;
         D[i + 1] = gr;
-        D[i + 2] = b;
+        D[i + 2] = bl;
         D[i + 3] = 255;
       }
-      const t = cur;
+      const t = prev;
+      prev = cur;
       cur = next;
       next = t;
       // (a strip of sixteen rows put down, and a pause)
@@ -977,42 +1033,55 @@ export class BigMap {
       }
     }
     const X = (wx: number) => (wx - a.x0) * S, Y = (wz: number) => (wz - a.z0) * S;
-    // the woods: green, deeper where the trees stand close
-    g.fillStyle = 'rgba(92, 132, 66, 0.2)';
-    let trees = 0;
-    for (const t of world.trees) {
-      if (t.kind.startsWith('bush')) continue;
+    // The woods: every tree a canopy (the owner's picture: woods that read as forest, not a faint wash), its shadow
+    // to the south-east, its crown, and its lit north-west side, each laid for all the trees at once.
+    const crowns = world.trees.filter((t) => !t.kind.startsWith('bush'));
+    const pass = (fill: string, r: number, off: number) => {
+      g.fillStyle = fill;
       g.beginPath();
-      g.arc(X(t.x), Y(t.z), 3.4 * S, 0, Math.PI * 2);
+      for (const t of crowns) {
+        const px = X(t.x) + off * S, py = Y(t.z) + off * S;
+        g.moveTo(px + r * S, py);
+        g.arc(px, py, r * S, 0, Math.PI * 2);
+      }
       g.fill();
-      if (++trees % 400 === 0) yield;
-    }
+    };
+    pass('rgba(12, 22, 8, 0.22)', 3.6, 1.1);
     yield;
-    // the lakes, the swamp and the river, blue (the swamp's water greener, as its reeds are through it)
+    pass('rgba(38, 66, 30, 0.62)', 3.1, 0);
+    yield;
+    pass('rgba(96, 134, 58, 0.32)', 1.5, -0.9);
+    yield;
+    // the lakes, the swamp and the river, deep blue with a light bank (the swamp's water greener, as its reeds are through it)
     for (const lake of world.water?.lakes ?? []) {
-      g.fillStyle = lake.swamp ? 'rgba(104, 150, 140, 0.6)' : 'rgba(98, 150, 196, 0.85)';
       g.beginPath();
       // (the swamp by its own shore, as its ground is made: its water's outline is the plan's box, a rectangle on the sheet)
       (lake.swamp ? swampShore : lake.outline).forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
       g.closePath();
+      g.fillStyle = lake.swamp ? 'rgba(52, 96, 84, 0.72)' : 'rgba(34, 84, 128, 0.94)';
       g.fill();
+      g.strokeStyle = lake.swamp ? 'rgba(150, 186, 150, 0.5)' : 'rgba(150, 196, 220, 0.75)';
+      g.lineWidth = 1.6 * S;
+      g.stroke();
     }
-    g.strokeStyle = 'rgba(98, 150, 196, 0.9)';
     g.lineJoin = g.lineCap = 'round';
-    for (const river of world.water?.rivers ?? []) {
-      for (let i = 1; i < river.pts.length; i++) {
-        const [ax, az, , aw] = river.pts[i - 1], [bx, bz] = river.pts[i];
-        g.lineWidth = Math.max(1.5, aw * S);
-        g.beginPath();
-        g.moveTo(X(ax), Y(az));
-        g.lineTo(X(bx), Y(bz));
-        g.stroke();
+    for (const [extra, colour] of [[2.4, 'rgba(18, 40, 64, 0.85)'], [0, 'rgba(64, 128, 182, 0.95)']] as [number, string][]) {
+      g.strokeStyle = colour;
+      for (const river of world.water?.rivers ?? []) {
+        for (let i = 1; i < river.pts.length; i++) {
+          const [ax, az, , aw] = river.pts[i - 1], [bx, bz] = river.pts[i];
+          g.lineWidth = Math.max(1.5, (aw + extra) * S);
+          g.beginPath();
+          g.moveTo(X(ax), Y(az));
+          g.lineTo(X(bx), Y(bz));
+          g.stroke();
+        }
       }
     }
     yield;
-    // the grid: hundred-metre squares, plain to see (the owner, 2026-10-16: "make the grid lines more prominent by default
-    // so its easier for people to tell where the grids are")
-    g.strokeStyle = 'rgba(36, 58, 92, 0.55)';
+    // the grid: hundred-metre squares, plain to see on the darker land (the owner, 2026-10-16: "make the grid lines more
+    // prominent by default so its easier for people to tell where the grids are")
+    g.strokeStyle = 'rgba(8, 12, 8, 0.32)';
     g.lineWidth = Math.max(1, S * 0.7);
     // (laid from the square's corner, wherever the part is: one grid the world over)
     const gx = (((-SQUARE_HALF - a.x0) % GRID) + GRID) % GRID, gz = (((-SQUARE_HALF - a.z0) % GRID) + GRID) % GRID;
@@ -1029,7 +1098,7 @@ export class BigMap {
       g.stroke();
     }
     // and each square's name faint in its top corner ("im in C12 for example is helpful to people")
-    g.fillStyle = 'rgba(29, 27, 22, 0.38)';
+    g.fillStyle = 'rgba(248, 242, 222, 0.42)';
     g.font = `600 ${Math.max(7, Math.round(GRID * S * 0.11))}px 'JetBrains Mono', ui-monospace, monospace`;
     g.textAlign = 'left';
     g.textBaseline = 'top';
@@ -1042,9 +1111,9 @@ export class BigMap {
       }
     }
     g.textBaseline = 'alphabetic';
-    // the roads: cased in black, filled the orange of a made road
+    // the roads: cream, cased in dark (the owner's picture)
     g.lineJoin = g.lineCap = 'round';
-    for (const [extra, colour] of [[3, INK], [0, '#d9963f']] as [number, string][]) {
+    for (const [extra, colour] of [[3, '#211c14'], [0, '#e6d8b0']] as [number, string][]) {
       for (const road of [world.road, ...world.roads]) {
         const pts = road.points;
         g.strokeStyle = colour;
@@ -1058,27 +1127,33 @@ export class BigMap {
       }
     }
     // the ways that are not roads, each as a map draws what it is (`Way`): a cart track in long strokes, a foot
-    // path in a finer broken line, as a way that is walked and not driven (and one few come by, finer still)
-    g.strokeStyle = INK;
-    for (const path of world.paths) {
-      g.lineWidth = (path.driven ? 1.9 : path.faint ? 1.1 : 1.4) * S;
-      g.setLineDash(path.driven ? [9 * S, 3 * S] : path.faint ? [2 * S, 4 * S] : [3 * S, 3 * S]);
-      g.beginPath();
-      path.line.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
-      g.stroke();
+    // path in a finer broken line, as a way that is walked and not driven (and one few come by, finer still); pale on
+    // a thin dark line, to be seen on the dark country
+    for (const [extra, colour] of [[1.2, 'rgba(24, 20, 14, 0.7)'], [0, 'rgba(232, 218, 178, 0.9)']] as [number, string][]) {
+      g.strokeStyle = colour;
+      for (const path of world.paths) {
+        g.lineWidth = ((path.driven ? 1.9 : path.faint ? 1.1 : 1.4) + extra) * S;
+        g.setLineDash(path.driven ? [9 * S, 3 * S] : path.faint ? [2 * S, 4 * S] : [3 * S, 3 * S]);
+        g.beginPath();
+        path.line.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
+        g.stroke();
+      }
     }
     g.setLineDash([]);
     yield;
-    // every building, by its own footprint
-    g.fillStyle = INK;
-    for (const b of world.buildings) {
-      const [w, d] = BUILDING_FOOTPRINT[b.type];
-      g.save();
-      g.translate(X(b.x), Y(b.z));
-      g.rotate(-b.rot);
-      g.fillRect((-w / 2) * S, (-d / 2) * S, w * S, d * S);
-      g.restore();
+    // every building, by its own footprint: a dark roof with a lit edge
+    for (const [grow, colour] of [[0.8, 'rgba(226, 214, 180, 0.55)'], [0, '#29241e']] as [number, string][]) {
+      g.fillStyle = colour;
+      for (const b of world.buildings) {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        g.save();
+        g.translate(X(b.x), Y(b.z));
+        g.rotate(-b.rot);
+        g.fillRect((-w / 2 - grow) * S, (-d / 2 - grow) * S, (w + grow * 2) * S, (d + grow * 2) * S);
+        g.restore();
+      }
     }
+    g.fillStyle = '#29241e';
     for (const s of world.solids) {
       g.beginPath();
       g.arc(X(s.x), Y(s.z), Math.max(1.2, s.r) * S, 0, Math.PI * 2);
@@ -1125,7 +1200,12 @@ export class BigMap {
     if (v.width !== W || v.height !== Hh) {
       v.width = W;
       v.height = Hh;
+      if (this.zoom > 0) this.clamp();
+    }
+    if (this.zoom === 0) {
+      this.zoom = this.farthest();
       this.clamp();
+      this.dirty = true;
     }
     if (!this.dirty && !live.pings.length) return;
     this.dirty = false;
@@ -1142,15 +1222,28 @@ export class BigMap {
       g.drawImage(s.c, 0, 0);
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
-    const text = (s: string, px: number, py: number, size: number, colour = INK, weight = 700) => {
+    // (names as the owner's picture has them: light lettering on a dark halo, spaced)
+    const text = (s: string, px: number, py: number, size: number, colour = '#f4eedc', weight = 700, spacing = 0.08) => {
       g.font = `${weight} ${Math.round(size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
-      g.lineWidth = Math.max(2, size * u * 0.26);
-      g.strokeStyle = 'rgba(226, 221, 200, 0.92)';
+      g.letterSpacing = `${(size * u * spacing).toFixed(1)}px`;
+      g.lineWidth = Math.max(2.5, size * u * 0.32);
+      g.strokeStyle = 'rgba(10, 9, 6, 0.82)';
       g.lineJoin = 'round';
       g.strokeText(s, px, py);
       g.fillStyle = colour;
       g.fillText(s, px, py);
+      g.letterSpacing = '0px';
     };
+    // the regions, large and faint behind everything else, at any distance but the nearest
+    if (this.shown.names && this.zoom < 5) {
+      g.textAlign = 'center';
+      g.globalAlpha = 0.9;
+      for (const r of REGIONS) {
+        const px = sx(r.x), py = sy(r.z);
+        if (on(px, py, 300 * u)) text(r.name, px, py, Math.min(34, 20 + this.zoom * 4) * (TOUCH ? 0.8 : 1), r.colour, 700, 0.22);
+      }
+      g.globalAlpha = 1;
+    }
 
     // the gas: the ground it lies on, hatched round
     for (const gas of this.gases) {
@@ -1166,7 +1259,7 @@ export class BigMap {
         g.stroke();
         g.setLineDash([]);
         g.textAlign = 'center';
-        text('GAS · MASK NEEDED', qx, qz + qr + 16 * u, 13, '#5c6a08');
+        text('GAS · MASK NEEDED', qx, qz + qr + 16 * u, 13, '#e8f08c');
       }
     }
 
@@ -1290,7 +1383,27 @@ export class BigMap {
         if (!s.label && this.zoom < (TOUCH ? 2.6 : 1.5)) continue;
         const px = sx(s.x), py = sy(s.z);
         if (!on(px, py, 80 * u)) continue;
-        text(s.name.toUpperCase(), px, py - 9 * u, (s.label ? 15 : 12.5) * (TOUCH ? 0.82 : 1), s.tier && this.shown.tiers.includes(s.tier) ? INK : '#3a372e', s.label ? 700 : 600);
+        const size = (s.label ? 16 : 13) * (TOUCH ? 0.82 : 1), icon = ICON[s.kind];
+        // (its mark: a dark disc with a light rim, its sign in it, left of the name)
+        if (icon) {
+          g.font = `700 ${Math.round(size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+          g.letterSpacing = `${(size * u * 0.08).toFixed(1)}px`;
+          const half = g.measureText(s.name.toUpperCase()).width / 2, r = size * 0.62 * u, ix = px - half - r - 4 * u, iy = py - 9 * u - size * 0.34 * u;
+          g.letterSpacing = '0px';
+          g.beginPath();
+          g.arc(ix, iy, r, 0, Math.PI * 2);
+          g.fillStyle = 'rgba(16, 14, 10, 0.88)';
+          g.fill();
+          g.lineWidth = 1.4 * u;
+          g.strokeStyle = s.tier ? onPaper(s.tier) : '#e8d9a8';
+          g.stroke();
+          g.fillStyle = '#efe4c2';
+          g.font = `700 ${Math.round(size * 0.78 * u)}px 'Segoe UI Symbol', 'Barlow Condensed', sans-serif`;
+          g.textBaseline = 'middle';
+          g.fillText(icon, ix, iy + 0.5 * u);
+          g.textBaseline = 'alphabetic';
+        }
+        text(s.name.toUpperCase(), px, py - 9 * u, size, s.tier && this.shown.tiers.includes(s.tier) ? '#fbf6e6' : '#e2dccb', s.label ? 700 : 600);
       }
     }
 
@@ -1317,38 +1430,25 @@ export class BigMap {
       }
     }
 
-    // a scale: a round number of metres, about a hand's width of the picture
+    // a scale: a round number of metres, about a hand's width of the picture, as a bar in four on a dark panel
     {
-      const want = (150 * u) / k, steps = [10, 20, 50, 100, 200, 500], m = steps.reduce((p, q) => (Math.abs(q - want) < Math.abs(p - want) ? q : p)), len = m * k;
-      const x1 = W - 18 * u, y1 = Hh - 18 * u;
-      g.fillStyle = 'rgba(226, 221, 200, 0.9)';
-      g.fillRect(x1 - len - 8 * u, y1 - 20 * u, len + 16 * u, 30 * u);
-      g.strokeStyle = INK;
-      g.lineWidth = 2 * u;
-      g.beginPath();
-      g.moveTo(x1 - len, y1 - 6 * u);
-      g.lineTo(x1 - len, y1);
-      g.lineTo(x1, y1);
-      g.lineTo(x1, y1 - 6 * u);
-      g.stroke();
+      const want = (170 * u) / k, steps = [10, 20, 50, 100, 200, 500, 1000], m = steps.reduce((p, q) => (Math.abs(q - want) < Math.abs(p - want) ? q : p)), len = m * k;
+      const x1 = W - 22 * u, y1 = Hh - 22 * u;
+      g.fillStyle = 'rgba(14, 13, 11, 0.86)';
+      g.fillRect(x1 - len - 14 * u, y1 - 34 * u, len + 28 * u, 46 * u);
+      g.strokeStyle = 'rgba(200, 180, 130, 0.45)';
+      g.lineWidth = 1 * u;
+      g.strokeRect(x1 - len - 14 * u, y1 - 34 * u, len + 28 * u, 46 * u);
+      g.fillStyle = '#e4ddcc';
+      for (let q = 0; q < 4; q++) if (q % 2 === 0) g.fillRect(x1 - len + (q * len) / 4, y1 - 8 * u, len / 4, 6 * u);
+      g.strokeStyle = '#e4ddcc';
+      g.strokeRect(x1 - len, y1 - 8 * u, len, 6 * u);
+      g.font = `600 ${Math.round(10.5 * u)}px 'JetBrains Mono', ui-monospace, monospace`;
       g.textAlign = 'center';
-      g.font = `700 ${Math.round(11 * u)}px 'JetBrains Mono', ui-monospace, monospace`;
-      g.fillStyle = INK;
-      g.fillText(`${m} M`, x1 - len / 2, y1 - 7 * u);
-      // and north
-      const nx = W - 26 * u, ny = (this.shown.grid ? 17 : 0) * u + 34 * u;
-      g.beginPath();
-      g.moveTo(nx, ny - 18 * u);
-      g.lineTo(nx + 7 * u, ny + 4 * u);
-      g.lineTo(nx, ny - 2 * u);
-      g.lineTo(nx - 7 * u, ny + 4 * u);
-      g.closePath();
-      g.fillStyle = INK;
-      g.strokeStyle = 'rgba(226, 221, 200, 0.92)';
-      g.lineWidth = 2.5 * u;
-      g.stroke();
-      g.fill();
-      text('N', nx, ny + 17 * u, 12);
+      for (let q = 0; q <= 4; q += 2) {
+        g.textAlign = q === 0 ? 'left' : q === 4 ? 'right' : 'center';
+        g.fillText(q === 4 ? `${m} M` : String((m * q) / 4), x1 - len + (q * len) / 4 + (q === 4 ? 6 * u : 0), y1 - 14 * u);
+      }
     }
 
     // everybody else, to an admin: a dot each, and their name (how, is the admin's to choose: see `drawPeople`)

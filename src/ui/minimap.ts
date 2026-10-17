@@ -117,9 +117,15 @@ export class Minimap {
         // (the desert of the west sand-coloured, its rock red: World.sand)
         const sand = world.sand ? world.sand[(Math.min(WORLD_NZ - 1, Math.max(0, Math.round(y / per))) * WORLD_NX + Math.min(WORLD_NX - 1, Math.max(0, Math.round(x / per)))) * 4] / 255 : 0;
         const lit = 0.55 + shade * 0.8;
-        img.data[i] = ((62 + k * 70) * (1 - sand) + 176 * sand) * lit;
-        img.data[i + 1] = ((72 + k * 62) * (1 - sand) + 140 * sand) * lit;
-        img.data[i + 2] = ((44 + k * 40) * (1 - sand) + 102 * sand) * lit;
+        // (in the big map's colours, 2026-10-17: deep green country, olive up the hills, golden sand, the canyon's red
+        // where the desert is steep, snow on the peaks)
+        const steep = Math.abs(at(x + 1, y) - at(x - 1, y)) + Math.abs(at(x, y + 1) - at(x, y - 1));
+        let r = (74 + k * 58) * (1 - sand) + 214 * sand, gg = (118 + k * 22) * (1 - sand) + 172 * sand, b = (50 + k * 26) * (1 - sand) + 104 * sand;
+        if (sand > 0.3 && steep > 6 * per) [r, gg, b] = [r + (168 - r) * 0.7, gg + (80 - gg) * 0.7, b + (48 - b) * 0.7];
+        if (h > 132) [r, gg, b] = [r + (234 - r) * clamp((h - 132) / 12, 0, 1), gg + (237 - gg) * clamp((h - 132) / 12, 0, 1), b + (240 - b) * clamp((h - 132) / 12, 0, 1)];
+        img.data[i] = r * lit;
+        img.data[i + 1] = gg * lit;
+        img.data[i + 2] = b * lit;
         img.data[i + 3] = 255;
       }
     }
