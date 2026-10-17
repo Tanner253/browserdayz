@@ -9,8 +9,7 @@
 // ground (src/world/rock-blend.ts). Drawn and made solid by a RockField (src/world/rock-field.ts).
 
 import { hash2 } from '../core/noise';
-import { caveMouths, type Pass } from '../sim/pass';
-import type { FieldPiece } from './rock-field';
+import { caveMouths, type Pass, type RockPiece } from '../sim/pass';
 import { PLAN, SEA_LEVEL, WORLD_X0, WORLD_Z0, WORLD_Z1, heightAt, passLine, ridgeAt, type World } from './worldgen';
 
 export const OUTCROPS = {
@@ -42,9 +41,9 @@ const SIZE: Record<string, { tall: number; long: number }> = {
 };
 
 /** the outcrops of a world: its ground read for faces, feet, lips and gullies (see the head of this file) */
-export function outcropPieces(world: World, pass: Pass): FieldPiece[] {
+export function outcropPieces(world: World, pass: Pass): RockPiece[] {
   const H = world.heights, h = (x: number, z: number) => heightAt(H, x, z), O = OUTCROPS, G = O.grid;
-  const out: FieldPiece[] = [], count = { big: 0, medium: 0, small: 0 };
+  const out: RockPiece[] = [], count = { big: 0, medium: 0, small: 0 };
   const seed = 9137, r = (a: number, b: number, k: number) => hash2(Math.round(a * 13), Math.round(b * 13), seed + k);
   // (a slow noise for where the clusters are: smooth, from a coarse net of hashes)
   const cluster = (x: number, z: number) => {
