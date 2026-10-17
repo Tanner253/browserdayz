@@ -8,7 +8,7 @@ import { ITEMS } from '../src/sim/items';
 import { fillCrash, fillDrop, pickDropSite } from '../src/sim/drops';
 import { UNDER_GAS } from '../src/sim/crates';
 import { generateWorld, heightAt } from '../src/world/worldgen';
-import { APART, Economy, GAS_RESTOCK } from '../src/sim/economy';
+import { Economy, GAS_RESTOCK, apartOf } from '../src/sim/economy';
 import { fillCrate } from '../src/sim/crates';
 import { RNG } from '../src/core/noise';
 import { buildWorldData } from '../server/world';
@@ -167,7 +167,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     let gasThings = 0;
     for (const l of e.loot.values()) {
       // (the fort on the mountain is stocked apart, on top of the map: what is in it is of none of these)
-      if (l.point >= 0 && APART.has(data.lootPoints[l.point].building)) continue;
+      if (l.point >= 0 && apartOf(data.lootPoints[l.point].building)) continue;
       const under = l.point >= 0 && data.lootPoints[l.point].usage.includes('Gas');
       // (the bunker is stocked apart as well: what is in it is neither of the gas nor of the rest of the map)
       // (and so is Kamenka, the town in the east)

@@ -15,6 +15,7 @@ import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
+import { TOWNS } from '../sim/towns';
 import { castleLoot, castleProps } from '../sim/castle';
 import { frameToWorld, planBasements, type RoomKind } from '../sim/basements';
 import { buildBasement, roomVolume, type Kit } from './basement-build';
@@ -73,6 +74,10 @@ export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 
  * hut, the rooms the hospital's own people sat in.)
  */
 export const SEARCHED_KINDS = new Set(['med_cabinet', 'steel_locker']);
+/** the new towns' building ids (`<town>_<n>`): their plots are the last of the world's, and what they make comes after everything older (see `plan`) */
+export const TOWN_PLOT = new RegExp(`^(${TOWNS.map((t) => t.name.toLowerCase()).join('|')})_\\d+$`);
+/** how far from Kalat's middle the things set down in it lie (its pieces reach some 200 m) */
+const KALAT_REACH = 260;
 
 /**
  * Walls and doors are drawn before anything that grows or lies about (trees, grass and props
@@ -1473,7 +1478,20 @@ export class Buildings {
 
   /** Generates layouts; pushes furniture / yard props into world.props so they get instanced. */
   plan() {
+    // The new places of the map three times over (the towns and Kalat, 2026-10-16) come after everything older, so
+    // that no place for a thing, fire pit or drum before them is renumbered: what the towns' plots make (places,
+    // racks' places, furniture) is taken out as it is made, and the things the west set down in the towns and Kalat
+    // are taken out now; all of it goes back at the very end. (Their plots are the last of the world's buildings.)
+    const firstTown = this.world.buildings.findIndex((b) => TOWN_PLOT.test(b.id));
+    const site = this.world.kalat, inPlace = (q: Instance) => (!!site && Math.hypot(q.x - site.x, q.z - site.z) < KALAT_REACH) || (this.world.towns ?? []).some(({ town: t }) => {
+      const c = Math.cos(t.rot), s = Math.sin(t.rot), dx = q.x - t.x, dz = q.z - t.z;
+      return Math.abs(dx * c - dz * s) < t.pad[0] + 10 && Math.abs(dx * s + dz * c) < t.pad[1] + 10;
+    });
+    const placed = this.world.props.filter(inPlace);
+    if (placed.length) this.world.props = this.world.props.filter((q) => !inPlace(q));
+    let cut = -1, rackCut = -1, propCut = -1;
     for (const [i, plot] of this.world.buildings.entries()) {
+      if (i === firstTown) [cut, rackCut, propCut] = [this.lootPoints.length, this.racked.length, this.world.props.length];
       // (for scripts/overlap-audit.ts: every piece of the first building of each kind, as it is laid)
       if (this.pieces && !this.piecesOf.has(plot.type)) {
         this.piecesOf.add(plot.type);
@@ -1484,11 +1502,12 @@ export class Buildings {
       this.owner = -1;
       this.noting = null;
     }
+    const townLoot = cut < 0 ? [] : [...this.lootPoints.splice(cut), ...this.racked.splice(rackCut)], townProps = cut < 0 ? [] : this.world.props.splice(propCut);
     this.planVillageProps();
     this.planSiteProps();
     // (the new towns' containers, laid among the props with the rest of a town's things: stood after the sites', so
     // no door before them is renumbered. One whose foot is well over the ground is stacked on another, and stands level where it is put.)
-    for (const it of this.world.props) {
+    for (const it of [...this.world.props, ...townProps, ...placed]) {
       if (!it.kind.startsWith(CONTAINER.id) || it.lean) continue;
       if (it.y > heightAt(this.world.heights, it.x, it.z) + 1) {
         it.lean = [0, 0, it.y];
@@ -1604,6 +1623,19 @@ export class Buildings {
     // And the basements under some of the houses and the storm cellars by some barns (src/sim/basements.ts): after
     // the fort, the last of all, so that not one place on the map is renumbered for them.
     this.planBasements(mark);
+    // And the new towns' places (their buildings' and their racks'), after the basements': places apart, each its
+    // town's (see APART in the economy). (Kalat's come after these: main.ts and server/world.ts add them.)
+    mark(townLoot);
+    this.lootPoints.push(...townLoot);
+    // (and the new places' things, the towns' buildings' furniture first. A crate stacked on another is set a hand's
+    // breadth askew, as the fort's are: what is searched is told by where it stands)
+    const searched = (q: Instance) => CRATE_KINDS.has(q.kind.split(/[#@]/)[0]) || SEARCHED_KINDS.has(q.kind.split(/[#@]/)[0]);
+    const taken = new Set(this.world.props.filter(searched).map((q) => `${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`));
+    for (const q of [...townProps, ...placed]) {
+      while (searched(q) && taken.has(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`)) q.x += 0.11;
+      if (searched(q)) taken.add(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`);
+      this.world.props.push(q);
+    }
   }
 
   /**

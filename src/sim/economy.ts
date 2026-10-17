@@ -12,6 +12,7 @@ import type { Tier } from './tiers';
 import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type ItemInstance } from './items';
 import { ITEM_SIZES, fitsPoint } from './placement';
 import { RNG } from '../core/noise';
+import { TOWNS } from './towns';
 
 export interface TypeRule {
   /**
@@ -392,7 +393,18 @@ export interface EconomyEvents {
 // marks the fort as wide as the fort)
 // ('cellar': every basement's places, 2026-10-14: "basements are missing loot". Part of their steps they shared those
 // steps' counts with every house, and stood empty.)
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar']);
+// ('kalat', the ruined town in the desert, and the new towns of the map three times over, 2026-10-16, each by its
+// name: their places are `ruins_<piece>`'s and `<town>_<n>`'s. Of their steps, they took those steps' things from the
+// old map: Kalat the gas works' share of the fourth step's, the towns on the third Kamenka's. See OWN: stocked as
+// their steps are.)
+export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', ...TOWNS.map((t) => t.name.toLowerCase())]);
+/** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`), or null: the map's own */
+export function apartOf(building: string): string | null {
+  if (APART.has(building)) return building;
+  if (building.startsWith('ruins_')) return 'kalat';
+  const town = building.replace(/_\d+$/, '');
+  return town !== building && APART.has(town) ? town : null;
+}
 /** the most of a place apart's free places that are ever filled: a room with something on every surface is a shop */
 const APART_FILL = 0.85;
 /** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
@@ -402,7 +414,11 @@ const APART_RICH = 1.5;
  * and APART_LEAN, the fort's garrison store). The cellars are houses' stores, of every kind a house keeps, and well
  * stocked, a reward for going down: their places are few against the map's, and at the fort's share they held little.
  */
-const OWN: Record<string, { rich: number; lean: Record<string, number> }> = { cellar: { rich: 3, lean: {} } };
+// (the new places of the map three times over are stocked as their steps are, no richer: they are new ground, not a reward)
+const OWN: Record<string, { rich: number; lean: Record<string, number> }> = {
+  cellar: { rich: 3, lean: {} },
+  ...Object.fromEntries(['kalat', ...TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
+};
 /**
  * How a place apart's share leans, sort by sort (times its share; a sort not named, 1). 2026-10-13, after the owner
  * had played the fort: "the loot in the castle should be a bit better i think". It was stocked exactly as its step
@@ -450,7 +466,7 @@ export class Economy {
     private fits: (id: string, p: LootPoint) => boolean = fitsPoint,
   ) {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
-    this.apart = points.map((p) => (APART.has(p.building) ? p.building : null));
+    this.apart = points.map((p) => apartOf(p.building));
     // (a sort kept by a rate: its count on each step from the spots there it can lie at, see TypeRule.per)
     for (const [id, rule] of Object.entries(TYPES)) {
       if (!rule.per) continue;

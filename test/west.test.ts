@@ -221,7 +221,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
 // --- THE TOWNS and KALAT
 {
   const towns = world.towns!;
-  assert.deepEqual(towns.map((t) => t.town.name), ['Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye']);
+  assert.deepEqual(towns.map((t) => t.town.name), ['Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);

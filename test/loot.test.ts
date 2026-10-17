@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
 import { RNG } from '../src/core/noise';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
-import { APART, APART_KIND, Economy, TYPES } from '../src/sim/economy';
+import { APART_KIND, Economy, TYPES, apartOf } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
@@ -40,7 +40,7 @@ const data = buildWorldData(process.cwd());
 // left out of every count below but its own: it is stocked on top of the map and takes nothing from it. Its
 // places are the last in the list, so the numbers of the rest are theirs still.)
 const every = data.lootPoints;
-const points = every.filter((p) => !APART.has(p.building));
+const points = every.filter((p) => !apartOf(p.building));
 assert.ok(every.slice(0, points.length).every((p, i) => p === points[i]), 'a place apart is not at the end of the list of places');
 const STEPS: Tier[] = [1, 2, 3, 4, 5];
 const melee = Object.values(ITEMS).filter((d) => d.category === 'melee').map((d) => d.id);
@@ -356,7 +356,7 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
 });
 
 ok('the fort on the mountain is stocked on top of the map: the army\'s things in its armoury, a dressing station\'s in its cells, and nothing taken from anywhere else', () => {
-  const own = every.filter((p) => APART.has(p.building)), free = own.filter((p) => !p.arms && !p.keeps);
+  const own = every.filter((p) => apartOf(p.building)), free = own.filter((p) => !p.arms && !p.keeps);
   assert.ok(own.length >= 40, `${own.length} places in the fort`);
   for (const { fort } of worlds) {
     const loose = fort.filter(({ p }) => !p.arms && !p.keeps);
