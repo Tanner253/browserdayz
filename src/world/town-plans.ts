@@ -14,6 +14,12 @@ const WALK = KIT_LEVELS.walk;
 
 /** an opening with a sill and no glass: a belfry's arch, a shop's hatch */
 const arch = (a: number, b: number, bottom: number, top: number): Opening => ({ a, b, bottom, top, kind: 'gap' });
+/**
+ * How far a crate laid on another is set askew, along both of its building's ways: a crate is known by its place to a
+ * tenth of a metre (crateId in src/net/protocol.ts), and so far off along both is a tenth off along one of the world's
+ * ways however the building is turned. Two in one place were one container on the server.
+ */
+export const STACK = 0.15;
 /** where a part of a building opens into the next part of it (see Blueprint.joined): no door, no step */
 const join = (a: number, b: number, top: number): Opening => ({ a, b, bottom: 0, top, kind: 'gap', join: true });
 /** a rack whose boards hold things (see RACKS in buildings.ts: its places are made last) */
@@ -280,7 +286,7 @@ export function tavernPlan(): Blueprint {
     },
     sign: { x: 1.4, y: 2.75, text: 'ТРАКТИР', sub: 'TAVERN' },
     dress: { plinth: { h: 0.5, key: 'plinth' }, trim: 'trim_white' },
-    usage: ['Town', 'Shop'],
+    usage: ['Town'],
   };
 }
 
@@ -291,7 +297,8 @@ export function merchantPlan(): Blueprint {
   rack(g, 'rack_wide', -4.0, -3.95, 0);
   rack(g, 'rack_wide', -1.6, -3.95, 0);
   g.floor([-2.6, 2.6], [0.6, -1.6]);
-  g.put('wooden_military_crate', 3.0, -3.8, 0).put('wooden_crate_01', 3.0, -3.8, 0, 0.5).put('Barrel_01', 2.8, 3.8).floor([3.0, 1.4]);
+  // (a crate on a crate set askew: a crate is known by its place to a tenth of a metre, and two in one place were one: STACK)
+  g.put('wooden_military_crate', 3.0, -3.8, 0).put('wooden_crate_01', 3.0 + STACK, -3.8 + STACK, 0.06, 0.5).put('Barrel_01', 2.8, 3.8).floor([3.0, 1.4]);
   const u = new Floor();
   u.top('WoodenTable_01', -3.0, 0.6, 0, 0.57).put('painted_wooden_chair_01', -3.4, 1.3, PI).put('painted_wooden_chair_01', -2.6, -0.1, 0).put('scandinavian_masonry_heater', -4.6, -3.4, 0).floor([-1.2, 2.8]);
   u.bed(3.9, -2.9).top('painted_wooden_cabinet', 1.6, -3.95, 0, 1.2).case('Shelf_01', 1.0, 4.1, PI, [0.66, 1.22]).floor([2.4, 1.0]);
@@ -314,7 +321,7 @@ export function merchantPlan(): Blueprint {
     upper: { h: 2.6, int: 'int_painted', floor: 'floor_wood', walls: [...outer([win(-4.2, -3.0), win(-1.2, 0.0), win(2.6, 3.8)]), inner([-0.5, -HD + 0.2], [-0.5, HD - 0.2], [door(1.6, 2.5)], 'int_painted', 'int_painted')], furniture: u.furniture, loot: u.loot },
     sign: { x: -1.1, y: 2.65, text: 'ЛАВКА', sub: 'SHOP' },
     dress: { plinth: { h: 0.5, key: 'plinth' }, trim: 'trim_white' },
-    usage: ['Shop', 'Town'],
+    usage: ['Shop'],
   };
 }
 
@@ -372,7 +379,7 @@ export function izbaPlan(rng?: RNG): Blueprint {
     furniture: g.furniture, loot: g.loot,
     // (the porch: boards before the door, a step down from the floor)
     fittings: [{ level: 0, list: [{ key: 'planks', x0: -3.1, x1: -0.7, y0: -0.3, y1: -0.04, z0: HD, z1: HD + 1.3 }] }],
-    usage: ['Village', 'Farm'],
+    usage: ['Village'],
   };
 }
 
@@ -399,7 +406,7 @@ export function izbaTwoPlan(rng?: RNG): Blueprint {
     stairs: { x0: 2.6, x1: 4.0, foot: 2.8, top: -2.6 },
     upper: { h: 2.5, int: 'planks', floor: 'floor_wood', walls: [...outer([win(-3.4, -2.5), win(-1.0, -0.1), win(1.6, 2.5)]), inner([M, -HD + 0.2], [M, HD - 0.2], [door(-3.0, -2.2)], 'planks', 'planks')], furniture: u.furniture, loot: u.loot },
     fittings: [{ level: 0, list: [{ key: 'planks', x0: -2.3, x1: 0.1, y0: -0.3, y1: -0.04, z0: HD, z1: HD + 1.4 }] }],
-    usage: ['Village', 'Farm', 'Hunting'],
+    usage: ['Village'],
   };
 }
 
@@ -429,7 +436,7 @@ export function sawmillPlan(): Blueprint {
   const HW = 10, HD = 3.5;
   const g = new Floor();
   g.top('painted_wooden_table', -1.5, -0.9, 0, 0.98, 2);
-  for (const [x, z] of [[-7.6, -2.4], [-7.6, -0.9], [4.2, -2.6]] as [number, number][]) g.put('old_military_crate', x, z, 0).put('old_military_crate', x, z, 0.04, 0.3).put('old_military_crate', x, z, -0.03, 0.6);
+  for (const [x, z] of [[-7.6, -2.4], [-7.6, -0.9], [4.2, -2.6]] as [number, number][]) g.put('old_military_crate', x, z, 0).put('old_military_crate', x + STACK, z + STACK, 0.04, 0.3).put('old_military_crate', x + 2 * STACK, z, -0.03, 0.6);
   g.put('Barrel_01', 8.6, 2.6).put('wooden_ladder', 9.45, 0.4, -Q).floor([-5.0, 1.6], [1.6, 1.8], [6.4, -0.4]);
   rack(g, 'rack_small', 8.7, -2.9, 0);
   return {
@@ -441,6 +448,6 @@ export function sawmillPlan(): Blueprint {
       { side: 'right', ext: 'planks_ext', int: 'planks', openings: [] },
     ],
     furniture: g.furniture, loot: g.loot,
-    usage: ['Industrial', 'Village'],
+    usage: ['Industrial'],
   };
 }

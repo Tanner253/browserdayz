@@ -14,6 +14,7 @@ import { walkDecks, walkPieces, type WalkRun } from './walkways';
 import { MOKROYE, MOKROYE_GROUND, MOKROYE_WALKS, mokroyeBuildings, mokroyePosts, mokroyeThings } from './mokroye';
 import { POKROV_GROUND, POKROV_TERRACE, pokrovBuildings, pokrovThings } from './pokrov';
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
+import { ZASTAVA, ZASTAVA_GROUND, ZASTAVA_SLABS, zastavaBuildings, zastavaThings } from './zastava';
 
 export { LIPKI };
 
@@ -98,12 +99,12 @@ export interface PlacedTown { town: Town; padY: number }
 
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
-  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : t.name === MOKROYE.name ? mokroyeBuildings() : [];
+  return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : t.name === MOKROYE.name ? mokroyeBuildings() : t.name === ZASTAVA.name ? zastavaBuildings() : [];
 }
 
 /** what lies about a town (containers, crates, drums), in its frame */
 export function townThings(t: Town): TownThing[] {
-  return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : t.name === MOKROYE.name ? mokroyeThings() : [];
+  return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : t.name === MOKROYE.name ? mokroyeThings() : t.name === ZASTAVA.name ? zastavaThings() : [];
 }
 
 /**
@@ -127,7 +128,7 @@ export interface TownGround {
   terraces?: { poly: [number, number][]; h: number; out: number }[];
 }
 export function townGround(t: Town): TownGround {
-  return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : t.name === MOKROYE.name ? MOKROYE_GROUND : { yards: [], lanes: [] };
+  return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : t.name === MOKROYE.name ? MOKROYE_GROUND : t.name === ZASTAVA.name ? ZASTAVA_GROUND : { yards: [], lanes: [] };
 }
 
 /** how far a point is outside a line round (0 inside it) */
@@ -162,14 +163,34 @@ export function moundAt(t: Town, lx: number, lz: number): number {
 /** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */
 export interface SlabRun { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }
 
+/** a room of a building the water stands in (coast-kit's Waters.rooms): its middle, its turn, half its size each way; `dry` for one the water must stay out of */
+export interface WaterRoom { x: number; z: number; rot: number; hx: number; hz: number; dry?: boolean }
+
+/**
+ * The rooms of a town in water where the water stands inside (Mokroye's flooded houses and its sunk barn): each a
+ * building whose floor lies under the town's water, its footprint (from `sizes`, the world's BUILDING_FOOTPRINT, given
+ * by the caller: the footprints' file is the world's generator's and imports this one) turned with it. A building on
+ * stilts or an island, its floor over the water, is none: marked dry, it would leave a hole in the water under it.
+ */
+export function placedRooms(p: PlacedTown, sizes: Partial<Record<BuildingType, [number, number]>>): WaterRoom[] {
+  const water = townGround(p.town).water;
+  if (!water) return [];
+  return townBuildings(p.town).flatMap((s) => {
+    const size = sizes[s.type], floor = s.up ?? moundAt(p.town, s.x, s.z) + 0.3;
+    if (!size || floor >= water.level) return [];
+    const [x, z] = townPoint(p.town, s.x, s.z);
+    return [{ x, z, rot: p.town.rot + s.rot, hx: size[0] / 2, hz: size[1] / 2 }];
+  });
+}
+
 /** a town's walls of concrete slabs in the world, its runs moved from its frame */
 export function placedSlabs(t: Town): SlabRun[] {
-  const runs = t.name === ZAVOD.name ? ZAVOD_WALL : [];
+  const runs = t.name === ZAVOD.name ? ZAVOD_WALL : t.name === ZASTAVA.name ? ZASTAVA_SLABS : [];
   return runs.map((r) => ({ ...r, a: townPoint(t, ...r.a), b: townPoint(t, ...r.b) }));
 }
 
 /** every new town, as it is planned (where the world sets each down is the world's) */
-export const TOWNS: Town[] = [POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE];
+export const TOWNS: Town[] = [POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA];
 
 /** a town's kit pieces that are not walkways: the stilts under Mokroye's house on stilts (on the pad at y) */
 export function townPosts(t: Town, y: number): KitPiece[] {

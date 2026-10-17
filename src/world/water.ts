@@ -15,8 +15,8 @@
 
 import * as THREE from 'three';
 import type { Atmosphere } from './atmosphere';
-import { Ocean, sharedWaves, skyOf, type OceanLook } from './ocean';
-import { WADE, inside, type River, type Waters } from '../sim/water';
+import { Ocean, ROOMS_GLSL, roomsFor, sharedWaves, skyOf, type OceanLook } from './ocean';
+import { WADE, inside, type River, type WaterRoom, type Waters } from '../sim/water';
 
 /** A lake's look: calmer water than the sea's, greener and murkier, waves only lapping at its edge. */
 export const LAKE: Partial<OceanLook> = {
@@ -36,26 +36,21 @@ export const LAKE: Partial<OceanLook> = {
 };
 
 /**
- * A swamp's look (the owner's investor, 2026-10-16, of a lake over a village's meadow: "a swamp area would be cool"):
- * still, shallow, murky brown-green water the grass and reeds stand up through (the ground's own grass, left growing
- * under it), duckweed in drifts, no foam to speak of, and a low mist over it at dusk and dawn (SWAMP_MIST).
+ * A swamp's look. The investor, 2026-10-16, of the lake test over a village's meadow: "a swamp area would be cool", and
+ * of that picture: "the image attached is really good vibe for what a swamp might look like". So it is that lake's
+ * look (its small waves, its foam lines at the water's edge and round what stands in it) made murkier and browner,
+ * stiller, with duckweed drifting and gathering at the walls; the meadow's own grass stands up through it, and a low
+ * mist lies over it at dusk and dawn (SWAMP_MIST).
  */
 export const SWAMP: Partial<OceanLook> = {
-  layers: [
-    [6, 0, 0.12, 1],
-    [2.3, 0.9, 0.08, 0.5],
-    [21, -0.5, 0.2, 0.4],
-  ],
-  slope: 0.05,
-  shallow: [0.075, 0.07, 0.03],
-  deep: [0.022, 0.026, 0.012],
-  murk: 1.1,
-  foamDepth: 0.06,
-  surf: { apart: 2, pace: 0.1, steep: 0, reach: 1, breaks: 1 },
-  solid: 99,
-  weed: 0.7,
-  foam: 0.08,
-  dim: 0.7,
+  ...LAKE,
+  slope: 0.09,
+  shallow: [0.075, 0.08, 0.04],
+  deep: [0.02, 0.028, 0.014],
+  murk: 0.75,
+  weed: 0.35,
+  foam: 0.8,
+  dim: 0.45,
 };
 
 /** The mist on a swamp: its sheets' heights over the water and how thick each is, at its thickest (dusk and dawn). */
@@ -107,9 +102,10 @@ export class Waterways {
           cell: 2,
           depthAt: (x, z) => (inside(lake.outline, x, z) ? lake.level - ground(x, z) : -1),
           look: { ...(lake.swamp ? SWAMP : LAKE), cut: true },
+          rooms: waters.rooms,
         }),
       );
-      if (lake.swamp) this.mistOver(scene, lake.level, Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs));
+      if (lake.swamp) this.mistOver(scene, lake.level, Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs), waters.rooms);
     }
     const fog = scene.fog as THREE.FogExp2 | null, w = sharedWaves();
     this.material = new THREE.ShaderMaterial({
@@ -154,10 +150,11 @@ export class Waterways {
    * Mist over a swamp: sheets of it a little over the water, drifting, thickest at dusk and dawn, thinning toward the
    * swamp's edge and away from an eye that is in it (it is seen as a haze, never as a sheet). Each sheet is one square.
    */
-  private mistOver(scene: THREE.Scene, level: number, x0: number, x1: number, z0: number, z1: number) {
-    const fog = scene.fog as THREE.FogExp2 | null;
+  private mistOver(scene: THREE.Scene, level: number, x0: number, x1: number, z0: number, z1: number, rooms?: WaterRoom[]) {
+    const fog = scene.fog as THREE.FogExp2 | null, inRooms = roomsFor(rooms, { x0, x1, z0, z1 }, level);
     const mist = new THREE.ShaderMaterial({
-      uniforms: { uWaves: { value: sharedWaves().tex }, uTime: { value: 0 }, uMist: { value: 0 }, uBox: { value: new THREE.Vector4() }, fogColor: { value: fog ? fog.color : new THREE.Color(0.6, 0.65, 0.7) } },
+      defines: inRooms.defines,
+      uniforms: { ...inRooms.uniforms, uWaves: { value: sharedWaves().tex }, uTime: { value: 0 }, uMist: { value: 0 }, uBox: { value: new THREE.Vector4() }, fogColor: { value: fog ? fog.color : new THREE.Color(0.6, 0.65, 0.7) } },
       vertexShader: /* glsl */ `
         attribute float aThick;
         varying vec3 vP;
@@ -175,8 +172,13 @@ export class Waterways {
         uniform vec3 fogColor;
         varying vec3 vP;
         varying float vThick;
+        ${ROOMS_GLSL}
         void main() {
           vec2 p = vP.xz;
+          // (none in a room: a room's air is its own)
+          #ifdef SEA_ROOMS
+            for ( int i = 0; i < SEA_ROOMS; i++ ) if ( fromRoom( i, p ) < 0.0 ) discard;
+          #endif
           float n = texture2D( uWaves, p * 0.006 + vec2( uTime * 0.0035, uTime * 0.002 ) ).b * 0.6 + texture2D( uWaves, p * 0.019 - vec2( uTime * 0.006, 0.0 ) ).b * 0.4;
           float edge = smoothstep( 0.0, 30.0, min( min( p.x - uBox.x, uBox.z - p.x ), min( p.y - uBox.y, uBox.w - p.y ) ) );
           float a = uMist * vThick * smoothstep( 0.3, 0.75, n ) * edge * smoothstep( 1.5, 9.0, distance( cameraPosition, vP ) );

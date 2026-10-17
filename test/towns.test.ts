@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 import { STOREY, facadeOpenings, facadePieces, facadeSize, movePieces, type FacadeSpec } from '../src/world/facade';
 import { FACADES, flatsPlan, hallPlan } from '../src/world/zavod-plans';
-import { TOWNS, moundAt, placedKits, placedSlabs, townBuildings, townPoint, townThings, type Town, type TownSpot } from '../src/sim/towns';
+import { TOWNS, moundAt, placedKits, placedRooms, placedSlabs, townBuildings, townPoint, townThings, type Town, type TownSpot } from '../src/sim/towns';
 import { KNOLL } from '../src/sim/lipki';
 import { POKROV_TERRACE } from '../src/sim/pokrov';
 import { DECK, PIERS, SHORE } from '../src/sim/ozerki';
@@ -18,7 +18,8 @@ import { MOKROYE_WALKS, SUNK_DEPTH, SUNK_FLOOR, WATER, WET_DEPTH, WET_FLOOR, mok
 import { WADE } from '../src/sim/water';
 import { flooded } from '../src/world/mokroye-plans';
 import { izbaPlan } from '../src/world/town-plans';
-import { blueprintOf } from '../src/world/buildings';
+import { CRATE_KINDS, blueprintOf } from '../src/world/buildings';
+import { crateId } from '../src/net/protocol';
 import { RNG } from '../src/core/noise';
 
 /** the village's barn as Buildings plans it */
@@ -137,6 +138,41 @@ ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boat
   ok(MOKROYE_WALKS.every((w) => w.deck > WATER + 0.2), 'the boardwalks stand over the water');
   ok(mokroyeBuildings().every((s) => s.up === undefined || s.up === WET_FLOOR || s.up === SUNK_FLOOR || s.up > WATER), 'every floor is dry, or flooded on purpose');
   ok(mokroyePosts(0).length === 4, 'four clusters of stilts');
+  // (the water stands in the houses whose floors are under it, and nowhere else: not under the stilts, not on the islands)
+  const mok = TOWNS.find((t) => t.name === 'Mokroye')!, rooms = placedRooms({ town: mok, padY: 50 }, BUILDING_FOOTPRINT);
+  ok(rooms.length === 3 && rooms.every((q) => !q.dry), `the water stands in the two flooded houses and the barn (${rooms.length} rooms)`);
+  ok(TOWNS.filter((t) => t !== mok).every((t) => placedRooms({ town: t, padY: 0 }, BUILDING_FOOTPRINT).length === 0), 'no rooms in the towns on dry land');
+}
+
+// ---- every building of a town of one kind, as test/loot.test.ts has it: no shop, clinic or hospital that is also a
+// house, and no shed's kind (where tools and things to hit with lie) that is also a house's, a shop's or the police's
+{
+  const HOUSE = ['Village', 'Town'], SHED = ['Farm', 'Industrial', 'Hunting'], SERVICE = ['Shop', 'Medic', 'Hospital', 'Police'];
+  for (const t of TOWNS) for (const s of townBuildings(t)) {
+    if (s.type === 'tower') continue;
+    const bp = blueprintOf(s.type, new RNG(1));
+    for (const u of [bp.usage, ...(bp.levels ?? []).map((l) => l.usage ?? bp.usage), ...(bp.deck ? [bp.deck.usage ?? bp.usage] : [])]) {
+      const has = (list: string[]) => u.some((k) => list.includes(k));
+      ok(!(has(['Shop', 'Medic', 'Hospital']) && has(HOUSE)), `${t.name} ${s.type}: a ${u.join(' and ')} is a service and a house`);
+      ok(!(has(SHED) && has([...HOUSE, ...SERVICE])), `${t.name} ${s.type}: a ${u.join(' and ')} is a shed and a house`);
+    }
+  }
+}
+
+// ---- every crate of a town a container of its own: known by its place to a tenth of a metre (crateId), no two in one
+// place, on any floor (two stacked in one place were one container on the server)
+for (const t of TOWNS) {
+  const seen = new Map<string, string>();
+  for (const s of townBuildings(t)) {
+    if (s.type === 'tower') continue;
+    const bp = blueprintOf(s.type, new RNG(1)), [bx, bz] = townPoint(t, s.x, s.z), rot = t.rot + s.rot, c = Math.cos(rot), sn = Math.sin(rot);
+    for (const f of [bp.furniture, ...(bp.levels ?? []).map((l) => l.furniture), ...(bp.upper ? [bp.upper.furniture] : []), ...(bp.deck ? [bp.deck.furniture] : [])].flat()) {
+      if (!CRATE_KINDS.has(f.id)) continue;
+      const id = crateId(bx + f.x * c + f.z * sn, bz - f.x * sn + f.z * c), was = seen.get(id);
+      ok(!was, `${t.name}: a ${f.id} in its ${s.type} in the same place as one in its ${was}`);
+      seen.set(id, s.type);
+    }
+  }
 }
 
 console.log(`towns: ${checks} checks passed`);

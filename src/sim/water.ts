@@ -24,9 +24,45 @@ export interface River {
   pts: [x: number, z: number, surface: number, width: number][];
 }
 
+/**
+ * A building's ground in or by the water, as the world sets it down: a turned box on the ground's plane (its middle,
+ * turn, half sizes across and along, as the terrain's wells take them; a building's is its footprint, its turn the
+ * building's). Flooded (the usual): the water stands in it under a roof, drawn still and dark, with no sky in it.
+ * `dry`, with its `floor` given and that floor DRY_ABOVE or more over the water: the water keeps out of it (a raised
+ * floor over the water: none drawn under it, none waded in on it). A room called dry whose floor is under the water, or
+ * not given, is flooded whatever it is called: water does not stop at a door (the owner, 2026-10-16, of a garage
+ * standing in water with a dry floor at the same height: "i think the dry house is misplaced"). Where the water meets
+ * its walls, either way, a line of scum and foam (src/world/ocean.ts).
+ */
+export interface WaterRoom {
+  x: number;
+  z: number;
+  rot: number;
+  hx: number;
+  hz: number;
+  dry?: boolean;
+  /** the height of its floor (the world's): what says whether it can be dry */
+  floor?: number;
+}
+
+/** how far over the water a room's floor must be for the room to be kept dry */
+export const DRY_ABOVE = 0.1;
+
+/** Whether a room keeps the water out, its water's surface being this high (see WaterRoom). */
+export const keptDry = (r: WaterRoom, surface: number) => !!r.dry && r.floor !== undefined && r.floor >= surface + DRY_ABOVE;
+
 export interface Waters {
   lakes: Lake[];
   rivers: River[];
+  /** the buildings and rooms in the water (see WaterRoom) */
+  rooms?: WaterRoom[];
+}
+
+/** How far a point is outside a room's walls (under 0 inside), on the ground's plane. */
+export function fromRoom(r: WaterRoom, x: number, z: number): number {
+  const dx = x - r.x, dz = z - r.z, c = Math.cos(r.rot), sn = Math.sin(r.rot);
+  const qx = Math.abs(dx * c - dz * sn) - r.hx, qz = Math.abs(dx * sn + dz * c) - r.hz;
+  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
 }
 
 /** What there is at a point that has water over it. */
@@ -94,21 +130,26 @@ interface Stretch {
 
 /** The waters laid out in cells, to be found quickly: made once for a set of waters (see waterAt). */
 export class WaterIndex {
-  private cells = new Map<number, { lakes: Lake[]; stretches: Stretch[] }>();
+  private cells = new Map<number, { lakes: Lake[]; stretches: Stretch[]; dry: WaterRoom[] }>();
 
   constructor(readonly waters: Waters) {
     const cellOf = (i: number, j: number) => {
       const k = i * 100003 + j;
       let c = this.cells.get(k);
-      if (!c) this.cells.set(k, (c = { lakes: [], stretches: [] }));
+      if (!c) this.cells.set(k, (c = { lakes: [], stretches: [], dry: [] }));
       return c;
     };
-    const over = (x0: number, x1: number, z0: number, z1: number, put: (c: { lakes: Lake[]; stretches: Stretch[] }) => void) => {
+    const over = (x0: number, x1: number, z0: number, z1: number, put: (c: { lakes: Lake[]; stretches: Stretch[]; dry: WaterRoom[] }) => void) => {
       for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) put(cellOf(i, j));
     };
     for (const lake of waters.lakes) {
       const xs = lake.outline.map((p) => p[0]), zs = lake.outline.map((p) => p[1]);
       over(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs), (c) => c.lakes.push(lake));
+    }
+    for (const r of waters.rooms ?? []) {
+      if (!r.dry) continue;
+      const reach = Math.hypot(r.hx, r.hz);
+      over(r.x - reach, r.x + reach, r.z - reach, r.z + reach, (c) => c.dry.push(r));
     }
     for (const river of waters.rivers) {
       for (let k = 0; k + 1 < river.pts.length; k++) {
@@ -144,6 +185,8 @@ export class WaterIndex {
       const speed = s.speed * (1 - 0.6 * (d / half) * (d / half));
       best = { surface, depth, flow: [ex / s.len, ez / s.len, speed], kind: 'river' };
     }
+    // (none on a floor kept dry over it)
+    if (best && c.dry.some((r) => fromRoom(r, x, z) < 0 && keptDry(r, best!.surface))) return null;
     return best;
   }
 }

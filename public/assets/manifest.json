@@ -5643,6 +5643,10 @@
     {
      "url": "assets/models/namaqualand_cliff_01_lod1.glb",
      "tris": 3999
+    },
+    {
+     "url": "assets/models/namaqualand_cliff_01_phys.glb",
+     "tris": 2306
     }
    ],
    "hi": "assets/models/hi/namaqualand_cliff_01.glb",
@@ -5671,6 +5675,10 @@
     {
      "url": "assets/models/namaqualand_cliff_02_lod1.glb",
      "tris": 6000
+    },
+    {
+     "url": "assets/models/namaqualand_cliff_02_phys.glb",
+     "tris": 2339
     }
    ],
    "hi": "assets/models/hi/namaqualand_cliff_02.glb",
@@ -5923,6 +5931,10 @@
     {
      "url": "assets/models/mountainside_lod1.glb",
      "tris": 5000
+    },
+    {
+     "url": "assets/models/mountainside_phys.glb",
+     "tris": 4609
     }
    ],
    "hi": "assets/models/hi/mountainside.glb",

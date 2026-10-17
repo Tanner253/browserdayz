@@ -14,11 +14,11 @@ import { SECTION, type WalkRun } from './walkways';
 const PI = Math.PI;
 
 /**
- * Where it is planned (plan v5): on the west shore of the forest lake north of Lipki (about -1250, 200), turned a
- * quarter round so that its own north (the lake's side) is the world's east: the lane runs north and south, the piers
- * out east over the water. The world's lane sets it down where the lake's shore is.
+ * Where it is planned (plan v5, as the world's lane put it): on the main road between the trader and the loop, its
+ * lake (about 220 by 140 m, its water 0.7 m under the bank) north of its shore line, between the road and the river
+ * valley's south rim.
  */
-export const OZERKI: Town = { name: 'Ozerki', x: -1420, z: 200, pad: [70, 60], rot: -Math.PI / 2 };
+export const OZERKI: Town = { name: 'Ozerki', x: -1250, z: -120, pad: [70, 60], rot: 0 };
 
 /** the water's edge and the lane, along z */
 export const SHORE = -10;
