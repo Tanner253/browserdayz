@@ -394,6 +394,39 @@ export class InventoryUI {
     return box;
   }
 
+  /**
+   * Got ready out of sight before the first opening: every item's picture decoded (and kept), and the veil with the
+   * figure's hole in it laid over the screen, all but clear, for a few frames. The first opening did both in its own
+   * frame, 0.6 to 0.8 seconds measured (2026-10-17): the veil's blur and cut half of it, as the browser makes what it
+   * draws them with the first time it is asked, and the pictures most of the rest.
+   */
+  warm() {
+    if (this.decoded.length) return;
+    for (const url of new Set(Object.values(this.icons))) {
+      if (!url) continue;
+      const img = new Image();
+      img.src = url;
+      void img.decode().catch(() => {});
+      this.decoded.push(img);
+    }
+    const w = document.createElement('div');
+    w.className = `inv show fig-live${this.root.classList.contains('veil-plain') ? ' veil-plain' : ''}`;
+    w.style.opacity = '0.004';
+    w.style.pointerEvents = 'none';
+    w.setAttribute('aria-hidden', 'true');
+    for (const cls of ['inv-veil', 'inv-veil inv-veil-band']) {
+      const v = document.createElement('div');
+      v.className = cls;
+      for (const [k, x] of [['--fig-l', '420px'], ['--fig-t', '120px'], ['--fig-r', '760px'], ['--fig-b', '640px']]) v.style.setProperty(k, x);
+      w.append(v);
+    }
+    this.root.after(w);
+    let n = 0;
+    const tick = () => void (++n < 5 ? requestAnimationFrame(tick) : w.remove());
+    requestAnimationFrame(tick);
+  }
+  private decoded: HTMLImageElement[] = [];
+
   /** Whether the figure was drawn this frame, said by whoever draws it: the hole in the veil is open for exactly as long as it is. */
   figureShown(on: boolean) {
     if (on === this.figLive) return;

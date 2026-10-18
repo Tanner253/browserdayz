@@ -679,6 +679,8 @@ export class Game {
       .catch((e) => console.error('what is built behind the menu', e))
       .then(() => {
         this.isLoaded = true;
+        // (and the inventory's first opening got ready behind the menu: see InventoryUI.warm)
+        this.invUI?.warm();
         if (this.wantIn) {
           this.wantIn = false;
           void this.join();
