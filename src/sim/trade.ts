@@ -7,39 +7,20 @@
 // and the guns and their fittings that are kept under the gas and down the bunker. Those are
 // still got the way they were got.
 
-import { ITEMS, fittedOf, type ItemInstance } from './items';
+import { ITEMS, fittedOf, type Category, type ItemInstance } from './items';
 
-/** what one of a thing is worth to him, in credit (for a thing that stacks: each of the stack) */
-const WORTH: Record<string, number> = {
-  // guns: he takes them, and does not sell them
-  colt: 14, m9: 16, mpa: 34, scorpion: 36, mp7a1: 44, aks74u: 48, dual_smg: 50, dual_mac10: 52, dual_sawnoff: 30, db12: 22, sniper50: 120, barrett: 140, vssk: 110, mosin: 28, deagle: 40, benelli: 45, ak: 55, ar15: 60,
-  hatchet: 5, machete: 5, crowbar: 4, bat: 3, shovel: 4, knife: 3, pitchfork: 3,
-  // rounds by the one (a sealed box is worth the rounds in it: see `worth`)
-  ammo_9mm: 0.4, ammo_45: 0.5, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2, ammo_739: 0.7, ammo_556: 0.7,
-  // fittings
-  red_dot: 20, gun_light: 10, pu_scope: 30, rifle_wrap: 8, suppressor_9: 22, suppressor_762: 28, suppressor_12: 28, suppressor_739: 30, suppressor_556: 30, foregrip: 12, mp7_suppressor: 26, mp7_sight: 22, elcan: 34, mac10_suppressor: 24,
-  // magazines: the plain ones he sells as well (a gun with none is no gun)
-  mag_colt: 5, mag_m9: 5, mag_sniper: 8, mag_deagle: 9, mag_m9_ext: 12, mag_deagle_ext: 14, mag_ak: 10, mag_ar: 10, mag_mpa: 8, drum_ak: 30, mag_ar_60: 24,
-  // food, drink, medicine
-  sprats: 2, condensed: 3, beans: 3, tomatoes: 2, sardines: 2, apple: 1, milk: 2,
-  water_jug: 3, flask: 3, thermos: 4,
-  bandage: 3, stim: 11, stim_stamina: 9, stim_combat: 22, aid_pouch: 10, firstaid: 12, splint: 5, saline: 8, blood_bag: 16,
-  // what is worn and carried
-  boonie_hat: 18, chest_rig: 6, soft_vest: 12, armor_vest: 18, life_vest: 22, heavy_armor: 32, gasmask: 30, helmet_m1: 9, work_gloves: 3, rubber_boots: 3, sack_pack: 8, camping_pack: 14, suitcase: 20,
-  flashlight: 5, binoculars: 10, compass: 4, watch: 6, patrol_cap: 4, fishermans_hat: 4, garden_gloves: 2,
-  // (the frag grenade he buys, half as dear again as the stick grenade, and does not sell: it is found, from Kamenka on)
-  cigarettes: 2, grenade: 15, frag: 22, stash_kit: 15, old_suitcase: 8, black_bag: 3, jerrycan: 8, radio: 35,
-};
 
+// (What a thing is worth to him and whether he sells it, and how many a day, are said on the thing itself: its
+// `worth` and `sells`, in src/sim/items/. He is a place to top up at, not a place to be fitted out from: the dear
+// things one a day, and the rest a handful. The guns he takes and does not sell; the frag grenade he buys, half as
+// dear again as the stick grenade, and does not sell: it is found, from Kamenka on.)
+
+/** the order his shelf is shown in, by sort: what mends you first */
+const SHOWN: Category[] = ['medical', 'food', 'drink', 'ammo', 'magazine', 'tool', 'attachment', 'clothing', 'misc', 'stash'];
 /** what he has to sell, in the order it is shown */
-export const STOCK = ['bandage', 'firstaid', 'splint', 'beans', 'sardines', 'flask', 'box_9mm', 'box_45', 'box_762', 'box_739', 'box_556', 'box_12', 'box_50', 'mag_colt', 'mag_m9', 'mag_sniper', 'flashlight', 'gun_light', 'red_dot', 'sack_pack', 'gasmask', 'grenade', 'stash_kit', 'radio'];
-
-/**
- * How many of a thing he will sell one player in a day (three, where nothing is said). He is a place to top up
- * at, not a place to be fitted out from: the dear things one a day, and the rest a handful.
- */
-const A_DAY: Record<string, number> = { radio: 1, gasmask: 1, stash_kit: 1, red_dot: 1, gun_light: 1, sack_pack: 1, grenade: 2, firstaid: 2, box_9mm: 4, box_762: 4, box_739: 3, box_556: 3, box_12: 4, box_50: 2 };
-export const aDay = (id: string) => A_DAY[id] ?? 3;
+export const STOCK = Object.values(ITEMS).filter((d) => d.sells).sort((x, y) => SHOWN.indexOf(x.category) - SHOWN.indexOf(y.category)).map((d) => d.id);
+/** how many of a thing he will sell one player in a day */
+export const aDay = (id: string) => ITEMS[id]?.sells ?? 0;
 /** what is left of a player's credit with him when they are killed: he writes the rest off */
 export const KEPT_ON_DEATH = 0.5;
 
@@ -48,8 +29,8 @@ export function worth(id: string): number {
   const def = ITEMS[id];
   if (!def) return 0;
   // (a box of rounds: what is in it, so that nothing is gained or lost by opening it before it is sold)
-  if (def.open) return (WORTH[def.open.gives] ?? 0) * def.open.qty;
-  return WORTH[id] ?? 0;
+  if (def.open) return (ITEMS[def.open.gives]?.worth ?? 0) * def.open.qty;
+  return def.worth ?? 0;
 }
 
 /** how many times what he pays for a thing he asks for it */
