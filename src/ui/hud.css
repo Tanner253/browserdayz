@@ -209,10 +209,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   margin-left: -210px;
   overflow: hidden;
   opacity: 0;
-  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
 }
 .hud-compass.show { opacity: 1; }
+/* (its marks, and the fade at its ends, are drawn into this: see HUD.drawCompass) */
+.hud-compass-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hud-bearing { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); display: none; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--ink-dim); text-shadow: 0 1px 2px #000; }
 .hud-bearing.show { display: block; }
 

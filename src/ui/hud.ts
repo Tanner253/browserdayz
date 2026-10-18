@@ -597,18 +597,69 @@ export class HUD {
     document.addEventListener('fullscreenchange', () => setTimeout(fit, 250));
   }
 
+  /**
+   * The compass: drawn into a picture of its own when the heading moves (2026-10-18). It was seventy-two marks with
+   * shadows in a strip faded at its ends by a mask, and every turn of the view the page drew the masked strip again:
+   * hidden in the owner's flight it gave 6% more frames. The same marks, sizes, colours and fade, four pixels a degree.
+   */
+  private compass: { ctx: CanvasRenderingContext2D; k: number; ink: string; faint: string; font: string; mono: string } | null = null;
   private buildCompass() {
     const strip = this.root.querySelector('.hud-compass-strip') as HTMLElement;
-    const marks: string[] = [];
+    const c = document.createElement('canvas');
+    c.className = 'hud-compass-canvas';
+    strip.replaceWith(c);
+    const css = getComputedStyle(this.root), v = (n: string, or: string) => css.getPropertyValue(n).trim() || or;
+    this.compass = { ctx: c.getContext('2d')!, k: 0, ink: v('--ink', '#e9e4d8'), faint: v('--ink-faint', 'rgba(233,228,216,0.45)'), font: v('--font', 'sans-serif'), mono: v('--mono', 'monospace') };
+    // (sharp at whatever the page is zoomed to: measured again when the window changes)
+    const fit = () => {
+      const r = c.getBoundingClientRect(), k = Math.max(1, (r.width || 420) / 420) * devicePixelRatio;
+      if (this.compass && Math.abs(k - this.compass.k) > 0.01) {
+        this.compass.k = k;
+        c.width = Math.round(420 * k);
+        c.height = Math.round(30 * k);
+        this.last.compass = '';
+      }
+    };
+    fit();
+    window.addEventListener('resize', fit);
+  }
+
+  private drawCompass(deg: number) {
+    const C = this.compass;
+    if (!C) return;
+    const { ctx: g, k } = C;
     const names: Record<number, string> = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
-    for (let rep = -1; rep <= 1; rep++) {
-      for (let d = 0; d < 360; d += 15) {
-        const deg = d + rep * 360;
-        const label = names[d] ?? (d % 45 === 0 ? '' : `<small>${d}</small>`);
-        marks.push(`<span style="left:${deg * 4}px" class="${names[d] ? 'major' : ''}">${label}</span>`);
+    g.setTransform(k, 0, 0, k, 0, 0);
+    g.globalCompositeOperation = 'source-over';
+    g.clearRect(0, 0, 420, 30);
+    g.textAlign = 'center';
+    g.textBaseline = 'alphabetic';
+    g.shadowColor = '#000';
+    g.shadowBlur = 2 * k;
+    g.shadowOffsetY = 1 * k;
+    for (let d = Math.floor((deg - 55) / 15) * 15; d <= deg + 55; d += 15) {
+      const at = 210 + (d - deg) * 4, n = ((d % 360) + 360) % 360, name = names[n];
+      if (name) {
+        g.font = `600 13px ${C.font}`;
+        g.fillStyle = C.ink;
+        g.fillText(name, at, 18);
+      } else if (n % 45 !== 0) {
+        g.font = `9px ${C.mono}`;
+        g.fillStyle = C.faint;
+        g.fillText(String(n), at, 18);
       }
     }
-    strip.innerHTML = marks.join('');
+    // (faded at its ends as the mask did: clear, whole from a quarter in, clear again)
+    g.shadowColor = 'transparent';
+    g.globalCompositeOperation = 'destination-in';
+    const fade = g.createLinearGradient(0, 0, 420, 0);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(0.25, '#000');
+    fade.addColorStop(0.75, '#000');
+    fade.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = fade;
+    g.fillRect(0, 0, 420, 30);
+    g.globalCompositeOperation = 'source-over';
   }
 
   private set(key: string, el: HTMLElement, value: string, prop: 'text' | 'html' | 'hurt' = 'text') {
@@ -1948,7 +1999,10 @@ export class HUD {
       const deg = ((s.heading % 360) + 360) % 360;
       // (moved only when it has moved a tenth of a pixel: written every frame, a still view restyled the page every frame)
       const x = (-deg * 4).toFixed(1);
-      if (this.last.compass !== x) (e.compass.firstElementChild as HTMLElement).style.transform = `translateX(${(this.last.compass = x)}px)`;
+      if (this.last.compass !== x) {
+        this.last.compass = x;
+        this.drawCompass(deg);
+      }
       this.toggle(e.bearing, 'show', s.bearing);
       if (s.bearing) this.set('bearing', e.bearing, `${String(Math.round(deg) % 360).padStart(3, '0')}°`);
     } else {
