@@ -115,9 +115,15 @@ body {
   margin-right: -0.32em;
   color: var(--ink);
 }
+/* one line, wider than the bar if it must (a flex row overflows evenly both sides), smaller on a narrow screen;
+   the left padding balances the letter-spacing after the last letter */
 .load-sub {
+  display: flex;
+  justify-content: center;
+  white-space: nowrap;
+  padding-left: 0.4em;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: min(11px, 2.2vw);
   letter-spacing: 0.4em;
   text-transform: uppercase;
   color: var(--ink-faint);
