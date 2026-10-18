@@ -1509,7 +1509,20 @@ body.touch .set-page .gfx-range { height: 30px; }
 .howto-head h2 { font-size: 28px; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a; }
 .howto-x { background: none; border: none; color: rgba(233, 228, 216, 0.62); font-size: 28px; cursor: pointer; }
 .hud-howto .pane-brief { display: block; }
-@media (min-width: 900px) { .hud-howto .pane-brief { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; } }
+/* the five steps of a life across the card, joined left to right, and what is out to get you in a row of cards under them */
+.hud-howto .start-loop { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; margin-top: 6px; }
+.hud-howto .start-loop li { display: flex; flex-direction: column; gap: 12px; padding: 0; }
+.hud-howto .start-loop li:not(:last-child)::before { left: 62px; right: -10px; top: 26px; bottom: auto; width: auto; height: 1px; }
+.hud-howto .loop-ico { width: 52px; height: 52px; }
+.hud-howto .loop-ico svg { width: 26px; height: 26px; }
+.hud-howto .start-loop span { margin-top: 4px; font-size: 15px; }
+.hud-howto .sm-threats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+@media (max-width: 760px) {
+  .hud-howto .start-loop { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
+  .hud-howto .start-loop li::before { display: none; }
+  .hud-howto .sm-threats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) { .hud-howto .start-loop, .hud-howto .sm-threats { grid-template-columns: minmax(0, 1fr); } }
 .howto-ok { margin-top: 16px; padding: 10px 30px; background: #ffd35a; color: #101211; border: none; font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
 
 
