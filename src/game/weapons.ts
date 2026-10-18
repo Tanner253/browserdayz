@@ -103,8 +103,9 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.6 } },
   // (the M32's grip under the AR-15's rail where its own stood)
   ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 }, grip: { at: [0.126, 0.056, 0.008], size: 0.75 } },
-  // (the MP7A1: the holographic sight on its rail where its own sight stood, between its folded irons)
-  mp7a1: { dot: { at: [0.049, 0.1171, -0.0055], size: 0.8 } },
+  // (the MP7A1: the holographic sight on its rail where its own sight stood, between its folded irons and on their line:
+  // on the middle of the gun's box, 3 mm right of them, the gun was seen from one side under it, "not straight")
+  mp7a1: { dot: { at: [0.049, 0.1171, -0.0085], size: 0.8 } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
