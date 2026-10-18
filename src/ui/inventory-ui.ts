@@ -30,6 +30,8 @@ import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
 
 const CELL = 46;
+/** What a press on keeps the chosen thing chosen (anywhere else, it is let go: see the constructor) */
+const KEEPS_CHOSEN = '.inv-item, .inv-inspect, .inv-menu, .inv-card, .inv-hot, .inv-view, .inv-view-menu, button, input, label, a, h4';
 
 export interface InvActions {
   /** remove a world item from the ground and hand it over */
@@ -323,6 +325,14 @@ export class InventoryUI {
     window.addEventListener('pointercancel', letGo);
     this.root.addEventListener('dblclick', (e) => {
       if (onFigure(e)) this.figure?.front();
+    });
+    // A press on nothing lets the chosen thing go (there was no way to). Not on a thing, the inspector under the
+    // grids with what it offers, a menu or card, the hot keys, the figure, or anything that is pressed for itself.
+    this.root.addEventListener('pointerdown', (e) => {
+      if (!this.selected || e.button !== 0 || this.drag || onFigure(e)) return;
+      if ((e.target as Element | null)?.closest(KEEPS_CHOSEN)) return;
+      this.selected = null;
+      this.render();
     });
     this.veil[0].className = 'inv-veil';
     this.veil[1].className = 'inv-veil inv-veil-band';
