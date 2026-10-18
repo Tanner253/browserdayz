@@ -104,13 +104,21 @@ export class Near {
     }
   }
 
+  private wasAt = new THREE.Vector3();
+
   update(eye: THREE.Vector3, dt: number) {
     if ((this.lookT += dt) >= LOOK_EVERY) {
       this.lookT = 0;
       this.look();
     }
     if ((this.measureT += dt) < MEASURE_EVERY) return;
+    // (nothing made sharp or let go while the eye goes faster than 15 m/s: flying over the fort its 4096 pictures were
+    // fetched, unpacked and sent to the card on every pass, and let go again behind, and from a helicopter a 1024 on a
+    // wall a hundred metres off is the same picture, 2026-10-18)
+    const fast = this.wasAt.distanceTo(eye) / this.measureT > 15;
+    this.wasAt.copy(eye);
     this.measureT = 0;
+    if (fast) return;
     const want: { s: Seen; nearness: number; cost: number }[] = [];
     let mine = 0;
     for (const [id, s] of this.seen) {

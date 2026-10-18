@@ -237,7 +237,8 @@ export class PostSite {
       const caster = new THREE.Mesh(shadow, new THREE.MeshBasicMaterial({ shadowSide: THREE.DoubleSide }));
       caster.castShadow = true;
       caster.matrixAutoUpdate = false;
-      caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+      // (and only into a map of the sun's it lies in: it was drawn into all three from anywhere, 2026-10-18)
+      caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f) && f.intersectsObject(caster);
       caster.name = 'castle post shadow';
       this.near.add(caster);
     }
@@ -277,9 +278,11 @@ export class PostSite {
     (this.beacon.material as THREE.SpriteMaterial).opacity = on * (0.3 + 0.7 * dusk);
     this.beacon.scale.setScalar(0.011 + 0.012 * dusk);
     for (const l of this.lamps) {
+      // (height counted, and not for an eye high over them: see Castle.update's fires)
+      const by = eye.y - l.pos.y < 25 ? eye.distanceTo(l.pos) : Infinity;
       if (l.kind === 'beacon') {
-        if (near && off < 60 && dusk > 0) lit(l.pos, on * dusk * 0.5, l.colour, l.reach);
-      } else if (near && dusk > 0 && off < 120) lit(l.pos, dusk * (l.kind === 'flood' ? 1 : 0.55), l.colour, l.reach);
+        if (near && by < 60 && dusk > 0) lit(l.pos, on * dusk * 0.5, l.colour, l.reach);
+      } else if (near && dusk > 0 && by < 120) lit(l.pos, dusk * (l.kind === 'flood' ? 1 : 0.55), l.colour, l.reach);
     }
   }
 }

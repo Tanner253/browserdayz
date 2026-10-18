@@ -572,7 +572,8 @@ export class CastleSite {
       const caster = new THREE.Mesh(shadow, new THREE.MeshBasicMaterial({ shadowSide: THREE.DoubleSide }));
       caster.castShadow = true;
       caster.matrixAutoUpdate = false;
-      caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+      // (and only into a map of the sun's it lies in: it was drawn into all three from anywhere, 2026-10-18)
+      caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f) && f.intersectsObject(caster);
       caster.name = 'castle shadow';
       this.near.add(caster);
     }
@@ -673,7 +674,10 @@ export class CastleSite {
         this.own[k].scale.set(0.8 + 0.2 * burn, (0.75 + 0.35 * Math.sin(this.clock * 11 + k * 1.7) ** 2) * burn, 0.8 + 0.2 * burn);
       }
       // (under a vault a fire is a pace from the stone it lights: it is told at little more than half, or the stone by it is white)
-      if (burn > 0 && off < 90) lit(pos, burn * (low ? 0.5 : 1) * (0.8 + 0.2 * Math.sin(this.clock * 9 + k * 2.1)));
+      // (and lighting the stone only for an eye within 90 m of it, height counted, and not more than 25 m over it: flying
+      // over at dawn the fires brought the lamps into the world, thirty-three shaders made in the frame and every
+      // paint drawn for ten lights for half a minute, for a glow nobody up there could see; the flames themselves burn)
+      if (burn > 0 && eye.y - pos.y < 25 && eye.distanceTo(pos) < 90) lit(pos, burn * (low ? 0.5 : 1) * (0.8 + 0.2 * Math.sin(this.clock * 9 + k * 2.1)));
     });
   }
 }

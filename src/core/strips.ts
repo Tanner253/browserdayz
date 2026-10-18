@@ -24,7 +24,8 @@ import { steady } from './breathe';
  */
 export const STRIP_OVER = 256;
 /** what a frame gives to this: so many milliseconds, or this share of the frame where frames are long (a slow computer is not kept waiting a minute for its pictures) */
-const BUDGET_MS = 2, BUDGET_OF_FRAME = 0.12, BUDGET_MOST = 40;
+// (no more than 4 ms: a frame made long by this very work gave it more time, and the next frame was longer, 2026-10-18)
+const BUDGET_MS = 2, BUDGET_OF_FRAME = 0.12, BUDGET_MOST = 4;
 /** and what one strip is sized to take: what is over when a strip runs long is no more than this */
 const STRIP_MS = 0.6;
 
