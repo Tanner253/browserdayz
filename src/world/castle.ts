@@ -291,6 +291,9 @@ export class CastleSite {
   /** the fort's own flame in each lantern, where whoever stands the fort gives it none of the game's (see CastleOptions.fire): a small bright shape, enough to say the lantern is lit */
   private own: THREE.Mesh[] = [];
   private clock = 0;
+  /** how fast the eye goes, m/s, smoothed: what the fort is sent for ahead of (see update) */
+  private speed = 0;
+  private wasAt = new THREE.Vector3();
   /** seconds, for the water's slow ripples */
   private time = { value: 0 };
   /** the day over what is under the terrace, as its stone and its water are told it each frame */
@@ -638,7 +641,11 @@ export class CastleSite {
     const P = this.place, off = Math.hypot(eye.x - P.x, eye.z - P.z);
     // (somebody is near and it is not all made yet: it is made now, one long frame of it, which is better than a body through its floor)
     if (this.making && off < MADE_BY) this.finish();
-    if (this.state === 'far' && off < ASK) this.ask();
+    // (sent for ten seconds of the eye's own going ahead of NEAR, walking or flying: at ASK alone a helicopter was at NEAR in a
+    // second and a half, and the fort's pictures, its making and its thirty-odd shaders all came in those frames, 2026-10-18)
+    if (dt > 0) this.speed += (Math.min(80, this.wasAt.distanceTo(eye) / dt) - this.speed) * Math.min(1, dt * 2);
+    this.wasAt.copy(eye);
+    if (this.state === 'far' && off < Math.max(ASK, NEAR + this.speed * 10)) this.ask();
     if (this.state === 'asked' && this.skins && this.come()) void this.build();
     const near = this.state === 'near' && off < NEAR;
     this.near.visible = near;
