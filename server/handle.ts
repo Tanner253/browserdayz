@@ -5,7 +5,7 @@ import { bagGrid, holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, makeItem, TAG_HOLD, type ItemInstance } from '../src/sim/items';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
-import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
+import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
 import { THROWN, LAUNCHED, pullPin, letGo, judge, launch } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
@@ -244,7 +244,8 @@ export function handle(c: Client, m: C2S) {
         const hill = rule.melee || CHECKS === 'off' ? 0 : hillBetween(c.pose, target.pose);
         if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
         c.lastHit = now;
-        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1);
+        // (what the round left in the bodies it went through first: see PIERCE)
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
       }
       if (amount <= 0) return;
       const len = Math.max(0.001, Math.hypot(target.pose[0] - from[0], target.pose[2] - from[1]));
@@ -288,7 +289,7 @@ export function handle(c: Client, m: C2S) {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (!mayHit(c, `i${m.i}`, now, rule.interval * 700)) return;
         c.lastHit = now;
-        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1);
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
       }
       const r = horde.hurt(m.i, amount, now);
       if (!r) return;

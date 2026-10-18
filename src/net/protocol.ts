@@ -179,7 +179,7 @@ export type C2S =
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
   | { t: 'back'; b: Slung[] }
-  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number }
+  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number }
   | { t: 'take'; uid: string }
   /** a field radio keyed: a supply drop is asked for where the sender stands */
   | { t: 'radio' }
@@ -237,7 +237,7 @@ export type C2S =
   /** where the infected this game is moving have got to (see src/sim/infected.ts): [which, ...where and what it is doing] */
   | { t: 'is'; s: [number, ...IState][] }
   /** a round or a blow of ours landed on one of them */
-  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number }
+  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
   | { t: 'ping'; n: number }

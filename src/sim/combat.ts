@@ -31,6 +31,17 @@ export interface WeaponRule {
 export const ONE_SHOT = 1000;
 
 /**
+ * How many bodies a round goes on through after the first it hits, by its cartridge (the owner, 2026-10-18: "we should
+ * have bullet penetration so you can collateral, depending on the bullet caliber. small calibers cannot, while .50bmg
+ * can collateral like 5 targets"); and what each body it has gone through leaves of what it does to the next.
+ */
+export const PIERCE: Record<string, number> = { ammo_556: 1, ammo_739: 1, ammo_762: 2, ammo_127x55: 2, ammo_50bmg: 4 };
+export const PIERCE_KEPT = 0.75;
+export const pierceOf = (weapon: string) => PIERCE[GUNS[weapon]?.ammo ?? ''] ?? 0;
+/** what is left of a hit after so many bodies (as many as its round can have gone through, and no more) */
+export const piercedBy = (weapon: string, passed: unknown) => (typeof passed === 'number' && passed > 0 ? PIERCE_KEPT ** Math.min(pierceOf(weapon), Math.floor(passed)) : 1);
+
+/**
  * The guns' rules, out of the one table the game shoots by (src/sim/gunplay.ts): what a round does is its
  * cartridge's, how fast a gun can hit is its own rate (a bolt's: its cycle), how far a hit is believed is its
  * reach, and what is left of a round at a distance is what its speed there leaves it.

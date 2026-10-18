@@ -22,7 +22,7 @@ import { MAX_STAMINA } from '../net/protocol';
 import { GRAVITY, GUNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, intervalOf, kickOf, scatterOf, shotOf, zeroOf } from '../sim/gunplay';
 import type { ItemModels } from './loot';
 
-import { ownHit } from '../sim/combat';
+import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
@@ -58,6 +58,8 @@ export interface HitInfo {
   killed: boolean;
   distance: number;
   melee: boolean;
+  /** how many bodies the round went through first (see PIERCE) */
+  pierced?: number;
 }
 
 /** Is its bolt worked by hand after every shot? (a rifle's is, unless the gun says it loads itself) */
@@ -142,6 +144,9 @@ interface Bullet {
   from?: unknown;
   /** the thin thing it last went through (a curtain, a door of boards): its hole is made there once */
   through?: unknown;
+  /** the bodies it has gone through, and how many (see PIERCE) */
+  passed?: Set<unknown>;
+  pierced?: number;
 }
 
 const _toCam = new THREE.Vector3();
@@ -3600,6 +3605,16 @@ export class Weapons {
           const next = physics.raycast(b.pos.clone().addScaledVector(dir, past), dir, len - past, SHOT_GROUPS);
           hit = next ? { ...next, toi: next.toi + past } : null;
         }
+        // (and a body it has gone through already: on past what is left of it, see PIERCE)
+        for (let past = 0, k = 0; hit && b.passed?.has(hit.tag?.owner) && k < 8; k++) {
+          past = hit.toi + 0.04;
+          if (past >= len) {
+            hit = null;
+            break;
+          }
+          const next = physics.raycast(b.pos.clone().addScaledVector(dir, past), dir, len - past, SHOT_GROUPS, b.ghost ? undefined : this.player.collider);
+          hit = next ? { ...next, toi: next.toi + past } : null;
+        }
         // What is thin lets a round through (2026-10-12: "the curtains and thin stuff needs to be wallbangable",
         // "wooden doors should be wall bangable"): a curtain, a door of boards. It leaves its hole there, and the
         // sound of it, and flies on.
@@ -3624,10 +3639,12 @@ export class Weapons {
             if (target && !b.ghost) {
               const zone = hit.tag?.zone ?? 'torso';
               // (by how much of its speed it has left: the same sum the server does from how far off it was)
-              const kept = damageKept(speed / b.v0), dmg = ownHit(b.weapon, zone, !!b.quiet, kept) ?? b.damage * kept * ZONE_MULT[zone][0];
+              // (the .50s' kill whatever they hit, as the server has it; and what the bodies it went through left of it)
+              const kept = damageKept(speed / b.v0), whole = WEAPON_RULES[b.weapon]?.kill ? ONE_SHOT : ownHit(b.weapon, zone, !!b.quiet, kept) ?? b.damage * kept * ZONE_MULT[zone][0];
+              const dmg = whole * piercedBy(b.weapon, b.pierced);
               const killed = target.damage(dmg, pt, dir, zone);
               this.markHit(killed, zone === 'head');
-              this.onHit({ victim: target, weapon: b.weapon, target: target.name, zone, damage: dmg, killed, distance: dist, melee: false });
+              this.onHit({ victim: target, weapon: b.weapon, target: target.name, zone, damage: dmg, killed, distance: dist, melee: false, pierced: b.pierced ?? 0 });
             }
             // a body: yours, somebody else's, or one lying on the ground
             const power = ITEMS[b.weapon]?.weapon?.kind === 'pistol' ? 0.6 : 1;
@@ -3635,6 +3652,14 @@ export class Weapons {
             this.fx.bleed(pt, dir, power, owner === this.player);
             this.onFlesh(owner, pt, dir, power);
             audio.impact('flesh', pt, b.ghost ? pt.distanceTo(this.mainCam?.position ?? pt) : dist);
+            // through the body and on, a round heavy enough (the owner, 2026-10-18: ".50bmg can collateral like 5 targets")
+            if (!b.ghost && (b.pierced ?? 0) < pierceOf(b.weapon)) {
+              b.pierced = (b.pierced ?? 0) + 1;
+              (b.passed ??= new Set()).add(owner);
+              b.pos.copy(pt).addScaledVector(dir, 0.02);
+              b.travelled += hit.toi;
+              continue;
+            }
           } else {
             const s = (hit.tag?.surface ?? 'dirt') as Surface;
             // doors swing: their holes are parented to the door
