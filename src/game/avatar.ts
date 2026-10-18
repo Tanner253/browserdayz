@@ -27,6 +27,8 @@ export const FP_BODY_LAYER = 4;
 export const BODY_SCALE = 0.965;
 /** how far from its hips a body can reach, metres, however it is bent: what it is judged in sight by (see Avatar.make) */
 const BODY_REACH = 2.5;
+/** what a bone does when its turn changes: nothing (see Avatar.load) */
+const unread = () => {};
 
 /** bones collapsed in the first-person body: the camera is the head, the viewmodel is the arms */
 const FP_HIDDEN = new Set(['Head', 'upperarm_l', 'upperarm_r']);
@@ -1010,6 +1012,10 @@ export class Avatar {
     });
     this.driverRoot = driver;
     this.modelRoot = model;
+    // (A bone's turn is never read as angles, and three works the angles out afresh from every turn set on a bone: the
+    // clips', the copies' and the arms' alike, two skeletons' worth a body a frame. Its turn is all there is: a sixth
+    // of what posing another player cost, and a fifth of the infected (2026-10-18).)
+    for (const r of [driver, model]) r.traverse((o) => void ((o as THREE.Bone).isBone && (o.quaternion as unknown as { _onChange(f: () => void): void })._onChange(unread)));
     this.mixer = new THREE.AnimationMixer(driver);
     for (const name of CLIPS) {
       // (the infected's files have no lying down or crawling, and they never do either: a copy of the fall stands in)
