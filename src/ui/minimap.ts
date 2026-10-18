@@ -9,6 +9,7 @@ import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_NZ, W
 import { gasClouds, type GasZone } from '../sim/gas';
 import { HELI } from '../sim/heli';
 import { POLICE_CAR } from '../sim/vehicles';
+import { bookmark, bookmarkRev, distanceText, drawLabel, drawPin } from './bookmark';
 
 /**
  * The colours of the vehicles' marks (the owner, 2026-10-18: "make uaz car icon green and the heli icon black with white
@@ -104,7 +105,7 @@ export class Minimap {
   private base: HTMLCanvasElement;
   private view: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private last = { x: 1e9, z: 1e9, yaw: 9, big: false };
+  private last = { x: 1e9, z: 1e9, yaw: 9, big: false, pin: -1 };
   private world: World;
   /** where tag carriers were last seen, and when (seconds, performance clock) */
   private pings: { x: number; z: number; at: number }[] = [];
@@ -119,6 +120,8 @@ export class Minimap {
   private jeepKey = '';
   /** where gas lies: every place under it */
   private gases: GasZone[] = [];
+  /** the bookmark when it is out of the corner view: an arrow outside the ring, pointing the way to it */
+  private pinOff: HTMLElement;
 
   constructor(world: World) {
     this.world = world;
@@ -128,7 +131,8 @@ export class Minimap {
     this.root.className = 'hud-minimap';
     this.view = document.createElement('canvas');
     this.root.appendChild(this.view);
-    this.root.insertAdjacentHTML('beforeend', '<b>N</b><span><kbd>M</kbd> map</span>');
+    this.root.insertAdjacentHTML('beforeend', '<b>N</b><span><kbd>M</kbd> map</span><i class="hud-mm-pin" hidden><svg viewBox="-10 -10 20 20"><path d="M0,-9 L5.6,6.5 L0,3 L-5.6,6.5 Z"/></svg><em></em></i>');
+    this.pinOff = this.root.querySelector('.hud-mm-pin')!;
     this.ctx = this.view.getContext('2d')!;
     this.resize();
   }
@@ -347,7 +351,7 @@ export class Minimap {
     const live = this.pings.length > 0 || now - this.marked < PING_LIFE + 0.2;
     this.root.classList.toggle('marked', now - this.marked < PING_LIFE);
     // redrawn only when something on it has moved a pixel's worth (or a mark is pulsing)
-    if (!live && Math.abs(l.x - x) < 0.35 && Math.abs(l.z - z) < 0.35 && Math.abs(l.yaw - yaw) < 0.012 && l.big === this.big) return;
+    if (!live && Math.abs(l.x - x) < 0.35 && Math.abs(l.z - z) < 0.35 && Math.abs(l.yaw - yaw) < 0.012 && l.big === this.big && l.pin === bookmarkRev()) return;
     // (and no more than thirty times a second: flying or turning it was drawn and sent to the card every frame, 2026-10-18)
     if (l.big === this.big && now - this.drawnAt < 1 / 30) return;
     this.drawnAt = now;
@@ -355,6 +359,7 @@ export class Minimap {
     l.z = z;
     l.yaw = yaw;
     l.big = this.big;
+    l.pin = bookmarkRev();
     const g = this.ctx, W = this.view.width;
     const span = this.big ? Math.max(WORLD_X1 - WORLD_X0, WORLD_Z1 - WORLD_Z0) : SPAN;
     const k = W / span;
@@ -525,6 +530,22 @@ export class Minimap {
       g.fill();
       g.stroke();
     }
+    // the player's own bookmark (bookmark.ts), in the player's own yellow: in view, a pin where it is and how far;
+    // out of it, an arrow outside the ring the way to go, the distance just inside (see `pointTo`)
+    const pin = bookmark();
+    let out = false;
+    if (pin) {
+      const qx = (pin.x - cx + span / 2) * k, qz = (pin.z - cz + span / 2) * k, r = this.big ? W / 110 : W / 30;
+      const far = distanceText(Math.hypot(pin.x - x, pin.z - z)), fs = this.big ? W / 70 : W / 13;
+      // (out of view is when the pin's head would touch the ring, which stands above the place it marks)
+      out = !this.big && Math.hypot(qx - W / 2, qz - r * 1.9 - W / 2) > W / 2 - r * 1.4;
+      if (out) this.pointTo(qx - W / 2, qz - W / 2, far);
+      else {
+        drawPin(g, qx, qz, r, { fill: '#ffd35a', edge: 'rgba(0, 0, 0, 0.85)' });
+        drawLabel(g, far, qx, qz + fs * 1.05, fs);
+      }
+    }
+    this.pinOff.hidden = !out;
     // you: an arrow pointing the way you face
     const s = this.big ? W / 70 : W / 13;
     g.save();
@@ -542,6 +563,16 @@ export class Minimap {
     g.stroke();
     g.fill();
     g.restore();
+  }
+
+  /** the arrow outside the ring, set the way (dx, dz) points from the middle, and the distance inside the ring by it */
+  private pointTo(dx: number, dz: number, far: string) {
+    const a = Math.atan2(dz, dx), R = this.root.clientWidth / 2;
+    const at = (rad: number) => `left:calc(50% + ${(Math.cos(a) * rad).toFixed(1)}px);top:calc(50% + ${(Math.sin(a) * rad).toFixed(1)}px)`;
+    const svg = this.pinOff.firstElementChild as SVGElement, em = this.pinOff.lastElementChild as HTMLElement;
+    svg.setAttribute('style', `${at(R + 9)};transform:translate(-50%,-50%) rotate(${(a + Math.PI / 2).toFixed(3)}rad)`);
+    em.setAttribute('style', at(R - 22));
+    em.textContent = far;
   }
 }
 

@@ -22,6 +22,7 @@
 // The small round map in the corner of the screen is another thing (minimap.ts) and is as it was.
 
 import { breathe } from '../core/breathe';
+import { bookmark, distanceText, drawLabel, drawPin, setBookmark } from './bookmark';
 import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
@@ -538,6 +539,8 @@ export class BigMap {
   private down = new Map<number, { x: number; y: number }>();
   private pinch = 0;
   private dragged = 0;
+  /** the last tap on the sheet, for a double one (which sets or takes off the bookmark) */
+  private lastTap = { t: -1e9, x: 0, y: 0 };
 
   private held: Held[] = [];
 
@@ -747,6 +750,7 @@ export class BigMap {
       if (this.dragged >= 6 || e.type !== 'pointerup') return;
       // (to an admin, a click on somebody's dot picks them: see `clickPerson`)
       if (e.button === 0 && this.clickPerson((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.clientX - r.left, e.clientY - r.top)) return;
+      if (e.button === 0 && this.doubleTap(e, r)) return;
       this.point((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.clientX - r.left, e.clientY - r.top);
     };
     v.addEventListener('pointerup', up);
@@ -759,6 +763,26 @@ export class BigMap {
       this.onPick(this.at.x + (((e.clientX - r.left) / r.width - 0.5) * v.width) / k, this.at.z + (((e.clientY - r.top) / r.height - 0.5) * v.height) / k);
     });
     window.addEventListener('resize', () => (this.dirty = true));
+  }
+
+  /**
+   * A second tap close to the first and soon after it: the bookmark goes there, or, made on the bookmark itself, comes
+   * off. (pointerup and not dblclick, so that a finger on a phone does it as a mouse does.)
+   */
+  private doubleTap(e: PointerEvent, r: DOMRect): boolean {
+    const now = performance.now(), was = this.lastTap;
+    const twice = now - was.t < 350 && Math.hypot(e.clientX - was.x, e.clientY - was.y) < 24;
+    this.lastTap = twice ? { t: -1e9, x: 0, y: 0 } : { t: now, x: e.clientX, y: e.clientY };
+    if (!twice) return false;
+    const v = this.view, k = this.perMetre();
+    const wx = this.at.x + (((e.clientX - r.left) / r.width - 0.5) * v.width) / k, wz = this.at.z + (((e.clientY - r.top) / r.height - 0.5) * v.height) / k;
+    // (on the pin is within a fingertip of its head, which stands above the place it marks)
+    const pin = bookmark(), cssK = k * (r.width / v.width);
+    const onPin = pin && Math.hypot((wx - pin.x) * cssK, (wz - pin.z) * cssK + 16) < 20;
+    setBookmark(onPin ? null : { x: wx, z: wz });
+    this.tip.hidden = true;
+    this.dirty = true;
+    return true;
   }
 
   // ------------------------------------------------------------------ opened and shut
@@ -811,7 +835,7 @@ export class BigMap {
     const T = t ? TIERS[t] : null;
     this.key.innerHTML = T
       ? `<b style="color:${T.colour}">${T.name}</b><span>${T.where}.</span>`
-      : `<span>A building is outlined in the colour of its tier. ${TOUCH ? 'Tap' : 'Point at'} one for the kind of loot kept there. ${TOUCH ? 'Two fingers bring it nearer, one moves it.' : 'The wheel brings it nearer, a drag moves it.'}</span>`;
+      : `<span>A building is outlined in the colour of its tier. ${TOUCH ? 'Tap' : 'Point at'} one for the kind of loot kept there. ${TOUCH ? 'Two fingers bring it nearer, one moves it.' : 'The wheel brings it nearer, a drag moves it.'} ${TOUCH ? 'Double-tap' : 'Double-click'} to set a bookmark; again on it to take it off.</span>`;
   }
 
   // ------------------------------------------------------------------ where things are on the screen
@@ -1453,6 +1477,17 @@ export class BigMap {
       g.save();
       this.drawPeople(g, sx, sy, W, Hh, u, k);
       g.restore();
+    }
+
+    // the player's own bookmark (bookmark.ts): a pin, and how far it is from them
+    const pin = bookmark();
+    if (pin) {
+      const qx = sx(pin.x), qz = sy(pin.z), r = 7 * u;
+      if (on(qx, qz, 40 * u)) {
+        // (as the player's own arrow is drawn on this sheet: red, ringed in cream, the owner's ink round that)
+        drawPin(g, qx, qz, r, { fill: '#d2311b', edge: INK, halo: '#fff8e0' });
+        drawLabel(g, distanceText(Math.hypot(pin.x - x, pin.z - z)), qx, qz + 15 * u, 14 * u);
+      }
     }
 
     // you: an arrow pointing the way you face
