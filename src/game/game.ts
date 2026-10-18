@@ -740,6 +740,7 @@ export class Game {
       attach: (att, weapon, loose) => this.attachMod(att, weapon, loose),
       detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
       fillMag: (mag) => this.fillMagazine(mag),
+      fillAllMags: (ammo) => this.fillAllMagazines(ammo),
       emptyMag: (mag) => this.emptyMagazine(mag),
       looseFor: (mag) => this.inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
       assignHot: (item, i) => this.assignHot(i, item),
@@ -1573,6 +1574,7 @@ export interface Game {
   turnMagWork: Methods<typeof gunsMethods>['turnMagWork'];
   unloadMagazine: Methods<typeof gunsMethods>['unloadMagazine'];
   fillMagazine: Methods<typeof gunsMethods>['fillMagazine'];
+  fillAllMagazines: Methods<typeof gunsMethods>['fillAllMagazines'];
   emptyMagazine: Methods<typeof gunsMethods>['emptyMagazine'];
   newStash: Methods<typeof gunsMethods>['newStash'];
   dig: Methods<typeof gunsMethods>['dig'];

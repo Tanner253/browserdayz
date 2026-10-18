@@ -223,11 +223,11 @@ export const gunsMethods = {
    * Rounds pushed into a magazine out of the loose ones carried, one at a time, until it is full, there are no
    * more, or the hands are taken off it (anything that breaks an action off: what is in it by then stays in it).
    */
-  fillMagazine(this: Game, mag: ItemInstance) {
+  fillMagazine(this: Game, mag: ItemInstance, then?: () => void) {
     const d = ITEMS[mag.id].mag;
     if (!d || this.use || this.player.dead || this.weapons.working) return;
     const room = d.capacity - (mag.rounds ?? 0);
-    if (room <= 0) return void this.hud.note('It is full', 'info');
+    if (room <= 0) return void (then ? then() : this.hud.note('It is full', 'info'));
     if (this.inv.count(d.ammo) <= 0) return void this.hud.note(`No ${ITEMS[d.ammo].name.toLowerCase()} to put in it`, 'warn');
     this.startUse(`Filling the magazine · ${mag.rounds ?? 0}/${d.capacity}`, Game.ROUND_IN, mag.id, 'load', null, () => {
       // (put down, sold or fitted meanwhile)
@@ -237,9 +237,26 @@ export const gunsMethods = {
       audio.ui('round');
       this.inventoryChanged();
       // (and the next, for as long as there is one and room for it)
-      if ((mag.rounds ?? 0) < d.capacity && this.inv.count(d.ammo) > 0) this.fillMagazine(mag);
+      if ((mag.rounds ?? 0) < d.capacity && this.inv.count(d.ammo) > 0) this.fillMagazine(mag, then);
+      else if (then && this.inv.count(d.ammo) > 0) then();
       else this.hud.note(`${mag.rounds} in the ${ITEMS[mag.id].name.toLowerCase()}`, 'good');
     }, 'load');
+  },
+
+  /**
+   * Every magazine carried that takes these rounds filled, one after another, the fullest first so that a full one
+   * is had soonest (the inventory's Fill all magazines, 2026-10-18), for as long as there are rounds and the hands
+   * are left to it. Each is filled as one is by hand: a round at a time.
+   */
+  fillAllMagazines(this: Game, ammo: string) {
+    const mags = this.inv.pileGrids.flatMap((c) => c.items.map((p) => p.item))
+      .filter((it) => { const m = ITEMS[it.id].mag; return !!m && m.ammo === ammo && (it.rounds ?? 0) < m.capacity; })
+      .sort((a, b) => (b.rounds ?? 0) - (a.rounds ?? 0));
+    const next = (i: number): void => {
+      if (i >= mags.length || this.inv.count(ammo) <= 0) return void this.hud.note(`${i} magazine${i === 1 ? '' : 's'} filled`, 'good');
+      this.fillMagazine(mags[i], () => next(i + 1));
+    };
+    next(0);
   },
 
   /** The rounds out of a magazine and loose into the pockets (what there is no room for is put down). */

@@ -55,6 +55,8 @@ export interface InvActions {
   detach(weapon: ItemInstance, mod: string, loose?: boolean): ItemInstance | null;
   /** push loose rounds into a magazine, one at a time, for as long as the hands are left to it */
   fillMag(mag: ItemInstance): void;
+  /** every magazine carried that takes these rounds filled, one after another */
+  fillAllMags(ammo: string): void;
   /** the rounds out of a magazine, loose into the pockets */
   emptyMag(mag: ItemInstance): void;
   /** how many loose rounds are carried of the kind this magazine holds */
@@ -1441,6 +1443,9 @@ export class InventoryUI {
       if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', run: () => this.takeOff(loc) });
     }
     if (d.mag) {
+      // (filled from the loose rounds carried, as letting them go on it does: 2026-10-18, "instead of dragging rounds in by hand")
+      const room = d.mag.capacity - (it.rounds ?? 0), loose = this.actions.looseFor(it);
+      if (this.carried(loc) && room > 0 && loose > 0) out.push({ label: `Fill it (${Math.min(room, loose)})`, icon: 'fill', run: () => this.actions.fillMag(it) });
       if ((it.rounds ?? 0) > 0) out.push({ label: `Empty it (${it.rounds})`, icon: 'empty', run: () => this.actions.emptyMag(it) });
     }
     // a pile of two or more is halved: the half is laid beside it, to be given away, put elsewhere or dropped
@@ -1454,6 +1459,11 @@ export class InventoryUI {
           else this.actions.note('No room beside it for the other half');
         },
       });
+    }
+    // loose rounds: every magazine carried that takes them, filled
+    if (d.category === 'ammo' && !d.open && this.carried(loc)) {
+      const mags = this.inv.pileGrids.flatMap((c) => c.items).filter((p) => { const m = ITEMS[p.item.id].mag; return !!m && m.ammo === it.id && (p.item.rounds ?? 0) < m.capacity; });
+      if (mags.length) out.push({ label: `Fill all magazines (${mags.length})`, icon: 'fill', run: () => this.actions.fillAllMags(it.id) });
     }
     // every pile of it that is carried made into as few as hold it, where that is fewer than there are
     if (d.stack && this.carried(loc)) {
