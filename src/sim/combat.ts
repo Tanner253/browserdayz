@@ -23,7 +23,12 @@ export interface WeaponRule {
   car?: number;
   /** a shotgun: `damage` is one pellet's, and no shot is believed to land more than this many */
   pellets?: number;
+  /** a hit anywhere, at any distance, through any armour, is the end of whoever it lands on (see ONE_SHOT) */
+  kill?: boolean;
 }
+
+/** what a hit from a gun that always kills does: more than any armour could bring under a whole life */
+export const ONE_SHOT = 1000;
 
 /**
  * The guns' rules, out of the one table the game shoots by (src/sim/gunplay.ts): what a round does is its
@@ -49,6 +54,9 @@ export const FRAG_RULE: WeaponRule = { damage: 200, melee: false, range: 70, int
 
 export const WEAPON_RULES: Record<string, WeaponRule> = {
   ...gunRules(),
+  // The two .50s: a hit is the end of anybody, and two and a half of them the end of a jeep (the owner, 2026-10-18: "the
+  // l96 and berret should always 1 shot kill and should do lots of damage to vehicles")
+  ...Object.fromEntries((['sniper50', 'barrett'] as const).flatMap((id) => (gunRules()[id] ? [[id, { ...gunRules()[id], kill: true, car: 0.4 }]] : []))),
   fists: { damage: 14, melee: true, range: 3.2, interval: 0.3, falloff: 1 },
   hatchet: { damage: 45, melee: true, range: 3.6, interval: 0.5, falloff: 1 },
   machete: { damage: 38, melee: true, range: 3.8, interval: 0.4, falloff: 1 },
@@ -112,6 +120,7 @@ export function hitDamage(weapon: string, zone: HitZone, distance: number, suppr
   // a blast: `distance` is how far the victim was from it
   if (r.blast) return r.damage * Math.pow(Math.min(1, Math.max(0, 1 - distance / r.blast)), 1.3);
   const k = r.melee ? 1 : r.drag ? damageKept(speedAt(r.drag, distance)) : 1 - (1 - r.falloff) * Math.min(1, Math.max(0, distance) / r.range);
+  if (r.kill && !r.melee) return ONE_SHOT;
   const own = ownHit(weapon, zone, suppressed, k);
   if (own !== null) return own;
   // (a fitted suppressor takes a tenth off; a can that is part of the gun is in its figure already: Gun.quiet)
