@@ -1036,7 +1036,7 @@ const VOICE: Record<string, Voice> = {
   sniper50: { rate: 1, gain: 1.3, rec: 'shot_50' },
   barrett: { rate: 1, gain: 1.3, rec: 'shot_barrett' },
   // (quieted by build: its own quieted shot, louder than the .22's by as much as a 12.7 mm is)
-  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.35 },
+  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.12 },
   m32: { rate: 1, gain: 0.7, rec: 'shot_m32' },
   db12: { rate: 1, gain: 1.5, rec: 'shot_db12' },
   dual_sawnoff: { rate: 1, gain: 1.5, rec: 'shot_sawnoff' },

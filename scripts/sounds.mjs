@@ -214,7 +214,9 @@ SOUNDS.shot_sawnoff = { src: lib('CD/H_21P.wav'), side: 1, takes: 2, len: 2, rat
 // last shot of an Uzi's last burst; the M32 a 40 mm launcher; the Desert Eagle its own, cut before its case lands)
 SOUNDS.shot_barrett = { src: dec('fs-855592'), len: 2, rate: 44100, gain: 1 };
 SOUNDS.shot_50 = { src: dec('fs-854700'), len: 2.2, rate: 44100, gain: 1 };
-SOUNDS.shot_vssk = { src: dec('fs-737570'), len: 1.8, rate: 44100, gain: 1 };
+// (cut short: its long boom was the loudest thing about it, and a quieted gun is not heard ringing on: the owner,
+// 2026-10-18, "the vssk sound is supposed to be a lot quieter")
+SOUNDS.shot_vssk = { src: dec('fs-737570'), len: 0.9, rate: 44100, gain: 1, fade: 0.35 };
 SOUNDS.shot_mac10 = { src: fsnd('734062__areniporgen__heckler-koch-usp45.wav'), len: 1.6, rate: 44100, gain: 1 };
 SOUNDS.shot_mp7 = { src: dec('fs-418433'), from: 0.86, len: 0.44, rate: 44100, gain: 1, fade: 0.12 };
 SOUNDS.shot_m32 = { src: fsnd('163458__lemudcrab__grenade-launcher.wav'), rate: 44100, gain: 1, fade: 0.1 };
