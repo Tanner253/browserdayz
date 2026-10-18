@@ -798,6 +798,13 @@ export class Avatar {
    * waited for, and the rest are drawn with what was made for it.
    */
   static onMade: (parts: THREE.Object3D[], kind: string) => Promise<void> = async () => {};
+  /**
+   * Something has been put on a body (worn, slung, taken up): it is drawn from this frame, and got ready for the
+   * other lighting behind it, so that the lamps wait for it when they come on or go off (the game sets this:
+   * Renderer.ready). Nothing put on a body was: at the first lamp of a night your own arms, body, knife, lamp and
+   * sight had their shaders made in the one frame, 0.8 to 1.8 s each, six seconds in all (2026-10-18).
+   */
+  static onDressed: (parts: THREE.Object3D[]) => void = () => {};
 
   load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
     return Avatar.line.take(file === 'survivor', () => this.make(atmo, layer, firstPersonBody, look, file));
@@ -1116,6 +1123,7 @@ export class Avatar {
       c.userData.over = k * 0.045;
       this.slung.add(c);
     });
+    if (this.slung.children.length) Avatar.onDressed([...this.slung.children]);
   }
 
   /** Hat, vest, pack: whatever of it is drawn (see GEAR). The models are this body's to keep. */
@@ -1151,6 +1159,7 @@ export class Avatar {
       if (g.pack) this.packOut = 0.2;
     }
     for (const c of this.slung.children) c.position.z = 0.01 + this.packOut + (c.userData.over ?? 0);
+    if (this.gearObjs.length) Avatar.onDressed(this.gearObjs);
   }
 
   /**
@@ -1221,9 +1230,11 @@ export class Avatar {
       fist.add(obj);
       r.hand.add(fist);
       this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder };
+      Avatar.onDressed([obj]);
       return;
     }
     this.heldPivot.add(obj);
+    Avatar.onDressed([obj]);
     // (a long gun is held by its butt: one with a way of its own of being stood with has no stock, and is held by where the butt of one would be)
     const b = kind !== 'pistol' ? buttOf(obj) : null;
     const butt = b && grips.stand ? b.at.clone().setX(b.at.x - POSE.hold.stockless / obj.scale.x) : (b?.at ?? null);
