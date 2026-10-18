@@ -21,7 +21,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
+import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, combinePiles, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon, type Act } from './act-icons';
@@ -630,6 +630,24 @@ export class InventoryUI {
     return t.join('');
   }
 
+  /**
+   * What is carried for the gun in the hands, by "Carried": its magazines and every round that feeds it, in them,
+   * loose and in boxes (not what is in the gun itself). Nothing with no gun in the hands. (Idea 4, 2026-10-18:
+   * "AK: 3 mags · 81 rounds".)
+   */
+  private ammoLine() {
+    const gun = this.actions.inHands(), w = gun && ITEMS[gun.id].weapon;
+    if (!gun || !w) return '';
+    const carried = this.inv.pileGrids.flatMap((c) => c.items.map((p) => p.item));
+    const mags = w.mag ? carried.filter((it) => magFits(it, gun)) : [];
+    const inMags = mags.reduce((n, it) => n + (it.rounds ?? 0), 0);
+    const loose = carried.filter((it) => it.id === w.ammo).reduce((n, it) => n + it.qty, 0);
+    const boxed = carried.reduce((n, it) => n + (ITEMS[it.id].open?.gives === w.ammo ? ITEMS[it.id].open!.qty : 0), 0);
+    const all = inMags + loose + boxed;
+    const tip = `Carried for the ${ITEMS[gun.id].name}, not counting what is in it: ${mags.length ? `${inMags} in ${mags.length} magazine${mags.length === 1 ? '' : 's'}, ` : ''}${loose} loose, ${boxed} in boxes`;
+    return `<em class="inv-ammo${all ? '' : ' none'}" title="${tip}">${ITEMS[gun.id].name}: ${w.mag ? `${mags.length} mag${mags.length === 1 ? '' : 's'} · ` : ''}${all} round${all === 1 ? '' : 's'}</em>`;
+  }
+
   /** The gear by "Carried", and, open, the choices under it: things in their kinds' colours, the symbols, and those in colour. */
   private viewEl() {
     // (the symbols' colours mean nothing with no symbols shown: that choice waits, greyed, until they are)
@@ -1044,9 +1062,9 @@ export class InventoryUI {
     // (what is carried and, where the game has said a load weighs on anybody, what it leaves of a sprint: the rule is
     // src/sim/load.ts. In red past the weight that slows the feet as well.)
     const kg = inv.weight(), told = this.carryLimit !== null;
-    cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}</b><span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
+    cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
     // (an admin's power: it weighs nothing to them, and the head says that and no weight)
-    if (this.weightless) cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}</b><span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
+    if (this.weightless) cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
     this.wireView(cargo);
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';

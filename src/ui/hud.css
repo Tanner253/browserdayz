@@ -1011,6 +1011,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .kinds-plain .inv-item:not(.sel, .kin) { box-shadow: none; }
 .kinds-plain .inv-item .qbar i { background: #c9b27c; }
 .inv-h { position: relative; display: flex; align-items: center; gap: 8px; font-weight: inherit; }
+/* (what is carried for the gun in the hands: InventoryUI.ammoLine) */
+.inv-ammo { margin-left: 6px; font-family: var(--mono); font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0.04em; text-transform: none; color: var(--ink-dim); white-space: nowrap; }
+.inv-ammo.none { color: var(--danger); }
 .inv-view { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
 .inv-view svg { width: 13px; height: 13px; fill: currentColor; }
 .inv-view:hover, .inv-view.on { color: var(--accent); border-color: var(--line); }
