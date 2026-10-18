@@ -12,7 +12,7 @@ import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
-import { playerName, remoteServer } from '../../net/client';
+import { playerName, remoteServer, serverSays } from '../../net/client';
 import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
 import { bloodOf, bleedOf } from '../../sim/blood';
 import { type Avatar, GEAR_SHOWN, facepiece, DEATH_REST } from '../avatar';
@@ -498,8 +498,7 @@ export const onlineMethods = {
       const look = async () => {
         // (a server that answers, and has not been running for long: the one that came after)
         try {
-          const r = await fetch(`${remote}/healthz`, { cache: 'no-store' });
-          const j = r.ok ? ((await r.json()) as { uptime?: number }) : null;
+          const j = await serverSays<{ uptime?: number }>(remote, 8000);
           if (j && typeof j.uptime === 'number' && (j.uptime < 240 || performance.now() - began > 150_000)) return void reloadPage();
         } catch {
           /* not there yet */

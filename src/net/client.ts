@@ -74,21 +74,32 @@ function wsUrl(): string {
   return `${remote ? remote.replace(/^http/, 'ws') : here}/ws`;
 }
 
+/**
+ * What a server says of itself, asked at /status and, from one older than that, at /healthz: the blocklist that Brave's
+ * Shields and uBlock Origin go by (EasyPrivacy) has `||onrender.com/health`, and from behind either every /healthz was
+ * refused (the owner, 2026-10-18: "people cant use our game on" Brave). Null if neither answers.
+ */
+export async function serverSays<T>(base: string, timeout: number): Promise<T | null> {
+  for (const at of ['/status', '/healthz']) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeout);
+    try {
+      const r = await fetch(`${base}${at}`, { cache: 'no-store', signal: ctl.signal });
+      if (r.ok) return (await r.json()) as T;
+    } catch {
+      /* refused, or not there: the next */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
+
 /** How many people are on the server right now, how many it holds and how many are waiting to get in (for the start screen). Null if it can't be reached. */
 export async function serverStatus(timeout = 6000): Promise<{ players: number; max: number; queue: number; today: number | null } | null> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeout);
-  try {
-    const r = await fetch(`${remoteServer() ?? ''}/healthz`, { cache: 'no-store', signal: ctl.signal });
-    if (!r.ok) return null;
-    const j = (await r.json()) as { players?: number; max?: number; queue?: number; today?: number };
-    // (today: how many have played in the last 24 hours; null from a server older than its count)
-    return typeof j.players === 'number' ? { players: j.players, max: j.max ?? 0, queue: j.queue ?? 0, today: typeof j.today === 'number' ? j.today : null } : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const j = await serverSays<{ players?: number; max?: number; queue?: number; today?: number }>(remoteServer() ?? '', timeout);
+  // (today: how many have played in the last 24 hours; null from a server older than its count)
+  return j && typeof j.players === 'number' ? { players: j.players, max: j.max ?? 0, queue: j.queue ?? 0, today: typeof j.today === 'number' ? j.today : null } : null;
 }
 
 /**
@@ -96,18 +107,8 @@ export async function serverStatus(timeout = 6000): Promise<{ players: number; m
  * '' where it is not, or cannot be asked just now (it then says so itself when it turns the game away).
  */
 export async function personKey(timeout = 5000): Promise<string> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeout);
-  try {
-    const r = await fetch(`${remoteServer() ?? ''}/healthz`, { cache: 'no-store', signal: ctl.signal });
-    if (!r.ok) return '';
-    const j = (await r.json()) as { captchaKey?: unknown };
-    return typeof j.captchaKey === 'string' ? j.captchaKey : '';
-  } catch {
-    return '';
-  } finally {
-    clearTimeout(timer);
-  }
+  const j = await serverSays<{ captchaKey?: unknown }>(remoteServer() ?? '', timeout);
+  return typeof j?.captchaKey === 'string' ? j.captchaKey : '';
 }
 
 export function playerName(): string {
@@ -261,22 +262,33 @@ export class Net {
     // (the server asked first, which wakes one that sleeps: the arena on a free plan does, after fifteen quiet minutes)
     const remote = wagerQuery() ? arenaBase() || null : remoteServer();
     if (remote) {
-      // any answer at all means it is awake; the request itself is what wakes it
+      // any answer at all means it is awake; the request itself is what wakes it. (Asked at its plain address: /healthz
+      // is refused by Brave's Shields and uBlock Origin, whose list has `||onrender.com/health`, and refused, the game
+      // went no further, though its way in, /ws, is on no list. Refused now, the way in is tried all the same.)
       const slow = setTimeout(() => onStatus('Waking the server… this can take a minute'), 3500);
       const ctl = new AbortController();
       const giveUp = setTimeout(() => ctl.abort(), 90_000);
+      let refused = false;
       try {
-        await fetch(`${remote}/healthz`, { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
+        await fetch(`${remote}/`, { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
       } catch {
-        clearTimeout(slow);
-        clearTimeout(giveUp);
         // (given up after a minute and a half: asleep or down; failed at once: never sent, which is the browser's doing)
-        this.unreached = ctl.signal.aborted ? 'asleep' : 'blocked';
-        return null;
+        if (ctl.signal.aborted) {
+          clearTimeout(slow);
+          clearTimeout(giveUp);
+          this.unreached = 'asleep';
+          return null;
+        }
+        refused = true;
       }
       clearTimeout(slow);
       clearTimeout(giveUp);
       onStatus('Connecting…');
+      if (refused) {
+        const tried = await this.open(name, 12_000, proof, await deviceId());
+        if (!tried && !this.kicked && !this.left) this.unreached = 'blocked';
+        return tried;
+      }
     }
     const timeout = remote ? 12_000 : 4000;
     this.left = false;

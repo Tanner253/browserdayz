@@ -740,7 +740,10 @@ function newsHttp(req: http.IncomingMessage, res: http.ServerResponse, url: URL)
 
 function serve(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? '/', 'http://x');
-  if (url.pathname === '/healthz') {
+  // (and the same at /status: EasyPrivacy, a list Brave's Shields and uBlock Origin block by, has `||onrender.com/health`,
+  // and every /healthz the game asked for from them was refused, its way in with it: the owner, 2026-10-18, "people
+  // cant use our game on" Brave)
+  if (url.pathname === '/healthz' || url.pathname === '/status') {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
