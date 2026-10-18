@@ -662,13 +662,16 @@ export class HUD {
     g.globalCompositeOperation = 'source-over';
   }
 
-  private set(key: string, el: HTMLElement, value: string, prop: 'text' | 'html' | 'hurt' = 'text') {
+  private set(key: string, el: HTMLElement, value: string, prop: 'text' | 'html' | 'hurt' | 'width' = 'text') {
     if (this.last[key] === value) return;
     this.last[key] = value;
     if (prop === 'text') el.textContent = value;
     else if (prop === 'html') el.innerHTML = value;
+    else if (prop === 'width') el.style.width = value;
     else el.style.setProperty('--hurt', value);
   }
+  /** when the figures read now and then were last written (see update) */
+  private slowAt = 0;
 
   private toggle(el: HTMLElement, cls: string, on: boolean) {
     if (el.classList.contains(cls) !== on) el.classList.toggle(cls, on);
@@ -1972,11 +1975,15 @@ export class HUD {
     this.toggle(e.arms, 'show', s.arms < 0.995);
     this.toggle(e.arms, 'spent', s.arms < 0.15);
     this.toggle(e.ride, 'show', !!s.ride);
-    if (s.ride) {
+    // (figures that change all the time but are read now and then are written ten times a second, all on the same
+    // frames: written as they changed, the speed in a helicopter and the fps were the page drawn again most frames)
+    const slow = performance.now() - this.slowAt >= 100;
+    if (slow) this.slowAt = performance.now();
+    if (s.ride && slow) {
       this.set('kmh', e.ride.firstElementChild as HTMLElement, String(Math.round(s.ride.kmh)));
       const [fuel, hp] = [...e.ride.querySelectorAll('i')] as HTMLElement[];
-      fuel.style.width = `${Math.round(s.ride.fuel * 100)}%`;
-      hp.style.width = `${Math.round(s.ride.hp * 100)}%`;
+      this.set('rfuel', fuel, `${Math.round(s.ride.fuel * 100)}%`, 'width');
+      this.set('rhp', hp, `${Math.round(s.ride.hp * 100)}%`, 'width');
       this.toggle(fuel.parentElement!, 'low', s.ride.fuel < 0.15);
       this.toggle(hp.parentElement!, 'low', s.ride.hp < 0.4);
       // the seats, as DayZ shows them: each by what it is and who is in it, this player's own lit, Ctrl and its number to move to it
@@ -2025,8 +2032,10 @@ export class HUD {
     // only as it changes: written every frame, it was a restyle and repaint of the page every frame, 2026-10-18)
     this.toggle(e.damage, 'low', v.health < 25);
     this.set('hurt', e.damage, Math.min(1, s.hurt * 0.9).toFixed(2), 'hurt');
-    this.set('fps', e.fps, `${Math.round(s.fps)} fps`);
-    this.set('net', e.net, this.netText + (s.ping !== null ? ` · ${s.ping} ms` : ''));
+    if (slow) {
+      this.set('fps', e.fps, `${Math.round(s.fps)} fps`);
+      this.set('net', e.net, this.netText + (s.ping !== null ? ` · ${s.ping} ms` : ''));
+    }
     this.toggle(e.dead, 'show', s.dead);
     if (s.dead) this.set('dead', e.dead.querySelector('.dead-sub') as HTMLElement, s.deadText);
   }
