@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { CARTRIDGES, GRAVITY, GUNS, MOA, PATTERNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, fly, intervalOf, kickOf, scatterOf, shotOf, speedAt, zeroOf, type Hold } from '../src/sim/gunplay';
-import { RIFLE_HITS, WEAPON_RULES, hitDamage } from '../src/sim/combat';
+import { ONE_SHOT, RIFLE_HITS, WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { ITEMS, sanitizeItem, makeItem } from '../src/sim/items';
 import { LAUNCHED } from '../src/sim/grenades';
 
@@ -311,6 +311,12 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
     // (the sniper rifle has figures of its own, by where it lands and whether it is quieted: see below)
     // (and a launched grenade does what its blast does, wherever it lands)
     if (RIFLE_HITS[id] || LAUNCHED[GUNS[id].ammo]) continue;
+    // (the .50s kill with any hit, anywhere, at any distance: the owner, 2026-10-18, "the l96 and berret should always 1
+    // shot kill")
+    if (r.kill) {
+      for (const d of [0, GUNS[id].reach]) for (const zone of ['legs', 'arms'] as const) assert.equal(hitDamage(id, zone, d), ONE_SHOT, `${id} in the ${zone} at ${d} m`);
+      continue;
+    }
     assert.equal(hitDamage(id, 'torso', 0), s.damage, `${id} at the muzzle`);
     for (const share of [0.15, 0.5, 1]) {
       const d = GUNS[id].reach * share;

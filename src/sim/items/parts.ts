@@ -192,8 +192,8 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits the M9, the Colt 1911, the MPA30, the shotgun and both assault rifles. Faster to aim with than irons.',
-    attach: { fits: ['colt', 'm9', 'mpa', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
+    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits the M9, the Colt 1911, the MPA30, the MP7A1, the shotgun and both assault rifles. Faster to aim with than irons.',
+    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
     loot: { pair: 'M68Optic', at: [0, 1, 7, 3, 3], restock: 1800, usage: ARMY, lean: 4 },
     worth: 20, sells: 1,
   },
@@ -227,13 +227,6 @@ export const PART_ITEMS: ItemDef[] = [
     attach: { fits: ['mp7a1'], slot: 'muzzle', ergo: -6, recoil: 0.86, quiet: true },
     loot: { pair: 'PistolSuppressor', at: [0, 0, 0, 3, 2], restock: 1800, usage: ARMY },
     worth: 26,
-  },
-  {
-    id: 'mp7_sight', name: 'MP7 Sight', model: 'mp7a1', nodeRe: '^sight(_\\d+)?$', w: 2, h: 1, weight: 0.25, category: 'attachment',
-    desc: 'The MP7A1 reflex sight, and no other gun takes it: a lit dot over its rail.',
-    attach: { fits: ['mp7a1'], slot: 'optic', ergo: 3 },
-    loot: { pair: 'ReflexOptic', at: [0, 0, 0, 3, 2], restock: 1800, usage: ARMY },
-    worth: 22,
   },
   {
     id: 'suppressor_556', name: '5.56 Suppressor', model: 'ar15', nodeRe: '^silencer', w: 3, h: 1, weight: 0.45, category: 'attachment',

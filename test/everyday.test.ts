@@ -441,7 +441,9 @@ ok('everything else a body does starts what it should: a landing, a jump, a fall
   is('a car’s door', (e) => e.carDoor(THERE), ['latch', 'gate_slam']);
   is('a car into something', (e) => e.crash(THERE, 0.6), ['crash_tin', 'thud', 'hit_metal']);
   // (and what there is no recording of is still what it was: nothing recorded is started for it)
-  for (const kind of ['eat', 'drink', 'bandage', 'inject', 'smoke', 'unbox', 'open', 'close'] as const) is(`${kind} (made up still)`, (e) => e.ui(kind), []);
+  for (const kind of ['eat', 'bandage', 'inject', 'smoke', 'unbox', 'open', 'close'] as const) is(`${kind} (made up still)`, (e) => e.ui(kind), []);
+  // (the drink recorded since, 2026-10-18: its gulps, not the "ahh" after them)
+  is('drink (recorded)', (e) => e.ui('drink'), ['drink']);
 });
 
 ok('with `asBefore` on, as the `?sounds` page sets it for "old", none of them is started and the guns still are', () => {

@@ -453,7 +453,9 @@ export function itemWeight(it: ItemInstance): number {
 
 /** drop anything a save refers to that no longer exists */
 /** things that are gone, and what one of them carried from before is now: the Pistol 43 and its magazines (2026-10-11) */
-const NOW: Record<string, string> = { p38: 'colt', mag_p38: 'mag_colt', mag_p38_ext: 'mag_colt' };
+const NOW: Record<string, string> = { p38: 'colt', mag_p38: 'mag_colt', mag_p38_ext: 'mag_colt', mp7_sight: 'red_dot' };
+/** a part fitted to a gun since replaced by another that sits where it did: the MP7's own sight is the holographic sight */
+const MOD_NOW: Record<string, string> = { mp7_sight: 'red_dot' };
 
 /**
  * How big a thing is inside, if things are kept in it: a bag or a vest that is worn, or a stash, which keeps what
@@ -464,7 +466,7 @@ export const holds = (id: string): [number, number] | undefined => ITEMS[id]?.we
 export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (it && NOW[it.id]) it.id = NOW[it.id];
   if (it?.mag && NOW[it.mag]) it.mag = NOW[it.mag];
-  if (it?.mods) it.mods = it.mods.filter((m) => !NOW[m]);
+  if (it?.mods) it.mods = it.mods.map((m) => MOD_NOW[m] ?? m).filter((m) => !NOW[m]);
   if (!it || !ITEMS[it.id]) return null;
   // (a bottle from before bottles were counted is a full one)
   const sips = ITEMS[it.id].use?.sips;

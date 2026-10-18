@@ -139,13 +139,14 @@ export const GUN_ITEMS: ItemDef[] = [
     loot: { pair: 'AKS74U', at: [0, 0, 0, 2, 0], restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON, rack: { town: 0.8, fort: 1.2 } },
     worth: 48,
   },
-  // The MP7A1 (2026-10-17): the small personal defence weapon, rare. Its own suppressor and sight are its own parts,
-  // seen only when fitted. Fed 9 mm here, as every submachine gun in the Zone is.
+  // The MP7A1 (2026-10-17): the small personal defence weapon, rare. Its own suppressor is its own part, seen only when
+  // fitted; its own sight is gone ("totally glitched": the owner, 2026-10-18), never fitted so never drawn, and it takes
+  // the holographic sight instead, as the AK does. Fed 9 mm here, as every submachine gun in the Zone is.
   {
     id: 'mp7a1', name: 'MP7A1', model: 'mp7a1', w: 5, h: 3, weight: 1.9, category: 'weapon', slot: 'long',
     desc: 'Compact personal defence weapon. Forty rounds in its long magazine, very fast and very steady. B changes it to single shots.',
-    weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 40, mag: 'mag_mp7', ergo: 78, modes: ['auto', 'semi'], shows: { mag_mp7: ['mag'], mp7_suppressor: ['silencer'], mp7_sight: ['sight'] }, optic: 'mp7_sight' }, iconYaw: 0,
-    loot: { pair: 'Vikhr', at: [0, 0, 0, 4, 2], restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON, rack: { town: 0.8, fort: 1 }, fitted: [['mp7_sight', 0.12], ['mp7_suppressor', 0.05]] },
+    weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 40, mag: 'mag_mp7', ergo: 78, modes: ['auto', 'semi'], shows: { mag_mp7: ['mag'], mp7_suppressor: ['silencer'], mp7_sight: ['sight'] } }, iconYaw: 0,
+    loot: { pair: 'Vikhr', at: [0, 0, 0, 4, 2], restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON, rack: { town: 0.8, fort: 1 }, fitted: [['red_dot', 0.12], ['mp7_suppressor', 0.05]] },
     worth: 44,
   },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,

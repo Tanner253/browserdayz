@@ -103,6 +103,8 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.6 } },
   // (the M32's grip under the AR-15's rail where its own stood)
   ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 }, grip: { at: [0.126, 0.056, 0.008], size: 0.75 } },
+  // (the MP7A1: the holographic sight on its rail where its own sight stood, between its folded irons)
+  mp7a1: { dot: { at: [0.049, 0.1171, -0.0055], size: 0.8 } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
@@ -939,9 +941,14 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
  * up; metres). The AR's mark stood a millimetre right of its window's middle and as much low: from the eye, the
  * window was off to one side of it. A player: "holo scope on the ar is not in the middle its kinda off center".
  */
-const GLASS: Record<string, [number, number]> = { ar15: [-0.0012, 0.0008], mp7a1: [-0.0035, -0.0009] };
+const GLASS: Record<string, [number, number]> = { ar15: [-0.0012, 0.0008] };
 /** a gun whose own sight's lens is painted opaque into its picture: that piece's lens is cut away (see packGun) */
-const LENS: Record<string, string> = { mp7a1: 'sight', m32: 'sight' };
+const LENS: Record<string, string> = { m32: 'sight' };
+/**
+ * A holographic sight that stands further along its gun than the AK's does, brought as much nearer the eye (metres):
+ * on the MP7's short rail it stood 13 cm further off than on the AK, a small window far down the gun.
+ */
+const DOT_NEAR: Record<string, number> = { mp7a1: 0.13 };
 /**
  * The faces of a tube sight that look along the barrel (x, the gun's own space) inside its ring, taken out: its
  * lens. The ring is found from those same faces over the lower two fifths of it (the mount under it has faces that
@@ -1466,8 +1473,8 @@ export class Weapons {
     }));
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
-    const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };
-    const mp7 = await this.packGun({ pack: 'mp7a1', item: 'mp7a1', gun: 'mp7a1', kind: 'auto', hands: true, hip: HELD.mp7a1, flashSize: 0.22, flash: mkFlash(), square: true, strip: [], ride: mp7Ride });
+    const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175' };
+    const mp7 = await this.packGun({ pack: 'mp7a1', item: 'mp7a1', gun: 'mp7a1', kind: 'auto', hands: true, hip: HELD.mp7a1, flashSize: 0.22, flash: mkFlash(), square: true, strip: ['scope_0177'], ride: mp7Ride });
     mp7.gait = true;
     this.models.set('mp7a1', mp7);
     const scorpRide = { base: 'Weapon_0725', bolt: 'Changing_handle_0726', trigger: 'Trigger_0728', safety: 'Firemode_0727', mag: 'Magazine_0730' };
@@ -2203,7 +2210,7 @@ export class Weapons {
     // (a sight of its own looked through, the M32's and the MP7's: as near the eye as a holographic sight stood on a gun
     // is, 10 cm behind it, its window round its mark. At 20 cm it was a small ring in the middle of the view, off the
     // gun: the owner, 2026-10-18, "the mp7a1 red dot sight is broken and does NOT look okay")
-    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig ? 0.1 : ownScope ? 0.09 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
+    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig ? 0.1 : ownScope ? 0.09 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07) + (DOT_NEAR[o.item] ?? 0)) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
     const tip = post ? squared(post as THREE.Vector3) : null;
     const mouthAt = long && hung.has('base') ? frontOf(hung.get('base')!) : null;
