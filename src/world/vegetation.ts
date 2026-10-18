@@ -132,6 +132,9 @@ const _p = new THREE.Vector3();
 const _sphere = new THREE.Sphere();
 const _box = new THREE.Box3();
 const _span = new Int32Array(4);
+const _look = new THREE.Vector3();
+/** a thing of some set shown or hidden since the sets were last gone through (see LodSet.show) */
+let stale = false;
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** One kind of object (tree variant, rock, prop) drawn as instanced LOD levels. */
@@ -256,6 +259,8 @@ class LodSet {
   /** take one of them out of the world, or put it back */
   show(i: number, on: boolean) {
     this.far[i] = on ? this.instances[i].far ?? Infinity : -1;
+    // (and gone through again on the next frame, however still the eye: see Vegetation.update)
+    stale = true;
     this.invalidate();
   }
 
@@ -1044,9 +1049,25 @@ export class Vegetation {
   update(dt: number, camera: THREE.Camera) {
     wind.uTime.value += dt;
     const cam = camera.position;
+    // (what is drawn at what detail follows from where the eye is and which way it looks, nothing else: an eye that
+    // has not gone a quarter of a metre or turned a third of a degree is shown what it was, the sets not gone through
+    // again. Half a millisecond of every frame, standing or aiming, 2026-10-18; looked over twice a second all the same)
+    this.since += dt;
+    camera.getWorldDirection(_look);
+    const always = import.meta.env.DEV && (globalThis as { __vegAlways?: boolean }).__vegAlways;
+    if (!always && !stale && this.since < 0.5 && cam.distanceToSquared(this.lastAt) < 0.0625 && _look.dot(this.lastLook) > 0.99998 && (camera as THREE.PerspectiveCamera).fov === this.lastFov) return;
+    this.since = 0;
+    stale = false;
+    this.lastAt.copy(cam);
+    this.lastLook.copy(_look);
+    this.lastFov = (camera as THREE.PerspectiveCamera).fov;
     this.projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projView);
     for (const s of this.sets) s.update(cam, this.frustum);
     this.impostors.update(cam, this.frustum, HANDOVER[0] * this.reachK);
   }
+  private since = Infinity;
+  private lastAt = new THREE.Vector3(Infinity, 0, 0);
+  private lastLook = new THREE.Vector3();
+  private lastFov = 0;
 }

@@ -14,6 +14,13 @@ import * as THREE from 'three';
 
 const SPOTS = 3;
 const POINTS = 5;
+/**
+ * How long the real lights stay in the scene after the last lamp said went out of the reckoning, seconds. In or out, the
+ * world's lights number differently, and every material in sight takes another shader for it: at 1.5 s, looking round
+ * among lit lamps took them in and out every few seconds, five hundred materials changing shader each time (a frame of
+ * 15 to 35 ms, and half a millisecond of every frame on average, 2026-10-18). Lit with nothing to light, they cost little.
+ */
+const KEEP = 30;
 /** over how many metres the furthest of the real lights dims before it is given to a nearer lamp */
 const FADE = 3;
 const GLARES = 96;
@@ -236,7 +243,7 @@ export class Lamps {
   update(cam: THREE.Camera, dt: number) {
     const eye = cam.position;
     const lit = this.nBeams + this.nGlows + this.nFlares > 0;
-    this.keep = lit ? 1.5 : Math.max(0, this.keep - dt);
+    this.keep = lit ? KEEP : Math.max(0, this.keep - dt);
     // (the real lights go in or out of the world when its shaders for that are made: see Renderer.readyToLight)
     // (and two and a half seconds late at most once nothing is being got ready for it: see Renderer.warming)
     const want = this.keep > 0;
