@@ -72,9 +72,9 @@ export const GUN_ITEMS: ItemDef[] = [
   // A .50 calibre bolt-action sniper rifle (2026-10-17): the bunker's, its scope part of it.
   {
     id: 'sniper50', name: '.50 Sniper Rifle', model: 'sniper50', w: 10, h: 3, weight: 11.5, category: 'weapon', slot: 'long',
-    desc: 'A bolt-action rifle in .50 BMG with a scope of its own that turns from four to twelve times on the mouse wheel, mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it. Five rounds. It reaches further and hits harder than anything else in the Zone.',
-    weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, shows: { mag_sniper50: ['mag'] } }, iconYaw: 0,
-    loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], restock: 900, loaded: [1, 5], rack: { fort: 0.6 } },
+    desc: 'A bolt-action rifle in .50 BMG. It takes its long-range scope (four to twelve times, mil-dots, a laser rangefinder); without it, plain sights. Five rounds. It reaches further and hits harder than anything else in the Zone.',
+    weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, optic: 'scope_50', shows: { mag_sniper50: ['mag'], scope_50: ['scope'] } }, iconYaw: 0,
+    loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], restock: 900, loaded: [1, 5], rack: { fort: 0.6 }, fitted: [['scope_50', 0.85]] },
     worth: 120,
   },
   // The M32 MGL (2026-10-17): a six-shot 40 mm grenade launcher, for admins only (the owner: "the grenade launcher
@@ -90,18 +90,18 @@ export const GUN_ITEMS: ItemDef[] = [
   // its own: held as the .50 sniper rifle is.
   {
     id: 'barrett', name: 'Barrett M82', model: 'barrett', w: 10, h: 3, weight: 13.5, category: 'weapon', slot: 'long',
-    desc: 'A self-loading rifle in .50 BMG with a scope of its own that turns from four to twelve times on the mouse wheel, mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it. Ten rounds, as fast as the trigger, and it kicks like a mule.',
-    weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, shows: { mag_barrett: ['mag'] } }, iconYaw: 0,
+    desc: 'A self-loading rifle in .50 BMG. It takes its NightForce scope (four to twelve times, mil-dots, a laser rangefinder); without it, plain sights. Ten rounds, as fast as the trigger, and it kicks like a mule.',
+    weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, optic: 'scope_barrett', shows: { mag_barrett: ['mag'], scope_barrett: ['scope'] } }, iconYaw: 0,
     // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
-    loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], restock: 1200, loaded: [2, 10], rack: { fort: 0.5 } },
+    loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], restock: 1200, loaded: [2, 10], rack: { fort: 0.5 }, fitted: [['scope_barrett', 0.85]] },
     worth: 140,
   },
   // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the .50 sniper rifle is.
   {
     id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
-    desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. Its scope turns from two to six times on the mouse wheel, with the chevrons and range lines of a PSO.',
-    weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, shows: { mag_vssk: ['mag', 'bullet'] } }, iconYaw: 0,
-    loot: { pair: 'VSS', at: [0, 0, 0, 0, 1], restock: 900, loaded: [1, 5], rack: { fort: 1 } },
+    desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. It takes its own PSO scope (two to six times), and no other sights.',
+    weapon: { kind: 'rifle', ammo: 'ammo_127x55', capacity: 5, mag: 'mag_vssk', ergo: 40, action: 'self', ownScope: true, optic: 'scope_vssk', shows: { mag_vssk: ['mag', 'bullet'], scope_vssk: ['scope'] } }, iconYaw: 0,
+    loot: { pair: 'VSS', at: [0, 0, 0, 0, 1], restock: 900, loaded: [1, 5], rack: { fort: 1 }, fitted: [['scope_vssk', 0.85]] },
     worth: 110,
   },
   // A pair of submachine guns, one in each hand (2026-10-17): the left button fires the left one, the right button the

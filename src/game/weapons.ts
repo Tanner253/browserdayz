@@ -896,7 +896,16 @@ const WORK_ON: Record<string, Grips['work']> = {
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
 const IRON_DROP = 0.004;
 /** rifles that came with no sights of their own and are given plain ones: a post at the muzzle, a notch over the breech (see `Weapons.fitIrons`) */
-const PLAIN_SIGHTS = new Set(['mosin', 'ar15']);
+const PLAIN_SIGHTS = new Set(['mosin', 'ar15', 'sniper50', 'barrett']);
+/** where a gun's plain sights stand along it (x in its own file), where the highest of its top is not the place for the
+ * notch nor its mouth the place for the post: the Barrett's both on its rail (read off its top, progress/opt/top-profile.mjs).
+ * (None on the VSSK: "we dont need iron sights on vssk", the owner, 2026-10-18.) */
+const IRON_AT: Record<string, { rear: number; front: number }> = { barrett: { rear: 0.08, front: 0.43 } };
+/** a gun whose own scope is on it: one that is a part of it, or (the .50s and the VSSK) its parted scope fitted */
+const ownScopeOn = (it: ItemInstance | null | undefined) => {
+  const w = it ? ITEMS[it.id]?.weapon : undefined;
+  return !!w?.ownScope && (!w.optic || hasMod(it, w.optic));
+};
 /**
  * The line of a gun's own sights, in the space of its own file (x along the barrel, y up, z to its right, metres):
  * the middle of its notch, at the height of the leaf either side of it, and the tip of its post. Measured off the
@@ -1826,7 +1835,7 @@ export class Weapons {
           break;
         }
       }
-      const xr = railBack + 0.016, xf = span.max.x - 0.02;
+      const xr = IRON_AT[o.item]?.rear ?? railBack + 0.016, xf = IRON_AT[o.item]?.front ?? span.max.x - 0.02;
       const rearTop = topAt(xr, 0.009), muzzleTop = topAt(xf, 0.006);
       if (Number.isFinite(muzzleTop) && Number.isFinite(rearTop)) {
         const line = Math.max(rearTop + 0.0085, muzzleTop + 0.011);
@@ -1856,7 +1865,7 @@ export class Weapons {
         mine.position.copy(nudge);
         rig.hang(mine, onBody);
         // (they are under the sight when one is on, where its mount stands: with it, they are put away)
-        shown.push([mine, PLAIN_SIGHTS.has(o.item) && o.item !== 'mosin' ? '!red_dot' : '!pu_scope']);
+        shown.push([mine, ITEMS[o.item].weapon?.optic ? `!${ITEMS[o.item].weapon!.optic}` : PLAIN_SIGHTS.has(o.item) && o.item !== 'mosin' ? '!red_dot' : '!pu_scope']);
         ironPost = mine.getObjectByName('post') ?? null;
       }
     }
@@ -2243,7 +2252,7 @@ export class Weapons {
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
       // (a gun with a scope of its own has no line over its irons: it came up on one, 2 cm over its receiver and under its scope)
-      adsIron: ITEMS[o.item].weapon?.fixedSight || ownScope ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      adsIron: ITEMS[o.item].weapon?.fixedSight || (ownScope && !PLAIN_SIGHTS.has(o.item)) ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       aimRot: o.square ? aimRot : undefined,
       aimRotOptic: lensRig && o.square ? opticRot : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
@@ -2388,7 +2397,7 @@ export class Weapons {
     }
     const src = m.body ?? m.root.children[0];
     const wasVisible = [m.scope, m.wrap, m.suppressor, m.mag].map((o) => o?.visible);
-    if (m.scope) m.scope.visible = mods.includes('pu_scope') || !!ITEMS[id]?.weapon?.ownScope;
+    if (m.scope) m.scope.visible = mods.includes('pu_scope') || (!!ITEMS[id]?.weapon?.ownScope && (!ITEMS[id].weapon!.optic || mods.includes(ITEMS[id].weapon!.optic!)));
     if (m.wrap) m.wrap.visible = mods.includes('rifle_wrap');
     if (m.suppressor) m.suppressor.visible = mods.includes('suppressor_9');
     if (m.mag) m.mag.visible = true;
@@ -2434,7 +2443,7 @@ export class Weapons {
     const it = this.currentItem;
     if (!it) return null;
     if (hasMod(it, 'elcan')) return 'elcan';
-    return ITEMS[it.id]?.weapon?.ownScope && ZOOMS[it.id] ? it.id : null;
+    return ownScopeOn(it) && ZOOMS[it.id] ? it.id : null;
   }
 
   /** how far the scope looked through is turned, times; null for a scope that does not turn */
@@ -2459,7 +2468,7 @@ export class Weapons {
   get reticleKind(): string {
     const it = this.currentItem;
     if (!it) return 'pu';
-    return hasMod(it, 'elcan') ? 'elcan' : ITEMS[it.id]?.weapon?.ownScope ? (OWN_RETICLE[it.id] ?? 'pu') : 'pu';
+    return hasMod(it, 'elcan') ? 'elcan' : ownScopeOn(it) ? (OWN_RETICLE[it.id] ?? 'pu') : 'pu';
   }
 
   /** the hands are in the middle of something that has to be seen through: a reload, a blow */
@@ -2702,7 +2711,7 @@ export class Weapons {
     const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
-    this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || !!ITEMS[this.currentItem!.id]?.weapon?.ownScope)) || hasMod(this.currentItem, 'elcan')) && this.adsT > 0.9 && this.aiming;
+    this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || ownScopeOn(this.currentItem))) || hasMod(this.currentItem, 'elcan')) && this.adsT > 0.9 && this.aiming;
     // (the rangefinder reads five times a second while it is looked through: to whatever is under the cross, out to two kilometres)
     if (!this.ranged) this.range = null;
     else if ((this.rangeAt -= dt) <= 0) {
@@ -3403,7 +3412,7 @@ export class Weapons {
     const m = this.current;
     if (!m) return;
     const it = this.currentItem;
-    if (m.scope) m.scope.visible = hasMod(it, 'pu_scope') || !!(it && ITEMS[it.id]?.weapon?.ownScope);
+    if (m.scope) m.scope.visible = hasMod(it, 'pu_scope') || ownScopeOn(it);
     if (m.wrap) m.wrap.visible = hasMod(it, 'rifle_wrap');
     if (m.suppressor) m.suppressor.visible = hasMod(it, 'suppressor_9');
     // (a piece said with a `!` is there when the part is NOT fitted: the plain sights a scope stands in the place of)

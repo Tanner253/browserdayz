@@ -113,7 +113,8 @@ function tableFor(spec: Pick<CrateSpec, 'usage' | 'lean' | 'only' | 'long'>, t: 
     // (nothing the whole map keeps but one of: the .50s and the VSSK are the bunker's floor's, counted, and a crate that
     // fills again in five minutes would be a well of them)
     const all = ([1, 2, 3, 4, 5] as Tier[]).reduce((a, s) => a + keeps(d.id, s), 0), home = n / (all || 1);
-    if (all < 2) continue;
+    // (a sight or a can the map keeps one of may come in a crate: it is no well of rifles)
+    if (all < 2 && d.category !== 'attachment') continue;
     // (the step up: only what that step is the home of more than any above it, so a case of the second step holds an armoured vest of the third and never its rifle)
     if (homeOnly && ([4, 5] as Tier[]).some((s) => s > t && keeps(d.id, s) > n)) continue;
     const fav = t < 4 ? (r.on?.[t]?.favour ?? r.favour) : undefined;

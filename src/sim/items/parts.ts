@@ -138,6 +138,30 @@ export const PART_ITEMS: ItemDef[] = [
     loot: { pair: 'PUScopeOptic', at: [0, 0, 2, 6, 3], restock: 1800, usage: ARMY, lean: 2.5 },
     worth: 30,
   },
+  // The .50s' and the VSSK's scopes, parted off them and found as any sight is (the owner, 2026-10-18: "the sniper scope
+  // for vssk can be exclusive but the sniper for .50bmg should go on some other applicable rifles if any, and we should
+  // make sure they drop as loot"). Off, a .50 is aimed along plain sights (see PLAIN_SIGHTS in src/game/weapons.ts); the VSSK has none.
+  {
+    id: 'scope_50', name: 'Long-Range Scope', model: 'sniper50', nodeRe: '^scope', w: 3, h: 1, weight: 0.9, category: 'attachment',
+    desc: "The .50 sniper rifle's scope: it turns from four to twelve times on the mouse wheel, with mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it.",
+    attach: { fits: ['sniper50'], slot: 'optic', ergo: -10 },
+    loot: { pair: 'HuntingOptic', at: [0, 0, 0, 0, 1], restock: 1800, usage: ARMY },
+    worth: 45,
+  },
+  {
+    id: 'scope_barrett', name: 'NightForce Scope', model: 'barrett', nodeRe: '^scope', w: 3, h: 1, weight: 0.9, category: 'attachment',
+    desc: "The Barrett's scope: four to twelve times on the mouse wheel, mil-dots on its cross, and a laser rangefinder that reads the range to whatever is under it.",
+    attach: { fits: ['barrett'], slot: 'optic', ergo: -10 },
+    loot: { pair: 'HuntingOptic', at: [0, 0, 0, 1, 0], restock: 1800, usage: ARMY },
+    worth: 50,
+  },
+  {
+    id: 'scope_vssk', name: 'PSO Scope', model: 'vssk', nodeRe: '^scope', w: 2, h: 1, weight: 0.6, category: 'attachment',
+    desc: "The VSSK's own scope, and no other rifle takes it: two to six times on the mouse wheel, with the chevrons and range lines of a PSO.",
+    attach: { fits: ['vssk'], slot: 'optic', ergo: -7 },
+    loot: { pair: 'PSO1Optic', at: [0, 0, 0, 0, 1], restock: 1800, usage: ARMY },
+    worth: 35,
+  },
   {
     id: 'rifle_wrap', name: 'Cheek Rest', model: 'sniper', nodeRe: '^cheekrest', w: 2, h: 1, weight: 0.2, category: 'attachment',
     desc: 'A raised rest for the cheek, strapped to the stock. Steadies the rifle: a quarter less sway, and a surer hold.',
