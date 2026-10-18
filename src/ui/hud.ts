@@ -325,18 +325,19 @@ export class HUD {
               </div>
             </div>
             <div class="start-pane pane-brief">
-              <ol class="start-loop">
-                <li style="--i:0"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/><path d="M12 3v7M9 8l3 3 3-3"/></svg></i><div><b>Drop in</b><span>On the edge of the map, bare hands. The nearest marked place always has a weapon.</span></div></li>
-                <li style="--i:1"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8-4 8 4v8l-8 4-8-4z"/><path d="M4 9l8 4 8-4M12 13v8"/></svg></i><div><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></div></li>
-                <li style="--i:2"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></i><div><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></div></li>
-                <li style="--i:3"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="9" rx="3"/><circle cx="8.5" cy="12.5" r="1"/><path d="M12 11h4M12 14h3M8 8c-3-5 3-7 5-3"/></svg></i><div><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></div></li>
-                <li style="--i:4"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></i><div><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></div></li>
+              <ol class="ht-steps" aria-label="How a life goes">
+                <li style="--i:0"><figure><img src="/howto/drop-in.jpg" alt="" loading="lazy" decoding="async"><i>01</i></figure><b>Drop in</b><span>On the edge of the map, bare hands. The nearest marked place always has a weapon.</span></li>
+                <li style="--i:1"><figure><img src="/howto/loot.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></li>
+                <li style="--i:2"><figure><img src="/howto/fight.jpg" alt="" loading="lazy" decoding="async"><i>03</i></figure><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></li>
+                <li style="--i:3"><figure><img src="/howto/tag.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></li>
+                <li style="--i:4"><figure><img src="/howto/hold.jpg" alt="" loading="lazy" decoding="async"><i>05</i></figure><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></li>
               </ol>
-              <div class="sm-threats">
-                <div><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
-                <div><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
-                <div><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
-                <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
+              <h3 class="ht-h">What wants you dead</h3>
+              <div class="ht-threats">
+                <div><img src="/howto/players.jpg" alt="" loading="lazy" decoding="async"><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
+                <div><img src="/howto/infected.jpg" alt="" loading="lazy" decoding="async"><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
+                <div><img src="/howto/gas.jpg" alt="" loading="lazy" decoding="async"><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
+                <div><img src="/howto/bunker.jpg" alt="" loading="lazy" decoding="async"><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
               </div>
             </div>
 
