@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- the game asks for what it loads by paths from the site's root (assets/sounds/...): moved into tools/, a page sent
+         them to tools/assets/..., which the dev server answers with a page (the film's soundtrack waited for ever) -->
+    <base href="/" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ZONA: trailer stage</title>
