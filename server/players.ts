@@ -339,7 +339,10 @@ export function drop(c: Client) {
   if (ADMIN.gone.length > 60) ADMIN.gone.shift();
   releaseLock(c);
   leaveSeat(c, true);
-  records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: Date.now() });
+  // (left when they went: a body left sleeping after a connection was lost is not its owner on the server, and the
+  // clock on a tag they took does not run for it, the owner, 2026-10-17: "the cash-in clock on a taken tag only counts
+  // while the carrier is online". See the `resume` shift in `join`.)
+  records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: c.asleep || Date.now() });
   broadcast({ t: 'leave', id: c.id });
   log(`- ${c.name} (#${c.id}) — ${clients.size} online`);
   fillFromQueue();
