@@ -1,9 +1,9 @@
 // Cutting pictures and short films out of a film that is already made, in a browser: there is
 // no other cutter on the machine. For the changelog's pictures (public/changelog/media), out
-// of the trailers in trailer/out. Not part of the built site: loaded by hand on a dev page,
+// of the trailers in tools/trailer/out. Not part of the built site: loaded by hand on a dev page,
 //   const C = await import('/src/dev/clip.ts')
-//   await C.send('sheet-5', await C.sheet('/trailer/out/zona-trailer-5.mp4', 24))
-//   await C.send('infected-chase', await C.clip('/trailer/out/zona-trailer-5.mp4', 21, 27))
+//   await C.send('sheet-5', await C.sheet('/tools/trailer/out/zona-trailer-5.mp4', 24))
+//   await C.send('infected-chase', await C.clip('/tools/trailer/out/zona-trailer-5.mp4', 21, 27))
 // (`send` posts to the little receiver that writes what it is given to a folder.)
 
 const open = async (src: string) => {

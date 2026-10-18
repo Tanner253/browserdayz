@@ -1,7 +1,7 @@
 // Films the trailer: the real game, on a clock that only moves when told to, photographed one
 // frame at a time in a headless Chrome and encoded in the page (H.264 + AAC into an MP4).
 //
-//   node scripts/film.mjs                     full take, 1920x1080 at 60 fps -> trailer/out/zona-trailer.mp4
+//   node scripts/film.mjs                     full take, 1920x1080 at 60 fps -> tools/trailer/out/zona-trailer.mp4
 //   node scripts/film.mjs --draft             half size, 30 fps
 //   node scripts/film.mjs --from 18 --to 30   only that stretch (seconds)
 //   node scripts/film.mjs --stills 30         also keep every 30th frame, and lay them out as contact sheets
@@ -29,7 +29,7 @@ import WebSocket from 'ws';
 import sharp from 'sharp';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const OUT = path.join(ROOT, 'trailer', 'out');
+const OUT = path.join(ROOT, 'tools', 'trailer', 'out');
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i < 0 ? fallback : process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : true;
@@ -49,7 +49,7 @@ const twice = !!arg('twice', false);
 const motion = !!arg('motion', false);
 const cut = String(arg('cut', '1'));
 const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '') + (web ? '-web' : '')));
-const URL_ = String(arg('url', `http://localhost:5173/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}${web ? '&web=1' : ''}`));
+const URL_ = String(arg('url', `http://localhost:5173/tools/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}${web ? '&web=1' : ''}`));
 const still = !!arg('still', false);
 const PORT = Number(arg('port', 9333));
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));

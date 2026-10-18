@@ -8,9 +8,9 @@ data
 *.log
 .DS_Store
 # trailer takes
-trailer/out
+tools/trailer/out
 # clips for the trailer, built by: npm run character -- --emotes
-trailer/emotes.glb
+tools/trailer/emotes.glb
 # settings and keys never go in the repository
 .env*
 

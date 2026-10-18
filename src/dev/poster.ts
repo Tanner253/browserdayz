@@ -1,9 +1,9 @@
 // The squad's map: a poster. The valley as a printed survey sheet, lying on a table, written
 // over by the people who mean to get into Bunker 17 with it, and what they had on the table
-// that night. Not part of the built site (poster.html is not in the build).
+// that night. Not part of the built site (tools/poster.html is not in the build).
 //
-//   /poster.html                      1920 x 1080, with the name on it
-//   /poster.html?w=3840&h=2160        the size it is kept at (scripts/poster.mjs photographs it)
+//   /tools/poster.html                      1920 x 1080, with the name on it
+//   /tools/poster.html?w=3840&h=2160        the size it is kept at (scripts/poster.mjs photographs it)
 //   &title=0                          the picture alone
 //   &film=1                           the table filmed: a camera goes over the sheet, cut to a score, the name at the end
 //                                     (an MP4, sent to the receiver as `post` names it)

@@ -1,4 +1,4 @@
-// The trailer's director. Loaded only by trailer.html, after trailer/clock.js has put the
+// The trailer's director. Loaded only by tools/trailer.html, after tools/trailer/clock.js has put the
 // page on a virtual clock. It stages an offline match (the game's own single-player world,
 // plus bodies that stand in for other players), plays the shot list in shots.ts one frame
 // at a time when scripts/film.mjs asks, logs every sound the game would have played, and
@@ -108,7 +108,7 @@ export class Actor {
   /** anything else the body is doing that a pose tells of (lying down, leaning: the F_ flags of src/net/protocol.ts) */
   more = 0;
   private corpse: string | null = null;
-  /** a clip from trailer/emotes.glb laid over whatever the game is playing on this body */
+  /** a clip from tools/trailer/emotes.glb laid over whatever the game is playing on this body */
   private emoting: { act: THREE.AnimationAction; dur: number; t0: number; loop: boolean; speed: number; phase: number } | null = null;
 
   /**
@@ -286,7 +286,7 @@ export class Stage {
   trail!: THREE.Mesh;
   /** a shot's setup can run the clock on unseen (smoke building, a body settling): what the game plays meanwhile is not for the soundtrack */
   mute = false;
-  /** clips for Actor.emote, by name (empty when trailer/emotes.glb has not been built) */
+  /** clips for Actor.emote, by name (empty when tools/trailer/emotes.glb has not been built) */
   emotes = new Map<string, THREE.AnimationClip>();
 
   private seed = 1;
@@ -540,10 +540,10 @@ async function stage() {
   // movements for the "coming soon" scenes (npm run character -- --emotes)
   if (CUT === 2) {
     try {
-      const em = await assets.gltf.loadAsync('/trailer/emotes.glb');
+      const em = await assets.gltf.loadAsync('/tools/tools/trailer/emotes.glb');
       for (const clip of em.animations) S.emotes.set(clip.name, clip);
     } catch {
-      console.log('[tr] trailer/emotes.glb is missing: run "npm run character -- --emotes"');
+      console.log('[tr] tools/trailer/emotes.glb is missing: run "npm run character -- --emotes"');
     }
   }
 

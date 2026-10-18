@@ -1,4 +1,4 @@
-// node scripts/architecture.mjs: writes ARCHITECTURE.md, the map of the code (2026-10-14). Every TypeScript file of
+// node scripts/architecture.mjs: writes docs/ARCHITECTURE.md, the map of the code (2026-10-14). Every TypeScript file of
 // the game, the server and the site's functions, folder by folder: its size and the first sentence of its own header
 // comment. Made from the files themselves so that it is never out of date: run it again after adding or moving a file.
 // Why: a new chat or agent finds where a thing lives here instead of searching the tree for it (the owner, watching
@@ -55,5 +55,5 @@ for (const f of files) {
   const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
   out.push(`| \`${path.basename(f)}\` | ${text.split('\n').length} | ${about(text)} |`);
 }
-fs.writeFileSync(path.join(ROOT, 'ARCHITECTURE.md'), out.join('\n') + '\n');
-console.log(`ARCHITECTURE.md: ${files.length} files in ${new Set(files.map((f) => path.dirname(f))).size} folders`);
+fs.writeFileSync(path.join(ROOT, 'docs', 'ARCHITECTURE.md'), out.join('\n') + '\n');
+console.log(`docs/ARCHITECTURE.md: ${files.length} files in ${new Set(files.map((f) => path.dirname(f))).size} folders`);

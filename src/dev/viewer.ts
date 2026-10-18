@@ -1,6 +1,6 @@
 // A look at models as the game will load them, without starting the game: for whoever is
-// fitting a new one. Not part of the built site (viewer.html is not in the build).
-//   /viewer.html?m=plate_carrier,weapons_case        models by their id in the manifest
+// fitting a new one. Not part of the built site (tools/viewer.html is not in the build).
+//   /tools/viewer.html?m=plate_carrier,weapons_case        models by their id in the manifest
 //   &yaw=0.6&pitch=0.3                               from where (radians)
 //   &post=name                                       and hand the picture to the receiver on 5199 under that name
 //   &clean                                           no floor, no axes, no words: the thing alone, for showing

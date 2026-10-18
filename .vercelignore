@@ -7,6 +7,6 @@ dist
 # local server save
 data
 # trailer takes and marketing pictures are not part of the site
-trailer/out
+tools/trailer/out
 marketing
-trailer/emotes.glb
+tools/trailer/emotes.glb

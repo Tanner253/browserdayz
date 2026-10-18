@@ -2,8 +2,8 @@
 // drawn half size, and recorded as it plays (so it takes as long as the stretch is). No game is run, and no
 // dev server is needed. A still from the middle of it is kept beside it, for the poster.
 //
-//   node scripts/clip.mjs trailer/out/zona-trailer-7.mp4 public/changelog/media/teaser           the whole of it
-//   node scripts/clip.mjs trailer/out/zona-trailer-7.mp4 public/changelog/media/teaser 3.7 9.4   that stretch (seconds)
+//   node scripts/clip.mjs tools/trailer/out/zona-trailer-7.mp4 public/changelog/media/teaser           the whole of it
+//   node scripts/clip.mjs tools/trailer/out/zona-trailer-7.mp4 public/changelog/media/teaser 3.7 9.4   that stretch (seconds)
 //
 // -> teaser.mp4 (or .webm, where this Chrome cannot record MP4) and teaser.jpg
 

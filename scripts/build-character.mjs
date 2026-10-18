@@ -47,7 +47,7 @@ const CLIPS = {
 };
 /**
  * `--emotes`: the same body with a few more clips from the library, written to
- * trailer/emotes.glb for the trailer's "coming soon" scenes. The game's own file and its
+ * tools/trailer/emotes.glb for the trailer's "coming soon" scenes. The game's own file and its
  * mask are left exactly as they are.
  */
 const EMOTES = process.argv.includes('--emotes');
@@ -918,7 +918,7 @@ await doc.transform(
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEX, TEX], quality: 90 }),
   meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
 );
-const dest = EMOTES ? path.join(ROOT, 'trailer', 'emotes.glb') : INFECTED ? path.join(ROOT, 'assets-src', 'characters', 'plain.glb') : path.join(OUT, 'survivor.glb');
+const dest = EMOTES ? path.join(ROOT, 'tools', 'trailer', 'emotes.glb') : INFECTED ? path.join(ROOT, 'assets-src', 'characters', 'plain.glb') : path.join(OUT, 'survivor.glb');
 await io.write(dest, doc);
 // asset addresses carry the manifest's date: move it on, so no browser keeps the old body
 if (!EMOTES && !INFECTED) {

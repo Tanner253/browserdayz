@@ -1,8 +1,8 @@
 # ZONA: what every agent working here must know
 
-Read this whole file before touching anything, then `HANDOFF.md` (where the work stands right now). The long history
+Read this whole file before touching anything, then `docs/HANDOFF.md` (where the work stands right now). The long history
 of decisions is in the memory notes (`MEMORY.md` and its files); read the ones that touch your task. The notes are
-history: some are out of date. WHERE A NOTE DISAGREES WITH THIS FILE OR WITH `HANDOFF.md`, THESE TWO WIN (for example older
+history: some are out of date. WHERE A NOTE DISAGREES WITH THIS FILE OR WITH `docs/HANDOFF.md`, THESE TWO WIN (for example older
 notes describe other ways to deploy, one lane at a time, or publishing the site freely: all superseded).
 
 ## The project
@@ -13,10 +13,10 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - Stack: Vite + TypeScript + three.js + Rapier (character controller), a Node `ws` server that shares `src/sim` with the game, Vercel functions in `api/`.
 
 ## Where things are
-`ARCHITECTURE.md` is the map: every file, its size and what it is (`node scripts/architecture.mjs` rebuilds it; do so after adding or moving a file). Look there before searching the tree.
+`docs/ARCHITECTURE.md` is the map: every file, its size and what it is (`node scripts/architecture.mjs` rebuilds it; do so after adding or moving a file). Look there before searching the tree.
 - `src/game/` the game in the browser (`game.ts` the Game class: its fields, its constructor, and a list of which file in `src/game/game/` each of its methods is in), `src/world/` the world and how it is drawn (`worldgen.ts` makes the map, its parts in `src/world/worldgen/`: `generate.ts` is one long function with an index of its stages at its head; `terrain.ts`, `snow.ts`, `seat.ts`, `vegetation.ts`, `castle*.ts` the mountain fort), `src/sim/` rules shared by game and server (items, economy and loot, `castle.ts` the fort's plan, grenades, fires, infected), `src/ui/`, `src/net/protocol.ts` (`PROTOCOL`).
 - `server/index.ts` the game server as it starts (what it does at start-up, in order; the world state; the loops; http and ws), its parts beside it in `server/` (`handle.ts` is every message a player sends, `admin.ts` every admin command). `api/` payouts (`api/_lib/payouts.ts`), cash-ins, admin, saves.
-- `test/*.test.ts` plain scripts run with tsx. `scripts/` deploy, cards, icons, films. `src/trailer/` + `scripts/film.mjs` the films.
+- `test/*.test.ts` plain scripts run with tsx. `scripts/` deploy, cards, icons, films. `src/trailer/` + `scripts/film.mjs` the films; their stage page and clock are in `tools/` (`tools/trailer.html`, takes in `tools/trailer/out`), beside the other dev pages (`tools/viewer.html`, `tools/poster.html`, `tools/reel.html`). `docs/` the admin guide, this map and the handoff.
 - `public/changelog/` the changelog page and its pictures; `marketing/` cards (`node scripts/card.mjs <name>`).
 - `progress/` (git-excluded, kept for the story, the owner 2026-10-15: "just for us and our story"): every plan, design picture and picture of work as it goes is saved here, never only in a scratch folder. Plan pages stay `marketing/plan-*.html` -> `zona-plan-*.png` (also excluded) so the card tool renders them.
 - `assets-src/` (git-ignored, about 10 GB): downloaded packs and model sources. NEVER delete it; it exists only on this machine.

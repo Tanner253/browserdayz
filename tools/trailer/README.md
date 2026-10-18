@@ -7,14 +7,14 @@ not recorded: every sound the game asks for is logged with its time, and the sou
 
 ## Re-render
 
-The dev server has to be running (`npm run dev`), and nothing in `src/`, `trailer/` or
-`trailer.html` may be edited while a take runs: the dev server would reload the page.
+The dev server has to be running (`npm run dev`), and nothing in `src/`, `tools/` or
+`tools/trailer.html` may be edited while a take runs: the dev server would reload the page.
 
 ```bash
 npm run film
 ```
 
-That writes `trailer/out/zona-trailer.mp4` (1920x1080, 60 fps, H.264 + AAC, 75 s) and
+That writes `tools/trailer/out/zona-trailer.mp4` (1920x1080, 60 fps, H.264 + AAC, 75 s) and
 `zona-trailer-first-frame.jpg`. A full take is about 16 minutes on the RTX 3070 Ti laptop.
 
 ## Drafts
@@ -23,7 +23,7 @@ That writes `trailer/out/zona-trailer.mp4` (1920x1080, 60 fps, H.264 + AAC, 75 s
 npm run film -- --draft --no-video --stills 15              # the whole cut as contact sheets, about 3 minutes
 npm run film -- --draft --from 18.75 --to 30 --out fight    # one stretch, half size, 30 fps, with sound
 npm run film -- --draft --no-video --twice --from 19.5 --to 21.5   # film a stretch twice and compare the takes
-node trailer/probe.mjs trailer/out/zona-trailer.mp4         # what is in the file
+node tools/trailer/probe.mjs tools/trailer/out/zona-trailer.mp4         # what is in the file
 ```
 
 `--stills N` keeps every Nth frame and lays them out twenty to a sheet, each stamped with
@@ -33,8 +33,8 @@ its time. Look at the sheets before watching anything.
 
 | File | What it is |
 |---|---|
-| `trailer.html` | the stage page: the game, with the clock loaded first and the director after |
-| `trailer/clock.js` | virtual time, virtual timers and animation frames, seeded `Math.random` |
+| `tools/trailer.html` | the stage page: the game, with the clock loaded first and the director after |
+| `tools/trailer/clock.js` | virtual time, virtual timers and animation frames, seeded `Math.random` |
 | `src/trailer/director.ts` | stages the offline match, runs the shot list a frame at a time, logs sound, encodes |
 | `src/trailer/shots.ts` | the trailer itself: every shot, cue, camera and title, on a 128 BPM grid (a bar is 1.875 s) |
 | `src/trailer/music.ts` | the score: one row per bar |

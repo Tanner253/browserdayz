@@ -55,7 +55,7 @@ const run = async (expression) => {
 await cdp('Page.enable');
 await cdp('Runtime.enable');
 await cdp('Emulation.setDeviceMetricsOverride', { width: 1500, height: 1000, deviceScaleFactor: 1, mobile: false });
-await cdp('Page.navigate', { url: 'http://localhost:5173/trailer.html?cut=5' });
+await cdp('Page.navigate', { url: 'http://localhost:5173/tools/trailer.html?cut=5' });
 process.stdout.write('loading the game');
 for (let i = 0; ; i++) {
   await sleep(1000);

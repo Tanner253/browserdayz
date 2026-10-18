@@ -4,7 +4,7 @@
 // entries going by, and the address and the X account to end on. Filmed by scripts/film.mjs, which asks of a page what
 // it asks of the trailer's (window.tr): ready, info, begin, step, encodeFrame, finish, piece, soundLog.
 //
-//   node scripts/film.mjs --url http://localhost:5173/reel.html --out zona-changelog-reel
+//   node scripts/film.mjs --url http://localhost:5173/tools/reel.html --out zona-changelog-reel
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { scoreMusic15 } from './music15';
 
