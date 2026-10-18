@@ -33,6 +33,7 @@ import { ajar, findCarried, hurtJeep, kill, leaveSeat, releaseLock, seatOf } fro
 import { scores } from './queue';
 import { sendDrop } from './drops';
 import { seen } from './seen';
+import { changed, contents } from './storages';
 
 export function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
@@ -445,12 +446,24 @@ export function handle(c: Client, m: C2S) {
       c.openCid = m.cid;
       if (!again) ajar(m.cid, true, c);
       touched(b);
-      send(c, { t: 'cdata', cid: m.cid, items: b.items });
+      send(c, { t: 'cdata', cid: m.cid, items: b.kind === 'furniture' ? contents(b) : b.items });
       return;
     }
     case 'cset': {
       const b = boxes.get(m.cid);
       if (!b || locks.get(m.cid) !== c.id || c.seatAt) return;
+      // (a piece of furniture: the economy's things in it are told apart from what they leave there, server/storages.ts)
+      if (b.kind === 'furniture') {
+        const items = cleanStored(m.items);
+        changed(b, items);
+        if (CHECKS !== 'off') {
+          const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
+          if (made.length && flag(c, `stored ${ITEMS[made[0].id].name}, which the server never put in the world`)) b.items = b.items.filter((it) => !made.includes(it));
+          for (const it of b.items) issue(it);
+        }
+        touched(b);
+        return;
+      }
       b.items = cleanStored(m.items);
       if (CHECKS !== 'off') {
         const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));

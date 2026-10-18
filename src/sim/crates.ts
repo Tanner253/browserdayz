@@ -119,6 +119,10 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 3] },
   gun_rack: { label: 'Weapon Rack', w: 8, h: 4, table: ON_RACKS, count: [2, 4] },
   bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, table: IN_BUNKER, count: [1, 2] },
+  // (the furniture with no places of its own, filled from a list as DayZ's cargo presets fill a container: a thing or
+  // two in a cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
+  cardboard_box_01: { label: 'Cardboard Box', w: 4, h: 3, table: CIVILIAN, count: [0, 2] },
+  crate_big: { label: 'Large Crate', w: 8, h: 4, table: CIVILIAN, count: [1, 3] },
   bunker_desk: { label: 'Desk', w: 6, h: 3, table: IN_BUNKER, count: [0, 2] },
 };
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */

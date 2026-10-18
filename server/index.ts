@@ -19,6 +19,8 @@ import { PLAN, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
 import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK } from '../src/sim/crates';
+import { FURNITURE } from '../src/sim/storage';
+import { hidden } from './storages';
 import { News } from '../src/sim/news';
 import { underGas, gasEdge } from '../src/sim/gas';
 import { CourseJudge, dealCourse } from '../src/sim/course';
@@ -91,7 +93,9 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 
 export interface Box {
   cid: string;
-  kind: 'crate' | 'stash' | 'corpse' | 'drop';
+  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture';
+  /** furniture: where in its grid each of the economy's things inside it was last put, by uid (server/storages.ts) */
+  layout?: Record<string, [number, number, boolean]>;
   /** a drop that is the cargo of a helicopter that came down */
   heli?: boolean;
   w: number;
@@ -244,11 +248,12 @@ export const economy = new Economy(world.lootPoints, {
     issue(l.item);
     // (a case, a suitcase or a bag somebody dropped is kept between restarts: see `keptAt`)
     if (l.keptAt !== undefined) keptChanged();
-    broadcast({ t: 'loot+', l });
+    // (what is put in a piece of furniture is not lying anywhere to be told of: it is seen when the piece is opened)
+    if (!hidden(l.point)) broadcast({ t: 'loot+', l });
   },
   despawn: (l) => {
     if (l.keptAt !== undefined) keptChanged();
-    broadcast({ t: 'loot-', uid: l.uid });
+    if (!hidden(l.point)) broadcast({ t: 'loot-', uid: l.uid });
   },
 });
 
@@ -281,6 +286,12 @@ function fillBox(b: Box) {
 
 function loadWorld() {
   for (const c of world.crates) {
+    // (furniture that holds the loot of its own places: src/sim/storage.ts, server/storages.ts)
+    const own = FURNITURE[c.kind];
+    if (own?.cargo === 'economy') {
+      boxes.set(c.cid, { cid: c.cid, kind: 'furniture', w: own.grid[0], h: own.grid[1], items: [], x: c.x, y: c.y, z: c.z, rot: 0, emptiedAt: -1 });
+      continue;
+    }
     const spec = CRATE_SPECS[c.kind];
     if (!spec) continue;
     // (a steel cabinet is filled with what its building kept: in a police building a constable's locker, in the
@@ -310,6 +321,9 @@ function loadWorld() {
       if (b.kind === 'crate') {
         const cur = boxes.get(b.cid);
         if (cur) Object.assign(cur, { items: b.items, emptiedAt: b.emptiedAt });
+      } else if (b.kind === 'furniture') {
+        const cur = boxes.get(b.cid);
+        if (cur?.kind === 'furniture') Object.assign(cur, { items: b.items, layout: b.layout ?? {} });
       } else if (b.kind === 'stash') {
         if (b.buried) boxes.set(b.cid, b);
         else if (!economy.loot.has(b.cid)) economy.drop(stashItem(b), b.x, b.y, b.z, b.rot).keptAt = b.touchedAt ?? Date.now();

@@ -23,7 +23,7 @@ import { FLOOR_CACHE, caveSpansUnder, passWorld, wallParts } from '../sim/pass';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
-import { Economy } from '../sim/economy';
+import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_SPECS } from '../sim/crates';
 import '../sim/combat';
 import { LAUNCHED } from '../sim/grenades';
@@ -33,6 +33,7 @@ import '../sim/emotes';
 import '../sim/save';
 import { Net, playerName, publicId, serverStatus } from '../net/client';
 import { crateId } from '../net/protocol';
+import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
 import '../sim/blood';
 import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
@@ -522,15 +523,17 @@ export class Game {
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
+    // (offline, what the economy puts in a piece of furniture is not drawn: it is found when the piece is opened, see fillCrate)
+    const inside = (l: WorldLoot) => l.point >= 0 && !!buildings.lootPoints[l.point]?.inside;
     this.economy = new Economy(buildings.lootPoints, {
-      spawn: (l) => this.loot.spawn(l),
-      despawn: (l) => this.loot.despawn(l),
+      spawn: (l) => void (inside(l) || this.loot.spawn(l)),
+      despawn: (l) => void (inside(l) || this.loot.despawn(l)),
     });
-    // crates standing around the map become searchable containers
+    // crates standing around the map become searchable containers, and the furniture that holds things (src/sim/storage.ts)
     for (const c of veg.crates) {
-      const spec = CRATE_SPECS[c.kind];
+      const own = FURNITURE[c.kind], spec = CRATE_SPECS[c.kind] ?? (own ? { w: own.grid[0], h: own.grid[1], label: own.label } : null);
       if (!spec) continue;
-      const st = new Stash(crateId(c.x, c.z), c.x, c.y, c.z, c.rot, spec.w, spec.h, spec.label);
+      const st = new Stash(storageId(c.kind, c.x, c.y, c.z), c.x, c.y, c.z, c.rot, spec.w, spec.h, spec.label);
       st.kind = c.kind;
       st.adopt(c.collider);
       this.loot.crates.push(st);

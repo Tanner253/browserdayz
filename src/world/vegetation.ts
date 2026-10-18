@@ -4,7 +4,8 @@
 import { CANYON_ROCK_TINT } from './ground';
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { CONTAINER, CRATE_KINDS, SEARCHED_KINDS, paintBlue } from './buildings';
+import { CONTAINER, paintBlue } from './buildings';
+import { isSearchable } from '../sim/storage';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
@@ -989,7 +990,8 @@ export class Vegetation {
               }
               if (drum) drum.collider = col;
               this.solidAt.set(spotKey(it.x, it.z), col);
-              if (CRATE_KINDS.has(id) || SEARCHED_KINDS.has(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
+              // (a crate, a locker, or furniture that holds things: src/sim/storage.ts)
+              if (isSearchable(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
             });
           }
         }

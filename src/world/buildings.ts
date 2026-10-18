@@ -17,6 +17,7 @@ import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
 import { TOWNS } from '../sim/towns';
 import { castleLoot, castleProps } from '../sim/castle';
+import { CRATE_KINDS, SEARCHED_KINDS, markInside } from '../sim/storage';
 import { frameToWorld, planBasements, type RoomKind } from '../sim/basements';
 import { buildBasement, roomVolume, type Kit } from './basement-build';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
@@ -53,6 +54,8 @@ export interface LootPoint {
   keeps?: string;
   /** the furniture surface this point sits on: world-space centre, yaw and usable half extents */
   surf?: { x: number; z: number; rot: number; hx: number; hz: number; /** free height above the surface */ clear: number };
+  /** in a piece of furniture, by its id: what the economy puts here is in it, not drawn (src/sim/storage.ts) */
+  inside?: string;
 }
 
 /** what a basement's room keeps, by its kind (src/sim/basements.ts): a root cellar a village's, a vault the army's */
@@ -61,19 +64,8 @@ const CELLAR_USAGE: Record<RoomKind, Usage[]> = {
   store: ['Farm', 'Village'], bunk: ['Military', 'Hunting'], vault: ['Military'],
 };
 
-/** props that are searched as containers (loot is inside, never lying on top) */
-export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case']);
-/**
- * Furniture that is searched as a crate is (2026-10-12: "the metal lockers found in the police station and the
- * medical station should be lootable and have inventories"): the steel cabinet with two doors that stands in the
- * headquarters and the hospital. Kept apart from the crates: a crate has no place for a thing on it, and these
- * are asked nothing of where places are, so that not one place on the map is other than it was.
- * (2026-10-13: and the steel locker the owner brought in, two lockers in one case, whose doors swing open while it
- * is searched: see HUNG in src/sim/crates.ts. It stands where the men's lockers were cabinets, in the headquarters
- * and over its cells, and where a locker belongs and there was none: a police station's hall, a barracks, a long
- * hut, the rooms the hospital's own people sat in.)
- */
-export const SEARCHED_KINDS = new Set(['med_cabinet', 'steel_locker']);
+// (what is searched is said in one place, src/sim/storage.ts; these two are there and said again here for what asks them of here)
+export { CRATE_KINDS, SEARCHED_KINDS } from '../sim/storage';
 /** the new towns' building ids (`<town>_<n>`): their plots are the last of the world's, and what they make comes after everything older (see `plan`) */
 export const TOWN_PLOT = new RegExp(`^(${TOWNS.map((t) => t.name.toLowerCase()).join('|')})_\\d+$`);
 /** how far from Kalat's middle the things set down in it lie (its pieces reach some 200 m) */
@@ -1637,6 +1629,8 @@ export class Buildings {
       if (searched(q)) taken.add(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`);
       this.world.props.push(q);
     }
+    // (and which places are inside the furniture they lie on: the same here and on the server, by the same props)
+    markInside(this.lootPoints, this.world.props);
   }
 
   /**

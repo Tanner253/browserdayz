@@ -5,9 +5,10 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { bunkerPlace, generateWorld, heightAt } from '../src/world/worldgen';
 import { BUNKER, bunkerAt, bunkerCrates, levelY } from '../src/sim/bunker';
-import { Buildings, CRATE_KINDS, SEARCHED_KINDS } from '../src/world/buildings';
+import { Buildings } from '../src/world/buildings';
 import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
+import { isSearchable, storageId } from '../src/sim/storage';
 import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, jeepSpots, policeSpots } from '../src/sim/vehicles';
@@ -105,10 +106,11 @@ export function buildWorldData(root: string) {
   for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, (x, z) => heightAt(world.heights, x, z)));
   // (and the pass's caves' and its floor's cache, after those: src/sim/pass.ts)
   buildings.lootPoints.push(...caveLootPoints());
+  // (what is searched: the crates and lockers, and the furniture that holds things, src/sim/storage.ts)
   const crates: CrateSpot[] = world.props
     .map((p) => ({ p, kind: p.kind.split(/[#@]/)[0] }))
-    .filter(({ kind }) => CRATE_KINDS.has(kind) || SEARCHED_KINDS.has(kind))
-    .map(({ p, kind }) => ({ cid: crateId(p.x, p.z), kind, x: p.x, y: p.y, z: p.z }));
+    .filter(({ kind }) => isSearchable(kind))
+    .map(({ p, kind }) => ({ cid: storageId(kind, p.x, p.y, p.z), kind, x: p.x, y: p.y, z: p.z }));
   // (and what is searched in the bunker that is no crate: its lockers, racks, cabinets and desks)
   const under = bunkerPlace(world);
   if (under) for (const c of bunkerCrates(under)) crates.push({ cid: crateId(c.x, c.z), kind: c.kind, x: c.x, y: c.y, z: c.z });

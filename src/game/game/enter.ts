@@ -11,6 +11,7 @@ import { heightAt, inPlay } from '../../world/worldgen';
 import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
 import { fillCrate } from '../../sim/crates';
+import { economyCargo } from '../../sim/storage';
 import { loadSave, type SaveData, writeSave } from '../../sim/save';
 import { playerName, setPlayerName, personKey, remoteServer, publicId } from '../../net/client';
 import { PROTOCOL, type S2C } from '../../net/protocol';
@@ -300,6 +301,11 @@ export const enterMethods = {
 
   /** a crate of the map filled (one under the gas with the best of everything) */
   fillCrate(this: Game, c: Stash) {
+    // (offline, a piece of furniture holds what the economy put in it: taken out of the economy into it as it would be by hand)
+    if (economyCargo(c.kind)) {
+      for (const l of [...this.economy.loot.values()]) if (l.point >= 0 && this.economy.points[l.point]?.inside === c.uid && c.container.hasRoom(l.item) && this.economy.take(l.uid, false)) c.container.add(l.item);
+      return;
+    }
     fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z));
   },
 

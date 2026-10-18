@@ -16,6 +16,7 @@ import { callSite, describeSpot, DROP } from '../../sim/drops';
 import { planFlight, type Flight, flightTimes, comesFrom, restAt } from '../../sim/airdrop';
 import { type JobBook, bookFor, dayOf } from '../../sim/jobs';
 import { DIG_SECONDS, Game } from '../game';
+import { economyCargo } from '../../sim/storage';
 
 export const gunsMethods = {
   // ------------------------------------------------------------ attachments
@@ -474,6 +475,8 @@ export const gunsMethods = {
       this.openLying();
       this.invUI.open(this.around(), this.openStash, this.player.vitals);
       if (this.garage.ride && this.loot.near(this.player.pos, 2.3).length) this.hud.note('Nothing is picked up from a seat: get out for it', 'info');
+      // (offline, a piece of furniture is given what the economy has put in it since it was last opened)
+      if (!this.online && this.openStash && economyCargo(this.openStash.kind)) this.fillCrate(this.openStash);
       if (this.online && this.openStash) {
         // the server holds what is inside; show it once it answers
         this.invUI.setStashState('Opening…');

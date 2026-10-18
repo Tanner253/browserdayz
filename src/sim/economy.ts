@@ -494,7 +494,7 @@ export class Economy {
   private wants = new Map<string, number>();
 
   constructor(
-    private points: LootPoint[],
+    readonly points: LootPoint[],
     private events: EconomyEvents,
     /** can this item type physically lie at this loot point? */
     private fits: (id: string, p: LootPoint) => boolean = fitsPoint,
