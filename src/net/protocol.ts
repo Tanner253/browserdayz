@@ -34,7 +34,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (47, 2026-10-17: the loot on DayZ's model and more places for it: new loot points (racks under the gas, the bunker's
 // shelves, the field posts in the west) and ground levelled under the posts; a page from before would put loot where the
 // server has none, and stand on ground it does not have. And furniture holds its own places' loot.)
-export const PROTOCOL = 47;
+// (48, 2026-10-18: gun racks show what stands in them (`racks` in the welcome, 'rack' when it changes), and a hit says
+// how many bodies the round went through first (`p`); the racks are new loot places.)
+export const PROTOCOL = 48;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
