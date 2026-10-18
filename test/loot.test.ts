@@ -298,19 +298,19 @@ ok('food is in the shop before anywhere, and dressings in the clinic', () => {
   assert.ok(inCare / dress > share('Medic', 3) * 4, `${inCare} of ${dress} bandages and stims in the village and Kamenka were in their clinics`);
 });
 
-ok('a step asked for more than it has places is stocked to what it holds, what it is for cut least', () => {
-  // (2026-10-17: the gas was asked for 165 things on its 127 places and the bunker for 175 on its 145)
+ok('the gas and the bunker hold all they are asked; a step asked for more than it has places is stocked to what it holds, what it is for cut least', () => {
+  // (2026-10-17: the gas was asked for 165 things on its 127 places and the bunker for 175 on its 145; with their new
+  // places they hold all of it, and nothing is cut)
   const { e } = worlds[0];
-  for (const t of [4, 5] as Tier[]) {
-    const room = points.filter((p) => p.tier === t && !p.arms && !p.keeps).length;
-    const kept = Object.keys(TYPES).reduce((n, id) => n + e.kept(id, t), 0);
-    assert.ok(kept <= room && kept >= room - 2, `step ${t} keeps ${kept} things on ${room} places`);
-    for (const id of Object.keys(TYPES)) if (TYPES[id].at[t - 1]) assert.ok(e.kept(id, t) >= 1, `${id} cut to nothing on step ${t}`);
-  }
-  // (what opens the bunker, and what is the bunker's and nobody else's, whole; a dressing every village has cut more than a rifle)
-  assert.equal(e.kept('keycard', 4), TYPES.keycard.at[3]);
-  for (const id of ['benelli', 'deagle', 'sniper50', 'barrett', 'vssk', 'heavy_armor']) assert.equal(e.kept(id, 5), TYPES[id].at[4], `${id} cut in the bunker`);
-  assert.ok(e.kept('mosin', 4) / TYPES.mosin.at[3] > e.kept('bandage', 4) / TYPES.bandage.at[3], 'a rifle cut more than a dressing under the gas');
+  for (const t of [4, 5] as Tier[]) for (const id of Object.keys(TYPES)) if (!TYPES[id].per) assert.equal(e.kept(id, t), TYPES[id].at[t - 1], `${id} cut on step ${t}`);
+  // (and a bunker of a hundred and twenty places is cut to them)
+  const few = new Economy(points.filter((p) => p.tier === 5).slice(0, 120), { spawn: () => {}, despawn: () => {} });
+  const kept = Object.keys(TYPES).reduce((n, id) => n + few.kept(id, 5), 0);
+  assert.ok(kept <= 120 && kept >= 118, `a bunker of 120 places keeps ${kept} things`);
+  for (const id of Object.keys(TYPES)) if (TYPES[id].at[4]) assert.ok(few.kept(id, 5) >= 1, `${id} cut to nothing`);
+  // (what is the bunker's and nobody else's cut least; a dressing every village has more than a shotgun)
+  assert.ok(few.kept('benelli', 5) / TYPES.benelli.at[4] > few.kept('bandage', 5) / TYPES.bandage.at[4], 'the shotgun cut more than a dressing');
+  for (const id of ['sniper50', 'barrett', 'vssk']) assert.equal(few.kept(id, 5), 1, `${id} cut`);
 });
 
 ok('the K6-3 stops a sniper\'s round to the head, barely; nothing else does', () => {

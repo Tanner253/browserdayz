@@ -337,7 +337,7 @@ const GATE = { half: 0.72, frame: 0.1125, hinge: [0.512, 0.2097], leaf: [-0.4698
  * is. Moved about as they are, the points stay whole numbers in that box, and the thing comes
  * out the size of a shoebox: so they are written out as plain numbers first.)
  */
-function inMetres(mesh: THREE.Mesh): THREE.BufferGeometry {
+export function inMetres(mesh: THREE.Mesh): THREE.BufferGeometry {
   const from = mesh.geometry, geo = new THREE.BufferGeometry();
   for (const name of Object.keys(from.attributes)) {
     const a = from.getAttribute(name), out = new Float32Array(a.count * a.itemSize);

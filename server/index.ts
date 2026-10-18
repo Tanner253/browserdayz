@@ -78,7 +78,9 @@ export const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character
 /** bump when loot points change: world loot from an older save is re-rolled */
 // (26, 2026-10-16: the map three times over, its new places' loot after every old one)
 // (27, 2026-10-17: everybody set down afresh at the starts round the village again, with what they had)
-export const WORLD_REV = 27;
+// (28, 2026-10-17: more places for loot: racks in the gas works, shelves and floors in the bunker, the field posts in
+// the west and a stash in each cave, and the ground levelled under the posts)
+export const WORLD_REV = 28;
 
 export const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -279,8 +281,8 @@ function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
-  // (a crate under the gas, down in the bunker, or on a basement's second level, is filled with the best of everything)
-  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z), keeps);
+  // (a crate under the gas, down in the bunker, on a basement's second level, or in one of the pass's caves, is filled with the best of everything)
+  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z) || inCave(b.x, b.y + 0.5, b.z), keeps);
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;

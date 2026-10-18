@@ -6,6 +6,7 @@ import type { FortPlace } from '../../sim/castle';
 import type { Basement } from '../../sim/basements';
 import type { Place } from '../../sim/ruins';
 import type { PlacedTown } from '../../sim/towns';
+import type { Post } from '../../sim/posts';
 import type { Waters } from '../../sim/water';
 import type { Carved } from '../cave-carve';
 import type { BuildingPlot, SiteKind } from './layout';
@@ -116,6 +117,8 @@ export interface World {
   sites: Site[];
   /** the chimney and the tanks of the works */
   solids: Solid[];
+  /** the army's field posts in the west, each with the height of the ground levelled under it (src/sim/posts.ts) */
+  posts?: (Post & { y: number })[];
   /** default spawn (first of the ring) */
   spawn: { x: number; z: number; yaw: number };
   /** fresh characters start at one of these, out on the edge of the map, facing inward */

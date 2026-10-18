@@ -91,6 +91,7 @@ import { jobsFor, progress as jobDone } from '../sim/jobs';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
+import { FieldPosts } from '../world/posts';
 import { Cellars } from './cellars';
 import { BUNKER, bunkerCrates } from '../sim/bunker';
 import { CastleSite } from '../world/castle';
@@ -153,7 +154,8 @@ export interface TimedAction {
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
 // (24, 2026-10-16: the map three times over)
-export const LOOT_REV = 24;
+// (25, 2026-10-17: more places for loot, see WORLD_REV 28 in server/index.ts)
+export const LOOT_REV = 25;
 /** how far over the ridge's crest its invisible wall stands, metres: past it a helicopter flies over */
 const RIDGE_OVER = 18;
 /** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */
@@ -428,6 +430,8 @@ export class Game {
     this.lamps.canLight = (lit) => r.readyToLight(lit);
     this.lamps.held = (lit) => r.warming(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
+    // (the army's field posts by the western roads: src/world/posts.ts)
+    void new FieldPosts(world.posts ?? [], atmo, r.scene);
     this.cellars = new Cellars(r.scene, world.basements ?? []);
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
     // (and what it draws is got ready before it is shown, as the bunker's is: a dozen kinds of surface made in the frame it first came into sight stood the game still on the way up to it)

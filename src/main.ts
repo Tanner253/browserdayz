@@ -19,7 +19,7 @@ import { Ocean } from './world/ocean';
 import { Waterways } from './world/water';
 import { waterAt } from './sim/water';
 import { caveMouths } from './sim/pass';
-import { caveLootPoints } from './world/caves-carved';
+import { caveLootPoints, inCave } from './world/caves-carved';
 import { PassCaves } from './world/caves';
 import { RockField } from './world/rock-field';
 import { CANYON_ROCK_TINT } from './world/ground';
@@ -248,6 +248,15 @@ async function boot() {
       const [ax, az] = c[k], [bx, bz] = c[(k + 1) % 4], yaw = Math.atan2(-(bz - az), bx - ax), y = Math.max(...[[ax, az], [bx, bz]].map(([x, z]) => heightAt(world.heights, x, z)));
       physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2, 40, 0.3), 'concrete', { x: (ax + bx) / 2, y, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, undefined, GLASS_GROUPS);
     }
+  }
+  // (a stash in a cave stands on the carved rock, whose floor is the plan's give or take most of a metre: measured once
+  // the caves are solid and before what stands is drawn. The server keeps the plan's height, which opens it as well.
+  // A ray finds only what a step of the world has taken in: one is taken first.)
+  if (caves) physics.step(1 / 30);
+  if (caves) for (const q of world.props) {
+    if (q.kind !== 'weapons_case' || !inCave(q.x, q.y + 0.5, q.z)) continue;
+    const hit = physics.raycast({ x: q.x, y: q.y + 1.6, z: q.z }, { x: 0, y: -1, z: 0 }, 4);
+    if (hit) q.y = hit.point.y;
   }
   stage('forest', 'growing forest');
   await frame();

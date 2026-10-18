@@ -437,6 +437,23 @@ export function caveLoot(p: Pass): { x: number; y: number; z: number; tier: 4 | 
   return out;
 }
 
+/**
+ * A stash in each cave (the owner, 2026-10-17: "we need more loot places", and the plan they said yes to, "a reason to
+ * walk into every cave"): the army's hard case, at the back of a cave with one mouth (its last chamber) and in the middle
+ * of one that goes through, in the chamber's middle and lying along the cave, clear of the places round its walls. (The carved floor is the plan's give or take most of a metre: the game stands
+ * the case on the rock, see main.ts.) Searched as any case is, and filled as one under the gas is: the best of the fourth step (crates.ts).
+ */
+export function caveStashes(p: Pass): { x: number; y: number; z: number; rot: number; where: string }[] {
+  return CAVES.map((c) => {
+    const k = c.mouths.length > 1 ? Math.floor(c.nodes.length / 2) : c.mouths[0] === 'first' ? c.nodes.length - 1 : 0;
+    const n = c.nodes[k], from = c.nodes[k === 0 ? 1 : k - 1];
+    // (in the chamber's middle: set to one side, the cache room behind the squeeze had it in the rock, its carved walls
+    // standing in from the plan's)
+    const q = passWorld(p, n.s, n.t, n.y), back = passWorld(p, from.s, from.t, from.y);
+    return { x: q[0], y: q[1], z: q[2], rot: Math.atan2(q[0] - back[0], q[2] - back[2]), where: c.name };
+  });
+}
+
 /** A rock piece stood in the pass or in a cave: which model, where its foot is, its turn and tilt, how big. */
 export interface RockPiece {
   id: string;

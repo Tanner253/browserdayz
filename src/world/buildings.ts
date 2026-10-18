@@ -11,6 +11,7 @@ import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surf
 import { RNG } from '../core/noise';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
+import { PILLBOX, POST_ROOM, postAt, postFoot, postYaw } from '../sim/posts';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
@@ -113,6 +114,27 @@ const SHELF_LEVELS: Record<string, number[]> = {
 const RACKS: Record<string, { boards: number[]; mid: [number, number]; half: [number, number]; clear: number; places: number }> = {
   rack_small: { boards: [0.187, 0.724, 1.265, 1.824], mid: [0.08, 0.06], half: [0.42, 0.2], clear: 0.46, places: 1 },
   rack_wide: { boards: [0.183, 0.728, 1.256, 1.828], mid: [0, 0.06], half: [0.84, 0.2], clear: 0.46, places: 2 },
+};
+/**
+ * What a building under the gas keeps over its kind's own (the owner, 2026-10-17: "we need more loot places"; the gas
+ * was asked for 165 things on its 127 places, and what did not fit was never put down): racks along its free walls, on
+ * every board, and a few places on a floor for a rifle. Stood clear by a hand's breadth of what is there (measured on
+ * the models: a wide rack 1.81 m by 0.61, a small one 1.19 by 0.62, both 1.88 high), and of every door, and under no
+ * window lower than they are tall (the garage's side window is at 1.7 m: its rack stands between that and the barrel).
+ * Their places come after every other place on the map, as every rack's do (see RACKS).
+ */
+const UNDER_GAS: Partial<Record<BuildingPlot['type'], { furniture: Furn[]; floor?: [number, number][] }>> = {
+  barn: {
+    furniture: [
+      { id: 'rack_wide', x: 1.3, z: -3.47, rot: 0, on: [0, 1, 2, 3] },
+      { id: 'rack_wide', x: -5.47, z: -1.6, rot: Math.PI / 2, on: [0, 1, 2, 3] },
+      { id: 'rack_wide', x: 5.47, z: 1.2, rot: -Math.PI / 2, on: [0, 1, 2, 3] },
+    ],
+    floor: [[-2.6, 2.8], [2.6, -2.4], [4.0, 1.0], [-3.0, -2.6]],
+  },
+  garage: { furniture: [{ id: 'rack_small', x: -3.97, z: 1.6, rot: Math.PI / 2, on: [0, 1, 2, 3] }] },
+  // (in the arms room, between its shelves and its desk)
+  barracks: { furniture: [{ id: 'rack_wide', x: 5.97, z: 0.85, rot: -Math.PI / 2, on: [0, 1, 2, 3] }] },
 };
 /** how high a bed's springs are over its feet, and how thick the mattress on them is: what is kept on a bed lies on that */
 const BED = { springs: 0.49, mattress: 0.1 };
@@ -1568,6 +1590,8 @@ export class Buildings {
     // building stands on, as that building's other places are.
     mark(this.racked);
     this.lootPoints.push(...this.racked);
+    // (and the field posts' places, the last of the map's own: every place stocked apart comes after them)
+    this.postPlaces();
     // The leaves of the containers, one at each end: after every other door, so that none of those is renumbered.
     const lot = new RNG(4471);
     this.containers.forEach((it, n) => {
@@ -1628,6 +1652,15 @@ export class Buildings {
       while (searched(q) && taken.has(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`)) q.x += 0.11;
       if (searched(q)) taken.add(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`);
       this.world.props.push(q);
+    }
+    // And what stands in the army's field posts by the western roads (src/sim/posts.ts): the rack and the case in each,
+    // after every other thing, so that none is renumbered. (Their places come after the racks': see `postPlaces`.)
+    for (const p of this.world.posts ?? []) {
+      const foot = postFoot(p.y), yaw = postYaw(p);
+      for (const q of [POST_ROOM.rack, POST_ROOM.case]) {
+        const [x, y, z] = postAt(p, foot, q.x, PILLBOX.floor, q.z);
+        this.world.props.push({ kind: q.id, x, y, z, rot: yaw + q.rot, scale: 1, far: 46 });
+      }
     }
     // (and which places are inside the furniture they lie on: the same here and on the server, by the same props)
     markInside(this.lootPoints, this.world.props);
@@ -2105,6 +2138,36 @@ export class Buildings {
       .makeTranslation((a + b) / 2, -DROP / 2 - HALF * Math.cos(tilt), LEN / 2 - HALF * Math.sin(tilt))
       .multiply(new THREE.Matrix4().makeRotationX(tilt));
     this.collider((b - a) / 2 + 0.3, HALF, Math.hypot(DROP, LEN) / 2, F.clone().multiply(m), 'wood', GLASS_GROUPS);
+  }
+
+  /**
+   * The places in the army's field posts by the western roads (src/sim/posts.ts): on the boards of the rack in each, as
+   * a building's rack's are (see `stock`), and on its floor, the first kept with a gun as a guard post's is. A place of
+   * the army's on the third step of the map.
+   */
+  private postPlaces() {
+    for (const p of this.world.posts ?? []) {
+      const foot = postFoot(p.y), yaw = postYaw(p), at = (lx: number, ly: number, lz: number) => postAt(p, foot, lx, ly, lz);
+      const name = `post_${Math.round(p.x)}_${Math.round(p.z)}`, rack = POST_ROOM.rack;
+      const R = RACKS[rack.id], c = Math.cos(rack.rot), sn = Math.sin(rack.rot), seg = R.half[0] / R.places;
+      for (const b of rack.boards) for (let k = 0; k < R.places; k++) {
+        const ox = R.mid[0] - R.half[0] + (2 * k + 1) * seg, oz = R.mid[1];
+        const [x, y, z] = at(rack.x + ox * c + oz * sn, PILLBOX.floor + R.boards[b] + 0.003, rack.z - ox * sn + oz * c);
+        this.lootPoints.push({ x, y, z, usage: ['Military'], building: name, floor: false, tier: 3, surf: { x, z, rot: yaw + rack.rot, hx: seg, hz: R.half[1], clear: R.clear } });
+      }
+      POST_ROOM.floor.forEach(([lx, lz], k) => {
+        const [x, y, z] = at(lx, PILLBOX.floor + 0.02, lz);
+        this.lootPoints.push({ x, y, z, usage: ['Military'], building: name, floor: true, tier: 3, ...(k === 0 ? { arms: 'guns' as const } : {}) });
+      });
+    }
+  }
+
+  /** where the gas lies (see src/sim/gas.ts), once asked */
+  private gasField?: ReturnType<typeof gasZone>;
+  /** does a building stand under the gas (its floor, a man's height up, in air that cannot be breathed) */
+  private gassed(plot: BuildingPlot): boolean {
+    this.gasField ??= gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
+    return gasDepth(this.gasField, plot.x, plot.floorY + 1.5, plot.z) > GAS.breathe;
   }
 
   private planBuilding(plot: BuildingPlot) {
@@ -2768,6 +2831,15 @@ export class Buildings {
     // (his shop and his shed, that is: the bunkhouse along the yard is nobody's)
     const his = plot.type !== 'hut' && this.world.sites.some((st) => st.kind === 'market' && Math.hypot(st.x - plot.x, st.z - plot.z) < 40);
     stock(bp.furniture, his ? [] : bp.loot, 0);
+    // (and under the gas, more: see UNDER_GAS)
+    const more = UNDER_GAS[plot.type];
+    if (more && this.gassed(plot)) {
+      stock(more.furniture, [], 0);
+      for (const [lx, lz] of more.floor ?? []) {
+        const p = new THREE.Vector3(lx, 0.02, lz).applyMatrix4(B);
+        this.racked.push({ x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: true });
+      }
+    }
     if (bp.upper) stock(bp.upper.furniture, bp.upper.loot, h + SLAB);
     (bp.levels ?? []).forEach((l, k) => stock(l.furniture, l.loot, storeyY[k + 1], l.usage));
     if (bp.deck) {

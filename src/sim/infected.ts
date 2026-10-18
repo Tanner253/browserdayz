@@ -252,6 +252,7 @@ export function openGround(world: World, x: number, z: number) {
   }
   const near = (list: { x: number; z: number }[], r: number) => list.some((t) => Math.abs(t.x - x) < r && Math.abs(t.z - z) < r && Math.hypot(t.x - x, t.z - z) < r);
   if (world.solids.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 1.6)) return false;
+  if ((world.posts ?? []).some((p) => Math.hypot(p.x - x, p.z - z) < 7)) return false;
   return !near(world.trees, 1.8) && !near(world.rocks, 2.2) && !near(world.props, 1.6);
 }
 

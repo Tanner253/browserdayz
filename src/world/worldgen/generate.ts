@@ -25,12 +25,15 @@ import { Simplex, RNG, smoothstep, lerp, clamp, hash2 } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
 import { type Bridge, wreckUnder } from '../../sim/bridge';
 import { type FortPlace, castleFoot, CASTLE, CASTLE_SCALE, castleAt, castleLocal, castleLoose, HOUSES, castleJeep, castleCuts, squareTouches, castleOpen, castleHides } from '../../sim/castle';
-import { BUNKER_WAS, CELL, EDGE_ROUND, EXPANSION, KAMENKA, LOOP, MOUNTAIN, OLD_HALF, PASS, SQUARE_HALF, SQUARE_RES, TOWN, WORLD_SEED, eastRoad, kamenkaQ } from './places';
+import { BUNKER_WAS, CELL, EDGE_ROUND, EXPANSION, KAMENKA, LOOP, MOUNTAIN, OLD_HALF, PASS, SQUARE_HALF, SQUARE_RES, TOWN, WORLD_NX, WORLD_NZ, WORLD_SEED, WORLD_X0, WORLD_Z0, eastRoad, kamenkaQ } from './places';
+import { POSTS, seatPost } from '../../sim/posts';
+import { caveStashes } from '../../sim/pass';
 import { ARMY_CAMP, BUILDING_FOOTPRINT, HOSPITAL_AT, HOSPITAL_GROUNDS, NO_START, OLD_ROAD, OUTLYING, PEAK, POLICE_PARTS, SERVICES, SNOW, TRADE_WAS, VILLAGE_STREETS, doorRoad, hospitalDrive, leftOut, loopLine, offLine, peakOf, type BuildingPlot, type BuildingType, type SiteKind } from './layout';
 import type { Instance, POI, Site, Solid, World, Worn } from './types';
 // (the square is made on its own net, `idx` its numbering, and laid into the world's at the end: see `toWorld`)
 import { catmullRom, evenOut, heightAt, squareIdx as idx, slopeAt, soften } from './ground';
 import { toWorld } from './west';
+import { passPlan } from './west-relief';
 import { openSquare, type Kept } from './opening';
 
 // ------------------------------------------------------------------ generation
@@ -2690,6 +2693,11 @@ function* worldStages(seed: number): Generator<string, World, void> {
   const seen = surface ?? heights;
   openSquare({ heights, surface: seen, splat, grass, roadDist, roadWidth: ROAD_W, trees, rocks, props, sites, pois, buildings, roads: [{ points: roadPts, width: ROAD_W }, ...roads], paint, noise: [n1, n2, n3], kept });
   const world = toWorld({ heights, surface: seen, splat, grass }, { seed, ringShape, forestMask, trees, rocks, props, sites, pois, post: buildings.slice(kept.trade[0], kept.trade[1]), buildings, roads, noise: [n1, n2, n3] });
+  // (and the army's field posts by the western roads, each on ground levelled for it: last of all, so that nothing is
+  // moved by them. src/sim/posts.ts)
+  const posts = POSTS.map((p) => ({ ...p, y: seatPost(p, world, { cell: CELL, x0: WORLD_X0, z0: WORLD_Z0, nx: WORLD_NX, nz: WORLD_NZ }) }));
+  // (and a stash at the back of each of the pass's caves: src/sim/pass.ts caveStashes)
+  for (const st of caveStashes(passPlan)) props.push({ kind: 'weapons_case', x: st.x, y: st.y, z: st.z, rot: st.rot, scale: 1, far: 40 });
 
   return {
     heights: world.heights,
@@ -2724,5 +2732,6 @@ function* worldStages(seed: number): Generator<string, World, void> {
     slabs: world.slabs,
     water: world.water,
     sand: world.sand,
+    posts,
   };
 }

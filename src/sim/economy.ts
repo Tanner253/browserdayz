@@ -7,7 +7,7 @@
 // Runs on the server in multiplayer (clients only mirror it through inject / take)
 // and in the browser when playing offline.
 
-import type { LootPoint } from '../world/buildings';
+import type { LootPoint, Usage } from '../world/buildings';
 import type { Tier } from './tiers';
 import { ITEMS, fitAtRandom, foundMag, holds, makeItem, plainMag, stockGun, TAG_GROUND, type ItemInstance } from './items';
 import { bagGrid } from './inventory';
@@ -16,7 +16,7 @@ import { RNG } from '../core/noise';
 import { APART_FILL, APART_KIND, APART_LEAN, APART_LEAST, APART_RICH, OWN, apartOf } from './apart';
 
 export { APART, APART_KIND, apartOf } from './apart';
-import { dayzCategory, typeRule, type TypeRule } from './items/rules';
+import { typeRule, type TypeRule } from './items/rules';
 
 export type { TypeRule };
 
@@ -130,8 +130,8 @@ const UNSORTED = 4;
  * place is spoken for, and a place apart has its own most (APART_FILL).
  */
 const LOOTMAX: Record<Tier, number> = { 1: 0.8, 2: 0.8, 3: 1, 4: 1, 5: 1 };
-/** how likely a floor is for a thing that would lie on a shelf, against a shelf (see `fill`) */
-const FLOOR_SPARE = 0.15;
+/** the kinds of building that keep no most: a shop, a clinic, the police and the army are meant to be full of what they keep (the outskirts' shop held at 24 of its 30 shelves went short of water) */
+const FULL_KINDS = new Set<Usage>(['Shop', 'Medic', 'Hospital', 'Police', 'Military']);
 /**
  * How much likelier a weapon is to be put down next than anything else as far short (see `fill`). DayZ lays its guns
  * in a container of their own and they never want for room; here they lie where everything else does, and where every
@@ -151,6 +151,8 @@ const HOME = 1000;
  * of them.
  */
 const PRESSED = 50;
+/** floors are kept for what lies only on a floor when that wants this share of the free ones (see `fill`) */
+const FLOORS_SCARCE = 0.6;
 /** what a pack or a case is found with in it: supplies (see `pack`) */
 const SUPPLIES = new Set(['food', 'drink', 'medical', 'ammo', 'tool', 'misc', 'clothing']);
 
@@ -198,6 +200,8 @@ export class Economy {
   private bld: number[];
   private bldMax: number[] = [];
   private bldHeld: number[] = [];
+  /** the buildings (by name) with a place on a shelf or a table: food is kept off their floors */
+  private shelved: Set<string>;
 
   constructor(
     readonly points: LootPoint[],
@@ -207,9 +211,10 @@ export class Economy {
   ) {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
     this.apart = points.map((p) => apartOf(p.building));
+    this.shelved = new Set(points.filter((p) => !p.floor).map((p) => p.building));
     const named = new Map<string, number>(), step: Tier[] = [];
     this.bld = points.map((p, i) => {
-      if (p.arms || p.keeps || this.apart[i] !== null) return -1;
+      if (p.arms || p.keeps || this.apart[i] !== null || p.usage.some((u) => FULL_KINDS.has(u))) return -1;
       let b = named.get(p.building);
       if (b === undefined) {
         named.set(p.building, (b = named.size));
@@ -374,8 +379,11 @@ export class Economy {
     // its own has one there: see APART_KIND.)
     const kinds = (this.apart[i] !== null ? APART_KIND[id] : undefined) ?? rule.on?.[where]?.usage ?? rule.usage;
     if ((where < UNSORTED || this.apart[i] !== null) && !p.usage.some((u) => kinds.includes(u))) return false;
-    // (DayZ's floor takes tools, clothes and what things are kept in, and its shelves food as well: a tin is on a shelf)
-    if (p.floor && dayzCategory(ITEMS[id]) === 'food') return false;
+    // (DayZ's floor takes tools, clothes and what things are kept in, and its shelves food as well: a tin is on a shelf.
+    // A jug or a flask may stand on a floor, most being too big for a shelf: kept off the floor, the shops went short of
+    // water. Where there is no shelf at all, a root cellar or a wreck, a tin lies on the floor: the cellars had no food.
+    // And a shop's floor is where its stock stands: "the store should spawn supplies and food, and water".)
+    if (p.floor && this.shelved.has(p.building) && ITEMS[id].category === 'food' && !p.usage.includes('Shop')) return false;
     // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
     return this.fits(id, p);
   }
@@ -425,6 +433,10 @@ export class Economy {
       }
     });
     const n = at.map((a) => a.length), m = again.map((a) => a.length);
+    // (where the floors are wanted by most of what lies only on a floor, they are kept for it: see below)
+    const floorOnly = (k: number) => [...at[k], ...again[k]].every((i) => this.points[i].floor);
+    const floors = [...open].filter((i) => this.points[i].floor).length;
+    const scarce = ids.reduce((a, id, k) => a + (floorOnly(k) ? due.get(id)! : 0), 0) >= floors * FLOORS_SCARCE;
     // (how sought after each spot is: of every sort that can lie on it, how much of its room it needs. A pistol, which can
     // lie in a house as well, keeps off a police station's shelf that the rifles' rounds have nowhere else to go than)
     const need = new Map<number, number>();
@@ -453,11 +465,13 @@ export class Economy {
       let r = this.rng.next() * total, k = 0;
       for (; k < ids.length - 1; k++) if ((r -= w[k]) <= 0) break;
       const id = ids[k], list = (n[k] ? at[k] : again[k]).filter((i) => open.has(i));
-      // (a thing that will lie on a shelf takes a shelf before a floor: the floors are the rifles')
-      const shelf = list.some((i) => !this.points[i].floor);
+      // (where floors are scarce, a thing that will lie on a shelf takes a shelf while there is one free: the floors are
+      // the rifles'. Only made less likely, a tin took a floor one time in seven, and under the gas its rifles went short
+      // of floors; kept so everywhere, the shops' floors stood empty and the shops went short of water.)
+      const shelf = scarce && list.some((i) => !this.points[i].floor);
       let pulls = 0;
       const pw = list.map((i) => {
-        const x = (this.pull(TYPES[id], i, where) * (shelf && this.points[i].floor ? FLOOR_SPARE : 1)) / (need.get(i) || 1);
+        const x = shelf && this.points[i].floor ? 0 : this.pull(TYPES[id], i, where) / (need.get(i) || 1);
         pulls += x;
         return x;
       });

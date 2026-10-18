@@ -71,6 +71,8 @@ function supports(world: ReturnType<typeof generateWorld>, crates: { x: number; 
   }
   for (const r of world.rocks) add(r.x, r.z, 2.5 * Math.max(1, r.scale) + REACH);
   for (const s of world.solids) add(s.x, s.z, s.r + REACH);
+  // (the army's field posts: their rooms and their roofs, src/sim/posts.ts)
+  for (const p of world.posts ?? []) add(p.x, p.z, 6 + REACH);
   // (a wall as a ring round its middle that takes in its whole length: more than it reaches, never less)
   for (const w of world.walls) add(w.x, w.z, w.long / 2 + REACH);
   for (const p of world.props) add(p.x, p.z, 1 + REACH);

@@ -327,6 +327,8 @@ function layOut(seed: number): Plan {
   // ---- what stands in each room
   const stood: Stood[] = [], builtList: Made[] = [], spots: Spot[] = [], lamps: [number, number, number, number][] = [];
   const SHELF = [0.38, 0.94, 1.51], BOOK = [0.39, 0.96], TOP = [1];
+  /** what is laid in each room when the whole plan has been (see the end of the room's own) */
+  const later: (() => void)[] = [];
   for (const q of rooms) {
     const w = q.r1 - q.r0, d = q.f1 - q.f0, cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2;
     // is a spot by a wall clear of that room's ways in?
@@ -633,6 +635,29 @@ function layOut(seed: number): Plan {
       if (onSpine) build('sign', dr - Math.sign(dr) * (T / 2 + 0.02), df, dr > 0 ? -Math.PI / 2 : Math.PI / 2, 1.5, 0.02, 0.3, { y: 2.3, text: q.name.toUpperCase(), solid: false });
       else if (onCross) build('sign', dr, df - Math.sign(df - cross) * (T / 2 + 0.02), df > cross ? Math.PI : 0, 1.5, 0.02, 0.3, { y: 2.3, text: q.name.toUpperCase(), solid: false });
     }
+    // More places for things (the owner, 2026-10-17: "we need more loot places"): the bunker was asked for 175 things on
+    // its 145 places, and for 23 that lie only on a floor on its 13 floors. A place on the open floor, and a shelf on a
+    // free wall where nothing stands within a body's length. Laid when the whole plan has been, after every other thing
+    // and with no throw of the dice, so that nothing already in the bunker moves.
+    later.push(() => {
+      const apart = (r: number, f: number) => spots.every((sp) => Math.hypot(sp.r - r, sp.f - f) > 1.0);
+      for (const [dr, df] of [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) {
+        if (!open(cr + dr, cf + df, 0.5) || !apart(cr + dr, cf + df)) continue;
+        floorSpot(cr + dr, cf + df);
+        break;
+      }
+      if (q.kind === 'cells' || q.kind === 'washroom') return;
+      const roomy = (r: number, f: number) => !stood.some((st) => Math.hypot(st.r - r, st.f - f) < 1.6) && !builtList.some((m) => m.solid !== false && m.kind !== 'sign' && Math.hypot(m.r - r, m.f - f) < 1.2 + Math.max(m.w, m.d) / 2) && apart(r, f);
+      let done = false;
+      for (const wl of free) {
+        along(wl, (r, f, rot) => {
+          if (done || !roomy(r, f)) return;
+          put('Shelf_01', r, f, rot, { on: SHELF });
+          done = true;
+        }, 0.3, 1.1);
+        if (done) break;
+      }
+    });
     lamps.push([cr, cf, Y + B.tall - 0.25, lamp]);
     if (w * d > 60) lamps.push([cr + (w > d ? w * 0.28 : 0), cf + (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0.3, 0, 0])], [cr - (w > d ? w * 0.28 : 0), cf - (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0, 0, 0])]);
   }
@@ -691,6 +716,7 @@ function layOut(seed: number): Plan {
     side = -side;
   }
 
+  for (const add of later) add();
   return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, H.back], cross };
 }
 
