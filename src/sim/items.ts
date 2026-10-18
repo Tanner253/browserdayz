@@ -807,6 +807,12 @@ export const TAG_OUT = 15;
  * 2026-10-12; five before.)
  */
 export const TAG_FRESH = 10 * 60;
+/**
+ * Seconds a dog tag lies on the ground before it is gone, whoever is standing by it (the owner, 2026-10-17: "dogtags
+ * dropped on the ground should despawn after 10 mins, so people cant leave them in the world for too long and come back
+ * later to circumvent stashing them").
+ */
+export const TAG_GROUND = 10 * 60;
 /** the same in minutes, for everything that says so in words */
 export const TAG_HOLD_MIN = TAG_HOLD / 60;
 

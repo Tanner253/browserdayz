@@ -485,6 +485,7 @@ export const frameMethods = {
         this.tickDrops();
       }
       this.econT = 0;
+      this.tagWhenDue();
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     }
     this.saveT += dt;

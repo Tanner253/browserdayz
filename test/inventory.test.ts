@@ -623,7 +623,9 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     // (the fattest single thing to say: a tag, with whose it was, whose game took it and how long it has been carried)
     const tag = (k: number) => Object.assign(makeItem('dogtag'), { owner: `Survivor ${k}`.padEnd(16, 'x'), pid: 'p'.repeat(24), holder: 'h'.repeat(24), held: 899.123456 });
     let k = 0;
+    // (tags are refused anywhere but the pouch and a body now; this measures how big a save can be, so these take them)
     const fill = (c: Container) => {
+      c.tagsHere = true;
       while (c.add(tag(k)) === null) k++;
     };
     // the pack: as many stash cases as it takes, which is five (three on end across the top, two under them), each

@@ -9,7 +9,7 @@
 
 import type { Usage, LootPoint } from '../world/buildings';
 import type { Tier } from './tiers';
-import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type ItemInstance } from './items';
+import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, TAG_GROUND, type ItemInstance } from './items';
 import { ITEM_SIZES, fitsPoint } from './placement';
 import { RNG } from '../core/noise';
 import { TOWNS } from './towns';
@@ -860,6 +860,11 @@ export class Economy {
     const near = (l: WorldLoot) => players.some((p) => Math.hypot(l.x - p.x, l.z - p.z) < 60);
     const now = Date.now();
     for (const l of [...this.loot.values()]) {
+      // (a dog tag on the ground is gone ten minutes on, near anybody or not: see TAG_GROUND)
+      if (l.item.id === 'dogtag') {
+        if (this.time - l.spawnedAt > TAG_GROUND) this.take(l.uid, false);
+        continue;
+      }
       // (a container somebody dropped goes by the calendar, and not by how long this game has been running)
       if (l.keptAt !== undefined) {
         if (now - l.keptAt > (l.item.cargo?.length ? this.containerLife.full : this.containerLife.empty) && !near(l)) this.take(l.uid, false);

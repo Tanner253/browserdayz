@@ -41,7 +41,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `drops.ts` | 130 | The server: supply drops and the helicopter that brings them. |
 | `elite.ts` | 32 | The Elite: players whose last payout was at the top rate, each held by their key's hash (nobody's anything), with a crown by their name in chat (the owner, 2026-10-15: |
 | `gate.ts` | 637 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
-| `handle.ts` | 845 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 855 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1157 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 683 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `players.ts` | 347 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
@@ -56,7 +56,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `assets.ts` | 853 |  |
-| `audio.ts` | 2382 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
+| `audio.ts` | 2384 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `breathe.ts` | 103 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `device.ts` | 69 | What kind of device this is. |
 | `gamepad.ts` | 275 | A controller (PlayStation, Xbox, any the browser calls "standard"), read each frame, pressing the game's own controls by their names as the keyboard and the phone's buttons do (src/core/input.ts). |
@@ -109,20 +109,20 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `effects.ts` | 957 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `fires.ts` | 297 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1568 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1569 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
 | file | lines | what it is |
 |---|---:|---|
 | `drops.ts` | 563 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
-| `enter.ts` | 659 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 680 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `enter.ts` | 674 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
+| `frame.ts` | 681 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 508 | The game: attachments and magazines. |
 | `hands.ts` | 574 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `interact.ts` | 306 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 662 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 736 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 738 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
 ## src/game/
 
@@ -151,7 +151,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
 | `vehicle.ts` | 613 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 4587 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 4588 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
 ## src/
@@ -197,24 +197,24 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `combat.ts` | 121 | Damage rules. The server uses these to decide how much a reported hit hurts, so a client can say "I hit player 7 in the head with a Mosin" but never "for 5000 damage". |
+| `combat.ts` | 122 | Damage rules. The server uses these to decide how much a reported hit hurts, so a client can say "I hit player 7 in the head with a Mosin" but never "for 5000 damage". |
 | `cooking.ts` | 836 | Cooking spots (2026-10-13): whatever a fire is made in and food is made hot on. |
 | `course.ts` | 496 | The bot check's 360-degree course: the yard, the six figures the server walks and shows, and the judge of a go. |
 | `crates.ts` | 187 | Searchable crates that are part of the map (military crates at the checkpoint, wooden crates in barns, sheds and yards). |
 | `daynight.ts` | 82 | Day and night. The Zone has a day of thirty-two minutes: three quarters of it light (first light, a long day, dusk) and one quarter, eight minutes, night. The night is kept shorter than the time a dog tag has to be... |
 | `drops.ts` | 256 | Supply drops. Every few minutes, while anybody is playing, a crate of the best things on the map is set down somewhere in the open and everyone is told where. It is there for a few minutes, or until somebody has... |
-| `economy.ts` | 919 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
+| `economy.ts` | 924 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
 | `emotes.ts` | 126 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
 | `fires.ts` | 84 | Campfires. The rings of stones at the lodges, the cabins and the hamlet can be lit. A fire is somewhere to mend: resting beside one puts health back far faster than it comes back on its own, and what is eaten beside... |
 | `gas.ts` | 154 | The gas. One place on the map is sunk in it (the Chemical Works, in the cirque behind the checkpoint: the map's first expansion). A low dome of it lies over the place, thickest at the middle and thinning to nothing... |
 | `grenades.ts` | 282 | Grenades: what is thrown, how its fuse runs, and what the server believes of one. |
-| `gunplay.ts` | 358 | How the guns shoot. One place for what each cartridge does in the air and what each gun does with it, read by the game (a bullet's flight, the kick, the cone a shot can land in, what its sights are set for) and by... |
+| `gunplay.ts` | 361 | How the guns shoot. One place for what each cartridge does in the air and what each gun does with it, read by the game (a bullet's flight, the kick, the cone a shot can land in, what its sights are set for) and by... |
 | `heli.ts` | 171 | The helicopter a player flies (2026-10-14), its rules shared by the game and the server: what it is, how it flies (src/game/heli.ts flies it by these numbers), and where it stands when the world is new. |
 | `hitclock.ts` | 24 | How often a shooter's hits on one body are believed (server/tags.ts, mayHit): no oftener than the gun fires, over a run of them, with one allowed a gap early when the one before came late. |
 | `infected.ts` | 439 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
-| `inventory.ts` | 1018 | Grid inventory (DayZ / Tarkov style). |
-| `items.ts` | 1101 |  |
+| `inventory.ts` | 1032 | Grid inventory (DayZ / Tarkov style). |
+| `items.ts` | 1112 |  |
 | `jobs.ts` | 64 | Work the trader has. Three jobs a day, the same three for everybody (they come out of the date): the infected to be put down, something common to be brought in, something that has to be gone and got. He pays in... |
 | `kit.ts` | 534 | A KIT of building pieces, and a LAYOUT made of them. |
 | `kits.ts` | 75 | Whole sets of gear an admin can hand out in one go (2026-10-11): |
@@ -295,7 +295,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `emotes-menu.ts` | 239 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
 | `hud.ts` | 1930 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 471 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
-| `inventory-ui.ts` | 2135 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
+| `inventory-ui.ts` | 2139 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
 | `minimap.ts` | 473 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
 | `person.ts` | 104 | The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a program came by the dozen, and stood in the world as players). |
 | `platform.ts` | 33 | ZONA PvP, the platform both games stand under (2026-10-14). |

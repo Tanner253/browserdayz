@@ -1418,6 +1418,7 @@ export interface Game {
   emptyHold: Methods<typeof enterMethods>['emptyHold'];
   makeTag: Methods<typeof enterMethods>['makeTag'];
   ensureTag: Methods<typeof enterMethods>['ensureTag'];
+  tagWhenDue: Methods<typeof enterMethods>['tagWhenDue'];
   tickZone: Methods<typeof enterMethods>['tickZone'];
   voidTags: Methods<typeof enterMethods>['voidTags'];
   tickTags: Methods<typeof enterMethods>['tickTags'];

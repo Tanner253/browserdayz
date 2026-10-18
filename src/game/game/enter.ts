@@ -8,7 +8,7 @@ import { ArenaHud } from '../../ui/arena-hud';
 import { reloadPage } from '../../core/leave';
 import { CUT } from '../../../arena/rules';
 import { heightAt, inPlay } from '../../world/worldgen';
-import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
+import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
 import { fillCrate } from '../../sim/crates';
 import { economyCargo } from '../../sim/storage';
@@ -331,7 +331,9 @@ export const enterMethods = {
     this.inv.add(makeItem(pick(['thermos', 'milk'])));
     // one dressing: the first wound is survivable, the second is yours to deal with
     this.inv.add(makeItem('bandage'));
-    this.inv.neck = this.makeTag();
+    // (no tag of their own yet: it is put round their neck once they have lived long enough, see `tagWhenDue`)
+    this.inv.neck = null;
+    this.inv.neckDue = Date.now() + TAG_FRESH * 1000;
     this.player.vitals = freshVitals();
     this.player.drip.left = 0;
     this.bloodSaid = 0;
@@ -366,7 +368,7 @@ export const enterMethods = {
       const neck = inv.neck, pouch = inv.tags.items.map((q) => q.item);
       // (a kit replaces everything: the jacket and the trousers that were on go too, with what was in them, and `clear` leaves new ones on)
       inv.clear();
-      inv.neck = neck ?? this.makeTag();
+      inv.neck = neck;
       for (const tag of pouch) inv.tags.add(tag);
       this.ready = null;
       this.inHand = null;
@@ -506,12 +508,25 @@ export const enterMethods = {
     return it;
   },
 
-  /** characters from before dog tags existed get theirs now */
+  /**
+   * Tags where they belong as a character comes in (the one in a pocket round the neck, the taken ones into the
+   * pouch), and their own round their neck only once they have been alive TAG_FRESH since coming in: until then it is
+   * put aside, and put on when it is due (see `tagWhenDue`). The server counts a life from the same moment.
+   */
   ensureTag(this: Game) {
     const me = publicId();
-    // (and from before tags had places of their own: the one in the pocket goes round the neck, the taken ones into the pouch)
     this.inv.sortTags((tag) => tag.pid === me);
-    this.inv.neck ??= this.makeTag();
+    this.inv.neck = null;
+    this.inv.neckDue = Date.now() + TAG_FRESH * 1000;
+  },
+
+  /** their own tag round their neck, once it is due (asked every few seconds) */
+  tagWhenDue(this: Game) {
+    if (this.inv.neck || !this.inv.neckDue || Date.now() < this.inv.neckDue || this.player.dead) return;
+    this.inv.neck = this.makeTag();
+    this.inv.neckDue = 0;
+    this.inventoryChanged();
+    this.hud.note('Your dog tag is round your neck now: whoever kills you can take it', 'info');
   },
 
   /**

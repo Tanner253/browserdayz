@@ -16,7 +16,7 @@ import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, tellSeats, things, vehicles, world } from './index';
-import { CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, tagSeen, voided } from './tags';
+import { TAG_FRESH_MS, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, tagSeen, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { shortDevice } from './device';
@@ -34,6 +34,12 @@ import { scores } from './queue';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { changed, contents } from './storages';
+
+/** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
+function withoutTags<T extends { id: string; cargo?: { item: { id: string } }[] }>(items: T[]): T[] {
+  for (const it of items) if (it.cargo) it.cargo = it.cargo.filter((p) => p.item.id !== 'dogtag');
+  return items.filter((it) => it.id !== 'dogtag');
+}
 
 export function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
@@ -387,7 +393,7 @@ export function handle(c: Client, m: C2S) {
       if (typeof m.uid !== 'string' || locks.get(`l:${m.uid}`) !== c.id || c.seatAt || !c.alive) return;
       const l = economy.loot.get(m.uid);
       if (!l || !holds(l.item.id) || Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > LYING_REACH + 2) return;
-      let items = cleanStored(m.items);
+      let items = withoutTags(cleanStored(m.items));
       if (CHECKS !== 'off') {
         const made = items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
         if (made.length && flag(c, `put ${ITEMS[made[0].id].name} in a ${ITEMS[l.item.id].name.toLowerCase()} lying there, which the server never put in the world`)) items = items.filter((it) => !made.includes(it));
@@ -454,7 +460,7 @@ export function handle(c: Client, m: C2S) {
       if (!b || locks.get(m.cid) !== c.id || c.seatAt) return;
       // (a piece of furniture: the economy's things in it are told apart from what they leave there, server/storages.ts)
       if (b.kind === 'furniture') {
-        const items = cleanStored(m.items);
+        const items = withoutTags(cleanStored(m.items));
         changed(b, items);
         if (CHECKS !== 'off') {
           const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
@@ -464,7 +470,8 @@ export function handle(c: Client, m: C2S) {
         touched(b);
         return;
       }
-      b.items = cleanStored(m.items);
+      // (a dog tag lies on a body and nowhere else that holds things: the owner, "dogtags should not be stashed")
+      b.items = b.kind === 'corpse' ? cleanStored(m.items) : withoutTags(cleanStored(m.items));
       if (CHECKS !== 'off') {
         const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
         if (made.length && flag(c, `stored ${ITEMS[made[0].id].name}, which the server never put in the world`)) b.items = b.items.filter((it) => !made.includes(it));
@@ -524,6 +531,9 @@ export function handle(c: Client, m: C2S) {
       if (!c.alive) return;
       const had = c.inv;
       c.inv = cleanInventory(m.inv);
+      // (no tag of their own round the neck of somebody alive less than TAG_FRESH: their game puts it on then, and an
+      // admin looking in their pockets before that sees none)
+      if (c.inv?.slots?.neck && Date.now() - c.lifeAt < TAG_FRESH_MS) c.inv.slots.neck = null;
       // (nobody without the power puts a thing in a hold: see `carryOrder`)
       if (c.inv && !c.power.bottomless) holdOnlyEmpties(c.inv, had);
       pockets(c);

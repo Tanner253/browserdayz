@@ -88,6 +88,9 @@ export class Container {
     return !this.refusal(item);
   }
 
+  /** dog tags may lie here though it is not the pouch for them: a body (see `refusal`) */
+  tagsHere = false;
+
   /**
    * Why a thing is not taken here, in words that can be said to the player; null when it is. (Whether there is
    * room for it is another question: `free`, `findSpace`.)
@@ -96,6 +99,9 @@ export class Container {
     // (the words are made only when there is something to say: this is asked for every cell a thing is dragged over)
     const what = () => (ITEMS[item.id]?.name ?? 'thing').toLowerCase(), here = () => this.name.toLowerCase();
     if (this.only && item.id !== this.only) return `Only a ${(ITEMS[this.only]?.name ?? this.only).toLowerCase()} goes in the ${here()}`;
+    // (a dog tag is carried in the pouch for them or lies on a body, and is put away nowhere else: the owner, 2026-10-17,
+    // "dogtags should not be stashed in inventory")
+    if (item.id === 'dogtag' && this.only !== 'dogtag' && !this.tagsHere) return 'A dog tag goes in your dog tag pouch, and nowhere else';
     if (this.id === `gear:${item.uid}` || this.id === `bag:${item.uid}`) return `The ${what()} does not go inside itself`;
     const within = (it: ItemInstance): boolean => !!it.cargo && (it.cargo === this.items || it.cargo.some((p) => within(p.item)));
     if (within(item)) return `The ${here()} is inside the ${what()}`;
@@ -508,6 +514,12 @@ export class PlayerInventory {
   }
   /** the survivor's own dog tag, round their neck */
   neck: ItemInstance | null = null;
+  /**
+   * When the survivor's own tag is put round their neck (Date.now()): only once they have been alive TAG_FRESH since
+   * they came in or came back (the owner, 2026-10-17: "a player should not have a dogtag object in their inventory
+   * until theyve been alive long enough"). Nought: not waiting.
+   */
+  neckDue = 0;
   /** which of the body's own places has its thing in the hands (null: none of them) */
   active: Slot | null = null;
   /** a thing carried in a pocket or a pack that is in the hands: it stays where it is carried, and is held (see `hold`) */
@@ -1007,6 +1019,8 @@ export const BODY_GRID: [number, number] = [8, 17];
  * @returns what found no room (the caller puts it on the ground beside the body)
  */
 export function layOnBody(box: Container, things: ItemInstance[]): ItemInstance[] {
+  // (a body is where dog tags are taken from: they lie on it)
+  box.tagsHere = true;
   const cells = (it: ItemInstance) => ITEMS[it.id].w * ITEMS[it.id].h, long = (it: ItemInstance) => Math.max(ITEMS[it.id].w, ITEMS[it.id].h);
   const spill: ItemInstance[] = [];
   for (const it of [...things].sort((a, b) => cells(b) - cells(a) || long(b) - long(a))) {

@@ -21,7 +21,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
+import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import type { WorldItem, Stash } from '../game/loot';
@@ -626,7 +626,11 @@ export class InventoryUI {
    */
   private neckEl() {
     const tag = this.inv.neck;
-    if (!tag) return '';
+    // (not yet: it is put on once they have been alive long enough)
+    if (!tag) {
+      const left = Math.ceil((this.inv.neckDue - Date.now()) / 60000);
+      return this.inv.neckDue && left > 0 ? `<div class="inv-neck" title="Your own dog tag is put round your neck once you have been alive ${TAG_FRESH / 60} minutes. Until then, nobody who kills you finds one on you."><div class="inv-item-img fit"></div><div><b>Your dog tag</b><span>Round your neck in ${left} min</span></div></div>` : '';
+    }
     const url = this.icons[tag.id];
     return `<div class="inv-neck" title="Your own dog tag. It hangs round your neck: it cannot be moved or dropped, and whoever kills you takes it off your body."><div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div><div><b>${itemName(tag)}</b><span>Round your neck · cannot be dropped</span></div></div>`;
   }

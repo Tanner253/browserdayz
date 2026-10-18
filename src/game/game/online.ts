@@ -703,6 +703,8 @@ export const onlineMethods = {
     if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);
     stash.corpse = true;
+    // (dog tags lie on a body, and are taken off it: see Container.refusal)
+    stash.container.tagsHere = true;
     // the box to search is where the body lies: behind where they stood if they went over
     // backwards, ahead if they went down on their face, beside it if they folded up
     const v = c.v ?? 0;
