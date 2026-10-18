@@ -27,6 +27,7 @@ import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon, type Act } from './act-icons';
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
+import { TAKE_GROUPS, inTakeGroup, type TakeGroup } from './inv-take';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -1085,6 +1086,7 @@ export class InventoryUI {
         // under the lowest thing in it are left off, bar two to put things down in, so that what the body wears is
         // not a screen's height further down. It is as deep as it is all the same: a thing let go on it lands
         // wherever there is room, and the rows are counted again.)
+        vic.appendChild(this.takeBar());
         const low = box.items.reduce((n, p) => Math.max(n, p.y + Container.size(p.item, p.rot)[1]), 0);
         vic.appendChild(this.gridEl(box, body ? Math.min(box.h, Math.max(3, low + 2)) : box.h));
         // (a pack on a body or in a crate is opened where it lies, and gone through)
@@ -1628,6 +1630,53 @@ export class InventoryUI {
     }
     this.actions.sound('move');
     this.actions.changed();
+  }
+
+  /** what in the open crate or body a button takes: all of it as it lies, or every thing of a kind, in the bags there too */
+  private takeList(group: TakeGroup | null): Source[] {
+    const out: Source[] = [];
+    const walk = (c: Container, depth: number) => {
+      for (const p of c.items) {
+        if (!group || inTakeGroup(p.item, group)) {
+          out.push({ kind: 'container', c, item: p.item });
+          continue;
+        }
+        const bag = group && p.item.cargo?.length ? this.bagOf(p.item, depth + 1) : null;
+        if (bag) walk(bag, depth + 1);
+      }
+    };
+    if (this.stash) walk(this.stash.container, this.stash.container.depth);
+    return out;
+  }
+
+  private takeBar(): HTMLElement {
+    const bar = document.createElement('div');
+    bar.className = 'inv-takes';
+    const add = (label: string, group: TakeGroup | null, n: number) => {
+      if (!n) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = `${label} <span>${n}</span>`;
+      b.addEventListener('click', () => this.takeAll(group));
+      bar.appendChild(b);
+    };
+    add('Take all', null, this.takeList(null).length);
+    for (const g of TAKE_GROUPS) add(g.label, g.id, this.takeList(g.id).length);
+    return bar;
+  }
+
+  /** every thing a button names is moved across, one after another, until one finds no room; and the player is told */
+  private takeAll(group: TakeGroup | null) {
+    const all = this.takeList(group);
+    let moved = 0;
+    for (const src of all) {
+      if (src.kind !== 'container') continue;
+      this.transfer(src);
+      if (src.c.has(src.item)) break;
+      moved++;
+    }
+    if (moved < all.length) this.actions.note(moved ? `Took ${moved} of ${all.length}: no room for the rest` : 'No room: nothing was taken');
+    this.render();
   }
 
   /**
