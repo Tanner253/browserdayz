@@ -770,6 +770,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-takes button { padding: 4px 9px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); color: var(--ink-dim); font-family: var(--mono); font-size: 11px; cursor: pointer; }
 .inv-takes button span { color: var(--accent); }
 .inv-takes button:hover { color: var(--ink); border-color: var(--accent); }
+.inv-takes .inv-fits { margin-left: auto; }
+.inv-takes .inv-fits[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); background: rgba(201, 178, 124, 0.16); }
 .inv-sort { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
 .inv-sort svg { width: 11px; height: 11px; fill: currentColor; }
 .inv-sort:hover { color: var(--accent); border-color: var(--line); background: rgba(0, 0, 0, 0.3); }

@@ -27,7 +27,7 @@ import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon, type Act } from './act-icons';
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
-import { TAKE_GROUPS, inTakeGroup, type TakeGroup } from './inv-take';
+import { TAKE_GROUPS, fitsGuns, inTakeGroup, type TakeGroup } from './inv-take';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -227,6 +227,10 @@ export class InventoryUI {
   /** the words typed in the search box under "Carried" (none: nothing is dimmed), and the box, made once (see `findEl`) */
   private terms: string[] = [];
   private findBox: HTMLLabelElement | null = null;
+  /** "Fits my guns" over a crate or body (idea 11): on, it stays on from one crate to the next until pressed again */
+  private fitsOnly = false;
+  /** while it is on: the guns carried, and everything in the open crate (its bags too), which is lit or dimmed by them */
+  private fitting: { guns: string[]; crate: Set<ItemInstance> } | null = null;
   /** the pockets and bags folded away (by their names): a click on the bar over one folds it, and opens it again */
   private folded = new Set<string>();
   private drag: Drag | null = null;
@@ -730,6 +734,7 @@ export class InventoryUI {
   private mark(item: ItemInstance) {
     if (item === this.selected) return ' sel';
     if (this.terms.length) return searchMatch(item, this.terms, kindOf(ITEMS[item.id])) ? ' kin' : ' dim';
+    if (this.fitting?.crate.has(item)) return fitsGuns(item, this.fitting.guns) ? ' kin' : ' dim';
     return this.selected && goesWith(this.selected.id, item.id) ? ' kin' : '';
   }
 
@@ -1020,6 +1025,7 @@ export class InventoryUI {
     const scrolls = '.inv-col, .inv-ground, .inv-scroll, .inv-inspect';
     const was = [...r.querySelectorAll<HTMLElement>(scrolls)].map((e) => [e.scrollTop, e.scrollLeft]);
     r.innerHTML = '';
+    this.fitting = null;
     this.clocks.clear();
     this.hover = null;
     const wrap = document.createElement('div');
@@ -1086,6 +1092,7 @@ export class InventoryUI {
         // under the lowest thing in it are left off, bar two to put things down in, so that what the body wears is
         // not a screen's height further down. It is as deep as it is all the same: a thing let go on it lands
         // wherever there is room, and the rows are counted again.)
+        this.fitting = this.fitsOnly ? { guns: this.carriedGuns(), crate: this.crateItems() } : null;
         vic.appendChild(this.takeBar());
         const low = box.items.reduce((n, p) => Math.max(n, p.y + Container.size(p.item, p.rot)[1]), 0);
         vic.appendChild(this.gridEl(box, body ? Math.min(box.h, Math.max(3, low + 2)) : box.h));
@@ -1632,16 +1639,45 @@ export class InventoryUI {
     this.actions.changed();
   }
 
-  /** what in the open crate or body a button takes: all of it as it lies, or every thing of a kind, in the bags there too */
+  /** the guns on the back, at the hip, in the hands or packed away: what "Fits my guns" feeds */
+  private carriedGuns(): string[] {
+    const out = new Set<string>();
+    const walk = (it: ItemInstance) => {
+      if (ITEMS[it.id].weapon) out.add(it.id);
+      for (const p of it.cargo ?? []) walk(p.item);
+    };
+    for (const it of Object.values(this.inv.slots)) if (it) walk(it);
+    for (const c of this.inv.containers) for (const p of c.items) walk(p.item);
+    const held = this.actions.inHands();
+    if (held) walk(held);
+    return [...out];
+  }
+
+  /** everything in the open crate or body, and in the bags in it */
+  private crateItems() {
+    const out = new Set<ItemInstance>();
+    const walk = (it: ItemInstance) => {
+      out.add(it);
+      for (const p of it.cargo ?? []) walk(p.item);
+    };
+    for (const p of this.stash?.container.items ?? []) walk(p.item);
+    return out;
+  }
+
+  /**
+   * what in the open crate or body a button takes: all of it as it lies, or every thing of a kind, in the bags there
+   * too; with "Fits my guns" on, only what that lights
+   */
   private takeList(group: TakeGroup | null): Source[] {
     const out: Source[] = [];
+    const fit = this.fitting;
     const walk = (c: Container, depth: number) => {
       for (const p of c.items) {
-        if (!group || inTakeGroup(p.item, group)) {
+        if ((!group || inTakeGroup(p.item, group)) && (!fit || fitsGuns(p.item, fit.guns))) {
           out.push({ kind: 'container', c, item: p.item });
           continue;
         }
-        const bag = group && p.item.cargo?.length ? this.bagOf(p.item, depth + 1) : null;
+        const bag = (group || fit) && p.item.cargo?.length ? this.bagOf(p.item, depth + 1) : null;
         if (bag) walk(bag, depth + 1);
       }
     };
@@ -1661,7 +1697,21 @@ export class InventoryUI {
       bar.appendChild(b);
     };
     add('Take all', null, this.takeList(null).length);
-    for (const g of TAKE_GROUPS) add(g.label, g.id, this.takeList(g.id).length);
+    // (with only what fits shown, every kind's button would take the same as "Take all")
+    if (!this.fitting) for (const g of TAKE_GROUPS) add(g.label, g.id, this.takeList(g.id).length);
+    // (no gun carried: no button, unless it is on and must be put off again)
+    if (!this.fitsOnly && !this.carriedGuns().length) return bar;
+    const fits = document.createElement('button');
+    fits.type = 'button';
+    fits.className = 'inv-fits';
+    fits.textContent = 'Fits my guns';
+    fits.title = 'Shows only the rounds and magazines the guns you carry take, and dims the rest';
+    fits.setAttribute('aria-pressed', String(this.fitsOnly));
+    fits.addEventListener('click', () => {
+      this.fitsOnly = !this.fitsOnly;
+      this.render();
+    });
+    bar.appendChild(fits);
     return bar;
   }
 
