@@ -24,10 +24,11 @@
 import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, combinePiles, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
-import { actIcon, type Act } from './act-icons';
+import { actIcon } from './act-icons';
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
 import { TAKE_GROUPS, fitsGuns, inTakeGroup, type TakeGroup } from './inv-take';
+import { KEY, does, kindOf, rows, type Action, type Deed, type Row, type Stat } from './inv-card';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -109,19 +110,6 @@ interface Drag {
   offY: number;
 }
 
-interface Action {
-  label: string;
-  /** its symbol before the words: src/ui/act-icons.ts */
-  icon: Act | { kind: string };
-  /** drawn in the danger colour: what loses the thing (Drop) */
-  danger?: boolean;
-  run: () => void;
-  primary?: boolean;
-}
-
-/** what one of the three clicks does with a thing where it lies (and what to call it), or why it does nothing */
-type Deed = { label: string; run: () => void } | { why: string };
-
 /** where a thing being dragged is held over */
 type Target =
   | { kind: 'grid'; el: HTMLElement; id: string }
@@ -136,12 +124,6 @@ type Target =
 
 type Def = (typeof ITEMS)[string];
 
-/** the kinds of thing, in plain words (the rules' own names for them are not all words a player uses) */
-const KIND: Record<string, string> = { weapon: 'Gun', ammo: 'Ammunition', magazine: 'Magazine', food: 'Food', drink: 'Drink', medical: 'Medical', melee: 'Hand weapon', tool: 'Tool', misc: 'Gear', stash: 'Storage', attachment: 'Gun part', clothing: 'Clothing' };
-const kindOf = (d: Def) => KIND[d.category] ?? d.category;
-
-/** what a player has typed (a name on a tag, on a body), made safe to put into markup */
-const esc = (s: string) => s.replace(/[<>&"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 const things = (n: number) => (n === 1 ? '1 thing' : `${n} things`);
 /** said when a thing lying about is reached for and is not there */
 const GONE = 'It is not there to take any more';
@@ -156,42 +138,6 @@ const useWord = (d: Def) => (d.use?.sound === 'eat' ? 'Eat it' : d.use?.sound ==
 const wearWord = (d: Def) => (d.category === 'clothing' ? 'Wear it' : d.slot === 'holster' ? 'Holster it' : 'Sling it on your back');
 /** can it be held in the hands and carried nowhere else? (A gun, a thing to hit with and clothes need a place: see `takeUp` in src/game/game.ts.) */
 const holdable = (d: Def) => d.category !== 'clothing' && !d.weapon && !d.melee;
-
-/**
- * What a thing does, in a few words, read off the rules so that it is never out of step with them: the line under
- * its name on the card by the pointer.
- */
-function does(d: Def): string {
-  const o: string[] = [];
-  const u = d.use;
-  if (u?.health) o.push(`+${u.health} health`);
-  if (u?.stopBleed) o.push('stops bleeding');
-  if (u?.splint) o.push('sets a broken leg');
-  if (u?.blood) o.push(`+${u.blood} ml of blood`);
-  if (u?.energy) o.push(`${u.energy > 0 ? '+' : '−'}${Math.abs(u.energy)} energy`);
-  if (u?.water) o.push(`${u.water > 0 ? '+' : '−'}${Math.abs(u.water)} water`);
-  if (u?.stamina) o.push('fills your stamina');
-  if (u?.boost) o.push(`${u.boost} s in which nothing costs breath`);
-  if (u?.sips) o.push(`${u.sips} drinks, filled again at a well`);
-  if (d.look) o.push(`brings things ${Math.round(1 / d.look)}× closer`);
-  if (d.throw) o.push(`thrown: it goes off ${d.throw.fuse} s after`);
-  if (d.call) o.push('calls a supply drop down, under open sky');
-  if (d.weapon) o.push(`fires ${ITEMS[d.weapon.ammo]?.name ?? d.weapon.ammo}`);
-  if (d.mag) o.push(`holds ${d.mag.capacity} × ${ITEMS[d.mag.ammo]?.name ?? d.mag.ammo}`);
-  if (d.melee) o.push(`hits for ${d.melee.damage}`);
-  if (d.open) o.push(`${d.open.qty} × ${ITEMS[d.open.gives]?.name ?? d.open.gives} inside`);
-  if (d.wear?.cargo) o.push(`${d.wear.cargo[0]}×${d.wear.cargo[1]} of room in it`);
-  if (d.wear?.armor) o.push(`chest hits −${pct(1 - d.wear.armor)}%`);
-  if (d.wear?.head) o.push(`head hits −${pct(1 - d.wear.head)}%`);
-  if (d.wear?.fall) o.push(`falls hurt −${pct(1 - d.wear.fall)}%`);
-  if (d.wear?.fist) o.push(`punches +${d.wear.fist}`);
-  if (d.wear?.gas) o.push('keeps the gas out');
-  if (d.stash) o.push(`${d.stash[0]}×${d.stash[1]} of room in it`);
-  if (d.attach?.quiet) o.push('quiets the shot');
-  if (d.attach?.recoil) o.push(`kick −${pct(1 - d.attach.recoil)}%`);
-  if (d.attach?.ergo) o.push(`handling ${d.attach.ergo > 0 ? '+' : '−'}${Math.abs(d.attach.ergo)}`);
-  return o.join(' · ');
-}
 
 export class InventoryUI {
   root: HTMLDivElement;
@@ -238,6 +184,8 @@ export class InventoryUI {
   private vitals: Vitals | null = null;
   private hover: Source | null = null;
   private menu: HTMLDivElement | null = null;
+  /** the thing the menu is open on: G and the number keys act on it there as on a thing pointed at */
+  private menuSrc: Source | null = null;
   private dragStart = { x: 0, y: 0, moved: false };
   /**
    * The card by the pointer: what the thing pointed at is, said at once (the browser's own tip took a second, and
@@ -313,8 +261,10 @@ export class InventoryUI {
         this.onMove({ clientX: this.at.x, clientY: this.at.y } as PointerEvent);
       }
       // hover an item and press G: it goes on the ground
-      if (e.code === 'KeyG' && !this.drag && this.hover && this.hover.kind !== 'ground') {
-        const src = this.hover;
+      const on = this.hover ?? this.menuSrc;
+      if (e.code === 'KeyG' && !this.drag && on && on.kind !== 'ground') {
+        const src = on;
+        this.closeMenu();
         this.detach(src);
         this.actions.drop(src.item);
         this.finish('drop');
@@ -322,8 +272,9 @@ export class InventoryUI {
       }
       // point at anything carried and press a number: it goes on that hot key (1 to 9, and 0)
       const q = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'].indexOf(e.code);
-      if (q >= 0 && !this.drag && this.hover && this.hover.kind !== 'ground' && this.carried(this.hover)) {
-        this.actions.assignHot(this.hover.item, q);
+      if (q >= 0 && !this.drag && on && on.kind !== 'ground' && this.carried(on)) {
+        this.closeMenu();
+        this.actions.assignHot(on.item, q);
         this.actions.sound('move');
         this.render();
       }
@@ -592,43 +543,84 @@ export class InventoryUI {
     this.placeCard();
   }
 
+  /** the head of the card, the same at every depth (src/ui/inv-card.ts): its picture, its kind, its name */
+  private cardHead(it: ItemInstance): string {
+    const d = ITEMS[it.id], url = this.icons[it.id];
+    return `<div class="card-head"><div class="card-img" style="${url ? `background-image:url(${url})` : ''}"></div><div><small>${kindOf(d)}${d.slot && d.category === 'clothing' ? ` · ${this.placeName(d)}` : ''}</small><b>${itemName(it)}</b></div>${kindIcon(it.id)}</div>`;
+  }
+
   /**
-   * What the card says of a thing: its name and kind, what it does in a line read off the rules, what it is in a
-   * line or two of its own words, its weight, for a gun its rounds and what is fitted to it, and what each of the
-   * three clicks would do with it where it lies (asked of the clicks themselves, so the card cannot say one thing
-   * and a click do another).
+   * Everything said of a thing: what was on the card and in the inspector, once.
+   */
+  private stats(src: Source): Stat[] {
+    const it = src.item, d = ITEMS[it.id];
+    const s: Stat[] = [];
+    s.push({ k: 'Weight', v: `${itemWeight(it).toFixed(2)} kg` }, { k: 'Size', v: `${d.w}×${d.h}` });
+    if (d.stack) s.push({ k: 'In the pile', v: `${it.qty} of ${d.stack}` });
+    if (d.use?.sips) s.push({ k: 'Drinks left', v: `${it.left ?? d.use.sips} of ${d.use.sips}` });
+    if (d.weapon) {
+      s.push({ k: 'Rounds', v: d.weapon.mag ? (it.mag ? `${it.loaded ?? 0} of ${magRoom(it)}` : `${it.loaded ?? 0}, and no magazine in it`) : `${it.loaded ?? 0} of ${capacityOf(it)}` });
+      if (d.weapon.mag) s.push({ k: 'Magazine', v: it.mag ? ITEMS[it.mag]?.name ?? it.mag : 'None in it' });
+      s.push({ k: 'Fitted', v: it.mods?.length ? it.mods.map((m) => ITEMS[m]?.name ?? m).join(', ') : 'Nothing' });
+    }
+    if (d.mag) s.push({ k: 'Rounds', v: `${it.rounds ?? 0} of ${d.mag.capacity}` });
+    if (d.melee) s.push({ k: 'Damage', v: String(d.melee.damage) });
+    if (holds(it.id)) s.push({ k: 'Inside', v: it.cargo?.length ? things(it.cargo.length) : 'Nothing' });
+    const vs = this.against(src);
+    if (vs) s.push({ k: vs.label, v: vs.change });
+    if (d.wear?.armor) s.push({ k: 'Chest hits', v: `−${pct(1 - d.wear.armor)}%` });
+    if (d.wear?.fall) s.push({ k: 'Fall damage', v: `−${pct(1 - d.wear.fall)}%` });
+    const hd = handlingOf(it);
+    if (hd) s.push({ k: 'Handling', v: `${Math.round(hd.ergo)} / 100` });
+    if (d.attach) s.push({ k: 'Fits', v: d.attach.fits.map((f) => ITEMS[f].name).join(', ') });
+    if (it.id === 'dogtag') {
+      s.push({ k: 'Owner', v: tagOwner(it) });
+      s.push({ k: 'Cashes in', v: it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : `after ${TAG_HOLD_MIN} min carried`, clock: this.counting(it) ? it.uid : undefined });
+    }
+    const key = this.actions.hotIndex(it);
+    if (key >= 0) s.push({ k: 'On key', v: String((key + 1) % 10) });
+    return s;
+  }
+
+  private statHtml(list: Stat[]): string {
+    return list.map((s) => `<div><span>${s.k}</span><b${s.clock ? ` data-clock="${s.clock}"` : ''}>${s.v}</b></div>`).join('');
+  }
+
+  /**
+   * Every deed with the keys that do it (src/ui/inv-card.ts `rows`): what the menu lists and the small card picks
+   * its one or two from, so the two cannot say different things. The keys are asked of the clicks themselves.
+   */
+  private keyed(src: Source): Row[] {
+    const acts = this.actionsFor(src);
+    const keys: [string, Deed][] = [[KEY.use, this.useIt(src)], [KEY.across, this.across(src)], [KEY.wield, this.wield(src)]];
+    // (Shift-click as `quickMove` has it: across where there is an across, else what stands first)
+    const main = acts.find((a) => a.primary);
+    if (src.kind === 'ground' || (this.stash && !this.stashState)) keys.push([KEY.quick, this.across(src)]);
+    else if (main?.id) keys.push([KEY.quick, { label: main.label, id: main.id, icon: main.icon, run: main.run }]);
+    const drop = acts.find((a) => a.id === 'drop');
+    if (drop && src.kind !== 'ground') keys.push([KEY.drop, { label: drop.label, id: 'drop', icon: drop.icon, run: drop.run }]);
+    return rows(acts, keys);
+  }
+
+  /**
+   * The card by the pointer: everything there is to know of the thing, and nothing of what to do with it (Fettah,
+   * 2026-10-18: the hover card is "an info card"; the keys are the menu's). It took in the inspector's full stats.
+   * Its head is the menu's head too, so the one reads as the other turned over.
    */
   private cardHtml(src: Source): string {
-    const it = src.item, d = ITEMS[it.id];
-    const rows: string[] = [];
-    const row = (k: string, v: string) => rows.push(`<div><span>${k}</span><b>${v}</b></div>`);
-    row('Weight', `${itemWeight(it).toFixed(2)} kg`);
-    if (d.stack) row('In the pile', `${it.qty} of ${d.stack}`);
-    if (d.use?.sips) row('Drinks left', `${it.left ?? d.use.sips} of ${d.use.sips}`);
-    if (d.weapon) {
-      row('Rounds', d.weapon.mag ? (it.mag ? `${it.loaded ?? 0} of ${magRoom(it)}` : `${it.loaded ?? 0}, and no magazine in it`) : `${it.loaded ?? 0} of ${capacityOf(it)}`);
-      if (d.weapon.mag && it.mag) row('Magazine', ITEMS[it.mag]?.name ?? it.mag);
-      row('Fitted', it.mods?.length ? it.mods.map((m) => ITEMS[m]?.name ?? m).join(', ') : 'Nothing');
-    }
-    if (d.mag) row('Rounds', `${it.rounds ?? 0} of ${d.mag.capacity}`);
-    const room = holds(it.id);
-    if (room) row('Inside', it.cargo?.length ? things(it.cargo.length) : 'Nothing');
-    const vs = this.against(src);
-    if (vs) row(vs.label, vs.change);
-    if (it.id === 'dogtag') row('Cashes in', it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : `after ${TAG_HOLD_MIN} min carried`);
-    const key = this.actions.hotIndex(it);
-    if (key >= 0) row('On key', String((key + 1) % 10));
-    const lines: string[] = [];
-    if (this.actions.inHands() === it) lines.push(src.kind === 'loose' ? 'In your hands and nowhere else: put away, it goes on the ground unless there is room for it.' : 'In your hands: used with the left button, held, once this is shut.');
-    const clicks = ([['Double-click', this.useIt(src)], ['Alt-click', this.wield(src)], ['Ctrl-click', this.across(src)]] as [string, Deed][]).filter(([, k]) => 'label' in k).map(([name, k]) => `<span><b>${name}</b> ${esc((k as { label: string }).label)}</span>`);
-    const what = does(d);
-    const url = this.icons[it.id];
-    return `<div class="card-head"><div class="card-img" style="${url ? `background-image:url(${url})` : ''}"></div><div><small>${kindOf(d)}${d.slot && d.category === 'clothing' ? ` · ${this.placeName(d)}` : ''}</small><b>${itemName(it)}</b></div></div>`
+    const d = ITEMS[src.item.id], what = does(d), note = this.heldNote(src);
+    return this.cardHead(src.item)
       + (what ? `<p class="card-does">${what}</p>` : '')
       + `<p class="card-desc">${d.desc}</p>`
-      + `<div class="card-rows">${rows.join('')}</div>`
-      + lines.map((l) => `<p class="card-note">${l}</p>`).join('')
-      + (clicks.length ? `<div class="card-keys">${clicks.join('')}</div>` : '');
+      + (note ? `<p class="card-note">${note}</p>` : '')
+      + `<div class="card-rows">${this.statHtml(this.stats(src))}</div>`
+      + `<p class="card-more">Right-click for actions</p>`;
+  }
+
+  /** said of a thing in the hands */
+  private heldNote(src: Source): string {
+    if (this.actions.inHands() !== src.item) return '';
+    return src.kind === 'loose' ? 'In your hands and nowhere else: put away, it goes on the ground unless there is room for it.' : 'In your hands: used with the left button, held, once this is shut.';
   }
 
   /**
@@ -1212,8 +1204,10 @@ export class InventoryUI {
       if (carried.length) scroll.insertAdjacentHTML('beforeend', `<div class="inv-tip">Only your pockets. A vest or a bag on your back adds more space.</div>`);
     }
     // (The inspector stood under all the grids, and with a pack on it was scrolled out of sight. It, and the body's
-    // state under it, are fixed at the foot of this side now: only the grids over them scroll.)
-    cargo.appendChild(this.inspector());
+    // state under it, are fixed at the foot of this side now: only the grids over them scroll. With a mouse its
+    // stats are on the card by the pointer and its deeds on the menu (Fettah, 2026-10-18): it is drawn only for a
+    // finger, which hovers on nothing and has no right button.)
+    if (document.body.classList.contains('touch')) cargo.appendChild(this.inspector());
     // (The body's state is the row of symbols the game has in its corner, which this screen covers: the same row,
     // and no key to it beside it. They were four bars, drawn when this was and stale until it was drawn again; this
     // is one element of the HUD's own, which the HUD keeps up to date while this screen is open, and it is put here
@@ -1297,28 +1291,9 @@ export class InventoryUI {
       box.innerHTML = `<div class="inv-empty">Click an item to inspect it.</div>`;
       return box;
     }
-    const d = ITEMS[it.id];
-    const stats: string[] = [`<div><span>Weight</span><b>${itemWeight(it).toFixed(2)} kg</b></div>`, `<div><span>Size</span><b>${d.w}×${d.h}</b></div>`];
-    if (d.stack) stats.push(`<div><span>Quantity</span><b>${it.qty}/${d.stack}</b></div>`);
-    if (d.use?.sips) stats.push(`<div><span>Drinks left</span><b>${it.left ?? d.use.sips} of ${d.use.sips}</b></div>`);
-    if (d.weapon) stats.push(`<div><span>Loaded</span><b>${it.loaded ?? 0}${d.weapon.mag ? '' : `/${capacityOf(it)}`}</b></div>`, `<div><span>Ammo</span><b>${ITEMS[d.weapon.ammo].name}</b></div>`);
-    if (d.weapon?.mag) stats.push(`<div><span>Magazine</span><b>${it.mag ? `${ITEMS[it.mag].name} (${magRoom(it)})` : 'None in it'}</b></div>`);
-    if (d.mag) stats.push(`<div><span>Rounds</span><b>${it.rounds ?? 0}/${d.mag.capacity}</b></div>`, `<div><span>Holds</span><b>${ITEMS[d.mag.ammo].name}</b></div>`);
-    if (d.melee) stats.push(`<div><span>Damage</span><b>${d.melee.damage}</b></div>`);
-    if (d.wear?.cargo) stats.push(`<div><span>Adds</span><b>${d.wear.cargo[0]}×${d.wear.cargo[1]} slots</b></div>`);
-    if (d.stash) stats.push(`<div><span>Holds</span><b>${d.stash[0]}×${d.stash[1]} slots</b></div>`);
-    if (d.wear?.armor) stats.push(`<div><span>Chest hits</span><b>−${Math.round((1 - d.wear.armor) * 100)}%</b></div>`);
-    if (d.wear?.fall) stats.push(`<div><span>Fall damage</span><b>−${Math.round((1 - d.wear.fall) * 100)}%</b></div>`);
-    const hd = handlingOf(it);
-    if (hd) stats.push(`<div><span>Handling</span><b>${Math.round(hd.ergo)} / 100</b></div>`);
-    if (d.attach) stats.push(`<div><span>Fits</span><b>${d.attach.fits.map((f) => ITEMS[f].name).join(', ')}</b></div>`);
-    if (d.attach?.ergo) stats.push(`<div><span>Handling</span><b>${d.attach.ergo > 0 ? '+' : '−'}${Math.abs(d.attach.ergo)}</b></div>`);
-    if (d.attach?.recoil) stats.push(`<div><span>Kick</span><b>−${Math.round((1 - d.attach.recoil) * 100)}%</b></div>`);
-    if (it.mods?.length) stats.push(`<div><span>Fitted</span><b>${it.mods.map((m) => ITEMS[m].name).join(', ')}</b></div>`);
-    if (it.id === 'dogtag') {
-      stats.push(`<div><span>Owner</span><b>${tagOwner(it)}</b></div>`);
-      stats.push(`<div><span>Cashes in</span><b${this.counting(it) ? ` data-clock="${it.uid}"` : ''}>${it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : `after ${TAG_HOLD_MIN} min carried`}</b></div>`);
-    }
+    const d = ITEMS[it.id], what = does(d);
+    const held = this.actions.inHands() === it, note = this.heldNote(loc);
+    // (a phone's: the card's info, and the menu's rows as buttons)
     box.innerHTML = `
       <div class="ins-head">
         <div class="ins-img" style="background-image:url(${this.icons[it.id] ?? ''})"></div>
@@ -1328,19 +1303,19 @@ export class InventoryUI {
         </div>
       </div>
       <div class="ins-actions"></div>
+      ${what ? `<div class="ins-does">${what}</div>` : ''}
       <div class="ins-desc">${d.desc}</div>
-      <div class="ins-stats">${stats.join('')}</div>`;
-    // (What can be done with it stands straight under its name, where it is in sight however much there is to say
-    // of the thing: the rest scrolls under it when it is long.)
+      ${note ? `<div class="ins-note">${note}</div>` : ''}
+      <div class="ins-stats">${this.statHtml(this.stats(loc))}</div>`;
     const acts = box.querySelector('.ins-actions') as HTMLElement;
     // (A gun carried in a pocket or a pack: its parts, each in its place, as they are under a gun on the back or in
     // the hands. A part put on or taken off here has the gun drawn first, like any other.)
-    if (d.weapon && loc.kind === 'container' && this.carried(loc) && this.actions.inHands() !== it) {
+    if (d.weapon && loc.kind === 'container' && this.carried(loc) && !held) {
       const parts = this.partsEl(it);
       parts.classList.add('in-inspect');
       box.insertBefore(parts, acts);
     }
-    for (const act of this.actionsFor(loc).filter((a) => !a.label.startsWith('Quick key'))) {
+    for (const act of this.keyed(loc)) {
       const b = document.createElement('button');
       b.textContent = act.label;
       if (act.primary) b.className = 'primary';
@@ -1454,12 +1429,12 @@ export class InventoryUI {
   private hands(src: Source): Deed {
     const it = src.item, n = ITEMS[it.id].name.toLowerCase();
     if (this.actions.inHands() === it) return { why: `The ${n} is in your hands already: shut this, and the left button uses it` };
-    return { label: 'Take in hands', run: () => this.actions.hold(it) };
+    return { label: 'Take in hands', id: 'hands', icon: 'hand', run: () => this.actions.hold(it) };
   }
 
   /** A thing in a bag that lies in a pocket or a pack is taken out into what is carried: nothing is used, worn or held from in there. */
   private takeOut(src: Source): Deed {
-    return { label: 'Take it out', run: () => this.putAway(src) };
+    return { label: 'Take it out', id: 'out', icon: 'out', run: () => this.putAway(src) };
   }
 
   /** A thing is put away wherever there is room for it among what is carried: one held in the hands and carried nowhere, or one out of a bag that lies in a pocket. */
@@ -1484,16 +1459,16 @@ export class InventoryUI {
     const it = src.item, d = ITEMS[it.id], n = d.name.toLowerCase();
     if (src.kind === 'fitted') return { why: '' };
     if (!this.mine(src)) return this.across(src);
-    if (this.opens(src)) return { label: this.opened.has(it.uid) ? 'Close it' : 'Open it', run: () => this.toggleBag(it) };
+    if (this.opens(src)) return { label: this.opened.has(it.uid) ? 'Close it' : 'Open it', id: 'bag', icon: this.opened.has(it.uid) ? 'shut' : 'open', run: () => this.toggleBag(it) };
     if (src.kind === 'container' && !this.inv.containers.includes(src.c)) return this.takeOut(src);
-    if (eaten(d)) return { label: useWord(d), run: () => this.actions.use(it) };
-    if (d.open) return { label: 'Open it', run: () => this.actions.open(it) };
+    if (eaten(d)) return { label: useWord(d), id: 'use', icon: { kind: it.id }, run: () => this.actions.use(it) };
+    if (d.open) return { label: 'Open it', id: 'open', icon: 'open', run: () => this.actions.open(it) };
     if (src.kind === 'slot' && !WEAPON_SLOTS.includes(src.slot)) return { why: `You have the ${n} on: Alt-click takes it off` };
     if (d.attach && src.kind === 'container') {
       const gun = this.actions.attachTargets(it)[0];
-      if (gun) return { label: `Fit it to the ${ITEMS[gun.id].name}`, run: () => this.actions.attach(it, gun) };
+      if (gun) return { label: `Fit it to the ${ITEMS[gun.id].name}`, id: `attach:${gun.uid}`, icon: 'attach', run: () => this.actions.attach(it, gun) };
     }
-    if (d.slot && d.category === 'clothing' && src.kind === 'container') return { label: 'Wear it', run: () => this.equip(src) };
+    if (d.slot && d.category === 'clothing' && src.kind === 'container') return { label: 'Wear it', id: 'wear', icon: { kind: it.id }, run: () => this.equip(src) };
     return this.hands(src);
   }
 
@@ -1505,10 +1480,10 @@ export class InventoryUI {
   private wield(src: Source): Deed {
     const it = src.item, d = ITEMS[it.id], n = d.name.toLowerCase();
     if (src.kind === 'fitted') return { why: '' };
-    if (src.kind === 'slot') return WEAPON_SLOTS.includes(src.slot) ? this.hands(src) : { label: 'Take it off', run: () => this.takeOff(src) };
+    if (src.kind === 'slot') return WEAPON_SLOTS.includes(src.slot) ? this.hands(src) : { label: 'Take it off', id: 'off', icon: 'out', run: () => this.takeOff(src) };
     if (src.kind === 'loose') return { why: `The ${n} is in your hands already` };
-    if (d.slot) return { label: wearWord(d), run: () => this.equip(src) };
-    if (!this.mine(src)) return { label: 'Take in hands', run: () => this.intoHands(src) };
+    if (d.slot) return { label: wearWord(d), id: 'wear', icon: { kind: it.id }, run: () => this.equip(src) };
+    if (!this.mine(src)) return { label: 'Take in hands', id: 'hands', icon: 'hand', run: () => this.intoHands(src) };
     if (src.kind === 'container' && !this.inv.containers.includes(src.c)) return this.takeOut(src);
     return this.hands(src);
   }
@@ -1520,10 +1495,10 @@ export class InventoryUI {
    */
   private across(src: Source): Deed {
     if (src.kind === 'fitted') return { why: '' };
-    if (src.kind === 'ground') return { label: 'Pick it up', run: () => this.pickUp(src) };
-    if (!this.mine(src)) return { label: 'Take it', run: () => this.transfer(src) };
+    if (src.kind === 'ground') return { label: 'Pick it up', id: 'pick', icon: 'take', run: () => this.pickUp(src) };
+    if (!this.mine(src)) return { label: 'Take it', id: 'across', icon: 'take', run: () => this.transfer(src) };
     if (!this.stash || this.stashState) return { why: 'Nothing is open to move it into. To put it down: press G on it, or drag it to the left' };
-    return { label: `Move it to ${this.stash.label}`, run: () => this.transfer(src) };
+    return { label: `Move it to ${this.stash.label}`, id: 'across', icon: 'move', run: () => this.transfer(src) };
   }
 
   /** One of the three clicks is carried out, or the player is told why it does nothing. */
@@ -1542,9 +1517,9 @@ export class InventoryUI {
     const out: Action[] = [];
     const gearWord = d.category === 'clothing' ? 'Wear' : 'Equip';
     if (loc.kind === 'ground') {
-      out.push({ label: 'Take', icon: 'take', run: () => this.quickMove(loc), primary: true });
-      if (d.slot) out.push({ label: gearWord, icon: { kind: it.id }, run: () => this.equip(loc) });
-      if (d.category !== 'clothing' && !d.weapon && !d.melee) out.push({ label: 'Take in hands', icon: 'hand', run: () => this.intoHands(loc) });
+      out.push({ label: 'Take', icon: 'take', id: 'pick', run: () => this.quickMove(loc), primary: true });
+      if (d.slot) out.push({ label: gearWord, icon: { kind: it.id }, id: 'wear', run: () => this.equip(loc) });
+      if (d.category !== 'clothing' && !d.weapon && !d.melee) out.push({ label: 'Take in hands', icon: 'hand', id: 'hands', run: () => this.intoHands(loc) });
       return out;
     }
     // (in the crate or on the body that is open, or in a bag that lies there: it is taken, and not "moved to" where it already is)
@@ -1556,14 +1531,14 @@ export class InventoryUI {
     if (this.carried(loc) && !worn && d.category !== 'clothing') {
       const held = this.actions.inHands() === it;
       // (the gold one is what a double-click does, as `useIt` has it: into the hands, unless it is eaten, opened or fitted)
-      if (!held) out.push({ label: 'Take in hands', icon: 'hand', run: () => this.actions.hold(it), primary: !eaten(d) && !d.open && !(d.attach && this.actions.attachTargets(it).length) });
+      if (!held) out.push({ label: 'Take in hands', icon: 'hand', id: 'hands', run: () => this.actions.hold(it), primary: !eaten(d) && !d.open && !(d.attach && this.actions.attachTargets(it).length) });
     }
     // (and what a double-click does with a thing that is eaten, drunk or put on a wound, or with a box of rounds: said here too, for whoever looks for it)
-    if ((this.carried(loc) || loc.kind === 'loose') && eaten(d)) out.push({ label: `${useWord(d)} now`, icon: { kind: it.id }, primary: true, run: () => this.actions.use(it) });
-    if ((this.carried(loc) || loc.kind === 'loose') && d.open) out.push({ label: 'Open it now', icon: 'open', primary: true, run: () => this.actions.open(it) });
+    if ((this.carried(loc) || loc.kind === 'loose') && eaten(d)) out.push({ label: `${useWord(d)} now`, icon: { kind: it.id }, id: 'use', primary: true, run: () => this.actions.use(it) });
+    if ((this.carried(loc) || loc.kind === 'loose') && d.open) out.push({ label: 'Open it now', icon: 'open', id: 'open', primary: true, run: () => this.actions.open(it) });
     if (this.opens(loc)) {
       const open = this.opened.has(it.uid);
-      out.push({ label: open ? 'Close it' : `Open (${it.cargo?.length ?? 0} inside)`, icon: open ? 'shut' : 'open', primary: true, run: () => {
+      out.push({ label: open ? 'Close it' : `Open (${it.cargo?.length ?? 0} inside)`, icon: open ? 'shut' : 'open', id: 'bag', primary: true, run: () => {
         if (!this.opened.delete(it.uid)) this.opened.add(it.uid);
         this.actions.sound('move');
         this.render();
@@ -1571,14 +1546,14 @@ export class InventoryUI {
     }
     if (d.attach) {
       // (a double-click fits it to the first of them)
-      this.actions.attachTargets(it).forEach((w, i) => out.push({ label: `Attach to ${ITEMS[w.id].name}`, icon: 'attach', run: () => this.actions.attach(it, w), primary: i === 0 }));
+      this.actions.attachTargets(it).forEach((w, i) => out.push({ label: `Attach to ${ITEMS[w.id].name}`, icon: 'attach', id: `attach:${w.uid}`, run: () => this.actions.attach(it, w), primary: i === 0 }));
     }
-    if (d.slot && loc.kind === 'container') out.push({ label: d.category === 'clothing' ? gearWord : d.slot === 'holster' ? 'Holster it' : 'Sling on your back', icon: { kind: it.id }, run: () => this.equip(loc), primary: d.category === 'clothing' && !this.opens(loc) });
+    if (d.slot && loc.kind === 'container') out.push({ label: d.category === 'clothing' ? gearWord : d.slot === 'holster' ? 'Holster it' : 'Sling on your back', icon: { kind: it.id }, id: 'wear', run: () => this.equip(loc), primary: d.category === 'clothing' && !this.opens(loc) });
     if (loc.kind === 'slot') {
       // (With no room for it in a pocket this did nothing, and said nothing. It comes off all the same, onto the
       // ground, and the entry says so before it is chosen. A gun with no room for it is put down with Drop.)
       const room = this.inv.containers.some((c) => c.hasRoom(it));
-      if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', run: () => this.takeOff(loc) });
+      if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', id: 'off', run: () => this.takeOff(loc) });
     }
     if (d.mag) {
       // (filled from the loose rounds carried, as letting them go on it does: 2026-10-18, "instead of dragging rounds in by hand")
@@ -1616,10 +1591,11 @@ export class InventoryUI {
       else if ((it.loaded ?? 0) > 0) out.push({ label: 'Unload', icon: 'unload', run: () => this.actions.unload(it) });
     } else if (d.weapon && (it.loaded ?? 0) > 0) out.push({ label: `Unload (${it.loaded})`, icon: 'unload', run: () => this.actions.unload(it) });
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, icon: 'detach', run: () => this.actions.detach(it, m) });
-    if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, icon: inStash ? 'take' : 'move', run: () => this.transfer(loc), primary: inStash });
+    if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, icon: inStash ? 'take' : 'move', id: 'across', run: () => this.transfer(loc), primary: inStash });
     out.push({
       label: 'Drop',
       icon: 'drop',
+      id: 'drop',
       danger: true,
       run: () => {
         this.detach(loc);
@@ -1776,21 +1752,24 @@ export class InventoryUI {
   private closeMenu() {
     this.menu?.remove();
     this.menu = null;
+    this.menuSrc = null;
   }
 
   private openMenu(src: Source, x: number, y: number) {
     this.closeMenu();
     this.selected = src.item;
     this.render();
-    // (the menu stands where the card would: one or the other)
+    // (the menu is what to do, as the card is what it is: it stands where the card stood, with the card's own head, and then every deed with its keys)
     this.hideCard();
     const m = document.createElement('div');
     m.className = 'inv-menu';
-    m.innerHTML = `<div class="inv-menu-title"><span>${itemName(src.item)}</span>${kindIcon(src.item.id)}</div>`;
-    for (const act of this.actionsFor(src)) {
+    m.innerHTML = this.cardHead(src.item);
+    for (const act of this.keyed(src)) {
       const b = document.createElement('button');
       b.innerHTML = actIcon(act.icon);
       b.append(act.label);
+      // (two keys at most: a thing on the ground is taken by three, and the row is a row, not a list)
+      if (act.keys.length) b.insertAdjacentHTML('beforeend', `<span class="menu-keys">${act.keys.slice(0, 2).map((k) => `<kbd>${k}</kbd>`).join('')}</span>`);
       if (act.primary) b.className = 'primary';
       if (act.danger) b.className = 'danger';
       b.onclick = () => {
@@ -1800,11 +1779,16 @@ export class InventoryUI {
       };
       m.appendChild(b);
     }
+    // (the number keys put what is carried on a quick key: said here, where every other key is)
+    if (src.kind !== 'ground' && this.carried(src)) m.insertAdjacentHTML('beforeend', `<div class="menu-foot"><kbd>1</kbd>–<kbd>0</kbd> puts it on a quick key</div>`);
     this.root.appendChild(m);
+    this.menuSrc = src;
     const z = this.z;
     const r = m.getBoundingClientRect();
-    m.style.left = `${Math.min(x, window.innerWidth - r.width - 8) / z}px`;
-    m.style.top = `${Math.min(y, window.innerHeight - r.height - 8) / z}px`;
+    // (by the pointer as the card is, `placeCard`: to its right and under it, or the other side where that would run off)
+    const px = x + 18 + r.width > window.innerWidth - 8 ? x - r.width - 14 : x + 18;
+    m.style.left = `${Math.max(8, px) / z}px`;
+    m.style.top = `${Math.max(8, Math.min(y + 20, window.innerHeight - r.height - 8)) / z}px`;
     this.menu = m;
   }
 
