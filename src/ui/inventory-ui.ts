@@ -34,6 +34,10 @@ import type { DollBox as FigureBox } from '../game/doll';
 const CELL = 46;
 /** the hot key a thing in a place is on, as a key before the place's name (nothing for none) */
 const slotKey = (i: number) => (i >= 0 ? `<span class="slot-key">${(i + 1) % 10}</span>` : '');
+/** weight, as a weight is drawn (idea 6: "instead of kg ... an icon"): a ring over a block, read at 11 px */
+const WEIGHT_ICON = `<svg class="kg-ic" viewBox="0 0 32 32" aria-hidden="true"><path fill-rule="evenodd" d="M16 2A5.5 5.5 0 1 1 15.99 2ZM16 5A2.5 2.5 0 1 0 16.01 5ZM8 12H24L29 30H3Z"/></svg>`;
+/** a sprint, as a runner (idea 6: "an icon instead of the word sprint") */
+const SPRINT_ICON = `<svg class="kg-ic run-ic" viewBox="0 0 32 32" aria-hidden="true"><circle cx="20" cy="5" r="3.5"/><path d="M17.5 11L13.5 19.5M17 12.5L22.5 16M17 12.5L10.5 13.5M13.5 19.5L19 23L18 29.5M13.5 19.5L10 25L3.5 25.5"/></svg>`;
 /** What a press on keeps the chosen thing chosen (anywhere else, it is let go: see the constructor) */
 const KEEPS_CHOSEN = '.inv-item, .inv-inspect, .inv-menu, .inv-card, .inv-hot, .inv-view, .inv-view-menu, button, input, label, a, h4';
 
@@ -663,7 +667,7 @@ export class InventoryUI {
     const box = (k: keyof typeof kindView, label: string, off = false) =>
       `<label${off ? ' class="off"' : ''}><input type="checkbox" data-view="${k}"${kindView[k] ? ' checked' : ''}${off ? ' disabled' : ''}> ${label}</label>`;
     return `<button type="button" class="inv-view${this.viewOpen ? ' on' : ''}" title="How things are shown"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.3 5.5L14 1.6L18 1.6L18.7 5.5A10.8 10.8 0 0 1 21.5 6.7L24.7 4.4L27.6 7.3L25.3 10.5A10.8 10.8 0 0 1 26.5 13.3L30.4 14L30.4 18L26.5 18.7A10.8 10.8 0 0 1 25.3 21.5L27.6 24.7L24.7 27.6L21.5 25.3A10.8 10.8 0 0 1 18.7 26.5L18 30.4L14 30.4L13.3 26.5A10.8 10.8 0 0 1 10.5 25.3L7.3 27.6L4.4 24.7L6.7 21.5A10.8 10.8 0 0 1 5.5 18.7L1.6 18L1.6 14L5.5 13.3A10.8 10.8 0 0 1 6.7 10.5L4.4 7.3L7.3 4.4L10.5 6.7A10.8 10.8 0 0 1 13.3 5.5ZM16 11.2A4.8 4.8 0 1 0 16.01 11.2Z"/></svg></button>` +
-      (this.viewOpen ? `<div class="inv-view-menu">${box('colors', 'Show type colors')}${box('icons', 'Show icons')}${box('iconColors', 'Show icon colors', !kindView.icons)}</div>` : '');
+      (this.viewOpen ? `<div class="inv-view-menu">${box('colors', 'Show type colors')}${box('icons', 'Show icons')}${box('iconColors', 'Show icon colors', !kindView.icons)}${box('weights', 'Show bag weights')}</div>` : '');
   }
 
   private wireView(col: HTMLElement) {
@@ -674,7 +678,7 @@ export class InventoryUI {
     col.querySelectorAll<HTMLInputElement>('[data-view]').forEach((b) =>
       b.addEventListener('change', () => {
         setKindView({ [b.dataset.view!]: b.checked });
-        if (b.dataset.view === 'icons') this.render();
+        if (b.dataset.view === 'icons' || b.dataset.view === 'weights') this.render();
       }),
     );
     if (!this.viewOpen) return;
@@ -815,12 +819,17 @@ export class InventoryUI {
     // wherever it stands in less room than it is wide. Nothing is ever off the edge.)
     box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '') + (c.w >= 9 ? ' wide' : '');
     // (a bag's room taken, "13 / 20", is not said any more: 2026-10-18, "not much use for it"; the tag pouch and the hold still say theirs)
+    // (what a bag's things weigh, idea 6, 2026-10-18: "so you can see which bag to drop", drawn as their share of all
+    // that is carried, a percentage and a weight; nothing on an empty one, nor with the choice by "Carried" off)
+    const kg = hold || c === this.inv.tags || !c.items.length || !kindView.weights ? 0 : c.weight();
+    const all = kg && this.inv.weight(), share = all ? Math.min(1, kg / all) : 0;
     const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : '';
-    const tip = hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
+    const weighs = kg ? `<span class="inv-bagkg">${Math.round(share * 100)}%${WEIGHT_ICON}</span>` : '';
+    const tip = kg ? `What is in it weighs ${kg.toFixed(2)} kg: ${Math.round(share * 100)}% of the ${all.toFixed(1)} kg you carry. ` : hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
     // (a grid of what is carried, open, with two things or more in it and not sorted already, can be sorted: packed tight, kind by kind)
     const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && this.inv.containers.some((x) => x.id === c.id) && c.sort(false);
     const sortBtn = sorts ? `<button type="button" class="inv-sort" title="Sort: pack it tight, kind by kind"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 6H28V10H4ZM4 14H21V18H4ZM4 22H14V26H4Z"/></svg></button>` : '';
-    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn}${said ? ` <span>${said}</span>` : ''}</h4>`;
+    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
     box.querySelector('h4')!.addEventListener('click', () => {
       if (!this.folded.delete(c.id)) this.folded.add(c.id);
       this.render();
@@ -1113,7 +1122,7 @@ export class InventoryUI {
     // (what is carried and, where the game has said a load weighs on anybody, what it leaves of a sprint: the rule is
     // src/sim/load.ts. In red past the weight that slows the feet as well.)
     const kg = inv.weight(), told = this.carryLimit !== null;
-    cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
+    cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${told ? `${Math.round(breathOf(kg) * 100)}%${SPRINT_ICON} · ` : ''}${kg.toFixed(1)}${WEIGHT_ICON}</span></h3>`;
     // (an admin's power: it weighs nothing to them, and the head says that and no weight)
     if (this.weightless) cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
     this.wireView(cargo);

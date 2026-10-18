@@ -37,12 +37,13 @@ const GLYPHS: Record<Kind, string> = {
 
 /**
  * How kinds are shown, each player's own choice (the gear by "Carried" in the inventory): things in their kinds'
- * colours or the page's plain pale; these symbols, and those in their kinds' colours or plain. Kept in this
+ * colours or the page's plain pale; these symbols, and those in their kinds' colours or plain; each bag's share of
+ * the weight carried (idea 6: "maybe someone doesn't care about this weight per bag"). Kept in this
  * browser, as the map's choices are. (The words on the page are American: the contributor's ask, 2026-10-18.)
  */
-export interface KindView { colors: boolean; iconColors: boolean; icons: boolean }
+export interface KindView { colors: boolean; iconColors: boolean; icons: boolean; weights: boolean }
 const VIEW_KEPT = 'zona.kindView';
-export const kindView: KindView = { colors: true, iconColors: true, icons: true };
+export const kindView: KindView = { colors: true, iconColors: true, icons: true, weights: true };
 try {
   Object.assign(kindView, JSON.parse(localStorage.getItem(VIEW_KEPT) ?? '{}'));
 } catch {

@@ -261,6 +261,11 @@ export class Container {
     return this.items.reduce((s, p) => s + (p.item.id === id ? p.item.qty : 0), 0);
   }
 
+  /** what is in it weighs, a bag in it with all that is in that */
+  weight() {
+    return this.items.reduce((s, p) => s + itemWeight(p.item), 0);
+  }
+
   /** consumes up to n of a stackable id; returns how many were taken */
   take(id: string, n: number): number {
     let taken = 0;

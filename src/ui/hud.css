@@ -762,6 +762,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-gridbox h4:hover { background: rgba(233, 228, 216, 0.12); color: var(--ink); }
 .inv-gridbox h4 i { width: 12px; font-style: normal; color: var(--accent); }
 .inv-gridbox h4 span { margin-left: auto; padding-left: 10px; }
+.inv-bagkg { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.kg-ic { width: 10px; height: 10px; margin-left: 3px; vertical-align: -1px; fill: currentColor; flex: none; }
+.run-ic path { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
 /* (the sort button by a grid's name: src/sim/inventory.ts Container.sort) */
 .inv-sort { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
 .inv-sort svg { width: 11px; height: 11px; fill: currentColor; }
