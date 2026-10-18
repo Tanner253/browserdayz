@@ -72,10 +72,11 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 - Open: others do not see the Barrett's bipod down (needs a server field); the loot branch `refs/heads/claude/loot-world-6b02f8` (Kalat ruins T5, 2 east MD-500 pads, gun re-tiering) NOT merged: ask the owner; the old shared attachments' exclusivity is the owner's call; two 15 s weapon trailers.
 - Next, in the owner's order: the offline/refused reasons (done on branch `claude/refusal-reasons-fc6875`, 1f39038, NOT merged: ask); the map made better (their inspiration picture, 2026-10-17); furniture with storage everywhere; the DayZ-style loot rework (per-spot tier and categories, a roll per spot, more places: cave stashes, cheap POIs with bunker tops).
 
-## Open, after the trailer
+## Open, after the trailer (the Google Ads media stays LAST)
 - Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
 - In-page reconnect (a drop as a blip, no reload); optimizations (the shadow-shader warm-up tried 2026-10-15 was reverted: unproven).
 - LATER, real recorded audio (the owner, 2026-10-16: "our generated audio and low effort patch work is less than desirable, we cant take this on now but its worth documenting for later"). Their reference for bullets flying by: https://www.youtube.com/watch?v=VTuuOiWgVZ0 ("amazing fly by sound"). It is the target to match, not a source: audio taken off a video is a rip (CLAUDE.md: nothing ripped). Find recordings of the same kind (supersonic crack + whizz, near and far) with a licence that allows a game: CC0 on Freesound, the free Sonniss GDC bundles (royalty-free), or a bought pack; then a pass over every generated or patched sound, judged side by side with the reference.
+- **LAST: Google Ads media** (the owner, 2026-10-18: "put this at the very end of our todo list for now"): 15 stills (5 landscape 1200x628, 5 square 1200x1200, 5 portrait 1080x1920), five trailers each in 16:9, 1:1 and 9:16 on the ABCD plan, and the 15:5:5 copy. The plan, with the owner's brief whole and three questions for them first (the tag holds 15 minutes, not the brief's 10; ZONA has no "extraction"; a landing page without token or payouts): `progress/google-ads/plan.md`. The owner: "do not discuss mention or elude to payouts or play to earn".
 
 # Where the work stood (handoff, 2026-10-14)
 
