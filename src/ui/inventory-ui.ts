@@ -26,6 +26,7 @@ import { Container, bagGrid, combinePiles, splitPile, swapPlaces, type PlayerInv
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon, type Act } from './act-icons';
 import { kindIcon, kindView, setKindView } from './kind-icons';
+import { searchMatch, searchTerms } from './inv-search';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -218,6 +219,9 @@ export class InventoryUI {
   private selected: ItemInstance | null = null;
   /** the choices of how things are shown, open under the gear by "Carried" */
   private viewOpen = false;
+  /** the words typed in the search box under "Carried" (none: nothing is dimmed), and the box, made once (see `findEl`) */
+  private terms: string[] = [];
+  private findBox: HTMLLabelElement | null = null;
   /** the pockets and bags folded away (by their names): a click on the bar over one folds it, and opens it again */
   private folded = new Set<string>();
   private drag: Drag | null = null;
@@ -285,6 +289,8 @@ export class InventoryUI {
     window.addEventListener('keydown', (e) => {
       if (!this.isOpen) return;
       if (e.key === 'Alt') e.preventDefault();
+      // (typing in the search box: a G or a number is a letter there, not a drop or a hot key)
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
       if (e.code === 'KeyR' && this.drag) {
         this.drag.rot = !this.drag.rot;
         this.styleGhost();
@@ -497,6 +503,9 @@ export class InventoryUI {
     this.isOpen = false;
     this.viewOpen = false;
     this.hover = null;
+    // (what was looked for is not looked for still the next time it is opened, with half of it dimmed for no reason seen)
+    this.terms = [];
+    if (this.findBox) this.findBox.querySelector('input')!.value = '';
     this.closeMenu();
     this.cancelDrag();
     this.hideCard();
@@ -680,9 +689,51 @@ export class InventoryUI {
     window.addEventListener('pointerdown', away, true);
   }
 
-  /** The chosen thing is ringed; what feeds it or is fed by it (its rounds, its magazines, the guns they go in) is lit beside it. */
+  /**
+   * The chosen thing is ringed; what feeds it or is fed by it (its rounds, its magazines, the guns they go in) is lit
+   * beside it. While something is searched for, what is found is lit in the same way and the rest dimmed.
+   */
   private mark(item: ItemInstance) {
-    return item === this.selected ? ' sel' : this.selected && goesWith(this.selected.id, item.id) ? ' kin' : '';
+    if (item === this.selected) return ' sel';
+    if (this.terms.length) return searchMatch(item, this.terms, kindOf(ITEMS[item.id])) ? ' kin' : ' dim';
+    return this.selected && goesWith(this.selected.id, item.id) ? ' kin' : '';
+  }
+
+  /** The search box under "Carried": made once and put back each time this is drawn, so what is typed and the caret stay. */
+  private findEl() {
+    if (this.findBox) return this.findBox;
+    const box = (this.findBox = document.createElement('label'));
+    box.className = 'inv-find';
+    box.title = 'Dims everything that does not match: a name, a kind (medical, food) or the rounds a gun or magazine takes (9mm)';
+    box.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 1a5.5 5.5 0 0 1 4.4 8.8l3.9 3.9-1.1 1.1-3.9-3.9A5.5 5.5 0 1 1 6.5 1Zm0 1.6a3.9 3.9 0 1 0 0 7.8 3.9 3.9 0 0 0 0-7.8Z"/></svg><input type="text" placeholder="Search" spellcheck="false" autocomplete="off"><button type="button" title="Clear">×</button>`;
+    const input = box.querySelector('input')!;
+    const find = () => {
+      const at = input.selectionStart;
+      this.terms = searchTerms(input.value);
+      box.classList.toggle('on', input.value !== '');
+      this.render();
+      // (drawn afresh, the box was taken out and put back, which lets go of the keys)
+      input.focus();
+      input.setSelectionRange(at, at);
+    };
+    input.addEventListener('input', find);
+    box.querySelector('button')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      input.value = '';
+      find();
+    });
+    input.addEventListener('keydown', (e) => {
+      // Escape empties it first, and only an empty box lets Escape shut the inventory; Enter and Tab put the keys back to the game
+      if (e.key === 'Escape' && input.value) {
+        e.stopPropagation();
+        input.value = '';
+        find();
+      } else if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'Tab') {
+        if (e.key === 'Tab') e.preventDefault();
+        input.blur();
+      }
+    });
+    return box;
   }
 
   private itemEl(item: ItemInstance, w: number, h: number, rot: boolean) {
@@ -867,7 +918,7 @@ export class InventoryUI {
     this.inv.hot.forEach((b, i) => {
       const it = b ? this.inv.hotItem(i) : null;
       const cell = document.createElement('div');
-      cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '') + (it && this.mark(it) === ' kin' ? ' kin' : '');
+      cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '') + (it && this.mark(it) !== ' sel' ? this.mark(it) : '');
       cell.dataset.hot = String(i);
       const id = it?.id ?? b?.id;
       cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[id] ?? ''})"></div>${kindIcon(id)}` : ''}`;
@@ -948,7 +999,7 @@ export class InventoryUI {
     for (const w of this.vicinity) {
       const d = ITEMS[w.loot.item.id];
       const row = document.createElement('div');
-      row.className = 'inv-ground-row';
+      row.className = 'inv-ground-row' + (this.mark(w.loot.item) === ' dim' ? ' dim' : '');
       const ic = document.createElement('div');
       ic.className = 'inv-item mini';
       // (its kind, for the faint colour each kind's cell has: see the stylesheet. Not as a `cat-` class: those are how a thing in a grid is found by what films the screen, and this is no thing in a grid.)
@@ -1066,6 +1117,7 @@ export class InventoryUI {
     // (an admin's power: it weighs nothing to them, and the head says that and no weight)
     if (this.weightless) cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
     this.wireView(cargo);
+    cargo.appendChild(this.findEl());
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';
     const grids = document.createElement('div');
