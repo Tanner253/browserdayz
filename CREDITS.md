@@ -273,6 +273,8 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Painted Wooden Table](https://polyhaven.com/a/painted_wooden_table) | Kirill Sannikov |
 | model | [Plastic Bottle Gallon](https://polyhaven.com/a/plastic_bottle_gallon) | Rahul Chaudhary |
 | model | [Plastic Thermos](https://polyhaven.com/a/plastic_thermos) | PierreB3D |
+| model | [Portable Generator](https://polyhaven.com/a/portable_generator) | James Ray Cock |
+| model | [Propane Tank](https://polyhaven.com/a/propane_tank) | Slinc |
 | model | [Rock Face 01](https://polyhaven.com/a/rock_face_01) | Dario Barresi |
 | model | [Rock Face 02](https://polyhaven.com/a/rock_face_02) | Dario Barresi, Rico Cilliers |
 | model | [Rock Moss Set 01](https://polyhaven.com/a/rock_moss_set_01) | Kless Gyzen |

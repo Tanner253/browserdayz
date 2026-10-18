@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-17T20:40:09.393Z",
+ "generated": "2026-10-18T07:42:08.806Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12182,6 +12182,59 @@
     0.0102
    ],
    "lods": []
+  },
+  "portable_generator": {
+   "url": "assets/models/portable_generator.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 539924,
+   "srcTris": 26419,
+   "tris": 13981,
+   "min": [
+    -0.4145,
+    0.0001,
+    -0.282
+   ],
+   "max": [
+    0.4038,
+    0.577,
+    0.282
+   ],
+   "lods": [
+    {
+     "url": "assets/models/portable_generator_lod1.glb",
+     "tris": 1251
+    }
+   ],
+   "hi": "assets/models/hi/portable_generator.glb",
+   "hiBytes": 2101052,
+   "hiCard": 85
+  },
+  "propane_tank": {
+   "url": "assets/models/propane_tank.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 427312,
+   "srcTris": 5238,
+   "tris": 3999,
+   "min": [
+    -0.1687,
+    0,
+    -0.1687
+   ],
+   "max": [
+    0.1687,
+    0.5538,
+    0.1687
+   ],
+   "lods": [
+    {
+     "url": "assets/models/propane_tank_lod1.glb",
+     "tris": 305
+    }
+   ]
   }
  }
 }

@@ -1472,6 +1472,10 @@ export const MODELS = {
 
   // interiors
   old_bed_frame: { res: '1k', tex: 1024, budget: 6000, far: 500, tags: ['furniture'] },
+  // (the bunker's generator and its gas, in place of the ones it was drawn with: 2026-10-17, "replace the ones in the
+  // bunker we made ourselves")
+  portable_generator: { res: '2k', tex: 2048, budget: 14000, far: 1400, tags: ['prop'] },
+  propane_tank: { res: '1k', tex: 1024, budget: 4000, far: 400, tags: ['prop'] },
   WoodenTable_01: { res: '1k', tex: 1024, budget: 952, far: 200, tags: ['furniture'] },
   painted_wooden_table: { res: '1k', tex: 1024, budget: 600, far: 200, tags: ['furniture'] },
   painted_wooden_chair_01: { res: '1k', tex: 512, budget: 724, far: 200, tags: ['furniture'] },
