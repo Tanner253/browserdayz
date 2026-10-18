@@ -15,6 +15,9 @@ const NAME_STORE = 'zona.player.name';
  * build time, e.g. the client on Vercel and the server on Render). Null when the game
  * server is the host that served this page.
  */
+/** the server was named in the address (`?server=`): a development page's, or one played offline on purpose by naming an address where nothing answers */
+export const serverNamed = () => new URLSearchParams(location.search).has('server');
+
 export function remoteServer(): string | null {
   const q = new URLSearchParams(location.search).get('server');
   const env = (import.meta as { env?: { VITE_SERVER_URL?: string } }).env?.VITE_SERVER_URL;
@@ -161,6 +164,18 @@ function readKey(): string {
   }
 }
 
+/**
+ * What a player is told on the way in when the server could not be reached, by why (Net.unreached). The owner,
+ * 2026-10-18: "players who get this message still dont know why ... why do players need to disable adblock to play? we
+ * dont serve ads". The game's server is on another address than the site, and an ad blocker or a privacy extension
+ * can stop a page from reaching it.
+ */
+export const UNREACHED: Record<'blocked' | 'asleep' | 'socket', string> = {
+  blocked: "Can't reach the game server: your browser stopped the connection. This is almost always an ad blocker or privacy extension (ZONA shows no ads). Allow zonapvp.fun and browserdayz.onrender.com in it, or use another browser, then press Deploy.",
+  asleep: 'The game server did not answer. It may be restarting after an update: press Deploy again in a minute.',
+  socket: "Can't connect to the game server. An ad blocker, privacy extension, VPN or school or work network can stop it: allow zonapvp.fun and browserdayz.onrender.com, or try another browser or network, then press Deploy.",
+};
+
 export class Net {
   online = false;
   id = 0;
@@ -185,6 +200,12 @@ export class Net {
   private pingT = 0;
   private kicked = '';
   private kickedV: number | undefined;
+  /**
+   * Why the server could not be reached, the last time it was not: the browser stopped the request to it before it
+   * went (an ad blocker or a privacy extension, nearly always), it did not answer in time, or the line to it would not
+   * open. '' when it was reached. See UNREACHED.
+   */
+  unreached: '' | 'blocked' | 'asleep' | 'socket' = '';
   private proofKey = '';
   /** turned away for want of the check that this is a person: the key the server said to ask for it with (see src/ui/person.ts) */
   get wantsProof() {
@@ -236,6 +257,7 @@ export class Net {
     this.kicked = '';
     this.kickedV = undefined;
     this.proofKey = '';
+    this.unreached = '';
     // (the server asked first, which wakes one that sleeps: the arena on a free plan does, after fifteen quiet minutes)
     const remote = wagerQuery() ? arenaBase() || null : remoteServer();
     if (remote) {
@@ -248,6 +270,8 @@ export class Net {
       } catch {
         clearTimeout(slow);
         clearTimeout(giveUp);
+        // (given up after a minute and a half: asleep or down; failed at once: never sent, which is the browser's doing)
+        this.unreached = ctl.signal.aborted ? 'asleep' : 'blocked';
         return null;
       }
       clearTimeout(slow);
@@ -262,7 +286,9 @@ export class Net {
     if (first || this.kicked || this.left) return first;
     // one more try: a proxy or a server that has only just started can drop the first connection
     await new Promise((r) => setTimeout(r, 400));
-    return this.open(name, timeout, proof, fp);
+    const second = await this.open(name, timeout, proof, fp);
+    if (!second && !this.kicked && !this.left) this.unreached = 'socket';
+    return second;
   }
 
   private open(name: string, timeout: number, proof = '', fp = ''): Promise<Welcome | null> {

@@ -522,6 +522,19 @@ export class CorpseBody {
     this.avatar.layDown(variant);
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);
     if (slope && slope.y > 0.6 && slope.y < 0.9995) this.avatar.root.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), slope));
+    // (A body never moves again: its pose is worked out once, and its skeleton sent to the card once. Worked out anew
+    // every frame, forty bodies cost 9 ms of every frame, and since bodies lie an hour there are that many: 2026-10-18,
+    // "after the most recent update fps has tanked".)
+    const root = this.avatar.root;
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh) return;
+      m.skeleton.update();
+      m.skeleton.update = () => {};
+    });
+    root.matrixAutoUpdate = false;
+    root.matrixWorldAutoUpdate = false;
   }
   dispose() {
     this.gone = true;

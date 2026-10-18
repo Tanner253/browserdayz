@@ -18,7 +18,7 @@ import type { Economy } from '../../sim/economy';
 const keepsOf = new WeakMap<Economy, Keeps>();
 import { economyCargo } from '../../sim/storage';
 import { loadSave, type SaveData, writeSave } from '../../sim/save';
-import { playerName, setPlayerName, personKey, remoteServer, publicId } from '../../net/client';
+import { playerName, setPlayerName, personKey, remoteServer, publicId, serverNamed, UNREACHED } from '../../net/client';
 import { PROTOCOL, type S2C } from '../../net/protocol';
 import { freshVitals } from '../player';
 import { lookFor } from '../look';
@@ -173,6 +173,16 @@ export const enterMethods = {
         this.input.unlock();
         this.hud.showStart(true);
         this.hud.refused(this.net.refused);
+        return;
+      } else if (remoteServer() && !serverNamed()) {
+        // The site's own server not reached: said on the way in where it stays said, with the likely cause and what to
+        // do, and not into a world alone. (It was a note gone in four seconds, then the OFFLINE banner, and players did
+        // not know why: 2026-10-18, "players who get this message still dont know why". A server named in the address,
+        // as a development page or a game played offline on purpose names one, is played without as it was.)
+        this.joining = false;
+        this.input.unlock();
+        this.hud.showStart(true);
+        this.hud.refused(UNREACHED[this.net.unreached || 'socket']);
         return;
       } else if (remoteServer()) this.hud.note('The server could not be reached: you are playing OFFLINE, alone. Reload the page to try again.', 'warn');
       await this.enterOffline();
