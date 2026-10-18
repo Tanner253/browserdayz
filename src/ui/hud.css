@@ -1633,14 +1633,23 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.paused .sm-foot a, .hud-start.paused .sm-foot button, .hud-start.paused .sm-hero > button { cursor: pointer; }
 .hud-start.paused .sm-cut, .hud-start.paused .sm-live, .hud-start.paused .start-kicker em, .hud-start.paused .start-sub2, .hud-start.paused .sm-loop, .hud-start.paused .sm-name, .hud-start.paused .sm-tag { display: none; }
 .hud-start.paused .sm-main { align-items: center; }
-.hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; }
-.hud-start.paused .start-title { font-size: 92px; }
+.hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; display: grid; grid-template-columns: max-content 1fr; column-gap: 28px; align-items: center; }
+/* the number online beside the name, on its middle; everything else across the whole width as before */
+.hud-start.paused .sm-hero > * { grid-column: 1 / -1; }
+.hud-start.paused .start-title { grid-column: 1; grid-row: 2; font-size: 92px; }
+.hud-start.paused .start-online { grid-column: 2; grid-row: 2; margin: 0; }
+/* (the room the number used to take under Resume, kept above the wallet line) */
+.hud-start.paused .sm-wallet { margin-top: 28px; }
 .hud-start.paused .start-sub { font-size: 20px; color: var(--ink-dim); }
 .hud-start.paused.live .start-sub { max-width: 620px; font-size: 17px; line-height: 1.35; }
-/* leaving the proper way: under Resume on the pause screen, when playing on a server */
-.start-out { display: none; margin-top: 10px; padding: 8px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
+/* leaving the proper way: a square beside Resume, as tall as it, on the pause screen when playing on a server */
+.start-out { display: none; flex: none; width: 58px; height: 58px; padding: 0; place-items: center; font-family: var(--mono); font-size: 18px; font-weight: 600; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
+.start-out svg { width: 24px; height: 24px; }
+.start-out b { font-weight: inherit; }
 .start-out:hover { color: var(--ink); border-color: rgba(233, 228, 216, 0.6); }
-.hud-start.paused.live .start-out { display: block; }
+.start-out.counting { color: var(--brand); border-color: var(--brand); }
+.start-out.counting svg { display: none; }
+.hud-start.paused.live .start-out { display: grid; }
 .hud-logout { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: #ffd58a; background: rgba(10, 12, 11, 0.78); border: 1px solid rgba(255, 213, 138, 0.5); pointer-events: none; z-index: 40; white-space: nowrap; }
 .hud-logout.show { display: block; }
 /* said to everybody by an admin: across the screen, for a while */

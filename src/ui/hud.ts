@@ -300,7 +300,7 @@ export class HUD {
                 </span>
               </label>
               <button class="start-btn" type="button"><span>Deploy</span></button>
-              <button class="start-out" type="button">Log out</button>
+              <button class="start-out" type="button" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4H5v16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h10M16.5 8.5 20 12l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><b></b></button>
               <div class="sm-tag" title="Your dog tag: whoever kills you takes it"></div>
             </div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
@@ -1518,7 +1518,13 @@ export class HUD {
     let bar = this.root.querySelector('.hud-logout') as HTMLElement | null;
     if (!bar) this.root.appendChild((bar = Object.assign(document.createElement('div'), { className: 'hud-logout' })));
     const show = () => {
-      (this.root.querySelector('.start-out') as HTMLElement).textContent = this.outLeft > 0 ? `Stay in the game  (out in ${this.outLeft} s)` : 'Log out';
+      // (the button is a square with the way out drawn on it; while the wait runs it shows the seconds, and pressing it stays)
+      const out = this.root.querySelector('.start-out') as HTMLElement;
+      const say = this.outLeft > 0 ? `Stay in the game (out in ${this.outLeft} s)` : 'Log out';
+      out.title = say;
+      out.setAttribute('aria-label', say);
+      (out.querySelector('b') as HTMLElement).textContent = this.outLeft > 0 ? String(this.outLeft) : '';
+      this.toggle(out, 'counting', this.outLeft > 0);
       bar!.textContent = this.outLeft > 0 ? `Logging out in ${this.outLeft} s. Stay where you are: moving, firing or being hit stops it.` : '';
       this.toggle(bar!, 'show', this.outLeft > 0);
     };
