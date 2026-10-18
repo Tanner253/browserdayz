@@ -1237,17 +1237,16 @@ body.touch .set-page .gfx-range { height: 30px; }
   transition: color 0.15s, border-color 0.15s;
 }
 .sm-nav button:hover { color: var(--ink); }
-/* (The ways out of the menu to pages of their own, the changelog and the payouts: small, in one type, each marked
-   as leaving, and set off from the sheets by a line. They are words, and neither is a box.) */
-.sm-nav .sm-out { align-self: center; flex: none; margin-left: 22px; padding: 6px 0 7px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); transition: color 0.15s; }
-.sm-nav button + .sm-out { margin-left: 12px; padding-left: 18px; border-left: 1px solid var(--line); }
-.sm-nav .sm-out::after { content: ' \2197'; color: var(--brand); }
-.sm-nav .sm-out:hover { color: var(--ink); }
-.sm-nav .sm-out:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+/* (The ways out of the menu to pages of their own, the Arena, the changelog and the payouts: at the right beside
+   the Discord, small, in one type, each marked as leaving. The screens of the menu itself stay at the left.) */
+.sm-out { align-self: center; flex: none; padding: 6px 0 7px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); transition: color 0.15s; }
+.sm-out::after { content: ' \2197'; color: var(--brand); }
+.sm-out:hover { color: var(--ink); }
+.sm-out:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 /* (Payouts is one of them: it was a gold button at the top right, with a light crossing it, and was not liked.
    What a tag pays now is said small beside the word, when it is known.) */
-.sm-nav .sm-pay { display: inline-flex; align-items: baseline; gap: 9px; }
-.sm-nav .sm-pay::after { content: none; }
+.sm-pay { display: inline-flex; align-items: baseline; gap: 9px; }
+.sm-out.sm-pay::after { content: none; }
 .sm-pay span::after { content: ' \2197'; color: var(--brand); }
 .sm-pay em { font-size: 11px; font-style: normal; letter-spacing: 0.06em; color: var(--ink); }
 .sm-pay em:empty { display: none; }
@@ -1259,7 +1258,7 @@ body.touch .set-page .gfx-range { height: 30px; }
   .sm-nav { overflow-x: auto; scrollbar-width: none; }
   .sm-nav::-webkit-scrollbar { display: none; }
 }
-.sm-status { display: flex; flex: none; align-items: center; gap: 16px; margin-left: auto; }
+.sm-status { display: flex; flex: none; align-items: center; gap: 22px; margin-left: auto; }
 /* who is online: said under the name and the button, where it bears on pressing it (a full server says so there,
    and that there is a line). It was at the top right, and ran into the menu when it had much to say. */
 .start-online { display: none; margin-top: 16px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--ok); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
@@ -1514,11 +1513,10 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-sheet.em-hole { position: relative; isolation: isolate; background: none; backdrop-filter: none; }
 .em-sheet.em-hole::before { content: ''; position: absolute; inset: 0; z-index: -1; background: rgba(10, 12, 11, 0.82); backdrop-filter: blur(12px); clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--em-l) var(--em-t), var(--em-l) var(--em-b), var(--em-r) var(--em-b), var(--em-r) var(--em-t), var(--em-l) var(--em-t)); }
 .start-brief[data-tab='map'] .pane-map, .start-brief[data-tab='brief'] .pane-brief { display: block; }
-/* How to play: a card over the screen (HUD.howTo), once on the first visit; its button is there only in a game (the Esc menu) */
-.sm-howto { display: none !important; }
-.hud-start.paused .sm-howto { display: inline-block !important; }
-/* the way across to the other game */
-.sm-arena { color: #ff4a36 !important; border: 1px solid rgba(255, 74, 54, 0.6); padding: 4px 12px !important; }
+/* How to play: a card over the screen (HUD.howTo), once on the first visit, and its button in the menu on every screen of it */
+/* the way across to the other game: a red box as tall as the Discord's */
+.sm-out.sm-arena { padding: 7px 12px 8px; color: #ff4a36; border: 1px solid rgba(255, 74, 54, 0.6); }
+.sm-out.sm-arena:hover { color: #ff6a58; border-color: #ff4a36; }
 .hud-howto { position: fixed; inset: 0; z-index: 40; display: none; place-items: center; background: rgba(5, 6, 6, 0.72); pointer-events: auto; }
 .hud-howto.on { display: grid; }
 .howto-card { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: rgba(14, 16, 15, 0.97); border-top: 3px solid #ffd35a; padding: 20px 24px 22px; box-shadow: 0 18px 60px #000; }
