@@ -2134,7 +2134,9 @@ export class AudioEngine {
         rate += (speed - rate) * k;
         top += (cutoff - top) * k;
         first = false;
-        out.gain.value = level;
+        // (half as loud as it was, every helicopter, flown or flying by: the owner, 2026-10-17, "the helicopter sound is
+        // too loud when people are driving it can we reduce by 50% across the board")
+        out.gain.value = level * 0.5;
         src.playbackRate.value = rate;
         lp.frequency.value = top;
       },
