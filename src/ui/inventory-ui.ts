@@ -734,7 +734,6 @@ export class InventoryUI {
    */
   private gridBox(c: Container, where = '') {
     const box = document.createElement('div');
-    const used = c.items.reduce((n, p) => n + ITEMS[p.item.id].w * ITEMS[p.item.id].h, 0);
     const shut = this.folded.has(c.id);
     // An admin's hold (src/sim/inventory.ts): it has no bottom, so there is no "of how many" to say of it. It says
     // how many things lie in it and whether it still takes any. It is drawn whole, as tall as what is in it and a
@@ -744,12 +743,13 @@ export class InventoryUI {
     // of this screen has room for when it is opened there, on a body: it is marked, and scrolls sideways by itself
     // wherever it stands in less room than it is wide. Nothing is ever off the edge.)
     box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '') + (c.w >= 9 ? ' wide' : '');
-    const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`;
+    // (a bag's room taken, "13 / 20", is not said any more: 2026-10-18, "not much use for it"; the tag pouch and the hold still say theirs)
+    const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : '';
     const tip = hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
-    // (a grid of what is carried, with two things or more in it and open, can be sorted: packed tight, kind by kind)
-    const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && this.inv.containers.some((x) => x.id === c.id);
+    // (a grid of what is carried, open, with two things or more in it and not sorted already, can be sorted: packed tight, kind by kind)
+    const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && this.inv.containers.some((x) => x.id === c.id) && c.sort(false);
     const sortBtn = sorts ? `<button type="button" class="inv-sort" title="Sort: pack it tight, kind by kind"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 6H28V10H4ZM4 14H21V18H4ZM4 22H14V26H4Z"/></svg></button>` : '';
-    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn} <span>${said}</span></h4>`;
+    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn}${said ? ` <span>${said}</span>` : ''}</h4>`;
     box.querySelector('h4')!.addEventListener('click', () => {
       if (!this.folded.delete(c.id)) this.folded.add(c.id);
       this.render();

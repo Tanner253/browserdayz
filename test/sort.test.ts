@@ -19,11 +19,15 @@ const sound = (c: Container) => {
   const ids = ['beans', 'ammo_9mm', 'mpa', 'bandage', 'mag_mpa', 'apple', 'box_9mm', 'mag_mpa', 'flask', 'colt'];
   for (const id of ids) assert.equal(c.add(makeItem(id, ITEMS[id].stack ? 5 : undefined)), null, `${id} did not go in`);
   const before = c.items.map((p) => p.item.uid).sort();
+  const at = JSON.stringify(c.items.map((p) => [p.item.uid, p.x, p.y, p.rot]));
+  assert.equal(c.sort(false), true, 'a jumble was said to be sorted');
+  assert.equal(JSON.stringify(c.items.map((p) => [p.item.uid, p.x, p.y, p.rot])), at, 'asking whether it would sort moved things');
   assert.equal(c.sort(), true, 'nothing moved');
   sound(c);
   assert.deepEqual(c.items.map((p) => p.item.uid).sort(), before, 'something was lost or made');
   const first = c.items.slice().sort((a, b) => a.y - b.y || a.x - b.x)[0];
   assert.equal(ITEMS[first.item.id].category, 'weapon', `the top left is ${first.item.id}, not a gun`);
+  assert.equal(c.sort(false), false, 'a sorted grid was said to need sorting (its button would show)');
   assert.equal(c.sort(), false, 'sorted twice, it moved again');
   console.log('  ok  a jumble comes out whole, guns first, and a second sort moves nothing');
 }

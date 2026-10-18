@@ -182,9 +182,11 @@ export class Container {
    * Packed afresh, kind by kind (the inventory's sort button, 2026-10-18): guns, then what feeds them, then the
    * rest, the bigger of a kind first, each in the first place it fits. If that order leaves anything without room
    * the bigger things go first whatever their kind; and if that does too, nothing is moved.
-   * @returns whether anything moved
+   * @param apply false: only asks whether sorting would move anything, and leaves the grid as it was (the button is
+   *   shown only then: 2026-10-18, "if the box is already sorted, so we don't show it")
+   * @returns whether anything moved (or would)
    */
-  sort(): boolean {
+  sort(apply = true): boolean {
     const was = this.items.map((p) => ({ ...p }));
     const area = (p: Placed) => ITEMS[p.item.id].w * ITEMS[p.item.id].h;
     const byKind = (a: Placed, b: Placed) => sortRank(a.item.id) - sortRank(b.item.id) || area(b) - area(a) || a.item.id.localeCompare(b.item.id) || (b.item.qty ?? 0) - (a.item.qty ?? 0);
@@ -195,7 +197,13 @@ export class Container {
         const at = this.anywhere(p.item);
         if (at) this.items.push({ item: p.item, ...at });
         return !!at;
-      })) return this.items.some((p) => { const o = was.find((q) => q.item === p.item)!; return o.x !== p.x || o.y !== p.y || o.rot !== p.rot; });
+      })) {
+        const moved = this.items.some((p) => { const o = was.find((q) => q.item === p.item)!; return o.x !== p.x || o.y !== p.y || o.rot !== p.rot; });
+        if (apply) return moved;
+        this.items.length = 0;
+        this.items.push(...was);
+        return moved;
+      }
     }
     this.items.length = 0;
     this.items.push(...was);
