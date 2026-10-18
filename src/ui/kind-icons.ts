@@ -73,6 +73,9 @@ function kindOf(id: string): Kind {
   return d.throw ? 'explosive' : d.category;
 }
 
+/** The outline of an item's kind's symbol, for whatever draws it in a frame of its own (src/ui/act-icons.ts). */
+export const kindGlyph = (id: string) => GLYPHS[kindOf(id)];
+
 /** The symbol of an item's kind, coloured by the kind's tint (`data-kind` in src/ui/hud.css). */
 export function kindIcon(id: string): string {
   const k = kindOf(id);
