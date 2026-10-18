@@ -27,6 +27,8 @@ export const FP_BODY_LAYER = 4;
 export const BODY_SCALE = 0.965;
 /** how far from its hips a body can reach, metres, however it is bent: what it is judged in sight by (see Avatar.make) */
 const BODY_REACH = 2.5;
+/** what a bone does when its turn changes: nothing (see Avatar.load) */
+const unread = () => {};
 
 /** bones collapsed in the first-person body: the camera is the head, the viewmodel is the arms */
 const FP_HIDDEN = new Set(['Head', 'upperarm_l', 'upperarm_r']);
@@ -796,6 +798,13 @@ export class Avatar {
    * waited for, and the rest are drawn with what was made for it.
    */
   static onMade: (parts: THREE.Object3D[], kind: string) => Promise<void> = async () => {};
+  /**
+   * Something has been put on a body (worn, slung, taken up): it is drawn from this frame, and got ready for the
+   * other lighting behind it, so that the lamps wait for it when they come on or go off (the game sets this:
+   * Renderer.ready). Nothing put on a body was: at the first lamp of a night your own arms, body, knife, lamp and
+   * sight had their shaders made in the one frame, 0.8 to 1.8 s each, six seconds in all (2026-10-18).
+   */
+  static onDressed: (parts: THREE.Object3D[]) => void = () => {};
 
   load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
     return Avatar.line.take(file === 'survivor', () => this.make(atmo, layer, firstPersonBody, look, file));
@@ -1010,6 +1019,10 @@ export class Avatar {
     });
     this.driverRoot = driver;
     this.modelRoot = model;
+    // (A bone's turn is never read as angles, and three works the angles out afresh from every turn set on a bone: the
+    // clips', the copies' and the arms' alike, two skeletons' worth a body a frame. Its turn is all there is: a sixth
+    // of what posing another player cost, and a fifth of the infected (2026-10-18).)
+    for (const r of [driver, model]) r.traverse((o) => void ((o as THREE.Bone).isBone && (o.quaternion as unknown as { _onChange(f: () => void): void })._onChange(unread)));
     this.mixer = new THREE.AnimationMixer(driver);
     for (const name of CLIPS) {
       // (the infected's files have no lying down or crawling, and they never do either: a copy of the fall stands in)
@@ -1110,6 +1123,7 @@ export class Avatar {
       c.userData.over = k * 0.045;
       this.slung.add(c);
     });
+    if (this.slung.children.length) Avatar.onDressed([...this.slung.children]);
   }
 
   /** Hat, vest, pack: whatever of it is drawn (see GEAR). The models are this body's to keep. */
@@ -1145,6 +1159,7 @@ export class Avatar {
       if (g.pack) this.packOut = 0.2;
     }
     for (const c of this.slung.children) c.position.z = 0.01 + this.packOut + (c.userData.over ?? 0);
+    if (this.gearObjs.length) Avatar.onDressed(this.gearObjs);
   }
 
   /**
@@ -1215,9 +1230,11 @@ export class Avatar {
       fist.add(obj);
       r.hand.add(fist);
       this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder };
+      Avatar.onDressed([obj]);
       return;
     }
     this.heldPivot.add(obj);
+    Avatar.onDressed([obj]);
     // (a long gun is held by its butt: one with a way of its own of being stood with has no stock, and is held by where the butt of one would be)
     const b = kind !== 'pistol' ? buttOf(obj) : null;
     const butt = b && grips.stand ? b.at.clone().setX(b.at.x - POSE.hold.stockless / obj.scale.x) : (b?.at ?? null);

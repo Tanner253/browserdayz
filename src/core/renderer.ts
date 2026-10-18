@@ -70,6 +70,14 @@ export function programsOf(renderer: THREE.WebGLRenderer, materials: Iterable<TH
   return out;
 }
 
+/** What a shader is written for in a part: its paints, the sort of thing it is, its shape, and whether shadows fall on it (null: nothing drawn) */
+function kindOf(o: THREE.Object3D): string | null {
+  const d = o as THREE.Mesh & THREE.InstancedMesh & THREE.SkinnedMesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean; isBatchedMesh?: boolean };
+  if (!(d.isMesh || d.isPoints || d.isLine || d.isSprite) || !d.material) return null;
+  const ms = Array.isArray(d.material) ? d.material : [d.material];
+  return `${ms.map((m) => m.uuid).join(',')}|${+!!d.isSkinnedMesh}${+!!d.isInstancedMesh}${+!!d.instanceColor}${+!!d.isBatchedMesh}${+!!d.isPoints}${+!!d.isLine}${+!!d.isSprite}${+d.receiveShadow}|${d.morphTargetInfluences?.length ?? 0}|${shapeOf(o)}`;
+}
+
 /**
  * Over when the card has made every one of these shaders (its own workers make them, where it has any, while the
  * game goes on). (The library's own waiting asks the card every hundredth of a second, of every material, whether
@@ -356,6 +364,7 @@ export class Renderer {
     // (the one part and nothing under it: each is come to in its turn)
     const only = (o: THREE.Object3D) => ({ traverse: (f: (x: THREE.Object3D) => void) => f(o), traverseVisible: (f: (x: THREE.Object3D) => void) => f(o) }) as unknown as THREE.Object3D;
     const count = () => (this.renderer.info.programs as unknown[] | null)?.length ?? 0;
+    this.known(drawn, lit);
     for (const o of drawn) {
       await breathe();
       const had = count();
@@ -406,7 +415,6 @@ export class Renderer {
         while (this.readying > 0 && !this.rushing && performance.now() - since < 1500) await new Promise((r) => setTimeout(r, LATER_APART));
         const { programs, entries } = await this.write(job.drawn, job.lit, !this.rushing);
         await made(programs);
-        this.rushLast = performance.now();
         if (!TRY.has('nolook')) await this.lookOver(programs);
         if (!TRY.has('noahead')) await this.drawAhead(this.rushing ? entries.map((e) => ({ ...e, low: false })) : entries);
       }
@@ -418,10 +426,8 @@ export class Renderer {
   }
   /** the lighting the job in hand is being got ready for (null: none in hand) */
   private laterNow: boolean | null = null;
-  /** what is waiting for the other lighting is being got ready at once (see `readyToLight`); since when, and when the last of it was made (see `warming`) */
+  /** what is waiting for the other lighting is being got ready at once (see `readyToLight`) */
   private rushing = false;
-  private rushFrom = 0;
-  private rushLast = 0;
 
   /**
    * Whether the world can be drawn lit so (the lamps' real lights in it or not) without a shader being made in the
@@ -432,10 +438,92 @@ export class Renderer {
   readyToLight(lit: boolean): boolean {
     // (the world as it stood at the start, still being got ready for it behind the menu: see `warming`)
     if (this.lighting && this.otherAt === lit) return false;
-    if (!this.lighting || (this.laterNow !== lit && !this.later.some((j) => j.lit === lit))) return true;
-    if (!this.rushing) this.rushFrom = this.rushLast = performance.now();
-    this.rushing = true;
-    void this.workLater();
+    if (!this.lighting) return true;
+    // (And what is being got ready this moment for the lighting there is: put into the world when it is, and drawn
+    // under this one then. What you held, wore and had slung, 2026-10-18: ten shaders in a row, 0.6 to 1.2 s each.)
+    const coming = this.readying > 0 && this.lighting.lit() !== lit;
+    // (once what was coming has come, the world is looked over again: see `sweep`)
+    if (!(coming && this.sweepFor === lit && this.swept) && this.sweep(lit) && !coming) {
+      this.heldSince = 0;
+      this.sweepFor = null;
+      return true;
+    }
+    // (from when they were first held back for this lighting: let in regardless, they are held afresh the other way)
+    if (this.heldFor !== lit || !this.heldSince) this.heldSince = performance.now();
+    this.heldFor = lit;
+    // (and what is waiting to be got ready for it is got on with at once, as well: see workLater)
+    if (this.laterNow === lit || this.later.some((j) => j.lit === lit)) {
+      this.rushing = true;
+      void this.workLater();
+    }
+    return false;
+  }
+  /** these, and all under them, are being got ready for this lighting (null: as it is lit now): known so for `sweep` */
+  private known(list: THREE.Object3D[], lit: boolean | null) {
+    const which = lit ?? this.lighting?.lit();
+    if (which === undefined) return;
+    const known = this.kinds[+which];
+    for (const top of list)
+      top.traverse((o) => {
+        const k = kindOf(o);
+        if (k) known.add(k);
+      });
+  }
+  /** since when the lamps have been held back for what is still being got ready for their lighting (0: they are not), and for which */
+  private heldSince = 0;
+  private heldFor = false;
+  /** the kinds of part (see kindOf) with a shader for each lighting, as far as is known here: [unlit, lit] */
+  private kinds = [new Set<string>(), new Set<string>()];
+  /** the lighting the lamps' sweep is for (null: none), the number of its pass, and whether that pass is over */
+  private sweepFor: boolean | null = null;
+  private sweepN = 0;
+  private swept = false;
+
+  /**
+   * The lamps are to come on or go off: every part in the world, drawn now or not, of a kind with no shader for that
+   * lighting has one asked for (a few parts a frame, made by the card's own workers) and looked over, and the lamps
+   * wait for it (`warming`); then the world is looked over again for what came meanwhile. They waited on what had come being
+   * got ready for the other lighting a part a frame, well apart: 235 of those were waiting fifteen seconds after
+   * coming in, the lamps were let in after their two and a half seconds, and what was left was made in the one frame,
+   * the whole game standing still: your own body, what you held, loot as it lay (2026-10-18, five seconds; a
+   * flashlight on the ground 3.7 s alone).
+   * @returns whether nothing is wanting
+   */
+  private sweep(lit: boolean): boolean {
+    if (this.sweepFor === lit && !this.swept) return false;
+    this.sweepFor = lit;
+    const known = this.kinds[+lit], fresh: THREE.Object3D[] = [];
+    this.scene.traverse((o) => {
+      const k = kindOf(o);
+      if (k && !known.has(k)) {
+        known.add(k);
+        fresh.push(o);
+      }
+    });
+    if (!fresh.length || !this.lighting) return (this.swept = true);
+    this.swept = false;
+    const n = ++this.sweepN, lighting = this.lighting;
+    // (a few parts at a time, in each frame's spare time: asked for in one frame, the first sweep's 500 were 0.4 s of
+    // it; a part at a time, eight seconds, the library going through the whole world for its lights at each)
+    void (async () => {
+      const ps: Program[] = [];
+      for (let i = 0; i < fresh.length; i += 8) {
+        await breathe();
+        const some = fresh.slice(i, i + 8), back = lighting.as(lit), prev = this.renderer.getRenderTarget();
+        this.renderer.setRenderTarget(this.composer.inputBuffer);
+        try {
+          const one = { traverse: (f: (x: THREE.Object3D) => void) => some.forEach(f), traverseVisible: (f: (x: THREE.Object3D) => void) => some.forEach(f) } as unknown as THREE.Object3D;
+          ps.push(...programsOf(this.renderer, this.renderer.compile(one, this.camera, this.scene) as unknown as Set<THREE.Material>));
+        } finally {
+          this.renderer.setRenderTarget(prev);
+          back();
+        }
+      }
+      await made(ps);
+      await this.lookOver(ps);
+    })().finally(() => {
+      if (this.sweepN === n) this.swept = true;
+    });
     return false;
   }
 
@@ -617,6 +705,7 @@ export class Renderer {
    */
   async compileSoftly(lit: boolean | null, extra: THREE.Object3D[] = [], fine = false) {
     const tops = [...this.scene.children, ...extra];
+    this.known(tops, lit);
     const only = (o: THREE.Object3D) => ({ traverse: (f: (x: THREE.Object3D) => void) => f(o), traverseVisible: (f: (x: THREE.Object3D) => void) => f(o) }) as unknown as THREE.Object3D;
     let parts = tops;
     if (fine) {
@@ -624,11 +713,8 @@ export class Renderer {
       const one = new Map<string, THREE.Object3D>();
       for (const top of tops) {
         top.traverse((o) => {
-          const d = o as THREE.Mesh & THREE.InstancedMesh & THREE.SkinnedMesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean; isBatchedMesh?: boolean };
-          if (!(d.isMesh || d.isPoints || d.isLine || d.isSprite) || !d.material) return;
-          const ms = Array.isArray(d.material) ? d.material : [d.material];
-          const key = `${ms.map((m) => m.uuid).join(',')}|${+!!d.isSkinnedMesh}${+!!d.isInstancedMesh}${+!!d.instanceColor}${+!!d.isBatchedMesh}${+!!d.isPoints}${+!!d.isLine}${+!!d.isSprite}${+d.receiveShadow}|${d.morphTargetInfluences?.length ?? 0}|${shapeOf(o)}`;
-          if (!one.has(key)) one.set(key, o);
+          const key = kindOf(o);
+          if (key && !one.has(key)) one.set(key, o);
         });
       }
       parts = [...one.values()].map(only);
@@ -675,11 +761,12 @@ export class Renderer {
    */
   warming(lit: boolean) {
     if (this.otherAt === lit) return true;
-    // (And while what has come since is being got ready for it at once, and getting on, ten seconds at most: let in
-    // after their two and a half regardless, the lamps had every shader still to be made made in one frame. At night
-    // in the village, 2026-10-17: nineteen of them, ten seconds in which nothing moved.)
+    // (And while what is being got ready for the lighting there is, or the world swept for this one, is getting on: ten
+    // seconds at most from when they were first held. Let in after their two and a half regardless, the lamps had every
+    // shader still to be made made in one frame: at night in the village, 2026-10-17, nineteen of them, ten seconds in
+    // which nothing moved. See `readyToLight`.)
     const now = performance.now();
-    return this.rushing && this.working && now - this.rushLast < 1500 && now - this.rushFrom < 10000;
+    return !!this.heldSince && now - this.heldSince < 10000 && (this.readying > 0 || (this.sweepFor === lit && !this.swept));
   }
   /**
    * The world got ready for the lighting it is not lit by, behind the menu: its shaders were half of what a first

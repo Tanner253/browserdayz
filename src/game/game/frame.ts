@@ -18,6 +18,7 @@ import { greyOf, bleedsOutIn, BLOOD } from '../../sim/blood';
 import { AVATAR_LAYER, FP_BODY_LAYER, Avatar } from '../avatar';
 import { INJECT } from '../weapons';
 import { Stash, WorldItem } from '../loot';
+import { RemotePlayer } from '../remote';
 import { Jeep } from '../vehicle';
 import { JEEP } from '../../sim/vehicles';
 import { hpOf } from '../../sim/heli';
@@ -435,6 +436,7 @@ export const frameMethods = {
     Avatar.eye.copy(cam.position);
     Avatar.ground ??= (x, z) => heightAt(this.s.world.heights, x, z);
     this.horde.update(dt, now, cam.position);
+    RemotePlayer.look(cam);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);
       rp.avatar.veil(this.s.buildings.hides(cam.position, rp.pos));
