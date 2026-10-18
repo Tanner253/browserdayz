@@ -97,8 +97,11 @@ export function castsInto(f: THREE.Frustum | THREE.FrustumArray, at: THREE.Vecto
   return z + reach >= SEEN.lo[i] && z - reach <= SEEN.hi[i];
 }
 
+/** how far from the eye a shadow can be seen, metres: the furthest cascade with its fade, and the longest shadow of a man's height now (until the first frame, everywhere) */
+export const shadowsReach = () => (SEEN.hi.length ? SEEN.hi[SEEN.hi.length - 1] + SEEN.long : Infinity);
+
 export class Atmosphere {
-  sunDir = new THREE.Vector3(0.4, 0.7, 0.3).normalize(); // points toward the sun
+  sunDir =new THREE.Vector3(0.4, 0.7, 0.3).normalize(); // points toward the sun
   sunColor = new THREE.Color(1, 0.95, 0.88);
   sunIntensity = 3.4;
   fogColor = new THREE.Color(0.62, 0.68, 0.74);

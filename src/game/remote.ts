@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
-import type { Atmosphere } from '../world/atmosphere';
+import { shadowsReach, type Atmosphere } from '../world/atmosphere';
 import { EMOTE_BY_N, EMOTE_MASK, EMOTE_SHIFT } from '../sim/emotes';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
@@ -32,6 +32,23 @@ export type HeldFactory = (id: string | null, mods: string[]) => { obj: THREE.Ob
 const _along = new THREE.Vector3(), _legs = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _lie = new THREE.Quaternion();
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 
+/**
+ * What the eye takes in this frame (`RemotePlayer.look`, once a frame before anybody is moved): from where, which way,
+ * the cosine of the widest angle off that way a body can be seen at, and how near a body is seen whichever way it is
+ * (its shadow may lie in sight). Before the first look, everybody is seen.
+ */
+const SIGHT = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), cos: -1, near: Infinity };
+/** how far out from the hips a body and what it holds can reach, metres, lying or with a long gun up */
+const BODY = 4;
+/** how often a body out of sight is posed all the same, seconds: never further behind than this when it comes into sight */
+const REST_STEP = 0.1;
+const seen = (p: THREE.Vector3) => {
+  // (development: every body posed every frame again, as it was, to measure the difference: progress/ping/rest-ab.js)
+  if (import.meta.env.DEV && (globalThis as { __posedAlways?: boolean }).__posedAlways) return true;
+  const dx = p.x - SIGHT.eye.x, dy = p.y + 0.9 - SIGHT.eye.y, dz = p.z - SIGHT.eye.z, d = Math.hypot(dx, dy, dz);
+  return d < SIGHT.near || dx * SIGHT.fwd.x + dy * SIGHT.fwd.y + dz * SIGHT.fwd.z >= SIGHT.cos * d;
+};
+
 /** metres within which what somebody's hands are doing is heard: rounds into a magazine, a box torn open (eating and the like, three less) */
 export const HANDS_HEARD = 11;
 /** somebody going through what holds things: how long their hands are at it, and within how many metres it is heard
@@ -55,6 +72,9 @@ export class RemotePlayer implements Damageable {
   /** a vanished admin, seen by another admin: drawn faintly (see Avatar.setGhost) */
   ghost = false;
   private ghostT = 0;
+  /** out of sight (see update), and the time it has not been posed for */
+  private resting = false;
+  private owed = 0;
 
   setGhost(on: boolean) {
     this.ghost = on;
@@ -253,8 +273,9 @@ export class RemotePlayer implements Damageable {
    * rifle, leaning out round a corner, and in whatever the body learns to do next. (The legs
    * stay under the hips: they do not go anywhere the feet do not.)
    */
-  private placeZones() {
-    if (this.alive && this.avatar.frame(_head, _neck, _pelvis)) this.bendZones();
+  /** @param bend put the bent ones where the joints now are (else where they last were, on the body as it now stands) */
+  private placeZones(bend = true) {
+    if (bend && this.alive && this.avatar.frame(_head, _neck, _pelvis)) this.bendZones();
     // (the bent ones are colliders of their own: put where the body now is, bent this frame or not)
     for (const c of this.lying ? this.flat : this.crouched ? this.crouch : this.stand) this.loose.get(c)?.place(this.pos.x, this.pos.y, this.pos.z, this.yaw);
   }
@@ -386,6 +407,16 @@ export class RemotePlayer implements Damageable {
     return this.headAt && this.alive ? out.copy(this.headAt) : out.set(this.pos.x, this.pos.y + (this.crouched ? 1.02 : 1.62), this.pos.z);
   }
 
+  /** what the eye takes in this frame: called once a frame, the camera placed, before anybody is moved */
+  static look(cam: THREE.PerspectiveCamera) {
+    cam.getWorldPosition(SIGHT.eye);
+    cam.getWorldDirection(SIGHT.fwd);
+    // (out to the frustum's corners, and ten degrees over: the shake of a blast is laid on the eye after this)
+    const half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * Math.hypot(1, cam.aspect)) + 0.17;
+    SIGHT.near = Math.max(60, shadowsReach() + 10);
+    SIGHT.cos = Math.cos(Math.min(Math.PI, half + Math.asin(Math.min(1, BODY / SIGHT.near))));
+  }
+
   update(dt: number, now: number, listener: THREE.Vector3) {
     if (!this.ready) return;
     this.heard.copy(listener);
@@ -475,11 +506,40 @@ export class RemotePlayer implements Damageable {
       this.avatar.setGhost(true);
     }
     this.flinch = Math.max(0, this.flinch - dt * 4);
+    const r = this.avatar.root;
+    // Out of sight, and too far off for a shadow of theirs to fall in sight: posed ten times a second and not drawn,
+    // where it was posed and drawn every frame. Posing a body is most of what somebody else costs a frame, and most
+    // of a server's players are behind the eye or off to one side of it: sixteen of them, none near, were 106 ms of
+    // every second of the game's own work (2026-10-18). Coming into sight it is posed for the time it was not, before
+    // the frame is drawn. (A lamp of theirs is placed from the gun in their hands and seen wherever its light falls:
+    // a body with one lit is posed every frame.)
+    if (!this.lit && !seen(this.pos)) {
+      this.resting = true;
+      this.owed += dt;
+      const pose = this.owed >= REST_STEP;
+      if (pose) {
+        // (shown while it is posed: what is hidden keeps its joints as they were, see restWhileHidden)
+        r.visible = true;
+        this.avatar.update(Math.min(0.1, this.owed), this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
+        if (seat) r.quaternion.copy(seat.jeep.quat);
+        this.owed = 0;
+      }
+      // (its zones go where it is all the same: a round already on its way may yet reach it)
+      this.placeZones(pose);
+      r.visible = false;
+      if (!this.alive) this.fall = Math.min(4, this.fall + dt * 2.1);
+      return;
+    }
+    if (this.resting) {
+      this.resting = false;
+      r.visible = this.fall < 4;
+      dt = Math.min(0.1, dt + this.owed);
+      this.owed = 0;
+    }
     this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
     // (sat in it, they lean and tip as it does)
-    if (seat) this.avatar.root.quaternion.copy(seat.jeep.quat);
+    if (seat) r.quaternion.copy(seat.jeep.quat);
     this.placeZones();
-    const r = this.avatar.root;
     if (!this.alive) {
       // they go down, lie there for a moment, then the body on the ground takes over
       this.fall = Math.min(4, this.fall + dt * 2.1);
