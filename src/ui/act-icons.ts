@@ -23,8 +23,8 @@ const GLYPHS = {
   // at fourteen pixels (a plus was taken for the medical cross; a chain and a puzzle piece were not clear)
   attach: 'M4 15V4H28V15H24V8H8V15ZM13.5 30V20H8.5L16 12L23.5 20H18.5V30Z',
   detach: 'M4 15V4H28V15H24V8H8V15ZM13.5 12V22H8.5L16 30L23.5 22H18.5V12Z',
-  // a magazine with nothing in it: its outline only
-  empty: 'M9 3H20L21 9C21.5 15 23 20 26 25.5L17 29.5C14 24 12.5 17.5 11.5 10ZM12.6 6L13.9 10.6C14.8 16.6 16.2 22.4 18.6 26.6L22.2 25C19.8 20.5 18.6 15.4 18.1 9.6L17.4 6Z',
+  // a magazine with nothing in it (its outline only), and two rounds out beside it
+  empty: 'M2 2H12.5L13.5 8C14 13.5 15.4 18.5 18 24L10 27.5C7.5 22 6 16.5 5 9.5ZM5.6 5L6.8 9.4C7.6 15 8.8 20 11.2 23.8L13.6 22.8C11.6 18.4 10.4 13.6 9.9 8.6L9.4 5ZM19.5 20V18Q21.5 13.5 23.5 18V20ZM19.3 21.2H23.7V29.5H19.3ZM25.5 20V18Q27.5 13.5 29.5 18V20ZM25.3 21.2H29.7V29.5H25.3Z',
   // a gun, and a round fallen out under it
   unload: 'M2 5H28V10H15L14 13.5H11.5L10.5 21H6L8 10H2ZM20 19.5V17.5Q22.5 12 25 17.5V19.5ZM19.6 21H25.4V28.5H19.6Z',
   // one pile in two

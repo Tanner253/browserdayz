@@ -1377,11 +1377,12 @@ export class InventoryUI {
     const worn = loc.kind === 'slot' && !WEAPON_SLOTS.includes(loc.slot);
     if (this.carried(loc) && !worn && d.category !== 'clothing') {
       const held = this.actions.inHands() === it;
-      if (!held) out.push({ label: 'Take in hands', icon: 'hand', run: () => this.actions.hold(it), primary: !d.attach || !this.actions.attachTargets(it).length });
+      // (the gold one is what a double-click does, as `useIt` has it: into the hands, unless it is eaten, opened or fitted)
+      if (!held) out.push({ label: 'Take in hands', icon: 'hand', run: () => this.actions.hold(it), primary: !eaten(d) && !d.open && !(d.attach && this.actions.attachTargets(it).length) });
     }
     // (and what a double-click does with a thing that is eaten, drunk or put on a wound, or with a box of rounds: said here too, for whoever looks for it)
-    if ((this.carried(loc) || loc.kind === 'loose') && eaten(d)) out.push({ label: `${useWord(d)} now`, icon: { kind: it.id }, run: () => this.actions.use(it) });
-    if ((this.carried(loc) || loc.kind === 'loose') && d.open) out.push({ label: 'Open it now', icon: 'open', run: () => this.actions.open(it) });
+    if ((this.carried(loc) || loc.kind === 'loose') && eaten(d)) out.push({ label: `${useWord(d)} now`, icon: { kind: it.id }, primary: true, run: () => this.actions.use(it) });
+    if ((this.carried(loc) || loc.kind === 'loose') && d.open) out.push({ label: 'Open it now', icon: 'open', primary: true, run: () => this.actions.open(it) });
     if (this.opens(loc)) {
       const open = this.opened.has(it.uid);
       out.push({ label: open ? 'Close it' : `Open (${it.cargo?.length ?? 0} inside)`, icon: open ? 'shut' : 'open', primary: true, run: () => {
@@ -1391,7 +1392,8 @@ export class InventoryUI {
       } });
     }
     if (d.attach) {
-      for (const w of this.actions.attachTargets(it)) out.push({ label: `Attach to ${ITEMS[w.id].name}`, icon: 'attach', run: () => this.actions.attach(it, w), primary: true });
+      // (a double-click fits it to the first of them)
+      this.actions.attachTargets(it).forEach((w, i) => out.push({ label: `Attach to ${ITEMS[w.id].name}`, icon: 'attach', run: () => this.actions.attach(it, w), primary: i === 0 }));
     }
     if (d.slot && loc.kind === 'container') out.push({ label: d.category === 'clothing' ? gearWord : d.slot === 'holster' ? 'Holster it' : 'Sling on your back', icon: { kind: it.id }, run: () => this.equip(loc), primary: d.category === 'clothing' && !this.opens(loc) });
     if (loc.kind === 'slot') {
@@ -1401,7 +1403,7 @@ export class InventoryUI {
       if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', run: () => this.takeOff(loc) });
     }
     if (d.mag) {
-      if ((it.rounds ?? 0) > 0) out.push({ label: `Empty (${it.rounds})`, icon: 'empty', run: () => this.actions.emptyMag(it) });
+      if ((it.rounds ?? 0) > 0) out.push({ label: `Empty it (${it.rounds})`, icon: 'empty', run: () => this.actions.emptyMag(it) });
     }
     // a pile of two or more is halved: the half is laid beside it, to be given away, put elsewhere or dropped
     if (d.stack && it.qty > 1 && loc.kind === 'container') {
@@ -1416,8 +1418,10 @@ export class InventoryUI {
       });
     }
     if (d.weapon?.mag) {
-      if (it.mag) out.push({ label: `Take out the ${ITEMS[it.mag].name.toLowerCase()}`, icon: 'detach', run: () => this.actions.detach(it, it.mag!) });
-      if (it.mag || (it.loaded ?? 0) > 0) out.push({ label: 'Unload', icon: 'unload', run: () => this.actions.unload(it) });
+      // One of the two, never both (2026-10-18: "why there is two?"): the magazine out, the round in the chamber
+      // left there as in DayZ; and with none in, that round out.
+      if (it.mag) out.push({ label: 'Take out the magazine', icon: 'detach', run: () => this.actions.detach(it, it.mag!) });
+      else if ((it.loaded ?? 0) > 0) out.push({ label: 'Unload', icon: 'unload', run: () => this.actions.unload(it) });
     } else if (d.weapon && (it.loaded ?? 0) > 0) out.push({ label: `Unload (${it.loaded})`, icon: 'unload', run: () => this.actions.unload(it) });
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, icon: 'detach', run: () => this.actions.detach(it, m) });
     if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, icon: inStash ? 'take' : 'move', run: () => this.transfer(loc), primary: inStash });
@@ -1432,7 +1436,8 @@ export class InventoryUI {
         this.actions.changed();
       },
     });
-    return out;
+    // (what a double-click does stands first, in gold)
+    return out.sort((a, b) => +!!b.primary - +!!a.primary);
   }
 
   /**
