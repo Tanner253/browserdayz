@@ -610,11 +610,13 @@ export class InventoryUI {
     return t.join('');
   }
 
-  /** The gear by "Carried", and, open, the choices under it: things with their kinds' colours, and with their symbols. */
+  /** The gear by "Carried", and, open, the choices under it: things in their kinds' colours, the symbols, and those in colour. */
   private viewEl() {
-    const box = (k: 'colours' | 'icons', label: string) => `<label><input type="checkbox" data-view="${k}"${kindView[k] ? ' checked' : ''}> ${label}</label>`;
+    // (the symbols' colours mean nothing with no symbols shown: that choice waits, greyed, until they are)
+    const box = (k: keyof typeof kindView, label: string, off = false) =>
+      `<label${off ? ' class="off"' : ''}><input type="checkbox" data-view="${k}"${kindView[k] ? ' checked' : ''}${off ? ' disabled' : ''}> ${label}</label>`;
     return `<button type="button" class="inv-view${this.viewOpen ? ' on' : ''}" title="How things are shown"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.3 5.5L14 1.6L18 1.6L18.7 5.5A10.8 10.8 0 0 1 21.5 6.7L24.7 4.4L27.6 7.3L25.3 10.5A10.8 10.8 0 0 1 26.5 13.3L30.4 14L30.4 18L26.5 18.7A10.8 10.8 0 0 1 25.3 21.5L27.6 24.7L24.7 27.6L21.5 25.3A10.8 10.8 0 0 1 18.7 26.5L18 30.4L14 30.4L13.3 26.5A10.8 10.8 0 0 1 10.5 25.3L7.3 27.6L4.4 24.7L6.7 21.5A10.8 10.8 0 0 1 5.5 18.7L1.6 18L1.6 14L5.5 13.3A10.8 10.8 0 0 1 6.7 10.5L4.4 7.3L7.3 4.4L10.5 6.7A10.8 10.8 0 0 1 13.3 5.5ZM16 11.2A4.8 4.8 0 1 0 16.01 11.2Z"/></svg></button>` +
-      (this.viewOpen ? `<div class="inv-view-menu">${box('colours', 'Show colours')}${box('icons', 'Show icons')}</div>` : '');
+      (this.viewOpen ? `<div class="inv-view-menu">${box('colors', 'Show type colors')}${box('icons', 'Show icons')}${box('iconColors', 'Show icon colors', !kindView.icons)}</div>` : '');
   }
 
   private wireView(col: HTMLElement) {
@@ -622,7 +624,12 @@ export class InventoryUI {
       this.viewOpen = !this.viewOpen;
       this.render();
     });
-    col.querySelectorAll<HTMLInputElement>('[data-view]').forEach((b) => b.addEventListener('change', () => setKindView({ [b.dataset.view!]: b.checked })));
+    col.querySelectorAll<HTMLInputElement>('[data-view]').forEach((b) =>
+      b.addEventListener('change', () => {
+        setKindView({ [b.dataset.view!]: b.checked });
+        if (b.dataset.view === 'icons') this.render();
+      }),
+    );
     if (!this.viewOpen) return;
     // (a press anywhere but on the gear or its choices puts them away)
     const away = (e: PointerEvent) => {

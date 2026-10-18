@@ -36,12 +36,13 @@ const GLYPHS: Record<Kind, string> = {
 };
 
 /**
- * How kinds are shown, each player's own choice (the gear by "Carried" in the inventory): with their colours or
- * all in the page's plain pale, and with these symbols or without. Kept in this browser, as the map's choices are.
+ * How kinds are shown, each player's own choice (the gear by "Carried" in the inventory): things in their kinds'
+ * colours or the page's plain pale; these symbols, and those in their kinds' colours or plain. Kept in this
+ * browser, as the map's choices are. (The words on the page are American: the contributor's ask, 2026-10-18.)
  */
-export interface KindView { colours: boolean; icons: boolean }
-const VIEW_KEPT = 'zona.kinds';
-export const kindView: KindView = { colours: true, icons: true };
+export interface KindView { colors: boolean; iconColors: boolean; icons: boolean }
+const VIEW_KEPT = 'zona.kindView';
+export const kindView: KindView = { colors: true, iconColors: true, icons: true };
 try {
   Object.assign(kindView, JSON.parse(localStorage.getItem(VIEW_KEPT) ?? '{}'));
 } catch {
@@ -50,7 +51,8 @@ try {
 // (on the page's root, so that it holds wherever a kind is drawn: the inventory and the game's hot keys alike)
 const applyView = () => {
   if (typeof document === 'undefined') return;
-  document.documentElement.classList.toggle('kinds-plain', !kindView.colours);
+  document.documentElement.classList.toggle('kinds-plain', !kindView.colors);
+  document.documentElement.classList.toggle('kind-icons-plain', !kindView.iconColors);
   document.documentElement.classList.toggle('kinds-hidden', !kindView.icons);
 };
 applyView();
