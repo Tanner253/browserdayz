@@ -24,6 +24,7 @@
 import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
+import { kindIcon } from './kind-icons';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -590,7 +591,8 @@ export class InventoryUI {
     // (a gun fed by a magazine: what is in it over what its magazine holds, or that it has none)
     if (d.weapon) t.push(`<span class="qty">${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : '–') : capacityOf(item)}</span>`);
     if (d.mag) t.push(`<span class="qty">${item.rounds ?? 0}/${d.mag.capacity}</span>`);
-    if (item.mods?.length) t.push(`<span class="mods">+${item.mods.length}</span>`);
+    // (what kind of thing it is, in its corner: what stood there was the count of a gun's attachments, which its card says)
+    t.push(kindIcon(item.id));
     if (item.cargo?.length) t.push(`<span class="qty">${item.cargo.length} in</span>`);
     // how full it is, as a line along its foot: a stack, a bottle, what is loaded in a gun
     const fill = d.stack ? item.qty / d.stack : d.use?.sips ? (item.left ?? d.use.sips) / d.use.sips : d.weapon ? (item.loaded ?? 0) / Math.max(1, d.weapon.mag ? magRoom(item) : capacityOf(item)) : d.mag ? (item.rounds ?? 0) / d.mag.capacity : -1;
@@ -787,7 +789,7 @@ export class InventoryUI {
       cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '') + (it && this.mark(it) === ' kin' ? ' kin' : '');
       cell.dataset.hot = String(i);
       const id = it?.id ?? b?.id;
-      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[id] ?? ''})"></div>` : ''}`;
+      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[id] ?? ''})"></div>${kindIcon(id)}` : ''}`;
       cell.title = id ? `${ITEMS[id].name}${it ? '' : ' (none carried)'} · right-click to clear` : `Key ${(i + 1) % 10}: drag a thing here, or point at it and press ${(i + 1) % 10}`;
       cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();

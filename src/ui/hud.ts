@@ -16,6 +16,7 @@ import { EMOTE } from '../sim/emotes';
 import { onWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 import { TIERS, type Tier } from '../sim/tiers';
 import { ITEMS, TAG_FRESH, TAG_HOLD_MIN, ZONA_VOID } from '../sim/items';
+import { kindIcon } from './kind-icons';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
@@ -1920,7 +1921,7 @@ export class HUD {
       e.hotbar.innerHTML = s.hotbar
         .map((h, i) => {
           const icon = h.id && this.icons[h.id] ? `<i style="background-image:url(${this.icons[h.id]})"></i>` : '';
-          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}<em>${h.label}</em></div>`;
+          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}${h.id && ITEMS[h.id] ? kindIcon(h.id) : ''}<em>${h.label}</em></div>`;
         })
         .join('');
     }

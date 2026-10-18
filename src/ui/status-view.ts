@@ -21,7 +21,7 @@ interface Glyph {
   bottom: number;
 }
 
-const SYMBOLS: Record<Stat, Glyph> = {
+export const SYMBOLS: Record<Stat, Glyph> = {
   health: { d: 'M11.5 4.5h9v7h7v9h-7v7h-9v-7h-7v-9h7z', top: 4.5, bottom: 27.5 },
   blood: { d: 'M16 3.5C12.5 9 7.5 14.5 7.5 20a8.5 8.5 0 0 0 17 0C24.5 14.5 19.5 9 16 3.5z', mark: 'M11.7 20.4a4.4 4.4 0 0 0 3.7 4.3', top: 3.5, bottom: 28.5 },
   food: {
