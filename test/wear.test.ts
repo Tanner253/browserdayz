@@ -75,7 +75,7 @@ ok('the mask on the face keeps the gas out: nothing asks for it by name', () => 
 });
 
 ok('the masks are a policeman\'s: three in the village and two in Kamenka, as there were', () => {
-  assert.deepEqual(TYPES.gasmask.at, [0, 3, 2, 0, 0]);
+  assert.deepEqual(TYPES.gasmask.at, [0, 0, 5, 0, 0]);
   assert.deepEqual(TYPES.gasmask.usage, ['Police']);
   assert.ok(STOCK.includes('gasmask') && worth('gasmask') > worth('boonie_hat'));
 });
@@ -162,12 +162,12 @@ ok('a stim, the pouch and the kit: each does something that neither of the other
 
 ok('the pouch is a soldier\'s: kept where the army and the police were before a clinic, in what the bandages and the kit gave up', () => {
   const r = TYPES.aid_pouch;
-  assert.deepEqual(r.at, [0, 3, 5, 1, 1]);
+  assert.deepEqual(r.at, [0, 1, 13, 1, 1]);
   assert.ok(r.usage.includes('Military') && r.usage.includes('Police') && (r.favour?.Military ?? 0) > 1 && !r.usage.includes('Village') && !r.usage.includes('Shop'));
-  // (what lay on each step in bandages, kits and pouches together is what lay there in bandages and kits before it)
-  assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.bandage.at[t] + TYPES.firstaid.at[t] + r.at[t]), [16, 39, 81, 5, 6]);
+  // (what lay on each step in bandages, kits and pouches together: the village's share of the second step moved to the third with it, 2026-10-17)
+  assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.bandage.at[t] + TYPES.firstaid.at[t] + r.at[t]), [16, 5, 151, 5, 6]);
   // (and the same of the caps and the steel helmet; the bunker's Combat Helmets are the four they were)
-  assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.patrol_cap.at[t] + TYPES.helmet_m1.at[t]), [0, 11, 3, 0, 0]);
+  assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.patrol_cap.at[t] + TYPES.helmet_m1.at[t]), [0, 6, 12, 0, 0]);
   assert.equal(TYPES.boonie_hat.at[4], 4);
   // (every kit an admin hands out that has the First Aid Kit in it has the pouch)
   for (const kit of KITS) assert.equal(kit.things.some((t) => t.id === 'firstaid'), kit.things.some((t) => t.id === 'aid_pouch'), kit.id);

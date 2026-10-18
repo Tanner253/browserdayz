@@ -327,7 +327,7 @@ export const TYPES: Record<string, TypeRule> = {
   // (The mask is what lets anybody into the gas, so it is not kept IN the gas: it is a policeman's, in the
   // police station of the village and in Kamenka's, and these are what the whole map has to share, bar what one
   // of the army's cases or a supply drop turns up.)
-  gasmask: { at: [0, 0, 8, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
+  gasmask: { at: [0, 0, 5, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
   // (armour by weight: the rig in sheds and houses, the soft vest where the police and the army were, the
   // armoured vest in Kamenka and one that got as far as the village, the plate carrier under the gas, the heavy
   // armour only down the bunker)
