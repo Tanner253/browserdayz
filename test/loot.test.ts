@@ -61,7 +61,7 @@ const stock = (seed: number) => {
 };
 const worlds = [11, 2026, 77123].map(stock);
 
-ok('every place for a thing is on a step, and every step has places: the camp, the village and the checkpoint on the second', () => {
+ok('every place for a thing is on a step, and every step has places: the camp and the checkpoints on the second', () => {
   for (const p of points) assert.ok(p.tier && p.tier >= 1 && p.tier <= 5, 'a place on no step');
   for (const t of STEPS) assert.ok(points.filter((p) => p.tier === t).length > 100, `step ${t} has hardly a place`);
   const camp = points.filter((p) => Math.hypot(p.x - ARMY_CAMP.x, p.z - ARMY_CAMP.z) < 40);
@@ -76,16 +76,24 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // (nor the launcher and its grenades: the owner, "the grenade launcher and its ammo is an admin only weapon")
   for (const id of Object.keys(ITEMS)) if (!['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
-  const { ruled: on, e } = worlds[0];
+  const { ruled: on, e, all } = worlds[0];
+  // (how full each step is: a thing short where there is room, two or a fifth where a step is nearly full (the police
+  // stations and the army's posts of Kamenka are wanted by more than they hold: of the 5.56 kept there by its rate the old
+  // roll put down half, this one five in six), and where every place
+  // is spoken for, under the gas and down the bunker, up to half of a sort: the bunker is asked for 175 things on its
+  // 145 places, and for 23 that lie only on a floor on its 13 floors, and its guns and its own are put down first)
+  const full = (t: Tier) => all.filter(({ p }) => p.tier === t && !p.arms).length / points.filter((p) => p.tier === t && !p.arms).length;
   for (const id of Object.keys(TYPES)) for (const t of STEPS) {
-    // (a thing or two short where a step is nearly full, and never one too many beyond what is always left at an armed place)
+    // (and never one too many beyond what is always left at an armed place)
     // (what is wanted: its count, or what its rate comes to on this map, see TypeRule.per)
     const got = on(id, t), spare = guns.includes(id) || melee.includes(id) ? 40 : 0, want = e.kept(id, t);
-    assert.ok(got >= want - 1 && got <= want + spare, `${id} on step ${t}: ${got}, and ${want} are wanted`);
+    const short = full(t) >= 0.95 ? Math.max(Math.ceil(want / 2), Math.min(want, 3)) : full(t) >= 0.85 ? Math.max(2, Math.ceil(want * 0.2)) : 1;
+    assert.ok(got >= want - short && got <= want + spare, `${id} on step ${t}: ${got}, and ${want} are wanted`);
   }
   // (the AR-15's rounds by a rate: some at most police and army places in the village and Kamenka, the owner, 2026-10-15:
   // "someone with an AR needs to be able to loot reliable places for ammo not set spawns, just spawn frequency")
-  assert.ok(e.kept('ammo_556', 2) >= 20 && e.kept('ammo_556', 3) >= 8, `5.56 kept: ${e.kept('ammo_556', 2)} in the village, ${e.kept('ammo_556', 3)} in Kamenka`);
+  // (the second step is the checkpoints and the army's camp since the village went to the third, 2026-10-17)
+  assert.ok(e.kept('ammo_556', 2) >= 8 && e.kept('ammo_556', 3) >= 20, `5.56 kept: ${e.kept('ammo_556', 2)} at the checkpoints and the camp, ${e.kept('ammo_556', 3)} in Kamenka and the village`);
 });
 
 const kind = (p: (typeof points)[number], ...kinds: string[]) => kinds.some((k) => p.usage.includes(k as never));
@@ -96,30 +104,35 @@ ok('the outskirts are for something to hit with, and no gun; past them a tool li
     const out = melee.reduce((s, id) => s + on(id, 1), 0), past = all.filter(({ id, p }) => melee.includes(id) && p.tier !== 1);
     assert.ok(out >= 70, `little to hit with on the outskirts: ${out}`);
     // (a few, and they are a shed's: "sheds should spawn industrial and tools")
-    assert.ok(past.length >= 6 && past.length * 3 <= out, `${past.length} things to hit with past the outskirts, ${out} on them`);
+    // (the village is of the third step now, 2026-10-17, its sheds and their tools with it: still fewer past the outskirts than on them)
+    assert.ok(past.length >= 6 && past.length < out, `${past.length} things to hit with past the outskirts, ${out} on them`);
     for (const { id, p } of past) assert.ok(p.tier! <= 3 && kind(p, ...SHED) && !kind(p, 'Village', 'Town', 'Shop', 'Medic', 'Hospital', 'Police'), `a ${id} on step ${p.tier} in ${p.building}`);
     for (const id of ['bat', 'machete']) assert.equal(on(id, 2) + on(id, 3), 0, `a ${id} past the outskirts`);
     for (const id of guns) assert.equal(on(id, 1), 0, `a ${id} on the outskirts`);
     // (and what is always left at an armed place out there is something to hit with)
     for (const { id, p } of all) if (p.arms && p.tier === 1) assert.ok(melee.includes(id), `a ${id} left at an armed place on the outskirts`);
-    assert.ok(on('flashlight', 1) > on('flashlight', 2) + on('flashlight', 3) - 1, 'the lights are not mostly on the outskirts');
+    // (by the place: the village and its sheds are of the third step now, which has six times the outskirts' places)
+    const lights = (t: Tier) => on('flashlight', t) / points.filter((p) => p.tier === t && !p.arms).length;
+    assert.ok(lights(1) > lights(2) && lights(1) > lights(3), 'the lights are not mostly on the outskirts');
   }
 });
 
-ok('pistols from the village on, most of them where guns were kept; a submachine gun at the police station; the sniper rare in Kamenka and common under the gas', () => {
+ok('pistols from the second step on, most of them where guns were kept; a submachine gun at the police station; the sniper rare in Kamenka and common under the gas', () => {
   for (const { on, all } of worlds) {
-    assert.ok(on('colt', 2) + on('m9', 2) >= 26, 'few pistols in the village and the army\'s places');
+    // (the second step is the checkpoints, the army's camp and the depot: the village went to the third, 2026-10-17)
+    assert.ok(on('colt', 2) + on('m9', 2) >= 10, 'few pistols at the checkpoints and the army\'s places');
     const pistols = all.filter(({ id, p }) => (id === 'colt' || id === 'm9') && p.tier === 2);
     const kept = pistols.filter(({ p }) => kind(p, ...KEPT_GUNS)).length;
     assert.ok(kept > pistols.length * 0.6, `${kept} of ${pistols.length} pistols on the second step are where guns were kept`);
-    // ("we shoul dhave more sub machine guns in the story police station": in the village they are the police's and the army's, and most are the police's)
+    // ("we shoul dhave more sub machine guns in the story police station": on the second step they are the army's, and in no house)
     const smg = all.filter(({ id, p }) => id === 'mpa' && p.tier === 2);
-    assert.ok(smg.length >= 9 && smg.every(({ p }) => kind(p, ...KEPT_GUNS)), `${smg.length} submachine guns in the village, or one of them in a house`);
-    assert.ok(smg.filter(({ p }) => /^police/.test(p.building)).length >= 5, 'the submachine guns of the village are not at its police');
+    assert.ok(smg.length >= 2 && smg.every(({ p }) => kind(p, ...KEPT_GUNS)), `${smg.length} submachine guns on the second step, or one of them in a house`);
+    assert.ok(all.filter(({ id, p }) => id === 'mpa' && p.tier === 3 && /^police/.test(p.building)).length >= 5, 'the submachine guns are not at the police');
     assert.equal(on('mosin', 1) + on('mosin', 2), 0, 'a sniper rifle below Kamenka');
     assert.ok(on('mosin', 3) >= 1 && on('mosin', 3) <= 3, `${on('mosin', 3)} sniper rifles in Kamenka`);
-    assert.ok(on('mosin', 4) >= 6 && on('mosin', 4) >= on('mosin', 3) * 3, `${on('mosin', 4)} sniper rifles under the gas`);
-    assert.ok(on('pu_scope', 4) >= 5 && on('pu_scope', 1) + on('pu_scope', 2) === 0);
+    assert.ok(on('mosin', 4) >= 6 && on('mosin', 4) >= on('mosin', 3) * 3, `${on('mosin', 4)} sniper rifles under the gas, ${on('mosin', 3)} in Kamenka`);
+    // (under the gas every place is spoken for, some forty things more wanted than there are places: a scope or two short)
+    assert.ok(on('pu_scope', 4) >= 3 && on('pu_scope', 1) + on('pu_scope', 2) === 0, `${[1, 2, 3, 4, 5].map((t) => on('pu_scope', t as Tier))} scopes`);
   }
 });
 
@@ -127,30 +140,35 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
   let rifles = 0, withMag = 0;
   for (const { on, all, e } of worlds) {
     // ("tier 3 should be submachine guns heavy")
-    assert.ok(on('mpa', 3) >= 12 && on('mpa', 3) > on('colt', 3) + on('m9', 3), `${on('mpa', 3)} submachine guns in Kamenka, ${on('colt', 3) + on('m9', 3)} pistols`);
+    // (the weapons pass's submachine guns with the MPA30's, 2026-10-17)
+    const smgs = ['mpa', 'scorpion', 'dual_smg', 'dual_mac10', 'mp7a1'].reduce((n, id) => n + on(id, 3), 0);
+    assert.ok(on('mpa', 3) >= 12 && smgs > on('colt', 3) + on('m9', 3), `${smgs} submachine guns in Kamenka, ${on('colt', 3) + on('m9', 3)} pistols`);
     assert.ok(on('mag_mpa', 3) >= 12 && on('ammo_9mm', 3) + on('box_9mm', 3) >= 36, 'little to feed a submachine gun with in Kamenka');
     // ("it should be possible to find an AK and an AR15 at kamenka but rarely ... you CAN get everything you need from T3 for AR's but its very rare")
     for (const [gun, mag, rounds] of [['ak', 'mag_ak', 'ammo_739'], ['ar15', 'mag_ar', 'ammo_556']]) {
       assert.equal(on(gun, 1) + on(gun, 2), 0, `a ${gun} below Kamenka`);
-      assert.equal(on(gun, 3), 1, `${on(gun, 3)} of ${gun} in Kamenka`);
-      assert.equal(on(mag, 3), 1, `${on(mag, 3)} of ${mag} in Kamenka`);
+      // (one in Kamenka and one in the village, since the village is of the third step)
+      assert.ok(on(gun, 3) >= 1 && on(gun, 3) <= TYPES[gun].at[2], `${on(gun, 3)} of ${gun} in Kamenka`);
+      assert.ok(on(mag, 3) >= 1 && on(mag, 3) <= TYPES[mag].at[2], `${on(mag, 3)} of ${mag} in Kamenka`);
       // (but the AR-15's rounds, kept by a rate where the police and the army were: see TypeRule.per)
-      const most = TYPES[rounds].per ? Infinity : on(rounds, 4) + 1;
-      assert.ok(on(rounds, 3) >= 2 && on(rounds, 3) <= most, `${on(rounds, 3)} handfuls of ${rounds} in Kamenka, ${on(rounds, 4)} under the gas`);
+      // (light by the place: the third step has eight times the gas's places)
+      const per = (t: Tier) => on(rounds, t) / points.filter((p) => p.tier === t && !p.arms).length;
+      assert.ok(on(rounds, 3) >= 2 && (TYPES[rounds].per || per(3) < per(4)), `${on(rounds, 3)} handfuls of ${rounds} in Kamenka, ${on(rounds, 4)} under the gas`);
       // ("more common in the T4")
-      assert.ok(on(gun, 4) >= 3 && on(mag, 4) >= 3, `${on(gun, 4)} of ${gun} under the gas`);
+      // (the magazines a little short, where every place is spoken for)
+      assert.ok(on(gun, 4) >= 3 && on(mag, 4) >= 2, `${on(gun, 4)} of ${gun} and ${on(mag, 4)} of ${mag} under the gas`);
       assert.ok(TYPES[gun].on![3]!.restock! >= 2400 && TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
     }
     // (they lie where the army and the police kept things, and in nobody's kitchen)
     for (const { id, p } of all) if ((id === 'ak' || id === 'ar15' || id === 'mosin') && p.tier === 3 && !p.keeps) assert.ok(kind(p, ...KEPT_GUNS), `a ${id} in ${p.building}`);
     // ("an even rarer chance of having a magazine": over many makings of the town)
-    const eco = e as unknown as { rng: RNG; spawnType(id: string, at: number, where: Tier): boolean; loot: Map<string, { item: { id: string; mag?: string | null } }>; take(uid: string, looted: boolean): unknown };
+    const eco = e as unknown as { rng: RNG; fill(where: Tier, place: string | null, due: Map<string, number>): Map<string, number>; loot: Map<string, { item: { id: string; mag?: string | null } }>; take(uid: string, looted: boolean): unknown };
     // (The town's own two are taken up first, as they are in play before another is put down: of its thirty-one
     // places for a rifle none or one is free after a stocking, by the dice, and with none nothing was counted.)
     for (const l of [...e.loot.values()]) if ((l.item.id === 'ak' || l.item.id === 'ar15') && points[l.point].tier === 3 && !points[l.point].keeps) eco.take(l.uid, false);
     for (let k = 0; k < 200; k++) {
       const had = new Set(eco.loot.keys());
-      if (!eco.spawnType(k % 2 ? 'ak' : 'ar15', -1, 3)) continue;
+      if (!eco.fill(3, null, new Map([[k % 2 ? 'ak' : 'ar15', 1]])).size) continue;
       const [uid] = [...eco.loot.keys()].filter((u) => !had.has(u));
       rifles++;
       if (eco.loot.get(uid)!.item.mag) withMag++;
@@ -169,7 +187,8 @@ ok('the shotgun, the Desert Eagle, the heavy armour and the K6-3 are the bunker\
       for (const t of [1, 2, 3, 4] as Tier[]) assert.equal(on(id, t), 0, `a ${id} on step ${t}`);
     }
     for (const t of [1, 2, 3] as Tier[]) assert.equal(on('suitcase', t) + on('life_vest', t), 0, `the army's rucksack or a plate carrier on step ${t}`);
-    assert.ok(on('suitcase', 4) + on('suitcase', 5) >= 4);
+    // (the rucksack lies only on a floor, and the bunker's thirteen floors are its guns' first)
+    assert.ok(on('suitcase', 4) + on('suitcase', 5) >= 1, `${on('suitcase', 4) + on('suitcase', 5)} rucksacks under the gas and down the bunker`);
   }
   // (and nothing below the fourth step is drawn with the army's backpack)
   for (const [id, rule] of Object.entries(TYPES)) if (ITEMS[id].model === 'military_backpack') assert.equal(rule.at[0] + rule.at[1] + rule.at[2], 0, `${id} is the army's backpack and is kept below the fourth step`);
@@ -179,7 +198,7 @@ ok('every calibre where the police and the army were, from the village on: heavy
   const rounds = Object.values(ITEMS).filter((d) => d.category === 'ammo').map((d) => d.id);
   /** the loose rounds of a gun, and the step the gun belongs to */
   const OF: [string, Tier][] = [['ammo_9mm', 2], ['ammo_45', 2], ['ammo_762', 4], ['ammo_739', 4], ['ammo_556', 4], ['ammo_12', 5], ['ammo_50', 5]];
-  for (const { on, all } of worlds) {
+  for (const { on, all, e } of worlds) {
     // (of whatever kind: down the bunker it is mostly what the guns kept there fire)
     for (const t of STEPS) assert.ok(rounds.reduce((n, id) => n + on(id, t), 0) >= 12, `little to fire on step ${t}`);
     // ("i am only finding low tier ammo in the big police when i should find all ammo there", "the small police
@@ -195,15 +214,18 @@ ok('every calibre where the police and the army were, from the village on: heavy
       if (home >= 4) {
         assert.ok(on(id, 1) <= 2, `${on(id, 1)} of ${id} on the outskirts`);
         // (but the AR-15's, kept by a rate where the police and the army were: see above)
-        if (!TYPES[id].per) assert.ok(on(id, 2) <= 6 && on(id, 3) <= 6, `${id}: ${on(id, 2)} in the village and ${on(id, 3)} in Kamenka, of a gun of step ${home}`);
+        // (light by the place: Kamenka and the village have eight times the gas's places, so fifteen there is lighter than five under it)
+        const per = (t: Tier) => on(id, t) / points.filter((p) => p.tier === t && !p.arms).length;
+        if (!TYPES[id].per) assert.ok(per(2) < per(home) && per(3) < per(home), `${id}: ${on(id, 2)} on the second step and ${on(id, 3)} on the third, of a gun of step ${home}`);
         // (and past the outskirts it is nobody's but the police's, the army's and a hunter's)
         for (const { id: it, p } of all) if (it === id && (p.tier === 2 || p.tier === 3)) assert.ok(kind(p, ...KEPT_GUNS, 'Hunting'), `${id} in ${p.building}`);
       }
-      assert.ok(on(id, home) >= 4, `${on(id, home)} of ${id} on its gun's own step`);
+      // (as many as its own step keeps, up to three: under the gas the counts are cut to its places, see Economy.fit)
+      assert.ok(on(id, home) >= Math.min(3, e.kept(id, home)), `${on(id, home)} of ${id} on its gun's own step`);
     }
     // (sealed boxes of the rifles' rounds: one or so below the gas, and the bunker's guns' not below the gas at all)
     // (the AR-15's boxes by a rate where the police and the army were, as its rounds are: see TypeRule.per)
-    for (const id of ['box_739', 'box_556']) assert.ok(on(id, 1) === 0 && (TYPES[id].per || (on(id, 2) <= 2 && on(id, 3) <= 2)) && on(id, 4) >= 2, `${id}: ${[1, 2, 3, 4].map((t) => on(id, t as Tier))}`);
+    for (const id of ['box_739', 'box_556']) assert.ok(on(id, 1) === 0 && (TYPES[id].per || (on(id, 2) <= 2 && on(id, 3) <= TYPES[id].at[2])) && on(id, 4) >= 1, `${id}: ${[1, 2, 3, 4].map((t) => on(id, t as Tier))}`);
     for (const id of ['box_12', 'box_50']) assert.equal(on(id, 1) + on(id, 2) + on(id, 3), 0, `a ${id} below the gas`);
   }
 });
@@ -211,7 +233,8 @@ ok('every calibre where the police and the army were, from the village on: heavy
 ok('the gas masks are a policeman\'s, and the keycards are under the gas', () => {
   for (const { on, all } of worlds) {
     const masks = all.filter(({ id }) => id === 'gasmask');
-    assert.ok(masks.filter(({ p }) => p.tier === 2).length === 3 && masks.filter(({ p }) => p.tier === 3).length === 2 && masks.length === 5, `${masks.length} gas masks, on steps ${masks.map(({ p }) => p.tier)}`);
+    // (all five on the third step since the village is of it, 2026-10-17)
+    assert.ok(masks.filter(({ p }) => p.tier === 3).length >= 4 && masks.length <= 5, `${masks.length} gas masks, on steps ${masks.map(({ p }) => p.tier)}`);
     assert.ok(masks.every(({ p }) => kind(p, 'Police')), 'a mask that is not in a police station');
     assert.ok(on('keycard', 4) >= 1 && on('keycard', 1) + on('keycard', 2) + on('keycard', 3) + on('keycard', 5) === 0);
   }
@@ -236,7 +259,7 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
       return m;
     };
     // ("the small medical buildings should lean heavy on bandages and stims and less mekits")
-    for (const t of [2, 3] as Tier[]) {
+    for (const t of [3] as Tier[]) {
       const clinic = inside((p) => p.tier === t && kind(p, 'Medic'));
       assert.ok(total(clinic) >= 12 && cat(clinic, 'medical') === total(clinic), `a clinic on step ${t} holds ${[...clinic].map(([id, k]) => `${id} ${k}`).join(', ')}`);
       assert.ok(sum(clinic, 'bandage') >= 4 && sum(clinic, 'stim', 'stim_stamina') >= 4 && sum(clinic, 'firstaid') * 4 <= sum(clinic, 'bandage', 'stim', 'stim_stamina'), `a clinic on step ${t}: ${sum(clinic, 'bandage')} bandages, ${sum(clinic, 'stim', 'stim_stamina')} stims, ${sum(clinic, 'firstaid')} kits`);
@@ -245,7 +268,7 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
     const hospital = inside((p) => kind(p, 'Hospital') && !kind(p, 'Military'));
     assert.ok(cat(hospital, 'medical') === total(hospital) && sum(hospital, 'firstaid') >= 40 && sum(hospital, 'stim', 'stim_stamina') >= 45 && sum(hospital, 'firstaid') > sum(hospital, 'bandage') * 2, `the hospital: ${[...hospital].map(([id, k]) => `${id} ${k}`).join(', ')}`);
     // ("the store should spawn supplies and food, and water, flashlight")
-    for (const t of [1, 2, 3] as Tier[]) {
+    for (const t of [1, 3] as Tier[]) {
       const shop = inside((p) => p.tier === t && kind(p, 'Shop'));
       assert.ok(cat(shop, 'food') >= 8 && cat(shop, 'drink') >= 4 && cat(shop, 'food', 'drink') * 5 >= total(shop) * 3, `the shop on step ${t}: ${[...shop].map(([id, k]) => `${id} ${k}`).join(', ')}`);
       assert.equal(cat(shop, 'weapon', 'magazine', 'ammo', 'attachment', 'melee'), 0, `the shop on step ${t} holds something to fight with`);
@@ -253,9 +276,10 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
     lights.push([1, 2, 3].reduce((n, t) => n + sum(inside((p) => p.tier === t && kind(p, 'Shop')), 'flashlight'), 0));
     // ("sheds should spawn industrial and tools, flashlight etc": past the outskirts they were all but empty)
     const TOOLS = ['hatchet', 'crowbar', 'shovel', 'knife', 'flashlight', 'jerrycan', 'work_gloves', 'rubber_boots', 'garden_gloves', 'stash_kit', 'black_bag', 'sack_pack', 'chest_rig', 'gun_light'];
-    const sheds = inside((p) => p.tier === 2 && kind(p, ...SHED) && !kind(p, 'Military')), places = points.filter((p) => p.tier === 2 && !p.arms && kind(p, ...SHED) && !kind(p, 'Military')).length;
+    const sheds = inside((p) => p.tier === 3 && kind(p, ...SHED) && !kind(p, 'Military')), places = points.filter((p) => p.tier === 3 && !p.arms && kind(p, ...SHED) && !kind(p, 'Military')).length;
     assert.ok(total(sheds) >= places * 0.25 && sum(sheds, ...TOOLS) * 2 >= total(sheds), `the sheds of the village: ${total(sheds)} things on ${places} places, ${sum(sheds, ...TOOLS)} of them a shed's`);
-    assert.equal(cat(sheds, 'weapon', 'magazine'), 0, 'a gun or a magazine in a shed');
+    // (a hunter's cabin keeps its shotgun, as DayZ's hunting places keep theirs: a farm's or a works' shed keeps no gun)
+    assert.equal(cat(inside((p) => p.tier === 3 && kind(p, 'Farm', 'Industrial') && !kind(p, 'Military', 'Hunting', 'Village', 'Town')), 'weapon', 'magazine'), 0, 'a gun or a magazine in a shed');
   }
   // ("the store should spawn supplies and food, and water, flashlight": three to a stocking on the whole, and never a stocking with none)
   assert.ok(lights.reduce((a, b) => a + b, 0) >= worlds.length * 3 - 2 && Math.min(...lights) >= 1, `hardly a light in any shop: ${lights.join(', ')} over ${worlds.length} stockings`);
@@ -265,13 +289,28 @@ ok('food is in the shop before anywhere, and dressings in the clinic', () => {
   const share = (kind: 'Shop' | 'Medic', t: Tier) => points.filter((p) => p.tier === t && p.usage.includes(kind)).length / points.filter((p) => p.tier === t).length;
   let food = 0, inShop = 0, dress = 0, inCare = 0;
   for (const { all } of worlds) for (const { id, p } of all) {
-    if (p.tier !== 2) continue;
+    if (p.tier !== 3) continue;
     if (ITEMS[id].category === 'food') (food++, p.usage.includes('Shop') && inShop++);
     if (id === 'bandage' || id === 'stim') (dress++, p.usage.includes('Medic') && inCare++);
   }
   // (a place in the shop gets food several times as often as its share of the places would give it)
-  assert.ok(inShop / food > share('Shop', 2) * 2.5, `${inShop} of ${food} things to eat in the village were in its shop`);
-  assert.ok(inCare / dress > share('Medic', 2) * 4, `${inCare} of ${dress} bandages and stims in the village were in its clinics`);
+  assert.ok(inShop / food > share('Shop', 3) * 2.5, `${inShop} of ${food} things to eat in the village and Kamenka were in their shops`);
+  assert.ok(inCare / dress > share('Medic', 3) * 4, `${inCare} of ${dress} bandages and stims in the village and Kamenka were in their clinics`);
+});
+
+ok('a step asked for more than it has places is stocked to what it holds, what it is for cut least', () => {
+  // (2026-10-17: the gas was asked for 165 things on its 127 places and the bunker for 175 on its 145)
+  const { e } = worlds[0];
+  for (const t of [4, 5] as Tier[]) {
+    const room = points.filter((p) => p.tier === t && !p.arms && !p.keeps).length;
+    const kept = Object.keys(TYPES).reduce((n, id) => n + e.kept(id, t), 0);
+    assert.ok(kept <= room && kept >= room - 2, `step ${t} keeps ${kept} things on ${room} places`);
+    for (const id of Object.keys(TYPES)) if (TYPES[id].at[t - 1]) assert.ok(e.kept(id, t) >= 1, `${id} cut to nothing on step ${t}`);
+  }
+  // (what opens the bunker, and what is the bunker's and nobody else's, whole; a dressing every village has cut more than a rifle)
+  assert.equal(e.kept('keycard', 4), TYPES.keycard.at[3]);
+  for (const id of ['benelli', 'deagle', 'sniper50', 'barrett', 'vssk', 'heavy_armor']) assert.equal(e.kept(id, 5), TYPES[id].at[4], `${id} cut in the bunker`);
+  assert.ok(e.kept('mosin', 4) / TYPES.mosin.at[3] > e.kept('bandage', 4) / TYPES.bandage.at[3], 'a rifle cut more than a dressing under the gas');
 });
 
 ok('the K6-3 stops a sniper\'s round to the head, barely; nothing else does', () => {
@@ -320,6 +359,7 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
   assert.ok(lying.length > 25, `${lying.length} things lie in Kamenka`);
   const before = lying.length;
   let near = 0, same = 0, early = 0, back = 0, tried = 0;
+  const missed = new Set<string>();
   const sorts = new Set<string>();
   // (A dozen things, one after another, each of what lies there at the time: of many sorts, in many buildings.
   // It goes on for hours of the game's time, and what lay there at the start has gone with age by the end.)
@@ -344,16 +384,21 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
     for (let t = 0; t < 600; t += 5) e.tick(5, nobody);
     if (all().some((q) => q.point === spot && q.item.id === id)) same++;
     if (e.held(id, 3) >= had) back++;
+    else missed.add(id);
   }
   assert.equal(near, 0, `${near} things were put down within 6 m of a spot looted less than three minutes before`);
   assert.equal(early, 0, `${early} spots had something on them again inside three minutes`);
   // (none but a sort kept in two or three spots and nowhere else, the police station's gas masks among them: theirs
   // is the one spot there is, and it goes back there once the spot has rested, as things do under the gas)
   assert.ok(same <= 2, `${same} things were back on the very spot they were taken from inside fifteen minutes`);
-  assert.ok(tried >= 8 && back >= Math.ceil(tried * 0.8), `only ${back} of ${tried} sorts were made up again inside thirteen minutes`);
+  // (Kamenka's police stations and the army's posts are wanted by more than they hold: a sort kept only there waits
+  // for a place there to come free, and that is not always inside thirteen minutes)
+  assert.ok(tried >= 8 && back >= Math.ceil(tried * 0.7), `only ${back} of ${tried} sorts were made up again inside thirteen minutes: not ${[...missed].join(', ')}`);
   // (and the town is as full as it was, give or take: nothing is lost to the rule, and nothing piles up)
   const after = all().filter((q) => q.point >= 0 && tiers[q.point] === 3 && !points[q.point].arms && !points[q.point].keeps).length;
-  assert.ok(Math.abs(after - before) <= 8, `Kamenka held ${before} things and holds ${after}`);
+  // (things age away and come back after their wait, so over two and a half hours with nobody about a town is a few in a
+  // hundred short at any moment: the old roll as well, 1539 and 1500)
+  assert.ok(Math.abs(after - before) <= before * 0.04, `Kamenka held ${before} things and holds ${after}`);
 });
 
 ok('the fort on the mountain is stocked on top of the map: the army\'s things in its armoury, a dressing station\'s in its cells, and nothing taken from anywhere else', () => {

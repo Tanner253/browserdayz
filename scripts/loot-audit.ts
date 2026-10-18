@@ -3,7 +3,7 @@
 // have no rule at all, and which rules cannot be kept (nowhere they fit).
 // npx tsx scripts/loot-audit.ts
 import { buildWorldData } from '../server/world';
-import { Economy, TYPES } from '../src/sim/economy';
+import { Economy, TYPES, apartOf } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import type { Container } from '../src/sim/inventory';
@@ -46,12 +46,15 @@ for (let t = 1; t <= 5; t++) {
   const things = [...eco.loot.values()].filter((l) => l.point >= 0 && tierOf(l.point) === t && !points[l.point].arms).length;
   console.log(`  step ${t}: ${things} things on ${places} places (${((things / places) * 100).toFixed(0)}% full)`);
 }
-console.log('\n  id                 want (steps 1 to 5)     got                  where it lay');
-for (const [id, r] of Object.entries(TYPES)) {
-  const per = [1, 2, 3, 4, 5].map((t) => [...eco.loot.values()].filter((l) => l.item.id === id && l.point >= 0 && !points[l.point].arms && tierOf(l.point) === t).length);
-  const short = per.some((n, k) => n < r.at[k]);
+// (what each step keeps of a sort, as the economy has it: a step asked for more than it holds is cut to fit, see
+// Economy.fit; and what lies there of it, on the map's own places and its armed ones: a place apart is stocked on top)
+console.log('\n  id                 kept (steps 1 to 5)     got                  where it lay');
+for (const id of Object.keys(TYPES)) {
+  const want = [1, 2, 3, 4, 5].map((t) => eco.kept(id, t as 1));
+  const per = [1, 2, 3, 4, 5].map((t) => [...eco.loot.values()].filter((l) => l.item.id === id && l.point >= 0 && !points[l.point].keeps && !apartOf(points[l.point].building) && tierOf(l.point) === t).length);
+  const short = per.some((n, k) => n < want[k]);
   const w = [...(where.get(id) ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([u, k]) => `${u} ${k}`).join(', ');
-  console.log(`  ${id.padEnd(18)} ${r.at.map((n) => String(n).padStart(3)).join(' ')}   ${per.map((n) => String(n).padStart(3)).join(' ')}${short ? ' SHORT' : '      '} ${w}`);
+  console.log(`  ${id.padEnd(18)} ${want.map((n) => String(n).padStart(3)).join(' ')}   ${per.map((n) => String(n).padStart(3)).join(' ')}${short ? ' SHORT' : '      '} ${w}`);
 }
 
 const unruled = Object.keys(ITEMS).filter((id) => !TYPES[id]);

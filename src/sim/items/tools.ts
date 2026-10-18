@@ -68,7 +68,7 @@ export const TOOL_ITEMS: ItemDef[] = [
   },
   // ---------------------------------------------------------------- base building
   { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case. Dropped, it lies where it lands and can be opened there: it stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.',
-    loot: { pair: 'SmallProtectorCase', at: [3, 1, 4, 0, 0], restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
+    loot: { pair: 'SmallProtectorCase', at: [3, 1, 4, 0, 0], restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'], filled: { chance: 0.25, most: 2 } },
     worth: 15, sells: 1,
   },
   // (two more things to keep things in, 2026-10-12: smaller than the case, lighter, and found in houses)
@@ -76,12 +76,12 @@ export const TOOL_ITEMS: ItemDef[] = [
   // was: on the ground, in the hands, in its picture. 2026-10-13: "the suitcase model is duplicated". The one is
   // drawn as wide as the pair was, so that it lies wherever it lay; and stood down as a stash it is a suitcase's size.)
   { id: 'old_suitcase', name: 'Suitcase', model: 'vintage_suitcase', nodeRe: '^vintage_suitcase_01', w: 4, h: 3, weight: 3, category: 'stash', scale: 0.7, place: 1, stash: [6, 5], desc: 'An old travelling case. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.',
-    loot: { pair: 'SeaChest', at: [3, 0, 13, 0, 0], restock: 1800, usage: HOMES },
+    loot: { pair: 'SeaChest', at: [3, 0, 13, 0, 0], restock: 1800, usage: HOMES, filled: { chance: 0.5, most: 3 } },
     worth: 8,
   },
   { id: 'black_bag', name: 'Black Bag', model: 'trashbag', w: 2, h: 3, weight: 0.3, category: 'stash', scale: 0.5, stash: [5, 4], desc: 'A heavy black sack. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.',
     // (two more things to keep things in, beside the stash case: a black sack, in every shed, and a suitcase, in houses)
-    loot: { pair: 'CourierBag', at: [5, 0, 15, 0, 0], restock: 1200, usage: [...SHEDS, 'Town'] },
+    loot: { pair: 'CourierBag', at: [5, 0, 15, 0, 0], restock: 1200, usage: [...SHEDS, 'Town'], filled: { chance: 0.35, most: 2 } },
     worth: 3,
   },
 ];

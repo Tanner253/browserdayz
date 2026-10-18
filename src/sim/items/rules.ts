@@ -56,6 +56,8 @@ export interface LootRule extends Partial<TypeRule> {
   pair: string;
   /** what a gun is found fitted with now and then: [what, how often], one roll each (DayZ's cfgspawnabletypes attachments) */
   fitted?: [string, number][];
+  /** a pack or a case: how often one is found with something in it, and the most things in it (DayZ's cargo presets; see `pack` in economy.ts) */
+  filled?: { chance: number; most: number };
   /** its weight on an armed point (a rack, a guard post): anywhere, from Kamenka on where guns were kept, and on a fort's racks */
   rack?: { any?: number; town?: number; fort?: number };
   /** how a place apart's share of it leans, times its share (the fort's garrison store: see APART_LEAN in economy.ts) */
@@ -75,7 +77,7 @@ export const LIFETIME: Record<Category, number> = {
 export function typeRule(def: ItemDef): TypeRule | null {
   const l = def.loot;
   if (!l?.at || l.restock === undefined) return null;
-  const { pair: _p, fitted: _f, rack: _r, lean: _l, apart: _a, ...rule } = l;
+  const { pair: _p, fitted: _f, filled: _c, rack: _r, lean: _l, apart: _a, ...rule } = l;
   return { ...rule, at: l.at, restock: l.restock, lifetime: l.lifetime ?? LIFETIME[def.category], usage: l.usage ?? [] };
 }
 

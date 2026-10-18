@@ -172,20 +172,20 @@ export const WEAR_ITEMS: ItemDef[] = [
     desc: 'A small black day pack that sits close to the back. 25 slots.', wear: { cargo: [5, 5] },
     // (three packs: the day pack from the first step, the camping pack from the village on, and the army's
     // rucksack, the biggest, from the fourth step up and never below it)
-    loot: { pair: 'TaloonBag_Green', at: [8, 0, 16, 0, 0], restock: 600, usage: [...SHEDS, 'Town', 'Shop'] },
+    loot: { pair: 'TaloonBag_Green', at: [8, 0, 16, 0, 0], restock: 600, usage: [...SHEDS, 'Town', 'Shop'], filled: { chance: 0.35, most: 2 } },
     worth: 8, sells: 1,
   },
   {
     id: 'camping_pack', name: 'Camping Backpack', model: 'camping_backpack', w: 4, h: 3, weight: 1.5, category: 'clothing', slot: 'back',
     desc: 'A tall black hiking pack with red lacing. 42 slots.', wear: { cargo: [7, 6] },
-    loot: { pair: 'MountainBag_Green', at: [0, 0, 17, 0, 0], restock: 900, usage: [...HOMES, 'Hunting', 'Shop'] },
+    loot: { pair: 'MountainBag_Green', at: [0, 0, 17, 0, 0], restock: 900, usage: [...HOMES, 'Hunting', 'Shop'], filled: { chance: 0.4, most: 3 } },
     worth: 14,
   },
   {
     // (still `suitcase`: the largest)
     id: 'suitcase', name: 'Field Rucksack', model: 'military_backpack', scale: 1.22, w: 4, h: 3, weight: 2.2, category: 'clothing', slot: 'back',
     desc: 'A full-size military backpack, the biggest there is: 63 slots, nine across. Two rifles lie in it with room over.', wear: { cargo: [9, 7] },
-    loot: { pair: 'AliceBag_Green', at: [0, 0, 0, 3, 3], restock: 1200 },
+    loot: { pair: 'AliceBag_Green', at: [0, 0, 0, 3, 3], restock: 1200, filled: { chance: 0.5, most: 3 } },
     worth: 20,
   },
 ];

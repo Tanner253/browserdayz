@@ -57,7 +57,7 @@ export const GUN_ITEMS: ItemDef[] = [
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_mpa', ergo: 68, modes: ['auto', 'semi'], shows: { mag_mpa: ['mag'] } }, iconYaw: 0,
     // The submachine gun: Kamenka's, and the big police station's before that.
     // (in the village it is a policeman's and a soldier's, and not a householder's)
-    loot: { pair: 'MP5K', at: [0, 3, 38, 0, 0], restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN }, rack: { town: 2.4, fort: 1.6 }, lean: 0.4 },
+    loot: { pair: 'MP5K', at: [0, 3, 38, 0, 0], restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN }, rack: { town: 2.4, fort: 1.6 }, lean: 0.4, fitted: [['suppressor_9', 0.05], ['red_dot', 0.05], ['gun_light', 0.06], ['foregrip', 0.06]] },
     worth: 34,
   },
   // The CZ Scorpion EVO (2026-10-17, the weapons pass): a 9 mm submachine gun of the newer kind, light and quick to
@@ -119,7 +119,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'dual_mac10', name: 'Dual MAC-10s', model: 'dualmac', w: 5, h: 3, weight: 5.6, category: 'weapon', slot: 'long',
     desc: 'Two MAC-10s in .45 ACP, one in each hand: left button for the left, right button for the right. Thirty rounds in each and very fast. Never aimed down a sight.',
     weapon: { kind: 'auto', ammo: 'ammo_45', capacity: 60, mag: 'mag_dual_mac10', ergo: 50, modes: ['auto', 'semi'], akimbo: true, shows: { mag_dual_mac10: ['mag'], mac10_suppressor: ['silencer'] } }, iconYaw: 0,
-    loot: { pair: 'UMP45', at: [0, 0, 7, 2, 0], restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [10, 40], keep: SOON, rack: { town: 0.8 } },
+    loot: { pair: 'UMP45', at: [0, 0, 7, 2, 0], restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [10, 40], keep: SOON, rack: { town: 0.8 }, fitted: [['mac10_suppressor', 0.06]] },
     worth: 52,
   },
   // A pair of sawn-off shotguns (2026-10-17), one in each hand: left button the left, right button the right. Two
@@ -137,7 +137,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'db12', name: 'Double-Barrel Shotgun', model: 'db12', w: 8, h: 2, weight: 3.2, category: 'weapon', slot: 'long',
     desc: 'A side-by-side 12 gauge. Two shells, one in each barrel, both loaded at once when it is broken open.',
     weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 2, ergo: 50, action: 'self' }, iconYaw: 0,
-    loot: { pair: 'Izh43Shotgun', at: [0, 0, 15, 0, 0], restock: 240, usage: ['Hunting', ...HOMES], loaded: [0, 2], keep: SOON },
+    loot: { pair: 'Izh43Shotgun', at: [0, 0, 15, 0, 0], restock: 240, usage: ['Hunting', ...HOMES], loaded: [0, 2], keep: SOON, fitted: [['foregrip', 0.1]] },
     worth: 22,
   },
   // The AKS-74U (2026-10-17): the AK cut short, folding stock, rare. It takes the AK's magazines.
@@ -154,7 +154,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'mp7a1', name: 'MP7A1', model: 'mp7a1', w: 5, h: 3, weight: 1.9, category: 'weapon', slot: 'long',
     desc: 'Compact personal defence weapon. Forty rounds in its long magazine, very fast and very steady. B changes it to single shots.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 40, mag: 'mag_mp7', ergo: 78, modes: ['auto', 'semi'], shows: { mag_mp7: ['mag'], mp7_suppressor: ['silencer'], mp7_sight: ['sight'] }, optic: 'mp7_sight' }, iconYaw: 0,
-    loot: { pair: 'Vikhr', at: [0, 0, 0, 4, 2], restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON, rack: { town: 0.8, fort: 1 } },
+    loot: { pair: 'Vikhr', at: [0, 0, 0, 4, 2], restock: 300, usage: [...ARMY], favour: ARMOURY, loaded: [5, 20], keep: SOON, rack: { town: 0.8, fort: 1 }, fitted: [['mp7_sight', 0.12], ['mp7_suppressor', 0.05]] },
     worth: 44,
   },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,

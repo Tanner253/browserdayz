@@ -7,13 +7,16 @@
 // Runs on the server in multiplayer (clients only mirror it through inject / take)
 // and in the browser when playing offline.
 
-import type { Usage, LootPoint } from '../world/buildings';
+import type { LootPoint } from '../world/buildings';
 import type { Tier } from './tiers';
-import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, TAG_GROUND, type ItemInstance } from './items';
+import { ITEMS, fitAtRandom, foundMag, holds, makeItem, plainMag, stockGun, TAG_GROUND, type ItemInstance } from './items';
+import { bagGrid } from './inventory';
 import { ITEM_SIZES, fitsPoint } from './placement';
 import { RNG } from '../core/noise';
-import { TOWNS } from './towns';
-import { typeRule, type TypeRule } from './items/rules';
+import { APART_FILL, APART_KIND, APART_LEAN, APART_LEAST, APART_RICH, OWN, apartOf } from './apart';
+
+export { APART, APART_KIND, apartOf } from './apart';
+import { dayzCategory, typeRule, type TypeRule } from './items/rules';
 
 export type { TypeRule };
 
@@ -122,23 +125,34 @@ const STEPS: Tier[] = [1, 2, 3, 4, 5];
 const UNSORTED = 4;
 
 /**
- * What is put down before anything else when a world is stocked: the masks, which are what lets anybody into the
- * gas; then the long things and the big ones, which lie only on a floor, while there are floors free (down the
- * bunker there are thirteen, and with everything put down turn about half the shotguns had nowhere to lie; on the
- * outskirts the bats and the crowbars came up a few short, which of them depending on the dice); and then what
- * each kind of building is FOR, so that a clinic's shelves hold dressings and an armoury's hold guns before
- * anything else that may lie there has taken them.
- * (2026-10-13: and last of these, the travelling suitcase and the stash case. Each lies only on a floor, and the
- * houses of the outskirts have seventeen floors between them: on one throw of the dice in twenty, small things had
- * taken them and two of the three suitcases had nowhere to lie.)
+ * The most of a building's spots that hold anything at once, by its step: DayZ's `lootmax` (a house of a dozen-odd
+ * spots holds six things), so that no house is stuffed full and the rest bare. Under the gas and down the bunker every
+ * place is spoken for, and a place apart has its own most (APART_FILL).
  */
-// (the weapons pass's guns first of the long things, so that they have floors: the gas and the bunker were full,
-// and stocked in the turn of the list they found none, the owner: "ensure that the new weapons can spawn at T3+")
-const FIRST = [
-  'gasmask', 'barrett', 'sniper50', 'vssk', 'aks74u', 'mp7a1', 'scorpion', 'dual_smg', 'dual_mac10', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
-  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'stim_combat', 'saline', 'bandage', 'old_suitcase', 'stash_kit',
-];
-
+const LOOTMAX: Record<Tier, number> = { 1: 0.8, 2: 0.8, 3: 1, 4: 1, 5: 1 };
+/** how likely a floor is for a thing that would lie on a shelf, against a shelf (see `fill`) */
+const FLOOR_SPARE = 0.15;
+/**
+ * How much likelier a weapon is to be put down next than anything else as far short (see `fill`). DayZ lays its guns
+ * in a container of their own and they never want for room; here they lie where everything else does, and where every
+ * place is spoken for (the bunker: 175 things wanted on 145 spots) a gun is what a place is fought over: the dressings
+ * are what goes short, not the shotgun.
+ */
+const ARMS_FIRST = 1000;
+/**
+ * And how much sooner what a step is FOR is put down there, by how much the step is its home (squared: see
+ * Economy.home): under the gas its helmets and scopes before a dressing that every village has, and down the bunker
+ * what is the bunker's and nobody else's before anything.
+ */
+const HOME = 1000;
+/**
+ * How much sooner a sort is put down for every whole of its free spots it still needs (see `fill`): one that can lie
+ * only where the army kept things is put there before a pistol, which can lie in a house as well, has taken the last
+ * of them.
+ */
+const PRESSED = 50;
+/** what a pack or a case is found with in it: supplies (see `pack`) */
+const SUPPLIES = new Set(['food', 'drink', 'medical', 'ammo', 'tool', 'misc', 'clothing']);
 
 export interface WorldLoot {
   uid: string;
@@ -165,68 +179,6 @@ export interface EconomyEvents {
   despawn(l: WorldLoot): void;
 }
 
-/**
- * Places that are stocked APART from the rest of the map, by the name their loot points carry as their building
- * (2026-10-13: the fort on the mountain, seventy places; and the wreck in the cleft under the bridge, five, which
- * being floor took three of the gas's five AKs). Every step of the map is stocked to counts (`at`), so a
- * new place on a step took its things out of the places that were there: with the fort part of the third step
- * Kamenka had two armoured vests where it had five, and the Chemical Works shared its rifles with the fort's
- * vaults. A place apart is stocked ON TOP of the map, which keeps all of its own: of each sort, as many as its
- * places would have drawn had they been part of their step (by the same kinds of place and the same leanings),
- * never more of a sort than the whole step has, and never more things than `APART_FILL` of its places.
- */
-// ('hamlet': the ruined houses along the track to the fort, 2026-10-13: named apart from the fort so that the map
-// marks the fort as wide as the fort)
-// ('cellar': every basement's places, 2026-10-14: "basements are missing loot". Part of their steps they shared those
-// steps' counts with every house, and stood empty.)
-// ('kalat', the ruined town in the desert, and the new towns of the map three times over, 2026-10-16, each by its
-// name: their places are `ruins_<piece>`'s and `<town>_<n>`'s. Of their steps, they took those steps' things from the
-// old map: Kalat the gas works' share of the fourth step's, the towns on the third Kamenka's. See OWN: stocked as
-// their steps are.)
-// ('pass', the canyon pass's caves and the cache on its floor, `cave_<where>`: part of the fifth step they took the
-// bunker's own things; apart, stocked as the fort is, as the owner's "best loot in the center of the bottom of the canyon")
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', ...TOWNS.map((t) => t.name.toLowerCase())]);
-/** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`), or null: the map's own */
-export function apartOf(building: string): string | null {
-  if (APART.has(building)) return building;
-  if (building.startsWith('ruins_')) return 'kalat';
-  if (building.startsWith('cave_')) return 'pass';
-  const town = building.replace(/_\d+$/, '');
-  return town !== building && APART.has(town) ? town : null;
-}
-/** the most of a place apart's free places that are ever filled: a room with something on every surface is a shop */
-const APART_FILL = 0.85;
-/** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
-const APART_RICH = 1.5;
-/**
- * A place apart that is not stocked as the fort is: how many times its fair share, and how it leans (unsaid: APART_RICH
- * and APART_LEAN, the fort's garrison store). The cellars are houses' stores, of every kind a house keeps, and well
- * stocked, a reward for going down: their places are few against the map's, and at the fort's share they held little.
- */
-// (the new places of the map three times over are stocked as their steps are, no richer: they are new ground, not a reward)
-const OWN: Record<string, { rich: number; lean: Record<string, number> }> = {
-  cellar: { rich: 3, lean: {} },
-  ...Object.fromEntries(['kalat', ...TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
-};
-/**
- * How a place apart's share leans, sort by sort (times its share; a sort not named, 1). 2026-10-13, after the owner
- * had played the fort: "the loot in the castle should be a bit better i think". It was stocked exactly as its step
- * of the map is, and so it held what a step holds: three loose submachine guns and their magazines, cigarettes and
- * hats, and not one magazine for the rifles on its own racks. A garrison's store leans to what a rifle needs and
- * what a wound needs, and has less of what lies in any village. (Still never more of a sort than the whole step
- * has, and nothing that is the bunker's alone: the drum, the long magazine, the K6-3.)
- */
-const APART_LEAN: Record<string, number> = Object.fromEntries(Object.values(ITEMS).flatMap((d) => (d.loot?.lean ? [[d.id, d.loot.lean]] : [])));
-
-/** what a named place apart never has less of on its fourth step, whatever its shares come to (where it has a spot of the kind): a magazine for each rifle of its racks, and a dressing station's own */
-const APART_LEAST: Record<string, Record<string, number>> = {
-  castle: { mag_ak: 2, mag_ar: 2, mag_sniper: 1, pu_scope: 1, suppressor_762: 1, grenade: 2, armor_vest: 1, stim_combat: 2, blood_bag: 2, saline: 1, firstaid: 2 },
-};
-/**
- * The kind of spot a sort lies at in a place apart, where it has no kind of its own (under the gas such a thing
- * lies anywhere, and a place apart is sorted on every step: so it lay nowhere in one).
- */
-export const APART_KIND: Record<string, Usage[]> = Object.fromEntries(Object.values(ITEMS).flatMap((d) => (d.loot?.apart ? [[d.id, d.loot.apart]] : [])));
 
 export class Economy {
   loot = new Map<string, WorldLoot>();
@@ -242,6 +194,10 @@ export class Economy {
   /** the places apart there are, and how many of each sort each is stocked to on each step (`place|sort@step`) */
   private places: string[];
   private wants = new Map<string, number>();
+  /** the building each spot is of (an index; -1: an armed spot, or a place apart's, which keep no building's most), and each building's most and what it holds (see LOOTMAX) */
+  private bld: number[];
+  private bldMax: number[] = [];
+  private bldHeld: number[] = [];
 
   constructor(
     readonly points: LootPoint[],
@@ -251,6 +207,20 @@ export class Economy {
   ) {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
     this.apart = points.map((p) => apartOf(p.building));
+    const named = new Map<string, number>(), step: Tier[] = [];
+    this.bld = points.map((p, i) => {
+      if (p.arms || p.keeps || this.apart[i] !== null) return -1;
+      let b = named.get(p.building);
+      if (b === undefined) {
+        named.set(p.building, (b = named.size));
+        this.bldMax.push(0);
+        this.bldHeld.push(0);
+        step.push(this.tier[i]);
+      }
+      this.bldMax[b]++;
+      return b;
+    });
+    this.bldMax = this.bldMax.map((n, b) => (n <= 2 ? n : Math.ceil(n * LOOTMAX[step[b]])));
     // (a sort kept by a rate: its count on each step from the spots there it can lie at, see TypeRule.per)
     for (const [id, rule] of Object.entries(TYPES)) {
       if (!rule.per) continue;
@@ -263,17 +233,74 @@ export class Economy {
       });
       this.counts.set(id, n);
     }
+    this.spots = STEPS.map((t) => this.points.filter((p, i) => this.tier[i] === t && this.apart[i] === null && !p.arms && !p.keeps).length);
+    // (every step's cut worked out from the counts as written, and only then made)
+    for (const [t, cut] of STEPS.map((t) => [t, this.fit(t)] as const)) for (const [id, k] of cut) this.cuts.set(`${id}@${t}`, k);
     this.places = [...new Set(this.apart.filter((a): a is string => a !== null))];
     for (const place of this.places) for (const t of STEPS) this.share(place, t);
   }
 
   private counts = new Map<string, number[]>();
-  /** how many of a sort are kept on a step: its `at`, or what its rate comes to on this map (see TypeRule.per) */
+  /** how many places of the map's own each step has (not an armed one, nor one that keeps a named thing) */
+  private spots: number[] = [];
+
+  /**
+   * How much a step is a sort's home: of how thickly it lies on each step (its count over the step's places), the
+   * share that is this step's. The helmet lies five in Kamenka and the village and five under the gas, and the gas has
+   * a thirteenth of their places: it is the gas's. (A dressing every village has is nobody's in particular.)
+   */
+  private home(id: string, t: Tier): number {
+    const thick = (s: Tier) => (this.spots[s - 1] ? this.written(id, s) / this.spots[s - 1] : 0);
+    const all = STEPS.reduce((n, s) => n + thick(s), 0);
+    return all ? thick(t) / all : 0;
+  }
+
+  /**
+   * A step asked for more than it has places is stocked to what it holds: every sort is cut to fit, none below one, and
+   * what the step is for least (a sort whose home it is, see `home`: the keycards under the gas, its rifles and helmets,
+   * the bunker's own), and a dressing that every village has most. (2026-10-17: the gas was asked for 165 things on its 127 places and the bunker
+   * for 175 on its 145, and whatever came last went without: which that was hung on the order things were put down
+   * in.) What the counts then say is what lies there. @returns the cut counts, [sort, how many]
+   */
+  private fit(t: Tier): [string, number][] {
+    const room = this.spots[t - 1];
+    const ids = Object.keys(TYPES).filter((id) => this.written(id, t) > 0);
+    const asked = ids.reduce((n, id) => n + this.written(id, t), 0);
+    if (asked <= room) return [];
+    // (each sort's share of the room by its count, the more as the step is its home: its own are cut least, and none
+    // below one; then a thing less of the most-kept of what is not its own while there are too many)
+    const weight = (id: string) => this.written(id, t) * (1 + this.home(id, t)) ** 2;
+    const all = ids.reduce((n, id) => n + weight(id), 0);
+    const cut = ids.map((id) => {
+      const x = Math.min(this.written(id, t), (weight(id) * room) / all);
+      return { id, n: Math.max(1, Math.floor(x)), rest: x - Math.floor(x) };
+    });
+    let left = room - cut.reduce((n, c) => n + c.n, 0);
+    for (const c of [...cut].sort((p, q) => q.rest - p.rest || (p.id < q.id ? -1 : 1))) {
+      if (left <= 0) break;
+      if (c.n < this.written(c.id, t)) (c.n++, left--);
+    }
+    while (left < 0) {
+      const most = cut.filter((c) => c.n > 1).sort((p, q) => this.home(p.id, t) - this.home(q.id, t) || q.n - p.n)[0];
+      if (!most) break;
+      most.n--;
+      left++;
+    }
+    return cut.map((c): [string, number] => [c.id, c.n]);
+  }
+
+  /** what a step asked for more than it holds keeps of a sort (`sort@step`): see `fit` */
+  private cuts = new Map<string, number>();
+  /** how many of a sort are kept on a step: its `at`, or what its rate comes to on this map (see TypeRule.per), cut to the step's places (see `fit`) */
   kept(id: string, t: Tier): number {
+    return this.cuts.get(`${id}@${t}`) ?? this.written(id, t);
+  }
+  /** and as its rule has it, before any cut: what a place apart's share is reckoned from, being stocked on top of the map */
+  private written(id: string, t: Tier): number {
     return this.counts.get(id)?.[t - 1] ?? TYPES[id].at[t - 1];
   }
 
-  /** how strongly a spot draws a sort on a step: as `pickPoint` weighs it */
+  /** how strongly a spot draws a sort on a step (its kind of building's favour) */
   private pull(rule: TypeRule, i: number, where: Tier): number {
     const favour = where < UNSORTED || this.apart[i] !== null ? (rule.on?.[where]?.favour ?? rule.favour) : undefined;
     let w = 1;
@@ -288,7 +315,7 @@ export class Economy {
     if (!here.length) return;
     const fair: [string, number][] = [];
     for (const [id, rule] of Object.entries(TYPES)) {
-      const at = this.kept(id, t);
+      const at = this.written(id, t);
       if (!at) continue;
       const sum = (list: number[]) => list.reduce((a, i) => a + (this.liesAt(id, rule, i, t) ? this.pull(rule, i, t) : 0), 0);
       const mine = sum(here), theirs = sum(there);
@@ -299,7 +326,7 @@ export class Economy {
     // enough of it.)
     const least = t === 4 ? APART_LEAST[place] ?? {} : {};
     const base = fair.map(([id, e]) => {
-      const sure = Math.min(least[id] ?? 0, this.kept(id, t));
+      const sure = Math.min(least[id] ?? 0, this.written(id, t));
       return { id, sure, spare: Math.max(0, e - sure) };
     });
     const kept = base.reduce((a, s) => a + s.sure, 0), all = base.reduce((a, s) => a + s.spare, 0), most = Math.max(0, here.length * APART_FILL - kept), k = all > most ? most / all : 1;
@@ -347,57 +374,109 @@ export class Economy {
     // its own has one there: see APART_KIND.)
     const kinds = (this.apart[i] !== null ? APART_KIND[id] : undefined) ?? rule.on?.[where]?.usage ?? rule.usage;
     if ((where < UNSORTED || this.apart[i] !== null) && !p.usage.some((u) => kinds.includes(u))) return false;
+    // (DayZ's floor takes tools, clothes and what things are kept in, and its shelves food as well: a tin is on a shelf)
+    if (p.floor && dayzCategory(ITEMS[id]) === 'food') return false;
     // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
     return this.fits(id, p);
   }
 
-  private pickPoint(id: string, rule: TypeRule, where: Tier, place: string | null = null): number {
-    // (a place apart is sorted on every step: see `liesAt`)
-    const sorted = where < UNSORTED || place !== null, favour = rule.on?.[where]?.favour ?? rule.favour;
-    let candidates: number[] = [];
-    const weights: number[] = [];
-    let total = 0;
-    /** spots it could lie at but for having lain there last: where it goes when there is nowhere else at all */
-    const again: number[] = [];
+  /** a spot is taken, or given up: its building's count goes with it (see LOOTMAX) */
+  private occupy(i: number, on: boolean) {
+    if (on === this.pointBusy.has(i)) return;
+    if (on) this.pointBusy.add(i);
+    else this.pointBusy.delete(i);
+    const b = this.bld[i];
+    if (b >= 0) this.bldHeld[b] += on ? 1 : -1;
+  }
+
+  /** is there room for one more thing in the building this spot is of */
+  private room(i: number): boolean {
+    const b = this.bld[i];
+    return b < 0 || this.bldHeld[b] < this.bldMax[b];
+  }
+
+  /**
+   * Puts down what is due on one step, or in one place apart: a roll per spot (the owner, 2026-10-17: "a loot roll is
+   * rolled for each spot when loot rerolls or respawns"). Every free spot there with room (its building under its
+   * most, nobody near, not just looted) is rolled for among the sorts that are short and can lie on it: each sort as
+   * likely as it is short, the hard-pressed first (a rifle lies only on a floor, and where every place is spoken for the
+   * floors are its before a tin's), and a spot drawing what its kind of building favours. What lay at a spot comes back
+   * to it only when there is nowhere else (see SAME_AGAIN). @returns how many of each were put down
+   */
+  private fill(where: Tier, place: string | null, due: Map<string, number>): Map<string, number> {
+    const put = new Map<string, number>();
+    const ids = [...due.keys()].filter((id) => due.get(id)! > 0);
+    if (!ids.length) return put;
+    const open = new Set<number>(), inBld = new Map<number, number[]>();
     this.points.forEach((p, i) => {
-      // armed points are stocked on their own (see arm)
-      if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where || this.apart[i] !== place) return;
-      // (not under anybody's nose)
-      if (this.crowded.has(i)) return;
-      // (not where somebody has just looted, nor back where this same thing last lay)
-      if (!this.rested(i)) return;
-      if (!this.liesAt(id, rule, i, where)) return;
-      const was = this.lastAt.get(i);
-      if (was && was.id === id && this.time - was.at < SAME_AGAIN) return void again.push(i);
-      let w = 1;
-      if (sorted && favour) for (const u of p.usage) w = Math.max(w, favour[u] ?? 1);
-      candidates.push(i);
-      weights.push(w);
-      total += w;
+      if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where || this.apart[i] !== place || this.crowded.has(i) || !this.room(i) || !this.rested(i)) return;
+      open.add(i);
+      if (this.bld[i] >= 0) (inBld.get(this.bld[i]) ?? inBld.set(this.bld[i], []).get(this.bld[i])!).push(i);
     });
-    // (Where every place is spoken for, under the gas and down the bunker, the spot a thing was taken from is the
-    // one spot there is: it goes back there once the spot has rested, and is not kept out of the world for a
-    // quarter of an hour. "The same loot shouldnt spawn in the same locations (unless by chance)": or need.)
-    if (!candidates.length && again.length) {
-      candidates = again;
-      for (const _ of again) weights.push(1);
-      total = again.length;
+    // where each sort can lie; and where it could but for having lain there last, where it goes when there is nowhere else
+    const at = ids.map(() => [] as number[]), again = ids.map(() => [] as number[]);
+    const sorts = new Map<number, number[]>();
+    ids.forEach((id, k) => {
+      for (const i of open) {
+        if (!this.liesAt(id, TYPES[id], i, where)) continue;
+        const was = this.lastAt.get(i);
+        (was && was.id === id && this.time - was.at < SAME_AGAIN ? again[k] : at[k]).push(i);
+        (sorts.get(i) ?? sorts.set(i, []).get(i)!).push(k);
+      }
+    });
+    const n = at.map((a) => a.length), m = again.map((a) => a.length);
+    // (how sought after each spot is: of every sort that can lie on it, how much of its room it needs. A pistol, which can
+    // lie in a house as well, keeps off a police station's shelf that the rifles' rounds have nowhere else to go than)
+    const need = new Map<number, number>();
+    for (const [i, ks] of sorts) need.set(i, ks.reduce((a, k) => a + due.get(ids[k])! / Math.max(1, n[k] || m[k]), 0));
+    const want = ids.map((id) => Math.max(due.get(id)!, place ? this.wanted(place, id, where) : this.kept(id, where)));
+    const armed = ids.map((id) => !!(ITEMS[id].weapon || ITEMS[id].melee));
+    // (and what this step is for, the more of the map's that lie on it: "the bunker's and nobody else's" before the rest)
+    const home = ids.map((id) => HOME * this.home(id, where) ** 2);
+    const close = (i: number) => {
+      if (!open.delete(i)) return;
+      for (const k of sorts.get(i) ?? []) {
+        const was = this.lastAt.get(i);
+        if (was && was.id === ids[k] && this.time - was.at < SAME_AGAIN) m[k]--;
+        else n[k]--;
+      }
+    };
+    for (;;) {
+      let total = 0;
+      const w = ids.map((id, k) => {
+        const left = due.get(id)! - (put.get(id) ?? 0), room = n[k] || m[k];
+        const x = left > 0 && room > 0 ? (left / want[k]) ** 6 * (1 + PRESSED * (left / room)) * (1 + (armed[k] ? ARMS_FIRST : 0) + home[k]) : 0;
+        total += x;
+        return x;
+      });
+      if (total <= 0) break;
+      let r = this.rng.next() * total, k = 0;
+      for (; k < ids.length - 1; k++) if ((r -= w[k]) <= 0) break;
+      const id = ids[k], list = (n[k] ? at[k] : again[k]).filter((i) => open.has(i));
+      // (a thing that will lie on a shelf takes a shelf before a floor: the floors are the rifles')
+      const shelf = list.some((i) => !this.points[i].floor);
+      let pulls = 0;
+      const pw = list.map((i) => {
+        const x = (this.pull(TYPES[id], i, where) * (shelf && this.points[i].floor ? FLOOR_SPARE : 1)) / (need.get(i) || 1);
+        pulls += x;
+        return x;
+      });
+      let q = this.rng.next() * pulls, j = 0;
+      for (; j < list.length - 1; j++) if ((q -= pw[j]) <= 0) break;
+      const i = list[j];
+      close(i);
+      if (!this.spawnType(id, i, where, false, place)) continue;
+      put.set(id, (put.get(id) ?? 0) + 1);
+      // (a building at its most takes nothing more)
+      if (!this.room(i)) for (const o of inBld.get(this.bld[i]) ?? []) close(o);
     }
-    if (!candidates.length) return -1;
-    let r = this.rng.next() * total;
-    for (let k = 0; k < candidates.length; k++) {
-      r -= weights[k];
-      if (r <= 0) return candidates[k];
-    }
-    return candidates[candidates.length - 1];
+    return put;
   }
 
   /** @param armed the spot is one that always holds a weapon (see `arm`): what is put there is a gun that fires */
-  private spawnType(id: string, at = -1, where: Tier = 1, armed = at >= 0, place: string | null = null): boolean {
+  private spawnType(id: string, pi: number, where: Tier = 1, armed = true, _place: string | null = null): boolean {
     const rule = TYPES[id];
     const def = ITEMS[id];
-    const pi = at >= 0 ? at : this.pickPoint(id, rule, where, place);
-    if (pi < 0) return false;
     const p = this.points[pi];
     const item = makeItem(id);
     if (def.stack && rule.qty) item.qty = Math.max(1, Math.round(def.stack * this.rng.range(rule.qty[0], rule.qty[1])));
@@ -413,6 +492,8 @@ export class Economy {
       if (rule.loaded) stockGun(item, this.rng.int(rule.loaded[0], Math.min(rule.loaded[1], def.weapon.capacity)));
     }
     if (def.mag) foundMag(item, () => this.rng.next());
+    const filled = def.loot?.filled;
+    if (filled && this.rng.next() < filled.chance) this.pack(item, pi, where, filled.most);
     const l: WorldLoot = {
       uid: item.uid,
       item,
@@ -423,10 +504,37 @@ export class Economy {
       point: pi,
       spawnedAt: this.time,
     };
-    this.pointBusy.add(pi);
+    this.occupy(pi, true);
     this.loot.set(l.uid, l);
     this.events.spawn(l);
     return true;
+  }
+
+  /**
+   * Puts a few things in a pack or a case found at a spot (its `loot.filled`): supplies its step and its kind of
+   * building keep, each as likely as it is kept there, small enough for a pocket of it. Not a gun, a part of one, a grenade or another bag, and nothing kept by
+   * twos and threes (a keycard in a bag would be a keycard more than the gas keeps). What is in a bag is not counted to
+   * the map, as DayZ counts no cargo.
+   */
+  private pack(bag: ItemInstance, i: number, where: Tier, most: number) {
+    const grid = bagGrid(bag);
+    if (!grid) return;
+    const pool: [string, number][] = [];
+    for (const [id, rule] of Object.entries(TYPES)) {
+      const d = ITEMS[id], n = this.kept(id, where);
+      if (n < 3 || !SUPPLIES.has(d.category) || holds(id) || d.throw || d.w * d.h > 4) continue;
+      const kinds = rule.on?.[where]?.usage ?? rule.usage;
+      if (where < UNSORTED && !this.points[i].usage.some((u) => kinds.includes(u))) continue;
+      pool.push([id, n]);
+    }
+    for (let k = this.rng.int(1, most); k > 0 && pool.length; k--) {
+      const total = pool.reduce((a, [, w]) => a + w, 0);
+      let r = this.rng.next() * total, j = 0;
+      for (; j < pool.length - 1; j++) if ((r -= pool[j][1]) <= 0) break;
+      const it = makeItem(pool[j][0]), d = ITEMS[it.id], q = TYPES[it.id].qty;
+      if (d.stack && q) it.qty = Math.max(1, Math.round(d.stack * this.rng.range(q[0], q[1])));
+      grid.add(it);
+    }
   }
 
   /** when each sort was first found short on each step, since it was last made up (see `restock`) */
@@ -529,24 +637,27 @@ export class Economy {
     // fort gave Kamenka's clinic three bandages where it had had five.)
     this.arm(true, 'map');
     this.calibres();
-    // (what the whole map hangs on is put down first, while its few places are still free)
-    for (const id of FIRST) for (const t of STEPS) while (this.held(id, t) < this.kept(id, t) && this.spawnType(id, -1, t));
-    // interleave types so scarce ones still find free points
-    const ids = Object.keys(TYPES);
-    let progress = true;
-    while (progress) {
-      progress = false;
-      for (const id of ids) for (const t of STEPS) if (this.held(id, t) < this.kept(id, t) && this.spawnType(id, -1, t)) progress = true;
-    }
+    for (const t of STEPS) this.fill(t, null, this.short(t, null));
     // (and each place apart, to its own counts, out of its own places)
     this.arm(true, 'apart');
-    for (const place of this.places) {
-      progress = true;
-      while (progress) {
-        progress = false;
-        for (const id of ids) for (const t of STEPS) if (this.held(id, t, place) < this.wanted(place, id, t) && this.spawnType(id, -1, t, false, place)) progress = true;
-      }
+    for (const place of this.places) for (const t of STEPS) this.fill(t, place, this.short(t, place));
+  }
+
+  /** what each sort is short of on a step, or in a place apart, against what is kept there */
+  private short(t: Tier, place: string | null): Map<string, number> {
+    const has = this.tally(t, place), due = new Map<string, number>();
+    for (const id of Object.keys(TYPES)) {
+      const want = place ? this.wanted(place, id, t) : this.kept(id, t);
+      if (want > (has.get(id) ?? 0)) due.set(id, want - (has.get(id) ?? 0));
     }
+    return due;
+  }
+
+  /** how many of each sort lie on a step, or in a place apart (as `held` counts them, all at once) */
+  private tally(t: Tier, place: string | null): Map<string, number> {
+    const n = new Map<string, number>();
+    for (const l of this.loot.values()) if (l.point >= 0 && this.tier[l.point] === t && this.apart[l.point] === place) n.set(l.item.id, (n.get(l.item.id) ?? 0) + 1);
+    return n;
   }
 
   /**
@@ -566,7 +677,7 @@ export class Economy {
   inject(l: WorldLoot) {
     if (this.loot.has(l.uid)) return;
     this.loot.set(l.uid, l);
-    if (l.point >= 0) this.pointBusy.add(l.point);
+    if (l.point >= 0) this.occupy(l.point, true);
     this.events.spawn(l);
   }
 
@@ -579,7 +690,7 @@ export class Economy {
     if (!l) return null;
     this.loot.delete(uid);
     if (l.point >= 0) {
-      this.pointBusy.delete(l.point);
+      this.occupy(l.point, false);
       this.lastAt.set(l.point, { id: l.item.id, at: this.time });
       if (looted) this.looted.set(l.point, this.time);
     }
@@ -625,45 +736,43 @@ export class Economy {
       if (this.time - l.spawnedAt > life && !near(l)) this.take(l.uid, false);
     }
     this.arm();
-    for (const [id, rule] of Object.entries(TYPES)) {
-      for (const t of STEPS) {
-        const want = this.kept(id, t);
-        if (!want) continue;
-        // (from Kamenka up every one that is gone is put back, and soon; below it, once a share of them is gone)
-        const every = rule.on?.[t]?.restock;
-        if (t >= 3) this.restock(id, t, want, want, every ?? Math.min(rule.restock, GAS_RESTOCK));
-        else this.restock(id, t, want, Math.max(1, Math.ceil(want * (rule.keep ?? 0.6))), every ?? rule.restock);
-      }
-      // (a place apart: every one that is gone is put back, as from Kamenka up)
-      for (const place of this.places) for (const t of STEPS) {
-        const want = this.wanted(place, id, t);
-        if (want) this.restock(id, t, want, want, rule.on?.[t]?.restock ?? Math.min(rule.restock, GAS_RESTOCK), place);
-      }
-    }
+    for (const t of STEPS) this.restock(t, null);
+    for (const place of this.places) for (const t of STEPS) this.restock(t, place);
   }
 
-  /** Puts a sort back up to `want` on a step where fewer than `least` of it are left there, no oftener than `every` seconds. */
-  private restock(id: string, where: Tier, want: number, least: number, every: number, place: string | null = null) {
-    const n = this.held(id, where, place);
-    const key = place ? `${place}|${id}@${where}` : `${id}@${where}`;
-    if (n >= least) return void delete this.shortSince[key];
-    // (The wait runs from when it was first found short, which is within a count of its being taken. It ran from
-    // when its sort was last PUT BACK: a thing that had lain an hour, or since the server started, was back five
-    // seconds after it was taken, however long its rule said. Kamenka's one AK, "three quarters of an hour"
-    // coming back, came straight back. Found on reading, twice over, 2026-10-13.)
-    const since = (this.shortSince[key] ??= this.time);
-    if (this.time - since < every) return;
-    // (the clock of a sort starts again when some of it has been put back: with nowhere for it to go just now, a
-    // looted spot resting and its only other place taken, it is tried again at the next count and not in seven minutes)
-    let put = 0;
-    for (let k = n; k < want; k++) {
-      if (!this.spawnType(id, -1, where, false, place)) break;
-      put++;
+  /**
+   * Puts back what is gone on a step, or in a place apart, by a roll per spot (see `fill`): each sort that is short and
+   * whose wait is over. From Kamenka up, and in a place apart, every one that is gone is put back, and soon; below it,
+   * once a share of them is gone (its `keep`). The wait runs from when it was first found short, which is within a
+   * count of its being taken. (It ran from when its sort was last PUT BACK: a thing that had lain an hour came back
+   * five seconds after it was taken, however long its rule said. Kamenka's one AK, "three quarters of an hour" coming
+   * back, came straight back. Found on reading, twice over, 2026-10-13.)
+   */
+  private restock(t: Tier, place: string | null) {
+    const has = this.tally(t, place), due = new Map<string, number>(), least = new Map<string, number>();
+    for (const [id, rule] of Object.entries(TYPES)) {
+      const want = place ? this.wanted(place, id, t) : this.kept(id, t);
+      if (!want) continue;
+      const every = rule.on?.[t]?.restock;
+      const soon = place !== null || t >= 3;
+      const lo = soon ? want : Math.max(1, Math.ceil(want * (rule.keep ?? 0.6)));
+      const wait = every ?? (soon ? Math.min(rule.restock, GAS_RESTOCK) : rule.restock);
+      const n = has.get(id) ?? 0, key = place ? `${place}|${id}@${t}` : `${id}@${t}`;
+      if (n >= lo) {
+        delete this.shortSince[key];
+        continue;
+      }
+      const since = (this.shortSince[key] ??= this.time);
+      if (this.time - since < wait) continue;
+      due.set(id, want - n);
+      least.set(id, lo - n);
     }
-    if (put) {
+    // (the clock of a sort starts again when some of it has been put back; still short with nowhere for the rest just
+    // now, a looted spot resting and its only other place taken, it is tried again at the next count)
+    for (const [id, k] of this.fill(t, place, due)) {
+      const key = place ? `${place}|${id}@${t}` : `${id}@${t}`;
       this.lastRestock[key] = this.time;
-      // (made up: the next wait begins at the next loss. Still short, with nowhere to put the rest: tried again at every count.)
-      if (n + put >= least) delete this.shortSince[key];
+      if (k >= least.get(id)!) delete this.shortSince[key];
     }
   }
 
