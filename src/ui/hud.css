@@ -19,6 +19,8 @@
   background: rgba(233, 228, 216, 0.85);
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
   transition: opacity 0.15s;
+  /* (moved with the gun's lag every frame it lags: a layer of its own, so the move is the card's alone) */
+  will-change: translate;
 }
 .hud-cross.off {
   opacity: 0;
@@ -260,6 +262,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .hud-compass-needle { position: absolute; left: 50%; bottom: 0; width: 1px; height: 7px; background: var(--accent); }
 
 .hud-area { position: absolute; top: 22%; left: 0; right: 0; text-align: center; opacity: 0; }
+.hud-area:not(.show) { display: none; }
 .hud-area span {
   font-size: 34px;
   font-weight: 600;
@@ -334,9 +337,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* the arms, above it: runs down while a gun is held up to the eye */
 .hud-arms { position: absolute; left: 50%; bottom: 36px; width: 120px; height: 2px; margin-left: -60px; background: rgba(255, 255, 255, 0.1); opacity: 0; transition: opacity 0.6s; }
 .hud-arms.show { opacity: 1; }
-.hud-arms div { height: 100%; background: rgba(233, 196, 120, 0.8); }
+.hud-arms div { height: 100%; background: rgba(233, 196, 120, 0.8); transform-origin: left center; will-change: transform; }
 .hud-arms.spent div { background: #c8553d; }
-.hud-stamina div { height: 100%; background: rgba(233, 228, 216, 0.75); }
+.hud-stamina div { height: 100%; background: rgba(233, 228, 216, 0.75); transform-origin: left center; will-change: transform; }
 /* out of breath: the bar has to fill to the mark before the next sprint */
 .hud-stamina.spent div { background: #c8553d; }
 .hud-stamina.boost div { background: #f0bd12; box-shadow: 0 0 8px rgba(240, 189, 18, 0.7); }
@@ -2325,7 +2328,7 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
 .st-arrow { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
 .st-arrows { position: relative; }
 .st-arrows > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.st-blink { animation: st-run 1.1s linear infinite; animation-delay: calc(var(--i) * 0.16s); }
+.st-lit { animation: st-run 1.1s linear infinite; animation-delay: calc(var(--i) * 0.16s); }
 .st-stat[data-going="up"] .st-arrows { color: #8fd49a; }
 @keyframes st-run { 0%, 60%, 100% { opacity: 0.7; } 20% { opacity: 1; } }
 /* the badges: red for what is killing, yellow for what hinders, green for what is doing good */

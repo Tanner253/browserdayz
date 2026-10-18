@@ -81,7 +81,7 @@ function arrowsSvg(n: number): string {
     // (each lights a moment after the one before it, the way it points. Each in a picture of its own, which the card
     // can light by itself: a line inside one picture lit by the page was the whole page drawn again every frame, the
     // arrows being always there, 2026-10-18)
-    lit += `<svg class="st-blink" viewBox="0 0 12 32" style="--i:${up ? k - 1 - i : i}"><path class="st-arrow" d="${d}"/></svg>`;
+    lit += `<svg class="st-lit" viewBox="0 0 12 32" style="--i:${up ? k - 1 - i : i}"><path class="st-arrow" d="${d}"/></svg>`;
   }
   return k ? `<svg viewBox="0 0 12 32">${under}</svg>${lit}` : '';
 }

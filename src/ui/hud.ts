@@ -711,6 +711,8 @@ export class HUD {
     a.classList.remove('show');
     void a.offsetWidth;
     a.classList.add('show');
+    // (and out of the page once it has faded: there unseen, it cost the frame as much as the crosshair, 2026-10-18)
+    a.onanimationend = () => a.classList.remove('show');
   }
 
   /**
@@ -1806,7 +1808,9 @@ export class HUD {
     this.toggle(e.cross, 'off', (s.aiming && !s.sightless) || s.scoped || s.glass || s.dead || !!s.ride);
     // the four ticks stand as far out as the shot can land: half the cone, at this field of view
     this.toggle(e.cross, 'gun', s.spread > 0);
-    const lag = `${s.lag[0].toFixed(1)}px,${s.lag[1].toFixed(1)}px`;
+    // (to the half pixel: to the tenth, the sway of a gun held still moved it every frame, and every move was the page
+    // drawn again, 0.4 ms a frame standing still, 2026-10-18)
+    const lag = `${(Math.round(s.lag[0] * 2) / 2).toFixed(1)}px,${(Math.round(s.lag[1] * 2) / 2).toFixed(1)}px`;
     if (this.last.lag !== lag) {
       this.last.lag = lag;
       e.cross.style.translate = lag.replace(',', ' ');
@@ -1839,11 +1843,23 @@ export class HUD {
     this.toggle(e.hit, 'kill', s.kill);
     this.toggle(e.hit, 'head', s.head && !s.kill);
 
-    // hotbar: rebuilt only when something on it changes
-    let sig = '';
-    for (const h of s.hotbar) sig += `${h.id ?? ''}|${h.label}|${h.active ? 1 : 0}${h.dim ? 1 : 0};`;
+    // hotbar: rebuilt only when what is in it changes; the words under a slot (the rounds in a gun: every shot) are
+    // written alone. (Rebuilt with every shot, it was every slot and its picture made again, in the middle of a fight.)
+    let sig = '', words = '';
+    for (const h of s.hotbar) {
+      sig += `${h.id ?? ''}|${h.active ? 1 : 0}${h.dim ? 1 : 0};`;
+      words += `${h.label}`;
+    }
+    if (sig === this.last.hotbar && words !== this.last.hotbarWords) {
+      this.last.hotbarWords = words;
+      const ems = e.hotbar.querySelectorAll('.hb > em');
+      s.hotbar.forEach((h, i) => {
+        if (ems[i] && ems[i].innerHTML !== h.label) ems[i].innerHTML = h.label;
+      });
+    }
     if (sig !== this.last.hotbar) {
       this.last.hotbar = sig;
+      this.last.hotbarWords = words;
       e.hotbar.innerHTML = s.hotbar
         .map((h, i) => {
           const icon = h.id && this.icons[h.id] ? `<i style="background-image:url(${this.icons[h.id]})"></i>` : '';
@@ -1891,13 +1907,17 @@ export class HUD {
     if (lvl && this.last.bleedfx !== lvl) e.bleedfx.dataset.lvl = this.last.bleedfx = lvl;
     this.bloodOnGlass(s.bleed?.rate ?? 0);
     const reserve = (v.stamina / MAX_STAMINA) * 100;
-    (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
+    // (the bars are scaled, and only as they change: their width set every frame of a sprint was the page laid out again)
+    const bar = (key: string, el: Element, k: number) => {
+      const t = Math.max(0, Math.min(1, k)).toFixed(3);
+      if (this.last[key] !== t) (el as HTMLElement).style.transform = `scaleX(${(this.last[key] = t)})`;
+    };
+    bar('stamina', e.stamina.firstElementChild!, s.boost > 0 ? Math.min(100, s.boost * 10) / 100 : reserve / 100);
     this.toggle(e.stamina, 'show', reserve < 99.5 || s.boost > 0);
     this.toggle(e.stamina, 'spent', s.winded);
     // (on adrenaline the bar is full and yellow, and runs down as the ten seconds do)
     this.toggle(e.stamina, 'boost', s.boost > 0);
-    if (s.boost > 0) (e.stamina.firstElementChild as HTMLElement).style.width = `${Math.min(100, s.boost * 10)}%`;
-    (e.arms.firstElementChild as HTMLElement).style.width = `${s.arms * 100}%`;
+    bar('arms', e.arms.firstElementChild!, s.arms);
     this.toggle(e.arms, 'show', s.arms < 0.995);
     this.toggle(e.arms, 'spent', s.arms < 0.15);
     this.toggle(e.ride, 'show', !!s.ride);

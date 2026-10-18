@@ -247,6 +247,8 @@ export class Minimap {
     this.last.x = 1e9;
   }
 
+  private drawnAt = 0;
+
   /** @param yaw the way the player faces, radians (0 = north, turning left is positive) */
   update(x: number, z: number, yaw: number) {
     const l = this.last;
@@ -256,6 +258,9 @@ export class Minimap {
     this.root.classList.toggle('marked', now - this.marked < PING_LIFE);
     // redrawn only when something on it has moved a pixel's worth (or a mark is pulsing)
     if (!live && Math.abs(l.x - x) < 0.35 && Math.abs(l.z - z) < 0.35 && Math.abs(l.yaw - yaw) < 0.012 && l.big === this.big) return;
+    // (and no more than thirty times a second: flying or turning it was drawn and sent to the card every frame, 2026-10-18)
+    if (l.big === this.big && now - this.drawnAt < 1 / 30) return;
+    this.drawnAt = now;
     l.x = x;
     l.z = z;
     l.yaw = yaw;

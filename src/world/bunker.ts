@@ -880,7 +880,7 @@ export class BunkerSite {
       }
       this.pieces = all.children.length;
     }
-    if (this.under) this.under.visible = near < OPEN_FROM || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
+    if (this.under) this.under.visible = (near < OPEN_FROM && eye.y < P.y + 8) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
   }
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */
