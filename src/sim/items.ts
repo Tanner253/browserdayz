@@ -180,10 +180,10 @@ export interface ItemInstance {
 
 /**
  * seconds somebody else's dog tag has to be carried before it is cashed in
- * (fifteen minutes since 2026-10-12, when it was asked for: "i think we should bump the hold time requirement to
- * 15 minutes, and the time to be alive for tag drops is 10 minutes". It was ten; before that, thirty.)
+ * (thirty minutes since 2026-10-18: the owner, "cash in now take 30 minutes", for a fairer game with more players on.
+ * It was fifteen from 2026-10-12, ten before that, and thirty before that.)
  */
-export const TAG_HOLD = 15 * 60;
+export const TAG_HOLD = 30 * 60;
 /**
  * The Zona is the played part of the map, the red line round it (PLAY_AREAS in the world's generator): tags are
  * earned inside it. The country outside is for stashes and for building. A tag taken off somebody and carried
@@ -192,10 +192,11 @@ export const TAG_HOLD = 15 * 60;
 export const TAG_OUT = 15;
 /**
  * Seconds somebody has to have been alive before there is a tag on their body at all. Whoever has just arrived
- * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Ten minutes since
- * 2026-10-12; five before.)
+ * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Twenty minutes since
+ * 2026-10-18, the owner: "players must be alive for 20 minutes now before spawning a dogtag when dying"; ten from
+ * 2026-10-12, five before.)
  */
-export const TAG_FRESH = 10 * 60;
+export const TAG_FRESH = 20 * 60;
 /**
  * Seconds a dog tag lies on the ground before it is gone, whoever is standing by it (the owner, 2026-10-17: "dogtags
  * dropped on the ground should despawn after 10 mins, so people cant leave them in the world for too long and come back
