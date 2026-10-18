@@ -1046,7 +1046,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* What is carried: the grids scroll by themselves, and the inspector and the body's state stay in sight under them.
    (The inspector stood under every grid, and with a pack on it was off the foot of the screen.) Should the screen be
    too low for all three, the whole side scrolls as it did. */
-.inv-cargo > .inv-scroll { flex: 1 1 0; min-height: 150px; margin-right: -8px; padding-right: 8px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+/* (its scrollbar's room is kept whether or not one is shown: a thing chosen fills the inspector under it, a bar came, the grids lost its width and a bag that had stood beside another fell under it) */
+.inv-cargo > .inv-scroll { flex: 1 1 0; min-height: 150px; margin-right: -10px; padding-right: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
 .inv-scroll::-webkit-scrollbar, .inv-inspect::-webkit-scrollbar { width: 9px; height: 9px; }
 .inv-scroll::-webkit-scrollbar-track, .inv-inspect::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.28); border-left: 1px solid var(--line); }
 .inv-scroll::-webkit-scrollbar-thumb, .inv-inspect::-webkit-scrollbar-thumb { background: rgba(233, 228, 216, 0.24); border: 2px solid transparent; background-clip: padding-box; }
