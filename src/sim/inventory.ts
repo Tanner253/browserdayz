@@ -416,6 +416,31 @@ export function holdOnlyEmpties(now: SerializedInventory, before: SerializedInve
  * a pack on a body or in a crate, a bag in a pack, a stash case that is carried. Null for a thing nothing is kept in.
  * @param depth how far down the grid is (see `Container.depth`): one more than the grid the thing lies in
  */
+/** One pile topped up from another: what Combine all did, for the screen to show it (`combinePiles`). */
+export interface PileMove { from: ItemInstance; to: ItemInstance; n: number }
+
+/**
+ * Every pile of one thing in these grids made into as few as hold it (the inventory's Combine all, 2026-10-18).
+ * The grids are in the order they are filled: the first piles are topped up from the last, so what is worn fills
+ * before the bags carried inside it ("start filling the stacks ... in his main containers before the sub
+ * containers"). A pile emptied is taken out of its grid. Nothing is made or lost: only counts move.
+ */
+export function combinePiles(grids: Container[], id: string): PileMove[] {
+  const cap = ITEMS[id]?.stack ?? 1, moves: PileMove[] = [];
+  const piles = grids.flatMap((c) => c.items.filter((p) => p.item.id === id).map((p) => ({ c, item: p.item })));
+  let i = 0, j = piles.length - 1;
+  while (i < j) {
+    const to = piles[i].item, from = piles[j].item;
+    if (to.qty >= cap) { i++; continue; }
+    const n = Math.min(cap - to.qty, from.qty);
+    to.qty += n;
+    from.qty -= n;
+    if (n > 0) moves.push({ from, to, n });
+    if (from.qty <= 0) { piles[j].c.remove(from); j--; }
+  }
+  return moves;
+}
+
 export function bagGrid(item: ItemInstance, depth = 1): Container | null {
   const d = ITEMS[item.id], room = holds(item.id);
   if (!room) return null;
@@ -629,6 +654,16 @@ export class PlayerInventory {
   }
 
   /** every grid the player can put things in right now: the tag pouch (which takes only tags), the pockets of jacket and trousers, then vest and bag; and last, an admin's hold while it is open or has anything in it */
+  /**
+   * Every grid of what is carried in the order piles are joined in (`combinePiles`): what is worn, as `containers`
+   * has it, then the inside of every bag lying in those (not the tag pouch: tags are no pile).
+   */
+  get pileGrids(): Container[] {
+    const worn = this.containers.filter((c) => c !== this.tags);
+    const inner = worn.flatMap((c) => c.items.map((p) => bagGrid(p.item)).filter((g): g is Container => !!g));
+    return [...worn, ...inner];
+  }
+
   get containers(): Container[] {
     const out: Container[] = [this.tags];
     for (const s of POCKET_ORDER) {

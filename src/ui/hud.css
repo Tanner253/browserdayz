@@ -2409,3 +2409,6 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .hud-bleed .hb-drop, .hud-bleed.low .hb-cut { display: none; }
 .hud-bleed.low .hb-drop { display: flex; }
 .rw-umb { margin: 0 0 14px; padding: 8px 12px; background: #1d1b14; border-left: 2px solid #ffd35a; font-size: 13px; color: #e9e4d8; }
+
+/* (a thing flying from one pile to the one it joins: Combine all, InventoryUI.combineAll) */
+.inv-fly { position: fixed; z-index: 60; pointer-events: none; background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0 0 4px rgba(201, 178, 124, 0.8)); }

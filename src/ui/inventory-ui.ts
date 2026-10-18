@@ -22,7 +22,7 @@
 // which is the nearest free spot to the pointer, not only the cell under it.
 
 import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
-import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
+import { Container, bagGrid, combinePiles, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon, type Act } from './act-icons';
 import { kindIcon, kindView, setKindView } from './kind-icons';
@@ -1452,6 +1452,12 @@ export class InventoryUI {
         },
       });
     }
+    // every pile of it that is carried made into as few as hold it, where that is fewer than there are
+    if (d.stack && this.carried(loc)) {
+      const piles = this.inv.pileGrids.flatMap((c) => c.items.filter((p) => p.item.id === it.id));
+      const total = piles.reduce((n, p) => n + p.item.qty, 0);
+      if (piles.length > Math.ceil(total / d.stack)) out.push({ label: `Combine all (${piles.length} piles)`, icon: 'merge', run: () => this.combineAll(it.id) });
+    }
     if (d.weapon?.mag) {
       // One of the two, never both (2026-10-18: "why there is two?"): the magazine out, the round in the chamber
       // left there as in DayZ; and with none in, that round out.
@@ -2256,6 +2262,42 @@ export class InventoryUI {
     // (nothing stands out to be done with it: said, where it was passed over without a word)
     else this.actions.note(`Right-click the ${ITEMS[src.item.id].name.toLowerCase()} for what can be done with it`);
     this.render();
+  }
+
+  /**
+   * Combine all: the piles joined (src/sim/inventory.ts combinePiles), and what moved shown going: a picture of the
+   * thing flies from each pile emptied to the one it joined, and that one glows (the note on the idea: "the items
+   * flying from source to destination").
+   */
+  private combineAll(id: string) {
+    const where = () => {
+      const at = new Map<string, DOMRect>();
+      for (const el of this.root.querySelectorAll('.inv-item')) {
+        const uid = this.bound.get(el)?.item.uid;
+        if (uid) at.set(uid, el.getBoundingClientRect());
+      }
+      return at;
+    };
+    const before = where();
+    const moves = combinePiles(this.inv.pileGrids, id);
+    if (!moves.length) return;
+    this.finish('move');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const after = where(), url = this.icons[id] ?? '';
+    moves.forEach((m, k) => {
+      const a = before.get(m.from.uid), b = after.get(m.to.uid) ?? before.get(m.to.uid);
+      if (!a || !b) return;
+      const s = Math.min(a.width, a.height, 46);
+      const fly = document.createElement('div');
+      fly.className = 'inv-fly';
+      fly.style.cssText = `left:${a.left + a.width / 2 - s / 2}px;top:${a.top + a.height / 2 - s / 2}px;width:${s}px;height:${s}px;background-image:url(${url})`;
+      document.body.appendChild(fly);
+      const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+      fly.animate([{ transform: 'translate(0, 0) scale(1)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.7)`, opacity: 0.9 }], { duration: 420, delay: k * 70, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'both' }).finished.then(() => {
+        fly.remove();
+        for (const el of this.root.querySelectorAll('.inv-item')) if (this.bound.get(el)?.item === m.to) el.animate([{ boxShadow: '0 0 0 2px rgba(201,178,124,.9), 0 0 14px rgba(201,178,124,.7)' }, { boxShadow: '0 0 0 0 rgba(201,178,124,0)' }], { duration: 500 });
+      });
+    });
   }
 
   private finish(sound: 'pickup' | 'drop' | 'move') {
