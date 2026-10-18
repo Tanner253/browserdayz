@@ -35,6 +35,13 @@ export const SLOT_ORDER: Slot[] = WEAPON_SLOTS;
  * next bandage is on.
  */
 export const HOT_KEYS = 10;
+
+/** the order kinds stand in once a grid is sorted: guns and what feeds them first, the rest after (Container.sort) */
+const SORT_ORDER = ['weapon', 'melee', 'magazine', 'ammo', 'attachment', 'explosive', 'medical', 'food', 'drink', 'tool', 'clothing', 'stash', 'misc'];
+const sortRank = (id: string) => {
+  const i = SORT_ORDER.indexOf(ITEMS[id]?.throw ? 'explosive' : ITEMS[id]?.category ?? 'misc');
+  return i < 0 ? SORT_ORDER.length : i;
+};
 export interface HotBind {
   uid: string;
   id: string;
@@ -169,6 +176,30 @@ export class Container {
     const def = ITEMS[item.id];
     if (def.stack && this.items.some((p) => p.item.id === item.id && p.item.qty < def.stack!)) return true;
     return !!this.anywhere(item);
+  }
+
+  /**
+   * Packed afresh, kind by kind (the inventory's sort button, 2026-10-18): guns, then what feeds them, then the
+   * rest, the bigger of a kind first, each in the first place it fits. If that order leaves anything without room
+   * the bigger things go first whatever their kind; and if that does too, nothing is moved.
+   * @returns whether anything moved
+   */
+  sort(): boolean {
+    const was = this.items.map((p) => ({ ...p }));
+    const area = (p: Placed) => ITEMS[p.item.id].w * ITEMS[p.item.id].h;
+    const byKind = (a: Placed, b: Placed) => sortRank(a.item.id) - sortRank(b.item.id) || area(b) - area(a) || a.item.id.localeCompare(b.item.id) || (b.item.qty ?? 0) - (a.item.qty ?? 0);
+    const bySize = (a: Placed, b: Placed) => area(b) - area(a) || byKind(a, b);
+    for (const order of [byKind, bySize]) {
+      this.items.length = 0;
+      if ([...was].sort(order).every((p) => {
+        const at = this.anywhere(p.item);
+        if (at) this.items.push({ item: p.item, ...at });
+        return !!at;
+      })) return this.items.some((p) => { const o = was.find((q) => q.item === p.item)!; return o.x !== p.x || o.y !== p.y || o.rot !== p.rot; });
+    }
+    this.items.length = 0;
+    this.items.push(...was);
+    return false;
   }
 
   place(item: ItemInstance, x: number, y: number, rot: boolean): boolean {

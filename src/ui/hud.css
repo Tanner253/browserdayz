@@ -762,6 +762,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-gridbox h4:hover { background: rgba(233, 228, 216, 0.12); color: var(--ink); }
 .inv-gridbox h4 i { width: 12px; font-style: normal; color: var(--accent); }
 .inv-gridbox h4 span { margin-left: auto; padding-left: 10px; }
+/* (the sort button by a grid's name: src/sim/inventory.ts Container.sort) */
+.inv-sort { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
+.inv-sort svg { width: 11px; height: 11px; fill: currentColor; }
+.inv-sort:hover { color: var(--accent); border-color: var(--line); background: rgba(0, 0, 0, 0.3); }
 .inv-gridbox.shut h4 { border-bottom: 1px solid var(--line); opacity: 0.75; }
 .inv-item {
   position: absolute;

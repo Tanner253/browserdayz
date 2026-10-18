@@ -744,10 +744,18 @@ export class InventoryUI {
     box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '') + (c.w >= 9 ? ' wide' : '');
     const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`;
     const tip = hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
-    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''} <span>${said}</span></h4>`;
+    // (a grid of what is carried, with two things or more in it and open, can be sorted: packed tight, kind by kind)
+    const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && this.inv.containers.some((x) => x.id === c.id);
+    const sortBtn = sorts ? `<button type="button" class="inv-sort" title="Sort: pack it tight, kind by kind"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 6H28V10H4ZM4 14H21V18H4ZM4 22H14V26H4Z"/></svg></button>` : '';
+    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn} <span>${said}</span></h4>`;
     box.querySelector('h4')!.addEventListener('click', () => {
       if (!this.folded.delete(c.id)) this.folded.add(c.id);
       this.render();
+    });
+    box.querySelector('.inv-sort')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (c.sort()) this.finish('move');
+      else this.actions.note(`The ${c.name.toLowerCase()} is as tidy as it gets`);
     });
     if (!shut) box.appendChild(this.gridEl(c));
     return box;
