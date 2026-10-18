@@ -31,6 +31,8 @@ import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
 
 const CELL = 46;
+/** the hot key a thing in a place is on, as a key before the place's name (nothing for none) */
+const slotKey = (i: number) => (i >= 0 ? `<span class="slot-key">${(i + 1) % 10}</span>` : '');
 /** What a press on keeps the chosen thing chosen (anywhere else, it is let go: see the constructor) */
 const KEEPS_CHOSEN = '.inv-item, .inv-inspect, .inv-menu, .inv-card, .inv-hot, .inv-view, .inv-view-menu, button, input, label, a, h4';
 
@@ -767,7 +769,7 @@ export class InventoryUI {
     const item = this.actions.inHands();
     s.className = 'inv-slot slot-inhands' + (item ? '' : ' empty');
     s.dataset.hands = '1';
-    s.innerHTML = `<div class="slot-label">In your hands</div>`;
+    s.innerHTML = `<div class="slot-label">${slotKey(item ? this.actions.hotIndex(item) : -1)}In your hands</div>`;
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + this.mark(item);
@@ -874,9 +876,10 @@ export class InventoryUI {
     const item = this.inv.slots[slot];
     // (the key it is on, if it is on one: the keys are bound to things and can be given to anything)
     const key = item ? this.actions.hotIndex(item) : -1;
-    // (the number of its key is not written over a place on the body any more: the keys are along the foot of the page. 2026-10-11: "the floating numbers above the weapon and hand and back slots are not intuitive we can just remove them")
-    void key;
-    s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
+    // (2026-10-11 the floating numbers over the places were taken off: "not intuitive". Its key is said again
+    // before the place's name, drawn as the same key as on the hot keys, so which gun is on which key is matched at
+    // a glance: 2026-10-18, "so it's clear like which one is which shortcut")
+    s.innerHTML = `<div class="slot-label">${slotKey(key)}${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + this.mark(item) + (this.actions.inHands() === item ? ' active' : '');
