@@ -259,6 +259,12 @@ export class InventoryUI {
   /** the bags that have been shown open by themselves once (by their numbers): one shut by hand after that stays shut */
   private shown = new Set<string>();
   /**
+   * Idea 9, "New" marker: what was carried when this was last shut (by number; null: not yet looked at), and what
+   * has come in since and not yet been hovered. Things taken while it is open were seen being taken, and are not new.
+   */
+  private known: Set<string> | null = null;
+  private fresh = new Set<string>();
+  /**
    * Set by the game where what is carried weighs on a survivor (null: not told, and only the weight is shown). What
    * a load does is src/sim/load.ts: this screen shows what it leaves of a sprint, and marks one that slows the feet.
    * (It was the weight at which a load began to slow them, shown beside what was carried: the figure is no longer read.)
@@ -482,8 +488,29 @@ export class InventoryUI {
     this.stashState = '';
     this.vitals = vitals;
     this.isOpen = true;
+    const now = this.everyUid();
+    if (this.known) for (const uid of now) if (!this.known.has(uid)) this.fresh.add(uid);
+    for (const uid of this.fresh) if (!now.has(uid)) this.fresh.delete(uid);
     this.root.classList.add('show');
     this.render();
+  }
+
+  /** What is carried now is not new: a save loaded, or a new life's kit (the game's to call). */
+  settle() {
+    this.known = this.everyUid();
+    this.fresh.clear();
+  }
+
+  /** the number of every thing carried, worn or inside another */
+  private everyUid() {
+    const out = new Set<string>();
+    const walk = (it: ItemInstance) => {
+      out.add(it.uid);
+      for (const p of it.cargo ?? []) walk(p.item);
+    };
+    for (const it of Object.values(this.inv.slots)) if (it) walk(it);
+    for (const c of this.inv.containers) for (const p of c.items) walk(p.item);
+    return out;
   }
 
   refresh(vicinity: WorldItem[], stash: Stash | null) {
@@ -504,6 +531,7 @@ export class InventoryUI {
   }
 
   close() {
+    if (this.isOpen) this.known = this.everyUid();
     this.isOpen = false;
     this.viewOpen = false;
     this.hover = null;
@@ -640,6 +668,7 @@ export class InventoryUI {
     }
     const qi = this.actions.hotIndex(item);
     if (qi >= 0) t.push(`<span class="qkey">${(qi + 1) % 10}</span>`);
+    if (this.fresh.has(item.uid)) t.push('<span class="new">New</span>');
     return t.join('');
   }
 
@@ -1736,6 +1765,7 @@ export class InventoryUI {
     });
     el.addEventListener('pointerenter', (e) => {
       this.hover = src;
+      if (this.fresh.delete(src.item.uid)) el.classList.add('seen');
       this.at = { x: e.clientX, y: e.clientY, mouse: e.pointerType === 'mouse' };
       this.showCard(src);
     });

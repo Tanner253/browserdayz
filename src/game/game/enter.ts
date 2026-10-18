@@ -361,6 +361,7 @@ export const enterMethods = {
     this.avatar.clearWounds();
     this.weapons.validate();
     this.autoHot();
+    this.invUI.settle();
     // (and it is seen with nothing on: the helmet, the vest and the pack of the life before were still on the body,
     // and on the figure in the inventory, until something was next picked up. "when i die and respawn my player
     // model still has its old equipement shown", 2026-10-12.)
@@ -669,6 +670,7 @@ export const enterMethods = {
       this.ensureTag();
       this.autoHot();
       this.weapons.validate();
+      this.invUI.settle();
     } else {
       // the map changed under the old character (or they were dead): a new life on the edge
       this.spawnAtEdge();
