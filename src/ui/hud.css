@@ -877,6 +877,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* over a stack it adds to, or a weapon it fits */
 .inv-outline.join { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .inv-outline { overflow: hidden; padding-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-align: center; text-transform: uppercase; color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.inv-outline span { position: relative; z-index: 1; }
+/* the faded picture of the thing where it would land, lying on the cells as it would (the 2px border is outside them) */
+.inv-outline .inv-item { position: absolute; left: -1px; top: -1px; opacity: 0.45; pointer-events: none; }
+.inv-outline.bad .inv-item { opacity: 0.3; filter: grayscale(1); }
 
 /* While something is dragged, every place it can go is lit, and the rest stands back. */
 .inv.dragging, .inv.dragging * { cursor: grabbing !important; }

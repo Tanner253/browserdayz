@@ -2032,14 +2032,16 @@ export class InventoryUI {
     const t = this.target(e.clientX, e.clientY);
     // (held where it will not go, the reason is said by the pointer before it is let go, and not only after)
     this.hint(t ? this.refusal(d, t, e) : '');
-    const box = (rect: DOMRect, x: number, y: number, w: number, h: number, cls: string, label = '') => {
+    // (rot, where given: a faded picture of the thing is drawn where it would land, turned as it would lie there. 2026-10-18, idea 8 on Fettah's board)
+    const box = (rect: DOMRect, x: number, y: number, w: number, h: number, cls: string, label = '', rot?: boolean) => {
       o.style.display = 'block';
       o.style.left = `${rect.left / z + x * CELL}px`;
       o.style.top = `${rect.top / z + y * CELL}px`;
       o.style.width = `${w * CELL}px`;
       o.style.height = `${h * CELL}px`;
       o.className = 'inv-outline ' + cls;
-      o.textContent = label;
+      if (rot !== undefined) o.appendChild(this.itemEl(d.src.item, w, h, rot));
+      if (label) o.insertAdjacentHTML('beforeend', `<span>${label}</span>`);
     };
     if (t?.kind === 'grid') {
       const c = this.containerById(t.id!);
@@ -2066,12 +2068,13 @@ export class InventoryUI {
       }
       const at = this.landing(c, d.src.item, cx, cy, d.rot);
       if (at) {
+        // (turned to fit where it was not held turned: it says so, as it would otherwise only be seen once let go)
         const [w, h] = Container.size(d.src.item, at.rot);
-        box(rect, at.x, at.y, w, h, 'ok');
+        box(rect, at.x, at.y, w, h, 'ok', at.rot !== d.rot ? 'Turned' : '', at.rot);
       } else {
         // (why not is said in full by the pointer: see `refusal`)
         const [w, h] = Container.size(d.src.item, d.rot);
-        box(rect, cx, cy, w, h, 'bad');
+        box(rect, cx, cy, w, h, 'bad', '', d.rot);
       }
     } else if (t?.kind === 'slot') {
       const occupant = this.inv.slots[t.slot];
