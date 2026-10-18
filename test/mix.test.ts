@@ -166,12 +166,12 @@ ok('each way out passes one fader, of its own group, once; and the one volume, o
 ok('a slider turns its own group by its share and no other; the one volume turns them all (the figures each ends at are printed)', () => {
   const near = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b)), `${what}: ${a}, and should be ${b}`);
   const cases: [volume: number, mix: Mix][] = [
-    [1, { fx: 0.5, voice: 1, ambience: 1, ui: 1 }],
-    [1, { fx: 1, voice: 0.25, ambience: 1, ui: 1 }],
-    [1, { fx: 1, voice: 1, ambience: 0, ui: 1 }],
-    [1, { fx: 1, voice: 1, ambience: 1, ui: 0.63 }],
-    [0.5, { fx: 0.3, voice: 0.8, ambience: 0.1, ui: 1 }],
-    [0.25, { fx: 0, voice: 0, ambience: 0, ui: 0 }],
+    [1, { fx: 0.5, voice: 1, ambience: 1, ui: 1, vehicles: 1 }],
+    [1, { fx: 1, voice: 0.25, ambience: 1, ui: 1, vehicles: 1 }],
+    [1, { fx: 1, voice: 1, ambience: 0, ui: 1, vehicles: 1 }],
+    [1, { fx: 1, voice: 1, ambience: 1, ui: 0.63, vehicles: 0.4 }],
+    [0.5, { fx: 0.3, voice: 0.8, ambience: 0.1, ui: 1, vehicles: 0.7 }],
+    [0.25, { fx: 0, voice: 0, ambience: 0, ui: 0, vehicles: 0 }],
     [0, { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 }],
     [1, { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 }],
   ];
