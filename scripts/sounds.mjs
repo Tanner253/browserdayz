@@ -194,6 +194,50 @@ several('hit_wood', ['c-wood_hit_03', 'c-wood_hit_04', 'c-wood_hit_07', 'c-wood_
 // played, and how its pitch and its top change with distance, is ROTOR there.
 SOUNDS.rotor = { src: path.join(ROOT, 'assets-src', '854493__qubodup__uh60-black-hawk-helicopter-hover-loop-1.wav'), loop: true, rate: 48000, gain: 1 };
 
+// The weapons pass's guns, each a shot of its own (2026-10-17; the owner chose them and downloaded the Freesound ones,
+// all CC0, into assets-src/ itself; the FLAC, MP3 and 32-bit ones decoded by a browser into decoded/fs-<number>.wav).
+// The library's are a muzzle's snap and want weight under them, as the pistol's does; Freesound's are made to be played.
+const fsnd = (f) => path.join(ROOT, 'assets-src', f);
+const AIR = { src: snake('Full Sound/5.56/WAV/556 Single WAV.wav'), level: 0.65, after: 0.012, die: 0.3 };
+const BORE = [
+  { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), level: 1.1, low: 520 },
+  { src: snake('Full Sound/7.62x39/WAV/762x39 Single WAV.wav'), level: 0.75, after: 0.012, die: 0.55 },
+];
+// (the Scorpion a Swedish K, the Dual SMGs a PPSh, the AKS-74U an AK-47: the library's, each its own three takes)
+SOUNDS.shot_scorpion = { src: lib('Carl Gustav M45/G_31P.wav'), side: 1, takes: 3, len: 1.5, rate: 44100, gain: 1, press: 1.4, air: 0.9, with: [AIR] };
+SOUNDS.shot_ppsh = { src: lib('PPSh/P_30P.wav'), side: 1, takes: 3, len: 1.5, rate: 44100, gain: 1, press: 1.4, air: 0.6, with: [AIR] };
+SOUNDS.shot_aks = { src: lib('AK-47/C_28P.wav'), side: 1, takes: 3, len: 1.7, rate: 44100, gain: 1, press: 1.2, with: [{ ...AIR, level: 0.5 }] };
+// (the DB-12 a Winchester Model 12, the sawn-offs a Charles Daly: twelve bores, with the shotgun's thump under them)
+SOUNDS.shot_db12 = { src: lib('Model 12/K_22P.wav'), side: 1, takes: 2, len: 2.2, rate: 44100, gain: 1, press: 1.6, with: BORE };
+SOUNDS.shot_sawnoff = { src: lib('CD/H_21P.wav'), side: 1, takes: 2, len: 2, rate: 44100, gain: 1, press: 1.6, with: BORE };
+// (the Barrett an M82A1, the .50 an M107; the VSSK's quieted shot a quieted Tac-50; the MAC-10s a .45 USP; the MP7 the
+// last shot of an Uzi's last burst; the M32 a 40 mm launcher; the Desert Eagle its own, cut before its case lands)
+SOUNDS.shot_barrett = { src: dec('fs-855592'), len: 2, rate: 44100, gain: 1 };
+SOUNDS.shot_50 = { src: dec('fs-854700'), len: 2.2, rate: 44100, gain: 1 };
+SOUNDS.shot_vssk = { src: dec('fs-737570'), len: 1.8, rate: 44100, gain: 1 };
+SOUNDS.shot_mac10 = { src: fsnd('734062__areniporgen__heckler-koch-usp45.wav'), len: 1.6, rate: 44100, gain: 1 };
+SOUNDS.shot_mp7 = { src: dec('fs-418433'), from: 0.86, len: 0.44, rate: 44100, gain: 1, fade: 0.12 };
+SOUNDS.shot_m32 = { src: fsnd('163458__lemudcrab__grenade-launcher.wav'), rate: 44100, gain: 1, fade: 0.1 };
+SOUNDS.shot_deagle = { src: dec('fs-233322'), len: 0.95, rate: 44100, gain: 1, fade: 0.15 };
+// A pump worked (a Mossberg's, after its shot: back, and forward), for the Benelli; a spent case on the ground; and an
+// Uzi reloaded empty, its magazine out, the new one in, and its bolt drawn, for the submachine guns.
+SOUNDS.pump = { src: fsnd('159710__anthonychan0__mossberg-500a-1-shot-and-pump.wav'), from: 1.18, len: 0.66, rate: 32000, gain: 0.8, fade: 0.08 };
+SOUNDS.casing = { src: fsnd('179006__smartwentcody__bullet-casing-on-concrete-1.wav'), len: 0.8, rate: 32000, gain: 0.7, fade: 0.2 };
+const UZI = fsnd('677160__serutonin-deprivd__uzi-submachine-gun-being-reloaded-while-empty.wav');
+SOUNDS.uzi_mag_out = { src: UZI, from: 0.15, len: 0.55, rate: 32000, gain: 0.75, fade: 0.08 };
+SOUNDS.uzi_mag_in = { src: UZI, from: 1.5, len: 0.85, rate: 32000, gain: 0.75, fade: 0.1 };
+SOUNDS.uzi_rack = { src: UZI, from: 2.95, len: 0.95, rate: 32000, gain: 0.8, fade: 0.1 };
+// And what the owner added after (2026-10-17): a round's crack going by (five of a recording of thirteen), a drink
+// (its gulps, cut before the "ahh" it ends with: "the end of the sound ... we wont need"), a wooden door opened then
+// shut (the two halves apart), and a steel hinge creaking, for the bunker's door and the lockers.
+// (the five of its thirteen that are a crack and nothing after it: two others ring on, a round striking something)
+[0, 3.3, 5.8, 11.4, 12.85].forEach((from, n) => (SOUNDS[`bullet_crack${n ? `_${n + 1}` : ''}`] = { src: fsnd('161001__deleted_user_1371021__whipper-snappersbullet-hits.wav'), from, len: 0.35, rate: 44100, gain: 0.9, fade: 0.12 }));
+SOUNDS.drink = { src: dec('fs-411172'), len: 1.06, rate: 32000, gain: 0.8, fade: 0.06 };
+const DOOR = fsnd('125958__ryding__wooden-door-open-close.wav');
+SOUNDS.door_opened = { src: DOOR, len: 1.3, rate: 44100, gain: 0.6, fade: 0.2 };
+SOUNDS.door_shut = { src: DOOR, from: 1.8, len: 0.95, rate: 44100, gain: 0.9, fade: 0.2 };
+SOUNDS.metal_creak = { src: fsnd('119468__ingudios__metal-creak-4.wav'), len: 1.6, rate: 44100, gain: 0.8, fade: 0.3 };
+
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
 async function readWav(file, side) {
   const b = await fs.readFile(file);

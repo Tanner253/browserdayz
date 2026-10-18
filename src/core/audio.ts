@@ -7,6 +7,9 @@ import { EMOTE } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 
 type V3 = { x: number; y: number; z: number };
+/** how a gun sounds where it is not as its kind does: its recording, played so much slower (deeper) and louder; and a
+ * quieted shot of its own, at its own level against the .22's (see gunshot) */
+export interface Voice { rate: number; gain: number; rec?: string; quiet?: string; quietGain?: number }
 
 /**
  * How much of a loud sound comes back from round about: [in the open, under a roof]. Open
@@ -158,7 +161,7 @@ export interface RotorVoice {
  * made-up sound is what is heard: but for the infected (z_), who have no made-up voice any more
  * and are silent until theirs is there.
  */
-const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, mag_round: 1, rack: 1, shot_ak: 1, shot_ar: 1, ak_mag_out: 1, ak_mag_in: 1, ak_rack: 1, ar_mag_out: 1, ar_mag_in: 1, ar_rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
+const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, mag_round: 1, rack: 1, shot_ak: 1, shot_ar: 1, ak_mag_out: 1, ak_mag_in: 1, ak_rack: 1, ar_mag_out: 1, ar_mag_in: 1, ar_rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1, shot_scorpion: 3, shot_ppsh: 3, shot_aks: 3, shot_db12: 2, shot_sawnoff: 2, shot_barrett: 1, shot_50: 1, shot_vssk: 1, shot_mac10: 1, shot_mp7: 1, shot_m32: 1, shot_deagle: 1, pump: 1, casing: 1, uzi_mag_out: 1, uzi_mag_in: 1, uzi_rack: 1, bullet_crack: 5, drink: 1, door_opened: 1, door_shut: 1, metal_creak: 1 };
 /**
  * Recordings of what a body does all day (2026-10-13: "our sounds for drinking and doing basically everything can
  * and should get rehauled"): feet by what is under them, a thing taken up or put down by what it is made of, a
@@ -647,7 +650,7 @@ export class AudioEngine {
    * @param voice a gun that is deeper and louder than its kind: its recording played that much slower and that much louder
    * @param sonic through a suppressor: how much of a crack its round makes, 0 (slower than sound when it leaves: none) .. 1 (a rifle's)
    */
-  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: { rate: number; gain: number; rec?: string }, sonic = kind === 'rifle' ? 1 : 0) {
+  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: Voice, sonic = kind === 'rifle' ? 1 : 0) {
     if (!this.ready) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + (distance > 0 ? distance / 343 : 0);
@@ -682,7 +685,8 @@ export class AudioEngine {
       th.connect(tg).connect(o2);
       th.start(t);
       th.stop(t + 0.26);
-      if (this.rec('shot_quiet', o2, t, level, mix(QUIET.rate))) return;
+      // (a gun with a quieted shot of its own plays that, at its own level: the VSSK, a 12.7 mm, is no .22)
+      if (voice?.quiet ? this.rec(voice.quiet, o2, t, level * (voice.quietGain ?? 1), 1) : this.rec('shot_quiet', o2, t, level, mix(QUIET.rate))) return;
       // (until the recording has come: a made-up snap in its place)
       const n = this.noise(t, 0.12);
       const f = this.filter('bandpass', 1300, 0.8);
@@ -761,7 +765,11 @@ export class AudioEngine {
     // slowed to the weight of this one. With those there is no klaxon (it was the made-up part of it, and what was
     // heard across the whole map) and the grinding under them is half what it was.
     const real = this.rec(opening ? 'gate_open' : 'gate_close', out, t + 0.05, 2.6, 0.8);
-    if (real) this.rec('gate_slam', out, t + 2.95, 2.8, 0.72);
+    if (real) {
+      this.rec('gate_slam', out, t + 2.95, 2.8, 0.72);
+      // (and its hinges complaining as it goes)
+      this.rec('metal_creak', out, t + 0.4, 1.4, 0.8);
+    }
     // the klaxon: two notes, turn about, for as long as it moves (only until the recordings have come)
     for (let k = 0; k < (real ? 0 : 6); k++) {
       const o = ctx.createOscillator();
@@ -853,8 +861,8 @@ export class AudioEngine {
    * (`pos`). It was once heard forty metres off, after every shot from every rifle about, and was taken out for
    * that; it is back for the rifle's own hands, and close by.
    */
-  boltCycle(start = 0, pos?: V3) {
-    if (this.ready) this.rec('bolt', pos ? this.out(pos, 2, 1.6) : this.sfx, this.ctx.currentTime + start, pos ? 1.1 : 0.95);
+  boltCycle(start = 0, pos?: V3, rec: 'bolt' | 'pump' = 'bolt') {
+    if (this.ready) this.rec(rec, pos ? this.out(pos, 2, 1.6) : this.sfx, this.ctx.currentTime + start, pos ? 1.1 : 0.95);
   }
 
   /** another player close by reloading: a magazine out and one in, from where they stand (it is not heard across a field) */
@@ -894,6 +902,8 @@ export class AudioEngine {
 
   shellDrop(delay = 0.35) {
     if (!this.ready) return;
+    // (a recording of a spent case landing, when it has come; until then three made-up ticks)
+    if (this.rec('casing', this.sfx, this.ctx.currentTime + delay, 0.32, 0.92 + Math.random() * 0.16, true, true)) return;
     for (let i = 0; i < 3; i++) this.click(5200 + Math.random() * 1500, 0.08 / (i + 1), 0.04, delay + i * 0.09 + Math.random() * 0.03);
   }
 
@@ -924,6 +934,8 @@ export class AudioEngine {
       const waves: [after: number, peak: number][] = [[0, level], [(bounce - miss) / 343, level * CRACK.ground * Math.pow(miss / bounce, 0.75)]];
       for (const [after, peak] of waves) {
         if (peak < 0.01) continue;
+        // (a recording of a round's crack going by, where they have come; the made-up one until then)
+        if (this.rec('bullet_crack', out, t + after, peak * 1.1, 0.95 + Math.random() * 0.1, false, true)) continue;
         const c = this.noise(t + after, CRACK.shape[2]);
         const hp = this.filter('highpass', 1000);
         const cg = ctx.createGain();
@@ -1188,6 +1200,9 @@ export class AudioEngine {
     // or swung to and shut. Until then, the made-up click, creak and thud.
     // (Shut, it is the same recording as opened, a little lower: asked for 2026-10-10, the recording of one
     // being shut not being liked.)
+    // (the owner's own recording of a wooden door, 2026-10-17, its opening and its shutting apart: "add sound for door
+    // open close as well"; the earlier ones, until it has come)
+    if (opening ? this.rec('door_opened', out, t, 0.8) : this.rec('door_shut', out, t + 0.04, 0.7)) return;
     if (opening ? this.rec('door_open', out, t, 0.7) : this.rec('door_open', out, t + 0.12, 0.7, 0.92)) {
       if (opening) this.rec('door_creak', out, t + 0.14, 0.22);
       return;
@@ -1237,7 +1252,10 @@ export class AudioEngine {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const out = this.out(pos, 1.6, 2.4, distance * 6);
-    if (opening ? this.rec('gate_open', out, t, 0.5, 1.5) : this.rec('gate_slam', out, t + swing * 0.85, 0.42, 1.6)) return;
+    if (opening ? this.rec('gate_open', out, t, 0.5, 1.5) : this.rec('gate_slam', out, t + swing * 0.85, 0.42, 1.6)) {
+      if (opening) this.rec('metal_creak', out, t + 0.05, 0.28, 1.3);
+      return;
+    }
     this.door(opening, pos, distance);
   }
 
@@ -1519,6 +1537,8 @@ export class AudioEngine {
         return;
       }
     }
+    // (a drink, recorded: the gulps, and not the "ahh" after them)
+    if (kind === 'drink' && this.rec('drink', to, t, pos ? EVERY.hand.other : 0.9, 1, false, true)) return;
     const rustle = (dur: number, freq: number, vol: number, at = 0) => {
       const n = this.noise(t + at, dur);
       const f = this.filter('bandpass', freq, 0.8);

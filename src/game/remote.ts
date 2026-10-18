@@ -342,7 +342,7 @@ export class RemotePlayer implements Damageable {
     // one, a box torn open, somebody eating or drinking or seeing to a wound. It is how the one who is not seen is
     // found.
     const d2 = this.pos.distanceToSquared(listener);
-    if (a === 'bolt' && d2 < 12 * 12) audio.boltCycle(0, this.pos);
+    if (a === 'bolt' && d2 < 12 * 12) audio.boltCycle(0, this.pos, this.weapon === 'benelli' ? 'pump' : 'bolt');
     else if (a === 'reload' && d2 < 22 * 22) audio.reloadNear(this.pos, dur, ITEMS[this.weapon ?? '']?.weapon?.kind === 'pistol');
     else if (a === 'load' && d2 < HANDS_HEARD * HANDS_HEARD) audio.ui('round', this.pos);
     else if (a === 'unbox' && d2 < HANDS_HEARD * HANDS_HEARD) audio.ui('unbox', this.pos);

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
-import { CRACK, audio } from '../core/audio';
+import { CRACK, audio, type Voice } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
 import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf, canOf } from '../sim/items';
@@ -201,6 +201,8 @@ interface VmModel {
   boltSlide?: THREE.Group;
   slide?: THREE.Object3D;
   charging?: THREE.Object3D;
+  /** a revolving launcher's cylinder: its pieces, each as it was hung, and how far it has turned and is to turn (radians) */
+  drum?: { parts: THREE.Object3D[]; rest: THREE.Quaternion[]; at: number; to: number };
   selector?: THREE.Object3D;
   mag?: THREE.Object3D;
   round?: THREE.Object3D;
@@ -341,6 +343,7 @@ const SLIDE_LOCK = 0.03;
  */
 const HAMMER: Record<string, { at: [number, number]; down: number }> = { m9: { at: [0.003, 0.056], down: -0.7 } };
 const _Z = new THREE.Vector3(0, 0, 1);
+const _drumX = new THREE.Vector3(1, 0, 0), _drumQ = new THREE.Quaternion();
 
 /**
  * A magazine where it sits in its gun, as a mark to set one gun on another by (the gun-alone file's space): the
@@ -1011,10 +1014,11 @@ const NUDGE = {
 
 /**
  * How a gun sounds, where it is not how its kind does: the recording played slower (deeper)
- * and louder. Nobody has listened to these: they are set by what the guns are.
+ * and louder. Nobody has listened to these: they are set by what the guns are, and the newer guns' own recordings
+ * by how loud each is against the AK's, the pistol's and the shotgun's (2026-10-17: the owner chose and downloaded them).
  */
-const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
-  deagle: { rate: 0.86, gain: 1.5, rec: 'shot_magnum' },
+const VOICE: Record<string, Voice> = {
+  deagle: { rate: 1, gain: 0.75, rec: 'shot_deagle' },
   benelli: { rate: 0.9, gain: 1.5, rec: 'shot_shotgun' },
   // (each its own recording: a 7.62x39 and a 5.56, single shots)
   ak: { rate: 1, gain: 1.15, rec: 'shot_ak' },
@@ -1023,21 +1027,25 @@ const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
   mpa: { rate: 1.06, gain: 1.05, rec: 'shot_pistol' },
   // (a .45: the pistol's recording, lower and a little louder)
   colt: { rate: 0.9, gain: 1.2 },
-  // (the weapons pass's: the short AK its rifle's recording higher; the 9 mm and .45 guns the pistol's; the .50s and
-  // the 12.7 the rifle's, deep; the shotguns the shotgun's)
-  aks74u: { rate: 1.08, gain: 1.1, rec: 'shot_ak' },
-  mp7a1: { rate: 1.12, gain: 1, rec: 'shot_pistol' },
-  scorpion: { rate: 1.1, gain: 1, rec: 'shot_pistol' },
-  dual_smg: { rate: 1.06, gain: 1.05, rec: 'shot_pistol' },
-  dual_mac10: { rate: 0.92, gain: 1.15, rec: 'shot_pistol' },
-  sniper50: { rate: 0.78, gain: 1.6, rec: 'shot_rifle' },
-  barrett: { rate: 0.78, gain: 1.6, rec: 'shot_rifle' },
-  vssk: { rate: 0.82, gain: 1.3, rec: 'shot_rifle' },
-  db12: { rate: 0.9, gain: 1.5, rec: 'shot_shotgun' },
-  dual_sawnoff: { rate: 0.95, gain: 1.5, rec: 'shot_shotgun' },
+  // (the weapons pass's, each its own: see scripts/sounds.mjs for what each is a recording of)
+  aks74u: { rate: 1, gain: 1.4, rec: 'shot_aks' },
+  mp7a1: { rate: 1, gain: 1, rec: 'shot_mp7' },
+  scorpion: { rate: 1, gain: 1.1, rec: 'shot_scorpion' },
+  dual_smg: { rate: 1, gain: 1.1, rec: 'shot_ppsh' },
+  dual_mac10: { rate: 1, gain: 1.15, rec: 'shot_mac10' },
+  sniper50: { rate: 1, gain: 1.3, rec: 'shot_50' },
+  barrett: { rate: 1, gain: 1.3, rec: 'shot_barrett' },
+  // (quieted by build: its own quieted shot, louder than the .22's by as much as a 12.7 mm is)
+  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.35 },
+  m32: { rate: 1, gain: 0.7, rec: 'shot_m32' },
+  db12: { rate: 1, gain: 1.5, rec: 'shot_db12' },
+  dual_sawnoff: { rate: 1, gain: 1.5, rec: 'shot_sawnoff' },
 };
-/** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut) */
-const HANDLED: Record<string, 'ak' | 'ar'> = { ak: 'ak', ar15: 'ar' };
+/** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut): the submachine
+ * guns an Uzi's (the owner, 2026-10-17: "the uzi reload can be applied to both submachine guns") */
+const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', ar15: 'ar', mpa: 'uzi', scorpion: 'uzi', mp7a1: 'uzi', dual_smg: 'uzi', dual_mac10: 'uzi' };
+/** guns that throw no case as they fire: a revolving launcher, and shotguns broken open to be emptied */
+const NO_CASE = new Set(['m32', 'db12', 'dual_sawnoff']);
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */
 function reticleMaterial(src: THREE.Material): THREE.Material {
@@ -1414,6 +1422,15 @@ export class Weapons {
     // (squared to the eye when aimed, its sight's tube along the eye's line: held as the pack holds its own rifle, the
     // tube looked down at a slant, its far end low in its window)
     this.models.set('m32', await this.packGun({ pack: 'sniper50', item: 'm32', gun: 'm32', kind: 'rifle', hands: true, hip: HELD.m32, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: { base: 'base', cylinder: 'base', sight: 'base', trigger: 'trigger' } }));
+    // (its cylinder stood still, hung on the body: it is turned a chamber on by each shot, 2026-10-17: "the grenade
+    // launcher does not cycle when shot ... no animation")
+    {
+      const m32 = this.models.get('m32')!, parts: THREE.Object3D[] = [];
+      m32.root.traverse((o) => {
+        if (o.name.startsWith('cylinder') && (o as THREE.Mesh).isMesh) parts.push(o);
+      });
+      if (parts.length) m32.drum = { parts, rest: parts.map((p) => p.quaternion.clone()), at: 0, to: 0 };
+    }
     this.models.set('vssk', await this.packGun({ pack: 'sniper50', item: 'vssk', gun: 'vssk', kind: 'rifle', hands: true, hip: HELD.vssk, flashSize: 0.2, flash: mkFlash(), strip: [], ride: { base: 'base', scope: 'scope', mag: 'mag', bullet: 'mag' } }));
     // (a pair: the right hand's gun on its own nodes, the left's on the _2 nodes; each hand and its gun fire by themselves)
     this.models.set('dual_smg', await this.packGun({
@@ -2931,6 +2948,8 @@ export class Weapons {
     }
     m.shotT = 0;
     m.shotClip = m.rig?.has('fireLast') && (item.loaded ?? 0) === 0 ? 'fireLast' : 'fire';
+    // (the next chamber brought round under the hammer: a sixth of a turn)
+    if (m.drum) m.drum.to += Math.PI / 3;
     if (boltAction(item.id)) {
       this.boltReady = false;
       this.fireCooldown = interval;
@@ -2943,7 +2962,7 @@ export class Weapons {
       this.slideKick = 1;
       // (a pack throws its own case)
       if (!m.rig || m.brass) this.eject(m, kind === 'rifle');
-      audio.shellDrop();
+      if (!NO_CASE.has(item.id)) audio.shellDrop();
       if ((item.loaded ?? 0) === 0) this.dry.add(item);
     }
   }
@@ -3012,7 +3031,8 @@ export class Weapons {
   }
 
   private cycleBolt(m: VmModel) {
-    audio.boltCycle();
+    // (the Benelli is pumped, not a bolt drawn)
+    audio.boltCycle(0, undefined, m === this.models.get('benelli') ? 'pump' : 'bolt');
     audio.shellDrop(0.5);
     // (the pack's hand has further to go than a bolt moved by itself: a little longer)
     const dur = m.rig ? 0.95 : 0.78;
@@ -3860,6 +3880,14 @@ export class Weapons {
     }
     // AK bolt carrier: charging handle reciprocates with every shot
     if (m.charging && (!a || a.name !== 'magswap')) m.charging.position.x = -this.slideKick * 0.08;
+    // the launcher's cylinder turned on a chamber after each shot, quickly, and settled (each piece about its own middle,
+    // which is on the barrel's line, the gun's length)
+    const drum = m.drum;
+    if (drum && drum.at !== drum.to) {
+      drum.at += (drum.to - drum.at) * (1 - Math.exp(-26 * dt));
+      if (Math.abs(drum.to - drum.at) < 1e-3) drum.at = drum.to;
+      drum.parts.forEach((p, i) => p.quaternion.copy(drum.rest[i]).multiply(_drumQ.setFromAxisAngle(_drumX, -drum.at)));
+    }
     if (m.selector && this.currentItem) {
       const target = this.fireMode(this.currentItem) === 'auto' ? -0.012 : 0;
       m.selector.position.y += (target - m.selector.position.y) * (1 - Math.exp(-20 * dt));
