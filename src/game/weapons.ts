@@ -1035,8 +1035,9 @@ const VOICE: Record<string, Voice> = {
   dual_mac10: { rate: 1, gain: 1.15, rec: 'shot_mac10' },
   sniper50: { rate: 1, gain: 1.3, rec: 'shot_50' },
   barrett: { rate: 1, gain: 1.3, rec: 'shot_barrett' },
-  // (quieted by build: its own quieted shot, louder than the .22's by as much as a 12.7 mm is)
-  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.12 },
+  // (quieted by build, and its rounds slower than sound, as the real one's are: very quiet, which is what it is for (the
+  // owner, 2026-10-18: "its an integrated supressor its quietness should be a major feature of the weapon"))
+  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.05, subsonic: true },
   m32: { rate: 1, gain: 0.7, rec: 'shot_m32' },
   db12: { rate: 1, gain: 1.5, rec: 'shot_db12' },
   dual_sawnoff: { rate: 1, gain: 1.5, rec: 'shot_sawnoff' },
@@ -2938,7 +2939,7 @@ export class Weapons {
     const ahead = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     const thin = gun?.auto && this.burst > 2 && this.burst % 2 === 0 ? 0 : (suppressed ? 0.3 : 0.8) * (gun?.auto ? 0.4 : 1) * THREE.MathUtils.lerp(1, 0.5, this.adsT);
     this.fx.muzzle(suppressed ? muzzleWorld.addScaledVector(ahead, kind === 'pistol' ? 0.13 : 0.19) : muzzleWorld, ahead, big || kind === 'auto', suppressed, 0, thin);
-    audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed, VOICE[item.id], crackOf(v0));
+    audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed, VOICE[item.id], VOICE[item.id]?.subsonic ? 0 : crackOf(v0));
 
     // (a pair: the hand that fired takes the shot by itself, at the pace of one gun of the two)
     if (side && m.twin) {
@@ -3449,7 +3450,7 @@ export class Weapons {
     const seen = from && from.pos.distanceTo(origin) < 2.5 ? from : null;
     const at = seen ? seen.pos : origin.clone().addScaledVector(out, kind === 'pistol' ? 0.6 : 1).add(new THREE.Vector3(0, kind === 'pistol' ? 0 : -0.05, 0));
     this.fx.muzzle(at, seen ? seen.dir : out, kind !== 'pistol', suppressed, FLAME[kind]);
-    audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId], crackOf(v0));
+    audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId], VOICE[weaponId]?.subsonic ? 0 : crackOf(v0));
   }
 
   /**
@@ -3650,7 +3651,8 @@ export class Weapons {
             // round is level with it (never later than sound takes to cross the gap, and sooner the nearer the
             // round is to the speed of sound), and from back along the path: from where the round was when it
             // made the part of the wave that gets there first.
-            const mach = speed / SOUND, cone = mach > 1 ? Math.sqrt(mach * mach - 1) : 0;
+            // (a round that is slower than sound by build is heard so whatever it is flown at: see Voice.subsonic)
+            const mach = VOICE[b.weapon]?.subsonic ? Math.min(0.95, speed / SOUND) : speed / SOUND, cone = mach > 1 ? Math.sqrt(mach * mach - 1) : 0;
             const back = cone ? Math.min(miss / cone, miss * 3) : 0;
             // (And before the muzzle there was no round to make it: level with whoever fires, or behind them,
             // nothing goes by. What is heard there is the shot. Without this, now that a crack is heard nine
