@@ -11,9 +11,9 @@ import { HELI, skidGround } from '../src/sim/heli';
 import { INFECTED } from '../src/sim/infected';
 import type { S2C } from '../src/net/protocol';
 import { ORDERS, written, entityBy, ENTITIES, GROUND } from '../src/net/orders';
-import { KITS } from '../src/sim/kits';
+import { KITS, TEST_KITS } from '../src/sim/kits';
 import { type CarryPower, refill, carriedOf, refilledWords, CARRY_POWERS } from '../src/sim/powers';
-import { BANS, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log, news, standJeep, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
+import { BANS, LOCAL_ADMIN, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log, news, standJeep, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
 import { ipOf, namesOf } from './tags';
 import { deviceOf, forgetDevice, shortDevice } from './device';
 import { CHECK, CHECKS } from './checks';
@@ -705,8 +705,10 @@ export async function command(c: Client, line: string) {
     }
     case 'kit': {
       if (!admin) return need();
-      const kit = KITS.find((k) => k.id === (rest[0] ?? '').toLowerCase());
-      if (!kit) return void sys(c, `The kits are: ${KITS.map((k) => k.id).join(', ')}.`);
+      // (the loads for trying the game are only for a server on one's own machine: src/sim/kits.ts TEST_KITS)
+      const kits = LOCAL_ADMIN ? [...KITS, ...TEST_KITS] : KITS;
+      const kit = kits.find((k) => k.id === (rest[0] ?? '').toLowerCase());
+      if (!kit) return void sys(c, `The kits are: ${kits.map((k) => k.id).join(', ')}.`);
       const t = rest[1] ? whoIs(rest[1]) : c;
       if (t && !outranks(c, t)) return above(t.name);
       if (!t) return void sys(c, `Nobody online is "${rest[1]}" (or more than one is): see /players.`);

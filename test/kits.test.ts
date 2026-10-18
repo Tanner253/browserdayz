@@ -5,9 +5,9 @@
 import assert from 'node:assert/strict';
 import { PlayerInventory } from '../src/sim/inventory';
 import { ITEMS, makeItem } from '../src/sim/items';
-import { KITS } from '../src/sim/kits';
+import { KITS, TEST_KITS } from '../src/sim/kits';
 
-for (const kit of KITS) {
+for (const kit of [...KITS, ...TEST_KITS]) {
   const inv = new PlayerInventory();
   const over: string[] = [];
   for (const th of kit.things) {
@@ -39,7 +39,7 @@ for (const kit of KITS) {
 // A kit "replaces everything" a player carries, and leaves them a jacket and trousers (2026-10-13, when the two
 // became things that can be taken off): new ones, with nothing of the old pockets in them. As kitUp in
 // src/game/game.ts does it: the tags are kept, `clear`, and then each thing of the kit is put on or away.
-for (const kit of [...KITS, { id: 'nothing', name: '', does: 'what /clear sends: a kit of nothing', things: [] }]) {
+for (const kit of [...KITS, ...TEST_KITS, { id: 'nothing', name: '', does: 'what /clear sends: a kit of nothing', things: [] }]) {
   for (const th of kit.things) assert.ok(!['top', 'legs'].includes(ITEMS[th.id].slot ?? ''), `${kit.id}: lists ${th.id}, which is worn where the jacket or the trousers are: whoever is given a kit has those on already, and it would be a spare in a pocket`);
   const inv = new PlayerInventory();
   const jacket = inv.slots.top!, trousers = inv.slots.legs!, tin = makeItem('beans'), tag = Object.assign(makeItem('dogtag'), { owner: 'Ann', pid: 'pid-ann' });

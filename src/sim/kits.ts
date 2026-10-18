@@ -72,3 +72,30 @@ export const KITS: Kit[] = [
     things: [...many(2, { id: 'firstaid' }), ...many(2, { id: 'aid_pouch' }), ...many(2, { id: 'bandage', qty: 5 }), ...many(2, { id: 'stim', qty: 3 }), ...many(2, { id: 'stim_stamina', qty: 3 }), { id: 'stim_combat', qty: 5 }, ...many(2, { id: 'blood_bag' }), ...many(2, { id: 'saline' }), ...many(2, { id: 'splint' }), { id: 'beans' }, { id: 'sardines' }, { id: 'condensed' }, { id: 'water_jug' }, { id: 'flask' }],
   },
 ];
+
+/**
+ * Loads for trying the game on one's own machine, and nowhere else: the server hands these out only while it is a
+ * local one (LOCAL_ADMIN, server/index.ts), never lists them otherwise, and the admin panel does not show them.
+ * `npx tsx scripts/test-load.ts` puts one on a player on the local server.
+ */
+export const TEST_KITS: Kit[] = [
+  {
+    // (2026-10-18: "simulate a load that a user will normally have ... in mid game. So it doesn't have everything ...
+    // a cocktail of everything and different amounts", and "multiple bags arranged in a similar way")
+    id: 'midgame', name: 'Mid-game', does: 'A load some hours into a life: a pistol, an SMG and two rifles, each with magazines, loose rounds and boxes of its own, part used; food, drink and medicine; a vest and a pack',
+    things: [
+      { id: 'boonie_hat' }, { id: 'chest_rig' }, { id: 'camping_pack' }, { id: 'garden_gloves' }, { id: 'rubber_boots' },
+      { id: 'ak', mag: 'mag_ak', loaded: 22 }, { id: 'mosin', mag: 'mag_sniper', loaded: 4 }, { id: 'colt', mag: 'mag_colt', loaded: 6 }, { id: 'mpa', mag: 'mag_mpa', loaded: 19 },
+      { id: 'mag_ak', rounds: 30 }, { id: 'mag_ak', rounds: 17 }, { id: 'mag_ak', rounds: 4 },
+      { id: 'ammo_739', qty: 30 }, { id: 'ammo_739', qty: 14 }, { id: 'ammo_739', qty: 5 }, ...many(2, { id: 'box_739' }),
+      { id: 'mag_sniper', rounds: 5 }, { id: 'mag_sniper', rounds: 2 },
+      { id: 'ammo_762', qty: 22 }, { id: 'ammo_762', qty: 8 }, ...many(2, { id: 'box_762' }),
+      { id: 'mag_colt', rounds: 7 }, { id: 'mag_colt', rounds: 3 },
+      { id: 'ammo_45', qty: 26 }, { id: 'ammo_45', qty: 9 }, ...many(2, { id: 'box_45' }),
+      { id: 'mag_mpa', rounds: 30 }, { id: 'mag_mpa', rounds: 24 }, { id: 'mag_mpa', rounds: 11 },
+      { id: 'ammo_9mm', qty: 30 }, { id: 'ammo_9mm', qty: 16 }, { id: 'ammo_9mm', qty: 3 }, ...many(3, { id: 'box_9mm' }),
+      { id: 'beans' }, { id: 'sardines' }, { id: 'tomatoes' }, { id: 'apple' }, { id: 'flask' }, { id: 'milk' },
+      { id: 'bandage', qty: 4 }, { id: 'bandage', qty: 1 }, { id: 'stim', qty: 2 }, { id: 'aid_pouch' }, { id: 'splint' }, { id: 'saline' },
+    ],
+  },
+];
