@@ -2,15 +2,19 @@
 // controls by their names as the keyboard and the phone's buttons do (src/core/input.ts). Laid out as Call of Duty's
 // default (the owner, 2026-10-15: "make sure that the buttons map similar to default COD and that all of our
 // functionality is maintained"): what that layout has no button for (leaning, the light, the map) is where a shooter's
-// player looks for it. Switched on in Settings, Controls ("settings to enable this in the settings menu").
+// player looks for it. Switched on in Settings, Controls ("settings to enable this in the settings menu"). The bumpers
+// change what is in the hands, and the sticks pressed in lean while aiming (the owner, 2026-10-18: "using r1 and r2 is the
+// best for switching items ... more important than leaning left and right"; "use lean for when they press the left or
+// right stick").
 //
 // In play the sticks move and look. Anywhere else (the menu, the inventory, the map, Emotes, the dead screen) the left
 // stick steers a cursor of its own: ✕ clicks, held it drags, ○ goes back, the right stick scrolls.
 
 /** the standard layout's buttons, by the place they are in (PlayStation names; Xbox has A B X Y, LB RB LT RT) */
 const B = { cross: 0, circle: 1, square: 2, triangle: 3, l1: 4, r1: 5, l2: 6, r2: 7, create: 8, options: 9, l3: 10, r3: 11, up: 12, down: 13, left: 14, right: 15, pad: 17 };
-/** how far a stick is pushed before it counts; past `walk` it jogs; how far a trigger is pulled before it fires */
-const DEAD = 0.16, WALK = 0.62, PULL = 0.3;
+/** how far a stick is pushed before it counts; past `walk` it jogs; how far a trigger is pulled before it fires; L2 pulled
+ * past `full` holds the breath (the aim is at a light pull) */
+const DEAD = 0.16, WALK = 0.62, PULL = 0.3, FULL = 0.95;
 /** a button held this long (seconds) does its second thing */
 const HOLD = 0.32;
 /** the right stick all the way over: pixels of mouse a second; and how much more it gives held there a while */
@@ -143,16 +147,17 @@ export class Gamepad {
     // triggers: aim and fire
     this.hold('Mouse2', down(B.l2));
     this.hold('Mouse0', down(B.r2));
-    const riding = this.host.riding();
-    // L3: sprint, kept up until the stick comes back or the sights go up; aiming, it holds the breath. In a seat, the horn.
+    const riding = this.host.riding(), aiming = down(B.l2);
+    // L3: sprint, kept up until the stick comes back or the sights go up; aiming, lean left (and L2 pulled all the way in
+    // holds the breath). In a seat, the horn.
     if (riding) this.hold('KeyH', down(B.l3));
     else {
-      if (went(B.l3)) this.sprint = !down(B.l2);
-      if (!moving || ly > -0.3 || down(B.l2)) this.sprint = false;
-      this.hold('ShiftLeft', this.sprint || (down(B.l2) && down(B.l3)));
+      if (went(B.l3)) this.sprint = !aiming;
+      if (!moving || ly > -0.3 || aiming) this.sprint = false;
+      this.hold('ShiftLeft', this.sprint || (aiming && (gp.buttons[B.l2]?.value ?? 0) >= FULL));
     }
-    // R3: the light; in a seat, the siren
-    if (went(B.r3)) this.tap(riding ? 'KeyJ' : 'KeyL');
+    // R3: the light; aiming, lean right; in a seat, the siren
+    if (went(B.r3) && (riding || !aiming)) this.tap(riding ? 'KeyJ' : 'KeyL');
     // ✕ jump (the helicopter: up)
     this.hold('Space', down(B.cross));
     // ○ crouch, held lie down (the helicopter: down)
@@ -176,9 +181,14 @@ export class Gamepad {
     // △ the next weapon, held empty hands
     if (up(B.triangle) && !this.second.has(B.triangle)) this.input.wheel += 1;
     this.second2(B.triangle, heldFor, () => this.tap('KeyX'));
-    // bumpers: lean, held
-    this.hold('KeyQ', down(B.l1));
-    this.hold('KeyE', down(B.r1));
+    // bumpers: the next thing in the hands (R1) or the one before (L1), as the mouse's wheel; aiming, they turn a scope that
+    // turns, R1 nearer. In a seat they roll the helicopter, as Q and E do. Leaning is the sticks pressed in while aiming.
+    if (!riding) {
+      if (went(B.r1)) this.input.wheel += aiming ? -1 : 1;
+      if (went(B.l1)) this.input.wheel += aiming ? 1 : -1;
+    }
+    this.hold('KeyQ', riding ? down(B.l1) : aiming && down(B.l3));
+    this.hold('KeyE', riding ? down(B.r1) : aiming && down(B.r3));
     // the D-pad: ↑ the map; ↓ the call-out wheel, held (the right stick picks); ← single shots or automatic, held drops
     // what is held; → look the gun over, held talks
     if (went(B.up)) this.tap('KeyM');
