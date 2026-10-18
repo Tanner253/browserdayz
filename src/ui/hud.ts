@@ -33,10 +33,11 @@ const SET_TABS = [['controls', 'Controls'], ['audio', 'Audio'], ['video', 'Video
 type SetTab = (typeof SET_TABS)[number][0];
 /** the four groups of sound under the one volume (src/core/audio.ts, GROUPS): what each is called, and what it turns */
 const MIX_ROWS: Record<Group, [name: string, turns: string]> = {
-  fx: ['Effects', 'Guns, blasts, footsteps, vehicles, doors'],
+  fx: ['Effects', 'Guns, blasts, footsteps, doors'],
   voice: ['Voice', 'Other players talking, and the calls said aloud'],
   ambience: ['Ambience', 'Wind, birds, fires, the bunker'],
   ui: ['Interface', 'Your pockets, and the tick of a shot landing'],
+  vehicles: ['Vehicles', 'Jeeps and helicopters'],
 };
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
