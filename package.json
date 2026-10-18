@@ -13,7 +13,7 @@
     "assets": "node scripts/fetch-assets.mjs",
     "icons": "node scripts/icons.mjs",
     "character": "node scripts/build-character.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json",
+    "typecheck": "node scripts/typecheck.mjs",
     "film": "node scripts/film.mjs",
     "test:bunker": "tsx test/bunker.test.ts",
     "test:daynight": "tsx test/daynight.test.ts",

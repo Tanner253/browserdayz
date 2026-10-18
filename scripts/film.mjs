@@ -27,6 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import sharp from 'sharp';
+import { takeCard } from './card-lock.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const OUT = path.join(ROOT, 'tools', 'trailer', 'out');
@@ -57,6 +58,7 @@ if (!CHROME) throw new Error('no Chrome or Edge found');
 fs.mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+await takeCard(`film.mjs ${name}`);
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'zona-film-'));
 const chrome = spawn(CHROME, [
   '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11',
