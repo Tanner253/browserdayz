@@ -102,7 +102,7 @@ ok('no thing there was is worn anywhere else than it was', () => {
     // (and what has been made since is worn where its like is: the steel helmet)
     helmet_m1: 'head',
     // (and the weapons pass's guns, a pair of them too, and the pitchfork, on the back as every long thing is)
-    aks74u: 'long', barrett: 'long', db12: 'long', dual_mac10: 'long', dual_sawnoff: 'long', dual_smg: 'long', m32: 'long',
+    aks74u: 'long', barrett: 'long', dual_mac10: 'long', dual_sawnoff: 'long', dual_smg: 'long', m32: 'long',
     mp7a1: 'long', pitchfork: 'long', scorpion: 'long', sniper50: 'long', vssk: 'long',
     chest_rig: 'vest', soft_vest: 'vest', armor_vest: 'vest', heavy_armor: 'vest', life_vest: 'vest',
     sack_pack: 'back', camping_pack: 'back', suitcase: 'back', garden_gloves: 'hands', work_gloves: 'hands', rubber_boots: 'feet',

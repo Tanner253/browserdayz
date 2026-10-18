@@ -614,6 +614,8 @@ export const frameMethods = {
       reticle: this.weapons.reticleKind,
       range: this.weapons.ranged ? this.weapons.range : undefined,
       zoom: this.weapons.scoped ? this.weapons.zoom : null,
+      breath: this.weapons.breathLeft,
+      steady: this.weapons.steady,
       sightless: this.weapons.sightless,
       glass: !!this.glass,
       hitMarker: this.weapons.hitMarker,

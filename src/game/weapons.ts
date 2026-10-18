@@ -77,7 +77,7 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the M32's own vertical grip taken off it: where the middle of its top meets the rail under this gun, and the node it rides on in the hands where that is not the gun's body (the double-barrel's barrels, which drop open) */ grip?: { at: [number, number, number]; size: number; on?: string }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; /** the Elcan, the AR-15's own magnified sight: where its foot stands on the rail */ elcan?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the M32's own vertical grip taken off it: where the middle of its top meets the rail under this gun, and the node it rides on in the hands where that is not the gun's body */ grip?: { at: [number, number, number]; size: number; on?: string }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
@@ -101,9 +101,8 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // rail under the fore-end at its very front, ahead of the left hand, which holds the fore-end itself: a stop for
   // that hand, as is put on a gun this short. Further back it was inside the fist.)
   mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.6 } },
-  // (the M32's grip under the AR-15's rail where its own stood, and under the double-barrel's fore-end, on its barrels)
+  // (the M32's grip under the AR-15's rail where its own stood)
   ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 }, grip: { at: [0.126, 0.056, 0.008], size: 0.75 } },
-  db12: { grip: { at: [0.17, 0.008, -0.009], size: 0.75, on: 'barrels_050' } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
@@ -288,7 +287,6 @@ const HELD = {
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
-  db12: new THREE.Vector3(0.05, -0.02, -0.05),
   // (that maker's packs stand their camera half a metre behind where they are put: as the sniper's)
   dual_smg: new THREE.Vector3(0, -0.02, -0.36),
   dual_mac10: new THREE.Vector3(0, -0.02, -0.36),
@@ -787,7 +785,7 @@ const SEAT = {
  * magazine where the body's arms were too short, and its thumb through the far side.)
  */
 const FORE: Record<string, number | { post: [number, number] }> = {
-  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.215, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
   // (the owner: "the 40mm gun has a vertical grip for us to use, like the ar15")
   m32: { post: [0.368, -0.078] }, mp7a1: { post: [0.16, 0] },
 };
@@ -798,7 +796,7 @@ const FORE: Record<string, number | { post: [number, number] }> = {
  * pack's own right hand, which on the M32, the Barrett and the MP7 was 5 to 8 cm ahead of the trigger.
  */
 const TRIGGER_WRIST = new THREE.Vector3(-0.095, -0.005, 0.028);
-const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
+const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0] };
 /**
  * A pair as everybody else sees it held: the gun twice, side by side this far apart (the gun's own metres, as far as
  * its pack's two hands are), each in its own fist, held out in front as two cans would be (the owner, 2026-10-17:
@@ -848,7 +846,7 @@ const UNFOLDED = new THREE.Quaternion();
 /** the guns whose bipod is let down and folded on the fire-mode key, theirs being one mode (the owner, 2026-10-17: "for the barrett .50 cal add a button to toggle the bipod, its cool and it should be animated") */
 const BIPODS = new Set(['barrett']);
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
-const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007], db12: [0.17, -0.041] };
+const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
 function foreHold(at: THREE.Vector3, post: boolean): HandGrip {
   return post
@@ -931,8 +929,6 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the MP7's rear: a notch between two ears on its drum. The eye was over the ears, where the front post stood hidden
   // behind them: through the notch, the post's tip in it)
   mp7a1: { notch: [-0.089, 0.1338, -0.0076], post: [0.137, 0.1352, -0.0067] },
-  // (the double barrel's: along the rib between its barrels, from over the breech to the bead at the muzzle)
-  db12: { notch: [0.3, 0.1135, -0.0094], post: [0.96, 0.113, -0.0094] },
   // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
   // (the AKS-74U's rear notch stands 6 mm left of its front post in its model: the eye behind the notch, not the post,
   // or the notch sat off to one side of the post when aimed, the owner: "aks iron sights are off")
@@ -1008,6 +1004,8 @@ const HELD_RIFLE = 0.9;
 const SPRINT_OUT = { up: 0.22, keep: 0.45, lock: 0.4 };
 /** shots no further apart than this are one string: the kick of each goes by which shot of the string it is. Seconds. */
 const STRING_GAP = 0.28;
+/** how long a breath can be held, seconds (DayZ holds one some seconds too) */
+const BREATH = 6;
 /** how far up the sights are (`adsT`) before they steady a shot: at the eye, as near as makes no difference (a scope is looked through from here too) */
 const SIGHTS_UP = 0.9;
 /**
@@ -1050,17 +1048,18 @@ const VOICE: Record<string, Voice> = {
   sniper50: { rate: 1, gain: 1.3, rec: 'shot_50' },
   barrett: { rate: 1, gain: 1.3, rec: 'shot_barrett' },
   // (quieted by build, and its rounds slower than sound, as the real one's are: very quiet, which is what it is for (the
-  // owner, 2026-10-18: "its an integrated supressor its quietness should be a major feature of the weapon"))
-  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.05, subsonic: true },
+  // owner, 2026-10-18: "its an integrated supressor its quietness should be a major feature of the weapon"). At a
+  // twentieth it was a whisper ("the vssk is too quiet now. not realistic"): at about a fifth it is the cough and clack a
+  // VSS is, still the quietest gun there is.)
+  vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.22, subsonic: true },
   m32: { rate: 1, gain: 0.7, rec: 'shot_m32' },
-  db12: { rate: 1, gain: 1.5, rec: 'shot_db12' },
   dual_sawnoff: { rate: 1, gain: 1.5, rec: 'shot_sawnoff' },
 };
 /** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut): the submachine
  * guns an Uzi's (the owner, 2026-10-17: "the uzi reload can be applied to both submachine guns") */
 const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', ar15: 'ar', mpa: 'uzi', scorpion: 'uzi', mp7a1: 'uzi', dual_smg: 'uzi', dual_mac10: 'uzi' };
 /** guns that throw no case as they fire: a revolving launcher, and shotguns broken open to be emptied */
-const NO_CASE = new Set(['m32', 'db12', 'dual_sawnoff']);
+const NO_CASE = new Set(['m32', 'dual_sawnoff']);
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */
 function reticleMaterial(src: THREE.Material): THREE.Material {
@@ -1247,7 +1246,9 @@ export class Weapons {
     else this.dry.delete(it);
   }
   private fireCooldown = 0;
-  private breath = { held: false, t: 0 };
+  private breath = { held: false, t: 0, winded: 0 };
+  /** how steady the breath held has made the gun, eased in and out (0 to 1): the sway, and how near a scope brings things */
+  steady = 0;
   /**
    * What is left in the arms, 0..1. Holding a gun up to the eye uses it (a heavy one faster,
    * and holding the breath faster still); with the gun down it comes back in a few seconds.
@@ -1463,21 +1464,6 @@ export class Weapons {
       ride: { base: 'base', trigger: 'trigger1', front: 'front', slug1: 'slug1', slug2: 'slug2' },
       twin: { ride: { base: 'base_2', trigger: 'trigger1_2', front: 'front_2', slug1: 'slug1_2', slug2: 'slug2_2' }, flash: mkFlash(), roots: { L: ['sawnoffL', 'L_arm_01'], R: ['sawnoffR', 'R_arm_025'] } },
     }));
-    this.models.set('db12', await this.packGun({ pack: 'db12', item: 'db12', gun: 'db12', kind: 'rifle', hands: true, hip: HELD.db12, flashSize: 0.34, flash: mkFlash(), square: true, strip: [], ride: { base: 'stock_049', barrels: 'barrels_050', shells: 'shells_052' } }));
-    this.models.get('db12')!.gait = true;
-    // (it came with no pictures, its one paint a bare colour nearly black: lifted as the dark guns are it was still a
-    // black cut-out. Painted a worn gunmetal here, its own paint and nobody else's: the name is Blender's default.)
-    // (As others see it, out in the sky's light, the same paint was nearly white: there it is darker and gives back less of the sky.)
-    for (const o of [this.models.get('db12')!.root, this.models.get('db12')!.world]) o?.traverse((n) => {
-      const mat = (n as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-      if (!mat?.isMeshStandardMaterial || mat.map || mat.userData.lifted) return;
-      const theirs = o === this.models.get('db12')!.world;
-      mat.userData.lifted = true;
-      mat.color.setScalar(theirs ? 0.07 : 0.17);
-      mat.metalness = theirs ? 0.5 : 0.55;
-      mat.roughness = Math.max(mat.roughness, 0.48);
-      mat.envMapIntensity = theirs ? 0.7 : 1.4;
-    });
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175', sight: 'scope_0177' };
@@ -2214,9 +2200,10 @@ export class Weapons {
     const glassAt = new THREE.Vector3(hung.size ? glassX : c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2);
     const through = lensRig ? glassAt.clone().applyEuler(opticRot) : squared(glassAt);
     const lit = dotAt ? squared(dotAt) : null;
-    // (a sight of its own looked through, the M32's: as near the eye as a holographic sight stood on a gun is, 10 cm
-    // behind it, its window round its mark. At 20 cm it was a small ring in the middle of the view, off the gun.)
-    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig && o.item === 'm32' ? 0.1 : ownScope ? 0.09 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
+    // (a sight of its own looked through, the M32's and the MP7's: as near the eye as a holographic sight stood on a gun
+    // is, 10 cm behind it, its window round its mark. At 20 cm it was a small ring in the middle of the view, off the
+    // gun: the owner, 2026-10-18, "the mp7a1 red dot sight is broken and does NOT look okay")
+    const ads = long && !lit ? new THREE.Vector3(-through.x, -through.y, -sight.max.z - (lensRig ? 0.1 : ownScope ? 0.09 : hung.size ? 0.2 : 0.075)) : lit ? new THREE.Vector3(-lit.x, -lit.y, o.hip.z + (long ? 0.02 : 0.07)) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
     const tip = post ? squared(post as THREE.Vector3) : null;
     const mouthAt = long && hung.has('base') ? frontOf(hung.get('base')!) : null;
@@ -2461,7 +2448,13 @@ export class Weapons {
   scopeFov(base: number): number {
     const z = this.zoom;
     const half = THREE.MathUtils.degToRad(base / 2);
-    return z ? (2 * Math.atan(Math.tan(half) / z)) / (2 * half) : 0.3;
+    // (the breath held brings it a little nearer, as DayZ's does: the "focus")
+    return (z ? (2 * Math.atan(Math.tan(half) / z)) / (2 * half) : 0.3) * (1 - 0.08 * this.steady);
+  }
+
+  /** the breath left to hold, looked through a scope (1 a whole one); null when it is not looked through */
+  get breathLeft(): number | null {
+    return this.scoped ? Math.max(0, 1 - this.breath.t / BREATH) : null;
   }
 
   /** whose scope has a rangefinder, looked through now */
@@ -2735,16 +2728,23 @@ export class Weapons {
     this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;
 
-    // ----- hold breath while aiming (Shift): steadier for a few seconds, and hard on the arms
-    const wantBreath = this.aiming && this.adsT > 0.85 && input.held('ShiftLeft') && p.vitals.stamina > 5 && this.armStamina > 0.06;
+    // ----- hold breath while aiming (Shift; a controller's L3 held): steady for a few seconds, and hard on the arms. As
+    // DayZ's (the owner, 2026-10-18: "we need a hold breath mechanic to steady the scope uses stamina, like dayz / to
+    // make the reticle focus"): the sway eases nearly away and a scope closes in a little; held past the breath there
+    // is, the gun shakes worse for a moment after.
+    // (the body's stamina is what a breath costs, not the arms': a .50 was as heavy as it is, 11 to 13 kg, and held
+    // up, its arms gave out a second into a breath)
+    const wantBreath = this.aiming && this.adsT > 0.85 && input.held('ShiftLeft') && p.vitals.stamina > 5;
     if (wantBreath) {
       this.breath.t += dt;
       p.vitals.stamina = Math.max(0, p.vitals.stamina - 9 * dt);
     } else this.breath.t = Math.max(0, this.breath.t - dt * 2);
-    this.breath.held = wantBreath && this.breath.t < 6;
+    this.breath.held = wantBreath && this.breath.t < BREATH;
+    this.breath.winded = wantBreath && this.breath.t >= BREATH ? 1.5 : Math.max(0, this.breath.winded - dt);
+    this.steady += ((this.breath.held ? 1 : 0) - this.steady) * (1 - Math.exp(-6 * dt));
     // ----- the arms: tiring while the gun is up, resting while it is down
     // (down on a knee the elbow has somewhere to rest: the gun stays up half as long again)
-    if (this.aiming && def?.weapon) this.armStamina = Math.max(0, this.armStamina - (0.028 + hd.weight * 0.011) * (this.breath.held ? 2.6 : 1) * (p.crouched ? 0.65 : 1) * dt);
+    if (this.aiming && def?.weapon) this.armStamina = Math.max(0, this.armStamina - (0.028 + hd.weight * 0.011) * (this.breath.held ? 1.3 : 1) * (p.crouched ? 0.65 : 1) * dt);
     else this.armStamina = Math.min(1, this.armStamina + 0.3 * dt);
 
     // ----- trigger / actions
@@ -2826,7 +2826,7 @@ export class Weapons {
     const tired = (1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5) * p.shake;
     const heft = THREE.MathUtils.clamp((100 - hd.ergo) / 60, 0.25, 1.2);
     const armsK = 1 + Math.pow(1 - this.armStamina, 2) * 2.6;
-    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);
+    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (1 - 0.9 * this.steady) * (1 + 0.8 * Math.min(1, this.breath.winded)) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);
     const t = this.time;
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
     const rec = this.aimRecoil.step(dt);
@@ -3123,7 +3123,7 @@ export class Weapons {
       // animation first plays a magazine being taken out ... we can skip the first part")
       const from = fed && !item.mag ? (m.kind === 'pistol' ? 0.22 : 0.38) : 0;
       const dur = whole * (1 - from), at = (part: number) => Math.max(0.02, whole * (part - from));
-      // (one broken open and loaded by hand, the double barrel: its shells go in, there is no magazine to hear)
+      // (one broken open and loaded by hand, as the sawn-offs are: its shells go in, there is no magazine to hear)
       if (!fed) for (const part of [0.42, 0.56]) audio.shellIn(at(part));
       else {
         if (!from) audio.magOut(whole * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol', set);

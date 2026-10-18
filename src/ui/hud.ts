@@ -253,6 +253,7 @@ export class HUD {
           </g>
         </svg>
         <div class="scope-read"><b class="sr-range"></b><span class="sr-zoom"></span></div>
+        <div class="scope-breath"><i></i><span></span></div>
       </div>
       <div class="hud-damage"></div>
       <div class="hud-bleedfx"></div>
@@ -1764,6 +1765,9 @@ export class HUD {
     range?: number | null;
     /** how far a scope that turns is turned, times */
     zoom?: number | null;
+    /** looked through a scope: the breath left to hold (1 a whole one; null not looked through), and how steady it has made the gun */
+    breath?: number | null;
+    steady?: number;
     /** aimed with a gun that has no sights: the mark stays on the screen */
     sightless?: boolean;
     hitMarker: number;
@@ -1821,6 +1825,15 @@ export class HUD {
       e.scope.querySelector('.sr-zoom')!.textContent = zoom;
     }
     this.toggle(e.scope, 'glass', s.glass && !s.scoped);
+    // (under that: the breath to hold, and the key that holds it, a controller's own on a controller)
+    const breath = s.breath == null ? '' : String(Math.round(s.breath * 40) / 40);
+    if (this.last.scopeBreath !== breath) {
+      this.last.scopeBreath = breath;
+      const b = e.scope.querySelector<HTMLElement>('.scope-breath')!;
+      b.style.setProperty('--left', breath || '0');
+      b.querySelector('span')!.textContent = document.body.classList.contains('pad') ? 'hold L3 · steady' : `hold ${shown('ShiftLeft')} · steady`;
+    }
+    this.toggle(e.scope, 'steady', (s.steady ?? 0) > 0.5);
     this.toggle(e.hit, 'show', s.hitMarker > 0);
     this.toggle(e.hit, 'kill', s.kill);
     this.toggle(e.hit, 'head', s.head && !s.kill);

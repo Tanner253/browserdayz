@@ -208,8 +208,7 @@ const BORE = [
 SOUNDS.shot_scorpion = { src: lib('Carl Gustav M45/G_31P.wav'), side: 1, takes: 3, len: 1.5, rate: 44100, gain: 1, press: 1.4, air: 0.9, with: [AIR] };
 SOUNDS.shot_ppsh = { src: lib('PPSh/P_30P.wav'), side: 1, takes: 3, len: 1.5, rate: 44100, gain: 1, press: 1.4, air: 0.6, with: [AIR] };
 SOUNDS.shot_aks = { src: lib('AK-47/C_28P.wav'), side: 1, takes: 3, len: 1.7, rate: 44100, gain: 1, press: 1.2, with: [{ ...AIR, level: 0.5 }] };
-// (the DB-12 a Winchester Model 12, the sawn-offs a Charles Daly: twelve bores, with the shotgun's thump under them)
-SOUNDS.shot_db12 = { src: lib('Model 12/K_22P.wav'), side: 1, takes: 2, len: 2.2, rate: 44100, gain: 1, press: 1.6, with: BORE };
+// (the sawn-offs a Charles Daly: twelve bores, with the shotgun's thump under them)
 SOUNDS.shot_sawnoff = { src: lib('CD/H_21P.wav'), side: 1, takes: 2, len: 2, rate: 44100, gain: 1, press: 1.6, with: BORE };
 // (the Barrett an M82A1, the .50 an M107; the VSSK's quieted shot a quieted Tac-50; the MAC-10s a .45 USP; the MP7 the
 // last shot of an Uzi's last burst; the M32 a 40 mm launcher; the Desert Eagle its own, cut before its case lands)

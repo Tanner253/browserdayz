@@ -470,7 +470,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   display: none;
   background: radial-gradient(circle at 50% 50%, transparent 0, transparent 38vmin, #000 38.3vmin);
 }
-.hud-scope.show { display: block; }
+.hud-scope.show { display: block; animation: scope-in 0.16s ease-out; }
+/* (the eyepiece's black at the eye, then the view in it: no cut from the rifle coming up to the ring) */
+@keyframes scope-in { from { opacity: 0; } }
 .hud-scope svg {
   position: absolute;
   left: 50%;
@@ -1933,6 +1935,12 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .hud-scope[data-ret='pu'] .ret-pu, .hud-scope[data-ret='mildot'] .ret-mildot, .hud-scope[data-ret='pso'] .ret-pso, .hud-scope[data-ret='elcan'] .ret-elcan { display: inline; }
 .hud-scope.glass[data-ret] .ret { display: none; }
 /* the range and the turn under the ring, in the black: bright on it, to be read at a glance */
+/* the breath to hold, under the readout: a bar that empties while it is held, and the key (src/game/weapons.ts BREATH).
+   Held, the ring opens a touch: the scope "focuses" (the owner: "to make the reticle focus") */
+.hud-scope .scope-breath { position: absolute; left: 50%; top: calc(50% + 44.5vmin); transform: translateX(-50%); display: flex; gap: 1.6vmin; align-items: center; font: 600 2.1vmin/1 ui-monospace, Consolas, monospace; color: rgba(233, 228, 216, 0.6); letter-spacing: 0.06em; text-transform: uppercase; }
+.hud-scope .scope-breath i { width: 16vmin; height: 0.7vmin; background: linear-gradient(90deg, #b8ff8a calc(var(--left, 1) * 100%), rgba(233, 228, 216, 0.18) 0); }
+.hud-scope.glass .scope-breath { display: none; }
+.hud-scope.steady { background: radial-gradient(circle at 50% 50%, transparent 0, transparent 39.2vmin, #000 39.5vmin); }
 .hud-scope .scope-read {
   position: absolute;
   left: 50%;
