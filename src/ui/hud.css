@@ -1633,11 +1633,12 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.paused .sm-foot a, .hud-start.paused .sm-foot button, .hud-start.paused .sm-hero > button { cursor: pointer; }
 .hud-start.paused .sm-cut, .hud-start.paused .sm-live, .hud-start.paused .start-kicker em, .hud-start.paused .start-sub2, .hud-start.paused .sm-loop, .hud-start.paused .sm-name, .hud-start.paused .sm-tag { display: none; }
 .hud-start.paused .sm-main { align-items: center; }
-.hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; display: grid; grid-template-columns: max-content 1fr; column-gap: 28px; align-items: center; }
+.hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; --tfs: 92px; display: grid; grid-template-columns: max-content 1fr; column-gap: 28px; align-items: center; }
 /* the number online beside the name, on its middle; everything else across the whole width as before */
 .hud-start.paused .sm-hero > * { grid-column: 1 / -1; }
-.hud-start.paused .start-title { grid-column: 1; grid-row: 2; font-size: 92px; }
-.hud-start.paused .start-online { grid-column: 2; grid-row: 2; margin: 0; }
+.hud-start.paused .start-title { grid-column: 1; grid-row: 2; font-size: var(--tfs); }
+/* (the letters sit low in their line, 0.115 of their size below its middle: the number is moved down as far, by twice that in margin) */
+.hud-start.paused .start-online { grid-column: 2; grid-row: 2; margin: calc(var(--tfs, 92px) * 0.23) 0 0; }
 /* (the room the number used to take under Resume, kept above the wallet line) */
 .hud-start.paused .sm-wallet { margin-top: 28px; }
 .hud-start.paused .start-sub { font-size: 20px; color: var(--ink-dim); }
@@ -1645,6 +1646,8 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 /* leaving the proper way: a square beside Resume, as tall as it, on the pause screen when playing on a server */
 .start-out { display: none; flex: none; width: 58px; height: 58px; padding: 0; place-items: center; font-family: var(--mono); font-size: 18px; font-weight: 600; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
 .start-out svg { width: 24px; height: 24px; }
+/* (the drawing and the seconds share the one middle) */
+.start-out > * { grid-area: 1 / 1; }
 .start-out b { font-weight: inherit; }
 .start-out:hover { color: var(--ink); border-color: rgba(233, 228, 216, 0.6); }
 .start-out.counting { color: var(--brand); border-color: var(--brand); }
@@ -1738,7 +1741,7 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .sm-foot { gap: 16px; padding: 0 calc(22px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(22px + env(safe-area-inset-left)); }
   .sl-ca code { max-width: 210px; }
   .hud-start.paused .sm-hero { padding-bottom: 20px; }
-  .hud-start.paused .start-title { font-size: 76px; }
+  .hud-start.paused .sm-hero { --tfs: 76px; }
 }
 /* --- and one stood up, or a very narrow window */
 @media (max-width: 640px) {
