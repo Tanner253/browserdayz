@@ -842,9 +842,10 @@ export class InventoryUI {
    * a grid with its bar over it, as DayZ has it: its name, how much of it is taken up, and a click folds it away
    * @param where the place on the body the thing it is the inside of is worn in, written small after its name
    */
-  private gridBox(c: Container, where = '') {
+  private gridBox(c: Container, where = '', close?: () => void) {
     const box = document.createElement('div');
-    const shut = this.folded.has(c.id);
+    // (a bag opened inside another is closed by its arrow, the whole header: no word "close" beside it, idea 16, 2026-10-18)
+    const shut = !close && this.folded.has(c.id);
     // An admin's hold (src/sim/inventory.ts): it has no bottom, so there is no "of how many" to say of it. It says
     // how many things lie in it and whether it still takes any. It is drawn whole, as tall as what is in it and a
     // few rows more, and is scrolled to with everything else on this side; narrower than itself, it scrolls sideways.
@@ -864,8 +865,9 @@ export class InventoryUI {
     // (a grid of what is carried, open, with two things or more in it and not sorted already, can be sorted: packed tight, kind by kind)
     const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && this.inv.containers.some((x) => x.id === c.id) && c.sort(false);
     const sortBtn = sorts ? `<button type="button" class="inv-sort" title="Sort: pack it tight, kind by kind"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 6H28V10H4ZM4 14H21V18H4ZM4 22H14V26H4Z"/></svg></button>` : '';
-    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
+    box.innerHTML = `<h4 title="${tip}${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
     box.querySelector('h4')!.addEventListener('click', () => {
+      if (close) return close();
       if (!this.folded.delete(c.id)) this.folded.add(c.id);
       this.render();
     });
@@ -1932,16 +1934,13 @@ export class InventoryUI {
       if (!this.opened.has(p.item.uid)) continue;
       const bag = this.bagOf(p.item, c.depth + 1);
       if (!bag) continue;
-      const box = this.gridBox(bag);
-      box.classList.add('inv-bag');
-      const h4 = box.querySelector('h4');
-      // (on a body, where it is said to be is "on the body": the body's own name is a player's, and is over the grid already)
-      if (h4) h4.insertAdjacentHTML('beforeend', `<em title="Close it">${c === this.stash?.container && this.stash.corpse ? 'on the body' : `in ${c.name.toLowerCase()}`} · close</em>`);
-      h4?.querySelector('em')?.addEventListener('click', (e) => {
-        e.stopPropagation();
+      // (where it sits is said in the name's own style after a dot, "BLACK BAG · FIELD JACKET"; on a body, where the body's own name is a player's and is over the grid already, "on the body")
+      const where = `· ${c === this.stash?.container && this.stash.corpse ? 'on the body' : c.name}`;
+      const box = this.gridBox(bag, where, () => {
         this.opened.delete(p.item.uid);
         this.render();
       });
+      box.classList.add('inv-bag');
       into.appendChild(box);
       this.openBags(into, bag);
     }
