@@ -437,7 +437,7 @@ export class Game {
     r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
     this.lamps.canLight = (lit) => r.readyToLight(lit);
     this.lamps.held = (lit) => r.warming(lit);
-    this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
+    this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid, (o) => r.ready(o).then(() => r.send(o)));
     // (the army's field posts by the western roads: src/world/posts.ts)
     void new FieldPosts(world.posts ?? [], atmo, r.scene);
     this.cellars = new Cellars(r.scene, world.basements ?? []);
@@ -508,6 +508,8 @@ export class Game {
     Avatar.onDressed = (parts) => void r.ready(parts);
     // (and a gun in another player's hands, likewise: see RemotePlayer.readyHeld)
     RemotePlayer.readyHeld = (obj) => Promise.race([r.ready(obj).then(() => r.send(obj)), new Promise<void>((done) => setTimeout(done, 3000))]);
+    // (and a rack's guns, before the rack shows them: see GunRacks.onMade)
+    GunRacks.onMade = (obj) => r.ready(obj).then(() => r.send(obj));
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();

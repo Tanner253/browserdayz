@@ -382,7 +382,12 @@ export class BunkerSite {
   readonly solidAt = new Map<string, RAPIER.Collider>();
 
   /** @param ground what the ground is drawn with: the bunker's roof is drawn with the same, where it lies under the open sky */
-  constructor(world: World, atmo: Atmosphere, scene: THREE.Scene, ground: THREE.Material | null = null) {
+  /**
+   * @param ready what makes a thing ready to be drawn (its shaders made, its pictures on the card) while it is hidden:
+   * the buried rooms are made ready so as soon as the eye is in range, and shown at their first frame without the card
+   * waiting (shown unready, flying over the hut was a frame of 0.8 s, 2026-10-18)
+   */
+  constructor(world: World, atmo: Atmosphere, scene: THREE.Scene, ground: THREE.Material | null = null, private ready: ((o: THREE.Object3D) => Promise<unknown>) | null = null) {
     this.place = bunkerPlace(world);
     this.heights = world.heights;
     const P = this.place;
@@ -879,8 +884,9 @@ export class BunkerSite {
         under.add(c);
       }
       this.pieces = all.children.length;
+      if (this.ready) void this.ready(under).catch(() => {});
     }
-    if (this.under) this.under.visible = (near < OPEN_FROM && eye.y < P.y + 8) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
+    if (this.under) this.under.visible = (near < OPEN_FROM && eye.y < P.y + 4) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
   }
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */

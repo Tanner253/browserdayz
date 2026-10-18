@@ -34,6 +34,13 @@ export class GunRacks {
   /** how each sort is turned to stand, worked out once: the turn that stands it butt down with its side to the front */
   private stand = new Map<string, THREE.Quaternion>();
 
+  /**
+   * Made ready to be drawn (its shaders made, its pictures on the card) before it is shown: set by the game. Put in
+   * the world at once, a rack's guns made their shaders in the frame they were first seen, 0.6 s near the desert
+   * town's racks (2026-10-18).
+   */
+  static onMade: ((obj: THREE.Object3D) => Promise<unknown>) | null = null;
+
   constructor(private scene: THREE.Scene, private models: ItemModels, private plan: RackPlan) {}
 
   /** a rack in the world, by its crate's id: where it stands and which way it faces */
@@ -101,12 +108,13 @@ export class GunRacks {
         obj.position.set(x - (_box.min.x + _box.max.x) / 2, y - _box.min.y, z - (_box.min.z + _box.max.z) / 2);
         g.add(obj);
       }
+      g.updateMatrixWorld(true);
+      if (GunRacks.onMade) await GunRacks.onMade(g);
     } finally {
       r.making = false;
     }
     // (what was asked for may have changed while it was being made: drawn as asked, and made again next time if not)
     this.putAway(r);
-    g.updateMatrixWorld(true);
     this.scene.add(g);
     r.group = g;
     r.drawn = ids.join(',');

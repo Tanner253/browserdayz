@@ -85,12 +85,17 @@ function kindOf(o: THREE.Object3D): string | null {
  * measured, with nothing drawn. Asked once now, and then a few times a good while apart. A dozen shaders asked for
  * together are four seconds in the making on a laptop: waited for as long as six, and then drawn as they are.)
  */
-export async function made(programs: Iterable<Program>) {
+export async function made(programs: Iterable<Program>, most = 6100): Promise<boolean> {
   const done = () => {
     for (const p of programs) if (!p.isReady()) return false;
     return true;
   };
-  for (let i = 0; i < 40 && !done(); i++) await new Promise((r) => setTimeout(r, i ? 150 : 250));
+  const t0 = performance.now();
+  for (let i = 0; !done(); i++) {
+    if (performance.now() - t0 > most) return false;
+    await new Promise((r) => setTimeout(r, i ? 150 : 250));
+  }
+  return true;
 }
 
 export interface QualitySettings {
@@ -364,7 +369,9 @@ export class Renderer {
     this.readying++;
     try {
       const { programs, entries } = await this.write(drawn, null);
-      await made(programs);
+      // (as long as the card takes, within reason: given up at six seconds, a thing came into sight with its shaders
+      // still being made and the frame waited on the card, 0.5 to 1.2 s near the gun racks, 2026-10-18)
+      await made(programs, 60_000);
       if (!TRY.has('nolook')) await this.lookOver(programs);
       for (const o of list) await this.send(o);
       if (!TRY.has('noahead')) await this.drawAhead(entries);
@@ -604,7 +611,10 @@ export class Renderer {
         this.drawingAhead = true;
         let drawn = true;
         try {
-          drawn = this.drawOnce([e.o], e.lit, false, (e.tries ?? 0) < AHEAD_TRIES);
+          // (never drawn with a shader still being made, however long it waits: drawn so after AHEAD_TRIES, the frame
+          // waited on the card for it)
+          drawn = this.drawOnce([e.o], e.lit, false, true);
+          if (import.meta.env.DEV && !drawn && e.tries === AHEAD_TRIES) console.warn('ahead: still waiting for a shader after', AHEAD_TRIES, 'tries');
         } finally {
           this.drawingAhead = false;
         }
