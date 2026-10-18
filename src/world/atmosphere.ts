@@ -411,6 +411,8 @@ export class Atmosphere {
 #ifdef USE_FOG
   uniform vec3 fogColor;
   varying vec3 vFogWorldPos;
+  // (the camera's own, for where it stops drawing: see fog_fragment)
+  uniform mat4 projectionMatrix;
   #ifdef FOG_EXP2
     uniform float fogDensity;
   #else
@@ -448,6 +450,12 @@ export class Atmosphere {
     float fogDist = length( fogRay );
     vec3 fogDir = fogRay / max( fogDist, 1e-4 );
     float fogAmt = atmoFogAmount( cameraPosition, fogDir, fogDist );
+    // (the draw distance, which is the camera's far: the last quarter of the way to it closes in haze, so that where
+    // nothing more is drawn there is no edge)
+    if ( projectionMatrix[ 3 ][ 3 ] < 0.5 ) {
+      float drawFar = projectionMatrix[ 3 ][ 2 ] / ( projectionMatrix[ 2 ][ 2 ] + 1.0 );
+      fogAmt = max( fogAmt, smoothstep( drawFar * 0.72, drawFar * 0.97, fogDist ) );
+    }
     gl_FragColor.rgb = mix( gl_FragColor.rgb, atmoFogColor( fogDir ), fogAmt );
     #ifdef GAS_ZONE
       // (what is seen through the gas is lost to it, by as much of it as lies in the way)
@@ -712,11 +720,14 @@ export class Atmosphere {
     (this.scene.fog as THREE.FogExp2).color.copy(h.air);
     if (this.glow) {
       this.glow.position.copy(this.camera.position);
+      // (inside the draw distance, or the camera's far cuts it away)
+      this.glow.scale.setScalar(Math.min(1, (this.camera.far * 0.9) / 1400));
       this.glow.visible = this.low > 0.01;
       (this.glow.material as THREE.ShaderMaterial).uniforms.uLow.value = this.low;
     }
     if (this.stars) {
       this.stars.position.copy(this.camera.position);
+      this.stars.scale.setScalar(Math.min(1, (this.camera.far * 0.9) / 1500));
       const seen = Math.max(0, this.night - 0.5) / 0.5;
       this.stars.visible = seen > 0.01;
       (this.stars.material as THREE.PointsMaterial).opacity = seen * seen;

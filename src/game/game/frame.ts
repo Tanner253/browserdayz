@@ -662,6 +662,15 @@ export const frameMethods = {
       eye.updateMatrixWorld();
     }
     this.prefetch?.update(r.camera.position);
+    // (the draw distance is where the world ends, as Minecraft's does: past it nothing is drawn, the last quarter of the
+    // way to it closing in haze (see the fog in atmosphere.ts). The owner, 2026-10-18: "when i have my render distance at
+    // 600m how come the entire map contonies to load past that? why not stop it like minecraft rander distance". The
+    // menu's view keeps the whole of it.)
+    const far = this.started && !(import.meta.env.DEV && (globalThis as { __fullFar?: boolean }).__fullFar) ? Math.max(200, this.gfx.draw) : 1800;
+    if (r.camera.far !== far) {
+      r.camera.far = far;
+      r.camera.updateProjectionMatrix();
+    }
     r.render(dt);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);

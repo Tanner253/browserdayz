@@ -1392,7 +1392,7 @@ export class HUD {
         row('Ambient occlusion', 'ao', g.ao, AO_MODES.map((a) => [a, a === 'off' ? 'Off' : a === 'half' ? 'Standard' : 'High'])) +
         row('Shadows', 'shadows', g.shadows, LEVELS.map((l) => [l, cap(l)])) +
         row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
-        row('Draw distance', 'draw', g.draw, DRAWS.map((d) => [d, `${d} m`]), 'Buildings past it are not drawn. Loot: 55 m') +
+        row('Draw distance', 'draw', g.draw, DRAWS.map((d) => [d, `${d} m`]), 'Nothing past it is drawn: the world closes in haze. Loot: 55 m') +
         row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
         `<div class="gfx-info">${this.gfxInfo()}</div>`,
     };
