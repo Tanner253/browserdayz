@@ -42,7 +42,8 @@ log(`the map is made in ${Date.now() - t0} ms`);
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   const head = { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' };
-  if (url.pathname === '/healthz') return void res.writeHead(200, head).end(JSON.stringify({ ok: true, protocol: PROTOCOL, lobbies: arenaList().length, players: arenaPlayers(), branch: process.env.RENDER_GIT_BRANCH ?? null, commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? null }));
+  // (/status as well: see the game server's, which a blocklist's `||onrender.com/health` refused)
+  if (url.pathname === '/healthz' || url.pathname === '/status') return void res.writeHead(200, head).end(JSON.stringify({ ok: true, protocol: PROTOCOL, lobbies: arenaList().length, players: arenaPlayers(), branch: process.env.RENDER_GIT_BRANCH ?? null, commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? null }));
   if (url.pathname === '/arena/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: arenaList() }));
   res.writeHead(404, head).end('{}');
 });

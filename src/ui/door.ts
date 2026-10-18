@@ -6,7 +6,7 @@
 import './door.css';
 import { paidLine, platformPaid } from './platform';
 import { TAG_HOLD_MIN } from '../sim/items';
-import { arenaBase, serverStatus } from '../net/client';
+import { arenaBase, serverSays, serverStatus } from '../net/client';
 import type { LobbyInfo } from '../../arena/rules';
 
 export type Mode = 'zona' | 'arena';
@@ -126,7 +126,7 @@ export function modeOf(wager: boolean): Mode | null {
 /** how many are in the Arena now (its own count, or, from an arena older than that, everybody in its matches and watching them), and how many matches are being played */
 async function arenaOnline(): Promise<{ players: number; matches: number } | null> {
   try {
-    const h = (await (await fetch(`${arenaBase()}/healthz`, { cache: 'no-store', signal: AbortSignal.timeout(20_000) })).json()) as { players?: number };
+    const h = (await serverSays<{ players?: number }>(arenaBase(), 20_000)) ?? {};
     const l = (await (await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })).json()) as { lobbies: LobbyInfo[] };
     const matches = l.lobbies.filter((x) => x.score).length;
     return { players: typeof h.players === 'number' ? h.players : l.lobbies.reduce((n, x) => n + x.have + (x.watching ?? 0), 0), matches };
