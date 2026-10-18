@@ -241,10 +241,14 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
   const box = () => ({ add: (it: { id: string }) => (seen.set(it.id, (seen.get(it.id) ?? 0) + 1), it) });
   for (let k = 0; k < 300; k++) fillCrate(box() as never, 'weapons_case', rnd, true);
   const rich = (id: string) => (seen.get(id) ?? 0) / 300;
-  assert.ok(rich('boonie_hat') > 0.2 && rich('life_vest') > 0.2 && rich('pu_scope') > 0.15, 'a crate under the gas is no better than another');
+  const gas = { helmet: rich('boonie_hat'), plates: rich('life_vest'), scope: rich('pu_scope') };
+  assert.ok(gas.helmet > 0.12 && gas.plates > 0.2 && gas.scope > 0.15, `a crate under the gas is no better than another: ${JSON.stringify(gas)}`);
   seen.clear();
   for (let k = 0; k < 300; k++) fillCrate(box() as never, 'weapons_case', rnd, false);
   assert.ok(rich('life_vest') < 0.06 && rich('pu_scope') < 0.04, 'plates and scopes are common in a crate outside the gas');
+  // (the helmet: ten times as likely under the gas, which keeps no more of them than Kamenka and the village since the
+  // village is of the third step, 2026-10-17, and has a thirteenth of their places)
+  assert.ok(gas.helmet > rich('boonie_hat') * 10, `a helmet in ${gas.helmet} crates under the gas and ${rich('boonie_hat')} elsewhere`);
   for (let k = 0; k < 60; k++) {
     const got: string[] = [];
     fillDrop({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);

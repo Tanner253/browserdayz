@@ -1,134 +1,130 @@
-// Searchable crates that are part of the map (military crates at the checkpoint, wooden
-// crates in barns, sheds and yards). Unlike ground loot they hide their contents until
-// opened, and refill some time after being emptied. Pure data + rules, shared with the
-// future server.
+// Searchable crates that are part of the map (the army's cases at the checkpoints, wooden crates in barns, sheds and
+// yards, the lockers and cabinets). They hide what is in them until opened, and refill some time after they are
+// emptied. Pure data and rules, shared by the game and the server.
+//
+// What is in one is read from the item rules (src/sim/items/), as DayZ fills a building's containers from types.xml: a
+// crate is a container of a kind of building on a step of the map, and holds what that kind of building keeps there,
+// each thing as likely as the step keeps it, as the building favours it and as the step is its home. So a new item
+// turns up in the crates it belongs in with nothing more said. (Until 2026-10-17 each sort of crate had a list of its
+// own, which every new item had to be added to by hand.)
 
-import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun } from './items';
+import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type Category } from './items';
+import { typeRule } from './items/rules';
 import type { Container } from './inventory';
+import type { Tier } from './tiers';
+import type { Usage } from '../world/buildings';
 
 type Table = [id: string, weight: number][];
-
-// (By the steps of the map, 2026-10-10. One of the army's cases is of the second step wherever it stands: pistols
-// and what they fire, the army's kit; now and then something of the third, an armoured vest, a helmet or a
-// submachine gun; and a gas mask, if you are lucky. No rifle, no scope, no plates: those are under the gas. A
-// wooden crate is of the first: food, tools, something to hit with, and no gun.)
-// (2026-10-13: "ammo should be more abundant in polive stations and armories ... i should find all ammo there":
-// a case and a constable's locker hold a handful of every calibre now, the rifles' and the bunker's guns' among
-// them, a little of each.)
-const MILITARY: Table = [
-  ['box_9mm', 3], ['ammo_9mm', 2.5], ['ammo_762', 1.2], ['bandage', 1.8], ['firstaid', 0.7], ['aid_pouch', 0.5], ['stim', 0.7], ['stim_stamina', 0.5], ['saline', 0.4],
-  ['condensed', 1.5], ['thermos', 1], ['flask', 0.9], ['binoculars', 0.5], ['compass', 0.5], ['grenade', 0.6],
-  ['colt', 1], ['m9', 1], ['box_45', 0.5], ['mag_m9_ext', 0.3], ['suppressor_9', 0.25], ['gun_light', 0.3],
-  ['soft_vest', 0.6], ['patrol_cap', 0.35], ['helmet_m1', 0.25], ['rubber_boots', 0.4], ['work_gloves', 0.4], ['flashlight', 0.5], ['jerrycan', 0.4],
-  ['armor_vest', 0.22], ['boonie_hat', 0.2], ['gasmask', 0.3],
-  ['ammo_45', 1.2], ['mag_m9', 0.6], ['mag_colt', 0.6], ['ammo_739', 0.6], ['ammo_556', 0.6], ['ammo_12', 0.3], ['ammo_50', 0.25], ['mpa', 0.22], ['mag_mpa', 0.35],
-];
-const CIVILIAN: Table = [
-  ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6], ['water_jug', 0.9], ['flask', 0.5],
-  ['bandage', 1.2], ['splint', 0.6], ['cigarettes', 1.2], ['ammo_9mm', 0.6], ['ammo_762', 0.3],
-  ['knife', 0.9], ['hatchet', 0.9], ['bat', 0.8], ['crowbar', 0.8], ['machete', 0.6], ['shovel', 0.6],
-  ['garden_gloves', 0.8], ['fishermans_hat', 0.6], ['sack_pack', 0.8], ['chest_rig', 0.5], ['flashlight', 1], ['compass', 0.3], ['jerrycan', 0.4],
-];
-
-/** what is in any crate that stands under the gas, whatever sort of crate it is: the best of everything */
-export const UNDER_GAS: Table = [
-  // (the pistols and their rounds a good deal less than they were: the rifles below have their share)
-  ['box_762', 3], ['box_9mm', 1.8], ['ammo_762', 1.5], ['ammo_9mm', 0.8], ['mosin', 1.4], ['m9', 0.7], ['colt', 0.4],
-  // (the frag grenade, 2026-10-13: where the stick grenade is, a third as often; in none of the army's cases, which are of the second step)
-  ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['frag', 0.5], ['firstaid', 1.2], ['aid_pouch', 0.3], ['bandage', 1.5], ['stim', 1], ['stim_stamina', 0.7], ['stim_combat', 0.35], ['blood_bag', 0.7], ['saline', 0.5],
-  ['suppressor_9', 0.8], ['box_45', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
-  ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.5], ['mag_m9_ext', 0.4], ['flask', 0.5], ['keycard', 0.5],
-  // (2026-10-10: the two assault rifles and what feeds them)
-  ['ak', 0.6], ['mag_ak', 0.6], ['box_739', 0.8], ['ammo_739', 0.4], ['ar15', 0.25], ['mag_ar', 0.3], ['box_556', 0.4], ['mag_sniper', 0.4],
-  // (2026-10-11: the submachine gun)
-  ['mpa', 0.5], ['mag_mpa', 0.5],
-];
-
-/**
- * What is in whatever is searched down the bunker: the fourth and (for now) the best of the
- * places things are kept. The shotgun, the Desert Eagle and all that goes with them, the heavy
- * armour and the K6-3 helmet are here and nowhere else.
- */
-const IN_BUNKER: Table = [
-  ['benelli', 1.5], ['ammo_12', 3.2], ['box_12', 2.2], ['suppressor_12', 0.9], ['red_dot', 1.1], ['gun_light', 1.1],
-  ['mosin', 1.1], ['pu_scope', 1.5], ['suppressor_762', 0.9], ['box_762', 2.2], ['ammo_762', 1.2],
-  ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['deagle', 1.2], ['ammo_50', 2], ['box_50', 1], ['mag_deagle_ext', 0.6],
-  ['grenade', 1.8], ['frag', 0.7], ['boonie_hat', 1.8], ['life_vest', 1.8], ['heavy_armor', 0.5], ['helmet_k63', 0.35], ['suitcase', 0.7], ['firstaid', 1.8], ['aid_pouch', 0.4], ['bandage', 2.2], ['stim', 1.3], ['stim_stamina', 1], ['stim_combat', 0.5], ['blood_bag', 1.1], ['saline', 0.7], ['splint', 0.8],
-  ['flashlight', 0.9], ['flask', 0.9], ['condensed', 0.8], ['thermos', 0.6], ['water_jug', 0.7], ['beans', 0.7], ['sardines', 0.6],
-  // (2026-10-10: the two assault rifles, their big magazines and what is fitted to them)
-  ['ar15', 1.1], ['mag_ar', 1.4], ['mag_ar_60', 0.6], ['box_556', 1.8], ['ammo_556', 1.2], ['suppressor_556', 0.6], ['foregrip', 0.7],
-  ['ak', 0.8], ['mag_ak', 1], ['drum_ak', 0.6], ['box_739', 1.4], ['ammo_739', 1], ['suppressor_739', 0.5], ['mag_deagle', 0.8], ['mag_sniper', 0.7],
-];
-// (the submachine gun, the Colt and what feeds them, down the bunker with the rest of the firepower)
-IN_BUNKER.push(['mpa', 0.9], ['mag_mpa', 1.1], ['colt', 0.5], ['mag_colt', 0.6], ['box_45', 0.8], ['ammo_45', 0.6]);
-/** and on its racks, the long things */
-const ON_RACKS: Table = [['mpa', 1.5], ['benelli', 3], ['mosin', 2], ['ar15', 2], ['ak', 1.5], ['box_556', 1.2], ['box_739', 1], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];
-
-/**
- * The steel cabinets of the hospital, of a clinic and of the police (2026-10-12: "the metal lockers found in the
- * police station and the medical station should be lootable and have inventories"). A hospital's holds what a
- * hospital has, and a great deal of it ("the hospital should be medkit abundant and lots of stims"); a clinic's
- * leans on dressings and stims ("the small medical buildings should lean heavy on bandages and stims and less
- * medkits"); a constable's holds what the police carried: a pistol now and then, a submachine gun more seldom,
- * and what every gun fires.
- */
-const IN_MEDICINE: Table = [['bandage', 4.2], ['stim', 3.6], ['stim_stamina', 1.6], ['firstaid', 0.9], ['aid_pouch', 0.3], ['splint', 1.4], ['saline', 1.4], ['blood_bag', 0.4], ['flask', 0.4], ['work_gloves', 0.3]];
-const IN_HOSPITAL: Table = [['firstaid', 3.6], ['aid_pouch', 0.4], ['stim', 3.6], ['stim_stamina', 2], ['bandage', 2.2], ['splint', 1.6], ['blood_bag', 2], ['saline', 1.8], ['flask', 0.3], ['work_gloves', 0.3]];
-const IN_POLICE: Table = [
-  ['box_9mm', 3], ['ammo_9mm', 2.4], ['box_45', 1.2], ['ammo_45', 1.4], ['mag_m9', 1.6], ['mag_colt', 1.6], ['m9', 0.9], ['colt', 1],
-  ['soft_vest', 0.9], ['patrol_cap', 0.9], ['flashlight', 0.9], ['bandage', 1], ['aid_pouch', 0.4], ['stim', 0.5], ['stim_stamina', 0.3], ['gun_light', 0.3], ['suppressor_9', 0.2], ['thermos', 0.5], ['cigarettes', 0.5],
-  ['ammo_762', 0.8], ['ammo_739', 0.7], ['ammo_556', 0.7], ['ammo_12', 0.4], ['ammo_50', 0.3], ['mpa', 0.45], ['mag_mpa', 0.8],
-];
-/**
- * A soldier's locker, in a barracks or a long hut (2026-10-13, with the steel lockers the owner brought in): what a
- * man kept by his bed, which is his clothes, something to eat and to smoke, a dressing, a torch, and a handful of
- * what his pistol fired. A pistol itself seldom: those are in the cases. Of the second step of the map, as a case is,
- * and a good deal poorer than one.
- */
-const IN_BARRACKS: Table = [
-  ['patrol_cap', 1.6], ['rubber_boots', 1.4], ['work_gloves', 1.4], ['soft_vest', 0.5], ['chest_rig', 0.5], ['sack_pack', 0.5],
-  ['condensed', 1.8], ['sardines', 1.2], ['thermos', 1], ['flask', 1], ['cigarettes', 1.8], ['bandage', 1.6], ['splint', 0.4], ['flashlight', 1], ['compass', 0.4], ['knife', 0.5],
-  ['ammo_9mm', 1.6], ['ammo_45', 0.8], ['mag_m9', 0.5], ['mag_colt', 0.4], ['m9', 0.15], ['colt', 0.15],
-];
 
 export interface CrateSpec {
   label: string;
   w: number;
   h: number;
-  table: Table;
   count: [number, number];
+  /** the kind of building whose loot it holds, and the step of the map it is of wherever it stands */
+  usage: Usage[];
+  tier: Tier;
+  /** how it leans among the sorts of things, times (1 unsaid), and the only sorts it holds, if it holds only some */
+  lean?: Partial<Record<Category, number>>;
+  only?: Category[];
+  /** how often a thing in it is of the next step up instead (and then only what that step is the home of, never what is above it) */
+  up?: number;
+  /** what else is found in one now and then: [what, how often, in a crate] */
+  also?: [string, number][];
+  /** other steps whose things it holds as well (the bunker's racks: the gas's long guns too) */
+  with?: Tier[];
+  /** of the guns, only the long ones */
+  long?: true;
 }
 
 export const CRATE_SPECS: Record<string, CrateSpec> = {
-  wooden_military_crate: { label: 'Military Crate', w: 8, h: 4, table: MILITARY, count: [2, 4] },
-  old_military_crate: { label: 'Ammunition Crate', w: 8, h: 4, table: MILITARY, count: [2, 4] },
+  // (One of the army's cases is of the second step wherever it stands, 2026-10-10: pistols and what they fire, the army's
+  // kit; now and then something of the third, an armoured vest, a helmet or a submachine gun, and never a rifle, a scope
+  // or plates; and a gas mask if you are lucky: the masks are the police's, "bar what one of the army's cases or a
+  // supply drop turns up". 2026-10-13: "ammo should be more abundant in polive stations and armories ... i should find
+  // all ammo there": a handful of every calibre the army kept.)
+  wooden_military_crate: { label: 'Military Crate', w: 8, h: 4, count: [2, 4], usage: ['Military'], tier: 2, lean: { weapon: 0.18, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
+  old_military_crate: { label: 'Ammunition Crate', w: 8, h: 4, count: [2, 4], usage: ['Military'], tier: 2, lean: { weapon: 0.15, ammo: 0.6, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
   // (the hard case that stands wherever a military crate or an ammunition crate stood, and a little better filled)
-  weapons_case: { label: 'Weapons Case', w: 8, h: 4, table: MILITARY, count: [2, 5] },
-  wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, table: CIVILIAN, count: [1, 3] },
-  // a steel cabinet (see IN_MEDICINE). The same cabinet in a police building is filled as a constable's locker: the
-  // server knows which it is by where it stands, and the game is told nothing but what is in it.
-  med_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_MEDICINE, count: [2, 4] },
-  hospital_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_HOSPITAL, count: [2, 4] },
-  police_locker: { label: 'Locker', w: 4, h: 6, table: IN_POLICE, count: [1, 3] },
-  // The steel locker with two doors (see HUNG). Where it stands in a police building it is a constable's, and in the
-  // hospital it is filled as a clinic's cabinet is: the server knows which by where it stands, as with the cabinet.
-  // Anywhere else it is the army's, and this.
-  steel_locker: { label: 'Locker', w: 4, h: 6, table: IN_BARRACKS, count: [1, 3] },
-  // what is searched in the bunker and is no crate (see bunkerCrates): some of them are empty
-  // ("abundant supplies in the T5": a rack is never bare, and a locker seldom)
-  locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 3] },
-  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, table: ON_RACKS, count: [2, 4] },
-  bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, table: IN_BUNKER, count: [1, 2] },
-  // (the furniture with no places of its own, filled from a list as DayZ's cargo presets fill a container: a thing or
-  // two in a cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
-  cardboard_box_01: { label: 'Cardboard Box', w: 4, h: 3, table: CIVILIAN, count: [0, 2] },
-  crate_big: { label: 'Large Crate', w: 8, h: 4, table: CIVILIAN, count: [1, 3] },
-  bunker_desk: { label: 'Desk', w: 6, h: 3, table: IN_BUNKER, count: [0, 2] },
+  weapons_case: { label: 'Weapons Case', w: 8, h: 4, count: [2, 5], usage: ['Military'], tier: 2, lean: { weapon: 0.2, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
+  // (a wooden crate is of the outskirts, of their farms, yards and sheds: food, tools, something to hit with, and no gun)
+  wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
+  // The steel cabinets of the hospital, of a clinic and of the police (2026-10-12: "the metal lockers found in the police
+  // station and the medical station should be lootable and have inventories"): what each kind of building keeps,
+  // "medkit abundant" in the hospital's, "heavy on bandages and stims" in a clinic's. The same cabinet in a police
+  // building is a constable's: the server knows which by where it stands. A constable's holds a pistol now and then
+  // and what every gun fires.
+  med_cabinet: { label: 'Locker', w: 4, h: 6, count: [2, 4], usage: ['Medic'], tier: 3 },
+  hospital_cabinet: { label: 'Locker', w: 4, h: 6, count: [2, 4], usage: ['Hospital'], tier: 3 },
+  police_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Police'], tier: 3, lean: { weapon: 0.2 } },
+  // The steel locker with two doors (see HUNG): a soldier's, in a barracks or a long hut (2026-10-13), where a man kept
+  // his clothes, something to eat and to smoke, a dressing, a torch and a handful of what his pistol fired; a pistol
+  // itself seldom, those are in the cases. In a police building it is a constable's, in the hospital a clinic's cabinet.
+  steel_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Military'], tier: 2, lean: { clothing: 4, food: 8, drink: 5, misc: 1, medical: 2, tool: 3, melee: 2, ammo: 0.12, weapon: 0.05, magazine: 0.2, attachment: 0.2 } },
+  // What is searched down the bunker ("abundant supplies in the T5": a rack is never bare, and a locker seldom), and on
+  // its racks the long things.
+  locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5 },
+  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, count: [2, 4], usage: ['Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
+  bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, count: [1, 2], usage: ['Bunker'], tier: 5 },
+  // (the furniture with no places of its own, filled as DayZ's cargo presets fill a container: a thing or two in a
+  // cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
+  cardboard_box_01: { label: 'Cardboard Box', w: 4, h: 3, count: [0, 2], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
+  crate_big: { label: 'Large Crate', w: 8, h: 4, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
+  bunker_desk: { label: 'Desk', w: 6, h: 3, count: [0, 2], usage: ['Bunker'], tier: 5 },
 };
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
 const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker', 'steel_locker']);
+
+/** how many of a sort a step keeps: its rule's count, or the economy's as written (which knows what a sort kept by a rate comes to on the map; not cut to a step's places, which a crate is none of) */
+export type Keeps = (id: string, t: Tier) => number;
+const written: Keeps = (id, t) => ITEMS[id]?.loot?.at?.[t - 1] ?? 0;
+/** how much more likely a thing is in a crate for every whole that its step is its home (its share of the map's count) */
+const HOME_LEAN = 2;
+
+/**
+ * The table a crate of a kind is filled from on a step: every item the step keeps that its kind of building keeps
+ * (from the gas up, anything), weighted by how many the step keeps, how the building favours it, how the step is its
+ * home and how the crate leans. @param homeOnly only what the step is the home of (the step up from a crate's own)
+ */
+function tableFor(spec: Pick<CrateSpec, 'usage' | 'lean' | 'only' | 'long'>, t: Tier, keeps: Keeps, homeOnly = false): Table {
+  const out: Table = [];
+  for (const d of Object.values(ITEMS)) {
+    const r = typeRule(d), n = r ? keeps(d.id, t) : 0;
+    if (!r || n <= 0 || (spec.only && !spec.only.includes(d.category)) || (spec.long && d.weapon && d.slot !== 'long')) continue;
+    const kinds = r.on?.[t]?.usage ?? r.usage;
+    if (t < 4 && !spec.usage.some((u) => kinds.includes(u))) continue;
+    // (nothing the whole map keeps but one of: the .50s and the VSSK are the bunker's floor's, counted, and a crate that
+    // fills again in five minutes would be a well of them)
+    const all = ([1, 2, 3, 4, 5] as Tier[]).reduce((a, s) => a + keeps(d.id, s), 0), home = n / (all || 1);
+    if (all < 2) continue;
+    // (the step up: only what that step is the home of more than any above it, so a case of the second step holds an armoured vest of the third and never its rifle)
+    if (homeOnly && ([4, 5] as Tier[]).some((s) => s > t && keeps(d.id, s) > n)) continue;
+    const fav = t < 4 ? (r.on?.[t]?.favour ?? r.favour) : undefined;
+    let w = 1;
+    if (fav) for (const u of spec.usage) w = Math.max(w, fav[u] ?? 1);
+    out.push([d.id, n * w * (1 + HOME_LEAN * home) * (spec.lean?.[d.category] ?? 1)]);
+  }
+  return out;
+}
+const tables = new WeakMap<Keeps, Map<string, Table>>();
+function table(spec: Pick<CrateSpec, 'usage' | 'lean' | 'only' | 'long' | 'with'>, key: string, t: Tier, keeps: Keeps, homeOnly = false): Table {
+  const mine = tables.get(keeps) ?? tables.set(keeps, new Map()).get(keeps)!, k = `${key}@${t}${homeOnly ? '+' : ''}`;
+  return mine.get(k) ?? mine.set(k, [t, ...(homeOnly ? [] : (spec.with ?? []))].flatMap((s) => tableFor(spec, s, keeps, homeOnly))).get(k)!;
+}
+
+/** what is in any crate that stands under the gas, whatever sort of crate it is: the best of everything (and in a helicopter's cargo, see drops.ts) */
+const PLAIN = { usage: [] as Usage[] };
+export const UNDER_GAS: Table = tableFor(PLAIN, 4, written);
+
+function pick(t: Table, rnd: () => number): string | null {
+  const total = t.reduce((a, [, w]) => a + w, 0);
+  if (!total) return null;
+  let r = rnd() * total;
+  for (const [id, w] of t) if ((r -= w) <= 0) return id;
+  return t[t.length - 1][0];
+}
 
 /**
  * The containers whose doors are hung on hinges and swing (2026-10-13: "lockers for example when opened should have
@@ -155,29 +151,29 @@ export const CRATE_RESTOCK = 300;
 /**
  * @param rich the crate stands under the gas (true) or down the bunker ('bunker'): it holds the
  *   best of what is kept there, and one thing more
+ * @param keeps how many of each the steps keep (the economy's, where there is one: see Keeps)
  */
-export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false) {
+export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false, keeps: Keeps = written) {
   const spec = CRATE_SPECS[kind];
   if (!spec) return;
   const own = OWN_TABLE.has(kind);
-  const table = own ? spec.table : rich === 'bunker' ? IN_BUNKER : rich ? UNDER_GAS : spec.table;
-  const total = table.reduce((s, [, w]) => s + w, 0);
+  const t: Tier = own || !rich ? spec.tier : rich === 'bunker' ? 5 : 4;
+  // (one that stands under the gas or down the bunker, not of its own kind, holds what is kept there, as any crate there does)
+  const main = !own && rich ? table(PLAIN, 'plain', t, keeps) : table(spec, kind, t, keeps);
+  const up = spec.up && !rich && t < 5 ? table(spec, kind, (t + 1) as Tier, keeps, true) : null;
   const n = spec.count[0] + Math.floor(rnd() * (spec.count[1] - spec.count[0] + 1)) + (rich && !own ? 1 : 0);
+  const ids: string[] = [];
   for (let i = 0; i < n; i++) {
-    let r = rnd() * total;
-    let id = table[0][0];
-    for (const [tid, w] of table) {
-      r -= w;
-      if (r <= 0) {
-        id = tid;
-        break;
-      }
-    }
+    const id = up && rnd() < spec.up! ? pick(up, rnd) : pick(main, rnd);
+    if (id) ids.push(id);
+  }
+  for (const [id, chance] of rich ? [] : (spec.also ?? [])) if (ITEMS[id] && rnd() < chance) ids.push(id);
+  for (const id of ids) {
     const def = ITEMS[id];
     const item = makeItem(id, def.stack ? Math.max(1, Math.round(def.stack * (0.2 + rnd() * 0.45))) : 1);
     if (def.weapon) {
       fitAtRandom(item, rnd);
-      if (rich !== 'bunker') plainMag(item);
+      if (t < 5) plainMag(item);
       stockGun(item, Math.floor(rnd() * (def.weapon.capacity / 2 + 1)));
     }
     if (def.mag) foundMag(item, rnd);

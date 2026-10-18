@@ -62,7 +62,8 @@ console.log(`\nthings with no rule (never put in a building): ${unruled.join(', 
 const unknown = Object.keys(TYPES).filter((id) => !ITEMS[id]);
 if (unknown.length) console.log(`RULES FOR THINGS THAT DO NOT EXIST: ${unknown.join(', ')}`);
 
-// what the crates give, over many openings
+// what the crates give, over many openings (by the economy's counts, as the server fills them)
+const keeps = (id: string, t: 1 | 2 | 3 | 4 | 5) => eco.written(id, t);
 console.log('\ncrates:');
 const kinds = new Map<string, number>();
 for (const c of world.crates) kinds.set(c.kind, (kinds.get(c.kind) ?? 0) + 1);
@@ -80,7 +81,7 @@ for (const [kind, n] of kinds) {
     const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
     // (a box that takes whatever it is given: only what is put in it is of interest here)
     const box = { add: (it: { id: string }) => (seen.set(it.id, (seen.get(it.id) ?? 0) + 1), count++, true) };
-    fillCrate(box as unknown as Container, kind, rnd);
+    fillCrate(box as unknown as Container, kind, rnd, false, keeps);
   }
   console.log(`  ${kind}: ${n} on the map, ${(count / N).toFixed(1)} things a time: ` + [...seen].sort((a, b) => b[1] - a[1]).map(([id, k]) => `${id} ${((k / N) * 100).toFixed(0)}%`).join(', '));
 }

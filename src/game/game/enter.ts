@@ -10,7 +10,11 @@ import { CUT } from '../../../arena/rules';
 import { heightAt, inPlay } from '../../world/worldgen';
 import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
-import { fillCrate } from '../../sim/crates';
+import { fillCrate, type Keeps } from '../../sim/crates';
+import type { Economy } from '../../sim/economy';
+
+/** what each step keeps, as this game's economy has it, one for each economy (crates are filled from the item rules by it) */
+const keepsOf = new WeakMap<Economy, Keeps>();
 import { economyCargo } from '../../sim/storage';
 import { loadSave, type SaveData, writeSave } from '../../sim/save';
 import { playerName, setPlayerName, personKey, remoteServer, publicId } from '../../net/client';
@@ -306,7 +310,8 @@ export const enterMethods = {
       for (const l of [...this.economy.loot.values()]) if (l.point >= 0 && this.economy.points[l.point]?.inside === c.uid && c.container.hasRoom(l.item) && this.economy.take(l.uid, false)) c.container.add(l.item);
       return;
     }
-    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z));
+    const e = this.economy, keeps = keepsOf.get(e) ?? keepsOf.set(e, (id, t) => e.written(id, t)).get(e)!;
+    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z), keeps);
   },
 
   fresh(this: Game) {

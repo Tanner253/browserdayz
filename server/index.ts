@@ -18,7 +18,7 @@ import { ITEMS, type ItemInstance } from '../src/sim/items';
 import { PLAN, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
 import { STOCK } from '../src/sim/trade';
-import { CRATE_SPECS, fillCrate, CRATE_RESTOCK } from '../src/sim/crates';
+import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, type Keeps } from '../src/sim/crates';
 import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
 import { News } from '../src/sim/news';
@@ -272,12 +272,15 @@ export const stashItem = (b: Box): ItemInstance => ({ uid: b.cid, id: b.item ?? 
 
 export const cargoOf = (item: ItemInstance): Box['items'] => (item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot }));
 
+/** what each step keeps, as the economy has it (a crate is filled from the item rules by it: see crates.ts) */
+const keeps: Keeps = (id, t) => economy.written(id, t);
+
 function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
   // (a crate under the gas, down in the bunker, or on a basement's second level, is filled with the best of everything)
-  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z));
+  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z), keeps);
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;

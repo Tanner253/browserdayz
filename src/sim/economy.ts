@@ -295,8 +295,8 @@ export class Economy {
   kept(id: string, t: Tier): number {
     return this.cuts.get(`${id}@${t}`) ?? this.written(id, t);
   }
-  /** and as its rule has it, before any cut: what a place apart's share is reckoned from, being stocked on top of the map */
-  private written(id: string, t: Tier): number {
+  /** and as its rule has it, before any cut: what a place apart's share is reckoned from, being stocked on top of the map, and a crate's (DayZ's nominal) */
+  written(id: string, t: Tier): number {
     return this.counts.get(id)?.[t - 1] ?? TYPES[id].at[t - 1];
   }
 

@@ -2,6 +2,13 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## LOOT ON DAYZ'S MODEL (2026-10-17, on `perf-aggressive`, NOT deployed: the owner, "do not restart keep working")
+The owner approved the plan (`progress/loot-rework/plan-1.jpg`): "use dayz as a template for loot distribution", "a loot roll is rolled for each spot", "keep it DRY". What is built (sheet: `progress/loot-rework/sheet-1.jpg`):
+- Each item says everything about itself in `src/sim/items/*.ts`: its `loot` rule (DayZ counterpart `pair`, counts per step, restock, usage, found-with parts `fitted`, packs' `filled`), its trader `worth`/`sells`. A new item is one entry. The economy, the trader, FITTED and the crates read it (src/sim/items/rules.ts).
+- The economy rolls per free spot (`Economy.fill`), cuts a packed step to its places (`fit`: the gas is asked 165 on 127 places, the bunker 175 on 145), keeps food off floors, caps buildings on steps 1-2. Crates are a kind of building on a step with a lean (crates.ts CRATE_SPECS), never holding what the map keeps one of.
+- Waiting on the owner: about 40 more spots under the gas and a few bunker floors so all of it spawns (a loot-place change: WORLD_REV/LOOT_REV, players set down at the map's edge); then the new places (cave stashes, bunker-top posts).
+- Goes with the server deploy still waiting past `main` (furniture storage, the Mosin, gas masks, heli sound, VSSK, dog-tag rules, bodies kept an hour): write its changelog entry and restart note then.
+
 ## BUG LIST (this build: the map three times over, on `perf-aggressive`, not deployed)
 The owner, 2026-10-16: "we need to add a buglist to this build". Each line: the bug, then its state.
 - **A player shot out of a helicopter: their body floated in the sky.** The owner: "it should be stuck in the helicopter till the helicopter lands or crashes then spawn on the ground". FIXED, server only (server/acts.ts `leaveSeat`): a solo pilot killed in the air left the helicopter to their own dead game, which flew it no more, so it hung where they died and `riders` never laid the body out. Now the nearest player's game takes it over and it falls (its rotor runs down), or with nobody near the server sets it down wrecked; the body rides in its seat until then and is laid beside it. test/heli-body.test.ts (6 checks; the new ones fail on the old code), test/heli-orphan.test.ts. Goes live with the next server deploy.
