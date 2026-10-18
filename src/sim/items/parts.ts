@@ -61,7 +61,7 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'mag_sniper50', name: '.50 Sniper Magazine', model: 'sniper50', nodeRe: '^mag', w: 1, h: 2, weight: 0.6, category: 'magazine',
-    desc: 'Five rounds of .50 BMG for the .50 sniper rifle.',
+    desc: 'Five rounds of .50 BMG for the L96 AWP .50.',
     mag: { ammo: 'ammo_50bmg', capacity: 5 }, attach: { fits: ['sniper50'], slot: 'magazine' },
     loot: { pair: 'Mag_SV98_10Rnd', at: [0, 0, 0, 1, 2], restock: 900 },
   },
