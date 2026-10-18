@@ -17,6 +17,7 @@ import { planFlight, type Flight, flightTimes, comesFrom, restAt } from '../../s
 import { type JobBook, bookFor, dayOf } from '../../sim/jobs';
 import { DIG_SECONDS, Game } from '../game';
 import { economyCargo } from '../../sim/storage';
+import { SEARCHED } from '../remote';
 
 export const gunsMethods = {
   // ------------------------------------------------------------ attachments
@@ -482,6 +483,8 @@ export const gunsMethods = {
         this.invUI.setStashState('Opening…');
         this.net.send({ t: 'copen', cid: this.openStash.uid });
       }
+      // (going through something is heard by whoever is near, as the lockers' doors are seen, but of an admin vanished: see SEARCHED)
+      if (this.online && !this.powers.hidden && (this.openStash || this.lying.size)) this.act('open', SEARCHED.hands);
       this.input.uiMode = true;
       this.input.unlock();
       audio.ui('open');

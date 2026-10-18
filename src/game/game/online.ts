@@ -27,6 +27,16 @@ import { INFECTED } from '../../sim/infected';
 import { cashedTags } from '../../ui/rewards';
 import type { Game } from '../game';
 
+/** what holds things within reach of where somebody stands, if anything does: a crate, a cupboard or a drop is 'hard'; a body, a pack, a stash or a cardboard box 'soft' */
+function searched(g: Game, at: THREE.Vector3): 'hard' | 'soft' | null {
+  const near = (s: { x: number; y: number; z: number }) => Math.hypot(s.x - at.x, s.z - at.z) < 2.4 && Math.abs(s.y - at.y) < 1.8;
+  const crate = g.loot.crates.find(near);
+  if (crate) return crate.kind.startsWith('cardboard') ? 'soft' : 'hard';
+  if ([...g.drops.values()].some((d) => near(d.stash))) return 'hard';
+  if (g.loot.stashes.some((s) => !s.buried && near(s)) || [...g.corpses.values()].some((c) => near(c.stash))) return 'soft';
+  return [...g.economy.loot.values()].some((l) => holds(l.item.id) && near(l)) ? 'soft' : null;
+}
+
 export const onlineMethods = {
   // ------------------------------------------------------------ multiplayer
 
@@ -164,7 +174,11 @@ export const onlineMethods = {
       const spec = LAUNCHED[m.w];
       if (spec) this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), spec.flight, false, m.w, true);
     });
-    net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
+    // (hands opened where something that holds things stands are somebody going through it: the server passes on no more than 'open')
+    net.on('act', (m) => {
+      const r = this.remotes.get(m.id);
+      r?.act(m.a, m.d, cam().position, m.a === 'open' ? searched(this, r.pos) : null);
+    });
     net.on('emote', (m) => {
       const r = this.remotes.get(m.id), e = EMOTE[m.e];
       if (!r?.alive || !e?.say) return;

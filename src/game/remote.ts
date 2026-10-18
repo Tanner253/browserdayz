@@ -34,6 +34,9 @@ const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new TH
 
 /** metres within which what somebody's hands are doing is heard: rounds into a magazine, a box torn open (eating and the like, three less) */
 export const HANDS_HEARD = 11;
+/** somebody going through what holds things: how long their hands are at it, and within how many metres it is heard
+ * (the owner, 2026-10-17: "opening an inventory to loot it should make noise to nearby players") */
+export const SEARCHED = { hands: 1.4, heard: 18 };
 
 export class RemotePlayer implements Damageable {
   alive = true;
@@ -324,11 +327,16 @@ export class RemotePlayer implements Damageable {
   }
 
   /** they are working the bolt, reloading, eating, dressing a wound: seen, and heard if close */
-  act(a: Act, dur: number, listener: THREE.Vector3) {
+  /** @param searched hands opened at what holds things (see Game's `searched`): a crate's lid or a cupboard ('hard'), a body or a pack ('soft') */
+  act(a: Act, dur: number, listener: THREE.Vector3, searched: 'hard' | 'soft' | null = null) {
     if (!this.ready || !this.alive) return;
     if (a === 'stop') return this.avatar.act(null);
     // (rounds going into a magazine and a box being torn open are hands at work in front of the body, as opening anything is)
     this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, dur);
+    if (searched) {
+      if (this.pos.distanceToSquared(listener) < SEARCHED.heard * SEARCHED.heard) audio.rummage(this.pos, searched === 'hard');
+      return;
+    }
     // A magazine going in is heard only by whoever is close, and a bolt worked by whoever is closer still. And the
     // small things hands do are heard by whoever is within a room's length: rounds clicked into a magazine one by
     // one, a box torn open, somebody eating or drinking or seeing to a wound. It is how the one who is not seen is

@@ -2184,6 +2184,21 @@ export class AudioEngine {
   }
 
   /**
+   * Somebody going through what holds things, heard by whoever is near (the owner, 2026-10-17: "opening an inventory
+   * to loot it should make noise to nearby players"): a lid or a door let go, then hands among what is in it.
+   * @param hard a crate, a locker, a piece of furniture; else cloth and straps: a body, a pack, a case
+   */
+  rummage(pos: V3, hard: boolean) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, out = this.out(pos, 2.5, 1.5), [gain] = EVERY.hand.pickup, near = EVERY.hand.other;
+    // (until the recordings have come, the rustle the game's own pockets make)
+    if (!this.has('take_any')) return this.hands('open', pos);
+    if (hard) this.rec('latch', out, t, 0.6, 1.1, false, true);
+    else this.rec('step_soft', out, t, gain * near, 0.85, false, true);
+    for (let i = 0; i < 3; i++) this.rec(i === 1 ? (hard ? 'take_metal' : 'step_soft') : 'take_any', out, t + 0.3 + i * 0.34 + Math.random() * 0.12, gain * near, 0.95 + Math.random() * 0.1, false, true);
+  }
+
+  /**
    * A car's door, as somebody gets in or out: the catch let go, and the door pulled to behind them. Heard from
    * where the car is, by whoever is within a yard's length of it. Recordings and nothing else: a car's door had
    * no sound before there were any, and has none until they have come.
