@@ -136,7 +136,7 @@ const product = (gains: number[]) => gains.reduce((p, g) => p * g, 1);
 const sorted = (ws: { turned: number; rest: string[] }[]) => ws.map((w) => `${w.rest.join('>')} x${w.turned}`).sort();
 
 ok('with every slider at 100 %, every way out is turned by what it was before there were groups, to the last digit, through the same things in the same order: in the open and under a roof', () => {
-  assert.deepEqual(MIX, { fx: 1, voice: 1, ambience: 1, ui: 1 }, 'a group does not start at full');
+  assert.deepEqual(MIX, { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 }, 'a group does not start at full');
   for (const indoors of [false, true]) {
     engine.setEnvironment(indoors);
     for (const [, name, at, was] of INS) {
@@ -154,7 +154,7 @@ ok('with every slider at 100 %, every way out is turned by what it was before th
 ok('each way out passes one fader, of its own group, once; and the one volume, once', () => {
   const all = new Map<Thing, Group>();
   for (const g of GROUPS) for (const f of engine.faders[g]) all.set(f, g);
-  assert.equal(all.size, 8, 'the faders are not the eight there should be (Effects 4, Voice 1, Ambience 2, Interface 1)');
+  assert.equal(all.size, 9, 'the faders are not the nine there should be (Effects 4, Voice 1, Ambience 2, Interface 1, Vehicles 1)');
   for (const [group, name, at] of INS) {
     for (const w of ways(at(engine))) {
       assert.deepEqual(w.gains.filter((g) => all.has(g)).map((g) => all.get(g)), [group], `${name}: the faders on its way out`);
@@ -172,8 +172,8 @@ ok('a slider turns its own group by its share and no other; the one volume turns
     [1, { fx: 1, voice: 1, ambience: 1, ui: 0.63 }],
     [0.5, { fx: 0.3, voice: 0.8, ambience: 0.1, ui: 1 }],
     [0.25, { fx: 0, voice: 0, ambience: 0, ui: 0 }],
-    [0, { fx: 1, voice: 1, ambience: 1, ui: 1 }],
-    [1, { fx: 1, voice: 1, ambience: 1, ui: 1 }],
+    [0, { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 }],
+    [1, { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 }],
   ];
   console.log('      master  effects voice ambience interface   comes to the squeeze at (of what it was made at): effects  voice  ambience  interface');
   for (const [volume, mix] of cases) {
@@ -202,10 +202,10 @@ ok('a slider past its ends is held at them; one group moved leaves the others wh
   engine.setMix({ voice: 1 });
   const late = new AudioEngine() as unknown as typeof engine;
   late.setVolume(0.5);
-  late.setMix({ fx: 0.2, voice: 0.4, ambience: 0.6, ui: 0.8 });
+  late.setMix({ fx: 0.2, voice: 0.4, ambience: 0.6, ui: 0.8, vehicles: 0.3 });
   late.start();
   assert.equal(level(late.master), BUS.master * 0.5);
-  assert.deepEqual(GROUPS.map((g) => late.faders[g].map(level)), [[0.2, 0.2, 0.2, 0.2], [0.4], [0.6, 0.6], [0.8]]);
+  assert.deepEqual(GROUPS.map((g) => late.faders[g].map(level)), [[0.2, 0.2, 0.2, 0.2], [0.4], [0.6, 0.6], [0.8], [0.3]]);
 });
 
 // ---- which group each thing the game asks for is made on: by what is connected, while it is made, to a fader
@@ -234,10 +234,12 @@ for (const asBefore of [false, true]) {
     is('a step, a jump, a landing', ['fx'], (e) => { e.footstep('grass', 4); e.footstep('concrete', 4, THERE); e.jump('grass'); e.land('grass', 6); });
     is('a blast', ['fx'], (e) => e.explosion(THERE, 12));
     is('the bunker door', ['fx'], (e) => e.blastDoor(THERE, 10, true));
-    is('a door, a locker, a car door', ['fx'], (e) => { e.door(true, THERE, 3); e.locker(true, THERE, 3); e.carDoor(THERE); });
+    is('a door, a locker', ['fx'], (e) => { e.door(true, THERE, 3); e.locker(true, THERE, 3); });
+    // (a car's door is recordings and nothing else: with none on the disk it is nothing, and with them a vehicle's)
+    assert.ok(made((e) => e.carDoor(THERE)).every((g) => g === 'vehicles'), 'a car door');
     is('a round on steel, a fist landing, a swing', ['fx'], (e) => { e.impact('metal', THERE, 5); e.blow(true, THERE, 2); e.whoosh(0.5); });
-    is('a car into a wall', ['fx'], (e) => e.crash(THERE, 0.8));
-    is("a jeep's engine", ['fx'], (e) => void e.engine());
+    is('a car into a wall', ['vehicles'], (e) => e.crash(THERE, 0.8));
+    is("a jeep's engine", ['vehicles'], (e) => void e.engine());
     is('being hit, a bone going, dying, a body falling', ['fx'], (e) => { e.hurt(); e.hurt(THERE, 5); e.snap(); e.death(); e.bodyFall(THERE, 4); });
     is('breath and heart', ['fx'], (e) => { for (let k = 0; k < 40; k++) e.body(0.25, 0, 10, true, true); });
     is('a cough in the gas', ['fx'], (e) => e.cough());
@@ -261,10 +263,10 @@ for (const asBefore of [false, true]) {
 }
 engine.asBefore = false;
 
-ok("a helicopter's rotor is of the world: Effects, by hanging on sfx as it was written to", () => {
+ok("a helicopter's rotor is a vehicle's: the Vehicles group (the owner, 2026-10-18: \"a volume slider for vehicles specifically\")", () => {
   const voice = engine.rotor?.();
   if (!voice) return void console.log('      (no rotor recording on the disk, or no rotor in this tree: not looked at)');
-  assert.deepEqual(made((e) => void e.rotor()), ['fx']);
+  assert.deepEqual(made((e) => void e.rotor()), ['vehicles']);
 });
 
 ok("another player's voice goes in at the Voice group, and nowhere else", () => {
@@ -297,16 +299,17 @@ ok('the calls said aloud are turned by Voice too: as loud as they were at 100 %,
 const { loadMix, saveMix, loadGraphics, saveGraphics } = await import('../src/core/settings');
 const { loadControls, AIM, SENS } = await import('../src/core/keys');
 
-ok('the four groups are kept between visits by themselves; nothing kept, or something damaged, is all four at full', () => {
+ok('the groups are kept between visits by themselves; nothing kept, or something damaged, is all of them at full', () => {
   kept.clear();
-  assert.deepEqual(loadMix(), { fx: 1, voice: 1, ambience: 1, ui: 1 });
-  saveMix({ fx: 0.3, voice: 0.85, ambience: 0, ui: 0.5 });
-  assert.deepEqual(loadMix(), { fx: 0.3, voice: 0.85, ambience: 0, ui: 0.5 });
+  assert.deepEqual(loadMix(), { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 });
+  saveMix({ fx: 0.3, voice: 0.85, ambience: 0, ui: 0.5, vehicles: 0.25 });
+  assert.deepEqual(loadMix(), { fx: 0.3, voice: 0.85, ambience: 0, ui: 0.5, vehicles: 0.25 });
   assert.deepEqual([...kept.keys()], ['zona.mix'], 'they are kept under some other name, or with something else');
   kept.set('zona.mix', '{"fx":7,"voice":"loud","ambience":-1,"ui":0.4,"other":1}');
-  assert.deepEqual(loadMix(), { fx: 1, voice: 1, ambience: 1, ui: 0.4 });
+  // (and one kept before there was a Vehicles slider is that at full)
+  assert.deepEqual(loadMix(), { fx: 1, voice: 1, ambience: 1, ui: 0.4, vehicles: 1 });
   kept.set('zona.mix', 'not this');
-  assert.deepEqual(loadMix(), { fx: 1, voice: 1, ambience: 1, ui: 1 });
+  assert.deepEqual(loadMix(), { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 });
 });
 
 ok('the one volume is kept where it always was: each of the five steps it used to be is read as it was, and anywhere between them is kept now', () => {

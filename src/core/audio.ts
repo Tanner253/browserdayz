@@ -51,11 +51,13 @@ export const madeUp = (c: { threshold: number; ratio: number }) => Math.pow(10, 
  *   ambience  the wind, the leaves, the insects, birds and crows, a fire burning near by, breath through a gas
  *             mask, the bunker's hum and the noises it makes off in the dark
  *   ui        Interface: one's own hands in the pockets (`ui`), and the tick of a shot landing (`hitTick`)
+ *   vehicles  the jeeps' engines, horns, doors and crashes, and the helicopters' rotors (the owner, 2026-10-18: "we
+ *             shoudl add a volume slider for vehicles specifically")
  */
-export const GROUPS = ['fx', 'voice', 'ambience', 'ui'] as const;
+export const GROUPS = ['fx', 'voice', 'ambience', 'ui', 'vehicles'] as const;
 export type Group = (typeof GROUPS)[number];
 export type Mix = Record<Group, number>;
-export const MIX: Mix = { fx: 1, voice: 1, ambience: 1, ui: 1 };
+export const MIX: Mix = { fx: 1, voice: 1, ambience: 1, ui: 1, vehicles: 1 };
 /** what a slider at `v` turns its group by: the share itself, 0..1, as the one volume has always been */
 export const share = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1);
 
@@ -377,7 +379,7 @@ export class AudioEngine {
       g.connect(this.master);
       return g;
     };
-    this.bus = { fx: this.sfx, voice: group(), ambience: group(), ui: group() };
+    this.bus = { fx: this.sfx, voice: group(), ambience: group(), ui: group(), vehicles: group() };
     this.ears = this.sfx;
 
     // white noise source buffer (2 s)
@@ -445,7 +447,7 @@ export class AudioEngine {
     this.ambLP = this.filter('lowpass', 18000, 0.5);
     this.amb.connect(this.ambLP).connect(this.bus.ambience);
 
-    this.faders = { fx: [this.sfx, this.reverbSend, this.echo, this.roomSend], voice: [this.bus.voice], ambience: [this.bus.ambience, this.ambSend], ui: [this.bus.ui] };
+    this.faders = { fx: [this.sfx, this.reverbSend, this.echo, this.roomSend], voice: [this.bus.voice], ambience: [this.bus.ambience, this.ambSend], ui: [this.bus.ui], vehicles: [this.bus.vehicles] };
     for (const g of GROUPS) for (const f of this.faders[g]) f.gain.value = this.mix[g];
 
     this.startAmbience();
@@ -832,11 +834,11 @@ export class AudioEngine {
   }
 
   /** short metallic click (bolt, mag, hammer) */
-  click(freq = 3000, vol = 0.4, dur = 0.02, delay = 0, pos?: V3) {
+  click(freq = 3000, vol = 0.4, dur = 0.02, delay = 0, pos?: V3, bus?: AudioNode) {
     if (!this.ready) return;
     const t = this.ctx.currentTime + delay;
-    // somebody else's weapon: the same sound, from where they are
-    const to = pos ? this.out(pos, 3, 1.2) : this.ears;
+    // somebody else's weapon: the same sound, from where they are (and a vehicle's on the vehicles' fader)
+    const to = pos ? this.out(pos, 3, 1.2, 0, bus) : this.ears;
     if (pos) vol *= 1.6;
     const n = this.noise(t, dur + 0.03);
     const f = this.filter('bandpass', freq * (0.9 + Math.random() * 0.2), 6);
@@ -1963,7 +1965,7 @@ export class AudioEngine {
     pan.refDistance = 10;
     pan.rolloffFactor = 0.9;
     pan.maxDistance = 2000;
-    pan.connect(this.sfx);
+    pan.connect(this.bus.vehicles);
     const hornG = ctx.createGain(), sirenG = ctx.createGain();
     hornG.gain.value = 0;
     sirenG.gain.value = 0;
@@ -2073,7 +2075,7 @@ export class AudioEngine {
     skidG.gain.value = 0;
     skid.connect(skidBP).connect(skidG).connect(out);
     skid.start();
-    out.connect(pan).connect(this.sfx);
+    out.connect(pan).connect(this.bus.vehicles);
     let live = true;
     let level = 0;
     return {
@@ -2135,7 +2137,7 @@ export class AudioEngine {
     const come = ctx.createGain();
     come.gain.setValueAtTime(0, ctx.currentTime);
     come.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.35);
-    src.connect(lp).connect(out).connect(come).connect(pan).connect(this.sfx);
+    src.connect(lp).connect(out).connect(come).connect(pan).connect(this.bus.vehicles);
     // (anywhere in its round: two of them in the air at once are not one sound twice as loud)
     src.start(0, Math.random() * buf.duration);
     this.heard?.('rotor', 0, 1, 1);
@@ -2177,7 +2179,7 @@ export class AudioEngine {
   crash(pos: V3, k: number) {
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    const out = this.out(pos, 8, 1.1);
+    const out = this.out(pos, 8, 1.1, 0, this.bus.vehicles);
     // Recorded: sheet steel giving, the weight behind it, and the steel struck that a round on a car's door has
     // already, an octave down for a thing that size. (Until they have come, the made-up thud and rattle.)
     const C = EVERY.crash;
@@ -2201,7 +2203,7 @@ export class AudioEngine {
     this.env(ng, t, 0.25 + k * 0.55, 0.002, 0.12 + k * 0.2);
     n.connect(bp).connect(ng).connect(out);
     // something loose in it rattles on after
-    for (let i = 0; i < 3; i++) this.click(600 + Math.random() * 900, 0.12 + k * 0.2, 0.03, 0.05 + i * 0.07 + Math.random() * 0.04, pos);
+    for (let i = 0; i < 3; i++) this.click(600 + Math.random() * 900, 0.12 + k * 0.2, 0.03, 0.05 + i * 0.07 + Math.random() * 0.04, pos, this.bus.vehicles);
   }
 
   /**
@@ -2226,7 +2228,7 @@ export class AudioEngine {
    */
   carDoor(pos: V3) {
     if (!this.has('latch')) return;
-    const t = this.ctx.currentTime, out = this.out(pos, 2.5, 1.6);
+    const t = this.ctx.currentTime, out = this.out(pos, 2.5, 1.6, 0, this.bus.vehicles);
     this.rec('latch', out, t, 0.8, 0.9, false, true);
     // (the steel door the bunker and the lockers have, quicker: a door a twentieth of that one's weight)
     this.rec('gate_slam', out, t + 0.42, 0.6, 1.3);
