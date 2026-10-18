@@ -271,6 +271,29 @@ export class WeaponRig {
     }
   }
 
+  /**
+   * Several parts each in a movement of its own over the pack as it stands (a pair's two hands, each at its own moment
+   * of its shot): every part's pose is taken in turn, and only then are they all put. One part laid and the next laid
+   * after it, a pair fired on the same frame had its right hand in nothing: what plays the movements writes only what
+   * has changed since it last wrote, and the right hand's moment was the left's (the owner, 2026-10-18: "when you shoot
+   * both submachine guns at the same time the right hand bugs out").
+   */
+  layers(parts: { clip: string; k: number; roots: string[] }[]) {
+    if (!parts.length) return;
+    const keep = new Map<THREE.Object3D, [THREE.Vector3, THREE.Quaternion]>();
+    this.scene.traverse((o) => void keep.set(o, [o.position.clone(), o.quaternion.clone()]));
+    const took = new Map<THREE.Object3D, [THREE.Vector3, THREE.Quaternion]>();
+    for (const p of parts) {
+      this.pose(p.clip, p.k);
+      for (const r of p.roots) this.node(r)?.traverse((o) => void took.set(o, [o.position.clone(), o.quaternion.clone()]));
+    }
+    for (const [o, [pos, q]] of keep) {
+      const t = took.get(o);
+      o.position.copy(t ? t[0] : pos);
+      o.quaternion.copy(t ? t[1] : q);
+    }
+  }
+
   /** Our arms put after the pack's: once the frame's movement is set. */
   follow() {
     this.hands?.follow();

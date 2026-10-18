@@ -4026,12 +4026,15 @@ export class Weapons {
     }
     // (a pair: each hand and its gun fire by themselves, over the other standing as it was)
     if (m.twin) {
+      const parts: { clip: string; k: number; roots: string[] }[] = [];
       for (const s of ['L', 'R'] as const) {
         m.twin.shotT[s] += dt;
         // (a pack that draws each hand's shot by itself, the sawn-offs: `fireL`, `fireR`; one that draws both at once: `fire`)
         const own = rig.has(`fire${s}`) ? `fire${s}` : shot, ownLen = rig.seconds(own);
-        if (m.twin.shotT[s] < ownLen) rig.layer(own, m.twin.shotT[s] / ownLen, m.twin.roots[s]);
+        if (m.twin.shotT[s] < ownLen) parts.push({ clip: own, k: m.twin.shotT[s] / ownLen, roots: m.twin.roots[s] });
       }
+      // (both hands' poses taken before either is put: see Rig.layers)
+      rig.layers(parts);
     }
     // (a pistol on a pack with no drawing of a last shot: run dry, its slide stays back)
     if (m.slideOn && this.chamberEmpty && m.shotT >= len) rig.slide(m.slideOn, -SLIDE_LOCK);
