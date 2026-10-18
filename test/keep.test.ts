@@ -16,6 +16,7 @@ import { keep, type Kept } from '../api/keep';
 import type { Store } from '../api/_lib/store';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { noBurying } from '../src/sim/stash';
+import { makeItem } from '../src/sim/items';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8151, SITE = 8152;
@@ -127,7 +128,9 @@ async function withServer(play: (log: () => string) => Promise<void>) {
 }
 
 let checks = 0;
-const ann = new Player('Ann'), bob = new Player('Bob');
+const ann = new Player('Ann'), bob = new Player('Bob'), cal = new Player('Cal');
+/** the body Cal leaves (server/keep.ts `bodies`) */
+let body: { uid: string; x: number; z: number } | undefined;
 const rifle = { uid: 'keep-test-rifle', id: 'ak', qty: 1, loaded: 0, mag: null };
 const tin = { uid: 'keep-test-tin', id: 'beans', qty: 1 };
 // (out in the country, where a stash can be buried)
@@ -152,6 +155,17 @@ await withServer(async (log) => {
   ann.send({ t: 'bury', uid: stash.uid, on: true });
   await sleep(300);
   assert.ok(ann.got.some((m) => m.t === 'stash+' && m.s.uid === stash.uid && m.s.buried), 'the bag she dropped could not be buried');
+  // (and Cal comes in with a tin and dies where he stands: his body is kept too, 2026-10-17)
+  assert.ok(await cal.join());
+  cal.send({ t: 's', p: [at[0] + 6, ground(at[0] + 6, at[1]), at[1], 0, 0, 0], w: null, m: [] });
+  cal.send({ t: 'me', inv: { slots: {}, active: null, containers: [{ id: 'pockets', items: [{ ...makeItem('sardines'), x: 0, y: 0, rot: false }] }] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
+  await sleep(300);
+  cal.send({ t: 'died', cause: 'a fall', v: 0 });
+  for (let k = 0; k < 40 && !body; k++) {
+    body = (cal.got.find((m) => m.t === 'death' && !!(m as { corpse?: unknown }).corpse) as { corpse?: { uid: string; x: number; z: number } } | undefined)?.corpse;
+    await sleep(100);
+  }
+  assert.ok(body, 'Cal left no body');
   // (written once she was in, and again as time goes by: the second has what she did since)
   for (let k = 0; k < 120 && !/time has gone by: 1 characters and 2 stashes/.test(log()); k++) await sleep(100);
   assert.ok(/\[keep\] time has gone by: 1 characters and 2 stashes written/.test(log()), `nothing was written to the site as time went by:\n${log().slice(-600)}`);
@@ -176,9 +190,12 @@ const before = writes;
 await withServer(async (log) => {
   assert.ok(await ann.join(), `she was not let in after the restart:\n${log().slice(-500)}`);
   assert.ok(/\[keep\] 1 characters and 2 stashes as they were kept/.test(log()), `what was kept was not read:\n${log().slice(-500)}`);
+  // (Cal's body, where it lay)
+  const lies = ann.last('welcome')!.corpses.find((c) => c.uid === body!.uid);
+  assert.ok(lies && Math.hypot(lies.x - body!.x, lies.z - body!.z) < 0.5, `Cal's body was not kept through the restart: ${JSON.stringify(ann.last('welcome')!.corpses)}`);
   // (who played before it stopped is still counted on the door's "played today": kept with the rest, server/seen.ts)
   const h = (await (await fetch(`http://127.0.0.1:${PORT}/healthz`)).json()) as { today?: number };
-  assert.equal(h.today, 1, 'who had played before the restart was forgotten by it');
+  assert.equal(h.today, 2, 'who had played before the restart was forgotten by it');
   const w = ann.last('welcome')!;
   assert.ok(Math.hypot(w.spawn.x - at[0], w.spawn.z - at[1]) < 0.5 && Math.abs(w.spawn.yaw - 1.25) < 0.01, `she is not where she was: ${JSON.stringify(w.spawn)}`);
   assert.equal((w.me?.inv.slots as Record<string, { id: string } | null>).primary?.id, 'ak', 'she has not what she carried');
@@ -199,7 +216,7 @@ await withServer(async (log) => {
   for (let k = 0; k < 60 && writes === before; k++) await sleep(100);
   assert.ok(writes > before, 'the server that is alive now never said so');
   checks++;
-  console.log('  ok  after the server is stopped dead and started again: she is where she was, as she was, with what she carried; the bag she buried and the suitcase she left lying have what she put in them');
+  console.log('  ok  after the server is stopped dead and started again: she is where she was, as she was, with what she carried; the bag she buried and the suitcase she left lying have what she put in them; and a body lies where it lay');
 });
 
 site.close();

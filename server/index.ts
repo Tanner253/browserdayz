@@ -324,6 +324,9 @@ function loadWorld() {
       } else if (b.kind === 'furniture') {
         const cur = boxes.get(b.cid);
         if (cur?.kind === 'furniture') Object.assign(cur, { items: b.items, layout: b.layout ?? {} });
+      } else if (b.kind === 'corpse') {
+        // (a body: lying where it lay, for the time it had left, the economy's clock being kept with it)
+        if (!boxes.has(b.cid) && (b.expires ?? 0) > economy.time) boxes.set(b.cid, b);
       } else if (b.kind === 'stash') {
         if (b.buried) boxes.set(b.cid, b);
         else if (!economy.loot.has(b.cid)) economy.drop(stashItem(b), b.x, b.y, b.z, b.rot).keptAt = b.touchedAt ?? Date.now();
@@ -348,7 +351,8 @@ function saveWorld() {
     const data = {
       rev: WORLD_REV,
       economy: economy.serialize(),
-      boxes: [...boxes.values()].filter((b) => b.kind !== 'corpse' && b.kind !== 'drop'),
+      // (and the dead lying on the ground, not one riding in a seat: see `bodies` in keep.ts)
+      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && b.ride)),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     };
     writeFileSync(SAVE_FILE, JSON.stringify(data));

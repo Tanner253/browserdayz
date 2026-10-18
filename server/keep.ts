@@ -4,10 +4,10 @@
 import http from 'node:http';
 import { createHash, randomBytes, createCipheriv, createDecipheriv, createHmac } from 'node:crypto';
 import zlib from 'node:zlib';
-import { heldIn } from '../src/sim/inventory';
+import { BODY_GRID, heldIn } from '../src/sim/inventory';
 import { type ItemInstance, ITEMS } from '../src/sim/items';
 import type { NewsKept } from '../src/sim/news';
-import { BOOT, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
+import { BOOT, CORPSE_LIFETIME, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
 import { SITE_URL } from './tags';
 import { CHECK } from './checks';
 import { ADMIN, keyHash, roleOf, siteAdmin, type AdminState } from './gate';
@@ -103,6 +103,40 @@ interface Snapshot {
   powers?: [string, Client['power']][];
   /** the Elite, by key hash and when they were last paid at the top rate (see elite.ts) */
   elite?: [string, number][];
+  /** the dead lying on the ground, with what is on them and how many seconds each has left (see `bodies`) */
+  bodies?: KeptBody[];
+}
+
+/** a body as it is kept: where it lies, whose it was, how it fell, what is on it, and the seconds it has left */
+interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; name: string; v: number; left: number; items: Box['items'] }
+
+/**
+ * The dead lying on the ground, kept through a restart and a deploy with the time each had left (2026-10-17: a player
+ * walking up to the body of somebody they had killed saw it go; the server had been started again, and a body was the
+ * one thing that was not kept). Not one still riding in a seat: it goes with what it rides in.
+ */
+function bodies(): KeptBody[] {
+  return [...boxes.values()]
+    .filter((b) => b.kind === 'corpse' && !b.ride && (b.expires ?? 0) > economy.time)
+    .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items }));
+}
+
+/** the kept bodies laid out again, each with the time it had left, and everybody on told of each @returns how many */
+function layBodies(list: KeptBody[] | undefined, moved: boolean): number {
+  let n = 0;
+  for (const b of list ?? []) {
+    if (typeof b?.cid !== 'string' || boxes.has(b.cid) || ![b.x, b.y, b.z, b.rot, b.left].every(num) || b.left <= 0) continue;
+    const items = (Array.isArray(b.items) ? b.items : []).flatMap((s) => {
+      const it = cleanItem(s);
+      return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
+    });
+    for (const it of items) issue(it);
+    const y = moved ? world.groundAt(b.x, b.z) : b.y, name = String(b.name ?? 'Survivor').slice(0, 24), v = num(b.v) ? b.v : 0;
+    boxes.set(b.cid, { cid: b.cid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items, x: b.x, y, z: b.z, rot: b.rot, emptiedAt: -1, name, v, expires: economy.time + Math.min(CORPSE_LIFETIME, b.left) });
+    broadcast({ t: 'corpse@', corpse: { uid: b.cid, x: b.x, y, z: b.z, rot: b.rot, name, v } });
+    n++;
+  }
+  return n;
 }
 
 interface KeptFile { at: string; boot: string; final: boolean; z: string }
@@ -153,7 +187,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), powers: [...POWERS_KEPT], elite: elite.keep() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -216,6 +250,7 @@ function takeInLate(save: KeptFile) {
   elite.restore(snap.elite);
   takePowers(snap.powers);
   const moved = snap.rev !== WORLD_REV, now = Date.now();
+  layBodies(snap.bodies, moved);
   const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
   const carried = new Set<string>();
   for (const c of clients.values()) for (const it of things(c.inv)) carried.add(it.uid);
@@ -496,6 +531,8 @@ export async function loadKept() {
       economy.drop(item, l.x, moved ? world.groundAt(l.x, l.z) : l.y, l.z, l.rot).keptAt = num(l.at) ? l.at : now;
       stashes++;
     }
+    const laid = layBodies(snap.bodies, moved);
+    if (laid) log(`[keep] ${laid} bodies laid out again where they lay, each with the time it had left`);
     // (what has been said under the changelog, and its hearts: kept with the rest, and no worse for a new map)
     news.restore(snap.news);
     seen.restore(snap.seen);
