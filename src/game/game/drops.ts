@@ -317,14 +317,16 @@ export const dropsMethods = {
     this.hud.note(`${h.target} down${h.zone === 'head' ? ' · headshot' : ''}${how}`, 'good');
   },
 
-  /** The next weapon carried, round and round (the mouse wheel, for a thumb: it never stops on empty hands). */
-  nextWeapon(this: Game) {
+  /** The next weapon carried, round and round (the mouse wheel, for a thumb: it never stops on empty hands). False: none is carried. */
+  nextWeapon(this: Game): boolean {
     const have = SLOT_ORDER.filter((s) => this.inv.slots[s]);
-    if (!have.length || this.use || this.garage.ride) return;
+    if (!have.length) return false;
+    if (this.use || this.garage.ride) return true;
     const at = this.inv.active ? have.indexOf(this.inv.active) : -1;
     this.handsFree = false;
     this.stow();
     this.weapons.equip(have[(at + 1) % have.length]);
+    return true;
   },
 
   resume(this: Game) {

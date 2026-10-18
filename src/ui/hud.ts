@@ -1324,7 +1324,7 @@ export class HUD {
         (c.pad
           ? slide('Controller look speed', 'padSens', c.padSens, [PAD_SENS.least, PAD_SENS.most, PAD_SENS.step], `${c.padSens.toFixed(2)}×`) +
             row('Invert look', 'padInvert', c.padInvert ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The right stick pushed up looks down') +
-            `<p class="pad-map">R2 fire · L2 aim · ✕ jump · ○ crouch, held lie down · □ reload, or take, doors and search · △ next weapon, held empty hands · L3 sprint, aiming hold your breath · R3 light · L1 R1 lean · D-pad ↑ map, ↓ call-out wheel (held), ← single or automatic (held: drop), → look the gun over (held: talk) · touchpad inventory · options menu. In menus the left stick moves a cursor: ✕ clicks, ○ goes back, the right stick scrolls.</p>`
+            `<p class="pad-map">R2 fire · L2 aim · ✕ jump · ○ crouch, held lie down · □ reload, or take, doors and search · △ next gun, held empty hands · L1 R1 the hot bar, one slot along (aiming: a scope's zoom) · L3 sprint · R3 light · aiming, L3 or R3 clicked leans left or right (again: back), L3 held holds your breath · D-pad ↑ map, ↓ call-out wheel (held), ← single or automatic (held: drop), → look the gun over (held: talk) · touchpad inventory · options menu. In menus the left stick moves a cursor: ✕ clicks, ○ goes back, the right stick scrolls.</p>`
           : ''),
       audio:
         loud('Master', 'volume', g.volume, 'Everything') +

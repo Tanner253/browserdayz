@@ -21,7 +21,7 @@ import type { AdminSelf, AdminLook } from '../../ui/admin-ui';
 import { type Well, WELL } from '../../sim/wells';
 import { Infected } from '../infected';
 import { castleUnder } from '../../sim/castle';
-import { ESP_FAR, ESP_NEAR, ESP_SIZE, HOT_FREE, _lampPos, type Game } from '../game';
+import { ESP_FAR, ESP_NEAR, ESP_SIZE, HOT_CODES, HOT_FREE, _lampPos, type Game } from '../game';
 
 export const handsMethods = {
   // ------------------------------------------------------------ inventory ops
@@ -384,6 +384,22 @@ export const handsMethods = {
     }
     if (this.inv.held() === item || this.inHand === item) return this.emptyHands();
     this.takeUp(item);
+  },
+
+  /**
+   * A controller's bumpers: the key of the next (1) or last (-1) hot-bar slot with something on it, counted from the one
+   * whose thing is in the hands (from the ends, with empty hands); null when there is no other.
+   */
+  hotStep(this: Game, dir: 1 | -1): string | null {
+    const n = this.inv.hot.length, held = this.inv.held() ?? this.inHand;
+    const at = held ? this.inv.hot.findIndex((_, i) => this.inv.hotItem(i) === held) : -1;
+    const from = at >= 0 ? at : dir > 0 ? -1 : n;
+    for (let k = 1; k <= n; k++) {
+      const i = (((from + dir * k) % n) + n) % n;
+      if (i === at) break;
+      if (this.inv.hotItem(i)) return HOT_CODES[i];
+    }
+    return null;
   },
 
   /** the hands are emptied: what was in them is put away where it is carried, and anything they were at is broken off */

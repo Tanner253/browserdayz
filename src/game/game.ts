@@ -786,6 +786,8 @@ export class Game {
       playing: () => this.started && !this.paused && !this.player.dead && !this.input.uiMode && !this.invUI?.isOpen && !this.map?.open && !this.shop?.isOpen && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen,
       facing: () => !!this.focus,
       riding: () => !!this.garage.ride,
+      swap: () => this.breakOff() || this.turnMagWork() || this.nextWeapon(),
+      hotStep: (dir) => this.hotStep(dir),
       look: () => ({ sens: controls().padSens, invert: controls().padInvert }),
       mouseSens: () => controls().sens,
       note: (text) => this.hud.note(text),
@@ -1500,6 +1502,7 @@ export interface Game {
   drawNames: Methods<typeof handsMethods>['drawNames'];
   flyCamera: Methods<typeof handsMethods>['flyCamera'];
   hot: Methods<typeof handsMethods>['hot'];
+  hotStep: Methods<typeof handsMethods>['hotStep'];
   emptyHands: Methods<typeof handsMethods>['emptyHands'];
   stow: Methods<typeof handsMethods>['stow'];
   takeUp: Methods<typeof handsMethods>['takeUp'];
