@@ -951,6 +951,11 @@ const LENS: Record<string, string> = { m32: 'sight' };
  */
 const DOT_NEAR: Record<string, number> = { mp7a1: 0.13 };
 /**
+ * A lean a pack gives its gun as it is brought to the eye, degrees (+ to the right), undone as it comes up: the MP7's
+ * stood 5.5 degrees over to the left, aimed (the owner, 2026-10-18: "the gun itself is not straight its leaning to the left").
+ */
+const AIM_ROLL: Record<string, number> = { mp7a1: -5.53 };
+/**
  * The faces of a tube sight that look along the barrel (x, the gun's own space) inside its ring, taken out: its
  * lens. The ring is found from those same faces over the lower two fifths of it (the mount under it has faces that
  * look along the barrel too): its middle is the middle of them, and its lens three quarters of the way out to the
@@ -2118,6 +2123,8 @@ export class Weapons {
       u.crossVectors(r, f);
       // (what takes its right, its up and its back to the eye's: the turn that undoes how it stands)
       aimRot.setFromRotationMatrix(new THREE.Matrix4().makeBasis(r, u, f.clone().negate()).transpose());
+      // (and a lean its pack gives it as it comes up, which its pose at rest does not show: undone with it)
+      if (AIM_ROLL[o.item]) aimRot.setFromQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(AIM_ROLL[o.item])).multiply(new THREE.Quaternion().setFromEuler(aimRot)));
       if (notch) lineAt = notch.applyEuler(aimRot);
     }
     // (and one that squares the tube of a sight of its own to the eye, for when that is fitted: the MP7's sight looks
