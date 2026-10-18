@@ -1,12 +1,13 @@
-// Google Ads: its tag on the site, and one conversion when a visitor first goes into a game, the Zone or the Arena
-// (the owner, 2026-10-14: "we should setup conversion measurment for google ads on pla[y]"). A page view would count
-// everybody who looks at the door and leaves; going in is what an ad is for.
-// The account's tag and the Play conversion's label are not secrets: every page that carries them shows them.
+// Google Ads: its tag on the site, and its conversion sent once a page as the page is loaded (the owner, 2026-10-18,
+// giving Google's own event snippet for the account's "Page view" conversion: "use this". Until then it was sent when a
+// visitor first went into a game, under another number, and Google had seen nothing: "Unverified ... no activity").
+// The account's tag and the conversion's label are not secrets: every page that carries them shows them.
 
 /** the account's Google tag, 'AW-' and its number ('': nothing is loaded) */
-const TAG = 'AW-7844801690';
-/** the Play conversion: the tag, a slash and its label, as the conversion's event snippet says it */
-const PLAY = 'AW-7844801690/f8gwCJrZ2JwdEP3O39A9';
+const TAG = 'AW-6551556919';
+/** the Page view conversion: the tag, a slash and its label, and what it is worth, as Google's event snippet says them */
+const PLAY = 'AW-6551556919/f8gwCJrZ2JwdEP3O39A9';
+const WORTH = { value: 1.0, currency: 'USD' };
 
 type Gtag = (...a: unknown[]) => void;
 const w = window as unknown as { dataLayer?: unknown[]; gtag?: Gtag };
@@ -32,6 +33,9 @@ export function startAds() {
   w.gtag('consent', 'default', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'granted', analytics_storage: 'granted' });
   w.gtag('js', new Date());
   w.gtag('config', TAG);
+  // (the Page view conversion, right after the tag, as Google's snippet has it)
+  counted = true;
+  w.gtag('event', 'conversion', { send_to: PLAY, ...WORTH });
   const s = document.createElement('script');
   s.async = true;
   s.src = `https://www.googletagmanager.com/gtag/js?id=${TAG}`;
@@ -39,9 +43,9 @@ export function startAds() {
 }
 
 let counted = false;
-/** somebody has gone into a game: counted once a page (Google counts one a click besides, as the conversion is set) */
+/** somebody has gone into a game: the conversion, where the page's own has not been sent (it is sent as the page loads: once a page) */
 export function playedAd() {
   if (counted || !PLAY || !w.gtag) return;
   counted = true;
-  w.gtag('event', 'conversion', { send_to: PLAY });
+  w.gtag('event', 'conversion', { send_to: PLAY, ...WORTH });
 }
