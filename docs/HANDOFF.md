@@ -2,6 +2,25 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## PICK UP HERE (2026-10-18, paused for the owner's restart; branch `gun-racks`, NOT deployed: the owner, "hold deploys for now")
+Done today on `gun-racks`: the controller (`5e86c58`: bumpers along the whole hot bar, △ gun to gun, L3/R3 lean while
+aiming, L3 held the breath); the repo tidied (`6d56534`: docs/ and tools/, the site built the same); weapons fixes part
+one (`aaf58e1`: the double barrel out entirely, the VSSK louder, the MP7A1's sight, the breath held as DayZ's, the scope's
+fade); the Brave/uBlock fix (`cf9cae9`); disk cleared (115 unpacked zips, old film masters, 5 idle worktrees).
+Left, in this order (the owner's words in the commits):
+1. The whole test suite after the double barrel's removal: `node scripts/test-all.mjs`.
+2. The gun rack in the game with its guns, a picture: `progress/rack-plan/rack-look-off.js` (offline; finds the first
+   rack with guns in it). The owner: "this model in the game yet? it should be." (It is, on this branch.)
+3. Reshoot the weapons film. Its session ("showcase", branch `claude/weapons-showcase-5a754b`, the film at `610be96`)
+   needs this branch merged into it first (its own controller commit `30a4414` is superseded here). The owner's notes:
+   the breath held before the sniper's shot; the bullet drop shown at range (a first round low, the zero turned up or
+   held over, the second home, the round's arc seen); the aim on the target; the scope on the rifle from the start
+   (`mods: ['scope_50']`), no irons-then-scope cut; the VSSK's new sound; the MP7's fixed sight; NO double barrel in it.
+   The film's page is `tools/trailer.html` now, its takes in `tools/trailer/out`.
+4. The Benelli's pump heard on a reload from empty: `1de4499` on `claude/intelligent-fermat-fd14fd`, not merged (ask).
+5. LAST: the Google Ads media (`progress/google-ads/plan.md`).
+The performance session ("perf-ping", `claude/perf-ping-61c7c4`) was asked to pause at a commit of its own.
+
 ## LOOT ON DAYZ'S MODEL (2026-10-17, on `perf-aggressive`, NOT deployed: the owner, "do not restart keep working")
 The owner approved the plan (`progress/loot-rework/plan-1.jpg`): "use dayz as a template for loot distribution", "a loot roll is rolled for each spot", "keep it DRY". What is built (sheet: `progress/loot-rework/sheet-1.jpg`):
 - Each item says everything about itself in `src/sim/items/*.ts`: its `loot` rule (DayZ counterpart `pair`, counts per step, restock, usage, found-with parts `fitted`, packs' `filled`), its trader `worth`/`sells`. A new item is one entry. The economy, the trader, FITTED and the crates read it (src/sim/items/rules.ts).
