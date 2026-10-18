@@ -789,7 +789,9 @@ const SEAT = {
  * magazine where the body's arms were too short, and its thumb through the far side.)
  */
 const FORE: Record<string, number | { post: [number, number] }> = {
-  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.215, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.46, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  // (the double barrel: on its forearm past the breech; 0.215 had the hand under the action, off the gun, the owner,
+  // 2026-10-18: "for the db shotgun the left hand is not on the gun")
   // (the owner: "the 40mm gun has a vertical grip for us to use, like the ar15")
   m32: { post: [0.368, -0.078] }, mp7a1: { post: [0.16, 0] },
 };
@@ -958,6 +960,9 @@ const DOT_NEAR: Record<string, number> = { mp7a1: 0.13 };
  * stood 5.5 degrees over to the left, aimed (the owner, 2026-10-18: "the gun itself is not straight its leaning to the left").
  */
 const AIM_ROLL: Record<string, number> = { mp7a1: -5.53 };
+/** a holographic sight set across onto the line of its gun's irons as the eye sees it aimed, metres to the right (the
+ * owner, 2026-10-18: "the holographic is not centered": the MP7's irons stood 2.5 mm right of its middle) */
+const DOT_SIDE: Record<string, number> = { mp7a1: 0.0025 };
 /**
  * The faces of a tube sight that look along the barrel (x, the gun's own space) inside its ring, taken out: its
  * lens. The ring is found from those same faces over the lower two fifths of it (the mount under it has faces that
@@ -2013,6 +2018,8 @@ export class Weapons {
       // same on the rail, or it stood upright while the gun leaned, and leaned once the gun was upright: "the holographic is
       // sideways 5 degrees")
       if (name === 'red_dot' && AIM_ROLL[o.item]) mine.rotateX(THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
+      // (and set back on the line of the gun's irons, which turning it about its foot took it off: measured aimed)
+      if (name === 'red_dot' && DOT_SIDE[o.item]) mine.position.z += DOT_SIDE[o.item];
       const mark = mine.getObjectByName('reticle');
       if (mark) marks.push(mark);
       rig.hang(mine, on);
