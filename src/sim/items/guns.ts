@@ -71,7 +71,7 @@ export const GUN_ITEMS: ItemDef[] = [
   },
   // A .50 calibre bolt-action sniper rifle (2026-10-17): the bunker's, its scope part of it.
   {
-    id: 'sniper50', name: '.50 Sniper Rifle', model: 'sniper50', w: 10, h: 3, weight: 11.5, category: 'weapon', slot: 'long',
+    id: 'sniper50', name: 'L96 AWP .50', model: 'sniper50', w: 10, h: 3, weight: 11.5, category: 'weapon', slot: 'long',
     desc: 'A bolt-action rifle in .50 BMG. It takes its long-range scope (four to twelve times, mil-dots, a laser rangefinder); without it, plain sights. Five rounds. It reaches further and hits harder than anything else in the Zone.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 5, mag: 'mag_sniper50', ergo: 30, ownScope: true, optic: 'scope_50', shows: { mag_sniper50: ['mag'], scope_50: ['scope'] } }, iconYaw: 0,
     loot: { pair: 'SV98', at: [0, 0, 0, 0, 1], restock: 900, loaded: [1, 5], rack: { fort: 0.6 }, fitted: [['scope_50', 0.85]] },
@@ -79,7 +79,7 @@ export const GUN_ITEMS: ItemDef[] = [
   },
   // The M32 MGL (2026-10-17): a six-shot 40 mm grenade launcher, for admins only (the owner: "the grenade launcher
   // and its ammo is an admin only weapon"): found nowhere, sold by nobody, and its grenades believed by the server
-  // from an admin alone. Held in the .50 sniper rifle's movements.
+  // from an admin alone. Held in the L96's movements.
   {
     id: 'm32', name: 'M32 MGL', model: 'm32', w: 6, h: 3, weight: 5.3, category: 'weapon', slot: 'long',
     desc: 'A six-shot 40 mm grenade launcher, loaded by hand, aimed through its own holographic sight. Its grenades fly in an arc and go off where they strike. For admins.',
@@ -87,16 +87,16 @@ export const GUN_ITEMS: ItemDef[] = [
     loot: { pair: 'M79' },
   },
   // The Barrett M82 (2026-10-17): the bunker's .50, loading itself, ten rounds, its scope part of it. No movements of
-  // its own: held as the .50 sniper rifle is.
+  // its own: held as the L96 is. (Named so by the owner, 2026-10-18: "the berret is a berret .50".)
   {
-    id: 'barrett', name: 'Barrett M82', model: 'barrett', w: 10, h: 3, weight: 13.5, category: 'weapon', slot: 'long',
+    id: 'barrett', name: 'Barrett .50', model: 'barrett', w: 10, h: 3, weight: 13.5, category: 'weapon', slot: 'long',
     desc: 'A self-loading rifle in .50 BMG. It takes its NightForce scope (four to twelve times, mil-dots, a laser rangefinder); without it, plain sights. Ten rounds, as fast as the trigger, and it kicks like a mule.',
     weapon: { kind: 'rifle', ammo: 'ammo_50bmg', capacity: 10, mag: 'mag_barrett', ergo: 25, action: 'self', ownScope: true, optic: 'scope_barrett', shows: { mag_barrett: ['mag'], scope_barrett: ['scope'] } }, iconYaw: 0,
     // (the weapons pass, 2026-10-17: the Scorpion a third-step gun, the towns' and the army's)
     loot: { pair: 'SVD', at: [0, 0, 0, 0, 1], restock: 1200, loaded: [2, 10], rack: { fort: 0.5 }, fitted: [['scope_barrett', 0.85]] },
     worth: 140,
   },
-  // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the .50 sniper rifle is.
+  // The VSSK Vykhlop (2026-10-17): a quiet heavy bullpup, 12.7x55 subsonic, its scope part of it. Held as the L96 is.
   {
     id: 'vssk', name: 'VSSK Vykhlop', model: 'vssk', w: 8, h: 3, weight: 7.0, category: 'weapon', slot: 'long',
     desc: 'A bullpup sniper rifle with a can the length of its barrel, firing heavy subsonic 12.7x55. Five rounds, self-loading. It takes its own PSO scope (two to six times), and no other sights.',

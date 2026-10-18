@@ -61,7 +61,7 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'mag_sniper50', name: '.50 Sniper Magazine', model: 'sniper50', nodeRe: '^mag', w: 1, h: 2, weight: 0.6, category: 'magazine',
-    desc: 'Five rounds of .50 BMG for the .50 sniper rifle.',
+    desc: 'Five rounds of .50 BMG for the L96 AWP .50.',
     mag: { ammo: 'ammo_50bmg', capacity: 5 }, attach: { fits: ['sniper50'], slot: 'magazine' },
     loot: { pair: 'Mag_SV98_10Rnd', at: [0, 0, 0, 1, 2], restock: 900 },
   },
@@ -143,7 +143,7 @@ export const PART_ITEMS: ItemDef[] = [
   // make sure they drop as loot"). Off, a .50 is aimed along plain sights (see PLAIN_SIGHTS in src/game/weapons.ts); the VSSK has none.
   {
     id: 'scope_50', name: 'Long-Range Scope', model: 'sniper50', nodeRe: '^scope', w: 3, h: 1, weight: 0.9, category: 'attachment',
-    desc: "The .50 sniper rifle's scope: it turns from four to twelve times on the mouse wheel, with mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it.",
+    desc: "The L96's scope: it turns from four to twelve times on the mouse wheel, with mil-dots on its cross and a laser rangefinder that reads the range to whatever is under it.",
     attach: { fits: ['sniper50'], slot: 'optic', ergo: -10 },
     loot: { pair: 'HuntingOptic', at: [0, 0, 0, 0, 1], restock: 1800, usage: ARMY },
     worth: 45,
