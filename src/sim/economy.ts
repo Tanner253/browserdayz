@@ -155,6 +155,8 @@ const PRESSED = 50;
 const FLOORS_SCARCE = 0.6;
 /** what a pack or a case is found with in it: supplies (see `pack`) */
 const SUPPLIES = new Set(['food', 'drink', 'medical', 'ammo', 'tool', 'misc', 'clothing']);
+/** a step of the map's own spots, or a place apart's on it, as one key */
+const group = (place: string | null, t: Tier) => `${place ?? ''}@${t}`;
 
 export interface WorldLoot {
   uid: string;
@@ -202,6 +204,13 @@ export class Economy {
   private bldHeld: number[] = [];
   /** the buildings (by name) with a place on a shelf or a table: food is kept off their floors */
   private shelved: Set<string>;
+  /** what lies on each spot, and the spots in each piece of furniture (by its uid): an emptied one is filled offline from
+   * its own spots, not from a look through all the loot for each (a hitch every five minutes) */
+  private atPoint = new Map<number, WorldLoot>();
+  private furnished = new Map<string, number[]>();
+  /** each spot's step (and place apart) as a key, and the spots of each, in order: a count looks at its own, not at all of them for each step */
+  private groupOf: string[];
+  private groups = new Map<string, number[]>();
 
   constructor(
     readonly points: LootPoint[],
@@ -212,6 +221,12 @@ export class Economy {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
     this.apart = points.map((p) => apartOf(p.building));
     this.shelved = new Set(points.filter((p) => !p.floor).map((p) => p.building));
+    this.groupOf = points.map((_, i) => group(this.apart[i], this.tier[i]));
+    points.forEach((p, i) => {
+      if (p.inside) (this.furnished.get(p.inside) ?? this.furnished.set(p.inside, []).get(p.inside)!).push(i);
+      const g = this.groupOf[i];
+      (this.groups.get(g) ?? this.groups.set(g, []).get(g)!).push(i);
+    });
     const named = new Map<string, number>(), step: Tier[] = [];
     this.bld = points.map((p, i) => {
       if (p.arms || p.keeps || this.apart[i] !== null || p.usage.some((u) => FULL_KINDS.has(u))) return -1;
@@ -416,11 +431,12 @@ export class Economy {
     const ids = [...due.keys()].filter((id) => due.get(id)! > 0);
     if (!ids.length) return put;
     const open = new Set<number>(), inBld = new Map<number, number[]>();
-    this.points.forEach((p, i) => {
-      if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where || this.apart[i] !== place || this.crowded.has(i) || !this.room(i) || !this.rested(i)) return;
+    for (const i of this.groups.get(group(place, where)) ?? []) {
+      const p = this.points[i];
+      if (p.arms || p.keeps || this.pointBusy.has(i) || this.crowded.has(i) || !this.room(i) || !this.rested(i)) continue;
       open.add(i);
       if (this.bld[i] >= 0) (inBld.get(this.bld[i]) ?? inBld.set(this.bld[i], []).get(this.bld[i])!).push(i);
-    });
+    }
     // where each sort can lie; and where it could but for having lain there last, where it goes when there is nowhere else
     const at = ids.map(() => [] as number[]), again = ids.map(() => [] as number[]);
     const sorts = new Map<number, number[]>();
@@ -519,6 +535,7 @@ export class Economy {
       spawnedAt: this.time,
     };
     this.occupy(pi, true);
+    this.atPoint.set(pi, l);
     this.loot.set(l.uid, l);
     this.events.spawn(l);
     return true;
@@ -674,6 +691,20 @@ export class Economy {
     return n;
   }
 
+  /** every step's and place's tally at once, by `group`: one look through the loot a count, not one for each */
+  private tallies(): Map<string, Map<string, number>> {
+    const all = new Map<string, Map<string, number>>();
+    for (const l of this.loot.values()) {
+      if (l.point < 0) continue;
+      const g = this.groupOf[l.point];
+      if (g === undefined) continue;
+      let n = all.get(g);
+      if (!n) all.set(g, (n = new Map()));
+      n.set(l.item.id, (n.get(l.item.id) ?? 0) + 1);
+    }
+    return all;
+  }
+
   /**
    * Restore saved world loot. `keepPoints` is false when the map's loot points changed
    * since the save: spawned loot is then dropped (it gets repopulated) and only items
@@ -691,8 +722,21 @@ export class Economy {
   inject(l: WorldLoot) {
     if (this.loot.has(l.uid)) return;
     this.loot.set(l.uid, l);
-    if (l.point >= 0) this.occupy(l.point, true);
+    if (l.point >= 0) {
+      this.occupy(l.point, true);
+      this.atPoint.set(l.point, l);
+    }
     this.events.spawn(l);
+  }
+
+  /** what the economy has put in a piece of furniture (by its uid) */
+  within(uid: string): WorldLoot[] {
+    const out: WorldLoot[] = [];
+    for (const i of this.furnished.get(uid) ?? []) {
+      const l = this.atPoint.get(i);
+      if (l) out.push(l);
+    }
+    return out;
   }
 
   /**
@@ -705,6 +749,7 @@ export class Economy {
     this.loot.delete(uid);
     if (l.point >= 0) {
       this.occupy(l.point, false);
+      if (this.atPoint.get(l.point) === l) this.atPoint.delete(l.point);
       this.lastAt.set(l.point, { id: l.item.id, at: this.time });
       if (looted) this.looted.set(l.point, this.time);
     }
@@ -750,8 +795,10 @@ export class Economy {
       if (this.time - l.spawnedAt > life && !near(l)) this.take(l.uid, false);
     }
     this.arm();
-    for (const t of STEPS) this.restock(t, null);
-    for (const place of this.places) for (const t of STEPS) this.restock(t, place);
+    // (each restock puts things on its own step's spots only, so what every other one holds is as counted here)
+    const all = this.tallies(), none = new Map<string, number>();
+    for (const t of STEPS) this.restock(t, null, all.get(group(null, t)) ?? none);
+    for (const place of this.places) for (const t of STEPS) this.restock(t, place, all.get(group(place, t)) ?? none);
   }
 
   /**
@@ -762,16 +809,10 @@ export class Economy {
    * five seconds after it was taken, however long its rule said. Kamenka's one AK, "three quarters of an hour" coming
    * back, came straight back. Found on reading, twice over, 2026-10-13.)
    */
-  private restock(t: Tier, place: string | null) {
-    const has = this.tally(t, place), due = new Map<string, number>(), least = new Map<string, number>();
-    for (const [id, rule] of Object.entries(TYPES)) {
-      const want = place ? this.wanted(place, id, t) : this.kept(id, t);
-      if (!want) continue;
-      const every = rule.on?.[t]?.restock;
-      const soon = place !== null || t >= 3;
-      const lo = soon ? want : Math.max(1, Math.ceil(want * (rule.keep ?? 0.6)));
-      const wait = every ?? (soon ? Math.min(rule.restock, GAS_RESTOCK) : rule.restock);
-      const n = has.get(id) ?? 0, key = place ? `${place}|${id}@${t}` : `${id}@${t}`;
+  private restock(t: Tier, place: string | null, has: Map<string, number>) {
+    const due = new Map<string, number>(), least = new Map<string, number>();
+    for (const { id, want, lo, wait, key } of this.asked(t, place)) {
+      const n = has.get(id) ?? 0;
       if (n >= lo) {
         delete this.shortSince[key];
         continue;
@@ -788,6 +829,28 @@ export class Economy {
       this.lastRestock[key] = this.time;
       if (k >= least.get(id)!) delete this.shortSince[key];
     }
+  }
+
+  /** the sorts kept on a step (or in a place apart there), how many, below how many it is restocked, after how long, and
+   * its clock's key: fixed from the start, so worked out once (every sort on every step and place, a key made for each,
+   * was most of what a count cost, every five seconds) */
+  private asks = new Map<string, { id: string; want: number; lo: number; wait: number; key: string }[]>();
+  private asked(t: Tier, place: string | null) {
+    const at = group(place, t);
+    let list = this.asks.get(at);
+    if (list) return list;
+    list = [];
+    for (const [id, rule] of Object.entries(TYPES)) {
+      const want = place ? this.wanted(place, id, t) : this.kept(id, t);
+      if (!want) continue;
+      const every = rule.on?.[t]?.restock;
+      const soon = place !== null || t >= 3;
+      const lo = soon ? want : Math.max(1, Math.ceil(want * (rule.keep ?? 0.6)));
+      const wait = every ?? (soon ? Math.min(rule.restock, GAS_RESTOCK) : rule.restock);
+      list.push({ id, want, lo, wait, key: place ? `${place}|${id}@${t}` : `${id}@${t}` });
+    }
+    this.asks.set(at, list);
+    return list;
   }
 
   serialize() {

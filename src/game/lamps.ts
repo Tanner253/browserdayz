@@ -238,7 +238,7 @@ export class Lamps {
     const lit = this.nBeams + this.nGlows + this.nFlares > 0;
     this.keep = lit ? 1.5 : Math.max(0, this.keep - dt);
     // (the real lights go in or out of the world when its shaders for that are made: see Renderer.readyToLight)
-    // (and never more than two and a half seconds late, whatever is still arriving to be got ready)
+    // (and two and a half seconds late at most once nothing is being got ready for it: see Renderer.warming)
     const want = this.keep > 0;
     if (want === this.pool.visible) this.waited = 0;
     else if (this.canLight(want) || ((this.waited += dt) > 2.5 && !this.held(want))) {

@@ -318,7 +318,7 @@ export const enterMethods = {
   fillCrate(this: Game, c: Stash) {
     // (offline, a piece of furniture holds what the economy put in it: taken out of the economy into it as it would be by hand)
     if (economyCargo(c.kind)) {
-      for (const l of [...this.economy.loot.values()]) if (l.point >= 0 && this.economy.points[l.point]?.inside === c.uid && c.container.hasRoom(l.item) && this.economy.take(l.uid, false)) c.container.add(l.item);
+      for (const l of this.economy.within(c.uid)) if (c.container.hasRoom(l.item) && this.economy.take(l.uid, false)) c.container.add(l.item);
       return;
     }
     const e = this.economy, keeps = keepsOf.get(e) ?? keepsOf.set(e, (id, t) => e.written(id, t)).get(e)!;

@@ -406,6 +406,7 @@ export class Renderer {
         while (this.readying > 0 && !this.rushing && performance.now() - since < 1500) await new Promise((r) => setTimeout(r, LATER_APART));
         const { programs, entries } = await this.write(job.drawn, job.lit, !this.rushing);
         await made(programs);
+        this.rushLast = performance.now();
         if (!TRY.has('nolook')) await this.lookOver(programs);
         if (!TRY.has('noahead')) await this.drawAhead(this.rushing ? entries.map((e) => ({ ...e, low: false })) : entries);
       }
@@ -417,8 +418,10 @@ export class Renderer {
   }
   /** the lighting the job in hand is being got ready for (null: none in hand) */
   private laterNow: boolean | null = null;
-  /** what is waiting for the other lighting is being got ready at once (see `readyToLight`) */
+  /** what is waiting for the other lighting is being got ready at once (see `readyToLight`); since when, and when the last of it was made (see `warming`) */
   private rushing = false;
+  private rushFrom = 0;
+  private rushLast = 0;
 
   /**
    * Whether the world can be drawn lit so (the lamps' real lights in it or not) without a shader being made in the
@@ -430,6 +433,7 @@ export class Renderer {
     // (the world as it stood at the start, still being got ready for it behind the menu: see `warming`)
     if (this.lighting && this.otherAt === lit) return false;
     if (!this.lighting || (this.laterNow !== lit && !this.later.some((j) => j.lit === lit))) return true;
+    if (!this.rushing) this.rushFrom = this.rushLast = performance.now();
     this.rushing = true;
     void this.workLater();
     return false;
@@ -670,7 +674,12 @@ export class Renderer {
    * every shader of the world still to be made would be made in the one frame.
    */
   warming(lit: boolean) {
-    return this.otherAt === lit;
+    if (this.otherAt === lit) return true;
+    // (And while what has come since is being got ready for it at once, and getting on, ten seconds at most: let in
+    // after their two and a half regardless, the lamps had every shader still to be made made in one frame. At night
+    // in the village, 2026-10-17: nineteen of them, ten seconds in which nothing moved.)
+    const now = performance.now();
+    return this.rushing && this.working && now - this.rushLast < 1500 && now - this.rushFrom < 10000;
   }
   /**
    * The world got ready for the lighting it is not lit by, behind the menu: its shaders were half of what a first
