@@ -1076,15 +1076,42 @@ export class InventoryUI {
 
     wrap.append(vic, gear, cargo);
     r.appendChild(wrap);
-    r.appendChild(this.hotEl());
-    // The clicks, said along the foot of the screen either side of the hot keys, where they are always in sight
-    // and take no room from the grids: each means one thing, wherever the thing lies and whatever else is open.
-    // (A finger has no Ctrl and no Alt: it is told what a finger can do.)
+    // The foot of the screen, on the columns' own grid: the clicks under the first two, the hot keys under Carried
+    // and as wide as it (2026-10-18: "the same width and under the carriage", so the clicks have the room to the
+    // left). The clicks are always in sight there and take no room from the grids: each means one thing, wherever
+    // the thing lies and whatever else is open. (A finger has no Ctrl and no Alt: it is told what a finger can do.)
+    const foot = document.createElement('div');
+    foot.className = 'inv-foot';
+    // Each a key and what it does, in columns of two rows as tall as the hot keys beside them (2026-10-18: "the
+    // action and beside it what it does ... almost like columns"); the whole of what it does is on the pointer.
+    const help = (pairs: [string, string, string][]) => {
+      const cols: string[] = [];
+      for (let i = 0; i < pairs.length; i += 2) cols.push(`<div>${pairs.slice(i, i + 2).map(([k, does, all]) => `<span title="${all}"><b>${k}</b><i>${does}</i></span>`).join('')}</div>`);
+      return `<div class="inv-help">${cols.join('')}</div>`;
+    };
     if (document.body.classList.contains('touch')) {
-      r.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> a thing to move it: onto your character to wear or hold it, onto another thing to change places, to the left to put it down · <b>Tap twice</b> to use it, or to take it if it is not yours yet</div><div class="inv-help right"><b>Press and hold</b> for everything else that can be done with it. What is in your hands is used with the fire button once this is shut.</div>`);
+      foot.innerHTML = help([
+        ['Drag', 'move it', 'Drag a thing to move it: onto your character to wear or hold it, onto another thing to change places, to the left to put it down'],
+        ['Tap twice', 'use it', 'Tap twice to use it, or to take it if it is not yours yet'],
+        ['Press and hold', 'everything else', 'Press and hold for everything else that can be done with it'],
+        ['Fire', 'use what is in hands', 'What is in your hands is used with the fire button once this is shut'],
+      ]);
     } else {
-      r.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> move it · <b>R</b> turn it · <b>Double-click</b> use it (not yours yet: take it) · <b>Alt-click</b> wear it or hold it, or take it off · <b>Ctrl-click</b> move it across: ground or crate to you, you to the open crate</div><div class="inv-help right"><b>Shift-click</b> quick move · <b>Right-click</b> everything else · point + <b>1</b>–<b>0</b> put it on that key · point + <b>G</b> drop it. What is in your hands is used with the <b>left button</b> once this is shut.</div>`);
+      foot.innerHTML = help([
+        ['Drag', 'move it', 'Drag: move it'],
+        ['R', 'turn it', 'R: turn it'],
+        ['Double-click', 'use it', 'Double-click: use it (not yours yet: take it)'],
+        ['Alt-click', 'wear or hold it', 'Alt-click: wear it or hold it, or take it off'],
+        ['Ctrl-click', 'move it across', 'Ctrl-click: move it across: ground or crate to you, you to the open crate'],
+        ['Shift-click', 'quick move', 'Shift-click: quick move'],
+        ['Right-click', 'everything else', 'Right-click: everything else that can be done with it'],
+        ['Left button', 'use what is in hands', 'What is in your hands is used with the left button once this is shut'],
+        ['Point + 1–0', 'put it on that key', 'Point at a thing and press 1 to 0: it is put on that key'],
+        ['Point + G', 'drop it', 'Point at a thing and press G: it is dropped'],
+      ]);
     }
+    foot.appendChild(this.hotEl());
+    r.appendChild(foot);
     [...r.querySelectorAll<HTMLElement>(scrolls)].forEach((e, i) => {
       if (!was[i]) return;
       e.scrollTop = was[i][0];

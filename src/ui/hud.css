@@ -368,7 +368,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .hb.on { border-color: var(--accent); background: rgba(10, 12, 11, 0.62); }
 .hb.empty { opacity: 0.45; }
 .hb.dim i { opacity: 0.3; filter: grayscale(1); }
-.hb b { position: absolute; left: 4px; top: 2px; font-family: var(--mono); font-size: 9px; font-weight: 400; color: var(--ink-faint); z-index: 1; }
+/* (the key's number drawn as a key, so that it is not read as one more count: 2026-10-18, "a square around them so they look like buttons") */
+.hb b { position: absolute; left: 3px; top: 3px; min-width: 12px; padding: 0 3px; font-family: var(--mono); font-size: 9px; font-weight: 400; line-height: 11px; text-align: center; color: var(--ink-faint); border: 1px solid rgba(233, 228, 216, 0.3); background: rgba(0, 0, 0, 0.5); z-index: 1; }
 .hb.on b { color: var(--accent); }
 .hb i { position: absolute; inset: 3px; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .hb em { position: absolute; right: 4px; bottom: 1px; font-family: var(--mono); font-size: 10px; font-style: normal; color: var(--ink); text-shadow: 0 1px 2px #000; }
@@ -852,8 +853,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-hot { position: absolute; left: 50%; bottom: 6px; z-index: 3; display: flex; gap: 5px; padding: 5px 7px; transform: translateX(-50%); background: rgba(8, 10, 9, 0.82); border: 1px solid var(--line); }
 .inv-hotkey { position: relative; width: 46px; height: 46px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); }
 .inv-hotkey.empty { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0 5px, transparent 5px 10px), rgba(0, 0, 0, 0.22); }
-.inv-hotkey b { position: absolute; left: 3px; top: 1px; z-index: 1; font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--accent); }
-.inv-hotkey .inv-item-img.fit { position: absolute; inset: 8px 4px 4px; pointer-events: none; }
+.inv-hotkey b { position: absolute; left: 3px; top: 3px; z-index: 1; min-width: 13px; padding: 0 3px; font-family: var(--mono); font-size: 10px; font-weight: 400; line-height: 12px; text-align: center; color: var(--accent); border: 1px solid rgba(201, 178, 124, 0.55); background: rgba(0, 0, 0, 0.55); }
+.inv-hotkey .inv-item-img.fit { position: absolute; inset: 12px 4px 4px; pointer-events: none; }
 .inv-hotkey.gone .inv-item-img { opacity: 0.3; filter: grayscale(1); }
 .inv-hotkey.on { border-color: var(--accent); }
 .inv-hotkey:nth-child(3) { margin-right: 9px; }
@@ -1099,9 +1100,17 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-gear > .inv-gridbox { margin-top: 14px; }
 
 /* What each click does, along the foot of the screen either side of the hot keys: in sight always, and out of the way of the grids. */
-.inv > .inv-help { position: absolute; left: 30px; bottom: 4px; z-index: 2; width: calc(50% - 312px); max-height: 62px; margin: 0; overflow: hidden; font-size: 12px; line-height: 1.28; }
-.inv > .inv-help.right { left: auto; right: 30px; text-align: right; }
-.inv > .inv-help b { font-size: 10px; }
+/* (a key and what it does, in columns of two rows, as tall as the hot keys' box between them: 46 + 5 + 5 + 2 + 2) */
+/* (the foot on the columns' own grid, so that the hot keys stand under Carried and as wide as it, the clicks under the other two) */
+.inv-foot { position: absolute; left: 30px; right: 30px; bottom: 6px; z-index: 3; height: 60px; display: grid; grid-template-columns: minmax(402px, 1.1fr) 408px minmax(420px, 1.2fr); gap: 20px; }
+.inv-foot > .inv-hot { position: static; grid-column: 3; transform: none; }
+.inv-foot > .inv-hot .inv-hotkey { flex: 1 1 0; width: auto; min-width: 0; }
+.inv-foot > .inv-help { grid-column: 1 / 3; min-width: 0; height: 60px; margin: 0; overflow: hidden; display: flex; justify-content: flex-start; gap: 24px; font-size: 12px; line-height: 1; }
+/* (each column its keys over one another and what they do beside them, both lined up) */
+.inv-foot > .inv-help > div { display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(2, 1fr); column-gap: 8px; align-items: center; }
+.inv-foot > .inv-help span { display: contents; }
+.inv-foot > .inv-help b { justify-self: start; padding: 3px 6px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); font-size: 10px; line-height: 1; }
+.inv-foot > .inv-help i { font-style: normal; white-space: nowrap; }
 body.touch .inv-scroll, body.touch .inv-inspect { touch-action: pan-x pan-y; }
 
 /* ------------------------------------------------------------ F3 performance overlay */
