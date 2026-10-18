@@ -72,6 +72,7 @@ export const onlineMethods = {
     // the fuel drums that are gone at the moment
     this.fuses.length = this.drumsBack.length = 0;
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
+    for (const [cid, g] of w.racks ?? []) this.racks.show(cid, g);
     this.fires.clear();
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
     // the lockers somebody is searching at the moment: their doors stand open
@@ -280,6 +281,7 @@ export const onlineMethods = {
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), null);
     });
     net.on('cdoor', (m) => this.lockers.set(m.cid, m.open));
+    net.on('rack', (m) => this.racks.show(m.cid, m.g));
     net.on('stash+', (m) => void this.addRemoteStash(m.s));
     net.on('stash-', (m) => {
       // (one whose model is still coming is not stood when it has: see addRemoteStash)

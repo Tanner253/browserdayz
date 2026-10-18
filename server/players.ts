@@ -18,7 +18,7 @@ import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWor
 import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
-import { leaveSeat, releaseLock } from './acts';
+import { leaveSeat, racksNow, releaseLock } from './acts';
 import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
 
@@ -298,6 +298,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     // (the helicopters in the air at this moment, each with how long it has been: this game puts it where everybody else's has it)
     flights: [...flights.values()].map(flightNow),
     barrels: [...barrelsGone.keys()],
+    racks: racksNow(),
     fires: hearths.alight(Date.now() / 1000),
     bunker: bunkerDoor.open,
     // (the map's containers that somebody has open at this moment: a locker among them is seen standing open)

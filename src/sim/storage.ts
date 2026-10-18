@@ -55,7 +55,7 @@ export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 
  * doors of the headquarters and the hospital, and the steel locker (two in one case, whose doors swing: HUNG in
  * crates.ts). A crate has no place for a thing on it, and these are asked nothing of where places are.
  */
-export const SEARCHED_KINDS = new Set(['med_cabinet', 'steel_locker']);
+export const SEARCHED_KINDS = new Set(['med_cabinet', 'steel_locker', 'gun_rack']);
 
 /** whether a model is searched: a crate, a locker, or furniture that holds things. Every part of the game asks this. */
 export const isSearchable = (kind: string) => CRATE_KINDS.has(kind) || SEARCHED_KINDS.has(kind) || !!FURNITURE[kind];

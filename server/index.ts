@@ -18,7 +18,7 @@ import { ITEMS, type ItemInstance } from '../src/sim/items';
 import { PLAN, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
 import { STOCK } from '../src/sim/trade';
-import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, type Keeps } from '../src/sim/crates';
+import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
 import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
 import { News } from '../src/sim/news';
@@ -37,7 +37,7 @@ import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFul
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
-import { blowJeep, settleRiders, voice } from './acts';
+import { blowJeep, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
 import { seen } from './seen';
@@ -282,12 +282,13 @@ function fillBox(b: Box) {
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
   // (a crate under the gas, down in the bunker, on a basement's second level, or in one of the pass's caves, is filled with the best of everything)
-  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z) || inCave(b.x, b.y + 0.5, b.z), keeps);
+  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z) || inCave(b.x, b.y + 0.5, b.z), keeps, RACKS.has(b.crate!) ? stepNear(world.lootPoints, b.x, b.z) : undefined);
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;
   b.pickedAt = undefined;
   b.filled = b.items.map((it) => it.uid);
+  rackChanged(b);
 }
 
 function loadWorld() {

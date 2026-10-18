@@ -64,7 +64,8 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // What is searched down the bunker ("abundant supplies in the T5": a rack is never bare, and a locker seldom), and on
   // its racks the long things.
   locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5 },
-  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, count: [2, 4], usage: ['Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
+  // (in the bunker its own, the best; anywhere else, the military's of the step it stands on: see fillCrate's `at`)
+  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, count: [2, 4], usage: ['Military', 'Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
   bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, count: [1, 2], usage: ['Bunker'], tier: 5 },
   // (the furniture with no places of its own, filled as DayZ's cargo presets fill a container: a thing or two in a
   // cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
@@ -72,6 +73,20 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   crate_big: { label: 'Large Crate', w: 8, h: 4, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
   bunker_desk: { label: 'Desk', w: 6, h: 3, count: [0, 2], usage: ['Bunker'], tier: 5 },
 };
+/** a gun rack: what stands in it is seen from outside it, by everybody (the owner, 2026-10-17: "renders guns on the 3d
+ * model that are in its inventory"); how many of its guns stand in its cups; and which of what it holds those are */
+export const RACKS = new Set(['gun_rack']);
+export const RACK_SHOWN = 6;
+/** the step of the map a thing stands on: its nearest place for loot's, within thirty metres (a rack's building's) */
+export function stepNear(points: readonly { x: number; z: number; tier?: Tier }[], x: number, z: number): Tier | undefined {
+  let best: Tier | undefined, bd = 30 * 30;
+  for (const p of points) {
+    const d = (p.x - x) ** 2 + (p.z - z) ** 2;
+    if (d < bd && p.tier) (bd = d), (best = p.tier);
+  }
+  return best;
+}
+export const rackShows = (items: readonly { id: string }[]) => items.filter((it) => ITEMS[it.id]?.weapon).map((it) => it.id).slice(0, RACK_SHOWN);
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
@@ -152,12 +167,14 @@ export const CRATE_RESTOCK = 300;
  * @param rich the crate stands under the gas (true) or down the bunker ('bunker'): it holds the
  *   best of what is kept there, and one thing more
  * @param keeps how many of each the steps keep (the economy's, where there is one: see Keeps)
+ * @param at the step of the map where it stands (a gun rack's: see stepNear)
  */
-export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false, keeps: Keeps = written) {
+export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false, keeps: Keeps = written, at?: Tier) {
   const spec = CRATE_SPECS[kind];
   if (!spec) return;
   const own = OWN_TABLE.has(kind);
-  const t: Tier = own || !rich ? spec.tier : rich === 'bunker' ? 5 : 4;
+  // (a gun rack out of the bunker holds the military's of the step it stands on, and not the bunker's)
+  const t: Tier = RACKS.has(kind) && rich !== 'bunker' && at ? at : own || !rich ? spec.tier : rich === 'bunker' ? 5 : 4;
   // (one that stands under the gas or down the bunker, not of its own kind, holds what is kept there, as any crate there does)
   const main = !own && rich ? table(PLAIN, 'plain', t, keeps) : table(spec, kind, t, keeps);
   const up = spec.up && !rich && t < 5 ? table(spec, kind, (t + 1) as Tier, keeps, true) : null;

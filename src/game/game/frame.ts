@@ -27,6 +27,7 @@ import { TOUCH } from '../../core/device';
 import { hourAt, DAY } from '../../sim/daynight';
 import { FIRE } from '../../sim/fires';
 import { bunkerDark } from '../../sim/bunker';
+import { rackShows } from '../../sim/crates';
 import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../game';
 
 export const frameMethods = {
@@ -270,6 +271,12 @@ export const frameMethods = {
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
     this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
+    // (offline a rack shows what is in it as it is; online the server says: see GunRacks)
+    if (!this.online && (this.rackT += dt) > 0.5) {
+      this.rackT = 0;
+      for (const st of this.loot.crates) if (this.racks.has(st.uid)) this.racks.show(st.uid, rackShows(st.container.items.map((p) => p.item)));
+    }
+    this.racks.update(this.s.r.camera.position);
     for (const f of this.beside) f(dt, this.s.r.camera.position, this.s.r.camera);
     // (Resting by a fire, mending or only warm; a broken leg; the air breathed: each was a word at the top of the
     // screen, and is a badge beside the survivor's health now, for as long as it is so. Why a fire is doing no good,

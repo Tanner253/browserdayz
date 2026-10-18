@@ -492,7 +492,9 @@ function layOut(seed: number): Plan {
           const c = Math.cos(rot), sn = Math.sin(rot);
           for (const k of [-0.55, 0.55]) spots.push({ r: r + k * c, f: f - k * sn, y: Y + 0.92, floor: false });
         }, 0.5, 2.2, 3);
-        along(longest[2], (r, f, rot) => build('rack', r, f, rot, 1.6, 0.4, 1.9), 0.3, 1.6, 3);
+        // (the gun racks: the real one, its back to the wall, in place of the ones that were drawn here; searched as any
+        // rack is, what stands in it seen: src/game/racks.ts)
+        along(longest[2], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 3);
         for (let k = 0; k < 3; k++) {
           const pr = cr + (k - 1) * 1.6 * (w > d ? 1 : 0) + between(-0.2, 0.2), pf = cf + (k - 1) * 1.6 * (w > d ? 0 : 1) + between(-0.2, 0.2);
           if (clear(pr, pf, 1.4)) put('weapons_case', pr, pf, (w > d ? Math.PI / 2 : 0) + between(-0.2, 0.2));

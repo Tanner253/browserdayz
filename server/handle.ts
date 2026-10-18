@@ -29,7 +29,7 @@ const LYING_REACH = 4;
 /** what is in a thing, as it is sent: each with its place in it */
 const storedOf = (item: ItemInstance): StoredItem[] => (item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
 import { broadcast, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
-import { ajar, findCarried, hurtJeep, kill, leaveSeat, releaseLock, seatOf } from './acts';
+import { ajar, findCarried, hurtJeep, kill, leaveSeat, rackChanged, releaseLock, seatOf } from './acts';
 import { scores } from './queue';
 import { sendDrop } from './drops';
 import { seen } from './seen';
@@ -480,6 +480,7 @@ export function handle(c: Client, m: C2S) {
       }
       if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
       if (b.kind === 'crate') b.pickedAt = economy.time;
+      rackChanged(b);
       touched(b);
       return;
     }

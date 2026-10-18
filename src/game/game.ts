@@ -24,7 +24,7 @@ import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance 
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
 import { Economy, type WorldLoot } from '../sim/economy';
-import { CRATE_SPECS } from '../sim/crates';
+import { CRATE_SPECS, RACKS } from '../sim/crates';
 import '../sim/combat';
 import { LAUNCHED } from '../sim/grenades';
 import '../sim/gunplay';
@@ -39,6 +39,7 @@ import '../sim/blood';
 import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
 import { Doll } from './doll';
+import { GunRacks, RACK_PLAN } from './racks';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
 import { CorpseBody, RemotePlayer } from './remote';
@@ -237,6 +238,8 @@ export class Game {
   readonly darkBeside: ((x: number, y: number, z: number) => number)[] = [];
   /** the doors of the lockers that have them: swung open while one is searched, by anybody (see ./lockers.ts) */
   lockers!: Lockers;
+  /** the gun racks, each with what stands in it drawn (./racks.ts) */
+  racks!: GunRacks;
   /** the bunker: what is built of it, its door and its lamps */
   bunker!: BunkerSite;
   /** the fort on the mountain (src/world/castle.ts): none, in a world that has no place for one */
@@ -308,6 +311,8 @@ export class Game {
   use: TimedAction | null = null;
   saveT = 0;
   econT = 0;
+  /** seconds since what is in the racks was last looked at, offline */
+  rackT = 0;
   poi: string | null = null;
   prompt: string | null = null;
   /** where on screen the thing the prompt is about sits (fractions of the screen) */
@@ -561,6 +566,8 @@ export class Game {
         this.loot.crates.push(st);
       }
     }
+    this.racks = new GunRacks(r.scene, this.loot.models, RACK_PLAN);
+    for (const st of this.loot.crates) if (RACKS.has(st.kind)) this.racks.add(st.uid, st.x, st.y, st.z, st.rot);
 
     progress('loading weapons');
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);

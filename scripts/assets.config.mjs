@@ -767,6 +767,24 @@ export const LOCAL_MODELS = {
   // (It is two lockers side by side, each with its own door, and the doors came as one shape, the right-hand one a
   // hand's breadth open. `node scripts/split-locker.mjs` makes of the download a case and two doors, both shut, each
   // door a piece hung on the line of its own hinges: built from that, so that the game can swing them. See `hung`.)
+  // The gun rack (2026-10-17): a green steel weapons locker, what stands in it drawn standing in it (src/game/racks.ts):
+  // the bunker's armoury and the military places (the owner: "we just want the best one").
+  gun_rack: {
+    dir: 'gun_rack',
+    // (it came facing along x: turned to face +z as the rest of the furniture does)
+    rot: [0, Math.PI / 2, 0],
+    size: 1.85,
+    tex: 2048,
+    tags: ['furniture'],
+    changes: "Stood on the ground about its own middle, at a locker's height; textures re-encoded as WebP at 2048; geometry compressed.",
+    credit: {
+      name: 'Gun Rack',
+      url: 'https://sketchfab.com/3d-models/gun-rack-394e6e2958e04c3bbc8bc7c305e48f4c',
+      author: 'Javier_Fernandez',
+      line: 'Gun Rack by Javier_Fernandez (https://sketchfab.com/Javier.Fernandez), CC-BY-4.0',
+      changes: "stood on the ground at a locker's height, textures at 2048",
+    },
+  },
   steel_locker: { dir: 'metal_cabinet_split', scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, hung: { door_l: /^DoorL/, door_r: /^DoorR/ }, tags: ['furniture'], changes: 'Its two doors, which came as one shape, made two, each with its own handle and each a piece of its own hung on the line of its hinges; the right-hand door, which came standing a little open, turned shut; stood on the ground about its own middle, at the size it came; its glint map left out and its surface said to be dull steel; textures re-encoded as WebP at the size they came; geometry compressed.' },
   // (The canopy, its pillar, the island with its pump, bin and posts, and the cracked pad they stand on: the pad
   // made ten metres long. The plain slab drawn under the pad is left out. The island's material gave its colour

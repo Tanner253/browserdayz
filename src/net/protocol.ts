@@ -274,6 +274,8 @@ export type S2C =
       flights?: Flight[];
       /** fuel drums that have gone up and not been stood up again yet */
       barrels?: number[];
+      /** the guns standing in each gun rack, by its crate's id (see RACKS in src/sim/crates.ts) */
+      racks?: [string, string[]][];
       /** the fireplaces that are alight: [which, seconds left] */
       fires?: [number, number][];
       /** the jeeps: where each stands, what state it is in and who is in it */
@@ -328,6 +330,8 @@ export type S2C =
    * every locker shut.
    */
   | { t: 'cdoor'; cid: string; open: boolean }
+  /** the guns that stand in a gun rack now (see `racks` in the welcome) */
+  | { t: 'rack'; cid: string; g: string[] }
   | { t: 'stash+'; s: StashInfo }
   | { t: 'stash-'; uid: string }
   /** a stash has been buried, or dug up */
