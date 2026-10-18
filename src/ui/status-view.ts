@@ -73,14 +73,17 @@ export const symbol = (id: Stat | BadgeId) => (id in SYMBOLS ? symbolSvg(id as S
 /** the arrows beside a symbol: so many, up or down, one over the other about its middle */
 function arrowsSvg(n: number): string {
   const k = Math.abs(n), up = n > 0;
-  let out = '';
+  let under = '', lit = '';
   for (let i = 0; i < k; i++) {
     const y = 16 - (k * 8 - 3) / 2 + i * 8;
     const d = up ? `M1.5 ${y + 5}L6 ${y}L10.5 ${y + 5}` : `M1.5 ${y}L6 ${y + 5}L10.5 ${y}`;
-    // (each lights a moment after the one before it, the way it points)
-    out += `<path class="st-under" d="${d}"/><path class="st-arrow" style="--i:${up ? k - 1 - i : i}" d="${d}"/>`;
+    under += `<path class="st-under" d="${d}"/>`;
+    // (each lights a moment after the one before it, the way it points. Each in a picture of its own, which the card
+    // can light by itself: a line inside one picture lit by the page was the whole page drawn again every frame, the
+    // arrows being always there, 2026-10-18)
+    lit += `<svg class="st-blink" viewBox="0 0 12 32" style="--i:${up ? k - 1 - i : i}"><path class="st-arrow" d="${d}"/></svg>`;
   }
-  return out;
+  return k ? `<svg viewBox="0 0 12 32">${under}</svg>${lit}` : '';
 }
 
 /** one of the four on the page, kept in step with what it is to show: nothing of the page is touched that has not changed */
@@ -95,7 +98,7 @@ class StatMark {
   constructor(private stat: Stat, private told: boolean) {
     this.el.className = 'st-stat';
     this.el.dataset.stat = stat;
-    this.el.innerHTML = `${symbolSvg(stat, `st-c${++made}`)}<svg class="st-arrows" viewBox="0 0 12 32" aria-hidden="true"></svg><b class="st-fig"></b>`;
+    this.el.innerHTML = `${symbolSvg(stat, `st-c${++made}`)}<span class="st-arrows" aria-hidden="true"></span><b class="st-fig"></b>`;
     this.level = this.el.querySelector('rect') as SVGRectElement;
     this.arrows = this.el.querySelector('.st-arrows') as Element;
     this.fig = this.el.querySelector('.st-fig') as HTMLElement;

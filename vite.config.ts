@@ -109,6 +109,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // (the page may sample its own processor time, `new Profiler(...)`: the frame's costs found in the real game, not headless)
+    headers: { 'Document-Policy': 'js-profiling' },
     // `npm run server` runs the game server on :8080; the dev page talks to it through here
     // (and the arena's list and matches to the local arena on :8090, or to the one ARENA_TARGET names, as the site's own
     // page would reach it; the Arena's page itself, /arena, is the game's page)

@@ -3208,6 +3208,11 @@ export class Buildings {
       g.dispose();
     }
     mesh.sortObjects = false;
+    // (not tested a part at a time against the view by three before each drawing of it: that went through every part
+    // of the map, two hundred of them for the concrete, in the view and again in each of the sun's maps, a tenth of a
+    // millisecond a draw, and sent the list to the card every time. Parts past the draw distance are hidden by `far`;
+    // the rest are sent as they are, measured in the owner's flight 2026-10-18: +2.7% fps, a fifth fewer frames over 33 ms)
+    mesh.perObjectFrustumCulled = false;
     mesh.matrixAutoUpdate = false;
     return mesh;
   }

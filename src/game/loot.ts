@@ -1066,7 +1066,9 @@ export class LootManager {
     }
     const s2 = this.shadowDist * this.shadowDist;
     for (const w of this.items.values()) {
-      const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.z - cam.z) ** 2;
+      // (the height counted too: from a helicopter sixty metres up, everything lying in the town below was drawn, a
+      // speck of a pixel each, some forty draws a frame and their shadows, 2026-10-18)
+      const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.y - cam.y) ** 2 + (w.loot.z - cam.z) ** 2;
       const near = d2 < 55 * 55;
       let seen = near;
       if (near && view && d2 > 16) {

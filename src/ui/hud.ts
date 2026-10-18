@@ -611,11 +611,12 @@ export class HUD {
     strip.innerHTML = marks.join('');
   }
 
-  private set(key: string, el: HTMLElement, value: string, prop: 'text' | 'html' = 'text') {
+  private set(key: string, el: HTMLElement, value: string, prop: 'text' | 'html' | 'hurt' = 'text') {
     if (this.last[key] === value) return;
     this.last[key] = value;
     if (prop === 'text') el.textContent = value;
-    else el.innerHTML = value;
+    else if (prop === 'html') el.innerHTML = value;
+    else el.style.setProperty('--hurt', value);
   }
 
   private toggle(el: HTMLElement, cls: string, on: boolean) {
@@ -1925,7 +1926,9 @@ export class HUD {
     if (s.heading !== null) {
       this.toggle(e.compass, 'show', true);
       const deg = ((s.heading % 360) + 360) % 360;
-      (e.compass.firstElementChild as HTMLElement).style.transform = `translateX(${-deg * 4}px)`;
+      // (moved only when it has moved a tenth of a pixel: written every frame, a still view restyled the page every frame)
+      const x = (-deg * 4).toFixed(1);
+      if (this.last.compass !== x) (e.compass.firstElementChild as HTMLElement).style.transform = `translateX(${(this.last.compass = x)}px)`;
       this.toggle(e.bearing, 'show', s.bearing);
       if (s.bearing) this.set('bearing', e.bearing, `${String(Math.round(deg) % 360).padStart(3, '0')}°`);
     } else {
@@ -1944,7 +1947,10 @@ export class HUD {
       ((e.progress.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.min(100, s.progress.t * 100)}%`;
     } else this.toggle(e.progress, 'show', false);
 
-    e.damage.style.opacity = String(Math.min(1, s.hurt * 0.9 + (v.health < 25 ? 0.35 + 0.15 * Math.sin(performance.now() / 300) : 0)));
+    // (the beat of a body near death is the page's own animation, run by the card, and the flash of a hit is written
+    // only as it changes: written every frame, it was a restyle and repaint of the page every frame, 2026-10-18)
+    this.toggle(e.damage, 'low', v.health < 25);
+    this.set('hurt', e.damage, Math.min(1, s.hurt * 0.9).toFixed(2), 'hurt');
     this.set('fps', e.fps, `${Math.round(s.fps)} fps`);
     this.set('net', e.net, this.netText + (s.ping !== null ? ` · ${s.ping} ms` : ''));
     this.toggle(e.dead, 'show', s.dead);

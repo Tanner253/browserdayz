@@ -661,6 +661,7 @@ export const frameMethods = {
       eye.rotateZ(sh.roll);
       eye.updateMatrixWorld();
     }
+    this.prefetch?.update(r.camera.position);
     r.render(dt);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);

@@ -181,6 +181,29 @@ export class Renderer {
       draws++;
       render(scene, camera);
     };
+    // Things of one shader program drawn together, and then by paint (2026-10-18). three sorts by paint alone, and
+    // paints are numbered as they were made: the fifty or so programs in view were switched between at nearly every
+    // change of paint, and a change of program sends the camera and every light again (a change of paint alone does
+    // not). Front to back within a paint, as before. (A paint's program, as last drawn, looked up twice a second.)
+    const props = this.renderer.properties;
+    let gen = 0;
+    setInterval(() => gen++, 500);
+    const pid = (m: THREE.Material & { __pg?: number; __pid?: number }) => {
+      if (m.__pg !== gen) {
+        m.__pg = gen;
+        m.__pid = (props.get(m) as { currentProgram?: { id: number } }).currentProgram?.id ?? 0;
+      }
+      return m.__pid!;
+    };
+    type Item = { groupOrder: number; renderOrder: number; material: THREE.Material & { id: number }; materialVariant?: number; z: number; id: number };
+    this.renderer.setOpaqueSort(((a: Item, b: Item) =>
+      a.groupOrder - b.groupOrder ||
+      a.renderOrder - b.renderOrder ||
+      (import.meta.env.DEV && (globalThis as { __paintSort?: boolean }).__paintSort ? 0 : pid(a.material) - pid(b.material)) ||
+      a.material.id - b.material.id ||
+      (a.materialVariant ?? 0) - (b.materialVariant ?? 0) ||
+      a.z - b.z ||
+      a.id - b.id) as never);
     this.vmCamera.layers.enableAll();
     this.buildComposer();
     this.resize();

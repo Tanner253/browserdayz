@@ -9,7 +9,7 @@ import { physics } from '../core/physics';
 import { assets } from '../core/assets';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Atmosphere } from './atmosphere';
-import { bunkerPlace, type World } from './worldgen';
+import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BUNKER, bunkerAt, bunkerPlan, lampBurns, levelY, type Place } from '../sim/bunker';
 
@@ -353,6 +353,8 @@ export const spotKey = (x: number, z: number) => `${Math.round(x * 10)}_${Math.r
 
 /** how far from the bunker the eye may be, over the ground, for anything of it to be drawn: its house on the hill is seen from further than its rooms are long */
 const SEEN_FROM = 320;
+/** how near its hut the eye must be, metres, to see down its stair (or be under the ground itself) for what is buried to be drawn */
+const OPEN_FROM = 30;
 
 export class BunkerSite {
   /** where it stands: null in a world that has none (and then this does nothing) */
@@ -382,6 +384,7 @@ export class BunkerSite {
   /** @param ground what the ground is drawn with: the bunker's roof is drawn with the same, where it lies under the open sky */
   constructor(world: World, atmo: Atmosphere, scene: THREE.Scene, ground: THREE.Material | null = null) {
     this.place = bunkerPlace(world);
+    this.heights = world.heights;
     const P = this.place;
     if (!P) return;
     const B = BUNKER, D = B.depth, Y = levelY();
@@ -857,6 +860,28 @@ export class BunkerSite {
    * when the eye is near enough to its way in to see any of it.
    */
   private all: THREE.Group | null = null;
+  private heights: Float32Array | null = null;
+  /**
+   * What of it lies under the ground, more than half a metre down (its halls, rooms and their lamps): from the hill
+   * over it, or flying past, it was two hundred draws a frame of rooms nobody could see (2026-10-18, the owner's own
+   * flight played again). Drawn when the eye is at its hut, to look down the stair, or is under the ground itself.
+   * Gathered again whenever pieces are added (its models come in after it is built).
+   */
+  private under: THREE.Group | null = null;
+  private pieces = 0;
+  private buried(all: THREE.Group, P: Place, eye: THREE.Vector3, near: number) {
+    if (all.children.length !== this.pieces) {
+      const under = (this.under ??= Object.assign(new THREE.Group(), { name: 'bunker under', matrixAutoUpdate: false }));
+      if (under.parent !== all) all.add(under);
+      const box = new THREE.Box3();
+      for (const c of [...all.children]) {
+        if (c === under || box.setFromObject(c).isEmpty() || box.max.y > P.y - 0.5) continue;
+        under.add(c);
+      }
+      this.pieces = all.children.length;
+    }
+    if (this.under) this.under.visible = near < OPEN_FROM || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
+  }
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */
   setOpen(open: boolean, quiet = false) {
@@ -891,7 +916,11 @@ export class BunkerSite {
   update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number) => void) {
     const P = this.place;
     if (!P) return;
-    if (this.all) this.all.visible = Math.hypot(eye.x - P.x, eye.z - P.z) < SEEN_FROM;
+    if (this.all) {
+      const near = Math.hypot(eye.x - P.x, eye.z - P.z);
+      this.all.visible = near < SEEN_FROM;
+      if (this.all.visible) this.buried(this.all, P, eye, near);
+    }
     this.clock += dt;
     const d = this.door;
     if (d) {

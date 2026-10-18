@@ -840,15 +840,21 @@ export class Atmosphere {
       const s = l.shadow;
       s.autoUpdate = false;
       const drawn = (this.drawn[i] ??= { pos: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3() });
-      const turn = i === 1 ? this.frame % 2 === 0 : this.frame % 4 === 1;
+      // (the nearest too every other frame, on the frames the middle one is not drawn (2026-10-18): a map not drawn
+      // keeps the matrix it was drawn with, so a shadow stays where it was in the world for one frame, a few
+      // centimetres afoot; and drawn at once after a jump of more than a metre)
+      const near = i === 0 && !(globalThis as { __c0Every?: boolean }).__c0Every;
+      const turn = i === 0 ? this.frame % 2 === 1 : i === 1 ? this.frame % 2 === 0 : this.frame % 4 === 1;
       const now = this.sunAt[i], r = this.round[i];
       // (development, as it was: fitted to the view, a turn of three or four degrees needed them drawn again)
-      const gone = this.fitToView
-        ? drawn.pos.distanceToSquared(cam.position) > (i === 1 ? 0.5 : 4) || drawn.dir.dot(_dir) < (i === 1 ? 0.9986 : 0.9976)
-        : !now || !r || Math.hypot(now.x - drawn.pos.x, now.y - drawn.pos.y) > r.pad * 0.9;
-      if (i === 0 || turn || gone || !s.map) {
+      const gone = near
+        ? drawn.pos.distanceToSquared(cam.position) > 1
+        : this.fitToView
+          ? drawn.pos.distanceToSquared(cam.position) > (i === 1 ? 0.5 : 4) || drawn.dir.dot(_dir) < (i === 1 ? 0.9986 : 0.9976)
+          : !now || !r || Math.hypot(now.x - drawn.pos.x, now.y - drawn.pos.y) > r.pad * 0.9;
+      if ((i === 0 && !near) || turn || gone || !s.map) {
         s.needsUpdate = true;
-        if (this.fitToView) {
+        if (near || this.fitToView) {
           drawn.pos.copy(cam.position);
           drawn.dir.copy(_dir);
         } else if (now) drawn.pos.copy(now);

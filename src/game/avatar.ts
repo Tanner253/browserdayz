@@ -867,7 +867,9 @@ export class Avatar {
     model.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (m.isMesh) {
-        m.castShadow = true;
+        // (not the hair nor the glasses: a finger's breadth on the shadow of a head, and a draw each in every map of
+        // the sun's that a body is in, a hundred infected about the map, 2026-10-18)
+        m.castShadow = m.name !== 'hair' && m.name !== 'glass';
         m.receiveShadow = true;
         if (m.isSkinnedMesh) m.intersectsFrustum = inSight;
         const src = m.material as THREE.MeshStandardMaterial;

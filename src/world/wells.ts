@@ -70,7 +70,9 @@ export function buildWells(wells: Well[], atmo: Atmosphere, scene: THREE.Scene) 
   }
   for (const [m, list] of byPaint) {
     const mesh = new THREE.Mesh(mergeGeometries(list, false)!, m);
-    mesh.castShadow = true;
+    // (the water, the pail and its rope cast none: the shaft hides the one, the others are a thread in the shadow of
+    // the frame, and each of these is every well on the map, drawn again in each of the sun's maps, 2026-10-18)
+    mesh.castShadow = m !== water && m !== pail && m !== rope;
     // (the water takes no shadow)
     mesh.receiveShadow = m !== water;
     mesh.matrixAutoUpdate = false;

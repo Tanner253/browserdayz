@@ -26,7 +26,8 @@ import { CANYON_ROCK_TINT } from './world/ground';
 import { outcropPieces } from './world/outcrops';
 import { passPlan } from './world/worldgen';
 import { loadWorld } from './world/load-world';
-import { Atmosphere } from './world/atmosphere';
+import { Atmosphere, SHADOW_FRUSTA } from './world/atmosphere';
+import { installTiny } from './core/tiny';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
 import { Grass } from './world/grass';
@@ -182,6 +183,7 @@ async function boot() {
 
   stage('sky');
   const atmo = new Atmosphere(r.renderer, r.scene, r.camera);
+  installTiny(r.scene, r.renderer, (f) => SHADOW_FRUSTA.has(f));
   // (`?nogas` on a development build leaves it out of the shaders, to measure what it costs)
   // (and in a wager's arena there is none: the works are far off)
   atmo.gases = arena || (import.meta.env.DEV && new URLSearchParams(location.search).has('nogas')) ? [] : gasClouds(world);
