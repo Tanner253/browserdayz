@@ -68,7 +68,8 @@ const TICK_HZ = 15;
 /** how long a game is given to build the bot check's range and say it stands ('rgo'), ms: a phone on its own connection included */
 const RANGE_BUILD = 60_000;
 
-export const CORPSE_LIFETIME = 600; // seconds
+// (an hour, as DayZ keeps a dead player (CleanupLifetimeDeadPlayer): the owner, 2026-10-17, "bodies should last an hour yes"; it was ten minutes)
+export const CORPSE_LIFETIME = 3600; // seconds
 
 // (A character is its player's until it dies: whoever comes back in a year has what they left with. It was
     // half an hour.)
