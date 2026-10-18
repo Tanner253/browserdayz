@@ -135,12 +135,22 @@ body {
   background: var(--accent);
   transition: width 0.25s ease;
 }
-.load-label {
+.load-count {
   margin-top: 12px;
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-faint);
-  height: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.load-label {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  height: 16px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

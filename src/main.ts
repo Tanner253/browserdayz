@@ -35,6 +35,7 @@ import { Buildings } from './world/buildings';
 import { buildRoad } from './world/road';
 import { Game } from './game/game';
 import { initRotatePrompt } from './ui/rotate';
+import { LoadingScreen } from './ui/loading-screen';
 import { gasClouds } from './sim/gas';
 import { buildWorks } from './world/works';
 import { buildWells } from './world/wells';
@@ -45,8 +46,7 @@ initRotatePrompt();
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const loading = document.getElementById('loading')!;
-const fill = loading.querySelector('.load-fill') as HTMLElement;
-const label = loading.querySelector('.load-label') as HTMLElement;
+const screen = new LoadingScreen(loading);
 const frame = () => new Promise((res) => setTimeout(res, 0));
 
 // ------------------------------------------------------------------ the watch on the start
@@ -61,10 +61,10 @@ interface Watch { t0: number; stage: string; errs: string[]; done: boolean; say?
 const B = ((window as unknown as { __boot?: Watch }).__boot ??= { t0: Date.now(), stage: 'page', errs: [], done: false });
 let card = '';
 
-function stage(name: string, say?: string) {
+function stage(name: string) {
   B.stage = name;
   bootStage(name);
-  if (say) label.textContent = say;
+  screen.stage(name);
 }
 
 function tell(how: 'ok' | 'failed' | 'slow' | 'died' | 'lost', err = '') {
@@ -100,7 +100,7 @@ const QUIET = 45;
   let was = '', quiet = 0;
   const watch = setInterval(() => {
     if (B.done) return clearInterval(watch);
-    const now = `${B.stage}|${assets.received}|${label.textContent}`;
+    const now = `${B.stage}|${assets.received}`;
     quiet = now === was ? quiet + 5 : 0;
     was = now;
     if (quiet !== QUIET) return;
@@ -116,7 +116,7 @@ canvas.addEventListener('webglcontextlost', () => {
     const gl = canvas.getContext('webgl2');
     if (gl && !gl.isContextLost()) return;
     tell('lost');
-    label.textContent = 'the picture was shut down';
+    screen.fail('the picture was shut down');
     B.say?.('Your device shut the game’s graphics down, which is nearly always for want of memory. Close other tabs and apps, then reload.');
     loading.classList.remove('done');
   }, 3000);
@@ -164,14 +164,11 @@ async function boot() {
   }
   assets.maxAnisotropy = Math.min(16, r.maxAnisotropy);
   assets.strips = new Strips(r.renderer);
-  assets.onProgress = (d, t, l) => {
-    fill.style.width = `${(d / Math.max(t, 1)) * 100}%`;
-    label.textContent = l;
-  };
+  assets.onProgress = (d, t) => screen.files(d, t);
   stage('assets');
   await Promise.all([physics.init(), assets.init()]);
 
-  stage('world', 'generating world');
+  stage('world');
   await frame();
   const t0 = performance.now();
   const world = await worldReady;
@@ -265,7 +262,7 @@ async function boot() {
     const hit = physics.raycast({ x: q.x, y: q.y + 1.6, z: q.z }, { x: 0, y: -1, z: 0 }, 4);
     if (hit) q.y = hit.point.y;
   }
-  stage('forest', 'growing forest');
+  stage('forest');
   await frame();
   const veg = new Vegetation(world, atmo, terrain.heightTex);
   await veg.build(r.renderer, r.scene);
@@ -286,10 +283,10 @@ async function boot() {
     game.player.water = (x, z) => waterAt(W, x, z, ground);
     game.player.onWade = (x, y, z, depth) => game.effects?.splash(new THREE.Vector3(x, y, z), depth);
   }
-  await game.init((l) => stage(l, l));
+  await game.init(stage);
   // (a wager's arena: its fort made whole now, not as somebody comes near it; and the Arena's own menu over it)
   if (arena && game.castle) {
-    stage('fort', 'building the fort');
+    stage('fort');
     await game.castle.whole();
   }
   // (out of the wait for a match: still loading, the Deploy that waits for it is let go; connected, the place given up)
@@ -317,6 +314,7 @@ async function boot() {
   // headless browser is a first visit: the owner, "when running locally simply disable the how to play modal")
   if (!arena && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) game.hud.howTo(false);
   B.done = true;
+  screen.done();
   B.stage = 'up';
   bootDone();
   if (TOUCH) tell('ok');
@@ -326,7 +324,7 @@ async function boot() {
 boot().catch((e) => {
   console.error(e);
   const what = String(e?.message ?? e);
-  label.textContent = `error: ${what}`;
+  screen.fail(`error: ${what}`);
   B.say?.(`The game could not start (${what.slice(0, 120)}). Reload to try again: what has already come down is kept.`);
   tell('failed', what);
 });
