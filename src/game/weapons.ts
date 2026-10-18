@@ -8,7 +8,7 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { CRACK, audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf, canOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
@@ -2852,7 +2852,8 @@ export class Weapons {
     this.burst++;
     this.sinceShot = 0;
     const suppressed = quietOf(item);
-    const v0 = b.muzzleVel * (suppressed ? QUIETED : 1);
+    // (slowed by a fitted suppressor; a gun whose can is part of it fires at its own speed, see Gun.quiet)
+    const v0 = b.muzzleVel * (canOf(item) ? QUIETED : 1);
     // From the eye, along the way the gun is pointing (on the eye's own line unless it is still catching up with a
     // turn), and lifted by what brings the round back down onto that line at the range its sights are set for.
     const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.lag.y, this.lag.x, 0, 'YXZ')).applyQuaternion(camera.quaternion);
@@ -3415,7 +3416,7 @@ export class Weapons {
     const out = dir.clone().normalize();
     // (as fast as it left where it was fired, which through a suppressor is slower: it lands where it landed
     // there, and a 9 mm that went by without a crack there goes by without one here)
-    const v0 = b.muzzleVel * (suppressed ? QUIETED : 1);
+    const v0 = b.muzzleVel * (suppressed && !GUNS[weaponId]?.quiet ? QUIETED : 1);
     for (let k = 0; k < b.pellets; k++) {
       const d = b.cone ? strewn(out, b.cone) : out.clone();
       this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(v0), drag: b.drag, damage: 0, v0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true, from: shooter });

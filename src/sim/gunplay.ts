@@ -53,6 +53,8 @@ export const CARTRIDGES: Record<string, Cartridge> = {
 export interface Gun {
   /** what it fires (the same as its item says: a test holds the two together) */
   ammo: string;
+  /** its suppressor is part of it (the VSSK's can): it is always heard as quieted, and its round's speed, subsonic already, is its own */
+  quiet?: true;
   /** rounds a minute: an automatic's rate, or as fast as its trigger can be worked */
   rpm: number;
   /** worked by hand between shots: seconds from one shot to the next (what the server goes by) */
@@ -92,7 +94,8 @@ export const GUNS: Record<string, Gun> = {
   // (twice as fast as it was, the owner: "can we make the 40mm grenade launcher able to shoot 2x as fast its a bit slow")
   m32: { ammo: 'ammo_40mm', rpm: 240, barrel: 1, moa: 3, hip: 2, up: 3.2, side: 0.6, lean: 0, first: 1, held: 1, stays: 0.3, back: 9, jump: 3.6, heavy: true, zero: [50, 100, 150, 200], reach: 400 },
   barrett: { ammo: 'ammo_50bmg', rpm: 150, barrel: 1, moa: 1.2, hip: 3.6, up: 3.8, side: 0.7, lean: 0.1, first: 1, held: 1, stays: 0.32, back: 9, jump: 4, heavy: true, zero: [100, 200, 300, 400, 500, 600, 800, 1000], reach: 1400 },
-  vssk: { ammo: 'ammo_127x55', rpm: 180, barrel: 1, moa: 2.5, hip: 2.4, up: 2.6, side: 0.6, lean: 0.12, first: 1, held: 1, stays: 0.3, back: 8.5, jump: 3, heavy: true, zero: [100, 200, 300, 400], reach: 450 },
+  // (the owner, 2026-10-17: "the suppressed sniper vss we have does not sound suppressed")
+  vssk: { ammo: 'ammo_127x55', quiet: true, rpm: 180, barrel: 1, moa: 2.5, hip: 2.4, up: 2.6, side: 0.6, lean: 0.12, first: 1, held: 1, stays: 0.3, back: 8.5, jump: 3, heavy: true, zero: [100, 200, 300, 400], reach: 450 },
   sniper50: { ammo: 'ammo_50bmg', rpm: 60, cycle: 1.1, barrel: 1, moa: 0.5, hip: 3.4, up: 4.2, side: 0.6, lean: 0.1, first: 1, held: 1, stays: 0.3, back: 9, jump: 4.4, heavy: true, zero: [100, 200, 300, 400, 500, 600, 800, 1000], reach: 1600 },
   mosin: { ammo: 'ammo_762', rpm: 300, cycle: 0.8, barrel: 1, moa: 1.6, hip: 1.3, up: 3.1, side: 0.5, lean: 0.15, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 3.2, heavy: true, zero: [100, 200, 300, 400, 500, 600], reach: 900 },
   // (the Colt: a heavier round than the 9 mm's and a harder shove with each, a little slower to come back)

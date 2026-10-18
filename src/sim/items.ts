@@ -1024,6 +1024,11 @@ export function capacityOf(it: ItemInstance): number {
 
 /** Is something on its muzzle that quiets it? (a quieted shot shows no flash, carries a fraction as far, and hits a little softer) */
 export function quietOf(it: ItemInstance | null | undefined): boolean {
+  return !!it && (!!GUNS[it.id]?.quiet || canOf(it));
+}
+
+/** a suppressor fitted to it (not one that is part of it): what slows its round (QUIETED) */
+export function canOf(it: ItemInstance | null | undefined): boolean {
   return !!it?.mods?.some((m) => ITEMS[m]?.attach?.quiet);
 }
 

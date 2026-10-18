@@ -114,7 +114,8 @@ export function hitDamage(weapon: string, zone: HitZone, distance: number, suppr
   const k = r.melee ? 1 : r.drag ? damageKept(speedAt(r.drag, distance)) : 1 - (1 - r.falloff) * Math.min(1, Math.max(0, distance) / r.range);
   const own = ownHit(weapon, zone, suppressed, k);
   if (own !== null) return own;
-  const base = r.melee ? r.damage + Math.min(10, Math.max(0, bonus)) : r.damage * (suppressed ? 0.9 : 1);
+  // (a fitted suppressor takes a tenth off; a can that is part of the gun is in its figure already: Gun.quiet)
+  const base = r.melee ? r.damage + Math.min(10, Math.max(0, bonus)) : r.damage * (suppressed && !GUNS[weapon]?.quiet ? 0.9 : 1);
   const n = r.pellets ? Math.max(1, Math.min(r.pellets, Math.floor(pellets) || 1)) : 1;
   return base * k * zoneMultiplier(zone, r.melee) * n;
 }

@@ -320,7 +320,8 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
     assert.ok(hitDamage(id, 'torso', GUNS[id].reach) < s.damage * 0.95 && hitDamage(id, 'torso', GUNS[id].reach) >= s.damage * 0.4, `${id}: at its furthest it has lost nothing, or everything`);
     assert.ok(hitDamage(id, 'head', 50) > hitDamage(id, 'torso', 50) * 3 && hitDamage(id, 'legs', 50) < hitDamage(id, 'torso', 50));
     assert.equal(hitDamage(id, 'arms', 50), hitDamage(id, 'legs', 50), `${id}: an arm is not hit as a leg is`);
-    assert.ok(Math.abs(hitDamage(id, 'torso', 30, true) - hitDamage(id, 'torso', 30) * 0.9) < 1e-9, `${id}: quieted`);
+    // (a fitted suppressor takes a tenth off; a can that is part of the gun is in its figure already)
+    assert.ok(Math.abs(hitDamage(id, 'torso', 30, true) - hitDamage(id, 'torso', 30) * (GUNS[id].quiet ? 1 : 0.9)) < 1e-9, `${id}: quieted`);
   }
   // ---- the sniper rifle, as it was asked for (2026-10-17): never one to the body; one to a bare head, loud or quiet,
   // and not to a helmeted one; less to an arm or a leg
