@@ -235,6 +235,27 @@ const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const BASE = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
 
 /** Central loader with caching + progress reporting for the loading screen. */
+/**
+ * One sharp picture put in its place a frame (see `sharpen`). Each was put in as its last strip went in, and a thing's
+ * pictures finish together: the fort's thirteen were first drawn with in one frame, each a picture the card had to make
+ * ready for its first use, 106 ms of the card's in that frame (2026-10-18, the research session's fourth round).
+ */
+const swaps: (() => void)[] = [];
+let swapping = false;
+function oneAFrame(): Promise<void> {
+  return new Promise((done) => {
+    swaps.push(done);
+    if (swapping) return;
+    swapping = true;
+    const tick = () => {
+      swaps.shift()?.();
+      if (swaps.length) requestAnimationFrame(tick);
+      else swapping = false;
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
 export class Assets {
   manifest!: Manifest;
   trees!: Record<string, TreeEntry>;
@@ -580,9 +601,11 @@ export class Assets {
                   });
                   this.onCard.set(hi, on);
                 }
-                return on.then((card) => {
+                return on.then(async (card) => {
+                  if (!card) return false;
+                  await oneAFrame();
                   const w = this.worn.get(mat);
-                  if (!card || !w || w.n <= 0 || !mat[slot] || mat[slot] === card) return false;
+                  if (!w || w.n <= 0 || !mat[slot] || mat[slot] === card) return false;
                   if (!(slot in w.lo)) w.lo[slot] = mat[slot]!;
                   mat[slot] = card;
                   return false;
