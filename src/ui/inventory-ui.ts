@@ -24,7 +24,7 @@
 import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
-import { kindIcon } from './kind-icons';
+import { kindIcon, kindView, setKindView } from './kind-icons';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -204,6 +204,8 @@ export class InventoryUI {
   private stash: Stash | null = null;
   private stashState = '';
   private selected: ItemInstance | null = null;
+  /** the choices of how things are shown, open under the gear by "Carried" */
+  private viewOpen = false;
   /** the pockets and bags folded away (by their names): a click on the bar over one folds it, and opens it again */
   private folded = new Set<string>();
   private drag: Drag | null = null;
@@ -473,6 +475,7 @@ export class InventoryUI {
 
   close() {
     this.isOpen = false;
+    this.viewOpen = false;
     this.hover = null;
     this.closeMenu();
     this.cancelDrag();
@@ -605,6 +608,31 @@ export class InventoryUI {
     const qi = this.actions.hotIndex(item);
     if (qi >= 0) t.push(`<span class="qkey">${(qi + 1) % 10}</span>`);
     return t.join('');
+  }
+
+  /** The gear by "Carried", and, open, the choices under it: things with their kinds' colours, and with their symbols. */
+  private viewEl() {
+    const box = (k: 'colours' | 'icons', label: string) => `<label><input type="checkbox" data-view="${k}"${kindView[k] ? ' checked' : ''}> ${label}</label>`;
+    return `<button type="button" class="inv-view${this.viewOpen ? ' on' : ''}" title="How things are shown"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M13.3 5.5L14 1.6L18 1.6L18.7 5.5A10.8 10.8 0 0 1 21.5 6.7L24.7 4.4L27.6 7.3L25.3 10.5A10.8 10.8 0 0 1 26.5 13.3L30.4 14L30.4 18L26.5 18.7A10.8 10.8 0 0 1 25.3 21.5L27.6 24.7L24.7 27.6L21.5 25.3A10.8 10.8 0 0 1 18.7 26.5L18 30.4L14 30.4L13.3 26.5A10.8 10.8 0 0 1 10.5 25.3L7.3 27.6L4.4 24.7L6.7 21.5A10.8 10.8 0 0 1 5.5 18.7L1.6 18L1.6 14L5.5 13.3A10.8 10.8 0 0 1 6.7 10.5L4.4 7.3L7.3 4.4L10.5 6.7A10.8 10.8 0 0 1 13.3 5.5ZM16 11.2A4.8 4.8 0 1 0 16.01 11.2Z"/></svg></button>` +
+      (this.viewOpen ? `<div class="inv-view-menu">${box('colours', 'Show colours')}${box('icons', 'Show icons')}</div>` : '');
+  }
+
+  private wireView(col: HTMLElement) {
+    col.querySelector<HTMLButtonElement>('.inv-view')?.addEventListener('click', () => {
+      this.viewOpen = !this.viewOpen;
+      this.render();
+    });
+    col.querySelectorAll<HTMLInputElement>('[data-view]').forEach((b) => b.addEventListener('change', () => setKindView({ [b.dataset.view!]: b.checked })));
+    if (!this.viewOpen) return;
+    // (a press anywhere but on the gear or its choices puts them away)
+    const away = (e: PointerEvent) => {
+      if ((e.target as Element | null)?.closest('.inv-view, .inv-view-menu')) return;
+      window.removeEventListener('pointerdown', away, true);
+      if (!this.viewOpen) return;
+      this.viewOpen = false;
+      this.render();
+    };
+    window.addEventListener('pointerdown', away, true);
   }
 
   /** The chosen thing is ringed; what feeds it or is fed by it (its rounds, its magazines, the guns they go in) is lit beside it. */
@@ -980,9 +1008,10 @@ export class InventoryUI {
     // (what is carried and, where the game has said a load weighs on anybody, what it leaves of a sprint: the rule is
     // src/sim/load.ts. In red past the weight that slows the feet as well.)
     const kg = inv.weight(), told = this.carryLimit !== null;
-    cargo.innerHTML = `<h3>Carried <span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
+    cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}</b><span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
     // (an admin's power: it weighs nothing to them, and the head says that and no weight)
-    if (this.weightless) cargo.innerHTML = `<h3>Carried <span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
+    if (this.weightless) cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}</b><span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
+    this.wireView(cargo);
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';
     const grids = document.createElement('div');

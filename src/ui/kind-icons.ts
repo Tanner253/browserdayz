@@ -35,6 +35,36 @@ const GLYPHS: Record<Kind, string> = {
   misc: 'M4.5 16.5L16.5 4.5H27.5V15.5L15.5 27.5ZM23 7A2 2 0 1 0 23.01 7Z',
 };
 
+/**
+ * How kinds are shown, each player's own choice (the gear by "Carried" in the inventory): with their colours or
+ * all in the page's plain pale, and with these symbols or without. Kept in this browser, as the map's choices are.
+ */
+export interface KindView { colours: boolean; icons: boolean }
+const VIEW_KEPT = 'zona.kinds';
+export const kindView: KindView = { colours: true, icons: true };
+try {
+  Object.assign(kindView, JSON.parse(localStorage.getItem(VIEW_KEPT) ?? '{}'));
+} catch {
+  /* nothing kept, or no storage: everything shown */
+}
+// (on the page's root, so that it holds wherever a kind is drawn: the inventory and the game's hot keys alike)
+const applyView = () => {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.toggle('kinds-plain', !kindView.colours);
+  document.documentElement.classList.toggle('kinds-hidden', !kindView.icons);
+};
+applyView();
+
+export function setKindView(v: Partial<KindView>) {
+  Object.assign(kindView, v);
+  applyView();
+  try {
+    localStorage.setItem(VIEW_KEPT, JSON.stringify(kindView));
+  } catch {
+    /* not kept: it holds until the page is left */
+  }
+}
+
 /** A thrown thing that goes off is an explosive, whatever list it is kept in (the grenades are in `misc`). */
 function kindOf(id: string): Kind {
   const d = ITEMS[id];
