@@ -1527,21 +1527,26 @@ body.touch .set-page .gfx-range { height: 30px; }
 .howto-head h2 { font-size: 28px; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a; }
 .howto-x { background: none; border: none; color: rgba(233, 228, 216, 0.62); font-size: 28px; cursor: pointer; }
 .hud-howto .pane-brief { display: block; }
-/* How to play: the five steps of a life as pictures across the card, numbered, the step under way lit in turn along
-   the bar over them; what is out to get you in pictured cards beneath. (Pictures: the changelog's, cropped, public/howto/) */
+/* How to play: the five steps of a life as pictures across the card, numbered. Each step takes the stage in turn
+   (2 s of a 10 s round): its card rises with a yellow edge, its picture wakes and pushes in, a light sweeps across it
+   and its number kicks; the rest wait greyed. What is out to get you in pictured cards beneath. (Pictures: the
+   changelog's, cropped, public/howto/) */
 .hud-howto .howto-card { width: min(1180px, calc(100vw - 32px)); }
-.ht-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
-.ht-steps li::before { content: ''; display: block; height: 3px; margin-bottom: 12px; background: var(--line); animation: ht-bar 10s linear infinite; animation-delay: calc(var(--i) * 2s - 10s); }
-.ht-steps figure { position: relative; margin: 0 0 12px; aspect-ratio: 16 / 10; overflow: hidden; background: #0b0c0c; }
+.ht-steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.ht-steps li { --at: calc(var(--i) * 2s - 10s); }
+.ht-steps figure { position: relative; margin: 0 0 12px; aspect-ratio: 16 / 10; overflow: hidden; background: #0b0c0c; outline: 2px solid transparent; animation: ht-card 10s ease-out infinite var(--at); }
 .ht-steps figure::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(8, 9, 9, 0.88), rgba(8, 9, 9, 0) 58%); }
+.ht-steps figure::before { content: ''; position: absolute; z-index: 1; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 236, 180, 0.32), transparent); transform: skewX(-12deg); animation: ht-sweep 10s ease-out infinite var(--at); }
 .ht-steps img, .ht-threats img { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.8) brightness(0.78); transition: filter 0.4s, transform 0.6s ease; }
-.ht-steps img { animation: ht-pic 10s linear infinite; animation-delay: calc(var(--i) * 2s - 10s); }
-.ht-steps li:hover img, .ht-threats div:hover img { filter: none; transform: scale(1.04); }
-.ht-steps i { position: absolute; left: 12px; bottom: 4px; z-index: 1; font-size: 40px; font-weight: 700; font-style: normal; line-height: 1; color: var(--brand); text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8); }
+.ht-steps img { animation: ht-pic 10s linear infinite var(--at); }
+.ht-threats div:hover img { filter: none; transform: scale(1.04); }
+.ht-steps i { position: absolute; left: 12px; bottom: 4px; z-index: 2; font-size: 40px; font-weight: 700; font-style: normal; line-height: 1; color: var(--brand); text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8); transform-origin: left bottom; animation: ht-num 10s ease-out infinite var(--at); }
 .ht-steps b { display: block; font-size: 17px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
 .ht-steps span { display: block; margin-top: 4px; font-size: 15px; line-height: 1.3; color: var(--ink-dim); }
-@keyframes ht-bar { 0%, 19% { background: var(--brand); } 21%, 100% { background: var(--line); } }
-@keyframes ht-pic { 0%, 19% { filter: none; } 21%, 100% { filter: saturate(0.8) brightness(0.78); } }
+@keyframes ht-card { 0% { transform: none; outline-color: transparent; box-shadow: none; } 3%, 18% { transform: translateY(-8px); outline-color: var(--brand); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6), 0 0 22px rgba(255, 211, 90, 0.28); } 22%, 100% { transform: none; outline-color: transparent; box-shadow: none; } }
+@keyframes ht-pic { 0% { filter: grayscale(0.7) brightness(0.5); transform: scale(1); } 3% { filter: none; transform: scale(1.02); } 19% { filter: none; transform: scale(1.12); } 22%, 100% { filter: grayscale(0.7) brightness(0.5); transform: scale(1); } }
+@keyframes ht-sweep { 0% { left: -60%; } 6%, 100% { left: 130%; } }
+@keyframes ht-num { 0% { transform: none; } 2% { transform: scale(1.45) rotate(-4deg); } 5%, 18% { transform: scale(1.15); } 22%, 100% { transform: none; } }
 .ht-h { margin: 28px 0 12px; font-size: 14px; font-weight: 600; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-faint); }
 .ht-threats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .ht-threats div { overflow: hidden; background: rgba(233, 228, 216, 0.04); border-top: 2px solid rgba(255, 211, 90, 0.55); }
@@ -1550,7 +1555,7 @@ body.touch .set-page .gfx-range { height: 30px; }
 .ht-threats span { display: block; padding: 4px 14px 14px; font-size: 14.5px; line-height: 1.32; color: var(--ink-dim); }
 @media (max-width: 900px) { .ht-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; } .ht-threats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .ht-steps, .ht-threats { grid-template-columns: minmax(0, 1fr); } }
-@media (prefers-reduced-motion: reduce) { .ht-steps li::before, .ht-steps img { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ht-steps figure, .ht-steps figure::before, .ht-steps img, .ht-steps i { animation: none; } .ht-steps img { filter: none; } }
 .howto-ok { margin-top: 16px; padding: 10px 30px; background: #ffd35a; color: #101211; border: none; font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
 
 
