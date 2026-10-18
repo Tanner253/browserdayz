@@ -9,7 +9,7 @@ import { ITEMS } from '../sim/items';
 type V3 = { x: number; y: number; z: number };
 /** how a gun sounds where it is not as its kind does: its recording, played so much slower (deeper) and louder; and a
  * quieted shot of its own, at its own level against the .22's (see gunshot) */
-export interface Voice { rate: number; gain: number; rec?: string; quiet?: string; quietGain?: number }
+export interface Voice { rate: number; gain: number; rec?: string; quiet?: string; quietGain?: number; /** its rounds slower than sound: no crack, quieted or going by */ subsonic?: true }
 
 /**
  * How much of a loud sound comes back from round about: [in the open, under a roof]. Open
@@ -681,7 +681,8 @@ export class AudioEngine {
       th.frequency.setValueAtTime(150, t);
       th.frequency.exponentialRampToValueAtTime(55, t + 0.1);
       const tg = ctx.createGain();
-      this.env(tg, t, level * QUIET.thump, 0.01, 0.17);
+      // (a gun quieted by build with its own recording keeps its thump as low as that is: the VSSK's would else be the loudest of it)
+      this.env(tg, t, level * QUIET.thump * (voice?.quiet ? Math.min(1, (voice.quietGain ?? 1) * 4) : 1), 0.01, 0.17);
       th.connect(tg).connect(o2);
       th.start(t);
       th.stop(t + 0.26);

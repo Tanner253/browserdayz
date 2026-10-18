@@ -58,6 +58,7 @@ const ZED = { groan: [16, 20, 1, 23], growl: [17, 18, 21, 15], alert: [8, 10, 12
  *   press – how hard the loudest of it is pressed down, so that the rest of it comes up (0: not at all)
  *   from  – seconds of the recording passed over before the sound is looked for (the second thing in it, not the first)
  *   fade  – seconds it dies away over at its end (0.18, if not given: too long for a footstep a tenth of a second long)
+ *   curve – how it dies away: 1 evenly, 2 and over quicker at first and long and soft at its last, as an echo does
  *   loop  – it is played round and round, and was made to join its own beginning: all of it is kept as it lies,
  *           neither cut to where it begins nor let die away at its end (give it the rate it came at: put to another,
  *           its end no longer meets its beginning)
@@ -213,8 +214,12 @@ SOUNDS.shot_sawnoff = { src: lib('CD/H_21P.wav'), side: 1, takes: 2, len: 2, rat
 // (the Barrett an M82A1, the .50 an M107; the VSSK's quieted shot a quieted Tac-50; the MAC-10s a .45 USP; the MP7 the
 // last shot of an Uzi's last burst; the M32 a 40 mm launcher; the Desert Eagle its own, cut before its case lands)
 SOUNDS.shot_barrett = { src: dec('fs-855592'), len: 2, rate: 44100, gain: 1 };
-SOUNDS.shot_50 = { src: dec('fs-854700'), len: 2.2, rate: 44100, gain: 1 };
-SOUNDS.shot_vssk = { src: dec('fs-737570'), len: 1.8, rate: 44100, gain: 1 };
+// (its recording is loud to its last sample, and its echo stopped dead: let die away over most of its length, as an
+// echo does: the owner, 2026-10-18, "the .50 sniper needs to have better end and echo fade")
+SOUNDS.shot_50 = { src: dec('fs-854700'), len: 2.5, rate: 44100, gain: 1, fade: 1.9, curve: 2.2 };
+// (cut short: its long boom was the loudest thing about it, and a quieted gun is not heard ringing on: the owner,
+// 2026-10-18, "the vssk sound is supposed to be a lot quieter")
+SOUNDS.shot_vssk = { src: dec('fs-737570'), len: 0.9, rate: 44100, gain: 1, fade: 0.35 };
 SOUNDS.shot_mac10 = { src: fsnd('734062__areniporgen__heckler-koch-usp45.wav'), len: 1.6, rate: 44100, gain: 1 };
 SOUNDS.shot_mp7 = { src: dec('fs-418433'), from: 0.86, len: 0.44, rate: 44100, gain: 1, fade: 0.12 };
 SOUNDS.shot_m32 = { src: fsnd('163458__lemudcrab__grenade-launcher.wav'), rate: 44100, gain: 1, fade: 0.1 };
@@ -392,7 +397,7 @@ for (const [name, cfg] of Object.entries(SOUNDS)) {
     let peak = 0;
     for (const v of cut) peak = Math.max(peak, Math.abs(v));
     const fade = cfg.loop ? 0 : Math.min(cut.length, Math.round(cfg.rate * (cfg.fade ?? 0.18)));
-    cut = cut.map((v, i) => (v / (peak || 1)) * 0.92 * cfg.gain * (i > cut.length - fade ? (cut.length - i) / fade : 1));
+    cut = cut.map((v, i) => (v / (peak || 1)) * 0.92 * cfg.gain * (i > cut.length - fade ? ((cut.length - i) / fade) ** (cfg.curve ?? 1) : 1));
     const file = `${name}${k ? `_${k + 1}` : ''}.wav`;
     await writeWav(path.join(OUT, file), cut, cfg.rate);
     total += 44 + cut.length * 2;
