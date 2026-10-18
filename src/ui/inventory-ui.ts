@@ -613,6 +613,8 @@ export class InventoryUI {
     if (d.mag) row('Rounds', `${it.rounds ?? 0} of ${d.mag.capacity}`);
     const room = holds(it.id);
     if (room) row('Inside', it.cargo?.length ? things(it.cargo.length) : 'Nothing');
+    const vs = this.against(src);
+    if (vs) row(vs.label, vs.change);
     if (it.id === 'dogtag') row('Cashes in', it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : `after ${TAG_HOLD_MIN} min carried`);
     const key = this.actions.hotIndex(it);
     if (key >= 0) row('On key', String((key + 1) % 10));
@@ -627,6 +629,23 @@ export class InventoryUI {
       + `<div class="card-rows">${rows.join('')}</div>`
       + lines.map((l) => `<p class="card-note">${l}</p>`).join('')
       + (clicks.length ? `<div class="card-keys">${clicks.join('')}</div>` : '');
+  }
+
+  /**
+   * A vest, bag or other gear with room in it, not yet worn, set against what is worn in its place (Idea 12,
+   * 2026-10-18: "+12 slots, +1.8 kg"). The weight is of the gear alone, not what is in it, which is moved either way.
+   */
+  private against(src: Source): { label: string; change: string } | null {
+    const it = src.item, d = ITEMS[it.id], room = d.wear?.cargo;
+    if (!room || !d.slot || src.kind === 'slot' || src.kind === 'fitted') return null;
+    const now = Object.values(this.inv.slots).find((w) => w && w !== it && ITEMS[w.id].slot === d.slot) ?? null;
+    if (now === it) return null;
+    const cells = (id: string | undefined) => { const c = id ? ITEMS[id].wear?.cargo : undefined; return c ? c[0] * c[1] : 0; };
+    const dc = room[0] * room[1] - cells(now?.id), dw = d.weight - (now ? ITEMS[now.id].weight : 0);
+    const part = (n: number, unit: string, worse: boolean) => `<em class="${n === 0 ? '' : worse ? 'worse' : 'better'}">${n > 0 ? '+' : '−'}${unit}</em>`;
+    const slots = dc === 0 ? 'same slots' : part(dc, `${Math.abs(dc)} slot${Math.abs(dc) === 1 ? '' : 's'}`, dc < 0);
+    const kg = Math.abs(dw) < 0.05 ? 'same weight' : part(dw, `${Math.abs(dw).toFixed(1)} kg`, dw > 0);
+    return { label: now ? `Instead of the ${ITEMS[now.id].name}` : 'Worn, it adds', change: `${slots}, ${kg}` };
   }
 
   /** the name written on the place a thing is worn or slung in */

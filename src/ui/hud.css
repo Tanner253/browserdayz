@@ -1075,6 +1075,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .card-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 13.5px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .card-rows span { color: var(--ink-faint); white-space: nowrap; }
 .card-rows b { font-weight: 500; text-align: right; }
+.card-rows em { font-style: normal; }
+.card-rows em.better { color: #8fae6b; }
+.card-rows em.worse { color: #d66a58; }
 .card-keys { display: flex; flex-direction: column; gap: 1px; margin-top: 7px; padding-top: 6px; font-size: 13.5px; color: var(--ink-dim); border-top: 1px solid var(--line); }
 .card-keys b { display: inline-block; min-width: 92px; font-family: var(--mono); font-size: 10px; font-weight: 400; letter-spacing: 0.04em; color: var(--ink-faint); }
 
