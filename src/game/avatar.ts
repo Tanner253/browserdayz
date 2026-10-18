@@ -616,6 +616,10 @@ const SOLE_UNDER = new Map<string, number>();
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
+/** the infected's shared paints, a kind and a piece each, while they are unhurt (see Avatar.own), and the wounds they show: none */
+const CLEAN = new Map<string, THREE.Material>();
+let CLEAN_U: LookUniforms | null = null;
+
 export class Avatar {
   root = restWhileHidden(new THREE.Group());
   /** first-person body (only built for the local player) */
@@ -875,10 +879,21 @@ export class Avatar {
         if (m.isSkinnedMesh) m.intersectsFrustum = inSight;
         const src = m.material as THREE.MeshStandardMaterial;
         if (zombie) {
-          // one of the infected: painted as it came, and bloodied by what is done to it
-          const mat = src.clone(), at = rest(m);
-          atmo.register(mat, (shader) => stainPatch(shader, uniforms, at), 'zombie');
+          // one of the infected: painted as it came, and bloodied by what is done to it. Every infected of a kind
+          // shares one paint a piece until it is first hit, and has its own from then (see own()): a paint each was a
+          // hundred-odd paints in sight, each made ready again for every draw of it, and every one kept for good by the
+          // sun's maps (2026-10-18, the research session's fifth round)
+          const at = rest(m), key = `${file}|${m.name}`;
+          let mat = CLEAN.get(key);
+          if (!mat) {
+            const u = (CLEAN_U ??= lookUniforms());
+            mat = src.clone();
+            atmo.register(mat, (shader) => stainPatch(shader, u, at), 'zombie');
+            CLEAN.set(key, mat);
+          }
           m.material = mat;
+          m.userData.paint = { src, at };
+          this.paintAtmo = atmo;
           if (m.name === 'body') this.skin = m;
         } else if (suit) {
           // every piece of it takes this body's stains; the cloth takes its colours as well
@@ -1445,6 +1460,7 @@ export class Avatar {
   wound(point: THREE.Vector3, dir: THREE.Vector3, size = 0.08, through = false) {
     const skin = this.skin;
     if (!skin || !this.uniforms || !this.woundBones.length) return;
+    this.own();
     const stain = (at: THREE.Vector3, r: number) => {
       // the nearest limb, measured to the line from its joint to the next
       let best = this.woundBones[0][0], bd = 1e9;
@@ -1469,6 +1485,23 @@ export class Avatar {
     // the hit zones stand a little proud of the body: the wound is just inside them
     stain(point.clone().addScaledVector(dir, 0.05), size);
     if (through) stain(point.clone().addScaledVector(dir, 0.27), size * 1.35);
+  }
+
+  /** the atmosphere an infected's shared paints were made with, for its own when it is first hit */
+  private paintAtmo: Atmosphere | null = null;
+  private owned = false;
+  /** an infected's own paints, from its first wound: its blood is its own (the program is the shared one's: no shader is made) */
+  private own() {
+    const atmo = this.paintAtmo, uniforms = this.uniforms;
+    if (this.owned || !atmo || !uniforms) return;
+    this.owned = true;
+    this.root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh, p = m.userData.paint as { src: THREE.Material; at: THREE.Matrix4 } | undefined;
+      if (!m.isMesh || !p) return;
+      const mat = p.src.clone();
+      atmo.register(mat, (shader) => stainPatch(shader, uniforms, p.at), 'zombie');
+      m.material = mat;
+    });
   }
 
   /** a new life: clean clothes */
