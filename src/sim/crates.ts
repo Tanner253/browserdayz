@@ -21,6 +21,8 @@ export interface CrateSpec {
   w: number;
   h: number;
   count: [number, number];
+  /** how many, by the step it is filled on, where that is not `count` */
+  countOn?: Partial<Record<Tier, [number, number]>>;
   /** the kind of building whose loot it holds, and the step of the map it is of wherever it stands */
   usage: Usage[];
   tier: Tier;
@@ -65,7 +67,9 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // its racks the long things.
   locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5 },
   // (in the bunker its own, the best; anywhere else, the military's of the step it stands on: see fillCrate's `at`)
-  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, count: [2, 4], usage: ['Military', 'Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
+  // (as full as its step is rich: a thing or two in a village's, three to five down the bunker, the owner: "loot density
+  // depends on tier it spawns in"; ten across, as a .50 is long)
+  gun_rack: { label: 'Weapon Rack', w: 10, h: 5, count: [2, 4], countOn: { 1: [1, 2], 2: [1, 3], 3: [2, 3], 4: [2, 4], 5: [3, 5] }, usage: ['Military', 'Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
   bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, count: [1, 2], usage: ['Bunker'], tier: 5 },
   // (the furniture with no places of its own, filled as DayZ's cargo presets fill a container: a thing or two in a
   // cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
@@ -179,7 +183,8 @@ export function fillCrate(c: Container, kind: string, rnd: () => number = Math.r
   // (one that stands under the gas or down the bunker, not of its own kind, holds what is kept there, as any crate there does)
   const main = !own && rich ? table(PLAIN, 'plain', t, keeps) : table(spec, kind, t, keeps);
   const up = spec.up && !rich && t < 5 ? table(spec, kind, (t + 1) as Tier, keeps, true) : null;
-  const n = spec.count[0] + Math.floor(rnd() * (spec.count[1] - spec.count[0] + 1)) + (rich && !own ? 1 : 0);
+  const [lo, hi] = spec.countOn?.[t] ?? spec.count;
+  const n = lo + Math.floor(rnd() * (hi - lo + 1)) + (rich && !own ? 1 : 0);
   const ids: string[] = [];
   for (let i = 0; i < n; i++) {
     const id = up && rnd() < spec.up! ? pick(up, rnd) : pick(main, rnd);

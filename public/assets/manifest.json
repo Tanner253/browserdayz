@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-18T07:55:57.420Z",
+ "generated": "2026-10-18T09:09:45.171Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12241,7 +12241,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 59896,
+   "bytes": 59900,
    "srcTris": 1396,
    "tris": 1396,
    "min": [
@@ -12256,7 +12256,7 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/gun_rack.glb",
-   "hiBytes": 306852,
+   "hiBytes": 306856,
    "hiCard": 64
   }
  }

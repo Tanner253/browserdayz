@@ -100,6 +100,7 @@ const SOLID: Record<string, [Surface, number]> = {
   med_cabinet: ['metal', 0.95],
   // (2026-10-13: the steel locker and the two racks the owner brought in)
   steel_locker: ['metal', 0.98],
+  gun_rack: ['metal', 0.98],
   rack_small: ['metal', 0.95],
   rack_wide: ['metal', 0.95],
   lab_counter: ['concrete', 0.95],

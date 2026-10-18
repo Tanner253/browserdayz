@@ -985,6 +985,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           // (2026-10-13: the men's lockers, at the end of the room of beds, against the wall of the arms room)
           { id: 'steel_locker', x: 3.2, z: -0.6, rot: -Math.PI / 2 },
           { id: 'steel_locker', x: 3.2, z: -1.75, rot: -Math.PI / 2 },
+          // (and the arms room's gun rack, on its end wall between the shelves and the desk: "more of the new weapon
+          // lockers ... in military locations", the owner, 2026-10-18)
+          { id: 'gun_rack', x: 6.09, z: 0.97, rot: -Math.PI / 2 },
         ],
         loot: [
           [5.0, 0.02, 0.3], [4.9, 0.02, -1.6],
@@ -1657,7 +1660,7 @@ export class Buildings {
     // after every other thing, so that none is renumbered. (Their places come after the racks': see `postPlaces`.)
     for (const p of this.world.posts ?? []) {
       const foot = postFoot(p.y), yaw = postYaw(p);
-      for (const q of [POST_ROOM.rack, POST_ROOM.case]) {
+      for (const q of [POST_ROOM.rack, POST_ROOM.case, POST_ROOM.gunRack]) {
         const [x, y, z] = postAt(p, foot, q.x, PILLBOX.floor, q.z);
         this.world.props.push({ kind: q.id, x, y, z, rot: yaw + q.rot, scale: 1, far: 46 });
       }

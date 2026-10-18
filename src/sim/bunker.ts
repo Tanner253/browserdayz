@@ -407,6 +407,9 @@ function layOut(seed: number): Plan {
         // bunks down the two longest walls, lockers along a third, a table in the middle if there is room
         for (const wl of longest.slice(0, 2)) along(wl, (r, f, rot) => build('bunk', r, f, rot, 2.05, 0.95, 1.75), 1.15, 0.95, 5);
         along(longest[2], (r, f, rot) => build('locker', r, f, rot, 0.5, 0.5, 1.85), 0.42, 0.5, 6);
+        // (and a gun rack on the fourth wall where it is free: where the men sleep their rifles are kept to hand. The owner,
+        // 2026-10-18: "i want to see more of the new weapon lockers in the bunker")
+        along(longest[3], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 1);
         if (w > 6.5 && d > 6.5) {
           const turn = rnd() < 0.5 ? 0 : Math.PI / 2;
           put('WoodenTable_01', cr, cf, turn, { on: TOP });
@@ -495,6 +498,7 @@ function layOut(seed: number): Plan {
         // (the gun racks: the real one, its back to the wall, in place of the ones that were drawn here; searched as any
         // rack is, what stands in it seen: src/game/racks.ts)
         along(longest[2], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 3);
+        along(longest[3], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 2);
         for (let k = 0; k < 3; k++) {
           const pr = cr + (k - 1) * 1.6 * (w > d ? 1 : 0) + between(-0.2, 0.2), pf = cf + (k - 1) * 1.6 * (w > d ? 0 : 1) + between(-0.2, 0.2);
           if (clear(pr, pf, 1.4)) put('weapons_case', pr, pf, (w > d ? Math.PI / 2 : 0) + between(-0.2, 0.2));

@@ -775,8 +775,12 @@ export const LOCAL_MODELS = {
     rot: [0, Math.PI / 2, 0],
     size: 1.85,
     tex: 2048,
+    // (its paint said to be all metal drew it black where there is nothing for it to shine back: painted steel, as the locker's)
+    plain: true,
+    metal: 0.3,
+    rough: 0.6,
     tags: ['furniture'],
-    changes: "Stood on the ground about its own middle, at a locker's height; textures re-encoded as WebP at 2048; geometry compressed.",
+    changes: "Stood on the ground about its own middle, at a locker's height; its glint map left out and its surface said to be painted steel; textures re-encoded as WebP at 2048; geometry compressed.",
     credit: {
       name: 'Gun Rack',
       url: 'https://sketchfab.com/3d-models/gun-rack-394e6e2958e04c3bbc8bc7c305e48f4c',

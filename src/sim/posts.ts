@@ -52,6 +52,9 @@ export const postFoot = (level: number) => level - PILLBOX.floor + 0.02;
 export const POST_ROOM = {
   rack: { id: 'rack_small', x: 1.0, z: 2.56, rot: Math.PI, boards: [0, 1, 2, 3] },
   case: { id: 'weapons_case', x: -1.5, z: 1.7, rot: Math.PI / 2 },
+  // (and a gun rack beside the shelf on the back wall: the owner, 2026-10-18, "more of the new weapon lockers ... in
+  // military locations")
+  gunRack: { id: 'gun_rack', x: -0.62, z: 2.56, rot: Math.PI },
   floor: [[0, 0.2], [1.2, -1.5], [-1.1, -1.7]] as [number, number][],
 };
 
