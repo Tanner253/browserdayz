@@ -7,7 +7,7 @@
 // test either. What is shown of a key on the screen is asked of `shown()` (or, for words already written with a
 // key in them, of `relabel`).
 
-export type KeyGroup = 'Move' | 'Fight' | 'Gear' | 'Talk';
+export type KeyGroup = 'Move' | 'Fight' | 'Gear' | 'Talk' | 'Admin';
 export interface Action {
   /** the key it was given, and the name it is asked for by */
   code: string;
@@ -46,8 +46,11 @@ export const ACTIONS: Action[] = [
   { code: 'KeyV', does: 'Talk to whoever is near (hold)', group: 'Talk' },
   { code: 'KeyT', does: 'Call out · dance (hold)', group: 'Talk' },
   { code: 'Enter', does: 'Chat', group: 'Talk' },
+  // (listed in Settings only to whoever has a role, as the panel is theirs: the owner, 2026-10-17, "once they have the
+  // admin role the keybind customization becomes available in the settings panel for rebind")
+  { code: 'Backquote', does: 'Admin panel', group: 'Admin' },
 ];
-export const KEY_GROUPS: KeyGroup[] = ['Move', 'Fight', 'Gear', 'Talk'];
+export const KEY_GROUPS: KeyGroup[] = ['Move', 'Fight', 'Gear', 'Talk', 'Admin'];
 
 /** how fast the mouse turns the head, as a share of what the game was made with */
 export const SENS = { least: 0.2, most: 3, step: 0.05 };
@@ -67,8 +70,9 @@ export interface Controls {
   /** what has been put on another key: the name it is asked for by, to the key that answers to it now */
   keys: Record<string, string>;
 }
-/** keys nothing may be put on: the menu's own, the browser's, an admin's */
-const KEPT = /^(Escape|F\d+|Backquote|MetaLeft|MetaRight|ContextMenu|PrintScreen|ControlLeft|ControlRight)$/;
+/** keys nothing may be put on: the menu's own, the browser's (the admin panel's ` was one until it could be moved:
+ * it is a key like any other now, its own changing places with whatever is put on it) */
+const KEPT = /^(Escape|F\d+|MetaLeft|MetaRight|ContextMenu|PrintScreen|ControlLeft|ControlRight)$/;
 export const bindable = (key: string) => !KEPT.test(key);
 
 const STORE = 'zona.controls.v1';
@@ -143,7 +147,7 @@ export function translation(c: Controls): Map<string, string> {
 const NAMES: Record<string, string> = {
   Mouse0: 'LMB', Mouse1: 'MMB', Mouse2: 'RMB', Mouse3: 'M4', Mouse4: 'M5', Space: 'Space', Tab: 'Tab', Enter: 'Enter', Backspace: 'Bksp', CapsLock: 'Caps',
   ShiftLeft: 'Shift', ShiftRight: 'R Shift', AltLeft: 'Alt', AltRight: 'R Alt', PageUp: 'PgUp', PageDown: 'PgDn', Insert: 'Ins', Delete: 'Del', Home: 'Home', End: 'End',
-  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\',
+  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Backslash: '\\',
 };
 /** a key, as it is written on the screen */
 export function keyName(key: string): string {

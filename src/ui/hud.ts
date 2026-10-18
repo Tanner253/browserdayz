@@ -1221,7 +1221,7 @@ export class HUD {
       `<button type="button" class="kbs-row${this.binding === a.code ? ' on' : ''}${c.keys[a.code] ? ' set' : ''}" data-code="${a.code}"><span>${a.does}</span><kbd${keyName(keyOf(c, a.code)).length > 2 ? ' class="wide"' : ''}>${this.binding === a.code ? '…' : keyName(keyOf(c, a.code))}</kbd></button>`;
     pane.innerHTML =
       `<div class="kbs-top">${this.binding ? '<span>Press the key for it. <b>Esc</b> leaves it as it is.</span><div class="kbs-mouse">or press a mouse button here</div>' : '<span>Click a thing to put it on another key. Two things that want one key change places.</span>'}<button type="button" class="kbs-reset"${Object.keys(c.keys).length ? '' : ' disabled'}>Reset all</button></div>` +
-      `<div class="kbs-cols">${KEY_GROUPS.map((name) => `<div class="kbs-group"><h4>${name}</h4>${ACTIONS.filter((a) => a.group === name).map(row).join('')}</div>`).join('')}</div>` +
+      `<div class="kbs-cols">${KEY_GROUPS.filter((name) => name !== 'Admin' || this.role).map((name) => `<div class="kbs-group"><h4>${name}</h4>${ACTIONS.filter((a) => a.group === name).map(row).join('')}</div>`).join('')}</div>` +
       `<div class="kbs-fixed"><kbd class="wide">Esc</kbd> this menu <kbd class="wide">F3</kbd> performance <span>The wheel is the next weapon. Hold the left button to use what is in your hands.</span></div>`;
   }
 
@@ -1409,8 +1409,18 @@ export class HUD {
 
   // ---- orders (src/net/orders.ts): offered under the box as one is typed, to whoever has a role
 
-  /** what this player may order on the server (the server says, and is the one that holds them to it) */
-  role: Role | null = null;
+  /** what this player may order on the server (the server says, and is the one that holds them to it); whoever has a
+   * role finds their panel's key among the keys in Settings, to be put on another */
+  get role() {
+    return this.roleNow;
+  }
+  set role(r: Role | null) {
+    if (r === this.roleNow) return;
+    this.roleNow = r;
+    if (this.binding === 'Backquote') this.binding = null;
+    this.renderKeys();
+  }
+  private roleNow: Role | null = null;
   /** who else is online, to be named in an order */
   people: () => { id: number; name: string }[] = () => [];
   /** the names of who left lately, newest last: they can still be banned */

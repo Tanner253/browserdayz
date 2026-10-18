@@ -36,6 +36,7 @@ import { KITS } from '../sim/kits';
 import { CARRY_POWERS, type CarryPower } from '../sim/powers';
 import type { S2C } from '../net/protocol';
 import type { ItemInstance } from '../sim/items';
+import { controls, keyOf, shown } from '../core/keys';
 import './admin.css';
 
 export interface AdminActions {
@@ -299,7 +300,7 @@ export class AdminUI {
       if (!(e.target as HTMLElement).closest('button, input')) this.resetLayout();
     });
     window.addEventListener('resize', () => this.isOpen && this.fit());
-    // (the window can be given the keyboard itself, so that Tab starts inside it and ` shuts it)
+    // (the window can be given the keyboard itself, so that Tab starts inside it and its key shuts it)
     this.root.tabIndex = -1;
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-label', 'Admin panel');
@@ -307,7 +308,7 @@ export class AdminUI {
     this.root.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') return;
       e.stopPropagation();
-      if (e.code === 'Backquote') {
+      if (e.code === keyOf(controls(), 'Backquote')) {
         e.preventDefault();
         // (not a key held down: the window has the keyboard from the moment it opens, and the key that opened it is still down)
         if (!e.repeat) this.act.close();
@@ -730,7 +731,7 @@ export class AdminUI {
     const reset = this.button('Reset layout', () => this.resetLayout(), 'ghostly', 'window');
     reset.title = 'Put this window back where it opens, at the size it opens. (Drag the bar to move it, any edge or corner to resize it.)';
     const x = this.button('Close', () => this.act.close(), 'ghostly', 'x');
-    x.append(el('kbd', '', '`'));
+    x.append(el('kbd', '', shown('Backquote')));
     this.swap(this.bar, [title, chips, reset, x]);
   }
 
@@ -1445,7 +1446,7 @@ export class AdminUI {
       r.append(el('kbd', '', k), el('span', '', does));
       keys.append(r);
     };
-    key('`', 'This panel');
+    key(shown('Backquote'), 'This panel');
     key('/', 'An order, typed: they are listed as you type');
     if (this.admin) {
       key('N', 'Noclip, on and off');

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { rejoinSoon, reloadPage } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
+import { shown } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
 import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
@@ -331,7 +332,7 @@ export const onlineMethods = {
     net.on('role', (m) => {
       this.role = m.role;
       this.hud.role = m.role;
-      if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press \` for your panel, or / for your orders: they are listed as you type.`);
+      if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press ${shown('Backquote')} for your panel, or / for your orders: they are listed as you type.`);
       // (a place right-clicked on the map is gone to: an admin's alone)
       this.map.onPick = m.role === 'admin' ? (x, z) => {
         this.order(`/tp ${x.toFixed(0)} ${z.toFixed(0)}`);
