@@ -244,7 +244,8 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     // (the M32's own vertical grip, the owner, 2026-10-17: "I like the 40mm foregrip model it should also work for the
-    // ar15". It was the AR-15's own stub of a grip.)
+    // ar15". It was the AR-15's own stub of a grip. On the double barrel too, till "remove the foregrip it looks bad, we added it
+    // aftermarket", 2026-10-18.)
     id: 'foregrip', name: 'Foregrip', model: 'm32', nodeRe: '^base_3$', w: 1, h: 2, weight: 0.12, category: 'attachment',
     desc: 'A vertical grip for the forward hand, clamped under the AR-15 or the MPA30. It holds the gun down when it fires: a fifth less kick, and it comes up a little faster.',
     attach: { fits: ['ar15', 'mpa'], slot: 'grip', ergo: 4, recoil: 0.8 },

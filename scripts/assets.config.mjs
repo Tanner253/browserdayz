@@ -1347,6 +1347,34 @@ export const WEAPON_PACKS = {
       changes: 'set in rigid pieces and held in our own arms moved as the dual submachine guns pack moves its own, textures at 2048',
     },
   },
+  db12: {
+    dir: 'shotgun_set',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 1,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (Its gun's points are a hundred times the size of the space its joints were bound in, and turned through
+    // themselves: drawn as it came, by three.js too, the gun was 142 metres long behind the eye. Times -0.01 it is in
+    // the hands, its bead on the bead's own joint at the muzzle. Alone it is as long as such a gun is.)
+    meshScale: -0.01,
+    aloneLength: 1.15,
+    // (its four joints are named in Russian in a Windows code page: given names here by how theirs end)
+    rename: { '^[^\\x00-\\x7f].*_049$': 'stock_049', '^[^\\x00-\\x7f].*_050$': 'barrels_050', '^[^\\x00-\\x7f].*_051$': 'bead_051', '^[^\\x00-\\x7f].*_052$': 'shells_052' },
+    skinned: { mesh: ['Shotgun_Material.001_0'], joints: { stock_049: 'base', barrels_050: 'barrels', bead_051: 'barrels', shells_052: 'shells' }, rest: 'base' },
+    eye: 'cam_controller_047', atEye: true, ourArms: true,
+    wrists: { right: 'r_wrist_028', left: 'l_wrist_03' },
+    origin: [0.08, 0.02, -0.03],
+    fps: 30,
+    clips: { fire: 'Shoot', draw: 'Equip', holster: 'Unequip', reload: 'Reload', walk: 'Walk', run: 'Run' },
+    credit: {
+      name: 'Shotgun animation set',
+      url: 'https://sketchfab.com/3d-models/shotgun-animation-set-c24e049dccfe4a1d837b1b0ae1461636',
+      author: 'Vlasov Daniil',
+      line: 'This work is based on "Shotgun animation set" (https://sketchfab.com/3d-models/shotgun-animation-set-c24e049dccfe4a1d837b1b0ae1461636) by Vlasov Daniil (https://sketchfab.com/dan741vlasov) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'held in our own arms (its own arms left out), its gun stood at the size and the turn its joints were bound in, its pieces parted by joint, textures at 2048',
+    },
+  },
   sawnoffs: {
     dir: 'sawnoffs',
     file: 'scene.gltf',

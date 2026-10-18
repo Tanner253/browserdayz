@@ -46,7 +46,7 @@ ok('every gun is fed by a magazine of its own or by its own tube, and every maga
     const w = g.weapon!;
     if (!w.mag) {
       // (or loaded whole by hand: the broken-open shotguns, the launcher's cylinder)
-      assert.ok(w.tube || ['dual_sawnoff', 'm32'].includes(g.id), `${g.id} has neither a magazine nor a tube`);
+      assert.ok(w.tube || ['db12', 'dual_sawnoff', 'm32'].includes(g.id), `${g.id} has neither a magazine nor a tube`);
       continue;
     }
     const m = ITEMS[w.mag];

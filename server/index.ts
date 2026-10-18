@@ -324,8 +324,7 @@ function loadWorld() {
     economy.time = saved.economy.time;
     economy.lastRestock = saved.economy.lastRestock;
     economy.restore(saved.economy.loot);
-    // (a thing since taken out of the game is not put back in a box: the double barrel, the owner 2026-10-18, "remove
-    // the double barrel shotgun from the game entirely")
+    // (a thing since taken out of the game is not put back in a box: nothing saved names an item the game has no more)
     for (const b of saved.boxes) if (Array.isArray(b.items)) b.items = b.items.filter((it: ItemInstance) => !!sanitizeItem(it));
     for (const b of saved.boxes) {
       if (b.kind === 'crate') {

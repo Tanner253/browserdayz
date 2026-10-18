@@ -290,6 +290,7 @@ const HELD = {
   scorpion: new THREE.Vector3(0.05, -0.02, 0),
   mp7a1: new THREE.Vector3(0.05, -0.02, -0.1),
   aks74u: new THREE.Vector3(0.05, -0.02, 0.08),
+  db12: new THREE.Vector3(0.05, -0.02, -0.05),
   // (that maker's packs stand their camera half a metre behind where they are put: as the sniper's)
   dual_smg: new THREE.Vector3(0, -0.02, -0.36),
   dual_mac10: new THREE.Vector3(0, -0.02, -0.36),
@@ -788,7 +789,7 @@ const SEAT = {
  * magazine where the body's arms were too short, and its thumb through the far side.)
  */
 const FORE: Record<string, number | { post: [number, number] }> = {
-  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.215, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
   // (the owner: "the 40mm gun has a vertical grip for us to use, like the ar15")
   m32: { post: [0.368, -0.078] }, mp7a1: { post: [0.16, 0] },
 };
@@ -799,7 +800,7 @@ const FORE: Record<string, number | { post: [number, number] }> = {
  * pack's own right hand, which on the M32, the Barrett and the MP7 was 5 to 8 cm ahead of the trigger.
  */
 const TRIGGER_WRIST = new THREE.Vector3(-0.095, -0.005, 0.028);
-const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0] };
+const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
 /**
  * A pair as everybody else sees it held: the gun twice, side by side this far apart (the gun's own metres, as far as
  * its pack's two hands are), each in its own fist, held out in front as two cans would be (the owner, 2026-10-17:
@@ -932,6 +933,8 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the MP7's rear: a notch between two ears on its drum. The eye was over the ears, where the front post stood hidden
   // behind them: through the notch, the post's tip in it)
   mp7a1: { notch: [-0.089, 0.1338, -0.0076], post: [0.137, 0.1352, -0.0067] },
+  // (the double barrel's: along the rib between its barrels, from over the breech to the bead at the muzzle)
+  db12: { notch: [0.3, 0.1135, -0.0094], post: [0.96, 0.113, -0.0094] },
   // (the AKS-74U's as the AK's: the middle of the notch at the height of its leaf, the post's tip 3 mm lower)
   // (the AKS-74U's rear notch stands 6 mm left of its front post in its model: the eye behind the notch, not the post,
   // or the notch sat off to one side of the post when aimed, the owner: "aks iron sights are off")
@@ -1066,13 +1069,14 @@ const VOICE: Record<string, Voice> = {
   // VSS is, still the quietest gun there is.)
   vssk: { rate: 1, gain: 1, quiet: 'shot_vssk', quietGain: 0.22, subsonic: true },
   m32: { rate: 1, gain: 0.7, rec: 'shot_m32' },
+  db12: { rate: 1, gain: 1.5, rec: 'shot_db12' },
   dual_sawnoff: { rate: 1, gain: 1.5, rec: 'shot_sawnoff' },
 };
 /** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut): the submachine
  * guns an Uzi's (the owner, 2026-10-17: "the uzi reload can be applied to both submachine guns") */
 const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', ar15: 'ar', mpa: 'uzi', scorpion: 'uzi', mp7a1: 'uzi', dual_smg: 'uzi', dual_mac10: 'uzi' };
 /** guns that throw no case as they fire: a revolving launcher, and shotguns broken open to be emptied */
-const NO_CASE = new Set(['m32', 'dual_sawnoff']);
+const NO_CASE = new Set(['m32', 'db12', 'dual_sawnoff']);
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */
 function reticleMaterial(src: THREE.Material): THREE.Material {
@@ -1477,6 +1481,21 @@ export class Weapons {
       ride: { base: 'base', trigger: 'trigger1', front: 'front', slug1: 'slug1', slug2: 'slug2' },
       twin: { ride: { base: 'base_2', trigger: 'trigger1_2', front: 'front_2', slug1: 'slug1_2', slug2: 'slug2_2' }, flash: mkFlash(), roots: { L: ['sawnoffL', 'L_arm_01'], R: ['sawnoffR', 'R_arm_025'] } },
     }));
+    this.models.set('db12', await this.packGun({ pack: 'db12', item: 'db12', gun: 'db12', kind: 'rifle', hands: true, hip: HELD.db12, flashSize: 0.34, flash: mkFlash(), square: true, strip: [], ride: { base: 'stock_049', barrels: 'barrels_050', shells: 'shells_052' } }));
+    this.models.get('db12')!.gait = true;
+    // (it came with no pictures, its one paint a bare colour nearly black: lifted as the dark guns are it was still a
+    // black cut-out. Painted a worn gunmetal here, its own paint and nobody else's: the name is Blender's default.)
+    // (As others see it, out in the sky's light, the same paint was nearly white: there it is darker and gives back less of the sky.)
+    for (const o of [this.models.get('db12')!.root, this.models.get('db12')!.world]) o?.traverse((n) => {
+      const mat = (n as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      if (!mat?.isMeshStandardMaterial || mat.map || mat.userData.lifted) return;
+      const theirs = o === this.models.get('db12')!.world;
+      mat.userData.lifted = true;
+      mat.color.setScalar(theirs ? 0.07 : 0.17);
+      mat.metalness = theirs ? 0.5 : 0.55;
+      mat.roughness = Math.max(mat.roughness, 0.48);
+      mat.envMapIntensity = theirs ? 0.7 : 1.4;
+    });
     const aksRide = { base: 'wpn_body_068', bolt: 'wpn_zatvor_069', trigger: 'wpn_trigger_070', mag: 'wpn_magazine_072' };
     this.models.set('aks74u', await this.packGun({ pack: 'aks74u', item: 'aks74u', gun: 'aks74u', kind: 'auto', hands: true, hip: HELD.aks74u, flashSize: 0.3, flash: mkFlash(), square: true, strip: [], ride: aksRide, spare: ['wpn_magazine_2_074', aksRide.mag] }));
     const mp7Ride = { base: 'body_0161', stock: 'stock_0162', foregrip: 'foregrip_0170', mag: 'mag_0167', bolt: 'bolt_handle_0172', trigger: 'trigger_0164', safety: 'fire_switch_0156', silencer: 'silencer_0173', sightF: 'front_scope_0174', sightR: 'back_scope_0175' };
@@ -1990,6 +2009,10 @@ export class Weapons {
       theirs.getObjectByName('reticle')?.removeFromParent();
       world.add(theirs);
       const mine = await make();
+      // (on a pack whose gun leans on its own pieces, the lean undone as it is aimed (AIM_ROLL): the sight turned back the
+      // same on the rail, or it stood upright while the gun leaned, and leaned once the gun was upright: "the holographic is
+      // sideways 5 degrees")
+      if (name === 'red_dot' && AIM_ROLL[o.item]) mine.rotateX(THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
       const mark = mine.getObjectByName('reticle');
       if (mark) marks.push(mark);
       rig.hang(mine, on);
@@ -3138,7 +3161,7 @@ export class Weapons {
       // animation first plays a magazine being taken out ... we can skip the first part")
       const from = fed && !item.mag ? (m.kind === 'pistol' ? 0.22 : 0.38) : 0;
       const dur = whole * (1 - from), at = (part: number) => Math.max(0.02, whole * (part - from));
-      // (one broken open and loaded by hand, as the sawn-offs are: its shells go in, there is no magazine to hear)
+      // (one broken open and loaded by hand, the double barrel: its shells go in, there is no magazine to hear)
       if (!fed) for (const part of [0.42, 0.56]) audio.shellIn(at(part));
       else {
         if (!from) audio.magOut(whole * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol', set);
