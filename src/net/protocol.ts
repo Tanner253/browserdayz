@@ -31,7 +31,10 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // the game says the height it stands at.)
 // (45, 2026-10-16: the map three times over: the world's ground and its loot points are new, and the pass's caves
 // count as under the ground by right; a page from before would stand on ground the server does not have.)
-export const PROTOCOL = 46;
+// (47, 2026-10-17: the loot on DayZ's model and more places for it: new loot points (racks under the gas, the bunker's
+// shelves, the field posts in the west) and ground levelled under the posts; a page from before would put loot where the
+// server has none, and stand on ground it does not have. And furniture holds its own places' loot.)
+export const PROTOCOL = 47;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
