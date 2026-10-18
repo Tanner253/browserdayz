@@ -286,6 +286,27 @@ export function magFits(mag: ItemInstance | string, gun: ItemInstance | string):
   return !!m?.mag && m.attach?.slot === 'magazine' && m.attach.fits.includes(g);
 }
 
+/** The rounds a thing is, loose or sealed in their box (null for anything else). */
+function roundsOf(id: string): string | null {
+  const d = ITEMS[id];
+  if (d?.open) return ITEMS[d.open.gives]?.category === 'ammo' ? d.open.gives : null;
+  return d?.category === 'ammo' ? id : null;
+}
+
+/**
+ * Do these two feed one another: a gun and the rounds it fires or a magazine it takes, or a magazine and its
+ * rounds? Either way round. (What the inventory lights up beside a chosen thing.)
+ */
+export function goesWith(a: string, b: string): boolean {
+  const one = (x: string, y: string) => {
+    const d = ITEMS[x];
+    if (d?.weapon) return ITEMS[y]?.mag ? magFits(y, x) : roundsOf(y) === d.weapon.ammo;
+    if (d?.mag) return roundsOf(y) === d.mag.ammo;
+    return false;
+  };
+  return a !== b && (one(a, b) || one(b, a));
+}
+
 /** A magazine, made with this many rounds in it (no more than it holds). */
 export function makeMag(id: string, rounds = 0): ItemInstance {
   const it = makeItem(id);

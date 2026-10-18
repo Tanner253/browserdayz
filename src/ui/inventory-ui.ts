@@ -21,7 +21,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
+import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, goesWith, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import type { WorldItem, Stash } from '../game/loot';
@@ -605,10 +605,15 @@ export class InventoryUI {
     return t.join('');
   }
 
+  /** The chosen thing is ringed; what feeds it or is fed by it (its rounds, its magazines, the guns they go in) is lit beside it. */
+  private mark(item: ItemInstance) {
+    return item === this.selected ? ' sel' : this.selected && goesWith(this.selected.id, item.id) ? ' kin' : '';
+  }
+
   private itemEl(item: ItemInstance, w: number, h: number, rot: boolean) {
     const d = ITEMS[item.id];
     const el = document.createElement('div');
-    el.className = `inv-item cat-${d.category}` + (item === this.selected ? ' sel' : '');
+    el.className = `inv-item cat-${d.category}` + this.mark(item);
     el.style.width = `${w * CELL - 2}px`;
     el.style.height = `${h * CELL - 2}px`;
     const img = document.createElement('div');
@@ -704,7 +709,7 @@ export class InventoryUI {
     s.innerHTML = `<div class="slot-label">In your hands</div>`;
     if (item) {
       const el = document.createElement('div');
-      el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '');
+      el.className = 'inv-item in-slot' + this.mark(item);
       const url = this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
       // (how it is used from here, and that one held loose is carried nowhere else, is said on its card: see `cardHtml`)
@@ -779,7 +784,7 @@ export class InventoryUI {
     this.inv.hot.forEach((b, i) => {
       const it = b ? this.inv.hotItem(i) : null;
       const cell = document.createElement('div');
-      cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '');
+      cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '') + (it && this.mark(it) === ' kin' ? ' kin' : '');
       cell.dataset.hot = String(i);
       const id = it?.id ?? b?.id;
       cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[id] ?? ''})"></div>` : ''}`;
@@ -813,7 +818,7 @@ export class InventoryUI {
     s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
     if (item) {
       const el = document.createElement('div');
-      el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.actions.inHands() === item ? ' active' : '');
+      el.className = 'inv-item in-slot' + this.mark(item) + (this.actions.inHands() === item ? ' active' : '');
       // (what is worn has a picture of its own for where it is worn: see `slot:` in icons.ts)
       const url = this.icons[`slot:${item.id}`] ?? this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;

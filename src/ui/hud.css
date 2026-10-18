@@ -987,6 +987,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-item.cat-tool { box-shadow: inset 2px 0 0 #7ea2d0; }
 /* (what is chosen keeps its ring whatever kind it is: the stripe of its kind was drawn in the ring's place) */
 .inv-item.sel:where(:not(.in-slot)) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* (what goes with the chosen thing, its rounds, magazines or gun: lit, but softer than the ring, so the chosen one still stands out) */
+.inv-item.kin, .inv-hotkey.kin { border-color: rgba(201, 178, 124, 0.8); outline: 1px dashed rgba(201, 178, 124, 0.85); outline-offset: -4px; box-shadow: 0 0 10px rgba(201, 178, 124, 0.4); }
+.inv-item.kin:where(:not(.in-slot)) { background: linear-gradient(165deg, rgba(201, 178, 124, 0.3), rgba(var(--tint), 0.14)); }
 .inv-ground-row .inv-item.mini { background: rgba(var(--tint), 0.17); }
 /* A thin light edge round every picture: what parts a dark thing from a dark cell, whatever its picture is. (It is
    drawn here, round what the picture shows of the thing, and not in the pictures: it is the screen's, and the same
