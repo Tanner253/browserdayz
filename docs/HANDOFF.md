@@ -1,8 +1,28 @@
-# Where the work stands (handoff, 2026-10-16)
+# Where the work stands (handoff, 2026-10-19)
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## PICK UP HERE (2026-10-18, paused for the owner's restart; branch `gun-racks`, NOT deployed: the owner, "hold deploys for now")
+## PICK UP HERE (2026-10-19 ~04:30 UTC; branch `gun-racks`, READY, NOT deployed: deploy on the owner's word)
+Live: `517f9a2` (PROTOCOL 49; `main`, `site-live`, `hotfix` there). Ready on `gun-racks` past it, suite run, changelog
+entry "Start on the coast, walk east" with pictures, restart note written; `node scripts/deploy.mjs --dry` clean:
+- Starts on the far west beach (`src/world/worldgen/coast-starts.ts`); the desert's places Peski, Karavan, Bereg, Mys
+  (tier 1) and Blokpost (tier 2) with roads (`src/sim/desert.ts`); keycards only under the gas, three at once.
+- Kamenka's army and police places tier 4, stocked apart as 'kamenka' (`src/sim/apart.ts`); the map works each place's
+  tier out from its loot (`tierAround`), WEST/EAST either side of the tier buttons, the desert's places named.
+- Dog tags kept through a restart, from a LAST WORD only (a crash's older copy would pay a cashed tag twice; no cash-in
+  once stopping); owners' keys hashed (`server/tags.ts keepTags`, test/tag-keep.test.ts).
+- Admins in a line of who made whom (`over` in server/gate.ts): a password login marks its role `up` = its own hash;
+  a password role from before `RANKS_FROM` counts as one without the mark.
+- Drinking from rivers, lakes and the swamp, bigger bottles (drink-water branch); eight west jeeps, cars left 2 h taken
+  away, every vehicle marked on both maps (UAZ green, police blue, helicopter black) (west-cars branch). Both merged.
+- Payouts' SEVENTH cut-over (`RULES7_FROM` 2026-10-19 04:00 UTC, owner's word "12 hour"): past the free ten, a tag whose
+  wallet holds < 100k waits up to 12 h and is paid once it holds them; refusals of the last 12 h reopen (one write).
+At the deploy: WORLD_REV 30 sets down afresh ONLY whoever stood in the desert (REMADE in server/keep.ts); PROTOCOL 50
+asks open pages to reload; tags carried through THIS restart still pay nothing (the live server's save has no tag
+records yet). Open: BOT_RULES is not set on Render's browserdayz service (the server logs "not set"); the owner set it
+elsewhere. Value: `{"hits":9,"aim":0.7,"wrong":0,"snap":2500,"off":40,"strikes":3}`.
+
+## Earlier (2026-10-18, paused for the owner's restart; branch `gun-racks`)
 Done today on `gun-racks`: the controller (`5e86c58`: bumpers along the whole hot bar, △ gun to gun, L3/R3 lean while
 aiming, L3 held the breath); the repo tidied (`6d56534`: docs/ and tools/, the site built the same); weapons fixes part
 one (`aaf58e1`: the double barrel out entirely, the VSSK louder, the MP7A1's sight, the breath held as DayZ's, the scope's
