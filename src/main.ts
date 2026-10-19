@@ -117,7 +117,7 @@ canvas.addEventListener('webglcontextlost', () => {
     if (gl && !gl.isContextLost()) return;
     tell('lost');
     label.textContent = 'the picture was shut down';
-    B.say?.('Your device shut the game’s graphics down, which is nearly always for want of memory. Close other tabs and apps, then reload.');
+    B.say?.('Your device shut the game’s graphics down, which is nearly always for want of memory. Close other tabs and apps, then reload. If it then cannot start, close every window of the browser and open it again.');
     loading.classList.remove('done');
   }, 3000);
 });
@@ -327,6 +327,10 @@ boot().catch((e) => {
   console.error(e);
   const what = String(e?.message ?? e);
   label.textContent = `error: ${what}`;
-  B.say?.(`The game could not start (${what.slice(0, 120)}). Reload to try again: what has already come down is kept.`);
+  // (No 3D for the page at all: the browser switches it off after the graphics have crashed, and a reload gets the
+  // same answer until the whole browser is shut and opened again. Told to reload, a player shot while scoped and was
+  // left at this, reloading, 2026-10-19: "while scoping someone i shoot then my screen blank".)
+  if (/creating webgl context|webgl.*(not supported|unavailable|disabled)/i.test(what)) B.say?.('Your browser has switched off 3D graphics, which it does after the graphics crash. A reload is not enough: close every window of the browser and open it again. If it keeps happening, turn on "Use graphics acceleration when available" in its settings and update your graphics driver.');
+  else B.say?.(`The game could not start (${what.slice(0, 120)}). Reload to try again: what has already come down is kept.`);
   tell('failed', what);
 });
