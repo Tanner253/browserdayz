@@ -100,13 +100,18 @@ export function layPad(H: Float32Array, net: Net, t: Town, padY: number, lake?: 
 /**
  * A town's buildings, things and slab walls added to the world's (after every older one: nothing is renumbered), its
  * yards gravelled, its lanes trodden and its beds dug, and no grass on them nor under its buildings (lay(), as it is).
- * Its things and lamps stand on its pad, or on the ground `on` says where that is given: a desert town's, where the
- * river's wadi cuts into the brick works' pad (its quay's crates, and the lamps down its lane to the ford, stood up to
- * 4 m in the air at the pad's height: the owner, 2026-10-19, "some building decorations like at industrial are
- * floating very high off the ground"), let down to the lowest of it under the thing's foot (`footOn`).
+ * Its things and lamps stand on its pad, or on the ground `on` says where that is given, let down to the lowest of it
+ * under the thing's foot (`footOn`): a desert town's all of them (the river's wadi cuts into the brick works' pad: its
+ * quay's crates, and the lamps down its lane to the ford, stood up to 4 m in the air at the pad's height, the owner,
+ * 2026-10-19: "some building decorations like at industrial are floating very high off the ground"); another's only
+ * where what was laid after the pad moved the ground under it (`all` false: a road's bed had sunk a lamp at Zastava
+ * 0.8 m and one at Lipki, and dug under Ozerki's covered car), what stands on a deck or a table over the pad as laid.
  */
-export function fillTown(t: Town, padY: number, net: Net, out: { buildings: BuildingPlot[]; props: Instance[]; slabs: SlabRun[]; splat: Uint8Array; grass: Uint8Array }, on?: (x: number, z: number) => number) {
-  const foot = on && footOn(on), under = (x: number, z: number, lx: number, lz: number) => (foot ? foot(x, z) : padY + moundAt(t, lx, lz));
+export function fillTown(t: Town, padY: number, net: Net, out: { buildings: BuildingPlot[]; props: Instance[]; slabs: SlabRun[]; splat: Uint8Array; grass: Uint8Array }, on?: (x: number, z: number) => number, all = true) {
+  const foot = on && footOn(on), under = (x: number, z: number, lx: number, lz: number) => {
+    const laid = padY + moundAt(t, lx, lz);
+    return foot && (all || Math.abs(on(x, z) - laid) > MOVED) ? foot(x, z) : laid;
+  };
   townBuildings(t).forEach((s, n) => {
     const [x, z] = townPoint(t, s.x, s.z);
     out.buildings.push({ id: `${t.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: t.rot + s.rot, floorY: padY + (s.up ?? moundAt(t, s.x, s.z) + 0.3), seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
@@ -133,15 +138,19 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     out.grass[k] = Math.round(out.grass[k] * (1 - bare));
   });
   // (Two things stood one on the other, as crates are: the upper set a hand's breadth askew. What is searched is
-  // known by where it stands, to a tenth of a metre, and not by how high: two at one spot were one container.)
-  const stood = new Set<string>();
+  // known by where it stands, to a tenth of a metre, and not by how high: two at one spot were one container.) The
+  // upper stands on the lower, wherever that was set.
+  const stood = new Set<string>(), base = new Map<string, number>();
   for (const th of townThings(t)) {
     let [x, z] = townPoint(t, th.x, th.z);
+    const at = `${Math.round(x * 10)}_${Math.round(z * 10)}`;
     while (stood.has(`${Math.round(x * 10)}_${Math.round(z * 10)}`)) x += 0.11;
     stood.add(`${Math.round(x * 10)}_${Math.round(z * 10)}`);
+    const y = base.get(at) ?? (th.up && !all ? padY + moundAt(t, th.x, th.z) : under(x, z, th.x, th.z));
+    if (!base.has(at)) base.set(at, y);
     // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
-    out.props.push({ kind: th.kind, x, y: under(x, z, th.x, th.z) + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
+    out.props.push({ kind: th.kind, x, y: y + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
   }
   for (const l of townLamps(t)) {
     const [x, z] = townPoint(t, l.x, l.z);
@@ -150,6 +159,8 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
   out.slabs.push(...placedSlabs(t));
 }
 
+/** how far the ground under a thing may be off the pad as laid before it is taken to have been moved (`fillTown`) */
+const MOVED = 0.05;
 /** how far round its middle a thing on sloping ground reaches to the ground: a crate's or a drum's half width */
 const FOOT = 0.6;
 /**
@@ -173,9 +184,13 @@ const LAMP = { every: 22, out: 1.4, apart: 13 };
  */
 export function townLamps(t: Town): { x: number; z: number; rot: number }[] {
   const ground = townGround(t), out: { x: number; z: number; rot: number }[] = [];
-  // (a swamp's water is shallow, a lamp stands in it, as the drowned hamlet's houses do; a lake's is not)
+  // (a swamp's water is shallow, a lamp stands in it, as the drowned hamlet's houses do; a lake's is not, nor its
+  // shingle running down into it: Ozerki's lake is the world's, north of its shore, and three lamps beside its piers
+  // stood over the water at the bank's height)
   const homes = townBuildings(t), things = townThings(t), water = ground.water && !ground.water.swamp ? ground.water.outline : undefined;
+  const bank = t.name === OZERKI.name ? SHORE + 2.5 : -Infinity;
   const wet = (x: number, z: number) => {
+    if (z < bank) return true;
     if (!water) return false;
     let inside = false;
     for (let i = 0, j = water.length - 1; i < water.length; j = i++) {

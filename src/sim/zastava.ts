@@ -45,8 +45,10 @@ export const ZASTAVA_SLABS: SlabRun[] = [
 export function zastavaThings(): TownThing[] {
   const OR = 'container_shell@0', BL = 'container_shell@1';
   return [
-    // the barricade on the river side, at the canyon end: two containers end to end, one on another
-    { kind: OR, x: -30, z: -17, rot: Q }, { kind: BL, x: -30, z: -17, rot: Q, up: 2.2 }, { kind: BL, x: -23.5, z: -15.5, rot: Q + 0.08 },
+    // the barricade on the river side, at the canyon end: two containers end to end, one on another, the western
+    // pair turned along the river's bank (the river comes nearer the road to the west: at z -17 the pair stood in its
+    // water, a metre over it)
+    { kind: OR, x: -30, z: -12.4, rot: Q + 0.39 }, { kind: BL, x: -30, z: -12.4, rot: Q + 0.39, up: 2.2 }, { kind: BL, x: -23.5, z: -14.8, rot: Q + 0.08 },
     // the chicane's ends, and the road blocks pushed aside
     { kind: 'concrete_road_barrier', x: -16, z: 3.4, rot: 0.1 }, { kind: 'concrete_road_barrier', x: -3, z: -3.4, rot: -0.1 }, { kind: 'concrete_road_barrier', x: -22, z: 5.5, rot: 0.6 },
     // the post's stores by the barracks, the roadhouse's yard
