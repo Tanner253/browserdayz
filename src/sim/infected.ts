@@ -19,6 +19,9 @@ import { BUILDING_FOOTPRINT, bunkerPlace, onWorld, heightAt, type World } from '
 /** how far from the middle one may be said to be: the edge of the ground, and a little */
 import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
 import { castleHomes } from './castle';
+import { caveLoot } from './pass';
+import { waterAt } from './water';
+import { passPlan } from '../world/worldgen/west-relief';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
@@ -163,6 +166,18 @@ const ABOUT: Record<string, number> = { market: 0, hamlet: 4, depot: 4, post: 3,
  */
 const EAST: Record<string, [n: number, r: number]> = { town: [10, 60], squat: [2, 30], camp: [3, 34] };
 const EAST_ALL = Object.values(EAST).reduce((a, [n]) => a + n, 0);
+/**
+ * The west's own, by the name its place goes by on the map, over and above `max` as the fort's are (the owner,
+ * 2026-10-19: "the new part of the map are missing zombies, the coast and desert missing zombies, should be zombies in
+ * the caves and around church and stuff all the new pois missing ozmbies"). The map three times over had none at all.
+ * One that nobody is near costs nothing. Most where the loot is best, the coast's hamlets two or three.
+ */
+export const WEST_HOMES: Record<string, [n: number, r: number]> = {
+  Pokrov: [7, 70], Kalat: [6, 110], Lipki: [4, 55], Ozerki: [4, 55], Zastava: [4, 45], Zavod: [4, 50], Mokroye: [3, 50],
+  Peski: [3, 45], Karavan: [3, 40], Blokpost: [3, 35], Bereg: [2, 40], Mys: [2, 40],
+};
+/** and in the pass's caves, where their loot is: stood at the caves' own places, as the bunker's are at its */
+export const IN_CAVES = 5;
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
 // (half as many again as the six there were: the gas is where the best of everything is kept, and it was thinly guarded)
 const AT_WORKS = 9;
@@ -234,6 +249,13 @@ export function infectedHomes(world: World): Home[] {
     left -= h.n;
   }
   for (const s of world.sites) if (EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: EAST[s.kind][1], n: EAST[s.kind][0] });
+  // (the west's, its own: see WEST_HOMES)
+  for (const q of world.pois) if (WEST_HOMES[q.name]) homes.push({ x: q.x, z: q.z, r: WEST_HOMES[q.name][1], n: WEST_HOMES[q.name][0] });
+  const caves = world.towns ? caveLoot(passPlan).map((c): [number, number, number] => [c.x, c.y, c.z]) : [];
+  if (caves.length) {
+    const cx = caves.reduce((a, c) => a + c[0], 0) / caves.length, cz = caves.reduce((a, c) => a + c[2], 0) / caves.length;
+    homes.push({ x: cx, z: cz, r: 400, n: IN_CAVES, inside: caves });
+  }
   // (and the fort's, last: about its ruined village, and in the dark under its terrace)
   for (const h of fort) homes.push(h);
   return homes.filter((h) => h.n > 0);
@@ -253,6 +275,8 @@ export function openGround(world: World, x: number, z: number) {
   const near = (list: { x: number; z: number }[], r: number) => list.some((t) => Math.abs(t.x - x) < r && Math.abs(t.z - z) < r && Math.hypot(t.x - x, t.z - z) < r);
   if (world.solids.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 1.6)) return false;
   if ((world.posts ?? []).some((p) => Math.hypot(p.x - x, p.z - z) < 7)) return false;
+  // (nor in the water: a lake's, the swamp's, the sea's, since the west's places have homes beside them)
+  if (world.water && waterAt(world.water, x, z, (wx, wz) => heightAt(world.surface, wx, wz))) return false;
   return !near(world.trees, 1.8) && !near(world.rocks, 2.2) && !near(world.props, 1.6);
 }
 
