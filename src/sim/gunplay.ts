@@ -185,6 +185,8 @@ export const speedAt = (drag: number, metres: number) => Math.exp(-drag * Math.m
  * that can be written down: the fall after x metres is g (e^(2kx) - 1 - 2kx) / (4 k^2 v^2).
  */
 export function elevationFor(muzzleVel: number, drag: number, zero: number): number {
+  const key = `${muzzleVel}|${drag}|${zero}`, had = ZEROED.get(key);
+  if (had !== undefined) return had;
   const a = 2 * drag * zero;
   // (with next to no drag the same thing is g x / 2 v^2: said so, or it is nought over nought)
   const fall = (v: number) => (a < 1e-4 ? (GRAVITY * zero * zero) / (2 * v * v) : (GRAVITY * (Math.exp(a) - 1 - a)) / (4 * drag * drag * v * v));
@@ -192,7 +194,26 @@ export function elevationFor(muzzleVel: number, drag: number, zero: number): num
   // (A slow round, the launcher's grenade, goes up steeply enough to cross the ground slower than it flies: said
   // again at the speed it crosses it at. Every bullet's slope is under 0.02 and is as it was.)
   for (let k = 0; k < 6 && slope > 0.02; k++) slope = fall(muzzleVel / Math.hypot(1, slope)) / zero;
+  // Then set against the round as it is flown, a step at a time and slowed up and down as well as along (the owner,
+  // 2026-10-19: "can we make sure our zeroiing distance hits target accuratley at appropriate distances"): what is
+  // written above landed a few centimetres low at the far settings, four at a Mosin's 600 m. Twice is to the millimetre.
+  for (let k = 0; k < 3; k++) slope -= heightOver(muzzleVel, drag, slope, zero) / zero;
+  ZEROED.set(key, slope);
   return slope;
+}
+
+/** the step a round is flown in, seconds (src/game/weapons.ts `updateBullets`): what the sights are set against */
+export const BULLET_STEP = 1 / 240;
+const ZEROED = new Map<string, number>();
+/** how far over the line of sight a round fired at `slope` is when it has come `x` metres, flown as the game flies it (see `fly`) */
+function heightOver(v0: number, drag: number, slope: number, x: number): number {
+  const vel = { x: v0 / Math.hypot(1, slope), y: (v0 * slope) / Math.hypot(1, slope), z: 0 }, pos = { x: 0, y: 0, z: 0 };
+  for (let t = 0; t < 20; t += BULLET_STEP) {
+    const was = { x: pos.x, y: pos.y };
+    fly(pos, vel, drag, BULLET_STEP);
+    if (pos.x >= x) return was.y + ((pos.y - was.y) * (x - was.x)) / (pos.x - was.x);
+  }
+  return 0;
 }
 
 /** The range a gun's sights are set for: what its item says, if that is one of the ranges it has; else how it comes. */

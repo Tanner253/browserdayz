@@ -665,6 +665,8 @@ const HOLD_MIN = (cfg: Config, held: bigint) =>
 /** (the same words every time it is looked at, so that the book is not written again for it: see `says`) */
 const HOLD_WAIT = (cfg: Config) =>
   `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(cfg.holdMin)} $ZONA: this tag is paid as soon as it does, if within ${Math.round(cfg.holdWait / 3600_000)} hours of being cashed in`;
+/** (the owner, 2026-10-19, of a wallet that bought the coin after cashing in and sold it again: "if they sold thier tokens they revoke their right to be paid but we should render that, sold tokens, no payment") */
+const SOLD = (cfg: Config) => `sold tokens, no payment: this wallet held ${coins(cfg.holdMin)} $ZONA after the tag was cashed in, and sold them`;
 const HOLD_LATE = (cfg: Config) =>
   `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(cfg.holdMin)} $ZONA, and this one did not within ${Math.round(cfg.holdWait / 3600_000)} hours of the tag being cashed in`;
 /** a tag refused under the sixth for want of the coin, cashed in recently enough to wait for it under the seventh */
@@ -700,7 +702,7 @@ const says = (r: Row, o: Outcome, day: string) =>
 // ------------------------------------------------------------------ the world it runs in
 
 /** the questions asked of the chain (the real thing is Rpc; the tests bring their own) */
-export type Chain = Pick<Rpc, 'balance' | 'latestBlockhash' | 'blockHeight' | 'send' | 'statuses' | 'simulate' | 'account' | 'tokenBalance' | 'gained'> & { steady(): Promise<Pick<Rpc, 'blockHeight' | 'statuses'>> };
+export type Chain = Pick<Rpc, 'balance' | 'latestBlockhash' | 'blockHeight' | 'send' | 'statuses' | 'simulate' | 'account' | 'tokenBalance' | 'gained' | 'heldMost'> & { steady(): Promise<Pick<Rpc, 'blockHeight' | 'statuses'>> };
 
 export interface World {
   cfg: Config;
@@ -929,6 +931,9 @@ export async function walletRate(w: World, who: string) {
 }
 
 /** what of the coin a wallet holds now, in its smallest unit: its own account for the coin under either token program */
+/** the most of the coin a wallet held since a moment, by its token accounts' transactions (see Rpc.heldMost) */
+const soldSince = (w: World, who: Bytes, since: number) => w.rpc.heldMost([tokenAccount(who, w.cfg.mint, TOKEN_2022_PROGRAM), tokenAccount(who, w.cfg.mint, TOKEN_PROGRAM)], who, w.cfg.mint, since);
+
 async function coinsOf(w: World, who: Bytes): Promise<bigint> {
   const mint = w.cfg.mint;
   const [a, b] = await Promise.all([w.rpc.tokenBalance(tokenAccount(who, mint, TOKEN_2022_PROGRAM)), w.rpc.tokenBalance(tokenAccount(who, mint, TOKEN_PROGRAM))]);
@@ -1091,7 +1096,11 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
       // (under the seventh, what it holds now, and a wait for it: see `rules7From`. A tag that waits is not owed, so it
       // is asked this again each time it is looked at)
       if (now >= cfg.rules7From) {
-        if (nowHeld < cfg.holdMin) return only(now - Date.parse(t.at) < cfg.holdWait ? { state: 'waiting', why: HOLD_WAIT(cfg), hold: 'coin' } : { state: 'skipped', why: HOLD_LATE(cfg) });
+        if (nowHeld < cfg.holdMin) {
+          // (and one that held enough since, and holds less now, has sold it: not paid, and said so)
+          if ((await soldSince(w, to, Date.parse(t.at))) >= cfg.holdMin) return only({ state: 'skipped', why: SOLD(cfg) });
+          return only(now - Date.parse(t.at) < cfg.holdWait ? { state: 'waiting', why: HOLD_WAIT(cfg), hold: 'coin' } : { state: 'skipped', why: HOLD_LATE(cfg) });
+        }
       } else if (held < cfg.holdMin) return only({ state: 'skipped', why: HOLD_MIN(cfg, held) });
     }
     const wrong = await setup(w);

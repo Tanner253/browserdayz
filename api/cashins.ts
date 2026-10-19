@@ -54,7 +54,7 @@ function outcome(r: Row): string {
   if (r.state === 'paid') return `<b class="sol">${amount(r.lamports ?? 0)} SOL</b> ${link}`;
   if (r.state === 'sending') return `<span class="go">${amount(r.lamports ?? 0)} SOL on its way</span> ${link}`;
   if (r.state === 'waiting') return `<span class="go">waiting:</span> <i>${esc(r.why ?? '')}</i>`;
-  if (r.state === 'skipped') return `<i>not paid: ${esc(r.why ?? '')}</i>`;
+  if (r.state === 'skipped') return r.why?.startsWith('sold tokens') ? `<i>${esc(r.why)}</i>` : `<i>not paid: ${esc(r.why ?? '')}</i>`;
   return '<i>listed (payouts were not on)</i>';
 }
 
@@ -137,7 +137,7 @@ function page(book: Book, s: Snapshot, now: number): string {
         : s.problem
           ? ['bad', 'Automatic payouts are off', `They were asked for and could not start: ${s.problem}.`]
           : ['off', 'Automatic payouts are off', 'Tags are listed here as they are cashed in, and not paid by the machine.'];
-  const chip = (r: Row) => (r.state === 'paid' ? '<em class="c paid">Paid</em>' : r.state === 'sending' ? '<em class="c go">Sending</em>' : r.state === 'waiting' ? '<em class="c go">Waiting</em>' : r.state === 'skipped' ? '<em class="c no">Not paid</em>' : '<em class="c no">Listed</em>');
+  const chip = (r: Row) => (r.state === 'paid' ? '<em class="c paid">Paid</em>' : r.state === 'sending' ? '<em class="c go">Sending</em>' : r.state === 'waiting' ? '<em class="c go">Waiting</em>' : r.state === 'skipped' ? (r.why?.startsWith('sold tokens') ? '<em class="c no">Sold tokens</em>' : '<em class="c no">Not paid</em>') : '<em class="c no">Listed</em>');
   const account = (wallet: string) => `<a href="https://solscan.io/account/${esc(wallet)}" target="_blank" rel="noopener"><code>${esc(short(wallet))}</code></a>`;
   // (a wallet paid for several tags at once, in one transaction (the rule of five), is one line: the payment, the tags
   // it was for folded under it. The owner, 2026-10-15: "we shouldnt have a new row for each payment, put the

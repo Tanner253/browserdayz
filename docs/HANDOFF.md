@@ -19,8 +19,7 @@ entry "Start on the coast, walk east" with pictures, restart note written; `node
   wallet holds < 100k waits up to 12 h and is paid once it holds them; refusals of the last 12 h reopen (one write).
 At the deploy: WORLD_REV 30 sets down afresh ONLY whoever stood in the desert (REMADE in server/keep.ts); PROTOCOL 50
 asks open pages to reload; tags carried through THIS restart still pay nothing (the live server's save has no tag
-records yet). Open: BOT_RULES is not set on Render's browserdayz service (the server logs "not set"); the owner set it
-elsewhere. Value: `{"hits":9,"aim":0.7,"wrong":0,"snap":2500,"off":40,"strikes":3}`.
+records yet). BOT_RULES is set on Render (the server logs "6 of the bot rules' numbers set on the host" since 02:32).
 
 ## Earlier (2026-10-18, paused for the owner's restart; branch `gun-racks`)
 Done today on `gun-racks`: the controller (`5e86c58`: bumpers along the whole hot bar, △ gun to gun, L3/R3 lean while

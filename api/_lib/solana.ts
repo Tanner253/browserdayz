@@ -389,6 +389,29 @@ export class Rpc {
     return BigInt(r.meta.postBalances[i]) - BigInt(r.meta.preBalances[i]);
   }
 
+  /**
+   * The most of a coin an owner held, as the transactions of its token accounts since `since` (ms) found it or left it:
+   * what a wallet that has sold since, its account closed, still shows. The newest twenty of each account at most.
+   */
+  async heldMost(accounts: Bytes[], owner: Bytes, mint: Bytes, since: number): Promise<bigint> {
+    type Held = { owner?: string; mint: string; uiTokenAmount: { amount: string } };
+    const o = b58(owner), m = b58(mint);
+    let most = 0n;
+    for (const acc of accounts) {
+      const sigs = await this.call<{ signature: string; blockTime: number | null; err: unknown }[]>('getSignaturesForAddress', [b58(acc), { limit: 20, commitment: 'confirmed' }]);
+      for (const s of sigs) {
+        if (s.err || !s.blockTime || s.blockTime * 1000 < since) continue;
+        const r = await this.call<{ meta: { preTokenBalances?: Held[]; postTokenBalances?: Held[] } | null } | null>('getTransaction', [s.signature, { encoding: 'jsonParsed', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }]);
+        for (const b of [...(r?.meta?.preTokenBalances ?? []), ...(r?.meta?.postTokenBalances ?? [])]) {
+          if (b.owner !== o || b.mint !== m) continue;
+          const a = BigInt(b.uiTokenAmount.amount);
+          if (a > most) most = a;
+        }
+      }
+    }
+    return most;
+  }
+
   /** An account's contents, or null if there is no such account. */
   async account(who: Bytes): Promise<{ data: Bytes; lamports: bigint; owner: Bytes } | null> {
     const r = await this.call<{ value: { data: [string, string]; lamports: number; owner: string } | null }>('getAccountInfo', [b58(who), { encoding: 'base64', commitment: 'confirmed' }]);

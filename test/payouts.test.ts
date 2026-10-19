@@ -1280,6 +1280,15 @@ await test('from the seventh: past the free ten, a tag waits up to twelve hours 
   coin(c, 452, 100_000n);
   await sweep(c);
   assert.deepEqual([(await row(c, was.e)).state, got(c, 452)], ['paid', SOL(0.11)]);
+  // one whose wallet held enough after it was cashed in, and sold it, is not paid, and says so (the owner: "sold tokens, no payment")
+  const e = world(10, env);
+  const sold = (await cash(e, 454, 11))[10].e;
+  e.chain.peaks.set(b58(tokenAccount(address(wallet(454)), e.cfg.mint, TOKEN_2022_PROGRAM)), 100_114n * 10n ** 6n);
+  e.skip(60_000);
+  await sweep(e);
+  const out = await row(e, sold);
+  assert.equal(out.state, 'skipped');
+  assert.match(out.why ?? '', /^sold tokens, no payment: this wallet held 100,000 \$ZONA after the tag was cashed in, and sold them/);
   // one refused longer ago than that is left as it was
   const d = world(10, { ...env, PAYOUT_RULES7_FROM: '2026-10-09T01:00:00Z' });
   const old = (await cash(d, 453, 11))[10].e;

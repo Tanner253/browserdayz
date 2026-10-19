@@ -19,7 +19,7 @@ import { WeaponRig, liftPack } from './rig';
 import { type Curl, FPArms, type Grips, type HandGrip, mixCurl } from './arms';
 import type { Look } from './look';
 import { MAX_STAMINA } from '../net/protocol';
-import { GRAVITY, GUNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, intervalOf, kickOf, scatterOf, shotOf, zeroOf } from '../sim/gunplay';
+import { BULLET_STEP, GRAVITY, GUNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, intervalOf, kickOf, scatterOf, shotOf, zeroOf } from '../sim/gunplay';
 import type { ItemModels } from './loot';
 
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
@@ -2902,7 +2902,10 @@ export class Weapons {
   private spreadNow(id: string): number {
     const p = this.player;
     // (sliding down a steep face, nothing is steadier than it is in the air)
-    return coneOf(id, { aimed: this.adsT, moving: p.movingSmooth, air: !p.grounded || p.footing === 'slide', crouched: p.crouched, prone: p.prone, heat: this.burst });
+    // (at the eye in full once the sights are up, as the kick is: the scope was shown at nine tenths of the way and a
+    // tenth of the hip's cone came with it, a Mosin's shot anywhere in 80 cm at 300 m for the second it took to settle.
+    // The owner, 2026-10-19, testing the zero: "the bullet is not accurate")
+    return coneOf(id, { aimed: Math.min(1, this.adsT / SIGHTS_UP), moving: p.movingSmooth, air: !p.grounded || p.footing === 'slide', crouched: p.crouched, prone: p.prone, heat: this.burst });
   }
 
   /** how long until each gun of a pair can fire again (its own pace: half the pair's) */
@@ -3630,7 +3633,7 @@ export class Weapons {
       let remaining = dt;
       let dead = false;
       while (remaining > 0 && !dead) {
-        const h = Math.min(remaining, 1 / 240);
+        const h = Math.min(remaining, BULLET_STEP);
         remaining -= h;
         const speed = b.vel.length();
         b.vel.addScaledVector(b.vel, -b.drag * speed * h);
