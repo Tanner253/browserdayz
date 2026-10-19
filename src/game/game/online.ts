@@ -124,15 +124,14 @@ export const onlineMethods = {
     net.on('join', (m) => {
       void this.addRemote(m.p);
       this.updateOnline();
-      this.hud.feed(`${m.p.name} joined`);
-      this.hud.chatLine('system', '', `${m.p.name} joined`);
+      // (said to admins only: the owner, 2026-10-18, "remove the "player joined" and "player left" messages that show to all players")
+      if (this.role === 'admin') this.hud.feed(`${m.p.name} joined`);
     });
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
       r.seat = null;
-      this.hud.feed(`${r.name} left`);
-      this.hud.chatLine('system', '', `${r.name} left`);
+      if (this.role === 'admin') this.hud.feed(`${r.name} left`);
       this.hud.gone = [...this.hud.gone.filter((n) => n !== r.name), r.name].slice(-15);
       r.dispose();
       this.remotes.delete(m.id);
@@ -211,7 +210,9 @@ export const onlineMethods = {
       const drum = k.w === 'barrel';
       const jeep = k.w === 'jeep' || k.w === 'fire';
       const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w === 'fire' ? 'burning wreck' : k.w === 'jeep' ? 'run down' : k.w)}${zone}${k.dist > 3 && !jeep ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
-      this.hud.feed(how, k.by === net.id || me);
+      // (the kill feed is the admins': the owner, 2026-10-18, "the kill feed should only be shown to admins". The killer is
+      // still told, below, and whoever died sees how on their death screen)
+      if (this.role === 'admin') this.hud.feed(how, k.by === net.id || me);
       if (k.by === net.id) {
         this.weapons.confirmKill();
         this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
