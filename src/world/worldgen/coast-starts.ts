@@ -15,7 +15,8 @@ export function coastStarts(heights: Float32Array, stand: { trees: Spot[]; rocks
   const out: { x: number; z: number; yaw: number }[] = [];
   // (facing east, along +x: see the ring's own yaw, atan2 of the way to face)
   const yaw = Math.atan2(-1, 0);
-  for (let z = -660; z <= 660; z += 60) {
+  // (every 20 m down the coast since 2026-10-19, where it was 60: "i get people complain they spawn same place on desert 3x in a row")
+  for (let z = -660; z <= 660; z += 20) {
     for (const x of [PLAN.barrier + 40, PLAN.barrier + 55, PLAN.barrier + 30, PLAN.barrier + 70, PLAN.barrier + 90]) {
       const h0 = heightAt(heights, x, z);
       if (h0 < SEA_LEVEL + 0.6) continue;

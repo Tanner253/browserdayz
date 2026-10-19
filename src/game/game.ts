@@ -170,6 +170,9 @@ const WEST_PLACES: Record<string, [string, MenuSpot['kind'], Tier]> = {
   Zastava: ['The post at the pass\'s east mouth: slabs across the road, a booth, the barracks, a roadhouse over the road and a watchtower over the canyon. Whoever goes west comes through here.', 'army', 3],
   Zavod: ['The brick works by the desert river, west of the pass: the works hall, its office and the workers\' flats.', 'site', 3],
   Kalat: ['A ruined walled town on its own hill in the desert: the citadel, the curtain wall and its gate, the honeycomb of houses.', 'site', 4],
+  // (Pokrov's bell tower stood alone, 2026-10-19: src/sim/watchtowers.ts)
+  Watchtower: ['A stone tower standing alone, the army\'s lookout: five floors of stairs, and at the top a chamber open on all four sides. Seen from far off, and seen from.', 'army', 3],
+  'Hunting tower': ['A hunters\' tower of timber on its legs in the woods, a stair up to a roofed platform. What a hunter keeps: a pack, a knife, a light, a spade, and now and then something of the army\'s.', 'army', 2],
   // (the desert's, 2026-10-18: src/sim/desert.ts)
   Peski: ['A hamlet by the beach where the main road leaves the coast: plank houses, a shed, and a shop with food and water on its shelves.', 'town', 1],
   Karavan: ['A roadhouse halfway from the coast to the pass: a tavern, a shop and a workshop on the main road.', 'shop', 1],

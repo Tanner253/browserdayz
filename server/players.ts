@@ -174,11 +174,14 @@ export function pickSpawn(died?: { x: number; z: number }) {
     starts.filter((q) => q.d >= 60),
     starts,
   ].find((list) => list.length)!;
-  good.sort((a, b) => b.d - a.d);
-  const best = good[Math.floor(Math.random() * Math.min(3, good.length))].s;
-  // a few metres of scatter so two people never spawn inside each other
-  const a = Math.random() * Math.PI * 2;
-  return { x: best.x + Math.cos(a) * 3, z: best.z + Math.sin(a) * 3, yaw: best.yaw };
+  // (Any of the good ones, not one of the three furthest from anybody: with the starts in a line down the beach, the
+  // furthest were always the two ends of it. The owner, 2026-10-19: "i get people complain they spawn same place on
+  // desert 3x in a row". With none good, the furthest of the rest, as before.)
+  const pool = good === starts ? [...good].sort((a, b) => b.d - a.d).slice(0, 3) : good;
+  const best = pool[Math.floor(Math.random() * pool.length)].s;
+  // (and some metres of scatter, so two people never spawn inside each other nor on one spot twice)
+  const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * 5;
+  return { x: best.x + Math.cos(a) * r, z: best.z + Math.sin(a) * r, yaw: best.yaw };
 }
 
 // ------------------------------------------------------------------ validation

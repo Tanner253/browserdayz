@@ -13,6 +13,7 @@ import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
 import { PILLBOX, POST_ROOM, postAt, postFoot, postYaw } from '../sim/posts';
 import type { Tier } from '../sim/tiers';
+import { watchtowerTier } from '../sim/watchtowers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
@@ -1561,7 +1562,8 @@ export class Buildings {
       // "kamenka tier 4". The fourth step is the gas's guns and little else: the rest of a town of seven hundred places
       // stays on the third, its food and its hospital's shelves)
       const KAMENKA_FOURTH = (p: { usage: Usage[] }) => p.usage.some((u) => u === 'Military' || u === 'Police');
-      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? (KAMENKA_FOURTH(p) ? 4 : 3) : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? (valley(p.x) ? 3 : 2) : valley(p.x) ? 2 : 1);
+      // (a watchtower's its own, by how far east it stands: src/sim/watchtowers.ts)
+      for (const p of points) p.tier = watchtowerTier(p.building) ?? (p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? (KAMENKA_FOURTH(p) ? 4 : 3) : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? (valley(p.x) ? 3 : 2) : valley(p.x) ? 2 : 1));
     };
     mark(this.lootPoints);
     // The bunker: what stands in its rooms, and its places for things. After every other, so
@@ -2192,6 +2194,8 @@ export class Buildings {
     const rng = new RNG(plot.seed);
     const firstPoint = this.lootPoints.length;
     const bp = reskin(blueprint(plot.type, rng), plot.seed);
+    // (a watchtower is the bell tower stood alone, the army's lookout: its store is a soldier's, see src/sim/watchtowers.ts)
+    if (plot.id.startsWith('watchtower_')) bp.usage = ['Military', 'Hunting'];
     const B = new THREE.Matrix4().compose(
       new THREE.Vector3(plot.x, plot.floorY, plot.z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), plot.rot),
@@ -3084,7 +3088,8 @@ export class Buildings {
     this.world.props.push({ kind: 'weapons_case', x: c.x, y: c.y, z: c.z, rot: plot.rot + Math.PI / 2, scale: 1 });
     for (const [lx, lz] of [[-0.2, -0.6], [-1.6, 1.4], [0.5, 2.0]]) {
       const p = at(lx, TOP + 0.02, lz);
-      this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: ['Military'], building: plot.id, floor: true });
+      // (a hunting tower's a hunter's first: src/sim/watchtowers.ts)
+      this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: plot.id.startsWith('hunting_') ? ['Hunting', 'Military'] : ['Military'], building: plot.id, floor: true });
     }
     if (plot.arms) for (const p of this.lootPoints.slice(first, first + plot.arms)) p.arms = 'guns';
   }

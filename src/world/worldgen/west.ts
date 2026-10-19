@@ -26,6 +26,7 @@ import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-re
 import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
 import { fillTown, hamletGround, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
 import { moundAt, placedRooms } from '../../sim/towns';
+import { HUNTING_TOWERS, WATCHTOWERS, huntingId, watchtowerId } from '../../sim/watchtowers';
 import type { Instance, POI, Site } from './types';
 
 /** the shape of the new ground, in metres west of the square's edge (`d`) or from the shore (`c`, + inland) */
@@ -440,6 +441,59 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   const ground = (x: number, z: number) => heightAt(heights, x, z);
   for (const { piece, place } of ruinsPlan(kalat)) tools.props.push(...ruinProps(piece, place, ground));
   tools.pois.push({ name: PLAN.kalat.name, x: kalat.x, z: kalat.z, radius: 240 });
+  // ---- THE WATCHTOWERS: Pokrov's bell tower stood alone where the owner dotted the map (src/sim/watchtowers.ts), its
+  // door to the nearest road, on ground levelled for it, and nothing growing in it
+  /** a foot trail trodden from (x0, z0) to (x1, z1): earth through the grass, a pace and a half wide, wandering a little and ragged at its edges */
+  const trail = (x0: number, z0: number, x1: number, z1: number, seed: number) => {
+    const L = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / L, uz = (z1 - z0) / L;
+    for (let d = 0; d <= L; d += CELL * 0.5) {
+      // (it bends about as a walker does: never more than a few metres off the straight)
+      const bend = Math.sin(d * 0.045 + seed) * 3.2 * Math.min(1, d / 12, (L - d) / 12) + Math.sin(d * 0.13 + seed * 2) * 0.7;
+      const px = x0 + ux * d - uz * bend, pz = z0 + uz * d + ux * bend;
+      for (let iz = Math.floor((pz - 1.6 - WORLD_Z0) / CELL); iz <= Math.ceil((pz + 1.6 - WORLD_Z0) / CELL); iz++) for (let ix = Math.floor((px - 1.6 - WORLD_X0) / CELL); ix <= Math.ceil((px + 1.6 - WORLD_X0) / CELL); ix++) {
+        if (ix < 0 || iz < 0 || ix >= NX || iz >= NZ) continue;
+        const e = Math.hypot(WORLD_X0 + ix * CELL - px, WORLD_Z0 + iz * CELL - pz), wob = 0.25 * Math.sin(ix * 1.7 + iz * 0.9), bare = 1 - smoothstep(0.55 + wob, 0.95 + wob, e);
+        if (bare <= 0) continue;
+        const i = iz * NX + ix;
+        for (let ch = 0; ch < 4; ch++) splat[i * 4 + ch] = Math.max(Math.round(splat[i * 4 + ch] * (1 - bare * 0.85)), ch === 1 ? Math.round(255 * bare * 0.85) : 0);
+        grass[i] = Math.round(grass[i] * (1 - bare));
+      }
+    }
+  };
+  WATCHTOWERS.forEach((wt, k) => {
+    let best = Infinity, rx = wt.x, rz = wt.z + 1;
+    for (const r of [...ways, ...tools.roads]) for (let i = 0; i < r.points.length; i += 3) {
+      const d = Math.hypot(r.points[i] - wt.x, r.points[i + 2] - wt.z);
+      if (d < best) [best, rx, rz] = [d, r.points[i], r.points[i + 2]];
+    }
+    const plot: BuildingPlot = { id: watchtowerId(k), type: 'belfry', x: wt.x, z: wt.z, rot: Math.atan2(rx - wt.x, rz - wt.z), floorY: 0, seed: 7300 + k * 41 };
+    seatOn(heights, own ? surface : null, plot);
+    tools.buildings.push(plot);
+    for (const list of [tools.trees, tools.rocks, tools.props]) for (let i = list.length - 1; i >= 0; i--) if (Math.hypot(list[i].x - wt.x, list[i].z - wt.z) < 8) list.splice(i, 1);
+    tools.pois.push({ name: 'Watchtower', x: wt.x, z: wt.z, radius: 12 });
+    // (a trail trodden up to its door from the nearest road, and an army crate and a barrel left by the door: the owner,
+    // "with appropriate decoration around them like hikking trails up to them and a stash out front or something, natural")
+    // (the belfry's door is to the right of its front's middle, 1.45 m: see belfryPlan)
+    const fx = Math.sin(plot.rot), fz = Math.cos(plot.rot), dx0 = wt.x + fx * 4.2 + fz * 1.45, dz0 = wt.z + fz * 4.2 - fx * 1.45;
+    // (not in the desert: the wind has the sand over any trail by morning)
+    if (wt.x > -2400) trail(dx0, dz0, rx, rz, k);
+    const ground = (x: number, z: number) => heightAt(heights, x, z);
+    const by = (side: number, out: number): [number, number] => [wt.x + fx * out + fz * side, wt.z + fz * out - fx * side];
+    const [cx, cz] = by(-1.6, 4.2), [bx, bz] = by(-2.9, 3.6);
+    tools.props.push({ kind: 'wooden_military_crate', x: cx, y: ground(cx, cz), z: cz, rot: plot.rot + 0.35, scale: 1 });
+    tools.props.push({ kind: 'Barrel_01', x: bx, y: ground(bx, bz), z: bz, rot: 0, scale: 1 });
+  });
+  // ---- THE HUNTING TOWERS: the wooden watchtower in the woods (src/sim/watchtowers.ts), its stair to the south, nothing
+  // growing in it, and the hunters' wood stacked by it
+  HUNTING_TOWERS.forEach((ht, k) => {
+    const plot: BuildingPlot = { id: huntingId(k), type: 'tower', x: ht.x, z: ht.z, rot: (k * 1.7) % (Math.PI * 2), floorY: 0, seed: 7700 + k * 37 };
+    seatOn(heights, own ? surface : null, plot);
+    tools.buildings.push(plot);
+    for (const list of [tools.trees, tools.rocks, tools.props]) for (let i = list.length - 1; i >= 0; i--) if (Math.hypot(list[i].x - ht.x, list[i].z - ht.z) < 6.5) list.splice(i, 1);
+    tools.pois.push({ name: 'Hunting tower', x: ht.x, z: ht.z, radius: 10 });
+    const lx = ht.x + Math.cos(plot.rot) * 4.6, lz = ht.z - Math.sin(plot.rot) * 4.6;
+    tools.props.push({ kind: 'log_pile', x: lx, y: heightAt(heights, lx, lz), z: lz, rot: plot.rot, scale: 1, far: 150 });
+  });
   // ---- LAMPS DOWN THE ROADS OFF THE BEACH: the main road up to Peski, the coast track to Bereg, the road's end at Mys. The
   // desert rises from the beach and hides the towns from where everybody starts; at night these show the way inland
   // (the owner, 2026-10-19: "at night you cant really tell where to go especially as a fresh spawn")
