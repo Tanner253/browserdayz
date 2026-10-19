@@ -331,17 +331,17 @@ export class HUD {
             <div class="start-pane pane-brief">
               <ol class="ht-steps" aria-label="How a life goes">
                 <li style="--i:0"><figure><img src="/howto/drop-in.jpg" alt="" loading="lazy" decoding="async"><i>01</i></figure><b>Drop in</b><span>On the west coast, bare hands. The further east, the better the loot.</span></li>
-                <li style="--i:1"><figure><img src="/howto/loot.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></li>
+                <li style="--i:1"><figure><img src="/howto/loot.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>Loot inward</b><span>Tier 1, where you start, holds no gun. Then tier by tier: pistols, SMGs, rifles. Police and army places hold the most.</span></li>
                 <li style="--i:2"><figure><img src="/howto/fight.jpg" alt="" loading="lazy" decoding="async"><i>03</i></figure><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></li>
-                <li style="--i:3"><figure><img src="/howto/tag.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></li>
+                <li style="--i:3"><figure><img src="/howto/tag.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>Take their tag</b><span>Everybody alive ${TAG_FRESH / 60} minutes carries a dog tag. Kill them and loot it.</span></li>
                 <li style="--i:4"><figure><img src="/howto/hold.jpg" alt="" loading="lazy" decoding="async"><i>05</i></figure><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></li>
               </ol>
               <h3 class="ht-h">What wants you dead</h3>
               <div class="ht-threats">
                 <div><img src="/howto/players.jpg" alt="" loading="lazy" decoding="async"><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
                 <div><img src="/howto/infected.jpg" alt="" loading="lazy" decoding="async"><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
-                <div><img src="/howto/gas.jpg" alt="" loading="lazy" decoding="async"><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
-                <div><img src="/howto/bunker.jpg" alt="" loading="lazy" decoding="async"><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The ${ITEMS.benelli.name} shotgun is kept there and in the fort, and nowhere else.</span></div>
+                <div><img src="/howto/gas.jpg" alt="" loading="lazy" decoding="async"><b>The gas</b><span>The ${GAS.place} lies under it: Tier 4 loot, and the keycards to the bunker. A gas mask lets you breathe it: the police stations keep them.</span></div>
+                <div><img src="/howto/bunker.jpg" alt="" loading="lazy" decoding="async"><b>The bunker</b><span>Bunker 17, on the map: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. Tier 5, the best loot, is down there and in the fort; the ${ITEMS.benelli.name} shotgun nowhere else.</span></div>
               </div>
               ${howtoMore()}
             </div>
