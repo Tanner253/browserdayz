@@ -293,8 +293,10 @@ export function policeSpots(world: World, taken: { x: number; z: number }[] = []
  * owner: "add some more roads around kalat and some vehicle spawns". Pokrov's where the main road leaves its lane to
  * the east: in the lane it stood among the market's stalls.) And the kinds it may stand, where it is not the UAZ alone:
  * on the coast a police car as often as a UAZ (the owner, 2026-10-18: "police car can spawn on coast too?").
+ * (Peski's on the road south from its lane's east end, 2026-10-19: by its way in from the north, its mark on the map lay
+ * over the town's name.)
  */
-export const WEST_CARS: { name: string; from?: [number, number]; ks?: number[] }[] = [{ name: 'Pokrov', from: [-1700, 28] }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski' }, { name: 'Bereg', ks: [0, POLICE_CAR.kind] }, { name: 'Mys', ks: [0, POLICE_CAR.kind] }];
+export const WEST_CARS: { name: string; from?: [number, number]; ks?: number[] }[] = [{ name: 'Pokrov', from: [-1700, 28] }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski', from: [-3418, 130] }, { name: 'Bereg', ks: [0, POLICE_CAR.kind] }, { name: 'Mys', ks: [0, POLICE_CAR.kind] }];
 
 /**
  * The west's jeeps (the owner, 2026-10-18: "the west side of the map is lacking vehicle spawns completely", "add some
