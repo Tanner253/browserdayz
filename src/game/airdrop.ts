@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { audio, type RotorVoice } from '../core/audio';
 import { AIRDROP, crateAt, flightTimes, heliAt, rotorAt, type Flight, type HeliAt, type Times } from '../sim/airdrop';
+import { flying } from '../world/atmosphere';
 
 /** what is drawn of it, in one place */
 export const HELI_LOOK = {
@@ -292,6 +293,8 @@ export class Airdrops {
       const at = heliAt(l.f, t), h = l.heli;
       const dx = at.x - ear.x, dy = at.y - ear.y, dz = at.z - ear.z, away = Math.max(0.001, Math.hypot(dx, dy, dz));
       h.set(at, t, this.held === null ? dt : 0, light, away);
+      // (its shadow drawn every frame, wherever it lies: see flying. The ground under it taken as the drop's own)
+      if (at.phase !== 'gone' && away < 600) flying(at.x, at.y, at.z, l.f.y);
       if (at.phase === 'gone') {
         l.voice?.stop();
         l.voice = null;

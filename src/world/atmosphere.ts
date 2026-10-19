@@ -83,6 +83,18 @@ const CASCADE_OF = new Map<THREE.Frustum | THREE.FrustumArray, number>();
 /** the eye, the way it looks, how long the shadow of a man's height is now, and the depths each cascade is read at: kept by Atmosphere.update */
 const SEEN = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), long: 10, lo: [] as number[], hi: [] as number[] };
 
+/** what flies, this frame: x, y, z and the ground's height under it, four numbers each (see flying) */
+const FLYING: number[] = [];
+/**
+ * Something in the air at (x, y, z), the ground at `ground` under it: the cascade its shadow lies in is drawn this frame,
+ * not in its turn. A helicopter's shadow lies far below and off to one side of it, in a wider cascade drawn every
+ * second or fourth frame, and stepped as it flew (the owner, 2026-10-19: "the car shadows have been smoothed and fixed
+ * but not the helicopter shadows"). Said every frame by whatever moves it.
+ */
+export function flying(x: number, y: number, z: number, ground: number) {
+  FLYING.push(x, y, z, ground);
+}
+
 /**
  * Whether a thing `r` round `at` is to be drawn into this map of the sun's shadow: true for anything that is not one
  * of the cascades; for a cascade, whether it is read anywhere the thing or its shadow can lie (the depths in the
@@ -847,6 +859,18 @@ export class Atmosphere {
     // Turning never needs them: they are round the eye.
     this.frame++;
     if (this.fitToView) cam.getWorldDirection(_dir);
+    // (the cascades a flying thing's shadow lies in: where a line from it along the sun meets the ground under it, by
+    // its depth in the view as the shader reads it)
+    const ld = csm.lightDirection;
+    let due = 0;
+    // (development: as it was, for an A/B of what it costs: assets-src/_wf/me/replay.mjs --flip __noFlying)
+    if (import.meta.env.DEV && (globalThis as { __noFlying?: boolean }).__noFlying) FLYING.length = 0;
+    for (let k = 0; k < FLYING.length; k += 4) {
+      const up = FLYING[k + 1] - FLYING[k + 3], t = ld.y < -0.05 ? Math.max(0, up) / -ld.y : 0;
+      const z = (FLYING[k] + ld.x * t - SEEN.eye.x) * SEEN.fwd.x + (FLYING[k + 3] - SEEN.eye.y) * SEEN.fwd.y + (FLYING[k + 2] + ld.z * t - SEEN.eye.z) * SEEN.fwd.z;
+      for (let i = 0; i < SEEN.lo.length; i++) if (z + 12 >= SEEN.lo[i] && z - 12 <= SEEN.hi[i]) due |= 1 << i;
+    }
+    FLYING.length = 0;
     csm.lights.forEach((l, i) => {
       const s = l.shadow;
       s.autoUpdate = false;
@@ -863,7 +887,7 @@ export class Atmosphere {
         : this.fitToView
           ? drawn.pos.distanceToSquared(cam.position) > (i === 1 ? 0.5 : 4) || drawn.dir.dot(_dir) < (i === 1 ? 0.9986 : 0.9976)
           : !now || !r || Math.hypot(now.x - drawn.pos.x, now.y - drawn.pos.y) > r.pad * 0.9;
-      if ((i === 0 && !near) || turn || gone || !s.map) {
+      if ((i === 0 && !near) || turn || gone || due & (1 << i) || !s.map) {
         s.needsUpdate = true;
         if (near || this.fitToView) {
           drawn.pos.copy(cam.position);

@@ -9,7 +9,7 @@ import { audio, type EngineVoice, type RotorVoice } from '../core/audio';
 import { rotorAt } from '../sim/airdrop';
 import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
-import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
+import { flying, type Atmosphere, type ShaderPatch } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
 import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, carDamage, crashDamage, jeepSpots, parkKind, policeSpots, restState, westSpots, type VehicleInfo, type VState } from '../sim/vehicles';
 import { gasEdge, gasZone, type GasZone } from '../sim/gas';
@@ -613,6 +613,11 @@ export class Garage {
       }
       const x = this.extra.get(j)!;
       const near = j.pos.distanceToSquared(listener) < 220 * 220;
+      // (a helicopter up, or its rotor turning: its shadow drawn every frame, wherever it lies; see flying)
+      if (j instanceof Heli && near) {
+        const ground = heightAt(h.world.heights, j.pos.x, j.pos.z);
+        if (j.rpm > 0 || j.pos.y - ground > 3) flying(j.pos.x, j.pos.y, j.pos.z, ground);
+      }
       this.sound(j, x, dt, near);
       if (near) this.looks(j, x, dt);
       // playing alone the jeep keeps its own count of what it has left
