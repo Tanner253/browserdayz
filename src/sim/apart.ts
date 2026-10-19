@@ -5,6 +5,10 @@
 import type { Usage } from '../world/buildings';
 import { ITEMS } from './items';
 import { TOWNS } from './towns';
+import { DESERT_TOWNS } from './desert';
+
+/** the towns stocked apart: all but the desert's, which are the map's own first and second steps (src/sim/desert.ts) */
+const APART_TOWNS = TOWNS.filter((t) => !DESERT_TOWNS.includes(t));
 
 /**
  * Places that are stocked APART from the rest of the map, by the name their loot points carry as their building
@@ -26,7 +30,7 @@ import { TOWNS } from './towns';
 // their steps are.)
 // ('pass', the canyon pass's caves and the cache on its floor, `cave_<where>`: part of the fifth step they took the
 // bunker's own things; apart, stocked as the fort is, as the owner's "best loot in the center of the bottom of the canyon")
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', ...TOWNS.map((t) => t.name.toLowerCase())]);
+export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
 /** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`), or null: the map's own */
 export function apartOf(building: string): string | null {
   if (APART.has(building)) return building;
@@ -54,7 +58,7 @@ export const OWN: Record<string, { rich: number; lean: Record<string, number> }>
   cellar: { rich: 3, lean: {} },
   // (the fort on the fifth step, half as thick as the bunker and with none of what is the bunker's alone: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
   castle: { rich: 0.5, lean: { ...APART_LEAN_OF(), ...Object.fromEntries(Object.values(ITEMS).filter((d) => d.loot?.at && d.loot.at.slice(0, 4).every((n) => !n) && (d.loot.at[4] ?? 0) > 0).map((d) => [d.id, 0])) } },
-  ...Object.fromEntries(['kalat', ...TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
+  ...Object.fromEntries(['kalat', ...APART_TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
 };
 /**
  * How a place apart's share leans, sort by sort (times its share; a sort not named, 1). 2026-10-13, after the owner

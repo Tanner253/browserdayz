@@ -13,6 +13,7 @@ import { Simplex, clamp, lerp, smoothstep } from '../../core/noise';
 import { CELL, SQUARE_HALF, SQUARE_RES, WORLD_SEED } from './places';
 import type { Tier } from '../../sim/tiers';
 import { TOWNS, type Town } from '../../sim/towns';
+import { DESERT_TIERS } from '../../sim/desert';
 
 type P = [number, number];
 
@@ -147,7 +148,7 @@ export const PLAN = {
   towns: { Zastava: { x: -1965, z: -452 } } as Record<string, { x?: number; z?: number; rot?: number }>,
   /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
   // (west to east, worse to better: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)"; Pokrov, Ozerki and Zastava between, as the plan put them)
-  tiers: { Pokrov: 2, Lipki: 3, Zavod: 2, Ozerki: 3, Mokroye: 3, Zastava: 3 } as Record<string, Tier>,
+  tiers: { Pokrov: 2, Lipki: 3, Zavod: 2, Ozerki: 3, Mokroye: 3, Zastava: 3, ...DESERT_TIERS } as Record<string, Tier>,
   /**
    * The roads: the main one from the loop's west bend through the trader and Pokrov's lane, north-west to the pass's
    * mouth, through it beside the river (`pass`: so far south of its middle) and out across the desert past Kalat to the
@@ -163,6 +164,16 @@ export const PLAN = {
     /** to the north end of Lipki's lane, and Kalat's track */
     lipki: [[-1170, -90], [-1176, 60], [-1178, 180], [-1178, 246]] as P[],
     kalat: [[-2985, -58], [-2975, 100], [-2968, 230], [-2965, 326]] as P[],
+    // (the desert's own, 2026-10-18, the owner: "add some more roads around kalat", "new t1 and t2 buildings with roads
+    // attached in the desert": into Peski from the main road and on south from its east end; into Karavan from the main
+    // road; into Blokpost from Kalat's track; and round the south of Kalat from the track's end to the beach)
+    peski: [[-3480, -12], [-3480, 20], [-3480, 70]] as P[],
+    peskiSouth: [[-3418, 70], [-3416, 160], [-3425, 280], [-3440, 400]] as P[],
+    karavan: [[-2905, -119], [-2905, -150], [-2905, -165]] as P[],
+    blokpost: [[-2973, 110], [-2950, 110], [-2930, 110]] as P[],
+    kalatSouth: [[-2965, 326], [-3000, 420], [-3150, 455], [-3300, 445], [-3440, 400], [-3500, 440], [-3500, 500]] as P[],
+    // (up the coast from the main road to Bereg)
+    bereg: [[-3560, 8], [-3560, -120], [-3545, -260], [-3540, -380]] as P[],
     branch: 5,
     /** the steepest a road climbs, to the metre (the jeep's own limit is well over this), and how far its bed is laid out */
     steep: 0.08,

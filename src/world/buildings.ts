@@ -28,6 +28,9 @@ import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
 
+/** where the valley begins, going east: x, metres (the green west's east edge, by the big map) */
+const VALLEY_FROM = -700;
+
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 // (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
@@ -1549,7 +1552,12 @@ export class Buildings {
         ...this.world.sites.filter((st) => st.kind === 'depot' || st.kind === 'market' || st.kind === 'tents').map((st) => ({ x: st.x, z: st.z, r: 60 })),
       ];
       // (and the new places of the west, by their own: towns mid, the hamlet as a village, ruins and caves high: westTier)
-      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1);
+      // (and the valley, east of the green west, a step up on the west: its outskirts the second step and its checkpoints
+      // and camps the third, the first step being the desert's (src/sim/desert.ts). The owner, 2026-10-18: "balance it so
+      // the loot progression from west to east is unnavoidable and unmistakable. if you make it far east, you will find
+      // good loot", and "we will be adding plenty of tier 1 to the desert now so you can do as you need for t2 and above")
+      const valley = (x: number) => x > VALLEY_FROM;
+      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? (valley(p.x) ? 3 : 2) : valley(p.x) ? 2 : 1);
     };
     mark(this.lootPoints);
     // The bunker: what stands in its rooms, and its places for things. After every other, so

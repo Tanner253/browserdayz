@@ -297,7 +297,10 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const k = nearest(main.points, pts[0][0], pts[0][1]);
     return lay([[main.points[k], main.points[k + 2]], ...pts.slice(1)], main, R.branch, true);
   };
-  const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), branch(R.kalat)];
+  const kalatTrack = branch(R.kalat);
+  // (the desert's, 2026-10-18: its places' ways in, and round the south of Kalat; see PLAN.road)
+  const kalatSouth = lay(R.kalatSouth, kalatTrack, R.branch, true);
+  const ways = [main, lay(R.bunker, null, R.branch, true), branch(R.lipki), kalatTrack, branch(R.peski), branch(R.karavan), lay(R.blokpost, kalatTrack, R.branch, true), kalatSouth, lay(R.peskiSouth, null, R.branch, true), branch(R.bereg)];
   const preBed = heights.slice(), gap = new Float32Array(n).fill(1e9);
   // (the branches' beds first, and the main road's over them where they meet)
   // (but in the pass, where the road lies on its level floor: its shelves are the plan's, and the caves are under them)
