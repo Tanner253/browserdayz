@@ -10,7 +10,7 @@ import { JEEP, RIDE_HEIGHT, SEATS, restState, type VState } from '../src/sim/veh
 import { HELI, heliCrash, hpOf } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { RACKS, rackShows } from '../src/sim/crates';
-import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
+import { CORPSE_LIFETIME, PARKS, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, carriedTags, lootedTags, tagSeen } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast } from './gate';
@@ -236,7 +236,7 @@ export function blowJeep(v: Veh, byId: number) {
   v.burnAt = 0;
   v.goneAt = now + 120_000;
   v.siren = false;
-  jeepsDue.set(v.home, now + (Number(process.env.JEEP_RESPAWN_S) || JEEP.respawn) * 1000);
+  jeepsDue.set(v.home, now + RESPAWN_MS);
   const by = clients.get(byId);
   broadcast({ t: 'vboom', i: v.i, by: byId });
   // whoever is in it, and whoever is standing by it
@@ -261,6 +261,29 @@ export function blowJeep(v: Veh, byId: number) {
   v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
   tellSeats(v, true);
   log(`jeep #${v.i} burned out${by ? ` (${by.name})` : ''}`);
+}
+
+/** how long before a new car is stood for one burned or taken away, and how long one may be left alone (JEEP.idle) */
+const RESPAWN_MS = (Number(process.env.JEEP_RESPAWN_S) || JEEP.respawn) * 1000;
+export const CAR_IDLE_MS = (Number(process.env.CAR_IDLE_S) || JEEP.idle.after) * 1000;
+
+/**
+ * Each second, for each car: whoever sits at its wheel winds its clock back; one left alone too long (JEEP.idle) with
+ * nobody in it and nobody near is taken away, and a new one is due at its place, unless another stands on that place's
+ * books (an admin's). Cars are not kept over a restart, so neither is the clock, nor is one taken away brought back.
+ * @returns whether it was taken away
+ */
+export function leftAlone(v: Veh, now: number): boolean {
+  if (v.seats[0] !== null) v.drivenAt = now;
+  if (v.goneAt || v.burnAt || now - v.drivenAt < CAR_IDLE_MS || v.seats.some((s) => s !== null)) return false;
+  const p = PARKS[v.home];
+  if (p && Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8) return false;
+  if ([...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) < JEEP.idle.clear)) return false;
+  vehicles.delete(v.i);
+  broadcast({ t: 'v-', i: v.i });
+  if (!jeepsDue.has(v.home) && ![...vehicles.values()].some((o) => o.home === v.home && !o.goneAt)) jeepsDue.set(v.home, now + RESPAWN_MS);
+  log(`car #${v.i} left alone ${Math.round((now - v.drivenAt) / 60000)} min at ${v.s[0].toFixed(0)}, ${v.s[2].toFixed(0)}: taken away`);
+  return true;
 }
 
 /**

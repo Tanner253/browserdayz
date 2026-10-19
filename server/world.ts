@@ -11,7 +11,7 @@ import { crateId } from '../src/net/protocol';
 import { isSearchable, storageId } from '../src/sim/storage';
 import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
-import { JEEP, POLICE_CAR, jeepSpots, policeSpots } from '../src/sim/vehicles';
+import { JEEP, POLICE_CAR, jeepSpots, policeSpots, westSpots } from '../src/sim/vehicles';
 import { HELI, heliSpots } from '../src/sim/heli';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
 import { fireSpots } from '../src/sim/fires';
@@ -116,6 +116,8 @@ export function buildWorldData(root: string) {
   // (and what is searched in the bunker that is no crate: its lockers, racks, cabinets and desks)
   const under = bunkerPlace(world);
   if (under) for (const c of bunkerCrates(under)) crates.push({ cid: crateId(c.x, c.z), kind: c.kind, x: c.x, y: c.y, z: c.z });
+  // (where the cars stand: a search of the whole map, done once)
+  const parked = jeepSpots(world), stations = policeSpots(world, parked);
   return {
     lootPoints: buildings.lootPoints,
     /** where every building stands, and how it is turned (nothing is buried under a floor) */
@@ -137,11 +139,13 @@ export function buildWorldData(root: string) {
     /** the fireplaces, numbered as the game numbers them */
     fires: fireSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
-    jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? jeepSpots(world) : [],
+    jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? parked : [],
     /** and the police cars, one beside each police station: none without the jeeps, or without a model of their own */
-    cars: manifest.models?.[JEEP.model] && manifest.models?.[POLICE_CAR.model] ? policeSpots(world, jeepSpots(world)) : [],
+    cars: manifest.models?.[JEEP.model] && manifest.models?.[POLICE_CAR.model] ? stations : [],
     /** and the helicopters (src/sim/heli.ts): on the hospital's roof and by the fort; none without the jeeps, or without a model of their own */
     helis: manifest.models?.[JEEP.model] && manifest.models?.[HELI.model] ? heliSpots(world) : [],
+    /** and the west's jeeps, by the roads of its places (numbered after all the others, so none of those moves) */
+    west: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? westSpots(world, [...parked, ...stations]) : [],
     spawns: world.spawns,
     /** where the infected live, and somewhere to stand one about such a place (see src/sim/infected.ts) */
     homes: infectedHomes(world),
