@@ -864,7 +864,7 @@ export class Atmosphere {
     const ld = csm.lightDirection;
     let due = 0;
     // (development: as it was, for an A/B of what it costs: assets-src/_wf/me/replay.mjs --flip __noFlying)
-    if (import.meta.env.DEV && (globalThis as { __noFlying?: boolean }).__noFlying) FLYING.length = 0;
+    if ((globalThis as { __noFlying?: boolean }).__noFlying) FLYING.length = 0;
     for (let k = 0; k < FLYING.length; k += 4) {
       const up = FLYING[k + 1] - FLYING[k + 3], t = ld.y < -0.05 ? Math.max(0, up) / -ld.y : 0;
       const z = (FLYING[k] + ld.x * t - SEEN.eye.x) * SEEN.fwd.x + (FLYING[k + 3] - SEEN.eye.y) * SEEN.fwd.y + (FLYING[k + 2] + ld.z * t - SEEN.eye.z) * SEEN.fwd.z;
