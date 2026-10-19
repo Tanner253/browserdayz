@@ -11,10 +11,11 @@ import { HELI } from '../sim/heli';
 import { POLICE_CAR } from '../sim/vehicles';
 
 /**
- * The fills of the vehicles' marks: the UAZ and the helicopter orange, a colour no tier has, to stand out on sand and
- * forest alike; the police car blue, under a bar of red and blue lights.
+ * The colours of the vehicles' marks (the owner, 2026-10-18: "make uaz car icon green and the heli icon black with white
+ * window on the map"): the UAZ grass green, stronger than the second tier's mint; the police car blue, under a bar of red
+ * and blue lights; the helicopter black, its window white, and edged in white so that it shows on a dark roof.
  */
-export const VEHICLE_FILL = '#f0862a', POLICE_FILL = '#3a63d8', LIGHTS = ['#e8352e', '#56c8ff'];
+export const UAZ_FILL = '#5cb82e', POLICE_FILL = '#3a63d8', LIGHTS = ['#e8352e', '#56c8ff'], HELI_FILL = '#141414', HELI_EDGE = '#f2efe6';
 
 /**
  * A vehicle's mark, on either map and in the sheet's legend, by its kind (the `k` of a VehicleInfo): the UAZ a block
@@ -40,15 +41,16 @@ export function vehicleMark(g: CanvasRenderingContext2D, qx: number, qz: number,
     g.lineTo(qx + 0.15 * h, qz + 1.05 * h);
     g.moveTo(qx + 2.3 * h, qz - 0.95 * h);
     g.lineTo(qx + 2.3 * h, qz);
-    // (orange edged in ink, as the body is: ink alone was lost on the dark of the legend and of a roof)
+    // (black edged in white, as the body is: dark alone was lost on the dark of the legend and of a roof)
+    g.strokeStyle = HELI_EDGE;
     g.lineWidth = line * 2.6;
     g.stroke();
-    g.strokeStyle = VEHICLE_FILL;
+    g.strokeStyle = HELI_FILL;
     g.lineWidth = line * 1.1;
     g.stroke();
-    g.strokeStyle = ink;
+    g.strokeStyle = HELI_EDGE;
     g.lineWidth = line;
-    g.fillStyle = VEHICLE_FILL;
+    g.fillStyle = HELI_FILL;
     g.beginPath();
     g.moveTo(qx + 0.4 * h, qz - 0.35 * h);
     g.lineTo(qx + 2.3 * h, qz - 0.55 * h);
@@ -61,6 +63,11 @@ export function vehicleMark(g: CanvasRenderingContext2D, qx: number, qz: number,
     g.ellipse(qx - 0.4 * h, qz - 0.05 * h, 1.1 * h, 0.72 * h, 0, 0, Math.PI * 2);
     g.fill();
     g.stroke();
+    // its window, at the nose
+    g.fillStyle = HELI_EDGE;
+    g.beginPath();
+    g.ellipse(qx - 0.95 * h, qz - 0.22 * h, 0.42 * h, 0.3 * h, 0, 0, Math.PI * 2);
+    g.fill();
     return;
   }
   const police = k === POLICE_CAR.kind;
@@ -72,7 +79,7 @@ export function vehicleMark(g: CanvasRenderingContext2D, qx: number, qz: number,
     g.fillRect(qx, top, w, tall);
     g.strokeRect(qx - w, top, 2 * w, tall);
   }
-  g.fillStyle = police ? POLICE_FILL : VEHICLE_FILL;
+  g.fillStyle = police ? POLICE_FILL : UAZ_FILL;
   g.beginPath();
   g.rect(qx - h * 1.5, qz - h * 0.75, h * 3, h * 1.5);
   g.fill();
