@@ -46,7 +46,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // places (`lp`). A page from before numbers the west five off the server's.)
 // (52, 2026-10-19: nothing on the wire changed; raised so that every game open on 51's page, where nobody online could
 // drive, is told to load the page again with cars that drive.)
-export const PROTOCOL = 52;
+// (53, 2026-10-19: a tag cashes in after twenty minutes, and is on a body after ten alive: every game open on 52's page,
+// counting thirty and twenty, is told to load the page again.)
+export const PROTOCOL = 53;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
