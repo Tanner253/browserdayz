@@ -51,8 +51,10 @@ export const DRIVE = {
    */
   stop: 3.5,
   /** the engine: push at a standstill (newtons), and the fastest it will go on each kind of ground (m/s) */
-  force: 9800,
-  top: { asphalt: 22, gravel: 19.5, grass: 17.5, dirt: 16, rock: 14 } as Record<Ground, number>,
+  // (a tenth faster on every ground, and getting there a little sooner: the owner, 2026-10-19, "the uaz should be
+  // slightly faster than it is". It was 9,800 N and 22 / 19.5 / 17.5 / 16 / 14.)
+  force: 10600,
+  top: { asphalt: 24.2, gravel: 21.5, grass: 19.3, dirt: 17.6, rock: 15.4 } as Record<Ground, number>,
   /** backwards: the fastest, and how much of the engine */
   reverse: [7.5, 0.6] as [number, number],
   /** what the ground itself takes off, m/s² */
