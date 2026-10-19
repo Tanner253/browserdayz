@@ -30,10 +30,13 @@ const APART_TOWNS = TOWNS.filter((t) => !DESERT_TOWNS.includes(t));
 // their steps are.)
 // ('pass', the canyon pass's caves and the cache on its floor, `cave_<where>`: part of the fifth step they took the
 // bunker's own things; apart, stocked as the fort is, as the owner's "best loot in the center of the bottom of the canyon")
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
-/** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`), or null: the map's own */
-export function apartOf(building: string): string | null {
+// ('kamenka', its army and police places on the fourth step, 2026-10-18: of the step, they would have taken the gas's
+// guns. Told by being of the town ('East') and of that step, not by a building's name)
+export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', 'kamenka', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
+/** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`; Kamenka's fourth step by its kind), or null: the map's own */
+export function apartOf({ building, usage, tier }: { building: string; usage?: readonly string[]; tier?: number }): string | null {
   if (APART.has(building)) return building;
+  if (tier === 4 && usage?.includes('East')) return 'kamenka';
   if (building.startsWith('ruins_')) return 'kalat';
   if (building.startsWith('cave_')) return 'pass';
   const town = building.replace(/_\d+$/, '');
@@ -59,6 +62,8 @@ export const OWN: Record<string, { rich: number; lean: Record<string, number> }>
   // (the fort on the fifth step, half as thick as the bunker and with none of what is the bunker's alone: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
   castle: { rich: 0.5, lean: { ...APART_LEAN_OF(), ...Object.fromEntries(Object.values(ITEMS).filter((d) => d.loot?.at && d.loot.at.slice(0, 4).every((n) => !n) && (d.loot.at[4] ?? 0) > 0).map((d) => [d.id, 0])) } },
   ...Object.fromEntries(['kalat', ...APART_TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
+  // (as its step is, and never a keycard: those are the Chemical Works' alone)
+  kamenka: { rich: 1, lean: { keycard: 0 } },
 };
 /**
  * How a place apart's share leans, sort by sort (times its share; a sort not named, 1). 2026-10-13, after the owner

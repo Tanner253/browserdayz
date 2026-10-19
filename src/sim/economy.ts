@@ -219,7 +219,7 @@ export class Economy {
     private fits: (id: string, p: LootPoint) => boolean = fitsPoint,
   ) {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
-    this.apart = points.map((p) => apartOf(p.building));
+    this.apart = points.map((p) => apartOf(p));
     this.shelved = new Set(points.filter((p) => !p.floor).map((p) => p.building));
     this.groupOf = points.map((_, i) => group(this.apart[i], this.tier[i]));
     points.forEach((p, i) => {

@@ -573,7 +573,8 @@ export class BigMap {
       const C = world.castle, off = fort.filter((q) => (q.tier ?? 1) >= 3).map((q) => Math.hypot(q.x - C.x, q.z - C.z)).sort((m, n) => m - n);
       const wide = Math.min(90, Math.max(30, 2 * (off[Math.floor(off.length * 0.9)] ?? 15) + 6));
       const named = spots.find((q) => q.x === C.x && q.z === C.z)?.name ?? 'The fort';
-      this.held.push({ name: named, x: C.x, z: C.z, rot: C.rot, w: wide, d: wide, tier: 4, kinds: kinds(fort), gas: false });
+      // (of the fifth since 2026-10-18: "orlanoy tier 5")
+      this.held.push({ name: named, x: C.x, z: C.z, rot: C.rot, w: wide, d: wide, tier: 5, kinds: kinds(fort), gas: false });
     }
     // (and a wreck with things about it: each where it lies)
     const wrecks = inside.get('wreck');
@@ -625,7 +626,7 @@ export class BigMap {
       <div class="hm-sheet">
         <div class="hm-bar">
           <div class="hm-title"><b>MAP</b><span>GRID ${GRID} M · CONTOURS ${CONTOUR} M</span></div>
-          <div class="hm-tiers">${TIER_IDS.map((t) => `<button type="button" data-tier="${t}" style="--c:${TIERS[t].colour}"><i></i><span class="hm-long">Tier&nbsp;</span><span class="hm-short">T</span>${t}</button>`).join('')}</div>
+          <div class="hm-tiers" title="The loot is worse in the west and better to the east: the coast is tier 1, the bunker tier 5"><span class="hm-way"><span class="hm-long">West</span><span class="hm-short">W</span></span>${TIER_IDS.map((t) => `<button type="button" data-tier="${t}" style="--c:${TIERS[t].colour}"><i></i><span class="hm-long">Tier&nbsp;</span><span class="hm-short">T</span>${t}</button>`).join('')}<span class="hm-way"><span class="hm-long">East</span><span class="hm-short">E</span> &#8594;</span></div>
           <div class="hm-show">
             <button type="button" data-show="names">Names</button>
             <button type="button" data-show="wells">Wells</button>

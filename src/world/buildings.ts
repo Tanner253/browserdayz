@@ -1557,7 +1557,11 @@ export class Buildings {
       // the loot progression from west to east is unnavoidable and unmistakable. if you make it far east, you will find
       // good loot", and "we will be adding plenty of tier 1 to the desert now so you can do as you need for t2 and above")
       const valley = (x: number) => x > VALLEY_FROM;
-      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? (valley(p.x) ? 3 : 2) : valley(p.x) ? 2 : 1);
+      // (Kamenka's army and police places the fourth step, and stocked apart (src/sim/apart.ts): the owner, 2026-10-18,
+      // "kamenka tier 4". The fourth step is the gas's guns and little else: the rest of a town of seven hundred places
+      // stays on the third, its food and its hospital's shelves)
+      const KAMENKA_FOURTH = (p: { usage: Usage[] }) => p.usage.some((u) => u === 'Military' || u === 'Police');
+      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? (KAMENKA_FOURTH(p) ? 4 : 3) : westTier(p.x, p.z) ?? (Math.hypot(p.x - village.x, p.z - village.z) < village.r ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? (valley(p.x) ? 3 : 2) : valley(p.x) ? 2 : 1);
     };
     mark(this.lootPoints);
     // The bunker: what stands in its rooms, and its places for things. After every other, so

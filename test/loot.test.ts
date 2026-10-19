@@ -40,9 +40,9 @@ const data = buildWorldData(process.cwd());
 // left out of every count below but its own: it is stocked on top of the map and takes nothing from it. Its
 // places are the last in the list, so the numbers of the rest are theirs still.)
 const every = data.lootPoints;
-const points = every.filter((p) => !apartOf(p.building));
+const points = every.filter((p) => !apartOf(p));
 /** is the place of this number in the whole list a place apart (since 2026-10-18 the desert's towns, the map's own, come after some places apart: src/sim/desert.ts) */
-const apartAt = (i: number) => !!apartOf(every[i].building);
+const apartAt = (i: number) => !!apartOf(every[i]);
 const STEPS: Tier[] = [1, 2, 3, 4, 5];
 const melee = Object.values(ITEMS).filter((d) => d.category === 'melee').map((d) => d.id);
 const guns = Object.values(ITEMS).filter((d) => d.weapon).map((d) => d.id);
@@ -406,7 +406,7 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
 });
 
 ok('the fort on the mountain is stocked on top of the map: the army\'s things in its armoury, a dressing station\'s in its cells, and nothing taken from anywhere else', () => {
-  const own = every.filter((p) => apartOf(p.building)), free = own.filter((p) => !p.arms && !p.keeps);
+  const own = every.filter((p) => apartOf(p)), free = own.filter((p) => !p.arms && !p.keeps);
   assert.ok(own.length >= 40, `${own.length} places in the fort`);
   for (const { fort } of worlds) {
     const loose = fort.filter(({ p }) => !p.arms && !p.keeps);

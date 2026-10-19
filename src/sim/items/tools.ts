@@ -14,8 +14,9 @@ export const TOOL_ITEMS: ItemDef[] = [
     loot: { pair: 'ShippingContainerKeys_Red', at: [0, 0, 0, 3, 0], lifetime: 7200, restock: 300, usage: ['Gas'] },
   },
   { id: 'flashlight', name: 'Flashlight', model: 'vintage_flashlight', w: 1, h: 2, weight: 0.4, category: 'tool', desc: 'A battery lantern. Carried anywhere on you, L switches it on: it shines from your chest, wide and not far. It shows you the dark, and shows the dark where you are.',
-    // (a lantern is a thing of sheds, yards and the shop's shelf: most of them out where anybody starts, because the night is everybody's)
-    loot: { pair: 'Flashlight', at: [22, 1, 29, 1, 2], restock: 420, usage: [...SHEDS, 'Shop', 'Town'], favour: { Shop: 8, Industrial: 3, Farm: 2 } },
+    // (a lantern is a thing of sheds, yards and the shop's shelf: most of them out where anybody starts, because the night is everybody's.
+    // The shop's shelf three times a shed's since 2026-10-18: the first step the desert's alone, its two stores at eight took two thirds of its lights)
+    loot: { pair: 'Flashlight', at: [22, 1, 29, 1, 2], restock: 420, usage: [...SHEDS, 'Shop', 'Town'], favour: { Shop: 3, Industrial: 3, Farm: 2 } },
     worth: 5, sells: 3,
   },
   { id: 'binoculars', name: 'Binoculars', model: 'binoculars', w: 2, h: 2, weight: 0.8, category: 'tool', desc: 'Field binoculars. Use them to look five times closer; any other action puts them away.', use: { verb: 'Look through', time: 0.35, sound: 'bandage' }, look: 0.2,

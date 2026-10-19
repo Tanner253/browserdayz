@@ -32,6 +32,7 @@ import { ARMY_CAMP, BUILDING_FOOTPRINT, HOSPITAL_AT, HOSPITAL_GROUNDS, NO_START,
 import type { Instance, POI, Site, Solid, World, Worn } from './types';
 // (the square is made on its own net, `idx` its numbering, and laid into the world's at the end: see `toWorld`)
 import { catmullRom, evenOut, heightAt, squareIdx as idx, slopeAt, soften } from './ground';
+import { coastStarts } from './coast-starts';
 import { toWorld } from './west';
 import { passPlan } from './west-relief';
 import { openSquare, type Kept } from './opening';
@@ -2698,6 +2699,8 @@ function* worldStages(seed: number): Generator<string, World, void> {
   const posts = POSTS.map((p) => ({ ...p, y: seatPost(p, world, { cell: CELL, x0: WORLD_X0, z0: WORLD_Z0, nx: WORLD_NX, nz: WORLD_NZ }) }));
   // (and a stash at the back of each of the pass's caves: src/sim/pass.ts caveStashes)
   for (const st of caveStashes(passPlan)) props.push({ kind: 'weapons_case', x: st.x, y: st.y, z: st.z, rot: st.rot, scale: 1, far: 40 });
+  // (and where anybody starts, on the far west beach: coast-starts.ts. `starts`, the old valley's, is no longer handed out)
+  const coast = coastStarts(world.heights, { trees, rocks, props, buildings });
 
   return {
     heights: world.heights,
@@ -2720,11 +2723,8 @@ function* worldStages(seed: number): Generator<string, World, void> {
     pois,
     sites,
     solids,
-    spawn: starts[0],
-    // (and along the green land's west edge, after the square's own: plan v2)
-    // (the ring round the old valley only: started on the beach, players were kilometres from anywhere. The owner,
-    // 2026-10-17: "people are complaining on the server about spawning too far. we need to revert the spawn locations back to the village")
-    spawns: starts,
+    spawn: coast[0] ?? starts[0],
+    spawns: coast.length ? coast : starts,
     spawnRing: spawns,
     // (the west's towns, Kalat, the towns' slab walls and the water: plan v5)
     towns: world.towns,

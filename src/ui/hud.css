@@ -2127,6 +2127,8 @@ body.touch .hud-voice { top: 34%; }
 .hm-tiers button i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); opacity: 0.3; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
 .hm-tiers button.on { border-color: var(--c); }
 .hm-tiers button.on i { opacity: 1; }
+/* the way the steps run, either side of them: "the loot progression from west to east ... unmistakable" (2026-10-18) */
+.hm-way { align-self: center; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-faint); padding: 0 3px; white-space: nowrap; }
 .hm-zoom button { min-width: 34px; padding: 5px 8px; font-size: 17px; }
 .hm-zoom button:last-child { font-size: 15px; }
 .hud-map .hm-x { font-size: 17px; padding: 5px 12px; color: #14110b; background: var(--accent); border-color: var(--accent); }

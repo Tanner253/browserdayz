@@ -167,7 +167,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     let gasThings = 0;
     for (const l of e.loot.values()) {
       // (the fort on the mountain is stocked apart, on top of the map: what is in it is of none of these)
-      if (l.point >= 0 && apartOf(data.lootPoints[l.point].building)) continue;
+      if (l.point >= 0 && apartOf(data.lootPoints[l.point])) continue;
       const under = l.point >= 0 && data.lootPoints[l.point].usage.includes('Gas');
       // (the bunker is stocked apart as well: what is in it is neither of the gas nor of the rest of the map)
       // (and so is the third step, Kamenka and since 2026-10-17 the village: "the town" below)
@@ -188,7 +188,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     // of the seven finds no place free and waits for the next restock)
     // (by the place since the village is of the third step with Kamenka, 2026-10-17: it brought its own three helmets,
     // and the two of them have sixteen times the gas's places)
-    const town = data.lootPoints.filter((p) => p.tier === 3 && !p.arms && !apartOf(p.building)).length;
+    const town = data.lootPoints.filter((p) => p.tier === 3 && !p.arms && !apartOf(p)).length;
     for (const id of ['boonie_hat', 'life_vest', 'pu_scope']) assert.ok((t(id) / town) * 4 <= g(id) / places, `${t(id)} of ${id} in the town, ${g(id)} under the gas`);
     // (none of what the bunker and the gas are gone into for: the showcase that had the shotgun and the keycards in
     // the town is gone, 2026-10-13. A handful of the bunker's guns' rounds is another matter: see test/loot.test.ts.)

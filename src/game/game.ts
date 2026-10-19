@@ -65,7 +65,7 @@ import '../sim/airdrop';
 import { Airdrops } from './airdrop';
 import { wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
-import { TIERS, type Tier } from '../sim/tiers';
+import { TIERS, tierAround, type Tier } from '../sim/tiers';
 import { hasSlotIcon, iconSig, renderDoll, renderIcons } from '../ui/icons';
 import '../ui/person';
 import { BotCheck } from './botcheck';
@@ -917,7 +917,7 @@ export class Game {
     // the menu's map: the game's own, and what is said of each place on it
     {
       const town = world.pois[0];
-      const spots: MenuSpot[] = world.spawns.map((sp) => ({ x: sp.x, z: sp.z, name: 'A start', tip: 'New survivors drop in out here on the edge, with bare hands. The nearest marked place always has a weapon.', kind: 'spawn' as const }));
+      const spots: MenuSpot[] = world.spawns.map((sp) => ({ x: sp.x, z: sp.z, name: 'A start', tip: 'New survivors drop in here on the west coast, with bare hands. The further east, the better the loot.', kind: 'spawn' as const }));
       // (what is said of each kind of place, and which step of the map it is: see src/sim/tiers.ts. What is to be
       // had at a step is said under it, unless the place has more to say for itself.)
       const SITE: Record<SiteKind, [string, Tier, string?]> = {
@@ -952,7 +952,7 @@ export class Game {
       }
       // (the pass through the ridge: its caves, and the cache at the middle of its floor)
       const [cx, , cz] = passWorld(passPlan, FLOOR_CACHE.s, 0, 0);
-      spots.push(at({ x: cx, z: cz, name: 'The pass' }, 'The one way through the ridge: a canyon with shelves up both walls and caves in them, and the best of it cached on the floor at its middle.', 'army', 4, 'The caves hold the fourth step\'s things; the cache on the floor at the middle, the fifth\'s.', true));
+      spots.push(at({ x: cx, z: cz, name: 'The pass' }, 'The one way through the ridge: a canyon with shelves up both walls and caves in them, and the best of it cached on the floor at its middle.', 'army', 3, 'The caves and the cache at the middle of the floor hold the third step\'s things.', true));
       spots.push(at({ x: town.x, z: town.z + 46, name: town.name }, 'The village: police station, clinic, shop, workshop. The first place to go from the edge, and the most people after it.', 'town', 2, undefined, true));
       const inTown = (b: { x: number; z: number }) => Math.hypot(b.x - town.x, b.z - town.z) < town.radius;
       for (const b of world.buildings.filter(inTown)) {
@@ -963,6 +963,15 @@ export class Game {
       }
       for (const b of world.buildings) if (b.type === 'hospital') spots.push(at({ x: b.x, z: b.z, name: 'Hospital' }, 'Kamenka\'s district hospital: three floors and the roof. Casualty and the dispensary below, the wards above them, the theatres and the laboratory at the top. A stair at each end and steel stairs outside each end, from the roof down; a balcony over the doors; a wing behind with a stair of its own and a terrace on its roof.', 'clinic', 3, 'More dressings, stims and first aid kits than anywhere. On the roof somebody left a rifle, its scope and its suppressor.'));
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
+      // (each place's step worked out from the loot about it, cellars and wrecks aside, as they are finds of their own: see tierAround)
+      const marked = buildings.lootPoints.filter((p) => p.building !== 'cellar' && p.building !== 'wreck');
+      for (const s of spots) {
+        if (!s.tier) continue;
+        const t = tierAround(marked, s.x, s.z, s.label ? 80 : s.kind === 'police' || s.kind === 'clinic' || s.kind === 'shop' ? 15 : 40);
+        if (!t || t === s.tier) continue;
+        if (s.finds === TIERS[s.tier].finds) s.finds = TIERS[t].finds;
+        s.tier = t;
+      }
       // (the square: where everybody starts, 2026-10-16)
       this.hud.setMenuMap(this.minimap.poster(), 2 * SQUARE_HALF, spots, atmo.gases);
       // (and the map opened in the game says the same of the same places)
