@@ -526,10 +526,10 @@ export class CourseJudge {
     if (hit === CIV) {
       if (!this.civWarned) {
         this.civWarned = true;
-        return (this.why = 'shot somebody with their hands up, once: a warning', -1);
+        return (this.why = 'shot hostage once: warned', -1);
       }
       this.civShot = true;
-      return (this.why = 'shot somebody with their hands up', -1);
+      return (this.why = 'shot hostage', -1);
     }
     this.down.add(hit);
     this.lastDown = ms;
@@ -559,12 +559,28 @@ export class CourseJudge {
   get report() {
     const signed = this.sign !== 'off' && this.down.size >= this.course.need ? this.signed : '';
     const sure = this.down.size >= this.course.need ? this.tooSure : '';
-    return `${this.civShot ? 'shot somebody with their hands up; ' : this.civWarned ? 'shot somebody with their hands up once; ' : ''}${this.down.size} of ${this.course.need} down, ${this.shots} shots (${this.landed} landed by the course), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}${sure ? `; ${sure}` : ''}`;
+    return `${this.civShot ? 'shot hostage; ' : this.civWarned ? 'shot hostage once (warned); ' : ''}${this.down.size} of ${this.course.need} down, ${this.shots} shots (${this.landed} landed by the course), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}${sure ? `; ${sure}` : ''}`;
   }
 
   /** every figure down, by somebody who walked the yard and looked about it, said nothing that could not be so, and missed like a person: a person */
   get passed() {
     return !this.civShot && this.wrong <= this.limits.wrong && this.down.size >= this.course.need && this.walked >= 1 && this.turned >= 0.15 && !(this.sign === 'enforce' && this.signed) && !this.tooSure;
+  }
+
+  /**
+   * Why a go that is over did not pass, in a few words, put first in the log. A player who said they were stuck in
+   * the check had shot the hostage every go, and the log said so only partway along a long line (the owner,
+   * 2026-10-19: "we need better logging for this to 'shot hostage failed'"). Checked in the order `passed` is.
+   */
+  get failure() {
+    const why = this.civShot ? 'shot hostage'
+      : this.shots > SHOTS ? 'too many shots'
+      : this.wrong > this.limits.wrong ? 'said where they were and could not be'
+      : this.down.size < this.course.need ? `out of time, ${this.down.size} of ${this.course.need} down`
+      : this.sign === 'enforce' && this.signed ? 'the bot signature'
+      : this.tooSure ? 'too sure for a hand'
+      : 'never walked or looked about';
+    return `${why} failed`;
   }
 
   /** over, and not passed: the time is up, more was said that could not be so than a go may have, more was fired than anybody fires, or every figure is down and it did not pass */

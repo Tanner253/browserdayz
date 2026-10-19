@@ -969,7 +969,8 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       else if ((m.t === 'r' || m.t === 'rs') && m.g !== r.go) return;
       else if (m.t === 'r' && Array.isArray(m.p) && m.p.length === 5) r.judge.seen(Number(m.n), Number(m.p[0]), Number(m.p[1]), Number(m.p[2]), Number(m.p[3]), Number(m.p[4]), at);
       else if (m.t === 'rs' && Array.isArray(m.o) && Array.isArray(m.d) && m.o.length === 3 && m.d.length === 3) {
-        const i = r.judge.shot(Number(m.n), m.o.map(Number), m.d.map(Number), at);
+        const warned = r.judge.civWarned, i = r.judge.shot(Number(m.n), m.o.map(Number), m.d.map(Number), at);
+        if (!warned && r.judge.civWarned) log(`[botcheck] ${cleanName(r.hello.name)}: shot hostage once, warned (go ${r.go} of ${BOTCHECK.goes})`);
         if (process.env.RANGE_DEBUG) log(`[range] shot at ${m.n} (server ${at}) from ${m.o.map((v: number) => Number(v).toFixed(2)).join(',')} along ${m.d.map((v: number) => Number(v).toFixed(3)).join(',')}: ${i >= 0 ? `figure ${i} down` : r.judge.why || 'landed on nothing'}`);
         if (i >= 0) ws.send(JSON.stringify({ t: 'rhit', i } satisfies S2C));
         if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl) || spoofedRenderer(browser.gl) || fakeGl(browser.gl))) {
@@ -1086,10 +1087,10 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           if (!r.begun && Date.now() - r.dealtAt < RANGE_BUILD) return;
           if (!r.judge.failed(Date.now() - r.began)) return;
           RANGES.failed++;
-          log(`${cleanName(h.name)} did not pass go ${r.go} of the bot check: ${r.judge.report} [${agent}, ${drawsWith()}]`);
+          log(`[botcheck] ${cleanName(h.name)}: ${r.judge.failure} (go ${r.go} of ${BOTCHECK.goes}): ${r.judge.report} [${agent}, ${drawsWith()}]`);
           if (r.go >= BOTCHECK.goes) {
             TURNED.range++;
-            log(`${cleanName(h.name)} did not pass the bot check in ${BOTCHECK.goes} goes: turned away`);
+            log(`[botcheck] ${cleanName(h.name)}: did not pass in ${BOTCHECK.goes} goes, the last ${r.judge.failure}: turned away`);
             turnedAway(cleanName(h.name), key, ip, fp, `did not pass the bot check in ${BOTCHECK.goes} goes (the last: ${r.judge.report})`);
             offRange();
             ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed. Press Deploy to try again.' } satisfies S2C));
