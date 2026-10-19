@@ -2,7 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { SerializedInventory } from '../src/sim/inventory';
 import { TAG_HOLD, TAG_FRESH, type ItemInstance } from '../src/sim/items';
@@ -32,6 +32,8 @@ interface CashIn {
   name: string;
   owner: string;
   wallet: string;
+  /** the player, as a hash of their key: what the site counts their free tags by with the wallet's (see pastFree in api/_lib/payouts.ts) */
+  acct: string;
 }
 
 export const cashins: CashIn[] = [];
@@ -115,7 +117,7 @@ export function notEarned(c: Client, from: Looted, since: number | undefined, no
 
 export function recordCashIn(c: Client, owner: string, wallet: string) {
   // (its id is what the site is called with, and what the receipt of its payment is made from: not to be guessed)
-  const entry: CashIn = { id: randomBytes(16).toString('hex'), at: new Date().toISOString(), name: c.name, owner, wallet };
+  const entry: CashIn = { id: randomBytes(16).toString('hex'), at: new Date().toISOString(), name: c.name, owner, wallet, acct: createHash('sha256').update(`ZONA player ${c.key}`).digest('hex').slice(0, 24) };
   cashins.push(entry);
   if (cashins.length > 2000) cashins.shift();
   scoreOf(c).tags++;

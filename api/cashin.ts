@@ -26,6 +26,7 @@ export async function record(request: Request, w: World = live(), game = GAME): 
     name: String(e.name ?? '').slice(0, 24),
     owner: String(e.owner ?? '').slice(0, 24),
     wallet: String(e.wallet ?? '').slice(0, 44),
+    ...(typeof e.acct === 'string' && /^[0-9a-f]{8,64}$/.test(e.acct) ? { acct: e.acct } : {}),
   };
   const payout = await handle(w, entry);
   // A tag that waits for its wallet to have enough due (see dueOf in _lib/payouts.ts) is in the book, and is paid

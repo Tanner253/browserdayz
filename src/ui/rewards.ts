@@ -67,7 +67,7 @@ const RUN_MS = 5600;
  */
 async function siteStatus() {
   // (minTags: how many of a wallet's tags must be due before it is paid, when that is more than one; next: what is to change, and when)
-  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean; minTags?: number; next?: { from?: string; tagPays?: number; minTags?: number } | null; holder?: { from?: string; perM?: number; max?: number } | null };
+  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean; minTags?: number; next?: { from?: string; tagPays?: number; minTags?: number } | null; holder?: { from?: string; perM?: number; max?: number } | null; gate?: { from?: string; free?: number; hold?: number } | null };
   if (s.due) void fetch('/api/tick').catch(() => {});
   pays = s.on && typeof s.tagPays === 'number' ? s.tagPays : null;
   // (what this player's own tags pay, by what the wallet they gave holds of the coin: the owner, 2026-10-15, "the ui
@@ -85,7 +85,7 @@ async function siteStatus() {
   return s;
 }
 /** a wallet's standing under the holder rule, as the site says it (api/cashins.ts ?format=wallet) */
-interface Rate { tier: string; held: number; perTag: number; payout: number; max: boolean; next: { tier: string; perTag: number; more: number } | null }
+interface Rate { tier: string; held: number; perTag: number; payout: number; max: boolean; next: { tier: string; perTag: number; more: number } | null; free?: { paid: number; of: number; hold: number; holds: boolean } }
 /** this player's wallet's, when they have given one and the site has said */
 let mine: Rate | null = null;
 /**
@@ -228,15 +228,28 @@ export class RewardsModal {
       if (s.share === 0) {
         // (and more for holding the coin: api/_lib/payouts.ts, holderBonus)
         const h = s.holder && typeof s.holder.perM === 'number' && typeof s.holder.max === 'number' && typeof s.holder.from === 'string' ? s.holder : null;
+        // (the free tags, and the coin to hold past them: api/_lib/payouts.ts, pastFree. The owner, 2026-10-18: "the first 10
+        // tags are free to play play to earn", and "10 tags would give you enough sol to cover the minimum requirement")
+        const g = s.gate && typeof s.gate.free === 'number' && typeof s.gate.hold === 'number' && typeof s.gate.from === 'string' ? s.gate : null;
+        const fmtN = (k: number) => Math.round(k).toLocaleString('en-US');
+        const when = g && Date.now() < Date.parse(g.from!) ? `From ${g.from!.slice(0, 16).replace('T', ' ')} UTC: ` : '';
+        const f = mine?.free;
+        const gate = !g
+          ? ''
+          : f && f.paid >= f.of
+            ? f.holds
+              ? ` Your first ${f.of} tags are paid, and your wallet holds the <b>${fmtN(f.hold)} $ZONA</b> a tag needs past them.`
+              : ` <b>Your first ${f.of} tags are paid.</b> ${when}a tag is paid now only while your wallet holds <b>${fmtN(f.hold)} $ZONA</b>.`
+            : ` ${when}<b>${f ? f.of - f.paid : g.free} of ${g.free}</b> free tags${f ? ' left' : ''}: past your first ${g.free}, a tag is paid only while your wallet holds <b>${fmtN(g.hold!)} $ZONA</b>, and your first ${g.free} pay enough SOL to buy it.`;
         const more = h ? ` ${Date.now() >= Date.parse(h.from!) ? 'Holding $ZONA in that wallet pays more' : `From ${h.from!.slice(0, 16).replace('T', ' ')} UTC holding $ZONA in that wallet pays more`}: <b>+${round(h.perM!)} SOL</b> a tag for every full 1,000,000 held (from 1,000,000), up to <b>${round(h.max!)} SOL</b> a tag.` : '';
         if (mine) {
           // (the player's own: their tier, what their tags pay, and what the next tier needs)
           const fmt = (k: number) => Math.round(k).toLocaleString('en-US');
           const next = mine.next ? ` <b>${fmt(mine.next.more)}</b> more $ZONA makes you ${mine.next.tier}: <b>${round(mine.next.perTag)} SOL</b> a tag.` : ' The top rate.';
-          p.innerHTML = `Your tags pay <b>${round(mine.perTag)} SOL</b> each: <b>${mine.tier}</b>, ${fmt(mine.held)} $ZONA in your wallet. ${n > 1 ? `Sent when ${n} are due: <b>${round(mine.payout)} SOL</b> for the ${n}, at once.` : ''}${next} Play free, earn SOL, hold $ZONA: every 1,000,000 adds ${h ? round(h.perM!) : '0.001'} SOL a tag, up to ${h ? round(h.max!) : '0.025'}.${listed}`;
+          p.innerHTML = `Your tags pay <b>${round(mine.perTag)} SOL</b> each: <b>${mine.tier}</b>, ${fmt(mine.held)} $ZONA in your wallet. ${n > 1 ? `Sent when ${n} are due: <b>${round(mine.payout)} SOL</b> for the ${n}, at once.` : ''}${next} Play free, earn SOL, hold $ZONA: every 1,000,000 adds ${h ? round(h.perM!) : '0.001'} SOL a tag, up to ${h ? round(h.max!) : '0.025'}.${gate}${listed}`;
           return;
         }
-        p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b>${n > 1 ? `, sent to the wallet you enter here when ${n} of your tags are due: <b>${round(s.tagPays * n)} SOL</b> for the ${n}, at once. Until then they wait, counted, and none is lost.` : ', sent to the wallet you enter here.'}${more}${listed}`;
+        p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b>${n > 1 ? `, sent to the wallet you enter here when ${n} of your tags are due: <b>${round(s.tagPays * n)} SOL</b> for the ${n}, at once. Until then they wait, counted, and none is lost.` : ', sent to the wallet you enter here.'}${more}${gate}${listed}`;
         return;
       }
       const next = s.next && typeof s.next.from === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(s.next.from) && typeof s.next.tagPays === 'number' && typeof s.next.minTags === 'number' ? s.next : null;

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { TOKEN_2022_PROGRAM, address, b58, seeded, signed, tokenAccount } from '../api/_lib/solana';
-import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, RULES5_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
+import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, RULES5_FROM, RULES6_FROM, claimIfDue, config, dueOf, editBook, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
 import { record } from '../api/cashin';
 import { show } from '../api/cashins';
 import { MemoryStore, check } from '../api/_lib/store';
@@ -1205,6 +1205,50 @@ await test('from the fifth cut-over: a tag pays 0.001 SOL more for every million
   assert.equal(got(g, 426), SOL(0.055));
   // and none of it without a moment
   assert.deepEqual([config({}).rules5From, config({ PAYOUT_RULES5_FROM: 'never' }).rules5From], [RULES5_FROM ? Date.parse(RULES5_FROM) : Infinity, Infinity]);
+});
+
+await test('from the sixth cut-over: past its first ten paid tags, a wallet (or its player) is paid only while it holds 150,000 $ZONA', async () => {
+  // "the first 10 tags are free to play play to earn but after that we make the user have a token holder requirement to
+  // even be ELIGBLE to get payouts ... 10 tags covers 150k supply" (the owner, 2026-10-18)
+  const env = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-02T00:00:00Z', PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES5_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES6_FROM: '2026-10-08T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' };
+  const coin = (w: W, to: number, whole: bigint) => w.chain.tokens.set(b58(tokenAccount(address(wallet(to)), w.cfg.mint, TOKEN_2022_PROGRAM)), whole * 10n ** 6n);
+  // nothing held: ten paid, then none, and told why
+  const a = world(10, env);
+  const first = await cash(a, 440, 12);
+  assert.deepEqual(first.map((x) => x.o.state), [...Array(10).fill('paid'), 'skipped', 'skipped']);
+  assert.match((first[11].o as { why: string }).why, /150,000 \$ZONA, and this one held 0/);
+  assert.deepEqual([got(a, 440), (await readBook(a.store)).free?.[`w:${wallet(440)}`]], [SOL(0.1), 10]);
+  // 150,000 held: paid again; a coin short of it: not
+  coin(a, 440, 150_000n);
+  assert.equal((await cash(a, 440, 1))[0].o.state, 'paid');
+  coin(a, 440, 149_999n);
+  assert.equal((await cash(a, 440, 1))[0].o.state, 'skipped');
+  // a new wallet does not start a player's count again, nor a new player a wallet's
+  const b = world(10, env);
+  await cash(b, 441, 10, { acct: 'aaaa0000aaaa0000' });
+  assert.deepEqual([(await cash(b, 442, 1, { acct: 'aaaa0000aaaa0000' }))[0].o.state, (await cash(b, 441, 1, { acct: 'bbbb0000bbbb0000' }))[0].o.state, (await cash(b, 443, 1, { acct: 'cccc0000cccc0000' }))[0].o.state], ['skipped', 'skipped', 'paid']);
+  // tags paid before the moment count toward the ten, read from the rows the first time (a book from before kept no count)
+  const c = world(10, { ...env, PAYOUT_RULES6_FROM: '2026-10-08T13:00:00Z' });
+  await cash(c, 444, 9);
+  await editBook(c, (bk) => void delete bk.free);
+  c.skip(3600 * 1000);
+  assert.deepEqual((await cash(c, 444, 2)).map((x) => x.o.state), ['paid', 'skipped']);
+  // cashed in before the moment: paid, however many
+  const d = world(10, { ...env, PAYOUT_RULES6_FROM: '2026-10-09T00:00:00Z' });
+  assert.ok((await cash(d, 445, 12)).every((x) => x.o.state === 'paid'));
+  // and none of it without a moment; ten and 150,000 unless set otherwise
+  const cf = config({});
+  assert.deepEqual([cf.rules6From, config({ PAYOUT_RULES6_FROM: 'never' }).rules6From, cf.freeTags, cf.holdMin], [RULES6_FROM ? Date.parse(RULES6_FROM) : Infinity, Infinity, 10, 150_000n * 10n ** 6n]);
+});
+
+await test('the rule of the free tags is said: on the payouts page, to a wallet asked about, and to the game', async () => {
+  const w = world(10, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-02T00:00:00Z', PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES5_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES6_FROM: '2026-10-08T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' });
+  await cash(w, 446, 3);
+  const ask = async (q: string) => (await (await show(new Request(`http://localhost/api/cashins?${q}`), w)).json()) as Record<string, unknown>;
+  assert.deepEqual((await ask(`format=wallet&w=${wallet(446)}`)).free, { paid: 3, of: 10, hold: 150_000, holds: false });
+  assert.deepEqual((await ask('format=status')).gate, { from: '2026-10-08T00:00:00.000Z', free: 10, hold: 150_000 });
+  const page = await (await show(new Request('http://localhost/payouts'), w)).text();
+  assert.ok(page.includes('10 tags free, then hold 150,000 $ZONA'));
 });
 
 await test('a wallet asked about (?format=wallet): what it holds, its tier, what a tag pays it and what the next tier needs, as it is paid', async () => {

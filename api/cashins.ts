@@ -13,7 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { cached, dueOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, walletRate, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, dueOf, editBook, freshBook, glanceBook, paidTo, refOf, snapshot, sol, walletRate, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
@@ -228,14 +228,18 @@ function page(book: Book, s: Snapshot, now: number): string {
         })
         .sort((a, b) => b.earned - a.earned)
     : [];
+  // ---- the free tags and the coin to hold past them (api/_lib/payouts.ts, pastFree): the owner, 2026-10-18, "the first 10
+  // tags are free to play play to earn but after that we make the user have a token holder requirement", and of the price
+  // then, "10 tags would give you enough sol to cover the minimum requirement (for now)"
+  const gate = s.rules6From ? { at: `${new Date(s.rules6From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${s.rules6From.slice(11, 16)} UTC`, now: Date.parse(s.rules6From) <= now, free: s.freeTags, hold: s.holdMin.toLocaleString('en-US') } : null;
   const crown = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7zm2.3 13h13.4v2H5.3v-2z"/></svg>';
   const tiersSection = holders
     ? `
   <section class="tiers" id="tiers">
     <h2>Level up: play free, earn SOL, hold $ZONA, earn more <small>${Date.parse(s.rules5From!) <= now ? 'live' : `from ${s.rules5From!.slice(11, 16)} UTC`}</small></h2>
     <div class="flow loop">
-      ${step('1', 'Play free', `${amount(s.tiers[0].perTag)} SOL a tag`, 'No coin needed. Take a dog tag, hold it thirty minutes: it pays SOL.')}
-      ${step('2', 'Buy $ZONA', 'with what you earn', 'Put the SOL you win into $ZONA, in the wallet you are paid to.')}
+      ${gate ? step('1', 'Play free', `your first ${gate.free} tags`, `No coin needed for your first ${gate.free} paid tags, ${amount(s.tiers[0].perTag)} SOL each. Take a dog tag, hold it thirty minutes: it pays SOL.`) : step('1', 'Play free', `${amount(s.tiers[0].perTag)} SOL a tag`, 'No coin needed. Take a dog tag, hold it thirty minutes: it pays SOL.')}
+      ${gate ? step('2', `Hold ${gate.hold} $ZONA`, `to be paid past ${gate.free}`, `${gate.now ? '' : `From ${gate.at}: `}after your first ${gate.free}, a tag is paid only while the wallet you are paid to holds ${gate.hold} $ZONA. Your first ${gate.free} tags pay enough SOL to buy it, at the price of 18 October.`) : step('2', 'Buy $ZONA', 'with what you earn', 'Put the SOL you win into $ZONA, in the wallet you are paid to.')}
       ${step('3', 'Every tag pays more', `+${s.holderPerM} SOL per 1M`, `Each million $ZONA you hold adds ${s.holderPerM} SOL to every tag you cash in.`)}
       ${step('4', `Reach ${esc(topTier.name)}`, `${amount(topTier.perTag)} SOL a tag`, `${topTier.from}M $ZONA held: ${Math.round((topTier.perTag / s.tiers[0].perTag) * 10) / 10}× the pay, and your name on the Elite board below.`)}
     </div>
@@ -511,6 +515,11 @@ ${tiersSection}
           ? `<div class="rule"><h3>Holding $ZONA pays more</h3><p>From ${new Date(s.rules5From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${s.rules5From.slice(11, 16)} UTC, a tag pays ${s.holderPerM} SOL more for every full 1,000,000 $ZONA its wallet holds (nothing under 1,000,000), up to ${s.tagMax} SOL a tag in all (${Math.round((s.tagMax - s.flatPay / 1e9) / s.holderPerM)},000,000 held). What counts is the lower of what the wallet held when the tag was cashed in and when it is paid.</p></div>
       `
           : ''
+      }${
+        gate
+          ? `<div class="rule"><h3>${gate.free} tags free, then hold ${gate.hold} $ZONA</h3><p>From ${gate.at}, once a wallet, or the player cashing in, has had ${gate.free} tags paid, a tag is paid only if that wallet holds ${gate.hold} $ZONA: the lower of what it held when the tag was cashed in and when it is paid. One that is not is listed and not paid. ${gate.free} tags paid enough SOL to buy ${gate.hold} $ZONA at the coin's price of 18 October. Tags paid before this rule began count toward the ${gate.free}, as far as this ledger lists them.</p></div>
+      `
+          : ''
       }<div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>
       <div class="rule"><h3>Paid once, and the chain sees to it</h3><p>Each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</p></div>
       <div class="rule"><h3>No wallet, no payment</h3><p>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window: add it before you cash a tag in.</p></div>
@@ -551,6 +560,8 @@ ${
         if (r.error) { out.textContent = r.error === 'not a wallet address' ? 'That is not a Solana wallet address.' : 'The wallet could not be read just now: try again in a moment.'; return; }
         out.textContent = '';
         out.append(gold(r.tier), ' · ' + fmt(r.held) + ' $ZONA held · your tags pay ', gold(r.perTag + ' SOL'), ' each, ' + r.payout + ' SOL a payout of ${N}. ' + (r.next ? fmt(r.next.more) + ' more $ZONA makes you ' + r.next.tier + ': ' + r.next.perTag + ' SOL a tag.' : 'The top rate.') + (r.tags ? ' Paid so far: ' + r.earned + ' SOL for ' + r.tags + (r.tags === 1 ? ' tag.' : ' tags.') : ''));
+        // (its free tags and the coin to hold past them: see the rule below)
+        if (r.free) out.append(' ', r.free.paid < r.free.of ? gold((r.free.of - r.free.paid) + ' of ' + r.free.of + ' free tags left') : r.free.holds ? gold('holds the ' + fmt(r.free.hold) + ' $ZONA') : gold('needs ' + fmt(r.free.hold) + ' $ZONA'), r.free.paid < r.free.of ? ' before this wallet must hold ' + fmt(r.free.hold) + ' $ZONA to be paid.' : r.free.holds ? ' its tags need past its first ' + r.free.of + '.' : ' to be paid: its first ' + r.free.of + ' tags are paid.');
       } catch { out.textContent = 'The wallet could not be read just now: try again in a moment.'; }
     };
     go.onclick = ask;
@@ -583,7 +594,7 @@ export async function show(request: Request, w: World = live()): Promise<Respons
     // and `tagPays` is the flat figure. New: `minTags`, how many of a wallet's tags must be due before it is paid, 1
     // until the cut-over; and `next`, what is to change and when, while that is still to come.)
     const next = s.fives || !s.rules2From ? null : { from: s.rules2From, tagPays: sol(s.flatPay), minTags: s.minTags };
-    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due, minTags: s.fives ? s.minTags : 1, next, holder: s.rules5From && s.fives ? { from: s.rules5From, perM: s.holderPerM, max: s.tagMax } : null }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
+    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due, minTags: s.fives ? s.minTags : 1, next, holder: s.rules5From && s.fives ? { from: s.rules5From, perM: s.holderPerM, max: s.tagMax } : null, gate: s.rules6From ? { from: s.rules6From, free: s.freeTags, hold: s.holdMin } : null }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
   }
   const book = await cached(w, 'book', 20_000, async () => withOldEntries(w, await glanceBook(w.store)));
   const cache = { 'cache-control': 'public, s-maxage=20, stale-while-revalidate=60' };
@@ -618,6 +629,8 @@ export async function show(request: Request, w: World = live()): Promise<Respons
         next: r.next ? { tier: r.next.tier, from: r.next.from, perTag: sol(Number(r.next.perTag)), more: Math.max(0, r.next.from * 1_000_000 - held) } : null,
         earned: sol(mine.reduce((n, x) => n + (x.lamports ?? 0), 0)),
         tags: mine.length,
+        // (its free tags, as far as the book knows them by this wallet: the player's own count is the site's alone, see pastFree)
+        ...(s.rules6From ? { free: { paid: paidTo(book, `w:${who}`), of: s.freeTags, hold: s.holdMin, holds: held >= s.holdMin } } : {}),
       },
       { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=60' } },
     );
