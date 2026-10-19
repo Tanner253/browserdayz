@@ -87,6 +87,22 @@ export const KEPT = {
 
 export const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
+/**
+ * Where the ground was made again by the release that raised WORLD_REV past each number: a character kept from a world
+ * of an older number is set down afresh only if they stood where some release since remade it. A number not here: all
+ * of them, as before. (2026-10-18: with the starts on the far west beach since that day, a world remade anywhere sent
+ * everybody back across the whole map; the owner that day, of tags a restart took: "its bad UX its not their fault".)
+ */
+const REMADE: Record<number, (x: number, z: number) => boolean> = {
+  // (29 -> 30: the desert's places and their roads, src/sim/desert.ts, all west of the canyon)
+  29: (x) => x < -2800,
+};
+/** is somebody kept from a world of this number, standing here, set down afresh at a start */
+export function remadeUnder(rev: number, x: number, z: number): boolean {
+  for (let v = rev; v < WORLD_REV; v++) if (!REMADE[v] || REMADE[v](x, z)) return true;
+  return rev > WORLD_REV;
+}
+
 interface Snapshot {
   rev: number;
   wipe: string;
@@ -265,7 +281,7 @@ function takeInLate(save: KeptFile) {
       if (had && had.leftAt >= r.leftAt) continue;
       const inv = cleanInventory(r.inv);
       for (const it of things(inv)) issue(it);
-      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved || r.afresh ? { afresh: true } : {}) });
+      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(remadeUnder(snap.rev, r.pose[0], r.pose[2]) || r.afresh ? { afresh: true } : {}) });
       chars++;
     } catch {
       /* one that cannot be made sense of is left as this server had them */
@@ -504,8 +520,8 @@ export async function loadKept() {
         if (!r?.inv || !r.alive || now - r.leftAt > RECORD_LIFETIME || !isPose(r.pose)) continue;
         const inv = cleanInventory(r.inv);
         for (const it of things(inv)) issue(it);
-        // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall)
-        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved || r.afresh ? { afresh: true } : {}) });
+        // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall if it was remade there)
+        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(remadeUnder(snap.rev, r.pose[0], r.pose[2]) || r.afresh ? { afresh: true } : {}) });
       } catch {
         // (one character that cannot be made sense of is one character lost, not everybody)
         bad++;
@@ -546,7 +562,7 @@ export async function loadKept() {
     elite.restore(snap.elite);
     takePowers(snap.powers);
     takeTags(snap.tags);
-    open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
+    open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? `; the map has been made again since, so ${[...KEPT.chars.values()].filter((r) => r.afresh).length} who stood where it was remade start from the edge with what they had` : ''}`);
   } catch (e) {
     // (what could be taken in has been: it is not thrown away for the sake of what could not)
     KEPT.read = true;

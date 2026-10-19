@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import * as WG from '../src/world/worldgen';
-const { ARMY_CAMP, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION: E, PLAY_AREAS, PLAY_RADIUS, generateWorld, heightAt, inPlay, playOutline, seenGround, slopeAt, BUILDING_FOOTPRINT } = WG;
+const { ARMY_CAMP, CELL, KAMENKA, LOOP, MOUNTAIN, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION: E, PLAY_AREAS, PLAY_RADIUS, generateWorld, heightAt, inPlay, playOutline, seenGround, slopeAt, BUILDING_FOOTPRINT } = WG;
 /** the rounds the world was made by (PLAY_AREAS): the Zona's rule is the owner's drawing since 2026-10-18 (src/world/zona.ts), and these hold the world to the rounds */
 const { inRounds } = WG;
 // (this test is of the map as it was, and runs on a tree from before the world grew west too, to take its figures again:
@@ -187,15 +187,14 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   assert.equal(away.length, WAS.away, 'an old building has come into the village or left it');
   assert.equal(hash(away.flatMap((b) => [b.x, b.z, b.rot, b.floorY])), WAS.buildingsHash, 'an old building away from the village has moved');
   assert.equal(hash(world.spawnRing.flatMap((s) => [s.x, s.z, s.yaw])), WAS.spawns, 'a starting point has moved');
-  // (and of those, nobody is set down by the bunker any more, nor between the valley and the town in the east)
-  // (the square's own: those along the green land's west edge are plan v2's, 2026-10-16, and none of the ring)
-  const own = world.spawns.filter((q) => q.x > -SQUARE_HALF);
-  assert.ok(own.length >= 16 && own.length < world.spawnRing.length, `${own.length} starts left of ${world.spawnRing.length}`);
-  for (const sp of own) {
-    assert.ok(world.spawnRing.includes(sp), 'a start that is none of the ring');
-    assert.ok(Math.hypot(sp.x - BUNKER_WAS.x, sp.z - BUNKER_WAS.z) > NO_START.bunker, 'a start by the bunker');
-    assert.ok(Math.hypot(sp.x - TOWN.gate.x, sp.z - TOWN.gate.z) > NO_START.gate && Math.hypot(sp.x - TOWN.x, sp.z - TOWN.z) > NO_START.town, 'a start between the valley and the town');
+  // (and the starts handed out are on the far west beach since 2026-10-18, "move all player spawns to the far west coast
+  // like DAYZ does": inside the barrier, on dry ground, down the whole coast, none of them the ring's)
+  assert.ok(world.spawns.length >= 16, `${world.spawns.length} starts on the coast`);
+  for (const sp of world.spawns) {
+    assert.ok(!world.spawnRing.includes(sp) && sp.x > WG.PLAN.barrier && sp.x < WG.PLAN.barrier + 100, `a start off the west beach at ${sp.x.toFixed(0)}, ${sp.z.toFixed(0)}`);
+    assert.ok(WG.heightAt(world.heights, sp.x, sp.z) > WG.SEA_LEVEL + 0.5, `a start in the sea at ${sp.x.toFixed(0)}, ${sp.z.toFixed(0)}`);
   }
+  assert.ok(Math.min(...world.spawns.map((q) => q.z)) < -500 && Math.max(...world.spawns.map((q) => q.z)) > 500, 'the starts are not down the whole coast');
   const trees = world.trees.filter((t) => inOld(t.x, t.z) && !touched(t.x, t.z));
   assert.equal(trees.length, WAS.trees);
   assert.equal(hash(trees.flatMap((t) => [t.x, t.y, t.z])), WAS.treesHash, 'a tree away from the works has moved');

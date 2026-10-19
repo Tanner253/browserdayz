@@ -157,7 +157,8 @@ export interface TimedAction {
 // (24, 2026-10-16: the map three times over)
 // (25, 2026-10-17: more places for loot, see WORLD_REV 28 in server/index.ts)
 // (26, 2026-10-18: the gun racks, see WORLD_REV 29 in server/index.ts)
-export const LOOT_REV = 26;
+// (27, 2026-10-18: the desert's places, see WORLD_REV 30)
+export const LOOT_REV = 27;
 /** how far over the ridge's crest its invisible wall stands, metres: past it a helicopter flies over */
 const RIDGE_OVER = 18;
 /** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */
