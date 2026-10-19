@@ -2636,17 +2636,21 @@ export class Buildings {
       slab(st.x0, st.x1, z0i, zmin);
       slab(st.x0, st.x1, zmax, z1i);
       const L = zmax - zmin, xc = (st.x0 + st.x1) / 2;
+      // (which side of it is open to the room: the one further from a wall. Until 2026-10-19 a flight a hand short of
+      // the right-hand wall, the merchant's and the two-floor log house's, was taken for one against the left: its side
+      // to the room stood open on the hollow under the steps with no rail, and its way off the head was through the
+      // wall. The owner: "new buildings are missing panels on the stairs in the trader town and nearby")
+      const open = hw - T - st.x1 < st.x0 + hw - T ? st.x0 : st.x1, away = open === st.x0 ? -1 : 1;
       // (off the head of them: onto the landing and round the end of the rail, into the room)
-      const { rise, run } = this.flight(B, plot.id, st, 0, y1, [st.x1 > hw - T - 0.1 ? st.x0 - 0.8 : st.x1 + 0.8, st.top + dz * 0.6]);
+      const { rise, run } = this.flight(B, plot.id, st, 0, y1, [open + away * 0.8, st.top + dz * 0.6]);
       // under it the space is boarded in: solid to everything
       for (let k = 1; k < 4; k++) {
         const za = st.foot + dz * (k / 4) * L, zb = st.foot + dz * ((k + 1) / 4) * L;
         const top = (k / 4) * y1 - 0.12;
         this.collider((st.x1 - st.x0) / 2 - 0.02, top / 2, Math.abs(zb - za) / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation(xc, top / 2, (za + zb) / 2)), 'wood');
       }
-      // (which side of it is open to the room: the other is against a wall)
-      const open = st.x1 > hw - T - 0.1 ? st.x0 : st.x1, away = open === st.x0 ? -1 : 1;
-      this.push('planks', wedgeGeo(L, y1 - rise, 0.04, this.tile('planks'), B.clone().multiply(new THREE.Matrix4().makeTranslation(open, 0, st.foot)).multiply(new THREE.Matrix4().makeRotationY(dz < 0 ? Math.PI : 0))));
+      // (boarded up both sides: the room's, and the wall's, where a gap to the wall showed the hollow as well)
+      for (const side of [st.x0, st.x1]) this.push('planks', wedgeGeo(L, y1 - rise, 0.04, this.tile('planks'), B.clone().multiply(new THREE.Matrix4().makeTranslation(side, 0, st.foot)).multiply(new THREE.Matrix4().makeRotationY(dz < 0 ? Math.PI : 0))));
       // and its tall end, under the head of the flight, is boarded too: from behind, the
       // backs of the steps were seen, and the hollow under them
       this.push('planks', boxGeo(st.x0, st.x1, 0, h, Math.min(st.top, st.top + dz * 0.04), Math.max(st.top, st.top + dz * 0.04), this.tile('planks'), B));
