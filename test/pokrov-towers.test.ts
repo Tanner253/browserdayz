@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 import { POKROV, POKROV_WALL, onTownWall, placedTowers, placedWalls, townBuildings, townPoint } from '../src/sim/towns';
-import { TOWER_ROOM as R, faceAt, noseAt, towerHatch, towerSolids, towerSteps } from '../src/sim/pokrov-towers';
+import { TOWER_ROOM as R, faceAt, noseAt, stairRailSolids, towerHatch, towerSolids, towerSteps } from '../src/sim/pokrov-towers';
 import { kitSolids } from '../src/sim/kit';
 import { towerInsides } from '../src/world/pokrov-towers';
 
@@ -91,6 +91,9 @@ for (const p of pieces.filter((q) => q.id === 'fort_wall_stairs_straight_01')) {
   ok(sd.length === 4 && sd[0].t === 'hull', `a wall stair stops a body (${sd.length} solids)`);
   const ys = sd[0].t === 'hull' ? sd[0].pts.filter((_, i) => i % 3 === 1) : [];
   ok(Math.min(...ys) - p.at[1] > -0.01 && Math.max(...ys) - p.at[1] > 7, 'its flight from the ground to the walk');
+  // (and a parapet up its open side and along its landing, nearly a metre over the steps: "the stairs are missing collision along the wall")
+  const rail = stairRailSolids(p), top = Math.max(...rail.flatMap((r) => (r.t === 'hull' ? r.pts.filter((_, i) => i % 3 === 1) : []))) - p.at[1];
+  ok(rail.length === 2 && top > 7.9 && top < 8.1, `the wall stair's parapet stands ${top.toFixed(2)} m at the landing`);
 }
 
 console.log(`pokrov-towers: ${checks} checks passed`);

@@ -8,7 +8,7 @@ import { DESERT_TOWNS } from '../../sim/desert';
 import { MOKROYE, WATER } from '../../sim/mokroye';
 import { OZERKI, SHORE } from '../../sim/ozerki';
 import { LAND, OUTLINE, outside as offTop, ruinLocal, ruinsGround, type Place } from '../../sim/ruins';
-import { moundAt, placedSlabs, placedTowers, townBuildings, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
+import { moundAt, placedSlabs, placedTowers, townBuildings, townTrees, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
 import { BUILDING_FOOTPRINT, type BuildingPlot } from './layout';
 import { CELL, SEA_LEVEL, WORLD_SEED } from './places';
 import { PLACED, PLAN } from './west-plan';
@@ -105,7 +105,7 @@ export function layPad(H: Float32Array, net: Net, t: Town, padY: number, lake?: 
  * 4 m in the air at the pad's height: the owner, 2026-10-19, "some building decorations like at industrial are
  * floating very high off the ground"), let down to the lowest of it under the thing's foot (`footOn`).
  */
-export function fillTown(t: Town, padY: number, net: Net, out: { buildings: BuildingPlot[]; props: Instance[]; slabs: SlabRun[]; splat: Uint8Array; grass: Uint8Array }, on?: (x: number, z: number) => number) {
+export function fillTown(t: Town, padY: number, net: Net, out: { buildings: BuildingPlot[]; props: Instance[]; slabs: SlabRun[]; splat: Uint8Array; grass: Uint8Array; trees?: Instance[] }, on?: (x: number, z: number) => number) {
   const foot = on && footOn(on), under = (x: number, z: number, lx: number, lz: number) => (foot ? foot(x, z) : padY + moundAt(t, lx, lz));
   townBuildings(t).forEach((s, n) => {
     const [x, z] = townPoint(t, s.x, s.z);
@@ -146,6 +146,10 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
     out.props.push({ kind: th.kind, x, y: under(x, z, th.x, th.z) + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
+  }
+  for (const [kind, lx, lz, scale] of townTrees(t)) {
+    const [x, z] = townPoint(t, lx, lz);
+    out.trees?.push({ kind, x, y: under(x, z, lx, lz), z, rot: (lx * 7 + lz * 3) % 6.28, scale });
   }
   for (const l of townLamps(t)) {
     const [x, z] = townPoint(t, l.x, l.z);
@@ -197,7 +201,7 @@ export function townLamps(t: Town): { x: number; z: number; rot: number }[] {
     !things.some((th) => Math.hypot(th.x - x, th.z - z) < 2.5) && !out.some((o) => Math.hypot(o.x - x, o.z - z) < LAMP.apart);
   let side = 1;
   // (and beside the boardwalks, where those are the town's ways: the drowned hamlet has no lane)
-  for (const { line, w } of [...ground.lanes, ...townWalks(t).map((r) => ({ line: [r.a, r.b], w: 2 }))]) {
+  for (const { line, w } of [...ground.lanes.filter((l) => !l.dark), ...townWalks(t).map((r) => ({ line: [r.a, r.b], w: 2 }))]) {
     let walked = 0, next = LAMP.every / 3;
     for (let q = 0; q + 1 < line.length; q++) {
       const [ax, az] = line[q], [bx, bz] = line[q + 1], len = Math.hypot(bx - ax, bz - az);

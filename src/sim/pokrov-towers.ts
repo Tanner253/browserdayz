@@ -5,7 +5,7 @@
 // hatch in the platform onto the top, where its battlements and the little drum in its middle stop a body too.
 // Pure numbers, the same for the game and the server; heights are over the tower's foot (the wall's).
 
-import { KIT_TOWER, type Cut, type KitSolid, type V3 } from './kit';
+import { KIT_STAIR, KIT_TOWER, kitMatrix, kitPoint, type Cut, type KitPiece, type KitSolid, type V3 } from './kit';
 
 const D = Math.PI / 180;
 
@@ -67,6 +67,30 @@ export function towerHatch(t: TowerPlace): [number, number] {
 export function arcs(a0: number, a1: number, most: number): number[] {
   const n = Math.max(1, Math.ceil(Math.abs(a1 - a0) / most));
   return Array.from({ length: n + 1 }, (_, k) => a0 + ((a1 - a0) * k) / n);
+}
+
+/**
+ * A parapet up the open side of each of the walls' stairs (the owner, 2026-10-19: "the stairs are missing collision
+ * along the wall"): the kit's flight has only a kerb there, flush with its steps, and a drop of seven metres at its
+ * head. In the stair piece's own measure (its x across, 0 at the wall; z up it): over the kerb on its open side from
+ * its foot, and along the landing's side to the rim across the landing's far end; it stands RAIL over the line of the
+ * steps' fronts, its foot sunk into the kerb under it.
+ */
+export const STAIR_RAIL = { x0: KIT_STAIR.side[0], x1: KIT_STAIR.side[1], up: 0.95, sunk: 0.15 };
+/** the line of a wall stair's steps' fronts at a way up it (its own z), level along the landing */
+export function stairNose(z: number): number {
+  const S = KIT_STAIR, [z0, y0] = S.first, [z1, y1] = S.land;
+  return z >= z1 ? y1 : Math.max(0, y0 + ((y1 - y0) * (z - z0)) / (z1 - z0));
+}
+/** the parapet in two runs, up the flight (its foot in the kerb) and along the landing (on the landing's rim): each its two ends, [z, foot, top] */
+export function stairRailRuns(): [number, number, number][][] {
+  const R = STAIR_RAIL, S = KIT_STAIR, [land] = S.land, top = (z: number) => stairNose(z) + R.up;
+  return [[[0, stairNose(0) - R.sunk, top(0)], [land, stairNose(land) - R.sunk, top(land)]], [[land, S.rim - 0.05, top(land)], [S.back, S.rim - 0.05, top(S.back)]]];
+}
+/** what of a wall stair's parapet stops a body, in the world: the run up the flight, and along the landing */
+export function stairRailSolids(p: KitPiece): KitSolid[] {
+  const m = kitMatrix(p);
+  return stairRailRuns().map((run) => ({ t: 'hull' as const, name: 'Pokrov stair parapet', pts: run.flatMap(([z, lo, hi]) => [STAIR_RAIL.x0, STAIR_RAIL.x1].flatMap((x) => [...kitPoint(m, [x, lo, z]), ...kitPoint(m, [x, hi, z])])) }));
 }
 
 // ------------------------------------------------------------------ what is cut out of the kit

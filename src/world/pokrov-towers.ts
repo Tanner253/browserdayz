@@ -5,7 +5,8 @@
 // (as the kit's own flights are).
 // They go into the kit's own shapes (kitMeshes' `add`): no draw of their own, and near and far with the walls.
 
-import { arcs, faceAt, noseAt, towerHatch, towerSteps, TOWER_ROOM, type TowerPlace } from '../sim/pokrov-towers';
+import { KIT_STAIR, kitMatrix, kitPoint, type KitPiece } from '../sim/kit';
+import { arcs, faceAt, noseAt, STAIR_RAIL, stairRailRuns, towerHatch, towerSteps, TOWER_ROOM, type TowerPlace } from '../sim/pokrov-towers';
 
 /** the kit's picture, so many to the metre on the tower's wall and on its trim (measured on the model: one in 11.6 m and in 4.5 m, before the town's sets are laid three times as often) */
 const WALL = 0.0863, TRIM = 0.2236;
@@ -114,4 +115,36 @@ export function towerInsides(towers: TowerPlace[]): Record<string, number[][]> {
     railEnd(last, round(last));
   }
   return { fort_wall: wall, fort_trim: trim };
+}
+
+/** The parapets up the walls' stairs' open sides (see STAIR_RAIL), in the kit's dressed stone: corners for kitMeshes' `add`, as fort_trim. */
+export function stairRails(pieces: KitPiece[]): number[][] {
+  const out: number[][] = [];
+  for (const p of pieces.filter((q) => q.id === 'fort_wall_stairs_straight_01')) {
+    const m = kitMatrix(p), turn = p.turn ?? 0, c = Math.cos(turn), s = Math.sin(turn);
+    /** a way of the piece's own, in the world (it is only turned) */
+    const way = (x: number, y: number, z: number): P => [x * c + z * s, y, -x * s + z * c];
+    const at = (x: number, y: number, z: number) => kitPoint(m, [x, y, z]) as P;
+    const face = (local: P[], n: P, uv: (v: P) => [number, number]) => {
+      const g = at(...local[0]), h = at(...local[1]), k = at(...local[2]), l = at(...local[3]);
+      const e1 = [h[0] - g[0], h[1] - g[1], h[2] - g[2]], e2 = [k[0] - g[0], k[1] - g[1], k[2] - g[2]];
+      const flip = (e1[1] * e2[2] - e1[2] * e2[1]) * n[0] + (e1[2] * e2[0] - e1[0] * e2[2]) * n[1] + (e1[0] * e2[1] - e1[1] * e2[0]) * n[2] < 0;
+      const pts = [g, h, k, l], uvs = local.map(uv);
+      for (const i of flip ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3]) out.push([...pts[i], ...n, ...uvs[i]]);
+    };
+    const { x0, x1 } = STAIR_RAIL;
+    for (const run of stairRailRuns()) {
+      const [[za, la, ha], [zb, lb, hb]] = run;
+      const side = (v: [number, number, number]): [number, number] => [v[2] * TRIM, v[1] * TRIM], top = (v: [number, number, number]): [number, number] => [v[0] * TRIM, v[2] * TRIM];
+      face([[x0, la, za], [x0, lb, zb], [x0, hb, zb], [x0, ha, za]], way(-1, 0, 0), side);
+      face([[x1, la, za], [x1, lb, zb], [x1, hb, zb], [x1, ha, za]], way(1, 0, 0), side);
+      const n = way(0, zb - za, -(hb - ha)), l = Math.hypot(...n);
+      face([[x0, ha, za], [x1, ha, za], [x1, hb, zb], [x0, hb, zb]], n.map((v) => v / l) as P, top);
+      // (its ends: at the stair's foot, and against the rim across the landing's far end, over which it stands)
+      const endUV = (v: [number, number, number]): [number, number] => [v[0] * TRIM, v[1] * TRIM];
+      if (za === 0) face([[x0, la, za], [x1, la, za], [x1, ha, za], [x0, ha, za]], way(0, 0, -1), endUV);
+      if (zb === KIT_STAIR.back) face([[x0, lb, zb], [x1, lb, zb], [x1, hb, zb], [x0, hb, zb]], way(0, 0, 1), endUV);
+    }
+  }
+  return out;
 }

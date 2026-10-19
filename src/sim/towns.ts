@@ -12,7 +12,7 @@ import { KNOLL, LIPKI, LIPKI_GROUND, lipkiBuildings, lipkiThings } from './lipki
 import { OZERKI, OZERKI_GROUND, OZERKI_WALKS, ozerkiBuildings, ozerkiThings } from './ozerki';
 import { walkDecks, walkPieces, type WalkRun } from './walkways';
 import { MOKROYE, MOKROYE_GROUND, MOKROYE_WALKS, mokroyeBuildings, mokroyePosts, mokroyeThings } from './mokroye';
-import { POKROV_GROUND, POKROV_TERRACE, pokrovBuildings, pokrovThings } from './pokrov';
+import { POKROV_GROUND, POKROV_TERRACE, POKROV_TREES, pokrovBuildings, pokrovThings } from './pokrov';
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
 import { ZASTAVA, ZASTAVA_GROUND, ZASTAVA_SLABS, zastavaBuildings, zastavaThings } from './zastava';
 import { DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
@@ -90,12 +90,12 @@ export function pokrovWalls(y: number): KitPiece[] {
  */
 export const POKROV_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [
   // (the great one over the crossing, a small one along the nave's ridge to the west, one over each arm and the apse)
-  { x: 12.5, z: -38, over: 11.4, size: 1, gilt: false },
-  { x: 1.5, z: -38, over: 11.6, size: 0.5, gilt: false },
-  { x: 12.5, z: -47, over: 7.6, size: 0.45, gilt: false },
-  { x: 12.5, z: -29, over: 7.6, size: 0.45, gilt: false },
-  { x: 25, z: -38, over: 7.4, size: 0.45, gilt: true },
-  { x: 18, z: -58, over: 21.4, size: 0.55, gilt: true },
+  { x: 12, z: -38, over: 16.0, size: 1.45, gilt: false },
+  { x: -4.75, z: -38, over: 16.2, size: 0.72, gilt: false },
+  { x: 12, z: -50.5, over: 12.4, size: 0.65, gilt: false },
+  { x: 12, z: -25.5, over: 12.4, size: 0.65, gilt: false },
+  { x: 30.75, z: -38, over: 11.6, size: 0.65, gilt: true },
+  { x: 34, z: -58, over: 21.4, size: 0.55, gilt: true },
 ];
 /** and over Lipki's chapel, on its knoll */
 export const LIPKI_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [{ x: KNOLL.x, z: KNOLL.z, over: 5.9, size: 0.38, gilt: false }];
@@ -109,6 +109,11 @@ export function townBuildings(t: Town): TownSpot[] {
 }
 
 /** what lies about a town (containers, crates, drums), in its frame */
+/** the trees a town has planted in it (only Pokrov's court has any): kind, where in its frame, how big */
+export function townTrees(t: Town): [string, number, number, number][] {
+  return t.name === POKROV.name ? POKROV_TREES : [];
+}
+
 export function townThings(t: Town): TownThing[] {
   return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : t.name === MOKROYE.name ? mokroyeThings() : t.name === ZASTAVA.name ? zastavaThings() : desertThings(t);
 }
@@ -120,7 +125,8 @@ export function townThings(t: Town): TownThing[] {
  */
 export interface TownGround {
   yards: [number, number, number, number][];
-  lanes: { line: [number, number][]; w: number }[];
+  /** `dark`: no lamps stand along it (the monastery's court) */
+  lanes: { line: [number, number][]; w: number; dark?: boolean }[];
   /** gardens' beds, dug (rectangles as yards): painted earth, no grass */
   beds?: [number, number, number, number][];
   /** ground raised (or sunk, a hollow: h below 0): a knoll's middle, how far its foot reaches, how high its top, how wide its level top (x, z, r, h, top) */

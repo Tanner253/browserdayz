@@ -43,12 +43,15 @@ function cellsSpot(): TownSpot {
 export function pokrovBuildings(): TownSpot[] {
   return [
     // on the terrace, inside the walls: the cathedral (its nave, door to the west; its two arms; its apse to the east), the belfry, the cells, the refectory, the abbot's house
-    { type: 'cathedral', x: 10, z: -38, rot: 0 },
+    // (half as big again since 2026-10-19, the owner: it "feels too small for the poi area": the nave 36 by 18, its
+    // crossing 3.75 m east of its middle, where the arms open off it)
+    { type: 'cathedral', x: 8.25, z: -38, rot: 0 },
     // (an arm's own x runs out from the nave: north, a quarter turn; south, the other way)
-    { type: 'cathedral_arm', x: 12.5, z: -47, rot: Q },
-    { type: 'cathedral_arm', x: 12.5, z: -29, rot: -Q },
-    { type: 'cathedral_apse', x: 25, z: -38, rot: 0 },
-    { type: 'belfry', x: 18, z: -58, rot: 0 },
+    { type: 'cathedral_arm', x: 12, z: -50.5, rot: Q },
+    { type: 'cathedral_arm', x: 12, z: -25.5, rot: -Q },
+    { type: 'cathedral_apse', x: 30.75, z: -38, rot: 0 },
+    // (east of the north arm, which grew over where it stood)
+    { type: 'belfry', x: 34, z: -58, rot: 0 },
     // (the cells' back against the east wall's inside face, south of its stair: see cellsSpot)
     cellsSpot(),
     { type: 'refectory', x: -40, z: 0, rot: 0 },
@@ -78,12 +81,51 @@ export function pokrovThings(): TownThing[] {
   // what is piled at the ramp's foot and along the lanes
   out.push(
     { kind: 'crate_big', x: -1.0, z: 47.5, rot: 0.2 }, { kind: 'crate_big', x: 0.1, z: 48.2, rot: 0.1 }, { kind: 'Barrel_01', x: 10.6, z: 47.2, rot: 0 }, { kind: 'barrel_03', x: 11.4, z: 48.0, rot: 0.5 },
-    { kind: 'concrete_road_barrier', x: 5, z: 33, rot: 0.1 },
+    // (by the crates at the ramp's foot: it stood across the middle of the ramp, a hand in the air on its bank)
+    { kind: 'concrete_road_barrier', x: -3.6, z: 47.2, rot: Q + 0.1 },
     { kind: 'wooden_crate_01', x: -38.4, z: 59.4, rot: 0.3 }, { kind: 'Barrel_01', x: -50.6, z: 69.2, rot: 0 }, { kind: 'trashbag', x: 39.5, z: 59.6, rot: 0.8 },
     { kind: 'old_tyre', x: 62.6, z: 69.4, rot: 0.2 }, { kind: 'covered_car', x: -78, z: 64, rot: Q + 0.05 },
   );
+  // THE COURT (2026-10-19, the owner: "pokrov needs a polish pass really bad"): it was a lawn with buildings on it.
+  // The monks' kitchen garden north of the refectory, two beds in a white fence with its gate toward the court;
+  out.push(...pokrovGarden());
+  // the wood for the refectory's kitchen and the abbot's stove, and the stumps it was split on
+  out.push({ kind: 'log_pile', x: -55, z: 0, rot: 0 }, { kind: 'tree_stump_01', x: -55.6, z: 4.4, rot: 0.6 }, { kind: 'log_pile', x: 39.5, z: 4, rot: 0.05 }, { kind: 'tree_stump_01', x: 40.6, z: 8.2, rot: 2.1 });
+  // benches either side of the church's west door and of its south arm's (each faces away from the wall it stands against)
+  out.push({ kind: 'painted_wooden_bench', x: -10.6, z: -42.5, rot: -Q }, { kind: 'painted_wooden_bench', x: -10.6, z: -33.5, rot: -Q }, { kind: 'painted_wooden_bench', x: 8.0, z: -21.4, rot: 0 }, { kind: 'painted_wooden_bench', x: 16.0, z: -21.4, rot: 0 });
   return out;
 }
+
+/** the kitchen garden: its two beds (as POKROV_GROUND's), and its fence, with a gap on its east side toward the court's path */
+const GARDEN = { x0: -54, z0: -26, x1: -31, z1: -10, gate: [-18.5, -16.5] as [number, number], beds: [[-52, -24, -44, -12], [-41, -24, -33, -12]] as [number, number, number, number][] };
+function pokrovGarden(): TownThing[] {
+  const out: TownThing[] = [], G = GARDEN;
+  // (cabbages in the west bed, pumpkins in the east, in rows, a little askew)
+  const [a, b] = G.beds;
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) out.push({ kind: 'cabbage', x: a[0] + 1 + i * 1.5 + (j % 2) * 0.2, z: a[1] + 1.5 + j * 2, rot: i * 1.3 + j * 0.7 });
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) out.push({ kind: 'pumpkin', x: b[0] + 1 + i * 2 + (j % 2) * 0.3, z: b[1] + 2 + j * 2.5, rot: i * 0.9 + j * 1.7 });
+  // (the fence in two-metre lengths, each run shared out evenly along its side; a length's own x runs along it)
+  const run = (ax: number, az: number, bx: number, bz: number) => {
+    const L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 2), rot = Math.atan2(-(bz - az), bx - ax);
+    for (let k = 0; k < n; k++) out.push({ kind: 'fence_white', x: ax + ((bx - ax) * (k + 0.5)) / n, z: az + ((bz - az) * (k + 0.5)) / n, rot });
+  };
+  run(G.x0, G.z0, G.x1, G.z0);
+  run(G.x0, G.z1, G.x1, G.z1);
+  run(G.x0, G.z0, G.x0, G.z1);
+  run(G.x1, G.z0, G.x1, G.gate[0]);
+  run(G.x1, G.gate[1], G.x1, G.z1);
+  return out;
+}
+
+/** the court's well, in its frame, and which way it is turned (its windlass across the path beside it) */
+export const POKROV_WELL = { x: -20, z: -4, rot: 0.5 };
+
+/** the court's trees: an avenue of birches from the Holy Gate, an oak by the abbot's house, ashes and bushes about it (kind, x, z, size) */
+export const POKROV_TREES: [string, number, number, number][] = [
+  ['birch_a', 0.5, 11, 1.0], ['birch_a', 9.5, 11, 0.95], ['birch_a', 0.5, 3, 1.05], ['birch_a', 9.5, 3, 1.0], ['birch_a', 0.5, -5, 0.95], ['birch_a', 9.5, -5, 1.05],
+  ['oak_a', 45, -5, 1.1], ['ash_a', -24, -74, 1.0], ['ash_a', 52, -46, 0.95],
+  ['bush_a', -70, -42, 0.9], ['bush_b', -56, 10, 1.0], ['bush_a', 52, 13, 0.9], ['bush_b', -6, -80, 1.0], ['bush_a', -60, -20, 0.85], ['bush_b', 24, 12, 0.9],
+];
 
 /** the market and the ramp cobbled (gravel), the lanes trodden; the terrace under the monastery */
 export const POKROV_GROUND: TownGround = {
@@ -95,7 +137,18 @@ export const POKROV_GROUND: TownGround = {
     { line: [[5, 80], [6, 118]], w: 5 },
     // (the bunker road out of the north gate)
     { line: [[-44, -75], [-58, -112]], w: 4 },
+    // the court's paths: from the Holy Gate to the church's south arm (lit), round the church, out to the north gate,
+    // the church's west door, the refectory, the garden's gate, the abbot's house and the cells (dark)
+    { line: [[5, 17], [5, -10], [12, -20]], w: 4 },
+    { line: [[-14, -16], [-14, -58], [24, -58], [30, -52], [41, -48], [41, -28], [36, -16], [-14, -16]], w: 3, dark: true },
+    { line: [[-42.5, -70], [-28, -62], [-14, -58]], w: 3, dark: true },
+    { line: [[-14, -38], [-9.75, -38]], w: 3, dark: true },
+    { line: [[-14, -16], [-29, -8]], w: 3, dark: true },
+    { line: [[-14, -17.5], [-31, -17.5]], w: 2.5, dark: true },
+    { line: [[36, -16], [32, -2]], w: 3, dark: true },
+    { line: [[41, -28], [56, -10]], w: 3, dark: true },
   ],
+  beds: GARDEN.beds,
   terraces: [POKROV_TERRACE],
 };
 

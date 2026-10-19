@@ -45,7 +45,8 @@ ok('no thing outside a building stands in the way out of a door or in its swing'
 });
 
 ok('the drums are all there, and every water barrel slid clear has its lid place with it', () => {
-  assert.equal(world.props.filter((p) => p.kind === 'Barrel_01').length, 251);
+  // (252 since Pokrov's church was made half as big again, 2026-10-19: its yard has room for one more)
+  assert.equal(world.props.filter((p) => p.kind === 'Barrel_01').length, 252);
   // (a place on a water barrel's lid lies at its middle: none is left hanging where a barrel was)
   const lids = world.props.filter((p) => p.kind === 'barrel_03' && p.far === undefined);
   for (const q of plan.lootPoints) if (!q.floor && q.surf && q.surf.hx === 0.17 && q.surf.hz === 0.17) assert.ok(lids.some((p) => Math.hypot(p.x - q.x, p.z - q.z) < 0.01), `a lid's place at ${q.x.toFixed(1)},${q.z.toFixed(1)} with no barrel under it`);

@@ -35,41 +35,48 @@ const rack = (g: Floor, id: 'rack_wide' | 'rack_small', x: number, z: number, ro
  */
 export function cathedralPlan(): Blueprint {
   // (long along x, as a gable roof runs: the door in its west gable end, the left wall)
-  const HW = 12, HD = 6.5, I = 7.2;
+  // Half as big again as it was (the owner, 2026-10-19: it "feels too small for the poi area"): 36 by 18 m and 11 high.
+  // The crossing, where the arms open off it, is CROSS east of the middle, and the screen I east of that.
+  const HW = 18, HD = 9, I = 11, CROSS = 3.75, W = HD - 0.5;
   const g = new Floor();
   // The army's store (the owner, 2026-10-19: "the interior is completely empty, a military spawn in there would be
   // nice"), as the churches of these lands were made stores: the west end, from the door to the arms, stacked along its
-  // walls, a rack of arms, two lockers, the table things were counted out on, the aisle from the door kept clear. The
-  // crossing is left to the church: two tables of candles before the screen, benches by the door.
-  g.put('crate_big', -11.2, -5.7, 0.05).put('wooden_military_crate', -11.2 + STACK, -5.7 + STACK, 0.1, 1.0)
-    .put('old_military_crate', -9.4, -5.61, 0).put('old_military_crate', -9.4 + STACK, -5.61 + STACK, 0.04, 0.3)
-    .put('gun_rack', -6.0, -5.98, 0).put('wooden_military_crate', -3.6, -6.02, 0).put('Barrel_01', -2.35, -5.95);
-  g.put('steel_locker', -8.3, 6.0, PI).put('steel_locker', -7.2, 6.0, PI)
-    .top('steel_table', -4.5, 5.6, Q, 0.8, 2).put('SchoolChair_01', -4.9, 4.7, 0.2).put('painted_wooden_stool', -3.7, 4.75, 0.4)
-    .put('metal_jerrycan_green', -2.6, 5.95, 0.2).put('metal_jerrycan_green', -2.2, 5.9, -0.3).put('propane_tank', -2.15, 4.95);
-  g.put('crate_big', -6.8, -2.6, 0.1).put('crate_big', -5.75, -2.75, -0.05).put('Barrel_01', -6.3, 2.8).put('Barrel_01', -5.65, 3.1).put('metal_jerrycan_green', -7.0, 3.0, 1.2);
-  g.put('crate_big', -9.2, 3.0, 0.08).put('crate_big', -9.2 + STACK, 3.0 + STACK, -0.04, 1.0);
-  g.put('painted_wooden_bench', -11.55, -3.5, Q).put('painted_wooden_bench', -11.55, 3.5, Q);
-  for (const x of [0.6, 2.8]) g.put('painted_wooden_bench', x, -2.4, Q).put('painted_wooden_bench', x, 2.4, Q);
-  for (const z of [-2.6, 2.6]) {
-    g.put('WoodenTable_01', 5.6, z, Q);
-    for (const k of [-0.55, 0, 0.55]) g.put('wooden_candlestick', 5.6 + k * 0.2, z + k, 0, 0.55);
+  // walls, racks of arms, two lockers, the table things were counted out on with its wireless, the aisle from the door
+  // kept clear and clear of the side door's swing. The crossing is left to the church: benches, two tables of candles
+  // before the screen.
+  g.put('crate_big', -17.2, -8.2, 0.05).put('wooden_military_crate', -17.2 + STACK, -8.2 + STACK, 0.1, 1.0)
+    .put('old_military_crate', -15.4, -W + 0.39, 0).put('old_military_crate', -15.4 + STACK, -W + 0.39 + STACK, 0.04, 0.3)
+    .put('gun_rack', -12.0, -W + 0.02, 0).put('wooden_military_crate', -9.6, -W - 0.02, 0).put('Barrel_01', -8.35, -W + 0.05)
+    .put('gun_rack', -5.9, -W + 0.02, 0);
+  g.put('steel_locker', -13.0, W, PI).put('steel_locker', -11.9, W, PI)
+    .top('steel_table', -9.6, W - 0.4, Q, 0.8, 2).put('vintage_radio_transceiver', -9.6, W - 0.15, PI, 0.8).put('SchoolChair_01', -10.0, W - 1.3, 0.2).put('painted_wooden_stool', -8.8, W - 1.25, 0.4)
+    .put('metal_jerrycan_green', -8.0, W - 0.05, 0.2).put('metal_jerrycan_green', -7.6, W - 0.1, -0.3).put('propane_tank', -7.55, W - 1.05)
+    .put('wooden_military_crate', -5.6, W + 0.02, PI).put('wooden_military_crate', -5.6 - STACK, W + 0.02 - STACK, PI + 0.06, 0.4648);
+  g.put('crate_big', -12.8, -2.6, 0.1).put('crate_big', -11.75, -2.75, -0.05).put('Barrel_01', -12.3, 2.8).put('Barrel_01', -11.65, 3.1).put('metal_jerrycan_green', -13.0, 3.0, 1.2);
+  g.put('crate_big', -15.2, 3.0, 0.08).put('crate_big', -15.2 + STACK, 3.0 + STACK, -0.04, 1.0);
+  g.put('painted_wooden_bench', -17.55, -3.5, Q).put('painted_wooden_bench', -17.55, 3.5, Q);
+  for (const x of [0.6, 2.8, 5.0]) g.put('painted_wooden_bench', x, -2.6, Q).put('painted_wooden_bench', x, 2.6, Q);
+  for (const z of [-3.0, 3.0]) {
+    g.put('WoodenTable_01', 8.0, z, Q);
+    for (const k of [-0.55, 0, 0.55]) g.put('wooden_candlestick', 8.0 + k * 0.2, z + k, 0, 0.55);
   }
-  g.floor([4.2, 0], [-1.2, 2.4], [-4.6, 0], [-9.4, -2.6]);
+  g.floor([6.0, 0], [-2.2, 2.4], [-10.6, 0], [-15.4, -2.6]);
   // the sanctuary: the altar with its candles, the vestry's cupboard and shelves
-  g.top('painted_wooden_table', 9.6, 0, Q, 0.98, 2).top('painted_wooden_cabinet', 11.25, -5.2, -Q, 1.2).case('Shelf_01', 10.4, 5.95, PI, [0.66, 1.22, 1.75]).put('painted_wooden_chair_01', 9.2, 3.0, -0.4).floor([8.3, -3.6], [8.5, 3.3]);
-  g.put('wooden_candlestick', 9.6, -1.05, 0, 0.96).put('wooden_candlestick', 9.6, 1.05, 0, 0.96);
-  const tall = (x: number) => win(x - 0.6, x + 0.6, 3.4, 6.9);
+  g.top('painted_wooden_table', 14.2, 0, Q, 0.98, 2).top('painted_wooden_cabinet', 17.25, -7.7, -Q, 1.2).case('Shelf_01', 14.8, W - 0.05, PI, [0.66, 1.22, 1.75]).put('painted_wooden_chair_01', 13.4, 3.6, -0.4).floor([12.4, -4.8], [12.6, 4.4]);
+  g.put('wooden_candlestick', 14.2, -1.05, 0, 0.96).put('wooden_candlestick', 14.2, 1.05, 0, 0.96);
+  // (more of the army's: under the racks, and by the counting table)
+  g.floor([-13.5, -6.8], [-9.0, 6.4]);
+  const tall = (x: number) => win(x - 0.8, x + 0.8, 4.5, 9.0), arm = join(CROSS - 5.9, CROSS + 5.9, 8.0);
   return {
-    w: HW * 2, d: HD * 2, h: 8.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 11.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
     walls: [
-      { side: 'left', ext: 'lime_brick', int: 'int_painted', openings: [door(-1.1, 1.1, 3.4), win(-4.7, -3.5, 4.4, 6.8), win(3.5, 4.7, 4.4, 6.8), win(-0.6, 0.6, 4.6, 6.8)] },
+      { side: 'left', ext: 'lime_brick', int: 'int_painted', openings: [door(-1.5, 1.5, 4.2), win(-6.2, -4.6, 5.8, 9.0), win(4.6, 6.2, 5.8, 9.0), win(-0.8, 0.8, 6.0, 9.0)] },
       // (the east gable opens into the apse, the long walls into the arms: see cathedralArmPlan, cathedralApsePlan)
-      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [join(-3.6, 3.6, 6.0)] },
-      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [tall(-8), tall(-3), join(-1.6, 6.6, 6.0), win(8.6, 9.4, 3.4, 6.9), door(-10.6, -9.4, 2.4)] },
-      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [tall(-8), tall(-3), join(-1.6, 6.6, 6.0), door(9.9, 10.9)] },
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [join(-5.4, 5.4, 8.0)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [tall(-13.2), tall(-9.0), tall(-4.8), arm, win(13.6, 14.8, 4.5, 9.0), door(-16.4, -15.0, 2.6)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [tall(-13.2), tall(-9.0), tall(-4.8), arm, door(13.7, 14.9, 2.4)] },
       // the iconostasis: the royal doors, and a deacon's door each side
-      inner([I, -HD + 0.2], [I, HD - 0.2], [gap(-1.0, 1.0, 3.0), door(-4.2, -3.4), door(3.4, 4.2)], 'int_painted', 'int_painted'),
+      inner([I, -HD + 0.2], [I, HD - 0.2], [gap(-1.4, 1.4, 3.6), door(-5.6, -4.6, 2.4), door(4.6, 5.6, 2.4)], 'int_painted', 'int_painted'),
     ],
     furniture: g.furniture, loot: g.loot,
     dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
@@ -83,17 +90,19 @@ export function cathedralPlan(): Blueprint {
  * with a door at the far end, so its roof's ridge crosses the nave's. Stood one each side.
  */
 export function cathedralArmPlan(): Blueprint {
-  const HW = 2.5, HD = 4.5;
+  const HW = 3.5, HD = 6.5;
   const g = new Floor();
   // (where the soldiers who kept the store slept: four cots, their heads to the walls, a locker and the old cupboard)
-  g.bed(-1.3, -3.3, 0).bed(0.4, -3.3, 0, false).bed(-1.3, 3.3, PI, false).bed(0.4, 3.3, PI);
-  g.put('painted_wooden_chair_01', 1.4, -3.9, 0).put('painted_wooden_chair_01', 1.4, 3.9, PI).top('painted_wooden_cabinet', HW - 0.49, -3.2, -Q, 1.2).put('steel_locker', HW - 0.48, 3.2, -Q).floor([-0.5, 1.6], [-0.8, -1.6]);
+  g.bed(-2.0, -HD + 1.2, 0).bed(0.2, -HD + 1.2, 0, false).bed(-2.0, HD - 1.2, PI, false).bed(0.2, HD - 1.2, PI);
+  // (and at each cot's foot its soldier's box, the way down the arm to its door left clear between the rows)
+  for (const x of [-2.0, 0.2]) g.put('wooden_military_crate', x, -HD + 2.65, 0).put('wooden_military_crate', x, HD - 2.65, PI);
+  g.put('painted_wooden_chair_01', 2.2, -HD + 0.6, 0).put('painted_wooden_chair_01', 2.2, HD - 0.6, PI).top('painted_wooden_cabinet', HW - 0.49, -4.2, -Q, 1.2).put('steel_locker', HW - 0.48, 4.2, -Q).floor([-0.5, 1.6], [-0.8, -1.6]);
   return {
-    w: HW * 2, d: HD * 2, h: 6.5, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 9.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
     walls: [
-      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [door(-0.65, 0.65, 2.6), win(-0.45, 0.45, 3.6, 5.6)] },
-      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.5, 0.5, 2.6, 5.0)] },
-      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.5, 0.5, 2.6, 5.0)] },
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [door(-0.8, 0.8, 3.0), win(-0.6, 0.6, 4.5, 7.5)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.4, 6.8)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.4, 6.8)] },
     ],
     joined: ['left'],
     furniture: g.furniture, loot: g.loot,
@@ -104,16 +113,16 @@ export function cathedralArmPlan(): Blueprint {
 
 /** The apse: the sanctuary run on east of the nave (which its left side opens into), a tall window in its end. */
 export function cathedralApsePlan(): Blueprint {
-  const HW = 3, HD = 4;
+  const HW = 4.5, HD = 6;
   const g = new Floor();
-  g.top('painted_wooden_table', 0.6, 0, Q, 0.98, 2).put('painted_wooden_chair_01', -1.2, 2.6, 2.6).floor([1.8, -2.4]);
-  g.put('wooden_candlestick', 0.6, -1.05, 0, 0.96).put('wooden_candlestick', 0.6, 1.05, 0, 0.96).put('painted_wooden_bench', 2.55, 2.4, -Q).put('painted_wooden_bench', 2.55, -2.4, -Q);
+  g.top('painted_wooden_table', 1.2, 0, Q, 0.98, 2).put('painted_wooden_chair_01', -1.8, 4.0, 2.6).floor([2.7, -3.6]);
+  g.put('wooden_candlestick', 1.2, -1.05, 0, 0.96).put('wooden_candlestick', 1.2, 1.05, 0, 0.96).put('painted_wooden_bench', HW - 0.45, 3.6, -Q).put('painted_wooden_bench', HW - 0.45, -3.6, -Q);
   return {
-    w: HW * 2, d: HD * 2, h: 6.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 8.5, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
     walls: [
-      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 2.4, 5.2)] },
-      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.45, 0.45, 2.8, 4.6)] },
-      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.45, 0.45, 2.8, 4.6)] },
+      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.8, 0.8, 3.2, 7.0)] },
+      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.6, 6.2)] },
+      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.6, 6.2)] },
     ],
     joined: ['left'],
     furniture: g.furniture, loot: g.loot,

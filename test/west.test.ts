@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
-import { moundAt } from '../src/sim/towns';
+import { moundAt, townPoint, townTrees } from '../src/sim/towns';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
@@ -296,7 +296,9 @@ const ridge = (z: number) => RL.ridgeAt(z);
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
     const c = Math.cos(town.rot), s = Math.sin(town.rot);
-    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1]; });
+    // (but what the town planted itself: Pokrov's court has its trees, 2026-10-19)
+    const planted = townTrees(town).map(([, lx, lz]) => townPoint(town, lx, lz));
+    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01); });
     assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad`);
     // (but in a hollow: Mokroye's barn stands sunk to the waist, as it was drawn up)
     for (const b of ids) {

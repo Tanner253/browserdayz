@@ -13,8 +13,8 @@ import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { kitSolids, type KitPiece } from '../sim/kit';
 import { placedDomes, placedKits, placedTowers, placedWalls, type PlacedTown } from '../sim/towns';
-import { towerSolids } from '../sim/pokrov-towers';
-import { towerInsides } from './pokrov-towers';
+import { stairRailSolids, towerSolids } from '../sim/pokrov-towers';
+import { stairRails, towerInsides } from './pokrov-towers';
 import type { Atmosphere } from './atmosphere';
 import type { Buildings } from './buildings';
 import { onionDome } from './domes';
@@ -80,9 +80,11 @@ export class Towns {
     for (const t of this.placed) {
       const pieces = placedWalls(t);
       if (pieces.length) {
-        // (the corner towers are hollow: what stops a body in them, and what is drawn inside them, is their own plan's)
-        const towers = placedTowers(t), add = towerInsides(towers);
-        for (const s of [...kitSolids(pieces), ...towers.flatMap(towerSolids)]) {
+        // (the corner towers are hollow: what stops a body in them, and what is drawn inside them, is their own plan's;
+        // and the walls' stairs have a parapet up their open side)
+        const towers = placedTowers(t), add = towerInsides(towers), stairs = pieces.filter((k) => k.id === 'fort_wall_stairs_straight_01');
+        add.fort_trim.push(...stairRails(stairs));
+        for (const s of [...kitSolids(pieces), ...towers.flatMap(towerSolids), ...stairs.flatMap(stairRailSolids)]) {
           if (s.t === 'box') physics.addStaticQuat(physics.R.ColliderDesc.cuboid(s.h[0], s.h[1], s.h[2]), 'concrete', { x: s.c[0], y: s.c[1], z: s.c[2] }, { x: s.q[0], y: s.q[1], z: s.q[2], w: s.q[3] });
           else {
             const hull = physics.R.ColliderDesc.convexHull(new Float32Array(s.pts));

@@ -25,7 +25,7 @@ import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside 
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
 import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
 import { DESERT_EAST, desertTown, fillTown, footOn, hamletGround, kalatSite, layKalat, layPad, offPad, padHeld, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
-import { moundAt, placedRooms } from '../../sim/towns';
+import { POKROV, moundAt, placedRooms } from '../../sim/towns';
 import { HUNTING_TOWERS, WATCHTOWERS, huntingId, watchtowerId } from '../../sim/watchtowers';
 import type { Instance, POI, Site } from './types';
 
@@ -439,7 +439,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   const ground = (x: number, z: number) => heightAt(heights, x, z);
   for (const t of PLACED) {
     const y = padY.get(t.name)!;
-    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass }, t.x < DESERT_EAST ? ground : undefined);
+    // (Pokrov's things too: a lamp on its north road and a barrier on its ramp's bank stood at its pad's height, off the ground)
+    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass, trees: tools.trees }, t.x < DESERT_EAST || t.name === POKROV.name ? ground : undefined);
     towns.push(placed(t, y));
     tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
   }

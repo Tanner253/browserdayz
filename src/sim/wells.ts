@@ -4,6 +4,8 @@
 // Rules and places only: the game draws the well and does the drinking (src/world/wells.ts, src/game/game.ts).
 
 import { BUILDING_FOOTPRINT, TOWN, heightAt, type World } from '../world/worldgen';
+import { POKROV, townPoint } from './towns';
+import { POKROV_WELL } from './pokrov';
 
 export const WELL = {
   /** how near its middle somebody has to stand to drink at it, metres */
@@ -84,6 +86,11 @@ export function wellSpots(world: World): Well[] {
         break search;
       }
     }
+  }
+  // (and the monks' in Pokrov's court, by the path to the refectory: laid out with the court, 2026-10-19)
+  for (const p of world.towns ?? []) if (p.town.name === POKROV.name) {
+    const [x, z] = townPoint(p.town, POKROV_WELL.x, POKROV_WELL.z);
+    out.push({ x, y: heightAt(H, x, z), z, rot: p.town.rot + POKROV_WELL.rot, town: POKROV.name });
   }
   return out;
 }
