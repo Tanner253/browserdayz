@@ -342,9 +342,9 @@ const ridge = (z: number) => RL.ridgeAt(z);
 // --- the Zona, the starts
 {
   let out = 0;
-  for (let x = -3600; x <= -700; x += 40) for (let z = -740; z <= 740; z += 40) if (!WG.inPlay(x, z)) out++;
+  for (let x = -3600; x <= -700; x += 40) for (let z = -740; z <= 740; z += 40) if (!WG.inRounds(x, z)) out++;
   assert.equal(out, 0, `${out} spots of the new land outside the Zona`);
-  assert.ok(!WG.inPlay(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
+  assert.ok(!WG.inRounds(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
   // (no start in the west: on the beach, players began kilometres from anywhere; 2026-10-17, "revert the spawn locations back to the village")
   assert.equal(world.spawns.filter((s) => s.x < -SQUARE_HALF).length, 0, 'a start in the west');
   ok(`the Zona over all the new land out to the barrier; the starts the square's own, round the village (${world.spawns.length})`);

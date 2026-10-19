@@ -406,18 +406,18 @@ ok('the fort on the mountain is stocked on top of the map: the army\'s things in
   assert.ok(own.length >= 40, `${own.length} places in the fort`);
   for (const { fort } of worlds) {
     const loose = fort.filter(({ p }) => !p.arms && !p.keeps);
-    // (well stocked, and not a shop)
-    assert.ok(loose.length >= free.length * 0.45 && loose.length <= free.length * 0.9, `${loose.length} things in the fort's ${free.length} free places`);
-    const top = loose.filter(({ p }) => p.tier === 4);
-    assert.ok(top.length >= 10, `${top.length} things of the fourth step in the fort`);
+    // (well stocked, and not a shop: since 2026-10-18 the fort on the fifth step half as thick as the bunker, and Kalat, Zavod and Pokrov on the second)
+    assert.ok(loose.length >= free.length * 0.3 && loose.length <= free.length * 0.9, `${loose.length} things in the fort's ${free.length} free places`);
+    const top = loose.filter(({ p }) => p.tier === 5);
+    assert.ok(top.length >= 10, `${top.length} things of the fifth step in the fort`);
     // (each thing lies in a spot of a kind it is kept in, on every step: no rifle on a cot, no blood in the armoury)
     for (const { id, p } of loose) assert.ok((APART_KIND[id] ?? []).some((u) => p.usage.includes(u)) || TYPES[id].usage.some((u) => p.usage.includes(u)) || (TYPES[id].on?.[p.tier!]?.usage ?? []).some((u) => p.usage.includes(u)), `${id} in the fort's ${p.usage.join(' and ')}`);
     // (and it is a garrison's store, 2026-10-13: a magazine for each rifle of its racks, a scope, and what a wound needs)
     const has = (id: string) => loose.filter((l) => l.id === id).length;
     for (const [id, n] of [['mag_ak', 2], ['mag_ar', 2], ['mag_sniper', 1], ['pu_scope', 1], ['stim_combat', 2], ['blood_bag', 2], ['firstaid', 2], ['grenade', 2]] as const) assert.ok(has(id) >= n, `${has(id)} of ${id} in the fort, and ${n} are always there`);
     // (its guns are on its racks, a rifle among them; what lies loose is what goes with them, and a dressing station's things)
-    const guns = fort.filter(({ id, p }) => p.tier === 4 && ITEMS[id].weapon), med = top.filter(({ id }) => ITEMS[id].category === 'medical').length;
-    assert.ok(guns.length >= 4 && med >= 2, `${guns.length} guns and ${med} medical things in the fort's fourth step`);
+    const guns = fort.filter(({ id, p }) => p.tier === 5 && ITEMS[id].weapon), med = top.filter(({ id }) => ITEMS[id].category === 'medical').length;
+    assert.ok(guns.length >= 4 && med >= 2, `${guns.length} guns and ${med} medical things in the fort's fifth step`);
     // (and the racks that always hold a gun hold one)
     const racks = own.filter((p) => p.arms === 'guns').length;
     assert.ok(racks >= 4 && fort.filter(({ p, id }) => p.arms === 'guns' && ITEMS[id].weapon).length === racks, `${racks} racks in the fort, not all with a gun`);

@@ -344,7 +344,7 @@ export class Economy {
     // (What it is never without is taken out of the room there is first: `sure` of each sort. What each sort's share
     // comes to over that is its `spare`, and the spares fill what room is left, cut down alike if there is not
     // enough of it.)
-    const least = t === 4 ? APART_LEAST[place] ?? {} : {};
+    const least = t >= 4 ? APART_LEAST[place] ?? {} : {};
     const base = fair.map(([id, e]) => {
       const sure = Math.min(least[id] ?? 0, this.written(id, t));
       return { id, sure, spare: Math.max(0, e - sure) };

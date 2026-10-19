@@ -146,7 +146,8 @@ export const PLAN = {
    */
   towns: { Zastava: { x: -1965, z: -452 } } as Record<string, { x?: number; z?: number; rot?: number }>,
   /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
-  tiers: { Pokrov: 3, Lipki: 2, Zavod: 3, Ozerki: 2, Mokroye: 2, Zastava: 3 } as Record<string, Tier>,
+  // (west to east, worse to better: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)"; Pokrov, Ozerki and Zastava between, as the plan put them)
+  tiers: { Pokrov: 2, Lipki: 3, Zavod: 2, Ozerki: 3, Mokroye: 3, Zastava: 3 } as Record<string, Tier>,
   /**
    * The roads: the main one from the loop's west bend through the trader and Pokrov's lane, north-west to the pass's
    * mouth, through it beside the river (`pass`: so far south of its middle) and out across the desert past Kalat to the
@@ -212,7 +213,7 @@ export function westTier(x: number, z: number): Tier | null {
     const c = Math.cos(t.rot), s = Math.sin(t.rot), dx = x - t.x, dz = z - t.z;
     if (Math.abs(dx * c - dz * s) <= t.pad[0] + 10 && Math.abs(dx * s + dz * c) <= t.pad[1] + 10) return PLAN.tiers[t.name] ?? 2;
   }
-  if (nearLine(PLAN.pass.line, x, z).d < PLAN.pass.floor + 30) return 4;
+  if (nearLine(PLAN.pass.line, x, z).d < PLAN.pass.floor + 30) return 3;
   return null;
 }
 

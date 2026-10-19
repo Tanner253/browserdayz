@@ -1125,7 +1125,8 @@ export function ruinsGround(x: number, z: number): Ground {
  * long walk, one covered way in, and seen from everywhere. On 4 a thing lies wherever it will (the economy leaves
  * kinds out up there), so the kinds matter for the town and are only good sense for the palace.
  */
-export const RUIN_TIER: Record<Piece, 3 | 4> = { alcazar: 4, curtain: 3, gate: 3, honeycomb: 3, spur: 3, north: 3, stubA: 3, stubB: 3, stump: 3 };
+// (Kalat on the second step, the first town east of the coast: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
+export const RUIN_TIER: Record<Piece, 2 | 3 | 4> = { alcazar: 2, curtain: 2, gate: 2, honeycomb: 2, spur: 2, north: 2, stubA: 2, stubB: 2, stump: 2 };
 export type RuinUsage = 'Hunting' | 'Farm' | 'Industrial' | 'Military';
 export interface RuinLoot {
   x: number;
@@ -1134,7 +1135,7 @@ export interface RuinLoot {
   usage: RuinUsage[];
   building: string;
   floor: boolean;
-  tier: 3 | 4;
+  tier: 2 | 3 | 4;
   /** kept stocked with something to fight with: a gun in the nests, anything in a camp */
   arms?: 'guns' | 'any';
 }

@@ -35,6 +35,11 @@ export function apartOf(building: string): string | null {
   const town = building.replace(/_\d+$/, '');
   return town !== building && APART.has(town) ? town : null;
 }
+/** how a place apart's share leans, sort by sort, as each sort's own rule says (see APART_LEAN) */
+function APART_LEAN_OF(): Record<string, number> {
+  return Object.fromEntries(Object.values(ITEMS).flatMap((d) => (d.loot?.lean ? [[d.id, d.loot.lean]] : [])));
+}
+
 /** the most of a place apart's free places that are ever filled: a room with something on every surface is a shop */
 export const APART_FILL = 0.85;
 /** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
@@ -47,6 +52,8 @@ export const APART_RICH = 1.5;
 // (the new places of the map three times over are stocked as their steps are, no richer: they are new ground, not a reward)
 export const OWN: Record<string, { rich: number; lean: Record<string, number> }> = {
   cellar: { rich: 3, lean: {} },
+  // (the fort on the fifth step, half as thick as the bunker and with none of what is the bunker's alone: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
+  castle: { rich: 0.5, lean: { ...APART_LEAN_OF(), ...Object.fromEntries(Object.values(ITEMS).filter((d) => d.loot?.at && d.loot.at.slice(0, 4).every((n) => !n) && (d.loot.at[4] ?? 0) > 0).map((d) => [d.id, 0])) } },
   ...Object.fromEntries(['kalat', ...TOWNS.map((t) => t.name.toLowerCase())].map((k) => [k, { rich: 1, lean: {} }])),
 };
 /**
@@ -57,7 +64,7 @@ export const OWN: Record<string, { rich: number; lean: Record<string, number> }>
  * what a wound needs, and has less of what lies in any village. (Still never more of a sort than the whole step
  * has, and nothing that is the bunker's alone: the drum, the long magazine, the K6-3.)
  */
-export const APART_LEAN: Record<string, number> = Object.fromEntries(Object.values(ITEMS).flatMap((d) => (d.loot?.lean ? [[d.id, d.loot.lean]] : [])));
+export const APART_LEAN: Record<string, number> = APART_LEAN_OF();
 
 /** what a named place apart never has less of on its fourth step, whatever its shares come to (where it has a spot of the kind): a magazine for each rifle of its racks, and a dressing station's own */
 export const APART_LEAST: Record<string, Record<string, number>> = {

@@ -28,6 +28,7 @@ import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
 
+
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 // (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
 // that kind and no other: a clinic is not also a house, nor a shop, nor a shed a part of the village. They were,
@@ -1629,7 +1630,8 @@ export class Buildings {
     if (fort) {
       // (the ground as it is seen: over the hatch's stairwell that is the height it had before it was let down)
       const ground = (x: number, z: number) => heightAt(this.world.surface, x, z);
-      for (const q of castleLoot(fort, ground)) this.lootPoints.push(q);
+      // (the fort on the fifth step, stocked thinner than the bunker and without the bunker's own: see OWN in src/sim/apart.ts)
+      for (const q of castleLoot(fort, ground)) this.lootPoints.push(q.building === 'castle' ? { ...q, tier: 5 } : q);
       // (Two crates of its store stand one on the other. What is searched is told by where it stands over the ground
       // and not by how high: the upper of two such is set a hand's breadth askew, and is a box of its own.)
       const stood = new Set<string>();

@@ -416,8 +416,9 @@ export function inMouth(mouths: ReturnType<typeof caveMouths>, x: number, z: num
 }
 
 /** The loot places of the caves (all of the fourth tier: caves are the second best there is) and the floor's cache (the fifth). */
-export function caveLoot(p: Pass): { x: number; y: number; z: number; tier: 4 | 5; where: string }[] {
-  const out: { x: number; y: number; z: number; tier: 4 | 5; where: string }[] = [];
+// (the pass on the third step, its caves and the cache on its floor with it: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
+export function caveLoot(p: Pass): { x: number; y: number; z: number; tier: 3 | 4 | 5; where: string }[] {
+  const out: { x: number; y: number; z: number; tier: 3 | 4 | 5; where: string }[] = [];
   CAVES.forEach((c) => {
     for (const l of c.loot) {
       const n = c.nodes[l.at];
@@ -425,14 +426,14 @@ export function caveLoot(p: Pass): { x: number; y: number; z: number; tier: 4 | 
         // (round the node, against its walls: where a thing would be left, not in the way)
         const a = (i / Math.max(1, l.n)) * Math.PI * 2 + l.at, r = n.w / 2 - 0.7;
         const q = passWorld(p, n.s, n.t, n.y), o = alongPass(p, n.s);
-        out.push({ x: q[0] + Math.cos(a) * r * o.ux - Math.sin(a) * r * o.uz * 0.6, y: q[1] + 0.02, z: q[2] + Math.cos(a) * r * o.uz + Math.sin(a) * r * o.ux * 0.6, tier: 4, where: c.name });
+        out.push({ x: q[0] + Math.cos(a) * r * o.ux - Math.sin(a) * r * o.uz * 0.6, y: q[1] + 0.02, z: q[2] + Math.cos(a) * r * o.uz + Math.sin(a) * r * o.ux * 0.6, tier: 3, where: c.name });
       }
     }
   });
   const F = FLOOR_CACHE;
   for (let i = 0; i < F.n; i++) {
     const a = (i / F.n) * Math.PI * 2, q = passWorld(p, F.s + Math.cos(a) * F.r, F.t + Math.sin(a) * F.r * 0.5, 0);
-    out.push({ x: q[0], y: q[1] + 0.02, z: q[2], tier: 5, where: 'the pass floor' });
+    out.push({ x: q[0], y: q[1] + 0.02, z: q[2], tier: 3, where: 'the pass floor' });
   }
   return out;
 }
