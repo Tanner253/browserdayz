@@ -17,7 +17,7 @@ import type { Store } from '../api/_lib/store';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
-const PORT = 8253, SITE = 8254, HOLD = 2;
+const PORT = 8261, SITE = 8262, HOLD = 2;
 const PASSWORD = `test-only-${Math.random().toString(36).slice(2)}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const world = generateWorld();
