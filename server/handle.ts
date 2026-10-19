@@ -16,7 +16,7 @@ import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, tellSeats, things, vehicles, world } from './index';
-import { TAG_FRESH_MS, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, tagSeen, voided } from './tags';
+import { TAG_FRESH_MS, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { shortDevice } from './device';
@@ -549,7 +549,7 @@ export function handle(c: Client, m: C2S) {
       // the clock on a looted tag starts the first time the server sees it in somebody else's pockets
       for (const t of carriedTags(c.inv)) {
         const from = lootedTags.get(t.uid);
-        if (from && from.ownerKey !== c.key && !tagSeen.has(`${c.key}|${t.uid}`)) tagSeen.set(`${c.key}|${t.uid}`, Date.now());
+        if (from && !theirOwn(from, c.key) && !tagSeen.has(seenOf(c.key) + t.uid)) tagSeen.set(seenOf(c.key) + t.uid, Date.now());
       }
       // (there is no honest way to come by one in a seat: see 'take' and 'copen')
       if (c.seatAt && takenTag(c)) {
@@ -828,7 +828,7 @@ export function handle(c: Client, m: C2S) {
       // the tag has to be one this player really carries, with its time (nearly) served:
       // our copy of their inventory is a few seconds behind theirs
       const tag = findCarried(c, m.uid);
-      const seenAt = tag ? tagSeen.get(`${c.key}|${tag.uid}`) : undefined;
+      const seenAt = tag ? tagSeen.get(seenOf(c.key) + tag.uid) : undefined;
       if (!tag || tag.id !== 'dogtag' || ((tag.held ?? 0) < TAG_HOLD - 30 && !(seenAt !== undefined && Date.now() - seenAt >= CASH_HOLD_MS))) return;
       // (nothing is earned by somebody nothing can hurt, nobody can see, or no wall stops)
       if (c.power.god || c.power.hidden || c.power.clip) return void sys(c, 'No tag is cashed in with god mode, vanish or noclip on: put them off first.');
@@ -836,11 +836,11 @@ export function handle(c: Client, m: C2S) {
       const owner = tag.owner ?? 'Survivor';
       const from = lootedTags.get(tag.uid);
       const now = Date.now();
-      // (a tag this server did not see taken: it has restarted since, and no longer knows whose pockets it came out of)
-      const why = buried(c, now) ? 'it was cashed in from under the ground' : voided.has(tag.uid) ? 'it was carried out of the Zona or under the ground' : from ? notEarned(c, from, tagSeen.get(`${c.key}|${tag.uid}`), now) : 'the server restarted while you were carrying it';
+      // (a tag this server knows nothing of: taken before tags were kept through a restart, see keepTags)
+      const why = buried(c, now) ? 'it was cashed in from under the ground' : voided.has(tag.uid) ? 'it was carried out of the Zona or under the ground' : from ? notEarned(c, from, seenAt, now) : 'the server restarted while you were carrying it';
       log(`${c.name} cashed in ${owner}'s dog tag${why ? ` (not listed for a reward: ${why})` : ''}`);
       lootedTags.delete(tag.uid);
-      tagSeen.delete(`${c.key}|${tag.uid}`);
+      tagSeen.delete(seenOf(c.key) + tag.uid);
       if (from && !why) {
         // one tag, one reward
         for (const a of namesOf(c.key, c.ip)) for (const b of namesOf(from.ownerKey, from.ownerIp)) pairPaidAt.set(`${a}>${b}`, now);

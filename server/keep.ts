@@ -8,7 +8,7 @@ import { BODY_GRID, heldIn } from '../src/sim/inventory';
 import { type ItemInstance, ITEMS } from '../src/sim/items';
 import type { NewsKept } from '../src/sim/news';
 import { BOOT, CORPSE_LIFETIME, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
-import { SITE_URL } from './tags';
+import { SITE_URL, keepTags, takeTags, type TagsKept } from './tags';
 import { CHECK } from './checks';
 import { ADMIN, keyHash, roleOf, siteAdmin, type AdminState } from './gate';
 import { CARRY_KEPT, POWERS_KEPT, carryKeep, carryKept, keepPowers, noHold } from './admin';
@@ -105,6 +105,8 @@ interface Snapshot {
   elite?: [string, number][];
   /** the dead lying on the ground, with what is on them and how many seconds each has left (see `bodies`) */
   bodies?: KeptBody[];
+  /** whose each looted tag was and when its carrier picked it up (see keepTags) */
+  tags?: TagsKept;
 }
 
 /** a body as it is kept: where it lies, whose it was, how it fell, what is on it, and the seconds it has left */
@@ -187,7 +189,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -249,6 +251,7 @@ function takeInLate(save: KeptFile) {
   seen.restore(snap.seen);
   elite.restore(snap.elite);
   takePowers(snap.powers);
+  takeTags(snap.tags);
   const moved = snap.rev !== WORLD_REV, now = Date.now();
   layBodies(snap.bodies, moved);
   const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
@@ -542,6 +545,7 @@ export async function loadKept() {
     seen.restore(snap.seen);
     elite.restore(snap.elite);
     takePowers(snap.powers);
+    takeTags(snap.tags);
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
   } catch (e) {
     // (what could be taken in has been: it is not thrown away for the sake of what could not)

@@ -5,7 +5,7 @@ import { TAG_OUT, ZONA_VOID, type ItemInstance } from '../src/sim/items';
 import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
 import { BANS, SOAK, log, vehicles, world, type Box } from './index';
-import { carriedTags, lootedTags, namesOf, tagSeen, voided } from './tags';
+import { carriedTags, lootedTags, namesOf, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { TURNED, forgetShooter, keep, keyHash, roleOf, stayOn, turnedAway } from './gate';
 import { KEPT } from './keep';
 import { putOff } from './admin';
@@ -21,7 +21,7 @@ import { AIR, FIRST } from './bodywatch';
 export function takenTag(c: Client): boolean {
   return carriedTags(c.inv).some((t) => {
     const from = lootedTags.get(t.uid);
-    return !!from && from.ownerKey !== c.key;
+    return !!from && !theirOwn(from, c.key);
   });
 }
 
@@ -319,9 +319,9 @@ function voidTags(c: Client, where: string) {
   const uids: string[] = [];
   for (const t of carriedTags(c.inv)) {
     const from = lootedTags.get(t.uid);
-    if (!from || from.ownerKey === c.key) continue;
+    if (!from || theirOwn(from, c.key)) continue;
     lootedTags.delete(t.uid);
-    tagSeen.delete(`${c.key}|${t.uid}`);
+    tagSeen.delete(seenOf(c.key) + t.uid);
     voided.add(t.uid);
     uids.push(t.uid);
   }

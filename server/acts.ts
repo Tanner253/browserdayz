@@ -11,7 +11,7 @@ import { HELI, heliCrash, hpOf } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { RACKS, rackShows } from '../src/sim/crates';
 import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
-import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, carriedTags, lootedTags, tagSeen } from './tags';
+import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast } from './gate';
 import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
@@ -302,7 +302,7 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   /** a tag that is on a body whoever's body it is: one taken off somebody else */
   const taken = (t: ItemInstance) => {
     const from = lootedTags.get(t.uid);
-    return !!from && from.ownerKey !== c.key;
+    return !!from && !theirOwn(from, c.key);
   };
   let older = 0;
   const theirs = (it: ItemInstance) => {
@@ -339,7 +339,7 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
       const lost = layOnBody(box, laid);
       log(`${c.name} died with ${held.length} things in an admin's hold: ${bare ? 'none of them is left (an admin, who chose so)' : `${laid.length - lost.length} lie on the body, and ${lost.length} found no room there and are gone`}`);
     }
-    if (own && !noTag) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
+    if (own && !noTag) lootedTags.set(own.uid, lootedFrom(c, lived));
     else if (own || older) {
       log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : nobody ? 'no other player killed them' : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
@@ -426,7 +426,7 @@ export function kill(c: Client, cause: string, v = 0) {
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
   const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
   const corpse = makeCorpse(c, v, ride);
-  for (const k of [...tagSeen.keys()]) if (k.startsWith(`${c.key}|`)) tagSeen.delete(k);
+  for (const k of [...tagSeen.keys()]) if (k.startsWith(seenOf(c.key))) tagSeen.delete(k);
   c.inv = null;
   c.vitals = null;
   c.lastHitBy = null;

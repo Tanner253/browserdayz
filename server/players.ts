@@ -11,7 +11,7 @@ import { type Thrower, newThrower } from '../src/sim/grenades';
 import { BLOOD } from '../src/sim/blood';
 import { type Pose, type Slung, type Vitals, type S2C, type PlayerInfo, type StoredItem, type C2S, PROTOCOL, F_GROUND, MAX_STAMINA } from '../src/net/protocol';
 import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, vehInfo, vehicles, world } from './index';
-import { bunkerDoor, cardSeen, hitsBy, ipOf, tagSeen } from './tags';
+import { bunkerDoor, cardSeen, hitsBy, ipOf, seenOf, tagSeen } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
 import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, sigOfWs, turnedAway } from './gate';
@@ -269,7 +269,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   const rec = records.get(key) ?? KEPT.chars.get(keyHash(key));
   const resume = rec && rec.alive && rec.inv && Date.now() - rec.leftAt < RECORD_LIFETIME ? rec : null;
   // (a tag is carried for its time in the world: the time its carrier was out of it is not counted)
-  if (resume) for (const [k, since] of tagSeen) if (k.startsWith(`${key}|`)) tagSeen.set(k, since + (Date.now() - resume.leftAt));
+  if (resume) for (const [k, since] of tagSeen) if (k.startsWith(seenOf(key))) tagSeen.set(k, since + (Date.now() - resume.leftAt));
   // (Somebody who left the game down in the bunker comes back with what they carried, at one
   // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
   const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;

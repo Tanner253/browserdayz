@@ -38,22 +38,49 @@ interface CashIn {
 
 export const cashins: CashIn[] = [];
 
-/** a tag taken off a body this server made: whose it was, where they were playing from, and how long that life had lasted */
-interface Looted {
+/**
+ * A tag taken off a body this server made: whose it was, where they were playing from (both as hashes: these are kept
+ * with the world through a restart, see `keepTags`), and how long that life had lasted.
+ */
+export interface Looted {
   owner: string;
   ownerKey: string;
   ownerIp: string;
   livedMs: number;
 }
 
+const hashOf = (kind: string, s: string) => (s ? createHash('sha256').update(`zona tag ${kind} ${s}`).digest('hex').slice(0, 40) : '');
+
 /** tag uid -> that */
 export const lootedTags = new Map<string, Looted>();
+export const lootedFrom = (c: Client, livedMs: number): Looted => ({ owner: c.name, ownerKey: hashOf('key', c.key), ownerIp: hashOf('ip', c.ip), livedMs });
+/** a tag looted off this player's own body */
+export const theirOwn = (from: Looted, key: string) => from.ownerKey === hashOf('key', key);
 
 /** tags carried out of the Zona and held there past TAG_OUT: no reward is ever paid on one */
 export const voided = new Set<string>();
 
-/** `${player key}|${tag uid}` -> when the server first saw that player carrying it */
+/** `${seenOf(player key)}${tag uid}` -> when the server first saw that player carrying it */
 export const tagSeen = new Map<string, number>();
+export const seenOf = (key: string) => `${hashOf('key', key)}|`;
+
+/**
+ * The three above, kept with the world and taken in again (the owner, 2026-10-18: "when the server restarts, player
+ * sshould not lose their dogtags, its bad UX its not their fault"). Held only here, a restart forgot whose every tag
+ * had been and when it was picked up, and each was cashed in for nothing. The time a carrier is away, restart and all,
+ * is not counted (see `join` in players.ts). The newest few thousand, should it ever come to that.
+ */
+export interface TagsKept { looted: [string, Looted][]; seen: [string, number][]; voided: string[] }
+export const keepTags = (): TagsKept => ({ looted: [...lootedTags].slice(-4000), seen: [...tagSeen].slice(-4000), voided: [...voided].slice(-4000) });
+export function takeTags(k: TagsKept | undefined) {
+  if (!k) return;
+  const str = (s: unknown): s is string => typeof s === 'string';
+  for (const [uid, l] of Array.isArray(k.looted) ? k.looted : []) {
+    if (str(uid) && l && str(l.owner) && str(l.ownerKey) && str(l.ownerIp) && Number.isFinite(l.livedMs) && !lootedTags.has(uid)) lootedTags.set(uid, { owner: l.owner, ownerKey: l.ownerKey, ownerIp: l.ownerIp, livedMs: l.livedMs });
+  }
+  for (const [s, at] of Array.isArray(k.seen) ? k.seen : []) if (str(s) && Number.isFinite(at) && !tagSeen.has(s)) tagSeen.set(s, at);
+  for (const uid of Array.isArray(k.voided) ? k.voided : []) if (str(uid)) voided.add(uid);
+}
 
 export const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 
@@ -110,9 +137,9 @@ export const namesOf = (key: string, ip: string, fp = '') => [key, ...(ip && ips
 
 /** Why a tag earns nothing, or null if it does. */
 export function notEarned(c: Client, from: Looted, since: number | undefined, now: number): string | null {
-  if (from.ownerKey === c.key) return 'it is your own';
+  if (theirOwn(from, c.key)) return 'it is your own';
   if (since === undefined || now - since < CASH_HOLD_MS) return 'it was not held for the full time';
-  if (c.ip && from.ownerIp === c.ip && ipsTellApart()) return 'its owner was playing from the same connection as you';
+  if (c.ip && from.ownerIp === hashOf('ip', c.ip) && ipsTellApart()) return 'its owner was playing from the same connection as you';
   if (from.livedMs < TAG_MIN_LIFE_MS) return `its owner had been alive for less than ${TAG_MIN_LIFE_MS >= 60000 ? `${Math.round(TAG_MIN_LIFE_MS / 60000)} minutes` : `${Math.round(TAG_MIN_LIFE_MS / 1000)} seconds`}`;
   const theirs = namesOf(from.ownerKey, from.ownerIp);
   if (namesOf(c.key, c.ip).some((a) => theirs.some((b) => now - (pairPaidAt.get(`${a}>${b}`) ?? -Infinity) < TAG_PAIR_GAP_MS))) return `you cashed in another of their tags less than ${Math.round(TAG_PAIR_GAP_MS / 3600000)} hours ago`;
