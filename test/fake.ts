@@ -190,6 +190,14 @@ export class FakeChain {
   }
   /** what of a coin each token account holds (by its address): nothing unless a test says so */
   tokens = new Map<string, bigint>();
+  /** the most each token account held, as its transactions show (by its address): what it holds now unless a test says more */
+  peaks = new Map<string, bigint>();
+  async heldMost(accounts: Bytes[]) {
+    return accounts.reduce((most, a) => {
+      const k = b58(a), n = [this.peaks.get(k) ?? 0n, this.tokens.get(k) ?? 0n].reduce((x, y) => (x > y ? x : y));
+      return n > most ? n : most;
+    }, 0n);
+  }
   async tokenBalance(account: Bytes) {
     return this.tokens.get(b58(account)) ?? 0n;
   }
