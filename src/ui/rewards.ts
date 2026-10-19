@@ -108,6 +108,10 @@ export class RewardsModal {
   private input: HTMLInputElement;
   private err: HTMLElement;
   private timer = 0;
+  /** the wallet whose holding is said under the box, what it was found to hold, and the wait before asking */
+  private holdFor = '';
+  private holdShort = false;
+  private holdT = 0;
 
   /**
    * @param playerName what is stamped on the player's own tag in the first picture
@@ -156,6 +160,7 @@ export class RewardsModal {
           <input class="rw-input" placeholder="Your Solana address" maxlength="44" spellcheck="false" autocomplete="off" aria-label="Solana wallet address">
           <button class="rw-save">Save address</button>
         </div>
+        <div class="rw-hold" aria-live="polite" hidden></div>
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
           <span class="rw-fine">Use the public Solana address of your wallet. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
@@ -171,7 +176,10 @@ export class RewardsModal {
       if (e.key === 'Enter') this.save();
       else if (e.key === 'Escape') this.close();
     });
-    this.input.addEventListener('input', () => (this.err.textContent = ''));
+    this.input.addEventListener('input', () => {
+      this.err.textContent = '';
+      this.showHolding(this.input.value.trim());
+    });
     (this.root.querySelector('.rw-save') as HTMLButtonElement).onclick = () => this.save();
     (this.root.querySelector('.rw-skip') as HTMLButtonElement).onclick = () => this.close();
   }
@@ -201,6 +209,8 @@ export class RewardsModal {
     (this.root.querySelector('.rw-mine') as SVGGElement).innerHTML = tag(name);
     this.root.classList.add('show');
     this.input.focus();
+    this.holdFor = '';
+    this.showHolding(saved);
     this.runClock();
     void this.showPay();
     // (what the whole platform has paid, as every money screen of both games says it: src/ui/platform.ts)
@@ -297,6 +307,56 @@ export class RewardsModal {
     write(WALLET, v);
     // (what that wallet's tags pay, said everywhere it is said)
     void siteStatus().catch(() => {});
+    // (one that holds too little to be paid past its free tags stays in sight, saved, with that said under it)
+    if (this.holdFor === v && this.holdShort) {
+      this.err.textContent = '';
+      (this.root.querySelector('.rw-skip') as HTMLElement).textContent = 'Close';
+      (this.root.querySelector('.rw-hold') as HTMLElement).insertAdjacentHTML('afterbegin', '<em>Saved.</em> ');
+      return;
+    }
     this.close();
+  }
+
+  /**
+   * What the wallet in the box holds of the coin, said under it, as soon as it is a whole address (and for the saved one
+   * when the window opens). The coin counts only in the wallet the tags are paid to: two players who held 100,000 $ZONA
+   * in another wallet were waiting for pay that never came (the owner, 2026-10-19: "show the $ZONA a payout wallet holds
+   * when players set it in game"). api/cashins.ts ?format=wallet: read from the chain, held there half a minute.
+   */
+  private showHolding(who: string) {
+    const el = this.root.querySelector('.rw-hold') as HTMLElement;
+    clearTimeout(this.holdT);
+    if (!isWallet(who)) {
+      el.hidden = true;
+      this.holdFor = '';
+      return;
+    }
+    if (who === this.holdFor) return;
+    this.holdFor = who;
+    this.holdShort = false;
+    el.hidden = false;
+    el.className = 'rw-hold';
+    el.textContent = 'Reading what this wallet holds…';
+    this.holdT = window.setTimeout(async () => {
+      const r = (await fetch(`/api/cashins?format=wallet&w=${encodeURIComponent(who)}`)
+        .then((x) => (x.ok ? x.json() : null))
+        .catch(() => null)) as Rate | null;
+      if (this.holdFor !== who) return;
+      if (!r || typeof r.held !== 'number') {
+        el.hidden = true;
+        return;
+      }
+      const n = (k: number) => Math.round(k).toLocaleString('en-US'), f = r.free;
+      if (!f) {
+        el.innerHTML = `This wallet holds <b>${n(r.held)} $ZONA</b>.`;
+        return;
+      }
+      this.holdShort = !f.holds;
+      el.classList.add(f.holds ? 'ok' : 'short');
+      const left = f.paid < f.of ? ` ${f.of - f.paid} of its ${f.of} free tags are left.` : '';
+      el.innerHTML = f.holds
+        ? `This wallet holds <b>${n(r.held)} $ZONA</b>: enough to be paid past your first ${f.of} tags (${n(f.hold)} needed).${left}`
+        : `This wallet holds <b>${n(r.held)} $ZONA</b>. Past your first ${f.of} paid tags, a tag is paid only while <b>this wallet</b> holds <b>${n(f.hold)} $ZONA</b>: the coin must be here, in the wallet your tags are paid to.${left}`;
+    }, 350);
   }
 }
