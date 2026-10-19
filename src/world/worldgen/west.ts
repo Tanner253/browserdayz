@@ -434,13 +434,14 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   for (let i = 0; i < n; i++) if (kalatLand.share[i] > 76) grass[i] = 0;
 
   // ---- THE TOWNS: their buildings, things and slab walls, and their yards and lanes painted (west-towns.ts); a desert
-  // town's things on the ground as it is now, its last (nothing after this moves the ground under them)
+  // town's things on the ground as it is now, its last (nothing after this moves the ground under them), another's
+  // where the roads' beds, the river or the lake's shore have moved it off the pad
   const towns: PlacedTown[] = [], slabs: SlabRun[] = [];
   const ground = (x: number, z: number) => heightAt(heights, x, z);
   for (const t of PLACED) {
     const y = padY.get(t.name)!;
     // (Pokrov's things too: a lamp on its north road and a barrier on its ramp's bank stood at its pad's height, off the ground)
-    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass, trees: tools.trees }, t.x < DESERT_EAST || t.name === POKROV.name ? ground : undefined);
+    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass, trees: tools.trees }, ground, t.x < DESERT_EAST || t.name === POKROV.name);
     towns.push(placed(t, y));
     tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
   }
