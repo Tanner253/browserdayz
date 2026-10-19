@@ -55,8 +55,9 @@ ok('a jeep by the road at each place of the west, on level ground, off the aspha
   assert.equal(west.length, WEST_CARS.length, `${west.length} west jeeps for ${WEST_CARS.length} places`);
   west.forEach((c, k) => {
     const q = world.pois.find((o) => o.name === WEST_CARS[k].name)!, d = Math.hypot(c.x - q.x, c.z - q.z);
-    // (by the place: Kalat's on the road round its south, within the ruins' reach; the others at their way in)
-    assert.ok(q.name === 'Kalat' ? d < q.radius : d >= 15 && d < Math.max(q.radius, 80), `${q.name}'s jeep stands ${d.toFixed(0)} m from its middle`);
+    // (by the place: Kalat's on the road round its south and Pokrov's where the main road leaves its lane, within the
+    // place's reach; the others at their way in)
+    assert.ok(WEST_CARS[k].from ? d < q.radius : d >= 15 && d < Math.max(q.radius, 80), `${q.name}'s jeep stands ${d.toFixed(0)} m from its middle`);
     assert.ok(c.x < -1500, `${q.name}'s jeep is not in the west`);
     // (on the verge: its side, a metre from its middle, clear of the asphalt; and no further off than the verge)
     const off = asphalt(c.x, c.z);

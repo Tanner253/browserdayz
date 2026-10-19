@@ -58,11 +58,11 @@ try {
   const cars = a.welcome!.vehicles;
 
   // A jeep at each place of the west from the start (westSpots: by the road, a jeep, not a police car or a helicopter)
-  const west = WEST_CARS.map(({ name }) => {
+  const west = WEST_CARS.map(({ name, from }) => {
     const [x, z] = PLACES[name];
     const car = cars.filter((c) => !c.k && c.hp > 0).sort((p, q) => Math.hypot(p.s[0] - x, p.s[2] - z) - Math.hypot(q.s[0] - x, q.s[2] - z))[0];
     const d = Math.hypot(car.s[0] - x, car.s[2] - z);
-    assert.ok(d < (name === 'Kalat' ? 240 : 130), `no jeep by ${name}: the nearest is ${d.toFixed(0)} m off`);
+    assert.ok(d < (from ? 240 : 130), `no jeep by ${name}: the nearest is ${d.toFixed(0)} m off`);
     return car;
   });
   assert.equal(new Set(west.map((c) => c.i)).size, WEST_CARS.length, 'one jeep counted for two places');

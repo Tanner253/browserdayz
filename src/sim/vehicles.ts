@@ -287,9 +287,10 @@ export function policeSpots(world: World, taken: { x: number; z: number }[] = []
 /**
  * The places of the west that have a jeep by their road (westSpots), in the order they are numbered; and where to look
  * along the roads from, where that is not the place's middle. (Kalat's on the road laid round the south of it, the
- * owner: "add some more roads around kalat and some vehicle spawns".)
+ * owner: "add some more roads around kalat and some vehicle spawns". Pokrov's where the main road leaves its lane to
+ * the east: in the lane it stood among the market's stalls.)
  */
-export const WEST_CARS: { name: string; from?: [number, number] }[] = [{ name: 'Pokrov' }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski' }, { name: 'Bereg' }, { name: 'Mys' }];
+export const WEST_CARS: { name: string; from?: [number, number] }[] = [{ name: 'Pokrov', from: [-1700, 28] }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski' }, { name: 'Bereg' }, { name: 'Mys' }];
 
 /**
  * The west's jeeps (the owner, 2026-10-18: "the west side of the map is lacking vehicle spawns completely", "add some
