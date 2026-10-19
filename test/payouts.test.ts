@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { TOKEN_2022_PROGRAM, address, b58, seeded, signed, tokenAccount } from '../api/_lib/solana';
-import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, RULES5_FROM, RULES6_FROM, claimIfDue, config, dueOf, editBook, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
+import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, RULES5_FROM, RULES6_FROM, RULES7_FROM, claimIfDue, config, dueOf, editBook, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
 import { record } from '../api/cashin';
 import { show } from '../api/cashins';
 import { MemoryStore, check } from '../api/_lib/store';
@@ -1240,6 +1240,55 @@ await test('from the sixth cut-over: past its first ten paid tags, a wallet (or 
   // and none of it without a moment; ten and 100,000 unless set otherwise
   const cf = config({});
   assert.deepEqual([cf.rules6From, config({ PAYOUT_RULES6_FROM: 'never' }).rules6From, cf.freeTags, cf.holdMin], [RULES6_FROM ? Date.parse(RULES6_FROM) : Infinity, Infinity, 10, 100_000n * 10n ** 6n]);
+});
+
+await test('from the seventh: past the free ten, a tag waits up to twelve hours for its wallet to hold 100,000 $ZONA, and is paid as soon as it does', async () => {
+  // "people wiaitng for payouts currently on /payouts complain they have 100k supply on the wallet but dont get pay"
+  // (they had bought it after cashing in), and asked whether such a tag should wait: "12 hour" (the owner, 2026-10-19)
+  const env = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-02T00:00:00Z', PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES5_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES6_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES7_FROM: '2026-10-08T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' };
+  const coin = (w: W, to: number, whole: bigint) => w.chain.tokens.set(b58(tokenAccount(address(wallet(to)), w.cfg.mint, TOKEN_2022_PROGRAM)), whole * 10n ** 6n);
+  const row = async (w: W, e: Entry) => (await readBook(w.store)).rows.find((r) => r.ref === refOf(e.id))!;
+  // nothing held: the eleventh waits, and says for what
+  const a = world(10, env);
+  const first = await cash(a, 450, 11);
+  assert.deepEqual(first.map((x) => x.o.state), [...Array(10).fill('paid'), 'waiting']);
+  assert.equal((first[10].o as { hold?: string }).hold, 'coin');
+  assert.match((first[10].o as { why: string }).why, /100,000 \$ZONA: this tag is paid as soon as it does, if within 12 hours of being cashed in/);
+  // looked at again with nothing held: it still waits, and the book is not written again for it
+  a.skip(60_000);
+  const swaps = a.store.ops.swap;
+  await sweep(a);
+  assert.deepEqual([(await row(a, first[10].e)).state, a.store.ops.swap], ['waiting', swaps]);
+  // the coin bought: paid at the next look, what it holds now being what counts
+  coin(a, 450, 100_000n);
+  a.skip(60_000);
+  await sweep(a);
+  assert.deepEqual([(await row(a, first[10].e)).state, got(a, 450)], ['paid', SOL(0.11)]);
+  // twelve hours without it: not paid, and told why
+  const b = world(10, env);
+  const late = (await cash(b, 451, 11))[10].e;
+  b.skip(12 * 3600 * 1000 + 60_000);
+  await sweep(b);
+  const gone = await row(b, late);
+  assert.equal(gone.state, 'skipped');
+  assert.match(gone.why ?? '', /did not within 12 hours of the tag being cashed in/);
+  // refused under the sixth within twelve hours before the seventh: it waits from then, and is paid when the coin is held
+  const c = world(10, { ...env, PAYOUT_RULES7_FROM: '2026-10-08T14:00:00Z' });
+  const was = (await cash(c, 452, 11))[10];
+  assert.equal(was.o.state, 'skipped');
+  c.skip(2 * 3600 * 1000);
+  coin(c, 452, 100_000n);
+  await sweep(c);
+  assert.deepEqual([(await row(c, was.e)).state, got(c, 452)], ['paid', SOL(0.11)]);
+  // one refused longer ago than that is left as it was
+  const d = world(10, { ...env, PAYOUT_RULES7_FROM: '2026-10-09T01:00:00Z' });
+  const old = (await cash(d, 453, 11))[10].e;
+  d.skip(13 * 3600 * 1000);
+  coin(d, 453, 100_000n);
+  await sweep(d);
+  assert.deepEqual([(await row(d, old)).state, got(d, 453)], ['skipped', SOL(0.1)]);
+  // and none of it without a moment; twelve hours unless set otherwise
+  assert.deepEqual([config({}).rules7From, config({ PAYOUT_RULES7_FROM: 'never' }).rules7From, config({}).holdWait], [Date.parse(RULES7_FROM), Infinity, 12 * 3600 * 1000]);
 });
 
 await test('the rule of the free tags is said: on the payouts page, to a wallet asked about, and to the game', async () => {
