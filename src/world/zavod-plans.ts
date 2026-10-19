@@ -31,7 +31,8 @@ export function hallPlan(): Blueprint {
   // the machine floor: three machines down the middle, benches and racks along the back, what was being loaded by the garages
   for (const x of [-9, -1, 7]) g.put('bunker_machine', x, -0.4, 0).floor([x, 1.4]);
   g.top('steel_table', -13.5, -5.6, Q, 0.8, 2).top('steel_table', -4.5, -5.6, Q, 0.8, 2).top('lab_counter', 3.0, -6.6, 0, 0.9, 2);
-  g.put('rack_wide', -16.6, -2.0, Q).put('rack_wide', -16.6, 1.2, Q);
+  // (the racks back to the west wall either side of its door: at -16.6 they stood 0.9 m out from it, one across the door)
+  g.put('rack_wide', -17.48, -3.0, Q).put('rack_wide', -17.48, 3.0, Q);
   g.put('crate_big', -12.6, 5.6, 0.2).put('crate_big', -11.4, 5.9, 0.1).put('wooden_crate_01', -13.4, 4.4, 0.6).put('Barrel_01', 9.6, 5.8).put('barrel_03', 10.4, 6.3).put('Barrel_01', 11.1, 5.6);
   g.put('old_tyre', 12.0, -6.6, 0.3).put('metal_jerrycan_green', 11.2, -6.7, 1.2).put('utility_box_01', 17.4, 2.0, -Q);
   g.floor([-14.6, 3.8], [-6.2, 4.4], [2.6, 5.6], [10.6, 3.2], [-15.6, -6.4], [0.4, -3.2], [12.6, -4.6]);
