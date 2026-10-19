@@ -4,6 +4,7 @@
 // (`ruinsGround`: its top, its banks and moat, the dry river's flats), as src/dev/ruins.ts lays it on its test patch.
 
 import { Simplex, lerp, smoothstep } from '../../core/noise';
+import { DESERT_TOWNS } from '../../sim/desert';
 import { MOKROYE, WATER } from '../../sim/mokroye';
 import { OZERKI, SHORE } from '../../sim/ozerki';
 import { LAND, OUTLINE, outside as offTop, ruinLocal, ruinsGround, type Place } from '../../sim/ruins';
@@ -16,6 +17,24 @@ import type { Instance } from './types';
 
 export { PLACED };
 export const placedTown = (name: string) => PLACED.find((t) => t.name === name)!;
+
+/** the desert's towns lie west of this: what they set down stands on the ground as it is in the end (`fillTown`) */
+export const DESERT_EAST = -2400;
+/** the desert's own places (src/sim/desert.ts), whose pads are the last word on the ground under them (`padHeld`) */
+const DESERT = PLACED.filter((t) => DESERT_TOWNS.some((d) => d.name === t.name));
+export const desertTown = (t: Town) => DESERT.some((d) => d.name === t.name);
+/**
+ * How much of a spot is a desert place's own level ground: all of it on its pad, none `out` metres past its edge.
+ * What is laid after the pads (Kalat's land about it, the roads' beds) leaves that much of a spot as it was. Kalat's
+ * land, laid over Peski's east end and Blokpost's west, had tilted their pads by a metre: Peski's houses stood on
+ * their foundations' bare concrete and its lamps in the air (the owner, 2026-10-19: "a lot of the poi's in the desert
+ * are hovering off the ground").
+ */
+export function padHeld(x: number, z: number, out: number) {
+  let held = 0;
+  for (const t of DESERT) held = Math.max(held, 1 - smoothstep(0, out, offPad(t, x, z)));
+  return held;
+}
 
 /** a point of the world in a town's frame */
 export function townLocal(t: Town, x: number, z: number): [number, number] {
@@ -81,8 +100,13 @@ export function layPad(H: Float32Array, net: Net, t: Town, padY: number, lake?: 
 /**
  * A town's buildings, things and slab walls added to the world's (after every older one: nothing is renumbered), its
  * yards gravelled, its lanes trodden and its beds dug, and no grass on them nor under its buildings (lay(), as it is).
+ * Its things and lamps stand on its pad, or on the ground `on` says where that is given: a desert town's, where the
+ * river's wadi cuts into the brick works' pad (its quay's crates, and the lamps down its lane to the ford, stood up to
+ * 4 m in the air at the pad's height: the owner, 2026-10-19, "some building decorations like at industrial are
+ * floating very high off the ground"), let down to the lowest of it under the thing's foot (`footOn`).
  */
-export function fillTown(t: Town, padY: number, net: Net, out: { buildings: BuildingPlot[]; props: Instance[]; slabs: SlabRun[]; splat: Uint8Array; grass: Uint8Array }) {
+export function fillTown(t: Town, padY: number, net: Net, out: { buildings: BuildingPlot[]; props: Instance[]; slabs: SlabRun[]; splat: Uint8Array; grass: Uint8Array }, on?: (x: number, z: number) => number) {
+  const foot = on && footOn(on), under = (x: number, z: number, lx: number, lz: number) => (foot ? foot(x, z) : padY + moundAt(t, lx, lz));
   townBuildings(t).forEach((s, n) => {
     const [x, z] = townPoint(t, s.x, s.z);
     out.buildings.push({ id: `${t.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: t.rot + s.rot, floorY: padY + (s.up ?? moundAt(t, s.x, s.z) + 0.3), seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
@@ -117,14 +141,26 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     stood.add(`${Math.round(x * 10)}_${Math.round(z * 10)}`);
     // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
-    out.props.push({ kind: th.kind, x, y: padY + moundAt(t, th.x, th.z) + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
+    out.props.push({ kind: th.kind, x, y: under(x, z, th.x, th.z) + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
   }
   for (const l of townLamps(t)) {
     const [x, z] = townPoint(t, l.x, l.z);
-    out.props.push({ kind: 'street_lamp_01', x, y: padY + moundAt(t, l.x, l.z), z, rot: t.rot + l.rot, scale: 1 });
+    out.props.push({ kind: 'street_lamp_01', x, y: under(x, z, l.x, l.z), z, rot: t.rot + l.rot, scale: 1 });
   }
   out.slabs.push(...placedSlabs(t));
 }
+
+/** how far round its middle a thing on sloping ground reaches to the ground: a crate's or a drum's half width */
+const FOOT = 0.6;
+/**
+ * The ground a crate, a drum or a lamp stands on: the lowest under its foot, as src/world/seat.ts seats a rock. Stood
+ * at the ground under its middle, on the brick works' bank (28 in the hundred) its low edge was 14 cm in the air.
+ */
+export const footOn = (on: (x: number, z: number) => number) => (x: number, z: number) => {
+  let y = on(x, z);
+  for (let a = 0; a < 8; a++) y = Math.min(y, on(x + FOOT * Math.cos((a * Math.PI) / 4), z + FOOT * Math.sin((a * Math.PI) / 4)));
+  return y;
+};
 
 /** how far apart a town's street lamps stand along a lane, and how far out from its edge */
 const LAMP = { every: 22, out: 1.4, apart: 13 };
@@ -227,7 +263,8 @@ export function layKalat(H: Float32Array, net: Net, site: Place): { share: Uint8
       const i = iz * net.nx + ix;
       share[i] = Math.round(mix * 255);
       const g = ruinsGround(lx, lz);
-      H[i] = lerp(H[i], site.y + g.y, mix);
+      // (but not over a desert place's pad, nor much of the 40 m its pad is eased over: see `padHeld`)
+      H[i] = lerp(H[i], site.y + g.y, mix * (1 - padHeld(x, z, 40)));
       // (its flats, its moat and its dry river's bed are cracked earth)
       if (g.kind === 'flats' || g.kind === 'moat' || g.kind === 'river') wash[i] = Math.round(mix * 255);
     }

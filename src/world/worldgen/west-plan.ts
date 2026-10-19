@@ -295,9 +295,10 @@ export function movedPost() {
  * does, falling away from it no steeper than `fill` (and never above `cap`, the ground as it was, where that is
  * given); where it lies under the ground the banks are taken back to no steeper than `cut` (where `much` is more than
  * nothing). `gap`, if given: how far each spot is from the edge of a road (least of all the roads laid on it).
+ * `keep`, if given: how much of each spot is left as it was, whatever of the above (a desert town's pad: 1).
  */
 export function bed(H: Float32Array, p: Float32Array, width: number, reach: number, much: (x: number, z: number) => number,
-  net = { x0: -SQUARE_HALF, z0: -SQUARE_HALF, nx: SQUARE_RES, nz: SQUARE_RES }, o: { fill?: number; cut?: number; cap?: Float32Array; gap?: Float32Array } = {}) {
+  net = { x0: -SQUARE_HALF, z0: -SQUARE_HALF, nx: SQUARE_RES, nz: SQUARE_RES }, o: { fill?: number; cut?: number; cap?: Float32Array; gap?: Float32Array; keep?: (x: number, z: number) => number } = {}) {
   const { x0, z0, nx, nz } = net, edge = width / 2 + 1.5, fill = o.fill ?? Infinity, cut = o.cut ?? Infinity;
   const height = (x: number, z: number) => H[clamp(Math.round((z - z0) / CELL), 0, nz - 1) * nx + clamp(Math.round((x - x0) / CELL), 0, nx - 1)];
   // (each spot's distance from the nearest point of the road, and the road's height there: over the road's own box)
@@ -329,11 +330,12 @@ export function bed(H: Float32Array, p: Float32Array, width: number, reach: numb
     const d = dist[j];
     if (d === Infinity) continue;
     const ix = ox + (j % bw), iz = oz + Math.floor(j / bw), i = iz * nx + ix, y = ry[j];
-    const x = x0 + ix * CELL, z = z0 + iz * CELL, m = much(x, z), w = m * (1 - smoothstep(edge, edge + reach, d));
+    const x = x0 + ix * CELL, z = z0 + iz * CELL, m = much(x, z), w = m * (1 - smoothstep(edge, edge + reach, d)), was = H[i];
     if (w > 0) H[i] = lerp(H[i], y - 0.02, w);
     const past = Math.max(0, d - edge);
     if (fill < Infinity) { const floor = Math.min(y - 0.02 - fill * past, o.cap ? o.cap[i] : Infinity); if (H[i] < floor) H[i] = floor; }
     if (cut < Infinity && m > 0) { const ceil = y + cut * past; if (H[i] > ceil) H[i] = lerp(H[i], ceil, m); }
+    if (o.keep && H[i] !== was) H[i] = lerp(H[i], was, o.keep(x, z));
     if (o.gap) o.gap[i] = Math.min(o.gap[i], d - width / 2);
   }
 }
