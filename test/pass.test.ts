@@ -75,7 +75,8 @@ const pass = passOf(() => 40), E = passEdges();
 // ---- the loot, the rocks on the walls
 {
   const loot = caveLoot(pass);
-  assert.ok(loot.filter((l) => l.tier === 5).length >= 4 && loot.filter((l) => l.tier === 4).length >= 12, 'loot in the caves and the best on the floor');
+  // (all of it the third step since 2026-10-18, the owner: "the pass tier 3")
+  assert.ok(loot.length >= 16 && loot.every((l) => l.tier === 3), 'loot in the caves and on the floor, of the third step');
   for (const l of loot.filter((q) => q.tier === 4)) assert.ok(caveAt(pass, l.x, l.y + 0.5, l.z), `${l.where}: its loot in the cave`);
   const rocks = rockPieces(pass);
   assert.ok(rocks.length > 100, 'the walls dressed');

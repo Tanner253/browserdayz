@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
-import { TAG_HOLD, TAG_OUT } from '../src/sim/items';
+import { TAG_HOLD, TAG_OUT, ZONA_VOID } from '../src/sim/items';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { generateWorld, heightAt, inPlay } from '../src/world/worldgen';
 
@@ -80,9 +80,9 @@ class Player {
   }
 }
 
-// (Outside: the north-west corner. It was 470, 470 until 2026-10-13: that is inside the loop of the road now, and
-// everything inside the loop is the Zona's.)
-const IN: [number, number] = [0, 0], OUT: [number, number] = [-470, -470];
+// (Outside: the woods between Lipki and the works, out of the Zona as the owner drew it on 2026-10-18. It was the
+// north-west corner, -470, -470, which the drawing takes in.)
+const IN: [number, number] = [0, 0], OUT: [number, number] = [-700, 300];
 let failed: unknown = null;
 try {
   assert.ok(inPlay(...IN) && !inPlay(...OUT), 'the two places of this test are not one inside the Zona and one outside');
@@ -146,6 +146,14 @@ try {
   await ann.stand(...IN, 2);
   assert.equal(ann.got.filter((m) => m.t === 'void').length, 0, 'tags were called void inside the Zona');
 
+  // (the Zona's line voids nothing while ZONA_VOID is off, until there are bases: out there as long as it takes, and the tag is hers)
+  if (!ZONA_VOID) {
+    await ann.stand(...OUT, TAG_OUT + 6.5);
+    assert.equal(ann.got.filter((m) => m.t === 'void').length, 0, 'a tag was called void out of the Zona, with the Zona switched off');
+    ann.ws.close();
+    bee.ws.close();
+    console.log('  ok  out of the Zona, with its line switched off, a tag is not void; nobody who has just arrived leaves a tag');
+  } else {
   // over the line and back before the time is up: nothing, and the clock starts again from nothing
   await ann.stand(...OUT, TAG_OUT - 5);
   await ann.stand(...IN, 1);
@@ -172,6 +180,7 @@ try {
   ann.ws.close();
   bee.ws.close();
   console.log('  ok  a tag carried out of the Zona is void after', TAG_OUT, 'seconds, not before, not inside, and never her own; and nobody who has just arrived leaves a tag');
+  }
 } catch (e) {
   failed = e;
 } finally {
