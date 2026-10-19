@@ -682,7 +682,14 @@ export class Game {
       if (keptIcons[id] === sig && (!hasSlotIcon(id) || keptIcons[`slot:${id}`] === sig)) {
         icons[id] = assets.url(`assets/icons/${id}.webp`);
         if (hasSlotIcon(id)) icons[`slot:${id}`] = assets.url(`assets/icons/slot-${id}.webp`);
-      } else stale.push(id);
+      } else {
+        stale.push(id);
+        // (meanwhile the picture on disk, of the thing as it was, and not an empty cell: the new one waits on its
+        // model, and the guns' come down behind the menu. 2026-10-19, after the texture caps left every gun's picture
+        // out of date: "lots of missing icons...")
+        if (keptIcons[id]) icons[id] = assets.url(`assets/icons/${id}.webp`);
+        if (hasSlotIcon(id) && keptIcons[`slot:${id}`]) icons[`slot:${id}`] = assets.url(`assets/icons/slot-${id}.webp`);
+      }
     }
     if (stale.length && import.meta.env.DEV) console.info(`${stale.length} item pictures are not kept, or are of what has changed: made here (npm run icons makes them again): ${stale.slice(0, 12).join(', ')}${stale.length > 12 ? '…' : ''}`);
     // What is built behind the menu (see `loaded`): the guns; then, with them, how they look in the hands and in
@@ -747,6 +754,7 @@ export class Game {
       attach: (att, weapon, loose) => this.attachMod(att, weapon, loose),
       detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
       fillMag: (mag) => this.fillMagazine(mag),
+      fillAllMags: (ammo) => this.fillAllMagazines(ammo),
       emptyMag: (mag) => this.emptyMagazine(mag),
       looseFor: (mag) => this.inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
       assignHot: (item, i) => this.assignHot(i, item),
@@ -1580,6 +1588,7 @@ export interface Game {
   turnMagWork: Methods<typeof gunsMethods>['turnMagWork'];
   unloadMagazine: Methods<typeof gunsMethods>['unloadMagazine'];
   fillMagazine: Methods<typeof gunsMethods>['fillMagazine'];
+  fillAllMagazines: Methods<typeof gunsMethods>['fillAllMagazines'];
   emptyMagazine: Methods<typeof gunsMethods>['emptyMagazine'];
   newStash: Methods<typeof gunsMethods>['newStash'];
   dig: Methods<typeof gunsMethods>['dig'];

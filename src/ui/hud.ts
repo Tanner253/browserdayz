@@ -16,6 +16,8 @@ import { EMOTE } from '../sim/emotes';
 import { onWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 import { TIERS, type Tier } from '../sim/tiers';
 import { ITEMS, TAG_FRESH, TAG_HOLD_MIN, ZONA_VOID } from '../sim/items';
+import { kindIcon } from './kind-icons';
+import { howtoMore } from './howto-more';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
@@ -276,11 +278,11 @@ export class HUD {
             <button type="button" data-tab="howto" class="sm-howto">How to play</button>
             <button type="button" data-tab="gfx">Settings</button>
             <button type="button" data-tab="rewards" hidden>Rewards</button>
+          </nav>
+          <div class="sm-status">
             <a class="sm-out sm-arena" href="/arena">Arena</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
             <a class="sm-out sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><span>Payouts</span><em></em></a>
-          </nav>
-          <div class="sm-status">
             <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>
           </div>
         </header>
@@ -300,7 +302,7 @@ export class HUD {
                 </span>
               </label>
               <button class="start-btn" type="button"><span>Deploy</span></button>
-              <button class="start-out" type="button">Log out</button>
+              <button class="start-out" type="button" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4H5v16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12h10M16.5 8.5 20 12l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><b></b></button>
               <div class="sm-tag" title="Your dog tag: whoever kills you takes it"></div>
             </div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
@@ -327,19 +329,21 @@ export class HUD {
               </div>
             </div>
             <div class="start-pane pane-brief">
-              <ol class="start-loop">
-                <li style="--i:0"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/><path d="M12 3v7M9 8l3 3 3-3"/></svg></i><div><b>Drop in</b><span>On the west coast, bare hands. The further east, the better the loot.</span></div></li>
-                <li style="--i:1"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8-4 8 4v8l-8 4-8-4z"/><path d="M4 9l8 4 8-4M12 13v8"/></svg></i><div><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></div></li>
-                <li style="--i:2"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></i><div><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></div></li>
-                <li style="--i:3"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="9" rx="3"/><circle cx="8.5" cy="12.5" r="1"/><path d="M12 11h4M12 14h3M8 8c-3-5 3-7 5-3"/></svg></i><div><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></div></li>
-                <li style="--i:4"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></i><div><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></div></li>
+              <ol class="ht-steps" aria-label="How a life goes">
+                <li style="--i:0"><figure><img src="/howto/drop-in.jpg" alt="" loading="lazy" decoding="async"><i>01</i></figure><b>Drop in</b><span>On the west coast, bare hands. The further east, the better the loot.</span></li>
+                <li style="--i:1"><figure><img src="/howto/loot.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></li>
+                <li style="--i:2"><figure><img src="/howto/fight.jpg" alt="" loading="lazy" decoding="async"><i>03</i></figure><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></li>
+                <li style="--i:3"><figure><img src="/howto/tag.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></li>
+                <li style="--i:4"><figure><img src="/howto/hold.jpg" alt="" loading="lazy" decoding="async"><i>05</i></figure><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></li>
               </ol>
-              <div class="sm-threats">
-                <div><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
-                <div><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
-                <div><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
-                <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
+              <h3 class="ht-h">What wants you dead</h3>
+              <div class="ht-threats">
+                <div><img src="/howto/players.jpg" alt="" loading="lazy" decoding="async"><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
+                <div><img src="/howto/infected.jpg" alt="" loading="lazy" decoding="async"><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
+                <div><img src="/howto/gas.jpg" alt="" loading="lazy" decoding="async"><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
+                <div><img src="/howto/bunker.jpg" alt="" loading="lazy" decoding="async"><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The ${ITEMS.benelli.name} shotgun is kept there and in the fort, and nowhere else.</span></div>
               </div>
+              ${howtoMore()}
             </div>
 
             <div class="start-pane pane-gfx start-gfx">
@@ -1518,7 +1522,13 @@ export class HUD {
     let bar = this.root.querySelector('.hud-logout') as HTMLElement | null;
     if (!bar) this.root.appendChild((bar = Object.assign(document.createElement('div'), { className: 'hud-logout' })));
     const show = () => {
-      (this.root.querySelector('.start-out') as HTMLElement).textContent = this.outLeft > 0 ? `Stay in the game  (out in ${this.outLeft} s)` : 'Log out';
+      // (the button is a square with the way out drawn on it; while the wait runs it shows the seconds, and pressing it stays)
+      const out = this.root.querySelector('.start-out') as HTMLElement;
+      const say = this.outLeft > 0 ? `Stay in the game (out in ${this.outLeft} s)` : 'Log out';
+      out.title = say;
+      out.setAttribute('aria-label', say);
+      (out.querySelector('b') as HTMLElement).textContent = this.outLeft > 0 ? String(this.outLeft) : '';
+      this.toggle(out, 'counting', this.outLeft > 0);
       bar!.textContent = this.outLeft > 0 ? `Logging out in ${this.outLeft} s. Stay where you are: moving, firing or being hit stops it.` : '';
       this.toggle(bar!, 'show', this.outLeft > 0);
     };
@@ -1920,7 +1930,7 @@ export class HUD {
       e.hotbar.innerHTML = s.hotbar
         .map((h, i) => {
           const icon = h.id && this.icons[h.id] ? `<i style="background-image:url(${this.icons[h.id]})"></i>` : '';
-          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}<em>${h.label}</em></div>`;
+          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}${h.id && ITEMS[h.id] ? kindIcon(h.id) : ''}<em>${h.label}</em></div>`;
         })
         .join('');
     }

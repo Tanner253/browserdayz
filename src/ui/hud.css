@@ -224,12 +224,18 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   width: 176px;
   height: 176px;
   border-radius: 50%;
-  overflow: hidden;
+  /* (not hidden: the bookmark's arrow stands outside the ring; the canvas is rounded instead) */
+  overflow: visible;
   border: 2px solid rgba(233, 228, 216, 0.55);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), inset 0 0 18px rgba(0, 0, 0, 0.5);
   background: #1b1f17;
 }
-.hud-minimap canvas { display: block; width: 100%; height: 100%; }
+.hud-minimap canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.hud-minimap.big canvas { border-radius: 4px; }
+/* the bookmark out of view: the player's yellow arrow outside the ring, the distance inside it */
+.hud-mm-pin svg { position: absolute; width: 16px; height: 16px; overflow: visible; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8)); }
+.hud-mm-pin path { fill: #ffd35a; stroke: rgba(0, 0, 0, 0.85); stroke-width: 1.6; stroke-linejoin: round; }
+.hud-mm-pin em { position: absolute; transform: translate(-50%, -50%); font: 700 13px 'Barlow Condensed', 'Bahnschrift', sans-serif; font-style: normal; white-space: nowrap; color: #fff8e0; text-shadow: 0 0 3px #000, 0 0 3px #000; }
 /* this player has just been shown to everyone (they carry a tag they took) */
 .hud-minimap.marked { box-shadow: 0 0 0 2px rgba(255, 92, 60, 0.85), 0 0 18px rgba(255, 92, 60, 0.45); }
 .hud-minimap b { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000; }
@@ -368,7 +374,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .hb.on { border-color: var(--accent); background: rgba(10, 12, 11, 0.62); }
 .hb.empty { opacity: 0.45; }
 .hb.dim i { opacity: 0.3; filter: grayscale(1); }
-.hb b { position: absolute; left: 4px; top: 2px; font-family: var(--mono); font-size: 9px; font-weight: 400; color: var(--ink-faint); z-index: 1; }
+/* (the key's number drawn as a key, so that it is not read as one more count: Fettah 2026-10-18, "a square around them so they look like buttons") */
+.hb b { position: absolute; left: 3px; top: 3px; min-width: 12px; padding: 0 3px; font-family: var(--mono); font-size: 9px; font-weight: 400; line-height: 11px; text-align: center; color: var(--ink-faint); border: 1px solid rgba(233, 228, 216, 0.3); background: rgba(0, 0, 0, 0.5); z-index: 1; }
 .hb.on b { color: var(--accent); }
 .hb i { position: absolute; inset: 3px; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .hb em { position: absolute; right: 4px; bottom: 1px; font-family: var(--mono); font-size: 10px; font-style: normal; color: var(--ink); text-shadow: 0 1px 2px #000; }
@@ -761,6 +768,19 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-gridbox h4:hover { background: rgba(233, 228, 216, 0.12); color: var(--ink); }
 .inv-gridbox h4 i { width: 12px; font-style: normal; color: var(--accent); }
 .inv-gridbox h4 span { margin-left: auto; padding-left: 10px; }
+.inv-bagkg { display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.kg-ic { width: 10px; height: 10px; margin-left: 3px; vertical-align: -1px; fill: currentColor; flex: none; }
+.run-ic path { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+/* (the sort button by a grid's name: src/sim/inventory.ts Container.sort) */
+.inv-takes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.inv-takes button { padding: 4px 9px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); color: var(--ink-dim); font-family: var(--mono); font-size: 11px; cursor: pointer; }
+.inv-takes button span { color: var(--accent); }
+.inv-takes button:hover { color: var(--ink); border-color: var(--accent); }
+.inv-takes .inv-fits { margin-left: auto; }
+.inv-takes .inv-fits[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); background: rgba(201, 178, 124, 0.16); }
+.inv-sort { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
+.inv-sort svg { width: 11px; height: 11px; fill: currentColor; }
+.inv-sort:hover { color: var(--accent); border-color: var(--line); background: rgba(0, 0, 0, 0.3); }
 .inv-gridbox.shut h4 { border-bottom: 1px solid var(--line); opacity: 0.75; }
 .inv-item {
   position: absolute;
@@ -792,8 +812,15 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-item.cat-medical .qbar i { background: #c4523d; }
 .inv-item .qbar.none { background: rgba(196, 82, 61, 0.75); }
 .inv-item .qty { position: absolute; right: 3px; bottom: 4px; font-family: var(--mono); font-size: 10px; color: var(--ink); text-shadow: 0 1px 2px #000, 0 0 3px #000; }
-.inv-item .mods { position: absolute; right: 3px; top: 1px; font-family: var(--mono); font-size: 9px; color: #b9a6e6; text-shadow: 0 1px 2px #000; }
-.inv-item .qkey { position: absolute; left: 4px; top: 1px; font-family: var(--mono); font-size: 9px; color: var(--accent); text-shadow: 0 1px 2px #000; }
+/* (the symbol of what kind of thing it is, in the colour of its kind: src/ui/kind-icons.ts) */
+.inv-item .kind, .inv-hotkey .kind, .hb .kind { position: absolute; right: 3px; top: 3px; z-index: 1; width: 10px; height: 10px; pointer-events: none; color: rgb(var(--tint)); filter: drop-shadow(0 1px 1px #000); }
+.kind { --tint: 233, 228, 216; }
+.inv-item .kind svg, .inv-hotkey .kind svg, .hb .kind svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+/* (the key it is on, drawn as the same key as on the hot keys, so the two are matched at a glance) */
+.inv-item .new { position: absolute; left: 3px; top: 3px; z-index: 1; padding: 0 3px; font-family: var(--mono); font-size: 8px; font-weight: 600; line-height: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: #15130d; background: var(--accent); pointer-events: none; transition: opacity 0.8s ease-out; }
+.inv-item .qkey ~ .new { top: 17px; }
+.inv-item.seen .new { opacity: 0; }
+.inv-item .qkey { position: absolute; left: 3px; top: 3px; z-index: 1; min-width: 12px; padding: 0 3px; font-family: var(--mono); font-size: 9px; line-height: 11px; text-align: center; color: var(--accent); border: 1px solid rgba(201, 178, 124, 0.55); background: rgba(0, 0, 0, 0.55); }
 
 /* character */
 .inv-doll { display: grid; grid-template-columns: 92px 1fr 92px; gap: 6px; align-items: center; height: 300px; }
@@ -811,6 +838,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-slot.drop-ok { border-color: var(--ok); background: rgba(143, 174, 107, 0.12); }
 .inv-slot.drop-bad { border-color: var(--danger); }
 .slot-label { position: absolute; top: 4px; left: 6px; z-index: 1; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); pointer-events: none; }
+.slot-label .slot-key { display: inline-block; min-width: 12px; margin-right: 6px; padding: 0 3px; font-family: var(--mono); font-size: 9px; letter-spacing: 0; line-height: 11px; text-align: center; vertical-align: 1px; color: var(--accent); border: 1px solid rgba(201, 178, 124, 0.55); background: rgba(0, 0, 0, 0.55); }
 .slot-label b { margin-left: 4px; font-family: var(--mono); font-weight: 400; color: var(--accent); }
 .inv-item.in-slot { position: absolute; inset: 0; border: 0; background: transparent; box-shadow: none; }
 .inv-item.in-slot .inv-item-img.fit { inset: 13px 4px 3px; }
@@ -842,15 +870,14 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* the tags taken off others, under the survivor: clear of the guns over them */
 .inv-gear > .inv-gridbox { margin-top: 22px; }
 /* a bag opened where it lies: its grid under the grid it is in, set in a little, with where it is and a way to shut it */
-.inv-gridbox.inv-bag { margin-left: 10px; padding-left: 8px; border-left: 2px solid rgba(255, 211, 90, 0.35); }
-.inv-gridbox.inv-bag h4 em { float: right; font-style: normal; font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; text-transform: none; color: var(--accent); cursor: pointer; }
+.inv-gridbox.inv-bag { margin-left: 4px; padding-left: 3px; border-left: 2px solid rgba(255, 211, 90, 0.35); }
 .inv-vicinity .inv-gridbox { margin-top: 10px; }
 /* the hot keys, along the foot of the screen */
 .inv-hot { position: absolute; left: 50%; bottom: 6px; z-index: 3; display: flex; gap: 5px; padding: 5px 7px; transform: translateX(-50%); background: rgba(8, 10, 9, 0.82); border: 1px solid var(--line); }
 .inv-hotkey { position: relative; width: 46px; height: 46px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); }
 .inv-hotkey.empty { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0 5px, transparent 5px 10px), rgba(0, 0, 0, 0.22); }
-.inv-hotkey b { position: absolute; left: 3px; top: 1px; z-index: 1; font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--accent); }
-.inv-hotkey .inv-item-img.fit { position: absolute; inset: 8px 4px 4px; pointer-events: none; }
+.inv-hotkey b { position: absolute; left: 3px; top: 3px; z-index: 1; min-width: 13px; padding: 0 3px; font-family: var(--mono); font-size: 10px; font-weight: 400; line-height: 12px; text-align: center; color: var(--accent); border: 1px solid rgba(201, 178, 124, 0.55); background: rgba(0, 0, 0, 0.55); }
+.inv-hotkey .inv-item-img.fit { position: absolute; inset: 12px 4px 4px; pointer-events: none; }
 .inv-hotkey.gone .inv-item-img { opacity: 0.3; filter: grayscale(1); }
 .inv-hotkey.on { border-color: var(--accent); }
 .inv-hotkey:nth-child(3) { margin-right: 9px; }
@@ -864,6 +891,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* over a stack it adds to, or a weapon it fits */
 .inv-outline.join { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .inv-outline { overflow: hidden; padding-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-align: center; text-transform: uppercase; color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.inv-outline span { position: relative; z-index: 1; }
+/* the faded picture of the thing where it would land, lying on the cells as it would (the 2px border is outside them) */
+.inv-outline .inv-item { position: absolute; left: -1px; top: -1px; opacity: 0.45; pointer-events: none; }
+.inv-outline.bad .inv-item { opacity: 0.3; filter: grayscale(1); }
 
 /* While something is dragged, every place it can go is lit, and the rest stands back. */
 .inv.dragging, .inv.dragging * { cursor: grabbing !important; }
@@ -914,10 +945,13 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-ground.ground-over::after { color: var(--accent); }
 
 /* right-click menu */
+/* (what to do with a thing, idea 15: the card's head, then every deed with its keys at the right; what it is, is the card by the pointer) */
 .inv-menu {
   position: fixed;
   z-index: 30;
-  min-width: 190px;
+  width: max-content;
+  min-width: 290px;
+  max-width: 380px;
   padding: 4px;
   display: flex;
   flex-direction: column;
@@ -925,10 +959,16 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   border: 1px solid rgba(233, 228, 216, 0.22);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
 }
-.inv-menu-title { padding: 5px 10px 6px; margin-bottom: 3px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); border-bottom: 1px solid var(--line); }
-.inv-menu button { padding: 6px 10px; font-family: var(--font); font-size: 15px; text-align: left; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
+.inv-menu > .card-head { padding: 6px 8px 8px; margin-bottom: 3px; }
+.inv-menu button { display: flex; align-items: center; gap: 9px; padding: 6px 10px; font-family: var(--font); font-size: 15px; text-align: left; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
+/* (each entry's symbol, in the entry's own colour: src/ui/act-icons.ts; and its keys at the right, as a desktop menu has them, so a click on it teaches the key) */
+.inv-menu button .act { flex: none; width: 14px; height: 14px; fill: currentColor; opacity: 0.85; }
+.menu-keys { display: flex; gap: 4px; margin-left: auto; padding-left: 12px; }
+.inv-menu kbd { display: inline-block; min-width: 0; height: auto; margin: 0; background: none; padding: 1px 5px 2px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em; color: var(--ink-faint); border: 1px solid rgba(233, 228, 216, 0.18); border-radius: 2px; white-space: nowrap; }
+.menu-foot { display: flex; align-items: center; gap: 4px; margin-top: 3px; padding: 6px 10px 3px; font-size: 13px; color: var(--ink-faint); border-top: 1px solid var(--line); }
 .inv-menu button:hover { background: rgba(233, 228, 216, 0.1); }
 .inv-menu button.primary { color: var(--accent); }
+.inv-menu button.danger { color: var(--danger); }
 
 /* inspector + status */
 .inv-inspect { margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.22); }
@@ -943,6 +983,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .ins-stats span { color: var(--ink-faint); white-space: nowrap; }
 .ins-stats b { font-weight: 500; text-align: right; }
 .ins-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.ins-does { margin-top: 8px; font-size: 14px; color: var(--accent); }
+.ins-note { margin: 0 0 6px; font-size: 13px; color: var(--accent); }
 .ins-actions button {
   padding: 6px 14px;
   font-family: var(--font);
@@ -987,6 +1029,36 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-item.cat-tool { box-shadow: inset 2px 0 0 #7ea2d0; }
 /* (what is chosen keeps its ring whatever kind it is: the stripe of its kind was drawn in the ring's place) */
 .inv-item.sel:where(:not(.in-slot)) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* (what goes with the chosen thing, its rounds, magazines or gun: lit, but softer than the ring, so the chosen one still stands out) */
+.inv-item.kin, .inv-hotkey.kin { border-color: rgba(201, 178, 124, 0.8); outline: 1px dashed rgba(201, 178, 124, 0.85); outline-offset: -4px; box-shadow: 0 0 10px rgba(201, 178, 124, 0.4); }
+/* (each player's own choices, the gear by "Carried": things in the page's plain pale; the symbols plain; or no symbols) */
+.kinds-hidden .kind { display: none; }
+.kinds-plain .inv-item { --tint: 233, 228, 216; }
+.kind-icons-plain .kind { --tint: 233, 228, 216; }
+.kinds-plain .inv-item:not(.sel, .kin) { box-shadow: none; }
+.kinds-plain .inv-item .qbar i { background: #c9b27c; }
+.inv-h { position: relative; display: flex; align-items: center; gap: 8px; font-weight: inherit; }
+/* (what is carried for the gun in the hands: InventoryUI.ammoLine) */
+.inv-ammo { margin-left: 6px; font-family: var(--mono); font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0.04em; text-transform: none; color: var(--ink-dim); white-space: nowrap; }
+.inv-ammo.none { color: var(--danger); }
+.inv-view { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
+.inv-view svg { width: 13px; height: 13px; fill: currentColor; }
+.inv-view:hover, .inv-view.on { color: var(--accent); border-color: var(--line); }
+.inv-view-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; min-width: 150px; background: rgba(14, 16, 15, 0.97); border: 1px solid var(--line); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); font-size: 12px; font-weight: 400; letter-spacing: 0.04em; text-transform: none; }
+.inv-view-menu label { display: flex; align-items: center; gap: 8px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.inv-view-menu label.off { opacity: 0.4; cursor: default; }
+.inv-view-menu input { margin: 0; accent-color: var(--accent); }
+.inv-item.kin:where(:not(.in-slot)) { background: linear-gradient(165deg, rgba(201, 178, 124, 0.3), rgba(var(--tint), 0.14)); }
+/* The search box under "Carried", and what it does not find dimmed (src/ui/inv-search.ts) */
+.inv-find { display: flex; align-items: center; gap: 6px; margin: -4px 0 8px; padding: 0 4px 0 8px; height: 26px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); color: var(--ink-faint); cursor: text; }
+.inv-find:focus-within, .inv-find.on { border-color: rgba(201, 178, 124, 0.7); color: var(--accent); }
+.inv-find svg { flex: none; width: 12px; height: 12px; fill: currentColor; }
+.inv-find input { flex: 1; min-width: 0; padding: 0; border: 0; outline: 0; background: none; color: var(--ink); font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; }
+.inv-find input::placeholder { color: var(--ink-faint); }
+.inv-find button { display: none; padding: 0 4px; border: 0; background: none; color: var(--ink-dim); font-size: 15px; line-height: 1; cursor: pointer; }
+.inv-find.on button { display: block; }
+.inv-find button:hover { color: var(--ink); }
+.inv-item.dim, .inv-hotkey.dim, .inv-ground-row.dim { opacity: 0.25; filter: grayscale(1); }
 .inv-ground-row .inv-item.mini { background: rgba(var(--tint), 0.17); }
 /* A thin light edge round every picture: what parts a dark thing from a dark cell, whatever its picture is. (It is
    drawn here, round what the picture shows of the thing, and not in the pictures: it is the screen's, and the same
@@ -1004,24 +1076,31 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* The card by the pointer: what a thing is, at once. (And, red, the line that says why a thing dragged will not go where it is held.) */
 .inv-card { position: fixed; display: none; z-index: 25; width: 290px; padding: 10px 12px 9px; pointer-events: none; color: var(--ink); background: rgba(14, 17, 15, 0.97); border: 1px solid rgba(233, 228, 216, 0.28); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); }
 .inv-card.hint { width: auto; max-width: 310px; padding: 6px 10px 7px; font-size: 14px; line-height: 1.3; color: #ffd9d2; border-color: rgba(196, 82, 61, 0.95); }
-.card-head { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; }
+/* (the same head on the card and the menu, ruled off from what is under it) */
+.card-head { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+/* (the thing's kind, in its colour, at the head's right) */
+.card-head .kind { align-self: start; width: 12px; height: 12px; color: rgb(var(--tint)); }
+.card-head .kind svg { display: block; width: 100%; height: 100%; fill: currentColor; }
 .card-img { height: 46px; background: rgba(233, 228, 216, 0.1) center / contain no-repeat; }
 .card-head small { display: block; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
 .card-head b { display: block; font-size: 19px; font-weight: 600; line-height: 1.1; }
 .inv-card p { margin: 7px 0 0; font-size: 14px; line-height: 1.32; }
-.inv-card .card-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--ink-dim); }
-.inv-card .card-note { font-size: 13px; color: var(--accent); }
 .card-rows { margin-top: 7px; }
 .card-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 13.5px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .card-rows span { color: var(--ink-faint); white-space: nowrap; }
 .card-rows b { font-weight: 500; text-align: right; }
-.card-keys { display: flex; flex-direction: column; gap: 1px; margin-top: 7px; padding-top: 6px; font-size: 13.5px; color: var(--ink-dim); border-top: 1px solid var(--line); }
-.card-keys b { display: inline-block; min-width: 92px; font-family: var(--mono); font-size: 10px; font-weight: 400; letter-spacing: 0.04em; color: var(--ink-faint); }
+.card-rows em { font-style: normal; }
+.card-rows em.better { color: #8fae6b; }
+.card-rows em.worse { color: #d66a58; }
+.inv-card .card-desc { color: var(--ink-dim); }
+.inv-card .card-note { font-size: 13px; color: var(--accent); }
+.inv-card .card-more { margin-top: 6px; padding-top: 6px; font-size: 12.5px; color: var(--ink-faint); border-top: 1px solid var(--line); }
 
 /* What is carried: the grids scroll by themselves, and the inspector and the body's state stay in sight under them.
    (The inspector stood under every grid, and with a pack on it was off the foot of the screen.) Should the screen be
    too low for all three, the whole side scrolls as it did. */
-.inv-cargo > .inv-scroll { flex: 1 1 0; min-height: 150px; margin-right: -8px; padding-right: 8px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+/* (its scrollbar's room is kept whether or not one is shown: a thing chosen fills the inspector under it, a bar came, the grids lost its width and a bag that had stood beside another fell under it) */
+.inv-cargo > .inv-scroll { flex: 1 1 0; min-height: 150px; margin-right: -10px; padding-right: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
 .inv-scroll::-webkit-scrollbar, .inv-inspect::-webkit-scrollbar { width: 9px; height: 9px; }
 .inv-scroll::-webkit-scrollbar-track, .inv-inspect::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.28); border-left: 1px solid var(--line); }
 .inv-scroll::-webkit-scrollbar-thumb, .inv-inspect::-webkit-scrollbar-thumb { background: rgba(233, 228, 216, 0.24); border: 2px solid transparent; background-clip: padding-box; }
@@ -1053,9 +1132,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-gridbox.wide { max-width: 100%; padding-right: 1px; padding-bottom: 1px; margin-right: -1px; margin-bottom: -1px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
 .inv-gridbox.wide:not(.inv-bag) { padding-left: 1px; margin-left: -1px; }
 /* (opened where it lies, it stands in from the edge by its mark down the left: that much less room) */
-.inv-gridbox.wide.inv-bag { max-width: calc(100% - 10px); }
-/* (and where it lies is said a word's width after how full it is: the two ran together, "43 / 63on the body") */
-.inv-gridbox.inv-bag h4 em { margin-left: 10px; }
+.inv-gridbox.wide.inv-bag { max-width: calc(100% - 9px); }
 .inv-gridbox.wide h4 { position: sticky; left: 0; }
 /* An admin's hold, the inventory that never fills (2026-10-13): under everything that is worn, in the colour the
    powers are said in. It is drawn as tall as what is in it and is scrolled to with the rest of this side. */
@@ -1073,9 +1150,17 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-gear > .inv-gridbox { margin-top: 14px; }
 
 /* What each click does, along the foot of the screen either side of the hot keys: in sight always, and out of the way of the grids. */
-.inv > .inv-help { position: absolute; left: 30px; bottom: 4px; z-index: 2; width: calc(50% - 312px); max-height: 62px; margin: 0; overflow: hidden; font-size: 12px; line-height: 1.28; }
-.inv > .inv-help.right { left: auto; right: 30px; text-align: right; }
-.inv > .inv-help b { font-size: 10px; }
+/* (a key and what it does, in columns of two rows, as tall as the hot keys' box between them: 46 + 5 + 5 + 2 + 2) */
+/* (the foot on the columns' own grid, so that the hot keys stand under Carried and as wide as it, the clicks under the other two) */
+.inv-foot { position: absolute; left: 30px; right: 30px; bottom: 6px; z-index: 3; height: 60px; display: grid; grid-template-columns: minmax(402px, 1.1fr) 408px minmax(420px, 1.2fr); gap: 20px; }
+.inv-foot > .inv-hot { position: static; grid-column: 3; transform: none; }
+.inv-foot > .inv-hot .inv-hotkey { flex: 1 1 0; width: auto; min-width: 0; }
+.inv-foot > .inv-help { grid-column: 1 / 3; min-width: 0; height: 60px; margin: 0; overflow: hidden; display: flex; justify-content: flex-start; gap: 24px; font-size: 12px; line-height: 1; }
+/* (each column its keys over one another and what they do beside them, both lined up) */
+.inv-foot > .inv-help > div { display: grid; grid-template-columns: max-content max-content; grid-template-rows: repeat(2, 1fr); column-gap: 8px; align-items: center; }
+.inv-foot > .inv-help span { display: contents; }
+.inv-foot > .inv-help b { justify-self: start; padding: 3px 6px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); font-size: 10px; line-height: 1; }
+.inv-foot > .inv-help i { font-style: normal; white-space: nowrap; }
 body.touch .inv-scroll, body.touch .inv-inspect { touch-action: pan-x pan-y; }
 
 /* ------------------------------------------------------------ F3 performance overlay */
@@ -1237,17 +1322,16 @@ body.touch .set-page .gfx-range { height: 30px; }
   transition: color 0.15s, border-color 0.15s;
 }
 .sm-nav button:hover { color: var(--ink); }
-/* (The ways out of the menu to pages of their own, the changelog and the payouts: small, in one type, each marked
-   as leaving, and set off from the sheets by a line. They are words, and neither is a box.) */
-.sm-nav .sm-out { align-self: center; flex: none; margin-left: 22px; padding: 6px 0 7px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); transition: color 0.15s; }
-.sm-nav button + .sm-out { margin-left: 12px; padding-left: 18px; border-left: 1px solid var(--line); }
-.sm-nav .sm-out::after { content: ' \2197'; color: var(--brand); }
-.sm-nav .sm-out:hover { color: var(--ink); }
-.sm-nav .sm-out:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+/* (The ways out of the menu to pages of their own, the Arena, the changelog and the payouts: at the right beside
+   the Discord, small, in one type, each marked as leaving. The screens of the menu itself stay at the left.) */
+.sm-out { align-self: center; flex: none; padding: 6px 0 7px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); transition: color 0.15s; }
+.sm-out::after { content: ' \2197'; color: var(--brand); }
+.sm-out:hover { color: var(--ink); }
+.sm-out:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 /* (Payouts is one of them: it was a gold button at the top right, with a light crossing it, and was not liked.
    What a tag pays now is said small beside the word, when it is known.) */
-.sm-nav .sm-pay { display: inline-flex; align-items: baseline; gap: 9px; }
-.sm-nav .sm-pay::after { content: none; }
+.sm-pay { display: inline-flex; align-items: baseline; gap: 9px; }
+.sm-out.sm-pay::after { content: none; }
 .sm-pay span::after { content: ' \2197'; color: var(--brand); }
 .sm-pay em { font-size: 11px; font-style: normal; letter-spacing: 0.06em; color: var(--ink); }
 .sm-pay em:empty { display: none; }
@@ -1259,7 +1343,7 @@ body.touch .set-page .gfx-range { height: 30px; }
   .sm-nav { overflow-x: auto; scrollbar-width: none; }
   .sm-nav::-webkit-scrollbar { display: none; }
 }
-.sm-status { display: flex; flex: none; align-items: center; gap: 16px; margin-left: auto; }
+.sm-status { display: flex; flex: none; align-items: center; gap: 22px; margin-left: auto; }
 /* who is online: said under the name and the button, where it bears on pressing it (a full server says so there,
    and that there is a line). It was at the top right, and ran into the menu when it had much to say. */
 .start-online { display: none; margin-top: 16px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--ok); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
@@ -1514,19 +1598,69 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-sheet.em-hole { position: relative; isolation: isolate; background: none; backdrop-filter: none; }
 .em-sheet.em-hole::before { content: ''; position: absolute; inset: 0; z-index: -1; background: rgba(10, 12, 11, 0.82); backdrop-filter: blur(12px); clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--em-l) var(--em-t), var(--em-l) var(--em-b), var(--em-r) var(--em-b), var(--em-r) var(--em-t), var(--em-l) var(--em-t)); }
 .start-brief[data-tab='map'] .pane-map, .start-brief[data-tab='brief'] .pane-brief { display: block; }
-/* How to play: a card over the screen (HUD.howTo), once on the first visit; its button is there only in a game (the Esc menu) */
-.sm-howto { display: none !important; }
-.hud-start.paused .sm-howto { display: inline-block !important; }
-/* the way across to the other game */
-.sm-arena { color: #ff4a36 !important; border: 1px solid rgba(255, 74, 54, 0.6); padding: 4px 12px !important; }
-.hud-howto { position: fixed; inset: 0; z-index: 40; display: none; place-items: center; background: rgba(5, 6, 6, 0.72); pointer-events: auto; }
+/* How to play: a card over the screen (HUD.howTo), once on the first visit, and its button in the menu on every screen of it */
+/* the way across to the other game: a red box as tall as the Discord's */
+.sm-out.sm-arena { padding: 7px 12px 8px; color: #ff4a36; border: 1px solid rgba(255, 74, 54, 0.6); }
+.sm-out.sm-arena:hover { color: #ff6a58; border-color: #ff4a36; }
+/* (its own --brand: it is not inside .hud-start, where the rest of the menu gets it) */
+.hud-howto { --brand: #ffd35a; position: fixed; inset: 0; z-index: 40; display: none; place-items: center; background: rgba(5, 6, 6, 0.72); pointer-events: auto; }
 .hud-howto.on { display: grid; }
 .howto-card { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: rgba(14, 16, 15, 0.97); border-top: 3px solid #ffd35a; padding: 20px 24px 22px; box-shadow: 0 18px 60px #000; }
 .howto-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .howto-head h2 { font-size: 28px; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a; }
 .howto-x { background: none; border: none; color: rgba(233, 228, 216, 0.62); font-size: 28px; cursor: pointer; }
 .hud-howto .pane-brief { display: block; }
-@media (min-width: 900px) { .hud-howto .pane-brief { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; } }
+/* How to play: the five steps of a life as pictures across the card, numbered. Each step takes the stage in turn
+   (2 s of a 10 s round): its card rises with a yellow edge, its picture wakes and pushes in, a light sweeps across it
+   and its number kicks; the rest wait greyed. What is out to get you in pictured cards beneath. (Pictures: the
+   changelog's, cropped, public/howto/) */
+.hud-howto .howto-card { width: min(1180px, calc(100vw - 32px)); }
+.ht-steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.ht-steps li { --at: calc(var(--i) * 2s - 10s); }
+.ht-steps figure { position: relative; margin: 0 0 12px; aspect-ratio: 16 / 10; overflow: hidden; background: #0b0c0c; outline: 2px solid transparent; animation: ht-card 10s ease-out infinite var(--at); }
+.ht-steps figure::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(8, 9, 9, 0.88), rgba(8, 9, 9, 0) 58%); }
+.ht-steps figure::before { content: ''; position: absolute; z-index: 1; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 236, 180, 0.32), transparent); transform: skewX(-12deg); animation: ht-sweep 10s ease-out infinite var(--at); }
+.ht-steps img, .ht-threats img { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(0.8) brightness(0.78); transition: filter 0.4s, transform 0.6s ease; }
+.ht-steps img { animation: ht-pic 10s linear infinite var(--at); }
+.ht-threats div:hover img { filter: none; transform: scale(1.04); }
+.ht-steps i { position: absolute; left: 12px; bottom: 4px; z-index: 2; font-size: 40px; font-weight: 700; font-style: normal; line-height: 1; color: var(--brand); text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8); transform-origin: left bottom; animation: ht-num 10s ease-out infinite var(--at); }
+.ht-steps b { display: block; font-size: 17px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+.ht-steps span { display: block; margin-top: 4px; font-size: 15px; line-height: 1.3; color: var(--ink-dim); }
+@keyframes ht-card { 0% { transform: none; outline-color: transparent; box-shadow: none; } 3%, 18% { transform: translateY(-8px); outline-color: var(--brand); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6), 0 0 22px rgba(255, 211, 90, 0.28); } 22%, 100% { transform: none; outline-color: transparent; box-shadow: none; } }
+@keyframes ht-pic { 0% { filter: grayscale(0.7) brightness(0.5); transform: scale(1); } 3% { filter: none; transform: scale(1.02); } 19% { filter: none; transform: scale(1.12); } 22%, 100% { filter: grayscale(0.7) brightness(0.5); transform: scale(1); } }
+@keyframes ht-sweep { 0% { left: -60%; } 6%, 100% { left: 130%; } }
+@keyframes ht-num { 0% { transform: none; } 2% { transform: scale(1.45) rotate(-4deg); } 5%, 18% { transform: scale(1.15); } 22%, 100% { transform: none; } }
+.ht-h { margin: 28px 0 12px; font-size: 14px; font-weight: 600; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-faint); }
+.ht-threats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.ht-threats div { overflow: hidden; background: rgba(233, 228, 216, 0.04); border-top: 2px solid rgba(255, 211, 90, 0.55); }
+.ht-threats img { height: auto; aspect-ratio: 16 / 9; }
+.ht-threats b { display: block; padding: 11px 14px 0; font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand); }
+.ht-threats span { display: block; padding: 4px 14px 14px; font-size: 14.5px; line-height: 1.32; color: var(--ink-dim); }
+/* (the card's second half, src/ui/howto-more.ts: the five tiers in their map colours, the guns by hits to kill, and what is good to know) */
+.ht-tiers { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.ht-tiers div { padding: 10px 12px 12px; background: rgba(233, 228, 216, 0.04); border-top: 3px solid var(--tc); }
+.ht-tiers b { display: block; font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--tc); }
+.ht-tiers em { display: block; margin-top: 3px; font-size: 12.5px; font-style: normal; line-height: 1.3; color: var(--ink); }
+.ht-tiers span { display: block; margin-top: 6px; font-size: 13.5px; line-height: 1.32; color: var(--ink-dim); }
+.ht-sub { margin: -4px 0 10px; font-size: 14.5px; line-height: 1.35; color: var(--ink-dim); }
+.ht-taps { display: grid; gap: 6px; }
+.ht-tap { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 12px; background: rgba(233, 228, 216, 0.04); }
+.ht-tap > i { font-size: 34px; font-weight: 700; font-style: normal; line-height: 1; text-align: center; color: var(--ink-dim); }
+.ht-tap.one { background: rgba(255, 74, 54, 0.08); box-shadow: inset 3px 0 0 #ff4a36; }
+.ht-tap.one > i { color: #ff6a58; }
+.ht-tap small { display: block; margin-bottom: 5px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); }
+.ht-tap ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ht-tap li { display: inline-flex; align-items: baseline; gap: 7px; padding: 4px 9px; background: rgba(10, 12, 11, 0.6); border-left: 3px solid var(--tc); }
+.ht-tap li b { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.ht-tap li em { font-size: 11px; font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; color: var(--tc); }
+.ht-know { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ht-know li { padding: 10px 14px 12px; background: rgba(233, 228, 216, 0.04); border-top: 2px solid rgba(255, 211, 90, 0.55); }
+.ht-know b { display: block; font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand); }
+.ht-know span { display: block; margin-top: 4px; font-size: 14.5px; line-height: 1.35; color: var(--ink-dim); }
+.ht-know kbd { display: inline-block; min-width: 0; height: auto; margin: 0 2px; padding: 0 5px; font: 600 11px/16px var(--mono); vertical-align: 1px; color: #121413; background: #d8c594; border: 0; box-shadow: none; }
+@media (max-width: 900px) { .ht-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; } .ht-threats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ht-tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .ht-steps, .ht-threats, .ht-tiers, .ht-know { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .ht-steps figure, .ht-steps figure::before, .ht-steps img, .ht-steps i { animation: none; } .ht-steps img { filter: none; } }
 .howto-ok { margin-top: 16px; padding: 10px 30px; background: #ffd35a; color: #101211; border: none; font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
 
 
@@ -1577,18 +1711,6 @@ body.touch .set-page .gfx-range { height: 30px; }
 .mm-legend .k-gas { width: 0; height: 0; background: none; border: 5px solid transparent; border-top: 0; border-bottom: 9px solid #e4f07a; }
 
 /* how to play */
-.start-loop { list-style: none; margin: 0; padding: 0; }
-.start-loop li { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 13px; padding: 7px 0; }
-.start-loop li:not(:last-child)::before { content: ''; position: absolute; left: 17.5px; top: 43px; bottom: -7px; width: 1px; background: var(--line); }
-.loop-ico { display: grid; place-items: center; width: 36px; height: 36px; color: var(--brand); background: rgba(255, 211, 90, 0.06); border: 1px solid rgba(255, 211, 90, 0.45); animation: loop-step 8s linear infinite; animation-delay: calc(var(--i) * 1.6s); }
-.loop-ico svg { width: 19px; height: 19px; }
-@keyframes loop-step { 0%, 17% { color: #14110b; background: var(--brand); } 21%, 100% { color: var(--brand); background: rgba(255, 211, 90, 0.06); } }
-.start-loop b { display: block; font-size: 17px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
-.start-loop span { display: block; font-size: 15.5px; line-height: 1.3; color: var(--ink-dim); }
-.sm-threats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
-.sm-threats div { padding: 11px 13px 13px; background: rgba(233, 228, 216, 0.04); border-top: 2px solid rgba(255, 211, 90, 0.55); }
-.sm-threats b { display: block; font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand); }
-.sm-threats span { display: block; margin-top: 4px; font-size: 14.5px; line-height: 1.32; color: var(--ink-dim); }
 
 /* controls: a keyboard and a mouse, not a list */
 .kb { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
@@ -1633,14 +1755,26 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.paused .sm-foot a, .hud-start.paused .sm-foot button, .hud-start.paused .sm-hero > button { cursor: pointer; }
 .hud-start.paused .sm-cut, .hud-start.paused .sm-live, .hud-start.paused .start-kicker em, .hud-start.paused .start-sub2, .hud-start.paused .sm-loop, .hud-start.paused .sm-name, .hud-start.paused .sm-tag { display: none; }
 .hud-start.paused .sm-main { align-items: center; }
-.hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; }
-.hud-start.paused .start-title { font-size: 92px; }
+.hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; --tfs: 92px; display: grid; grid-template-columns: max-content 1fr; column-gap: 28px; align-items: center; }
+/* the number online beside the name, on its middle; everything else across the whole width as before */
+.hud-start.paused .sm-hero > * { grid-column: 1 / -1; }
+.hud-start.paused .start-title { grid-column: 1; grid-row: 2; font-size: var(--tfs); }
+/* (the letters sit low in their line, 0.115 of their size below its middle: the number is moved down as far, by twice that in margin) */
+.hud-start.paused .start-online { grid-column: 2; grid-row: 2; margin: calc(var(--tfs, 92px) * 0.23) 0 0; }
+/* (the room the number used to take under Resume, kept above the wallet line) */
+.hud-start.paused .sm-wallet { margin-top: 28px; }
 .hud-start.paused .start-sub { font-size: 20px; color: var(--ink-dim); }
 .hud-start.paused.live .start-sub { max-width: 620px; font-size: 17px; line-height: 1.35; }
-/* leaving the proper way: under Resume on the pause screen, when playing on a server */
-.start-out { display: none; margin-top: 10px; padding: 8px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
+/* leaving the proper way: a square beside Resume, as tall as it, on the pause screen when playing on a server */
+.start-out { display: none; flex: none; width: 58px; height: 58px; padding: 0; place-items: center; font-family: var(--mono); font-size: 18px; font-weight: 600; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
+.start-out svg { width: 24px; height: 24px; }
+/* (the drawing and the seconds share the one middle) */
+.start-out > * { grid-area: 1 / 1; }
+.start-out b { font-weight: inherit; }
 .start-out:hover { color: var(--ink); border-color: rgba(233, 228, 216, 0.6); }
-.hud-start.paused.live .start-out { display: block; }
+.start-out.counting { color: var(--brand); border-color: var(--brand); }
+.start-out.counting svg { display: none; }
+.hud-start.paused.live .start-out { display: grid; }
 .hud-logout { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: #ffd58a; background: rgba(10, 12, 11, 0.78); border: 1px solid rgba(255, 213, 138, 0.5); pointer-events: none; z-index: 40; white-space: nowrap; }
 .hud-logout.show { display: block; }
 /* said to everybody by an admin: across the screen, for a while */
@@ -1725,11 +1859,10 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .mm-spot { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
   .mm-spot.k-spawn { width: 22px; height: 22px; margin: -11px 0 0 -11px; }
   .start-brief[data-tab='brief'] .pane-brief { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; }
-  .sm-threats { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
   .sm-foot { gap: 16px; padding: 0 calc(22px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(22px + env(safe-area-inset-left)); }
   .sl-ca code { max-width: 210px; }
   .hud-start.paused .sm-hero { padding-bottom: 20px; }
-  .hud-start.paused .start-title { font-size: 76px; }
+  .hud-start.paused .sm-hero { --tfs: 76px; }
 }
 /* --- and one stood up, or a very narrow window */
 @media (max-width: 640px) {
@@ -1742,7 +1875,6 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .sm-tag { display: none; }
   .sm-enter .start-btn { width: 100%; }
   .sm-enter .start-btn { min-height: 58px; }
-  .sm-threats { grid-template-columns: minmax(0, 1fr); }
   .kb { grid-template-columns: minmax(0, 1fr); }
   .sm-foot { flex-wrap: wrap; gap: 8px 16px; }
   .sm-live { display: none; }
@@ -2376,3 +2508,6 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .hud-bleed .hb-drop, .hud-bleed.low .hb-cut { display: none; }
 .hud-bleed.low .hb-drop { display: flex; }
 .rw-umb { margin: 0 0 14px; padding: 8px 12px; background: #1d1b14; border-left: 2px solid #ffd35a; font-size: 13px; color: #e9e4d8; }
+
+/* (a thing flying from one pile to the one it joins: Combine all, InventoryUI.combineAll) */
+.inv-fly { position: fixed; z-index: 60; pointer-events: none; background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0 0 4px rgba(201, 178, 124, 0.8)); }

@@ -92,6 +92,7 @@ export const onlineMethods = {
       this.ensureTag();
       this.weapons.validate();
       this.autoHot();
+      this.invUI.settle();
     } else this.freshKit();
     this.meDirty = true;
     // the server has not heard what we are wearing yet
