@@ -271,6 +271,8 @@ function reskin(bp: Blueprint, seed: number): Blueprint {
 }
 /** how high the oil paint goes up an inside wall */
 const DADO = 1.45;
+/** how far under its floor a door's step reaches down to the ground at most */
+const STEP_DOWN = 0.6;
 /** what is big enough, and plain enough, for its picture to be seen coming round again */
 const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado']);
 /** a slow change of tone by where in the world a thing is (see `material`) */
@@ -2670,9 +2672,17 @@ export class Buildings {
     const lived = plot.type === 'house_small' || plot.type === 'house_brick' || plot.type === 'house_two' || plot.type === 'cabin';
     // (dice of its own: nothing here may take a throw from the ones the yard is laid out with)
     const rq = new RNG(plot.seed ^ 0x51ed5);
+    const at = new THREE.Vector3();
     for (const o of outside) {
-      // a step at each door
-      addBox('concrete', o.a - 0.22, o.b + 0.22, -0.14, -0.012, T / 2, T / 2 + 0.72, o.F, false);
+      // a step at each door, a hand's breadth deep, or down to the ground under it where that lies lower: a town's
+      // floors stand 0.3 m over its pad, and every step there stood 16 cm in the air (the owner, 2026-10-19: "the front
+      // step fo the houses, and the wooden shack are floating still"). Not past STEP_DOWN: that is a deck's or a pier's.
+      let foot = -0.14;
+      for (const x of [o.a - 0.22, (o.a + o.b) / 2, o.b + 0.22]) for (const z of [T / 2, T / 2 + 0.72]) {
+        at.set(x, 0, z).applyMatrix4(o.F);
+        foot = Math.min(foot, heightAt(this.world.heights, at.x, at.z) - at.y - 0.03);
+      }
+      addBox('concrete', o.a - 0.22, o.b + 0.22, foot < -STEP_DOWN ? -0.14 : foot, -0.012, T / 2, T / 2 + 0.72, o.F, false);
       if (!o.front || !(lived || plot.type === 'clinic' || plot.type === 'store')) continue;
       // and over the front one a little roof on two brackets
       const mid = (o.a + o.b) / 2, half = (o.b - o.a) / 2 + 0.42;
