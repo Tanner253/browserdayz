@@ -32,6 +32,7 @@ import { HELI, hpOf } from '../src/sim/heli';
 import { Director } from '../src/sim/infected';
 import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protocol';
 import { Hearths } from '../src/sim/fires';
+import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
 import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
@@ -551,6 +552,22 @@ setInterval(() => {
 
 // ------------------------------------------------------------------ loops
 
+/**
+ * How long the server's own thread kept everything waiting, over the last minute (2026-10-19, the owner: "people
+ * sometimes complain of lag spike when fighting people"): the middle, the slowest hundredth and the longest wait, in
+ * ms, on /healthz; a wait over 200 ms is written down as it happens, with how many were on. While the thread waits,
+ * nobody's moves or shots are heard and everybody's figures stop where they were.
+ */
+const loopDelay = monitorEventLoopDelay({ resolution: 20 });
+loopDelay.enable();
+export const LOOP = { p50: 0, p99: 0, max: 0 };
+setInterval(() => {
+  const ms = (ns: number) => Math.round(ns / 1e5) / 10;
+  Object.assign(LOOP, { p50: ms(loopDelay.percentile(50)), p99: ms(loopDelay.percentile(99)), max: ms(loopDelay.max) });
+  loopDelay.reset();
+  if (LOOP.max > 200) log(`[stall] the server's thread was held up ${LOOP.max} ms in the last minute (slowest hundredth ${LOOP.p99} ms), ${clients.size} on`);
+}, 60_000).unref();
+
 setInterval(() => {
   if (clients.size < 2) return;
   const s: Extract<S2C, { t: 'ps' }>['s'] = [];
@@ -785,7 +802,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, today: seen.today(), queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), lootPrint: LOOT_PRINT, lootOdd: LOOT_ODD.games, botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, today: seen.today(), queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), lootPrint: LOOT_PRINT, lootOdd: LOOT_ODD.games, loop: LOOP, botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
     return;
   }
   // whoever is about to deploy says so here first, and everything kept is written (see `deploying`)
