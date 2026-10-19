@@ -2355,14 +2355,33 @@ export class Buildings {
             } else if (drawn) addBox(key, x0, x1, ya, yb, z0, z1, F);
             else this.collider((x1 - x0) / 2, (yb - ya) / 2, (z1 - z0) / 2, F.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (ya + yb) / 2, (z0 + z1) / 2)), surf(key));
           };
-          let cur = 0;
-          for (const o of ops) {
-            if (o.a > cur) part(cur, o.a - e, 0, h);
-            if (o.top < h) part(o.a - e, o.b + e, o.top + e, h);
-            if (o.bottom > 0) part(o.a - e, o.b + e, 0, o.bottom - e);
-            cur = o.b + e;
+          // (A window over a door, in the same stretch of the wall (a church's gable: its door, a tall window over it):
+          // taken one at a time, the window's wall was laid from the floor up to its sill, across the doorway, and
+          // the door's from its head up across the window. The owner, 2026-10-19: "multiple doorways are uusable in the
+          // churches". So where openings share a stretch, the wall is laid in strips between their edges, each solid
+          // where none of the openings over it is.)
+          const stacked = ops.some((o, i) => ops.slice(0, i).some((p) => o.a < p.b - 1e-6));
+          if (stacked) {
+            const cuts = [...new Set([0, L, ...ops.flatMap((o) => [o.a, o.b])].filter((x) => x >= 0 && x <= L))].sort((p, q) => p - q);
+            for (let k = 0; k + 1 < cuts.length; k++) {
+              const x0 = cuts[k], x1 = cuts[k + 1], open = ops.filter((o) => o.a <= x0 + 1e-6 && o.b >= x1 - 1e-6).map((o): [number, number] => [o.bottom, o.top]).sort((p, q) => p[0] - q[0]);
+              let y = 0;
+              for (const [ya, yb] of open) {
+                if (ya > y) part(x0, x1, y, ya);
+                y = Math.max(y, yb);
+              }
+              if (y < h) part(x0, x1, y, h);
+            }
+          } else {
+            let cur = 0;
+            for (const o of ops) {
+              if (o.a > cur) part(cur, o.a - e, 0, h);
+              if (o.top < h) part(o.a - e, o.b + e, o.top + e, h);
+              if (o.bottom > 0) part(o.a - e, o.b + e, 0, o.bottom - e);
+              cur = o.b + e;
+            }
+            if (cur < L) part(cur, L, 0, h);
           }
-          if (cur < L) part(cur, L, 0, h);
         }
         // frames, glass, doors
         for (const o of ops) {
