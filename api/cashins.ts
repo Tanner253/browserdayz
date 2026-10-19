@@ -239,7 +239,7 @@ function page(book: Book, s: Snapshot, now: number): string {
     <h2>Level up: play free, earn SOL, hold $ZONA, earn more <small>${Date.parse(s.rules5From!) <= now ? 'live' : `from ${s.rules5From!.slice(11, 16)} UTC`}</small></h2>
     <div class="flow loop">
       ${gate ? step('1', 'Play free', `your first ${gate.free} tags`, `No coin needed for your first ${gate.free} paid tags, ${amount(s.tiers[0].perTag)} SOL each. Take a dog tag, hold it thirty minutes: it pays SOL.`) : step('1', 'Play free', `${amount(s.tiers[0].perTag)} SOL a tag`, 'No coin needed. Take a dog tag, hold it thirty minutes: it pays SOL.')}
-      ${gate ? step('2', `Hold ${gate.hold} $ZONA`, `to be paid past ${gate.free}`, `${gate.now ? '' : `From ${gate.at}: `}after your first ${gate.free}, a tag is paid only while the wallet you are paid to holds ${gate.hold} $ZONA. Your first ${gate.free} tags pay enough SOL to buy it, at the price of 18 October.`) : step('2', 'Buy $ZONA', 'with what you earn', 'Put the SOL you win into $ZONA, in the wallet you are paid to.')}
+      ${gate ? step('2', `Hold ${gate.hold} $ZONA`, `to be paid past ${gate.free}`, `${gate.now ? 'After' : `From ${gate.at}, after`} your first ${gate.free}, a tag is paid only while the wallet you are paid to holds ${gate.hold} $ZONA. Your first ${gate.free} tags pay enough SOL to buy it, at the price of 19 October.`) : step('2', 'Buy $ZONA', 'with what you earn', 'Put the SOL you win into $ZONA, in the wallet you are paid to.')}
       ${step('3', 'Every tag pays more', `+${s.holderPerM} SOL per 1M`, `Each million $ZONA you hold adds ${s.holderPerM} SOL to every tag you cash in.`)}
       ${step('4', `Reach ${esc(topTier.name)}`, `${amount(topTier.perTag)} SOL a tag`, `${topTier.from}M $ZONA held: ${Math.round((topTier.perTag / s.tiers[0].perTag) * 10) / 10}× the pay, and your name on the Elite board below.`)}
     </div>
@@ -517,7 +517,7 @@ ${tiersSection}
           : ''
       }${
         gate
-          ? `<div class="rule"><h3>${gate.free} tags free, then hold ${gate.hold} $ZONA</h3><p>From ${gate.at}, once a wallet, or the player cashing in, has had ${gate.free} tags paid, a tag is paid only if that wallet holds ${gate.hold} $ZONA: the lower of what it held when the tag was cashed in and when it is paid. One that is not is listed and not paid. ${gate.free} tags paid enough SOL to buy ${gate.hold} $ZONA at the coin's price of 18 October. Tags paid before this rule began count toward the ${gate.free}, as far as this ledger lists them.</p></div>
+          ? `<div class="rule"><h3>${gate.free} tags free, then hold ${gate.hold} $ZONA</h3><p>From ${gate.at}, once a wallet, or the player cashing in, has had ${gate.free} tags paid, a tag is paid only if that wallet holds ${gate.hold} $ZONA: the lower of what it held when the tag was cashed in and when it is paid. A tag cashed in without it is listed and not paid. On 19 October, at 0.00000062 SOL a coin (DexScreener), ${gate.hold} $ZONA cost about ${(s.holdMin * 6.2e-7).toFixed(3)} SOL, and ${gate.free} tags pay at least ${amount(s.tiers[0].perTag * gate.free)} SOL. Tags paid before this rule began count toward the ${gate.free}, as far as this ledger lists them.</p></div>
       `
           : ''
       }<div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>

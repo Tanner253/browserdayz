@@ -123,13 +123,13 @@ export interface Config {
   /**
    * The sixth cut-over (ms), the owner, 2026-10-18, the treasury paying out too much with more players on: "the first 10
    * tags are free to play play to earn but after that we make the user have a token holder requirement to even be
-   * ELIGBLE to get payouts ... 10 tags covers 150k supply". For a tag cashed in from this moment on, once its wallet or
+   * ELIGBLE to get payouts ... 10 tags covers 150k supply", and then "100k supply instead of 150". For a tag cashed in from this moment on, once its wallet or
    * its player has had `freeTags` paid, it is paid only if the wallet holds `holdMin` of the coin, the lower of then and
    * now as for the holder bonus; otherwise it is not paid. See `pastFree`.
    */
   rules6From: number;
   freeTags: number;
-  /** what of the coin a wallet must hold past its free tags, in its smallest unit (150,000 whole coins) */
+  /** what of the coin a wallet must hold past its free tags, in its smallest unit (100,000 whole coins) */
   holdMin: bigint;
   /** rewards are collected when at least this much is waiting */
   claimAt: bigint;
@@ -167,7 +167,7 @@ const COIN_DECIMALS = 6n;
 /** The moment of the fourth (see `rules4From`), written as RULES2_FROM is; PAYOUT_RULES4_FROM is asked first. '': none yet. */
 export const RULES4_FROM = '2026-10-15T17:30:00Z';
 /** The moment of the sixth (see `rules6From`), written as RULES2_FROM is; PAYOUT_RULES6_FROM is asked first. '': none yet. */
-export const RULES6_FROM = '';
+export const RULES6_FROM = '2026-10-19T01:15:00Z';
 /** a moment written in full, a day, a time and a zone (see `config`) */
 const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -264,7 +264,7 @@ export function config(env: Record<string, string | undefined> = process.env): C
     tagMax: lamports(num(env.TAG_PAY_MAX_HOLDER_SOL, 0.025, 0.001, 1)),
     rules6From: Number.isFinite(from6) ? Math.max(rulesFrom, from6) : Infinity,
     freeTags: Math.round(num(env.PAYOUT_FREE_TAGS, 10, 0, 1000)),
-    holdMin: BigInt(Math.round(num(env.PAYOUT_HOLD_MIN, 150_000, 0, 1e12))) * 10n ** COIN_DECIMALS,
+    holdMin: BigInt(Math.round(num(env.PAYOUT_HOLD_MIN, 100_000, 0, 1e12))) * 10n ** COIN_DECIMALS,
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
   };
