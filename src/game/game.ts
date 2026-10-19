@@ -11,7 +11,6 @@ import { audio } from '../core/audio';
 import { voiceOf } from '../sim/emotes';
 import { Input } from '../core/input';
 import { Gamepad } from '../core/gamepad';
-import { Prefetch } from '../core/prefetch';
 import { controls, translation, type Controls } from '../core/keys';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
@@ -205,8 +204,6 @@ export class Game {
   input: Input;
   /** a controller, when one is switched on in the settings (src/core/gamepad.ts) */
   pad: Gamepad | null = null;
-  /** the world's pictures sent to the card before they are first drawn (src/core/prefetch.ts), once the game is up */
-  prefetch: Prefetch | null = null;
   player: Player;
   avatar = new Avatar();
   director: CameraDirector;
@@ -694,7 +691,6 @@ export class Game {
       .catch((e) => console.error('what is built behind the menu', e))
       .then(() => {
         this.isLoaded = true;
-        this.prefetch = new Prefetch(this.s.r.renderer, this.s.r.scene, () => assets.strips);
         // (and the inventory's first opening got ready behind the menu: see InventoryUI.warm)
         this.invUI?.warm();
         if (this.wantIn) {
