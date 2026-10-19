@@ -13,8 +13,9 @@ import { STACK } from './town-plans';
 export function boathousePlan(): Blueprint {
   const HW = 3.5, HD = 3;
   const g = new Floor();
-  g.put('old_military_crate', -2.6, -2.2, 0.1).put('old_military_crate', -2.6 + STACK, -2.2 + STACK, 0.05, 0.3).put('Barrel_01', 2.7, -2.3).put('metal_jerrycan_green', 2.0, -2.5, 0.6);
-  g.top('WoodenTable_01', -2.7, 1.2, Q, 0.57, 2).case('Shelf_01', 2.95, 1.0, -Q, [0.66, 1.22]).floor([0.2, -0.6], [-0.4, 1.6]);
+  // (the cases along the west wall: they stood in the open end over the water, and through the wall)
+  g.put('old_military_crate', -2.6, -1.7, Q).put('old_military_crate', -2.6 + STACK, -1.7 + STACK, Q - 0.05, 0.3).put('Barrel_01', 2.7, -2.3).put('metal_jerrycan_green', 2.75, -1.5, Q);
+  g.top('WoodenTable_01', -2.7, 1.2, Q, 0.57, 2).case('Shelf_01', 3.16, 1.0, -Q, [0.66, 1.22]).floor([0.2, -0.6], [-0.4, 1.6]);
   return {
     w: HW * 2, d: HD * 2, h: 3.0, ext: 'boards_pale', int: 'planks', floor: 'floor_wood', roof: 'roof_iron', roofType: 'gable',
     walls: [
@@ -33,7 +34,7 @@ export function boathousePlan(): Blueprint {
 export function smokehousePlan(): Blueprint {
   const HW = 2.2, HD = 1.8;
   const g = new Floor();
-  g.put('stone_fire_pit', 0, -0.4, 0).put('wooden_crate_01', 1.4, 1.1, PI).floor([-1.2, 0.8]);
+  g.put('stone_fire_pit', 0, -0.4, 0).put('wooden_crate_01', 1.4, 1.1, PI).put('Barrel_01', 1.6, -1.2).floor([-1.2, 0.8]);
   return {
     w: HW * 2, d: HD * 2, h: 2.4, ext: 'planks_ext', int: 'planks', floor: 'floor_concrete', roof: 'roof_iron', roofType: 'gable',
     walls: [

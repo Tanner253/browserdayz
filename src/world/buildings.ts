@@ -27,6 +27,7 @@ import * as town from './town-plans';
 import * as zavod from './zavod-plans';
 import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
+import { clearWaysOut } from './ways-out';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
 
 /** where the valley begins, going east: x, metres (the green west's east edge, by the big map) */
@@ -138,8 +139,10 @@ const UNDER_GAS: Partial<Record<BuildingPlot['type'], { furniture: Furn[]; floor
     floor: [[-2.6, 2.8], [2.6, -2.4], [4.0, 1.0], [-3.0, -2.6]],
   },
   garage: { furniture: [{ id: 'rack_small', x: -3.97, z: 1.6, rot: Math.PI / 2, on: [0, 1, 2, 3] }] },
-  // (in the arms room, between its shelves and its desk)
-  barracks: { furniture: [{ id: 'rack_wide', x: 5.97, z: 0.85, rot: -Math.PI / 2, on: [0, 1, 2, 3] }] },
+  // (A small rack in the room of beds, between the arms room's door and the front wall, and four places on its floor:
+  // the eight places of the long rack that stood in the arms room until the gun rack was given that wall, the two one
+  // inside the other, 2026-10-19. As many places, in the same order, so that none after them is renumbered.)
+  barracks: { furniture: [{ id: 'rack_small', x: 3.17, z: 2.42, rot: -Math.PI / 2, on: [0, 1, 2, 3] }], floor: [[-4.6, 0.3], [-1.2, -0.3], [1.9, 0.9], [4.6, -0.2]] },
 };
 /** how high a bed's springs are over its feet, and how thick the mattress on them is: what is kept on a bed lies on that */
 const BED = { springs: 0.49, mattress: 0.1 };
@@ -991,8 +994,10 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'steel_locker', x: 3.2, z: -0.6, rot: -Math.PI / 2 },
           { id: 'steel_locker', x: 3.2, z: -1.75, rot: -Math.PI / 2 },
           // (and the arms room's gun rack, on its end wall between the shelves and the desk: "more of the new weapon
-          // lockers ... in military locations", the owner, 2026-10-18)
-          { id: 'gun_rack', x: 6.09, z: 0.97, rot: -Math.PI / 2 },
+          // lockers ... in military locations", the owner, 2026-10-18. Its back a finger off the plaster, at 6.3: stood
+          // by eye at 6.09, it was 9 cm into the wall in every barracks, "the weapon rack in zstava and pretty much all
+          // location slips into the wall", 2026-10-19)
+          { id: 'gun_rack', x: 5.98, z: 0.97, rot: -Math.PI / 2 },
         ],
         loot: [
           [5.0, 0.02, 0.3], [4.9, 0.02, -1.6],
@@ -1681,9 +1686,14 @@ export class Buildings {
         this.world.props.push({ kind: q.id, x, y, z, rot: yaw + q.rot, scale: 1, far: 46 });
       }
     }
+    // Nothing stands in a building's way out: what the yards, sites, village and towns set about the buildings is
+    // slid clear of each door when all of it is laid (src/world/ways-out.ts). No dice: nothing else moves.
+    this.waysCleared = clearWaysOut(this.world, (plot) => blueprint(plot.type, new RNG(plot.seed)), assets.manifest.models, this.lootPoints);
     // (and which places are inside the furniture they lie on: the same here and on the server, by the same props)
     markInside(this.lootPoints, this.world.props);
   }
+  /** how many things clearWaysOut slid out of a door's way, the last time the map was planned */
+  waysCleared = 0;
 
   /**
    * The basements: what they are made of (src/world/basement-build.ts), what stands in them, and their places for

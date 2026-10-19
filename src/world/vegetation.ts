@@ -104,6 +104,11 @@ const SOLID: Record<string, [Surface, number]> = {
   rack_small: ['metal', 0.95],
   rack_wide: ['metal', 0.95],
   lab_counter: ['concrete', 0.95],
+  // (2026-10-19, what the west's rooms were dressed with)
+  painted_wooden_bench: ['wood', 0.95],
+  painted_wooden_nightstand: ['wood', 0.95],
+  painted_wooden_shelves: ['wood', 0.95],
+  sofa_02: ['cloth', 0.95],
   med_sink: ['metal', 0.9],
   mop_bucket: ['metal', 0.6],
 };
@@ -113,9 +118,10 @@ const THIN = new Set(['ward_curtain', 'screen_curtain']);
 /**
  * Things whose solid part is not the whole of their model's box: how much of its depth is (the model's own z). The
  * cold chambers are a face and what is behind it; before the face a door lies on the floor, a door's length out,
- * and the box of the whole model stopped a body that far from the face.
+ * and the box of the whole model stopped a body that far from the face. (And what does not stand about its own middle:
+ * the shelves' foot is their back, the sofa's lies back from it.)
  */
-const SOLID_DEPTH: Record<string, [number, number]> = { body_lockers: [-1.5, 0.47] };
+const SOLID_DEPTH: Record<string, [number, number]> = { body_lockers: [-1.5, 0.47], painted_wooden_shelves: [0, 0.37], sofa_02: [-0.48, 0.34] };
 
 /**
  * Where a tree's simpler model gives way to its baked card, metres. It was 115-130, which from

@@ -241,6 +241,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Fishermans Hat](https://polyhaven.com/a/fishermans_hat) | PierreB3D |
 | model | [Food Apple 01](https://polyhaven.com/a/food_apple_01) | Oliver Harries |
 | model | [Garden Gloves 01](https://polyhaven.com/a/garden_gloves_01) | Satyaki Mandal |
+| model | [Green Chair 01](https://polyhaven.com/a/GreenChair_01) | Kirill Sannikov |
 | model | [Hatchet](https://polyhaven.com/a/hatchet) | James Ray Cock, Ulan Cabanilla |
 | model | [Large Castle Door](https://polyhaven.com/a/large_castle_door) | Tina |
 | model | [Life Jacket](https://polyhaven.com/a/life_jacket) | PierreB3D |
@@ -273,8 +274,12 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |
 | model | [Old Tyre](https://polyhaven.com/a/old_tyre) | MP |
+| model | [Painted Wooden Bench](https://polyhaven.com/a/painted_wooden_bench) | Kirill Sannikov |
 | model | [Painted Wooden Cabinet](https://polyhaven.com/a/painted_wooden_cabinet) | Kirill Sannikov |
 | model | [Painted Wooden Chair 01](https://polyhaven.com/a/painted_wooden_chair_01) | Kuutti Siitonen |
+| model | [Painted Wooden Nightstand](https://polyhaven.com/a/painted_wooden_nightstand) | Kirill Sannikov |
+| model | [Painted Wooden Shelves](https://polyhaven.com/a/painted_wooden_shelves) | Kirill Sannikov |
+| model | [Painted Wooden Stool](https://polyhaven.com/a/painted_wooden_stool) | Kirill Sannikov |
 | model | [Painted Wooden Table](https://polyhaven.com/a/painted_wooden_table) | Kirill Sannikov |
 | model | [Plastic Bottle Gallon](https://polyhaven.com/a/plastic_bottle_gallon) | Rahul Chaudhary |
 | model | [Plastic Thermos](https://polyhaven.com/a/plastic_thermos) | PierreB3D |
@@ -292,6 +297,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Seadogs Compass](https://polyhaven.com/a/seadogs_compass) | Benny Weimer |
 | model | [Service Pistol](https://polyhaven.com/a/service_pistol) | Mateusz Sadek |
 | model | [Shelf 01](https://polyhaven.com/a/Shelf_01) | Gabriel Radić |
+| model | [Sofa 02](https://polyhaven.com/a/sofa_02) | Kirill Sannikov |
 | model | [Steel Frame Shelves 01](https://polyhaven.com/a/steel_frame_shelves_01) | James Ray Cock |
 | model | [Stick Grenade](https://polyhaven.com/a/stick_grenade) | singaii |
 | model | [Stone Fire Pit](https://polyhaven.com/a/stone_fire_pit) | Sebastian Platen |
@@ -305,6 +311,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Vintage Radio Transceiver](https://polyhaven.com/a/vintage_radio_transceiver) | Mateusz Sadek |
 | model | [Vintage Suitcase](https://polyhaven.com/a/vintage_suitcase) | Maximilian Schuster |
 | model | [Wooden Bookshelf Worn](https://polyhaven.com/a/wooden_bookshelf_worn) | Ulan Cabanilla |
+| model | [Wooden Candlestick](https://polyhaven.com/a/wooden_candlestick) | Josh Dean |
 | model | [Wooden Crate 01](https://polyhaven.com/a/wooden_crate_01) | James Ray Cock |
 | model | [Wooden Ladder](https://polyhaven.com/a/wooden_ladder) | Miroslav Turura |
 | model | [Wooden Military Crate](https://polyhaven.com/a/wooden_military_crate) | Prabhjinder Singh |

@@ -485,7 +485,10 @@ export function hospitalWingPlan(): Blueprint {
   const roof: Deck = {
     parapet: 1.1, h: 2.5,
     walls: [
-      { side: 'inner', from: [x0, well.land + 0.2], to: [PW_ + 0.1, well.land + 0.2], ext: 'hosp_ext', int: 'int_painted', openings: [door(-5.1, -4.1)] },
+      // (its door at the head of the flight that comes up, x -4.53 to -3.0: it stood a stride west of it, over the
+      // railed-off hole the flight below leaves by, and the stair came up to a wall. The owner, 2026-10-19: "the kamenka
+      // hospital attached building door to the lower roof is off from the top of the stairs rendering it unusable")
+      { side: 'inner', from: [x0, well.land + 0.2], to: [PW_ + 0.1, well.land + 0.2], ext: 'hosp_ext', int: 'int_painted', openings: [door(-4.35, -3.25)] },
       { side: 'inner', from: [PW_, well.land + 0.1], to: [PW_, z0], ext: 'hosp_ext', int: 'int_painted', openings: [] },
     ],
     roofs: [{ x0: -WX, x1: PW_ + 0.1, z0: -WZ, z1: well.land + 0.3 }],

@@ -12267,6 +12267,181 @@
    "hi": "assets/models/hi/red_dot_1x.glb",
    "hiBytes": 1256476,
    "hiCard": 64
+  },
+  "painted_wooden_bench": {
+   "url": "assets/models/painted_wooden_bench.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 434172,
+   "srcTris": 630,
+   "tris": 630,
+   "min": [
+    -0.5761,
+    -0.0005,
+    -0.2537
+   ],
+   "max": [
+    0.5889,
+    0.8888,
+    0.2428
+   ],
+   "lods": [
+    {
+     "url": "assets/models/painted_wooden_bench_lod1.glb",
+     "tris": 200
+    }
+   ]
+  },
+  "painted_wooden_nightstand": {
+   "url": "assets/models/painted_wooden_nightstand.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 129760,
+   "srcTris": 470,
+   "tris": 470,
+   "min": [
+    -0.2534,
+    0,
+    -0.2492
+   ],
+   "max": [
+    0.2512,
+    0.6155,
+    0.2595
+   ],
+   "lods": [
+    {
+     "url": "assets/models/painted_wooden_nightstand_lod1.glb",
+     "tris": 203
+    }
+   ]
+  },
+  "painted_wooden_shelves": {
+   "url": "assets/models/painted_wooden_shelves.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 486048,
+   "srcTris": 524,
+   "tris": 524,
+   "min": [
+    -0.2556,
+    -0.001,
+    0
+   ],
+   "max": [
+    0.2555,
+    1.1241,
+    0.3671
+   ],
+   "lods": [
+    {
+     "url": "assets/models/painted_wooden_shelves_lod1.glb",
+     "tris": 200
+    }
+   ]
+  },
+  "painted_wooden_stool": {
+   "url": "assets/models/painted_wooden_stool.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 134552,
+   "srcTris": 676,
+   "tris": 676,
+   "min": [
+    -0.1875,
+    -0.001,
+    -0.1898
+   ],
+   "max": [
+    0.1974,
+    0.5779,
+    0.2163
+   ],
+   "lods": [
+    {
+     "url": "assets/models/painted_wooden_stool_lod1.glb",
+     "tris": 200
+    }
+   ]
+  },
+  "wooden_candlestick": {
+   "url": "assets/models/wooden_candlestick.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 191032,
+   "srcTris": 212992,
+   "tris": 1712,
+   "min": [
+    -0.0487,
+    0,
+    -0.0494
+   ],
+   "max": [
+    0.0485,
+    0.2197,
+    0.0493
+   ],
+   "lods": [
+    {
+     "url": "assets/models/wooden_candlestick_lod1.glb",
+     "tris": 92
+    }
+   ]
+  },
+  "sofa_02": {
+   "url": "assets/models/sofa_02.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 256600,
+   "srcTris": 2728,
+   "tris": 2728,
+   "min": [
+    -0.9033,
+    0.0002,
+    -0.4777
+   ],
+   "max": [
+    0.9039,
+    0.7097,
+    0.3401
+   ],
+   "lods": [
+    {
+     "url": "assets/models/sofa_02_lod1.glb",
+     "tris": 298
+    }
+   ]
+  },
+  "GreenChair_01": {
+   "url": "assets/models/GreenChair_01.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 419636,
+   "srcTris": 4213,
+   "tris": 4213,
+   "min": [
+    -0.3371,
+    -0.0005,
+    -0.378
+   ],
+   "max": [
+    0.336,
+    1.058,
+    0.2863
+   ],
+   "lods": [
+    {
+     "url": "assets/models/GreenChair_01_lod1.glb",
+     "tris": 300
+    }
+   ]
   }
  }
 }

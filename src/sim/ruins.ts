@@ -1201,14 +1201,18 @@ export function ruinLoot(piece: Piece, p: Place, ground: GroundAt = assumed(piec
   });
 }
 
-/** what stands in a piece off the shelf: [what, x, z, y (null: on the ground as it is), which way it is turned] */
+/**
+ * what stands in a piece off the shelf: [what, x, z, y (null: on the ground as it is), which way it is turned]. (Out of
+ * the ways through and off the flights, 2026-10-19: a case stood before the keep's door, a crate before the end
+ * tower's inside it and one under the curtain's stair, a big crate across the block's door, the shovel in a wall.)
+ */
 function stood(piece: Piece): [string, number, number, number | null, number][] {
   const A = ALCAZAR, U = A.upper, M = A.middle;
   if (piece === 'alcazar') {
     const S = frame(0, A.south.z, A.south.turn);
     return [
       // the hall of the block: what was carried in and stacked
-      ['wooden_military_crate', 2.6, 5.6, SILL, 0], ['wooden_crate_01', 4.2, 5.3, SILL, 0.3], ['crate_big', 5.2, 16.2, SILL, 1.5],
+      ['wooden_military_crate', 5.7, 5.6, SILL, 0], ['wooden_crate_01', 4.2, 5.3, SILL, 0.3], ['crate_big', 6.0, 16.2, SILL, 1.5],
       // the block's roof and the keep's top: something to kneel behind
       ['wooden_crate_01', 2.6, 8, 7.1, 1.3], ['old_military_crate', 5, 12, 7.1, 0.2], ['weapons_case', 3.2, -1.9, 13.1, 0.4], ['wooden_crate_01', 2.2, -0.6, 13.1, 0.9],
       // the camp in the church, out of the wind, and the one under the wall of the lower ward
@@ -1219,10 +1223,10 @@ function stood(piece: Piece): [string, number, number, number | null, number][] 
       ['old_military_crate', 3, 53.2, 4.6, 0.3], ['wooden_crate_01', 4.6, 40, SILL, 1.6],
     ];
   }
-  if (piece === 'curtain') return [['stone_fire_pit', 30, -5.5, null, 0], ['wooden_crate_01', 17.6, 4, SILL, 0.3], ['wooden_crate_01', 38.6, 8, SILL, 1], ['wooden_crate_01', 40.4, 0.1, CURTAIN.walk, 0.1]];
+  if (piece === 'curtain') return [['stone_fire_pit', 30, -5.5, null, 0], ['wooden_crate_01', 17.6, 3.3, SILL, 0.3], ['wooden_crate_01', 38.6, 8, SILL, 1], ['wooden_crate_01', 40.4, 0.1, CURTAIN.walk, 0.1]];
   if (piece === 'gate') return [['stone_fire_pit', 2, -3.5, SILL + 0.19, 0], ['wooden_crate_01', -1, -4.6, SILL, 0.6], ['wooden_crate_01', 9, 6, GATE.floor.low, 0.7], ['crate_big', -18, -3, SILL, 0.2]];
-  if (piece === 'honeycomb') return [['stone_fire_pit', 9, 9.4, null, 0], ['wooden_crate_01', 26, 22, null, 0.4], ['shovel', 13, 24, null, 1.2], ['wooden_crate_01', 30.5, 5.5, null, 1.2], ['wooden_crate_01', 6, 27, null, 2.1]];
-  if (piece === 'spur') return [['wooden_crate_01', 43, 4.2, SPUR.top, 0.3], ['wooden_crate_01', 76.4, 1.4, SPUR.plain + SILL, 0.5], ['stone_fire_pit', 75, -0.2, SPUR.top + 0.19, 0]];
+  if (piece === 'honeycomb') return [['stone_fire_pit', 9, 9.4, null, 0], ['wooden_crate_01', 26, 22, null, 0.4], ['shovel', 12.5, 23.8, null, 1.2], ['wooden_crate_01', 30.5, 5.5, null, 1.2], ['wooden_crate_01', 6, 27, null, 2.1]];
+  if (piece === 'spur') return [['wooden_crate_01', 43, 4.2, SPUR.top, 0.3], ['wooden_crate_01', 73.6, 1.4, SPUR.plain + SILL, 0.5], ['stone_fire_pit', 75, -0.2, SPUR.top + 0.19, 0]];
   if (piece === 'north') return [['stone_fire_pit', 42, 2.8, null, 0], ['wooden_crate_01', 22, 2.6, null, 0.3]];
   return [];
 }
