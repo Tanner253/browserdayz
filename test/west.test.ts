@@ -16,6 +16,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
 import { moundAt } from '../src/sim/towns';
+import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
 const SQ = 769, HALF = 768, CELL = 2;
@@ -24,7 +25,11 @@ const NX = W.WORLD_NX ?? SQ, OX = W.WORLD_X0 === undefined ? 0 : (-HALF - W.WORL
 const WAS_B = ((WG as unknown as { BUNKER_WAS?: { x: number; z: number } }).BUNKER_WAS ?? WG.BUNKER_AT) as { x: number; z: number };
 const WAS_T = { x: 200, z: -40 }, KEEP = 200;
 /** the east half of the square (x 0 to 768), but the ground the bunker left: in the square's own order */
-const east = (p: { x: number; z: number }) => p.x > 0 && p.x <= HALF && Math.abs(p.z) <= HALF && Math.hypot(p.x - WAS_B.x, p.z - WAS_B.z) > KEEP;
+// (and not the ground a watchtower or hunting tower was put on, 2026-10-19: 14 m round each, levelled and cleared; the
+// prints were taken again then, the ground having moved within 10.2 m of a tower and nowhere else, and the paint
+// along the trails up to the watchtowers)
+const TOWERS = [...WATCHTOWERS, ...HUNTING_TOWERS];
+const east = (p: { x: number; z: number }) => p.x > 0 && p.x <= HALF && Math.abs(p.z) <= HALF && Math.hypot(p.x - WAS_B.x, p.z - WAS_B.z) > KEEP && !TOWERS.some((t) => Math.hypot(p.x - t.x, p.z - t.z) < 14);
 function half<T extends Float32Array | Uint8Array>(a: T, per = 1): T {
   const out = new (a.constructor as new (n: number) => T)((SQ - 384) * SQ * per);
   for (let iz = 0; iz < SQ; iz++) for (let ix = 385; ix < SQ; ix++) {
@@ -67,8 +72,8 @@ const ok = (what: string) => { checks++; console.log(`  ok  ${what}`); };
 
 // --- the east half of today's map as it was (prints taken 2026-10-16 off f1d0ca0, the last tree with the square alone)
 const WAS = {
-  heights: '4fd34df70b1161bf', surface: '6465e5e0e9449e2b', splat: '5bfdf1b818379f3a', grass: '88229d83ee6f64b8', trees: 'ef7e372692c689f1', rocks: '8e6656ab18f30a00',
-  props: 'a5d0512c8234be5a', buildings: '3f0394645ba713f3', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: 'c507af5c93c3db81',
+  heights: 'e84eb63aae84e4a6', surface: '2d94c0e4a0819aa7', splat: 'cb750f3f74b54a53', grass: '2fca3323401c0679', trees: 'c70c152a660b373f', rocks: 'd9d17dfd2558a623',
+  props: '857fa1d1801cc1e7', buildings: '3f0394645ba713f3', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: 'c507af5c93c3db81',
 };
 for (const [k, v] of Object.entries(WAS)) assert.equal(prints[k as keyof typeof prints], v, `the east's ${k} are not what they were`);
 ok(`the east of today's map as it was, to the byte (but within ${KEEP} m of where the bunker was): its ground, paint and grass, ${world.trees.filter(east).length} trees, ${world.rocks.filter(east).length} rocks, ${world.props.filter(east).length} props, ${world.buildings.filter(east).length} buildings, the roads, the fort, Kamenka (made in ${made.toFixed(0)} ms)`);

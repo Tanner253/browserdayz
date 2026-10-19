@@ -16,7 +16,7 @@ const WORLD_X0 = (WGX.WORLD_X0 ?? -768) as number, WORLD_Z0 = (WGX.WORLD_Z0 ?? -
 import { buildWorldData } from '../server/world';
 import { TOWN_PLOT } from '../src/world/buildings';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
-import { INFECTED, openGround } from '../src/sim/infected';
+import { INFECTED, IN_CAVES, WEST_HOMES, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
 import { CASTLE, CASTLE_SCALE, UNDER, castleAt, castleFoot, castleHomes, castleLocal, castleLoose, castleOpen, castleUnder, hatchLine, looseLocal } from '../src/sim/castle';
 import { castleShapeIn } from '../src/world/castle-shape';
@@ -50,6 +50,7 @@ const ok = (name: string, fn: () => void) => {
 // 4.2 m, when the upstairs wall of the two-floor house was moved clear of its window and closets were built:
 // compared place by place, before and after, with assets-src/_wf/me/loot-points.ts. None was added or renumbered.)
 import { JEEP } from '../src/sim/vehicles';
+import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 // (2026-10-12, with the village fenced off (see VILLAGE_FENCE), off the map as it was live that day. They were: 190604
 // cells, 3515396887; all 72 buildings, 2448790248; 9494 trees, 1630127803; all 675 loot points, 2826555666.)
 // (2026-10-13, with the hillside behind the bunker fenced off as well (BUNKER_FENCE), off the map as it was live that
@@ -63,7 +64,7 @@ import { JEEP } from '../src/sim/vehicles';
 // (lootHash taken again 2026-10-14: the white shelves of the sheds, shops, clinics and barracks were stood clear of
 // their walls (85b9505), and the 62 old places on them moved with them, by 12 cm at most; none renumbered, nothing
 // else of the old map moved: was 760462293)
-const WAS = { cells: 124964, heights: 2448577329, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 6010, treesHash: 3652803591, lootPoints: 675, lootAway: 371, lootHash: 2120685143, jeeps: 8, jeepsAway: 3, jeepsHash: 211287781, fires: 6 };
+const WAS = { cells: 124509, heights: 3974542425, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 5987, treesHash: 3736410845, lootPoints: 675, lootAway: 371, lootHash: 2120685143, jeeps: 5, jeepsAway: 1, jeepsHash: 2828878713, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -135,6 +136,9 @@ const touched = (x: number, z: number) => {
   // (and where one of each of the downloaded buildings was stood in the village, 2026-10-10: 24 m round each)
   if (IN_VILLAGE.some((q) => Math.hypot(x - q.x, z - q.z) < 24)) return true;
   if (SECOND.some((q) => Math.hypot(x - q.x, z - q.z) < 30)) return true;
+  // (and the ground each watchtower and hunting tower was levelled on, 2026-10-19: 14 m round each. Compared cell by cell
+  // with the map before them, every cell that moved was within 10.2 m of one, and nothing else had)
+  if ([...WATCHTOWERS, ...HUNTING_TOWERS].some((t) => Math.hypot(x - t.x, z - t.z) < 14)) return true;
   // (and Kamenka's valley, 2026-10-10: its rim stands on the old map's ground west and north of the town)
   if (kamenkaQ(x, z) < KAMENKA.foot + 0.1) return true;
   // (and the bunker's hollow, on the far side of the map; and, since 2026-10-13, the hillside behind it, which was
@@ -159,7 +163,7 @@ const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
 // (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
-const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && !SECOND.some((q) => Math.hypot(b.x - q.x, b.z - q.z) < 3) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z) && !inVillage(b.x, b.z));
+const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && !SECOND.some((q) => Math.hypot(b.x - q.x, b.z - q.z) < 3) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z) && !inVillage(b.x, b.z) && !/^(watchtower|hunting)_/.test(b.id));
 
 // To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
 // (west of x 0 the small props were thinned, plan v2 of 2026-10-16, and a car looking for a clear verge may find one
@@ -204,7 +208,8 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   const points = data.lootPoints.slice(0, WAS.lootPoints).filter((p) => !inVillage(p.x, p.z));
   assert.equal(points.length, WAS.lootAway, 'an old loot point has come into the village or left it');
   assert.equal(hash(points.flatMap((p) => [p.x, p.y, p.z])), WAS.lootHash, 'an old loot point away from the village has moved or been renumbered');
-  // (2026-10-11: five more cars stand where the map had none, found after all the others: the eight that stood stand where they stood)
+  // (2026-10-11: more cars stand where the map had none, found after all the others; 2026-10-19 the east's halved, three
+  // by the road and two at the edge (WAS.jeeps) and two more, "remove maybe 50% of the spawns from the east")
   assert.equal(data.jeeps.length, WAS.jeeps + JEEP.far);
   // (those that do not stand in the village: the one or two that do stand where there is room for them now)
   const cars = data.jeeps.slice(0, WAS.jeeps).filter((j: { x: number; z: number }) => !inVillage(j.x, j.z) && !thinned(j.x));
@@ -313,16 +318,19 @@ ok('the gas lies over the works and nowhere else, and the checkpoint is clean ai
 });
 
 ok('the infected keep to it too, and nowhere else has fewer for it', () => {
-  const homes = data.homes as { x: number; z: number; n: number; inside?: unknown[] }[];
+  const homes = data.homes as { x: number; z: number; n: number; r: number; inside?: unknown[] }[];
   const here = homes.find((h) => Math.hypot(h.x - E.x, h.z - E.z) < 1);
   assert.ok(here && here.n >= 4, 'none at the works');
   // (the fort's are its own, over and above the map's: as many as its own file says)
   const forts = castleHomes(world.castle!).reduce((a, h) => a + h.n, 0);
-  assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max + forts);
+  // (and the west's, its own as the fort's are, 2026-10-19: about its places and in the pass's caves)
+  const west = world.pois.reduce((a, q) => a + (WEST_HOMES[q.name]?.[0] ?? 0), 0) + IN_CAVES;
+  assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max + forts + west);
   // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
   // (the bunker's: the fort on the mountain has a dark of its own under its terrace, counted further down)
   const atFort = (h: { x: number; z: number }) => Math.hypot(h.x - MOUNTAIN.castle.x, h.z - MOUNTAIN.castle.z) < 160;
-  const below = homes.filter((h) => h.inside && !atFort(h));
+  // (nor the pass's caves', the west's own: one round home over all their places, IN_CAVES strong)
+  const below = homes.filter((h) => h.inside && !atFort(h) && !(h.n === IN_CAVES && h.r === 400));
   assert.ok(below.length === 1 && below[0].n >= 4 && below[0].inside!.length >= below[0].n * 2, 'none in the bunker, or nowhere for them to stand');
   // (and those that walk the ground over it)
   const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
@@ -333,7 +341,8 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   // (and the fort's own since: about its ruined village and in the dark under its terrace)
   assert.ok(forts >= 8 && homes.filter(atFort).reduce((a, h) => a + h.n, 0) === forts, 'the fort has not its own');
   // (the bunker's, in and over it, are its own wherever it stands: since plan v2, 2026-10-16, in the pines of the west)
-  const east = homes.filter((h) => (Math.abs(h.x) > 512 || Math.abs(h.z) > 512) && !atFort(h) && Math.hypot(h.x - below[0].x, h.z - below[0].z) > 1);
+  // (and not the west's, beyond the square's west edge: see WEST_HOMES)
+  const east = homes.filter((h) => (Math.abs(h.x) > 512 || Math.abs(h.z) > 512) && h.x > -768 && !atFort(h) && Math.hypot(h.x - below[0].x, h.z - below[0].z) > 1);
   assert.equal(east.reduce((a, h) => a + h.n, 0), 15, 'the east country has not its fifteen');
 });
 
@@ -741,9 +750,10 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   const wreck = wreckUnder(b), ofFort = (q: { building: string }) => q.building === 'castle' || q.building === 'hamlet', end = data.lootPoints.findIndex(ofFort), last = data.lootPoints.slice(end - HELI - wreck.spots.length, end - HELI), about = data.lootPoints.slice(end - HELI, end);
   // (the fort's own, and its hamlet's before the gate, which are a place of their own to the map: 'hamlet')
   // (the basements' come after the fort's since 2026-10-14, the newest lot last: `cellar`; and Kalat's after all, plan v5: `ruins_`)
-  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "the fort's places for things are not the last there are");
+  // (and the watchtowers' and hunting towers' with the west's towns, 2026-10-19)
+  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(q.building)), "the fort's places for things are not the last there are");
   const cellarsAt = data.lootPoints.findIndex((q) => q.building === 'cellar');
-  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "something after the basements' places that is not theirs");
+  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(q.building)), "something after the basements' places that is not theirs");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
   assert.ok(heli && inRounds(heli.x, heli.z, 15), 'no helicopter by the fort');

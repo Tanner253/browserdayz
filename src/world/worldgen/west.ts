@@ -460,6 +460,11 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       }
     }
   };
+  // (what grows or lies about a tower's levelled ground, set back on it: the levelling reaches ten metres out, past
+  // what is cleared for it, and sixteen trees stood up to two thirds of a metre in the air or in the ground)
+  const reseat = (x: number, z: number) => {
+    for (const list of [tools.trees, tools.rocks]) for (const t of list) if (Math.hypot(t.x - x, t.z - z) < 14) t.y = heightAt(surface, t.x, t.z);
+  };
   WATCHTOWERS.forEach((wt, k) => {
     let best = Infinity, rx = wt.x, rz = wt.z + 1;
     for (const r of [...ways, ...tools.roads]) for (let i = 0; i < r.points.length; i += 3) {
@@ -470,6 +475,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     seatOn(heights, own ? surface : null, plot);
     tools.buildings.push(plot);
     for (const list of [tools.trees, tools.rocks, tools.props]) for (let i = list.length - 1; i >= 0; i--) if (Math.hypot(list[i].x - wt.x, list[i].z - wt.z) < 8) list.splice(i, 1);
+    reseat(wt.x, wt.z);
     tools.pois.push({ name: 'Watchtower', x: wt.x, z: wt.z, radius: 12 });
     // (a trail trodden up to its door from the nearest road, and an army crate and a barrel left by the door: the owner,
     // "with appropriate decoration around them like hikking trails up to them and a stash out front or something, natural")
@@ -490,6 +496,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     seatOn(heights, own ? surface : null, plot);
     tools.buildings.push(plot);
     for (const list of [tools.trees, tools.rocks, tools.props]) for (let i = list.length - 1; i >= 0; i--) if (Math.hypot(list[i].x - ht.x, list[i].z - ht.z) < 6.5) list.splice(i, 1);
+    reseat(ht.x, ht.z);
     tools.pois.push({ name: 'Hunting tower', x: ht.x, z: ht.z, radius: 10 });
     const lx = ht.x + Math.cos(plot.rot) * 4.6, lz = ht.z - Math.sin(plot.rot) * 4.6;
     tools.props.push({ kind: 'log_pile', x: lx, y: heightAt(heights, lx, lz), z: lz, rot: plot.rot, scale: 1, far: 150 });
