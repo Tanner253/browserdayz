@@ -20,16 +20,25 @@ export function carDamage(rule: { damage: number; blast?: number; car?: number }
 export const JEEP = {
   /** the model it is drawn with (see scripts/assets.config.mjs): without it there are no jeeps */
   model: 'uaz_469',
+  // (The east's jeeps, halved from thirteen to seven: every car the west had was driven east, and the east was full of
+  // them (the owner, 2026-10-19: "we should remove maybe 50% of the spawns from the east so the vehicle spawns can
+  // fill the west better"). See `refill` for the west's.)
   /** how many stand along the road */
-  count: 5,
+  count: 3,
   /** and how many more out at the edge of the map, away from the road, each behind one of the outlying places */
-  outlying: 3,
+  outlying: 2,
   /**
    * And how many more again, wherever on the whole map a place is furthest from any car: the east country and the
    * corners of the valley, which had none (2026-10-11: "make sure car spawns around the map good distrobution").
-   * They are found after all the others, so every car that stood before stands where it stood.
    */
-  far: 5,
+  far: 2,
+  /**
+   * The west's places (WEST_CARS), where the new come in on foot: one whose car was driven off has a new one once it has
+   * stood empty this many seconds, while fewer than `most` of its own are about. Its car went east with the first who
+   * came by, and the place stood empty for the two hours one takes to be left alone and brought back (the owner,
+   * 2026-10-19: "we need to make sure the west has cars"; an admin had stood seven there by hand that morning).
+   */
+  refill: { after: 900, most: 2 },
   /**
    * What it takes before it burns. (Three times what it was, 2026-10-11: "we need to triple the HP of cars they blow
    * up too easily": 600 to 1800. And three times that, 2026-10-13: "cars should have 3x more HP theyre too weak and

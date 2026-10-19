@@ -183,6 +183,8 @@ export type Park = { x: number; y: number; z: number; yaw: number; k: number; ks
 
 /** where every car stands when the world is new, by the number of its place: the jeeps, the police cars, the helicopters and the west's jeeps */
 export const PARKS: Park[] = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind })), ...world.west.map((p) => ({ ...p, k: 0 }))];
+/** the number of the west's first place, and since when each of the west's places has stood empty (JEEP.refill) */
+const WEST_FROM = PARKS.length - world.west.length, emptySince = new Map<number, number>();
 
 export function standJeep(home: number): Veh {
   const p = PARKS[home], k = parkKind(p);
@@ -621,6 +623,20 @@ setInterval(() => {
     if (now < at || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) continue;
     jeepsDue.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
+  }
+  // and the west's places, whose cars are driven off by the first who come by (JEEP.refill): a new one once the place
+  // has stood empty its time, and nobody is on the spot
+  for (let home = WEST_FROM; home < PARKS.length; home++) {
+    const p = PARKS[home], cars = [...vehicles.values()].filter((v) => !v.goneAt);
+    if (jeepsDue.has(home) || cars.filter((v) => v.home === home).length >= JEEP.refill.most || cars.some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) {
+      emptySince.delete(home);
+      continue;
+    }
+    const since = emptySince.get(home) ?? emptySince.set(home, now).get(home)!;
+    if (now - since < JEEP.refill.after * 1000 || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear)) continue;
+    emptySince.delete(home);
+    broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
+    log(`a new car at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}, the west's place ${home - WEST_FROM}: its own was driven off`);
   }
 }, 1000);
 
