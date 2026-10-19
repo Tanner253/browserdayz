@@ -99,8 +99,8 @@ ok('sights set for a range put the round on the mark at that range, and over it 
     for (const z of g.zero) {
       const slope = elevationFor(s.muzzleVel, s.drag, z);
       const at = flown(id, z, slope).y;
-      // (a grenade lands within ten centimetres: its blast is seven metres)
-      assert.ok(Math.abs(at) < (LAUNCHED[g.ammo] ? 0.1 : Math.max(0.012, z * 0.00012)), `${id} set for ${z} m is ${(at * 100).toFixed(1)} cm off the mark there`);
+      // (to half a centimetre since 2026-10-19, set against the round as it is flown; a grenade within ten: its blast is seven metres)
+      assert.ok(Math.abs(at) < (LAUNCHED[g.ammo] ? 0.1 : 0.005), `${id} set for ${z} m is ${(at * 100).toFixed(1)} cm off the mark there`);
       assert.ok(flown(id, z * 0.5, slope).y > 0, `${id} set for ${z} m is not above the line at half of it`);
       assert.ok(flown(id, z * 1.3, slope).y < 0, `${id} set for ${z} m is not under the line beyond it`);
     }
