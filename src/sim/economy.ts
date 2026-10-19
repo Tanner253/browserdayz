@@ -179,6 +179,19 @@ export interface WorldLoot {
 /** how long a dropped container lies before it is cleared away, milliseconds: empty, and with anything in it */
 export const CONTAINER_LIFE = { empty: 7 * 86400_000, full: 14 * 86400_000 };
 
+/**
+ * The places for things in a few letters: how many, and a print of each one's place to the decimetre and its
+ * building, in order. Server and game each make the list for themselves and must make the same one, as a thing is
+ * told by its place's number. The game says its print as it comes in, and the server writes down a game whose
+ * print is not its own: on 2026-10-19 the server numbered the west's places five off every game's, and nothing said
+ * so but players refused what they took off shelves (see planBasements' walls).
+ */
+export function lootPrint(points: readonly { x: number; z: number; building: string }[]): string {
+  let h = 0x811c9dc5;
+  for (const p of points) for (const ch of `${Math.round(p.x * 10)},${Math.round(p.z * 10)},${p.building};`) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193);
+  return `${points.length}:${(h >>> 0).toString(36)}`;
+}
+
 export interface EconomyEvents {
   spawn(l: WorldLoot): void;
   despawn(l: WorldLoot): void;
