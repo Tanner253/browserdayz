@@ -8,7 +8,8 @@
 // what state it is in; whoever is driving works out how it moves (as each player does for
 // their own two feet) and the server passes that on.
 
-import { BUILDING_FOOTPRINT, PLAY_RADIUS, SQUARE_HALF, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, PLAY_RADIUS, SEA_LEVEL, SQUARE_HALF, heightAt, type World } from '../world/worldgen';
+import { waterAt } from './water';
 
 /** What one hit takes off a car: a bullet's own harm up to `JEEP.shot`, a blast's `JEEP.blast` times over. The server's rule and the game's own, alone. */
 export function carDamage(rule: { damage: number; blast?: number; car?: number }): number {
@@ -53,6 +54,14 @@ export const JEEP = {
    * from the map for good: nobody goes back in for it.
    */
   gas: { after: 120, clear: 70 },
+  /**
+   * Left alone: one nobody has sat at the wheel of for this many seconds, with nobody in it and nobody within this many
+   * metres (nobody sees it go), is taken away, and a new one is stood at its place in its time, as for one that burned
+   * (the owner, 2026-10-18: "cull old unused cars left behind by the user no driver for 2 hours despawn vehicle for
+   * resapwning"; DayZ takes away abandoned cars). One standing at its own place still is left there. The server's
+   * own: CAR_IDLE_S says otherwise.
+   */
+  idle: { after: 7200, clear: 150 },
   /** under this it smokes, under this it is on fire and goes up a few seconds later */
   smokeAt: 0.4,
   fireAt: 0.12,
@@ -270,6 +279,86 @@ export function policeSpots(world: World, taken: { x: number; z: number }[] = []
       // (a building's front is the way its rot turns +z; a car at yaw 0 looks down -z)
       out.push({ x, y: heightAt(H, x, z), z, yaw: b.rot + Math.PI });
       break;
+    }
+  }
+  return out;
+}
+
+/**
+ * The places of the west that have a jeep by their road (westSpots), in the order they are numbered; and where to look
+ * along the roads from, where that is not the place's middle. (Kalat's on the road laid round the south of it, the
+ * owner: "add some more roads around kalat and some vehicle spawns". Pokrov's where the main road leaves its lane to
+ * the east: in the lane it stood among the market's stalls.)
+ */
+export const WEST_CARS: { name: string; from?: [number, number] }[] = [{ name: 'Pokrov', from: [-1700, 28] }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski' }, { name: 'Bereg' }, { name: 'Mys' }];
+
+/**
+ * The west's jeeps (the owner, 2026-10-18: "the west side of the map is lacking vehicle spawns completely", "add some
+ * more roads around kalat and some vehicle spawns that resapawn"): one by the road at each of WEST_CARS, at the
+ * nearest point of a road to its middle where the verge is level and clear, as the road's jeeps stand (at the way in,
+ * not in the middle of a hamlet); off every road's asphalt, out of the water, clear of walls, posts, trees and rocks.
+ * Numbered after every other car (PARKS), so none of those moves. The same on every game and on the server.
+ * @param taken where cars stand already: none is stood within 40 m of those
+ */
+export function westSpots(world: World, taken: { x: number; z: number }[] = []): { x: number; y: number; z: number; yaw: number }[] {
+  const H = world.heights, ground = (x: number, z: number) => heightAt(H, x, z);
+  const roads = [world.road, ...world.roads.filter((r) => !r.bridge)];
+  const out: { x: number; y: number; z: number; yaw: number }[] = [];
+  /** how far a spot is from the edge of the nearest road's asphalt */
+  const offRoad = (x: number, z: number) => {
+    let d = Infinity;
+    for (const r of roads) {
+      const p = r.points;
+      for (let i = 0; i + 5 < p.length; i += 3) {
+        const ax = p[i], az = p[i + 2], ex = p[i + 3] - ax, ez = p[i + 5] - az;
+        if (Math.abs(x - ax) > 60 || Math.abs(z - az) > 60) continue;
+        const t = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez || 1e-9)));
+        d = Math.min(d, Math.hypot(x - ax - ex * t, z - az - ez * t) - r.width / 2);
+      }
+    }
+    return d;
+  };
+  const clear = (x: number, z: number) => {
+    const y = ground(x, z);
+    for (const [dx, dz] of [[2.4, 0], [-2.4, 0], [0, 2.4], [0, -2.4]]) if (Math.abs(ground(x + dx, z + dz) - y) > 0.4) return false;
+    if (y < SEA_LEVEL + 1 || (world.water && waterAt(world.water, x, z, ground))) return false;
+    // (a car is two metres wide: its side a metre and more off the asphalt, of this road or any other it is near)
+    if (offRoad(x, z) < 2) return false;
+    if (world.buildings.some((b) => {
+      const [w, d] = BUILDING_FOOTPRINT[b.type];
+      const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+      return Math.abs(dx * c - dz * s) < w / 2 + 3.5 && Math.abs(dx * s + dz * c) < d / 2 + 3.5;
+    })) return false;
+    if (world.walls.some((w) => Math.hypot(w.x - x, w.z - z) < w.long / 2 + 3) || world.solids.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 4)) return false;
+    if (world.posts?.some((p) => Math.hypot(p.x - x, p.z - z) < 14)) return false;
+    if ([...taken, ...out].some((o) => Math.hypot(o.x - x, o.z - z) < 40)) return false;
+    return !world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2) && !world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4 * Math.max(1, t.scale)) && !world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3);
+  };
+  for (const { name, from } of WEST_CARS) {
+    const q = world.pois.find((o) => o.name === name);
+    if (!q) continue;
+    // every point of a road within reach, nearest first: of the place's middle (but 25 m out of it), or where it says
+    const [fx, fz] = from ?? [q.x, q.z], inner = from ? 0 : 25, reach = from ? 80 : q.radius + 60;
+    const near: { p: Float32Array; i: number; w: number; d: number }[] = [];
+    for (const r of roads) {
+      const p = r.points, n = p.length / 3;
+      for (let i = 1; i < n - 1; i++) {
+        const d = Math.hypot(p[i * 3] - fx, p[i * 3 + 2] - fz);
+        if (d >= inner && d < reach) near.push({ p, i, w: r.width, d });
+      }
+    }
+    near.sort((a, b) => a.d - b.d);
+    place: for (const { p, i, w } of near) {
+      const tx = p[(i + 1) * 3] - p[(i - 1) * 3], tz = p[(i + 1) * 3 + 2] - p[(i - 1) * 3 + 2], tl = Math.hypot(tx, tz) || 1;
+      // (on the place's own side of the road first)
+      const toward = Math.sign((-tz / tl) * (q.x - p[i * 3]) + (tx / tl) * (q.z - p[i * 3 + 2])) || 1;
+      for (const side of [toward, -toward]) {
+        const d = w / 2 + 2.4, x = p[i * 3] + (-tz / tl) * d * side, z = p[i * 3 + 2] + (tx / tl) * d * side;
+        if (!clear(x, z)) continue;
+        // nose along the road, as the road's jeeps stand (yaw 0 looks down -z)
+        out.push({ x, y: ground(x, z), z, yaw: Math.atan2(-tx, -tz) + (side > 0 ? 0 : Math.PI) });
+        break place;
+      }
     }
   }
   return out;

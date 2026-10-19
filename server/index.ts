@@ -38,7 +38,7 @@ import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFul
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
-import { blowJeep, rackChanged, settleRiders, voice } from './acts';
+import { blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
 import { seen } from './seen';
@@ -160,6 +160,8 @@ export interface Veh extends VehicleInfo {
   goneAt: number;
   /** standing empty under the gas with nobody near: since when (0: it is not) */
   leftAt?: number;
+  /** when somebody last sat at its wheel, or it was stood (JEEP.idle) */
+  drivenAt: number;
 }
 
 export const vehicles = new Map<number, Veh>();
@@ -169,12 +171,12 @@ export const jeepsDue = new Map<number, number>();
 
 let nextVeh = 1;
 
-/** where every car stands when the world is new, by the number of its place: the jeeps, and after them the police cars */
-export const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind }))];
+/** where every car stands when the world is new, by the number of its place: the jeeps, the police cars, the helicopters and the west's jeeps */
+export const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind })), ...world.west.map((p) => ({ ...p, k: 0 }))];
 
 export function standJeep(home: number): Veh {
   const p = PARKS[home];
-  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(p.k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, ...(p.k ? { k: p.k } : {}) };
+  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(p.k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, drivenAt: Date.now(), ...(p.k ? { k: p.k } : {}) };
   vehicles.set(v.i, v);
   return v;
 }
@@ -554,6 +556,7 @@ setInterval(() => {
 setInterval(() => {
   const now = Date.now();
   for (const v of [...vehicles.values()]) {
+    if (leftAlone(v, now)) continue;
     if (v.burnAt && now >= v.burnAt) blowJeep(v, v.by);
     else if (v.goneAt && now >= v.goneAt) {
       vehicles.delete(v.i);
