@@ -115,10 +115,10 @@ ok('the server knows it as the game does: its places for things come after every
   // to it, `hamlet`. And the basements', `cellar`, since 2026-10-14; and Kalat's, `ruins_`, plan v5. Each lot last, by the same rule.
   // And since 2026-10-17 the floor places laid with the racks of the buildings under the gas, and the field posts', `post_`.)
   const gassedFloor = (p: (typeof mine)[number]) => p.floor && p.usage.includes('Gas');
-  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => (!p.floor && !!p.surf && p.surf.clear < 1) || gassedFloor(p) || p.building.startsWith('post_') || p.building === 'wreck' || p.building === 'castle' || p.building === 'hamlet' || p.building === 'cellar' || p.building.startsWith('ruins_') || TOWN_PLOT.test(p.building) || p.building.startsWith('cave_')), 'a place after the bunker\'s that is not on a rack');
+  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => (!p.floor && !!p.surf && p.surf.clear < 1) || gassedFloor(p) || p.building.startsWith('post_') || p.building === 'wreck' || p.building === 'castle' || p.building === 'hamlet' || p.building === 'cellar' || p.building.startsWith('ruins_') || TOWN_PLOT.test(p.building) || p.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(p.building)), 'a place after the bunker\'s that is not on a rack');
   // (and the basements' are the very last: nothing has come after them since)
   const cellars = data.lootPoints.findIndex((p) => p.building === 'cellar');
-  assert.ok(cellars > first && data.lootPoints.slice(cellars).every((p) => p.building === 'cellar' || p.building.startsWith('ruins_') || TOWN_PLOT.test(p.building) || p.building.startsWith('cave_')), 'a place after the basements\' that is not one of theirs');
+  assert.ok(cellars > first && data.lootPoints.slice(cellars).every((p) => p.building === 'cellar' || p.building.startsWith('ruins_') || TOWN_PLOT.test(p.building) || p.building.startsWith('cave_') || /^(watchtower|hunting)_/.test(p.building)), 'a place after the basements\' that is not one of theirs');
   for (const p of mine) assert.ok(inBunker(P, p.x, p.y + 0.3, p.z), 'a place for things that is not in the bunker');
   assert.ok(mine.filter((p) => p.floor).length >= 12 && mine.filter((p) => p.surf).length >= 40);
   const d = data.bunkerDoor!;

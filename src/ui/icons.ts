@@ -64,7 +64,7 @@ const LIFT = [1.5, 1.3, 0.006];
  */
 const LAMPS = { plain: [1.8, 0.9, 0.75], gun: [3.6, 1.9, 1.7], worn: [2.6, 2.0, 1.2], kit: [2.4, 1.6, 1.1] };
 const lampsOf = (d: (typeof ITEMS)[string]): keyof typeof LAMPS =>
-  LIT(d) ? 'gun' : d.category === 'clothing' || d.category === 'stash' ? 'worn' : d.category === 'tool' || d.category === 'melee' || d.category === 'misc' ? 'kit' : 'plain';
+  LIT(d) || d.iconBright ? 'gun' : d.category === 'clothing' || d.category === 'stash' ? 'worn' : d.category === 'tool' || d.category === 'melee' || d.category === 'misc' ? 'kit' : 'plain';
 
 /**
  * How bright a picture is to be when it is done, whatever it is of: the mean of what is seen of the thing, as the
@@ -128,7 +128,7 @@ export function iconSig(id: string): string {
     if (!d) return [];
     const file = d.model.startsWith('@') ? '@' : assets.stamp(assets.manifest.models[d.model]?.url ?? '');
     // (a file the build has no version for: nothing made from it can be told to be current)
-    return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
+    return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : '', ...(d.iconBright ? ['bright'] : [])];
   };
   const d = ITEMS[id];
   const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(headUp(id) ? ['head up'] : []), ...(d.weapon ? ['flat', ...gunView(id)] : []), 'lamps', ...LAMPS[lampsOf(d)], ...(LIT(d) ? ['lit', ...LIFT] : []), 'tone', TONE.floor, TONE.ceil, TONE.least, TONE.most]);

@@ -9,6 +9,7 @@ import { type ItemInstance, ITEMS } from '../src/sim/items';
 import type { NewsKept } from '../src/sim/news';
 import { BOOT, CORPSE_LIFETIME, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
 import { SITE_URL, keepTags, takeTags, type TagsKept } from './tags';
+import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { CHECK } from './checks';
 import { ADMIN, keyHash, roleOf, siteAdmin, type AdminState } from './gate';
 import { CARRY_KEPT, POWERS_KEPT, carryKeep, carryKept, keepPowers, noHold } from './admin';
@@ -96,6 +97,8 @@ export const pause = (ms: number) => new Promise<void>((done) => setTimeout(done
 const REMADE: Record<number, (x: number, z: number) => boolean> = {
   // (29 -> 30: the desert's places and their roads, src/sim/desert.ts, all west of the canyon)
   29: (x) => x < -2800,
+  // (30 -> 31: the ground each watchtower and hunting tower was levelled on, 2026-10-19, and nowhere else it moved)
+  30: (x, z) => [...WATCHTOWERS, ...HUNTING_TOWERS].some((t) => Math.hypot(t.x - x, t.z - z) < 16),
 };
 /** is somebody kept from a world of this number, standing here, set down afresh at a start */
 export function remadeUnder(rev: number, x: number, z: number): boolean {

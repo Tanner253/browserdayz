@@ -112,6 +112,7 @@ export const TEXTURES = {
  * own middle, the whole standing on y = 0 with the middle of its wheelbase at the origin.
  * Anything else is a thing that stands still (see scripts/props.mjs for its settings); its
  * credit is read out of the licence that came with the download.
+ * `tex` is 2048 at most (the owner, 2026-10-19: "make sure no texture exceeds 2048"; see WEAPON_PACKS).
  */
 export const LOCAL_MODELS = {
   // Out of the packs of 2026-10-09. What goes on a gun is laid with its length along x (the
@@ -168,7 +169,7 @@ export const LOCAL_MODELS = {
   holo_sight: {
     dir: 'eotech_exps3',
     scale: 0.01,
-    tex: 4096,
+    tex: 2048,
     tags: ['loot', 'attachment'],
     changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed. In the game it is drawn smaller than life where it is fitted to a pistol.',
   },
@@ -176,7 +177,7 @@ export const LOCAL_MODELS = {
     dir: 'bottle_pouch',
     only: /^portable_bottle_portable_bottle_pouch/,
     size: 0.22,
-    tex: 4096,
+    tex: 2048,
     tags: ['loot', 'drink'],
     changes: 'Only the bottle is used, without its pouch: stood on the ground about its own middle, brought down to about six thousand triangles; textures re-encoded as WebP; geometry compressed.',
   },
@@ -251,7 +252,7 @@ export const LOCAL_MODELS = {
     dir: 'benelli_m3',
     only: /^Shell_Low/,
     scale: 1,
-    tex: 4096,
+    tex: 2048,
     tags: ['loot', 'ammo'],
     changes: 'Only its shell is used here: stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
@@ -270,18 +271,18 @@ export const LOCAL_MODELS = {
   ammo_box_739: {
     dir: 'ammo_box_rifle',
     size: 0.13,
-    tex: 4096,
+    tex: 2048,
     tags: ['loot', 'ammo'],
-    changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+    changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.',
   },
   // (The .45's box, for the Colt: a Remington box of fifty with its end open and the rounds showing, every round
   // of them a shape of its own. As it came, at the size it came: 17.7 cm long.)
   ammo_box_45: {
     dir: 'ammo_box_45acp',
     scale: 1,
-    tex: 4096,
+    tex: 2048,
     tags: ['loot', 'ammo'],
-    changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+    changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.',
   },
   ammo_box_50: {
     dir: 'ammo_box_b',
@@ -350,7 +351,7 @@ export const LOCAL_MODELS = {
   weapons_case: {
     dir: 'weapons_container',
     size: 1.25,
-    tex: 4096,
+    tex: 2048,
     tags: ['prop', 'crate'],
     changes: 'Scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.',
   },
@@ -404,7 +405,7 @@ export const LOCAL_MODELS = {
   tactical_gloves: {
     dir: 'tactical_gloves_sf',
     size: 0.27,
-    tex: 4096,
+    tex: 2048,
     tags: ['loot', 'gear'],
     // (and then scripts/gloves.mjs: run it again after anything rebuilds this model)
     changes: 'Scaled to metres; one glove turned into its pair and both laid flat, one half over the other; textures re-encoded as WebP; geometry compressed.',
@@ -431,13 +432,14 @@ export const LOCAL_MODELS = {
   house_interior: {
     dir: 'building_interior',
     size: 14.6,
-    // (as big as it came: it was brought down to 2048, a quarter of its points, and its brick was soft close to)
-    tex: 4096,
+    // (it came at 4096 and was first brought down to 2048, its brick soft close to, then kept at 4096: 2048 again
+    // with every model's, 2026-10-19)
+    tex: 2048,
     bare: true,
     rough: 0.9,
     metal: 0,
     tags: ['prop'],
-    changes: 'Stood on the ground about its own middle; its colour and its relief re-encoded as WebP at the size they came, its other maps left out; geometry compressed.',
+    changes: 'Stood on the ground about its own middle; its colour and its relief re-encoded as WebP at no more than 2048 a side, its other maps left out; geometry compressed.',
   },
   // (inspired by a game's barrack and not taken out of it: the owner of this project says so, 2026-10-10)
   // (It is a shell, and its windows and its door are boards with pictures of them on. Those boards are taken out:
@@ -639,8 +641,8 @@ export const LOCAL_MODELS = {
     dir: 'shanty_mansion',
     // (as it came it was twice the size of a house: a floor of it was five metres high. At this, a floor is 2.7 m.)
     size: 15.8,
-    // (as big as they came: they were brought down to 1024, a sixteenth of their points)
-    tex: 4096,
+    // (they came at 4096: 1024, a sixteenth of their points, was too soft; 2048 with every model's, 2026-10-19)
+    tex: 2048,
     bare: true,
     rough: 0.9,
     metal: 0,
@@ -689,12 +691,12 @@ export const LOCAL_MODELS = {
   // The police car (2026-10-10): the second car, a road car. It came 6.7 long, nose toward +z, a quarter of a
   // million triangles, and with its brakes as pieces of their own (four more things called a wheel): those are
   // left out, and it is made the length of the car it is drawn from. Nothing else of it is lessened: every
-  // triangle it came with, and its pictures at the size they came ("i dont want the quality of the models to be
-  // lowered"). It was first brought down to sixty thousand triangles and 2048: that was put back.
+  // triangle it came with ("i dont want the quality of the models to be lowered"). It was first brought down to
+  // sixty thousand triangles and 2048: that was put back; its pictures are 2048 again with every model's (2026-10-19).
   police_car: {
     kind: 'vehicle',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     scale: 0.806,
     turn: Math.PI,
     wheel: /Wheel\.(Ft|Bk)\./,
@@ -705,7 +707,7 @@ export const LOCAL_MODELS = {
       url: 'https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4',
       author: 'Mateusz Woliński',
       line: 'This work is based on "Police car" (https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4) by Mateusz Woliński (https://sketchfab.com/jeandiz) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; its brake discs left out; textures re-encoded as WebP at the size they came; geometry compressed.',
+      changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; its brake discs left out; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.',
     },
   },
   // The bunker's own fittings, all out of one download ("Bunker PBR Showcase Props JFG"): each is
@@ -748,11 +750,11 @@ export const LOCAL_MODELS = {
   instrument_tray: { dir: 'morgue_room', only: /^(Surgical_Tray_SmallGroup|Scissors_SmallGroup|Tool_SmallGroup)/, scale: 0.8, tex: 2048, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Only these of its shapes are used here, brought to the size of a room three metres high and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   // (the autopsy lab's three things, told apart by what each is painted with: a screen of three curtains on wheels,
   // a lamp on a stand, and a steel table: bare, and with a microscope and a rack of tubes on it)
-  screen_curtain: { dir: 'autopsy_lab', only: /CurtainDripper_2048/, scale: 1, tex: 4096, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  screen_curtain: { dir: 'autopsy_lab', only: /CurtainDripper_2048/, scale: 1, tex: 2048, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   medical_light: { dir: 'autopsy_lab', only: /MedicalLight_1024/, scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
-  steel_table: { dir: 'autopsy_lab', only: /DissectionTable_2048/, scale: 1, tex: 4096, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
-  lab_table: { dir: 'autopsy_lab', only: /DissectionTable_2048|ChemLab_1024/, scale: 1, tex: 4096, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
-  xray_viewer: { dir: 'xray_viewer', only: /./, scale: 1, tex: 4096, tags: ['furniture'], changes: 'Only these of its shapes are used here, brought to the size of a room three metres high and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  steel_table: { dir: 'autopsy_lab', only: /DissectionTable_2048/, scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  lab_table: { dir: 'autopsy_lab', only: /DissectionTable_2048|ChemLab_1024/, scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  xray_viewer: { dir: 'xray_viewer', only: /./, scale: 1, tex: 2048, tags: ['furniture'], changes: 'Only these of its shapes are used here, brought to the size of a room three metres high and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   // What stands over the bunker's stair, and the door at its foot: two more downloads.
   bunker_house: { dir: 'field_bunker', scale: 1, tex: 2048, tags: ['prop'], changes: 'Stood on the ground as it came; textures re-encoded as WebP; geometry compressed.' },
   // (the door came as one shape standing half open: scripts/split-door.mjs makes its frame and its leaf two, the leaf shut)
@@ -767,15 +769,16 @@ export const LOCAL_MODELS = {
   // (The ACOG: life size, 14.3 cm. Its objective is toward -x as it comes, the end its fibre lies along: turned
   // round. It is one shape with one material, drawn see-through: the picture's alpha is 22 in 255 on the clear lid
   // over the fibre, 224 on the objective's glass and 255 everywhere else. Cut at a half, the lid is gone and the red
-  // fibre shows as it does through a clear lid; the glass is solid and dark. Drawn solid whole, the lid hid the fibre.)
-  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 4096, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // fibre shows as it does through a clear lid; the glass is solid and dark. Drawn solid whole, the lid hid the fibre.
+  // Its pictures at 1024 as the heaviest guns' are: 71,000 triangles, where the other sights are 2,000 to 30,000.)
+  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 1024, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at no more than 1024 a side; geometry compressed.' },
   // (The M1: its shell, the band round it and the four cartridges tucked into the band; its chin straps and their
   // buckle hang a hand below the rim and are left off, as nothing holds them to a chin. Its brow is toward +z as it
   // comes: turned round. Its biggest picture is 1024.)
   helmet_m1: { dir: 'm1_helmet', only: / (Helm|Helmband|Patrone)$/, rot: [0, Math.PI, 0], scale: 1, tex: 1024, tags: ['loot', 'gear'], changes: 'Its shell, its band and the cartridges in the band, without its chin straps: turned to face -z and stood on the ground about its own middle, at the size it came; its materials put from specular and gloss into metal and roughness; textures re-encoded as WebP at the size they came; geometry compressed.' },
   // (Two racks of angle iron and boards, in metres already. The narrow one has a coil of rope lying at its foot.)
-  rack_small: { dir: 'shelf', only: /^Shelf_02_A/, scale: 1, tex: 4096, tags: ['furniture'], changes: 'Its narrow rack: stood on the ground about its own middle, at the size it came; textures re-encoded as WebP at the size they came; geometry compressed.' },
-  rack_wide: { dir: 'shelf', only: /^Shelf_02_B/, scale: 1, tex: 4096, tags: ['furniture'], changes: 'Its wide rack, made the same way.' },
+  rack_small: { dir: 'shelf', only: /^Shelf_02_A/, scale: 1, tex: 2048, tags: ['furniture'], changes: 'Its narrow rack: stood on the ground about its own middle, at the size it came; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.' },
+  rack_wide: { dir: 'shelf', only: /^Shelf_02_B/, scale: 1, tex: 2048, tags: ['furniture'], changes: 'Its wide rack, made the same way.' },
   // (A steel cupboard of two doors, two metres tall as it comes. Its glint map says bare steel nearly all over, and
   // steel that mirrors is a black shape in a room, where there is no sky to mirror: as with the morgue's lockers,
   // the map is left out and it is said to be dull painted steel.)
@@ -815,7 +818,7 @@ export const LOCAL_MODELS = {
   // given a far lighter copy by scripts/lods.mjs, which lets a shape go as far from itself as seven parts in a
   // hundred of its length. That is 12 cm of a rod a centimetre thick: the copy it made was a reel, four rings and
   // a butt cap hanging in the air with no rod between them. Gear is carried too, and is drawn as it is.)
-  fishing_rod: { dir: 'fishing_rod_rigged_and_animated', rot: [0, 0, -0.8755], size: 1.8, tex: 4096, tags: ['gear'], changes: 'Taken off its skeleton as it is held at rest, stood upright on its handle about its own middle and scaled to metres: its animation is left out. Textures re-encoded as WebP at the size they came; geometry compressed.' },
+  fishing_rod: { dir: 'fishing_rod_rigged_and_animated', rot: [0, 0, -0.8755], size: 1.8, tex: 2048, tags: ['gear'], changes: 'Taken off its skeleton as it is held at rest, stood upright on its handle about its own middle and scaled to metres: its animation is left out. Textures re-encoded as WebP at no more than 2048 a side; geometry compressed.' },
   // (The stove in two: its body with the flue, and its door alone, which is hung on the body by the game and turned
   // about y to open. Both at one scale, which makes body and flue 1.35 m; both turned a quarter so the door is on
   // the +z face. The door's own origin is on the line of its hinge pin, at the height of its lower edge.)
@@ -848,7 +851,7 @@ export const LOCAL_MODELS = {
   // came in its own metres (6.9 m nose to tail, a rotor 7.4 m across: an MD 500 is 7 m and 8 m): kept so. Nose
   // toward -z, stood with its origin under the main rotor's hub, its skids on y = 0.
   md500: { dir: 'md-500_defender_helicopter', pivot: /^Top_rotor$/, hung: { rotor: /^Top_rotor_/, tail: /^Tail_Rotor_/ }, rot: [0, Math.PI, 0], scale: 1, tex: 1024, tags: ['vehicle'], changes: 'Its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; kept at the size it came; textures re-encoded as WebP at the size they came; geometry compressed.' },
-  parachute: { dir: 'army_parachute', solid: true, both: true, size: 12, tex: 4096, tags: ['prop'], changes: 'Made solid: drawn as a thing that is not seen through, where it came half clear, with the clearness taken out of its colour picture, and both faces of its cloth drawn; scaled to metres (twelve from where its lines meet to the top of the canopy) and stood on the point where its lines meet; textures re-encoded as WebP at the size they came; geometry compressed. In the game it is drawn narrow as it opens and laid over as it settles.' },
+  parachute: { dir: 'army_parachute', solid: true, both: true, size: 12, tex: 2048, tags: ['prop'], changes: 'Made solid: drawn as a thing that is not seen through, where it came half clear, with the clearness taken out of its colour picture, and both faces of its cloth drawn; scaled to metres (twelve from where its lines meet to the top of the canopy) and stood on the point where its lines meet; textures re-encoded as WebP at no more than 2048 a side; geometry compressed. In the game it is drawn narrow as it opens and laid over as it settles.' },
   // The frag grenade (2026-10-13: "i added a new frag grenade, it takes up 1x1 in the inventory"). Unpack
   // assets-src/frag_granade.zip into assets-src/models/frag_grenade/. A ball grenade with its fuse, lever, pin and
   // ring: one material, three pictures of 2048. As it came its ball is 8.0 cm across, a quarter over life size: the
@@ -879,8 +882,11 @@ export const LOCAL_MODELS = {
  *   atEye     – the pack's camera (`eye`) is made the eye: for a pack whose camera stands where a body's head is
  *   ourArms   – held in our own arms (src/game/hands-on.ts): the pack's own arms are left out of its file
  *
- * `tex` is 2048 at most for a model brought in from 2026-10-17 on (the owner: "2048 should be our max for new
- * models"): a gun at 4096 was 256 MB on the card in the hands, at 2048 64, and the two could not be told apart.
+ * `tex` is 2048 at most for every model, and 1024 for the guns of very many triangles and dozens of pictures (the
+ * owner, 2026-10-19: "make sure no texture exceeds 2048 / 1024 if the weapon has ALOT of triangles and is super high
+ * quality"): a gun at 4096 was 256 MB on the card in the hands, at 2048 64, and the two could not be told apart;
+ * holding the AR-15 kept a gigabyte of pictures on the card, and cards that ran out dropped the game's picture.
+ * 1024: the AR-15 (102,000 triangles, 46 pictures), VSSK (85,000, 24), M32 (65,000, 15), Barrett (49,000, 15).
  */
 export const WEAPON_PACKS = {
   sniper: {
@@ -976,7 +982,7 @@ export const WEAPON_PACKS = {
   ak: {
     dir: 'ak74m',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     length: 0.943,
     forward: [0, 0, 1],
     up: [0, 1, 0],
@@ -998,7 +1004,7 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14',
       author: 'Cransh',
       line: 'This work is based on "FPS AK-74m animations" (https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the rifle alone, taken off its skeleton and standing still, in two pieces (the rifle and its magazine), made for the ground and for other players; textures re-encoded as WebP at the size they came; geometry compressed.',
+      changes: 'Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the rifle alone, taken off its skeleton and standing still, in two pieces (the rifle and its magazine), made for the ground and for other players; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.',
     },
   },
   // The submachine gun (2026-10-11): by the maker of the AK's pack, on the same arms and the same skeleton, with a
@@ -1011,7 +1017,7 @@ export const WEAPON_PACKS = {
   smg: {
     dir: 'smg_fps',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     scale: 0.3443,
     forward: [0, 0, 1],
     up: [0, 1, 0],
@@ -1031,19 +1037,19 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/3d-models/smg-fps-animations-ca37ea9148dc4fcc9cc632175d311b23',
       author: 'Cransh',
       line: 'This work is based on "SMG FPS Animations" (https://sketchfab.com/3d-models/smg-fps-animations-ca37ea9148dc4fcc9cc632175d311b23) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the gun alone, taken off its skeleton and standing still, in pieces (the gun, its bolt, its trigger, its magazine), made for the ground and for other players; its arms and its movements are also what the pistols are held in and moved by. Textures re-encoded as WebP at the size they came; geometry compressed.',
+      changes: 'Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the gun alone, taken off its skeleton and standing still, in pieces (the gun, its bolt, its trigger, its magazine), made for the ground and for other players; its arms and its movements are also what the pistols are held in and moved by. Textures re-encoded as WebP at no more than 2048 a side; geometry compressed.',
     },
   },
   // The AR-15 (2026-10-10): a rifle and nothing else, in twenty-nine pieces, with what was fitted to it as it
   // came: a suppressor and the brake it goes on in place of, a holographic sight, a foregrip, a light on its
   // mount, a magazine. Each of those is a piece by itself here, there when the thing is fitted and not otherwise
   // (see `shows` on the weapon). It came with no hands and no movements: it is held in the AK's, set where the
-  // AK is, magazine to magazine, since it is the magazine the hands go to. Every triangle and every picture as
-  // it came. Ten of its units are a metre: its lower receiver is 2.1 of them long, and an AR's is 0.2 m.
+  // AK is, magazine to magazine, since it is the magazine the hands go to. Every triangle as it came; its 46
+  // pictures at 1024 (see above). Ten of its units are a metre: its lower receiver is 2.1 of them long, and an AR's is 0.2 m.
   ar15: {
     dir: 'ar15',
     file: 'scene.gltf',
-    tex: 2048,
+    tex: 1024,
     fp: false,
     scale: 0.1,
     forward: [1, 0, 0],
@@ -1061,7 +1067,7 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/3d-models/ar-15-33e225811b404192b89dcd4096603fbe',
       author: 'wafla',
       line: 'This work is based on "AR-15" (https://sketchfab.com/3d-models/ar-15-33e225811b404192b89dcd4096603fbe) by wafla (https://sketchfab.com/wafla) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'Scaled to metres and set in the pieces the game shows and hides (the rifle, its magazine, its brake, its suppressor, its sight, its foregrip, its light); its muzzle brake, which lay beside the rifle, put on the barrel; textures re-encoded as WebP at the size they came; geometry compressed.',
+      changes: 'Scaled to metres and set in the pieces the game shows and hides (the rifle, its magazine, its brake, its suppressor, its sight, its foregrip, its light); its muzzle brake, which lay beside the rifle, put on the barrel; textures re-encoded as WebP at no more than 1024 a side; geometry compressed.',
     },
   },
   // The Colt 1911 (2026-10-11, in place of the Pistol 43, which is gone: "replace pistol 43 with colt 1911 i
@@ -1073,7 +1079,7 @@ export const WEAPON_PACKS = {
   colt_1911: {
     dir: 'colt_1911',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     fp: false,
     length: 0.216,
     forward: [0, 0, -1],
@@ -1094,7 +1100,7 @@ export const WEAPON_PACKS = {
   desert_eagle: {
     dir: 'desert_eagle',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     fp: false,
     length: 0.305,
     forward: [0, 0, 1],
@@ -1114,7 +1120,7 @@ export const WEAPON_PACKS = {
   benelli_m3: {
     dir: 'benelli_m3',
     file: 'scene.gltf',
-    tex: 4096,
+    tex: 2048,
     fp: false,
     scale: 1.17,
     forward: [0, 0, -1],
@@ -1212,7 +1218,7 @@ export const WEAPON_PACKS = {
   barrett: {
     dir: 'barrett',
     file: 'scene.gltf',
-    tex: 2048,
+    tex: 1024,
     fp: false,
     scale: 1,
     // (its muzzle toward -z: its magazine and scope are by the end its butt is)
@@ -1235,13 +1241,13 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/3d-models/barrett-m82-optimized-af16e974a47e463989311bcda6f51f87',
       author: 'Gintoki1234',
       line: 'This work is based on "Barrett-M82 (Optimized)" (https://sketchfab.com/3d-models/barrett-m82-optimized-af16e974a47e463989311bcda6f51f87) by Gintoki1234 (https://sketchfab.com/Gintoki1234) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
+      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 1024',
     },
   },
   vssk: {
     dir: 'vssk',
     file: 'scene.gltf',
-    tex: 2048,
+    tex: 1024,
     fp: false,
     scale: 1,
     // (its barrel runs across its maker's scene, the muzzle at the end of its long can toward +x: it is a bullpup,
@@ -1256,13 +1262,13 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/Diamonddogkz',
       author: 'Diamonddogkz',
       line: 'VSSK Vykhlop by Diamonddogkz (https://sketchfab.com/Diamonddogkz), Sketchfab Standard licence',
-      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
+      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 1024',
     },
   },
   m32: {
     dir: 'm32',
     file: 'scene.gltf',
-    tex: 2048,
+    tex: 1024,
     fp: false,
     length: 0.81,
     // (its barrel runs across its maker's scene, the muzzle toward -x: its stock at the other end, its sight on top)
@@ -1287,7 +1293,7 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/ardickasaretas',
       author: 'ardickasaretas',
       line: 'M32 MGL (old version) by ardickasaretas (https://sketchfab.com/ardickasaretas), Sketchfab Standard licence',
-      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 2048',
+      changes: 'set in rigid pieces and held in our own arms moved as the .50 sniper pack moves its own, textures at 1024',
     },
   },
   pitchfork: {
@@ -1590,7 +1596,7 @@ export const HAVEN_KITS = {
     src: 'modular_fort_01',
     name: (n) => n.replace('modular_fort_01_', 'fort_'),
     mat: (n) => n.replace('modular_fort_01_', 'fort_').replace(/_1$/, ''),
-    hi: { fort_wall: [4096, 2048, 2048], fort_trim: [2048, 2048, 2048], fort_plaster: [2048, 2048, 1024] },
+    hi: { fort_wall: [2048, 2048, 2048], fort_trim: [2048, 2048, 2048], fort_plaster: [2048, 2048, 1024] },
     far: { ratio: 0.4, error: 0.004, colour: 512, other: 256 },
     tags: ['building', 'kit'],
   },
@@ -1603,8 +1609,8 @@ export const HAVEN_KITS = {
     far: { ratio: 0.12, error: 0.01, colour: 512, other: 256 },
     tags: ['building', 'door'],
   },
-  rock_face_01: { src: 'rock_face_01', name: (n) => n, mat: (n) => n, hi: { rock_face_01: [4096, 2048, 2048] }, far: { ratio: 0.125, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
-  rock_face_02: { src: 'rock_face_02', name: (n) => n, mat: (n) => n, hi: { rock_face_02: [4096, 2048, 2048] }, far: { ratio: 0.1, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+  rock_face_01: { src: 'rock_face_01', name: (n) => n, mat: (n) => n, hi: { rock_face_01: [2048, 2048, 2048] }, far: { ratio: 0.125, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+  rock_face_02: { src: 'rock_face_02', name: (n) => n, mat: (n) => n, hi: { rock_face_02: [2048, 2048, 2048] }, far: { ratio: 0.1, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
   // (2026-10-16, the new land's towns: brick works and plaster flats dressed over the game's own buildings. Their
   // pictures come at 2k, so the world copy is the one drawn close to. Their flat pieces came finely cut up, to the
   // edges: thinned with their edges free, as a straight edge loses none of its line when its middle points go.)
