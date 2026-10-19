@@ -30,12 +30,12 @@ import { ZONA_VOID } from '../sim/items';
 import { swampShore } from '../world/worldgen/west-water';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
-import { VEHICLE_FILL, vehicleMark } from './minimap';
+import { vehicleMark } from './minimap';
 
 type Pt = { x: number; z: number };
 /** what stands about the world now, as the corner map is told it */
 export interface MapLive {
-  jeeps: (Pt & { heli?: boolean })[];
+  jeeps: (Pt & { k?: number })[];
   wells: Pt[];
   traders: Pt[];
   drops: Pt[];
@@ -644,7 +644,7 @@ export class BigMap {
           <div class="hm-frame" aria-hidden="true">
             <div class="hm-cart"><b>ZONA</b><span>SURVIVE · LOOT · EXTRACT</span></div>
             <svg class="hm-rose" viewBox="-60 -60 120 120"><circle r="44" class="o"/><circle r="36" class="d"/><polygon points="0,-40 6,0 0,40 -6,0" class="ns"/><polygon points="-40,0 0,-6 40,0 0,6" class="ew"/><polygon points="0,-40 6,0 -6,0" class="n"/><text y="-47">N</text><text y="57" class="s">S</text><text x="53" y="4" class="s">E</text><text x="-53" y="4" class="s">W</text></svg>
-            <div class="hm-legend"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div><div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div></div>
+            <div class="hm-legend"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div><div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div><div><i class="vk"><canvas data-k="0" width="48" height="32"></canvas></i>UAZ</div><div><i class="vk"><canvas data-k="1" width="48" height="32"></canvas></i>Police car</div><div><i class="vk"><canvas data-k="2" width="48" height="32"></canvas></i>Helicopter</div></div>
             <div class="hm-sector"><span>SECTOR</span><b>—</b></div>
           </div>
           <div class="hm-tip" hidden></div></div>
@@ -672,6 +672,11 @@ export class BigMap {
       });
       b.addEventListener('pointerenter', () => this.say(t));
       b.addEventListener('pointerleave', () => this.say(null));
+    }
+    // (the legend's vehicles, drawn as the sheet draws them)
+    for (const c of this.root.querySelectorAll<HTMLCanvasElement>('.hm-legend canvas[data-k]')) {
+      const g = c.getContext('2d');
+      if (g) vehicleMark(g, c.width / 2 - (c.dataset.k === '2' ? 1 : 0), c.height / 2 + 1, 9.5, Number(c.dataset.k), '#211c14', 2.4);
     }
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-show]')) {
       b.addEventListener('click', () => {
@@ -1390,12 +1395,12 @@ export class BigMap {
       }
     }
 
-    // every vehicle nobody is in, cars and helicopters (vehicleMark): over the places' names, so that none is hidden under one (the hospital's helicopter was)
+    // every vehicle nobody is in, each by its kind (vehicleMark): over the places' names, so that none is hidden under one (the hospital's helicopter was)
     if (this.shown.cars) {
-      const h = 5.5 * u;
+      const h = 8 * u;
       for (const j of live.jeeps) {
         const qx = sx(j.x), qz = sy(j.z);
-        if (on(qx, qz, h * 3)) vehicleMark(g, qx, qz, h, !!j.heli, VEHICLE_FILL, INK, 1.6 * u);
+        if (on(qx, qz, h * 3)) vehicleMark(g, qx, qz, h, j.k, INK, 1.8 * u);
       }
     }
     // the grid's letters and numbers, along the top and down the left of the picture

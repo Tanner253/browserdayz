@@ -7,32 +7,72 @@ import { playEdge } from '../world/outline';
 import { ZONA_VOID } from '../sim/items';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import { gasClouds, type GasZone } from '../sim/gas';
-
-/** the fill of a vehicle's mark: orange, a colour no tier has, to stand out on sand and forest alike */
-export const VEHICLE_FILL = '#f0862a';
+import { HELI } from '../sim/heli';
+import { POLICE_CAR } from '../sim/vehicles';
 
 /**
- * A vehicle's mark, on either map: a car a block with a wheel at each end, a helicopter a round body under its rotor's
- * two blades. `h`: its size on the sheet.
+ * The fills of the vehicles' marks: the UAZ and the helicopter orange, a colour no tier has, to stand out on sand and
+ * forest alike; the police car blue, under a bar of red and blue lights.
  */
-export function vehicleMark(g: CanvasRenderingContext2D, qx: number, qz: number, h: number, heli: boolean, fill: string, ink: string, line: number) {
-  g.fillStyle = fill;
+export const VEHICLE_FILL = '#f0862a', POLICE_FILL = '#3a63d8', LIGHTS = ['#e8352e', '#56c8ff'];
+
+/**
+ * A vehicle's mark, on either map and in the sheet's legend, by its kind (the `k` of a VehicleInfo): the UAZ a block
+ * with a wheel at each end, the police car the same in blue with its lights on the roof, a helicopter side on, its
+ * rotor over its cabin, a tail boom to its fin and skids under it (the owner, 2026-10-18: "we need a heli icon too and
+ * a icon to differ the police and uac spawns"). `h`: its size on the sheet.
+ */
+export function vehicleMark(g: CanvasRenderingContext2D, qx: number, qz: number, h: number, k: number | undefined, ink: string, line: number) {
   g.strokeStyle = ink;
   g.lineWidth = line;
-  if (heli) {
-    const b = h * 1.7;
+  g.lineJoin = 'round';
+  if (k === HELI.kind) {
     g.beginPath();
-    g.moveTo(qx - b, qz - b);
-    g.lineTo(qx + b, qz + b);
-    g.moveTo(qx + b, qz - b);
-    g.lineTo(qx - b, qz + b);
+    g.moveTo(qx - 2.1 * h, qz - 1.15 * h);
+    g.lineTo(qx + 1.3 * h, qz - 1.15 * h);
+    g.moveTo(qx - 0.4 * h, qz - 1.15 * h);
+    g.lineTo(qx - 0.4 * h, qz - 0.7 * h);
+    g.moveTo(qx - 1.3 * h, qz + 1.05 * h);
+    g.lineTo(qx + 0.5 * h, qz + 1.05 * h);
+    g.moveTo(qx - 0.95 * h, qz + 0.55 * h);
+    g.lineTo(qx - 0.95 * h, qz + 1.05 * h);
+    g.moveTo(qx + 0.15 * h, qz + 0.55 * h);
+    g.lineTo(qx + 0.15 * h, qz + 1.05 * h);
+    g.moveTo(qx + 2.3 * h, qz - 0.95 * h);
+    g.lineTo(qx + 2.3 * h, qz);
+    // (orange edged in ink, as the body is: ink alone was lost on the dark of the legend and of a roof)
+    g.lineWidth = line * 2.6;
+    g.stroke();
+    g.strokeStyle = VEHICLE_FILL;
+    g.lineWidth = line * 1.1;
+    g.stroke();
+    g.strokeStyle = ink;
+    g.lineWidth = line;
+    g.fillStyle = VEHICLE_FILL;
+    g.beginPath();
+    g.moveTo(qx + 0.4 * h, qz - 0.35 * h);
+    g.lineTo(qx + 2.3 * h, qz - 0.55 * h);
+    g.lineTo(qx + 2.3 * h, qz - 0.2 * h);
+    g.lineTo(qx + 0.4 * h, qz + 0.25 * h);
+    g.closePath();
+    g.fill();
     g.stroke();
     g.beginPath();
-    g.arc(qx, qz, h * 0.95, 0, Math.PI * 2);
+    g.ellipse(qx - 0.4 * h, qz - 0.05 * h, 1.1 * h, 0.72 * h, 0, 0, Math.PI * 2);
     g.fill();
     g.stroke();
     return;
   }
+  const police = k === POLICE_CAR.kind;
+  if (police) {
+    const w = 0.75 * h, top = qz - 1.3 * h, tall = 0.55 * h;
+    g.fillStyle = LIGHTS[0];
+    g.fillRect(qx - w, top, w, tall);
+    g.fillStyle = LIGHTS[1];
+    g.fillRect(qx, top, w, tall);
+    g.strokeRect(qx - w, top, 2 * w, tall);
+  }
+  g.fillStyle = police ? POLICE_FILL : VEHICLE_FILL;
   g.beginPath();
   g.rect(qx - h * 1.5, qz - h * 0.75, h * 3, h * 1.5);
   g.fill();
@@ -68,7 +108,7 @@ export class Minimap {
   private traders: { x: number; z: number }[] = [];
   private wells: { x: number; z: number }[] = [];
   /** vehicles nobody is in */
-  private jeeps: { x: number; z: number; heli?: boolean }[] = [];
+  private jeeps: { x: number; z: number; k?: number }[] = [];
   private jeepKey = '';
   /** where gas lies: every place under it */
   private gases: GasZone[] = [];
@@ -260,10 +300,11 @@ export class Minimap {
   /**
    * Every vehicle nobody is in, whatever its game is doing with it (an admin's, one left rolling, a helicopter): where
    * to go to find one (the owner, 2026-10-18: "we need to mark all vehicles on the map even admin spawned ones"). One
-   * that somebody is in is not shown: the map is not a way of following people.
+   * that somebody is in is not shown, the map being no way of following people; but to an admin it is (the owner:
+   * "maintain whatever functionality we currently have. admin can see all obviously").
    */
-  setJeeps(at: { x: number; z: number; heli?: boolean }[]) {
-    const key = at.map((j) => `${Math.round(j.x)},${Math.round(j.z)}${j.heli ? 'h' : ''}`).join(';');
+  setJeeps(at: { x: number; z: number; k?: number }[]) {
+    const key = at.map((j) => `${Math.round(j.x)},${Math.round(j.z)},${j.k ?? 0}`).join(';');
     if (key === this.jeepKey) return;
     this.jeepKey = key;
     this.jeeps = at;
@@ -361,7 +402,7 @@ export class Minimap {
       const qx = (j.x - cx + span / 2) * k, qz = (j.z - cz + span / 2) * k;
       if (qx < 0 || qz < 0 || qx > W || qz > W) continue;
       const h = this.big ? W / 150 : W / 32;
-      vehicleMark(g, qx, qz, h, !!j.heli, VEHICLE_FILL, 'rgba(0, 0, 0, 0.9)', Math.max(1.2, h * 0.3));
+      vehicleMark(g, qx, qz, h, j.k, 'rgba(0, 0, 0, 0.9)', Math.max(1.2, h * 0.3));
     }
     // a well: a drop of water
     for (const t of this.wells) {

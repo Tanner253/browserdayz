@@ -57,16 +57,16 @@ try {
   await a.join();
   const cars = a.welcome!.vehicles;
 
-  // A jeep at each place of the west from the start (westSpots: by the road, a jeep, not a police car or a helicopter)
-  const west = WEST_CARS.map(({ name, from }) => {
+  // A car at each place of the west from the start (westSpots: by the road; a UAZ, or on the coast a UAZ or a police car)
+  const west = WEST_CARS.map(({ name, from, ks }) => {
     const [x, z] = PLACES[name];
-    const car = cars.filter((c) => !c.k && c.hp > 0).sort((p, q) => Math.hypot(p.s[0] - x, p.s[2] - z) - Math.hypot(q.s[0] - x, q.s[2] - z))[0];
+    const car = cars.filter((c) => (ks ?? [0]).includes(c.k ?? 0) && c.hp > 0).sort((p, q) => Math.hypot(p.s[0] - x, p.s[2] - z) - Math.hypot(q.s[0] - x, q.s[2] - z))[0];
     const d = Math.hypot(car.s[0] - x, car.s[2] - z);
-    assert.ok(d < (from ? 240 : 130), `no jeep by ${name}: the nearest is ${d.toFixed(0)} m off`);
+    assert.ok(d < (from ? 240 : 130), `no car by ${name}: the nearest is ${d.toFixed(0)} m off`);
     return car;
   });
   assert.equal(new Set(west.map((c) => c.i)).size, WEST_CARS.length, 'one jeep counted for two places');
-  pass(`a jeep at each of the ${WEST_CARS.length} places of the west (${WEST_CARS.map((w) => w.name).join(', ')})`);
+  pass(`a car at each of the ${WEST_CARS.length} places of the west (${WEST_CARS.map((w) => w.name).join(', ')}): on the coast ${west.slice(-2).map((c) => (c.k ? 'a police car' : 'a UAZ')).join(' and ')} this time`);
 
   /** sit at the wheel of a car, move it `ahead` metres along its nose, and get out */
   const drive = async (car: Car, ahead: number) => {

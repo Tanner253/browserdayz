@@ -194,7 +194,7 @@ function takeCar(c: Client, v: Veh): string {
 function standCarAt(k: number, x: number, ground: number, z: number, yaw: number): Veh | null {
   let home = -1, best = Infinity;
   PARKS.forEach((p, i) => {
-    const d = Math.hypot(p.x - x, p.z - z) + (p.k === k ? 0 : 1e6);
+    const d = Math.hypot(p.x - x, p.z - z) + ((p.ks ?? [p.k]).includes(k) ? 0 : 1e6);
     if (d < best) {
       best = d;
       home = i;

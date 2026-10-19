@@ -2151,6 +2151,8 @@ body.touch .hud-voice { top: 34%; }
 .hm-legend { position: absolute; left: 34px; bottom: 24px; display: grid; grid-template-columns: auto auto; gap: 2px 16px; padding: 9px 14px; background: rgba(14, 13, 11, 0.84); border: 1px solid rgba(200, 180, 130, 0.45); border-radius: 3px; font-size: 14px; color: #e4ddcc; }
 .hm-legend i { display: inline-block; width: 20px; margin-right: 6px; text-align: center; font-style: normal; color: #e8d9a8; }
 .hm-legend i.rd { height: 5px; background: #e6d8b0; box-shadow: 0 0 0 1.5px #211c14; vertical-align: 3px; }
+.hm-legend i.vk { width: 30px; height: 20px; vertical-align: -5px; }
+.hm-legend i.vk canvas { width: 30px; height: 20px; }
 .hm-legend i.tr { height: 2px; background: repeating-linear-gradient(90deg, #e8dab2 0 5px, transparent 5px 8px); vertical-align: 4px; }
 .hm-sector { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; gap: 10px; align-items: baseline; padding: 7px 14px; background: rgba(14, 13, 11, 0.84); border: 1px solid rgba(200, 180, 130, 0.45); border-radius: 3px; font-family: var(--mono); color: #e4ddcc; }
 .hm-sector span { font-size: 10.5px; letter-spacing: 0.24em; color: #cfc6ae; }

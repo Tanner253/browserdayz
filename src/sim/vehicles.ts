@@ -124,6 +124,9 @@ export interface VehicleInfo {
  */
 export const POLICE_CAR = { model: 'police_car', kind: 1 };
 
+/** which car a place stands each time one is stood there: one of the kinds it may have (`ks`), at random, or its own */
+export const parkKind = (p: { k: number; ks?: number[] }, r = Math.random()) => (p.ks?.length ? p.ks[Math.min(p.ks.length - 1, Math.floor(r * p.ks.length))] : p.k);
+
 export const SEATS = 4;
 
 /** what a knock of `hard` m/s takes off a jeep, and off each of the people in it */
@@ -288,9 +291,10 @@ export function policeSpots(world: World, taken: { x: number; z: number }[] = []
  * The places of the west that have a jeep by their road (westSpots), in the order they are numbered; and where to look
  * along the roads from, where that is not the place's middle. (Kalat's on the road laid round the south of it, the
  * owner: "add some more roads around kalat and some vehicle spawns". Pokrov's where the main road leaves its lane to
- * the east: in the lane it stood among the market's stalls.)
+ * the east: in the lane it stood among the market's stalls.) And the kinds it may stand, where it is not the UAZ alone:
+ * on the coast a police car as often as a UAZ (the owner, 2026-10-18: "police car can spawn on coast too?").
  */
-export const WEST_CARS: { name: string; from?: [number, number] }[] = [{ name: 'Pokrov', from: [-1700, 28] }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski' }, { name: 'Bereg' }, { name: 'Mys' }];
+export const WEST_CARS: { name: string; from?: [number, number]; ks?: number[] }[] = [{ name: 'Pokrov', from: [-1700, 28] }, { name: 'Zavod' }, { name: 'Karavan' }, { name: 'Blokpost' }, { name: 'Kalat', from: [-3215, 450] }, { name: 'Peski' }, { name: 'Bereg', ks: [0, POLICE_CAR.kind] }, { name: 'Mys', ks: [0, POLICE_CAR.kind] }];
 
 /**
  * The west's jeeps (the owner, 2026-10-18: "the west side of the map is lacking vehicle spawns completely", "add some
@@ -300,10 +304,10 @@ export const WEST_CARS: { name: string; from?: [number, number] }[] = [{ name: '
  * Numbered after every other car (PARKS), so none of those moves. The same on every game and on the server.
  * @param taken where cars stand already: none is stood within 40 m of those
  */
-export function westSpots(world: World, taken: { x: number; z: number }[] = []): { x: number; y: number; z: number; yaw: number }[] {
+export function westSpots(world: World, taken: { x: number; z: number }[] = []): { x: number; y: number; z: number; yaw: number; ks?: number[] }[] {
   const H = world.heights, ground = (x: number, z: number) => heightAt(H, x, z);
   const roads = [world.road, ...world.roads.filter((r) => !r.bridge)];
-  const out: { x: number; y: number; z: number; yaw: number }[] = [];
+  const out: { x: number; y: number; z: number; yaw: number; ks?: number[] }[] = [];
   /** how far a spot is from the edge of the nearest road's asphalt */
   const offRoad = (x: number, z: number) => {
     let d = Infinity;
@@ -334,7 +338,7 @@ export function westSpots(world: World, taken: { x: number; z: number }[] = []):
     if ([...taken, ...out].some((o) => Math.hypot(o.x - x, o.z - z) < 40)) return false;
     return !world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2) && !world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4 * Math.max(1, t.scale)) && !world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3);
   };
-  for (const { name, from } of WEST_CARS) {
+  for (const { name, from, ks } of WEST_CARS) {
     const q = world.pois.find((o) => o.name === name);
     if (!q) continue;
     // every point of a road within reach, nearest first: of the place's middle (but 25 m out of it), or where it says
@@ -356,7 +360,7 @@ export function westSpots(world: World, taken: { x: number; z: number }[] = []):
         const d = w / 2 + 2.4, x = p[i * 3] + (-tz / tl) * d * side, z = p[i * 3 + 2] + (tx / tl) * d * side;
         if (!clear(x, z)) continue;
         // nose along the road, as the road's jeeps stand (yaw 0 looks down -z)
-        out.push({ x, y: ground(x, z), z, yaw: Math.atan2(-tx, -tz) + (side > 0 ? 0 : Math.PI) });
+        out.push({ x, y: ground(x, z), z, yaw: Math.atan2(-tx, -tz) + (side > 0 ? 0 : Math.PI), ...(ks ? { ks } : {}) });
         break place;
       }
     }

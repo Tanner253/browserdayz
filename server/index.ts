@@ -27,7 +27,7 @@ import { CIV, CourseJudge, dealCourse } from '../src/sim/course';
 import { RULES, RULES_NOTE, fakeGl } from './botrules';
 import { inBunker, BUNKER } from '../src/sim/bunker';
 import { BARREL } from '../src/sim/barrels';
-import { type VehicleInfo, POLICE_CAR, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
+import { type VehicleInfo, POLICE_CAR, parkKind, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
 import { HELI, hpOf } from '../src/sim/heli';
 import { Director } from '../src/sim/infected';
 import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protocol';
@@ -171,12 +171,15 @@ export const jeepsDue = new Map<number, number>();
 
 let nextVeh = 1;
 
+/** a place a car stands when the world is new: its own kind, and the kinds it may stand instead (see parkKind) */
+export type Park = { x: number; y: number; z: number; yaw: number; k: number; ks?: number[] };
+
 /** where every car stands when the world is new, by the number of its place: the jeeps, the police cars, the helicopters and the west's jeeps */
-export const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind })), ...world.west.map((p) => ({ ...p, k: 0 }))];
+export const PARKS: Park[] = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind })), ...world.west.map((p) => ({ ...p, k: 0 }))];
 
 export function standJeep(home: number): Veh {
-  const p = PARKS[home];
-  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(p.k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, drivenAt: Date.now(), ...(p.k ? { k: p.k } : {}) };
+  const p = PARKS[home], k = parkKind(p);
+  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, drivenAt: Date.now(), ...(k ? { k } : {}) };
   vehicles.set(v.i, v);
   return v;
 }
