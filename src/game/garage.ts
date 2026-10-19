@@ -388,6 +388,8 @@ export class Garage {
     }
     const here = online ? sim === me : j.mode === 'sim';
     if (here) j.setMode('sim');
+    // (a helicopter's wreck handed to this game to come down from where it went up: see Heli.fallApart)
+    if (here && j.wreck && j instanceof Heli) j.fallApart();
     else {
       j.setMode(sim === null ? 'parked' : 'follow');
       if (rest) j.place(rest);
@@ -771,6 +773,8 @@ export class Garage {
     const x = this.extra.get(j);
     if (x) this.h.effects.wrecked(x.smoke);
     this.h.boom(j.point(0, 0.3, -0.4, new THREE.Vector3()), mine);
+    // (a helicopter this game moves comes down, tumbling: see Heli.fallApart; online the server hands it to a game to)
+    if (j instanceof Heli && j.mode === 'sim') j.fallApart();
     if (!this.h.online()) {
       if (inside) this.h.hurt(400, `a burning ${CALLED[j.kind]}`);
       const home = this.homes.get(j.i);

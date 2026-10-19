@@ -64,6 +64,22 @@ export class Heli extends Jeep {
     super(i, groundAt, undefined, HELI.kind);
   }
 
+  /** thrown into its fall already (see fallApart) */
+  private fallen = false;
+
+  /**
+   * Gone up in the air, and handed to this game to fall: no rotor holds it up, and it goes into a tumble as it drops
+   * (the owner, 2026-10-19: "when a helicopter explodes in mid air it just stays there and does not tumble to the ground
+   * like it should"). Once: whatever else the server says of it after.
+   */
+  fallApart() {
+    if (this.fallen) return;
+    this.fallen = true;
+    this.rpm = 0;
+    const k = HELI.mass * 2.5, r = () => (Math.random() - 0.5) * 2;
+    this.body.applyTorqueImpulse({ x: r() * k, y: r() * k * 0.6, z: r() * k }, true);
+  }
+
   /** @param visual the model: its body, and its main and tail rotors, each turning about its own hub (as `wheels`) */
   override build(scene: THREE.Scene, s: VState, visual: { body: THREE.Object3D; wheels: THREE.Object3D[] }) {
     const R = physics.R, F = HELI;

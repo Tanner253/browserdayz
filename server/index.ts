@@ -169,6 +169,8 @@ export interface Veh extends VehicleInfo {
   leftAt?: number;
   /** when somebody last sat at its wheel, or it was stood (JEEP.idle) */
   drivenAt: number;
+  /** a helicopter's wreck coming down from where it went up, moved by the game it was handed to (see dropWreck) */
+  falling?: boolean;
 }
 
 export const vehicles = new Map<number, Veh>();
@@ -595,9 +597,10 @@ setInterval(() => {
         }
       }
     } else if (v.sim !== null && v.seats[0] !== v.sim && now - v.heard > 6000) {
-      // the game that was letting it roll to a stop has gone quiet
+      // the game that was letting it roll to a stop has gone quiet (a wreck it was letting fall: set down under it)
       v.sim = null;
-      v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+      v.s = v.falling ? restState(v.s[0], world.standAt(v.s[0], v.s[1], v.s[2]), v.s[2], 0) : [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+      v.falling = false;
       tellSeats(v, true);
     }
   }

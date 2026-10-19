@@ -736,7 +736,7 @@ export function handle(c: Client, m: C2S) {
     }
     case 'v': {
       const v = vehicles.get(m.i);
-      if (!v || v.sim !== c.id || v.goneAt || !isVState(m.s) || !num(m.at)) return;
+      if (!v || v.sim !== c.id || (v.goneAt && !v.falling) || !isVState(m.s) || !num(m.at)) return;
       const now = Date.now();
       // passed straight on, not held for the next tick: every wait here is a wobble there
       broadcast({ t: 'vs', s: [[v.i, m.at, ...m.s]] }, c);
@@ -754,6 +754,7 @@ export function handle(c: Client, m: C2S) {
       const v = vehicles.get(m.i);
       if (!v || v.sim !== c.id || !isVState(m.s)) return;
       v.s = [m.s[0], m.s[1], m.s[2], m.s[3], m.s[4], m.s[5], m.s[6], 0, 0, 0, 0, 0];
+      v.falling = false;
       // (with somebody still at the wheel it is only standing, not left)
       if (v.seats[0] === c.id) return;
       v.sim = null;

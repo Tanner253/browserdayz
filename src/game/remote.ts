@@ -91,6 +91,8 @@ export class RemotePlayer implements Damageable {
   private stamped: number | undefined;
   private vel = new THREE.Vector3();
   private fall = 0;
+  /** dead in the air: where the falling body is, how fast it falls, and what it will lie on (see setAlive) */
+  private drop: { y: number; v: number; floor: number } | null = null;
   private grounded = true;
   private aiming = false;
   private flinch = 0;
@@ -257,6 +259,18 @@ export class RemotePlayer implements Damageable {
     this.alive = alive;
     if (!alive) this.diedAt = performance.now();
     else this.aliveAt = performance.now();
+    // (Dead in the air, out of a helicopter or off a jump: the body falls to what is under it and lies there, where the
+    // server lays the body to be searched. It died hanging where it was: the owner, 2026-10-19, "they die in mid air".
+    // Through what was driven or flown, down to what stands still.)
+    this.drop = null;
+    if (!alive) {
+      let from = this.pos.y + 0.5, under = physics.raycast({ x: this.pos.x, y: from, z: this.pos.z }, { x: 0, y: -1, z: 0 }, 300, SOLID_GROUPS);
+      for (let k = 0; k < 8 && under && Array.isArray((under.tag?.owner as { seats?: unknown } | undefined)?.seats); k++) {
+        from = under.point.y - 0.02;
+        under = physics.raycast({ x: this.pos.x, y: from, z: this.pos.z }, { x: 0, y: -1, z: 0 }, 300, SOLID_GROUPS);
+      }
+      if (under && this.pos.y - under.point.y > 1.5) this.drop = { y: this.pos.y, v: 0, floor: under.point.y };
+    }
     // (a body going down is heard from where it falls, by whoever is near)
     if (!alive) audio.bodyFall(this.pos, this.pos.distanceTo(this.heard));
     // back from the dead is a new life in clean clothes
@@ -434,6 +448,11 @@ export class RemotePlayer implements Damageable {
       const going = secs > 0 ? Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) / secs : 0;
       if (tele) this.pos.copy(_to);
       else this.pos.lerp(_to, caughtUp(this.pos.distanceTo(_to), going, dt));
+      if (this.drop) {
+        this.drop.v += 9.81 * dt;
+        this.drop.y = Math.max(this.drop.floor, this.drop.y - this.drop.v * dt);
+        this.pos.y = this.drop.y;
+      }
       this.yaw = lerpAngle(a.p[3], b.p[3], Math.min(1, k));
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
       this.grounded = !!(b.p[5] & F_GROUND);

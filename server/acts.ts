@@ -216,6 +216,33 @@ function orphanHeli(v: Veh, by: Client): boolean {
   return true;
 }
 
+/**
+ * A helicopter gone up in the air comes down: the game of whoever is nearest lets the wreck fall, tumbling, and
+ * everybody sees it hit the ground; with nobody near enough to see it, the server sets it down under where it went up.
+ * It hung in the sky where it blew, and whoever had died in it with it (the owner, 2026-10-19: "when a helicopter
+ * explodes in mid air it just stays there and does not tumble to the ground like it should").
+ */
+function dropWreck(v: Veh, aboard: (number | null)[]) {
+  const [x, y, z] = v.s, ground = world.standAt(x, y, z);
+  if (v.k !== HELI.kind || y - RIDE_HEIGHT - ground < 1.5) return;
+  let near: Client | null = null, best: number = HELI.handOver;
+  // (not whoever was aboard: the blast in the seat is the end of them, a moment after this, by their own game)
+  for (const o of clients.values()) {
+    if (!o.alive || o.asleep || aboard.includes(o.id)) continue;
+    const d = Math.hypot(o.pose[0] - x, o.pose[2] - z);
+    if (d < best) [near, best] = [o, d];
+  }
+  if (near) {
+    v.sim = near.id;
+    v.heard = Date.now();
+    v.falling = true;
+    tellSeats(v);
+    return;
+  }
+  v.s = restState(x, ground, z, yawOf(v.s));
+  tellSeats(v, true);
+}
+
 /** a jeep is hit: what it has left, and what follows from that */
 export function hurtJeep(v: Veh, amount: number, by: Client) {
   if (v.goneAt || amount <= 0) return;
@@ -256,10 +283,13 @@ export function blowJeep(v: Veh, byId: number) {
     const c = id === null ? undefined : clients.get(id);
     if (c) c.seatAt = 0;
   }
+  const aboard = v.seats;
   v.seats = Array(SEATS).fill(null);
   v.sim = null;
   v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
   tellSeats(v, true);
+  // (and one that went up in the air comes down)
+  dropWreck(v, aboard);
   log(`jeep #${v.i} burned out${by ? ` (${by.name})` : ''}`);
 }
 
@@ -300,7 +330,8 @@ export function leftAlone(v: Veh, now: number): boolean {
 function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null {
   const inv = c.inv;
   const [x, , z, yaw] = c.pose;
-  const y = c.pose[1];
+  // (on what is under where they died: dead in the air, off a jump or out of a helicopter, the body falls (see kill))
+  const at = c.pose[1], under = world.standAt(x, at, z), y = !ride && at - under > 1.5 ? under : at;
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
   const box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
   const spill: ItemInstance[] = [];
@@ -443,7 +474,9 @@ export function kill(c: Client, cause: string, v = 0) {
   // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
   if (c.asleep) setTimeout(() => drop(c), 3000);
   releaseLock(c);
-  // (killed in a helicopter: the body stays in its seat until the helicopter is down, see `riders`)
+  // (killed in a helicopter: the body stays in its seat until the helicopter is down, see `riders`; the owner, 2026-10-19,
+  // "the shot player who dies in heli should remain with the heli till it touches the ground or crashes then it should
+  // fall on the ground")
   const rode = seatOf(c);
   const ride = rode && rode.v.k === HELI.kind && !rode.v.goneAt ? { i: rode.v.i, seat: rode.seat } : undefined;
   leaveSeat(c);
