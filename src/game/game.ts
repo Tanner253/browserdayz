@@ -23,7 +23,7 @@ import { FLOOR_CACHE, caveSpansUnder, passWorld, wallParts } from '../sim/pass';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
-import { Economy, type WorldLoot } from '../sim/economy';
+import { Economy, lootPrint, type WorldLoot } from '../sim/economy';
 import { CRATE_SPECS, RACKS } from '../sim/crates';
 import '../sim/combat';
 import { LAUNCHED } from '../sim/grenades';
@@ -158,7 +158,8 @@ export interface TimedAction {
 // (25, 2026-10-17: more places for loot, see WORLD_REV 28 in server/index.ts)
 // (26, 2026-10-18: the gun racks, see WORLD_REV 29 in server/index.ts)
 // (27, 2026-10-18: the desert's places, see WORLD_REV 30)
-export const LOOT_REV = 27;
+// (28, 2026-10-19: the cellars' places stand elsewhere, see PROTOCOL 51)
+export const LOOT_REV = 28;
 /** how far over the ridge's crest its invisible wall stands, metres: past it a helicopter flies over */
 const RIDGE_OVER = 18;
 /** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */
@@ -553,6 +554,9 @@ export class Game {
       spawn: (l) => void (inside(l) || this.loot.spawn(l)),
       despawn: (l) => void (inside(l) || this.loot.despawn(l)),
     });
+    // (the print of the places is said with hello, for the server to hold against its own: see lootPrint)
+    let printed = '';
+    this.net.lootPrint = () => (printed ||= lootPrint(buildings.lootPoints));
     // crates standing around the map become searchable containers, and the furniture that holds things (src/sim/storage.ts)
     for (const c of veg.crates) {
       const own = FURNITURE[c.kind], spec = CRATE_SPECS[c.kind] ?? (own ? { w: own.grid[0], h: own.grid[1], label: own.label } : null);

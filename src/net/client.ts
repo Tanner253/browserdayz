@@ -207,6 +207,8 @@ export class Net {
    * open. '' when it was reached. See UNREACHED.
    */
   unreached: '' | 'blocked' | 'asleep' | 'socket' = '';
+  /** this game's print of its places for things, said with hello (src/sim/economy.ts, lootPrint): set by the game */
+  lootPrint: () => string = () => '';
   private proofKey = '';
   /** turned away for want of the check that this is a person: the key the server said to ask for it with (see src/ui/person.ts) */
   get wantsProof() {
@@ -328,7 +330,10 @@ export class Net {
         return;
       }
       this.ws = ws;
-      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName() });
+      ws.onopen = () => {
+        const lp = this.lootPrint();
+        this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName(), ...(lp ? { lp } : {}) });
+      };
       ws.onerror = () => done(null);
       ws.onclose = () => {
         const was = this.online;

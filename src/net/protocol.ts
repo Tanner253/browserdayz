@@ -41,7 +41,10 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // course as drawn and be judged against another.)
 // (50, 2026-10-19: the desert's places came before the old towns', so every loot place from Pokrov on has another
 // number, and the desert has new ground: a page from before would lay the server's loot on the wrong shelves.)
-export const PROTOCOL = 50;
+// (51, 2026-10-19: the cellars' things and places stand where the dice put them on every engine, so their places, and
+// every one after them, the west's, are numbered as the server numbers them; hello says the game's print of its
+// places (`lp`). A page from before numbers the west five off the server's.)
+export const PROTOCOL = 51;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -161,7 +164,7 @@ export type C2S =
    * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
    * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
    */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string }
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }

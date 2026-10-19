@@ -390,7 +390,15 @@ function furnish(b: Basement, dice: RNG) {
     /** against which wall, how far along it: each wall in turn from a corner, a tenth of a metre at a time */
     const stand = (id: string): boolean => {
       const [sx, , sz, back] = SIZE[id] ?? [0.6, 0.6, 0.6, -0.3];
-      const walls = [0, 1, 2, 3].sort(() => dice.next() - 0.5);
+      // (The walls in an order the dice give, dealt as cards are. Sorted by asking the dice which of two came first,
+      // the order was each engine's own: the server, on Node 26, stood the cellars' things elsewhere than every
+      // page did, found five places fewer between them, and numbered every place after them five off the page's,
+      // which is the whole west: things drawn on one shelf were refused as taken "from 77 m away" (2026-10-19).)
+      const walls = [0, 1, 2, 3];
+      for (let i = 3; i > 0; i--) {
+        const j = Math.floor(dice.next() * (i + 1));
+        [walls[i], walls[j]] = [walls[j], walls[i]];
+      }
       for (const wall of walls) {
         // 0: the z0 wall (facing +z, rot 0); 1: the z1 wall (rot pi); 2: the x0 wall (facing +x); 3: the x1 wall
         const alongX = wall < 2, len = alongX ? X1 - X0 : Z1 - Z0;

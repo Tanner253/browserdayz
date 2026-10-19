@@ -58,6 +58,11 @@ export function handle(c: Client, m: C2S) {
       if (!isPose(m.p)) return;
       // (a step, or a turn of the head)
       const was = c.pose;
+      // (A game still dead on its own screen, while this server has it alive again: what it sent from where it fell
+      // before it heard it was back. Taken in the moment after coming back, when anything is, it put them back by
+      // their body; their first steps at the start were hundreds of metres from it, refused fifty times in three
+      // seconds, and they were put off the server (2026-10-19: "moved 745 m in 2.36 s on foot").)
+      if (c.alive && m.p[5] & F_DEAD) m.p = [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
       // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
       // (heard from again after the server kept their life for them: its figure is the figure)

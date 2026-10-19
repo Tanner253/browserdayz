@@ -12,7 +12,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { WebSocketServer } from 'ws';
 import { buildWorldData } from './world';
-import { Economy, type WorldLoot } from '../src/sim/economy';
+import { Economy, lootPrint, type WorldLoot } from '../src/sim/economy';
 import { type SerializedInventory, Container } from '../src/sim/inventory';
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { PLAN, onRidgeWall, onWorld } from '../src/world/worldgen';
@@ -96,7 +96,12 @@ const t0 = Date.now();
 
 export const world = buildWorldData(ROOT);
 
-log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot points, ${world.crates.length} crates, ${world.barrels.length} fuel drums, ${world.spawns.length} spawns`);
+/** this server's print of its places for things, held against each game's as it comes in (see lootPrint) */
+export const LOOT_PRINT = lootPrint(world.lootPoints);
+/** how many games have come in with another print since this server started */
+export const LOOT_ODD = { games: 0 };
+
+log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot points (print ${LOOT_PRINT}), ${world.crates.length} crates, ${world.barrels.length} fuel drums, ${world.spawns.length} spawns`);
 
 export interface Box {
   cid: string;
@@ -759,7 +764,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, today: seen.today(), queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, today: seen.today(), queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), lootPrint: LOOT_PRINT, lootOdd: LOOT_ODD.games, botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
     return;
   }
   // whoever is about to deploy says so here first, and everything kept is written (see `deploying`)
@@ -1036,6 +1041,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         return;
       }
       sigOfWs.set(ws, sigOf(ua, String(req.headers['accept-language'] ?? '').slice(0, 80), gl));
+      // (a game that numbers the places for things otherwise than this server lays what it is told of on the wrong
+      // shelves: written down, the first few since this server started, and counted on /healthz)
+      if (m.v === PROTOCOL && typeof m.lp === 'string' && m.lp !== LOOT_PRINT && ++LOOT_ODD.games <= 5) log(`[loot] ${cleanName(m.name)}'s game numbers the places for things otherwise: print ${m.lp.slice(0, 24)}, this server's ${LOOT_PRINT} (${agent})`);
       const ip = ipOf.get(ws) ?? '', key = keyOf(m), fp = cleanDevice(m.fp);
       // (The device the game runs on, said with hello (src/net/device.ts). Not said, where it is needed: the game
       // is not ours, or is one from before protocol 44, and is told what such a game is told. Said: the rules of
