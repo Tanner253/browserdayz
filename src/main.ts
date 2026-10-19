@@ -129,8 +129,13 @@ async function boot() {
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('castle')) return (await import('./dev/castle')).castlePage();
   // (`?post`: the same fort with the army's signals post stood on it, to be looked at)
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('post')) return (await import('./dev/castle-post')).postPage();
-  // (Google Ads' tag, on the live site only: src/ui/ads.ts)
-  startAds();
+  // (Google Ads' tag, on the live site only: src/ui/ads.ts. Never in the game's way: a blocker that has taken its
+  // names for itself, as Brave's shields may, made setting them throw, and the game never began, 2026-10-18)
+  try {
+    startAds();
+  } catch {
+    /* no tag: the game goes on */
+  }
   // the door: which game, asked before anything is built (src/ui/door.ts); an address that says goes straight in
   let mode = modeOf(!!wagerQuery());
   if (!mode) {
