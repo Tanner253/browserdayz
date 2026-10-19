@@ -296,7 +296,10 @@ interface Blast {
  * else), with the one thing in them that only a point of the picture knows taken out.
  */
 export function airGlsl(): string {
-  return THREE.ShaderChunk.fog_pars_fragment.replace('varying vec3 vFogWorldPos;', '').replace(/gl_FragCoord/g, 'vec4( 0.5 )');
+  // (nor the camera's matrix, which the fog's lines ask for in a picture's points and three.js gives every vertex
+  // shader already: asked twice, no smoke, dust, spark or flame was drawn from 2026-10-18 on, each a shader that
+  // would not build, and every shot that raised dust drew with one (found 2026-10-19 hunting a lost picture))
+  return THREE.ShaderChunk.fog_pars_fragment.replace('varying vec3 vFogWorldPos;', '').replace('uniform mat4 projectionMatrix;', '').replace(/gl_FragCoord/g, 'vec4( 0.5 )');
 }
 /** `vAir`: what the air adds (rgb) and how much of the thing is left (a), reckoned at `world` */
 export const AIR_AT = /* glsl */ `
