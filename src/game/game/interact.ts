@@ -16,6 +16,7 @@ import { WorldItem, Stash } from '../loot';
 import { Jeep } from '../vehicle';
 import type { HotbarEntry } from '../../ui/hud';
 import { WELL } from '../../sim/wells';
+import { waterName } from '../../sim/water';
 import { jobsFor, progress as jobDone } from '../../sim/jobs';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 
@@ -67,19 +68,24 @@ export const interactMethods = {
     if (!owner) {
       // nobody has a name floating over their head: you only learn it by looking right at them, up close
       const c = new THREE.Vector3();
-      // a well stood at and looked at
+      // a well stood at and looked at; or the river, a lake or the swamp, drunk from as a well is (the owner,
+      // 2026-10-18: "even the swamp water"): looked at from its bank, or looked down into, stood in it
       const well = this.wells.find((w) => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) < WELL.reach && Math.abs(w.y - this.player.pos.y) < 1.5);
-      if (well && c.set(well.x, well.y + 0.8, well.z).sub(cam.position).normalize().dot(dir) > 0.55) {
+      const wet = well ? null : this.waterHere();
+      if (wet) c.set(wet.under ? this.player.pos.x + dir.x * 1.2 : wet.x, wet.surface, wet.under ? this.player.pos.z + dir.z * 1.2 : wet.z);
+      else if (well) c.set(well.x, well.y + 0.8, well.z);
+      if ((well || wet) && c.sub(cam.position).normalize().dot(dir) > 0.55) {
         const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
         const dry = this.player.vitals.water < 99;
         const held = this.inHand && ITEMS[this.inHand.id].use?.sips ? this.inHand : null;
         const fill = held && (held.left ?? 0) < ITEMS[held.id].use!.sips! ? (this.touch ? 'Tap fire to fill it' : 'Hold the left button to fill it') : bottles ? 'Take a bottle into your hands to fill it here' : '';
-        if (!dry) this.prompt = `<small>The well · ${fill || 'you have drunk your fill, and your bottles are full'}</small>`;
-        else {
+        // (wading with nothing to drink or fill, nothing is said: the well's word for it would follow a walker the whole way through the swamp)
+        if (!dry && (well || fill)) this.prompt = `<small>${well ? 'The well' : `The ${waterName(wet!)}`} · ${fill || 'you have drunk your fill, and your bottles are full'}</small>`;
+        else if (dry) {
           this.prompt = `<kbd>F</kbd>Drink${fill ? ` <small>${fill}</small>` : ''}`;
-          if (this.input.pressed('KeyF') && !this.use && !this.hud.chatOpen) this.drinkAt(well);
+          if (this.input.pressed('KeyF') && !this.use && !this.hud.chatOpen) this.drinkAt((well ?? wet)!);
         }
-        return;
+        if (this.prompt) return;
       }
       // a fireplace stood beside and looked at
       const fi = this.fires.at(this.player.pos);

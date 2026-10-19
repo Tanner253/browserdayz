@@ -21,6 +21,7 @@ import type { Hold } from '../avatar';
 import type { UseKind } from '../weapons';
 import type { WorldItem } from '../loot';
 import { type Well, WELL } from '../../sim/wells';
+import { waterName, type Drink } from '../../sim/water';
 import { FIRE } from '../../sim/fires';
 import { WHEEL_OUTER, WHEEL_PICK, WHEEL_REACH, type TimedAction, type Game } from '../game';
 
@@ -43,14 +44,15 @@ export const itemsMethods = {
     return this.inv.containers.flatMap((c) => c.items).map((p) => p.item).filter((it) => !!ITEMS[it.id].use?.sips);
   },
 
-  /** A few seconds at a well: thirst gone, and every bottle carried full again. */
-  drinkAt(this: Game, w: Well) {
+  /** A few seconds at a well, or at the river, a lake or the swamp, the same: thirst gone. */
+  drinkAt(this: Game, w: Well | Drink) {
     this.putAway();
     this.toggleInventory(false);
-    const near = () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8;
+    const near = this.waterNear(w), well = 'town' in w;
     // (Out of cupped hands. A bottle is filled by holding it here and holding the button: see fillBottle. Walk off
     // and the drinking stops there: it was finished from across the yard, by having begun it at the well.)
-    this.use = { label: 'Drinking at the well', t: 0, dur: WELL.drink, sound: 'drink', soundT: 0, valid: near, lost: 'You walked off from the well', done: () => {
+    const label = well ? 'Drinking at the well' : `Drinking from the ${waterName(w)}`;
+    this.use = { label, t: 0, dur: WELL.drink, sound: 'drink', soundT: 0, valid: near, lost: well ? 'You walked off from the well' : 'You walked off from the water', done: () => {
       if (!near()) return;
       this.player.vitals.water = 100;
       this.meDirty = true;

@@ -71,16 +71,20 @@ export const KIT_ITEMS: ItemDef[] = [
     loot: { pair: 'PowderedMilk', at: [3, 0, 20, 0, 0], lifetime: 1800, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
     worth: 2,
   },
-  { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water: four good drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2.2, water: 20, sips: 4, drink: 2, sound: 'drink' },
+  // (More drinks in each bottle, and more in each drink, the litres and weights kept: the owner, 2026-10-18, "water
+  // containers should hold more water/drinking from them should replenish more water". A full jug was 80 of thirst,
+  // a flask 54, a thermos 40; now 180, 120 and 75: a full flask takes a body from parched to full. The flask is still
+  // a litre, as DayZ's canteen is.)
+  { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water: six good drinks. A well fills it again, and so does a river or a lake.', use: { verb: 'Drink from the', time: 2.2, water: 30, sips: 6, drink: 2, sound: 'drink' },
     // (there was a third as much to drink on the map as to eat, and thirst runs as fast as hunger)
     loot: { pair: 'WaterBottle', at: [8, 0, 39, 1, 1], restock: 300, usage: ['Shop', ...HOMES, 'Farm', 'Industrial'], favour: { Shop: 9 } },
     worth: 3,
   },
-  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.25, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask: three drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2, water: 18, sips: 3, drink: 1, sound: 'drink' },
+  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.25, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask: four drinks. A well fills it again, and so does a river or a lake.', use: { verb: 'Drink from the', time: 2, water: 30, sips: 4, drink: 1, sound: 'drink' },
     loot: { pair: 'Canteen', at: [4, 2, 22, 1, 3], restock: 300, usage: ['Shop', 'Military', 'Hunting', 'Village', 'Farm'], favour: { Shop: 5 } },
     worth: 3, sells: 3,
   },
-  { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea, two cups of it. Filled at a well it is water, and still better than nothing.', use: { verb: 'Drink from the', time: 2, water: 20, energy: 3, sips: 2, drink: 0.5, sound: 'drink' },
+  { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea, three cups of it. Filled at a well it is water, and still better than nothing.', use: { verb: 'Drink from the', time: 2, water: 25, energy: 3, sips: 3, drink: 0.5, sound: 'drink' },
     loot: { pair: 'SodaCan_Kvass', at: [4, 2, 19, 1, 1], restock: 300, usage: ['Shop', 'Military', 'Hunting', 'Village', 'Police', 'Industrial'], favour: { Shop: 2 } },
     worth: 4,
   },
