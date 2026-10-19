@@ -69,6 +69,10 @@ const TAG_MIN_LIFE_MS = (Number(process.env.TAG_MIN_LIFE_S) || 120) * 1000;
 /** and there is no tag on a body at all until its owner had lived this long (see TAG_FRESH) */
 export const TAG_FRESH_MS = (Number(process.env.TAG_FRESH_S) || TAG_FRESH) * 1000;
 
+/** and none unless another player's hit came this soon before the death (see makeCorpse in acts.ts): a bleed-out from a gunshot counts. TAG_CAUSE_S=0: any death leaves one */
+export const TAG_CAUSE_MS = (Number(process.env.TAG_CAUSE_S) || 180) * 1000;
+export const TAG_NEEDS_KILLER = process.env.TAG_CAUSE_S !== '0';
+
 const TAG_PAIR_GAP_MS = (Number(process.env.TAG_PAIR_GAP_S) || 3 * 3600) * 1000;
 
 /** `${who cashed in}>${whose tag}` (each a player's key, or "ip:" and where they play from) -> when */

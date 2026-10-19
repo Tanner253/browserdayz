@@ -31,7 +31,7 @@ await new Promise<void>((done) => site.listen(SITE, '127.0.0.1', done));
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-elite-'));
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', TAG_FRESH_S: '1', TAG_MIN_LIFE_S: '1', CASH_HOLD_S: '1' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', TAG_FRESH_S: '1', TAG_MIN_LIFE_S: '1', CASH_HOLD_S: '1', TAG_CAUSE_S: '0' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';

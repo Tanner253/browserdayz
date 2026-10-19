@@ -21,7 +21,7 @@ const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-zone-'));
 // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
   // (somebody has to have lived three seconds here before there is a tag on them: five minutes, in the game)
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', TAG_FRESH_S: '3' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', TAG_FRESH_S: '3', TAG_CAUSE_S: '0' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';

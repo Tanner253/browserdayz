@@ -11,7 +11,7 @@ import { HELI, heliCrash, hpOf } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { RACKS, rackShows } from '../src/sim/crates';
 import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
-import { TAG_FRESH_MS, carriedTags, lootedTags, tagSeen } from './tags';
+import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, carriedTags, lootedTags, tagSeen } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast } from './gate';
 import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
@@ -291,9 +291,14 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   const mine = pidOf(c.key);
   const own = inv ? carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.pid === mine || (t.owner ?? '') === c.name)) : undefined;
   const lived = Date.now() - c.lifeAt, fresh = lived < TAG_FRESH_MS;
+  // (and none from a death no other player caused: the owner, 2026-10-18, of the bots that lived out the tag's time
+  // and then had their own game say they "died of wounds", leaving a tag for their partner to take. A player's hit
+  // within TAG_CAUSE_MS counts, so one who bleeds out from a gunshot still leaves theirs.)
+  const hitter = c.lastHitBy && c.lastHitBy.id !== c.id && Date.now() - c.lastHitBy.at < TAG_CAUSE_MS ? c.lastHitBy : null;
+  const nobody = TAG_NEEDS_KILLER && !hitter && !fresh;
   // (and an admin who has chosen so leaves no tag of their own either, however long they lived; or nothing at all
   // of what they carried but the tags they took off other people)
-  const noTag = fresh || c.power.voidTag, bare = c.power.voidInv;
+  const noTag = fresh || nobody || c.power.voidTag, bare = c.power.voidInv;
   /** a tag that is on a body whoever's body it is: one taken off somebody else */
   const taken = (t: ItemInstance) => {
     const from = lootedTags.get(t.uid);
@@ -336,7 +341,7 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
     }
     if (own && !noTag) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
     else if (own || older) {
-      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
+      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : nobody ? 'no other player killed them' : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
       if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` : `No dog tag on ${c.name}: an admin, at work.` });
     }
