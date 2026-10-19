@@ -774,6 +774,12 @@ export class Stash {
 
 /** how near the eye a thing lying in the world is made, metres: well beyond the 55 at which it is first drawn, so that it is there by then */
 const MAKE_WITHIN = 90;
+/**
+ * How many things lying in the world are made in a frame, the nearest first (2026-10-19). Everything within
+ * MAKE_WITHIN was made in the one look, a town's worth in a frame as somebody ran into it (the owner: "instead of
+ * loading textures all at once at certain ranges can we not periodically load in loot?").
+ */
+const MAKE_PER_FRAME = 3;
 
 /**
  * Where something has been buried: a low heap of the ground's own mud, a little uneven, as a spade leaves it.
@@ -826,6 +832,8 @@ export class LootManager {
    * could be played, most of them for things at the far end of it.
    */
   private waiting = new Map<string, WorldLoot>();
+  /** near enough, and to be made: a few a frame, the nearest first (see MAKE_PER_FRAME) */
+  private due = new Map<string, WorldLoot>();
   private eye: THREE.Vector3 | null = null;
   private looked = 0;
 
@@ -836,7 +844,7 @@ export class LootManager {
 
   /** every thing lying in the world, made or not (what looks for one of a kind anywhere on the map asks this) */
   lying(): WorldLoot[] {
-    return [...[...this.items.values()].map((w) => w.loot), ...this.waiting.values()];
+    return [...[...this.items.values()].map((w) => w.loot), ...this.waiting.values(), ...this.due.values()];
   }
 
   /** where each item about to appear was let go of (uid -> hand position): it falls from there */
@@ -849,9 +857,10 @@ export class LootManager {
   lift: (x: number, z: number) => number = () => 0;
 
   spawn(l: WorldLoot) {
-    // (what a hand has just let go of is made at once, and so is anything near; the rest waits for the eye)
+    // (what a hand has just let go of is made at once; anything near joins those to be made; the rest waits for the eye)
     const e = this.eye;
-    if (this.hands.has(l.uid) || (e && (l.x - e.x) ** 2 + (l.z - e.z) ** 2 < MAKE_WITHIN * MAKE_WITHIN)) this.make(l);
+    if (this.hands.has(l.uid)) this.make(l);
+    else if (e && (l.x - e.x) ** 2 + (l.z - e.z) ** 2 < MAKE_WITHIN * MAKE_WITHIN) this.due.set(l.uid, l);
     else this.waiting.set(l.uid, l);
   }
 
@@ -996,6 +1005,7 @@ export class LootManager {
 
   despawn(l: WorldLoot) {
     this.waiting.delete(l.uid);
+    this.due.delete(l.uid);
     this.pending.delete(l.uid);
     const w = this.items.get(l.uid);
     if (w) {
@@ -1061,8 +1071,18 @@ export class LootManager {
       for (const l of this.waiting.values()) {
         if ((l.x - cam.x) ** 2 + (l.z - cam.z) ** 2 >= MAKE_WITHIN * MAKE_WITHIN) continue;
         this.waiting.delete(l.uid);
-        this.make(l);
+        this.due.set(l.uid, l);
       }
+    }
+    // (a few a frame, the nearest first)
+    for (let n = 0; n < MAKE_PER_FRAME && this.due.size; n++) {
+      let best: WorldLoot | null = null, bd = Infinity;
+      for (const l of this.due.values()) {
+        const d = (l.x - cam.x) ** 2 + (l.z - cam.z) ** 2;
+        if (d < bd) [best, bd] = [l, d];
+      }
+      this.due.delete(best!.uid);
+      this.make(best!);
     }
     const s2 = this.shadowDist * this.shadowDist;
     for (const w of this.items.values()) {

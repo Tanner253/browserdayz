@@ -228,6 +228,10 @@ async function boot() {
   if (caves) {
     await caves.build({ carved: world.caves, heightTex: terrain.heightTex });
     terrain.openWells(world.basements ?? [], caveMouths(passPlan));
+    // (and its walls' rock got ready as the outcrops' is: each of its lists empty until the eye comes near, none was in
+    // the drawing of the world at the start, and the driver did its first work on each as somebody walked into the pass,
+    // the card held in Present for 80 to 650 ms at a time; 2026-10-19, traced)
+    void caves.dressed.then(() => caves.field && ready(caves.field.group));
   }
   // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
   const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
