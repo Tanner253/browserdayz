@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-19T07:20:50.750Z",
+ "generated": "2026-10-19T09:13:38.461Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1959,7 +1959,7 @@
     "loot",
     "attachment"
    ],
-   "bytes": 298148,
+   "bytes": 299348,
    "srcTris": 6889,
    "tris": 6889,
    "min": [
@@ -1977,12 +1977,12 @@
      "url": "assets/models/holo_sight_lod1.glb",
      "tris": 1968,
      "far": 2,
-     "of": "298148:1791709095205"
+     "of": "299348:1792401255758"
     }
    ],
    "hi": "assets/models/hi/holo_sight.glb",
-   "hiBytes": 4556240,
-   "hiCard": 341
+   "hiBytes": 884024,
+   "hiCard": 85
   },
   "flask": {
    "url": "assets/models/flask.glb",
@@ -1990,7 +1990,7 @@
     "loot",
     "drink"
    ],
-   "bytes": 406596,
+   "bytes": 407956,
    "srcTris": 52520,
    "tris": 15292,
    "min": [
@@ -2008,12 +2008,12 @@
      "url": "assets/models/flask_lod1.glb",
      "tris": 1600,
      "far": 2,
-     "of": "406596:1791709095701"
+     "of": "407956:1792401256035"
     }
    ],
    "hi": "assets/models/hi/flask.glb",
-   "hiBytes": 10230112,
-   "hiCard": 256
+   "hiBytes": 1999688,
+   "hiCard": 64
   },
   "round_50": {
    "url": "assets/models/round_50.glb",
@@ -2147,7 +2147,7 @@
     "loot",
     "ammo"
    ],
-   "bytes": 129124,
+   "bytes": 131108,
    "srcTris": 22636,
    "tris": 308,
    "min": [
@@ -2162,8 +2162,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/shell_12.glb",
-   "hiBytes": 5949400,
-   "hiCard": 256
+   "hiBytes": 841748,
+   "hiCard": 64
   },
   "ammo_box_9mm": {
    "url": "assets/models/ammo_box_9mm.glb",
@@ -2202,7 +2202,7 @@
     "loot",
     "ammo"
    ],
-   "bytes": 1223904,
+   "bytes": 1225176,
    "srcTris": 42386,
    "tris": 42386,
    "min": [
@@ -2220,12 +2220,12 @@
      "url": "assets/models/ammo_box_739_lod1.glb",
      "tris": 30894,
      "far": 2,
-     "of": "1223904:1791709096586"
+     "of": "1225176:1792401256504"
     }
    ],
    "hi": "assets/models/hi/ammo_box_739.glb",
-   "hiBytes": 5697164,
-   "hiCard": 384
+   "hiBytes": 2327868,
+   "hiCard": 128
   },
   "ammo_box_45": {
    "url": "assets/models/ammo_box_45.glb",
@@ -2233,7 +2233,7 @@
     "loot",
     "ammo"
    ],
-   "bytes": 1749248,
+   "bytes": 1760140,
    "srcTris": 151392,
    "tris": 151392,
    "min": [
@@ -2249,14 +2249,14 @@
    "lods": [
     {
      "url": "assets/models/ammo_box_45_lod1.glb",
-     "tris": 6340,
+     "tris": 3658,
      "far": 2,
-     "of": "1749248:1791709097127"
+     "of": "1760140:1792401256905"
     }
    ],
    "hi": "assets/models/hi/ammo_box_45.glb",
-   "hiBytes": 15562048,
-   "hiCard": 597
+   "hiBytes": 4707536,
+   "hiCard": 149
   },
   "ammo_box_50": {
    "url": "assets/models/ammo_box_50.glb",
@@ -2428,7 +2428,7 @@
     "prop",
     "crate"
    ],
-   "bytes": 360740,
+   "bytes": 363164,
    "srcTris": 9964,
    "tris": 9964,
    "min": [
@@ -2443,8 +2443,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/weapons_case.glb",
-   "hiBytes": 4790048,
-   "hiCard": 256
+   "hiBytes": 1434100,
+   "hiCard": 64
   },
   "patrol_cap": {
    "url": "assets/models/patrol_cap.glb",
@@ -2525,7 +2525,7 @@
     "loot",
     "gear"
    ],
-   "bytes": 1207992,
+   "bytes": 1217808,
    "srcTris": 59114,
    "tris": 59114,
    "min": [
@@ -2541,14 +2541,14 @@
    "lods": [
     {
      "url": "assets/models/tactical_gloves_lod1.glb",
-     "tris": 4245,
+     "tris": 3987,
      "far": 2,
-     "of": "1207992:1791759634303"
+     "of": "1217808:1792401272642"
     }
    ],
    "hi": "assets/models/hi/tactical_gloves.glb",
-   "hiBytes": 4422172,
-   "hiCard": 96
+   "hiBytes": 2297924,
+   "hiCard": 32
   },
   "heli_wreck": {
    "url": "assets/models/heli_wreck.glb",
@@ -2603,7 +2603,7 @@
    "tags": [
     "prop"
    ],
-   "bytes": 286756,
+   "bytes": 293708,
    "srcTris": 3460,
    "tris": 3460,
    "min": [
@@ -2618,8 +2618,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/house_interior.glb",
-   "hiBytes": 4950388,
-   "hiCard": 256
+   "hiBytes": 1117768,
+   "hiCard": 64
   },
   "old_barrack": {
    "url": "assets/models/old_barrack.glb",
@@ -2857,7 +2857,7 @@
    "tags": [
     "prop"
    ],
-   "bytes": 1219856,
+   "bytes": 1260280,
    "srcTris": 5148,
    "tris": 5148,
    "min": [
@@ -2872,8 +2872,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/shanty_mansion.glb",
-   "hiBytes": 12047064,
-   "hiCard": 512
+   "hiBytes": 4028412,
+   "hiCard": 128
   },
   "military_backpack": {
    "url": "assets/models/military_backpack.glb",
@@ -2976,8 +2976,8 @@
     }
    ],
    "hi": "assets/models/hi/police_car.glb",
-   "hiBytes": 2271112,
-   "hiCard": 219
+   "hiBytes": 2097648,
+   "hiCard": 91
   },
   "bunker_terminal": {
    "url": "assets/models/bunker_terminal.glb",
@@ -3500,7 +3500,7 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 2730920,
+   "bytes": 620940,
    "srcTris": 23385,
    "tris": 23385,
    "min": [
@@ -3518,7 +3518,7 @@
      "url": "assets/models/ak_lod1.glb",
      "tris": 3204,
      "far": 2,
-     "of": "2730920:1791709102328"
+     "of": "620940:1792401260786"
     }
    ],
    "holds": {
@@ -3534,15 +3534,15 @@
     ]
    },
    "hi": "assets/models/hi/ak.glb",
-   "hiBytes": 11475808,
-   "hiCard": 341
+   "hiBytes": 2906888,
+   "hiCard": 85
   },
   "ak_fp": {
    "url": "assets/models/ak_fp.glb",
    "tags": [
     "viewmodel"
    ],
-   "bytes": 1037968,
+   "bytes": 1046008,
    "srcTris": 40023,
    "tris": 40023,
    "min": [
@@ -3636,15 +3636,15 @@
     ]
    },
    "hi": "assets/models/hi/ak_fp.glb",
-   "hiBytes": 18087116,
-   "hiCard": 341
+   "hiBytes": 5329972,
+   "hiCard": 85
   },
   "smg": {
    "url": "assets/models/smg.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 3336896,
+   "bytes": 536692,
    "srcTris": 13249,
    "tris": 13249,
    "min": [
@@ -3662,7 +3662,7 @@
      "url": "assets/models/smg_lod1.glb",
      "tris": 3014,
      "far": 2,
-     "of": "3336896:1791709103375"
+     "of": "536692:1792401261736"
     }
    ],
    "holds": {
@@ -3678,15 +3678,15 @@
     ]
    },
    "hi": "assets/models/hi/smg.glb",
-   "hiBytes": 8479024,
-   "hiCard": 512
+   "hiBytes": 1877152,
+   "hiCard": 128
   },
   "smg_fp": {
    "url": "assets/models/smg_fp.glb",
    "tags": [
     "viewmodel"
    ],
-   "bytes": 1021384,
+   "bytes": 1028656,
    "srcTris": 29282,
    "tris": 29282,
    "min": [
@@ -3780,15 +3780,15 @@
     ]
    },
    "hi": "assets/models/hi/smg_fp.glb",
-   "hiBytes": 11726616,
-   "hiCard": 256
+   "hiBytes": 3735868,
+   "hiCard": 64
   },
   "ar15": {
    "url": "assets/models/ar15.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 3413424,
+   "bytes": 5480772,
    "srcTris": 101947,
    "tris": 101947,
    "min": [
@@ -3806,7 +3806,7 @@
      "url": "assets/models/ar15_lod1.glb",
      "tris": 22487,
      "far": 2,
-     "of": "3413424:1791709104697"
+     "of": "5480772:1792401201398"
     }
    ],
    "holds": {
@@ -3820,17 +3820,14 @@
      0.029,
      -0.04894
     ]
-   },
-   "hi": "assets/models/hi/ar15.glb",
-   "hiBytes": 13260248,
-   "hiCard": 681
+   }
   },
   "colt_1911": {
    "url": "assets/models/colt_1911.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 438944,
+   "bytes": 435828,
    "srcTris": 14915,
    "tris": 14915,
    "min": [
@@ -3848,7 +3845,7 @@
      "url": "assets/models/colt_1911_lod1.glb",
      "tris": 2086,
      "far": 2,
-     "of": "438944:1791709104999"
+     "of": "435828:1792401262335"
     }
    ],
    "holds": {
@@ -3864,15 +3861,15 @@
     ]
    },
    "hi": "assets/models/hi/colt_1911.glb",
-   "hiBytes": 4533088,
-   "hiCard": 256
+   "hiBytes": 1498572,
+   "hiCard": 64
   },
   "desert_eagle": {
    "url": "assets/models/desert_eagle.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 947240,
+   "bytes": 956400,
    "srcTris": 12801,
    "tris": 12801,
    "min": [
@@ -3890,7 +3887,7 @@
      "url": "assets/models/desert_eagle_lod1.glb",
      "tris": 3152,
      "far": 2,
-     "of": "947240:1791709105478"
+     "of": "956400:1792401262732"
     }
    ],
    "holds": {
@@ -3906,15 +3903,15 @@
     ]
    },
    "hi": "assets/models/hi/desert_eagle.glb",
-   "hiBytes": 13870172,
-   "hiCard": 576
+   "hiBytes": 4800692,
+   "hiCard": 192
   },
   "benelli_m3": {
    "url": "assets/models/benelli_m3.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 720964,
+   "bytes": 726812,
    "srcTris": 22328,
    "tris": 22328,
    "min": [
@@ -3932,7 +3929,7 @@
      "url": "assets/models/benelli_m3_lod1.glb",
      "tris": 3776,
      "far": 2,
-     "of": "720964:1791709105937"
+     "of": "726812:1792401263135"
     }
    ],
    "holds": {
@@ -3948,8 +3945,8 @@
     ]
    },
    "hi": "assets/models/hi/benelli_m3.glb",
-   "hiBytes": 13045080,
-   "hiCard": 768
+   "hiBytes": 2571920,
+   "hiCard": 192
   },
   "hospital_desk": {
    "url": "assets/models/hospital_desk.glb",
@@ -4462,7 +4459,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 904016,
+   "bytes": 924520,
    "srcTris": 46706,
    "tris": 17135,
    "min": [
@@ -4477,8 +4474,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/screen_curtain.glb",
-   "hiBytes": 15744896,
-   "hiCard": 256
+   "hiBytes": 4244212,
+   "hiCard": 64
   },
   "medical_light": {
    "url": "assets/models/medical_light.glb",
@@ -4508,7 +4505,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 234924,
+   "bytes": 238124,
    "srcTris": 46706,
    "tris": 6252,
    "min": [
@@ -4523,15 +4520,15 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/steel_table.glb",
-   "hiBytes": 3743760,
-   "hiCard": 171
+   "hiBytes": 733828,
+   "hiCard": 43
   },
   "lab_table": {
    "url": "assets/models/lab_table.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 691880,
+   "bytes": 695080,
    "srcTris": 46706,
    "tris": 18119,
    "min": [
@@ -4546,8 +4543,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/lab_table.glb",
-   "hiBytes": 5170604,
-   "hiCard": 213
+   "hiBytes": 2160704,
+   "hiCard": 85
   },
   "blood_bag": {
    "url": "assets/models/blood_bag.glb",
@@ -4605,7 +4602,7 @@
     "loot",
     "attachment"
    ],
-   "bytes": 821824,
+   "bytes": 882628,
    "srcTris": 71178,
    "tris": 71178,
    "min": [
@@ -4623,12 +4620,9 @@
      "url": "assets/models/acog_sight_lod1.glb",
      "tris": 1671,
      "far": 2,
-     "of": "821824:1791873931002"
+     "of": "882628:1792401159975"
     }
-   ],
-   "hi": "assets/models/hi/acog_sight.glb",
-   "hiBytes": 1751364,
-   "hiCard": 256
+   ]
   },
   "helmet_m1": {
    "url": "assets/models/helmet_m1.glb",
@@ -4663,7 +4657,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 542828,
+   "bytes": 551220,
    "srcTris": 25132,
    "tris": 13108,
    "min": [
@@ -4678,15 +4672,15 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/rack_small.glb",
-   "hiBytes": 8658548,
-   "hiCard": 256
+   "hiBytes": 2728688,
+   "hiCard": 64
   },
   "rack_wide": {
    "url": "assets/models/rack_wide.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 519600,
+   "bytes": 527992,
    "srcTris": 25132,
    "tris": 12024,
    "min": [
@@ -4701,8 +4695,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/rack_wide.glb",
-   "hiBytes": 8635316,
-   "hiCard": 256
+   "hiBytes": 2705460,
+   "hiCard": 64
   },
   "steel_locker": {
    "url": "assets/models/steel_locker.glb",
@@ -4755,7 +4749,7 @@
    "tags": [
     "gear"
    ],
-   "bytes": 496520,
+   "bytes": 502704,
    "srcTris": 23276,
    "tris": 23276,
    "min": [
@@ -4770,8 +4764,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/fishing_rod.glb",
-   "hiBytes": 4448692,
-   "hiCard": 256
+   "hiBytes": 1605208,
+   "hiCard": 64
   },
   "wood_stove": {
    "url": "assets/models/wood_stove.glb",
@@ -5019,8 +5013,8 @@
     }
    ],
    "hi": "assets/models/hi/fort_kit.glb",
-   "hiBytes": 17488812,
-   "hiCard": 240,
+   "hiBytes": 13473068,
+   "hiCard": 176,
    "pieces": {
     "fort_wall_thick_corner_02": {
      "min": [
@@ -5445,8 +5439,8 @@
     }
    ],
    "hi": "assets/models/hi/rock_face_01.glb",
-   "hiBytes": 5882900,
-   "hiCard": 128,
+   "hiBytes": 3582268,
+   "hiCard": 64,
    "pieces": {
     "rock_face_01": {
      "min": [
@@ -5489,8 +5483,8 @@
     }
    ],
    "hi": "assets/models/hi/rock_face_02.glb",
-   "hiBytes": 6412060,
-   "hiCard": 128,
+   "hiBytes": 3918716,
+   "hiCard": 64,
    "pieces": {
     "rock_face_02": {
      "min": [
@@ -5513,7 +5507,7 @@
    "tags": [
     "prop"
    ],
-   "bytes": 354752,
+   "bytes": 358080,
    "srcTris": 17790,
    "tris": 17790,
    "min": [
@@ -5528,8 +5522,8 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/parachute.glb",
-   "hiBytes": 4503000,
-   "hiCard": 256
+   "hiBytes": 1182308,
+   "hiCard": 64
   },
   "saline_bag": {
    "url": "assets/models/saline_bag.glb",
@@ -11502,7 +11496,7 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 1104484,
+   "bytes": 1399992,
    "srcTris": 48637,
    "tris": 48637,
    "min": [
@@ -11520,7 +11514,7 @@
      "url": "assets/models/barrett_lod1.glb",
      "tris": 12544,
      "far": 2,
-     "of": "1104484:1792269616496"
+     "of": "1399992:1792401212715"
     }
    ],
    "holds": {
@@ -11534,17 +11528,14 @@
      -0.00207,
      -0.05353
     ]
-   },
-   "hi": "assets/models/hi/barrett.glb",
-   "hiBytes": 2631320,
-   "hiCard": 320
+   }
   },
   "vssk": {
    "url": "assets/models/vssk.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 1894392,
+   "bytes": 2874888,
    "srcTris": 85258,
    "tris": 85258,
    "min": [
@@ -11562,7 +11553,7 @@
      "url": "assets/models/vssk_lod1.glb",
      "tris": 5273,
      "far": 2,
-     "of": "1894392:1792240626352"
+     "of": "2874888:1792401217042"
     }
    ],
    "holds": {
@@ -11576,10 +11567,7 @@
      -0.00207,
      -0.05353
     ]
-   },
-   "hi": "assets/models/hi/vssk.glb",
-   "hiBytes": 7912468,
-   "hiCard": 452
+   }
   },
   "pitchfork": {
    "url": "assets/models/pitchfork.glb",
@@ -11995,7 +11983,7 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 1473816,
+   "bytes": 2252636,
    "srcTris": 64722,
    "tris": 64722,
    "min": [
@@ -12013,7 +12001,7 @@
      "url": "assets/models/m32_lod1.glb",
      "tris": 7323,
      "far": 2,
-     "of": "1473816:1792255922715"
+     "of": "2252636:1792401218458"
     }
    ],
    "holds": {
@@ -12027,10 +12015,7 @@
      -0.00207,
      -0.05353
     ]
-   },
-   "hi": "assets/models/hi/m32.glb",
-   "hiBytes": 3654496,
-   "hiCard": 133
+   }
   },
   "db12": {
    "url": "assets/models/db12.glb",

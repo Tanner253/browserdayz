@@ -825,6 +825,13 @@ const AKIMBO_GAP = 0.32;
 /** whose mark is seen through a gun's own scope (see `.ret` in the HUD's scope): a mil-dot crosshair, the PSO-1's chevrons */
 const OWN_RETICLE: Record<string, string> = { sniper50: 'mildot', barrett: 'mildot', vssk: 'pso' };
 /**
+ * The VSSK's PSO scope on another gun, the AK (the owner, 2026-10-19: "The vss scope can go on the ak47 btw"): taken off
+ * the VSSK's model, its foot where it stands on the gun (the gun's own space, as FIT's), and looked through as the
+ * VSSK's own is, two to six times with its chevrons.
+ */
+const PSO_AT: Record<string, [number, number, number]> = { ak: [-0.04, 0.114, -0.012] };
+const psoOn = (it: ItemInstance | null | undefined) => !!it && it.id !== 'vssk' && hasMod(it, 'scope_vssk');
+/**
  * Scopes turned on the wheel while looked through, from and to, times (the owner, 2026-10-17: "make the vssk 6x scope
  * with variable zoom", "make the ar15 elcan 6x scope with variable zoom"). Every other scope is as it was: a view 0.3
  * of the eye's, about 3.7 times.
@@ -1109,13 +1116,14 @@ function dotMaterial(): THREE.Material {
       varying vec2 vUv;
       void main() {
         float r = length( vUv - 0.5 ) * 2.0;
-        float lit = 1.0 - smoothstep( 0.22, 0.42, r ) + 0.25 * ( 1.0 - smoothstep( 0.42, 1.0, r ) );
-        gl_FragColor = vec4( vec3( 1.0, 0.12, 0.06 ) * lit * 1.8, lit );
+        float core = 1.0 - smoothstep( 0.24, 0.4, r ), halo = 0.45 * ( 1.0 - smoothstep( 0.4, 0.95, r ) );
+        gl_FragColor = vec4( mix( vec3( 1.0, 0.04, 0.02 ), vec3( 1.0, 0.45, 0.35 ), core * 0.25 ) * 1.3, max( core, halo ) );
       }`,
+    // (laid over what is behind, not added to it: added, against a bright sky it was white)
     transparent: true,
     depthWrite: false,
     depthTest: false,
-    blending: THREE.AdditiveBlending,
+    toneMapped: false,
   });
 }
 
@@ -2052,7 +2060,9 @@ export class Weapons {
       // (on a pack whose gun leans on its own pieces, the lean undone as it is aimed (AIM_ROLL): the sight turned back the
       // same on the rail, or it stood upright while the gun leaned, and leaned once the gun was upright: "the holographic is
       // sideways 5 degrees")
-      if ((name === 'red_dot' || name === RED_DOT) && AIM_ROLL[o.item]) mine.rotateX(THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
+      // (the red dot is turned a quarter about the upright to lie along the gun: the gun's length is its own -z)
+      if (name === 'red_dot' && AIM_ROLL[o.item]) mine.rotateX(THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
+      if (name === RED_DOT && AIM_ROLL[o.item]) mine.rotateZ(-THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
       // (and set back on the line of the gun's irons, which turning it about its foot took it off: measured aimed)
       if ((name === 'red_dot' || name === RED_DOT) && DOT_SIDE[o.item]) mine.position.z += DOT_SIDE[o.item];
       const mark = mine.getObjectByName('reticle');
@@ -2079,6 +2089,9 @@ export class Weapons {
     }
     // (the Elcan stands on its foot on the rail, as the holographic sight does: looked through, it is a scope)
     if (fit?.elcan) await fitted('elcan', 'elcan', fit.elcan.at, fit.elcan.size, onBody, () => {});
+    // (the PSO off the VSSK, its foot set where PSO_AT says: what it was on the VSSK is taken off where it stood)
+    const psoAt = PSO_AT[o.item];
+    if (psoAt) await fitted('scope_vssk', 'vssk', psoAt, 1, onBody, (obj, box) => obj.position.sub(new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2)), undefined, /^scope/);
     // (the red dot: stood on its foot along the gun, its glass to the muzzle, and its dot on the middle of the glass for
     // the eye behind it, which is where the eye goes when it is aimed through)
     let rdAt: THREE.Vector3 | null = null;
@@ -2095,7 +2108,7 @@ export class Weapons {
       }
       if (at) {
         const rd = await fitted(RED_DOT, RED_DOT, at, own?.size ?? fit?.dot?.size ?? (o.kind === 'pistol' ? 0.5 : 0.8), o.kind === 'pistol' ? o.ride?.slide ?? 'slide' : onBody, (obj) => void (obj.rotation.y = -Math.PI / 2));
-        const dot = new THREE.Mesh(new THREE.PlaneGeometry(0.004, 0.004), dotMaterial());
+        const dot = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.006), dotMaterial());
         dot.name = 'reticle';
         dot.renderOrder = 20;
         dot.position.set(...RED_DOT_GLASS);
@@ -2543,6 +2556,7 @@ export class Weapons {
     const it = this.currentItem;
     if (!it) return null;
     if (hasMod(it, 'elcan')) return 'elcan';
+    if (psoOn(it)) return 'vssk';
     return ownScopeOn(it) && ZOOMS[it.id] ? it.id : null;
   }
 
@@ -2574,7 +2588,7 @@ export class Weapons {
   get reticleKind(): string {
     const it = this.currentItem;
     if (!it) return 'pu';
-    return hasMod(it, 'elcan') ? 'elcan' : ownScopeOn(it) ? (OWN_RETICLE[it.id] ?? 'pu') : 'pu';
+    return hasMod(it, 'elcan') ? 'elcan' : psoOn(it) ? 'pso' : ownScopeOn(it) ? (OWN_RETICLE[it.id] ?? 'pu') : 'pu';
   }
 
   /** the hands are in the middle of something that has to be seen through: a reload, a blow */
@@ -2817,7 +2831,7 @@ export class Weapons {
     const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
-    this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || ownScopeOn(this.currentItem))) || hasMod(this.currentItem, 'elcan')) && this.adsT > 0.9 && this.aiming;
+    this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || ownScopeOn(this.currentItem))) || hasMod(this.currentItem, 'elcan') || psoOn(this.currentItem)) && this.adsT > 0.9 && this.aiming;
     // (the rangefinder reads five times a second while it is looked through: to whatever is under the cross, out to two kilometres)
     if (!this.ranged) this.range = null;
     else if ((this.rangeAt -= dt) <= 0) {

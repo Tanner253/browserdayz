@@ -216,12 +216,14 @@ export const GUN_ITEMS: ItemDef[] = [
     loot: { pair: 'Ammo_40mm_Explosive' },
   },
   {
-    id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'round_50bmg', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 3,
+    // (two to a pile and under a gun's lamps: three were small and dark in a pocket, the owner, 2026-10-19, ".50 bmg and vss
+    // ammo are too dark and the bmg ammo needs to be larger img")
+    id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'round_50bmg', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 2, iconBright: true,
     desc: 'Loose .50 calibre cartridges, heavy as a fistful of bolts. They go into the .50 rifle magazine by hand.',
     loot: { pair: 'Ammo_308WinTracer', at: [0, 0, 0, 2, 4], restock: 600, qty: [0.3, 0.8] },
   },
   {
-    id: 'ammo_127x55', name: '12.7x55 Rounds', model: 'vssk', nodeRe: '^bullet', w: 1, h: 1, weight: 0.075, category: 'ammo', stack: 10, scale: 1, pile: 3,
+    id: 'ammo_127x55', name: '12.7x55 Rounds', model: 'vssk', nodeRe: '^bullet', w: 1, h: 1, weight: 0.075, category: 'ammo', stack: 10, scale: 1, pile: 2, iconBright: true,
     desc: 'Heavy subsonic 12.7x55 cartridges for the VSSK Vykhlop. They go into its magazine by hand.',
     loot: { pair: 'Ammo_9x39AP', at: [0, 0, 0, 2, 3], restock: 600, qty: [0.3, 0.8] },
   },
