@@ -16,7 +16,9 @@ const world = generateWorld();
 
 ok('a well in each town: near its middle, on level ground, off the road and clear of every building and tree', () => {
   const wells = wellSpots(world);
-  assert.equal(wells.length, 2, `${wells.length} wells`);
+  // (and Pokrov's, in its court, since its polish of 2026-10-19)
+  assert.equal(wells.length, 3, `${wells.length} wells`);
+  assert.equal(wells[2].town, 'Pokrov', "the third well is not Pokrov's");
   const village = world.pois[0];
   assert.ok(Math.hypot(wells[0].x - village.x, wells[0].z - village.z) < 60, 'the village well is not in the village');
   assert.ok(Math.hypot(wells[1].x - TOWN.x, wells[1].z - TOWN.z) < 60, "Kamenka's well is not in Kamenka");

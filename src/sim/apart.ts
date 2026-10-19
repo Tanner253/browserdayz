@@ -32,7 +32,10 @@ const APART_TOWNS = TOWNS.filter((t) => !DESERT_TOWNS.includes(t));
 // bunker's own things; apart, stocked as the fort is, as the owner's "best loot in the center of the bottom of the canyon")
 // ('kamenka', its army and police places on the fourth step, 2026-10-18: of the step, they would have taken the gas's
 // guns. Told by being of the town ('East') and of that step, not by a building's name)
-export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', 'kamenka', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
+// ('watchtower' and 'hunting', the towers stood about the map 2026-10-19, `watchtower_<n>` and `hunting_<n>`: part of the
+// fourth step, the eastern watchtowers took the gas's things, a keycard among them, as under the gas anything lies
+// anywhere; apart, each keeps the army's and the hunter's gear it was stood for)
+export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar', 'kalat', 'pass', 'kamenka', 'watchtower', 'hunting', ...APART_TOWNS.map((t) => t.name.toLowerCase())]);
 /** the place apart a loot point is of, by the name of its building (Kalat's pieces `ruins_<piece>`, a new town's plots `<town>_<n>`, the pass's caves `cave_<where>`; Kamenka's fourth step by its kind), or null: the map's own */
 export function apartOf({ building, usage, tier }: { building: string; usage?: readonly string[]; tier?: number }): string | null {
   if (APART.has(building)) return building;

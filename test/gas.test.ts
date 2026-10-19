@@ -199,7 +199,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     // and the heaviest armour there is: the bunker's, and nowhere else's (the bunker is the last place, and the best)
     assert.ok(b('heavy_armor') >= 2 && g('heavy_armor') === 0 && o('heavy_armor') === 0, `heavy armour: ${b('heavy_armor')} in the bunker, ${g('heavy_armor')} under the gas, ${o('heavy_armor')} elsewhere`);
     for (const id of ['benelli', 'suppressor_12']) assert.equal(g(id) + o(id) + t(id), 0, `${id} outside the bunker`);
-    assert.ok(g('keycard') >= 1 && o('keycard') + b('keycard') === 0, 'the keycards are not under the gas, or not only there');
+    assert.ok(g('keycard') >= 1 && o('keycard') + b('keycard') === 0, `the keycards are not under the gas, or not only there: ${g('keycard')} under it, ${o('keycard')} elsewhere, ${b('keycard')} in the bunker`);
     // four places in five there have something lying in them (on the rest of the map it is three in five)
     assert.ok(gasThings / places >= 0.8, `only ${gasThings} things on the ${places} places under the gas`);
     // helmets, plates, scopes: common there, rare everywhere else
