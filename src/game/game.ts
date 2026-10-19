@@ -1515,6 +1515,8 @@ export interface Game {
   countOf: Methods<typeof handsMethods>['countOf'];
   handFire: Methods<typeof handsMethods>['handFire'];
   wellHere: Methods<typeof handsMethods>['wellHere'];
+  waterHere: Methods<typeof handsMethods>['waterHere'];
+  waterNear: Methods<typeof handsMethods>['waterNear'];
   swipeCard: Methods<typeof handsMethods>['swipeCard'];
   rest: Methods<typeof handsMethods>['rest'];
   pourFuel: Methods<typeof handsMethods>['pourFuel'];

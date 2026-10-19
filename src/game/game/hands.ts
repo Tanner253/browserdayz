@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { physics, SOLID_GROUPS, SHOT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
-import { heightAt } from '../../world/worldgen';
+import { SEA_LEVEL, heightAt } from '../../world/worldgen';
+import { drinkable, type Drink } from '../../sim/water';
 import { type ItemInstance, ITEMS, isBag } from '../../sim/items';
 import { RemotePlayer } from '../remote';
 import type { UseKind } from '../weapons';
@@ -486,7 +487,7 @@ export const handsMethods = {
   handFire(this: Game, item: ItemInstance) {
     const def = ITEMS[item.id];
     if (this.use || this.player.dead || this.weapons.working) return;
-    const well = def.use?.sips ? this.wellHere() : null;
+    const well = def.use?.sips ? (this.wellHere() ?? this.waterHere()) : null;
     if (def.mag) this.magWork(item) === 'empty' ? this.unloadMagazine(item) : this.fillMagazine(item);
     else if (def.open) this.openBox(item);
     else if (item.id === 'jerrycan') this.pourFuel(item);
@@ -505,6 +506,12 @@ export const handsMethods = {
   wellHere(this: Game): Well | null {
     const p = this.player.pos;
     return this.wells.find((w) => Math.hypot(w.x - p.x, w.z - p.z) < WELL.reach && Math.abs(w.y - p.y) < 1.5) ?? null;
+  },
+
+  /** the river, lake or swamp stood at or in, if it can be drunk from (src/sim/water.ts `drinkable`) */
+  waterHere(this: Game): Drink | null {
+    const p = this.player.pos;
+    return drinkable(this.player.water, p.x, p.y, p.z, SEA_LEVEL);
   },
 
   /** The keycard, held in the hands at the bunker's reader: held out to it and pushed home, and only then does anything move. */
@@ -573,10 +580,10 @@ export const handsMethods = {
     if (this.use) Object.assign(this.use, { valid: near, lost: 'You walked off from it: the can is still full' });
   },
 
-  /** A bottle held in the hands, filled at the well beside them. */
-  fillBottle(this: Game, bottle: ItemInstance, w: Well) {
+  /** A bottle held in the hands, filled at the well beside them, or from the river, lake or swamp. */
+  fillBottle(this: Game, bottle: ItemInstance, w: Well | Drink) {
     const full = ITEMS[bottle.id].use!.sips!;
-    const near = () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8;
+    const near = this.waterNear(w);
     this.startUse(`Filling the ${ITEMS[bottle.id].name.toLowerCase()}`, WELL.drink * 0.6, bottle.id, 'open', null, () => {
       if (!near()) return;
       bottle.left = full;
@@ -584,6 +591,11 @@ export const handsMethods = {
       this.hud.note(`The ${ITEMS[bottle.id].name.toLowerCase()} is full`, 'good');
       this.inventoryChanged();
     });
-    if (this.use) Object.assign(this.use, { valid: near, lost: 'You walked off from the well' });
+    if (this.use) Object.assign(this.use, { valid: near, lost: 'town' in w ? 'You walked off from the well' : 'You walked off from the water' });
+  },
+
+  /** whether the well or the water a drink or a filling was begun at is still at hand (walk off and it stops) */
+  waterNear(this: Game, w: Well | Drink): () => boolean {
+    return 'town' in w ? () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8 : () => !!this.waterHere();
   },
 };

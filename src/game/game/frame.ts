@@ -232,7 +232,7 @@ export const frameMethods = {
     if (playing) {
       const now2 = [stage(p.vitals.energy), stage(p.vitals.water)];
       if (now2[0] > this.wanting[0]) this.hud.note(now2[0] === 2 ? 'You are starving: your hands shake, and your breath is slow to come back. Eat' : 'You are hungry: your aim is less steady. Eat something', 'warn');
-      if (now2[1] > this.wanting[1]) this.hud.note(now2[1] === 2 ? 'You are parched: you cannot run flat out. Drink, or find a well' : 'You are thirsty: your breath comes back slower. Drink, or find a well (on the map)', 'warn');
+      if (now2[1] > this.wanting[1]) this.hud.note(now2[1] === 2 ? 'You are parched: you cannot run flat out. Drink, or find a well, a river or a lake' : 'You are thirsty: your breath comes back slower. Drink, or find a well (on the map), a river or a lake', 'warn');
       this.wanting = now2;
     }
     // carried weight and gear effects only change with the inventory: a few times a second is plenty

@@ -74,6 +74,8 @@ export interface WaterHere {
   /** which way it runs, and how fast (metres a second): nothing in a lake */
   flow: [x: number, z: number, speed: number];
   kind: 'lake' | 'river';
+  /** a lake that is a swamp */
+  swamp?: boolean;
 }
 
 /** What water does to a walker. Depths in metres. */
@@ -170,7 +172,7 @@ export class WaterIndex {
     for (const lake of c.lakes) {
       if (!inside(lake.outline, x, z)) continue;
       const depth = lake.level - ground(x, z);
-      if (depth > 0 && (!best || lake.level > best.surface)) best = { surface: lake.level, depth, flow: [0, 0, 0], kind: 'lake' };
+      if (depth > 0 && (!best || lake.level > best.surface)) best = { surface: lake.level, depth, flow: [0, 0, 0], kind: 'lake', swamp: lake.swamp };
     }
     // (of a river, the nearest stretch whose width takes the point in: where two meet, the one nearer its middle)
     let near = Infinity;
@@ -216,4 +218,44 @@ export function waterAt(waters: Waters, x: number, z: number, ground: (x: number
   let index = indexes.get(waters);
   if (!index) indexes.set(waters, (index = new WaterIndex(waters)));
   return index.at(x, z, ground);
+}
+
+/**
+ * Drinking from the world's water as at a well (the owner, 2026-10-18: "we need to allow the user to drink from the
+ * river and lakes we added therough the map, even the swamp water"): out of cupped hands, from the bank or standing in
+ * the shallows. Not the sea's, which is salt; nor the river's last stretch, come down to the sea's own height at its
+ * mouth. No sickness from it: the game has none (DayZ's cholera comes with a sickness system ZONA does not have).
+ */
+export const DRINK = {
+  /** how far from where somebody stands the water may be: a step to the bank and a reach down to it, metres */
+  reach: 1.8,
+  /** how far under their feet its surface may be (a bank crouched at; from a bridge it is out of reach) */
+  under: 1,
+  /** water whose surface is no higher than this over the sea is the sea's */
+  salt: 0.5,
+};
+
+/** Water that can be drunk from (see `drinkable`): what it is, where (on the ground's plane), and whether it is stood in. */
+export interface Drink extends WaterHere {
+  x: number;
+  z: number;
+  under: boolean;
+}
+
+/** what a water is called where somebody stands at it: river, lake or swamp */
+export const waterName = (w: WaterHere) => (w.kind === 'river' ? 'river' : w.swamp ? 'swamp' : 'lake');
+
+/**
+ * The water somebody whose feet are at (x, y, z) can drink from, if any: under them first, then the nearest within
+ * DRINK.reach. `at` is the water over a point (`waterAt` on the world's waters), `sea` the sea's height.
+ */
+export function drinkable(at: (x: number, z: number) => WaterHere | null, x: number, y: number, z: number, sea: number): Drink | null {
+  for (const r of [0, 0.6, 1.2, DRINK.reach]) {
+    const n = r ? Math.ceil(r * 6) : 1;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r, w = at(px, pz);
+      if (w && w.surface >= y - DRINK.under && w.surface <= y + WADE.deep + 0.3 && w.surface > sea + DRINK.salt) return { ...w, x: px, z: pz, under: !r };
+    }
+  }
+  return null;
 }
