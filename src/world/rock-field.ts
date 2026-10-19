@@ -12,7 +12,8 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
-import type { Atmosphere } from './atmosphere';
+import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
+import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { blendPatch, type BlendHole } from './rock-blend';
 import type { ShaderPatch } from './atmosphere';
 import type { RockPiece } from '../sim/pass';
@@ -49,6 +50,12 @@ interface Set {
   list: FieldPiece[];
   near: THREE.InstancedMesh[];
   far: THREE.InstancedMesh[];
+  /** the near pieces' shadows, cast by their far copies: in the shadow maps only */
+  shade: THREE.InstancedMesh[];
+  /** the pieces drawn near and far since the last sort, and of those, what was in sight when last written */
+  nearNow: FieldPiece[];
+  farNow: FieldPiece[];
+  shown: number;
   parts: { m: THREE.Matrix4 }[];
   farParts: { m: THREE.Matrix4 }[];
   /** triangles of one piece's world copy and far copy */
@@ -67,6 +74,17 @@ export class RockField {
   private shapes = new Map<string, { pos: Float32Array; index?: Uint32Array }>();
   private solidNow = new Map<FieldPiece, RAPIER.Collider>();
   private sortedAt = new THREE.Vector3(Infinity, 0, 0);
+  /** the eye the pieces in sight are reckoned from (none: every piece in reach is drawn) */
+  camera: THREE.Camera | null = null;
+  private placed = new Map<FieldPiece, THREE.Matrix4>();
+  private toSolid: FieldPiece[] = [];
+  private hulls = new Map<string, Float32Array>();
+  private frustum = new THREE.Frustum();
+  private pv = new THREE.Matrix4();
+  private ball = new THREE.Sphere();
+  private m = new THREE.Matrix4();
+  /** each piece's place in its model's list (what is in sight is said by these) */
+  private idx = new Map<FieldPiece, number>();
   private o: Required<Omit<FieldOptions, 'heightTex' | 'tint' | 'flat' | 'holes'>> & FieldOptions;
 
   constructor(
@@ -87,18 +105,26 @@ export class RockField {
       const [near, far] = await Promise.all([big ? assets.model(id, 0) : Promise.resolve(null), assets.model(id, 1)]);
       const size = Math.max(...entry.max.map((v, i) => v - entry.min[i]));
       const parts = near ? this.partsOf(near, size) : [], farParts = this.partsOf(far, size);
-      const mk = (ps: { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4 }[], shadow: boolean) =>
+      const mk = (ps: { geo: THREE.BufferGeometry; mat: THREE.Material; m: THREE.Matrix4 }[], shade = false) =>
         ps.map((q) => {
           const mesh = new THREE.InstancedMesh(q.geo, q.mat, list.length);
           mesh.count = 0;
-          mesh.castShadow = shadow;
-          mesh.receiveShadow = true;
-          mesh.name = `rock ${id}`;
+          mesh.receiveShadow = !shade;
+          mesh.castShadow = shade;
+          mesh.name = `rock ${id}${shade ? ' shadow' : ''}`;
+          if (shade) {
+            // (in the shadow maps and not in the view: three asks this of every pass it draws)
+            mesh.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+          } else mesh.frustumCulled = false; // (each piece is looked at against the view instead: see cull)
           this.group.add(mesh);
           return mesh;
         });
       const tris = (ps: { geo: THREE.BufferGeometry }[]) => ps.reduce((s, q) => s + (q.geo.index ? q.geo.index.count : q.geo.getAttribute('position').count) / 3, 0);
-      this.sets.push({ id, list, near: mk(parts, true), far: mk(farParts, false), parts, farParts, nearTris: tris(parts), farTris: tris(farParts), size });
+      // (A near piece's shadow is its far copy's: 1,200 to 6,000 triangles for its 30,000 to 52,000, drawn into each of the
+      // sun's three maps, where the difference is less than a texel; the rock was 3 of the 5 to 7 million triangles of a
+      // frame in the pass, and the card fell behind on those frames, 2026-10-19.)
+      list.forEach((q, i) => this.idx.set(q, i));
+      this.sets.push({ id, list, near: mk(parts), far: mk(farParts), shade: parts.length ? mk(farParts, true) : [], nearNow: [], farNow: [], shown: -1, parts, farParts, nearTris: tris(parts), farTris: tris(farParts), size });
       if (o.solid !== false && list.some((p) => !p.small)) {
         // (a cliff by its physics copy: a hull round one stood metres in front of the rock seen; a boulder is round enough for its hull)
         this.shapes.set(id, entry.lods.length > 1 ? this.shapeOf(await assets.model(id, 2)) : { pos: this.shapeOf(far).pos });
@@ -144,59 +170,133 @@ export class RockField {
     return { pos: new Float32Array(pos), index: new Uint32Array(index) };
   }
 
-  /** where a piece stands, as a matrix */
+  /** where a piece stands, as a matrix (worked out once a piece) */
   private placeOf(p: FieldPiece) {
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt[0], p.turn, p.tilt[1], 'YXZ'));
-    return new THREE.Matrix4().compose(new THREE.Vector3(...p.at), q, new THREE.Vector3(p.scale, p.scale, p.scale));
+    let m = this.placed.get(p);
+    if (!m) {
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt[0], p.turn, p.tilt[1], 'YXZ'));
+      this.placed.set(p, (m = new THREE.Matrix4().compose(new THREE.Vector3(...p.at), q, new THREE.Vector3(p.scale, p.scale, p.scale))));
+    }
+    return m;
+  }
+
+  /** a boulder's hull as a few points: its far copy's corners round which the hull lies, worked out once a model */
+  private hullOf(id: string, pos: Float32Array) {
+    let h = this.hulls.get(id);
+    if (!h) {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i < pos.length; i += 3) pts.push(new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2]));
+      const hull = new ConvexHull().setFromPoints(pts), out: number[] = [], seen = new Set<THREE.Vector3>();
+      for (const f of hull.faces) {
+        let e = f.edge;
+        do {
+          const at = e.head().point;
+          if (!seen.has(at)) {
+            seen.add(at);
+            out.push(at.x, at.y, at.z);
+          }
+          e = e.next;
+        } while (e !== f.edge);
+      }
+      this.hulls.set(id, (h = out.length >= 12 ? new Float32Array(out) : pos));
+    }
+    return h;
   }
 
   /** a piece made solid: its shape at its size, turned and stood where it is */
   private solidify(p: FieldPiece) {
     const shape = this.shapes.get(p.id);
     if (!shape || p.small) return;
-    const pos = shape.pos.map((v) => v * p.scale), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt[0], p.turn, p.tilt[1], 'YXZ'));
+    const pos = (shape.index ? shape.pos : this.hullOf(p.id, shape.pos)).map((v) => v * p.scale), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.tilt[0], p.turn, p.tilt[1], 'YXZ'));
     const desc = shape.index ? physics.R.ColliderDesc.trimesh(pos, shape.index) : physics.R.ColliderDesc.convexHull(pos);
     if (desc) this.solidNow.set(p, physics.addStaticQuat(desc, 'rock', { x: p.at[0], y: p.at[1], z: p.at[2] }, { x: q.x, y: q.y, z: q.z, w: q.w }));
   }
 
-  /** Each frame: when the eye has moved on, which pieces are drawn near, far or not at all, and which are solid. */
+  /** Each frame: when the eye has moved on, which pieces are drawn near, far or not at all, and which are to be solid; one made solid; what is in sight drawn. */
   update(eye: THREE.Vector3) {
-    if (this.sortedAt.distanceToSquared(eye) < RESORT * RESORT) return;
+    if (this.sortedAt.distanceToSquared(eye) >= RESORT * RESORT) this.sort(eye);
+    // (one piece made solid a frame, the nearest first: a few dozen at once as the eye came into the pass, a hull worked
+    // out of thousands of corners for each, was 7 to 17 ms of a frame every twelve metres, 2026-10-19)
+    const p = this.toSolid.shift();
+    if (p && !this.solidNow.has(p) && Math.hypot(p.at[0] - eye.x, p.at[1] - eye.y, p.at[2] - eye.z) < this.o.solid) this.solidify(p);
+    this.cull();
+  }
+
+  private sort(eye: THREE.Vector3) {
     this.sortedAt.copy(eye);
-    if (this.shapes.size) for (const p of this.pieces) {
-      if (p.small) continue;
-      const d = Math.hypot(p.at[0] - eye.x, p.at[1] - eye.y, p.at[2] - eye.z), c = this.solidNow.get(p);
-      if (!c && d < this.o.solid) this.solidify(p);
-      else if (c && d > this.o.solid + 2 * RESORT) {
-        physics.world.removeCollider(c, false);
-        this.solidNow.delete(p);
+    this.toSolid.length = 0;
+    if (this.shapes.size) {
+      const want: [FieldPiece, number][] = [];
+      for (const p of this.pieces) {
+        if (p.small) continue;
+        const d = Math.hypot(p.at[0] - eye.x, p.at[1] - eye.y, p.at[2] - eye.z), c = this.solidNow.get(p);
+        if (!c && d < this.o.solid) want.push([p, d]);
+        else if (c && d > this.o.solid + 2 * RESORT) {
+          physics.world.removeCollider(c, false);
+          this.solidNow.delete(p);
+        }
       }
+      want.sort((a, b) => a[1] - b[1]);
+      for (const [p] of want) this.toSolid.push(p);
     }
-    const m = new THREE.Matrix4(), D = this.drawn;
+    const m = this.m, D = this.drawn;
     D.near = D.far = D.nearTris = D.farTris = 0;
     for (const set of this.sets) {
-      let n = 0, f = 0;
+      set.nearNow.length = set.farNow.length = 0;
       for (const p of set.list) {
         const d = Math.hypot(p.at[0] - eye.x, p.at[1] - eye.y, p.at[2] - eye.z);
         if (d > (p.small ? this.o.smallReach : Math.max(this.o.smallReach, set.size * p.scale * this.o.seen))) continue;
-        const place = this.placeOf(p);
-        if (!p.small && d < this.o.near && set.near.length) {
-          set.near.forEach((mesh, i) => mesh.setMatrixAt(n, m.multiplyMatrices(place, set.parts[i].m)));
-          n++;
-        } else {
-          set.far.forEach((mesh, i) => mesh.setMatrixAt(f, m.multiplyMatrices(place, set.farParts[i].m)));
-          f++;
-        }
+        if (!p.small && d < this.o.near && set.near.length) set.nearNow.push(p);
+        else set.farNow.push(p);
       }
-      for (const [meshes, count] of [[set.near, n], [set.far, f]] as const) for (const mesh of meshes) {
-        mesh.count = count;
+      // (every near piece's shadow, in sight or not: a shadow from behind the eye falls in front of it)
+      set.nearNow.forEach((p, k) => set.shade.forEach((mesh, i) => mesh.setMatrixAt(k, m.multiplyMatrices(this.placeOf(p), set.farParts[i].m))));
+      for (const mesh of set.shade) {
+        mesh.count = set.nearNow.length;
         mesh.instanceMatrix.needsUpdate = true;
         mesh.computeBoundingSphere();
       }
-      D.near += n;
-      D.far += f;
-      D.nearTris += n * set.nearTris;
-      D.farTris += f * set.farTris;
+      set.shown = -1;
+      D.near += set.nearNow.length;
+      D.far += set.farNow.length;
+      D.nearTris += set.nearNow.length * set.nearTris;
+      D.farTris += set.farNow.length * set.farTris;
+    }
+  }
+
+  /**
+   * Each frame, the pieces in sight drawn and no others (2026-10-19): each list was looked at against the view as one
+   * ball round all of it, every near piece within 45 m in it, and the ones behind the eye were drawn at 30,000 to
+   * 52,000 triangles each. Each piece is looked at as a ball a third again its size and three metres more, so that
+   * none comes into sight late; the lists are written again only when what is in sight has changed.
+   */
+  private cull() {
+    const cam = this.camera, m = this.m, ball = this.ball;
+    if (cam) {
+      cam.updateMatrixWorld();
+      this.frustum.setFromProjectionMatrix(this.pv.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+    }
+    for (const set of this.sets) {
+      // (what is in sight, said as one number: written again only when it changes)
+      let sig = 0, k = 0;
+      const seen = (p: FieldPiece) => {
+        if (!cam) return true;
+        ball.center.set(p.at[0], p.at[1], p.at[2]);
+        ball.radius = set.size * p.scale * 0.75 * 1.33 + 3;
+        return this.frustum.intersectsSphere(ball);
+      };
+      const near: FieldPiece[] = [], far: FieldPiece[] = [];
+      for (const p of set.nearNow) if (seen(p)) { near.push(p); sig = (sig * 31 + (++k) * 7 + this.idx.get(p)!) | 0; }
+      for (const p of set.farNow) if (seen(p)) { far.push(p); sig = (sig * 37 + (++k) * 11 + this.idx.get(p)! * 3) | 0; }
+      sig = (sig * 41 + near.length * 1009 + far.length) | 0;
+      if (sig === set.shown) continue;
+      set.shown = sig;
+      near.forEach((p, n) => set.near.forEach((mesh, i) => mesh.setMatrixAt(n, m.multiplyMatrices(this.placeOf(p), set.parts[i].m))));
+      far.forEach((p, n) => set.far.forEach((mesh, i) => mesh.setMatrixAt(n, m.multiplyMatrices(this.placeOf(p), set.farParts[i].m))));
+      for (const [meshes, count] of [[set.near, near.length], [set.far, far.length]] as const) for (const mesh of meshes) {
+        mesh.count = count;
+        mesh.instanceMatrix.needsUpdate = true;
+      }
     }
   }
 

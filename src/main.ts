@@ -232,10 +232,14 @@ async function boot() {
     // the drawing of the world at the start, and the driver did its first work on each as somebody walked into the pass,
     // the card held in Present for 80 to 650 ms at a time; 2026-10-19, traced)
     void caves.dressed.then(() => caves.field && ready(caves.field.group));
+    if (caves.field) caves.field.camera = r.camera;
   }
   // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
   const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
-  if (outcrops) void outcrops.build().then(() => ready(outcrops.group));
+  if (outcrops) {
+    outcrops.camera = r.camera;
+    void outcrops.build().then(() => ready(outcrops.group));
+  }
   if (caves) buildings.lootPoints.push(...caveLootPoints());
   // (the sea's, the lakes' and the river's water and the swamp's mist got ready as they are made: hidden at the start
   // (the mist by day) they were a shader made in the frame they were first shown. Only these few: everything the west
