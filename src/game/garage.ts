@@ -387,10 +387,12 @@ export class Garage {
       j.forget();
     }
     const here = online ? sim === me : j.mode === 'sim';
-    if (here) j.setMode('sim');
-    // (a helicopter's wreck handed to this game to come down from where it went up: see Heli.fallApart)
-    if (here && j.wreck && j instanceof Heli) j.fallApart();
-    else {
+    if (here) {
+      j.setMode('sim');
+      // (a helicopter's wreck handed to this game to come down from where it went up: see Heli.fallApart. Set between
+      // the `if` and its `else` on 2026-10-19, it took every car from its driver online: "vehicles have stopped working")
+      if (j.wreck && j instanceof Heli) j.fallApart();
+    } else {
       j.setMode(sim === null ? 'parked' : 'follow');
       if (rest) j.place(rest);
     }

@@ -44,7 +44,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (51, 2026-10-19: the cellars' things and places stand where the dice put them on every engine, so their places, and
 // every one after them, the west's, are numbered as the server numbers them; hello says the game's print of its
 // places (`lp`). A page from before numbers the west five off the server's.)
-export const PROTOCOL = 51;
+// (52, 2026-10-19: nothing on the wire changed; raised so that every game open on 51's page, where nobody online could
+// drive, is told to load the page again with cars that drive.)
+export const PROTOCOL = 52;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
