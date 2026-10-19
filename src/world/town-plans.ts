@@ -339,9 +339,10 @@ export function tavernPlan(): Blueprint {
 export function merchantPlan(): Blueprint {
   const HW = 5.5, HD = 4.5, S = 2.1;
   const g = new Floor();
-  // (the racks either side of the back window, not across it)
-  rack(g, 'rack_wide', -4.3, -3.95, 0);
-  rack(g, 'rack_wide', -1.45, -3.95, 0);
+  // (the two racks either side of the back window, clear of it: at -4.0 and -1.6 they stood a third of a metre and a
+  // tenth across it)
+  rack(g, 'rack_wide', -4.36, -3.95, 0);
+  rack(g, 'rack_wide', -1.44, -3.95, 0);
   g.floor([-2.6, 2.6], [0.6, -1.6]);
   // (a crate on a crate set askew: a crate is known by its place to a tenth of a metre, and two in one place were one: STACK)
   g.put('wooden_military_crate', 3.0, -3.8, 0).put('wooden_crate_01', 3.0 + STACK, -3.8 + STACK, 0.06, 0.5).put('Barrel_01', 2.6, -2.6).floor([3.0, 1.4]);
@@ -380,7 +381,8 @@ export function smithyPlan(): Blueprint {
   const HW = 5, HD = 3.5;
   const g = new Floor();
   g.put('stone_fire_pit', -3.0, -1.9, 0).top('WoodenTable_01', 2.6, -2.85, 0, 0.57, 2).put('Barrel_01', 4.3, 2.6).put('barrel_03', 3.6, 2.9).put('wooden_crate_01', -4.45, 0.6, Q).floor([0.2, 0.6], [-1.6, 2.4]);
-  rack(g, 'rack_small', 4.3, -0.4, -Q);
+  // (its back a finger off the end wall: at 4.3 it stood a fifth of a metre out from it)
+  rack(g, 'rack_small', 4.47, -0.4, -Q);
   g.put('painted_wooden_stool', -1.9, -1.0, 0.4);
   return {
     w: HW * 2, d: HD * 2, h: 3.4, ext: 'brick_ext', int: 'int_plaster', floor: 'floor_concrete', roof: 'roof_iron', roofType: 'shed',

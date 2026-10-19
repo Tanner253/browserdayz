@@ -333,8 +333,8 @@ function layOut(seed: number): Plan {
     const w = q.r1 - q.r0, d = q.f1 - q.f0, cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2;
     // is a spot by a wall clear of that room's ways in?
     const clear = (r: number, f: number, by = 1.5) => q.doors.every(([dr, df]) => Math.hypot(dr - r, df - f) > by);
-    /** things stood along one wall of the room, a pace apart, facing in: [which wall, what, how far out from the wall its middle stands, how much of the wall each takes] */
-    const along = (wall: 'r0' | 'r1' | 'f0' | 'f1', make: (r: number, f: number, rot: number, k: number) => void, out: number, each: number, most = 99) => {
+    /** things stood along one wall of the room, a pace apart, facing in: [which wall, what, how far out from the wall its middle stands, how much of the wall each takes]. `make` says false where it would not stand: the next place along is tried */
+    const along = (wall: 'r0' | 'r1' | 'f0' | 'f1', make: (r: number, f: number, rot: number, k: number) => unknown, out: number, each: number, most = 99) => {
       const onR = wall === 'r0' || wall === 'r1';
       const lo = (onR ? q.f0 : q.r0) + 0.5 + each / 2, hi = (onR ? q.f1 : q.r1) - 0.5 - each / 2;
       let n = 0;
@@ -344,7 +344,7 @@ function layOut(seed: number): Plan {
         if (!clear(r, f, 1.35 + each / 2)) continue;
         // (facing into the room: its back to the wall)
         const rot = wall === 'r0' ? Math.PI / 2 : wall === 'r1' ? -Math.PI / 2 : wall === 'f0' ? 0 : Math.PI;
-        make(r, f, rot, n++);
+        if (make(r, f, rot, n) !== false) n++;
       }
     };
     const wallsOf: ('r0' | 'r1' | 'f0' | 'f1')[] = ['r0', 'r1', 'f0', 'f1'];
@@ -352,6 +352,28 @@ function layOut(seed: number): Plan {
     const free = wallsOf.filter((wl) => !q.doors.some(([dr, df]) => (wl === 'r0' ? Math.abs(dr - q.r0) < 0.5 : wl === 'r1' ? Math.abs(dr - q.r1) < 0.5 : wl === 'f0' ? Math.abs(df - q.f0) < 0.5 : Math.abs(df - q.f1) < 0.5)));
     const longest = [...wallsOf].sort((a, b) => ((b[0] === 'r' ? d : w) - (a[0] === 'r' ? d : w)) + (free.includes(b) ? 4 : 0) - (free.includes(a) ? 4 : 0));
     const put = (id: string, r: number, f: number, rot: number, o: Partial<Stood> = {}) => stood.push({ id, r, f, rot, ...o });
+    /**
+     * A gun rack, where it stands clear of all that was made in the room before it: along its wall it was stood where
+     * the wall was free of ways in, and in the barracks' corner it stood 0.8 m into the end of a bunk ("the weapon rack
+     * we placed in bunkers is clipping through walls", the owner, 2026-10-19). Its footprint (the model, 1.54 by 0.61)
+     * and half a metre of floor before it, to stand at it and open it, against every solid thing made, each as the
+     * turned box it is. @returns whether it was stood
+     */
+    const rack = (r: number, f: number, rot: number) => {
+      const box = (a: number, w: number, d: number) => [[Math.cos(a), -Math.sin(a), w / 2], [Math.sin(a), Math.cos(a), d / 2]].map(([ur, uf, h]) => ({ ur, uf, h }));
+      const me = box(rot, 1.56, 0.64 + 0.5), mr = r + Math.sin(rot) * 0.25, mf = f + Math.cos(rot) * 0.25;
+      const into = (m: Made) => {
+        const it = box(m.rot, m.w, m.d);
+        // (apart if some side of either is a line the two lie either side of)
+        return [...me, ...it].every(({ ur, uf }) => {
+          const reach = (b: typeof me) => b.reduce((t, e) => t + e.h * Math.abs(e.ur * ur + e.uf * uf), 0);
+          return Math.abs((m.r - mr) * ur + (m.f - mf) * uf) < reach(me) + reach(it);
+        });
+      };
+      if (builtList.some((m) => m.solid !== false && m.kind !== 'sign' && (m.y ?? 0) < 1.85 && into(m))) return false;
+      put('gun_rack', r, f, rot);
+      return true;
+    };
     const build = (kind: Made['kind'], r: number, f: number, rot: number, bw: number, bd: number, bh: number, o: Partial<Made> = {}) => builtList.push({ kind, r, f, rot, w: bw, d: bd, h: bh, ...o });
     const floorSpot = (r: number, f: number) => spots.push({ r, f, y: Y, floor: true });
     /** nothing already stands within `by` of a spot */
@@ -409,7 +431,9 @@ function layOut(seed: number): Plan {
         along(longest[2], (r, f, rot) => build('locker', r, f, rot, 0.5, 0.5, 1.85), 0.42, 0.5, 6);
         // (and a gun rack on the fourth wall where it is free: where the men sleep their rifles are kept to hand. The owner,
         // 2026-10-18: "i want to see more of the new weapon lockers in the bunker")
-        along(longest[3], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 1);
+        // (on the first wall along which there is room for it: the fourth's corners are the bunks')
+        const racks = stood.length;
+        for (const wl of [longest[3], longest[0], longest[1], longest[2]]) if (stood.length === racks) along(wl, rack, 0.32, 1.56, 1);
         if (w > 6.5 && d > 6.5) {
           const turn = rnd() < 0.5 ? 0 : Math.PI / 2;
           put('WoodenTable_01', cr, cf, turn, { on: TOP });
@@ -497,8 +521,8 @@ function layOut(seed: number): Plan {
         }, 0.5, 2.2, 3);
         // (the gun racks: the real one, its back to the wall, in place of the ones that were drawn here; searched as any
         // rack is, what stands in it seen: src/game/racks.ts)
-        along(longest[2], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 3);
-        along(longest[3], (r, f, rot) => put('gun_rack', r, f, rot), 0.32, 1.56, 2);
+        along(longest[2], rack, 0.32, 1.56, 3);
+        along(longest[3], rack, 0.32, 1.56, 2);
         for (let k = 0; k < 3; k++) {
           const pr = cr + (k - 1) * 1.6 * (w > d ? 1 : 0) + between(-0.2, 0.2), pf = cf + (k - 1) * 1.6 * (w > d ? 0 : 1) + between(-0.2, 0.2);
           if (clear(pr, pf, 1.4)) put('weapons_case', pr, pf, (w > d ? Math.PI / 2 : 0) + between(-0.2, 0.2));

@@ -139,8 +139,10 @@ const UNDER_GAS: Partial<Record<BuildingPlot['type'], { furniture: Furn[]; floor
     floor: [[-2.6, 2.8], [2.6, -2.4], [4.0, 1.0], [-3.0, -2.6]],
   },
   garage: { furniture: [{ id: 'rack_small', x: -3.97, z: 1.6, rot: Math.PI / 2, on: [0, 1, 2, 3] }] },
-  // (in the arms room, between its shelves and its desk)
-  barracks: { furniture: [{ id: 'rack_wide', x: 5.97, z: 0.85, rot: -Math.PI / 2, on: [0, 1, 2, 3] }] },
+  // (A small rack in the room of beds, between the arms room's door and the front wall, and four places on its floor:
+  // the eight places of the long rack that stood in the arms room until the gun rack was given that wall, the two one
+  // inside the other, 2026-10-19. As many places, in the same order, so that none after them is renumbered.)
+  barracks: { furniture: [{ id: 'rack_small', x: 3.17, z: 2.42, rot: -Math.PI / 2, on: [0, 1, 2, 3] }], floor: [[-4.6, 0.3], [-1.2, -0.3], [1.9, 0.9], [4.6, -0.2]] },
 };
 /** how high a bed's springs are over its feet, and how thick the mattress on them is: what is kept on a bed lies on that */
 const BED = { springs: 0.49, mattress: 0.1 };
@@ -992,8 +994,10 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'steel_locker', x: 3.2, z: -0.6, rot: -Math.PI / 2 },
           { id: 'steel_locker', x: 3.2, z: -1.75, rot: -Math.PI / 2 },
           // (and the arms room's gun rack, on its end wall between the shelves and the desk: "more of the new weapon
-          // lockers ... in military locations", the owner, 2026-10-18)
-          { id: 'gun_rack', x: 6.09, z: 0.97, rot: -Math.PI / 2 },
+          // lockers ... in military locations", the owner, 2026-10-18. Its back a finger off the plaster, at 6.3: stood
+          // by eye at 6.09, it was 9 cm into the wall in every barracks, "the weapon rack in zstava and pretty much all
+          // location slips into the wall", 2026-10-19)
+          { id: 'gun_rack', x: 5.98, z: 0.97, rot: -Math.PI / 2 },
         ],
         loot: [
           [5.0, 0.02, 0.3], [4.9, 0.02, -1.6],
