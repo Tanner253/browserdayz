@@ -26,8 +26,8 @@ const FILE = 'zona/admin.json';
 
 export type Role = 'admin' | 'mod';
 export interface AdminState {
-  /** by the hash of a player's key */
-  roles: Record<string, { role: Role; name: string; by: string; at: string }>;
+  /** by the hash of a player's key; `up` the hash of whoever gave it (since 2026-10-18: see `over` in server/gate.ts) */
+  roles: Record<string, { role: Role; name: string; by: string; up?: string; at: string }>;
   /** `fp`: the device they played on (a hash their game sent; since 2026-10-16), where it was known */
   bans: { key: string; ip: string; fp?: string; sig?: string; sigTill?: number; name: string; why: string; by: string; at: string }[];
 }
@@ -42,7 +42,7 @@ function clean(s: unknown): AdminState {
   const roles: AdminState['roles'] = {};
   for (const [k, v] of Object.entries(src.roles ?? {}).slice(0, 200)) {
     if (!hash(k) || !v || (v.role !== 'admin' && v.role !== 'mod')) continue;
-    roles[k] = { role: v.role, name: text(v.name, 24), by: text(v.by, 24), at: text(v.at, 30) };
+    roles[k] = { role: v.role, name: text(v.name, 24), by: text(v.by, 24), ...(hash(v.up) ? { up: v.up } : {}), at: text(v.at, 30) };
   }
   const bans = (Array.isArray(src.bans) ? src.bans : []).slice(0, 2000).flatMap((b) => {
     const key = hash(b?.key), ip = hash(b?.ip), fp = hash(b?.fp), sig = hash(b?.sig), till = Number(b?.sigTill);
@@ -95,7 +95,8 @@ export async function admin(request: Request, store: Store = blobStore, game = G
     const key = hash(op.key);
     if (!key) return Response.json({ ok: false, why: 'Your game gave no key.' }, none);
     let made: string | false = held?.mark ?? '';
-    if (state.roles[key]?.role !== 'admin') {
+    // (the password puts whoever has it at the top, whoever made them an admin before: see `over` in server/gate.ts)
+    if (state.roles[key]?.role !== 'admin' || state.roles[key].by !== 'password' || state.roles[key].up) {
       state.roles[key] = { role: 'admin', name: text(op.name, 24), by: 'password', at: new Date().toISOString() };
       made = await store.swap(FILE, state, held?.mark ?? null);
       if (made === false) return Response.json({ ok: false, why: 'The list was being written by something else: try again.' }, none);

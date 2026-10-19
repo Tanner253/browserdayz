@@ -17,7 +17,7 @@ import { BANS, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log,
 import { ipOf, namesOf } from './tags';
 import { deviceOf, forgetDevice, shortDevice } from './device';
 import { CHECK, CHECKS } from './checks';
-import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, keptOffNow, keyHash, roleOf, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
+import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, keptOffNow, keyHash, outranks, over, roleOf, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
 import { KEPT, asAdmin, keepBefore, place, saveAdmin, savedWords, sayRestart, setPower, sys, whoIs } from './keep';
 import { broadcast, cleanName, clients, drop, send, type Client } from './players';
 import { kill } from './acts';
@@ -231,6 +231,8 @@ export async function command(c: Client, line: string) {
   const admin = role === 'admin';
   const need = () => void sys(c, 'Only an admin can do that.');
   const who = rest[0] ?? '', why = rest.slice(1).join(' ').slice(0, 120);
+  /** somebody above them in the line of who made whom: not theirs to act against (see `over`) */
+  const above = (name: string) => void sys(c, `${name} is above you: only whoever made them, or somebody above that, can do that to them.`);
   const label = (o: Client) => `#${o.id} ${o.name}${roleOf(o) ? ` [${roleOf(o)}]` : ''}${o.fp ? `  dev:${shortDevice(o.fp)}` : ''}`;
   /** a device named in an order (dev:xxxxxxxx, as /players shows it), or '' */
   const devOf = (w: string) => (/^dev:[0-9a-f]{4,40}$/i.test(w) ? w.slice(4).toLowerCase() : '');
@@ -462,6 +464,7 @@ export async function command(c: Client, line: string) {
       const t = whoIs(who);
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (roleOf(t) === 'admin' && !admin) return need();
+      if (!outranks(c, t)) return above(t.name);
       log(`[admin] ${c.name} kicked ${t.name}${why ? `: ${why}` : ''}`);
       eject(t, `You were put off the server${why ? `: ${why}` : '.'}`);
       return void sys(c, `${t.name} is off the server.`);
@@ -470,6 +473,7 @@ export async function command(c: Client, line: string) {
       const t = whoIs(who), mins = Math.min(60, Math.max(1, Math.round(Number(rest[1]) || 10)));
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (roleOf(t) === 'admin' && !admin) return need();
+      if (!outranks(c, t)) return above(t.name);
       const reason = rest.slice(2).join(' ').slice(0, 120);
       for (const n of namesOf(t.key, t.ip, t.fp)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}`, name: t.name });
       log(`[admin] ${c.name} timed ${t.name} out for ${mins} minutes${reason ? `: ${reason}` : ''}`);
@@ -486,6 +490,7 @@ export async function command(c: Client, line: string) {
       if (!t && !left) return void sys(c, d ? `Nobody online or lately gone is on device ${d}: see /players and /recent.` : `Nobody online or lately gone is "${who}": see /players and /recent.`);
       if (t === c) return void sys(c, 'That is you.');
       const name = t ? t.name : left!.name, key = keyHash(t ? t.key : left!.key), ip = ipHash(t ? t.ip : left!.ip), fp = t ? t.fp : left!.fp, sig = (t ? t.sig : left!.sig) ?? '';
+      if (!over(keyHash(c.key), key)) return above(name);
       if (ADMIN.state.roles[key]?.role === 'admin') return void sys(c, `${name} is an admin: /demote first.`);
       // (the owner, 2026-10-16: "can i ban this computr or browser at the source?": the device goes on the ban with the key and the address;
       // and their browser for a day, the bots of 2026-10-18 coming back with a new device every time: see sigOf)
@@ -584,7 +589,10 @@ export async function command(c: Client, line: string) {
       const key = keyHash(t.key), roles = { ...ADMIN.state.roles }, was = roleOf(t) === 'admin';
       const to: Role | null = cmd === 'mod' ? 'mod' : cmd === 'demote' || cmd === 'deop' ? null : 'admin';
       if (t === c && to !== 'admin') return void sys(c, 'Not yourself: somebody else has to.');
-      if (to) roles[key] = { role: to, name: t.name, by: c.name, at: new Date().toISOString() };
+      if (t === c) return void sys(c, 'You are an admin already.');
+      if (!outranks(c, t)) return above(t.name);
+      // (who gave it, by their key's hash: the line of who made whom, see `over`)
+      if (to) roles[key] = { role: to, name: t.name, by: c.name, up: keyHash(c.key), at: new Date().toISOString() };
       else delete roles[key];
       log(`[admin] ${c.name} made ${t.name} ${to ?? 'nothing'}`);
       const kept = await saveAdmin({ roles, bans: ADMIN.state.bans });
@@ -631,6 +639,7 @@ export async function command(c: Client, line: string) {
       const t = whoIs(who);
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (t === c) return void sys(c, 'That is you.');
+      if (cmd === 'bring' && !outranks(c, t)) return above(t.name);
       const [moved, to] = cmd === 'goto' ? [c, t] : [t, c];
       if (!moved.alive) return void sys(c, `${moved === c ? 'You are' : `${moved.name} is`} dead: the dead are not moved.`);
       if (moved.seatAt) return void sys(c, `${moved === c ? 'You are' : `${moved.name} is`} in a car: out of it first.`);
@@ -697,6 +706,7 @@ export async function command(c: Client, line: string) {
       const kit = KITS.find((k) => k.id === (rest[0] ?? '').toLowerCase());
       if (!kit) return void sys(c, `The kits are: ${KITS.map((k) => k.id).join(', ')}.`);
       const t = rest[1] ? whoIs(rest[1]) : c;
+      if (t && !outranks(c, t)) return above(t.name);
       if (!t) return void sys(c, `Nobody online is "${rest[1]}" (or more than one is): see /players.`);
       if (!t.alive) return void sys(c, `${t === c ? 'You are' : `${t.name} is`} dead: there is nobody to put it on.`);
       // (every thing of it is made here, so that each is one the server knows it put in the world)
@@ -718,6 +728,7 @@ export async function command(c: Client, line: string) {
       const t = rest[0] ? whoIs(rest[0]) : c;
       if (!t) return void sys(c, `Nobody online is "${rest[0]}" (or more than one is): see /players.`);
       if (!t.alive) return void sys(c, `${t === c ? 'You are' : `${t.name} is`} dead: there is nothing on them to empty.`);
+      if (!outranks(c, t)) return above(t.name);
       // (a kit of nothing: what is carried and worn goes, as it does for any kit, and nothing comes in its place)
       log(`[admin] ${c.name} emptied what ${t === c ? 'they' : t.name} carried`);
       send(t, { t: 'kit', name: '', items: [], ...(t === c ? {} : { by: c.name }) });
@@ -735,6 +746,7 @@ export async function command(c: Client, line: string) {
       if (!admin) return need();
       const t = rest[1] ? whoIs(rest[0]) : c, uid = rest[1] ?? rest[0] ?? '';
       if (!t || !uid) return void sys(c, 'Whose, and which thing: /trash who thing (the panel writes this for you).');
+      if (!outranks(c, t)) return above(t.name);
       const had = [...things(t.inv)].find((it) => it.uid === uid);
       if (!had) return void sys(c, `${t === c ? 'You do' : `${t.name} does`} not carry that any more.`);
       takeOut(t.inv, new Set([uid]));
@@ -767,6 +779,7 @@ export async function command(c: Client, line: string) {
       const t = whoIs(who);
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (!t.alive) return void sys(c, `${t.name} is dead already.`);
+      if (!outranks(c, t)) return above(t.name);
       log(`[admin] ${c.name} slew ${t.name}`);
       t.lastHitBy = null;
       kill(t, 'an admin');
@@ -785,6 +798,7 @@ export async function command(c: Client, line: string) {
       const t = whom ? whoIs(whom) : c;
       if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
       if (roleOf(t) !== 'admin') return void sys(c, `${t.name} is not an admin: these are an admin's.`);
+      if (!outranks(c, t)) return above(t.name);
       const on = say ? say === 'on' : !t.power[k];
       setPower(t, k, on);
       const what = { god: 'god mode', hidden: 'vanish', clip: 'noclip', voidInv: 'void inventory on death', voidTag: 'void dog tag on death' }[k];

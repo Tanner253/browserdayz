@@ -492,7 +492,8 @@ export function bannedFor(key: string, ip: string, fp = '', sig = ''): string | 
 export type Role = 'admin' | 'mod';
 
 export interface AdminState {
-  roles: Record<string, { role: Role; name: string; by: string; at: string }>;
+  /** `up`: the hash of whoever gave the role (since 2026-10-18: see `over`) */
+  roles: Record<string, { role: Role; name: string; by: string; up?: string; at: string }>;
   /** `fp`: the device they played on, where their game said it (2026-10-16: "can i ban this computr or browser at the source?") */
   bans: { key: string; ip: string; fp?: string; /** their browser (`sigOf`), kept off until `sigTill` */ sig?: string; sigTill?: number; name: string; why: string; by: string; at: string }[];
 }
@@ -555,6 +556,33 @@ const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|1
 export const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash('sha256').update(`${ADMIN.pepper} ${ip}`).digest('hex').slice(0, 40) : '');
 
 export const roleOf = (c: Client): Role | null => (LOCAL_ADMIN ? 'admin' : ADMIN.state.roles[keyHash(c.key)]?.role ?? null);
+
+/**
+ * Whether one may act against another, by their keys' hashes (the owner, 2026-10-18: "admin is like heierchy, only can
+ * ban or remove admin that you yourself admined ... i was the first admin, via password, so i have the highest power but
+ * people i admin below me should not be able to kill admins above them kick them or ban them"). Somebody with no role is
+ * anybody's; somebody with one only whoever gave it them, or gave it whoever gave it them, and so on up. An admin by the
+ * password stands over every role but another by the password. A role given before then says who gave it by name only,
+ * and is followed up by that name.
+ */
+export function over(me: string, them: string): boolean {
+  const roles = ADMIN.state.roles;
+  if (LOCAL_ADMIN || me === them || !roles[them]) return true;
+  if (!roles[me]) return false;
+  const top = (k: string) => roles[k]?.by === 'password' && !roles[k].up;
+  if (top(them)) return false;
+  const seen = new Set<string>();
+  for (let k: string | undefined = them; k && !seen.has(k); ) {
+    seen.add(k);
+    const r: AdminState['roles'][string] | undefined = roles[k];
+    const by = r?.by.toLowerCase();
+    const up: string | undefined = r?.up ?? (by && by !== 'password' ? Object.keys(roles).find((x) => x !== k && roles[x].name.toLowerCase() === by) : undefined);
+    if (up === me) return true;
+    k = up;
+  }
+  return top(me);
+}
+export const outranks = (c: Client, t: Client) => over(keyHash(c.key), keyHash(t.key));
 
 function adminBan(key: string, ip: string, fp = '', sig = ''): boolean {
   const k = keyHash(key), a = ipHash(ip), now = Date.now();

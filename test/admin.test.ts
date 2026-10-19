@@ -110,7 +110,7 @@ class Player {
 async function withServer(play: (log: () => string) => Promise<void>, more: Record<string, string> = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-admin-'));
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'watch', ...more },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'watch', NEVER_SPOKE_S: '600', ...more },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';
@@ -386,8 +386,19 @@ if (ALL) await withServer(async () => {
   assert.match(await ann.order(`/god #${fay.id} on`), /Fay: god mode is on/);
   assert.equal(last(fay, 'powers')?.god, true, 'an admin\u2019s power was not put on by another admin');
   assert.match(await ann.order(`/noclip #${late.id}`), /not an admin/);
+  // (the line of who made whom, 2026-10-18: Fay, made an admin by Ann, does nothing against her)
+  // (all at once, and answered at once: the orders of somebody with a role are not held back)
+  const asked = [`/kick #${ann.id}`, `/timeout #${ann.id} 5`, `/ban #${ann.id}`, `/slay #${ann.id}`, `/demote #${ann.id}`, `/mod #${ann.id}`, `/god #${ann.id} on`, `/bring #${ann.id}`, `/clear #${ann.id}`];
+  const fayFrom = fay.got.length;
+  for (const o of asked) fay.send({ t: 'chat', ch: 'global', text: o });
+  await sleep(1200);
+  const refused = fay.got.slice(fayFrom).filter((m) => m.t === 'sys' && /Ann is above you/.test((m as { text: string }).text)).length;
+  assert.equal(refused, asked.length, `of ${asked.length} orders against Ann from an admin she made, ${refused} were refused`);
+  const roleBy = (name: string) => Object.entries(kept().roles).find(([, r]) => r.name === name);
+  assert.equal(roleBy('Fay')?.[1].up, roleBy('Ann')?.[0], 'who made Fay an admin is not kept with her role');
+  assert.match(await ann.order(`/god #${fay.id} off`), /Fay: god mode is off/);
   checks++;
-  console.log('  ok  somebody made an admin leaves nothing when they die until they choose to; admins see the vanished; an admin puts another admin\u2019s powers on');
+  console.log('  ok  somebody made an admin leaves nothing when they die until they choose to; admins see the vanished; an admin puts another admin\u2019s powers on, and the admin she made can do nothing against her');
 
   // ---- said to everybody, said to one, and two orders one on the heels of the other
   ann.send({ t: 'chat', ch: 'global', text: '/say hello all' });
