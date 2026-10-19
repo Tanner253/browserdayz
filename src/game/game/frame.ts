@@ -21,7 +21,7 @@ import { Stash, WorldItem } from '../loot';
 import { RemotePlayer } from '../remote';
 import { Jeep } from '../vehicle';
 import { JEEP } from '../../sim/vehicles';
-import { hpOf } from '../../sim/heli';
+import { HELI, hpOf } from '../../sim/heli';
 import { EMOTE } from '../../sim/emotes';
 import { stage } from '../../sim/wells';
 import { TOUCH } from '../../core/device';
@@ -246,7 +246,8 @@ export const frameMethods = {
     }
     this.tagT += dt;
     if (this.tagT >= 1) {
-      this.minimap.setJeeps([...this.garage.jeeps.values()].filter((j) => !j.wreck && j.mode === 'parked' && j.seats.every((s) => s === null)).map((j) => ({ x: j.pos.x, z: j.pos.z })));
+      // (every vehicle nobody is in, whatever its game is doing with it: see setJeeps)
+      this.minimap.setJeeps([...this.garage.jeeps.values()].filter((j) => !j.wreck && j.seats.every((s) => s === null)).map((j) => ({ x: j.pos.x, z: j.pos.z, ...(j.kind === HELI.kind ? { heli: true } : {}) })));
       if (this.started && !p.dead) this.tickTags(this.tagReal());
       else {
         this.hud.setTags([]);

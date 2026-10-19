@@ -8,6 +8,42 @@ import { ZONA_VOID } from '../sim/items';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import { gasClouds, type GasZone } from '../sim/gas';
 
+/** the fill of a vehicle's mark: orange, a colour no tier has, to stand out on sand and forest alike */
+export const VEHICLE_FILL = '#f0862a';
+
+/**
+ * A vehicle's mark, on either map: a car a block with a wheel at each end, a helicopter a round body under its rotor's
+ * two blades. `h`: its size on the sheet.
+ */
+export function vehicleMark(g: CanvasRenderingContext2D, qx: number, qz: number, h: number, heli: boolean, fill: string, ink: string, line: number) {
+  g.fillStyle = fill;
+  g.strokeStyle = ink;
+  g.lineWidth = line;
+  if (heli) {
+    const b = h * 1.7;
+    g.beginPath();
+    g.moveTo(qx - b, qz - b);
+    g.lineTo(qx + b, qz + b);
+    g.moveTo(qx + b, qz - b);
+    g.lineTo(qx - b, qz + b);
+    g.stroke();
+    g.beginPath();
+    g.arc(qx, qz, h * 0.95, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    return;
+  }
+  g.beginPath();
+  g.rect(qx - h * 1.5, qz - h * 0.75, h * 3, h * 1.5);
+  g.fill();
+  g.stroke();
+  g.fillStyle = ink;
+  g.beginPath();
+  g.arc(qx - h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
+  g.arc(qx + h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
+  g.fill();
+}
+
 /** pixels of the drawn map per metre of world */
 const SCALE = 1;
 /** metres across shown in the corner */
@@ -31,8 +67,8 @@ export class Minimap {
   private drops: { x: number; z: number }[] = [];
   private traders: { x: number; z: number }[] = [];
   private wells: { x: number; z: number }[] = [];
-  /** jeeps standing empty */
-  private jeeps: { x: number; z: number }[] = [];
+  /** vehicles nobody is in */
+  private jeeps: { x: number; z: number; heli?: boolean }[] = [];
   private jeepKey = '';
   /** where gas lies: every place under it */
   private gases: GasZone[] = [];
@@ -221,9 +257,13 @@ export class Minimap {
     if (me) this.marked = now;
   }
 
-  /** Jeeps standing empty: where to go to find one. (One that somebody is in is not shown: the map is not a way of following people.) */
-  setJeeps(at: { x: number; z: number }[]) {
-    const key = at.map((j) => `${Math.round(j.x)},${Math.round(j.z)}`).join(';');
+  /**
+   * Every vehicle nobody is in, whatever its game is doing with it (an admin's, one left rolling, a helicopter): where
+   * to go to find one (the owner, 2026-10-18: "we need to mark all vehicles on the map even admin spawned ones"). One
+   * that somebody is in is not shown: the map is not a way of following people.
+   */
+  setJeeps(at: { x: number; z: number; heli?: boolean }[]) {
+    const key = at.map((j) => `${Math.round(j.x)},${Math.round(j.z)}${j.heli ? 'h' : ''}`).join(';');
     if (key === this.jeepKey) return;
     this.jeepKey = key;
     this.jeeps = at;
@@ -316,23 +356,12 @@ export class Minimap {
         g.fillText(p.name.toUpperCase(), lx, lz - W / 70);
       }
     }
-    // jeeps nobody is in: a small pale block with a wheel at each end
+    // vehicles nobody is in (vehicleMark)
     for (const j of this.jeeps) {
       const qx = (j.x - cx + span / 2) * k, qz = (j.z - cz + span / 2) * k;
       if (qx < 0 || qz < 0 || qx > W || qz > W) continue;
       const h = this.big ? W / 150 : W / 32;
-      g.fillStyle = '#d9dfc8';
-      g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-      g.lineWidth = Math.max(1.2, h * 0.3);
-      g.beginPath();
-      g.rect(qx - h * 1.5, qz - h * 0.75, h * 3, h * 1.5);
-      g.fill();
-      g.stroke();
-      g.fillStyle = 'rgba(0, 0, 0, 0.9)';
-      g.beginPath();
-      g.arc(qx - h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
-      g.arc(qx + h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
-      g.fill();
+      vehicleMark(g, qx, qz, h, !!j.heli, VEHICLE_FILL, 'rgba(0, 0, 0, 0.9)', Math.max(1.2, h * 0.3));
     }
     // a well: a drop of water
     for (const t of this.wells) {

@@ -30,11 +30,12 @@ import { ZONA_VOID } from '../sim/items';
 import { swampShore } from '../world/worldgen/west-water';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
+import { VEHICLE_FILL, vehicleMark } from './minimap';
 
 type Pt = { x: number; z: number };
 /** what stands about the world now, as the corner map is told it */
 export interface MapLive {
-  jeeps: Pt[];
+  jeeps: (Pt & { heli?: boolean })[];
   wells: Pt[];
   traders: Pt[];
   drops: Pt[];
@@ -1324,26 +1325,6 @@ export class BigMap {
       g.lineWidth = 1.3 * u;
       g.stroke();
     }
-    // cars nobody is in: a block with a wheel at each end
-    if (this.shown.cars) {
-      const h = 4.2 * u;
-      for (const j of live.jeeps) {
-        const qx = sx(j.x), qz = sy(j.z);
-        if (!on(qx, qz, h * 3)) continue;
-        g.fillStyle = '#f2ecd6';
-        g.strokeStyle = INK;
-        g.lineWidth = 1.5 * u;
-        g.beginPath();
-        g.rect(qx - h * 1.5, qz - h * 0.75, h * 3, h * 1.5);
-        g.fill();
-        g.stroke();
-        g.fillStyle = INK;
-        g.beginPath();
-        g.arc(qx - h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
-        g.arc(qx + h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
     // supply drops and helicopters down: a crate, for as long as it stands
     for (const d of live.drops) {
       const qx = sx(d.x), qz = sy(d.z), h = 7 * u;
@@ -1409,6 +1390,14 @@ export class BigMap {
       }
     }
 
+    // every vehicle nobody is in, cars and helicopters (vehicleMark): over the places' names, so that none is hidden under one (the hospital's helicopter was)
+    if (this.shown.cars) {
+      const h = 5.5 * u;
+      for (const j of live.jeeps) {
+        const qx = sx(j.x), qz = sy(j.z);
+        if (on(qx, qz, h * 3)) vehicleMark(g, qx, qz, h, !!j.heli, VEHICLE_FILL, INK, 1.6 * u);
+      }
+    }
     // the grid's letters and numbers, along the top and down the left of the picture
     if (this.shown.grid) {
       // (along the sheet's own edges where the whole of it is in the picture, and the picture's where it runs off it)
