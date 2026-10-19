@@ -261,6 +261,9 @@ if (ALL) await withServer(async () => {
   assert.match(await ann.order('/ban Bob once more'), /Bob is banned/);
   assert.match(await ann.order('/unban 1'), /no longer banned/);
   assert.ok(await bob.join(), 'somebody unbanned was not let in');
+  // (a mod not online loses the role by name: once refused, until 2026-10-19's "I cannot demote someone i made admin bc
+  // theyre offline"; and somebody with none, not online, is nobody to name)
+  assert.match(await ann.order('/demote Cat'), /Cat \(not online\) is no longer either/);
   assert.match(await ann.order('/demote Cat'), /Nobody online is "Cat"/);
   checks++;
   console.log('  ok  after a restart the admin is an admin and the banned are banned; a ban is of a key, not a name; one who has left can be banned; an unban lets them in');
@@ -397,6 +400,21 @@ if (ALL) await withServer(async () => {
   const roleBy = (name: string) => Object.entries(kept().roles).find(([, r]) => r.name === name);
   assert.equal(roleBy('Fay')?.[1].up, roleBy('Ann')?.[0], 'who made Fay an admin is not kept with her role');
   assert.match(await ann.order(`/god #${fay.id} off`), /Fay: god mode is off/);
+  // (and taken away while Fay is not online, by the id the panel's Roles has: 2026-10-19, "I cannot demote someone i made
+  // admin bc theyre offline". Made an admin again after, for what follows.)
+  fay.ws.close();
+  await sleep(400);
+  ann.send({ t: 'adm' });
+  await sleep(400);
+  const fayRole = last(ann, 'adm')?.roles.find((r) => r.name === 'Fay');
+  assert.ok(fayRole?.low && fayRole.id, 'an admin is not offered to take away the role of one she made');
+  assert.ok(!last(ann, 'adm')?.roles.find((r) => r.name === 'Ann')?.low, 'an admin is offered to take away her own role');
+  assert.match(await ann.order('/admin Fay'), /not online: they have to be here/);
+  assert.match(await ann.order(`/demote ${fayRole.id}`), /Fay \(not online\) is no longer either/);
+  assert.equal(roleBy('Fay'), undefined, 'the role of an admin not online was not taken away');
+  assert.ok(await fay.join(), 'Fay could not come back');
+  assert.equal(last(fay, 'role')?.role ?? null, null, 'Fay came back with the role taken from her');
+  assert.match(await ann.order(`/admin #${fay.id}`), /Fay is an admin/);
   checks++;
   console.log('  ok  somebody made an admin leaves nothing when they die until they choose to; admins see the vanished; an admin puts another admin\u2019s powers on, and the admin she made can do nothing against her');
 

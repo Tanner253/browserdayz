@@ -75,6 +75,15 @@ export const CARRY_KEPT = new Map<string, Pick<Client['power'], CarryPower>>();
 export const POWERS_KEPT = new Map<string, Client['power']>();
 export const keepPowers = (c: Client) => void POWERS_KEPT.set(keyHash(c.key), { ...c.power });
 
+/** a role as the panel's Roles names it: `r:` and the start of the key's hash it is kept under */
+export const roleId = (k: string) => `r:${k.slice(0, 16)}`;
+/** the key's hash of the one role a word names (its roleId, or the name it was given under), or null */
+function roleKey(word: string): string | null {
+  const roles = ADMIN.state.roles, w = word.toLowerCase();
+  const hits = /^r:[0-9a-f]{6,}$/i.test(word) ? Object.keys(roles).filter((k) => k.startsWith(w.slice(2))) : Object.keys(roles).filter((k) => roles[k].name.toLowerCase() === w);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 export function carryKept(c: Client) {
   if (c.power.weightless || c.power.endless || c.power.bottomless) CARRY_KEPT.set(c.key, { weightless: c.power.weightless, endless: c.power.endless, bottomless: c.power.bottomless });
   else CARRY_KEPT.delete(c.key);
@@ -586,8 +595,29 @@ export async function command(c: Client, line: string) {
     case 'demote':
     case 'deop': {
       if (!admin) return need();
-      const t = whoIs(who);
-      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): they have to be here to be given a role, or to lose one.`);
+      // (somebody with a role named by the key it is kept under, `r:` and its start as the panel's Roles sends it, or by
+      // their name: online, as anybody named is; not online, taken away or an admin's made a mod's all the same. The
+      // owner, 2026-10-19: "I cannot demote someone i made admin bc theyre offline". Made an admin only when here.)
+      const named = whoIs(who), rk = named ? null : roleKey(who);
+      const t = named ?? (rk ? [...clients.values()].find((o) => keyHash(o.key) === rk) ?? null : null);
+      if (!t && rk) {
+        const r = ADMIN.state.roles[rk], mine = keyHash(c.key);
+        if (rk === mine) return void sys(c, 'Not yourself: somebody else has to.');
+        if (cmd === 'admin' || cmd === 'op') return void sys(c, `${r.name} is not online: they have to be here to be made an admin.`);
+        if (r.role === 'mod' && cmd === 'mod') return void sys(c, `${r.name} is a mod already.`);
+        if (!over(mine, rk)) return above(r.name);
+        const roles = { ...ADMIN.state.roles };
+        if (cmd === 'mod') roles[rk] = { role: 'mod', name: r.name, by: c.name, up: mine, at: new Date().toISOString() };
+        else delete roles[rk];
+        log(`[admin] ${c.name} made ${r.name} ${cmd === 'mod' ? 'mod' : 'nothing'} (offline)`);
+        const kept = await saveAdmin({ roles, bans: ADMIN.state.bans });
+        // (and nothing of an admin's waits for them to come back to)
+        POWERS_KEPT.delete(rk);
+        for (const k of [...ADMIN.voids.keys()]) if (keyHash(k) === rk) ADMIN.voids.delete(k);
+        for (const k of [...CARRY_KEPT.keys()]) if (keyHash(k) === rk) CARRY_KEPT.delete(k);
+        return void sys(c, `${r.name} (not online) is ${cmd === 'mod' ? 'a mod' : 'no longer either'}.${savedWords(kept)}`);
+      }
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is), and nobody with a role is: they have to be here to be given one.`);
       const key = keyHash(t.key), roles = { ...ADMIN.state.roles }, was = roleOf(t) === 'admin';
       const to: Role | null = cmd === 'mod' ? 'mod' : cmd === 'demote' || cmd === 'deop' ? null : 'admin';
       if (t === c && to !== 'admin') return void sys(c, 'Not yourself: somebody else has to.');

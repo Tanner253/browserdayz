@@ -504,7 +504,9 @@ export interface AdminLists {
   bans: { n: number; id?: string; name: string; why: string; by: string; at: string }[];
   /** whoever was turned away at the door lately (newest first), for the panel's Pardon button (`/pardon p:<id>`): an admin's alone. Not said by a server from before protocol 44 */
   turned?: { id: number; name: string; why: string; mins: number; dev?: string }[];
-  roles: { name: string; role: 'admin' | 'mod'; by: string; at: string }[];
+  /** `id`: `r:` and the start of its key's hash, what `/demote` takes for somebody not online; `low`: this admin is above
+   * it and may take it away (neither said by a server from before 2026-10-19) */
+  roles: { name: string; role: 'admin' | 'mod'; by: string; at: string; id?: string; low?: true }[];
   /** what the server's own checks are set to */
   checks: string;
   /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */

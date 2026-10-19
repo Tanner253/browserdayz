@@ -1545,14 +1545,23 @@ export class AdminUI {
   private roles(): HTMLElement[] {
     const list = el('div', 'adm-table roles');
     const head = el('div', 'adm-tr head');
-    for (const h of ['Name', 'Role', 'Given by', 'On']) head.append(el('span', '', h));
+    for (const h of ['Name', 'Role', 'Given by', 'On', '']) head.append(el('span', '', h));
     list.append(head);
     for (const r of this.lists.roles) {
       const row = el('div', 'adm-tr');
       for (const c of [r.name, r.role, r.by, r.at]) row.append(el('span', '', c));
+      // (taken away here, online or not, from whoever this admin is above: the owner, 2026-10-19, "as an admin i should be
+      // able to click offline admins via the role panel to un admin someone, assuming i am above them")
+      const act = el('span', 'adm-acts');
+      if (r.low && r.id) {
+        if (r.role === 'admin') act.append(this.grave(`mod:${r.id}`, 'Make a mod', () => this.send(`/mod ${r.id}`), 'star'));
+        act.append(this.grave(`demote:${r.id}`, 'Take their role', () => this.send(`/demote ${r.id}`), 'x'));
+        for (const b of act.children) b.classList.add('small');
+      }
+      row.append(act);
       list.append(row);
     }
     if (!this.lists.roles.length) list.append(el('div', 'adm-none', 'Nobody has a role.'));
-    return [list, el('div', 'dim', 'A role is given and taken away from a player’s own page: pick them on the left. They have to be online.')];
+    return [list, el('div', 'dim', 'A role is given from a player’s own page (pick them on the left: they have to be online), and taken away there or here, from anybody you are above, online or not.')];
   }
 }
