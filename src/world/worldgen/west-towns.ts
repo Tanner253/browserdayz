@@ -119,7 +119,65 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
     out.props.push({ kind: th.kind, x, y: padY + moundAt(t, th.x, th.z) + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
   }
+  for (const l of townLamps(t)) {
+    const [x, z] = townPoint(t, l.x, l.z);
+    out.props.push({ kind: 'street_lamp_01', x, y: padY + moundAt(t, l.x, l.z), z, rot: t.rot + l.rot, scale: 1 });
+  }
   out.slabs.push(...placedSlabs(t));
+}
+
+/** how far apart a town's street lamps stand along a lane, and how far out from its edge */
+const LAMP = { every: 22, out: 1.4, apart: 13 };
+
+/**
+ * Street lamps down a town's lanes, either side by turns (the owner, 2026-10-19: "i think we need to add some lights to
+ * each of the towns, at night you cant really tell where to go especially as a fresh spawn"): the village's lamp, lit
+ * from dusk and seen as a point of light from far off (src/game/game/drops.ts). Never in a building, by a thing, in the
+ * water or off the pad. In the town's frame: where each stands, and its turn (its arm over the lane).
+ */
+export function townLamps(t: Town): { x: number; z: number; rot: number }[] {
+  const ground = townGround(t), out: { x: number; z: number; rot: number }[] = [];
+  // (a swamp's water is shallow, a lamp stands in it, as the drowned hamlet's houses do; a lake's is not)
+  const homes = townBuildings(t), things = townThings(t), water = ground.water && !ground.water.swamp ? ground.water.outline : undefined;
+  const wet = (x: number, z: number) => {
+    if (!water) return false;
+    let inside = false;
+    for (let i = 0, j = water.length - 1; i < water.length; j = i++) {
+      const [xi, zi] = water[i], [xj, zj] = water[j];
+      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const clear = (x: number, z: number) =>
+    Math.abs(x) < t.pad[0] - 1 && Math.abs(z) < t.pad[1] - 1 && !wet(x, z) &&
+    !homes.some((s) => {
+      const [w, d] = BUILDING_FOOTPRINT[s.type], c = Math.cos(s.rot), sn = Math.sin(s.rot), dx = x - s.x, dz = z - s.z;
+      return Math.abs(dx * c - dz * sn) < w / 2 + 1.2 && Math.abs(dx * sn + dz * c) < d / 2 + 1.2;
+    }) &&
+    !things.some((th) => Math.hypot(th.x - x, th.z - z) < 2.5) && !out.some((o) => Math.hypot(o.x - x, o.z - z) < LAMP.apart);
+  let side = 1;
+  // (and beside the boardwalks, where those are the town's ways: the drowned hamlet has no lane)
+  for (const { line, w } of [...ground.lanes, ...townWalks(t).map((r) => ({ line: [r.a, r.b], w: 2 }))]) {
+    let walked = 0, next = LAMP.every / 3;
+    for (let q = 0; q + 1 < line.length; q++) {
+      const [ax, az] = line[q], [bx, bz] = line[q + 1], len = Math.hypot(bx - ax, bz - az);
+      if (len < 1e-6) continue;
+      const ux = (bx - ax) / len, uz = (bz - az) / len;
+      for (; next <= walked + len; next += LAMP.every) {
+        const k = next - walked, px = ax + ux * k, pz = az + uz * k;
+        for (const s of [side, -side]) {
+          // (out from the lane's edge on its side; turned so that its arm reaches back over the lane)
+          const x = px - uz * s * (w / 2 + LAMP.out), z = pz + ux * s * (w / 2 + LAMP.out);
+          if (!clear(x, z)) continue;
+          out.push({ x, z, rot: Math.atan2(ux, uz) + (s > 0 ? -Math.PI / 2 : Math.PI / 2) });
+          side = -s;
+          break;
+        }
+      }
+      walked += len;
+    }
+  }
+  return out;
 }
 
 /** a town as the world keeps it */

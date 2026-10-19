@@ -440,6 +440,12 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   const ground = (x: number, z: number) => heightAt(heights, x, z);
   for (const { piece, place } of ruinsPlan(kalat)) tools.props.push(...ruinProps(piece, place, ground));
   tools.pois.push({ name: PLAN.kalat.name, x: kalat.x, z: kalat.z, radius: 240 });
+  // ---- LAMPS DOWN THE ROADS OFF THE BEACH: the main road up to Peski, the coast track to Bereg, the road's end at Mys. The
+  // desert rises from the beach and hides the towns from where everybody starts; at night these show the way inland
+  // (the owner, 2026-10-19: "at night you cant really tell where to go especially as a fresh spawn")
+  for (const [p, from, run] of [[main.points, 'end', 280], [ways[9].points, 'start', 400], [kalatSouth.points, 'end', 150]] as [Float32Array, 'start' | 'end', number][]) {
+    for (const l of roadLamps(p, from, run, R.branch, (x, z) => PLACED.some((t) => offPad(t, x, z) < 4) || inWater(x, z) || tools.buildings.some((b) => Math.hypot(b.x - x, b.z - z) < 9))) tools.props.push({ ...l, y: ground(l.x, l.z) });
+  }
 
   // ---- THE TREES
   // The rim's woods down the fall, by the rule the square's own rim is planted by (its grid carried on west, its
@@ -716,4 +722,32 @@ function cutBunker(heights: Float32Array, surface: Float32Array, site: Site, too
   span(X, (_x, _z, i) => { surface[i] = heights[i]; });
   span(R, (x, z, i) => { const [r, f] = local(x, z); if (Math.abs(r) <= B.pit.r && f >= B.pit.back && f <= B.pit.front) heights[i] = floorY - B.depth - 0.3; });
   yard.push({ x: bx, z: bz, rot });
+}
+
+/** a line of points (x, y, z) the other way round */
+function flipped(p: Float32Array): Float32Array {
+  const out = new Float32Array(p.length), n = p.length / 3;
+  for (let i = 0; i < n; i++) out.set(p.subarray((n - 1 - i) * 3, (n - i) * 3), i * 3);
+  return out;
+}
+
+/**
+ * Street lamps down a road, either side by turns, every 30 m of `run` metres of it from its start or its end; never
+ * where `skip` says (a town, which has its own, water, a building).
+ */
+function roadLamps(p: Float32Array, from: 'start' | 'end', run: number, width: number, skip: (x: number, z: number) => boolean): { kind: string; x: number; z: number; rot: number; scale: number }[] {
+  const pts = from === 'start' ? p : flipped(p), n = pts.length / 3, out: { kind: string; x: number; z: number; rot: number; scale: number }[] = [];
+  let walked = 0, next = 12, side = 1;
+  for (let i = 0; i + 1 < n && walked < run; i++) {
+    const ax = pts[i * 3], az = pts[i * 3 + 2], bx = pts[i * 3 + 3], bz = pts[i * 3 + 5], len = Math.hypot(bx - ax, bz - az);
+    if (len < 1e-6) continue;
+    const ux = (bx - ax) / len, uz = (bz - az) / len;
+    for (; next <= walked + len && next <= run; next += 30) {
+      const k = next - walked, x = ax + ux * k - uz * side * (width / 2 + 1.6), z = az + uz * k + ux * side * (width / 2 + 1.6);
+      if (!skip(x, z)) out.push({ kind: 'street_lamp_01', x, z, rot: Math.atan2(ux, uz) + (side > 0 ? -Math.PI / 2 : Math.PI / 2), scale: 1 });
+      side = -side;
+    }
+    walked += len;
+  }
+  return out;
 }

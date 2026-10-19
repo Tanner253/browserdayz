@@ -36,6 +36,9 @@ import { castleDark } from '../../sim/castle';
 import { HELI } from '../../sim/heli';
 import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEARCHLIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
 
+/** how far off a lit street lamp is seen, metres: within the camera's reach (1800) */
+const LAMP_SEEN = 1600;
+
 export const dropsMethods = {
   // ------------------------------------------------------------ supply drops
 
@@ -469,8 +472,10 @@ export const dropsMethods = {
         this.lamps.beam(_lampPos.set(0, L.y, L.z).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5, 0);
         for (const side of [-1, 1]) this.lamps.flare(_lampPos.set(side * L.x, L.y, L.z + 0.06).applyQuaternion(j.quat).add(j.pos), _lampDir, 1);
       }
-      // the street lamps of the village, from dusk
-      for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);
+      // the street lamps of the village and the towns, from dusk: a point of light from as far off as the eye sees (the
+      // owner, 2026-10-19: "at night you cant really tell where to go especially as a fresh spawn"). Only the nearest
+      // few light the ground (see Lamps): the rest are their glare, and no more.
+      for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < LAMP_SEEN * LAMP_SEEN) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22, 1);
     }
     // (alone, this game keeps the door as a server would: open while it is in there, shut a minute after it has gone)
     if (!this.online && this.bunker.open) {

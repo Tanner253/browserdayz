@@ -29,7 +29,7 @@ const SHAFTS = 4;
 const BEAM = { power: 170, reach: 75, half: 0.36, soft: 0.7 };
 
 interface Beam { pos: THREE.Vector3; dir: THREE.Vector3; power: number; wide: number; glare: number; d2: number }
-interface Glow { pos: THREE.Vector3; color: THREE.Color; power: number; reach: number; d2: number }
+interface Glow { pos: THREE.Vector3; color: THREE.Color; power: number; reach: number; far: number; d2: number }
 interface Flare { pos: THREE.Vector3; dir: THREE.Vector3; power: number }
 
 const _v = new THREE.Vector3();
@@ -230,12 +230,13 @@ export class Lamps {
   }
 
   /** This frame, a lamp that shines all round: a street lamp, a bulb on a wall. @param power 1 is a street lamp */
-  glow(pos: THREE.Vector3, color: THREE.Color, power = 1, reach = 20) {
-    const w = (this.glows[this.nGlows] ??= { pos: new THREE.Vector3(), color: new THREE.Color(), power: 1, reach: 20, d2: 0 });
+  glow(pos: THREE.Vector3, color: THREE.Color, power = 1, reach = 20, far = 0) {
+    const w = (this.glows[this.nGlows] ??= { pos: new THREE.Vector3(), color: new THREE.Color(), power: 1, reach: 20, far: 0, d2: 0 });
     w.pos.copy(pos);
     w.color.copy(color);
     w.power = power;
     w.reach = reach;
+    w.far = far;
     this.nGlows++;
   }
 
@@ -320,7 +321,9 @@ export class Lamps {
       const facing = _v.copy(eye).sub(f.pos).normalize().dot(f.dir);
       put(f.pos, d2, 1, 0.94, 0.8, f.power * Math.max(0, (facing - 0.3) / 0.7) * Math.min(1, Math.max(0, (d - 7) / 18)) * 1.5);
     }
-    for (const w of glows) put(w.pos, w.d2, w.color.r, w.color.g, w.color.b, 0.55 * w.power);
+    // (a street lamp's the brighter the further off, to two and a half times from 450 m: what a town is seen by at night from
+    // across the desert, the owner, 2026-10-19, "at night you cant really tell where to go especially as a fresh spawn")
+    for (const w of glows) put(w.pos, w.d2, w.color.r, w.color.g, w.color.b, 0.55 * w.power * (1 + w.far * Math.min(1.6, Math.max(0, (Math.sqrt(w.d2) - 60) / 250))));
     this.glare.count = n;
     this.glare.instanceMatrix.needsUpdate = true;
     this.glareColor.needsUpdate = true;
