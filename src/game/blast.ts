@@ -109,16 +109,18 @@ const TIER = { full: 70, some: 220, none: 900, thrownTo: 95, atOnce: 2 };
  *   flames  – for fuel: little fires left burning on the ground for a few seconds
  */
 const KIND = {
+  // (a frag's and a 40 mm round's: their fire half again as big and twice as long, lit while it lasts. At a fifth of a
+  // second it was gone before it was seen: the owner, 2026-10-19, "m32 explosion and maybe grenades are missing the fire")
   grenade: {
     flash: [1.5, 2.5],
-    fire: { n: 7, r: [0.3, 1.2], life: [0.2, 0.34], out: 5, rise: 2.6, lift: 0, over: 0.03, heat: 1.7 },
+    fire: { n: 11, r: [0.45, 1.9], life: [0.45, 0.75], out: 5, rise: 3, lift: 1, over: 0.08, heat: 1.7 },
     smoke: { n: 9, r: [0.55, 2.7], life: [3.0, 4.4], out: 3.2, up: [3.5, 7.5], lift: 0.9, dark: 0.11, pale: 0.21, lit: 0.28, litFor: 0.14, over: [0.03, 0.15] },
     column: null as null | { n: number; r: number[]; life: number[]; up: number; over: number[]; from: number },
     dust: { n: 10, reach: 5, r: [0.45, 1.5], life: [1.5, 2.5] },
     ring: 4.2, shock: [4, 0.13],
     spray: 3, embers: 2, sparks: { n: 14, speed: [11, 26], life: [0.22, 0.6] },
     thrown: 0.7, burn: 2.0,
-    light: { flash: 260, fast: 0.2, ball: 0, ballFor: 0, reach: 30, color: [1, 0.72, 0.4] },
+    light: { flash: 260, fast: 0.2, ball: 70, ballFor: 0.5, reach: 30, color: [1, 0.72, 0.4] },
     shake: 0.02, flames: 0,
   },
   drum: {
