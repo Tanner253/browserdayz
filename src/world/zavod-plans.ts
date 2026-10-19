@@ -30,16 +30,19 @@ export function hallPlan(): Blueprint {
   const g = new Floor();
   // the machine floor: three machines down the middle, benches and racks along the back, what was being loaded by the garages
   for (const x of [-9, -1, 7]) g.put('bunker_machine', x, -0.4, 0).floor([x, 1.4]);
-  g.top('steel_table', -13.5, -5.6, Q, 0.8, 2).top('steel_table', -4.5, -5.6, Q, 0.8, 2).top('lab_counter', 3.0, -6.6, 0, 0.9, 2);
-  g.put('rack_wide', -16.6, -2.0, Q).put('rack_wide', -16.6, 1.2, Q);
+  // (the counter against the blank bay of the back wall, the racks against the west wall either side of its door: the
+  // counter stood across the back door, and a rack in the west door's swing)
+  g.top('steel_table', -13.5, -5.6, Q, 0.8, 2).top('steel_table', -4.5, -5.6, Q, 0.8, 2).top('lab_counter', 10.5, -6.98, 0, 0.9, 2);
+  g.put('rack_wide', -17.47, -3.0, Q).put('rack_wide', -17.47, 3.0, Q);
   g.put('crate_big', -12.6, 5.6, 0.2).put('crate_big', -11.4, 5.9, 0.1).put('wooden_crate_01', -13.4, 4.4, 0.6).put('Barrel_01', 9.6, 5.8).put('barrel_03', 10.4, 6.3).put('Barrel_01', 11.1, 5.6);
-  g.put('old_tyre', 12.0, -6.6, 0.3).put('metal_jerrycan_green', 11.2, -6.7, 1.2).put('utility_box_01', 17.4, 2.0, -Q);
+  g.put('old_tyre', 12.0, -6.6, 0.3).put('metal_jerrycan_green', 11.75, -7.1, 1.2).put('utility_box_01', 17.55, 1.3, -Q);
   g.floor([-14.6, 3.8], [-6.2, 4.4], [2.6, 5.6], [10.6, 3.2], [-15.6, -6.4], [0.4, -3.2], [12.6, -4.6]);
   // above: the drawing office to the west, the stores to the east behind a wall with a door
   const u = new Floor();
   for (const x of [-15, -11, -7, -3]) u.top('metal_office_desk', x, 4.6, PI, 0.79).put('SchoolChair_01', x, 3.6, 0.2);
   u.put('steel_locker', -17.3, -4.0, Q).put('steel_locker', -17.3, -2.9, Q).top('WoodenTable_01', -8, -4.4, 0, 0.57, 2);
-  u.shelves(3.0, -6.6, 0).shelves(6.0, -6.6, 0).shelves(9.0, -6.6, 0).put('wooden_military_crate', 4.2, 4.8, 0.3).put('cardboard_box_01', 6.4, 5.4, 1.1).put('cardboard_box_01', 6.8, 5.0, 0.4);
+  // (the stores' shelves back to the wall, on its blank bays and not before its windows)
+  u.shelves(1.6, -7.03, 0).shelves(6.6, -7.03, 0).shelves(8.4, -7.03, 0).put('wooden_military_crate', 4.2, 4.8, 0.3).put('cardboard_box_01', 6.4, 5.4, 1.1).put('cardboard_box_01', 6.8, 5.0, 0.4);
   u.floor([-12.6, 0.4], [-4.0, 1.6], [5.4, 1.0], [9.8, 4.6], [1.6, 3.0]);
   const well = { x0: 13.4, x1: 16.6, land: -2.2, far: -6.6, upTo: 1 };
   const levels: Level[] = [{
@@ -88,12 +91,16 @@ export function officePlan(): Blueprint {
   // the guard's room by the door, the canteen behind
   g.top('metal_office_desk', -6.6, 4.6, PI, 0.79).put('SchoolChair_01', -6.6, 3.6, 0.3).put('steel_locker', -8.4, 1.2, Q).put('Television_01', -7.9, 5.4, PI);
   for (const x of [2.4, 6.0]) g.top('WoodenTable_01', x, -2.6, 0, 0.57, 2).put('painted_wooden_chair_01', x - 0.6, -1.8, 2.9).put('painted_wooden_chair_01', x + 0.6, -3.4, 0.2);
-  g.put('electric_stove', 8.4, -5.3, 0).top('lab_counter', 6.0, -5.4, 0, 0.9, 1);
+  // (the stove and the counter on the canteen's blank walls, out of its windows)
+  g.put('electric_stove', 8.47, -1.6, -Q).top('lab_counter', 4.5, -5.48, 0, 0.9, 1);
   g.floor([-6.0, 2.0], [-1.2, 2.6], [4.2, 0.6], [-5.0, -3.8]);
+  g.put('painted_wooden_cabinet', -4.2, -5.47, 0).put('Shelf_01', -5.6, -5.67, 0).put('painted_wooden_bench', -8.55, -1.5, Q);
   const u = new Floor();
-  u.top('metal_office_desk', 5.2, -3.8, 0, 0.79, 2).put('painted_wooden_chair_01', 5.2, -2.8, PI).case('wooden_bookshelf_worn', 8.6, 1.6, -Q, [0.4, 1.0, 1.55]);
-  u.top('metal_office_desk', -6.0, 4.6, PI, 0.79).top('metal_office_desk', -3.2, 4.6, PI, 0.79).put('steel_locker', -8.5, -4.6, Q).put('steel_locker', -8.5, -3.5, Q);
+  // (the bookcase and the lockers between the windows: every bay of these walls has one)
+  u.top('metal_office_desk', 5.2, -3.8, 0, 0.79, 2).put('painted_wooden_chair_01', 5.2, -2.8, PI).case('wooden_bookshelf_worn', 8.5, 3.0, -Q, [0.4, 1.0, 1.55]);
+  u.top('metal_office_desk', -6.0, 4.6, PI, 0.79).top('metal_office_desk', -3.2, 4.6, PI, 0.79).put('steel_locker', -8.52, -3.0, Q).put('steel_locker', -8.52, 0, Q);
   u.floor([6.4, 0.2], [-4.6, 1.8], [-6.4, -2.6], [2.0, 4.2]);
+  u.put('SchoolChair_01', -6.0, 3.7, 0.15).put('SchoolChair_01', -3.2, 3.7, -0.2).put('GreenChair_01', 4.6, -4.95, 0.2).put('GreenChair_01', 5.9, -4.95, -0.2);
   const well = { x0: -2.4, x1: 0.8, land: -0.8, far: -5.3 };
   const levels: Level[] = [{
     h: STOREY_H, int: 'int_painted', floor: 'floor_lino',
@@ -133,13 +140,17 @@ export function flatsPlan(): Blueprint {
   // (the stair behind the front door, between two walls: x -3.2 to 0.2; a flat to the west of it and one to the east)
   const SW = -3.2, SE = 0.2;
   const flat = (f: Floor, n: number) => {
-    // west: the kitchen at the front, the bedroom behind a wall
-    f.put('electric_stove', -11.3, 3.6, -Q).top('WoodenTable_01', -8.6, 2.6, 0, 0.57, 2).put('painted_wooden_chair_01', -8.0, 1.8, 2.8);
-    f.bed(-10.6, -2.6, 0).put('painted_wooden_cabinet', -5.0, -3.8, 0).floor([-6.4, 0.4], [-9.6, 0.8]);
+    // west: the kitchen at the front, the bedroom behind a wall. (The stove stood facing the wall; the shelves and the
+    // cabinets before windows, and the beds out from the wall their heads were to.)
+    f.put('electric_stove', -11.47, 0.2, Q).top('WoodenTable_01', -8.6, 2.6, 0, 0.57, 2).put('painted_wooden_chair_01', -8.0, 1.8, 2.8);
+    f.bed(-10.6, -3.28, 0).put('painted_wooden_cabinet', -4.6, -1.62, PI).floor([-6.4, 0.4], [-9.6, 0.8]);
     // east: a long room and a bedroom at its end
-    f.top('WoodenTable_01', 3.6, 2.8, 0.1, 0.57, 2).put('painted_wooden_chair_01', 2.8, 2.0, 0.4).case('Shelf_01', 4.4, -3.95, 0, [0.66, 1.22]);
-    f.bed(9.8, -2.4, 0).put('painted_wooden_cabinet', 11.2, 2.8, -Q).floor([4.4, -1.0], [9.0, 1.6]);
-    if (n % 2) f.put('cardboard_box_01', -6.6, 3.4, 0.6).put('vintage_suitcase', 7.4, 3.6, 1.2);
+    f.top('WoodenTable_01', 3.6, 2.8, 0.1, 0.57, 2).put('painted_wooden_chair_01', 2.8, 2.0, 0.4).case('Shelf_01', 5.77, -3.3, -Q, [0.66, 1.22]);
+    f.bed(9.8, -3.28, 0).put('painted_wooden_cabinet', 6.4, -2.7, Q).floor([4.4, -1.0], [9.0, 1.6]);
+    if (n % 2) f.put('cardboard_box_01', -4.2, 3.9, 0.6).put('vintage_suitcase', 6.24, -1.0, Q);
+    f.put('sofa_02', 5.42, -1.0, -Q).put('painted_wooden_nightstand', 0.56, -1.0, Q).put('Television_01', 0.56, -1.0, Q, 0.62).put('GreenChair_01', 2.6, -3.2, -1.0);
+    f.put('painted_wooden_cabinet', -11.5, 1.2, Q).put('painted_wooden_shelves', -3.3, -0.4, -Q).put('painted_wooden_chair_01', -9.2, 3.4, PI - 0.3);
+    f.put('painted_wooden_nightstand', 10.65, -4.0, 0).put('painted_wooden_nightstand', -9.8, -4.0, 0).put('wooden_bookshelf_worn', 11.51, 1.25, -Q);
     return f;
   };
   const walls = (floor: number) => [

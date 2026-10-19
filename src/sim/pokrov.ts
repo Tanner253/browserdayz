@@ -80,7 +80,7 @@ export function pokrovThings(): TownThing[] {
     { kind: 'crate_big', x: -1.0, z: 47.5, rot: 0.2 }, { kind: 'crate_big', x: 0.1, z: 48.2, rot: 0.1 }, { kind: 'Barrel_01', x: 10.6, z: 47.2, rot: 0 }, { kind: 'barrel_03', x: 11.4, z: 48.0, rot: 0.5 },
     { kind: 'concrete_road_barrier', x: 5, z: 33, rot: 0.1 },
     { kind: 'wooden_crate_01', x: -38.4, z: 59.4, rot: 0.3 }, { kind: 'Barrel_01', x: -50.6, z: 69.2, rot: 0 }, { kind: 'trashbag', x: 39.5, z: 59.6, rot: 0.8 },
-    { kind: 'old_tyre', x: 60.4, z: 69.0, rot: 0.2 }, { kind: 'covered_car', x: -78, z: 64, rot: Q + 0.05 },
+    { kind: 'old_tyre', x: 62.6, z: 69.4, rot: 0.2 }, { kind: 'covered_car', x: -78, z: 64, rot: Q + 0.05 },
   );
   return out;
 }

@@ -1525,6 +1525,16 @@ export const MODELS = {
   metal_office_desk: { res: '1k', tex: 1024, budget: 5000, far: 400, tags: ['furniture'] },
   Television_01: { res: '1k', tex: 512, budget: 1918, far: 300, tags: ['furniture'] },
   electric_stove: { res: '1k', tex: 512, budget: 5000, far: 400, tags: ['furniture'] },
+  // (2026-10-19, the west's rooms dressed: "some of the buildings look unnatural or hollow with no decoration". The
+  // painted set the chairs, table and cabinet are of; a candlestick for the church and the chapel; a sofa and an
+  // armchair for the flats)
+  painted_wooden_bench: { res: '1k', tex: 1024, budget: 630, far: 200, tags: ['furniture'] },
+  painted_wooden_nightstand: { res: '1k', tex: 512, budget: 470, far: 200, tags: ['furniture'] },
+  painted_wooden_shelves: { res: '1k', tex: 1024, budget: 524, far: 200, tags: ['furniture'] },
+  painted_wooden_stool: { res: '1k', tex: 512, budget: 676, far: 200, tags: ['furniture'] },
+  wooden_candlestick: { res: '1k', tex: 512, budget: 1600, far: 100, tags: ['furniture'] },
+  sofa_02: { res: '1k', tex: 1024, budget: 2728, far: 300, tags: ['furniture'] },
+  GreenChair_01: { res: '1k', tex: 1024, budget: 4213, far: 300, tags: ['furniture'] },
 
   // nature
   rock_moss_set_01: { res: '1k', tex: 1024, budget: 40000, far: 6000, tags: ['nature'] },
