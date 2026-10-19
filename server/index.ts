@@ -1158,6 +1158,8 @@ loadAdmin();
 void loadKept();
 
 let stopping = false;
+/** is this server on its way out: its last word is being written, and nothing more it does is kept */
+export const stoppingNow = () => stopping;
 
 /**
  * A server that has been the one the world reaches, and now finds another answering there, has been replaced: a

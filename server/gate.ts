@@ -565,18 +565,23 @@ export const roleOf = (c: Client): Role | null => (LOCAL_ADMIN ? 'admin' : ADMIN
  * password stands over every role but another by the password. A role given before then says who gave it by name only,
  * and is followed up by that name.
  */
+/** when roles began to say who gave them (`up`): one given before says it by name */
+const RANKS_FROM = '2026-10-19T03:30:00.000Z';
 export function over(me: string, them: string): boolean {
   const roles = ADMIN.state.roles;
   if (LOCAL_ADMIN || me === them || !roles[them]) return true;
   if (!roles[me]) return false;
-  const top = (k: string) => roles[k]?.by === 'password' && !roles[k].up;
+  // (a password role is marked by its own hash for who gave it, which no player's name can be; one from before the marks
+  // by the word alone, given before the old server could hand out another's role under the name "password")
+  const top = (k: string) => roles[k]?.role === 'admin' && roles[k].by === 'password' && (roles[k].up === k || (!roles[k].up && roles[k].at < RANKS_FROM));
   if (top(them)) return false;
   const seen = new Set<string>();
   for (let k: string | undefined = them; k && !seen.has(k); ) {
     seen.add(k);
     const r: AdminState['roles'][string] | undefined = roles[k];
     const by = r?.by.toLowerCase();
-    const up: string | undefined = r?.up ?? (by && by !== 'password' ? Object.keys(roles).find((x) => x !== k && roles[x].name.toLowerCase() === by) : undefined);
+    // (an old role's giver, by name, among the old roles given before it: nobody made since can take a name into an old line)
+    const up: string | undefined = r?.up === k ? undefined : r?.up ?? (by && by !== 'password' ? Object.keys(roles).find((x) => x !== k && !roles[x].up && roles[x].at <= r.at && roles[x].name.toLowerCase() === by) : undefined);
     if (up === me) return true;
     k = up;
   }

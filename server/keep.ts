@@ -267,7 +267,8 @@ function takeInLate(save: KeptFile) {
   seen.restore(snap.seen);
   elite.restore(snap.elite);
   takePowers(snap.powers);
-  takeTags(snap.tags);
+  // (from a last word only: see loadKept)
+  if (save.final) takeTags(snap.tags);
   const moved = snap.rev !== WORLD_REV, now = Date.now();
   layBodies(snap.bodies, moved);
   const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
@@ -561,7 +562,11 @@ export async function loadKept() {
     seen.restore(snap.seen);
     elite.restore(snap.elite);
     takePowers(snap.powers);
-    takeTags(snap.tags);
+    // (Whose tags were whose only from a last word, written as the server stopped and after its last cash-in. Any
+    // other copy is from before cash-ins it never saw: the pockets it gives back still hold a tag cashed and paid
+    // since, and with its record that tag would be paid again. From such a copy a tag is carried for nothing, as
+    // every tag was before tags were kept.)
+    if (save.final) takeTags(snap.tags);
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? `; the map has been made again since, so ${[...KEPT.chars.values()].filter((r) => r.afresh).length} who stood where it was remade start from the edge with what they had` : ''}`);
   } catch (e) {
     // (what could be taken in has been: it is not thrown away for the sake of what could not)

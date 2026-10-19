@@ -16,7 +16,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
 import { moundAt } from '../src/sim/towns';
-import { SQUARE_HALF, generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
+import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
 const SQ = 769, HALF = 768, CELL = 2;
 const W = WG as unknown as Record<string, number> & typeof WG;
@@ -53,7 +53,8 @@ const prints = {
   rocks: print(world.rocks.filter(east)),
   props: print(world.props.filter(east)),
   buildings: print(world.buildings.filter((b) => east(b) && Math.hypot(b.x - WAS_T.x, b.z - WAS_T.z) > 80)),
-  spawns: print([world.spawns.filter(east), world.spawnRing]),
+  // (the ring alone since 2026-10-18: the starts handed out are on the west beach, see below; the ring is held as it was by test/expansion.test.ts)
+  spawns: print([world.spawnRing]),
   roads: print(roadsEast(world)),
   rest: print([world.bridges, world.paths, world.worn, world.wreck, world.walls, world.gatehouse, world.castle, world.pois.filter((p) => east(p) && p.name !== BUNKER.name && p.name !== 'Trading Post'), world.sites.filter((p) => east(p) && p.kind !== 'bunker' && p.kind !== 'market'), world.solids]),
 };
@@ -67,7 +68,7 @@ const ok = (what: string) => { checks++; console.log(`  ok  ${what}`); };
 // --- the east half of today's map as it was (prints taken 2026-10-16 off f1d0ca0, the last tree with the square alone)
 const WAS = {
   heights: '4fd34df70b1161bf', surface: '6465e5e0e9449e2b', splat: '5bfdf1b818379f3a', grass: '88229d83ee6f64b8', trees: 'ef7e372692c689f1', rocks: '8e6656ab18f30a00',
-  props: 'a5d0512c8234be5a', buildings: '3f0394645ba713f3', spawns: 'a4dd04bfc4d1ef94', roads: 'a502efb5b853d34f', rest: 'c507af5c93c3db81',
+  props: 'a5d0512c8234be5a', buildings: '3f0394645ba713f3', spawns: 'a8a476dff69fa1c0', roads: 'a502efb5b853d34f', rest: 'c507af5c93c3db81',
 };
 for (const [k, v] of Object.entries(WAS)) assert.equal(prints[k as keyof typeof prints], v, `the east's ${k} are not what they were`);
 ok(`the east of today's map as it was, to the byte (but within ${KEEP} m of where the bunker was): its ground, paint and grass, ${world.trees.filter(east).length} trees, ${world.rocks.filter(east).length} rocks, ${world.props.filter(east).length} props, ${world.buildings.filter(east).length} buildings, the roads, the fort, Kamenka (made in ${made.toFixed(0)} ms)`);
@@ -284,7 +285,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
 // --- THE TOWNS and KALAT
 {
   const towns = world.towns!;
-  assert.deepEqual(towns.map((t) => t.town.name), ['Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava']);
+  // (the desert's first, since 2026-10-18: src/sim/desert.ts)
+  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
@@ -306,7 +308,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
 
 // --- the roads
 {
-  const fresh = world.roads.slice(-4), river = world.water!.rivers[0].pts;
+  // (the west's, all that begin west of the square's rim: the main road first; since 2026-10-18 the desert's too)
+  const fresh = world.roads.filter((r) => r.points[0] < -600), river = world.water!.rivers[0].pts;
   for (const r of fresh) {
     const p = r.points;
     let steep = 0;
@@ -321,7 +324,7 @@ const ridge = (z: number) => RL.ridgeAt(z);
   const main = fresh[0].points, near = (p: Float32Array, x: number, z: number) => { let d = Infinity; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; };
   const mid = RL.passLine.at(RL.passLine.total / 2);
   assert.ok(near(main, -3640, 25) < 3 && near(main, mid.x, mid.z) < PLAN.pass.floor, 'the main road misses the beach or the pass');
-  ok(`four new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through Ozerki, the pass and past Zavod to the beach, to the bunker, Lipki, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
+  ok(`${fresh.length} new roads (the main one ${((main.length / 3) * 4 / 1000).toFixed(1)} km through Ozerki, the pass and past Zavod to the beach, to the bunker, Lipki, Kalat): none steeper than ${PLAN.road.steep * 100}% but into a ford, each on its bed`);
 }
 
 // --- the bunker and the trading post where they went
@@ -345,9 +348,10 @@ const ridge = (z: number) => RL.ridgeAt(z);
   for (let x = -3600; x <= -700; x += 40) for (let z = -740; z <= 740; z += 40) if (!WG.inRounds(x, z)) out++;
   assert.equal(out, 0, `${out} spots of the new land outside the Zona`);
   assert.ok(!WG.inRounds(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
-  // (no start in the west: on the beach, players began kilometres from anywhere; 2026-10-17, "revert the spawn locations back to the village")
-  assert.equal(world.spawns.filter((s) => s.x < -SQUARE_HALF).length, 0, 'a start in the west');
-  ok(`the Zona over all the new land out to the barrier; the starts the square's own, round the village (${world.spawns.length})`);
+  // (every start on the west beach since 2026-10-18, "move all player spawns to the far west coast like DAYZ does", the
+  // coast having its own first step by then: src/sim/desert.ts)
+  assert.ok(world.spawns.length >= 16 && world.spawns.every((s) => s.x > PLAN.barrier && s.x < PLAN.barrier + 100), 'a start off the west beach');
+  ok(`the Zona over all the new land out to the barrier; the starts on the west beach (${world.spawns.length})`);
 }
 
 // --- the ground bodies stand on: Rapier's heightfield of the whole world where the game lays it

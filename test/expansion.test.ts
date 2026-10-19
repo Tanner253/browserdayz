@@ -452,8 +452,9 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   // (one road; what was laid after it is streets, the village's and the hospital's drive; and after those, the loop:
   // see the last check)
   assert.ok(!world.roads[0].side && world.roads.slice(1, 5).every((r) => r.side), 'a second road that is not a street');
-  // (and since plan v5, 2026-10-16, the west's: its main road and three branches)
-  assert.equal(world.roads.length, 5 + 4 + 4);
+  // (and since plan v5, 2026-10-16, the west's: its main road and three branches; and since 2026-10-18 the desert's six,
+  // to Peski, Karavan, Blokpost and Bereg, round Kalat's south and on from Peski)
+  assert.equal(world.roads.length, 5 + 4 + 4 + 6);
   const p = world.roads[0].points, n = p.length / 3, last = world.road.points.length - 3;
   assert.ok(Math.hypot(p[0] - world.road.points[last], p[2] - world.road.points[last + 2]) < 0.01 && Math.abs(p[1] - world.road.points[last + 1]) < 0.01, 'the new road does not begin where the old one ends');
   let nearest = 1e9, steep = 0;

@@ -51,7 +51,7 @@ for (let t = 1; t <= 5; t++) {
 console.log('\n  id                 kept (steps 1 to 5)     got                  where it lay');
 for (const id of Object.keys(TYPES)) {
   const want = [1, 2, 3, 4, 5].map((t) => eco.kept(id, t as 1));
-  const per = [1, 2, 3, 4, 5].map((t) => [...eco.loot.values()].filter((l) => l.item.id === id && l.point >= 0 && !points[l.point].keeps && !apartOf(points[l.point].building) && tierOf(l.point) === t).length);
+  const per = [1, 2, 3, 4, 5].map((t) => [...eco.loot.values()].filter((l) => l.item.id === id && l.point >= 0 && !points[l.point].keeps && !apartOf(points[l.point]) && tierOf(l.point) === t).length);
   const short = per.some((n, k) => n < want[k]);
   const w = [...(where.get(id) ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([u, k]) => `${u} ${k}`).join(', ');
   console.log(`  ${id.padEnd(18)} ${want.map((n) => String(n).padStart(3)).join(' ')}   ${per.map((n) => String(n).padStart(3)).join(' ')}${short ? ' SHORT' : '      '} ${w}`);

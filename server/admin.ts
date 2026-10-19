@@ -115,6 +115,8 @@ function carryOrder(c: Client, cmd: 'weightless' | 'ammo' | 'bottomless' | 'refi
   const t = whom ? whoIs(whom) : c;
   if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
   if (roleOf(t) !== 'admin') return void sys(c, `${t.name} is not an admin: these are an admin's.`);
+  // (bottomless put off empties their hold at their feet: no admin's to do to one above them, see `over`)
+  if (!outranks(c, t)) return void sys(c, `${t.name} is above you: only whoever made them, or somebody above that, can do that to them.`);
   const on = say ? say === 'on' : !t.power[k];
   setPower(t, k, on);
   log(`[admin] ${c.name} has put ${p.name} ${on ? 'on' : 'off'}${t === c ? '' : ` for ${t.name}`}`);

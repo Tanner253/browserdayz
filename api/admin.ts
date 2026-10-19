@@ -95,9 +95,10 @@ export async function admin(request: Request, store: Store = blobStore, game = G
     const key = hash(op.key);
     if (!key) return Response.json({ ok: false, why: 'Your game gave no key.' }, none);
     let made: string | false = held?.mark ?? '';
-    // (the password puts whoever has it at the top, whoever made them an admin before: see `over` in server/gate.ts)
-    if (state.roles[key]?.role !== 'admin' || state.roles[key].by !== 'password' || state.roles[key].up) {
-      state.roles[key] = { role: 'admin', name: text(op.name, 24), by: 'password', at: new Date().toISOString() };
+    // (the password puts whoever has it at the top, whoever made them an admin before, marked by their own hash for who
+    // gave it, which no name a player takes can be: see `over` in server/gate.ts)
+    if (state.roles[key]?.role !== 'admin' || state.roles[key].by !== 'password' || state.roles[key].up !== key) {
+      state.roles[key] = { role: 'admin', name: text(op.name, 24), by: 'password', up: key, at: new Date().toISOString() };
       made = await store.swap(FILE, state, held?.mark ?? null);
       if (made === false) return Response.json({ ok: false, why: 'The list was being written by something else: try again.' }, none);
     }

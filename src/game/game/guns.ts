@@ -174,7 +174,7 @@ export const gunsMethods = {
     } else if (def.open) act = { on: 'l', hold, text: 'Open the box', sub: `${def.open.qty} rounds` };
     else if (item.id === 'jerrycan') act = { on: 'l', hold, text: 'Pour it in', sub: this.lookedAt instanceof Jeep ? undefined : 'at a car' };
     else if (item.id === 'keycard') act = { on: 'l', hold, text: 'Put the card in', sub: 'at the reader' };
-    else if (def.use?.sips && this.wellHere() && (item.left ?? 0) < def.use.sips) act = { on: 'l', hold, text: 'Fill it at the well' };
+    else if (def.use?.sips && (item.left ?? 0) < def.use.sips && (this.wellHere() ?? this.waterHere())) act = { on: 'l', hold, text: this.wellHere() ? 'Fill it at the well' : 'Fill it here' };
     else if (def.use) {
       const word = def.use.sound === 'eat' ? 'Eat' : def.use.sound === 'drink' ? 'Drink' : def.use.sound === 'bandage' ? 'Dress the wound' : def.use.sound === 'inject' ? 'Inject' : def.use.sound === 'smoke' ? 'Smoke' : 'Use';
       act = { on: 'l', hold, text: word, sub: def.use.sips ? `${item.left ?? def.use.sips}/${def.use.sips} left` : undefined };

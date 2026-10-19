@@ -1,7 +1,9 @@
 // A dog tag carried through a restart still pays (the owner, 2026-10-18: "when the server restarts, player sshould not
 // lose their dogtags, its bad UX its not their fault"): whose it was and when its carrier picked it up are kept with
-// the world (server/tags.ts keepTags), and the time held before the restart counts. The real server, started, stopped
-// dead and started again, with a stand-in for the site on this machine (as test/keep.test.ts). Nothing is paid.
+// the world (server/tags.ts keepTags), and the time held before the restart counts. Only through a last word, written
+// as the server stops: a server stopped dead comes back from an older copy, whose pockets may hold a tag cashed and
+// paid since, and a tag through that pays nothing (and is never paid twice). The real server, started, stopped and
+// started again, with a stand-in for the site on this machine (as test/keep.test.ts). Nothing is paid.
 //   npx tsx test/tag-keep.test.ts
 
 import assert from 'node:assert/strict';
@@ -15,6 +17,7 @@ import { admin } from '../api/admin';
 import { keep } from '../api/keep';
 import type { Store } from '../api/_lib/store';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { TAG_HOLD } from '../src/sim/items';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8261, SITE = 8262, HOLD = 2;
@@ -87,16 +90,17 @@ class Player {
     this.send({ t: 's', p: [x, ground(x, z), z, 0, 0, 0], w, m: [] });
   }
   /** these tags on them, and nothing else */
-  carry(tags: { uid: string; owner: string }[]) {
+  carry(tags: { uid: string; owner: string; held?: number }[]) {
     this.send({ t: 'me', inv: { slots: {}, active: null, containers: [{ id: 'tags', items: tags.map((t, i) => ({ ...t, id: 'dogtag', qty: 1, x: i, y: 0, rot: false })) }] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
   }
 }
 
-async function withServer(play: (log: () => string) => Promise<void>) {
+/** `how` the server is stopped at the end: by a word on its input, as a host stops it (its last word is written), or dead */
+async function withServer(how: 'word' | 'dead', play: (log: () => string) => Promise<void>) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-tag-keep-'));
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'on', KEEP_EVERY_MIN: '0.04', KEEP_WAIT_S: '3', TAG_FRESH_S: '1', TAG_MIN_LIFE_S: '1', FRESH_S: '0.2', CASH_HOLD_S: String(HOLD) },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'on', KEEP_EVERY_MIN: '0.04', KEEP_WAIT_S: '3', TAG_FRESH_S: '1', TAG_MIN_LIFE_S: '1', FRESH_S: '0.2', CASH_HOLD_S: String(HOLD), STOP_BY_WORD: '1' },
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
   let logged = '';
   server.stdout!.on('data', (d) => (logged += d));
@@ -109,7 +113,12 @@ async function withServer(play: (log: () => string) => Promise<void>) {
   } catch (e) {
     failed = e;
   } finally {
-    // (stopped dead: no last word is said)
+    if (how === 'word' && !failed) {
+      server.stdin!.write('stop');
+      for (let k = 0; k < 200 && server.exitCode === null; k++) await sleep(100);
+      if (!/\[keep\] this server is stopping: .*written/.test(logged)) failed = new Error(`no last word was written as the server stopped:\n${logged.slice(-600)}`);
+    }
+    // (stopped dead, or what is left of it: no last word is said)
     server.kill();
     await sleep(600);
     try {
@@ -125,44 +134,70 @@ async function withServer(play: (log: () => string) => Promise<void>) {
 }
 
 let checks = 0;
-const ann = new Player('Ann'), dan = new Player('Dan'), eli = new Player('Eli');
-const dans = { uid: 'own-Dan', owner: 'Dan' };
+const ann = new Player('Ann'), dan = new Player('Dan'), eli = new Player('Eli'), gil = new Player('Gil');
+const dans = { uid: 'own-Dan', owner: 'Dan' }, gils = { uid: 'own-Gil', owner: 'Gil' };
 
-// ---- Ann shoots Dan dead, Eli carries his tag for its time, and what is kept is written
-await withServer(async (log) => {
-  for (const p of [ann, dan, eli]) assert.ok(await p.join(), `${p.name} was not let in:\n${log().slice(-500)}`);
+/** Ann shoots `who` dead with their tag on them, and Eli carries it (with `also`) for its time */
+async function looted(log: () => string, who: Player, tag: { uid: string; owner: string }, also: { uid: string; owner: string }[] = []) {
   ann.say(30, 0, 'mosin');
-  dan.say(31, 0);
+  who.say(31, 0);
   eli.say(34, 0);
   await sleep(1500);
-  dan.carry([dans]);
+  who.carry([tag]);
   await sleep(300);
-  for (let k = 0; k < 8 && !log().includes('Dan was killed'); k++) {
-    ann.send({ t: 'hit', to: dan.id, w: 'mosin', zone: 'torso' });
+  for (let k = 0; k < 8 && !log().includes(`${who.name} was killed`); k++) {
+    ann.send({ t: 'hit', to: who.id, w: 'mosin', zone: 'torso' });
     await sleep(900);
   }
-  assert.ok(log().includes('Dan was killed') && !log().includes('Dan left no dog tag'), `Dan was not shot dead with his tag on him:\n${log().slice(-800)}`);
-  eli.carry([dans]);
+  assert.ok(log().includes(`${who.name} was killed`) && !log().includes(`${who.name} left no dog tag`), `${who.name} was not shot dead with their tag on them:\n${log().slice(-800)}`);
+  eli.carry([...also, tag]);
   await sleep(HOLD * 1000 + 800);
   const mark = log().length;
   for (let k = 0; k < 80 && !/time has gone by/.test(log().slice(mark)); k++) await sleep(100);
   assert.ok(/time has gone by/.test(log().slice(mark)), `nothing was written to the site after he had carried it:\n${log().slice(-600)}`);
+}
+
+/** Eli, back in, cashes a tag in: what the log says of it */
+async function cashed(log: () => string, tag: { uid: string; owner: string }) {
+  eli.send({ t: 'cash', uid: tag.uid, wallet: '' });
+  for (let k = 0; k < 40 && !log().includes(`cashed in ${tag.owner}'s dog tag`); k++) await sleep(100);
+  const line = log().split('\n').find((l) => l.includes(`Eli cashed in ${tag.owner}'s dog tag`)) ?? '';
+  assert.ok(line, `the tag could not be cashed in after the restart:\n${log().slice(-800)}`);
+  return line;
+}
+
+// ---- Ann shoots Dan dead, Eli carries his tag for its time, and the server is stopped as a host stops it
+await withServer('word', async (log) => {
+  for (const p of [ann, dan, eli]) assert.ok(await p.join(), `${p.name} was not let in:\n${log().slice(-500)}`);
+  await looted(log, dan, dans);
   checks++;
   console.log('  ok  a tag taken off a man shot dead is carried for its time, and the world is written to the site');
 });
 
-// ---- started again: Eli, back in, cashes it in, and it is listed for its reward
-await withServer(async (log) => {
+// ---- started again: Eli cashes it in, and it is listed for its reward; then he carries Gil's, and the server dies
+await withServer('dead', async (log) => {
   assert.ok(await eli.join(), `Eli was not let in after the restart:\n${log().slice(-500)}`);
   // (two more in from the same machine, so that one connection is not taken for one player: see ipsTellApart)
-  for (const p of [new Player('Fay'), new Player('Gus')]) assert.ok(await p.join());
-  eli.send({ t: 'cash', uid: dans.uid, wallet: '' });
-  for (let k = 0; k < 40 && !log().includes("cashed in Dan's dog tag"); k++) await sleep(100);
-  const line = log().split('\n').find((l) => l.includes("Eli cashed in Dan's dog tag")) ?? '';
-  assert.ok(line, `the tag could not be cashed in after the restart:\n${log().slice(-800)}`);
+  for (const p of [new Player('Fay'), new Player('Hal')]) assert.ok(await p.join());
+  const line = await cashed(log, dans);
   assert.ok(!line.includes('not listed for a reward'), `the tag was cashed in for nothing after the restart: ${line}`);
   checks++;
-  console.log('  ok  after the server is stopped dead and started again, the tag he carried is cashed in and listed for its reward');
+  console.log('  ok  after the server is stopped and started again, the tag he carried is cashed in and listed for its reward');
+  for (const p of [ann, gil]) assert.ok(await p.join());
+  await looted(log, gil, gils);
+});
+
+// ---- started again from what was written before it died: Gil's tag is carried for nothing, and so never paid twice
+await withServer('dead', async (log) => {
+  assert.ok(await eli.join(), `Eli was not let in after the second restart:\n${log().slice(-500)}`);
+  for (const p of [new Player('Ivy'), new Player('Jon')]) assert.ok(await p.join());
+  // (his game has counted the time he carried it, as any game does: what the server goes by for a tag it knows nothing of)
+  eli.carry([{ ...gils, held: TAG_HOLD }]);
+  await sleep(400);
+  const line = await cashed(log, gils);
+  assert.ok(line.includes('the server restarted while you were carrying it'), `a tag carried through a server that died paid all the same: ${line}`);
+  checks++;
+  console.log('  ok  a server that dies is followed by one that knows nothing of the tags it held: they pay nothing, and none is paid twice');
 });
 
 site.close();

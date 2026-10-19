@@ -45,6 +45,7 @@ const ARMS_TOWN = racked('town');
  */
 // (and the weapons pass's: its rifles, its short AK and its MP7 on the fort's racks too)
 const ARMS_FORT = racked('fort');
+const ARMS_FOURTH = ARMS_FORT.filter(([id]) => (ITEMS[id].loot?.at ?? []).slice(0, 4).some((n) => n > 0));
 /** seconds such a rack stays bare once its gun has been taken: the best part of half an hour, where a village's is three minutes (six racks of rifles filled every three minutes would be a well of them) */
 const APART_ARMS_RESTOCK = 1500;
 /** seconds an armed point stays bare once its weapon has been taken */
@@ -626,7 +627,8 @@ export class Economy {
       }
       // a few tries: a rifle will not lie on a shelf
       // (on the outskirts, something to hit with and never a gun; further in, a pistol where guns were kept)
-      const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? (this.apart[i] !== null && this.tier[i] >= 4 ? ARMS_FORT : this.tier[i] >= 3 ? ARMS_TOWN : ARMS.filter(([id]) => ITEMS[id].weapon)) : ARMS;
+      // (a place apart's rack below the fifth step, Kamenka's armoury since 2026-10-18, has none of the guns found on the fifth alone)
+      const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? (this.apart[i] !== null && this.tier[i] >= 5 ? ARMS_FORT : this.apart[i] !== null && this.tier[i] >= 4 ? ARMS_FOURTH : this.tier[i] >= 3 ? ARMS_TOWN : ARMS.filter(([id]) => ITEMS[id].weapon)) : ARMS;
       // (Each sort is tried once at most, by its weight. Thrown for afresh every time, the one sort that would not
       // lie there could come up six times running, and the place was left bare: one rack in fifty.)
       const left = [...table];

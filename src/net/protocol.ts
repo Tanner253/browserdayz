@@ -39,7 +39,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (49, 2026-10-18: the bot check's course comes mirrored, its cover moved, with somebody with their hands up and a wall
 // that slides (`lay` on 'range'), and hello says what the graphics card is (`gl`); a page from before would build the
 // course as drawn and be judged against another.)
-export const PROTOCOL = 49;
+// (50, 2026-10-19: the desert's places came before the old towns', so every loot place from Pokrov on has another
+// number, and the desert has new ground: a page from before would lay the server's loot on the wrong shelves.)
+export const PROTOCOL = 50;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
