@@ -191,6 +191,13 @@ export const TAG_HOLD = 30 * 60;
  */
 export const TAG_OUT = 15;
 /**
+ * Whether the Zona's line voids tags carried over it. Off for now, the line and its rule kept for when there are bases
+ * (the owner, 2026-10-18: "we will keep this functionality and borders but disable it for now. When we add bases we will
+ * add it back ... players can cash tags anywehrre except basements"). Down a basement still voids them, after TAG_OUT,
+ * whatever this says; and while it is off the maps draw no line.
+ */
+export const ZONA_VOID = false;
+/**
  * Seconds somebody has to have been alive before there is a tag on their body at all. Whoever has just arrived
  * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Twenty minutes since
  * 2026-10-18, the owner: "players must be alive for 20 minutes now before spawning a dogtag when dying"; ten from

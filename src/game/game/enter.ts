@@ -8,7 +8,8 @@ import { ArenaHud } from '../../ui/arena-hud';
 import { reloadPage } from '../../core/leave';
 import { CUT } from '../../../arena/rules';
 import { heightAt, inPlay } from '../../world/worldgen';
-import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
+import { basementUnder } from '../../sim/basements';
+import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, ZONA_VOID, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
 import { fillCrate, RACKS, stepNear, type Keeps } from '../../sim/crates';
 import { inCave } from '../../world/caves-carved';
@@ -552,9 +553,12 @@ export const enterMethods = {
    */
   tickZone(this: Game, dt: number) {
     const p = this.player;
-    if (this.started && !p.dead && this.takenTags.length && !inPlay(p.pos.x, p.pos.z)) {
+    // (down a basement, which is out of the Zona: the owner, 2026-10-18, "ad basements to the "out of bounds" area for
+    // dogtags"; and over the Zona's line only while ZONA_VOID says so, off until there are bases)
+    const down = this.started && basementUnder(this.s.world.basements, p.pos.x, p.pos.y, p.pos.z);
+    if (this.started && !p.dead && this.takenTags.length && (down || (ZONA_VOID && !inPlay(p.pos.x, p.pos.z)))) {
       this.outFor += dt;
-      this.hud.zone(Math.max(0, TAG_OUT - this.outFor), this.takenTags.length);
+      this.hud.zone(Math.max(0, TAG_OUT - this.outFor), this.takenTags.length, down);
       // (and two seconds after it, whatever the server says: a tag it does not know of was worth nothing already)
       if (this.outFor >= TAG_OUT + (this.online ? 2 : 0)) this.voidTags(this.takenTags);
     } else if (this.outFor) {
@@ -575,7 +579,8 @@ export const enterMethods = {
     this.hud.zone(null, 0);
     if (!n) return;
     this.inventoryChanged();
-    const text = `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried out of the Zona. Tags are earned inside the red line on the map.`;
+    const p = this.player, down = basementUnder(this.s.world.basements, p.pos.x, p.pos.y, p.pos.z);
+    const text = down || !ZONA_VOID ? `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried down a basement. A tag is cashed in above ground.` : `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried out of the Zona. Tags are earned inside the red line on the map.`;
     this.hud.note(text, 'warn');
     this.hud.chatLine('system', '', text);
   },

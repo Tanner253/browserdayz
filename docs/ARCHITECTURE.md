@@ -38,7 +38,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
 | `bodywatch.ts` | 201 | How a body moves, watched for a program walking it: standing on nothing, or to and fro on one spot doing nothing. |
 | `botrules.ts` | 51 | The server: the numbers the bot rules go by, kept off the public code (the owner, 2026-10-18: |
-| `checks.ts` | 439 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
+| `checks.ts` | 442 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
 | `device.ts` | 91 | The server: the devices games run on (2026-10-16). |
 | `drops.ts` | 130 | The server: supply drops and the helicopter that brings them. |
 | `elite.ts` | 32 | The Elite: players whose last payout was at the top rate, each held by their key's hash (nobody's anything), with a crown by their name in chat (the owner, 2026-10-15: |
@@ -119,7 +119,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `drops.ts` | 565 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
-| `enter.ts` | 690 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
+| `enter.ts` | 695 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 701 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 511 | The game: attachments and magazines. |
 | `hands.ts` | 590 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
@@ -219,7 +219,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `infected.ts` | 440 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
 | `inventory.ts` | 1032 | Grid inventory (DayZ / Tarkov style). |
-| `items.ts` | 496 |  |
+| `items.ts` | 503 |  |
 
 ## src/sim/items/
 
@@ -310,15 +310,15 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ads.ts` | 52 | Google Ads: its tag on the site, and its conversion sent once a page as the page is loaded (the owner, 2026-10-18, giving Google's own event snippet for the account's "Page view" conversion: |
 | `arena-hud.ts` | 172 | The arena's own screen (2026-10-14). |
 | `arena-menu.ts` | 216 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
-| `bigmap.ts` | 1485 | The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: |
+| `bigmap.ts` | 1487 | The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: |
 | `dogtag.ts` | 166 | The dog tag on the menu: two steel tags on a ball chain, the player's name stamped into the front one as it is typed. |
 | `door.ts` | 155 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
 | `elite-crown.ts` | 37 | The Elite's crown by a name in chat, and a word about them with the pointer on it (the owner, 2026-10-15: |
 | `emotes-menu.ts` | 239 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
-| `hud.ts` | 2043 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
+| `hud.ts` | 2046 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 471 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inventory-ui.ts` | 2172 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
-| `minimap.ts` | 478 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
+| `minimap.ts` | 480 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
 | `person.ts` | 104 | The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a program came by the dozen, and stood in the world as players). |
 | `platform.ts` | 33 | ZONA PvP, the platform both games stand under (2026-10-14). |
 | `rewards.ts` | 303 | Dog tags and creator rewards: the illustrated explanation a player sees on entering the site, and the wallet address they give. |
@@ -380,7 +380,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ocean-waves.ts` | 239 | The sea's numbers, apart from how it is drawn (src/world/ocean.ts), so that they can be checked without a page: the picture its waves are drawn from, the tiles it is laid in, and how deep it is everywhere over them. |
 | `ocean.ts` | 533 | THE SEA off the west coast (2026-10-16: |
 | `outcrops.ts` | 171 | The canyon country's outcrops (the owner, 2026-10-16: |
-| `outline.ts` | 218 | The edge of the Zona as one line. |
+| `outline.ts` | 219 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 49 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
 | `posts.ts` | 61 | The army's field posts by the western roads (src/sim/posts.ts): each the pillbox model ("WW2 Field Bunker"), drawn and made solid triangle for triangle, as the one over Bunker 17's stair is (src/world/bunker.ts), on... |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
@@ -407,7 +407,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `generate.ts` | 2738 | generateWorld: the whole map made from its seed, stage by stage (see the index below). |
 | `ground.ts` | 208 | Questions of the ground's net: the height and slope at a point, the ground as it is drawn over the fort's cuts, a curve through points, and the evening and softening of a field. |
-| `layout.ts` | 458 | The map's lines and areas: the mountain's and the loop road's lines, snow by height, the outlying places, where the play is, the hospital's grounds and the village's streets, the kinds of building and their footprints. |
+| `layout.ts` | 464 | The map's lines and areas: the mountain's and the loop road's lines, snow by height, the outlying places, where the play is, the hospital's grounds and the village's streets, the kinds of building and their footprints. |
 | `opening.ts` | 222 | THE SQUARE OPENED TO THE WEST (2026-10-16, plan v2), done to the square when everything of it is made and before it is laid into the world (see `toWorld`, west.ts). |
 | `places.ts` | 479 | The map's measures and its places as numbers: its size and seed, the expansions (the Chemical Works, the bunker, Kamenka), the loop road (LOOP) and the mountain with its fort (MOUNTAIN). |
 | `types.ts` | 129 | What a world is made of (World, Site, Instance, Solid, POI, Way, Worn): the types every part of the game reads it by. |
@@ -422,3 +422,4 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `zavod-plans.ts` | 182 | Zavod, the brick works by the river (2026-10-16): its buildings. |
+| `zona.ts` | 152 | The Zona as the owner drew it (2026-10-18), on the big map, in red: |

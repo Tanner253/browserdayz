@@ -13,6 +13,7 @@
 // Sums only: nothing of the page or of the renderer is known here (test/outline.test.ts holds it to all this).
 
 import { PLAY_AREAS } from './worldgen';
+import { zonaRings } from './zona';
 
 export interface Round { x: number; z: number; r: number }
 /** a closed line in world metres: its last point is its first again */
@@ -211,7 +212,7 @@ export function playRing(areas: Round[] = PLAY_AREAS, fillet = 14, step = 4): Ri
 }
 
 let kept: Ring[] | null = null;
-/** The line round the Zona as it is: worked out once and kept, for it never changes. */
+/** The line round the Zona as it is: worked out once and kept, for it never changes. The Zona as the owner drew it (src/world/zona.ts) since 2026-10-18; playRing draws the rounds it was. */
 export function playEdge(): Ring[] {
-  return (kept ??= playRing());
+  return (kept ??= zonaRings());
 }

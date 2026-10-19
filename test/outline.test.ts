@@ -10,6 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { playEdge, playRing, type Ring, type Round } from '../src/world/outline';
+import { zonaDepth, zonaRings } from '../src/world/zona';
 import { PLAY_AREAS, inPlay, playOutline } from '../src/world/worldgen';
 
 let n = 0;
@@ -124,11 +125,20 @@ ok('the Zona: one closed line, on its true edge but at the notches, never far fr
   // (the works, the bunker and the way to Kamenka each join the valley at two notches, and Kamenka joins the way to it at two)
   // (and, since the road was made a loop, each round strung along it joins the next at a notch: see LOOP.zona in the generator)
   assert.ok(runs.length >= 8, `${runs.length} notches`);
-  // and against the rule itself: no point of the line is in the Zona, and none is further out of it than the promise
+  // and against the rounds themselves: no point of the line is in them, and none is further out of them than the promise
+  // (the rounds the world was made by: the Zona's rule is the owner's drawing since 2026-10-18, see the next)
+  const inRounds = (x: number, z: number, m = 0) => PLAY_AREAS.some((a) => Math.hypot(x - a.x, z - a.z) < a.r - m);
   for (const p of rings[0]) {
-    assert.ok(!inPlay(p.x, p.z, 1e-6), `the line is inside the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
-    assert.ok(inPlay(p.x, p.z, -0.75 * FILLET), `the line is far outside the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
+    assert.ok(!inRounds(p.x, p.z, 1e-6), `the line is inside the rounds at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
+    assert.ok(inRounds(p.x, p.z, -0.75 * FILLET), `the line is far outside the rounds at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
   }
+});
+
+ok('the Zona as the owner drew it (src/world/zona.ts): one closed line, every point of it on the edge of the rule to within half its step', () => {
+  const rings = zonaRings();
+  assert.equal(rings.length, 1, `${rings.length} lines round a Zona that is all one piece`);
+  for (const p of rings[0]) assert.ok(Math.abs(zonaDepth(p.x, p.z)) <= 4, `the line is ${zonaDepth(p.x, p.z).toFixed(1)} m off the edge of the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
+  assert.ok(inPlay(-1180, 350) && inPlay(625, 365) && inPlay(-1855, 585) && !inPlay(-700, 300), 'Lipki, Kamenka or the swamp is out of it, or the woods by the works are in it');
   // (the maps are handed the same line, worked out once)
   assert.equal(playEdge(), playEdge());
   assert.deepEqual(playEdge(), rings);

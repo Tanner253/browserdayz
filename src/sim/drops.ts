@@ -6,7 +6,7 @@
 
 import { ITEMS, fitAtRandom, loadGun, makeItem, makeMag, plainMag } from './items';
 import type { Container } from './inventory';
-import { BUILDING_FOOTPRINT, SQUARE_HALF, heightAt, inPlay, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, SQUARE_HALF, heightAt, inRounds, type World } from '../world/worldgen';
 import { gasEdge, gasZone } from './gas';
 import { UNDER_GAS } from './crates';
 
@@ -206,7 +206,7 @@ export function pickDropSite(world: World, rnd: () => number = Math.random, insi
       const edge = SQUARE_HALF - 45;
       x = (rnd() * 2 - 1) * edge;
       z = (rnd() * 2 - 1) * edge;
-      if (inPlay(x, z, -DROP.out[0]) || !inPlay(x, z, -DROP.out[1])) continue;
+      if (inRounds(x, z, -DROP.out[0]) || !inRounds(x, z, -DROP.out[1])) continue;
     }
     // (for the first two hundred tries: after that, beside somebody is better than no drop at all)
     if (tries < 200 && avoid.some((p) => Math.hypot(p.x - x, p.z - z) < DROP_CLEAR)) continue;

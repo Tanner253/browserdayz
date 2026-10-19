@@ -26,6 +26,7 @@ import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
 import { playEdge } from '../world/outline';
+import { ZONA_VOID } from '../sim/items';
 import { swampShore } from '../world/worldgen/west-water';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
@@ -1165,7 +1166,8 @@ export class BigMap {
     // any point of it which side is the Zona. (It was a dashed arc for each round the Zona is made of, and read
     // as a row of circles: "i dont like the segmented circles".)
     g.beginPath();
-    for (const ring of playEdge()) {
+    // (no line while the Zona voids nothing: ZONA_VOID, off until there are bases)
+    for (const ring of ZONA_VOID ? playEdge() : []) {
       g.moveTo(X(ring[0].x), Y(ring[0].z));
       for (let i = 1; i < ring.length - 1; i++) g.lineTo(X(ring[i].x), Y(ring[i].z));
       g.closePath();

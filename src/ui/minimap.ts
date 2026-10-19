@@ -4,6 +4,7 @@
 // seconds, every half minute (see ping). M opens the sheet itself, large: that is another thing (bigmap.ts).
 
 import { playEdge } from '../world/outline';
+import { ZONA_VOID } from '../sim/items';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import { gasClouds, type GasZone } from '../sim/gas';
 
@@ -170,7 +171,8 @@ export class Minimap {
     // along the inside of it, so that the little of it the corner shows still says which side is in. (It was a
     // dashed arc for each round: "i dont like the segmented circles". The sheet opened large draws the same line.)
     g.beginPath();
-    for (const ring of playEdge()) {
+    // (no line while the Zona voids nothing: ZONA_VOID, off until there are bases)
+    for (const ring of ZONA_VOID ? playEdge() : []) {
       g.moveTo(X(ring[0].x), Y(ring[0].z));
       for (let i = 1; i < ring.length - 1; i++) g.lineTo(X(ring[i].x), Y(ring[i].z));
       g.closePath();

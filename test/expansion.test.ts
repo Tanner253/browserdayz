@@ -5,6 +5,8 @@
 import assert from 'node:assert/strict';
 import * as WG from '../src/world/worldgen';
 const { ARMY_CAMP, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION: E, PLAY_AREAS, PLAY_RADIUS, generateWorld, heightAt, inPlay, playOutline, seenGround, slopeAt, BUILDING_FOOTPRINT } = WG;
+/** the rounds the world was made by (PLAY_AREAS): the Zona's rule is the owner's drawing since 2026-10-18 (src/world/zona.ts), and these hold the world to the rounds */
+const { inRounds } = WG;
 // (this test is of the map as it was, and runs on a tree from before the world grew west too, to take its figures again:
 // where the bunker and the trading post were made, and the square's measures, said by such a tree's own names where it has them)
 const WGX = WG as unknown as Record<string, unknown>;
@@ -226,11 +228,13 @@ ok('it lies outside the ring the map used to end at, inside the ground there is,
   assert.deepEqual(PLAY_AREAS.slice(0, PLAY_FIRST).map((a) => [a.x, a.z]), [[0, 0], [E.x, E.z], [BUNKER_WAS.x, BUNKER_WAS.z], [TOWN.gate.x, TOWN.gate.z], [TOWN.x, TOWN.z]]);
   assert.deepEqual([PLAY_AREAS[0].r, PLAY_AREAS[1].r, PLAY_AREAS[3].r, PLAY_AREAS[4].r], [PLAY_RADIUS, E.floor + E.wall, TOWN.gate.r, TOWN.r]);
   assert.ok(PLAY_AREAS.length > PLAY_FIRST, 'the Zona has not grown along the loop');
-  assert.ok(inPlay(0, 0) && inPlay(E.x, E.z) && inPlay(camp.x, camp.z) && inPlay(BUNKER_WAS.x, BUNKER_WAS.z));
-  // (the corner across the valley from the works is not played in; the one across the road from it is, since
-  // 2026-10-13: it lies inside the loop of the road, and everything inside the loop is the Zona's)
-  assert.ok(!inPlay(E.x, -E.z) && !inPlay(E.x * 1.5, -E.z * 1.5), 'the north-west corner of the map is played in');
-  assert.ok(inPlay(-E.x, E.z), 'the ground inside the loop of the road is not played in');
+  // (the rounds the world was made by: the Zona's rule is the owner's drawing since 2026-10-18, src/world/zona.ts)
+  assert.ok(inRounds(0, 0) && inRounds(E.x, E.z) && inRounds(camp.x, camp.z) && inRounds(BUNKER_WAS.x, BUNKER_WAS.z));
+  // (the corner across the valley from the works is not in them; the one across the road from it is, since
+  // 2026-10-13: it lies inside the loop of the road, and everything inside the loop was the Zona's)
+  assert.ok(!inRounds(E.x, -E.z) && !inRounds(E.x * 1.5, -E.z * 1.5), 'the north-west corner of the map is in the rounds');
+  assert.ok(inRounds(-E.x, E.z), 'the ground inside the loop of the road is not in the rounds');
+  void inPlay;
   // one line round the whole: every arc ends where another begins (the valley's round is in two pieces, between the two places added to it)
   const arcs = playOutline();
   assert.ok(arcs.length >= 6, `${arcs.length} arcs`);
@@ -481,10 +485,10 @@ ok('the east country: a town out of the valley by the road, two places far out, 
     assert.ok(Math.abs(t.y - heightAt(world.surface, t.x, t.z)) < 0.06, 'a tree is off the ground');
   }
   // the Zona: the town is in it, joined to the valley over the road; the two far places are not
-  assert.ok(inPlay(town.x, town.z));
-  for (let i = 0; i < world.road.points.length / 3; i++) if (world.road.points[i * 3] > 0) assert.ok(inPlay(world.road.points[i * 3], world.road.points[i * 3 + 2]), 'the road east leaves the Zona before the town');
-  for (let i = 0; i < n; i++) if (Math.hypot(p[i * 3] - town.x, p[i * 3 + 2] - town.z) < 100 || p[i * 3 + 2] < town.z) assert.ok(inPlay(p[i * 3], p[i * 3 + 2]), 'the road to the town leaves the Zona on the way');
-  for (const o of OUTLYING) assert.ok(!inPlay(o.x, o.z), `${o.name} is inside the Zona`);
+  assert.ok(inRounds(town.x, town.z));
+  for (let i = 0; i < world.road.points.length / 3; i++) if (world.road.points[i * 3] > 0) assert.ok(inRounds(world.road.points[i * 3], world.road.points[i * 3 + 2]), 'the road east leaves the Zona before the town');
+  for (let i = 0; i < n; i++) if (Math.hypot(p[i * 3] - town.x, p[i * 3 + 2] - town.z) < 100 || p[i * 3 + 2] < town.z) assert.ok(inRounds(p[i * 3], p[i * 3 + 2]), 'the road to the town leaves the Zona on the way');
+  for (const o of OUTLYING) assert.ok(!inRounds(o.x, o.z), `${o.name} is inside the Zona`);
   // loot: the new buildings have places for things, all after every place there was
   const fresh = data.lootPoints.slice(WAS.lootPoints).filter((q: { x: number; z: number }) => !inOld(q.x, q.z));
   assert.ok(fresh.length >= 150, `${fresh.length} places for things out there`);
@@ -538,13 +542,13 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   // the Zona takes the loop in, all of it, with ground to fight on either side; the two far places stay outside it;
   // and it is one piece with no hole in it (nothing inside the loop is outside the line)
   for (const line of [loopLine().door, loopLine().main]) for (const [x, z] of line) {
-    assert.ok(inPlay(x, z), `the new road leaves the Zona at ${x.toFixed(0)}, ${z.toFixed(0)}`);
-    for (let a = 0; a < 6.28; a += 0.785) assert.ok(inPlay(x + Math.cos(a) * 30, z + Math.sin(a) * 30), `there are not thirty metres of the Zona beside the new road at ${x.toFixed(0)}, ${z.toFixed(0)}`);
+    assert.ok(inRounds(x, z), `the new road leaves the Zona at ${x.toFixed(0)}, ${z.toFixed(0)}`);
+    for (let a = 0; a < 6.28; a += 0.785) assert.ok(inRounds(x + Math.cos(a) * 30, z + Math.sin(a) * 30), `there are not thirty metres of the Zona beside the new road at ${x.toFixed(0)}, ${z.toFixed(0)}`);
   }
-  for (const o of OUTLYING) assert.ok(!inPlay(o.x, o.z, -LOOP.clear + 6), `${o.name} is in the Zona, or all but`);
+  for (const o of OUTLYING) assert.ok(!inRounds(o.x, o.z, -LOOP.clear + 6), `${o.name} is in the Zona, or all but`);
   {
     const S = 8, M = Math.floor((2 * SQUARE_HALF) / S) + 1, out = new Uint8Array(M * M), stack: number[] = [];
-    const inZona = (k: number) => inPlay(-half + (k % M) * S, -half + Math.floor(k / M) * S);
+    const inZona = (k: number) => inRounds(-half + (k % M) * S, -half + Math.floor(k / M) * S);
     for (let i = 0; i < M; i++) for (const k of [i, (M - 1) * M + i, i * M, i * M + M - 1]) if (!out[k] && !inZona(k)) (out[k] = 1), stack.push(k);
     while (stack.length) {
       const k = stack.pop()!;
@@ -742,7 +746,7 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar' || q.building.startsWith('ruins_') || TOWN_PLOT.test(q.building) || q.building.startsWith('cave_')), "something after the basements' places that is not theirs");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
-  assert.ok(heli && inPlay(heli.x, heli.z, 15), 'no helicopter by the fort');
+  assert.ok(heli && inRounds(heli.x, heli.z, 15), 'no helicopter by the fort');
   {
     // (outside the walls, and in plain sight of the top of the back wall: from an eye there, no ground stands in the way of it)
     assert.ok(footOf(heli.x, heli.z) > 12 && footOf(heli.x, heli.z) < 60, 'the helicopter is not on the bench outside the walls');
@@ -775,12 +779,12 @@ ok('the fort is no trap for tags and no window on the end of the map: the line t
   const fort = world.castle!;
   // (a tag carried outside the line is void after fifteen seconds: the whole way in is inside it, and the ground round the fort)
   const road = world.roads[world.roads.length - 1].points;
-  for (let i = 0; i < road.length; i += 3) assert.ok(inPlay(road[i], road[i + 2]), `the mountain road leaves the Zona at ${road[i].toFixed(0)}, ${road[i + 2].toFixed(0)}`);
-  for (const [x, z] of world.paths.flatMap((p) => p.line)) assert.ok(inPlay(x, z, 25), `a way to the fort leaves the Zona, or all but, at ${x}, ${z}`);
-  assert.ok(inPlay(fort.x, fort.z) && inPlay(world.wreck!.x, world.wreck!.z, 15));
+  for (let i = 0; i < road.length; i += 3) assert.ok(inRounds(road[i], road[i + 2]), `the mountain road leaves the Zona at ${road[i].toFixed(0)}, ${road[i + 2].toFixed(0)}`);
+  for (const [x, z] of world.paths.flatMap((p) => p.line)) assert.ok(inRounds(x, z, 25), `a way to the fort leaves the Zona, or all but, at ${x}, ${z}`);
+  assert.ok(inRounds(fort.x, fort.z) && inRounds(world.wreck!.x, world.wreck!.z, 15));
   for (let a = 0; a < 16; a++) {
     const x = fort.x + Math.sin((a / 16) * 6.283) * 100, z = fort.z + Math.cos((a / 16) * 6.283) * 100;
-    assert.ok(inPlay(x, z), `a hundred metres from the fort is outside the Zona: ${x.toFixed(0)}, ${z.toFixed(0)}`);
+    assert.ok(inRounds(x, z), `a hundred metres from the fort is outside the Zona: ${x.toFixed(0)}, ${z.toFixed(0)}`);
   }
   // (the owner's rule for such places holds here: nobody is set down within 250 m of it)
   for (const s of world.spawns) assert.ok(Math.hypot(s.x - fort.x, s.z - fort.z) > 250, 'somebody starts by the fort');

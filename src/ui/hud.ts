@@ -15,7 +15,7 @@ import { TOUCH } from '../core/device';
 import { EMOTE } from '../sim/emotes';
 import { onWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 import { TIERS, type Tier } from '../sim/tiers';
-import { ITEMS, TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
+import { ITEMS, TAG_FRESH, TAG_HOLD_MIN, ZONA_VOID } from '../sim/items';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
@@ -289,7 +289,7 @@ export class HUD {
             <div class="start-kicker"><span>PvP survival shooter</span><em>Play to earn</em></div>
             <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
             <p class="start-sub">Players hunt you. So do the infected.</p>
-            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive, and a tag carried out of the Zona is void.</p>
+            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive, and a tag carried ${ZONA_VOID ? 'out of the Zona' : 'down a basement'} is void.</p>
             <div class="sm-enter">
               <label class="sm-name">
                 <span class="sm-name-label">Your name<em>over your head, on your dog tag</em></span>
@@ -732,7 +732,8 @@ export class HUD {
    * The warning that tags taken off others are being carried out of the Zona: how many, and the seconds left
    * before they are void (null: no warning).
    */
-  zone(left: number | null, tags: number) {
+  /** @param down down a basement, which is out of the Zona too, rather than over its line */
+  zone(left: number | null, tags: number, down = false) {
     if (left === null) {
       this.zoneEl?.classList.remove('show');
       return;
@@ -743,6 +744,8 @@ export class HUD {
       this.zoneEl.innerHTML = '<b>You are leaving the Zona</b><span></span><i></i><em>Turn back: tags are earned inside the red line on the map (M)</em>';
       this.root.appendChild(this.zoneEl);
     }
+    (this.zoneEl.children[0] as HTMLElement).textContent = down ? 'Dog tags are void down a basement' : 'You are leaving the Zona';
+    (this.zoneEl.children[3] as HTMLElement).textContent = down ? 'Go back up: a tag is cashed in above ground' : 'Turn back: tags are earned inside the red line on the map (M)';
     const s = Math.ceil(left);
     (this.zoneEl.children[1] as HTMLElement).textContent = s > 0 ? `${tags === 1 ? 'Your dog tag is' : `Your ${tags} dog tags are`} void in` : `${tags === 1 ? 'Your dog tag is' : 'Your dog tags are'} void`;
     (this.zoneEl.children[2] as HTMLElement).textContent = s > 0 ? String(s) : '';

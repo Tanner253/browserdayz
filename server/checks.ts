@@ -1,7 +1,7 @@
 // The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait).
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
-import { TAG_OUT, type ItemInstance } from '../src/sim/items';
+import { TAG_OUT, ZONA_VOID, type ItemInstance } from '../src/sim/items';
 import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
 import { BANS, SOAK, log, vehicles, world, type Box } from './index';
@@ -301,14 +301,17 @@ export function hillBetween(a: Pose, b: Pose): number {
  * out of this server's copy of their pockets, and they are told to take it out of their own.
  */
 export function zoneCheck(c: Client, now = Date.now()) {
-  if (!c.alive || inPlay(c.pose[0], c.pose[2]) || !takenTag(c)) {
+  // (down a basement is out of it: the owner, 2026-10-18, "ad basements to the "out of bounds" area for dogtags". And over
+  // the Zona's line only while ZONA_VOID says so: off until there are bases)
+  const down = world.basementUnder(c.pose[0], c.pose[1], c.pose[2]);
+  if (!c.alive || !(down || (ZONA_VOID && !inPlay(c.pose[0], c.pose[2]))) || !takenTag(c)) {
     c.outAt = 0;
     return;
   }
   if (!c.outAt) c.outAt = now;
   if (now - c.outAt < TAG_OUT * 1000) return;
   c.outAt = 0;
-  voidTags(c, 'out of the Zona');
+  voidTags(c, down ? 'down a basement' : 'out of the Zona');
 }
 
 /** Every tag somebody carries that they took off another is void: forgotten here, taken out of this server's copy of their pockets, and they are told. */

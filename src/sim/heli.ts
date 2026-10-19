@@ -5,7 +5,7 @@
 // hospital". The model is the MD-500 they gave (scripts/assets.config.mjs, `md500`).
 import { hospitalPlan } from '../world/big-buildings';
 import { CASTLE_SCALE, castleClear, castleLocal, castleLoose, castleProps, inCastle, looseLocal } from './castle';
-import { heightAt, inPlay, BUILDING_FOOTPRINT, type World } from '../world/worldgen';
+import { heightAt, inRounds, BUILDING_FOOTPRINT, type World } from '../world/worldgen';
 import { JEEP, SEATS } from './vehicles';
 
 export const HELI = {
@@ -119,7 +119,7 @@ export function heliSpots(world: World): { x: number; y: number; z: number; yaw:
       const steps = Math.ceil((2 * Math.PI * d) / 2);
       for (let k = 0; k < steps; k++) {
         const a = (k / steps) * 2 * Math.PI, x = fort.x + Math.cos(a) * d, z = fort.z + Math.sin(a) * d;
-        if (!inPlay(x, z, 20) || !level(x, z)) continue;
+        if (!inRounds(x, z, 20) || !level(x, z)) continue;
         if (near(trees, x, z, P.clear) || near(rocks, x, z, P.clear) || near(props, x, z, P.clear)) continue;
         if (world.buildings.some((b) => { const [w, dd] = BUILDING_FOOTPRINT[b.type]; return Math.hypot(b.x - x, b.z - z) < Math.hypot(w, dd) / 2 + P.building; })) continue;
         const y = heightAt(H, x, z);

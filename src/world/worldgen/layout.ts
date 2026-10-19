@@ -8,6 +8,7 @@ import { BUNKER_WAS, EXPANSION, LOOP, MOUNTAIN, PASS, PLAY_RADIUS, TOWN, WORLD_S
 import type { World } from './types';
 import { catmullRom, heightAt } from './ground';
 import { generateWorld } from './generate';
+import { inZona } from '../zona';
 
 /**
  * The world made without the mountain road and the fort's place (the tenth step, below): the ground as every step
@@ -175,8 +176,13 @@ export function bunkerPlace(world: Pick<World, 'sites' | 'heights'>): Place | nu
   return { ...flat, y: heightAt(world.heights, x, z) };
 }
 
-/** is this place inside the part of the map that is played in */
+/** is this place inside the Zona, the part of the map where tags are earned: as the owner drew it on 2026-10-18 (src/world/zona.ts), no longer PLAY_AREAS */
 export function inPlay(x: number, z: number, margin = 0): boolean {
+  return inZona(x, z, margin);
+}
+
+/** is this place inside the rounds the Zona was until 2026-10-18 (PLAY_AREAS): what the world's own places (the helipad by the fort) and the drops' were found by, and still are */
+export function inRounds(x: number, z: number, margin = 0): boolean {
   return PLAY_AREAS.some((a) => Math.hypot(x - a.x, z - a.z) < a.r - margin);
 }
 

@@ -18,7 +18,7 @@ import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { BRIDGE, deckAt, deckWidth, onBridge, spanOf, standAt, type Bridge } from '../src/sim/bridge';
 import { RIDE_HEIGHT, jeepSpots, yawQuat } from '../src/sim/vehicles';
-import { LOOP, generateWorld, heightAt, inPlay, loopLine } from '../src/world/worldgen';
+import { LOOP, PLAY_AREAS, generateWorld, heightAt, loopLine } from '../src/world/worldgen';
 import { bridgeBoxes } from '../src/world/bridge';
 
 const PORT = 8201;
@@ -57,8 +57,9 @@ ok('there is one bridge: on the road, level, bank to bank, and nowhere more than
   let deep = 0;
   for (let t = 0; t <= 1; t += 0.02) for (const side of [-deckWidth() / 2, 0, deckWidth() / 2]) deep = Math.max(deep, LOOP.deck - ground(...on(t, side)));
   assert.ok(deep > 18 && deep <= 25, `the deck is ${deep.toFixed(1)} m over the ground at the most`);
-  // and all of it is in the Zona
-  for (let t = 0; t <= 1; t += 0.1) assert.ok(inPlay(...on(t)), 'the bridge is outside the Zona');
+  // and all of it is in the rounds the world was made by (the Zona's rule is the owner's drawing since 2026-10-18)
+  const inRounds = (x: number, z: number) => PLAY_AREAS.some((a) => Math.hypot(x - a.x, z - a.z) < a.r);
+  for (let t = 0; t <= 1; t += 0.1) assert.ok(inRounds(...on(t)), 'the bridge is outside the rounds');
 });
 
 ok('what there is to stand on: the deck for whoever is on it, the ground for whoever is under it or beside it', () => {
