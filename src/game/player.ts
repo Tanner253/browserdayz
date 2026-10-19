@@ -338,6 +338,7 @@ export class Player {
   seat(on: boolean) {
     this.seated = on;
     if (on && this.crouched) this.setCrouch(false);
+    if (!on) this.body.setTranslation({ x: this.pos.x, y: this.pos.y + this.half() + RADIUS, z: this.pos.z }, true);
     this.collider.setEnabled(!on);
     if (on) {
       this.steady();
@@ -354,7 +355,9 @@ export class Player {
     this.vel.copy(vel);
     this.lastFallSpeed = 0;
     this.fallTop = at.y;
-    this.body.setTranslation({ x: at.x, y: at.y + STAND_HALF + RADIUS, z: at.z }, false);
+    // (The body is not carried along: its collider is off in a seat (see seat), and nothing asks where it is. Moved every
+    // frame, it cost the physics' next step 4 ms of every frame in a helicopter, 0.5 without (2026-10-19, on the owner's
+    // flight). Put where the player is on getting out.)
   }
 
   private half() {
