@@ -61,7 +61,7 @@ export const awake = () => {
 };
 
 /** what has been turned away, for /healthz: by what */
-export const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0, agent: 0, recheck: 0, device: 0 };
+export const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0, agent: 0, recheck: 0, device: 0, name: 0 };
 
 /** when each connection lately said hello, by where it came from: see `flooding` */
 const hellos = new Map<string, number[]>();
@@ -108,6 +108,21 @@ export const BOTCHECK = {
  * REFUSE_AGENTS: what to look for, several parted by |, or "off", for the day they change it.
  */
 export const REFUSE_AGENTS = (process.env.REFUSE_AGENTS ?? 'Chrome/141.0.0.0').split('|').map((s) => s.trim()).filter((s) => s && s !== 'off');
+
+/**
+ * Names not let in (2026-10-18): a run of five figures or more, as every bot of that night's wave had ("vsm3704311"), the
+ * owner: "we should just block names like this". The game's own made-up name (Survivor and three figures) is not one.
+ * NAME_BLOCK: another pattern, or "off".
+ */
+const NAME_BLOCK = (() => {
+  if (process.env.NAME_BLOCK === 'off') return null;
+  try {
+    return new RegExp(process.env.NAME_BLOCK || '\\d{5,}', 'u');
+  } catch {
+    return /\d{5,}/u;
+  }
+})();
+export const botName = (name: string) => !!NAME_BLOCK && NAME_BLOCK.test(name);
 
 /** what of REFUSE_AGENTS a browser's name has in it ('': nothing) */
 export const refusedAgent = (ua: string) => REFUSE_AGENTS.find((s) => ua.includes(s)) ?? '';

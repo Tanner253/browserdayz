@@ -33,7 +33,7 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, deviceRules, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
+import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
@@ -1001,6 +1001,15 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         log(`${cleanName(m.name)} is not let in: an out-of-date browser (${agent}, matched "${old}")`);
         turnedAway(cleanName(m.name), keyOf(m), ipOf.get(ws) ?? '', cleanDevice(m.fp), `an out-of-date browser (${agent})`);
         ws.send(JSON.stringify({ t: 'kick', reason: 'Your browser is out of date. Update Chrome (Menu, Help, About Google Chrome) or play in another browser, then press Play again.' } satisfies S2C));
+        ws.close();
+        return;
+      }
+      // (and a name of the bots' kind: botName in gate.ts)
+      if (m.v === PROTOCOL && botName(cleanName(m.name))) {
+        TURNED.name++;
+        log(`${cleanName(m.name)} is not let in: a name of the bots' kind (${agent})`);
+        turnedAway(cleanName(m.name), keyOf(m), ipOf.get(ws) ?? '', cleanDevice(m.fp), "a name of the bots' kind");
+        ws.send(JSON.stringify({ t: 'kick', reason: 'Pick another name: names with five numbers or more in a row are not let in.' } satisfies S2C));
         ws.close();
         return;
       }
