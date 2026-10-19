@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-18T09:09:45.171Z",
+ "generated": "2026-10-19T07:20:50.750Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12257,6 +12257,30 @@
    "lods": [],
    "hi": "assets/models/hi/gun_rack.glb",
    "hiBytes": 306856,
+   "hiCard": 64
+  },
+  "red_dot_1x": {
+   "url": "assets/models/red_dot_1x.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 173828,
+   "srcTris": 2195,
+   "tris": 2195,
+   "min": [
+    -0.0348,
+    0,
+    -0.0791
+   ],
+   "max": [
+    0.0348,
+    0.0942,
+    0.0791
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/red_dot_1x.glb",
+   "hiBytes": 1256476,
    "hiCard": 64
   }
  }

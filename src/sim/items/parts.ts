@@ -157,8 +157,9 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'scope_vssk', name: 'PSO Scope', model: 'vssk', nodeRe: '^scope', w: 2, h: 1, weight: 0.6, category: 'attachment',
-    desc: "The VSSK's own scope, and no other rifle takes it: two to six times on the mouse wheel, with the chevrons and range lines of a PSO.",
-    attach: { fits: ['vssk'], slot: 'optic', ergo: -7 },
+    desc: "The VSSK's scope, which the AK takes too: two to six times on the mouse wheel, with the chevrons and range lines of a PSO.",
+    // (and the AK's: the owner, 2026-10-19, "The vss scope can go on the ak47 btw")
+    attach: { fits: ['vssk', 'ak'], slot: 'optic', ergo: -7 },
     loot: { pair: 'PSO1Optic', at: [0, 0, 0, 0, 1], restock: 1800, usage: ARMY },
     worth: 35,
   },
@@ -196,6 +197,14 @@ export const PART_ITEMS: ItemDef[] = [
     attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
     loot: { pair: 'M68Optic', at: [0, 1, 7, 3, 3], restock: 1800, usage: ARMY, lean: 4 },
     worth: 20, sells: 1,
+  },
+  // (a 1x red dot on every gun that takes a sight: the owner, 2026-10-19, "the red dot can go on everything that takes a scope")
+  {
+    id: 'red_dot_1x', name: 'Red Dot Sight', model: 'red_dot_1x', w: 2, h: 1, weight: 0.2, category: 'attachment',
+    desc: 'A 1x red dot: a lit dot that lies on whatever the gun points at, with nothing to magnify it. Fits every gun that takes a sight, the pistols and the sniper rifles too. Quicker to aim with than irons, and lighter than the holographic sight.',
+    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'mosin', 'vssk', 'sniper50', 'barrett'], slot: 'optic', ergo: 4 },
+    loot: { pair: 'M4_T3NRDSOptic', at: [0, 2, 8, 3, 2], restock: 1800, usage: ARMY, lean: 4 },
+    worth: 16, sells: 1,
   },
   {
     id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',

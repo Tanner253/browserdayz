@@ -125,6 +125,16 @@ const LOOK_OVER = {
 };
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
+/**
+ * The 1x red dot, on every gun that takes a sight (the owner, 2026-10-18: "i added a red dot sight 1x we need to fit to
+ * all the guns that accept scope attachments"; 2026-10-19: "the red dot can go on everything that takes a scope"). Its
+ * foot on a gun, in the gun's own space as FIT's are, and how big it is drawn; where not said, the holographic sight's
+ * foot, or the Elcan's, or under the middle of the gun's own scope or sight, set by eye on each.
+ */
+export const RED_DOT = 'red_dot_1x';
+const RED_DOT_AT: Record<string, { at?: [number, number, number]; size?: number }> = {};
+/** the middle of its glass in its own model (measured off it), and its dot put a millimetre behind, for the eye */
+const RED_DOT_GLASS: [number, number, number] = [0.0042, 0.071, -0.0584];
 
 interface Bullet {
   /** someone else's bullet has already been heard going past */
@@ -226,6 +236,8 @@ interface VmModel {
   shown?: [THREE.Object3D, string][];
   /** aim position without an optic */
   adsIron?: THREE.Vector3;
+  /** aim position through the red dot (RED_DOT), on whatever gun it is fitted to, whatever its own optic is */
+  adsDot?: THREE.Vector3;
   /** how far the gun is turned as it comes to the eye, where its pack holds it turned in at the hip: the line of its sights made the line of sight */
   aimRot?: THREE.Euler;
   /** the same with its own sight fitted, where that is squared another way (see `opticRot` in packGun) */
@@ -1084,6 +1096,29 @@ const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', ar15: 'ar', mpa
 const NO_CASE = new Set(['m32', 'db12', 'dual_sawnoff']);
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */
+/** The red dot's dot: round, soft at its edge and lit, whatever the hour; drawn over the glass as the holographic sight's mark is. */
+function dotMaterial(): THREE.Material {
+  return new THREE.ShaderMaterial({
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }`,
+    fragmentShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        float r = length( vUv - 0.5 ) * 2.0;
+        float lit = 1.0 - smoothstep( 0.22, 0.42, r ) + 0.25 * ( 1.0 - smoothstep( 0.42, 1.0, r ) );
+        gl_FragColor = vec4( vec3( 1.0, 0.12, 0.06 ) * lit * 1.8, lit );
+      }`,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
 function reticleMaterial(src: THREE.Material): THREE.Material {
   // (the sight's own picture of its mark is red on flat grey, with nothing to say what is glass:
   // the red is what is lit, by how much redder than grey it is)
@@ -1316,7 +1351,7 @@ export class Weapons {
   }
 
   get sightless() {
-    return this.aiming && this.current?.kind === 'rifle' && !!this.current.adsIron && !this.current.ownSights && !(this.current.optic && hasMod(this.currentItem, this.current.optic));
+    return this.aiming && this.current?.kind === 'rifle' && !!this.current.adsIron && !this.current.ownSights && !(this.current.optic && hasMod(this.currentItem, this.current.optic)) && !hasMod(this.currentItem, RED_DOT);
   }
   hitMarker = 0;
   /** the last hit marker was a kill (HUD draws it red) */
@@ -1893,7 +1928,7 @@ export class Weapons {
         mine.position.copy(nudge);
         rig.hang(mine, onBody);
         // (they are under the sight when one is on, where its mount stands: with it, they are put away)
-        shown.push([mine, ITEMS[o.item].weapon?.optic ? `!${ITEMS[o.item].weapon!.optic}` : PLAIN_SIGHTS.has(o.item) && o.item !== 'mosin' ? '!red_dot' : '!pu_scope']);
+        shown.push([mine, `${ITEMS[o.item].weapon?.optic ? `!${ITEMS[o.item].weapon!.optic}` : PLAIN_SIGHTS.has(o.item) && o.item !== 'mosin' ? '!red_dot' : '!pu_scope'}|${RED_DOT}`]);
         ironPost = mine.getObjectByName('post') ?? null;
       }
     }
@@ -2017,9 +2052,9 @@ export class Weapons {
       // (on a pack whose gun leans on its own pieces, the lean undone as it is aimed (AIM_ROLL): the sight turned back the
       // same on the rail, or it stood upright while the gun leaned, and leaned once the gun was upright: "the holographic is
       // sideways 5 degrees")
-      if (name === 'red_dot' && AIM_ROLL[o.item]) mine.rotateX(THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
+      if ((name === 'red_dot' || name === RED_DOT) && AIM_ROLL[o.item]) mine.rotateX(THREE.MathUtils.degToRad(AIM_ROLL[o.item]));
       // (and set back on the line of the gun's irons, which turning it about its foot took it off: measured aimed)
-      if (name === 'red_dot' && DOT_SIDE[o.item]) mine.position.z += DOT_SIDE[o.item];
+      if ((name === 'red_dot' || name === RED_DOT) && DOT_SIDE[o.item]) mine.position.z += DOT_SIDE[o.item];
       const mark = mine.getObjectByName('reticle');
       if (mark) marks.push(mark);
       rig.hang(mine, on);
@@ -2044,6 +2079,32 @@ export class Weapons {
     }
     // (the Elcan stands on its foot on the rail, as the holographic sight does: looked through, it is a scope)
     if (fit?.elcan) await fitted('elcan', 'elcan', fit.elcan.at, fit.elcan.size, onBody, () => {});
+    // (the red dot: stood on its foot along the gun, its glass to the muzzle, and its dot on the middle of the glass for
+    // the eye behind it, which is where the eye goes when it is aimed through)
+    let rdAt: THREE.Vector3 | null = null;
+    if (ITEMS[RED_DOT]?.attach?.fits.includes(o.item)) {
+      const own = RED_DOT_AT[o.item];
+      let at = own?.at ?? fit?.dot?.at ?? fit?.elcan?.at ?? null;
+      if (!at) {
+        const box = new THREE.Box3();
+        for (const p of alone) if (/^(scope|sight)$/.test(p.name.replace(/_\d+$/, ''))) {
+          p.geometry.computeBoundingBox();
+          box.union(p.geometry.boundingBox!);
+        }
+        if (!box.isEmpty()) at = [(box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2];
+      }
+      if (at) {
+        const rd = await fitted(RED_DOT, RED_DOT, at, own?.size ?? fit?.dot?.size ?? (o.kind === 'pistol' ? 0.5 : 0.8), o.kind === 'pistol' ? o.ride?.slide ?? 'slide' : onBody, (obj) => void (obj.rotation.y = -Math.PI / 2));
+        const dot = new THREE.Mesh(new THREE.PlaneGeometry(0.004, 0.004), dotMaterial());
+        dot.name = 'reticle';
+        dot.renderOrder = 20;
+        dot.position.set(...RED_DOT_GLASS);
+        rd.add(dot);
+        marks.push(dot);
+        rig.root.updateMatrixWorld(true);
+        rdAt = new THREE.Vector3().setFromMatrixPosition(dot.matrixWorld);
+      }
+    }
     if (fit?.light) {
       // the underside of the gun where the light goes: the lowest of its body within a finger's width of that place along it
       let under = Infinity;
@@ -2244,7 +2305,7 @@ export class Weapons {
     // (a rifle with a holographic sight stood on it from another model: the eye on its mark, as a pistol's)
     const glassAt = new THREE.Vector3(hung.size ? glassX : c.x, hung.size ? glassY : c.y, (sight.min.z + sight.max.z) / 2);
     const through = lensRig ? glassAt.clone().applyEuler(opticRot) : squared(glassAt);
-    const lit = dotAt ? squared(dotAt) : null;
+    const lit = dotAt ? squared(dotAt) : null, litRd = rdAt ? squared(rdAt) : null;
     // (a sight of its own looked through, the M32's and the MP7's: as near the eye as a holographic sight stood on a gun
     // is, 10 cm behind it, its window round its mark. At 20 cm it was a small ring in the middle of the view, off the
     // gun: the owner, 2026-10-18, "the mp7a1 red dot sight is broken and does NOT look okay")
@@ -2284,6 +2345,8 @@ export class Weapons {
       hip: o.hip.clone(),
       hipRot: new THREE.Euler(0, 0, 0),
       ads,
+      // (through the red dot: its dot before the eye, as near as a holographic sight's mark is)
+      adsDot: litRd ? new THREE.Vector3(-litRd.x, -litRd.y, o.hip.z + (long ? 0.02 : 0.07) + (DOT_NEAR[o.item] ?? 0)) : undefined,
       optic: ITEMS[o.item].weapon?.optic ?? (long ? (hung.size ? 'red_dot' : 'pu_scope') : dotAt ? 'red_dot' : undefined),
       ownSights: !!post,
       lamp: lamp ?? undefined,
@@ -2412,7 +2475,7 @@ export class Weapons {
     // fitted: it was asked of the gun's own pieces, which know nothing of it, and every AK anybody was seen
     // holding had its drum and its suppressor on.)
     const optic = PLAIN_SIGHTS.has(id) && id !== 'mosin' ? 'red_dot' : 'pu_scope';
-    for (const piece of c.children) piece.visible = piece.name === 'irons' ? !mods.includes(optic) : EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : ITEMS[piece.name]?.attach || ITEMS[piece.name]?.mag ? mods.includes(piece.name) : pieceShown(id, piece.name, mods);
+    for (const piece of c.children) piece.visible = piece.name === 'irons' ? !mods.includes(optic) && !mods.includes(RED_DOT) : EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : ITEMS[piece.name]?.attach || ITEMS[piece.name]?.mag ? mods.includes(piece.name) : pieceShown(id, piece.name, mods);
     return c;
   }
 
@@ -3472,7 +3535,8 @@ export class Weapons {
     // (The fresh magazine of a reload is there only while one is being changed, and is the kind that is going in:
     // at rest the pack parks it by the butt, under the eye, where a drum showed in the corner of the picture.)
     const fresh = this.action?.name === 'magswap' || this.action?.name === 'reload' ? this.incoming ?? it?.mag ?? null : null;
-    for (const [obj, mod] of m.shown ?? []) obj.visible = obj.userData.fresh ? (mod === '*' ? !!fresh : mod === fresh) : mod.startsWith('!') ? !hasMod(it, mod.slice(1)) : hasMod(it, mod);
+    // ('!a|b': there while neither is fitted)
+    for (const [obj, mod] of m.shown ?? []) obj.visible = obj.userData.fresh ? (mod === '*' ? !!fresh : mod === fresh) : mod.startsWith('!') ? !mod.slice(1).split('|').some((x) => hasMod(it, x)) : hasMod(it, mod);
     for (const mark of m.marks ?? []) mark.visible = this.adsT > 0.75;
     // (the rounds seen in a magazine's mouth are there when the magazine has them: what is in the gun less the one in its chamber)
     if (m.rounds === undefined) m.rounds = m.rig ? this.roundsOf(m.root) : [];
@@ -3821,7 +3885,7 @@ export class Weapons {
     this.lag.set(sw.x * trail * follow, sw.y * trail * follow);
 
     const ads = this.adsT;
-    const adsPos = m.adsIron && !(m.optic && hasMod(this.currentItem, m.optic)) ? m.adsIron : m.ads;
+    const adsPos = m.adsDot && hasMod(this.currentItem, RED_DOT) ? m.adsDot : m.adsIron && !(m.optic && hasMod(this.currentItem, m.optic)) ? m.adsIron : m.ads;
     const pos = new THREE.Vector3().lerpVectors(m.hip, adsPos, ads);
     const rot = new THREE.Euler(0, 0, 0);
 
@@ -3984,7 +4048,7 @@ export class Weapons {
     }
     // (and one held turned in at the hip is squared to the eye as it comes up)
     if (m.aimRot) {
-      const turn = m.aimRotOptic && m.optic && hasMod(this.currentItem, m.optic) ? m.aimRotOptic : m.aimRot;
+      const turn = m.aimRotOptic && m.optic && hasMod(this.currentItem, m.optic) && !hasMod(this.currentItem, RED_DOT) ? m.aimRotOptic : m.aimRot;
       rot.x += turn.x * ads;
       rot.y += turn.y * ads;
       rot.z += turn.z * ads;

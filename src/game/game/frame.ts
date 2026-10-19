@@ -16,7 +16,7 @@ import { weightFelt } from '../../sim/powers';
 import { MAX_STAMINA } from '../../net/protocol';
 import { greyOf, bleedsOutIn, BLOOD } from '../../sim/blood';
 import { AVATAR_LAYER, FP_BODY_LAYER, Avatar } from '../avatar';
-import { INJECT } from '../weapons';
+import { INJECT, RED_DOT } from '../weapons';
 import { Stash, WorldItem } from '../loot';
 import { RemotePlayer } from '../remote';
 import { Jeep } from '../vehicle';
@@ -388,7 +388,7 @@ export const frameMethods = {
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
-    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? this.weapons.scopeFov(this.director.baseFov) : this.weapons.aiming ? (this.weapons.equippedItem?.mods?.includes('red_dot') ? HOLO_ZOOM : kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
+    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? this.weapons.scopeFov(this.director.baseFov) : this.weapons.aiming ? (this.weapons.equippedItem?.mods?.some((m) => m === 'red_dot' || m === RED_DOT) ? HOLO_ZOOM : kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
     this.syncHeld();
 
     this.director.update(dt);

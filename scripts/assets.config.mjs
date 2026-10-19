@@ -150,6 +150,21 @@ export const LOCAL_MODELS = {
       changes: 'stood on the ground about its own middle, fitted to the AR-15 alone, textures at 2048',
     },
   },
+  // (a 1x red dot, on every gun that takes a sight: the owner, 2026-10-18, "i added a red dot sight 1x we need to fit
+  // to all the guns that accept scope attachments"; 2026-10-19, "the red dot can go on everything that takes a scope")
+  red_dot_1x: {
+    scale: 0.001,
+    tex: 2048,
+    tags: ['loot', 'attachment'],
+    changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at 2048; geometry compressed.',
+    credit: {
+      name: 'FPS Red Dot Sight (Game Model)',
+      url: 'https://sketchfab.com/3d-models/fps-red-dot-sight-game-model-0cf999d9363940c2b149dcd80c448554',
+      author: 'Michael Makivic',
+      line: 'This work is based on "FPS Red Dot Sight (Game Model)" (https://sketchfab.com/3d-models/fps-red-dot-sight-game-model-0cf999d9363940c2b149dcd80c448554) by Michael Makivic (https://sketchfab.com/makivic) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'scaled to metres, stood on the ground about its own middle, fitted to the guns that take a sight, textures at 2048',
+    },
+  },
   holo_sight: {
     dir: 'eotech_exps3',
     scale: 0.01,
