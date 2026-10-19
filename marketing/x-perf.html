@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: smoother</title>
+<!-- An X card, 1600x900 (2026-10-19). Rendered to marketing/zona-x-perf.png by: node scripts/card.mjs x-perf 1600 900
+     The picture is the canyon pass from its floor (assets-src/_wf/me/pass-look.js). Every number is measured on the
+     same machine with the same recorded runs, played again before and after, in turns (assets-src/_wf/me/replay.mjs):
+     the owner's helicopter flight (owner-run-2: this morning's build 4840f5b against the day's, two runs each), and a
+     walk from Zavod through the pass to Zastava (walk-pass, made by walk-run.mts: with the rock change and without, two
+     runs each). Draws per frame from the flight's middle frame; the vehicle frame from the flight's in-run A/B. -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --green: #9fe08a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .shot { position: absolute; inset: 0; background: url('src-x-perf.png') no-repeat; background-size: cover; background-position: center; filter: brightness(1.12) contrast(1.06) saturate(1.12); }
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(90deg, rgba(8, 9, 7, 0.94) 0%, rgba(8, 9, 7, 0.7) 34%, rgba(8, 9, 7, 0.1) 52%, rgba(8, 9, 7, 0.12) 100%),
+    linear-gradient(180deg, rgba(8, 9, 7, 0.3) 0%, rgba(8, 9, 7, 0) 22%, rgba(8, 9, 7, 0) 74%, rgba(8, 9, 7, 0.7) 100%); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .logo { position: absolute; left: 64px; top: 54px; font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8); }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .head { position: absolute; left: 64px; top: 170px; width: 640px; }
+  .head i { display: inline-block; padding: 6px 14px; font-style: normal; font-size: 18px; font-weight: 700; letter-spacing: 0.26em; color: #141109; background: var(--gold); }
+  .head h1 { margin-top: 20px; font-size: 100px; font-weight: 700; line-height: 0.9; letter-spacing: 0.03em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head p { margin-top: 24px; font-size: 25px; font-weight: 500; line-height: 1.32; letter-spacing: 0.02em; text-transform: none; color: var(--dim); }
+  .head p b { color: var(--ink); font-weight: 700; }
+  .tiles { position: absolute; right: 64px; top: 120px; width: 720px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tile { padding: 20px 24px 18px; background: rgba(12, 13, 11, 0.84); border: 1px solid var(--line); border-top: 6px solid var(--green); }
+  .tile.big { grid-column: span 2; border-top-color: var(--gold); }
+  .tile h3 { font-size: 17px; font-weight: 700; letter-spacing: 0.22em; color: var(--dim); }
+  .tile .n { margin-top: 10px; font-size: 64px; font-weight: 700; line-height: 0.95; letter-spacing: 0.02em; }
+  .tile .n s { text-decoration: none; color: var(--dim); font-size: 40px; }
+  .tile .n em { font-style: normal; color: var(--green); }
+  .tile.big .n em { color: var(--gold); }
+  .tile p { margin-top: 8px; font-size: 19px; font-weight: 500; line-height: 1.25; text-transform: none; color: var(--dim); }
+  .note { position: absolute; left: 64px; bottom: 96px; width: 640px; font-size: 16px; font-weight: 500; line-height: 1.35; text-transform: none; color: var(--dim); opacity: 0.85; }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 50px; display: flex; justify-content: space-between; font-size: 19px; font-weight: 600; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="shot"></div><div class="shade"></div><div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+  <div class="head">
+    <i>Performance update</i>
+    <h1>Smoother<br>in the <em>canyon</em><br>and the air</h1>
+    <p>The canyon's rock now sends the graphics card <b>a third of the triangles</b>, with nothing you can see changed. Flying, riding and every town with doors are lighter too.</p>
+  </div>
+  <div class="tiles">
+    <div class="tile big"><h3>The canyon pass, on foot</h3><div class="n"><s>108</s> → <em>120</em></div><p>frames a second in the pass, on average (+11%) · triangles a frame 4.8 → 1.7 million</p></div>
+    <div class="tile"><h3>Helicopter flight</h3><div class="n"><s>71</s> → <em>81</em></div><p>frames a second, on average (+15%)</p></div>
+    <div class="tile"><h3>Long frames in flight</h3><div class="n"><em>−44%</em></div><p>frames over 50 ms; over 33 ms −39%</p></div>
+    <div class="tile"><h3>Draw calls a frame</h3><div class="n"><s>431</s> → <em>304</em></div><p>every door in the world drawn as one</p></div>
+    <div class="tile"><h3>Riding a vehicle</h3><div class="n"><em>−3 ms</em></div><p>off every frame while seated (measured in a helicopter)</p></div>
+  </div>
+  <div class="note">Measured on one test PC, the same recorded runs played back before and after in turns: a helicopter flight from Kamenka, and a walk from Zavod through the pass to Zastava.</div>
+  <div class="foot"><span>X <b>@zonaSOL_</b></span><span><b>ZONAPVP.FUN</b></span></div>
+</body>
+</html>

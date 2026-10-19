@@ -185,8 +185,25 @@
         </div>
       </section>
 
-      <article class="entry" id="watchtowers-red-dot">
+      <article class="entry" id="smoother-canyon">
         <div class="when"><time datetime="2026-10-19">19 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>Smoother in the canyon, in the air and in town</h2>
+          <p class="lead">The canyon pass now sends the graphics card a third of the triangles it did, with nothing you can see changed: 108 to 120 frames a second on average in the pass. A helicopter flight runs at 81 frames a second where it ran at 71 this morning, with 44% fewer frames over 50 ms. Measured on one test PC, the same recorded runs played back before and after in turns.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/perf-canyon.jpg" alt="The performance figures over a view up the canyon pass: in the pass 108 to 120 frames a second and 4.8 to 1.7 million triangles a frame; a helicopter flight 71 to 81 frames a second; 44% fewer frames over 50 ms in flight; 431 to 304 draw calls a frame; 3 ms off every frame while seated in a vehicle" /><figcaption><b>The figures,</b> each from the same run before and after.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>The canyon's rock:</b> a rock close to you casts its shadow from a lighter copy of itself, and rocks out of your view are not drawn at all. In the pass a frame went from 4.8 to 1.7 million triangles.</li>
+            <li><b>Doors:</b> every door in the world is drawn in one go, not one go for each of some forty sizes: 304 draw calls a frame where there were 431.</li>
+            <li><b>Loot</b> appears a few things a frame, the nearest first, instead of a whole town's in one frame as you run into it.</li>
+            <li><b>Riding:</b> 3 ms off every frame while you sit in a car or a helicopter.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="watchtowers-red-dot">
+        <div class="when"><time datetime="2026-10-19">19 Oct 2026</time></div>
         <div>
           <h2>Watchtowers, the red dot, and loot you can pick up</h2>
           <p class="lead">Watchtowers and hunting towers stand across the map, a 1x red dot fits every gun that takes a sight, and the PSO scope fits the AK. Things on shelves in the west's towns can be picked up again: the server had them on the wrong shelves. Cars come back to the west, and a helicopter blown up in the air falls out of the sky.</p>
