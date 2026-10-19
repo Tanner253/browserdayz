@@ -28,7 +28,8 @@ import { banId, command, login, offId, roleId } from './admin';
 const LYING_REACH = 4;
 /** what is in a thing, as it is sent: each with its place in it */
 const storedOf = (item: ItemInstance): StoredItem[] => (item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
-import { broadcast, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
+import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
+import { shotHeard } from '../src/sim/heard';
 import { ajar, findCarried, hurtJeep, kill, leaveSeat, rackChanged, releaseLock, seatOf } from './acts';
 import { scores } from './queue';
 import { sendDrop } from './drops';
@@ -95,7 +96,8 @@ export function handle(c: Client, m: C2S) {
     case 'shot': {
       if (!c.alive || !isVec3(m.o) || !isVec3(m.d) || !WEAPON_RULES[m.w] || WEAPON_RULES[m.w].melee) return;
       stayOn(c, 'you fired');
-      broadcast({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, c);
+      // (to whoever is within earshot of that gun, and a little more for those on the move: see src/sim/heard.ts)
+      broadcastNear({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, m.o[0], m.o[2], shotHeard(m.w, !!m.sup)[1] + 50, c);
       return;
     }
     case 'swing': {

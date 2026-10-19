@@ -143,6 +143,22 @@ export function broadcast(m: S2C, except?: Client) {
   for (const c of clients.values()) if (c !== except && c.ws.readyState === 1) c.ws.send(s);
 }
 
+/**
+ * Said only to those within `within` metres of (x, z), across the ground: what nobody further off could hear or see.
+ * (A shot was said to every game on the map, and each flew its rounds for four seconds, a fight at one end of the map
+ * paid for by everybody at the other: the owner, 2026-10-19, "people sometimes complain of lag spike when fighting
+ * people".)
+ */
+export function broadcastNear(m: S2C, x: number, z: number, within: number, except?: Client) {
+  if (!clients.size) return;
+  let s: string | null = null;
+  const r2 = within * within;
+  for (const c of clients.values()) {
+    if (c === except || c.ws.readyState !== 1 || (c.pose[0] - x) ** 2 + (c.pose[2] - z) ** 2 > r2) continue;
+    c.ws.send((s ??= JSON.stringify(m)));
+  }
+}
+
 export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}) });
 
 /** is somebody shown to this player: everybody is, but a vanished admin, whom only admins see */

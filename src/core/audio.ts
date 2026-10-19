@@ -9,7 +9,7 @@ import { ITEMS } from '../sim/items';
 type V3 = { x: number; y: number; z: number };
 /** how a gun sounds where it is not as its kind does: its recording, played so much slower (deeper) and louder; and a
  * quieted shot of its own, at its own level against the .22's (see gunshot) */
-export interface Voice { rate: number; gain: number; rec?: string; quiet?: string; quietGain?: number; /** its rounds slower than sound: no crack, quieted or going by */ subsonic?: true }
+export interface Voice { rate: number; gain: number; rec?: string; quiet?: string; quietGain?: number; /** its rounds slower than sound: no crack, quieted or going by */ subsonic?: true; /** how much further than a rifle's it carries before its distance tells (the .50s: their boom holds) */ reach?: number }
 
 /**
  * How much of a loud sound comes back from round about: [in the open, under a roof]. Open
@@ -652,9 +652,18 @@ export class AudioEngine {
    * @param voice a gun that is deeper and louder than its kind: its recording played that much slower and that much louder
    * @param sonic through a suppressor: how much of a crack its round makes, 0 (slower than sound when it leaves: none) .. 1 (a rifle's)
    */
-  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: Voice, sonic = kind === 'rifle' ? 1 : 0) {
+  /** @param left how much of it is left past its distance's own fall-off (src/sim/heard.ts heardShare): 1 near, toward nothing at the edge of where it is heard */
+  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: Voice, sonic = kind === 'rifle' ? 1 : 0, left = 1) {
     if (!this.ready) return;
     const ctx = this.ctx;
+    // (what is left of it at the edge of where it is heard: in front of where it is placed in the world)
+    const fade = (to: AudioNode) => {
+      if (!pos || left >= 1) return to;
+      const g = ctx.createGain();
+      g.gain.value = left;
+      g.connect(to);
+      return g;
+    };
     const t = ctx.currentTime + (distance > 0 ? distance / 343 : 0);
     if (suppressed) {
       // Through a suppressor: a hard flat crack with a thump under it, and still a shot (see QUIET). What the
@@ -662,7 +671,7 @@ export class AudioEngine {
       // is most of what is heard of a quieted rifle, by whoever fires it and more by anybody to one side, so it is
       // louder, deeper and carries further than a 9 mm, which quieted is slower than sound and has no crack at all.
       const mix = (a: number[]) => a[0] + (a[1] - a[0]) * Math.min(1, Math.max(0, sonic));
-      let o2 = this.out(pos, QUIET.ref, QUIET.rolloff, distance * mix(QUIET.dull));
+      let o2 = fade(this.out(pos, QUIET.ref, QUIET.rolloff, distance * mix(QUIET.dull)));
       if (!pos) {
         // (a node of its own, as an open shot has below: what goes to the hills is tapped from it and from nothing else)
         const own = ctx.createGain();
@@ -701,7 +710,8 @@ export class AudioEngine {
     const big = kind === 'rifle';
     // 7.62x39: sharper and shorter than the full-power Mosin round
     const mid = intermediate ? 0.72 : 1;
-    let out = this.out(pos, big ? 12 : 8, 1, distance);
+    const reach = voice?.reach ?? 1;
+    let out = fade(this.out(pos, (big ? 12 : 8) * reach, 1, distance / reach));
     if (!pos) {
       // your own shot plays into a node of its own. What goes to the hills is tapped from
       // here, and tapping the shared one sent every other sound in the game there as well,
@@ -713,7 +723,7 @@ export class AudioEngine {
     const send = ctx.createGain();
     // the echo off the hills is taken before the sound is placed in space: it has to fall off
     // with distance by itself, or a shot across the valley rings as loud as your own
-    const ref = big ? 12 : 8;
+    const ref = (big ? 12 : 8) * reach;
     const fall = pos ? Math.pow(ref / (ref + Math.max(0, distance - ref)), 0.75) : 1;
     send.gain.value = (big ? 0.9 : 0.6) * fall;
     out.connect(send);

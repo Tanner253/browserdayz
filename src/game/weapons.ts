@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { CRACK, audio, type Voice } from '../core/audio';
+import { heardShare, shotHeard } from '../sim/heard';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
 import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf, canOf } from '../sim/items';
@@ -162,6 +163,13 @@ interface Bullet {
 }
 
 const _toCam = new THREE.Vector3();
+/** a bullet's step this substep, and its way (see updateBullets: taken afresh only where it meets something) */
+const _bStep = new THREE.Vector3(), _bDir = new THREE.Vector3();
+/**
+ * Somebody else's shot fired further off than this, metres, whose line passes no nearer this eye than SHOT_NEAR, is
+ * heard and its flash seen, and no round of it is flown here (see remoteShot).
+ */
+const SHOT_SEEN = 600, SHOT_NEAR = 80;
 const _cardV = new THREE.Vector3();
 
 /**
@@ -1085,8 +1093,10 @@ const VOICE: Record<string, Voice> = {
   scorpion: { rate: 1, gain: 1.1, rec: 'shot_scorpion' },
   dual_smg: { rate: 1, gain: 1.1, rec: 'shot_ppsh' },
   dual_mac10: { rate: 1, gain: 1.15, rec: 'shot_mac10' },
-  sniper50: { rate: 1, gain: 1.3, rec: 'shot_50' },
-  barrett: { rate: 1, gain: 1.3, rec: 'shot_barrett' },
+  // (the .50s carry: their distance tells at twice a rifle's, their boom held, out to where they fall away (src/sim/heard.ts).
+  // The owner, 2026-10-19: "the 50 cal's should be heard from quite a distance a way")
+  sniper50: { rate: 1, gain: 1.3, rec: 'shot_50', reach: 2 },
+  barrett: { rate: 1, gain: 1.3, rec: 'shot_barrett', reach: 2 },
   // (quieted by build, and its rounds slower than sound, as the real one's are: very quiet, which is what it is for (the
   // owner, 2026-10-18: "its an integrated supressor its quietness should be a major feature of the weapon"). At a
   // twentieth it was a whisper ("the vssk is too quiet now. not realistic"): at about a fifth it is the cough and clack a
@@ -3578,7 +3588,13 @@ export class Weapons {
     // (as fast as it left where it was fired, which through a suppressor is slower: it lands where it landed
     // there, and a 9 mm that went by without a crack there goes by without one here)
     const v0 = b.muzzleVel * (suppressed && !GUNS[weaponId]?.quiet ? QUIETED : 1);
-    for (let k = 0; k < b.pellets; k++) {
+    // (Fired far off, and passing nowhere near: not flown here. Every shot on the map is passed to every game, and each
+    // was flown for its four seconds, every pellet a ray against the world each 240th of a second, for fights at the far
+    // end of the map: the owner, 2026-10-19, "people sometimes complain of lag spike when fighting people". What could
+    // crack past this ear, or land where it can be seen, is flown as before; the shot is heard and its flash seen.)
+    const cam = this.mainCam?.position;
+    const far = !!cam && origin.distanceTo(cam) > SHOT_SEEN && _toCam.copy(origin).addScaledVector(out, Math.max(0, _bDir.copy(cam).sub(origin).dot(out))).distanceTo(cam) > SHOT_NEAR;
+    if (!far || (globalThis as { __noShotCull?: boolean }).__noShotCull) for (let k = 0; k < b.pellets; k++) {
       const d = b.cone ? strewn(out, b.cone) : out.clone();
       this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(v0), drag: b.drag, damage: 0, v0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true, from: shooter });
     }
@@ -3590,7 +3606,9 @@ export class Weapons {
     const seen = from && from.pos.distanceTo(origin) < 2.5 ? from : null;
     const at = seen ? seen.pos : origin.clone().addScaledVector(out, kind === 'pistol' ? 0.6 : 1).add(new THREE.Vector3(0, kind === 'pistol' ? 0 : -0.05, 0));
     this.fx.muzzle(at, seen ? seen.dir : out, kind !== 'pistol', suppressed, FLAME[kind]);
-    audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId], VOICE[weaponId]?.subsonic ? 0 : crackOf(v0));
+    // (heard as far as that gun carries, and fading out steeply past it: see src/sim/heard.ts)
+    const heard = shotHeard(weaponId, suppressed);
+    if (d < heard[1]) audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId], VOICE[weaponId]?.subsonic ? 0 : crackOf(v0), heardShare(heard, d));
   }
 
   /**
@@ -3716,9 +3734,9 @@ export class Weapons {
         const speed = b.vel.length();
         b.vel.addScaledVector(b.vel, -b.drag * speed * h);
         b.vel.y -= g * h;
-        const step = b.vel.clone().multiplyScalar(h);
+        const step = _bStep.copy(b.vel).multiplyScalar(h);
         const len = step.length();
-        const dir = step.clone().divideScalar(len);
+        const dir = _bDir.copy(step).divideScalar(len);
         // other players' bullets pass through nothing special: they stop on the world and on bodies alike
         let hit = physics.raycast(b.pos, dir, len, SHOT_GROUPS, b.ghost ? undefined : this.player.collider);
         // (somebody else's, and what it met is the body it came out of: on through it)
@@ -3757,6 +3775,8 @@ export class Weapons {
           hit = next ? { ...next, toi: next.toi + past } : null;
         }
         if (hit) {
+          // (its way, its own from here: what it meets may keep it)
+          const dir = _bDir.clone();
           const pt = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z);
           const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
           const target = this.resolveTarget(hit.tag?.owner);
