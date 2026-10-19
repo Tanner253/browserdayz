@@ -84,7 +84,9 @@ export const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character
 // (29, 2026-10-18: gun racks, new places for loot: down the bunker, in the barracks' arms rooms and in each field post)
 // (30, 2026-10-18: the desert's places and their roads, and Kamenka's army and police on the fourth step: whoever stood
 // in the desert is set down afresh, nobody else, see REMADE in keep.ts)
-export const WORLD_REV = 30;
+// (31, 2026-10-19: watchtowers and hunting towers on ground levelled for them, the cellars' and the desert's places
+// for things moved; whoever stood on a tower's ground is set down afresh, nobody else)
+export const WORLD_REV = 31;
 
 export const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
