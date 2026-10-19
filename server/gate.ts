@@ -150,6 +150,12 @@ export const RANGES = { dealt: 0, passed: 0, failed: 0, on: 0 };
  * shooting the course again). A new name or a new device is the course again.
  */
 export const shooterOf = (key: string, ip: string, fp: string, name: string) => `${keyHash(key)}|${ip}|${fp}|${name.toLowerCase()}`;
+/**
+ * The device a pass is held for: none for Brave, which names its card "Brave" and scrambles what a device is told by
+ * every time it is opened, so that its players were asked to shoot the course at every coming in (2026-10-19: "why
+ * everytime login need to clear the bot section? ... yep brave"). Held for their game, address and name alone.
+ */
+export const passDevice = (fp: string, gl: string | undefined) => (/^\s*brave\s*$/i.test(gl ?? '') ? '' : fp);
 
 /** every pass a game holds from where it plays, whatever its device and name */
 export function forgetShooter(key: string, ip: string) {

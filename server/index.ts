@@ -34,7 +34,7 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
+import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
@@ -987,7 +987,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           log(`${cleanName(h.name)} passed the bot check in ${(at / 1000).toFixed(0)} s (go ${r.go}): ${r.judge.report} [${agent}, ${drawsWith()}]`);
           RANGES.passed++;
           offRange();
-          if (key && BOTCHECK.ms) shooters.set(shooterOf(key, ipOf.get(ws) ?? '', deviceOf.get(ws) ?? '', cleanName(h.name)), now + BOTCHECK.ms);
+          if (key && BOTCHECK.ms) shooters.set(shooterOf(key, ipOf.get(ws) ?? '', passDevice(deviceOf.get(ws) ?? '', h.gl ?? browser?.gl), cleanName(h.name)), now + BOTCHECK.ms);
           if (shooters.size > 20000) for (const [k, until] of shooters) if (until < now) shooters.delete(k);
           ws.send(JSON.stringify({ t: 'rpass' } satisfies S2C));
           letIn(h, true);
@@ -1058,7 +1058,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       // (Shown to be a person's browser, or not asked: now the range, for whoever has not lately passed it.
       // Not for somebody who is to be turned away whatever they shoot: they are told so at once, by `join`.)
       const enter = (h: Extract<C2S, { t: 'hello' }>) => {
-        if (h.v !== PROTOCOL || knownShooter(key, ip, fp, cleanName(h.name)) || bannedFor(key || 'nobody', ip, fp, sigOfWs.get(ws)) || addressFull(key, ip)) return void letIn(h);
+        if (h.v !== PROTOCOL || knownShooter(key, ip, passDevice(fp, h.gl), cleanName(h.name)) || bannedFor(key || 'nobody', ip, fp, sigOfWs.get(ws)) || addressFull(key, ip)) return void letIn(h);
         const deal = (go: number) => {
           // (the server's own dice, from the system's: the game sees the yard's turn, and nothing it could work the
           // figures' walks out from)

@@ -377,6 +377,8 @@ export class CourseJudge {
   private shown: number[] = LANES.map(() => -1);
   /** a counted shot landed on the one with their hands up: the go is over */
   civShot = false;
+  /** one has landed on them already: the first is a warning (see `shot`) */
+  civWarned = false;
   private seenAt: number[] = LANES.map(() => -1e9);
   /** things said that could not be so (inside a wall, through one, out of the yard, in the air, a leap, a time that runs backwards): three, and the go is over */
   wrong = 0;
@@ -518,7 +520,14 @@ export class CourseJudge {
       if (t <= 0 || Math.hypot(s.x + l[0] * t - p.x, s.z + l[2] * t - p.z) > 0.8) return (this.why = 'the sights were not on it before it was fired', -1);
     }
     // (aimed at, held on and shot: the one with their hands up. Not one of the figures, and the go is over)
+    // (Once is a warning, and the go goes on; the second time it is over. Real players fired at them on their first sight
+    // of the yard, go after go, and were turned away for it: of the goes failed on 2026-10-19 nearly every one was this,
+    // one player failing sixteen. A program that fires at whatever moves fires at them twice.)
     if (hit === CIV) {
+      if (!this.civWarned) {
+        this.civWarned = true;
+        return (this.why = 'shot somebody with their hands up, once: a warning', -1);
+      }
       this.civShot = true;
       return (this.why = 'shot somebody with their hands up', -1);
     }
@@ -550,7 +559,7 @@ export class CourseJudge {
   get report() {
     const signed = this.sign !== 'off' && this.down.size >= this.course.need ? this.signed : '';
     const sure = this.down.size >= this.course.need ? this.tooSure : '';
-    return `${this.civShot ? 'shot somebody with their hands up; ' : ''}${this.down.size} of ${this.course.need} down, ${this.shots} shots (${this.landed} landed by the course), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}${sure ? `; ${sure}` : ''}`;
+    return `${this.civShot ? 'shot somebody with their hands up; ' : this.civWarned ? 'shot somebody with their hands up once; ' : ''}${this.down.size} of ${this.course.need} down, ${this.shots} shots (${this.landed} landed by the course), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}${sure ? `; ${sure}` : ''}`;
   }
 
   /** every figure down, by somebody who walked the yard and looked about it, said nothing that could not be so, and missed like a person: a person */
