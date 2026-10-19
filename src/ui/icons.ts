@@ -20,8 +20,9 @@ const ICONS_REV = 3;
  * grip uppermost, which is right for a knife or a shovel and wrong for an axe: an axe is drawn head up.
  * (2026-10-13: "the hatchet is updside down in inventory".)
  */
-// (and the First Aid Kit, whose lid was drawn with its words upside down: looked at on the sheet of every picture, 2026-10-13)
-const HEAD_UP = new Set(['hatchet', 'firstaid']);
+// (and the First Aid Kit, whose lid was drawn with its words upside down: looked at on the sheet of every picture, 2026-10-13;
+// and the stick grenade, drawn handle up: "the stick grenade in this image is upside down in the icon", 2026-10-19)
+const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
  * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip
