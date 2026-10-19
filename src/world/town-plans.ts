@@ -46,7 +46,7 @@ export function cathedralPlan(): Blueprint {
     .put('gun_rack', -6.0, -5.98, 0).put('wooden_military_crate', -3.6, -6.02, 0).put('Barrel_01', -2.35, -5.95);
   g.put('steel_locker', -8.3, 6.0, PI).put('steel_locker', -7.2, 6.0, PI)
     .top('steel_table', -4.5, 5.6, Q, 0.8, 2).put('SchoolChair_01', -4.9, 4.7, 0.2).put('painted_wooden_stool', -3.7, 4.75, 0.4)
-    .put('portable_generator', -2.4, 5.85, PI).put('propane_tank', -2.15, 4.95);
+    .put('metal_jerrycan_green', -2.6, 5.95, 0.2).put('metal_jerrycan_green', -2.2, 5.9, -0.3).put('propane_tank', -2.15, 4.95);
   g.put('crate_big', -6.8, -2.6, 0.1).put('crate_big', -5.75, -2.75, -0.05).put('Barrel_01', -6.3, 2.8).put('Barrel_01', -5.65, 3.1).put('metal_jerrycan_green', -7.0, 3.0, 1.2);
   g.put('crate_big', -9.2, 3.0, 0.08).put('crate_big', -9.2 + STACK, 3.0 + STACK, -0.04, 1.0);
   g.put('painted_wooden_bench', -11.55, -3.5, Q).put('painted_wooden_bench', -11.55, 3.5, Q);
@@ -295,7 +295,8 @@ export function tavernPlan(): Blueprint {
   // 2026-10-19: "many props bloock doorways"), and the beds lay with their feet to the wall.
   const u = new Floor();
   for (const [z, bed, cab, turn] of [[-3.2, -3.9, -4.52, 0], [0, -1.0, -1.21, 0], [3.2, 2.5, 4.52, PI]]) u.bed(5.7, bed, -Q).top('painted_wooden_cabinet', 1.9, cab, turn, 1.2).floor([2.0, z]);
-  for (const [bed, chair] of [[-3.9, -2.4], [-1.0, 0.9], [2.5, 2.2]]) u.put('painted_wooden_nightstand', 6.55, bed + 0.95, -Q).put('painted_wooden_chair_01', 0.2, chair, Q + 0.3);
+  // (a nightstand at each bed's head, a chair against the wall beside each cabinet)
+  for (const [bed, chair, turn] of [[-3.9, -4.4, 0.2], [-1.0, -1.15, 0.2], [2.5, 4.4, PI - 0.2]]) u.put('painted_wooden_nightstand', 6.55, bed + 0.95, -Q).put('painted_wooden_chair_01', 0.9, chair, turn);
   u.floor([-6.2, -4.3]);
   const ext = 'ochre_ext' as const;
   const outer = (front: Opening[], back: Opening[]): WallDef[] => [

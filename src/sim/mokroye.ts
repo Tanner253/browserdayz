@@ -56,8 +56,10 @@ export const MOKROYE_WALKS: WalkRun[] = [
   { a: [14, -8], b: [-13, -14], deck: DECK },
   { a: [14, -8], b: [6, 18], deck: DECK },
   { a: [6, 18], b: [-3, 24], deck: DECK },
-  // (on to the stilt house's porch: it ended 5 m short, in the water, and the door opened onto the swamp)
-  { a: [46, -10], b: [40.06, -29.21], deck: DECK },
+  // (on to the stilt house's porch, the last length a step up to it: the walk ended 5 m short in the water, and the
+  // door opened onto the swamp)
+  { a: [46, -10], b: [40.95, -26.34], deck: DECK },
+  { a: [40.95, -26.34], b: [40.06, -29.21], deck: STILT_FLOOR - 0.25 },
   { a: [6, 18], b: [31, 22], deck: DECK, posts: true },
   { a: [-31, -9], b: [-41, 26], deck: DECK },
   { a: [-42, -24], b: [-74, -26], deck: DECK, gate: true, posts: true },
