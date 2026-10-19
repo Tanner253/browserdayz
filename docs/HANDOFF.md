@@ -2,7 +2,25 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## PICK UP HERE (2026-10-19 ~04:30 UTC; branch `gun-racks`, READY, NOT deployed: deploy on the owner's word)
+## PICK UP HERE (2026-10-19 ~07:00 UTC; branch `gun-racks`, NOT deployed: the owner holds it for one full deploy)
+Live server `5716b79` (`9100439` + the bot-check fix; PROTOCOL 50; `main`, `hotfix`); live site `bc1cb91` (`site-live`).
+On `gun-racks` past both, for the full deploy:
+- West loot numbered alike on server and game (merge of `6a937a7`): the cellars' walls dealt as cards, not by a random
+  sort. Render runs **Node 26** (package.json `engines >=20`; render.yaml's 22 is not applied), whose sort found five
+  cellar places fewer, so the whole west was numbered five off every game's: "took X from 77 m away" refusals since
+  04:25 UTC. Hello says the game's `lootPrint` (`lp`); the server logs `[loot] ... otherwise`, /healthz `lootPrint` and
+  `lootOdd`. After the deploy read the boot line "world ready ... (print ...)" and `lootOdd`. PROTOCOL 51 (not live
+  yet, so the full deploy can go on 51), LOOT_REV 28.
+- Respawn: a game still dead on its screen no longer sets the server back by its body (Fettah put off 3 s after respawn).
+- Bot-check log: "[botcheck] name: shot hostage failed (go 2 of 4): ...", and "shot hostage once, warned".
+- Watchtowers, hunting towers, western infected, stairs boarded, beach starts (the commits of 2026-10-19).
+At the deploy: a new restart note (it still says the bot fix's); WORLD_REV for the towers' ground; changelog with pictures.
+Open asks (owner, 2026-10-19): the 1x red dot on every gun that takes a sight (model `assets-src/fps_red_dot_sight_game_model.zip`,
+its config parked in `stash@{0}`, never brought in), Pokrov's collisions, the church bigger and furnished with army loot,
+more for the swamp, the bunker gun racks through walls, every new west building looked over, the condensed-milk factory
+(plan picture first).
+
+## Before that (2026-10-19 ~04:30 UTC; deployed at 04:14 as `9100439`)
 Live: `517f9a2` (PROTOCOL 49; `main`, `site-live`, `hotfix` there). Ready on `gun-racks` past it, suite run, changelog
 entry "Start on the coast, walk east" with pictures, restart note written; `node scripts/deploy.mjs --dry` clean:
 - Starts on the far west beach (`src/world/worldgen/coast-starts.ts`); the desert's places Peski, Karavan, Bereg, Mys
