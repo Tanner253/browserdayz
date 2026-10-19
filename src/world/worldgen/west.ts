@@ -24,7 +24,7 @@ import { catmullRom, heightAt, slopeAt } from './ground';
 import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside } from './west-plan';
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
 import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
-import { fillTown, hamletGround, kalatSite, layKalat, layPad, offPad, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
+import { DESERT_EAST, desertTown, fillTown, footOn, hamletGround, kalatSite, layKalat, layPad, offPad, padHeld, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
 import { moundAt, placedRooms } from '../../sim/towns';
 import { HUNTING_TOWERS, WATCHTOWERS, huntingId, watchtowerId } from '../../sim/watchtowers';
 import type { Instance, POI, Site } from './types';
@@ -260,8 +260,12 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     for (let j = 0; j < p.length; j += 3) { const e = Math.hypot(p[j] - x, p[j + 2] - z); if (e < d) { d = e; k = j; } }
     return k;
   };
-  // (a road through a town lies exactly at its pad's own level; where it crosses the river, on the ford's bed)
-  const onPad = (x: number, z: number) => PLACED.find((t) => { const [lx, lz] = townLocal(t, x, z); return Math.abs(lx) < t.pad[0] - 10 && Math.abs(lz) < t.pad[1] - 10; });
+  // (a road through a town lies exactly at its pad's own level, a desert place's to its pad's edge, as its bed leaves
+  // the pad (`padHeld`); where it crosses the river, on the ford's bed)
+  const onPad = (x: number, z: number) => PLACED.find((t) => {
+    const [lx, lz] = townLocal(t, x, z), m = desertTown(t) ? 0 : 10;
+    return Math.abs(lx) < t.pad[0] - m && Math.abs(lz) < t.pad[1] - m;
+  });
   const lay = (pts: [number, number][], from: { points: Float32Array; width: number } | null, width: number, side: boolean) => {
     const line = catmullRom(pts, 4), raw = line.map(([x, z]) => heightAt(heights, x, z)), nL = line.length;
     const ys = raw.map((_, k) => { let s = 0, c = 0; for (let j = -12; j <= 12; j++) { const q = 1 - Math.abs(j) / 13; s += raw[clamp(k + j, 0, nL - 1)] * q; c += q; } return s / c; });
@@ -307,7 +311,7 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   // (but in the pass, where the road lies on its level floor: its shelves are the plan's, and the caves are under them)
   // (its mouths are open ground the road comes down into: the caves begin some ninety metres in)
   const outOfPass = (x: number, z: number) => { if (passNear(x, z) > 75) return 1; const a = passLine.near(x, z).along; return a > 60 && a < passLine.total - 60 ? 0 : 1; };
-  for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, outOfPass, net, { fill: 0.35, cut: 0.6, gap });
+  for (const r of [...ways.slice(1), main]) bed(heights, r.points, r.width, R.bed, outOfPass, net, { fill: 0.35, cut: 0.6, gap, keep: (x, z) => padHeld(x, z, 2) });
   // (and the loop's own over the main road's where it leaves it: the loop as the square laid it, about the junction only)
   {
     const jx = main.points[0], jz = main.points[2], lp = loop.points;
@@ -429,17 +433,18 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   // (Kalat's land bare, as the desert is)
   for (let i = 0; i < n; i++) if (kalatLand.share[i] > 76) grass[i] = 0;
 
-  // ---- THE TOWNS: their buildings, things and slab walls, and their yards and lanes painted (west-towns.ts)
+  // ---- THE TOWNS: their buildings, things and slab walls, and their yards and lanes painted (west-towns.ts); a desert
+  // town's things on the ground as it is now, its last (nothing after this moves the ground under them)
   const towns: PlacedTown[] = [], slabs: SlabRun[] = [];
+  const ground = (x: number, z: number) => heightAt(heights, x, z);
   for (const t of PLACED) {
     const y = padY.get(t.name)!;
-    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass });
+    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass }, t.x < DESERT_EAST ? ground : undefined);
     towns.push(placed(t, y));
     tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
   }
   // ---- KALAT: what lies about it, and its name on the maps
-  const ground = (x: number, z: number) => heightAt(heights, x, z);
-  for (const { piece, place } of ruinsPlan(kalat)) tools.props.push(...ruinProps(piece, place, ground));
+  for (const { piece, place } of ruinsPlan(kalat)) tools.props.push(...ruinProps(piece, place, footOn(ground)));
   tools.pois.push({ name: PLAN.kalat.name, x: kalat.x, z: kalat.z, radius: 240 });
   // ---- THE WATCHTOWERS: Pokrov's bell tower stood alone where the owner dotted the map (src/sim/watchtowers.ts), its
   // door to the nearest road, on ground levelled for it, and nothing growing in it
@@ -483,11 +488,11 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const fx = Math.sin(plot.rot), fz = Math.cos(plot.rot), dx0 = wt.x + fx * 4.2 + fz * 1.45, dz0 = wt.z + fz * 4.2 - fx * 1.45;
     // (not in the desert: the wind has the sand over any trail by morning)
     if (wt.x > -2400) trail(dx0, dz0, rx, rz, k);
-    const ground = (x: number, z: number) => heightAt(heights, x, z);
+    const foot = footOn(ground);
     const by = (side: number, out: number): [number, number] => [wt.x + fx * out + fz * side, wt.z + fz * out - fx * side];
     const [cx, cz] = by(-1.6, 4.2), [bx, bz] = by(-2.9, 3.6);
-    tools.props.push({ kind: 'wooden_military_crate', x: cx, y: ground(cx, cz), z: cz, rot: plot.rot + 0.35, scale: 1 });
-    tools.props.push({ kind: 'Barrel_01', x: bx, y: ground(bx, bz), z: bz, rot: 0, scale: 1 });
+    tools.props.push({ kind: 'wooden_military_crate', x: cx, y: foot(cx, cz), z: cz, rot: plot.rot + 0.35, scale: 1 });
+    tools.props.push({ kind: 'Barrel_01', x: bx, y: foot(bx, bz), z: bz, rot: 0, scale: 1 });
   });
   // ---- THE HUNTING TOWERS: the wooden watchtower in the woods (src/sim/watchtowers.ts), its stair to the south, nothing
   // growing in it, and the hunters' wood stacked by it
