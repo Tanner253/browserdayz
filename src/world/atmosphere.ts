@@ -851,10 +851,10 @@ export class Atmosphere {
       const s = l.shadow;
       s.autoUpdate = false;
       const drawn = (this.drawn[i] ??= { pos: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3() });
-      // (the nearest too every other frame, on the frames the middle one is not drawn (2026-10-18): a map not drawn
-      // keeps the matrix it was drawn with, so a shadow stays where it was in the world for one frame, a few
-      // centimetres afoot; and drawn at once after a jump of more than a metre)
-      const near = i === 0 && !(globalThis as { __c0Every?: boolean }).__c0Every;
+      // (The nearest every frame. Drawn every other frame from 2026-10-18 for the frames it saved, everything that moved
+      // near the eye, the eye's own body first, cast a shadow that stepped instead of moving: the owner, 2026-10-19,
+      // "shadows now stutter really bad and no longer move smoothly. this change is not worht the save".)
+      const near = false;
       const turn = i === 0 ? this.frame % 2 === 1 : i === 1 ? this.frame % 2 === 0 : this.frame % 4 === 1;
       const now = this.sunAt[i], r = this.round[i];
       // (development, as it was: fitted to the view, a turn of three or four degrees needed them drawn again)
