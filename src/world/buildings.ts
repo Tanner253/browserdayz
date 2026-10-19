@@ -9,7 +9,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
 import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surface } from '../core/physics';
 import { RNG } from '../core/noise';
-import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
+import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
 import { PILLBOX, POST_ROOM, postAt, postFoot, postYaw } from '../sim/posts';
 import type { Tier } from '../sim/tiers';
@@ -1246,58 +1246,80 @@ function containerLeaf(blue: boolean) {
 
 // ------------------------------------------------------------------ doors
 
+/**
+ * A door leaf's picture laid as a box of its own size had it, though every leaf is one box a metre each way stretched
+ * by its line of the list (DoorBatch): each face's two directions taken by as much as the leaf is stretched along
+ * them, its depth never stretched.
+ */
+const leafUv: ShaderPatch = (s) => {
+  s.vertexShader = s.vertexShader.replace(
+    '#include <uv_vertex>',
+    `#ifdef USE_INSTANCING
+  vec2 leafK = vec2(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz));
+  vec2 leafUv = uv * (abs(normal.y) > 0.5 ? vec2(leafK.x, 1.0) : abs(normal.x) > 0.5 ? vec2(1.0, leafK.y) : leafK);
+  #undef MAP_UV
+  #define MAP_UV leafUv
+  #undef NORMALMAP_UV
+  #define NORMALMAP_UV leafUv
+  #undef ROUGHNESSMAP_UV
+  #define ROUGHNESSMAP_UV leafUv
+  #undef METALNESSMAP_UV
+  #define METALNESSMAP_UV leafUv
+  #undef AOMAP_UV
+  #define AOMAP_UV leafUv
+#endif
+#include <uv_vertex>`,
+  );
+};
+
 /** a door's two handles as one shape: one on each face of the leaf */
 const HANDLES = mergeGeometries([new THREE.BoxGeometry(0.12, 0.03, 0.05).translate(0, 0, 0.05), new THREE.BoxGeometry(0.12, 0.03, 0.05).translate(0, 0, -0.05)], false)!;
 /** how far off a door's handle is still drawn, metres: it is a finger's length of steel */
 const HANDLE_SEEN = 45;
 
 /**
- * Every door leaf of one size, and every door handle, drawn in one go (2026-10-12). Each leaf was a thing of its
- * own to draw, a box of twelve triangles, and its handle another: in Kamenka three hundred of the picture's nine
- * hundred draws were door leaves, and they were drawn again in each of the sun's shadow maps. The same boxes in the
- * same places with the same paint; a leaf is moved by writing where it is into its line of the one list.
+ * Every door leaf, and every door handle, drawn in one go (2026-10-12). Each leaf was a thing of its own to draw, a
+ * box of twelve triangles, and its handle another: in Kamenka three hundred of the picture's nine hundred draws were
+ * door leaves, and they were drawn again in each of the sun's shadow maps. The same boxes in the same places with the
+ * same paint; a leaf is moved by writing where it is into its line of the one list.
+ * (One list for every size from 2026-10-19: a box a metre each way, stretched to each leaf by its line, its picture
+ * laid as before by `leafUv`. A list for each size was some forty lists drawn in every pass, wherever their doors
+ * were: 280 of the 1060 draws of a frame over the map in a helicopter.)
  */
 export class DoorBatch {
-  private leaves = new Map<string, { mesh: THREE.InstancedMesh; n: number }>();
+  private leaves: THREE.InstancedMesh;
+  private nLeaves = 0;
   private handles: THREE.InstancedMesh;
   private nHandles = 0;
 
   constructor(scene: THREE.Scene, doors: Door[], mat: THREE.Material, handleMat: THREE.Material) {
     const plain = doors.filter((d) => d.size);
-    const count = new Map<string, number>();
-    for (const d of plain) count.set(d.size!.join(), (count.get(d.size!.join()) ?? 0) + 1);
-    for (const [key, n] of count) {
-      const [w, h] = key.split(',').map(Number);
-      const mesh = new THREE.InstancedMesh(boxGeo(0, w - 0.02, 0, h - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat, n);
-      mesh.castShadow = mesh.receiveShadow = true;
-      mesh.renderOrder = WALLS_FIRST;
-      // (they stand all over the map: there is no one place to ask whether it is in sight)
-      mesh.frustumCulled = false;
-      mesh.matrixAutoUpdate = false;
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.name = `doors ${key}`;
-      scene.add(mesh);
-      this.leaves.set(key, { mesh, n: 0 });
-    }
+    const mesh = new THREE.InstancedMesh(boxGeo(0, 1, 0, 1, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat, Math.max(1, plain.length));
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.renderOrder = WALLS_FIRST;
+    // (they stand all over the map: there is no one place to ask whether it is in sight)
+    mesh.frustumCulled = false;
+    mesh.matrixAutoUpdate = false;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.name = 'doors';
+    scene.add(mesh);
+    this.leaves = mesh;
     this.handles = new THREE.InstancedMesh(HANDLES, handleMat, Math.max(1, plain.length));
     this.handles.frustumCulled = false;
     this.handles.matrixAutoUpdate = false;
     this.handles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.handles.name = 'door handles';
     scene.add(this.handles);
-    for (const d of plain) {
-      const l = this.leaves.get(d.size!.join())!;
-      d.hang(this, l.mesh, l.n++, this.nHandles++);
-    }
+    for (const d of plain) d.hang(this, this.leaves, this.nLeaves++, this.nHandles++);
   }
 
   private static none = new THREE.Matrix4().makeScale(0, 0, 0);
   private static m = new THREE.Matrix4();
 
-  /** a leaf is where its door's hinge now has it; its handle on it, if the handle is near enough to be drawn */
+  /** a leaf is where its door's hinge now has it, stretched to its size; its handle on it, if the handle is near enough to be drawn */
   place(d: Door, leaf: THREE.InstancedMesh, at: number, handle: number) {
     d.pivot.updateMatrix();
-    leaf.setMatrixAt(at, d.pivot.matrix);
+    leaf.setMatrixAt(at, DoorBatch.m.makeScale(d.size![0] - 0.02, d.size![1] - 0.02, 1).premultiply(d.pivot.matrix));
     leaf.instanceMatrix.needsUpdate = true;
     this.handles.setMatrixAt(handle, d.handleShown ? DoorBatch.m.makeTranslation(d.size![0] - 0.12, 1.0, 0).premultiply(d.pivot.matrix) : DoorBatch.none);
     this.handles.instanceMatrix.needsUpdate = true;
@@ -3369,7 +3391,7 @@ export class Buildings {
       scene.add(board);
     }
 
-    const doorMat = this.material('planks', ' doors') as THREE.MeshStandardMaterial;
+    const doorMat = this.material('planks', ' doors', { patch: leafUv, key: 'leaf' }) as THREE.MeshStandardMaterial;
     const handleMat = new THREE.MeshStandardMaterial({ color: 0x3a3a38, metalness: 0.9, roughness: 0.45 });
     this.atmo.register(handleMat);
     // (a container's leaves: painted as the shell is, once that has come; not drawn from further off than the shell)
@@ -3531,7 +3553,7 @@ export class Buildings {
 
   private matCache = new Map<string, THREE.Material>();
   /** @param apart a paint of its own, the same in every way (the doors' leaves, drawn many times over, are not drawn with the walls' own: three chose a shader again each time it went from the one to the other) */
-  private material(key: MatKey, apart = ''): THREE.Material {
+  private material(key: MatKey, apart = '', own?: { patch: ShaderPatch; key: string }): THREE.Material {
     let m = this.matCache.get(key + apart);
     if (m) return m;
     if (key === 'glass') {
@@ -3554,7 +3576,9 @@ export class Buildings {
     // (Walls, floors and roofs are one picture each, laid over and over: on a wall forty metres long the same stain
     // came round every three, in rows. A slow change of tone across the world, different at every place, is put over
     // the picture: the rows are not seen for it. "we are re-using the same textures too much", 2026-10-11.)
-    if (key !== 'glass' && MACRO.has(key)) this.atmo.register(m, macroTone, 'macro');
+    const tone = key !== 'glass' && MACRO.has(key);
+    if (own) this.atmo.register(m, (sh) => { if (tone) macroTone(sh); own.patch(sh); }, `${tone ? 'macro' : ''}|${own.key}`);
+    else if (tone) this.atmo.register(m, macroTone, 'macro');
     else this.atmo.register(m);
     this.matCache.set(key + apart, m);
     return m;
