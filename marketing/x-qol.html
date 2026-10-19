@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: easier to play</title>
+<!-- A card, 1600x900 (2026-10-19): four pictures of what a contributor's pull requests brought (security-reviewed and
+     brought in by the owner's word, commit 8d0b1bf): the item card on hover, a crate's Take all / Fits my guns, a pin on
+     the big map, the pause screen's Log out counting down. Pictures from progress/pr-qol/shots.
+     node scripts/card.mjs x-qol 1600 900 -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .head { position: absolute; left: 56px; top: 44px; right: 56px; display: flex; align-items: baseline; justify-content: space-between; }
+  .head h1 { font-size: 54px; font-weight: 700; letter-spacing: 0.04em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head span { font-size: 18px; font-weight: 600; letter-spacing: 0.24em; color: var(--dim); }
+  .grid { position: absolute; left: 56px; right: 56px; top: 128px; bottom: 56px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 18px; }
+  .cell { position: relative; overflow: hidden; border: 1px solid var(--line); background-size: cover; background-position: center; }
+  .cell b { position: absolute; left: 0; bottom: 0; right: 0; padding: 12px 16px; font-size: 22px; font-weight: 700; letter-spacing: 0.08em; background: linear-gradient(0deg, rgba(8, 9, 7, 0.92), rgba(8, 9, 7, 0.6) 70%, transparent); }
+  .cell b i { font-style: normal; color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="head"><h1>Easier to <em>play</em></h1><span>ZONAPVP.FUN</span></div>
+  <div class="grid">
+    <div class="cell" style="background-image:url('src-qol-inv-03-item-card.png'); background-position: 70% 30%;"><b><i>Inventory:</i> every stat on hover, search, sort, combine</b></div>
+    <div class="cell" style="background-image:url('src-qol-inv-11-crate-take-buttons.png'); background-position: 20% 20%;"><b><i>Crates and bodies:</i> take all, or what fits your guns</b></div>
+    <div class="cell" style="background-image:url('src-qol-map-1-bigmap-pin.png');"><b><i>The map:</i> double-click to drop a pin</b></div>
+    <div class="cell" style="background-image:url('src-qol-pause-2-counting.png');"><b><i>Pause:</i> log out counts down beside Resume</b></div>
+  </div>
+</body>
+</html>
