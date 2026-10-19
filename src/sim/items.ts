@@ -130,6 +130,8 @@ export interface ItemDef {
   paint?: number;
   /** camera hint for the icon renderer */
   iconYaw?: number;
+  /** its picture in the pockets taken under the lamps a gun's is (src/ui/icons.ts LAMPS): for a thing too dark under its own kind's */
+  iconBright?: boolean;
   /** where and how much of it is found, and what it is found with: on DayZ's Central Economy (src/sim/items/rules.ts) */
   loot?: LootRule;
   /** what the trader gives for one, in credit (a thing that stacks: each of the stack); unsaid, he does not deal in it (src/sim/trade.ts) */
