@@ -518,6 +518,10 @@ export async function loadKept() {
       });
       for (const it of items) issue(it);
       const box: Box = { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now };
+      // (as big as its kind is now, where that has grown: a stash crate buried at eight by six comes up ten by fifteen, with all it held where it was)
+      const [gw, gh] = ITEMS[b.item ?? 'stash_kit']?.stash ?? [box.w, box.h];
+      box.w = Math.max(box.w, gw);
+      box.h = Math.max(box.h, gh);
       if (Math.abs(box.y - b.y) > 1) log(`[keep] a stash at ${Math.round(b.x)}, ${Math.round(b.z)} lies on ground that has moved ${(box.y - b.y).toFixed(1)} m: it is set on the new ground`);
       // (one that stood on the ground, kept by a server from before a stash was a thing to drop: it lies there as one now)
       if (box.buried) boxes.set(b.cid, box);

@@ -2,7 +2,7 @@
 // server configured, or the dev server running on its own) the game plays offline.
 
 import { PROTOCOL, type C2S, type S2C } from './protocol';
-import { deviceId } from './device';
+import { deviceId, glName } from './device';
 
 type Handler<T extends S2C['t']> = (m: Extract<S2C, { t: T }>) => void;
 type Welcome = Extract<S2C, { t: 'welcome' }>;
@@ -328,7 +328,7 @@ export class Net {
         return;
       }
       this.ws = ws;
-      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}) });
+      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName() });
       ws.onerror = () => done(null);
       ws.onclose = () => {
         const was = this.online;

@@ -23,6 +23,8 @@ import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import type { Sighting } from '../src/sim/course';
 import { playCourse } from './course-player';
+import { blocksOf, moverAt } from '../src/sim/course';
+import type { RangeLayout } from '../src/net/protocol';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -36,6 +38,8 @@ class Conn {
   closed = false;
   /** the slip the check that this is a person gave, if it is to say one */
   proof = '';
+  /** what its hello says the graphics card is ('': nothing said) */
+  gl = '';
   constructor(public port: number, public name: string, public ip = '', public origin = '', public key = `bots-test-key-${name}-${String(++n).padStart(20, '0')}`) {}
   /** @returns welcomed, refused (with the reason given), or not taken at all */
   async hello(): Promise<'in' | 'refused' | 'waiting' | 'range' | 'no'> {
@@ -53,7 +57,7 @@ class Conn {
     this.open = true;
     this.got = [];
     this.closed = false;
-    this.ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, key: this.key, name: this.name, ...(this.proof ? { proof: this.proof } : {}) }));
+    this.ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, key: this.key, name: this.name, ...(this.proof ? { proof: this.proof } : {}), ...(this.gl ? { gl: this.gl } : {}) }));
     for (let k = 0; k < 100; k++) {
       if (this.got.some((m) => m.t === 'welcome')) return 'in';
       if (this.got.some((m) => m.t === 'kick')) return 'refused';
@@ -79,7 +83,7 @@ class Conn {
    * @param browser what its browser says of itself @returns whether it was welcomed into the world
    */
   async shoot(browser: { wd: boolean; gl: string } = { wd: false, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti (0x00002482) Direct3D11 vs_5_0 ps_5_0, D3D11)' }): Promise<boolean> {
-    const dealt = [...this.got].reverse().find((m) => m.t === 'range') as { turn: number; go: number; secs: number } | undefined;
+    const dealt = [...this.got].reverse().find((m) => m.t === 'range') as { turn: number; go: number; secs: number; lay?: RangeLayout } | undefined;
     if (!dealt) return false;
     const g = dealt.go, send = (m: unknown) => this.ws.readyState === 1 && this.ws.send(JSON.stringify(m));
     send({ t: 'renv', ...browser });
@@ -106,7 +110,7 @@ class Conn {
       until: async (ms) => {
         await sleep(Math.max(0, t0 + ms - Date.now()));
       },
-    });
+    }, { layout: dealt.lay && { flip: dealt.lay.flip, blocks: blocksOf(dealt.lay.shift), civ: dealt.lay.civ, mover: (ms) => moverAt({ mover: dealt.lay!.mover }, ms) } });
     for (let k = 0; k < 40 && !this.closed && !this.got.some((m) => m.t === 'welcome' || m.t === 'kick'); k++) await sleep(50);
     return this.got.some((m) => m.t === 'welcome');
   }
@@ -294,6 +298,21 @@ try {
     // (and is not asked again, coming back from the same place)
     assert.equal(await ann.hello(), 'in', 'somebody who had passed was dealt the range again');
     ann.leave();
+    // (but under another name from the same game and place, it is the course again: 2026-10-18, "ksm3595872", "ksm3595873" ...)
+    await sleep(400);
+    const renamed = new Conn(E, 'Ann2', '8.8.8.2', '', ann.key);
+    assert.equal(await renamed.hello(), 'range', 'a pass held for a new name');
+    renamed.leave();
+    // a graphics name no browser gives is turned away at the door (2026-10-18: "NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0")
+    const fake = new Conn(E, 'Fake', '8.8.8.7');
+    fake.gl = 'NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0';
+    assert.equal(await fake.hello(), 'refused', 'a graphics name no browser gives was let at the course');
+    assert.match(e.log(), /Fake is not let in: a graphics name no browser gives/);
+    fake.gl = 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+    const real = new Conn(E, 'Real', '8.8.8.8');
+    real.gl = fake.gl;
+    assert.equal(await real.hello(), 'range', "a real browser's graphics name was turned away");
+    real.leave();
     // the same shooting, in a browser that says a program is driving it
     const driven = new Conn(E, 'Driven', '8.8.8.3');
     assert.equal(await driven.hello(), 'range');

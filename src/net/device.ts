@@ -12,6 +12,21 @@
 // alone: see server/device.ts.
 
 let made: Promise<string> | null = null;
+let named: string | null = null;
+/** what the graphics card says it is, as WebGL tells it: said with `hello`, for the server's door (server/botrules.ts, fakeGl) */
+export function glName(): string {
+  if (named !== null) return named;
+  named = '';
+  try {
+    const c = document.createElement('canvas').getContext('webgl2') ?? document.createElement('canvas').getContext('webgl');
+    const ext = c?.getExtension('WEBGL_debug_renderer_info');
+    named = String((ext && c?.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || c?.getParameter(c.RENDERER) || '').slice(0, 160);
+    c?.getExtension('WEBGL_lose_context')?.loseContext();
+  } catch {
+    /* said as nothing */
+  }
+  return named;
+}
 
 /** this device's hash: made once, the first time it is asked for (a few tens of ms), and the same after */
 export function deviceId(): Promise<string> {

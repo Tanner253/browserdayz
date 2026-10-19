@@ -23,7 +23,8 @@ import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
 import { News } from '../src/sim/news';
 import { underGas, gasEdge } from '../src/sim/gas';
-import { CourseJudge, dealCourse } from '../src/sim/course';
+import { CIV, CourseJudge, dealCourse } from '../src/sim/course';
+import { RULES, RULES_NOTE, fakeGl } from './botrules';
 import { inBunker, BUNKER } from '../src/sim/bunker';
 import { BARREL } from '../src/sim/barrels';
 import { type VehicleInfo, POLICE_CAR, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
@@ -33,7 +34,7 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
+import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
@@ -859,7 +860,8 @@ function fromOurPage(req: http.IncomingMessage): boolean {
   return ORIGINS.has(host) || /^dayz-web-slice[\w-]*\.vercel\.app$/.test(host);
 }
 
-const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+// (512 KB: a player's fullest load and an admin's full hold in one message, since the stash crate grew to ten by fifteen on 2026-10-18; see test/inventory.test.ts)
+const wss = new WebSocketServer({ noServer: true, maxPayload: 512 * 1024 });
 
 server.on('upgrade', (req, socket, head) => {
   let wanted = '';
@@ -952,7 +954,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         if (m.g === r.go && !r.begun && now - r.dealtAt < RANGE_BUILD) {
           r.begun = true;
           r.began = now;
-          r.judge = new CourseJudge(r.judge.course, BOTCHECK.sig);
+          r.judge = new CourseJudge(r.judge.course, BOTCHECK.sig, RULES);
         }
       }
       // (of the go before this one, and late: nothing to this one)
@@ -962,9 +964,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         const i = r.judge.shot(Number(m.n), m.o.map(Number), m.d.map(Number), at);
         if (process.env.RANGE_DEBUG) log(`[range] shot at ${m.n} (server ${at}) from ${m.o.map((v: number) => Number(v).toFixed(2)).join(',')} along ${m.d.map((v: number) => Number(v).toFixed(3)).join(',')}: ${i >= 0 ? `figure ${i} down` : r.judge.why || 'landed on nothing'}`);
         if (i >= 0) ws.send(JSON.stringify({ t: 'rhit', i } satisfies S2C));
-        if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl) || spoofedRenderer(browser.gl))) {
+        if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl) || spoofedRenderer(browser.gl) || fakeGl(browser.gl))) {
           TURNED.range++;
-          const spoofed = !!browser && !browser.wd && spoofedRenderer(browser.gl);
+          const spoofed = !!browser && !browser.wd && (spoofedRenderer(browser.gl) || fakeGl(browser.gl));
           log(`${cleanName(r.hello.name)} shot the course, in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : `draws with "${browser.gl}"${spoofed ? ', a Windows card named without its id' : ''}`}: turned away`);
           turnedAway(cleanName(r.hello.name), keyOf(r.hello), ipOf.get(ws) ?? '', deviceOf.get(ws) ?? '', `shot the course in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : spoofed ? 'names a card without its id' : 'draws with no card'}`);
           offRange();
@@ -977,7 +979,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           log(`${cleanName(h.name)} passed the bot check in ${(at / 1000).toFixed(0)} s (go ${r.go}): ${r.judge.report} [${agent}, ${drawsWith()}]`);
           RANGES.passed++;
           offRange();
-          if (key && BOTCHECK.ms) shooters.set(`${keyHash(key)}|${ipOf.get(ws) ?? ''}`, now + BOTCHECK.ms);
+          if (key && BOTCHECK.ms) shooters.set(shooterOf(key, ipOf.get(ws) ?? '', deviceOf.get(ws) ?? '', cleanName(h.name)), now + BOTCHECK.ms);
           if (shooters.size > 20000) for (const [k, until] of shooters) if (until < now) shooters.delete(k);
           ws.send(JSON.stringify({ t: 'rpass' } satisfies S2C));
           letIn(h, true);
@@ -1013,6 +1015,18 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         ws.close();
         return;
       }
+      // (and a graphics name no browser of its own gives: fakeGl in botrules.ts. Those bots named theirs "NVIDIA GeForce
+      // RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0", where every real player's on Windows was "ANGLE (NVIDIA, ..., D3D11)")
+      const gl = String(m.gl ?? '').slice(0, 160);
+      if (m.v === PROTOCOL && fakeGl(gl)) {
+        TURNED.range++;
+        log(`${cleanName(m.name)} is not let in: a graphics name no browser gives, "${gl.replace(/[^\w ().,:/+-]/g, '').slice(0, 90)}" (${agent})`);
+        turnedAway(cleanName(m.name), keyOf(m), ipOf.get(ws) ?? '', cleanDevice(m.fp), 'a graphics name no browser gives');
+        ws.send(JSON.stringify({ t: 'kick', reason: 'This browser could not be let in. Play in an up-to-date Chrome, Edge or Firefox of your own, then press Play again.' } satisfies S2C));
+        ws.close();
+        return;
+      }
+      sigOfWs.set(ws, sigOf(ua, String(req.headers['accept-language'] ?? '').slice(0, 80), gl));
       const ip = ipOf.get(ws) ?? '', key = keyOf(m), fp = cleanDevice(m.fp);
       // (The device the game runs on, said with hello (src/net/device.ts). Not said, where it is needed: the game
       // is not ours, or is one from before protocol 44, and is told what such a game is told. Said: the rules of
@@ -1036,18 +1050,18 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       // (Shown to be a person's browser, or not asked: now the range, for whoever has not lately passed it.
       // Not for somebody who is to be turned away whatever they shoot: they are told so at once, by `join`.)
       const enter = (h: Extract<C2S, { t: 'hello' }>) => {
-        if (h.v !== PROTOCOL || knownShooter(key, ip) || bannedFor(key || 'nobody', ip, fp) || addressFull(key, ip)) return void letIn(h);
+        if (h.v !== PROTOCOL || knownShooter(key, ip, fp, cleanName(h.name)) || bannedFor(key || 'nobody', ip, fp, sigOfWs.get(ws)) || addressFull(key, ip)) return void letIn(h);
         const deal = (go: number) => {
           // (the server's own dice, from the system's: the game sees the yard's turn, and nothing it could work the
           // figures' walks out from)
           const bytes = randomBytes(4096);
           let k = 0;
-          const course = dealCourse(() => (k + 4 > bytes.length ? Math.random() : bytes.readUInt32LE((k += 4) - 4) / 4294967296));
+          const course = dealCourse(() => (k + 4 > bytes.length ? Math.random() : bytes.readUInt32LE((k += 4) - 4) / 4294967296), true);
           if (range) RANGES.on--;
-          range = { judge: new CourseJudge(course, BOTCHECK.sig), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
+          range = { judge: new CourseJudge(course, BOTCHECK.sig, RULES), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
           RANGES.on++;
           RANGES.dealt++;
-          ws.send(JSON.stringify({ t: 'range', turn: course.turn, go, need: course.need, secs: course.secs } satisfies S2C));
+          ws.send(JSON.stringify({ t: 'range', turn: course.turn, go, need: course.need, secs: course.secs, lay: { flip: course.flip, shift: course.shift, mover: course.mover, civ: course.civ ? CIV : -1 } } satisfies S2C));
           if (process.env.RANGE_DEBUG) log(`[range] dealt go ${go}, turned ${course.turn.toFixed(2)}`);
         };
         deal(1);
@@ -1128,7 +1142,10 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
 
 loadWorld();
 
-server.listen(PORT, () => log(`listening on :${PORT}${existsSync(DIST) ? '' : ' (no client build found: API only)'}`));
+server.listen(PORT, () => {
+  log(RULES_NOTE);
+  log(`listening on :${PORT}${existsSync(DIST) ? '' : ' (no client build found: API only)'}`);
+});
 
 // (who may give orders here and who is kept off: read from the site, which keeps them between this server's restarts)
 loadAdmin();

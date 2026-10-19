@@ -19,7 +19,7 @@ const keepsOf = new WeakMap<Economy, Keeps>();
 import { economyCargo } from '../../sim/storage';
 import { loadSave, type SaveData, writeSave } from '../../sim/save';
 import { playerName, setPlayerName, personKey, remoteServer, publicId, serverNamed, UNREACHED } from '../../net/client';
-import { PROTOCOL, type S2C } from '../../net/protocol';
+import { PROTOCOL, type RangeLayout, type S2C } from '../../net/protocol';
 import { freshVitals } from '../player';
 import { lookFor } from '../look';
 import type { Stash } from '../loot';
@@ -79,7 +79,7 @@ export const enterMethods = {
     // of the server: it deals the range in place of a welcome. See `onRange`.)
     if (!this.rangeHeard) {
       this.rangeHeard = true;
-      this.net.on('range', (m) => void this.onRange(m.turn, m.go, m.need, m.secs));
+      this.net.on('range', (m) => void this.onRange(m.turn, m.go, m.need, m.secs, m.lay));
       this.net.on('rfig', (m) => this.botCheck?.sighted(m.f));
       this.net.on('rhit', (m) => this.botCheck?.hit(m.i));
       this.net.on('rpass', () => this.botCheck?.passed());
@@ -250,7 +250,7 @@ export const enterMethods = {
    * rifle: not in the world, and with nothing of their own. It ends in `join`, when the server either welcomes this
    * game or turns it away.
    */
-  async onRange(this: Game, turn: number, go: number, need: number, secs: number) {
+  async onRange(this: Game, turn: number, go: number, need: number, secs: number, lay?: RangeLayout) {
     const { r, atmo, world } = this.s;
     if (!this.botCheck) {
       let top = 0;
@@ -281,7 +281,7 @@ export const enterMethods = {
       this.menu.dispose();
       this.hud.menuScene('', 0);
       this.hud.showStart(false);
-      await this.botCheck.deal(turn, go, need, secs);
+      await this.botCheck.deal(turn, go, need, secs, lay);
       // (straight to the eyes: the range's clock is running)
       this.director.flyIn(0.5);
       const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
@@ -298,7 +298,7 @@ export const enterMethods = {
     // (another go: a fresh magazine with the fresh course)
     const held = this.weapons.equippedItem;
     if (held?.id === 'ar15') Object.assign(held, { mag: 'mag_ar', loaded: 31 });
-    await this.botCheck.deal(turn, go, need, secs);
+    await this.botCheck.deal(turn, go, need, secs, lay);
   },
 
   async enterOffline(this: Game) {

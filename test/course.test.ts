@@ -8,7 +8,7 @@
 //     shown, tellings inside a wall, through one, out of the yard or hanging in the air.
 //   npx tsx test/course.test.ts
 import assert from 'node:assert/strict';
-import { BLOCKS, CourseJudge, LANES, dealCourse, fromPlan, inSight, lookOf, walkAt, YARD, type Course } from '../src/sim/course';
+import { BLOCKS, CIV, CourseJudge, LANES, dealCourse, fromPlan, inSight, lookOf, moverAt, walkAt, YARD, type Course } from '../src/sim/course';
 import { aimAt, playCourse } from './course-player';
 
 let checks = 0;
@@ -167,6 +167,68 @@ let ms0 = 0;
     assert.equal(j.wrong, 0, `a jump was taken for something that could not be so (${j.report})`);
   }
   ok('not counted: a figure never shown, a figure the moment it is shown; not so: inside a wall, through one, out of the yard, hanging in the air (a jump is fine)');
+}
+
+// ---- courses dealt with variety (2026-10-18): mirrored or not, the cover moved, the one with their hands up about, the
+// wall that slides in front of figure 6. Somebody honest passes every one, by the host's tighter limits too; somebody who
+// shoots the one with their hands up does not.
+{
+  const layout = (c: Course) => ({ flip: c.flip, blocks: c.blocks, civ: CIV, mover: (ms: number) => moverAt(c, ms) });
+  const tight = { hits: 9, aim: 0.7, wrong: 0 };
+  let flipped = 0, slowest = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const c = dealCourse(dice(seed * 6151 + 11), true), judge = new CourseJudge(c, 'enforce', tight);
+    if (c.flip) flipped++;
+    ms0 = 0;
+    const took = await playCourse(c.turn, c.secs, {
+      seen: (ms, x, y, z, yaw, pitch) => judge.seen(ms, x, y, z, yaw, pitch, ms + 60),
+      shot: (ms, o, d) => void judge.shot(ms, o, d, ms + 65),
+      shown: (ms) => judge.reveal(ms),
+      down: () => judge.down,
+      done: () => judge.passed || judge.failed(ms0),
+      until: (ms) => void (ms0 = ms),
+    }, { layout: layout(c) });
+    assert.ok(judge.passed, `varied course ${seed} (${c.flip ? 'mirrored' : 'as drawn'}, moved ${c.shift.join(', ')}): somebody honest did not pass (${judge.report})`);
+    slowest = Math.max(slowest, took);
+  }
+  assert.ok(flipped > 60 && flipped < 140, `${flipped} of 200 courses mirrored`);
+  // (the one with their hands up is shown, as the figures are, when in sight)
+  let civSeen = 0, civShot = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const c = dealCourse(dice(seed * 3571 + 7), true), judge = new CourseJudge(c, 'enforce', tight);
+    let at = 0;
+    await playCourse(c.turn, c.secs, {
+      seen: (ms, x, y, z, yaw, pitch) => judge.seen(ms, x, y, z, yaw, pitch, ms + 60),
+      shot: (ms, o, d) => void judge.shot(ms, o, d, ms + 65),
+      shown: (ms) => {
+        const s = judge.reveal(ms);
+        if (s.some((q) => q[0] === CIV)) civSeen++;
+        return s;
+      },
+      down: () => judge.down,
+      done: () => judge.passed || judge.failed(at),
+      until: (ms) => void (at = ms),
+    }, { layout: layout(c), shootCiv: true });
+    if (judge.civShot) {
+      civShot++;
+      assert.ok(!judge.passed && judge.failed(at), `course ${seed}: shooting the one with their hands up did not end the go (${judge.report})`);
+    }
+  }
+  assert.ok(civSeen > 0 && civShot >= 20, `the one with their hands up was seen ${civSeen} times and shot on ${civShot} of 40 courses`);
+  ok(`two hundred varied courses (${flipped} mirrored, the cover moved, the wall sliding): all passed by somebody honest, by the tighter limits (the slowest in ${(slowest / 1000).toFixed(0)} s); shooting the one with their hands up ended the go on ${civShot} of 40`);
+}
+
+// ---- too sure for a hand, by the limits: 9 landed of 10 fired does not pass, 6 of 20 does
+{
+  const c = dealCourse(dice(99));
+  const j = new CourseJudge(c, 'off', { hits: 9, aim: 0.7, wrong: 0 }) as unknown as { landed: number; shots: number; tooSure: string };
+  j.landed = 9;
+  j.shots = 10;
+  assert.match(j.tooSure, /too sure/);
+  j.landed = 6;
+  j.shots = 20;
+  assert.equal(j.tooSure, '');
+  ok('too sure for a hand: 9 of 10 landed is, 6 of 20 is not');
 }
 
 console.log(`\n${checks} checks passed`);

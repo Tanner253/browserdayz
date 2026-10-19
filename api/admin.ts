@@ -29,7 +29,7 @@ export interface AdminState {
   /** by the hash of a player's key */
   roles: Record<string, { role: Role; name: string; by: string; at: string }>;
   /** `fp`: the device they played on (a hash their game sent; since 2026-10-16), where it was known */
-  bans: { key: string; ip: string; fp?: string; name: string; why: string; by: string; at: string }[];
+  bans: { key: string; ip: string; fp?: string; sig?: string; sigTill?: number; name: string; why: string; by: string; at: string }[];
 }
 const EMPTY: AdminState = { roles: {}, bans: [] };
 
@@ -45,8 +45,8 @@ function clean(s: unknown): AdminState {
     roles[k] = { role: v.role, name: text(v.name, 24), by: text(v.by, 24), at: text(v.at, 30) };
   }
   const bans = (Array.isArray(src.bans) ? src.bans : []).slice(0, 2000).flatMap((b) => {
-    const key = hash(b?.key), ip = hash(b?.ip), fp = hash(b?.fp);
-    return key || ip || fp ? [{ key, ip, ...(fp ? { fp } : {}), name: text(b.name, 24), why: text(b.why, 120), by: text(b.by, 24), at: text(b.at, 30) }] : [];
+    const key = hash(b?.key), ip = hash(b?.ip), fp = hash(b?.fp), sig = hash(b?.sig), till = Number(b?.sigTill);
+    return key || ip || fp ? [{ key, ip, ...(fp ? { fp } : {}), ...(sig && Number.isFinite(till) ? { sig, sigTill: till } : {}), name: text(b.name, 24), why: text(b.why, 120), by: text(b.by, 24), at: text(b.at, 30) }] : [];
   });
   return { roles, bans };
 }

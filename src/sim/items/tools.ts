@@ -67,7 +67,7 @@ export const TOOL_ITEMS: ItemDef[] = [
     loot: { pair: 'Dogtag_Survivor' },
   },
   // ---------------------------------------------------------------- base building
-  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case. Dropped, it lies where it lands and can be opened there: it stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.',
+  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, /* (ten by fifteen: five Barretts laid flat, the owner, 2026-10-18: "we need to make stash crates larger, large enough to hold 5 barretts". It was eight by six) */ stash: [10, 15], desc: 'A hard case. Dropped, it lies where it lands and can be opened there: it stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.',
     loot: { pair: 'SmallProtectorCase', at: [3, 1, 4, 0, 0], restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'], filled: { chance: 0.25, most: 2 } },
     worth: 15, sells: 1,
   },

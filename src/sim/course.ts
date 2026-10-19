@@ -21,7 +21,7 @@
 /** a block of the yard, square to the plan: from x0 to x1, z0 to z1, its foot to its top */
 export interface Block { x0: number; x1: number; z0: number; z1: number; y0: number; y1: number; kind: 'wall' | 'block' | 'hut' | 'roof' | 'deck' | 'plinth' }
 /** a figure's lane: it walks between the two ends at the height `y` (the plinth's top, for the far one); `peek`: it crouches behind cover and comes up for moments */
-export interface Lane { a: [number, number]; b: [number, number]; y: number; speed: [number, number]; rest: [number, number]; peek?: boolean }
+export interface Lane { a: [number, number]; b: [number, number]; y: number; speed: [number, number]; rest: [number, number]; peek?: boolean; /** somebody with their hands up, not to be shot */ civ?: true }
 
 /** the yard: its radius to the inside of the ring wall, the ring's height, the eye of somebody standing */
 export const YARD = { r: 22, ring: 3, thick: 0.5, eye: 1.62 };
@@ -65,7 +65,36 @@ export const LANES: Lane[] = [
   { a: [-14.2, 12.7], b: [-7.3, 12.7], y: 0, speed: [1.2, 2.4], rest: [0.2, 1.2] },
   { a: [6, 10.6], b: [7.4, 10.6], y: 0, speed: [0.6, 1.2], rest: [0.3, 1], peek: true },
   { a: [-23.7, -20.5], b: [-19.2, -22.2], y: 3.5, speed: [0.8, 1.6], rest: [0.5, 2] },
+  // (somebody with their hands up, between the middle and figure 2: not to be shot. 2026-10-18: the programs that passed
+  // that night fired at every figure the server showed them)
+  { a: [-4, 11], b: [3, 11], y: 0, speed: [0.8, 1.4], rest: [0.5, 1.5], civ: true },
 ];
+/** the figures to bring down, and the one with their hands up (on a course dealt with variety: see dealCourse) */
+export const HOSTILES = LANES.filter((l) => !l.civ).length;
+export const CIV = LANES.findIndex((l) => l.civ);
+
+/**
+ * The wall that slides to and fro outside the ring, in front of figure 6's plinth (2026-10-18, "cover that moves"):
+ * where its middle goes between (x), how far it reaches (z0 to z1, its foot to its top), how wide it is, and how many
+ * seconds it takes one way. Nobody can get to it (it is beyond the ring): it hides, and stops shots, and that is all.
+ */
+export const MOVER = { x: [-23.8, -17.2] as [number, number], z0: -18.7, z1: -18.2, y1: 5.4, w: 2.4, secs: 6 };
+/** where the sliding wall is at `ms` into a go, as a block of the plan (null: the course has none) */
+export function moverAt(c: Pick<Course, 'mover'>, ms: number): Block | null {
+  if (c.mover < 0) return null;
+  const p = (((ms / 1000 / MOVER.secs + c.mover) % 2) + 2) % 2, t = p < 1 ? p : 2 - p, cx = MOVER.x[0] + (MOVER.x[1] - MOVER.x[0]) * t;
+  return { x0: cx - MOVER.w / 2, x1: cx + MOVER.w / 2, z0: MOVER.z0, z1: MOVER.z1, y0: 0, y1: MOVER.y1, kind: 'wall' };
+}
+
+/**
+ * The yard's blocks with the north wall and the cover block to the north-west moved along (2026-10-18: "several yard
+ * layouts instead of one turned around"): `shift` is the wall's step east and the block's step west and north-south,
+ * metres, each within what leaves the way round the yard open (see test/course-player.ts).
+ */
+export function blocksOf(shift: readonly number[]): Block[] {
+  const [wall, bx, bz] = [shift[0] ?? 0, shift[1] ?? 0, shift[2] ?? 0];
+  return BLOCKS.map((b, i) => (i === 0 ? { ...b, x0: b.x0 + wall, x1: b.x1 + wall } : i === 1 ? { ...b, x0: b.x0 + bx, x1: b.x1 + bx, z0: b.z0 + bz, z1: b.z1 + bz } : b));
+}
 
 /** a figure, as the judge takes it: a post this thick, from the knee to the crown; crouched behind its block, to here */
 const BODY = { r: 0.42, low: 0.25, high: 1.8, low_high: 1.2 };
@@ -76,8 +105,12 @@ const BODY = { r: 0.42, low: 0.25, high: 1.8, low_high: 1.2 };
 interface Leg { at: number; to: number; a: [number, number]; b: [number, number] }
 /** a figure's walk for the whole go, and (a peeker) the moments it is up */
 interface Walk { legs: Leg[]; up: [number, number][] }
-/** what is dealt: the way the yard is turned (radians), and every figure's walk (the server's alone) */
-export interface Course { turn: number; walks: Walk[]; need: number; secs: number }
+/**
+ * What is dealt: the way the yard is turned (radians), whether it is the plan's mirror (`flip`), how its two movable
+ * blocks are moved (`shift`, and the blocks as they then stand), where in its slide the moving wall starts (`mover`,
+ * -1: none), whether the one with their hands up is about (`civ`), and every figure's walk (the server's alone).
+ */
+export interface Course { turn: number; flip: boolean; shift: number[]; blocks: Block[]; mover: number; civ: boolean; walks: Walk[]; need: number; secs: number }
 
 /** how long a go is, seconds, and how far ahead a figure's walk is planned (the go and a margin) */
 export const SECS = 60;
@@ -88,7 +121,7 @@ const PLANNED = (SECS + 15) * 1000;
  * every leg's end and pace and every stop's length its own throw of the dice. `rnd` is the server's own dice; the
  * game is never told a walk.
  */
-export function dealCourse(rnd: () => number): Course {
+export function dealCourse(rnd: () => number, vary = false): Course {
   const span = (r: [number, number]) => r[0] + rnd() * (r[1] - r[0]);
   const walks = LANES.map((l) => {
     const legs: Leg[] = [];
@@ -112,7 +145,11 @@ export function dealCourse(rnd: () => number): Course {
     }
     return { legs, up };
   });
-  return { turn: rnd() * Math.PI * 2, walks, need: LANES.length, secs: SECS };
+  const turn = rnd() * Math.PI * 2;
+  // (the variety after everything else, so that a course dealt without it is the course it always was)
+  if (!vary) return { turn, flip: false, shift: [0, 0, 0], blocks: BLOCKS, mover: -1, civ: false, walks, need: HOSTILES, secs: SECS };
+  const flip = rnd() < 0.5, shift = [+(rnd() * 1.5).toFixed(2), +(-rnd()).toFixed(2), +((rnd() - 0.5) * 1).toFixed(2)];
+  return { turn, flip, shift, blocks: blocksOf(shift), mover: +(rnd() * 2).toFixed(3), civ: true, walks, need: HOSTILES, secs: SECS };
 }
 
 /** Where figure `i` is at `ms` into the go, in the plan's frame: its feet, its pace, and whether it is up (always, but for a peeker). */
@@ -134,17 +171,17 @@ export function walkAt(c: Course, i: number, ms: number): { x: number; y: number
 
 // ------------------------------------------------------------------ the turned frame
 
-/** a point of the yard (as said over the wire) in the plan's frame, and back */
-export function toPlan(turn: number, x: number, z: number): [number, number] {
+/** a point of the yard (as said over the wire) in the plan's frame, and back; `flip`: the yard is the plan's mirror, east for west, and then turned */
+export function toPlan(turn: number, x: number, z: number, flip = false): [number, number] {
   const c = Math.cos(turn), s = Math.sin(turn);
-  return [x * c - z * s, x * s + z * c];
+  return [(flip ? -1 : 1) * (x * c - z * s), x * s + z * c];
 }
-export function fromPlan(turn: number, x: number, z: number): [number, number] {
-  const c = Math.cos(turn), s = Math.sin(turn);
-  return [x * c + z * s, -x * s + z * c];
+export function fromPlan(turn: number, x: number, z: number, flip = false): [number, number] {
+  const c = Math.cos(turn), s = Math.sin(turn), px = flip ? -x : x;
+  return [px * c + z * s, -px * s + z * c];
 }
 /** a turn of the head in the yard as one in the plan (the game's own turn: none is along -z, a turn to the left is more) */
-export const yawToPlan = (turn: number, yaw: number) => yaw - turn;
+export const yawToPlan = (turn: number, yaw: number, flip = false) => (flip ? turn - yaw : yaw - turn);
 
 // ------------------------------------------------------------------ what stands in the way
 
@@ -179,12 +216,15 @@ function ringAlong(o: readonly number[], d: readonly number[], upTo: number): nu
   return o[1] + d[1] * t < YARD.ring ? t : Infinity;
 }
 
-/** Whatever stands nearest along a ray, in the plan's frame, out to `upTo`. */
-export function solidAlong(o: readonly number[], d: readonly number[], upTo = Infinity): number {
+/** Whatever stands nearest along a ray, in the plan's frame, out to `upTo`: the ring, the blocks, and the moving wall where it is. */
+export function solidAlong(o: readonly number[], d: readonly number[], upTo = Infinity, blocks: readonly Block[] = BLOCKS, mover: Block | null = null): number {
   let t = ringAlong(o, d, upTo);
-  for (const b of BLOCKS) t = Math.min(t, blockAlong(b, o, d));
+  for (const b of blocks) t = Math.min(t, blockAlong(b, o, d));
+  if (mover) t = Math.min(t, blockAlong(mover, o, d));
   return t;
 }
+/** how many of the lanes are walked on a course: the one with their hands up only where there is variety */
+export const figuresOf = (c: Pick<Course, 'civ'>) => (c.civ ? LANES.length : HOSTILES);
 
 /** How far along a ray a figure standing at (x, y, z) is met (Infinity: it is not). */
 function bodyAlong(x: number, y: number, z: number, up: boolean, o: readonly number[], d: readonly number[]): number {
@@ -199,8 +239,8 @@ function bodyAlong(x: number, y: number, z: number, up: boolean, o: readonly num
 
 /** Which standing figure a shot (in the plan's frame) lands on at `ms` (-1: none; something stood in the way, or it went by). */
 export function shotLands(c: Course, o: readonly number[], d: readonly number[], ms: number, down: ReadonlySet<number> = new Set()): number {
-  let best = -1, at = solidAlong(o, d);
-  for (let i = 0; i < LANES.length; i++) {
+  let best = -1, at = solidAlong(o, d, Infinity, c.blocks, moverAt(c, ms));
+  for (let i = 0; i < figuresOf(c); i++) {
     if (down.has(i)) continue;
     const p = walkAt(c, i, ms), t = bodyAlong(p.x, p.y, p.z, p.up, o, d);
     if (t < at) {
@@ -221,7 +261,7 @@ export function inSight(c: Course, i: number, ex: number, ey: number, ez: number
     const tx = p.x + side[0] * s, ty = p.y + h, tz = p.z + side[1] * s, v = [tx - ex, ty - ey, tz - ez], len = Math.hypot(v[0], v[1], v[2]);
     if (len < 1e-6) return true;
     const dir = [v[0] / len, v[1] / len, v[2] / len];
-    if (solidAlong([ex, ey, ez], dir, len) >= len) return true;
+    if (solidAlong([ex, ey, ez], dir, len, c.blocks, moverAt(c, ms)) >= len) return true;
   }
   return false;
 }
@@ -238,20 +278,20 @@ export function rampAt(x: number, z: number): number {
 }
 
 /** What somebody whose feet are at height `y` has under them at a place (the plan's frame): the floor, the ramp, or the top of a block they are up on. */
-export function floorAt(x: number, y: number, z: number): number {
+export function floorAt(x: number, y: number, z: number, blocks: readonly Block[] = BLOCKS): number {
   let f = Math.max(0, rampAt(x, z));
-  for (const b of BLOCKS) if (b.kind !== 'roof' && within(b, x, z, -0.25) && b.y1 <= y + 0.4) f = Math.max(f, b.y1);
+  for (const b of blocks) if (b.kind !== 'roof' && within(b, x, z, -0.25) && b.y1 <= y + 0.4) f = Math.max(f, b.y1);
   return f;
 }
 
 /** Is a body with its feet at (x, y, z) inside something solid? (a body is a post from a little over its feet to its head) */
-export function inSolid(x: number, y: number, z: number): boolean {
-  return BLOCKS.some((b) => within(b, x, z, 0.1) && b.y1 > y + 0.3 && b.y0 < y + 1.6);
+export function inSolid(x: number, y: number, z: number, blocks: readonly Block[] = BLOCKS): boolean {
+  return blocks.some((b) => within(b, x, z, 0.1) && b.y1 > y + 0.3 && b.y0 < y + 1.6);
 }
 
 /** Does a step from one place to another, on the level, pass through a wall? (a wall that stands from the foot to over the head of both ends) */
-export function through(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean {
-  for (const b of BLOCKS) {
+export function through(ax: number, ay: number, az: number, bx: number, by: number, bz: number, blocks: readonly Block[] = BLOCKS): boolean {
+  for (const b of blocks) {
     if (!(b.y0 < Math.min(ay, by) + 0.5 && b.y1 > Math.max(ay, by) + 0.6)) continue;
     // (a slab test on the level, against the block drawn in by a tenth: a body brushing a corner has not gone through it)
     let t0 = 0, t1 = 1;
@@ -309,6 +349,16 @@ const SHOTS = 90;
 const REFUSED = 12;
 
 /**
+ * What a go is judged by besides the course itself, set on the host (server/botrules.ts, BOT_RULES: kept off the public
+ * code). `hits` and `aim`: a go with that many shots landed by the course, and that share of every shot fired landed, is
+ * too sure for a hand (2026-10-18: every program that passed that night landed 11 to 17 with almost nothing missed,
+ * every person 6 to 10 and missed a lot). `wrong`: things said that could not be so that a go may have and pass (the
+ * programs passed with 1 or 2; no person that night had one). LOOSE is the judging before them.
+ */
+export interface Limits { hits: number; aim: number; wrong: number }
+export const LOOSE: Limits = { hits: Infinity, aim: 2, wrong: 2 };
+
+/**
  * The judge of one go at the course. It is told what the game says (where it stands and looks, and each shot), with
  * the time the game put to it and the server's own, says what the game is to be shown, and keeps count of the
  * figures brought down. Everything is said in the yard's (turned) frame; the judge turns it to the plan's.
@@ -325,14 +375,19 @@ export class CourseJudge {
   private aloft = 0;
   /** when the server first showed each figure, and last had it in sight (its own count, ms) */
   private shown: number[] = LANES.map(() => -1);
+  /** a counted shot landed on the one with their hands up: the go is over */
+  civShot = false;
   private seenAt: number[] = LANES.map(() => -1e9);
   /** things said that could not be so (inside a wall, through one, out of the yard, in the air, a leap, a time that runs backwards): three, and the go is over */
   wrong = 0;
   /** why the last shot that landed was not counted, or the last thing that could not be so: for the test and the log */
   why = '';
 
-  /** @param sign what is done with a go that carries the bot signature: see RangeJudge.signed */
-  constructor(readonly course: Course, readonly sign: 'enforce' | 'watch' | 'off' = 'off') {}
+  /**
+   * @param sign what is done with a go that carries the bot signature: see RangeJudge.signed
+   * @param limits see Limits
+   */
+  constructor(readonly course: Course, readonly sign: 'enforce' | 'watch' | 'off' = 'off', readonly limits: Limits = LOOSE) {}
 
   private timely(ms: number, now: number) {
     return Number.isFinite(ms) && ms <= now + 1000 && ms >= now - 5000;
@@ -354,16 +409,16 @@ export class CourseJudge {
     if (![x, y, z, yaw, pitch].every(Number.isFinite) || !this.timely(ms, now)) return this.bad('a time or a place that is no time or place');
     const last = this.trail[this.trail.length - 1];
     if (last && ms <= last.ms) return;
-    const [px, pz] = toPlan(this.course.turn, x, z);
-    const here: Seen = { ms, x: px, y, z: pz, yaw: yawToPlan(this.course.turn, yaw), pitch: Math.max(-1.5, Math.min(1.5, pitch)) };
+    const { turn, flip, blocks } = this.course, [px, pz] = toPlan(turn, x, z, flip);
+    const here: Seen = { ms, x: px, y, z: pz, yaw: yawToPlan(turn, yaw, flip), pitch: Math.max(-1.5, Math.min(1.5, pitch)) };
     // (the yard is the server's: in it, out of the walls, on something)
     if (Math.hypot(px, pz) > YARD.r - 0.1 || y < -0.5 || y > 4.5) return this.bad('out of the yard', ms);
-    if (inSolid(px, y, pz)) return this.bad('inside a wall', ms);
+    if (inSolid(px, y, pz, blocks)) return this.bad('inside a wall', ms);
     if (last) {
       const secs = (ms - last.ms) / 1000, far = Math.hypot(px - last.x, pz - last.z);
       // (A leap, or a step through a wall: counted, and where they now are is where they are from now on. Kept to
       // the last good place instead, every telling after it was the same leap again, and one glitch ended the go.)
-      const leap = far > 11 * secs + 0.6, wall = !leap && through(last.x, last.y, last.z, px, y, pz);
+      const leap = far > 11 * secs + 0.6, wall = !leap && through(last.x, last.y, last.z, px, y, pz, blocks);
       if (leap || wall) {
         this.bad(leap ? 'a leap faster than anybody runs' : 'through a wall', ms);
         this.aloft = 0;
@@ -371,8 +426,8 @@ export class CourseJudge {
         return;
       }
       // (Up off what is under them: a jump is back down inside a second. Hanging a second and a half is not a jump.)
-      const over = y - floorAt(px, y, pz);
-      if (y < floorAt(px, y + 0.4, pz) - 0.4) return this.bad('down in the floor', ms);
+      const over = y - floorAt(px, y, pz, blocks);
+      if (y < floorAt(px, y + 0.4, pz, blocks) - 0.4) return this.bad('down in the floor', ms);
       this.aloft = over > 0.6 ? this.aloft + (ms - last.ms) : 0;
       if (this.aloft > 1500) {
         this.aloft = 0;
@@ -395,7 +450,7 @@ export class CourseJudge {
     if (!at) return [];
     const out: Sighting[] = [];
     const ey = at.y + YARD.eye;
-    for (let i = 0; i < LANES.length; i++) {
+    for (let i = 0; i < figuresOf(this.course); i++) {
       const p = walkAt(this.course, i, now);
       const dx = p.x - at.x, dz = p.z - at.z, flat = Math.hypot(dx, dz) || 1, sx = (-dz / flat) * 0.5, sz = (dx / flat) * 0.5;
       const sees = inSight(this.course, i, at.x, ey, at.z, now) || inSight(this.course, i, at.x + sx, ey, at.z + sz, now) || inSight(this.course, i, at.x - sx, ey, at.z - sz, now) || inSight(this.course, i, at.x, ey, at.z, now + 150);
@@ -404,7 +459,7 @@ export class CourseJudge {
         if (this.shown[i] < 0) this.shown[i] = now;
       }
       if (now - this.seenAt[i] > LINGER && !sees) continue;
-      const [wx, wz] = fromPlan(this.course.turn, p.x, p.z), [vx, vz] = fromPlan(this.course.turn, p.vx, p.vz);
+      const [wx, wz] = fromPlan(this.course.turn, p.x, p.z, this.course.flip), [vx, vz] = fromPlan(this.course.turn, p.vx, p.vz, this.course.flip);
       out.push([i, +wx.toFixed(3), p.y, +wz.toFixed(3), +vx.toFixed(3), +vz.toFixed(3), p.up ? 1 : 0]);
     }
     return out;
@@ -416,7 +471,7 @@ export class CourseJudge {
     if (![...o, ...d].every(Number.isFinite) || o.length !== 3 || d.length !== 3 || !this.timely(ms, now)) return (this.wrong++, -1);
     const len = Math.hypot(d[0], d[1], d[2]);
     if (len < 0.5) return (this.wrong++, -1);
-    const turn = this.course.turn, [ox, oz] = toPlan(turn, o[0], o[2]), [dx, dz] = toPlan(turn, d[0] / len, d[2] / len);
+    const { turn, flip } = this.course, [ox, oz] = toPlan(turn, o[0], o[2], flip), [dx, dz] = toPlan(turn, d[0] / len, d[2] / len, flip);
     const po = [ox, o[1], oz], dir = [dx, d[1] / len, dz];
     this.shots++;
     if (ms - this.lastShot < 70) return -1;
@@ -431,6 +486,10 @@ export class CourseJudge {
       }
     }
     if (hit < 0) return -1;
+    // (the one with their hands up, walked in front of a figure that was being aimed at: in the way, a miss, and not
+    // counted as landed either, where it would go towards the bot signature. What ends the go is shooting them when
+    // nobody else was along the line.)
+    if (hit === CIV && shotLands(this.course, po, dir, ms - back, new Set([...this.down, CIV])) >= 0) return (this.why = 'somebody with their hands up was in the way', -1);
     this.landed++;
     if (this.shown[hit] < 0 || ms - back < this.shown[hit] + SEEN_FIRST) return (this.why = 'it had not been in sight long enough to be seen', -1);
     const lately = this.trail.filter((s) => s.ms <= ms + 40 && s.ms >= ms - 3000);
@@ -458,6 +517,11 @@ export class CourseJudge {
       const t = flat > 1e-9 ? ((p.x - s.x) * l[0] + (p.z - s.z) * l[2]) / flat : -1;
       if (t <= 0 || Math.hypot(s.x + l[0] * t - p.x, s.z + l[2] * t - p.z) > 0.8) return (this.why = 'the sights were not on it before it was fired', -1);
     }
+    // (aimed at, held on and shot: the one with their hands up. Not one of the figures, and the go is over)
+    if (hit === CIV) {
+      this.civShot = true;
+      return (this.why = 'shot somebody with their hands up', -1);
+    }
     this.down.add(hit);
     this.lastDown = ms;
     return hit;
@@ -477,19 +541,25 @@ export class CourseJudge {
     return refused >= 2 && per >= 25 ? `the bot signature (${refused} shots landed and not counted, ${per.toFixed(0)} degrees turned for every metre walked)` : '';
   }
 
+  /** more landed, and less missed, than a hand does (see Limits): '' when not */
+  get tooSure(): string {
+    return this.landed >= this.limits.hits && this.landed >= this.limits.aim * this.shots ? `too sure for a hand (${this.landed} of ${this.shots} shots landed)` : '';
+  }
+
   /** how the go went, in a line: for the server's log */
   get report() {
     const signed = this.sign !== 'off' && this.down.size >= this.course.need ? this.signed : '';
-    return `${this.down.size} of ${this.course.need} down, ${this.shots} shots (${this.landed} landed by the course), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}`;
+    const sure = this.down.size >= this.course.need ? this.tooSure : '';
+    return `${this.civShot ? 'shot somebody with their hands up; ' : ''}${this.down.size} of ${this.course.need} down, ${this.shots} shots (${this.landed} landed by the course), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}${sure ? `; ${sure}` : ''}`;
   }
 
-  /** every figure down, by somebody who walked the yard and looked about it: a person */
+  /** every figure down, by somebody who walked the yard and looked about it, said nothing that could not be so, and missed like a person: a person */
   get passed() {
-    return this.wrong < 3 && this.down.size >= this.course.need && this.walked >= 1 && this.turned >= 0.15 && !(this.sign === 'enforce' && this.signed);
+    return !this.civShot && this.wrong <= this.limits.wrong && this.down.size >= this.course.need && this.walked >= 1 && this.turned >= 0.15 && !(this.sign === 'enforce' && this.signed) && !this.tooSure;
   }
 
-  /** over, and not passed: the time is up, too much was said that could not be so, more was fired than anybody fires, or every figure is down with the bot signature */
+  /** over, and not passed: the time is up, more was said that could not be so than a go may have, more was fired than anybody fires, or every figure is down and it did not pass */
   failed(now: number) {
-    return !this.passed && (now > this.course.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > SHOTS || (this.down.size >= this.course.need && this.sign === 'enforce' && !!this.signed));
+    return !this.passed && (this.civShot || now > this.course.secs * 1000 + 1500 || this.wrong > this.limits.wrong || this.shots > SHOTS || this.down.size >= this.course.need);
   }
 }

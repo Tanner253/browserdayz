@@ -484,8 +484,8 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     assert.equal(inv.theHold.add(pack), pack, 'a pack with a thing in it went in where there was room for one thing');
     assert.equal(inv.theHold.add(over), null);
     const said = JSON.stringify({ t: 'me', inv: inv.serialize(), vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false, blood: 5000, bleed: 0, broken: false } });
-    // (the server reads no message of more than 256 KB: maxPayload in server/index.ts)
-    assert.ok(said.length < 256 * 1024 * 0.7, `a full hold is ${(said.length / 1024).toFixed(0)} KB to say: too near the 256 the server reads`);
+    // (the server reads no message of more than 512 KB: maxPayload in server/index.ts)
+    assert.ok(said.length < 512 * 1024 * 0.7, `a full hold is ${(said.length / 1024).toFixed(0)} KB to say: too near the 512 the server reads`);
     assert.equal(heldIn(read(inv)).length, HOLD_MOST);
     sound(inv.theHold);
     console.log(`      (a full hold is ${(said.length / 1024).toFixed(0)} KB to say, ${inv.theHold.h} rows deep, and took ${took} ms to fill)`);
@@ -538,8 +538,14 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     assert.deepEqual(order(vests, cells), order(vests, (id) => WAS[id][0] * WAS[id][1]), 'the vests are no longer in the order of what they carried');
     // (a jacket's pockets are what the smallest pack is, as they were, and well under the others)
     assert.ok(cells('field_jacket') <= cells('sack_pack') && cells('field_jacket') * 1.5 < cells('camping_pack') && cells('field_trousers') < cells('field_jacket'));
-    // what is not worn is as it was: the cases, a body
-    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[8, 6], [6, 5], [5, 4], [8, 17]]);
+    // what is not worn is as it was: the cases but the stash crate, a body
+    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[10, 15], [6, 5], [5, 4], [8, 17]]);
+  });
+
+  ok('a stash crate holds five Barretts (the owner, 2026-10-18: "large enough to hold 5 barretts")', () => {
+    const [w, h] = ITEMS.stash_kit.stash!, crate = new Container('stash_test', 'Stash Crate', w, h, [], true);
+    for (let k = 0; k < 5; k++) assert.equal(crate.add(makeItem('barrett')), null, `Barrett ${k + 1} found no room in the crate`);
+    assert.equal(crate.items.length, 5);
   });
 
   ok('the biggest pack takes two AKs with a column and a row over, or three Mosins and a row; the middle pack takes an AR-15 and no AK', () => {
@@ -629,12 +635,12 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
       while (c.add(tag(k)) === null) k++;
     };
     // the pack: as many stash cases as it takes, which is five (three on end across the top, two under them), each
-    // with forty-eight places of its own, full; a thing in every cell left over; and every pocket and the pouch full
+    // with all its places full (ten by fifteen since 2026-10-18); a thing in every cell left over; and every pocket and the pouch full
     const pack = inv.cargoOf(inv.slots.back!)!, cases: ItemInstance[] = [];
     for (const [x, y, rot] of [[0, 0, true], [3, 0, true], [6, 0, true], [0, 4, false], [4, 4, false]] as [number, number, boolean][]) {
       const box = makeItem('stash_kit');
       fill(bagGrid(box)!);
-      assert.equal(box.cargo!.length, 48);
+      assert.equal(box.cargo!.length, ITEMS.stash_kit.stash![0] * ITEMS.stash_kit.stash![1]);
       assert.ok(pack.place(box, x, y, rot), `no room for a case at ${x}, ${y}`);
       cases.push(box);
     }
@@ -644,8 +650,9 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     assert.ok(things > 330, `only ${things} things are carried`);
     const vitals = { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false, blood: 5000, bleed: 0, broken: false };
     const said = JSON.stringify({ t: 'me', inv: inv.serialize(), vitals });
-    // (the server reads no message of more than 256 KB: maxPayload in server/index.ts)
-    assert.ok(said.length < 256 * 1024 * 0.3, `the fullest load is ${(said.length / 1024).toFixed(0)} KB to say`);
+    // (the server reads no message of more than 512 KB: maxPayload in server/index.ts)
+    // (well under it: five stash crates of ten by fifteen, each stuffed with the smallest thing there is, as no player could, since 2026-10-18 about as much as an admin's full hold)
+    assert.ok(said.length < 512 * 1024 * 0.35, `the fullest load is ${(said.length / 1024).toFixed(0)} KB to say`);
     // every thing of it is kept by the server: no grid of it is cut short (a thing's are read to its cells, the pouch's to 120)
     const kept = cleanInventory(JSON.parse(JSON.stringify(inv.serialize())), name)!;
     assert.deepEqual(uids([...Object.values(kept.slots), ...kept.containers.flatMap((c) => c.items)]).sort(), uids(inv.topLevel()).sort(), 'the server did not keep every thing of the fullest load');
@@ -659,7 +666,7 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     inv.bottomless = true;
     for (let i = 0; i < HOLD_MOST; i++) assert.equal(inv.theHold.add(Object.assign(makeItem('ar15'), { mag: 'mag_ar_60', loaded: 61, mods: parts('ar15'), zero: 300 })), null);
     const both = JSON.stringify({ t: 'me', inv: inv.serialize(), vitals });
-    assert.ok(both.length < 256 * 1024 * 0.9, `the fullest load and a full hold are ${(both.length / 1024).toFixed(0)} KB to say: too near the 256 the server reads`);
+    assert.ok(both.length < 512 * 1024 * 0.9, `the fullest load and a full hold are ${(both.length / 1024).toFixed(0)} KB to say: too near the 512 the server reads`);
     console.log(`      (the fullest load is ${things} things and ${(said.length / 1024).toFixed(0)} KB to say; with an admin's full hold, ${(both.length / 1024).toFixed(0)} KB)`);
   });
 }

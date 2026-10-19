@@ -1,7 +1,9 @@
 // No dog tag from a death no other player caused (the owner, 2026-10-18, of bots that lived out the tag's time and then
 // had their own game say they "died of wounds", leaving a tag for their partner): a body keeps its owner's tag only if
-// another player's hit came within TAG_CAUSE_S before the death (server/acts.ts, makeCorpse). The real server on a port
-// of its own, with short times, and players over the wire. About forty seconds.
+// another player's hit came within TAG_CAUSE_S before the death (server/acts.ts, makeCorpse). And the course's judging
+// of an aim out in the world (server/aimwatch.ts): hits landed while looking far away are written down, and three send
+// the shooter back to the bot check. The real server on a port of its own, with short times, and players over the wire.
+// About a minute.
 //   npx tsx test/tag-cause.test.ts
 
 import assert from 'node:assert/strict';
@@ -65,8 +67,8 @@ let checks = 0, failed: unknown = null;
 try {
   for (let k = 0; k < 600 && !logged.includes('listening'); k++) await sleep(100);
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
-  const ann = new Player('Ann'), bee = new Player('Bee'), dan = new Player('Dan');
-  for (const p of [ann, bee, dan]) await p.join();
+  const ann = new Player('Ann'), bee = new Player('Bee'), dan = new Player('Dan'), eve = new Player('Eve');
+  for (const p of [ann, bee, dan, eve]) await p.join();
   for (const p of [ann, bee, dan]) p.say(20 + n++, 0);
   await sleep(1500);
 
@@ -93,6 +95,22 @@ try {
   assert.ok(!logged.includes('Dan left no dog tag'), `Dan's tag was not left on his body:\n${logged.slice(-800)}`);
   checks++;
   console.log('  ok  a player shot dead by another leaves their dog tag');
+
+  // ---- Ann hits Eve, eight metres east of her, three times while looking north: written down, and back to the bot check
+  eve.say(48, 0);
+  await sleep(5500);
+  for (let k = 0; k < 3; k++) {
+    for (let t = 0; t < 4; t++) {
+      ann.say(40, 0, 'm9');
+      await sleep(60);
+    }
+    ann.send({ t: 'hit', to: eve.id, w: 'm9', zone: 'legs' });
+    await sleep(1100);
+  }
+  assert.match(logged, /Ann hit Eve while looking 9\d degrees away from them/, `a hit while looking away was not written down:\n${logged.slice(-800)}`);
+  assert.match(logged, /Ann would be sent back to the bot check[^\n]*3 hits in ten minutes that a hand could not have aimed/, `three of them did not send her back:\n${logged.slice(-800)}`);
+  checks++;
+  console.log('  ok  hits landed while looking far away are written down, and three send the shooter back to the bot check');
 } catch (e) {
   failed = e;
 } finally {

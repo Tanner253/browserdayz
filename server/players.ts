@@ -14,7 +14,7 @@ import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors
 import { bunkerDoor, cardSeen, hitsBy, ipOf, tagSeen } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
-import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, turnedAway } from './gate';
+import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, sigOfWs, turnedAway } from './gate';
 import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
@@ -87,6 +87,8 @@ export interface Client {
   lifeAt: number;
   /** the device their game said it runs on ('' : none said): server/device.ts */
   fp: string;
+  /** their browser as it shows itself ('' : no graphics card said): sigOf in gate.ts */
+  sig: string;
   /** the role they were last told they have (see tellRoles in keep.ts) */
   roleTold?: string | null;
   msgCount: number;
@@ -225,7 +227,8 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     return null;
   }
   const key = keyOf(m) || `anon-${Math.random().toString(36).slice(2)}`, fp = deviceOf.get(ws) ?? '';
-  const off = bannedFor(key, ipOf.get(ws) ?? '', fp);
+  const sig = sigOfWs.get(ws) ?? '';
+  const off = bannedFor(key, ipOf.get(ws) ?? '', fp, sig);
   if (off) {
     log(`${cleanName(m.name)} is not let in: ${off}`);
     turnedAway(cleanName(m.name), key, ipOf.get(ws) ?? '', fp, off === 'banned' ? 'banned' : `kept off: ${off}`);
@@ -280,7 +283,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     heardAt: Date.now(), hitAway: 0, kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), fp, msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), fp, sig, msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
@@ -334,7 +337,7 @@ export function drop(c: Client) {
   if (!clients.delete(c.id)) return;
   hitsBy.delete(c.id);
   cardSeen.delete(c.id);
-  ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, fp: c.fp, at: Date.now() });
+  ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, fp: c.fp, sig: c.sig, at: Date.now() });
   ADMIN.asked.delete(c.id);
   ADMIN.tints.delete(c.id);
   if (ADMIN.gone.length > 60) ADMIN.gone.shift();

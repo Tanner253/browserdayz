@@ -36,7 +36,12 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // server has none, and stand on ground it does not have. And furniture holds its own places' loot.)
 // (48, 2026-10-18: gun racks show what stands in them (`racks` in the welcome, 'rack' when it changes), and a hit says
 // how many bodies the round went through first (`p`); the racks are new loot places.)
-export const PROTOCOL = 48;
+// (49, 2026-10-18: the bot check's course comes mirrored, its cover moved, with somebody with their hands up and a wall
+// that slides (`lay` on 'range'), and hello says what the graphics card is (`gl`); a page from before would build the
+// course as drawn and be judged against another.)
+export const PROTOCOL = 49;
+/** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
+export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -154,7 +159,7 @@ export type C2S =
    * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
    * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
    */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string }
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -417,7 +422,7 @@ export type S2C =
    * many figures there are and how long it has: where the figures are is the server's, shown as they come into
    * sight (`rfig`). `go` is which go this is. Nobody is in the world until it is passed.
    */
-  | { t: 'range'; turn: number; go: number; need: number; secs: number }
+  | { t: 'range'; turn: number; go: number; need: number; secs: number; /** the course's variety (src/sim/course.ts, dealCourse): mirrored, its blocks moved, where the sliding wall starts, the one with their hands up */ lay?: RangeLayout }
   /** on the course: the figures in the player's sight now (src/sim/course.ts `Sighting`: number, feet, pace, up) */
   | { t: 'rfig'; f: [number, number, number, number, number, number, 0 | 1][] }
   /** on the range: the server has counted this figure down; and the range is passed (the welcome follows) */

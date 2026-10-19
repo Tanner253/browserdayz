@@ -4,7 +4,10 @@
 // not told: the yard, and what the server shows. It says what a game says (where it stands and looks, and each
 // shot) through whatever it is given: straight to a judge (test/course.test.ts), or over the wire to a server in
 // real time (test/bots.test.ts).
-import { YARD, floorAt, fromPlan, lookOf, solidAlong, toPlan, type Sighting } from '../src/sim/course';
+import { YARD, floorAt, fromPlan, lookOf, solidAlong, toPlan, type Block, type Sighting } from '../src/sim/course';
+
+/** a course dealt with variety, as the game is told it: the mirror, the blocks as they stand, the one not to shoot, and where the moving wall is */
+export interface Layout { flip?: boolean; blocks?: Block[]; civ?: number; mover?: (ms: number) => Block | null }
 
 export interface CourseIO {
   seen(ms: number, x: number, y: number, z: number, yaw: number, pitch: number): void;
@@ -34,15 +37,15 @@ export const aimAt = (ex: number, ey: number, ez: number, tx: number, ty: number
  * @param how wait: how long a figure must have been shown before it is turned to (ms); pace: walking speed (m/s)
  * @returns how long it took, ms
  */
-export async function playCourse(turn: number, secs: number, io: CourseIO, how: { wait?: number; pace?: number } = {}): Promise<number> {
-  const wait = how.wait ?? 350, pace = how.pace ?? 4.5, step = 50;
+export async function playCourse(turn: number, secs: number, io: CourseIO, how: { wait?: number; pace?: number; layout?: Layout; shootCiv?: boolean } = {}): Promise<number> {
+  const wait = how.wait ?? 350, pace = how.pace ?? 4.5, step = 50, flip = !!how.layout?.flip, blocks = how.layout?.blocks, civ = how.layout?.civ ?? -1;
   let ms = 0, k = 0, yaw = turn, pitch = 0;
   let [px, pz] = [0, 0];
   let y = 0;
   /** when each figure was first shown in this run of sightings */
   const since = new Map<number, number>();
   const where = () => {
-    const [x, z] = fromPlan(turn, px, pz);
+    const [x, z] = fromPlan(turn, px, pz, flip);
     return { x, z };
   };
   const say = async () => {
@@ -56,14 +59,20 @@ export async function playCourse(turn: number, secs: number, io: CourseIO, how: 
     for (const i of [...since.keys()]) if (!shown.some((s) => s[0] === i)) since.delete(i);
     // (up, standing, shown a while, and its chest to be seen from here, as a person sees whether a wall is in the
     // way: a peeker crouched behind its block is waited for, and one only half out from a wall's edge walked to)
-    return shown.find((s) => !down.has(s[0]) && s[6] === 1 && ms - (since.get(s[0]) ?? ms) >= wait && (missed.get(s[0]) ?? 0) < ms && clear(s)) ?? null;
+    // (and never the one with their hands up, unless it is a test of shooting them)
+    return shown.find((s) => !down.has(s[0]) && (s[0] !== civ || how.shootCiv) && s[6] === 1 && ms - (since.get(s[0]) ?? ms) >= wait && (missed.get(s[0]) ?? 0) < ms && clear(s)) ?? null;
   };
   /** after a shot that did not bring it down, a figure is let be for a moment */
   const missed = new Map<number, number>();
   const clear = (s: Sighting) => {
-    const w = where(), [ex, ez] = toPlan(turn, w.x, w.z), [tx, tz] = toPlan(turn, s[1], s[3]), ey = y + YARD.eye, ty = s[2] + 1.55;
+    const w = where(), [ex, ez] = toPlan(turn, w.x, w.z, flip), [tx, tz] = toPlan(turn, s[1], s[3], flip), ey = y + YARD.eye, ty = s[2] + 1.55;
     const v = [tx - ex, ty - ey, tz - ez], len = Math.hypot(v[0], v[1], v[2]);
-    return solidAlong([ex, ey, ez], [v[0] / len, v[1] / len, v[2] / len], len) >= len;
+    if (solidAlong([ex, ey, ez], [v[0] / len, v[1] / len, v[2] / len], len, blocks, how.layout?.mover?.(ms) ?? null) < len) return false;
+    // (nor with the one with their hands up in front of it, as a person waits for them to walk by)
+    const c = s[0] === civ ? undefined : io.shown(ms).find((q) => q[0] === civ);
+    if (!c) return true;
+    const [cx, cz] = toPlan(turn, c[1], c[3], flip), t = ((cx - ex) * v[0] + (cz - ez) * v[2]) / (len * len);
+    return !(t > 0 && t < 1 && Math.hypot(ex + v[0] * t - cx, ez + v[2] * t - cz) < 1.2);
   };
   for (let k2 = 0; k2 < 6; k2++) {
     await say();
@@ -108,9 +117,10 @@ export async function playCourse(turn: number, secs: number, io: CourseIO, how: 
       px += (dx / far) * go;
       pz += (dz / far) * go;
     }
-    y = floorAt(px, y, pz);
+    y = floorAt(px, y, pz, blocks);
     if (far > 0.01) {
-      const want = Math.atan2(-dx, -dz) + turn;
+      // (the way it goes, in the yard: mirrored, a step east is a step west)
+      const want = (flip ? -1 : 1) * Math.atan2(-dx, -dz) + turn;
       yaw += Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw)) * 0.25;
       pitch *= 0.8;
     }

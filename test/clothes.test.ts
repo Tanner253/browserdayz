@@ -439,7 +439,7 @@ ok('a thing\'s cargo is read to as many things as it has cells: sixty-three in a
     it.cargo = Array.from({ length: n }, (_, k) => ({ item: makeItem('compass'), x: k % w, y: Math.floor(k / w), rot: false }));
     return it;
   };
-  for (const [id, cells] of [['suitcase', 63], ['stash_kit', 48], ['camping_pack', 42], ['sack_pack', 25], ['field_jacket', 25], ['field_trousers', 20], ['life_vest', 20], ['old_suitcase', 30], ['black_bag', 20]] as [string, number][]) {
+  for (const [id, cells] of [['suitcase', 63], ['stash_kit', 150], ['camping_pack', 42], ['sack_pack', 25], ['field_jacket', 25], ['field_trousers', 20], ['life_vest', 20], ['old_suitcase', 30], ['black_bag', 20]] as [string, number][]) {
     assert.equal(holds(id)![0] * holds(id)![1], cells, `${id} has ${holds(id)!.join('x')} cells`);
     const it = full(id, cells);
     const clean = cleanItem(copy(it), name)!;

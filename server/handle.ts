@@ -34,6 +34,7 @@ import { scores } from './queue';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { changed, contents } from './storages';
+import { aimWatch, looked } from './aimwatch';
 
 /** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
 function withoutTags<T extends { id: string; cargo?: { item: { id: string } }[] }>(items: T[]): T[] {
@@ -71,6 +72,8 @@ export function handle(c: Client, m: C2S) {
       c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
+      // (where they look, kept a moment for the aim's own checks: see aimwatch.ts)
+      looked(c, m.p[3], m.p[4]);
       // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
       if (!c.alive) c.pose[5] |= F_DEAD;
       zoneCheck(c);
@@ -254,6 +257,8 @@ export function handle(c: Client, m: C2S) {
       dealt(target, amount, m.zone, m.w);
       send(target, { t: 'dmg', from: c.id, amount, zone: m.zone, w: m.w, dir: [(target.pose[0] - from[0]) / len, 0, (target.pose[2] - from[1]) / len] });
       send(c, { t: 'hitok', to: target.id, amount, zone: m.zone });
+      // (a gun's hit on a player: the course's judging of an aim, asked out here too)
+      if (!rule.melee && !rule.blast && m.w !== 'barrel' && m.w !== 'jeep') aimWatch(c, target, now);
       return;
     }
     case 'is': {

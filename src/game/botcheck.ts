@@ -14,8 +14,8 @@ import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { physics, HITBOX_GROUPS } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
-import type { C2S } from '../net/protocol';
-import { BLOCKS, RAMP, YARD, fromPlan, type Sighting } from '../sim/course';
+import type { C2S, RangeLayout } from '../net/protocol';
+import { BLOCKS, MOVER, RAMP, YARD, blocksOf, fromPlan, moverAt, type Block, type Sighting } from '../sim/course';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
@@ -53,10 +53,12 @@ class Figure implements Damageable {
   private vel = new THREE.Vector3();
   private yaw = 0;
 
-  constructor(private i: number) {}
+  /** @param civ somebody with their hands up and a pale shirt, not to be shot (src/sim/course.ts, CIV) */
+  constructor(private i: number, readonly civ = false) {}
 
   async load(atmo: Atmosphere, scene: THREE.Scene) {
-    await this.avatar.load(atmo, 0, false, lookFor(`range figure ${this.i}`));
+    await this.avatar.load(atmo, 0, false, this.civ ? { ...lookFor('range civilian'), jacket: new THREE.Color('#e4dfd2') } : lookFor(`range figure ${this.i}`));
+    if (this.civ) this.avatar.setHold('surrender');
     this.avatar.root.visible = false;
     scene.add(this.avatar.root);
     const R = physics.R;
@@ -143,6 +145,12 @@ export class BotCheck {
   /** on the course now */
   active = false;
   private turn = 0;
+  /** the course's variety, as the server dealt it: mirrored, its blocks as they stand, the sliding wall's start, the one with their hands up (-1: none) */
+  private flip = false;
+  private blocks: Block[] = BLOCKS;
+  private mover = -1;
+  private civ = -1;
+  private slider: { mesh: THREE.Mesh; collider: RAPIER.Collider } | null = null;
   private need = 6;
   private secs = 60;
   private go = 0;
@@ -211,31 +219,53 @@ export class BotCheck {
   /** The course's walls, hut, catwalk and blocks, turned as the server turned them, in place of the last go's. */
   private raise(turn: number) {
     this.lower();
-    const m = this.material(), lay = new THREE.Group(), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion().setFromAxisAngle(up, turn);
+    const m = this.material(), lay = new THREE.Group(), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion().setFromAxisAngle(up, turn), flip = this.flip;
     lay.position.y = this.h.floor;
     lay.rotation.y = turn;
-    for (const b of BLOCKS) {
+    // (the plan's mirror, east for west, and then turned: as fromPlan reckons it)
+    lay.scale.x = flip ? -1 : 1;
+    for (const b of this.blocks) {
       const w = b.x1 - b.x0, h = b.y1 - b.y0, d = b.z1 - b.z0, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
       const mesh = new THREE.Mesh(slab(w, h, d), m.wall);
       mesh.position.set(cx, (b.y0 + b.y1) / 2, cz);
       mesh.castShadow = mesh.receiveShadow = true;
       lay.add(mesh);
-      const [x, z] = fromPlan(turn, cx, cz);
+      const [x, z] = fromPlan(turn, cx, cz, flip);
       this.solid(w, h, d, x, (b.y0 + b.y1) / 2, z, q, this.laid);
     }
     // (the ramp: a slab whose top is the slope from the floor up to the catwalk's deck)
     const run = RAMP.x1 - RAMP.x0, slope = Math.atan2(RAMP.top, run), long = Math.hypot(run, RAMP.top), thick = 0.3, wide = RAMP.z1 - RAMP.z0;
     const nx = Math.sin(slope), ny = Math.cos(slope), cx = (RAMP.x0 + RAMP.x1) / 2 - nx * (thick / 2), cy = RAMP.top / 2 - ny * (thick / 2), cz = (RAMP.z0 + RAMP.z1) / 2;
     const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -slope);
+    // (and the collider's tilt mirrored with it: the mesh's is, by the group's scale)
+    const tilted = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), flip ? slope : -slope);
     const ramp = new THREE.Mesh(slab(long, thick, wide), m.wall);
     ramp.position.set(cx, cy, cz);
     ramp.quaternion.copy(tilt);
     ramp.castShadow = ramp.receiveShadow = true;
     lay.add(ramp);
-    const [rx, rz] = fromPlan(turn, cx, cz);
-    this.solid(long, thick, wide, rx, cy, rz, q.clone().multiply(tilt), this.laid);
+    const [rx, rz] = fromPlan(turn, cx, cz, flip);
+    this.solid(long, thick, wide, rx, cy, rz, q.clone().multiply(tilted), this.laid);
+    // (the wall that slides outside the ring, in front of figure 6: moved each frame, see `slide`)
+    if (this.mover >= 0) {
+      const mesh = new THREE.Mesh(slab(MOVER.w, MOVER.y1, MOVER.z1 - MOVER.z0), m.wall);
+      mesh.castShadow = mesh.receiveShadow = true;
+      lay.add(mesh);
+      this.solid(MOVER.w, MOVER.y1, MOVER.z1 - MOVER.z0, 0, MOVER.y1 / 2, 0, q, this.laid);
+      this.slider = { mesh, collider: this.laid[this.laid.length - 1] };
+      this.slide(0);
+    }
     this.h.scene.add(lay);
     this.lay = lay;
+  }
+
+  /** the sliding wall where it is `ms` into the go, as the server reckons it (moverAt) */
+  private slide(ms: number) {
+    const s = this.slider, b = s && moverAt({ mover: this.mover }, ms);
+    if (!s || !b) return;
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, [x, z] = fromPlan(this.turn, cx, cz, this.flip);
+    s.mesh.position.set(cx, MOVER.y1 / 2, cz);
+    s.collider.setTranslation({ x, y: this.h.floor + MOVER.y1 / 2, z });
   }
 
   private lower() {
@@ -244,6 +274,7 @@ export class BotCheck {
       physics.world.removeCollider(c, false);
     }
     this.laid.length = 0;
+    this.slider = null;
     if (this.lay) {
       this.lay.removeFromParent();
       this.lay.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
@@ -252,9 +283,13 @@ export class BotCheck {
   }
 
   /** A go has been dealt by the server: the course is built as it is turned, the figures made ready, and the player put at its middle. */
-  async deal(turn: number, go: number, need: number, secs: number) {
+  async deal(turn: number, go: number, need: number, secs: number, lay?: RangeLayout) {
     this.active = true;
     this.turn = turn;
+    this.flip = !!lay?.flip;
+    this.blocks = lay ? blocksOf(lay.shift) : BLOCKS;
+    this.mover = lay?.mover ?? -1;
+    this.civ = lay?.civ ?? -1;
     this.need = need;
     this.secs = secs;
     this.go = go;
@@ -274,8 +309,8 @@ export class BotCheck {
     for (const f of this.figures) f.stand();
     // (the figures are made the first time, one after another)
     const made: Promise<void>[] = [];
-    for (let i = this.figures.length; i < need; i++) {
-      const f = new Figure(i);
+    for (let i = this.figures.length; i < Math.max(need, this.civ + 1); i++) {
+      const f = new Figure(i, i === this.civ);
       this.figures.push(f);
       made.push(
         f.load(this.h.atmo, this.h.scene).then(() => {
@@ -311,6 +346,7 @@ export class BotCheck {
     if (!this.active) return;
     if (!this.begun) return void this.show();
     const now = performance.now();
+    this.slide(this.ms);
     for (const f of this.figures) f.walk(this.h.floor, now, dt);
     const at = this.h.where();
     // (off the yard, by whatever way: back at its middle)
@@ -362,7 +398,7 @@ export class BotCheck {
     }
     const left = Math.max(0, Math.ceil(this.secs - this.ms / 1000));
     const head = done ? 'Bot check passed' : !this.begun ? (this.h.playing() ? 'Bot check · setting up the course' : 'Bot check · click to begin') : `Bot check · ${this.fell.size} of ${this.need} down · ${left} s`;
-    const how = `Bring down all ${this.need} figures, all round you: behind the walls, in the hut, beyond the catwalk. Walk the yard to find them, and hold your sights on each before you fire.`;
+    const how = `Bring down all ${this.need} figures, all round you: behind the walls, in the hut, beyond the catwalk. Walk the yard to find them, and hold your sights on each before you fire.${this.civ >= 0 ? ' Do not shoot anyone with their hands up.' : ''}`;
     const sub = done ? 'Going in.' : this.go > 1 ? `Not passed. A new course: go ${this.go} of 4. ${how}` : how;
     const told = !small || done || !this.begun || this.ms < 6000;
     const html = `<div style="font-size:${small ? 15 : 24}px;font-weight:700;color:${done ? '#9fe08a' : '#ffd35a'}">${head}</div>${told ? `<div style="margin-top:${small ? 2 : 4}px;font-size:${small ? 11 : 15}px;font-weight:500;color:#d8cfb8;letter-spacing:0.06em;line-height:1.25">${sub}</div>` : ''}`;

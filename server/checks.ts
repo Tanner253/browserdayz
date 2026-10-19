@@ -6,7 +6,7 @@ import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
 import { BANS, SOAK, log, vehicles, world, type Box } from './index';
 import { carriedTags, lootedTags, namesOf, tagSeen, voided } from './tags';
-import { TURNED, keep, keyHash, roleOf, shooters, stayOn, turnedAway } from './gate';
+import { TURNED, forgetShooter, keep, keyHash, roleOf, stayOn, turnedAway } from './gate';
 import { KEPT } from './keep';
 import { putOff } from './admin';
 import { clients, drop, send, type Client } from './players';
@@ -120,7 +120,7 @@ export function recheck(c: Client, why: string) {
   if (CHECKS !== 'enforce') return void log(`[check:${CHECKS}] ${c.name} would be sent back to the bot check, ${secs} s after coming in: ${why}`);
   TURNED.recheck++;
   log(`[check] ${c.name} is sent back to the bot check, ${secs} s after coming in: ${why}`);
-  shooters.delete(`${keyHash(c.key)}|${c.ip}`);
+  forgetShooter(c.key, c.ip);
   // Sent back again and again: kept off the server, by their key, where they play from and the device they play on
   // (the owner, 2026-10-16: "can we ban these accounts who join and get kcicked multiple times?". That day a swarm
   // with made-up names, Merric635, Brambl116 and the like, passed the course and was sent back from the world every

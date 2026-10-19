@@ -2,6 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import { createHash, randomBytes } from 'node:crypto';
+import type { WebSocket } from 'ws';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
 import { WEAPON_RULES } from '../src/sim/combat';
 import { type Vec3, inHandDamage, overdue, lyingBlast } from '../src/sim/grenades';
@@ -143,10 +144,23 @@ export const shooters = new Map<string, number>();
 
 export const RANGES = { dealt: 0, passed: 0, failed: 0, on: 0 };
 
-export function knownShooter(key: string, ip: string): boolean {
+/**
+ * What a pass is held by: the game, where it plays from, the device and the name (2026-10-18: those bots passed once
+ * and came back for six hours under name after name, "ksm3595872", "ksm3595873" ..., each with a new device and none
+ * shooting the course again). A new name or a new device is the course again.
+ */
+export const shooterOf = (key: string, ip: string, fp: string, name: string) => `${keyHash(key)}|${ip}|${fp}|${name.toLowerCase()}`;
+
+/** every pass a game holds from where it plays, whatever its device and name */
+export function forgetShooter(key: string, ip: string) {
+  const head = `${keyHash(key)}|${ip}|`;
+  for (const k of shooters.keys()) if (k.startsWith(head)) shooters.delete(k);
+}
+
+export function knownShooter(key: string, ip: string, fp: string, name: string): boolean {
   if (!BOTCHECK.on) return true;
   if (!key || !BOTCHECK.ms) return false;
-  const until = shooters.get(`${keyHash(key)}|${ip}`);
+  const until = shooters.get(shooterOf(key, ip, fp, name));
   return !!until && until > Date.now();
 }
 
@@ -444,10 +458,13 @@ export function doorWords(key: string, ip: string, off: string, fp = ''): string
   return off.startsWith('timed out') ? `You are kept off this server for about ${long} more (${off}).` : `You are kept off this server for about ${long} more: its checks put you off it more than once. If you were only playing, tell an admin on the Discord and they can lift it.`;
 }
 
-/** @param fp the device their game said it runs on ('' : none said): a device kept off keeps off every game on it */
-export function bannedFor(key: string, ip: string, fp = ''): string | null {
+/**
+ * @param fp the device their game said it runs on ('' : none said): a device kept off keeps off every game on it
+ * @param sig their browser (`sigOf`): one an admin banned is kept off for SIG_MS
+ */
+export function bannedFor(key: string, ip: string, fp = '', sig = ''): string | null {
   if (BANS.keys.has(key) || (!!ip && BANS.ips.has(ip))) return 'kept off by name';
-  if (adminBan(key, ip, fp)) return 'banned';
+  if (adminBan(key, ip, fp, sig)) return 'banned';
   const now = Date.now();
   for (const n of [key, ...(ip ? [`ip:${ip}`] : []), ...(fp ? [deviceName(fp)] : [])]) {
     const b = BANS.temp.get(n);
@@ -477,7 +494,7 @@ export type Role = 'admin' | 'mod';
 export interface AdminState {
   roles: Record<string, { role: Role; name: string; by: string; at: string }>;
   /** `fp`: the device they played on, where their game said it (2026-10-16: "can i ban this computr or browser at the source?") */
-  bans: { key: string; ip: string; fp?: string; name: string; why: string; by: string; at: string }[];
+  bans: { key: string; ip: string; fp?: string; /** their browser (`sigOf`), kept off until `sigTill` */ sig?: string; sigTill?: number; name: string; why: string; by: string; at: string }[];
 }
 
 export const ADMIN = {
@@ -492,7 +509,7 @@ export const ADMIN = {
   /** tries at the password: by key and by address, the times of them */
   tries: new Map<string, number[]>(),
   /** whoever has left lately (the newest last): somebody who does a thing and goes can still be banned */
-  gone: [] as { id: number; name: string; key: string; ip: string; fp: string; at: number }[],
+  gone: [] as { id: number; name: string; key: string; ip: string; fp: string; sig?: string; at: number }[],
   /**
    * Whoever was turned away at the door lately (the newest last): banned, kept off, a full device, the bot check
    * not passed, an out-of-date browser. For /pardon (the owner, 2026-10-16: "admins need a way to handle when
@@ -539,13 +556,24 @@ export const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash
 
 export const roleOf = (c: Client): Role | null => (LOCAL_ADMIN ? 'admin' : ADMIN.state.roles[keyHash(c.key)]?.role ?? null);
 
-function adminBan(key: string, ip: string, fp = ''): boolean {
-  const k = keyHash(key), a = ipHash(ip);
-  // (Somebody with a role is never kept off by an address or a device: an address is a household's, a café's, a
-  // whole phone network's, and an admin who banned somebody at their own would have banned themselves.)
+function adminBan(key: string, ip: string, fp = '', sig = ''): boolean {
+  const k = keyHash(key), a = ipHash(ip), now = Date.now();
+  // (Somebody with a role is never kept off by an address, a device or a browser: an address is a household's, a café's,
+  // a whole phone network's, and an admin who banned somebody at their own would have banned themselves.)
   const mine = !!ADMIN.state.roles[k];
-  return ADMIN.state.bans.some((b) => b.key === k || (!mine && !!a && b.ip === a && ipsTellApart()) || (!mine && !!fp && b.fp === fp));
+  return ADMIN.state.bans.some((b) => b.key === k || (!mine && !!a && b.ip === a && ipsTellApart()) || (!mine && !!fp && b.fp === fp) || (!mine && !!sig && b.sig === sig && (b.sigTill ?? 0) > now));
 }
+
+/**
+ * A browser as it shows itself (2026-10-18): how it names itself in full, its languages and its graphics card, in one
+ * hash. The bots of that night came back with a new key, name and device every time, and the same browser: an admin's
+ * /ban keeps that browser off too, for SIG_MS (a day), long enough to stop a farm and short enough that nobody else on
+ * the very same browser, languages and card is kept off for good. ('': no graphics card was said, and it is nothing.)
+ */
+export const SIG_MS = (Number(process.env.SIG_HOURS) || 24) * 3600_000;
+export const sigOf = (ua: string, lang: string, gl: string) => (gl ? createHash('sha256').update(`zona browser ${ua}|${lang}|${gl}`).digest('hex').slice(0, 24) : '');
+/** each connection's browser, once it has said hello */
+export const sigOfWs = new WeakMap<WebSocket, string>();
 
 // ---- the device a game runs on (server/device.ts): what is asked of it at the door
 //
