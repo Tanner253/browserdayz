@@ -312,6 +312,17 @@ export function onTownWall(placed: PlacedTown[] | undefined, x: number, y: numbe
   return false;
 }
 
+/** whether a place is inside the monastery's walls (on the plan: at any height) */
+export function inPokrovCourt(x: number, z: number): boolean {
+  const c = Math.cos(POKROV.rot), s = Math.sin(POKROV.rot), dx = x - POKROV.x, dz = z - POKROV.z, lx = dx * c - dz * s, lz = dx * s + dz * c, W = POKROV_WALL;
+  let inside = false;
+  for (let i = 0, j = W.length - 1; i < W.length; j = i++) {
+    const [xi, zi] = W[i], [xj, zj] = W[j];
+    if (zi > lz !== zj > lz && lx < ((xj - xi) * (lz - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 /** a point of a town's own frame in the world */
 export function townPoint(t: Town, lx: number, lz: number): [number, number] {
   const c = Math.cos(t.rot), s = Math.sin(t.rot);
