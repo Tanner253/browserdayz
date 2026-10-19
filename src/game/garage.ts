@@ -11,7 +11,7 @@ import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
 import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
-import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, carDamage, crashDamage, jeepSpots, policeSpots, restState, westSpots, type VehicleInfo, type VState } from '../sim/vehicles';
+import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, carDamage, crashDamage, jeepSpots, parkKind, policeSpots, restState, westSpots, type VehicleInfo, type VState } from '../sim/vehicles';
 import { gasEdge, gasZone, type GasZone } from '../sim/gas';
 import type { Net } from '../net/client';
 import { roadLift } from '../world/road';
@@ -307,7 +307,7 @@ export class Garage {
     this.parks().forEach((p, home) => this.standAlone(p, home));
   }
 
-  private parked: { x: number; y: number; z: number; yaw: number; k: number }[] | null = null;
+  private parked: { x: number; y: number; z: number; yaw: number; k: number; ks?: number[] }[] | null = null;
   /** where every car stands when the world is new: the jeeps, the police cars, the helicopters and the west's jeeps (as the server numbers them) */
   private parks() {
     // (Worked out once. It is a search of the whole map, every tree and wall of it, and it was asked for by every
@@ -318,10 +318,10 @@ export class Garage {
     return (this.parked = [...jeeps.map((p) => ({ ...p, k: 0 })), ...police.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...(this.protoHeli ? heliSpots(this.h.world).map((p) => ({ ...p, k: HELI.kind })) : []), ...westSpots(this.h.world, [...jeeps, ...police]).map((p) => ({ ...p, k: 0 }))]);
   }
 
-  private standAlone(p: { x: number; y: number; z: number; yaw: number; k: number }, home: number) {
-    const i = this.nextId++;
+  private standAlone(p: { x: number; y: number; z: number; yaw: number; k: number; ks?: number[] }, home: number) {
+    const i = this.nextId++, k = parkKind(p);
     this.homes.set(i, home);
-    this.add({ i, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(p.k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, ...(p.k ? { k: p.k } : {}) });
+    this.add({ i, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, ...(k ? { k } : {}) });
   }
 
   /** what the server sends about them, wired to what is done about it here */

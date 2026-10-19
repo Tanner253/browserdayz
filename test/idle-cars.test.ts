@@ -1,7 +1,8 @@
 // The west's jeeps on the real server, and cars left alone (JEEP.idle, server/acts.ts leftAlone): a jeep stands at
 // each place of the west from the start; one that burns comes back at its place; one nobody has sat at the wheel of
 // for CAR_IDLE_S is taken away, but not while anybody is near it or in it, nor while it stands at its own place,
-// and a new one is stood there in its time. The real server is started on a port of its own, with the times short.
+// and a new one is stood there in its time, even with an admin's car on that place's books driven off elsewhere.
+// The real server is started on a port of its own, with the times short (and LOCAL_ADMIN, for /spawn).
 //   npx tsx test/idle-cars.test.ts
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -41,7 +42,7 @@ class Player {
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-idle-cars-'));
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, BOTCHECK: 'off', CHECKS: 'off', LINGER_S: '0', CAR_IDLE_S: String(IDLE), JEEP_RESPAWN_S: String(RESPAWN) },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, BOTCHECK: 'off', CHECKS: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', CAR_IDLE_S: String(IDLE), JEEP_RESPAWN_S: String(RESPAWN) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';
@@ -57,19 +58,19 @@ try {
   await a.join();
   const cars = a.welcome!.vehicles;
 
-  // A jeep at each place of the west from the start (westSpots: by the road, a jeep, not a police car or a helicopter)
-  const west = WEST_CARS.map(({ name, from }) => {
+  // A car at each place of the west from the start (westSpots: by the road; a UAZ, or on the coast a UAZ or a police car)
+  const west = WEST_CARS.map(({ name, from, ks }) => {
     const [x, z] = PLACES[name];
-    const car = cars.filter((c) => !c.k && c.hp > 0).sort((p, q) => Math.hypot(p.s[0] - x, p.s[2] - z) - Math.hypot(q.s[0] - x, q.s[2] - z))[0];
+    const car = cars.filter((c) => (ks ?? [0]).includes(c.k ?? 0) && c.hp > 0).sort((p, q) => Math.hypot(p.s[0] - x, p.s[2] - z) - Math.hypot(q.s[0] - x, q.s[2] - z))[0];
     const d = Math.hypot(car.s[0] - x, car.s[2] - z);
-    assert.ok(d < (from ? 240 : 130), `no jeep by ${name}: the nearest is ${d.toFixed(0)} m off`);
+    assert.ok(d < (from ? 240 : 130), `no car by ${name}: the nearest is ${d.toFixed(0)} m off`);
     return car;
   });
   assert.equal(new Set(west.map((c) => c.i)).size, WEST_CARS.length, 'one jeep counted for two places');
-  pass(`a jeep at each of the ${WEST_CARS.length} places of the west (${WEST_CARS.map((w) => w.name).join(', ')})`);
+  pass(`a car at each of the ${WEST_CARS.length} places of the west (${WEST_CARS.map((w) => w.name).join(', ')}): on the coast ${west.slice(-2).map((c) => (c.k ? 'a police car' : 'a UAZ')).join(' and ')} this time`);
 
-  /** sit at the wheel of a car, move it `ahead` metres along its nose, and get out */
-  const drive = async (car: Car, ahead: number) => {
+  /** sit at the wheel of a car, move it `ahead` metres along its nose, and get out (or, `stay`, stay at the wheel) */
+  const drive = async (car: Car, ahead: number, stay = false) => {
     const [x, y, z, qx, qy, qz, qw] = car.s, yaw = 2 * Math.atan2(qy, qw);
     a.at(x + 1, y - 0.8, z);
     await sleep(300);
@@ -82,6 +83,7 @@ try {
     const rest = [to[0], y, to[2], qx, qy, qz, qw, 0, 0, 0, 0, 0];
     a.send({ t: 'vrest', i: car.i, s: rest });
     await sleep(100);
+    if (stay) return to;
     // (out, and it is left standing: the game that moved it says it is at rest)
     a.send({ t: 'vout' });
     await sleep(200);
@@ -123,6 +125,31 @@ try {
     pass(`and a new jeep at its place ${RESPAWN} s on (JEEP_RESPAWN_S)`);
   }
 
+  // An admin's car stood by a place is booked to it (the nearest of its kind): driven 300 m off with the admin at its
+  // wheel, it does not stand at the place, and the place's own, taken away, is followed by a new one there.
+  {
+    const car = west[2], [hx, , hz] = car.s;
+    a.at(hx + 10, car.s[1] - 0.8, hz);
+    await sleep(300);
+    let heard = a.got.length, mine: Extract<S2C, { t: 'v+' }> | undefined;
+    a.send({ t: 'chat', text: `/spawn jeep 1 ${(hx + 15).toFixed(1)} ${hz.toFixed(1)}` });
+    for (let k = 0; k < 30 && !(mine = a.got.slice(heard).find((m): m is Extract<S2C, { t: 'v+' }> => m.t === 'v+')); k++) await sleep(100);
+    assert.ok(mine, 'the admin`s /spawn stood no car');
+    await drive(car, 40);
+    const far = await drive(mine.v as Car, 300, true);
+    a.at(far[0] + 1, far[1] - 0.8, far[2]);
+    heard = a.got.length;
+    for (let k = 0; k < (IDLE + 4) * 10 && !a.gone(car.i); k++) await sleep(100);
+    assert.ok(a.gone(car.i), 'the place`s own was not taken away');
+    let fresh;
+    for (let k = 0; k < (RESPAWN + 5) * 10 && !(fresh = a.stood(heard, hx, hz)); k++) await sleep(100);
+    assert.ok(fresh, 'no new car at its place: the admin`s car, booked to it and driven off, was counted as standing there');
+    assert.ok(!a.gone(mine.v.i), 'the admin`s car was taken away with the admin at its wheel');
+    pass('with an admin`s car on its place`s books driven off elsewhere: still a new one at its place');
+    a.send({ t: 'vout' });
+    await sleep(200);
+  }
+
   // Burned: a new one at its place.
   {
     const car = west[1], [hx, , hz] = car.s;
@@ -146,7 +173,7 @@ try {
   }
 
   // Every car nobody touched, standing at its own place all this while (well past CAR_IDLE_S), is there still.
-  const touched = new Set([west[0].i, west[1].i]);
+  const touched = new Set([west[0].i, west[1].i, west[2].i]);
   const lost = cars.filter((c) => !touched.has(c.i) && a.gone(c.i));
   assert.deepEqual(lost.map((c) => c.i), [], 'cars standing at their own places were taken away');
   pass(`the ${cars.length - touched.size} cars standing at their own places: none taken away`);

@@ -269,8 +269,8 @@ export const CAR_IDLE_MS = (Number(process.env.CAR_IDLE_S) || JEEP.idle.after) *
 
 /**
  * Each second, for each car: whoever sits at its wheel winds its clock back; one left alone too long (JEEP.idle) with
- * nobody in it and nobody near is taken away, and a new one is due at its place, unless another stands on that place's
- * books (an admin's). Cars are not kept over a restart, so neither is the clock, nor is one taken away brought back.
+ * nobody in it and nobody near is taken away, and a new one is due at its place, unless another car stands there.
+ * Cars are not kept over a restart, so neither is the clock, nor is one taken away brought back.
  * @returns whether it was taken away
  */
 export function leftAlone(v: Veh, now: number): boolean {
@@ -281,7 +281,9 @@ export function leftAlone(v: Veh, now: number): boolean {
   if ([...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) < JEEP.idle.clear)) return false;
   vehicles.delete(v.i);
   broadcast({ t: 'v-', i: v.i });
-  if (!jeepsDue.has(v.home) && ![...vehicles.values()].some((o) => o.home === v.home && !o.goneAt)) jeepsDue.set(v.home, now + RESPAWN_MS);
+  // (unless another car stands at its place now: an admin's is booked to the nearest place of its kind, and one driven
+  // off from there left the place empty, its own never to come back)
+  if (!jeepsDue.has(v.home) && ![...vehicles.values()].some((o) => o.home === v.home && !o.goneAt && p && Math.hypot(o.s[0] - p.x, o.s[2] - p.z) < 8)) jeepsDue.set(v.home, now + RESPAWN_MS);
   log(`car #${v.i} left alone ${Math.round((now - v.drivenAt) / 60000)} min at ${v.s[0].toFixed(0)}, ${v.s[2].toFixed(0)}: taken away`);
   return true;
 }

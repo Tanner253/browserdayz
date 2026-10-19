@@ -144,8 +144,8 @@ export function buildWorldData(root: string) {
     cars: manifest.models?.[JEEP.model] && manifest.models?.[POLICE_CAR.model] ? stations : [],
     /** and the helicopters (src/sim/heli.ts): on the hospital's roof and by the fort; none without the jeeps, or without a model of their own */
     helis: manifest.models?.[JEEP.model] && manifest.models?.[HELI.model] ? heliSpots(world) : [],
-    /** and the west's jeeps, by the roads of its places (numbered after all the others, so none of those moves) */
-    west: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? westSpots(world, [...parked, ...stations]) : [],
+    /** and the west's jeeps, by the roads of its places (numbered after all the others, so none of those moves); on the coast a police car may stand instead, where the game has its model */
+    west: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? westSpots(world, [...parked, ...stations]).map(({ ks, ...p }) => (ks && manifest.models?.[POLICE_CAR.model] ? { ...p, ks } : p)) : [],
     spawns: world.spawns,
     /** where the infected live, and somewhere to stand one about such a place (see src/sim/infected.ts) */
     homes: infectedHomes(world),

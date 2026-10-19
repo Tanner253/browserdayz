@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
-import { JEEP, POLICE_CAR, WEST_CARS, jeepSpots, policeSpots, westSpots } from '../src/sim/vehicles';
+import { JEEP, POLICE_CAR, WEST_CARS, jeepSpots, parkKind, policeSpots, westSpots } from '../src/sim/vehicles';
 import { waterAt } from '../src/sim/water';
 import { BUILDING_FOOTPRINT, SEA_LEVEL, TOWN, generateWorld, heightAt } from '../src/world/worldgen';
 
@@ -72,6 +72,17 @@ ok('a jeep by the road at each place of the west, on level ground, off the aspha
     for (const o of [...jeeps, ...cars, ...west]) assert.ok(o === c || Math.hypot(o.x - c.x, o.z - c.z) > 39, `${q.name}'s jeep on top of another car`);
   });
   assert.deepEqual(westSpots(world, [...jeeps, ...cars]), west, 'not where they were the last time');
+});
+
+ok('on the coast a police car as often as a UAZ; everywhere else in the west the UAZ alone', () => {
+  west.forEach((c, k) => assert.deepEqual(c.ks, ['Bereg', 'Mys'].includes(WEST_CARS[k].name) ? [0, POLICE_CAR.kind] : undefined, `${WEST_CARS[k].name} stands the wrong kinds`));
+  const coast = { k: 0, ks: [0, POLICE_CAR.kind] };
+  assert.equal(parkKind(coast, 0), 0);
+  assert.equal(parkKind(coast, 0.49), 0);
+  assert.equal(parkKind(coast, 0.5), POLICE_CAR.kind);
+  assert.equal(parkKind(coast, 0.999999), POLICE_CAR.kind);
+  assert.equal(parkKind({ k: POLICE_CAR.kind }, 0.9), POLICE_CAR.kind, 'a station`s police car is not always a police car');
+  assert.equal(parkKind({ k: 0 }, 0.9), 0);
 });
 
 ok('the server stands the jeeps where it stood them, the police cars after them, and the west`s after those', () => {
