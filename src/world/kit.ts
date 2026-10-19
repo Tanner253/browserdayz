@@ -32,6 +32,12 @@ export interface KitOptions {
   dress?: (mat: THREE.MeshStandardMaterial, name: string) => THREE.Material;
   /** two numbers kept with every corner, under this name (the fort: whether the sky is over it, and how high it is over its foot) */
   attr?: { name: string; of: (p: V3, n: V3) => [number, number] };
+  /**
+   * Triangles of the layout's own beside its pieces', drawn in the kit's material of each name (the insides of a
+   * hollowed piece: src/world/pokrov-towers.ts). Corners as [x, y, z, nx, ny, nz, u, v], three a triangle, u and v
+   * in the kit's own measure of the picture (a set's `repeat` is laid on them as on the kit's).
+   */
+  add?: Record<string, number[][]>;
 }
 
 interface Part { geo: THREE.BufferGeometry; mat: THREE.MeshStandardMaterial; m: THREE.Matrix4; backs: Map<number, V3[][]> | null }
@@ -118,6 +124,15 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
       standTriangles(corners, index, p.cut ?? [], part.backs, (q) => put(name, q));
     }
     if (caps.wanted) caps.put(put);
+  }
+  for (const [name, corners] of Object.entries(o.add ?? {})) {
+    const to = rows.get(name), repeat = o.sets?.[name]?.repeat ?? 1;
+    if (to) for (const q of corners) {
+      to.pos.push(q[0], q[1], q[2]);
+      to.nrm.push(q[3], q[4], q[5]);
+      to.uv.push(q[6] * repeat, q[7] * repeat);
+      if (o.attr) to.extra.push(...o.attr.of([q[0], q[1], q[2]], [q[3], q[4], q[5]]));
+    }
   }
   const meshes: THREE.Mesh[] = [];
   let triangles = 0;

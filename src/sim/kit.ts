@@ -460,6 +460,13 @@ const BLOCKS: Record<string, Block[]> = {
 export const KIT_ROCK = { o: [-2.13, 0.00, 0.36], lean: 0.7504, nu: 15, nv: 16, cu: 0.3290, cv: 0.3166, v0: 0.135, tops: [-9, 0.21, 0.05, 0.03, -0.11, -0.15, -0.16, -9, -9, -9, -0.2, -0.19, -0.13, -0.18, -0.12, -9, -9, 0.2, 0.19, -0.02, -0.24, -0.26, -0.33, -0.44, -0.45, -0.42, -0.35, -0.31, -0.33, -0.26, -0.13, -0.02, -9, 0.12, 0.05, -0.23, -0.28, -0.26, -0.43, -0.46, -0.49, -0.44, -0.38, -0.26, -0.22, -0.17, -0.16, -0.14, -9, -0.11, -0.1, -0.35, -0.34, -0.33, -0.52, -0.53, -0.49, -0.43, -0.24, -0.18, -0.14, -0.09, -0.07, -0.08, -0.31, -0.37, -0.39, -0.4, -0.44, -0.41, -0.4, -0.4, -0.41, -0.32, -0.29, -0.23, -0.18, -0.14, -0.14, -9, -0.6, -0.55, -0.5, -0.5, -0.48, -0.44, -0.43, -0.47, -0.45, -0.38, -0.35, -0.29, -0.22, -0.18, -0.17, -9, -0.69, -0.65, -0.6, -0.56, -0.45, -0.35, -0.44, -0.4, -0.31, -0.45, -0.41, -0.38, -0.33, -0.26, -0.25, -9, -0.64, -0.59, -0.5, -0.41, -0.32, -0.25, -0.23, -0.2, -0.32, -0.5, -0.46, -0.45, -0.37, -0.32, -0.3, -9, -0.65, -0.59, -0.47, -0.34, -0.22, -0.14, -0.23, -0.26, -0.37, -0.4, -0.36, -0.31, -0.25, -0.14, -0.12, -9, -0.56, -0.48, -0.38, -0.34, -0.29, -0.22, -0.19, -0.25, -0.2, -0.18, -0.14, -0.15, -0.09, -0.09, -0.11, -9, -0.53, -0.51, -0.5, -0.44, -0.36, -0.3, -0.24, -0.31, -0.29, -0.25, -0.22, -0.16, -0.11, -0.06, -9, -9, -0.41, 0.26, 0.33, -0.47, -0.42, -0.37, -0.36, -0.34, -0.24, -0.13, -0.02, 0.04, 0.04, 0, -9, -9, -0.14, -0.39, 0.27, 0.28, 0.31, 0.31, 0.16, 0.22, 0.2, 0.25, 0.26, 0.09, 0.07, 0.03, -9, -9, -9, -9, 0.19, 0.21, 0.24, 0.26, 0.2, 0.16, 0.17, 0.27, 0.26, 0.11, 0.04, -0.03, -9, -9, -9, -9, -9, 0.12, 0.14, 0.16, 0.15, 0.12, 0.19, 0.2, 0.21, 0.09, -0.01, -0.05, -9, -9, -9, -9, -9, 0.05, 0.01, 0.03, 0.06, 0.06, 0.06, 0.09, 0.12, 0.01, 0.02, -9, -9, -9, -9, -9, -9, -9, -9, -0.03, 0.02, 0.03, 0, 0.01, 0.03, 0.02, -9, -9, -9, -9] };
 /** the round tower: how far out its face is at its foot, two metres up, and at its platform; its platform; and the ring of wall round that */
 export const KIT_TOWER = { foot: 7.93, waist: [2, 7.33] as [number, number], top: [11.5, 6.36] as [number, number], ring: { r0: 4.76, r1: 6.3, y: 12.75 } };
+/**
+ * The flight up to a wall's walk (fort_wall_stairs_straight_01), measured on the model: as wide as it is (its x),
+ * its first tread's front and top, the landing's front, its height and its far end, and the rims round the landing
+ * (on its open side, across its far end; the wall's side is open onto the walk). Its first step is 0.63 m: a body
+ * is carried up it from 0.6 m before it, then along the fronts of the steps as every flight in the game is.
+ */
+export const KIT_STAIR = { wide: 3.54, toe: -0.6, first: [0.02, 0.63] as [number, number], land: [10.62, 7.08] as [number, number], end: 14.8, rim: 7.53, side: [3.06, 3.49] as [number, number], back: 14.34 };
 
 /** What a piece is in its own measure, where there is a block for it: how far it reaches. (For a far stand-in, and for knowing a piece is known.) */
 export function kitBlocks(id: string): Block[] | null {
@@ -500,6 +507,15 @@ export function kitSolids(layout: KitPiece[], cell = 0.5): KitSolid[] {
       const pts: number[] = [], T = KIT_TOWER;
       for (const [y, r] of [[0, T.foot], T.waist, T.top] as [number, number][]) for (let k = 0; k < 16; k++) pts.push(...kitPoint(m, [(Math.cos(k * 0.3927) * r) / Math.cos(0.19635), y, (Math.sin(k * 0.3927) * r) / Math.cos(0.19635)]));
       out.push({ t: 'hull', pts, name });
+      continue;
+    }
+    if (p.id === 'fort_wall_stairs_straight_01') {
+      // (it stopped nothing, and was walked through: 2026-10-19, "pokrov is missing all kinds of collisions")
+      const S = KIT_STAIR, at = (x: number, y: number, z: number) => kitPoint(m, [x, y, z]);
+      out.push({ t: 'hull', pts: [0, S.wide].flatMap((x) => [[S.toe, 0], S.first, S.land, [S.land[0], 0], [S.first[0], 0]].flatMap(([z, y]) => at(x, y, z))), name });
+      put([0, S.wide, 0, S.land[1], S.land[0], S.end]);
+      put([S.side[0], S.side[1], S.land[1], S.rim, S.land[0], S.end]);
+      put([0, S.wide, S.land[1], S.rim, S.back, S.end]);
       continue;
     }
     for (const b of BLOCKS[p.id] ?? []) {

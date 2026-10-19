@@ -12,7 +12,9 @@
 import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { kitSolids, type KitPiece } from '../sim/kit';
-import { placedDomes, placedKits, placedWalls, type PlacedTown } from '../sim/towns';
+import { placedDomes, placedKits, placedTowers, placedWalls, type PlacedTown } from '../sim/towns';
+import { towerSolids } from '../sim/pokrov-towers';
+import { towerInsides } from './pokrov-towers';
 import type { Atmosphere } from './atmosphere';
 import type { Buildings } from './buildings';
 import { onionDome } from './domes';
@@ -41,7 +43,7 @@ const SKIN: KitOptions['sets'] = { fort_wall: { set: 'white_bricks', repeat: 3 }
  */
 interface Lazy { make: (near: boolean) => Promise<THREE.Group>; come: number; go: number; far: THREE.Group | null; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number }
 
-interface Walled { far: THREE.Group; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number; pieces: ReturnType<typeof placedWalls> }
+interface Walled { far: THREE.Group; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number; pieces: ReturnType<typeof placedWalls>; add: KitOptions['add'] }
 
 export class Towns {
   private walled: Walled[] = [];
@@ -78,14 +80,16 @@ export class Towns {
     for (const t of this.placed) {
       const pieces = placedWalls(t);
       if (pieces.length) {
-        for (const s of kitSolids(pieces)) {
+        // (the corner towers are hollow: what stops a body in them, and what is drawn inside them, is their own plan's)
+        const towers = placedTowers(t), add = towerInsides(towers);
+        for (const s of [...kitSolids(pieces), ...towers.flatMap(towerSolids)]) {
           if (s.t === 'box') physics.addStaticQuat(physics.R.ColliderDesc.cuboid(s.h[0], s.h[1], s.h[2]), 'concrete', { x: s.c[0], y: s.c[1], z: s.c[2] }, { x: s.q[0], y: s.q[1], z: s.q[2], w: s.q[3] });
           else {
             const hull = physics.R.ColliderDesc.convexHull(new Float32Array(s.pts));
             if (hull) physics.addStatic(hull, 'concrete', { x: 0, y: 0, z: 0 });
           }
         }
-        const { meshes, triangles } = await kitMeshes('fort_kit', pieces, { lod: 1, sets: SKIN, dress: this.dress });
+        const { meshes, triangles } = await kitMeshes('fort_kit', pieces, { lod: 1, sets: SKIN, dress: this.dress, add });
         this.counts.far += triangles;
         const far = new THREE.Group();
         far.name = `${t.town.name} walls far`;
@@ -94,7 +98,7 @@ export class Towns {
           far.add(m);
         }
         this.scene.add(far);
-        const w: Walled = { far, near: null, making: false, close: false, shown: true, x: t.town.x, z: t.town.z, r: Math.hypot(...t.town.pad), pieces };
+        const w: Walled = { far, near: null, making: false, close: false, shown: true, x: t.town.x, z: t.town.z, r: Math.hypot(...t.town.pad), pieces, add };
         this.walled.push(w);
         this.buildings.keepFar((on) => ((w.shown = on), this.show(w)), w.x, w.z, w.r);
       }
@@ -186,7 +190,7 @@ export class Towns {
       const close = d < (w.close ? GO : COME);
       if (close && !w.near && !w.making) {
         w.making = true;
-        void kitMeshes('fort_kit', w.pieces, { sets: SKIN, dress: this.dress }).then(async ({ meshes, triangles }) => {
+        void kitMeshes('fort_kit', w.pieces, { sets: SKIN, dress: this.dress, add: w.add }).then(async ({ meshes, triangles }) => {
           const near = new THREE.Group();
           near.name = 'town walls near';
           for (const m of meshes) {

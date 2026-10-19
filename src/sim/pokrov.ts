@@ -29,7 +29,7 @@ const south = (type: Kind, x: number): TownSpot => ({ type, x, z: SOUTH + DEEP[t
 
 /**
  * Where the cells stand: along the east side of the walls (POKROV_WALL's second side), 8 to 32 m from its south
- * corner (south of the stair up to the walk, whose foot is at 32.6), their back against the wall's inside face (the
+ * corner (south of the stair up to the walk, whose foot is at 35.3), their back against the wall's inside face (the
  * kit's thin wall is 2.55 deep, inside the line the walls are said by), their front to the court.
  */
 function cellsSpot(): TownSpot {

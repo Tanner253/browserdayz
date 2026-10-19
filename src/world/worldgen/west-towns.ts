@@ -8,7 +8,7 @@ import { DESERT_TOWNS } from '../../sim/desert';
 import { MOKROYE, WATER } from '../../sim/mokroye';
 import { OZERKI, SHORE } from '../../sim/ozerki';
 import { LAND, OUTLINE, outside as offTop, ruinLocal, ruinsGround, type Place } from '../../sim/ruins';
-import { moundAt, placedSlabs, townBuildings, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
+import { moundAt, placedSlabs, placedTowers, townBuildings, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
 import { BUILDING_FOOTPRINT, type BuildingPlot } from './layout';
 import { CELL, SEA_LEVEL, WORLD_SEED } from './places';
 import { PLACED, PLAN } from './west-plan';
@@ -116,6 +116,10 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
       if (i >= 0 && j >= 0 && i < net.nx && j < net.nz && Math.abs(dx * c - dz * sn) < fw / 2 + 1.5 && Math.abs(dx * sn + dz * c) < fd / 2 + 1.5) out.grass[j * net.nx + i] = 0;
     }
   });
+  // (nor in Pokrov's corner towers, which are hollow: a blade grows within a metre of its square's middle, and the room is 4.4 m round, the tower 7.9)
+  for (const w of placedTowers({ town: t, padY })) for (let j = Math.floor((w.z - 6 - net.z0) / CELL); j <= Math.ceil((w.z + 6 - net.z0) / CELL); j++) for (let i = Math.floor((w.x - 6 - net.x0) / CELL); i <= Math.ceil((w.x + 6 - net.x0) / CELL); i++) {
+    if (i >= 0 && j >= 0 && i < net.nx && j < net.nz && Math.hypot(net.x0 + i * CELL - w.x, net.z0 + j * CELL - w.z) < 5.8) out.grass[j * net.nx + i] = 0;
+  }
   const ground = townGround(t);
   overPad(net, t, 30, (k, _x, _z, lx, lz) => {
     let off = 1e9;

@@ -16,6 +16,7 @@ import { POKROV_GROUND, POKROV_TERRACE, pokrovBuildings, pokrovThings } from './
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
 import { ZASTAVA, ZASTAVA_GROUND, ZASTAVA_SLABS, zastavaBuildings, zastavaThings } from './zastava';
 import { DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
+import { TOWER_ROOM, towerCuts, wallCuts, type TowerPlace } from './pokrov-towers';
 
 export { LIPKI };
 
@@ -42,8 +43,11 @@ export const POKROV: Town = { name: 'Pokrov', x: -1850, z: -30, pad: [135, 115],
 export const POKROV_WALL: [number, number][] = [[-65, 20], [70, 20], [75, -60], [0, -95], [-80, -55]];
 /** where along which side of POKROV_WALL its gates' middles are (metres from the side's first corner) */
 const POKROV_GATES: { side: number; at: number }[] = [{ side: 0, at: 70 }, { side: 3, at: 49 }];
-/** the sides whose middle a stair climbs to the wall-walk, from inside */
-const POKROV_STAIRS = [1, 4];
+/**
+ * The sides whose middle a stair climbs to the wall-walk, from inside, and how far on from the middle its foot is.
+ * The east one's foot was 0.8 m from the cells' north end, a gap to sidle into: on by 2.5 m, it has room before it.
+ */
+const POKROV_STAIRS: { side: number; on: number }[] = [{ side: 1, on: 2.5 }, { side: 4, on: 0 }];
 
 /** the kit's lengths (see progress/intake/CATALOGUE.md): a thin straight, its half, the gate, how deep a thin wall is */
 const THIN = 14.82, HALF = 7.41, DEEP = 2.55, GATE_MID = 3.7;
@@ -68,9 +72,10 @@ export function pokrovWalls(y: number): KitPiece[] {
       const full = len >= HALF * 1.5, n = full ? Math.max(1, Math.round(len / THIN)) : 1, each = len / n;
       for (let k = 0; k < n; k++) out.push({ id: full ? 'fort_wall_thin_straight_01' : 'fort_wall_thin_straight_04', at: at(a + k * each), turn, scale: [1, 1, each / (full ? THIN : HALF)], name: 'Pokrov wall' });
     }
-    if (POKROV_STAIRS.includes(s)) {
+    const stair = POKROV_STAIRS.find((q) => q.side === s);
+    if (stair) {
       // (behind the wall, in from its outer face by its depth: rising along the side to its walk)
-      const [sx, , sz] = at(L / 2 - THIN / 2), ix = Math.cos(turn), iz = -Math.sin(turn);
+      const [sx, , sz] = at(L / 2 - THIN / 2 + stair.on), ix = Math.cos(turn), iz = -Math.sin(turn);
       out.push({ id: 'fort_wall_stairs_straight_01', at: [sx + ix * DEEP, y, sz + iz * DEEP], turn, name: 'Pokrov stair' });
     }
     out.push({ id: 'fort_tower_round', at: [px, y, pz], turn, name: 'Pokrov tower' });
@@ -232,12 +237,38 @@ export function placedKits(p: PlacedTown): { kit: string; pieces: KitPiece[]; bo
   ];
 }
 
-/** a town's walls in the world (only Pokrov has any) */
+/**
+ * Which way each corner tower's doorway faces, as turned from the way into the court from that corner (radians).
+ * The north-east one's is turned along the south wall: the cells' south end stands three metres off its middle line.
+ */
+const POKROV_DOORS = [0, -0.3, 0, 0, 0];
+
+/** Pokrov's corner towers in the world: where, how high their foot is, which way their doorway faces (see src/sim/pokrov-towers.ts) */
+export function placedTowers(p: PlacedTown): TowerPlace[] {
+  if (p.town.name !== POKROV.name) return [];
+  const W = POKROV_WALL, foot = p.padY + POKROV_TERRACE.h;
+  return W.map(([x, z], k) => {
+    const [px, pz] = W[(k + W.length - 1) % W.length], [nx, nz] = W[(k + 1) % W.length];
+    const a = Math.atan2(nz - z, nx - x), b = Math.atan2(pz - z, px - x), court = Math.atan2(Math.sin(a) + Math.sin(b), Math.cos(a) + Math.cos(b));
+    const [wx, wz] = townPoint(p.town, x, z);
+    // (the tower's piece is turned as its side is: see pokrovWalls. An angle on the plan of the town's frame is the world's less the town's turn.)
+    return { x: wx, z: wz, foot, door: court + POKROV_DOORS[k] - p.town.rot, dir: 1 as const, turn: Math.atan2(nx - x, nz - z) + p.town.rot };
+  });
+}
+
+/** a town's walls in the world (only Pokrov has any): the towers hollowed (they are made solid by their own plan), and the walls that run into them cut back there */
 export function placedWalls(p: PlacedTown): KitPiece[] {
   if (p.town.name !== POKROV.name) return [];
-  return pokrovWalls(p.padY + POKROV_TERRACE.h).map((k) => {
-    const [x, z] = townPoint(p.town, k.at[0], k.at[2]);
-    return { ...k, at: [x, k.at[1], z], turn: (k.turn ?? 0) + p.town.rot };
+  const towers = placedTowers(p);
+  return pokrovWalls(p.padY + POKROV_TERRACE.h).map((k): KitPiece => {
+    const [x, z] = townPoint(p.town, k.at[0], k.at[2]), placed: KitPiece = { ...k, at: [x, k.at[1], z], turn: (k.turn ?? 0) + p.town.rot };
+    if (k.name === 'Pokrov tower') {
+      const t = towers.find((w) => Math.hypot(w.x - x, w.z - z) < 0.01)!;
+      return { ...placed, cut: towerCuts(t), body: false };
+    }
+    // (a wall's piece runs from where it stands along its side, as far as THIN, to the next tower's middle at most)
+    const near = towers.filter((w) => Math.hypot(w.x - x, w.z - z) < THIN + 9);
+    return k.name === 'Pokrov wall' && near.length ? { ...placed, cut: near.flatMap(wallCuts) } : placed;
   });
 }
 
@@ -251,16 +282,19 @@ export function placedDomes(p: PlacedTown): { x: number; y: number; z: number; s
 }
 
 /**
- * Whether somebody at a place is on the monastery's walls (on its walk, its parapet, its stairs) and so has
+ * Whether somebody at a place is on the monastery's walls (on its walk, its parapet, its stairs, in or on a tower) and so has
  * something under them: for the server, which asks of anybody high off the ground what they stand on. Within the
  * band from the wall's outer face to the inner edge of its stairs, and no higher than its merlons.
  */
 export function onTownWall(placed: PlacedTown[] | undefined, x: number, y: number, z: number): boolean {
   for (const p of placed ?? []) {
     const foot = p.padY + POKROV_TERRACE.h;
-    if (p.town.name !== POKROV.name || y < foot - 0.5 || y > foot + 9.5) continue;
+    if (p.town.name !== POKROV.name || y < foot - 0.5) continue;
     const c = Math.cos(p.town.rot), s = Math.sin(p.town.rot), dx = x - p.town.x, dz = z - p.town.z;
     const lx = dx * c - dz * s, lz = dx * s + dz * c, W = POKROV_WALL;
+    // (the round towers at the corners: up their stairs, and on their tops to the battlements' height)
+    for (const [ax, az] of W) if (Math.hypot(lx - ax, lz - az) < 8.2 && y < foot + TOWER_ROOM.top + 2.2) return true;
+    if (y > foot + 9.5) continue;
     for (let i = 0; i < W.length; i++) {
       const [ax, az] = W[i], [bx, bz] = W[(i + 1) % W.length], ex = bx - ax, ez = bz - az, L2 = ex * ex + ez * ez;
       const t = Math.max(0, Math.min(1, ((lx - ax) * ex + (lz - az) * ez) / L2));
@@ -268,8 +302,6 @@ export function onTownWall(placed: PlacedTown[] | undefined, x: number, y: numbe
       const side = (ez * (lx - ax) - ex * (lz - az)) / Math.sqrt(L2);
       if (Math.hypot(lx - ax - ex * t, lz - az - ez * t) < 8 && side > -1 && side < DEEP + 3.6 + 0.5) return true;
     }
-    // (and the round towers at the corners, their tops)
-    for (const [ax, az] of W) if (Math.hypot(lx - ax, lz - az) < 8.2) return true;
   }
   return false;
 }
