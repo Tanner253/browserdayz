@@ -169,6 +169,12 @@ const WEST_PLACES: Record<string, [string, MenuSpot['kind'], Tier]> = {
   Zastava: ['The post at the pass\'s east mouth: slabs across the road, a booth, the barracks, a roadhouse over the road and a watchtower over the canyon. Whoever goes west comes through here.', 'army', 3],
   Zavod: ['The brick works by the desert river, west of the pass: the works hall, its office and the workers\' flats.', 'site', 3],
   Kalat: ['A ruined walled town on its own hill in the desert: the citadel, the curtain wall and its gate, the honeycomb of houses.', 'site', 4],
+  // (the desert's, 2026-10-18: src/sim/desert.ts)
+  Peski: ['A hamlet by the beach where the main road leaves the coast: plank houses, a shed, and a shop with food and water on its shelves.', 'town', 1],
+  Karavan: ['A roadhouse halfway from the coast to the pass: a tavern, a shop and a workshop on the main road.', 'shop', 1],
+  Blokpost: ['The army\'s post on the track down to Kalat: a guard post, a barracks, a garage and a watchtower.', 'army', 2],
+  Bereg: ['Fishermen\'s houses on the north coast, at the end of the coast track.', 'town', 1],
+  Mys: ['A farmstead on the south coast, where the road round Kalat comes down to the beach.', 'town', 1],
 };
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 export const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
