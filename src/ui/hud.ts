@@ -7,6 +7,8 @@ import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
 import { bleedLevel } from './status';
 import { StatusView, figuresWanted, symbol, wantFigures } from './status-view';
+import { KeysView } from './keys-view';
+import type { KeyHints } from '../game/key-hints';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
@@ -179,6 +181,7 @@ export class HUD {
   private last: Record<string, string> = {};
   /** the survivor's state: the symbols in the corner, and the same in words for the inventory (src/ui/status-view.ts) */
   private status: StatusView;
+  private keys: KeysView;
 
   /** the splashes as plain pictures, once drawn (see bakeSplashes) */
   private splashes: string[] | null = null;
@@ -191,7 +194,7 @@ export class HUD {
       <div class="hud-cross"><i></i><i></i><i></i><i></i></div>
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
-      <div class="hud-acts"></div>
+      <div class="hud-side"><div class="hud-acts"></div><div class="hud-keys"></div></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
       <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
@@ -370,7 +373,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'acts', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -378,6 +381,7 @@ export class HUD {
     // (set again in Emotes: the wedges drawn afresh)
     onWheelSlots((ids) => this.el.wheel.querySelector('svg')?.replaceWith(document.createRange().createContextualFragment(wheelSvg(ids))));
     this.status = new StatusView(this.el.vitals);
+    this.keys = new KeysView(this.el.keys, mouseSvg);
     this.buildCompass();
     // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it. What X
     // gave is shut into a pill the moment it is there, and the changelog is put over it: see `mountNews`.)
@@ -1815,6 +1819,8 @@ export class HUD {
     prompt: string | null;
     /** what the hands can do with what is in them (null: nothing to say) */
     acts?: HandAct[] | null;
+    /** the keys that do something now, for the corner (src/game/key-hints.ts) */
+    keys?: KeyHints | null;
     /** a phone: the buttons are named, where a mouse is drawn */
     touch?: boolean;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
@@ -1948,6 +1954,7 @@ export class HUD {
       this.set('acts', e.acts, acts.map((a) => `<div class="hud-act${a.hold ? ' hold' : ''}"><div class="hud-act-text"><b>${a.text}</b>${a.sub ? `<small>${a.sub}</small>` : ''}</div>${key(a)}</div>`).join(''), 'html');
     }
     this.toggle(e.acts, 'show', !!acts);
+    this.keys.show(s.keys);
     this.toggle(e.mark, 'show', !!s.mark);
     if (s.mark) {
       const at = `${(s.mark[0] * 100).toFixed(1)}%|${(s.mark[1] * 100).toFixed(1)}%`;

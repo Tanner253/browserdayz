@@ -143,6 +143,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
 | `infected.ts` | 1158 | The infected, as this game draws and (for the ones near its own player) moves them. |
+| `key-hints.ts` | 143 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
 | `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
@@ -339,6 +340,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `inv-search.ts` | 21 | The search box at the top of Carried (idea 5, 2026-10-18: typing "9mm" dims everything else, lit as the things that go with a chosen one are). |
 | `inv-take.ts` | 20 | The buttons over a crate or a body (idea 10, 2026-10-18): |
 | `inventory-ui.ts` | 2545 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
+| `keys-view.ts` | 41 | The keys that do something now, drawn in the corner under the hands' mouse (what they are is src/game/key-hints.ts). |
 | `kind-icons.ts` | 85 | What kind of thing an item is, as a small symbol in the top right of it in the inventory and on its hot keys, in the colour of its kind: so that a gun, its rounds, a bandage or a tin is told at a glance without the card. |
 | `loading-fx.ts` | 382 | The loading screen's blood and the part of its motion that answers the player. |
 | `loading-pumpkins.ts` | 118 | Pumpkins round the title on the loading screen, for October. |
