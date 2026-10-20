@@ -107,6 +107,9 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // (the MP7A1: the holographic sight on its rail where its own sight stood, between its folded irons and on their line:
   // on the middle of the gun's box, 3 mm right of them, the gun was seen from one side under it, "not straight")
   mp7a1: { dot: { at: [0.049, 0.1171, -0.0085], size: 0.8 } },
+  // (the 9A-91: a sight stands on the top of its rear sight's block, over the folded stock, which lies 6.5 mm over the
+  // receiver's cover and was through the foot of one stood on the cover)
+  a91: { dot: { at: [-0.03, 0.1092, 0.0015], size: 0.85 } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
@@ -263,6 +266,8 @@ interface VmModel {
   twin?: { flash: MuzzleFlash; muzzle: THREE.Vector3; roots: { L: string[]; R: string[] }; shotT: { L: number; R: number } };
   /** a bipod's legs in the hands, each on its hinge (see `hinged`), and how far down they are, 0 folded to 1 standing */
   bipod?: { hinges: THREE.Object3D[]; t: number };
+  /** a folding stock's pieces in the hands, each on its hinge (see STOCKS), and how far folded it is, 0 open to 1 folded */
+  stock?: { hinges: { h: THREE.Object3D; axis: THREE.Vector3; turn: number; from: number; to: number }[]; t: number };
   /** the attachment that is its optic: with it on, `ads` is where the eye goes; without, `adsIron` */
   optic?: string;
   /** the front of its weapon light, in the body's space (the beam starts there) */
@@ -293,7 +298,7 @@ interface VmModel {
 }
 
 type Reseat = { move?: THREE.Vector3; turn?: THREE.Quaternion; shoulder?: THREE.Vector3 };
-type Action = { name: 'equip' | 'unequip' | 'bolt' | 'reload' | 'swing' | 'magswap' | 'use' | 'punch' | 'check'; t: number; dur: number; done?: () => void; data?: Record<string, number> };
+type Action = { name: 'equip' | 'unequip' | 'bolt' | 'reload' | 'swing' | 'magswap' | 'use' | 'punch' | 'check' | 'fold'; t: number; dur: number; done?: () => void; data?: Record<string, number> };
 
 /**
  * Where each pack is held from: the eye, in the pack's space as the pipeline turns it
@@ -815,7 +820,7 @@ const SEAT = {
  * magazine where the body's arms were too short, and its thumb through the far side.)
  */
 const FORE: Record<string, number | { post: [number, number] }> = {
-  ak: 0.28, ar15: 0.32, mosin: 0.315, mosin9130: 0.33, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.46, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  ak: 0.28, ar15: 0.32, a91: 0.24, mosin: 0.315, mosin9130: 0.33, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.46, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
   // (the double barrel: on its forearm past the breech; 0.215 had the hand under the action, off the gun, the owner,
   // 2026-10-18: "for the db shotgun the left hand is not on the gun")
   // (the owner: "the 40mm gun has a vertical grip for us to use, like the ar15")
@@ -828,7 +833,7 @@ const FORE: Record<string, number | { post: [number, number] }> = {
  * pack's own right hand, which on the M32, the Barrett and the MP7 was 5 to 8 cm ahead of the trigger.
  */
 const TRIGGER_WRIST = new THREE.Vector3(-0.095, -0.005, 0.028);
-const BY_TRIGGER: Record<string, true | [number, number]> = { mosin9130: true, barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
+const BY_TRIGGER: Record<string, true | [number, number]> = { a91: true, mosin9130: true, barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
 /**
  * A pair as everybody else sees it held: the gun twice, side by side this far apart (the gun's own metres, as far as
  * its pack's two hands are), each in its own fist, held out in front as two cans would be (the owner, 2026-10-17:
@@ -882,8 +887,44 @@ function hinged(leg: THREE.Mesh): THREE.Object3D {
   return hinge;
 }
 const UNFOLDED = new THREE.Quaternion();
+/** how much of the sway is left with the gun on its bipod, lying down: the scope steady */
+const BRACED_SWAY = 0.05;
+/** lying down, moving faster than this (a share of a run) is crawling: no aiming in it */
+const PRONE_STILL = 0.04;
 /** the guns whose bipod is let down and folded on the fire-mode key, theirs being one mode (the owner, 2026-10-17: "for the barrett .50 cal add a button to toggle the bipod, its cool and it should be animated") */
 const BIPODS = new Set(['barrett']);
+/**
+ * A folding stock, folded and opened on the same key as the bipod (the owner, 2026-10-20, of the 9A-91: "we have the
+ * bipod for barret and nwow collapsable stock for this rifle should be same key, animated"). Each of its pieces turns
+ * on a hinge of its own (its point and axis in the gun's own space, how far it turns) through its share of the fold,
+ * and each later piece rides on the hinge before it. The 9A-91's are its maker's animation's, read off the file
+ * (they fold the model as that animation does, to the millimetre): the frame swings up and over onto the receiver,
+ * then the butt plate lies down flat on it.
+ */
+const STOCKS: Record<string, { piece: string; at: [number, number, number]; axis: [number, number, number]; turn: number; from: number; to: number }[]> = {
+  a91: [
+    { piece: 'stock', at: [-0.2211, 0.0771, 0.0015], axis: [0, 0, -1], turn: THREE.MathUtils.degToRad(189.33), from: 0, to: 0.78 },
+    { piece: 'butt', at: [-0.4705, 0.0108, 0.0015], axis: [0, 0, -1], turn: THREE.MathUtils.degToRad(81.01), from: 0.7, to: 1 },
+  ],
+};
+/**
+ * A stock folded or opened as it is done, off the shoulder (an action of its own: no aiming, firing or reloading in
+ * it): the gun lowered, pushed out and rolled well over to the left (FOLD_TIP) over FOLD.lead seconds, the stock
+ * swung over FOLD.swing, and the gun brought back over FOLD.back. Rolled over, the stock swings out beside the gun:
+ * at the hip its hinge is 12 cm before the eye and the stock 27 cm long, and upright it went up through the face.
+ */
+const FOLD = { lead: 0.3, swing: 0.9, back: 0.4 };
+/** a gun of a folding stock and fire modes both: B pressed and let go folds the stock, B held this long changes the mode */
+const MODE_HOLD = 0.35;
+/**
+ * What a folded stock does to how a gun handles: nothing at the shoulder, so it kicks harder and sways more aimed,
+ * and it is shorter and lighter at the front, so it comes up quicker. (DayZ folds no stocks; a gun without its
+ * buttstock kicks harder there. These are a stock taken away.)
+ */
+const FOLDED = { recoil: 1.45, ergo: 14, sway: 1.35 };
+/** the gun as its stock is folded (see FOLD): lowered and pushed out, metres, and turned, radians (muzzle up, across, top to the left), as LOOK_OVER's */
+const FOLD_TIP = { at: [-0.02, -0.08, -0.15], rot: [0.05, 0.1, 1.15] };
+const _foldAt = new THREE.Vector3();
 /** the foregrip, the AR-15's own piece: the middle of it, where the hand closes round it when it is fitted */
 const FOREGRIP_POST: Record<string, [number, number]> = { ar15: [0.126, 0.007] };
 /** The forward hand: palm up under the fore-end at a point on its underside, its thumb along the near side; or closed round a vertical grip at its middle. */
@@ -978,6 +1019,9 @@ const SIGHT_LINE: Record<string, { notch: [number, number, number]; post: [numbe
   // (the AKS-74U's rear notch stands 6 mm left of its front post in its model: the eye behind the notch, not the post,
   // or the notch sat off to one side of the post when aimed, the owner: "aks iron sights are off")
   aks74u: { notch: [0.128, 0.1375, 0.0022], post: [0.368, 0.1344, 0.0085] },
+  // (the 9A-91's: the notch in the leaf between the ears on the back of its receiver, the post in the hood on its gas
+  // block, level with each other; read off the file looking down its barrel, scripts/sight-profile.mjs)
+  a91: { notch: [-0.016, 0.1072, 0.0015], post: [0.125, 0.1073, 0.0015] },
 };
 /**
  * The middle of a holographic sight's window, from the middle of the box of the whole sight (the eye's space: across,
@@ -1105,6 +1149,9 @@ const VOICE: Record<string, Voice> = {
   colt: { rate: 0.9, gain: 1.2 },
   // (the weapons pass's, each its own: see scripts/sounds.mjs for what each is a recording of)
   aks74u: { rate: 1, gain: 1.4, rec: 'shot_aks' },
+  // (the 9A-91: the AKS's recording a little deeper, a heavier round; with its can on the VSSK's quieted one, which is a
+  // 9x39's cough as the VSS's is, and never a crack: its rounds are slower than sound)
+  a91: { rate: 0.92, gain: 1.3, rec: 'shot_aks', quiet: 'shot_vssk', quietGain: 0.3, subsonic: true },
   mp7a1: { rate: 1, gain: 1, rec: 'shot_mp7' },
   scorpion: { rate: 1, gain: 1.1, rec: 'shot_scorpion' },
   dual_smg: { rate: 1, gain: 1.1, rec: 'shot_ppsh' },
@@ -1124,7 +1171,7 @@ const VOICE: Record<string, Voice> = {
 };
 /** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut): the submachine
  * guns an Uzi's (the owner, 2026-10-17: "the uzi reload can be applied to both submachine guns") */
-const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', ar15: 'ar', mpa: 'uzi', scorpion: 'uzi', mp7a1: 'uzi', dual_smg: 'uzi', dual_mac10: 'uzi' };
+const HANDLED: Record<string, 'ak' | 'ar' | 'uzi'> = { ak: 'ak', a91: 'ak', ar15: 'ar', mpa: 'uzi', scorpion: 'uzi', mp7a1: 'uzi', dual_smg: 'uzi', dual_mac10: 'uzi' };
 /** guns that throw no case as they fire: a revolving launcher, and shotguns broken open to be emptied */
 const NO_CASE = new Set(['m32', 'db12', 'dual_sawnoff']);
 
@@ -1151,6 +1198,17 @@ function dotMaterial(): THREE.Material {
     depthTest: false,
     toneMapped: false,
   });
+}
+
+/**
+ * The red dot's glass. Its model paints it 86% metal, which under the sky gave back a milky sheet over the whole
+ * window (the owner, 2026-10-20: "the red dot glass does not look good its all washed out"), and lit by the hands' own
+ * lights it was a pale veil over dark walls and at night: a faint dark coat, the same by day and night, the world through it.
+ */
+function dotGlass(): THREE.Material {
+  // (unlit: lit, by the sky and the lights the hands are lit with, it gave back five times its colour, and a twentieth
+  // of it still greyed a black wall)
+  return new THREE.MeshBasicMaterial({ color: 0x2a3846, transparent: true, opacity: 0.06, depthWrite: false });
 }
 
 function reticleMaterial(src: THREE.Material): THREE.Material {
@@ -1631,6 +1689,12 @@ export class Weapons {
       ride: { base: akRide.base, mag: akRide.mag, brake: akRide.base, silencer: akRide.base, sight: akRide.base, foregrip: akRide.base, light: akRide.base },
       spare: ['Pmag2_063', akRide.mag],
     }));
+    // (the 9A-91 the same way, its trigger on the AK's; its stock and butt plate on the body, each on its hinge: STOCKS)
+    this.models.set('a91', await this.packGun({
+      pack: 'ak', item: 'a91', gun: 'a91', kind: 'auto', hip: HELD.ak, flashSize: 0.26, flash: mkFlash(), ownArms: true, square: true, strip: ['Object_97', 'Object_99'],
+      ride: { base: akRide.base, mag: akRide.mag, trigger: akRide.trigger, silencer: akRide.base, stock: akRide.base, butt: akRide.base },
+      spare: ['Pmag2_063', akRide.mag],
+    }));
 
     // ---- melee weapons: held upright in the right hand
     for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork']) {
@@ -1998,6 +2062,7 @@ export class Weapons {
     const hung = new Map<string, THREE.Object3D>();
     const twinHung = new Map<string, THREE.Object3D>();
     const hinges: THREE.Object3D[] = [];
+    const folds: NonNullable<VmModel['stock']>['hinges'] = [];
     if (o.gun) {
       rig.strip(o.strip ?? ['base', 'slide', 'mag', 'hammer', 'trigger', 'stopper', 'shell_1']);
       for (const [piece, on] of Object.entries(o.ride ?? { base: 'base', slide: 'slide', mag: 'mag' })) {
@@ -2022,6 +2087,26 @@ export class Weapons {
           }
         }
         for (const h of hinges) h.quaternion.copy(h.userData.fold);
+      }
+      // (a folding stock's pieces, each on its hinge, the later riding on the one before; open as it came. In the hands
+      // only: others see it open, as they see the bipod folded)
+      let on: THREE.Object3D | null = null;
+      const onAt = new THREE.Vector3();
+      for (const s of STOCKS[o.item] ?? []) {
+        const g = hung.get(s.piece);
+        if (!g) continue;
+        const at = new THREE.Vector3(...s.at).add(nudge), h = new THREE.Group();
+        h.name = `${s.piece}_hinge`;
+        for (const c of [...g.children]) {
+          c.position.sub(at);
+          h.add(c);
+        }
+        h.position.copy(at);
+        if (on) h.position.sub(onAt);
+        (on ?? g).add(h);
+        folds.push({ h, axis: new THREE.Vector3(...s.axis), turn: s.turn, from: s.from, to: s.to });
+        on = h;
+        onAt.copy(at);
       }
       // A sight looked through whose glass is a piece of its own, painted dark (the M32's): in the hands the glass is
       // not there, and the eye sees through the sight to its mark (the owner, 2026-10-17, of our scope's picture put
@@ -2069,7 +2154,7 @@ export class Weapons {
         obj.name = name;
         for (const p of modelId === 'holo' ? await holoParts() : extractParts(await assets.model(modelId), only ? (n) => only.test(n) : undefined)) {
           const reticle = /crosshair/i.test((p.material as THREE.Material).name);
-          const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : packMaterial(p.material));
+          const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : modelId === RED_DOT && (p.material as THREE.Material).transparent ? dotGlass() : packMaterial(p.material));
           mesh.name = reticle ? 'reticle' : name;
           mesh.castShadow = false;
           if (reticle) {
@@ -2390,6 +2475,7 @@ export class Weapons {
       root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown, marks,
       boltFed: o.boltFed, round: o.boltFed ? hung.get('bullet') : undefined,
       bipod: hinges.length ? { hinges, t: 0 } : undefined,
+      stock: folds.length ? { hinges: folds, t: 0 } : undefined,
       hammer: HAMMER[o.item] && hung.has('hammer') ? { piece: hung.get('hammer')!, at: new THREE.Vector3(HAMMER[o.item].at[0], HAMMER[o.item].at[1], 0).add(nudge), down: HAMMER[o.item].down } : undefined,
       scope: rig.node('scope') ?? undefined,
       wrap: rig.node('cheekrest') ?? undefined,
@@ -2780,6 +2866,9 @@ export class Weapons {
 
   private selectorT = 0;
 
+  /** the gun on its bipod, lying down and aimed (see BRACED_SWAY): steady, and the legs held */
+  braced = false;
+
   /** which guns of a bipod have it let down, by the item (folded when not said) */
   private bipodDown = new Map<string, boolean>();
 
@@ -2799,6 +2888,32 @@ export class Weapons {
   /** whether the gun in the hands has its bipod down */
   bipodIsDown(item: ItemInstance | null): boolean {
     return !!item && !!this.bipodDown.get(item.uid);
+  }
+
+  /** which guns of a folding stock have it folded, by the item (open when not said) */
+  private stockDown = new Map<string, boolean>();
+  /** B held on a gun of a folding stock and fire modes: how long, and whether the hold has changed the mode yet */
+  private bHeld: { t: number; done: boolean } | null = null;
+
+  /** a stock folded or opened (B, on a gun with one; not in the middle of something else): its catch let go as it starts to swing, and the click of it locking at the end */
+  toggleStock(item: ItemInstance) {
+    if (this.action) return;
+    this.stockDown.set(item.uid, !this.stockDown.get(item.uid));
+    this.start('fold', FOLD.lead + FOLD.swing + FOLD.back);
+    audio.click(2200, 0.35, 0.015, FOLD.lead);
+    audio.click(1500, 0.4, 0.03, FOLD.lead + FOLD.swing * 0.95);
+  }
+
+  /** whether a gun has its stock folded */
+  stockFolded(item: ItemInstance | null | undefined): boolean {
+    return !!item && !!this.stockDown.get(item.uid);
+  }
+
+  /** how a gun handles as it is held now: with what is fitted to it (handlingOf), and with its stock folded (FOLDED) */
+  private handling(item: ItemInstance | null | undefined) {
+    const hd = handlingOf(item);
+    if (!hd || !this.stockFolded(item)) return hd;
+    return { ...hd, ergo: Math.min(100, hd.ergo + FOLDED.ergo), recoil: hd.recoil * FOLDED.recoil };
   }
 
   /**
@@ -2852,9 +2967,26 @@ export class Weapons {
         input.wheel = 0;
       }
       if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);
-      if (input.pressed('KeyB') && this.currentItem) {
-        if (BIPODS.has(this.currentItem.id)) this.toggleBipod(this.currentItem);
-        else this.toggleMode(this.currentItem);
+      const it = this.currentItem;
+      if (it && STOCKS[it.id]) {
+        // (a gun of a folding stock and fire modes both: B let go folds or opens the stock, B held changes the mode)
+        if (input.pressed('KeyB')) this.bHeld = { t: 0, done: false };
+        if (this.bHeld && input.held('KeyB')) {
+          this.bHeld.t += dt;
+          if (!this.bHeld.done && this.bHeld.t >= MODE_HOLD) {
+            this.toggleMode(it);
+            this.bHeld.done = true;
+          }
+        } else if (this.bHeld) {
+          if (!this.bHeld.done) this.toggleStock(it);
+          this.bHeld = null;
+        }
+      } else {
+        this.bHeld = null;
+        if (input.pressed('KeyB') && it) {
+          if (BIPODS.has(it.id)) this.toggleBipod(it);
+          else this.toggleMode(it);
+        }
       }
       if (this.currentItem && (input.pressed('PageUp') || input.pressed('PageDown'))) this.setZero(this.currentItem, input.pressed('PageUp') ? 1 : -1);
     }
@@ -2866,13 +2998,20 @@ export class Weapons {
 
     // ----- aiming
     // (nor on hands and feet up a steep face: see Player.handsBusy)
-    const canAim = enabled && !this.held && !!m && !p.sprinting && !p.handsBusy && (!this.action || this.action.name === 'bolt') && !p.dead;
+    // (nor crawling: lying down, the gun comes to the eye only once the body is still, the owner, 2026-10-20: "you
+    // shouldnt be able to ADS while moving while prone")
+    const canAim = enabled && !this.held && !!m && !p.sprinting && !p.handsBusy && (!this.action || this.action.name === 'bolt') && !p.dead && !(p.prone && p.moving > PRONE_STILL);
     // (a pair is not aimed down sights: its right button is its right hand's trigger)
     this.aiming = canAim && input.held('Mouse2') && !def?.weapon?.akimbo;
     this.spread = def?.weapon && item ? this.spreadNow(item.id) : 0;
     p.aiming = this.aiming;
+    // (On its bipod, lying down and aimed, the gun rests on the ground: the scope is steady, and whoever is on it stays
+    // where they lie until they come off the scope. The owner, 2026-10-20: "bipod on berret works if prone and its down,
+    // scope is steady but locked into position, cant move while scoped when prone and using bipod.")
+    this.braced = this.aiming && p.prone && !!item && BIPODS.has(item.id) && this.bipodIsDown(item);
+    p.braced = this.braced;
     // a handy gun is at the eye in a fifth of a second; a long heavy one takes twice that
-    const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
+    const hd = this.handling(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
     this.scoped = !!m && ((m.kind === 'rifle' && (hasMod(this.currentItem, 'pu_scope') || ownScopeOn(this.currentItem))) || hasMod(this.currentItem, 'elcan') || psoOn(this.currentItem)) && this.adsT > 0.9 && this.aiming;
@@ -2890,6 +3029,14 @@ export class Weapons {
       m.bipod.t = THREE.MathUtils.clamp(m.bipod.t + Math.sign(want - m.bipod.t) * (1 / 0.45) * Math.min(dt, 0.05), 0, 1);
       const k = m.bipod.t * m.bipod.t * (3 - 2 * m.bipod.t);
       for (const h of m.bipod.hinges) h.quaternion.slerpQuaternions(h.userData.fold, UNFOLDED, k);
+    }
+    // (a folding stock swings over FOLD.swing once the gun is off the shoulder, each piece through its share, eased at
+    // both ends; turned about its axis, not slerped: the frame goes 189 degrees, up and over, where the short way round
+    // is down through the hand)
+    if (m?.stock && !(this.action?.name === 'fold' && this.action.t < FOLD.lead)) {
+      const want = this.stockFolded(this.currentItem) ? 1 : 0;
+      m.stock.t = THREE.MathUtils.clamp(m.stock.t + Math.sign(want - m.stock.t) * (1 / FOLD.swing) * Math.min(dt, 0.05), 0, 1);
+      for (const s of m.stock.hinges) s.h.quaternion.setFromAxisAngle(s.axis, s.turn * THREE.MathUtils.smoothstep(m.stock.t, s.from, s.to));
     }
     this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;
@@ -2992,7 +3139,7 @@ export class Weapons {
     const tired = (1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5) * p.shake;
     const heft = THREE.MathUtils.clamp((100 - hd.ergo) / 60, 0.25, 1.2);
     const armsK = 1 + Math.pow(1 - this.armStamina, 2) * 2.6;
-    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (1 - 0.9 * this.steady) * (1 + 0.8 * Math.min(1, this.breath.winded)) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);
+    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (1 - 0.9 * this.steady) * (1 + 0.8 * Math.min(1, this.breath.winded)) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * (this.stockFolded(item) ? FOLDED.sway : 1) * (this.braced ? BRACED_SWAY : 1) * armsK * (0.75 + heft * 0.5);
     const t = this.time;
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
     const rec = this.aimRecoil.step(dt);
@@ -3085,7 +3232,7 @@ export class Weapons {
     // the sights, tired arms, what is screwed on the muzzle): part of it throws the aim up and across and comes
     // back by itself, part of it stays and has to be pulled down. What is seen of the gun jumping is beside that.
     const big = !!gun?.heavy;
-    const feel = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
+    const feel = this.handling(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     // (steadied by the sights when they are at the eye, not from the moment their button goes down: it was the button)
     const kick = kickOf(item.id, { shot: this.burst, crouched: this.player.crouched, prone: this.player.prone, aimed: this.adsT > SIGHTS_UP, arms: this.armStamina, ergo: feel.ergo, fitted: feel.recoil }, Math.random);
     // (a pair's kick is in two hands held out apart, neither at the eye: two fifths of it reaches the view, or with
@@ -3958,7 +4105,7 @@ export class Weapons {
     const kr = this.kickRot.step(dt);
     // the gun has weight: it trails the eye through a turn and swings on a little after it. How far
     // goes by how fast the head is turning (not by how many frames that took), and by the gun.
-    const feel = handlingOf(this.currentItem);
+    const feel = this.handling(this.currentItem);
     const heft = feel ? THREE.MathUtils.clamp((100 - feel.ergo) / 60, 0.25, 1.2) : 0.6;
     this.sway.k = THREE.MathUtils.lerp(150, 85, heft / 1.2);
     this.sway.d = THREE.MathUtils.lerp(16, 12, heft / 1.2);
@@ -4015,6 +4162,24 @@ export class Weapons {
       rot.x += how.first[0] * first + how.second[0] * second;
       rot.y += how.first[1] * first + how.second[1] * second;
       rot.z += how.first[2] * first + how.second[2] * second;
+    }
+    // (a stock folding or opening: the gun off the shoulder and rolled over while it swings, back once it is locked)
+    if (a?.name === 'fold') {
+      const w = THREE.MathUtils.smoothstep(a.t, 0, FOLD.lead) * (1 - THREE.MathUtils.smoothstep(a.t, FOLD.lead + FOLD.swing, a.dur));
+      // (rolled about its own length through the stock's hinge, not about the pack's origin a hand under the gun,
+      // round which it stood up on end)
+      const roll = FOLD_TIP.rot[2] * w, c = Math.cos(roll), sn = Math.sin(roll), h = m.stock?.hinges[0]?.h;
+      if (h) {
+        const q = m.root.worldToLocal(h.getWorldPosition(_foldAt));
+        pos.x += q.x - (q.x * c - q.y * sn);
+        pos.y += q.y - (q.x * sn + q.y * c);
+      }
+      pos.x += FOLD_TIP.at[0] * w;
+      pos.y += FOLD_TIP.at[1] * w;
+      pos.z += FOLD_TIP.at[2] * w;
+      rot.x += FOLD_TIP.rot[0] * w;
+      rot.y += FOLD_TIP.rot[1] * w;
+      rot.z += roll;
     }
     // (a pack with no drawing of its coming up is lifted into the picture the way a still model is)
     if (a && (!m.rig || ((a.name === 'equip' || a.name === 'unequip') && !m.rig.has('holster') && !m.rig.has('draw')))) {

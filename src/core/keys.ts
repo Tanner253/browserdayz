@@ -32,7 +32,7 @@ export const ACTIONS: Action[] = [
   { code: 'Mouse0', does: 'Fire · use what you hold', group: 'Fight' },
   { code: 'Mouse2', does: 'Aim', group: 'Fight' },
   { code: 'KeyR', does: 'Reload', group: 'Fight' },
-  { code: 'KeyB', does: 'Automatic · single shots', group: 'Fight' },
+  { code: 'KeyB', does: 'Automatic · single shots · bipod · folding stock (held: fire mode)', group: 'Fight' },
   { code: 'KeyI', does: 'Look the gun over', group: 'Fight' },
   { code: 'KeyX', does: 'Empty your hands', group: 'Fight' },
   { code: 'PageUp', does: 'Sights: further', group: 'Fight' },

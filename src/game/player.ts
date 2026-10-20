@@ -127,6 +127,8 @@ export class Player {
   keepAlive = false;
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
+  /** lying on a bipod and aimed (set by the weapons): held where it lies until off the scope */
+  braced = false;
   weightKg = 0;
   /** nothing is held: whatever is carried is holstered or slung, or is on its way there (said every frame: see Weapons.handsEmpty) */
   emptyHanded = false;
@@ -468,8 +470,8 @@ export class Player {
     // crouch jumping works, its necessary for some jump spots").
     else if (this.crouched && this.grounded && input.pressedFixed('Space')) this.setCrouch(false);
 
-    const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
-    const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
+    const fwd = this.braced ? 0 : (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
+    const str = this.braced ? 0 : (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
     const wantsSprint = input.held('ShiftLeft') && fwd > 0 && !this.aiming && !this.crouched && !this.prone;
     const walk = input.held('AltLeft');
     // Out of breath is a state, not a line to hover on. With only the line, a player who kept

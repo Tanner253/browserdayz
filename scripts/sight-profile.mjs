@@ -11,7 +11,8 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
 const doc = await io.read(`public/assets/models/hi/${id}.glb`).catch(() => io.read(`public/assets/models/${id}.glb`));
 const pts = [];
 for (const n of doc.getRoot().listNodes()) {
-  if (n.getName() !== piece || !n.getMesh()) continue;
+  // (a piece made of several shapes is several nodes, the second on named `<piece>_2`, and so on)
+  if (n.getName().replace(/_\d+$/, '') !== piece || !n.getMesh()) continue;
   const M = n.getWorldMatrix();
   for (const p of n.getMesh().listPrimitives()) {
     const a = p.getAttribute('POSITION'), v = [0, 0, 0];

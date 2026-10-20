@@ -128,6 +128,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: stood on the ground at a locker's height, textures at 2048
 - This work is based on "FPS Red Dot Sight (Game Model)" (https://sketchfab.com/3d-models/fps-red-dot-sight-game-model-0cf999d9363940c2b149dcd80c448554) by Michael Makivic (https://sketchfab.com/makivic) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: scaled to metres, stood on the ground about its own middle, fitted to the guns that take a sight, textures at 2048
+- This work is based on "9A-91 Assault Rifle Gameready Lowpoly" (https://sketchfab.com/3d-models/9a-91-assault-rifle-gameready-lowpoly-788797a8a6284a29a04961cb09072eda) by valterjherson1 (https://sketchfab.com/valterjherson1) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Set in rigid pieces (the rifle, its stock and butt plate, its magazine, trigger and suppressor, its round) and held in the AK pack's hands; its stock folded by the game along the path its own animation takes; textures re-encoded as WebP at no more than 1024 a side; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

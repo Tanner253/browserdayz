@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-20T04:12:14.635Z",
+ "generated": "2026-10-20T08:17:53.023Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12484,6 +12484,45 @@
    "hi": "assets/models/hi/mosin9130.glb",
    "hiBytes": 7297528,
    "hiCard": 149
+  },
+  "a91": {
+   "url": "assets/models/a91.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 2914132,
+   "srcTris": 11192,
+   "tris": 11192,
+   "min": [
+    -0.4771,
+    -0.0875,
+    -0.0215
+   ],
+   "max": [
+    0.4852,
+    0.1092,
+    0.0449
+   ],
+   "lods": [
+    {
+     "url": "assets/models/a91_lod1.glb",
+     "tris": 2666,
+     "far": 2,
+     "of": "2914132:1792484273016"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.3,
+     -0.02,
+     0.03
+    ],
+    "left": [
+     0.0137,
+     0.029,
+     -0.04894
+    ]
+   }
   }
  }
 }

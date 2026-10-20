@@ -39,6 +39,8 @@ export const CARTRIDGES: Record<string, Cartridge> = {
   ammo_50bmg: { name: '.50 BMG', vel: 860, drag: 0.0003, damage: 150 },
   // 12.7x55 subsonic, 900 grain: 290 m/s, heavy enough to keep most of it: a slow round that drops, and hits hard
   ammo_127x55: { name: '12.7x55', vel: 290, drag: 0.0006, damage: 110 },
+  // 9x39 SP-5, 250 grain: 295 m/s, about 270 at a hundred metres. A heavy slow round: it hits as a .45 does, and drops
+  ammo_9x39: { name: '9x39', vel: 295, drag: 0.0009, damage: 48 },
   // 7.62x54R, 148 grain ball from a long barrel: 830 m/s, 622 at three hundred yards
   ammo_762: { name: '7.62x54R', vel: 830, drag: 0.00105, damage: 95 },
   // 7.62x39, 123 grain: 715 m/s, 480 at three hundred yards
@@ -118,6 +120,8 @@ export const GUNS: Record<string, Gun> = {
   dual_mac10: { ammo: 'ammo_45', rpm: 1800, auto: true, barrel: 0.8, moa: 10, hip: 2.8, up: 0.9, side: 0.8, lean: 0.16, first: 1.1, held: 0.85, stays: 0.34, back: 9, jump: 1.1, zero: [50], reach: 120 },
   dual_smg: { ammo: 'ammo_9mm', rpm: 1500, auto: true, barrel: 0.9, moa: 9, hip: 2.6, up: 0.6, side: 0.6, lean: 0.14, first: 1.0, held: 0.82, stays: 0.32, back: 9, jump: 0.9, zero: [50], reach: 150 },
   db12: { ammo: 'ammo_12', rpm: 360, barrel: 1, moa: 8, hip: 1.4, up: 4.4, side: 1, lean: 0, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 4.6, heavy: true, zero: [25], reach: 60 },
+  // (the 9A-91: a heavy round out of a gun of two kilos, fast, and it climbs harder than the AK; sighted for 100 and 200)
+  a91: { ammo: 'ammo_9x39', rpm: 750, auto: true, barrel: 1, moa: 5, hip: 2.2, up: 1.6, side: 0.55, lean: 0.3, first: 1.25, held: 0.8, stays: 0.44, back: 8.5, jump: 1.9, zero: [100, 200], reach: 350 },
   aks74u: { ammo: 'ammo_739', rpm: 700, auto: true, barrel: 0.8, moa: 6, hip: 2.3, up: 1.7, side: 0.65, lean: 0.4, first: 1.4, held: 0.8, stays: 0.48, back: 8.5, jump: 2.2, zero: [100, 200], reach: 350 },
   mp7a1: { ammo: 'ammo_9mm', rpm: 950, auto: true, barrel: 1.0, moa: 5, hip: 1.9, up: 0.6, side: 0.35, lean: 0.12, first: 0.9, held: 0.78, stays: 0.3, back: 8, jump: 0.9, zero: [50, 100], reach: 260 },
   scorpion: { ammo: 'ammo_9mm', rpm: 1150, auto: true, barrel: 1.0, moa: 6, hip: 2.1, up: 0.7, side: 0.45, lean: 0.14, first: 1.0, held: 0.82, stays: 0.32, back: 9, jump: 0.95, zero: [50, 100], reach: 240 },

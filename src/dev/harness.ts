@@ -146,6 +146,8 @@ export function installHarness(g: Game) {
       one('ak', (it) => Object.assign(it, { mag: 'mag_ak', loaded: 31 }));
       // (the AR-15 with everything that came on it fitted: its sight, its suppressor, its foregrip and its light. Each comes off in the inventory.)
       one('ar15', (it) => Object.assign(it, { mag: 'mag_ar', loaded: 31, mods: ['red_dot', 'suppressor_556', 'foregrip', 'gun_light'] }));
+      // (the 9A-91, its stock folding on B, with its can and a red dot)
+      one('a91', (it) => Object.assign(it, { mag: 'mag_a91', loaded: 21, mods: ['a91_suppressor', 'red_dot_1x'] }));
       one('m9', (it) => Object.assign(it, { mag: 'mag_m9', loaded: 16 }));
       // (the submachine gun, and the other two pistols in a pocket: all four are held in the same hands)
       one('mpa', (it) => Object.assign(it, { mag: 'mag_mpa', loaded: 31 }));

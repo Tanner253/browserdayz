@@ -1466,6 +1466,32 @@ export const WEAPON_PACKS = {
       changes: 'held in our own arms (its own arms left out), its pieces parted by joint, textures at 2048',
     },
   },
+  // The 9A-91 (2026-10-20, the owner: "i added a new gun ... collapsable stock for this rifle should be same key [as
+  // the Barrett's bipod], animated"). Rigid pieces on joints of their own, in the AK's hands as the AR-15 is, fitted
+  // magazine to magazine. Its stock is two pieces, the frame and the butt plate on its own hinge, folded by the game
+  // as its maker's one animation folds them; its PBS suppressor is a piece shown when fitted; its round lies beside it
+  // in its maker's scene and is what its loose rounds are drawn as. In metres as it comes, its muzzle to +z.
+  a91: {
+    dir: '9a91',
+    file: 'scene.gltf',
+    // (five sets of pictures on one small gun: at 2048 it was 320 MB on the card in the hands, four times the AK's; at
+    // 1024 a set it is drawn as sharp as the AK is, whose one 2048 set covers its whole gun and arms. The owner,
+    // 2026-10-20: "make sure no suboptimal fps drops")
+    tex: 1024,
+    fp: false,
+    scale: 1,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    fit: { to: 'ak', piece: 'mag' },
+    parts: { 'Bone.003_03': 'butt', 'Bone.001_01': 'stock', 'Bone.005_06': 'silencer', 'Bone.006_08': 'trigger', 'Bone.007_09': 'mag', Bone_00: 'base', 'wTube.087': 'bullet' },
+    credit: {
+      name: '9A-91 Assault Rifle Gameready Lowpoly',
+      url: 'https://sketchfab.com/3d-models/9a-91-assault-rifle-gameready-lowpoly-788797a8a6284a29a04961cb09072eda',
+      author: 'valterjherson1',
+      line: 'This work is based on "9A-91 Assault Rifle Gameready Lowpoly" (https://sketchfab.com/3d-models/9a-91-assault-rifle-gameready-lowpoly-788797a8a6284a29a04961cb09072eda) by valterjherson1 (https://sketchfab.com/valterjherson1) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Set in rigid pieces (the rifle, its stock and butt plate, its magazine, trigger and suppressor, its round) and held in the AK pack\'s hands; its stock folded by the game along the path its own animation takes; textures re-encoded as WebP at no more than 1024 a side; geometry compressed.',
+    },
+  },
 };
 
 export const MODELS = {

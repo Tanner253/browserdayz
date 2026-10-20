@@ -89,6 +89,13 @@ export const PART_ITEMS: ItemDef[] = [
     loot: { pair: 'Mag_VSS_10Rnd', at: [0, 0, 0, 1, 2], restock: 900 },
   },
   {
+    id: 'mag_a91', name: '9A-91 Magazine', model: 'a91', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'magazine',
+    desc: 'Twenty rounds of 9x39 for the 9A-91.',
+    mag: { ammo: 'ammo_9x39', capacity: 20 }, attach: { fits: ['a91'], slot: 'magazine' },
+    loot: { pair: 'Mag_Val_20Rnd', at: [0, 0, 0, 3, 1], restock: 300, usage: ARMY, keep: SOON, lean: 3 },
+    worth: 6, sells: 2,
+  },
+  {
     id: 'mag_dual_smg', name: 'SMG Magazine Pair', model: 'dualsmg', nodeRe: '^mag', w: 1, h: 3, weight: 0.5, category: 'magazine',
     desc: 'Two thirty-round magazines taped together, one for each of the Dual SMGs.',
     mag: { ammo: 'ammo_9mm', capacity: 60 }, attach: { fits: ['dual_smg'], slot: 'magazine' },
@@ -204,8 +211,8 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits the M9, the Colt 1911, the MPA30, the MP7A1, the shotgun and both assault rifles. Faster to aim with than irons.',
-    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
+    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits the M9, the Colt 1911, the MPA30, the MP7A1, the shotgun, both assault rifles and the 9A-91. Faster to aim with than irons.',
+    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'a91'], slot: 'optic', ergo: 3 },
     loot: { pair: 'M68Optic', at: [0, 1, 7, 3, 3], restock: 1800, usage: ARMY, lean: 4 },
     worth: 20, sells: 1,
   },
@@ -213,7 +220,7 @@ export const PART_ITEMS: ItemDef[] = [
   {
     id: 'red_dot_1x', name: 'Red Dot Sight', model: 'red_dot_1x', w: 2, h: 1, weight: 0.2, category: 'attachment',
     desc: 'A 1x red dot: a lit dot that lies on whatever the gun points at, with nothing to magnify it. Fits every gun that takes a sight, the pistols and the sniper rifles too. Quicker to aim with than irons, and lighter than the holographic sight.',
-    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'mosin', 'vssk', 'sniper50', 'barrett'], slot: 'optic', ergo: 4 },
+    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'a91', 'mosin', 'vssk', 'sniper50', 'barrett'], slot: 'optic', ergo: 4 },
     loot: { pair: 'M4_T3NRDSOptic', at: [0, 2, 8, 3, 2], restock: 1800, usage: ARMY, lean: 4 },
     worth: 16, sells: 1,
   },
@@ -245,6 +252,13 @@ export const PART_ITEMS: ItemDef[] = [
     id: 'mp7_suppressor', name: 'MP7 Suppressor', model: 'mp7a1', nodeRe: '^silencer', w: 3, h: 1, weight: 0.35, category: 'attachment',
     desc: 'The MP7A1 suppressor, and no other gun takes it. Much quieter and no flash; a softer kick, and a longer gun to swing.',
     attach: { fits: ['mp7a1'], slot: 'muzzle', ergo: -6, recoil: 0.86, quiet: true },
+    loot: { pair: 'PistolSuppressor', at: [0, 0, 0, 3, 2], restock: 1800, usage: ARMY },
+    worth: 26,
+  },
+  {
+    id: 'a91_suppressor', name: 'PBS-9 Suppressor', model: 'a91', nodeRe: '^silencer', w: 3, h: 1, weight: 0.4, category: 'attachment',
+    desc: 'The 9A-91\'s own suppressor, and no other gun takes it. With its slow rounds the rifle is hardly heard and shows no flash; a softer kick, and a longer gun to swing.',
+    attach: { fits: ['a91'], slot: 'muzzle', ergo: -6, recoil: 0.88, quiet: true },
     loot: { pair: 'PistolSuppressor', at: [0, 0, 0, 3, 2], restock: 1800, usage: ARMY },
     worth: 26,
   },
