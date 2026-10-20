@@ -737,6 +737,10 @@ export class Economy {
     for (const l of list) {
       if (!ITEMS[l.item.id]) continue;
       if (l.point >= 0 && (!keepPoints || l.point >= this.points.length)) continue;
+      // (a place moved since it was kept, the pillboxes' shelves out of their walls 2026-10-19: what lies at it is put
+      // where the place is now, not left in the wall; a thing is laid within 8 cm of its place)
+      const p = l.point >= 0 ? this.points[l.point] : null;
+      if (p && Math.hypot(l.x - p.x, l.z - p.z) > 0.2) [l.x, l.y, l.z] = [p.x, p.y, p.z];
       this.inject(l);
     }
   }

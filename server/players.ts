@@ -304,7 +304,10 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // restarts the server should spawn them on the surface outside the bunker". They were sent to the map's edge.)
   const under = !!resume && !!world.bunker && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
   const out = under ? bunkerOutside(world.bunker!) : null;
-  const sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
+  // (and whoever was kept by its lid stands on that ground as it is now: it was made again round the lid, 2026-10-19,
+  // and the world's number kept, for nobody anywhere else is to be moved: the owner, "i dont want this")
+  const byLid = !!resume && !!world.bunker && Math.hypot(resume.pose[0] - world.bunker.x, resume.pose[2] - world.bunker.z) < 50;
+  const sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: byLid ? world.coverAt(resume.pose[0], resume.pose[2]) : resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
