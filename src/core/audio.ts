@@ -4,6 +4,7 @@
 
 import type { Surface } from './physics';
 import { EMOTE } from '../sim/emotes';
+import { alarmShare, alarmTop } from '../sim/heard';
 import { ITEMS } from '../sim/items';
 
 type V3 = { x: number; y: number; z: number };
@@ -835,6 +836,103 @@ export class AudioEngine {
     run.connect(lp).connect(rg).connect(out);
     shake.start(t + 0.3);
     shake.stop(t + 3.3);
+  }
+
+  /**
+   * Bunker 17's alarm, heard by everybody on the map as its door opens or shuts (the owner, 2026-10-19: "the bunker
+   * door when opened should blare a siren for the whole map ... same with the bunker door close alarm"; the klaxon
+   * that was it went with the door's recordings on 2026-10-10). Opening, a motor siren's wail: two notes a third
+   * apart wound up, let down and up again twice, and run down. Shutting, a dive alarm's whoop, eight times. Made up:
+   * nobody has recorded one for us. How loud and how dull it is are the distance's (src/sim/heard.ts); the panner
+   * only says which way.
+   * @param pos where it is heard from, on the line to the door (brought near: see the bunker's onMove)
+   * @param distance how far off the door is
+   * @returns how loud it is played here (for checks)
+   */
+  alarm(pos: V3, distance: number, opening: boolean): number {
+    if (!this.ready) return 0;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + distance / 343;
+    const p = ctx.createPanner();
+    p.panningModel = 'HRTF';
+    p.distanceModel = 'inverse';
+    p.rolloffFactor = 0;
+    p.positionX.value = pos.x;
+    p.positionY.value = pos.y;
+    p.positionZ.value = pos.z;
+    p.connect(this.sfx);
+    const gain = 0.45 * alarmShare(distance);
+    const level = ctx.createGain();
+    level.gain.value = gain;
+    const far = this.filter('lowpass', alarmTop(distance));
+    level.connect(far).connect(p);
+    // (and the hills give a little of it back)
+    const back = ctx.createGain();
+    back.gain.value = 0.3;
+    far.connect(back).connect(this.reverbSend);
+    // the horn's mouth: driven hard, its lowest and its hiss taken off
+    const shape = ctx.createWaveShaper();
+    const curve = new Float32Array(257);
+    for (let i = 0; i < 257; i++) curve[i] = Math.tanh(((i - 128) / 128) * 2.2);
+    shape.curve = curve;
+    const env = ctx.createGain();
+    env.gain.value = 0;
+    shape.connect(this.filter('highpass', 160)).connect(this.filter('lowpass', 3600)).connect(env).connect(level);
+    const notes = [1, opening ? 1.2 : 1.5].map((k, n) => {
+      const o = ctx.createOscillator();
+      o.type = n ? 'square' : 'sawtooth';
+      const g = ctx.createGain();
+      g.gain.value = n ? 0.35 : 0.6;
+      o.connect(g).connect(shape);
+      return [o, k] as const;
+    });
+    /** the lower note's pitch at a moment, the upper's with it */
+    const at = (when: number, hz: number, ramp: 'set' | 'lin' | 'exp') => {
+      for (const [o, k] of notes) {
+        const f = o.frequency;
+        if (ramp === 'set') f.setValueAtTime(hz * k, t + when);
+        else if (ramp === 'lin') f.linearRampToValueAtTime(hz * k, t + when);
+        else f.exponentialRampToValueAtTime(hz * k, t + when);
+      }
+    };
+    const loud = (when: number, v: number, ramp: 'set' | 'lin') => (ramp === 'set' ? env.gain.setValueAtTime(v, t + when) : env.gain.linearRampToValueAtTime(v, t + when));
+    let end: number;
+    if (opening) {
+      // wound up from nothing, held, let down to a growl and up again, twice, and left to run down
+      at(0, 80, 'set');
+      loud(0, 0, 'set');
+      at(2.2, 440, 'exp');
+      loud(1.6, 1, 'lin');
+      let w = 2.2;
+      for (let k = 0; k < 3; k++) {
+        at((w += 1.4), 450, 'lin');
+        loud(w, 1, 'set');
+        if (k === 2) break;
+        at((w += 1.6), 250, 'exp');
+        loud(w, 0.7, 'lin');
+        at((w += 1.0), 440, 'exp');
+        loud(w, 1, 'lin');
+      }
+      at((end = w + 3.4), 60, 'exp');
+      loud(end, 0, 'lin');
+    } else {
+      // a whoop a second: up through an octave and a half, cut short
+      for (let k = 0; k < 8; k++) {
+        const w = k * 1.0;
+        at(w, 260, 'set');
+        at(w + 0.72, 760, 'exp');
+        loud(w, 0, 'set');
+        loud(w + 0.03, 1, 'lin');
+        loud(w + 0.72, 1, 'set');
+        loud(w + 0.8, 0, 'lin');
+      }
+      end = 8;
+    }
+    for (const [o] of notes) {
+      o.start(t);
+      o.stop(t + end + 0.1);
+    }
+    return gain;
   }
 
   /** the hammer falling on nothing: it has to be heard over a fight */
