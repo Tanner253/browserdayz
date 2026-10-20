@@ -17,7 +17,7 @@
 import { BUILDING_FOOTPRINT, bunkerPlace, onWorld, heightAt, type World } from '../world/worldgen';
 
 /** how far from the middle one may be said to be: the edge of the ground, and a little */
-import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
+import { BUNKER, bunkerAt, bunkerPlan, bunkerWays, levelY } from './bunker';
 import { castleHomes } from './castle';
 import { caveLoot } from './pass';
 import { waterAt } from './water';
@@ -60,6 +60,12 @@ export const INFECTED = {
   hearJeep: 45,
   hearShot: 125,
   hearQuiet: 22,
+  /**
+   * How near the bunker's still ones (see `IN_ROOMS`) let somebody come before they know, whatever is between, metres:
+   * standing or on the move, and crouched. Nearer than this from the passages' middles none of them is stood.
+   */
+  wake: 4,
+  wakeCrouched: 2,
   /** how long they go on after somebody they can no longer see, seconds (and how long they then look about where they last saw them) */
   forget: 14,
   search: 9,
@@ -135,6 +141,8 @@ export interface InfectedInfo {
   own: number | null;
   /** where it lives: it turned up there, and goes back there when it has nobody to be after */
   h: [number, number];
+  /** 1: one of the bunker's still ones (see `IN_ROOMS`): deaf, it stands where it is until it sees somebody or they come near */
+  w?: 1;
 }
 
 /**
@@ -146,14 +154,21 @@ export function guarded(x: number, z: number, yaw: number, fx: number, fz: numbe
   return Math.abs(Math.atan2(Math.sin(to - yaw), Math.cos(to - yaw))) < INFECTED.guardArc;
 }
 
+/** a spot one turns up at: where, and (in the bunker) the number of the room or passage it is in */
+export type Spot = [number, number, number, number?];
+
 /** somewhere they live: the middle of it, how far out they are found, and how many */
 export interface Home {
   x: number;
   z: number;
   r: number;
   n: number;
-  /** a place that is not open ground (the bunker): the spots they turn up at, and no others */
-  inside?: [number, number, number][];
+  /** a place that is not open ground (the bunker): the spots they turn up at, and no others (and in the bunker, which of its rooms or passages each is in) */
+  inside?: Spot[];
+  /** the bunker's: none comes back while its door is open */
+  bunker?: boolean;
+  /** its ones are still ones (`InfectedInfo.w`) */
+  still?: boolean;
 }
 
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
@@ -181,37 +196,118 @@ export const IN_CAVES = 5;
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
 // (half as many again as the six there were: the gas is where the best of everything is kept, and it was thinly guarded)
 const AT_WORKS = 9;
-/** and how many are shut in the bunker, in the dark */
-const IN_BUNKER = 12;
+/**
+ * And how many are shut in the bunker, in the dark: half by its passages, who come for the door when it opens and
+ * out of it, and half still about its rooms (the owner, 2026-10-19: "half of the zombies should be scattered around
+ * inside the bunker and they dont run at the player until line of sight or proximity requirementsd are met, so players
+ * haveto actuaklly clear the bunker"). Twelve in all, as before.
+ */
+const IN_PASSAGES = 6;
+const IN_ROOMS = 6;
 /** and how many walk the ground over it, in its gas */
 const OVER_BUNKER = 9;
 /** how far from the middle of the works one that turned up there may have done so */
 const WORKS_REACH = 62;
 
 /**
- * Where the infected of the bunker turn up: down its two passages and just inside its rooms,
- * clear of everything that stands there.
+ * Where the infected of the bunker turn up, clear of everything that stands there: those that come for the door, in
+ * its two passages this side of the far rooms (the door is a run of seconds away); the still ones (`rooms`), in every
+ * room, out of its doorways and where they can be, further from the passages' middles than they wake at, and down the
+ * passages' far ends: the back of the main one by the sealed door, and the two ends of the one across (the owner,
+ * 2026-10-19: "i want the zombies to be all throughout the bunker not just sitting by the front door or in the center
+ * halls"). The levels under the first are sealed: there is nowhere below to stand one.
  */
-export function bunkerSpots(world: World): [number, number, number][] {
+export function bunkerSpots(world: World, rooms = false): Spot[] {
   const P = bunkerPlace(world);
   if (!P) return [];
-  const plan = bunkerPlan(), H = BUNKER.hall, out: [number, number, number][] = [];
+  const plan = bunkerPlan(), H = BUNKER.hall, W = bunkerWays(), out: Spot[] = [];
   const clear = (r: number, f: number) => Math.abs(r) < H.r - 0.8 && f > H.back + 0.8 && f < H.front - 0.8
     && !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.4)
     && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1.0 + Math.max(m.w, m.d) / 2);
-  const put = (r: number, f: number) => void (clear(r, f) && out.push(bunkerAt(P, r, f, levelY())));
-  for (let f = H.front - 6; f > H.back + 2; f -= 4) put(0, f);
-  for (let r = -H.r + 3; r < H.r - 2; r += 4) if (Math.abs(r) > BUNKER.passage + 1.5) put(r, plan.cross);
-  for (const q of plan.rooms) {
-    // (a step inside each of its ways in: there are more of those than there were, and more standing in its middle)
-    const cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2;
-    for (const [dr, df] of q.doors) {
-      const d = Math.hypot(cr - dr, cf - df) || 1;
-      put(dr + ((cr - dr) / d) * 1.6, df + ((cf - df) / d) * 1.6);
-    }
+  const put = (r: number, f: number) => void (clear(r, f) && out.push([...bunkerAt(P, r, f, levelY()), W.part(r, f, levelY() + 1)]));
+  if (!rooms) {
+    for (let f = H.front - 6; f >= plan.cross - 2; f -= 4) put(0, f);
+    for (let r = -9; r <= 9; r += 4) if (Math.abs(r) > BUNKER.passage + 1.5) put(r, plan.cross);
+    return out;
   }
+  // (in each room the clear spot nearest its middle, and two more as far from that and each other as the room allows:
+  // so that every room has one, the big ones no more than the small. A room hard by both passages has nowhere out of
+  // waking reach of them: there it is any clear spot, and whoever goes by close wakes it.)
+  const far = INFECTED.wake + 0.3;
+  for (const q of plan.rooms) {
+    const cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2;
+    const grid = (keepOff: boolean) => {
+      const may: [number, number][] = [];
+      for (let r = q.r0 + 0.8; r <= q.r1 - 0.8; r += 0.5) {
+        for (let f = q.f0 + 0.8; f <= q.f1 - 0.8; f += 0.5) {
+          if ((keepOff && (Math.abs(r) < far || Math.abs(f - plan.cross) < far)) || q.doors.some(([a, b]) => Math.hypot(a - r, b - f) < 1.6) || !clear(r, f)) continue;
+          may.push([r, f]);
+        }
+      }
+      return may;
+    };
+    let may = grid(true);
+    if (!may.length) may = grid(false);
+    may.sort((a, b) => Math.hypot(a[0] - cr, a[1] - cf) - Math.hypot(b[0] - cr, b[1] - cf));
+    const took = may.slice(0, 1);
+    while (took.length < 3) {
+      let best: [number, number] | null = null, bd = 2.5;
+      for (const m of may) {
+        const d = Math.min(...took.map((t) => Math.hypot(t[0] - m[0], t[1] - m[1])));
+        if (d > bd) [best, bd] = [m, d];
+      }
+      if (!best) break;
+      took.push(best);
+    }
+    for (const [r, f] of took) put(r, f);
+  }
+  // the passages' far ends, a little to one side: by the sealed door, part way back to it, and at the ends of the one across
+  for (const f of [H.back + 1.4, H.back + 6.5]) put(0.7, f);
+  for (const side of [-1, 1]) for (const r of [H.r - 1.4, H.r - 6]) put(side * r, plan.cross + 0.5);
   return out;
 }
+
+/** the bunker's house and the walled yard before it, up top, as a body keeps clear of them (the bunker's measure: either side, back, front) */
+export const HOUSE = { r: 3.3, f0: 10.2, f1: 19.3 };
+
+/** whether a straight line between two spots (the bunker's measure) goes through a box */
+export function crosses(r0: number, f0: number, r1: number, f1: number, b: { r: number; f0: number; f1: number } = HOUSE): boolean {
+  // (the line cut down to the box, one pair of sides at a time: whatever is left of it is inside)
+  let lo = 0, hi = 1;
+  for (const [p, d, min, max] of [[r0, r1 - r0, -b.r, b.r], [f0, f1 - f0, b.f0, b.f1]]) {
+    if (Math.abs(d) < 1e-9) {
+      if (p <= min || p >= max) return false;
+      continue;
+    }
+    let t0 = (min - p) / d, t1 = (max - p) / d;
+    if (t0 > t1) [t0, t1] = [t1, t0];
+    lo = Math.max(lo, t0);
+    hi = Math.min(hi, t1);
+    if (lo >= hi) return false;
+  }
+  return true;
+}
+
+/**
+ * From a spot up top to another (the bunker's measure), with its house and yard in the way: the corner of them to go
+ * by first, the least far round; null when the way is clear. (Straight at it, they walked into its walls and slid
+ * along them, or stood there.)
+ */
+export function roundHouse(r: number, f: number, tr: number, tf: number): [number, number] | null {
+  if (!crosses(r, f, tr, tf)) return null;
+  // (the whole way round, by one corner or two: by the next corner alone, one just past a corner on its way to the next
+  // found the one behind it the nearer, went back, and stood between the two)
+  let best: [number, number] | null = null, bd = Infinity;
+  for (const c of CORNERS) {
+    const d0 = Math.hypot(c[0] - r, c[1] - f);
+    if (d0 < 0.5 || crosses(r, f, c[0], c[1])) continue;
+    let rest = crosses(c[0], c[1], tr, tf) ? Infinity : Math.hypot(tr - c[0], tf - c[1]);
+    for (const c2 of CORNERS) if (c2 !== c && !crosses(c[0], c[1], c2[0], c2[1]) && !crosses(c2[0], c2[1], tr, tf)) rest = Math.min(rest, Math.hypot(c2[0] - c[0], c2[1] - c[1]) + Math.hypot(tr - c2[0], tf - c2[1]));
+    if (d0 + rest < bd) [best, bd] = [c, d0 + rest];
+  }
+  return best;
+}
+const CORNERS: [number, number][] = [[-HOUSE.r - 0.9, HOUSE.f0 - 0.9], [HOUSE.r + 0.9, HOUSE.f0 - 0.9], [-HOUSE.r - 0.9, HOUSE.f1 + 0.9], [HOUSE.r + 0.9, HOUSE.f1 + 0.9]];
 
 /**
  * Whether one that turned up at a spot is one of the gas or of the bunker: those wear the
@@ -234,8 +330,9 @@ export function infectedHomes(world: World): Home[] {
   if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 5 });
   const works = world.sites.find((s) => s.kind === 'works');
   if (works) homes.push({ x: works.x, z: works.z, r: WORKS_REACH, n: AT_WORKS });
-  const below = bunkerSpots(world), bunker = world.sites.find((s) => s.kind === 'bunker');
-  if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_BUNKER, inside: below });
+  const below = bunkerSpots(world), rooms = bunkerSpots(world, true), bunker = world.sites.find((s) => s.kind === 'bunker');
+  if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_PASSAGES, inside: below, bunker: true });
+  if (bunker && rooms.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_ROOMS, inside: rooms, bunker: true, still: true });
   if (bunker) homes.push({ x: bunker.x, z: bunker.z, r: 40, n: OVER_BUNKER });
   for (const s of world.sites) if (!EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
@@ -328,13 +425,33 @@ export class Director {
     });
   }
 
+  /**
+   * A spot for one more of the bunker's still ones: in a room or passage none of the others of its home lives in, and
+   * of those, one among the furthest from where they live, so that they are through the whole of it (picked at random
+   * from the spots at least seven tenths as far off as the furthest).
+   */
+  private apart(k: number): { x: number; y: number; z: number } | null {
+    const spots = this.homes[k].inside ?? [], mates = [...this.bodies.values()].filter((b) => !b.diedAt && b.home === k);
+    if (!spots.length) return null;
+    const room = (x: number, z: number) => spots.find((s) => Math.abs(s[0] - x) < 0.2 && Math.abs(s[2] - z) < 0.2)?.[3];
+    const taken = new Set(mates.map((b) => room(b.h[0], b.h[1])));
+    const far = (s: Spot) => mates.reduce((d, b) => Math.min(d, Math.hypot(b.h[0] - s[0], b.h[1] - s[2])), 1e9);
+    let off = spots.map((s) => (s[3] !== undefined && taken.has(s[3]) ? 0 : far(s)));
+    // (every room taken: then only how far)
+    if (Math.max(...off) <= 0) off = spots.map(far);
+    const most = Math.max(...off), pick = spots.filter((_, n) => off[n] >= most * 0.7);
+    const s = pick[Math.floor(this.rnd() * pick.length)];
+    return { x: s[0], y: s[1], z: s[2] };
+  }
+
   /** one more about a home, somewhere nobody living is near enough to watch it appear (null: no such spot this time) */
   private stand(home: number, now: number, living: Somebody[]): Body | null {
-    const at = this.spot(this.homes[home]);
+    const at = this.homes[home].still ? this.apart(home) : this.spot(this.homes[home]);
     if (!at || living.some((p) => Math.hypot(p.x - at.x, p.z - at.z) < INFECTED.clear)) return null;
     // (and not where another of them is standing: two in one place can neither of them move)
     for (const o of this.bodies.values()) if (!o.diedAt && Math.hypot(o.s[0] - at.x, o.s[2] - at.z) < 1.5 && Math.abs(o.s[1] - at.y) < 2) return null;
     const b: Body = { i: this.next++, s: [at.x, at.y, at.z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, h: [Math.round(at.x * 10) / 10, Math.round(at.z * 10) / 10], home, diedAt: 0, heard: now, struck: 0 };
+    if (this.homes[home].still) b.w = 1;
     this.bodies.set(b.i, b);
     return b;
   }
@@ -413,7 +530,8 @@ export class Director {
   report(by: number, rows: unknown, now: number): [number, ...IState][] {
     const out: [number, ...IState][] = [];
     if (!Array.isArray(rows)) return out;
-    for (const r of rows.slice(0, 64)) {
+    // (as many as one game may be given to move: an admin's horde stood about them, over and above the map's own)
+    for (const r of rows.slice(0, 200)) {
       if (!Array.isArray(r) || r.length !== 7 || !r.every((v) => typeof v === 'number' && Number.isFinite(v))) continue;
       const b = this.bodies.get(r[0]);
       if (!b || b.diedAt || b.own !== by) continue;
@@ -458,6 +576,6 @@ export class Director {
 
   /** everything standing or lying, for somebody who has just arrived */
   list(): InfectedInfo[] {
-    return [...this.bodies.values()].map((b) => ({ i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h }));
+    return [...this.bodies.values()].map((b) => ({ i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) }));
   }
 }

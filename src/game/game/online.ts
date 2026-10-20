@@ -157,7 +157,7 @@ export const onlineMethods = {
     net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
     net.on('shot', (m) => {
       this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle(), this.remotes.get(m.id));
-      this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot);
+      this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot, m.o[1]);
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);
     });

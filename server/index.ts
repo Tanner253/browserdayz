@@ -624,10 +624,10 @@ setInterval(() => {
     }
   }
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
-  // (the bunker's are not put back while its door stands open: the home that is no open ground is the bunker)
-  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.inside && bunkerDoor.open);
+  // (the bunker's are not put back while its door stands open; by its own mark, as the caves' homes are no open ground either)
+  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.bunker && bunkerDoor.open);
   for (const i of turn.gone) broadcast({ t: 'i-', i });
-  for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
+  for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
   // the bunker's door: open while anybody is in there, shut a minute after the last of them is gone
   if (bunkerDoor.open) {
