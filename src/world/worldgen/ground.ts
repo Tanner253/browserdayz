@@ -4,6 +4,7 @@
 import { clamp, smoothstep } from '../../core/noise';
 import { CELL, SOFTEN, SQUARE_HALF, SQUARE_RES, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0 } from './places';
 import type { World } from './types';
+import { BUNKER, type Place } from '../../sim/bunker';
 
 // ------------------------------------------------------------------ helpers
 
@@ -74,13 +75,21 @@ export function sampleOf(x: number, z: number): [number, number] {
  *   1  a hatch's stairwell opens in it: the fort draws it, round the well;
  *   2  it is wholly under the fort's own stone, between a corner drawn where the ground was and the cut: it would
  *      slant down across the passage where that goes through the wall's foot, and nobody could see it but there.
- * `open` is null, and `heights` the world's own, in a world with nothing cut. (The bunker's roof is not this: it
- * is the bunker's own, drawn by the bunker over ground that is drawn as it is cut.)
+ * `open` is null, and `heights` the world's own, in a world with nothing cut. The bunker's roof (`roof`: where it
+ * stands, null in a world without it) lies level with the ground as it is seen over the hole dug for it, and the
+ * ground under it is drawn as it is seen too: drawn as it is dug, it sloped down into the hole from a square outside
+ * the roof and the roof's edge stood over a gap (the owner, 2026-10-19: "the ground around the bunker perimeiter does
+ * not meet with the bunker top"), and from past the bunker's own drawing distance the hole showed. About its edge,
+ * as far as a square that meets the edge reaches either side, the ground is drawn level with the roof's top: a
+ * finger under it, the step was a dark line round the roof.
  */
-export function seenGround(world: World): { heights: Float32Array; open: Uint8Array | null } {
-  const lid = world.castle?.lid, N = WORLD_NX;
-  if (!lid || !lid.squares.length) return { heights: world.heights, open: null };
-  const heights = world.heights.slice(), open = new Uint8Array(world.heights.length), told = new Set<number>();
+export function seenGround(world: World, roof: Place | null = null): { heights: Float32Array; open: Uint8Array | null } {
+  const lid = world.castle?.lid, N = WORLD_NX, roofed = underRoof(world, roof);
+  if ((!lid || !lid.squares.length) && !roofed.length) return { heights: world.heights, open: null };
+  const heights = world.heights.slice();
+  for (const [i, h] of roofed) heights[i] = h;
+  if (!lid || !lid.squares.length) return { heights, open: null };
+  const open = new Uint8Array(world.heights.length), told = new Set<number>();
   for (const s of lid.squares) {
     const k = idx(Math.round((s.x - WORLD_X0) / CELL), Math.round((s.z - WORLD_Z0) / CELL));
     told.add(k);
@@ -92,6 +101,22 @@ export function seenGround(world: World): { heights: Float32Array; open: Uint8Ar
     for (const q of [i, i - 1, i - N, i - N - 1]) if (!told.has(q)) open[q] = 2;
   }
   return { heights, open };
+}
+
+/** the corners of the net under the bunker's roof and about its edge, and the height each is drawn at (see `seenGround`) */
+function underRoof(world: World, roof: Place | null): [number, number][] {
+  if (!roof) return [];
+  const P = BUNKER.pad, c = Math.cos(roof.rot), n = Math.sin(roof.rot), top = roof.y + P.top, band = 2.9, out: [number, number][] = [];
+  const reach = Math.hypot(P.r, Math.max(-P.back, P.front)) + band;
+  const [x0, z0] = sampleOf(roof.x - reach, roof.z - reach), [x1, z1] = sampleOf(roof.x + reach, roof.z + reach);
+  for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) {
+    const i = idx(ix, iz), dx = WORLD_X0 + ix * CELL - roof.x, dz = WORLD_Z0 + iz * CELL - roof.z, r = dx * c - dz * n, f = dx * n + dz * c;
+    // (how far inside the roof's edge, or outside it as a negative)
+    const e = Math.abs(r) <= P.r && f >= P.back && f <= P.front ? Math.min(P.r - Math.abs(r), f - P.back, P.front - f) : -Math.hypot(Math.max(0, Math.abs(r) - P.r), Math.max(0, P.back - f, f - P.front));
+    if (Math.abs(e) < band) out.push([i, Math.max(top, e >= 0 ? world.surface[i] : world.heights[i])]);
+    else if (e > 0 && world.surface[i] !== world.heights[i]) out.push([i, world.surface[i]]);
+  }
+  return out;
 }
 
 export function slopeAt(heights: Float32Array, x: number, z: number): number {

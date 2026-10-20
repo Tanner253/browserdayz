@@ -8,8 +8,9 @@ import { canyonBedsGlsl } from './canyon-beds';
 import { macroTexture } from './macro';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { BELT, FORT_SNOW, RUTS, SNOW_LIFT, snowNet, snowOn, snowPicture, snowThinsGrass, snowUniforms, tellSnow } from './snow';
-import { CELL, SNOW, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, groundField, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
+import { CELL, SNOW, SQUARE_HALF, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, groundField, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
 import { frameToWorld, inWell, type Basement } from '../sim/basements';
+import { BUNKER, bunkerAt, bunkerLocal } from '../sim/bunker';
 
 // The paint as it was: four layers, in the order of the splat's channels (grass, forest floor, rock, gravel), and
 // the metres each was laid to a repeat. The paint as it is now has the kinds of src/world/ground.ts, each at the
@@ -317,19 +318,28 @@ export class Terrain {
    * metre of them, and the ground's collider open there (see physics.holes)
    */
   openWells(list: Basement[], mouths: ReturnType<typeof caveMouths> = []) {
-    const n = Math.min(list.length, MAX_WELLS);
+    // (And the bunker's stair where it comes up through the roof: the ground under the roof is drawn level with the
+    // roof (see `seenGround`) and lay across the well, and the ground as it is dug came up through the top of the
+    // flight, the owner 2026-10-19: "the lid of the bunker ... has a glitch where the stiars meet the surface".)
+    const P = bunkerPlace(this.world), S = BUNKER.stair, f0 = BUNKER.hut.back + 0.5, f1 = S.foot + S.run + 0.5;
+    const stair = P ? (() => { const [x, , z] = bunkerAt(P, 0, (f0 + f1) / 2); return { x, z, rot: P.rot, hx: S.half, hz: (f1 - f0) / 2 }; })() : null;
+    if (stair) {
+      this.wells.uWellA.value[0].set(stair.x, stair.z, Math.cos(stair.rot), Math.sin(stair.rot));
+      this.wells.uWellB.value[0].set(stair.hx, stair.hz, 0, 0);
+    }
+    const o = stair ? 1 : 0, n = Math.min(list.length, MAX_WELLS - o);
     for (let i = 0; i < n; i++) {
       const b = list[i], w = b.well, [cx, cz] = frameToWorld(b, (w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2);
-      this.wells.uWellA.value[i].set(cx, cz, Math.cos(b.rot), Math.sin(b.rot));
-      this.wells.uWellB.value[i].set((w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2, 0, 0);
+      this.wells.uWellA.value[o + i].set(cx, cz, Math.cos(b.rot), Math.sin(b.rot));
+      this.wells.uWellB.value[o + i].set((w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2, 0, 0);
     }
-    const m = Math.min(mouths.length, MAX_WELLS - n);
+    const m = Math.min(mouths.length, MAX_WELLS - o - n);
     for (let k = 0; k < m; k++) {
       const q = mouths[k];
-      this.wells.uWellA.value[n + k].set(q.x, q.z, Math.cos(q.rot), Math.sin(q.rot));
-      this.wells.uWellB.value[n + k].set(q.hx, q.hz, 0, 0);
+      this.wells.uWellA.value[o + n + k].set(q.x, q.z, Math.cos(q.rot), Math.sin(q.rot));
+      this.wells.uWellB.value[o + n + k].set(q.hx, q.hz, 0, 0);
     }
-    this.wells.uWells.value = n + m;
+    this.wells.uWells.value = o + n + m;
     const g = this.grassTex.image.data as Uint8Array;
     for (const b of list) {
       const [x0, z0, x1, z1] = b.box;
@@ -344,7 +354,8 @@ export class Terrain {
           if (inMouth([{ ...q, hx: q.hx + 1, hz: q.hz + 1 }], WORLD_X0 + ix * CELL, WORLD_Z0 + iz * CELL)) g[idx(ix, iz)] = 0;
     }
     this.grassTex.needsUpdate = true;
-    physics.holes = (x, z) => inWell(list, x, z) || (mouths.length > 0 && inMouth(mouths, x, z));
+    const inStair = (x: number, z: number) => { if (!P) return false; const [r, f] = bunkerLocal(P, x, 0, z); return Math.abs(r) < S.half && f > f0 && f < f1; };
+    physics.holes = (x, z) => inWell(list, x, z) || (mouths.length > 0 && inMouth(mouths, x, z)) || inStair(x, z);
   }
   splatTex!: THREE.DataTexture;
   grassTex!: THREE.DataTexture;
@@ -375,7 +386,7 @@ export class Terrain {
     // the fort's passage the ground is let down, and it is drawn where it was before that, with nothing laid over
     // it; and a few squares are not drawn at all (a hatch's stairwell opens in them, or they are inside the fort's
     // own stone). See `seenGround`.
-    const { heights: drawn, open } = seenGround(this.world);
+    const { heights: drawn, open } = seenGround(this.world, bunkerPlace(this.world));
     const pos = new Float32Array(NX * NZ * 3);
     const nrm = new Float32Array(NX * NZ * 3);
     for (let iz = 0; iz < NZ; iz++) {

@@ -433,6 +433,15 @@ export class BunkerSite {
     block(-B.pad.r, -B.stair.half, hole, B.pad.front, under, top, roof, up);
     block(B.stair.half, B.pad.r, hole, B.pad.front, under, top, roof, up);
     block(-B.stair.half, B.stair.half, head, B.pad.front, under, top, roof, up);
+    // (What is stood on round it: the ground's net dips into the hole dug under the roof wherever a square of it
+    // reaches under the roof's edge, and is drawn level with the roof (see `seenGround`), so a body stepping off the
+    // roof sank into ground it could not see. A slab nobody sees, level with the ground, as far out as such a square
+    // reaches.)
+    const apron = 2.9;
+    for (const [r0, r1, f0, f1] of [[-B.pad.r - apron, B.pad.r + apron, B.pad.back - apron, B.pad.back], [-B.pad.r - apron, B.pad.r + apron, B.pad.front, B.pad.front + apron], [-B.pad.r - apron, -B.pad.r, B.pad.back, B.pad.front], [B.pad.r, B.pad.r + apron, B.pad.back, B.pad.front]]) {
+      const [x, y, z] = bunkerAt(P, (r0 + r1) / 2, (f0 + f1) / 2, -0.25);
+      physics.addStatic(physics.R.ColliderDesc.cuboid((r1 - r0) / 2, 0.25, (f1 - f0) / 2), 'grass', { x, y, z }, P.rot);
+    }
     // the floor of the house's one room, round the well the stair comes up in
     for (const [r0, r1, f0, f1] of [[-2.2, -B.stair.half, hole - 0.5, B.hut.front - 0.1], [B.stair.half, 2.9, hole - 0.5, B.hut.front - 0.1], [-B.stair.half, B.stair.half, head, B.hut.front - 0.1]]) block(r0, r1, f0, f1, top, top + 0.02, floor, { solid: false });
 
@@ -493,6 +502,8 @@ export class BunkerSite {
       const f0 = S.foot + (k / steps) * S.run, f1 = S.foot + ((k + 1) / steps) * S.run;
       block(-S.half, S.half, f0, f1, Y - 0.3, Y + ((k + 1) / steps) * rise, floor, { solid: false });
     }
+    // (and the top of it on to the roof's edge: half a metre between the last tread and the roof was open, down to the ground)
+    block(-S.half, S.half, S.foot + S.run, head, Y - 0.3, top, floor);
     {
       // what is walked on: one slope under the treads (a foot does not catch on twenty-eight edges)
       const len = Math.hypot(S.run, rise), tilt = Math.atan2(rise, S.run);

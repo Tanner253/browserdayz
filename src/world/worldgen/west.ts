@@ -367,9 +367,11 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const east = ridgeAt(zOf(iz))[2];
     for (let ix = 0; ix < OX; ix++) {
       const x = xOf(ix), z = zOf(iz), i = iz * NX + ix, h = heights[i], c = x - shores[iz];
-      // (the slope as `slopeAt` has it, read off the net's own samples: they are the heights it would read)
+      // (the slope as `slopeAt` has it, read off the net's own samples: they are the heights it would read. Of the
+      // ground as it is seen: by the hole dug under the bunker's roof, which is drawn with this paint, a band round
+      // the roof's edge was painted bare rock)
       const r = Math.min(ix + 1, NX - 1), l = Math.max(ix - 1, 0), u = Math.max(iz - 1, 0), dn = Math.min(iz + 1, NZ - 1);
-      const slope = Math.hypot(heights[iz * NX + r] - heights[iz * NX + l], heights[dn * NX + ix] - heights[u * NX + ix]) / (2 * CELL);
+      const slope = Math.hypot(surface[iz * NX + r] - surface[iz * NX + l], surface[dn * NX + ix] - surface[u * NX + ix]) / (2 * CELL);
       // (each noise asked only where it can tell)
       let rock = slope < 0.39 ? 0 : clamp(smoothstep(0.5, 0.85, slope + 0.1 * n3.noise(x * 0.05, z * 0.05)), 0, 1);
       const desert = x <= east ? 1 : Math.max(1 - smoothstep(east + 20, east + PLAN.desert.fringe + 40 * n2.noise(x * 0.006, z * 0.006), x), 1 - smoothstep(M0[0], M0[1] + 50 * n3.noise(x * 0.008, z * 0.008), Math.hypot(x - mouth.x, z - mouth.z))), bank = banks[i] / 255;
@@ -777,6 +779,15 @@ function cutBunker(heights: Float32Array, surface: Float32Array, site: Site, too
       if (h - lo > 0.9 * CELL) heights[i] = lerp(h, lo + 0.9 * CELL, 0.5 * (1 - smoothstep(X - 70, X - 12, d)));
     }, 1);
   const local = (x: number, z: number): [number, number] => { const dx = x - bx, dz = z - bz; return [dx * Math.cos(rot) - dz * Math.sin(rot), dx * Math.sin(rot) + dz * Math.cos(rot)]; };
+  // (The ground under the roof and round it held at the level floor's height, the roof's own, as far out as a square
+  // of the net that meets its edge reaches, and eased out beyond: about its back corners, past the level floor, the
+  // hillside's cut fell away by more than a metre and the roof's concrete edge stood out of a hollow. The owner,
+  // 2026-10-19: "the ground around the bunker perimeiter does not meet with the bunker top".)
+  const held = 2.9, ease = 4;
+  span(R, (x, z, i) => {
+    const [r, f] = local(x, z), e = Math.hypot(Math.max(0, Math.abs(r) - B.pad.r), Math.max(0, B.pad.back - f, f - B.pad.front));
+    if (e < held + ease) heights[i] = lerp(floorY, heights[i], smoothstep(held, held + ease, e));
+  });
   for (const list of [tools.trees, tools.rocks, tools.props]) {
     for (let k = list.length - 1; k >= 0; k--) {
       const t = list[k];
