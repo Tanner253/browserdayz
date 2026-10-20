@@ -401,7 +401,7 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
     }
     if (own && !noTag) lootedTags.set(own.uid, lootedFrom(c, lived));
     else if (own || older) {
-      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : nobody ? 'no other player killed them' : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
+      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : nobody ? 'no other player killed them' : outside ? 'outside the Zona' : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
       if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` : `No dog tag on ${c.name}: an admin, at work.` });
     }

@@ -137,8 +137,11 @@ ok('the Zona: one closed line, on its true edge but at the notches, never far fr
 ok('the Zona as the owner drew it (src/world/zona.ts): one closed line, every point of it on the edge of the rule to within half its step', () => {
   const rings = zonaRings();
   assert.equal(rings.length, 1, `${rings.length} lines round a Zona that is all one piece`);
-  for (const p of rings[0]) assert.ok(Math.abs(zonaDepth(p.x, p.z)) <= 4, `the line is ${zonaDepth(p.x, p.z).toFixed(1)} m off the edge of the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
-  assert.ok(inPlay(-1180, 350) && inPlay(625, 365) && inPlay(-1855, 585) && !inPlay(-700, 300), 'Lipki, Kamenka or the swamp is out of it, or the woods by the works are in it');
+  // (since 2026-10-19 the Zona runs to the world's own edges east of its line: there the line is the world's edge, not the rule's)
+  const edge = (p: { x: number; z: number }) => p.x >= 760 || Math.abs(p.z) >= 760 || p.x <= -3832;
+  for (const p of rings[0]) if (!edge(p)) assert.ok(Math.abs(zonaDepth(p.x, p.z)) <= 4, `the line is ${zonaDepth(p.x, p.z).toFixed(1)} m off the edge of the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
+  // (Lipki, Kamenka, the swamp and Pokrov in it; the desert and Kalat out, since 2026-10-19: everything east of x -1950)
+  assert.ok(inPlay(-1180, 350) && inPlay(625, 365) && inPlay(-1855, 585) && inPlay(-1915, 0) && !inPlay(-2200, 0) && !inPlay(-3200, 200), 'Lipki, Kamenka, the swamp or Pokrov is out of it, or the desert or Kalat is in it');
   // (the maps are handed the same line, worked out once)
   assert.equal(playEdge(), playEdge());
   assert.deepEqual(playEdge(), rings);
