@@ -110,9 +110,9 @@ export function installHarness(g: Game) {
       return Object.fromEntries([...g.loot.models.sizes].map(([k, v]) => [k, [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)]]));
     },
     /** every item's inventory picture, made here from its model, with what it was made from (scripts/icons.mjs keeps them as files) */
-    async icons() {
+    async icons(only?: string[]) {
       const { renderIcons, iconSig } = await import('../ui/icons');
-      const made = await renderIcons(g.s.r.renderer, g.loot.models, g.s.atmo.envMap);
+      const made = await renderIcons(g.s.r.renderer, g.loot.models, g.s.atmo.envMap, only);
       // (a thing's second picture, `slot:<id>`, is made from what the first is)
       return Object.fromEntries(Object.entries(made).map(([id, url]) => [id, { url, sig: iconSig(id.replace(/^slot:/, '')) }]));
     },

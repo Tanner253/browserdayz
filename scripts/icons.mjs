@@ -9,6 +9,7 @@
 //
 //   npm run icons        (the local game must be running: npm run dev)
 //   npm run icons -- http://localhost:5173/zona?gfx=ultra
+//   npm run icons -- --only colt,m9   (those alone made again, every other picture and its note left as it is)
 // (?gfx=ultra: drawn with everything at full, as they always were; a player starts on Medium)
 
 import { spawn } from 'node:child_process';
@@ -20,7 +21,9 @@ import WebSocket from 'ws';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const OUT = path.join(ROOT, 'public', 'assets', 'icons');
-const address = process.argv[2] ?? 'http://localhost:5173/zona?gfx=ultra';
+const args = process.argv.slice(2), at = args.indexOf('--only');
+const only = at >= 0 ? args.splice(at, 2)[1].split(',') : null;
+const address = args[0] ?? 'http://localhost:5173/zona?gfx=ultra';
 const PORT = 9341;
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find((p) => fs.existsSync(p));
 if (!CHROME) throw new Error('no Chrome or Edge found');
@@ -69,12 +72,12 @@ for (let i = 0; i < 1200 && !up; i++) {
   up = await run(`!!window.T && !!window.__game && !document.querySelector('#loading:not(.done)')`).catch(() => false);
 }
 if (!up) throw new Error(`the local game did not come up at ${address}: is it running? (npm run dev)`);
-const made = JSON.parse(await run(`(async () => JSON.stringify(await window.T.icons()))()`));
+const made = JSON.parse(await run(`(async () => JSON.stringify(await window.T.icons(${only ? JSON.stringify(only) : ''})))()`));
 ws.close();
 quit();
 
 fs.mkdirSync(OUT, { recursive: true });
-const index = {};
+const index = only ? JSON.parse(fs.readFileSync(path.join(OUT, 'index.json'), 'utf8')) : {};
 let bytes = 0;
 // (what is worn has a second picture, for the place it is worn in: `slot:<id>` in the list, slot-<id>.webp on disk)
 const fileOf = (id) => `${id.replace(/^slot:/, 'slot-')}.webp`;
@@ -86,9 +89,9 @@ for (const id of Object.keys(made).sort()) {
   index[id] = sig;
   bytes += webp.length;
 }
-// (a picture of what is no longer an item goes)
+// (a picture of what is no longer an item goes; not when only some were made)
 const kept = new Set(Object.keys(index).map(fileOf));
-for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webp') && !kept.has(f)) fs.rmSync(path.join(OUT, f));
+if (!only) for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webp') && !kept.has(f)) fs.rmSync(path.join(OUT, f));
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
-console.log(`${Object.keys(index).length} pictures, ${(bytes / 1024).toFixed(0)} KB in all, in public/assets/icons`);
+console.log(`${Object.keys(made).length} pictures made, ${(bytes / 1024).toFixed(0)} KB, in public/assets/icons (${Object.keys(index).length} in its note)`);
 try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* Chrome still letting go */ }

@@ -21,7 +21,8 @@ const ICONS_REV = 3;
  * (2026-10-13: "the hatchet is updside down in inventory".)
  */
 // (and the First Aid Kit, whose lid was drawn with its words upside down: looked at on the sheet of every picture, 2026-10-13;
-// and the stick grenade, drawn handle up: "the stick grenade in this image is upside down in the icon", 2026-10-19)
+// and the stick grenade, drawn handle up: "the stick grenade in this image is upside down in the icon", 2026-10-19;
+// the three pistols were turned over in GUN_VIEW below and drawn grip up: "pistols reported", 2026-10-19)
 const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
@@ -42,7 +43,7 @@ const headUp = (id: string) => HEAD_UP.has(id);
  * four ways on one sheet and the one with its grip down and its muzzle to the right taken. A new gun is looked at
  * the same way (`__GUN_VIEW` below is how the sheet is made).
  */
-const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], mosin: [true, false], mpa: [true, false], scorpion: [true, false], mp7a1: [true, false], aks74u: [true, false], dual_smg: [true, false], dual_mac10: [true, false], dual_sawnoff: [true, true], db12: [true, true], sniper50: [true, false], barrett: [true, false], vssk: [true, false], colt: [true, false], deagle: [true, false], m9: [true, false], benelli: [false, false] };
+const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], mosin: [true, false], mpa: [true, false], scorpion: [true, false], mp7a1: [true, false], aks74u: [true, false], dual_smg: [true, false], dual_mac10: [true, false], dual_sawnoff: [true, true], db12: [true, true], sniper50: [true, false], barrett: [true, false], vssk: [true, false], colt: [false, false], deagle: [false, false], m9: [false, false], benelli: [false, false] };
 const gunView = (id: string): [boolean, boolean] => (globalThis as { __GUN_VIEW?: Record<string, [boolean, boolean]> }).__GUN_VIEW?.[id] ?? GUN_VIEW[id] ?? [false, false];
 /**
  * What is built lying on its back, its face to the sky, and is stood up to look out of its picture. (The gas mask's
