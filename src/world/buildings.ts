@@ -29,7 +29,7 @@ import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
 import { clearWaysOut } from './ways-out';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
-import { partsPerShadowMap } from './shadow-parts';
+import { cullBatch } from './batch-cull';
 
 /** where the valley begins, going east: x, metres (the green west's east edge, by the big map) */
 const VALLEY_FROM = -700;
@@ -3273,8 +3273,6 @@ export class Buildings {
       // (in the shadow maps and not in the view: three asks this of every pass it draws)
       caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
       caster.name = 'buildings shadow';
-      // (and each map given only the buildings in it)
-      partsPerShadowMap(caster);
       group.add(caster);
     }
   }
@@ -3301,6 +3299,9 @@ export class Buildings {
     // the rest are sent as they are, measured in the owner's flight 2026-10-18: +2.7% fps, a fifth fewer frames over 33 ms)
     mesh.perObjectFrustumCulled = false;
     mesh.matrixAutoUpdate = false;
+    // (and culled a part at a time in each drawing, the view and each shadow map, with nothing sent to the card for it:
+    // see cullBatch. The one shadow shape (`bare`) is drawn into the shadow maps alone.)
+    cullBatch(mesh, bare);
     return mesh;
   }
 
@@ -3479,6 +3480,9 @@ export class Buildings {
             many.castShadow = many.receiveShadow = true;
             many.renderOrder = WALLS_FIRST;
             many.name = m.name;
+            // (culled a copy at a time without three's list sent to the card at every drawing: see cullBatch)
+            many.perObjectFrustumCulled = false;
+            cullBatch(many);
             scene.add(many);
             this.drawnFrom = null;
             return;

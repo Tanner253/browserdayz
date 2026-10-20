@@ -614,6 +614,36 @@ function buttOf(obj: THREE.Object3D): Butt | null {
 /** how far under its ankle a body's sole is (in the foot's own measure), by the file it was made from and the side */
 const SOLE_UNDER = new Map<string, number>();
 
+/**
+ * Everything a body wears drawn by the body's own skeleton (2026-10-20, found playing the game through with a crowd
+ * about: every frame the graphics card was sent each worn piece's bones apart, seven skeletons a body, at about a
+ * sixth of a millisecond each, which with twenty players in sight was most of a frame). A piece's bones are the body's
+ * own; only how its shape is unpacked (its box: a scale and a shift) is folded into its own copy of them. Laid into
+ * the piece's bind matrix instead, it is the body's skeleton that moves it, and each body's bones go to the card once.
+ * What is drawn is the same: the piece's bind is checked to be the body's times one fixed matrix on every bone, and
+ * a piece that is not is left as it was.
+ */
+function shareSkeleton(model: THREE.Object3D, body: THREE.SkinnedMesh) {
+  const own = body.skeleton, bodyBind = (i: number) => _m2.copy(own.boneInverses[i]).multiply(body.bindMatrix);
+  model.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || m === body || m.skeleton === own) return;
+    const sk = m.skeleton;
+    if (sk.bones.length !== own.bones.length || !sk.bones.every((b, i) => b === own.bones[i])) return;
+    // (the fixed matrix: out through the piece's first bone, in through the body's)
+    const r = bodyBind(0).clone().invert().multiply(_m1.copy(sk.boneInverses[0]).multiply(m.bindMatrix));
+    for (let i = 0; i < sk.bones.length; i++) {
+      const a = _m1.copy(sk.boneInverses[i]).multiply(m.bindMatrix).elements, b = bodyBind(i).multiply(r).elements;
+      for (let k = 0; k < 16; k++) if (Math.abs(a[k] - b[k]) > 1e-4) return;
+    }
+    m.bind(own, body.bindMatrix.clone().multiply(r));
+    sk.dispose();
+    // (its bounds as now bound: the same place, worked out again)
+    m.computeBoundingBox();
+    m.computeBoundingSphere();
+  });
+}
+
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** the infected's shared paints, a kind and a piece each, while they are unhurt (see Avatar.own), and the wounds they show: none */
@@ -1003,6 +1033,7 @@ export class Avatar {
         this.soles.push({ foot, ball, high: low * foot.getWorldScale(_v1).y, made, toe: made.clone().invert().multiply(toes) });
       }
     }
+    if (this.skin) shareSkeleton(model, this.skin);
     this.collarL = bone('clavicle_l');
     this.collarR = bone('clavicle_r');
     // a shouldered weapon rides on the upper back: placed where it should be on the standing
