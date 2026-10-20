@@ -82,6 +82,11 @@ export const KITS: Kit[] = [
       ...many(4, { id: 'mag_vssk', rounds: 5 }), { id: 'box_127x55' }, ...many(3, { id: 'mag_scorpion', rounds: 30 }), { id: 'mag_m9_ext', rounds: 20 }, { id: 'box_9mm' }, ...CARE],
   },
   {
+    id: 'a91', name: '9A-91', does: 'The 9A-91 with its PBS-9 suppressor and a red dot, four more magazines and loose 9x39; an M9; the best armour',
+    things: [...WORN, { id: 'a91', mag: 'mag_a91', loaded: 21, mods: ['a91_suppressor', 'red_dot_1x'] }, M9,
+      ...many(4, { id: 'mag_a91', rounds: 20 }), { id: 'ammo_9x39', qty: 30 }, ...CARE],
+  },
+  {
     id: 'grenadier', name: 'Grenadier', does: 'The M32 grenade launcher full, and forty grenades for it; an AKS-74U with spare magazines; the best armour',
     things: [...WORN, { id: 'm32', loaded: 6 }, { id: 'aks74u', mag: 'mag_ak', loaded: 31 },
       ...many(2, { id: 'ammo_40mm', qty: 20 }), ...many(4, { id: 'mag_ak', rounds: 30 }), { id: 'box_739' }, ...CARE],

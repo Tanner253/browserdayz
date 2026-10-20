@@ -230,7 +230,7 @@ ok('a gun fires at its own rate, however fast the frames come', () => {
     return shots;
   };
   const autos = Object.keys(GUNS).filter((id) => GUNS[id].auto);
-  assert.deepEqual(autos.sort(), ['ak', 'aks74u', 'ar15', 'dual_mac10', 'dual_smg', 'mp7a1', 'mpa', 'scorpion']);
+  assert.deepEqual(autos.sort(), ['a91', 'ak', 'aks74u', 'ar15', 'dual_mac10', 'dual_smg', 'mp7a1', 'mpa', 'scorpion']);
   for (const id of autos) {
     for (const fps of [30, 60, 144, 240]) {
       const shots = held(id, fps, 10), rpm = GUNS[id].rpm;

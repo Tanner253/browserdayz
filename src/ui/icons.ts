@@ -48,7 +48,7 @@ const headUp = (id: string) => HEAD_UP.has(id);
 // (Set by looking in the world. At the menu five guns' models lie the other way round, and every picture made there,
 // 2026-10-19, had the pistols grip up and the sniper rifle and the Scorpion muzzle left: "pistols reported". So
 // scripts/icons.mjs makes them in the world.)
-const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], mosin: [true, false], mpa: [true, false], scorpion: [true, false], mp7a1: [true, false], aks74u: [true, false], dual_smg: [true, false], dual_mac10: [true, false], dual_sawnoff: [false, false], db12: [false, false], sniper50: [true, false], barrett: [true, false], vssk: [true, false], colt: [true, false], deagle: [true, false], m9: [true, false], benelli: [false, false] };
+const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], a91: [true, false], mosin: [true, false], mpa: [true, false], scorpion: [true, false], mp7a1: [true, false], aks74u: [true, false], dual_smg: [true, false], dual_mac10: [true, false], dual_sawnoff: [false, false], db12: [false, false], sniper50: [true, false], barrett: [true, false], vssk: [true, false], colt: [true, false], deagle: [true, false], m9: [true, false], benelli: [false, false] };
 const gunView = (id: string): [boolean, boolean] => (globalThis as { __GUN_VIEW?: Record<string, [boolean, boolean]> }).__GUN_VIEW?.[id] ?? GUN_VIEW[id] ?? [false, false];
 /**
  * What is built lying on its back, its face to the sky, and is stood up to look out of its picture. (The gas mask's
