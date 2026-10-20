@@ -279,19 +279,20 @@ export function crosses(r0: number, f0: number, r1: number, f1: number, b: { r: 
  * along them, or stood there.)
  */
 export function roundHouse(r: number, f: number, tr: number, tf: number): [number, number] | null {
-  const H = HOUSE, m = 0.9;
   if (!crosses(r, f, tr, tf)) return null;
+  // (the whole way round, by one corner or two: by the next corner alone, one just past a corner on its way to the next
+  // found the one behind it the nearer, went back, and stood between the two)
   let best: [number, number] | null = null, bd = Infinity;
-  for (const cr of [-H.r - m, H.r + m]) {
-    for (const cf of [H.f0 - m, H.f1 + m]) {
-      const d0 = Math.hypot(cr - r, cf - f);
-      if (d0 < 0.5 || crosses(r, f, cr, cf)) continue;
-      const d = d0 + Math.hypot(tr - cr, tf - cf);
-      if (d < bd) [best, bd] = [[cr, cf], d];
-    }
+  for (const c of CORNERS) {
+    const d0 = Math.hypot(c[0] - r, c[1] - f);
+    if (d0 < 0.5 || crosses(r, f, c[0], c[1])) continue;
+    let rest = crosses(c[0], c[1], tr, tf) ? Infinity : Math.hypot(tr - c[0], tf - c[1]);
+    for (const c2 of CORNERS) if (c2 !== c && !crosses(c[0], c[1], c2[0], c2[1]) && !crosses(c2[0], c2[1], tr, tf)) rest = Math.min(rest, Math.hypot(c2[0] - c[0], c2[1] - c[1]) + Math.hypot(tr - c2[0], tf - c2[1]));
+    if (d0 + rest < bd) [best, bd] = [c, d0 + rest];
   }
   return best;
 }
+const CORNERS: [number, number][] = [[-HOUSE.r - 0.9, HOUSE.f0 - 0.9], [HOUSE.r + 0.9, HOUSE.f0 - 0.9], [-HOUSE.r - 0.9, HOUSE.f1 + 0.9], [HOUSE.r + 0.9, HOUSE.f1 + 0.9]];
 
 /**
  * Whether one that turned up at a spot is one of the gas or of the bunker: those wear the

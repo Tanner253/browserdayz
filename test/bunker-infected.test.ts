@@ -103,15 +103,20 @@ ok('up top, round the house and its yard, never through it', () => {
     [0, 4, 0, 26],
   ];
   for (const [r0, f0, r1, f1] of ways) {
-    let r = r0, f = f0, legs = 0;
-    for (; legs < 5; legs++) {
-      const c = roundHouse(r, f, r1, f1);
-      if (!c) break;
-      assert.ok(!crosses(r, f, c[0], c[1]), 'a corner through the house');
-      [r, f] = c;
+    // walked as a body walks it, a step at a time toward wherever it is told next (the way is asked again every step:
+    // asked only at each corner, it hid one that sent them back and forth between two)
+    let r = r0, f = f0, steps = 0, walked = 0;
+    for (; steps < 400 && Math.hypot(r1 - r, f1 - f) > 0.1; steps++) {
+      const c = roundHouse(r, f, r1, f1) ?? [r1, f1];
+      assert.ok(!crosses(r, f, c[0], c[1]), `(${r.toFixed(1)}, ${f.toFixed(1)}) told through the house`);
+      const d = Math.hypot(c[0] - r, c[1] - f), k = Math.min(1, 0.15 / d);
+      r += (c[0] - r) * k;
+      f += (c[1] - f) * k;
+      walked += Math.min(d, 0.15);
     }
-    assert.ok(legs < 5 && !crosses(r, f, r1, f1), `(${r0}, ${f0}) to (${r1}, ${f1}) never got round`);
-    assert.ok(legs <= 2);
+    assert.ok(steps < 400, `(${r0}, ${f0}) to (${r1}, ${f1}) never got there: stuck at (${r.toFixed(1)}, ${f.toFixed(1)})`);
+    // (and not the long way round: no more than half as far again as the straight line)
+    assert.ok(walked < Math.hypot(r1 - r0, f1 - f0) * 1.5 + 4, `${walked.toFixed(1)} m walked`);
   }
   // with nothing in the way it walks straight
   assert.equal(roundHouse(-10, 0, -10, 30), null);
