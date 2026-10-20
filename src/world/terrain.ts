@@ -3,7 +3,7 @@ import { caveMouths, inMouth } from '../sim/pass';
 import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { physics } from '../core/physics';
-import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
+import { SHADOW_FRUSTA, castsAnywhere, type Atmosphere } from './atmosphere';
 import { canyonBedsGlsl } from './canyon-beds';
 import { macroTexture } from './macro';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
@@ -616,6 +616,7 @@ export class Terrain {
       // (a tile drawn in a run is not drawn on its own in the view: the sun's shadow maps draw it as they did, see `update`)
       tile.intersectsFrustum = (f) => (!tile.userData.inRun || SHADOW_FRUSTA.has(f)) && f.intersectsObject(tile);
       at.set(String(geo.userData.tile), tile);
+      this.tiles.push(tile);
       if (geo.userData.lods.length > 1) this.far.push(tile);
     }
     // the runs: four by four, and two by two inside each, where every tile of one is there to draw
@@ -665,6 +666,8 @@ export class Terrain {
 
   /** runs of tiles drawn at one go (see `update`) */
   private runs: Run[] = [];
+  /** every tile */
+  private tiles: THREE.Mesh[] = [];
   /** the tiles that are also laid coarser (the west's: see COARSE_AT) */
   private far: THREE.Mesh[] = [];
   /** the west's far tiles drawn coarser (see COARSE_AT); false, every tile is drawn fine, as the square's are */
@@ -698,6 +701,15 @@ export class Terrain {
       t.geometry.setDrawRange(from, n);
     }
     for (const r of this.runs) this.choose(r);
+    // (A tile past the end of the view that can throw no shadow into any of the sun's maps is not gone through at all:
+    // the four hundred-odd tiles were each looked at against the view and against every map drawn, every frame, wherever
+    // on the map they lay, a thousand tests a frame for the twenty-odd drawn, found counting them in the game,
+    // 2026-10-20. What can be seen or can shade is as it was.)
+    const reach = (globalThis as { __allTiles?: boolean }).__allTiles ? Infinity : (camera as THREE.PerspectiveCamera).far ?? Infinity;
+    for (const t of this.tiles) {
+      const s = t.geometry.boundingSphere!;
+      t.visible = s.center.distanceTo(c) - s.radius <= reach || castsAnywhere(s.center, s.radius);
+    }
   }
 
   /** whether every tile of a run is in sight: then it is drawn at one go (and its parts and tiles not), else each part is chosen for itself */

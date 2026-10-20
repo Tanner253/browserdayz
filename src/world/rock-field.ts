@@ -253,6 +253,9 @@ export class RockField {
       set.nearNow.forEach((p, k) => set.shade.forEach((mesh, i) => mesh.setMatrixAt(k, m.multiplyMatrices(this.placeOf(p), set.farParts[i].m))));
       for (const mesh of set.shade) {
         mesh.count = set.nearNow.length;
+        // (one with none in it is not drawn at all: it was drawn, empty, into every one of the sun's maps every frame,
+        // five of them in the nearest, found counting its draws in the game, 2026-10-20)
+        mesh.visible = mesh.count > 0;
         mesh.instanceMatrix.needsUpdate = true;
         mesh.computeBoundingSphere();
       }
@@ -295,6 +298,7 @@ export class RockField {
       far.forEach((p, n) => set.far.forEach((mesh, i) => mesh.setMatrixAt(n, m.multiplyMatrices(this.placeOf(p), set.farParts[i].m))));
       for (const [meshes, count] of [[set.near, near.length], [set.far, far.length]] as const) for (const mesh of meshes) {
         mesh.count = count;
+        mesh.visible = count > 0;
         mesh.instanceMatrix.needsUpdate = true;
       }
     }

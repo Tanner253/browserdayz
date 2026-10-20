@@ -10,9 +10,12 @@
 // copies are lit as three lights a back face (its FLIP_SIDED shader turns the normal, and the bitangent with it):
 // their normals turned, and the tangent's sign with them.
 //
-// Not for a thing drawn many times over (each copy's two runs would be drawn copy by copy, and not all the back
-// faces first), nor for shapes that change (morph targets), nor where a back face is lit otherwise (a normal map
-// in the object's own frame, flat shading).
+// Not for a batch of many shapes (each part's two runs would be drawn part by part), nor for shapes that change (morph
+// targets), nor where a back face is lit otherwise (a normal map in the object's own frame, flat shading). A thing
+// drawn many times over (an InstancedMesh: the glass of every stove, of every street lamp) is drawn copy by copy, each
+// copy's back faces and then its front; its copies were drawn nearest first in three's two passes too, so between two
+// copies nothing changes, and within one nothing does. (Left out until 2026-10-20, they were still chosen again twice a
+// frame each: found counting what makes three choose a shader again, the stoves' glass and the lamps' the most.)
 
 import * as THREE from 'three';
 
@@ -92,7 +95,7 @@ function frontOf(m: THREE.Material): THREE.Material {
 function fits(o: THREE.Mesh): boolean {
   const m = o.material;
   if (Array.isArray(m) || !m.transparent || m.side !== THREE.DoubleSide || m.forceSinglePass) return false;
-  if ((o as THREE.InstancedMesh).isInstancedMesh || (o as unknown as { isBatchedMesh?: boolean }).isBatchedMesh) return false;
+  if ((o as unknown as { isBatchedMesh?: boolean }).isBatchedMesh) return false;
   const g = o.geometry, s = m as THREE.MeshStandardMaterial;
   if (!g.attributes.position || g.morphAttributes.position || g.groups.length > 1) return false;
   if (g.drawRange.start !== 0 || g.drawRange.count !== Infinity) return false;

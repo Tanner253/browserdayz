@@ -331,13 +331,15 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   const atFort = (h: { x: number; z: number }) => Math.hypot(h.x - MOUNTAIN.castle.x, h.z - MOUNTAIN.castle.z) < 160;
   // (nor the pass's caves', the west's own: one round home over all their places, IN_CAVES strong)
   const below = homes.filter((h) => h.inside && !atFort(h) && !(h.n === IN_CAVES && h.r === 400));
-  assert.ok(below.length === 1 && below[0].n >= 4 && below[0].inside!.length >= below[0].n * 2, 'none in the bunker, or nowhere for them to stand');
+  // (two homes there since 2026-10-19, the ones that rush the door and the still ones all through it: each with a place
+  // inside for every one of it)
+  assert.ok(below.length >= 1 && below.every((h) => Math.hypot(h.x - below[0].x, h.z - below[0].z) < 40 && h.inside!.length >= h.n) && below.reduce((a, h) => a + h.n, 0) >= 4, 'none in the bunker, or nowhere for them to stand');
   // (and those that walk the ground over it)
   const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
   // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp; and, since
   // 2026-10-13, the fifteen the outlying places of the old valley were owed and had never had: see INFECTED.max)
-  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15 + 15);
+  assert.equal(INFECTED.max - here!.n - below.reduce((a, h) => a + h.n, 0) - over[0].n, 33 + 15 + 15);
   // (and the fort's own since: about its ruined village and in the dark under its terrace)
   assert.ok(forts >= 8 && homes.filter(atFort).reduce((a, h) => a + h.n, 0) === forts, 'the fort has not its own');
   // (the bunker's, in and over it, are its own wherever it stands: since plan v2, 2026-10-16, in the pines of the west)

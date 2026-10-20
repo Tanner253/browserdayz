@@ -3270,8 +3270,10 @@ export class Buildings {
       if (!caster) continue;
       caster.castShadow = true;
       caster.receiveShadow = false;
-      // (in the shadow maps and not in the view: three asks this of every pass it draws)
-      caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+      // (in the shadow maps and not in the view: three asks this of every pass it draws; and in a map only if one of
+      // its parts is, see cullBatch)
+      const parts = caster.intersectsFrustum;
+      caster.intersectsFrustum = function (this: THREE.BatchedMesh, f) { return SHADOW_FRUSTA.has(f) && parts.call(this, f); };
       caster.name = 'buildings shadow';
       group.add(caster);
     }

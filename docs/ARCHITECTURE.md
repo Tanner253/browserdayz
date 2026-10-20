@@ -63,15 +63,16 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `assets.ts` | 876 |  |
 | `audio.ts` | 2543 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
+| `bones.ts` | 137 |  |
 | `breathe.ts` | 103 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `device.ts` | 69 | What kind of device this is. |
-| `gamepad.ts` | 323 | A controller (PlayStation, Xbox, any the browser calls "standard"), read each frame, pressing the game's own controls by their names as the keyboard and the phone's buttons do (src/core/input.ts). |
+| `gamepad.ts` | 326 | A controller (PlayStation, Xbox, any the browser calls "standard"), read each frame, pressing the game's own controls by their names as the keyboard and the phone's buttons do (src/core/input.ts). |
 | `gltf-utils.ts` | 178 |  |
-| `input.ts` | 195 | Keyboard + mouse with pointer lock. |
+| `input.ts` | 199 | Keyboard + mouse with pointer lock. |
 | `keys.ts` | 176 | Which key does what, and how fast the mouse turns the head: both the player's to set (2026-10-12: |
 | `leave.ts` | 79 | Whether the page is being left on purpose (2026-10-14). |
 | `noise.ts` | 131 | Deterministic noise + RNG. |
-| `one-draw.ts` | 130 | See-through things seen from both sides, drawn in one go and not two. |
+| `one-draw.ts` | 133 | See-through things seen from both sides, drawn in one go and not two. |
 | `perf.ts` | 202 | Frame profiler + F3 overlay. |
 | `physics.ts` | 183 | Rapier (Rust, compiled to WASM) physics. |
 | `renderer.ts` | 967 |  |
@@ -106,7 +107,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 2724 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 2729 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 | `blast.ts` | 1420 | A blast: a grenade, a drum of fuel, a car going up. |
 | `botcheck-strip.ts` | 368 | The bot check as it was until 2026-10-15, kept for the ninth film (src/trailer/shots9.ts), which shows it: the game's own is the round course now (./botcheck.ts). |
 | `botcheck.ts` | 452 | The bot check, as the player meets it: a round yard high over the middle of the map, walls and a hut and a catwalk in it, and six figures about it that the server walks and the server shows (src/sim/course.ts: read... |
@@ -128,7 +129,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `frame.ts` | 709 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 529 | The game: attachments and magazines. |
 | `hands.ts` | 602 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
-| `interact.ts` | 324 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
+| `interact.ts` | 327 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 664 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
 | `online.ts` | 775 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
@@ -136,14 +137,14 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `garage.ts` | 1122 | Every jeep in this game, and the one the player is sitting in: getting in and out, the view from behind it, who it runs over, what it sounds like, how it burns, and keeping the server (and through it everybody else)... |
+| `garage.ts` | 1124 | Every jeep in this game, and the one the player is sitting in: getting in and out, the view from behind it, who it runs over, what it sounds like, how it burns, and keeping the server (and through it everybody else)... |
 | `gas.ts` | 336 | The gas as the game has it. |
 | `grenades.ts` | 130 | Thrown grenades. A grenade is a point flying under gravity that bounces off the world and goes off when its fuse runs out. Everyone is told where it left the hand and how fast (see the 'nade' message), and every game... |
 | `hands-on.ts` | 285 | Our own arms on a pack drawn round another maker's arms (2026-10-17). |
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
 | `infected.ts` | 1158 | The infected, as this game draws and (for the ones near its own player) moves them. |
-| `key-hints.ts` | 144 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
+| `key-hints.ts` | 147 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
 | `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
@@ -162,7 +163,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
 | `vehicle.ts` | 615 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5044 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5068 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
 ## src/
@@ -334,7 +335,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `elite-crown.ts` | 37 | The Elite's crown by a name in chat, and a word about them with the pointer on it (the owner, 2026-10-15: |
 | `emotes-menu.ts` | 239 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
 | `howto-more.ts` | 87 | The How to Play card's second half (the owner, 2026-10-19: |
-| `hud.ts` | 2095 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
+| `hud.ts` | 2096 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 478 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inv-card.ts` | 96 | What a thing is, and what to do with it (idea 15 of Fettah, a contributor, 2026-10-18). |
 | `inv-piles.ts` | 104 | The inventory's tidying (Fettah's inventory pull request, a contributor's, 2026-10-18): a grid sorted kind by kind, piles of one thing joined, a bag's weight, and which things feed one another. |
@@ -362,13 +363,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `atmosphere.ts` | 955 | Sky, sun, image-based lighting, cascaded shadows and height fog. |
+| `atmosphere.ts` | 992 | Sky, sun, image-based lighting, cascaded shadows and height fog. |
 | `basement-build.ts` | 172 | What a basement is made of (src/sim/basements.ts says where its rooms, steps and things are): its walls, floors and ceilings, a frame of timber round every way through, its flights, and up in the yard the kerb round... |
-| `batch-cull.ts` | 56 |  |
+| `batch-cull.ts` | 68 |  |
 | `big-buildings.ts` | 999 | The two buildings of several floors (2026-10-11): the district hospital in Kamenka and the police headquarters at the edge of the village. |
 | `bridge.ts` | 679 | The road bridge as it is built (see src/sim/bridge.ts for what a bridge is, in figures, and src/world/worldgen.ts for where one stands): a reinforced-concrete road bridge of the kind the country it stands in built by... |
-| `buildings.ts` | 3646 | Procedural buildings: walls with door/window cut-outs (two material layers), floors, ceilings, gable / shed / flat roofs, window frames + glass, hinged doors, hand-authored interior layouts with Poly Haven furniture,... |
-| `bunker.ts` | 963 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
+| `buildings.ts` | 3648 | Procedural buildings: walls with door/window cut-outs (two material layers), floors, ceilings, gable / shed / flat roofs, window frames + glass, hinged doors, hand-authored interior layouts with Poly Haven furniture,... |
+| `bunker.ts` | 966 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
 | `canyon-beds.ts` | 46 | THE CANYON'S BEDS as a chunk of shader (the terrain's, src/world/terrain.ts, and any other rock of the canyon: the carved rock round the caves' mouths, rock-blend's face), so that where a piece meets the wall its... |
 | `castle-post-shape.ts` | 439 | The signals post on the fort (src/sim/castle-post.ts): the shapes of what is made by hand, as plain numbers. |
 | `castle-post.ts` | 289 | The signals post on the fort (src/sim/castle-post.ts), as it is drawn and as it stops a body: what the game has no model for and is made here by hand. |
@@ -415,12 +416,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `posts.ts` | 61 | The army's field posts by the western roads (src/sim/posts.ts): each the pillbox model ("WW2 Field Bunker"), drawn and made solid triangle for triangle, as the one over Bunker 17's stair is (src/world/bunker.ts), on... |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
 | `rock-blend.ts` | 219 | Rock that meets the ground without a seam (the owner, 2026-10-16: |
-| `rock-field.ts` | 331 | A field of scanned rocks, drawn and made solid: the pass's walls and cave mouths (src/world/caves.ts) and the canyon country's outcrops (src/world/outcrops.ts). |
+| `rock-field.ts` | 335 | A field of scanned rocks, drawn and made solid: the pass's walls and cave mouths (src/world/caves.ts) and the canyon country's outcrops (src/world/outcrops.ts). |
 | `ruins-shape.ts` | 553 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
 | `ruins.ts` | 226 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |
 | `snow.ts` | 661 | Where snow lies: by height, OR BY PLACE. |
-| `terrain.ts` | 1416 |  |
+| `terrain.ts` | 1428 |  |
 | `town-plans.ts` | 523 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 216 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `vegetation.ts` | 1080 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |

@@ -256,7 +256,8 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
   // village is of the third step, 2026-10-17, and has a thirteenth of their places)
   // (seven times since the rifles' rounds went east, 2026-10-19: fewer things kept on the third step, so each of the rest
   // a little likelier there; over twenty thousand crates it went from 8.9 to 8.0)
-  assert.ok(gas.helmet > rich('boonie_hat') * 7, `a helmet in ${gas.helmet} crates under the gas and ${rich('boonie_hat')} elsewhere`);
+  // (six since the 9A-91 and its parts were put on the fourth step alone, 2026-10-20: 6.7)
+  assert.ok(gas.helmet > rich('boonie_hat') * 6, `a helmet in ${gas.helmet} crates under the gas and ${rich('boonie_hat')} elsewhere`);
   for (let k = 0; k < 60; k++) {
     const got: string[] = [];
     fillDrop({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);

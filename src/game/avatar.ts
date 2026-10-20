@@ -17,6 +17,9 @@ import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, look
 import type { Emote } from '../sim/emotes';
 import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
+import { keepBones, restBones } from '../core/bones';
+
+keepBones();
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
 export const AVATAR_LAYER = 2;
@@ -1117,6 +1120,8 @@ export class Avatar {
       fpRig.add(fp);
       this.fpRoot.add(fpRig);
     }
+    restBones(this.root);
+    restBones(this.fpRoot);
     this.setLook(look);
     await Avatar.onMade(firstPersonBody ? [this.root, this.fpRoot] : [this.root], `${file}|${firstPersonBody ? 'own' : ''}`).catch(() => {});
   }

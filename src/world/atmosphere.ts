@@ -146,7 +146,10 @@ export const SHADOW_FRUSTA = new Set<THREE.Frustum | THREE.FrustumArray>();
 /** which of the sun's cascades each of SHADOW_FRUSTA is (see castsInto) */
 const CASCADE_OF = new Map<THREE.Frustum | THREE.FrustumArray, number>();
 /** the eye, the way it looks, how long the shadow of a man's height is now, and the depths each cascade is read at: kept by Atmosphere.update */
-const SEEN = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), long: 10, lo: [] as number[], hi: [] as number[] };
+const SEEN = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), long: 10, lo: [] as number[], hi: [] as number[],
+  /** toward the sun; how far across from the eye the widest map reaches (square to the sun), and how far toward and away from the sun its box goes */
+  sun: new THREE.Vector3(0, 1, 0), across: Infinity, toward: Infinity, away: Infinity };
+const _cast = new THREE.Vector3();
 
 /** what flies, this frame: x, y, z and the ground's height under it, four numbers each (see flying) */
 const FLYING: number[] = [];
@@ -172,6 +175,20 @@ export function castsInto(f: THREE.Frustum | THREE.FrustumArray, at: THREE.Vecto
   if (i === undefined || !SEEN.hi.length) return true;
   const z = (at.x - SEEN.eye.x) * SEEN.fwd.x + (at.y - SEEN.eye.y) * SEEN.fwd.y + (at.z - SEEN.eye.z) * SEEN.fwd.z, reach = r + SEEN.long;
   return z + reach >= SEEN.lo[i] && z - reach <= SEEN.hi[i];
+}
+
+/**
+ * Whether something round `at`, `r` across, can throw a shadow into any of the sun's maps now: inside the widest one's
+ * box, seen along the sun's line (a shadow lands straight along that line, so nothing to one side of the box falls in
+ * it, however tall). True until the first frame. (2026-10-20: the ground's four hundred tiles were each tested against
+ * every map drawn, every frame, wherever on the map they lay.)
+ */
+export function castsAnywhere(at: THREE.Vector3, r: number): boolean {
+  if (!SEEN.hi.length) return true;
+  _cast.subVectors(at, SEEN.eye);
+  // (and ten metres more: a wider map is moved on by a few metres at a time, and its box is known as it was last drawn)
+  const along = _cast.dot(SEEN.sun), across = SEEN.across + r + 10;
+  return _cast.lengthSq() - along * along <= across * across && along <= SEEN.toward + r + 10 && along >= -(SEEN.away + r + 10);
 }
 
 /** how far from the eye a shadow can be seen, metres: the furthest cascade with its fade, and the longest shadow of a man's height now (until the first frame, everywhere) */
@@ -899,6 +916,17 @@ export class Atmosphere {
         const a = csm.breaks[i - 1] ?? 0, b = csm.breaks[i], m = 0.25 * b * b;
         SEEN.lo[i] = (a - m) * span + cam.near;
         SEEN.hi[i] = (b + m) * span + cam.near;
+      }
+      // (each map's box: how far across from the eye it reaches at its corners, and along the sun's line toward it and away)
+      SEEN.sun.copy(d).negate().normalize();
+      SEEN.across = SEEN.toward = SEEN.away = 0;
+      for (const l of csm.lights) {
+        const c = l.shadow.camera;
+        _cast.subVectors(c.position, SEEN.eye);
+        const along = _cast.dot(SEEN.sun), off = Math.sqrt(Math.max(0, _cast.lengthSq() - along * along));
+        SEEN.across = Math.max(SEEN.across, off + Math.SQRT2 * Math.max(Math.abs(c.left), Math.abs(c.right), Math.abs(c.top), Math.abs(c.bottom)));
+        SEEN.toward = Math.max(SEEN.toward, along - c.near);
+        SEEN.away = Math.max(SEEN.away, c.far - along);
       }
     }
     // (the two wider ones set round the eye, square to the sun, on whole texels of their maps so that what they

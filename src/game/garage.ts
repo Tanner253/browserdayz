@@ -613,8 +613,10 @@ export class Garage {
       }
       const x = this.extra.get(j)!;
       const near = j.pos.distanceToSquared(listener) < 220 * 220;
-      // (a helicopter up, or its rotor turning: its shadow drawn every frame, wherever it lies; see flying)
-      if (j instanceof Heli && near) {
+      // (a helicopter up, or its rotor turning: its shadow drawn every frame, wherever it lies; see flying. Not one left
+      // standing, rotor still: the one on Kamenka's roof is ten metres over the ground under it, and was both wider maps
+      // of the sun drawn every frame within 220 m of it, found in the game 2026-10-20)
+      if (j instanceof Heli && near && j.mode !== 'parked') {
         const ground = heightAt(h.world.heights, j.pos.x, j.pos.z);
         if (j.rpm > 0 || j.pos.y - ground > 3) flying(j.pos.x, j.pos.y, j.pos.z, ground);
       }

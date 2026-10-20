@@ -48,6 +48,18 @@ export function cullBatch(mesh: THREE.BatchedMesh, shadowOnly = false) {
     m._multiDrawCount = n;
     m._multiDrawBytesPerElement = step;
   };
+  // (and a drawing with none of its copies in it is not drawn at all: its one call with every range empty was still a
+  // call, the batches' twelve of them in the nearest shadow map every frame, found counting its draws in the game)
+  const base = mesh.intersectsFrustum;
+  mesh.intersectsFrustum = function (this: THREE.BatchedMesh, f: THREE.Frustum) {
+    if (!base.call(this, f)) return false;
+    if ((globalThis as { __batchAll?: boolean }).__batchAll) return true;
+    for (let k = 0; k < n; k++) {
+      const it = m._instanceInfo[k];
+      if (it.visible && it.active && f.intersectsSphere(balls[k])) return true;
+    }
+    return false;
+  };
   mesh.onBeforeRender = (_renderer, _scene, camera, geometry) => {
     if (!shadowOnly) fill(camera, geometry);
   };
