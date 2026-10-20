@@ -89,7 +89,7 @@ export const onlineMethods = {
     if (w.me) {
       for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
       this.takeVitals(w.me.vitals);
-      this.ensureTag();
+      this.ensureTag(w.me.tag ?? 0);
       this.weapons.validate();
       this.autoHot();
       this.invUI.settle();

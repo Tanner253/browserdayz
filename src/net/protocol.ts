@@ -283,7 +283,7 @@ export type S2C =
       /** where to start: a fresh spawn, or where this character logged out */
       spawn: { x: number; y?: number; z: number; yaw: number };
       /** the character the server remembers for this player (null = new life) */
-      me: { inv: SerializedInventory; vitals: Vitals } | null;
+      me: { inv: SerializedInventory; vitals: Vitals; /** ms of this life already counted toward a tag of their own (see tagTime in server/tags.ts) */ tag?: number } | null;
       /** supply drops standing in the world now */
       drops?: DropInfo[];
       /** the helicopters in the air with a supply drop at this moment, and how long each has been (see src/sim/airdrop.ts) */
