@@ -1243,22 +1243,24 @@ function reticleMaterial(src: THREE.Material): THREE.Material {
 /** The middle of the foremost end of something hung in the hands (the mouth of its barrel), in the space its matrices are in now. */
 function frontOf(obj: THREE.Object3D, within = 0.01): THREE.Vector3 | null {
   obj.updateWorldMatrix(true, true);
-  const pts: number[] = [];
-  let z0 = Infinity;
+  const meshes: THREE.Mesh[] = [];
+  obj.traverse((o) => void ((o as THREE.Mesh).isMesh && meshes.push(o as THREE.Mesh)));
+  // (gone over twice, the frontmost point and then those near it, rather than every point kept in a list between)
+  let z0 = Infinity, any = false;
   const v = new THREE.Vector3();
-  obj.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
+  for (const mesh of meshes) {
     const P = mesh.geometry.getAttribute('position');
     for (let i = 0; i < P.count; i++) {
-      v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
-      pts.push(v.x, v.y, v.z);
-      z0 = Math.min(z0, v.z);
+      z0 = Math.min(z0, v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld).z);
+      any = true;
     }
-  });
-  if (!pts.length) return null;
+  }
+  if (!any) return null;
   const ring = new THREE.Box3();
-  for (let i = 0; i < pts.length; i += 3) if (pts[i + 2] < z0 + within) ring.expandByPoint(v.set(pts[i], pts[i + 1], pts[i + 2]));
+  for (const mesh of meshes) {
+    const P = mesh.geometry.getAttribute('position');
+    for (let i = 0; i < P.count; i++) if (v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld).z < z0 + within) ring.expandByPoint(v);
+  }
   return ring.getCenter(new THREE.Vector3()).setZ(z0);
 }
 
@@ -1984,13 +1986,35 @@ export class Weapons {
       // Where the gun's own top is under each of them is found by looking straight down on its shape there. (Not
       // from its points: a barrel is a few rings of them a long way apart, and the nearest ring to the notch was
       // the rail's, a finger higher than the barrel under it: the sights stood in the air over the gun.)
-      const solids = alone.filter((p) => p.name.replace(/_\d+$/, '') === 'base').map((p) => new THREE.Mesh(p.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })));
-      const down = new THREE.Raycaster();
+      // (Every look down is along the one line across the gun at mouth.z: the triangles over it are found once, and each
+      // look meets only those. A look was a ray through every triangle of the gun, a hundred and twenty of them, and the
+      // first time an AR-15 was taken up that was a third of a gigabyte thrown away: found playing the game through,
+      // 2026-10-20. What each look finds is the same: the highest of the triangles, either face, that its line meets.)
+      const over: number[] = [];
+      for (const p of alone) {
+        if (p.name.replace(/_\d+$/, '') !== 'base') continue;
+        const P = p.geometry.getAttribute('position'), I = p.geometry.getIndex(), n = I ? I.count : P.count;
+        for (let t = 0; t + 2 < n; t += 3) {
+          const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, c = I ? I.getX(t + 2) : t + 2;
+          const az = P.getZ(a), bz = P.getZ(b), cz = P.getZ(c);
+          if (Math.min(az, bz, cz) > mouth.z || Math.max(az, bz, cz) < mouth.z) continue;
+          over.push(P.getX(a), P.getY(a), az, P.getX(b), P.getY(b), bz, P.getX(c), P.getY(c), cz);
+        }
+      }
       const topAt = (x: number, half = 0) => {
         let top = -Infinity;
         for (const dx of half ? [-half, 0, half] : [0]) {
-          down.set(new THREE.Vector3(x + dx, span.max.y + 1, mouth.z), new THREE.Vector3(0, -1, 0));
-          for (const solid of solids) for (const h of down.intersectObject(solid)) top = Math.max(top, h.point.y);
+          const qx = x + dx, qz = mouth.z;
+          for (let i = 0; i < over.length; i += 9) {
+            const ax = over[i], ay = over[i + 1], az = over[i + 2], bx = over[i + 3], by = over[i + 4], bz = over[i + 5], cx = over[i + 6], cy = over[i + 7], cz = over[i + 8];
+            if (qx < Math.min(ax, bx, cx) || qx > Math.max(ax, bx, cx)) continue;
+            // (where the line falls in the triangle seen from above, if it does: its height there)
+            const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+            if (Math.abs(d) < 1e-12) continue;
+            const u = ((bz - cz) * (qx - cx) + (cx - bx) * (qz - cz)) / d, v = ((cz - az) * (qx - cx) + (ax - cx) * (qz - cz)) / d, w = 1 - u - v;
+            if (u < 0 || v < 0 || w < 0) continue;
+            top = Math.max(top, u * ay + v * by + w * cy);
+          }
         }
         return top;
       };
