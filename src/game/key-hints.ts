@@ -69,7 +69,6 @@ export function keyHints(g: Game): KeyHints | null {
   // in a seat (garage.ts step; F out in interact.ts; Ctrl and a number in frame.ts)
   const r = g.garage.ride;
   if (r) {
-    const seats = g.garage.seatList()?.length ?? 0;
     if (r.seat === 0 && r.jeep instanceof Heli) {
       put(own, 'Up', [k('Space')], [P.x]);
       put(own, 'Down', [k('KeyC')], [P.o]);
@@ -84,7 +83,8 @@ export function keyHints(g: Game): KeyHints | null {
     }
     // (a controller has no way out of a seat yet: its □ is F only facing something, and nothing is faced from a seat)
     put(own, 'Get out', [k('KeyF')], null);
-    if (seats > 1) put(own, 'Change seat', ['Ctrl', `1–${Math.min(4, seats)}`], null);
+    // (not how to change seat: the seats are listed by the speed, each with its Ctrl and number, and it was there twice,
+    // the owner, 2026-10-20: "duplicated ui when flying heli")
     put(rest, 'Map', [k('KeyM')], ['↑']);
     put(rest, 'Talk (hold)', [k('KeyV')], ['→ held']);
     return done(`seat ${r.jeep.kind} ${r.seat === 0 ? 0 : 1}`);
