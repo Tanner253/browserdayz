@@ -272,8 +272,12 @@ export class Minimap {
       g.stroke();
     }
     g.restore();
-    g.strokeStyle = 'rgba(240, 220, 160, 0.75)';
-    g.lineWidth = 1.5 * SCALE;
+    // (red on a dark edge, as the big map's: pale, it was lost on the desert's sand, 2026-10-19)
+    g.strokeStyle = 'rgba(20, 8, 6, 0.55)';
+    g.lineWidth = 3.4 * SCALE;
+    g.stroke();
+    g.strokeStyle = 'rgba(255, 64, 44, 0.9)';
+    g.lineWidth = 1.8 * SCALE;
     g.stroke();
     // the chimney and the tanks of the works
     g.fillStyle = '#8f8a7c';

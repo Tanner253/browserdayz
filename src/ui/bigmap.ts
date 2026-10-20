@@ -28,6 +28,7 @@ import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
 import { playEdge } from '../world/outline';
 import { ZONA_VOID } from '../sim/items';
+import { ZONA_WEST } from '../world/zona';
 import { swampShore } from '../world/worldgen/west-water';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
@@ -1255,6 +1256,24 @@ export class BigMap {
       g.drawImage(s.c, 0, 0);
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
+    // The Zona's west line, drawn here at one width at any distance: on the sheet it is a metre or two wide, a hair
+    // at the whole map's distance, and dark red down the red canyon it runs by (the owner, 2026-10-19: "the map does
+    // not show the zona boundaries?"). Its words are put with the names, below.
+    const zx = ZONA_VOID ? sx(ZONA_WEST) : NaN;
+    const zonaOn = zx > -60 * u && zx < W + 60 * u;
+    if (zonaOn) {
+      g.beginPath();
+      g.moveTo(zx, Math.max(0, sy(-776)));
+      g.lineTo(zx, Math.min(Hh, sy(776)));
+      g.lineWidth = 5 * u;
+      g.strokeStyle = 'rgba(20, 8, 6, 0.55)';
+      g.stroke();
+      g.setLineDash([11 * u, 6 * u]);
+      g.lineWidth = 2.4 * u;
+      g.strokeStyle = 'rgba(255, 64, 44, 0.95)';
+      g.stroke();
+      g.setLineDash([]);
+    }
     // (names as the owner's picture has them: light lettering on a dark halo, spaced)
     const text = (s: string, px: number, py: number, size: number, colour = '#f4eedc', weight = 700, spacing = 0.08) => {
       g.font = `${weight} ${Math.round(size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
@@ -1488,6 +1507,15 @@ export class BigMap {
         drawPin(g, qx, qz, r, { fill: '#d2311b', edge: INK, halo: '#fff8e0' });
         drawLabel(g, distanceText(Math.hypot(pin.x - x, pin.z - z)), qx, qz + 15 * u, 14 * u);
       }
+    }
+    // (which side of the Zona's line is which: the Zona to the east, no tags to the west)
+    if (zonaOn) {
+      const ly = Math.min(Hh - 30 * u, Math.max(34 * u, sy(220)));
+      g.textAlign = 'left';
+      text('THE ZONA ▸', zx + 9 * u, ly, 15, '#ff7a62');
+      g.textAlign = 'right';
+      text('◂ NO TAGS', zx - 9 * u, ly, 15, '#ff7a62');
+      g.textAlign = 'left';
     }
 
     // you: an arrow pointing the way you face
