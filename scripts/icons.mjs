@@ -72,7 +72,8 @@ for (let i = 0; i < 1200 && !up; i++) {
   up = await run(`!!window.T && !!window.__game && !document.querySelector('#loading:not(.done)')`).catch(() => false);
 }
 if (!up) throw new Error(`the local game did not come up at ${address}: is it running? (npm run dev)`);
-const made = JSON.parse(await run(`(async () => JSON.stringify(await window.T.icons(${only ? JSON.stringify(only) : ''})))()`));
+// (in the world, not at the menu: five guns' models lie the other way round there, and GUN_VIEW in src/ui/icons.ts was set by looking in the world)
+const made = JSON.parse(await run(`(async () => { await window.T.boot(); return JSON.stringify(await window.T.icons(${only ? JSON.stringify(only) : ''})); })()`));
 ws.close();
 quit();
 
