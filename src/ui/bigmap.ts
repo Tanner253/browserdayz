@@ -23,6 +23,7 @@
 
 import { breathe } from '../core/breathe';
 import { bookmark, distanceText, drawLabel, drawPin, setBookmark } from './bookmark';
+import { layNames, type Box, type Mark } from './bigmap-names';
 import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
@@ -115,7 +116,8 @@ const KIND: Record<string, string> = { Village: 'Residential', Town: 'Residentia
 /** a building with something in it: where it stands, its step of the map, and the kinds of thing kept there */
 interface Held { name: string; x: number; z: number; rot: number; w: number; d: number; tier: Tier; kinds: string[]; gas: boolean }
 
-interface Shown { tiers: Tier[]; names: boolean; wells: boolean; cars: boolean; grid: boolean }
+/** `key`: the legend unfolded; `v`: 2 since the cars were off unless asked for (2026-10-19), what was kept before saying nothing of them */
+interface Shown { tiers: Tier[]; names: boolean; wells: boolean; cars: boolean; grid: boolean; key: boolean; v?: number }
 
 /** somebody on the server, as an admin's map shows them: where, which way they face, and how they are */
 export interface MapPerson { id?: number; x: number; z: number; name: string; yaw?: number; dead?: boolean; faint?: boolean; staff?: boolean; asleep?: boolean; away?: boolean; seat?: boolean; hp?: number; flags?: number }
@@ -535,7 +537,11 @@ export class BigMap {
   private at: Pt = { x: 0, z: 0 };
   private me = { x: 0, z: 0, yaw: 0 };
   private dirty = true;
-  private shown: Shown = { tiers: [...TIER_IDS], names: true, wells: true, cars: true, grid: true };
+  // (the cars and the legend off until asked for, the owner, 2026-10-19: "this map looks too busy")
+  private shown: Shown = { tiers: [...TIER_IDS], names: true, wells: true, cars: false, grid: true, key: false, v: 2 };
+  /** the places' marks where they were last drawn (see `layNames`), and the one pointed at, whose name is written by it */
+  private laid: Mark[] = [];
+  private hot: MenuSpot | null = null;
   /** fingers (or the mouse button) down on it, and how far apart two of them were */
   private down = new Map<number, { x: number; y: number }>();
   private pinch = 0;
@@ -620,7 +626,9 @@ export class BigMap {
     }
     try {
       const was = JSON.parse(localStorage.getItem(KEPT) ?? 'null') as Partial<Shown> | null;
-      if (was && Array.isArray(was.tiers)) this.shown = { ...this.shown, ...was, tiers: was.tiers.filter((t) => TIER_IDS.includes(t)) };
+      // (every click kept the cars on with the rest: what was kept before they were off is not held to)
+      if (was && was.v !== 2) delete was.cars;
+      if (was && Array.isArray(was.tiers)) this.shown = { ...this.shown, ...was, tiers: was.tiers.filter((t) => TIER_IDS.includes(t)), v: 2 };
     } catch {
       /* nothing kept: everything shown */
     }
@@ -649,7 +657,7 @@ export class BigMap {
           <div class="hm-frame" aria-hidden="true">
             <div class="hm-cart"><b>ZONA</b><span>SURVIVE · LOOT · EXTRACT</span></div>
             <svg class="hm-rose" viewBox="-60 -60 120 120"><circle r="44" class="o"/><circle r="36" class="d"/><polygon points="0,-40 6,0 0,40 -6,0" class="ns"/><polygon points="-40,0 0,-6 40,0 0,6" class="ew"/><polygon points="0,-40 6,0 -6,0" class="n"/><text y="-47">N</text><text y="57" class="s">S</text><text x="53" y="4" class="s">E</text><text x="-53" y="4" class="s">W</text></svg>
-            <div class="hm-legend"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div><div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div><div><i class="vk"><canvas data-k="0" width="48" height="32"></canvas></i>UAZ</div><div><i class="vk"><canvas data-k="1" width="48" height="32"></canvas></i>Police car</div><div><i class="vk"><canvas data-k="2" width="48" height="32"></canvas></i>Helicopter</div></div>
+            <div class="hm-legend"><button type="button" class="hm-fold">Key</button><div class="hm-rows"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div><div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div><div class="v"><i class="vk"><canvas data-k="0" width="48" height="32"></canvas></i>UAZ</div><div class="v"><i class="vk"><canvas data-k="1" width="48" height="32"></canvas></i>Police car</div><div class="v"><i class="vk"><canvas data-k="2" width="48" height="32"></canvas></i>Helicopter</div></div></div>
             <div class="hm-sector"><span>SECTOR</span><b>—</b></div>
           </div>
           <div class="hm-tip" hidden></div></div>
@@ -683,6 +691,11 @@ export class BigMap {
       const g = c.getContext('2d');
       if (g) vehicleMark(g, c.width / 2 - (c.dataset.k === '2' ? 1 : 0), c.height / 2 + 1, 9.5, Number(c.dataset.k), '#211c14', 2.4);
     }
+    // (the legend folded to its button until it is opened, and kept as it was left)
+    this.root.querySelector('.hm-fold')!.addEventListener('click', () => {
+      this.shown.key = !this.shown.key;
+      this.keep();
+    });
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-show]')) {
       b.addEventListener('click', () => {
         const k = b.dataset.show as 'names' | 'wells' | 'cars' | 'grid';
@@ -756,7 +769,10 @@ export class BigMap {
     };
     v.addEventListener('pointerup', up);
     v.addEventListener('pointercancel', up);
-    v.addEventListener('pointerleave', () => (this.tip.hidden = true));
+    v.addEventListener('pointerleave', () => {
+      this.tip.hidden = true;
+      this.hold(null);
+    });
     v.addEventListener('contextmenu', (e) => {
       if (!this.onPick) return;
       e.preventDefault();
@@ -829,6 +845,9 @@ export class BigMap {
   private marks() {
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-tier]')) b.classList.toggle('on', this.shown.tiers.includes(Number(b.dataset.tier) as Tier));
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-show]')) b.classList.toggle('on', this.shown[b.dataset.show as 'names']);
+    const key = this.root.querySelector('.hm-legend')!;
+    key.classList.toggle('open', this.shown.key);
+    key.classList.toggle('nocars', !this.shown.cars);
   }
 
   /** the line under the sheet: what a step of the map is, or how the sheet is read */
@@ -884,6 +903,13 @@ export class BigMap {
   private point(u: number, w: number, left: number, top: number) {
     const W = this.view.width, H = this.view.height, k = this.perMetre();
     const wx = this.at.x + ((u - 0.5) * W) / k, wz = this.at.z + ((w - 0.5) * H) / k;
+    // (a small place's mark pointed at has its name written by it, if it had none for want of room or nearness)
+    let hot: MenuSpot | null = null, by = (TOUCH ? 26 : 12) * (W / Math.max(1, this.view.clientWidth));
+    for (const m of this.laid) {
+      const d = Math.hypot(m.x - u * W, m.y - w * H);
+      if (!m.name && d < by) [hot, by] = [m.s, d];
+    }
+    this.hold(hot);
     // (the square under the pointer, as its corner names it, and where in the world that is)
     const sector = this.root.querySelector('.hm-sector b');
     if (sector) {
@@ -933,6 +959,12 @@ export class BigMap {
     const box = this.view.getBoundingClientRect();
     this.tip.style.left = `${Math.min(box.width - 290, Math.max(8, left + 16))}px`;
     this.tip.style.top = `${Math.min(box.height - 150, Math.max(8, top + 14))}px`;
+  }
+
+  private hold(s: MenuSpot | null) {
+    if (s === this.hot) return;
+    this.hot = s;
+    this.dirty = true;
   }
 
   // ------------------------------------------------------------------ the sheet, printed once
@@ -1286,16 +1318,41 @@ export class BigMap {
       g.fillText(s, px, py);
       g.letterSpacing = '0px';
     };
-    // the regions, large and faint behind everything else, at any distance but the nearest
-    if (this.shown.names && this.zoom < 5) {
-      g.textAlign = 'center';
-      g.globalAlpha = 0.9;
-      for (const r of REGIONS) {
-        const px = sx(r.x), py = sy(r.z);
-        if (on(px, py, 300 * u)) text(r.name, px, py, Math.min(34, 20 + this.zoom * 4) * (TOUCH ? 0.8 : 1), r.colour, 700, 0.22);
-      }
-      g.globalAlpha = 1;
+    const measure = (s: string, size: number, weight: number, spacing: number) => {
+      g.font = `${weight} ${Math.round(size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+      g.letterSpacing = `${(size * u * spacing).toFixed(1)}px`;
+      const w = g.measureText(s).width;
+      g.letterSpacing = '0px';
+      return w;
+    };
+    // (the scale's bar: a round number of metres, about a hand's width of the picture)
+    const want = (170 * u) / k, metres = [10, 20, 50, 100, 200, 500, 1000].reduce((p, q) => (Math.abs(q - want) < Math.abs(p - want) ? q : p)), bar = metres * k;
+    // Where every name goes, none on another nor under what is over the sheet (layNames): the title, the compass, the
+    // legend and the square's box (hud.css), the grid's bands, the scale, and the Zona's words.
+    const vr = v.getBoundingClientRect(), f = W / Math.max(1, vr.width), taken: Box[] = [];
+    for (const el of this.root.querySelectorAll<HTMLElement>('.hm-cart, .hm-rose, .hm-legend, .hm-sector')) {
+      const r = el.getBoundingClientRect();
+      if (r.width) taken.push([(r.left - vr.left) * f, (r.top - vr.top) * f, (r.right - vr.left) * f, (r.bottom - vr.top) * f]);
     }
+    if (this.shown.grid) {
+      const x0 = Math.max(0, sx(WORLD_X0)), y0 = Math.max(0, sy(WORLD_Z0));
+      taken.push([x0, y0, W, y0 + 17 * u], [x0, y0, x0 + 19 * u, Hh]);
+    }
+    taken.push([W - 22 * u - bar - 14 * u, Hh - 56 * u, W, Hh]);
+    const zly = Math.min(Hh - 30 * u, Math.max(34 * u, sy(220)));
+    if (zonaOn) {
+      const a = measure('THE ZONA ▸', 15, 700, 0.08), b = measure('◂ NO TAGS', 15, 700, 0.08);
+      taken.push([zx - 9 * u - b - 4 * u, zly - 16 * u, zx + 9 * u + a + 4 * u, zly + 6 * u]);
+    }
+    const laid = layNames({ spots: this.spots, regions: REGIONS, gases: this.gases, sx, sy, W, H: Hh, u, k, zoom: this.zoom, touch: TOUCH, names: this.shown.names, taken, measure });
+    this.laid = laid.marks;
+    // the regions, large and faint behind everything else, at any distance but the nearest
+    g.globalAlpha = 0.9;
+    for (const r of laid.regions) {
+      g.textAlign = r.align;
+      text(r.text, r.x, r.y, r.size, r.colour, 700, 0.22);
+    }
+    g.globalAlpha = 1;
 
     // the gas: the ground it lies on, hatched round
     for (const gas of this.gases) {
@@ -1310,8 +1367,6 @@ export class BigMap {
         g.strokeStyle = 'rgba(96, 112, 10, 0.95)';
         g.stroke();
         g.setLineDash([]);
-        g.textAlign = 'center';
-        text('GAS · MASK NEEDED', qx, qz + qr + 16 * u, 13, '#e8f08c');
       }
     }
 
@@ -1407,35 +1462,46 @@ export class BigMap {
       g.fill();
     }
 
-    // the places, by name: the big ones always, the rest once the sheet is brought a little nearer
+    // the places: each mark, with its name where layNames found room (the towns and the places that matter at any
+    // distance, the small ones nearer); and the one pointed at, named over everything by its mark
+    // (the gas's words with them, over the buildings, which covered a letter of them)
+    for (const n of laid.gas) {
+      if (!n) continue;
+      g.textAlign = n.align;
+      text(n.text, n.x, n.y, n.size, '#e8f08c');
+    }
     if (this.shown.names) {
-      g.textAlign = 'center';
-      for (const s of this.spots) {
-        if (s.kind === 'spawn' || s.kind === 'well') continue;
-        if (!s.label && this.zoom < (TOUCH ? 2.6 : 1.5)) continue;
-        const px = sx(s.x), py = sy(s.z);
-        if (!on(px, py, 80 * u)) continue;
-        const size = (s.label ? 16 : 13) * (TOUCH ? 0.82 : 1), icon = ICON[s.kind];
-        // (its mark: a dark disc with a light rim, its sign in it, left of the name)
+      const colour = (q: MenuSpot) => (q.tier && this.shown.tiers.includes(q.tier) ? '#fbf6e6' : '#e2dccb');
+      for (const m of laid.marks) {
+        // (its mark: a dark disc with a rim of its tier's colour, its sign in it)
+        g.beginPath();
+        g.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(16, 14, 10, 0.88)';
+        g.fill();
+        g.lineWidth = 1.4 * u;
+        g.strokeStyle = m.s.tier ? onPaper(m.s.tier) : '#e8d9a8';
+        g.stroke();
+        const icon = ICON[m.s.kind];
         if (icon) {
-          g.font = `700 ${Math.round(size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
-          g.letterSpacing = `${(size * u * 0.08).toFixed(1)}px`;
-          const half = g.measureText(s.name.toUpperCase()).width / 2, r = size * 0.62 * u, ix = px - half - r - 4 * u, iy = py - 9 * u - size * 0.34 * u;
-          g.letterSpacing = '0px';
-          g.beginPath();
-          g.arc(ix, iy, r, 0, Math.PI * 2);
-          g.fillStyle = 'rgba(16, 14, 10, 0.88)';
-          g.fill();
-          g.lineWidth = 1.4 * u;
-          g.strokeStyle = s.tier ? onPaper(s.tier) : '#e8d9a8';
-          g.stroke();
           g.fillStyle = '#efe4c2';
-          g.font = `700 ${Math.round(size * 0.78 * u)}px 'Segoe UI Symbol', 'Barlow Condensed', sans-serif`;
+          g.font = `700 ${Math.round(m.r * 1.26)}px 'Segoe UI Symbol', 'Barlow Condensed', sans-serif`;
+          g.textAlign = 'center';
           g.textBaseline = 'middle';
-          g.fillText(icon, ix, iy + 0.5 * u);
+          g.fillText(icon, m.x, m.y + 0.5 * u);
           g.textBaseline = 'alphabetic';
         }
-        text(s.name.toUpperCase(), px, py - 9 * u, size, s.tier && this.shown.tiers.includes(s.tier) ? '#fbf6e6' : '#e2dccb', s.label ? 700 : 600);
+        if (m.name) {
+          g.textAlign = m.name.align;
+          text(m.name.text, m.name.x, m.name.y, m.name.size, colour(m.s), m.name.weight);
+        }
+      }
+      const m = this.hot && laid.marks.find((q) => q.s === this.hot && !q.name);
+      if (m) {
+        const name = m.s.name.toUpperCase(), tx = m.x + m.r + 6 * u, ty = m.y + m.size * u * 0.34, w = measure(name, m.size, 700, 0.08);
+        g.fillStyle = 'rgba(14, 13, 11, 0.86)';
+        g.fillRect(tx - 4 * u, m.y - m.size * u * 0.7, w + 10 * u, m.size * u * 1.4);
+        g.textAlign = 'left';
+        text(name, tx, ty, m.size, '#fbf6e6');
       }
     }
 
@@ -1472,7 +1538,7 @@ export class BigMap {
 
     // a scale: a round number of metres, about a hand's width of the picture, as a bar in four on a dark panel
     {
-      const want = (170 * u) / k, steps = [10, 20, 50, 100, 200, 500, 1000], m = steps.reduce((p, q) => (Math.abs(q - want) < Math.abs(p - want) ? q : p)), len = m * k;
+      const m = metres, len = bar;
       const x1 = W - 22 * u, y1 = Hh - 22 * u;
       g.fillStyle = 'rgba(14, 13, 11, 0.86)';
       g.fillRect(x1 - len - 14 * u, y1 - 34 * u, len + 28 * u, 46 * u);
@@ -1510,7 +1576,7 @@ export class BigMap {
     }
     // (which side of the Zona's line is which: the Zona to the east, no tags to the west)
     if (zonaOn) {
-      const ly = Math.min(Hh - 30 * u, Math.max(34 * u, sy(220)));
+      const ly = zly;
       g.textAlign = 'left';
       text('THE ZONA ▸', zx + 9 * u, ly, 15, '#ff7a62');
       g.textAlign = 'right';
