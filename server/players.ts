@@ -21,6 +21,7 @@ import { noHold } from './admin';
 import { leaveSeat, racksNow, releaseLock } from './acts';
 import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
+import { partyIn, partyOut } from './party';
 
 export interface Client {
   ws: WebSocket;
@@ -339,6 +340,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // (a restart is on its way: whoever comes in before it happens is told as the others were)
   if (RESTART.pending !== null) send(c, { t: 'restart', why: RESTART.pending, in: Math.max(0, Math.round(RESTART.about - (Date.now() - RESTART.seen) / 1000)) });
   broadcast({ t: 'join', p: info(c) }, c);
+  partyIn(c);
   // back under another name: the board says so, to everybody
   const had = scores.get(c.key);
   if (had && had.name !== c.name) {
@@ -370,6 +372,7 @@ export function drop(c: Client) {
   // while the carrier is online". See the `resume` shift in `join`.)
   records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: c.asleep || Date.now() });
   broadcast({ t: 'leave', id: c.id });
+  partyOut(c);
   log(`- ${c.name} (#${c.id}) — ${clients.size} online`);
   fillFromQueue();
 }
