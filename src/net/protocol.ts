@@ -50,7 +50,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // counting thirty and twenty, is told to load the page again.)
 // (55, 2026-10-20: the 9A-91, its magazine and its suppressor are new things, and the 9x39 rounds gone: a page from
 // before knows none of them.)
-export const PROTOCOL = 55;
+// (56, 2026-10-20: the game is no longer open to the console as window.__game, and reading that name says so ('bait',
+// src/net/bait.ts): every game open on 55's page, open to it, is told to load the page again.)
+export const PROTOCOL = 56;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -261,6 +263,8 @@ export type C2S =
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
   | { t: 'ping'; n: number }
+  /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
+  | { t: 'bait'; what: string }
   /**
    * On the bot check's course, before being let in (src/sim/course.ts): where the player's feet are and where they
    * look (the yard's own x, the height over its floor, z, the turn and the tilt), and a shot fired (from where, and

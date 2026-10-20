@@ -3,6 +3,7 @@
 
 import { PROTOCOL, type C2S, type S2C } from './protocol';
 import { deviceId, glName } from './device';
+import { onBait } from './bait';
 
 type Handler<T extends S2C['t']> = (m: Extract<S2C, { t: T }>) => void;
 type Welcome = Extract<S2C, { t: 'welcome' }>;
@@ -382,6 +383,8 @@ export class Net {
             if (this.pingsOut.length < 30) this.pingsOut.push(n);
             this.send({ t: 'ping', n });
           }, 4000) as unknown as number;
+          // (a script that read window.__game, before this connection or after it: src/net/bait.ts)
+          onBait((what) => this.send({ t: 'bait', what }));
           // (from this word on, what is said is kept for the game until it listens)
           this.held = [];
           if (this.heldTill) clearTimeout(this.heldTill);

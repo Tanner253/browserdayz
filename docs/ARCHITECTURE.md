@@ -35,20 +35,20 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `acts.ts` | 510 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
-| `admin.ts` | 899 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
+| `admin.ts` | 916 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
 | `bodywatch.ts` | 201 | How a body moves, watched for a program walking it: standing on nothing, or to and fro on one spot doing nothing. |
 | `botrules.ts` | 51 | The server: the numbers the bot rules go by, kept off the public code (the owner, 2026-10-18: |
-| `checks.ts` | 446 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
+| `checks.ts` | 451 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
 | `device.ts` | 91 | The server: the devices games run on (2026-10-16). |
 | `drops.ts` | 130 | The server: supply drops and the helicopter that brings them. |
 | `elite.ts` | 32 | The Elite: players whose last payout was at the top rate, each held by their key's hash (nobody's anything), with a crown by their name in chat (the owner, 2026-10-15: |
 | `gate.ts` | 733 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
-| `handle.ts` | 878 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 885 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1288 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 758 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `party.ts` | 145 | Parties (2026-10-19), the lite first one: the owner, "players want to be able to team up with eachother, can we do a simple party system, with a very LITE indicator on friendlies ... |
-| `players.ts` | 407 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
+| `players.ts` | 409 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `queue.ts` | 142 | The server: the line to get in when it is full, and the leaderboard. |
 | `roles.ts` | 72 | The server: the roles as the panel's Roles shows them, and whether an admin leaves a dog tag, set by an admin above them. |
 | `seen.ts` | 40 | Who has played lately, for the door's "N played today" (the owner, offered a true number in place of fake players to fill the count: |
@@ -172,16 +172,17 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 345 |  |
+| `main.ts` | 351 |  |
 
 ## src/net/
 
 | file | lines | what it is |
 |---|---:|---|
-| `client.ts` | 444 | Client side of the game connection. |
+| `bait.ts` | 39 | window.__game was the whole game, open to the console of every player's page, until 2026-10-20: a script passed round among players reached through it to draw everybody through walls and light the night (the owner,... |
+| `client.ts` | 447 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `orders.ts` | 223 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 532 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 536 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
