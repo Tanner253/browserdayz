@@ -37,6 +37,7 @@ import { createHash } from 'node:crypto';
 import { EMPTY_ACCOUNT_RENT, Keypair, LAMPORTS, SYSTEM_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM, WRAPPED_SOL, address, b58, closeTokenAccount, computeLimit, computePrice, memo, onCurve, receipt, same, seeded, signed, tokenAccount, transfer, unsigned, type Bytes, type Instruction, type Rpc, type Signed, type Status } from './solana.js';
 import { claimCurve, claimPool, state as coinState, type CoinState } from './pump.js';
 import type { Store } from './store.js';
+import { PAID_BEFORE } from './paid-before.js';
 
 // ------------------------------------------------------------------ settings
 
@@ -453,6 +454,14 @@ export interface Book {
   most?: { day: string; lamports: number };
   /** tags paid, by wallet (`w:`) and by player (`a:`), as far back as the book knows: what `pastFree` counts. Read from the rows the first time a tag is paid (they keep only the latest ROWS_KEPT) */
   free?: Record<string, number>;
+  /**
+   * SOL paid to each wallet, and for how many tags, as far back as can be known: the payments the rows had lost read off
+   * the chain (paid-before.ts) and the rows the book had when this was begun, the first time a tag was paid after it
+   * came in; added to with every payment since. The payouts page's best-paid wallets (the owner, 2026-10-19: "it looks
+   * like we are missing data from the top paid out so far ... why do we not aggregate data for usage from our own DB?":
+   * the page had summed only the rows kept, 412 of 578 tags paid).
+   */
+  earned?: Record<string, { lamports: number; n: number }>;
 }
 
 /** the book as it was read, and the mark of that version (null: there is no book yet) */
@@ -619,7 +628,10 @@ export function enter(book: Book, t: Tag, o: Outcome, day: string, five = false)
   }
   if (row.state === 'paid') return row;
   // (read from the rows before this one is down as paid, and counted below)
-  if (o.state === 'paid') book.free ??= paidBy(book);
+  if (o.state === 'paid') {
+    book.free ??= paidBy(book);
+    book.earned ??= earnedBy(book);
+  }
   row.state = o.state;
   row.why = 'why' in o ? o.why : undefined;
   row.hold = o.state === 'waiting' ? o.hold : undefined;
@@ -637,8 +649,27 @@ export function enter(book: Book, t: Tag, o: Outcome, day: string, five = false)
     book.paid++;
     book.paidLamports += o.lamports;
     for (const k of freeKeys(row)) book.free![k] = (book.free![k] ?? 0) + 1;
+    const e = (book.earned![row.wallet] ??= { lamports: 0, n: 0 });
+    e.lamports += o.lamports;
+    e.n++;
   }
   return row;
+}
+
+/** SOL paid by wallet: the book's own tally, or (before it has one) the same worked out now */
+export const earnedOf = (book: Book) => book.earned ?? earnedBy(book);
+/** the payments from before the rows kept, from the chain, and the rows paid (a payment in both, by its transaction, counted once) */
+function earnedBy(book: Book): Record<string, { lamports: number; n: number }> {
+  const out: Record<string, { lamports: number; n: number }> = {};
+  const add = (wallet: string, lamports: number, n: number) => {
+    const e = (out[wallet] ??= { lamports: 0, n: 0 });
+    e.lamports += lamports;
+    e.n += n;
+  };
+  const sigs = new Set(book.rows.map((r) => r.signature).filter(Boolean));
+  for (const [sig, wallet, lamports, n] of PAID_BEFORE) if (!sigs.has(sig)) add(wallet, lamports, n);
+  for (const r of book.rows) if (r.state === 'paid') add(r.wallet, r.lamports ?? 0, 1);
+  return out;
 }
 
 /** how many tags the book knows to have been paid to a wallet (`w:` and its address) or a player (`a:`): see `pastFree` */

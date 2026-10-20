@@ -385,6 +385,8 @@ export class Game {
   indoors = false;
   inForest = false;
   deathInfo = '';
+  /** this life's hits on each player, as the server took them (`hitok`): said on the death screen of what you did to whoever killed you */
+  hitsOn = new Map<number, { amount: number; hits: number; head: number }>();
   deathSent = false;
   warned = { hunger: false, thirst: false };
   heldKey = '';

@@ -13,7 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { cached, dueOf, editBook, freshBook, glanceBook, paidTo, refOf, snapshot, sol, walletRate, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, dueOf, earnedOf, editBook, freshBook, glanceBook, paidTo, refOf, snapshot, sol, walletRate, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
@@ -188,24 +188,24 @@ function page(book: Book, s: Snapshot, now: number): string {
   const claims = book.claims
     .map((c) => `<tr><td>${when(c.at)}</td><td><b class="sol">+${amount(c.lamports)} SOL</b></td><td>${c.from === 'pool' ? 'PumpSwap' : 'bonding curve'}</td><td><a href="${tx(c.signature)}" target="_blank" rel="noopener">${esc(short(c.signature))}</a></td></tr>`)
     .join('');
-  // ---- what was paid each day, and to whom: sums of the rows listed (the book keeps the latest of them, and says how many)
+  // ---- what was paid each day: sums of the rows listed (the book keeps the latest of them, and says how many)
   const byDay = new Map<string, { lamports: number; n: number }>();
-  const byWallet = new Map<string, { lamports: number; n: number }>();
   for (const r of paidRows) {
-    const day = (r.paidAt ?? r.at).slice(0, 10), d = byDay.get(day) ?? { lamports: 0, n: 0 }, wl = byWallet.get(r.wallet) ?? { lamports: 0, n: 0 };
+    const day = (r.paidAt ?? r.at).slice(0, 10), d = byDay.get(day) ?? { lamports: 0, n: 0 };
     d.lamports += r.lamports ?? 0;
     d.n++;
     byDay.set(day, d);
-    wl.lamports += r.lamports ?? 0;
-    wl.n++;
-    byWallet.set(r.wallet, wl);
   }
   const days = [...byDay.entries()].sort((p, q) => (p[0] < q[0] ? -1 : 1)).slice(-14);
   const most = Math.max(1, ...days.map(([, d]) => d.lamports));
   const chart = days.length
     ? `<div class="chart">${days.map(([day, d]) => `<div class="col" title="${esc(dayName(day))}: ${d.n} ${d.n === 1 ? 'tag' : 'tags'}, ${amount(d.lamports)} SOL"><b>${amount(d.lamports)}</b><i style="height:${Math.max(3, Math.round((d.lamports / most) * 100))}%"></i><span>${esc(dayName(day))}</span><small>${d.n} ${d.n === 1 ? 'tag' : 'tags'}</small></div>`).join('')}</div>`
     : '<p class="none">Nothing paid yet.</p>';
-  const top = [...byWallet.entries()].sort((p, q) => q[1].lamports - p[1].lamports).slice(0, 6);
+  // (the best fifty, the list scrolled: the owner, 2026-10-19, "our payouts panel needs a scroll wheel for best paid, render
+  // top 50 paid players"; from the book's tally of every payment, not the rows it keeps: see `earned` in _lib/payouts.ts)
+  const earned = earnedOf(book);
+  const top = Object.entries(earned).sort((p, q) => q[1].lamports - p[1].lamports).slice(0, 50);
+  const untraced = book.paidLamports - Object.values(earned).reduce((n, e) => n + e.lamports, 0);
   const topMost = Math.max(1, ...top.map(([, v]) => v.lamports));
   const board = top.length
     ? `<ol class="board">${top.map(([wl, v]) => `<li><a href="https://solscan.io/account/${esc(wl)}" target="_blank" rel="noopener"><code>${esc(short(wl))}</code></a><span class="track"><i style="width:${Math.max(4, Math.round((v.lamports / topMost) * 100))}%"></i></span><b class="sol">${amount(v.lamports)} SOL</b><small>${v.n} ${v.n === 1 ? 'tag' : 'tags'}</small></li>`).join('')}</ol>`
@@ -325,15 +325,17 @@ function page(book: Book, s: Snapshot, now: number): string {
   .col b { margin-bottom: 5px; font: 700 15px/1 var(--cond); font-variant-numeric: tabular-nums; }
   .col span { margin-top: 7px; font: 12px/1 var(--mono); color: var(--dim); }
   .col small { margin: 3px 0 9px; font: 11px/1 var(--mono); color: var(--faint); white-space: nowrap; }
-  .board { margin: 0; padding: 6px 14px; list-style: none; counter-reset: n; background: var(--panel); border: 1px solid var(--line); }
-  .board li { counter-increment: n; display: grid; grid-template-columns: 22px 92px minmax(0, 1fr) auto 58px; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .board { margin: 0; padding: 6px 14px; list-style: none; counter-reset: n; background: var(--panel); border: 1px solid var(--line); max-height: 330px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .board li { counter-increment: n; display: grid; grid-template-columns: 22px 92px minmax(0, 1fr) 96px 58px; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
   .board li:last-child { border-bottom: 0; }
+  .untraced { margin: 8px 2px 0; font: 12px/1.4 var(--mono); color: var(--faint); }
   .board li::before { content: counter(n); font: 700 14px/1 var(--cond); color: var(--faint); }
   .track { display: block; height: 8px; background: rgba(255, 255, 255, 0.07); }
   .track i { display: block; height: 100%; background: var(--gold); }
   .track.five { display: inline-block; width: 84px; margin-right: 8px; vertical-align: middle; }
   b.go { font-variant-numeric: tabular-nums; }
   .board small { font: 11px/1 var(--mono); color: var(--faint); text-align: right; }
+  .board .sol { text-align: right; white-space: nowrap; }
   .none { margin: 0; padding: 22px 16px; background: var(--panel); border: 1px solid var(--line); color: var(--faint); }
   .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
   .filters button { padding: 6px 13px 7px; font: 600 12px/1 var(--cond); letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); background: none; border: 1px solid var(--line); cursor: pointer; }
@@ -372,7 +374,7 @@ function page(book: Book, s: Snapshot, now: number): string {
     .hero, .two, .rules { grid-template-columns: minmax(0, 1fr); }
     .flow { grid-template-columns: minmax(0, 1fr); gap: 26px; }
     .step:not(:last-child)::after { right: 50%; top: auto; bottom: -19px; margin: 0 -9px 0 0; transform: rotate(135deg); }
-    .board li { grid-template-columns: 18px 84px minmax(0, 1fr) auto; }
+    .board li { grid-template-columns: 18px 84px minmax(0, 1fr) 88px; }
     .board small { display: none; }
   }
   .loop { margin-bottom: 22px; }
@@ -464,8 +466,8 @@ ${tiersSection}
       ${chart}
     </div>
     <div>
-      <h2>The best-paid wallets <small>${partial ? 'of those listed' : 'so far'}</small></h2>
-      ${board}
+      <h2>The best-paid wallets <small>${top.length > 6 ? `the top ${top.length}, ` : ''}so far</small></h2>
+      ${board}${untraced >= 1e6 ? `<p class="untraced">And ${amount(untraced)} SOL of the first days' payments not traced to a wallet.</p>` : ''}
     </div>
   </section>
 
