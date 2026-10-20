@@ -887,6 +887,10 @@ function hinged(leg: THREE.Mesh): THREE.Object3D {
   return hinge;
 }
 const UNFOLDED = new THREE.Quaternion();
+/** how much of the sway is left with the gun on its bipod, lying down: the scope steady */
+const BRACED_SWAY = 0.05;
+/** lying down, moving faster than this (a share of a run) is crawling: no aiming in it */
+const PRONE_STILL = 0.04;
 /** the guns whose bipod is let down and folded on the fire-mode key, theirs being one mode (the owner, 2026-10-17: "for the barrett .50 cal add a button to toggle the bipod, its cool and it should be animated") */
 const BIPODS = new Set(['barrett']);
 /**
@@ -2862,6 +2866,9 @@ export class Weapons {
 
   private selectorT = 0;
 
+  /** the gun on its bipod, lying down and aimed (see BRACED_SWAY): steady, and the legs held */
+  braced = false;
+
   /** which guns of a bipod have it let down, by the item (folded when not said) */
   private bipodDown = new Map<string, boolean>();
 
@@ -2985,11 +2992,18 @@ export class Weapons {
 
     // ----- aiming
     // (nor on hands and feet up a steep face: see Player.handsBusy)
-    const canAim = enabled && !this.held && !!m && !p.sprinting && !p.handsBusy && (!this.action || this.action.name === 'bolt') && !p.dead;
+    // (nor crawling: lying down, the gun comes to the eye only once the body is still, the owner, 2026-10-20: "you
+    // shouldnt be able to ADS while moving while prone")
+    const canAim = enabled && !this.held && !!m && !p.sprinting && !p.handsBusy && (!this.action || this.action.name === 'bolt') && !p.dead && !(p.prone && p.moving > PRONE_STILL);
     // (a pair is not aimed down sights: its right button is its right hand's trigger)
     this.aiming = canAim && input.held('Mouse2') && !def?.weapon?.akimbo;
     this.spread = def?.weapon && item ? this.spreadNow(item.id) : 0;
     p.aiming = this.aiming;
+    // (On its bipod, lying down and aimed, the gun rests on the ground: the scope is steady, and whoever is on it stays
+    // where they lie until they come off the scope. The owner, 2026-10-20: "bipod on berret works if prone and its down,
+    // scope is steady but locked into position, cant move while scoped when prone and using bipod.")
+    this.braced = this.aiming && p.prone && !!item && BIPODS.has(item.id) && this.bipodIsDown(item);
+    p.braced = this.braced;
     // a handy gun is at the eye in a fifth of a second; a long heavy one takes twice that
     const hd = this.handling(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
@@ -3119,7 +3133,7 @@ export class Weapons {
     const tired = (1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5) * p.shake;
     const heft = THREE.MathUtils.clamp((100 - hd.ergo) / 60, 0.25, 1.2);
     const armsK = 1 + Math.pow(1 - this.armStamina, 2) * 2.6;
-    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (1 - 0.9 * this.steady) * (1 + 0.8 * Math.min(1, this.breath.winded)) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * (this.stockFolded(item) ? FOLDED.sway : 1) * armsK * (0.75 + heft * 0.5);
+    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (1 - 0.9 * this.steady) * (1 + 0.8 * Math.min(1, this.breath.winded)) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * (this.stockFolded(item) ? FOLDED.sway : 1) * (this.braced ? BRACED_SWAY : 1) * armsK * (0.75 + heft * 0.5);
     const t = this.time;
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
     const rec = this.aimRecoil.step(dt);
