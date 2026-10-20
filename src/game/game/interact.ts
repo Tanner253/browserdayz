@@ -106,7 +106,19 @@ export const interactMethods = {
         r.chest(c).sub(cam.position);
         const d = c.length();
         // (and only with nothing in between: it used to be read straight through walls)
-        if (d < 18 && c.normalize().dot(dir) > 0.992 && !physics.raycast(cam.position, c, d - 0.5, SIGHT_GROUPS)) this.prompt = `<small>${r.name}</small>`;
+        if (d < 18 && c.normalize().dot(dir) > 0.992 && !physics.raycast(cam.position, c, d - 0.5, SIGHT_GROUPS)) {
+          // (near enough to speak to: asked to your party, or a yes to theirs, with F, as in Rust: server/party.ts)
+          const mate = this.party.ids.has(r.id), asked = this.party.askedBy(r.id);
+          if (mate || d > 4) this.prompt = `<small>${r.name}${mate ? ' · party' : ''}</small>`;
+          else if (this.party.wasSent(r.id)) this.prompt = `<small>${r.name} · asked to your party</small>`;
+          else {
+            this.prompt = `<kbd>F</kbd>${asked ? `Join ${r.name}'s party` : `Ask ${r.name} to your party`}`;
+            if (this.input.pressed('KeyF') && !this.hud.chatOpen) {
+              this.net.send({ t: 'party', act: asked ? 'accept' : 'invite', id: r.id });
+              this.party.sent(r.id);
+            }
+          }
+        }
       }
       return;
     }

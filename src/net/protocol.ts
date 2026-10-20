@@ -48,7 +48,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // drive, is told to load the page again with cars that drive.)
 // (53, 2026-10-19: a tag cashes in after twenty minutes, and is on a body after ten alive: every game open on 52's page,
 // counting thirty and twenty, is told to load the page again.)
-export const PROTOCOL = 53;
+export const PROTOCOL = 54;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -226,6 +226,8 @@ export type C2S =
   | { t: 'adm' }
   /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
   | { t: 'tint'; color: string | null }
+  /** a party (server/party.ts): ask the player of that id to join yours, say yes to whoever asked you, or leave yours */
+  | { t: 'party'; act: 'invite' | 'accept' | 'leave'; id?: number }
   /** leaving the proper way: the wait is begun (see LOGOUT in server/index.ts), or called off */
   | { t: 'logout'; cancel?: true }
   /** a dog tag taken from another player has been carried for the full time */
@@ -452,6 +454,10 @@ export type S2C =
   | { t: 'role'; role: 'admin' | 'mod' | null }
   /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */
   | { t: 'sys'; text: string }
+  /** who is in your party (none: you are in none); a member away from the server has no id */
+  | { t: 'party'; members: { id: number | null; name: string }[] }
+  /** somebody asks you to join their party */
+  | { t: 'partyAsk'; from: number; name: string }
   /** put somewhere by an admin (by themselves, or by `by`). With no height, it is on top of whatever is there; `yaw`
    * (the arena's only): facing that way */
   | { t: 'put'; x: number; y?: number; z: number; by?: string; yaw?: number }

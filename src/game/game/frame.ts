@@ -447,6 +447,8 @@ export const frameMethods = {
         if (rp.pos.distanceToSquared(cam.position) < 90 * 90) this.effects.drip(_drip.set(rp.pos.x, rp.pos.y + (rp.crouched ? 0.55 : 0.95), rp.pos.z));
       }
     }
+    // (a dot over each of your party who is about)
+    this.party.update(this.remotes);
     // your own wound leaves the same trail: it is how you are followed
     if (p.vitals.bleeding && !p.dead && this.started && (this.dripT -= dt) <= 0) {
       this.dripT = 0.3 + Math.random() * 0.35;

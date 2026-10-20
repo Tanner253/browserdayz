@@ -64,6 +64,7 @@ import { AdminUI, type AdminPlayer } from '../ui/admin-ui';
 import '../sim/drops';
 import '../sim/airdrop';
 import { Airdrops } from './airdrop';
+import { Party } from './party';
 import { wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
 import { TIERS, tierAround, type Tier } from '../sim/tiers';
@@ -339,6 +340,8 @@ export class Game {
   nextDrop = -1;
   /** the helicopters in the air with a supply drop, and the crates coming down (src/game/airdrop.ts) */
   airdrops!: Airdrops;
+  /** your party: who is in it, and the dot over each of them (./party.ts) */
+  party!: Party;
   /** the page's own title: the tab shows the place in the line, and "your turn", over it */
   title = document.title;
   /** times at which the open inventory should look again at what lies on the ground (see drop) */
@@ -485,6 +488,7 @@ export class Game {
     for (const pad of helipads(world, (m) => atmo.register(m))) r.scene.add(pad);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
+    this.party = new Party(r.scene);
     this.airdrops = new Airdrops(r.scene, {
       // (the crate that comes down is the crate that stands there after: the same model, as big)
       crate: async () => {

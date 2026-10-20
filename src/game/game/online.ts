@@ -42,6 +42,8 @@ export const onlineMethods = {
 
   async enterOnline(this: Game, w: Extract<S2C, { t: 'welcome' }>) {
     const { world, buildings } = this.s;
+    // (in no party until this server says otherwise: a party is the server's, server/party.ts)
+    this.party.set([], w.you);
     // the server's hour, from which this game's clock runs on
     if (typeof w.hour === 'number') this.hourBase = { phase: w.hour, at: performance.now() };
     // Nothing of this game's own making is in a server's world: whatever it laid out or packed by itself is taken
@@ -379,6 +381,11 @@ export const onlineMethods = {
         if (!m.role) this.toggleAdmin(false);
       }
       this.adminUI.setSelf(this.adminSelf());
+    });
+    net.on('party', (m) => this.party.set(m.members, this.net.id));
+    net.on('partyAsk', (m) => {
+      this.party.ask(m.from);
+      this.hud.note(`${m.name} asks you to join their party`, 'info');
     });
     net.on('sys', (m) => {
       this.hud.chatLine('system', '', m.text);

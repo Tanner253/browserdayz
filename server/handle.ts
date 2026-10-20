@@ -33,6 +33,7 @@ import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clien
 import { shotHeard } from '../src/sim/heard';
 import { ajar, findCarried, hurtJeep, kill, leaveSeat, rackChanged, releaseLock, seatOf } from './acts';
 import { scores } from './queue';
+import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { changed, contents } from './storages';
@@ -612,6 +613,7 @@ export function handle(c: Client, m: C2S) {
       if (!text || (now - c.lastChat < 500 && !(text.startsWith('/') && roleOf(c)))) return;
       c.lastChat = now;
       // (an order, and never talk: whatever begins with a stroke is said to nobody and is not written down)
+      if (text.startsWith('/') && partyCommand(c, text)) return;
       if (text.startsWith('/')) return void command(c, text).catch((e) => log('[admin] an order failed:', e instanceof Error ? e.message : e));
       const quiet = ADMIN.muted.get(c.key) ?? 0;
       if (quiet > now) return void sys(c, `You are muted for ${Math.ceil((quiet - now) / 60000)} more minutes: what you type and say reaches nobody.`);
@@ -861,6 +863,8 @@ export function handle(c: Client, m: C2S) {
       broadcast({ t: 'cashed', id: c.id, name: c.name, owner });
       return;
     }
+    case 'party':
+      return partyAct(c, m);
     case 'ping':
       send(c, { t: 'pong', n: m.n });
       return;
