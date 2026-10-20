@@ -2,8 +2,18 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## LIVE NOW (2026-10-20 ~22:34 UTC): site and server from `20e2594` (PROTOCOL 56; `main`, `site-live`, `hotfix`)
+Two emergency deploys from a clean worktree (`../Zona-hotfix`, branch `hotfix-no-global`), on top of the performance round
+below (`76726d6`), which went live earlier the same day:
+- `c721b3e`: window.__game is no longer the whole game in a player's page. Reading it bans (src/net/bait.ts; server/admin.ts
+  `baited`; test/bait.test.ts). Pasted wallhack and aimbot scripts all went through it.
+- `5f3844b`: Zona time counts toward a tag only while the player's own hands do something (AFK_MS 60 s; server/checks.ts
+  zoneCheck, `handAt`). Report: bodies idled on the beach, flown into the Zona, and killed for their tag.
+`held-server` does NOT have these two yet: merge `main` into it before any deploy from it.
+Parked live reports: memory note `live-drops-2026-10-20` (bodies killed while their connection was down; pages reloading).
+
 ## PICK UP HERE (2026-10-20; branch `held-server`, NOT deployed: the owner said "dont deploy")
-Live: server from `d8e626e` (PROTOCOL 55, `main`); site from `f783816` (`site-live`). On `held-server` past both, the
+Before the deploys above: server from `d8e626e`, site from `f783816`. On `held-server` past both, the
 performance round of 2026-10-20 (the owner: "get in the game yourself ... run real data, fix real problems ... dont
 stop. and dont deploy"), every change measured in the Browser pane with 20 made-up players on the local server
 (scratchpad `crowd.mts`; it must say where it stands, or the server sends it away as silent):
@@ -153,6 +163,7 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 - Furniture searchable everywhere: the bunker's `bunker_cabinet`/`bunker_desk` ARE `painted_wooden_cabinet`/`metal_office_desk` (src/sim/bunker.ts SEARCHED); plan card `marketing/plan-furniture.html`.
 - In-page reconnect (a drop as a blip, no reload); optimizations (the shadow-shader warm-up tried 2026-10-15 was reverted: unproven).
 - LATER, real recorded audio (the owner, 2026-10-16: "our generated audio and low effort patch work is less than desirable, we cant take this on now but its worth documenting for later"). Their reference for bullets flying by: https://www.youtube.com/watch?v=VTuuOiWgVZ0 ("amazing fly by sound"). It is the target to match, not a source: audio taken off a video is a rip (CLAUDE.md: nothing ripped). Find recordings of the same kind (supersonic crack + whizz, near and far) with a licence that allows a game: CC0 on Freesound, the free Sonniss GDC bundles (royalty-free), or a bought pack; then a pass over every generated or patched sound, judged side by side with the reference.
+- **Server-side sight and aim checks, at the end of the list** (the owner, 2026-10-20: "draw the plan but we will not work on it for now", then "save it for later and put on the end of the to do list"). Players are sent only the players they could see: hills and solid walls hide, windows, doors and foliage never do. The test looks about 0.3 s ahead, so nobody pops in. Shots through solid walls are refused, and the aim watch grows. Steps: watch only, tune with bots, switch on, aim. Plan card: `marketing/plan-visibility.html` -> `zona-plan-visibility.png` (and `progress/plans/`). It is the real answer to the wallhacks of 2026-10-20: the trap on window.__game (live, c721b3e) stops pasted scripts, but not somebody who edits their own copy of the page.
 - **LAST: Google Ads media** (the owner, 2026-10-18: "put this at the very end of our todo list for now"): 15 stills (5 landscape 1200x628, 5 square 1200x1200, 5 portrait 1080x1920), five trailers each in 16:9, 1:1 and 9:16 on the ABCD plan, and the 15:5:5 copy. The plan, with the owner's brief whole and three questions for them first (the tag holds 15 minutes, not the brief's 10; ZONA has no "extraction"; a landing page without token or payouts): `progress/google-ads/plan.md`. The owner: "do not discuss mention or elude to payouts or play to earn".
 
 # Where the work stood (handoff, 2026-10-14)
