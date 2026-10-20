@@ -2,7 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import { Container, BODY_GRID, HOLD, layOnBody, heldIn } from '../src/sim/inventory';
-import type { ItemInstance } from '../src/sim/items';
+import { ZONA_VOID, type ItemInstance } from '../src/sim/items';
 import { VOICE } from '../src/sim/voice';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { fallen } from '../src/sim/grenades';
@@ -14,6 +14,7 @@ import { CORPSE_LIFETIME, PARKS, boxes, economy, issue, jeepsDue, locks, log, te
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast, tagLock } from './gate';
+import { inPlay } from '../src/world/worldgen';
 import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
 import { scoreOf, sendBoard } from './queue';
 
@@ -355,7 +356,9 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   // (and an admin who has chosen so leaves no tag of their own either, however long they lived, unless an admin above
   // them has chosen for them (tagLock); or nothing at all of what they carried but the tags they took off other people)
   const lock = tagLock(c.key);
-  const noTag = fresh || nobody || (lock === undefined ? c.power.voidTag : !lock), bare = c.power.voidInv;
+  // (nor anybody's who dies outside the Zona: the owner, 2026-10-19, "people cannot earn tags west of the wall")
+  const outside = ZONA_VOID && !inPlay(c.pose[0], c.pose[2]);
+  const noTag = fresh || nobody || outside || (lock === undefined ? c.power.voidTag : !lock), bare = c.power.voidInv;
   /** a tag that is on a body whoever's body it is: one taken off somebody else */
   const taken = (t: ItemInstance) => {
     const from = lootedTags.get(t.uid);
