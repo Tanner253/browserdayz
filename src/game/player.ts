@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { NEED, stage } from '../sim/wells';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physics';
+import { G_GLASS, groups, physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physics';
 import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
@@ -39,6 +39,9 @@ const EYE_SAT = 0.86;
 const EYE_PRONE = 0.36;
 /** the gap the character controller keeps from whatever it stands on or touches */
 const SKIN = 0.03;
+/** finds what stops only a body: the others' bodies, and glass (see Player.apart) */
+const BODIES = groups(0xffff, G_GLASS);
+const IDENTITY = { x: 0, y: 0, z: 0, w: 1 };
 /** how hard the body is held to the ground, m/s: a fall starts from this too */
 const PRESS = 1.5;
 /** the steepest ground a step is laid along (46°); past it the controller's own slope rules decide */
@@ -623,8 +626,9 @@ export class Player {
     if (this.grounded && this.vel.y < 0) this.vel.y = -PRESS;
 
     const pace = { x: this.vel.x * h, z: this.vel.z * h }, wasOnGround = this.grounded;
-    // (over a basement's open steps the ground is not there: see physics.through)
-    const at = this.collider.translation(), through = physics.through(at.x, at.z);
+    // (over a basement's open steps the ground is not there: see physics.through; and somebody already standing in
+    // this body is not there either: see apart)
+    const at = this.collider.translation(), through = this.apart(at, physics.through(at.x, at.z));
     // (Deep water is not gone into: a step that would take the body into it is not taken, along whichever way it
     // would, so that it slides along the edge. From deep water, as a body put down in it would be, it walks out and
     // never further in.)
@@ -1000,6 +1004,30 @@ export class Player {
    * open ground it does not: allowed to climb the hill, it takes the hill for a stair as well, and goes up it a
    * third of a metre at a bound.
    */
+  /**
+   * The bodies of others (players, the infected) already standing in this one, within the controller's skin, are left
+   * out of this step's moves: another body pressed into this one is a wall the controller meets at once whichever way
+   * it goes, and it went at it twenty times over in every move, each time with every wall and floor about (1.1 ms a
+   * move standing still, 1.9 walking, in a house in Kamenka with one of the infected at its arms' length: found
+   * fighting the infected in the game, 2026-10-20). Out of it again, a body stops this one as before.
+   */
+  private apart(at: RAPIER.Vector, through: ((c: RAPIER.Collider) => boolean) | undefined) {
+    const shape = this.collider.shape as RAPIER.Capsule;
+    const near = (this.near ??= new physics.R.Capsule(shape.halfHeight, shape.radius + SKIN + 0.01));
+    near.halfHeight = shape.halfHeight;
+    near.radius = shape.radius + SKIN + 0.01;
+    let inside: Set<number> | null = null;
+    physics.world.intersectionsWithShape(at, IDENTITY, near, (c) => {
+      // (a body is a capsule moved about with it; a pane of glass, the other thing that stops only a body, is not)
+      if (c.handle !== this.collider.handle && c.shapeType() === physics.R.ShapeType.Capsule && c.parent()?.isKinematic()) (inside ??= new Set()).add(c.handle);
+      return true;
+    }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, BODIES);
+    if (!inside) return through;
+    const out = inside as Set<number>;
+    return (c: RAPIER.Collider) => !out.has(c.handle) && (!through || through(c));
+  }
+  private near: RAPIER.Capsule | null = null;
+
   private slopes(climb: number, slip: number, steps: boolean) {
     const was = this.kccSlopes;
     if (climb !== was[0]) this.kcc.setMaxSlopeClimbAngle((climb * Math.PI) / 180);
