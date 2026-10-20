@@ -268,6 +268,9 @@ function page(book: Book, s: Snapshot, now: number): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>ZONA · payouts</title>
+<link rel="icon" type="image/svg+xml" href="/brand/zona-mark.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/icon-32.png">
+<link rel="apple-touch-icon" href="/brand/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -279,7 +282,10 @@ function page(book: Book, s: Snapshot, now: number): string {
   a:hover { text-decoration: underline; }
   code { font: 13px var(--mono); }
   .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 26px; padding: 12px 28px; background: rgba(12, 14, 11, 0.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
-  .logo { font: 800 26px/1 var(--cond); letter-spacing: 0.22em; color: var(--ink); }
+  .logo { display: inline-flex; align-items: center; gap: 10px; font: 800 26px/1 var(--cond); letter-spacing: 0.22em; color: var(--ink); }
+  /* the mark alive, and the season's pieces beside the word (scripts/live-mark.mjs) */
+  .logo img { width: 30px; height: 30px; }
+  .logo img.season { width: auto; height: 24px; }
   .logo:hover { text-decoration: none; color: var(--gold); }
   .bar nav { display: flex; gap: 22px; flex: 1; font: 600 13px/1 var(--cond); letter-spacing: 0.2em; text-transform: uppercase; }
   .bar nav a { color: var(--dim); padding: 6px 0; border-bottom: 2px solid transparent; white-space: nowrap; }
@@ -415,6 +421,7 @@ function page(book: Book, s: Snapshot, now: number): string {
   @media (max-width: 560px) {
     main { padding: 0 14px 50px; }
     .bar nav a:first-child { display: none; }
+    .logo img.season { display: none; }
     .cta { padding: 8px 12px 9px; letter-spacing: 0.16em; white-space: nowrap; }
     .tile { padding: 12px 12px 13px; }
     .tile b { font-size: 27px; }
@@ -427,7 +434,7 @@ function page(book: Book, s: Snapshot, now: number): string {
 </head>
 <body>
 <header class="bar">
-  <a class="logo" href="/" title="Back to the game">ZONA</a>
+  <a class="logo" href="/" title="Back to the game"><img src="/brand/zona-mark-live.svg" alt="">ZONA<img class="season" src="/brand/season.svg" alt=""></a>
   <nav><a href="/">The game</a><a href="${SITE.changelog}">Changelog</a><a class="on" href="/payouts">Payouts</a><a href="${SITE.x}" target="_blank" rel="noopener noreferrer">X</a></nav>
   <a class="cta" href="/">Play free</a>
 </header>
