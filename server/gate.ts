@@ -283,8 +283,9 @@ export function keeping(now: number) {
     }
     // (2026-10-14, the owner: "players who are tabbed out for 60 seconds should get removed from the server". A
     // minute of nothing from their game, and they go as with the proper leave, saved where they stood. A hit
-    // meanwhile starts the minute again, as a hit calls off the wait to leave: no tabbing out of a fight.)
-    if (TABBED_MS && c.spoke && !c.asleep && now - Math.max(c.heardAt, c.hitAway) >= TABBED_MS) {
+    // meanwhile starts the minute again, as a hit calls off the wait to leave: no tabbing out of a fight. Never an
+    // admin: the owner, 2026-10-19, "admins should not be kicked off the server for being tabbed out".)
+    if (TABBED_MS && c.spoke && !c.asleep && roleOf(c) !== 'admin' && now - Math.max(c.heardAt, c.hitAway) >= TABBED_MS) {
       log(`${c.name} (#${c.id}) has been tabbed out ${Math.round(TABBED_MS / 1000)} s: taken off the server${c.alive ? ', saved where they stood' : ''}`);
       send(c, { t: 'kick', reason: `You were tabbed out for ${Math.round(TABBED_MS / 1000)} seconds, so you were taken off the server.${c.alive ? ' Your character is saved where you stood, with everything you carried.' : ''}` });
       drop(c);

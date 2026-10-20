@@ -13,7 +13,7 @@ import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
-const PORT = 8217, TABBED = 3;
+const PORT = 8217, ADMIN_PORT = 8221, TABBED = 3;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const world = generateWorld();
 const ground = (x: number, z: number) => heightAt(world.heights, x, z);
@@ -24,11 +24,11 @@ class Player {
   got: S2C[] = [];
   id = 0;
   shut = false;
-  constructor(public name: string, public key = `tabbed-test-key-${name}-${String(++n).padStart(20, '0')}`) {}
+  constructor(public name: string, public key = `tabbed-test-key-${name}-${String(++n).padStart(20, '0')}`, public port = PORT) {}
   async join(): Promise<boolean> {
     this.got = [];
     this.shut = false;
-    this.ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
+    this.ws = new WebSocket(`ws://127.0.0.1:${this.port}/ws`);
     this.ws.on('message', (d, bin) => !bin && this.got.push(JSON.parse(String(d)) as S2C));
     this.ws.on('close', () => (this.shut = true));
     await new Promise<void>((done, fail) => {
@@ -136,6 +136,37 @@ try {
 if (failed) {
   console.error(logged.slice(-1200));
   throw failed;
+}
+
+// ---- and an admin is never taken off for it (the owner, 2026-10-19: "admins should not be kicked off the server for
+// being tabbed out"): a server where everybody is one, as the local one is
+{
+  const dir2 = mkdtempSync(path.join(os.tmpdir(), 'zona-tabbed-'));
+  const admins = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
+    env: { ...process.env, PORT: String(ADMIN_PORT), SITE_URL: 'http://127.0.0.1:9', LOCAL_ADMIN: '1', DATA_DIR: dir2, INFECTED: 'off', CHECKS: 'watch', TABBED_S: String(TABBED), FRESH_S: '0.2' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let said = '';
+  admins.stdout!.on('data', (d) => (said += d));
+  admins.stderr!.on('data', (d) => (said += d));
+  try {
+    for (let k = 0; k < 600 && !said.includes('listening'); k++) await sleep(100);
+    const dee = new Player('Dee', undefined, ADMIN_PORT);
+    assert.ok(await dee.join());
+    dee.say(40, 0);
+    await sleep((TABBED + 2) * 1000);
+    assert.ok(!dee.shut && !dee.kicked(), `an admin was taken off for being tabbed out: ${JSON.stringify(dee.kicked())}`);
+    checks++;
+    console.log('  ok  an admin tabbed out is never taken off');
+  } finally {
+    admins.kill();
+    await sleep(500);
+    try {
+      rmSync(dir2, { recursive: true, force: true });
+    } catch {
+      /* the server still letting go of it */
+    }
+  }
 }
 console.log(`\n${checks} checks passed`);
 process.exit(0);
