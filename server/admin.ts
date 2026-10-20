@@ -874,6 +874,23 @@ export async function login(c: Client, pw: unknown) {
   sys(c, 'You are an admin, on this and every game from now on. /help lists your orders.');
 }
 
+/**
+ * Their page's window.__game was read ('bait'): a script pasted into the console, as nothing of the game reads it
+ * (src/net/bait.ts; until 2026-10-20 it was the whole game, and a wallhack passed round among players used it).
+ * Banned as an admin's /ban bans: by their game, their address, their device and their browser (the owner,
+ * 2026-10-20: "ban anyone using this exploit"). An admin is only written down.
+ */
+export async function baited(c: Client, what: string) {
+  const why = `cheat script (read window.${what.slice(0, 24)})`;
+  if (roleOf(c) === 'admin') return void log(`[cheat] ${c.name} is an admin and is left alone: ${why}`);
+  const key = keyHash(c.key), ip = ipHash(c.ip), fp = c.fp, sig = c.sig ?? '';
+  const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, ...(fp ? { fp } : {}), ...(sig ? { sig, sigTill: Date.now() + SIG_MS } : {}), name: c.name, why, by: 'the server', at: new Date().toISOString() }] };
+  log(`[cheat] ${c.name} (#${c.id}) banned: ${why}${fp ? ` [dev ${shortDevice(fp)}]` : ''}`);
+  eject(c, 'You are banned from this server.');
+  for (let i = ADMIN.gone.length - 1; i >= 0; i--) if (ADMIN.gone[i].key === c.key) ADMIN.gone.splice(i, 1);
+  await saveAdmin(next);
+}
+
 /** Put off the server by a check (only ever when enforcing): told so, counted, and after enough of it kept off for a while. */
 export function putOff(c: Client, why: string) {
   // (no check puts an admin off the server)

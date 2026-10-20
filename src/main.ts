@@ -28,6 +28,7 @@ import { passPlan } from './world/worldgen';
 import { loadWorld } from './world/load-world';
 import { Atmosphere, SHADOW_FRUSTA } from './world/atmosphere';
 import { installTiny } from './core/tiny';
+import { layBait } from './net/bait';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
 import { Grass } from './world/grass';
@@ -44,6 +45,10 @@ import { wellSpots } from './sim/wells';
 
 // before anything loads: a phone held upright needs a way forward straight away
 initRotatePrompt();
+
+// (window.__game a trap in a player's page from the first line on, and in development with ?bait, to try it)
+const BAITED = !import.meta.env.DEV || new URLSearchParams(location.search).has('bait');
+if (BAITED) layBait(['__game']);
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const loading = document.getElementById('loading')!;
@@ -308,7 +313,8 @@ async function boot() {
   await r.compileSoftly(null);
   await r.settle();
   // (the models are let go once the guns are built too: Game.loaded)
-  (window as unknown as Record<string, unknown>).__game = game;
+  // (development builds only, for the tests and the console: in a player's page it is a trap, see src/net/bait.ts)
+  if (!BAITED) (window as unknown as Record<string, unknown>).__game = game;
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);
   // (F8: a flight recorded for the tests to fly again: src/dev/flight-record.ts)
   if (import.meta.env.DEV) (await import('./dev/flight-record')).installFlightRecorder(game);

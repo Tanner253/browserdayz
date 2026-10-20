@@ -22,7 +22,7 @@ import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, ro
 import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
 import { elite } from './elite';
-import { banId, command, login, offId } from './admin';
+import { baited, banId, command, login, offId } from './admin';
 import { roleRows } from './roles';
 
 /** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
@@ -868,6 +868,8 @@ export function handle(c: Client, m: C2S) {
     case 'ping':
       send(c, { t: 'pong', n: m.n });
       return;
+    case 'bait':
+      return void baited(c, String(m.what));
   }
 }
 
