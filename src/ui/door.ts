@@ -87,7 +87,7 @@ export function openDoor(): Promise<Mode> {
     t.hidden = false;
   };
   void serverStatus(8000).then((st) => {
-    on('zona', st ? st.players : null);
+    on('zona', st ? st.players + st.asleep : null);
     if (st?.today) stat('today', `${st.today} played Zona today`);
   });
   void arenaOnline().then((a) => {

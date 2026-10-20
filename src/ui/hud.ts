@@ -1223,15 +1223,18 @@ export class HUD {
    * The same number on the start / pause screen.
    * @param max how many the server holds, when known: a full server says so, and how long the line is
    * @param waiting how many are in line for it
+   * @param asleep bodies of those who just left, still in the world: in the number shown (as in the game's own count), not
+   *   in whether it is full (the server's cap counts only those playing)
    */
-  setStartOnline(count: number | null, max = 0, waiting = 0) {
+  setStartOnline(count: number | null, max = 0, waiting = 0, asleep = 0) {
     const e = this.root.querySelector('.start-online') as HTMLElement;
     const full = max > 0 && count !== null && count >= max;
+    const shown = (count ?? 0) + asleep;
     e.textContent =
       count === null ? ''
       : full ? `Full (${count}/${max})${waiting ? ` · ${waiting} waiting` : ''} · you will be put in line`
-      : count === 0 ? 'Nobody else online yet'
-      : `${count}${max ? ` / ${max}` : ''} online`;
+      : shown === 0 ? 'Nobody else online yet'
+      : `${shown}${max ? ` / ${max}` : ''} online`;
     this.toggle(e, 'show', count !== null);
     this.toggle(e, 'full', full);
   }
