@@ -139,10 +139,13 @@ const dans = { uid: 'own-Dan', owner: 'Dan' }, gils = { uid: 'own-Gil', owner: '
 
 /** Ann shoots `who` dead with their tag on them, and Eli carries it (with `also`) for its time */
 async function looted(log: () => string, who: Player, tag: { uid: string; owner: string }, also: { uid: string; owner: string }[] = []) {
-  ann.say(30, 0, 'mosin');
-  who.say(31, 0);
-  eli.say(34, 0);
-  await sleep(1500);
+  // (each says where they are as a game does, every moment: a life's time toward its tag is counted inside the Zona at each word)
+  for (let t = 0; t < 2000; t += 400) {
+    ann.say(30, 0, 'mosin');
+    who.say(31, 0);
+    eli.say(34, 0);
+    await sleep(400);
+  }
   who.carry([tag]);
   await sleep(300);
   for (let k = 0; k < 8 && !log().includes(`${who.name} was killed`); k++) {

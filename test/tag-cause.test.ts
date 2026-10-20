@@ -69,8 +69,12 @@ try {
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
   const ann = new Player('Ann'), bee = new Player('Bee'), dan = new Player('Dan'), eve = new Player('Eve');
   for (const p of [ann, bee, dan, eve]) await p.join();
-  for (const p of [ann, bee, dan]) p.say(20 + n++, 0);
-  await sleep(1500);
+  // (each says where they are as a game does, every moment: a life's time toward its tag is counted inside the Zona at each word)
+  const at = new Map([ann, bee, dan].map((p) => [p, 20 + n++]));
+  for (let t = 0; t < 2000; t += 400) {
+    for (const [p, x] of at) p.say(x, 0);
+    await sleep(400);
+  }
 
   // ---- Bee's own game says she died of her wounds, with nobody near: no tag on her body
   bee.carry();

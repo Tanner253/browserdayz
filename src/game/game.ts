@@ -465,15 +465,16 @@ export class Game {
     }
     // (a fall inside the fort is as long as its plan's: the speed of one a fifth shorter. See `landsAs`.)
     this.player.landsAs = (x, y, z) => (inCastle(world.castle ?? null, x, y, z) ? 1 / Math.sqrt(CASTLE_SCALE) : 1);
-    // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
-    // within two hundred and seventy metres and by nobody else.) Far off it is as late and as dull as a far
-    // sound is, and is brought no nearer to the ear than a hundred and ten metres along the line to it: the
-    // ear is told which way, and it is never too faint to tell.
+    // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. Far off it is as
+    // late and as dull as a far sound is, and is brought no nearer to the ear than a hundred and ten metres along
+    // the line to it: the ear is told which way. Over it the alarm, a siren opening and a whoop shutting, which
+    // carries over the whole map (the owner, 2026-10-19: "very feint from far away but still hearable").
     this.bunker.onMove = (opening) => {
       const at = this.bunker.doorAt(new THREE.Vector3());
       if (!at) return;
-      const ear = r.camera.position, d = at.distanceTo(ear), near = Math.min(d, 110);
-      audio.blastDoor(d > near ? ear.clone().lerp(at, near / d) : at, d, opening);
+      const ear = r.camera.position, d = at.distanceTo(ear), near = Math.min(d, 110), from = d > near ? ear.clone().lerp(at, near / d) : at;
+      audio.blastDoor(from, d, opening);
+      audio.alarm(from, d, opening);
       this.horde.doorMoved(opening);
       this.hud.note(opening ? 'The bunker is opening' : 'The bunker is shutting', 'warn');
     };

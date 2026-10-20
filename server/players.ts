@@ -11,7 +11,7 @@ import { type Thrower, newThrower } from '../src/sim/grenades';
 import { BLOOD } from '../src/sim/blood';
 import { type Pose, type Slung, type Vitals, type S2C, type PlayerInfo, type StoredItem, type C2S, PROTOCOL, F_GROUND, MAX_STAMINA } from '../src/net/protocol';
 import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, vehInfo, vehicles, world } from './index';
-import { bunkerDoor, cardSeen, hitsBy, ipOf, seenOf, tagSeen } from './tags';
+import { bunkerDoor, cardSeen, hitsBy, ipOf, seenOf, tagSeen, tagTime } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
 import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, sigOfWs, turnedAway } from './gate';
@@ -128,6 +128,8 @@ export interface Record_ {
   leftAt: number;
   /** kept from a world of another making: what they carried is theirs, where they stood is not */
   afresh?: boolean;
+  /** their time toward a tag of their own when they left (see tagTime): it goes on from there when they come back */
+  tagMs?: number;
 }
 
 export const clients = new Map<number, Client>();
@@ -292,6 +294,9 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   const resume = rec && rec.alive && rec.inv && Date.now() - rec.leftAt < RECORD_LIFETIME ? rec : null;
   // (a tag is carried for its time in the world: the time its carrier was out of it is not counted)
   if (resume) for (const [k, since] of tagSeen) if (k.startsWith(seenOf(key))) tagSeen.set(k, since + (Date.now() - resume.leftAt));
+  // (and the clock toward a tag of their own goes on where it stood, restart and all: it began again at every coming
+  // back, and the tag round their neck went with it. The owner, 2026-10-19: "users complain they lose their dog tags
+  // during server restart". Below, `lifeAt` and `zonaMs` from `tagMs`, and their game told it in `me.tag`.)
   // (Somebody who left the game down in the bunker comes back with what they carried, at one
   // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
   const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
@@ -305,7 +310,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     heardAt: Date.now(), hitAway: 0, kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), zonaMs: 0, zonaAt: 0, fp, sig, msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now() - (resume?.tagMs ?? 0), zonaMs: resume?.tagMs ?? 0, zonaAt: 0, fp, sig, msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
@@ -333,7 +338,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     // (the hour is the wall clock's: every game on the server is at the same one, and a restart does not put it back)
     hour: phaseOf(Date.now() / 1000),
     spawn: sp,
-    me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 } } : null,
+    me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 }, tag: resume.tagMs ?? 0 } : null,
     max: MAX_PLAYERS,
   });
   // (a restart is on its way: whoever comes in before it happens is told as the others were)
@@ -368,7 +373,7 @@ export function drop(c: Client) {
   // (left when they went: a body left sleeping after a connection was lost is not its owner on the server, and the
   // clock on a tag they took does not run for it, the owner, 2026-10-17: "the cash-in clock on a taken tag only counts
   // while the carrier is online". See the `resume` shift in `join`.)
-  records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: c.asleep || Date.now() });
+  records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: c.asleep || Date.now(), tagMs: tagTime(c, c.asleep || Date.now()) });
   broadcast({ t: 'leave', id: c.id });
   log(`- ${c.name} (#${c.id}) — ${clients.size} online`);
   fillFromQueue();

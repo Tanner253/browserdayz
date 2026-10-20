@@ -11,10 +11,24 @@
 
 /** the Zona's west line: everything east of it is inside */
 export const ZONA_WEST = -1950;
+/**
+ * And round Zastava, which it cut in half: west to x -2013 from z -520 to -380, eased back over 30 m each side, so the
+ * whole town is in (its tower stands at -1999) and the paved road out of the canyon is not (it turns south down x -2027,
+ * its near edge at -2021): the owner, 2026-10-19, "we need to include zatava in the zone but not the paved road that comes
+ * out of the canyon just to the west of zatava, need to fine tune it to go around the town so it doesnt cut through half of it".
+ */
+const ZASTAVA = { x: -2013, z0: -520, z1: -380, ease: 30 };
 
-/** how far inside the Zona a place is, metres (less than none: how far outside it) */
-export function zonaDepth(x: number, _z: number): number {
-  return x - ZONA_WEST;
+/** where the line runs at this z */
+export function westAt(z: number): number {
+  const { x, z0, z1, ease } = ZASTAVA;
+  const t = z < z0 ? (z - (z0 - ease)) / ease : z > z1 ? ((z1 + ease) - z) / ease : 1;
+  return ZONA_WEST + (x - ZONA_WEST) * Math.max(0, Math.min(1, t));
+}
+
+/** how far inside the Zona a place is, metres (less than none: how far outside it), measured along x */
+export function zonaDepth(x: number, z: number): number {
+  return x - westAt(z);
 }
 
 /** is this place inside the Zona, by `margin` metres at least (less than none: or within that much outside it) */

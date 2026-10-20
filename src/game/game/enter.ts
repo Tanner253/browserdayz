@@ -532,13 +532,14 @@ export const enterMethods = {
   /**
    * Tags where they belong as a character comes in (the one in a pocket round the neck, the taken ones into the
    * pouch), and their own round their neck only once they have been alive TAG_FRESH since coming in: until then it is
-   * put aside, and put on when it is due (see `tagWhenDue`). The server counts a life from the same moment.
+   * put aside, and put on when it is due (see `tagWhenDue`). `served`: the time of this life the server has counted
+   * already (`me.tag`), which a restart or a coming back does not take away: a tag that was round their neck stays.
    */
-  ensureTag(this: Game) {
+  ensureTag(this: Game, served = 0) {
     const me = publicId();
     this.inv.sortTags((tag) => tag.pid === me);
-    this.inv.neck = null;
-    this.inv.neckDue = Date.now() + TAG_FRESH * 1000;
+    if (served < TAG_FRESH * 1000) this.inv.neck = null;
+    this.inv.neckDue = this.inv.neck ? 0 : Date.now() + Math.max(0, TAG_FRESH * 1000 - served);
   },
 
   /** their own tag round their neck, once it is due (asked every few seconds) */

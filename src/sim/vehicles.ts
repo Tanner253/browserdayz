@@ -34,11 +34,14 @@ export const JEEP = {
   far: 2,
   /**
    * The west's places (WEST_CARS), where the new come in on foot: one whose car was driven off has a new one once it has
-   * stood empty this many seconds, while fewer than `most` of its own are about. Its car went east with the first who
-   * came by, and the place stood empty for the two hours one takes to be left alone and brought back (the owner,
-   * 2026-10-19: "we need to make sure the west has cars"; an admin had stood seven there by hand that morning).
+   * stood empty `after` seconds, while fewer than `most` of its own are within `near` metres of it, and while the whole
+   * map holds fewer than `cap` cars of each of the west's places. Its car went east with the first who came by, and the
+   * place stood empty for the two hours one takes to be left alone and brought back (the owner, 2026-10-19: "we need to
+   * make sure the west has cars"). And its own counted wherever they had gone: two driven east and the place had none
+   * again until those were taken away for standing idle, two hours on ("cars are still not respawning fast enough on
+   * the west", the map at 87 minutes with hardly a car west of the line); and it waited fifteen minutes, not five.
    */
-  refill: { after: 900, most: 2 },
+  refill: { after: 300, most: 2, near: 500, cap: 3 },
   /**
    * What it takes before it burns. (Three times what it was, 2026-10-11: "we need to triple the HP of cars they blow
    * up too easily": 600 to 1800. And three times that, 2026-10-13: "cars should have 3x more HP theyre too weak and

@@ -142,6 +142,9 @@ ok('the Zona as the owner drew it (src/world/zona.ts): one closed line, every po
   for (const p of rings[0]) if (!edge(p)) assert.ok(Math.abs(zonaDepth(p.x, p.z)) <= 4, `the line is ${zonaDepth(p.x, p.z).toFixed(1)} m off the edge of the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
   // (Lipki, Kamenka, the swamp and Pokrov in it; the desert and Kalat out, since 2026-10-19: everything east of x -1950)
   assert.ok(inPlay(-1180, 350) && inPlay(625, 365) && inPlay(-1855, 585) && inPlay(-1915, 0) && !inPlay(-2200, 0) && !inPlay(-3200, 200), 'Lipki, Kamenka, the swamp or Pokrov is out of it, or the desert or Kalat is in it');
+  // (and round Zastava: its five buildings in, the paved road out of the canyon beside it out)
+  for (const [x, z] of [[-1973, -460], [-1943, -467], [-1951, -436], [-1932, -437], [-1999, -425]]) assert.ok(inPlay(x, z), `Zastava's building at ${x}, ${z} is out of the Zona`);
+  for (const [x, z] of [[-2027, -425], [-2023, -454], [-2027, -375], [-2040, -450]]) assert.ok(!inPlay(x, z), `the road by Zastava at ${x}, ${z} is in the Zona`);
   // (the maps are handed the same line, worked out once)
   assert.equal(playEdge(), playEdge());
   assert.deepEqual(playEdge(), rings);

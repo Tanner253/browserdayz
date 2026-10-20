@@ -35,3 +35,22 @@ export function heardShare([full, gone]: [number, number], distance: number): nu
   const t = (distance - full) / (gone - full);
   return 1 - t * t * (3 - 2 * t);
 }
+
+/**
+ * Bunker 17's alarm, heard over the whole map (the owner, 2026-10-19: "a siren for the whole map with a gradual
+ * dropoff, it should be very feint from far away but still hearable"): as loud as at the door out to `near`, then
+ * falling as a power of the distance, never to nothing: a fifth at 500 m, under a tenth at 2 km, some 4% (-27 dB) at
+ * the map's far edge. And `dull`: the most of it heard, Hz, as the far end of anything is only its low notes.
+ */
+export const ALARM = { near: 60, fall: 0.75, dull: [9000, 300, 450] as const };
+
+/** how much of the alarm is left at `distance`, 1 at the door */
+export function alarmShare(distance: number): number {
+  return distance <= ALARM.near ? 1 : Math.pow(ALARM.near / distance, ALARM.fall);
+}
+
+/** the highest of the alarm still heard at `distance`, Hz */
+export function alarmTop(distance: number): number {
+  const [top, per, floor] = ALARM.dull;
+  return Math.max(floor, top / (1 + distance / per));
+}
