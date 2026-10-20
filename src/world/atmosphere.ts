@@ -12,6 +12,69 @@ import { LEAN, TOUCH } from '../core/device';
 import { GAS, type GasCloud, type GasZone } from '../sim/gas';
 
 /**
+ * The sharp sky put on the graphics card and made into the box of six sides it is drawn as, a little at a time
+ * (2026-10-20, found playing the game through: the frame it came in was a second long, 139 MB sent in it). three does
+ * all of it in the frame the sky is first drawn: the picture (67 MB) sent whole, then the six sides drawn from it at
+ * once. Here the picture goes in strips (src/core/strips.ts) and the sides one a frame, each drawn as three draws
+ * them (WebGLCubeRenderTarget.fromEquirectangularTexture: the same shader, the same size), and the box is what is
+ * hung. (The picture is upside down as it is kept, and is turned the right way up as it is sent: sent in strips, each
+ * strip was turned over on its own, and the sky came out in bands, the owner, "the sky was so ugly". It goes the way
+ * it is kept, and is read turned over where the sides are drawn.)
+ */
+export async function skyBox(renderer: THREE.WebGLRenderer, eq: THREE.DataTexture): Promise<THREE.Texture> {
+  const turned = eq.flipY;
+  eq.flipY = false;
+  const onCard = (await assets.strips?.put(eq, 1, () => true)) ?? eq;
+  const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+  const rt = new THREE.WebGLCubeRenderTarget((eq.image as { height: number }).height, { type: eq.type, colorSpace: eq.colorSpace as THREE.ColorSpace, magFilter: eq.magFilter });
+  rt.texture.minFilter = eq.minFilter;
+  rt.texture.generateMipmaps = false;
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(5, 5, 5),
+    new THREE.ShaderMaterial({
+      name: 'CubemapFromEquirect',
+      uniforms: { tEquirect: { value: onCard } },
+      vertexShader: /* glsl */ `
+        varying vec3 vWorldDirection;
+        vec3 transformDirection( in vec3 dir, in mat4 matrix ) { return normalize( ( matrix * vec4( dir, 0.0 ) ).xyz ); }
+        void main() {
+          vWorldDirection = transformDirection( position, modelMatrix );
+          #include <begin_vertex>
+          #include <project_vertex>
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tEquirect;
+        varying vec3 vWorldDirection;
+        #include <common>
+        void main() {
+          vec2 uv = equirectUv( normalize( vWorldDirection ) );
+          ${turned ? 'uv.y = 1.0 - uv.y;' : ''}
+          gl_FragColor = texture2D( tEquirect, uv );
+        }`,
+      side: THREE.BackSide,
+      blending: THREE.NoBlending,
+    }),
+  );
+  const cam = new THREE.CubeCamera(1, 10, rt);
+  cam.coordinateSystem = renderer.coordinateSystem;
+  cam.updateCoordinateSystem();
+  cam.updateMatrixWorld(true);
+  for (let side = 0; side < 6; side++) {
+    await frame();
+    const was = renderer.getRenderTarget(), face = renderer.getActiveCubeFace(), level = renderer.getActiveMipmapLevel();
+    renderer.setRenderTarget(rt, side);
+    renderer.render(box, cam.children[side] as THREE.Camera);
+    renderer.setRenderTarget(was, face, level);
+  }
+  box.geometry.dispose();
+  box.material.dispose();
+  if (onCard !== eq) onCard.dispose();
+  eq.dispose();
+  (eq.image as { data: unknown }).data = null;
+  return rt.texture;
+}
+
+/**
  * A sky picture made half the size each way: every four of its points made one, their light averaged. A few rows
  * at a time, so that the menu it is done under does not stop while it is.
  */
@@ -223,13 +286,12 @@ export class Atmosphere {
         if (TOUCH) await halve(bg);
         bg.mapping = THREE.EquirectangularReflectionMapping;
         bg.colorSpace = THREE.LinearSRGBColorSpace;
-        // 4k half-float sky is ~67 MB on the JS heap; release it after upload
-        bg.onUpdate = () => {
-          (bg.image as { data: Uint16Array | Float32Array | null }).data = null;
-        };
+        // (on the card a little at a time, and its 67 MB on the page let go after: see skyBox. Drawn both ways in one
+        // look, three's and this, they differ by at most 2 in 255 at any point of the picture.)
+        const sky = await skyBox(this.renderer, bg);
         // (whatever has put another sky up meanwhile keeps its own: only the stand-in is changed for this)
-        if (this.scene.background === this.background) this.scene.background = bg;
-        this.background = bg;
+        if (this.scene.background === this.background) this.scene.background = sky;
+        this.background = sky;
       },
       () => {},
     );
