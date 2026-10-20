@@ -8,7 +8,6 @@ import { onWorld } from '../src/world/worldgen';
 import { comesFrom, flightTimes } from '../src/sim/airdrop';
 import { POLICE_CAR, restState } from '../src/sim/vehicles';
 import { HELI, skidGround } from '../src/sim/heli';
-import { INFECTED } from '../src/sim/infected';
 import type { S2C } from '../src/net/protocol';
 import { ORDERS, written, entityBy, ENTITIES, GROUND } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
@@ -351,8 +350,8 @@ export async function command(c: Client, line: string) {
         log(`[admin] ${c.name} stood ${made.length} × ${e.name.toLowerCase()} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which})`);
         return void sys(c, `${made.length > 1 ? `${made.length} × ` : ''}${e.name} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which}). /delcar takes the nearest car away.`);
       }
-      const afoot = [...horde.bodies.values()].filter((b) => !b.diedAt).length;
-      if (afoot + count > INFECTED.max + 80) return void sys(c, `There are ${afoot} of the infected on their feet already: put some down first (/delz).`);
+      // (as many as are asked for, however many are on their feet already: the owner, 2026-10-19, "admins when they
+      // spawn zombies should bypass the server cap". The map's own are still kept to theirs: see Director.)
       const now = Date.now();
       for (let k = 0; k < count; k++) {
         // (the first where it was asked for, the rest spread round it a good pace apart: two in one place can neither of them move)

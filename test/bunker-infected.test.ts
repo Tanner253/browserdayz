@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { generateWorld, bunkerPlace } from '../src/world/worldgen';
 import { BUNKER, bunkerLocal, bunkerPlan, bunkerWays, levelY } from '../src/sim/bunker';
-import { Director, HOUSE, INFECTED, crosses, homeSpot, infectedHomes, roundHouse } from '../src/sim/infected';
+import { Director, HOUSE, crosses, homeSpot, infectedHomes, roundHouse } from '../src/sim/infected';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -21,7 +21,7 @@ const plan = bunkerPlan(), W = bunkerWays();
 const homes = infectedHomes(world);
 const ours = homes.filter((h) => h.bunker);
 const passages = ours.find((h) => !h.still)!, rooms = ours.find((h) => h.still)!;
-const local = (s: [number, number, number]) => bunkerLocal(P, s[0], s[1], s[2]);
+const local = (s: readonly (number | undefined)[]) => bunkerLocal(P, s[0]!, s[1]!, s[2]!);
 
 ok('twelve shut in the bunker, as before: six by the passages, six still in the rooms', () => {
   assert.equal(ours.length, 2);
@@ -42,23 +42,47 @@ ok('the passage ones stand in the two passages, this side of the far rooms, on t
   }
 });
 
-ok('the still ones stand in rooms, out of the doorways, clear of what stands there and of the passages by more than they wake at', () => {
-  const rs = new Set<number>();
+ok('the still ones have spots in every room, out of the doorways and clear of what stands there, and down the far ends of the passages', () => {
+  const rs = new Set<number>(), ends: string[] = [];
   for (const s of rooms.inside!) {
     const [r, f, h] = local(s);
     assert.ok(Math.abs(h - levelY()) < 1e-6);
+    assert.ok(!plan.stood.some((t) => Math.hypot(t.r - r, t.f - f) < 1.4 - 1e-6), `(${r.toFixed(2)}, ${f.toFixed(2)}) in something standing there: ${plan.stood.filter((t) => Math.hypot(t.r - r, t.f - f) < 1.4).map((t) => `${t.r},${t.f}`)}`);
+    assert.ok(!plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1 + Math.max(m.w, m.d) / 2), 'in something made');
     const k = W.part(r, f, h + 1);
-    assert.ok(k < plan.rooms.length, `(${r.toFixed(1)}, ${f.toFixed(1)}) is not in a room`);
+    if (k >= plan.rooms.length) {
+      // (a passage: only its far ends, the back of the main one and the ends of the one across)
+      assert.ok((Math.abs(r) < BUNKER.passage && f < plan.cross - 8) || Math.abs(r) > 12, `(${r.toFixed(1)}, ${f.toFixed(1)}) in a passage, not at its far end`);
+      ends.push(Math.abs(r) < BUNKER.passage ? 'back' : r < 0 ? 'left' : 'right');
+      continue;
+    }
     rs.add(k);
     const q = plan.rooms[k];
     assert.ok(r > q.r0 + 0.7 && r < q.r1 - 0.7 && f > q.f0 + 0.7 && f < q.f1 - 0.7, 'against a wall');
     assert.ok(q.doors.every(([a, b]) => Math.hypot(a - r, b - f) >= 1.6), 'in a doorway');
-    assert.ok(Math.abs(r) >= INFECTED.wake + 1 && Math.abs(f - plan.cross) >= INFECTED.wake + 1, 'woken from the passages');
-    assert.ok(!plan.stood.some((t) => Math.hypot(t.r - r, t.f - f) < 1.4), 'in something standing there');
-    assert.ok(!plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1 + Math.max(m.w, m.d) / 2), 'in something made');
   }
-  // (scattered: about most of the rooms, not a few)
-  assert.ok(rs.size >= 9, `${rs.size} rooms of ${plan.rooms.length}`);
+  // (all throughout: every room, and all three far ends)
+  assert.equal(rs.size, plan.rooms.length, `${rs.size} rooms of ${plan.rooms.length}`);
+  assert.deepEqual([...new Set(ends)].sort(), ['back', 'left', 'right']);
+});
+
+ok('the six still ones are stood apart, through the whole of it: no two to a room, the far rooms and ends as likely as the near', () => {
+  const k = homes.indexOf(rooms);
+  let far = 0, n = 0;
+  for (let run = 0; run < 40; run++) {
+    const d = new Director(homes, (h) => homeSpot(world, h, Math.random));
+    for (let t = 0; t < 5; t++) d.tick(t * 1000, []);
+    const still = [...d.bodies.values()].filter((b) => b.home === k);
+    assert.equal(still.length, 6);
+    const at = still.map((b) => local([b.s[0], b.s[1], b.s[2]]));
+    const parts = new Set(at.map(([r, f, h]) => W.part(r, f, h + 1)));
+    assert.equal(parts.size, 6, 'two in one room or passage');
+    for (let a = 0; a < at.length; a++) for (let c = a + 1; c < at.length; c++) assert.ok(Math.hypot(at[a][0] - at[c][0], at[a][1] - at[c][1]) > 6, 'two within six metres');
+    // (the far half of the place, behind the passage across: about half of them, not none)
+    far += at.filter(([, f]) => f < plan.cross).length;
+    n += at.length;
+  }
+  assert.ok(far / n > 0.35 && far / n < 0.75, `${Math.round((far / n) * 100)}% behind the passage across`);
 });
 
 ok('the director stands them all, the still ones marked so for every game, and puts none back while the door is open', () => {
