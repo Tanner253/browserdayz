@@ -1,87 +1,20 @@
-// The Zona as the owner drew it (2026-10-18), on the big map, in red: "the areas inside the enclosed red spaces are the
-// zona, where you can earn dog tags. leaving the zonas will start the dogtag void timer. we need to connect all the
-// seperate circles i made as well so its all 1 connected zone". It was rounds laid over one another (PLAY_AREAS in the
-// world's generator), and those are still what the world was made by; the rule of the tags, the line on the maps and
-// where drops and wrecks come down now go by this.
-//
-// The shapes are traced off the owner's picture of the map: its points are pixels of that picture (1489 wide), its
-// lettered squares a hundred metres, column A's west line at x -3868 and row 1's north line at z -768 (bigmap.ts). The
-// Zona is every place inside any of them: the valley's great loop, round Lipki and out past the works to Kamenka and
-// Orlinoye (out to the world's east edge, as the line was drawn along it); Bunker 17, Pokrov and the swamp at Mokroye, the Pass and
-// Zastava, Zavod and Kalat; and the bands between them.
+// The Zona: everything east of a line across the map, where tags are earned (the owner, 2026-10-19: "i think we should
+// make it so people cannot earn tags west of the wall. we should add the zona back so dogtags are void along the coast
+// ... the whole map to the east of the ruins can be hotzone", and of where: "x -2000 i think makes the most sense, enough
+// room on the east side of the canyon to take the road out south without being camped. but we keep pokrov in the zone").
+// The line is at x -1950: Pokrov's furthest place for a thing lies at -1920, and the monastery is inside. West of it,
+// the coast, the desert, Kalat, Zavod, Blokpost, Zastava and Mokroye, nobody has a tag, and one carried there is void
+// (ZONA_VOID in src/sim/items.ts); and nothing of the fourth step or above is found there (src/sim/economy.ts).
+// (It was the rounds the owner drew on 2026-10-18 round the valley and each town, and before that PLAY_AREAS.)
 //
 // Sums only: nothing of the page or of the renderer is known here.
 
-/** a pixel of the owner's picture, in world metres */
-const px = (x: number, y: number): [number, number] => [Math.round(-3718 + (100 * (x - 40)) / 32.42), Math.round(-618 + (100 * (y - 92)) / 32.8)];
-const PX_M = 100 / 32.6;
+/** the Zona's west line: everything east of it is inside */
+export const ZONA_WEST = -1950;
 
-type Shape = { poly: [number, number][] } | { at: [number, number]; r: number } | { a: [number, number]; b: [number, number]; r: number };
-
-const SHAPES: Shape[] = [
-  // the valley's great loop: along the top from Bunker 17 to Orlinoye, down the east by Kamenka, along the south road
-  // back to the works, up past them, west above the woods to Lipki, round Lipki and up by Ozerki
-  { poly: [
-    [830, 195], [900, 191], [1000, 192], [1080, 180], [1120, 160], [1160, 126], [1250, 119], [1350, 119], [1440, 121], [1488, 140],
-    [1496, 200], [1496, 300], [1496, 400], [1488, 462],
-    [1450, 490], [1350, 493], [1250, 491], [1150, 486], [1090, 472], [1072, 440],
-    [1064, 400], [1060, 340],
-    [1040, 318], [980, 305], [930, 305], [905, 322],
-    [900, 360], [898, 420], [890, 452],
-    [865, 460], [840, 452], [824, 430],
-    [819, 380], [817, 320], [811, 270], [795, 240],
-  ].map(([x, y]) => px(x, y)) },
-  // Bunker 17, Pokrov, Zavod and Kalat, each in its round
-  { at: px(770, 195), r: 58 * PX_M },
-  { at: px(633, 278), r: 52 * PX_M },
-  { at: px(343, 165), r: 37 * PX_M },
-  { at: px(197, 376), r: 46 * PX_M },
-  // the Pass and Zastava, along the river
-  { a: px(478, 149), b: px(628, 147), r: 48 * PX_M },
-  // and the bands between: Zavod to the Pass, the Pass down to Pokrov, Pokrov over to Bunker 17
-  { a: px(375, 160), b: px(445, 155), r: 22 * PX_M },
-  { a: px(588, 192), b: px(610, 238), r: 20 * PX_M },
-  { a: px(668, 256), b: px(736, 214), r: 24 * PX_M },
-  // the swamp round Mokroye, and the way down to it from Pokrov (the owner, 2026-10-18: "i neglected to include the swamp
-  // area with the zona area, expand and connect naturally")
-  { poly: [
-    [596, 432], [640, 424], [690, 428], [712, 448], [716, 490], [708, 528], [670, 538], [620, 536], [586, 522], [578, 480], [582, 446],
-  ].map(([x, y]) => px(x, y)) },
-  { poly: [[606, 318], [662, 318], [676, 360], [672, 432], [612, 434], [600, 380]].map(([x, y]) => px(x, y)) },
-  // the desert between Kalat and the two in the north, Zavod and the Pass
-  { poly: [
-    [200, 332], [240, 272], [280, 216], [305, 180], [380, 170], [430, 168], [466, 174],
-    [432, 230], [372, 290], [302, 360], [252, 410], [236, 382],
-  ].map(([x, y]) => px(x, y)) },
-];
-
-/** how far a point is from a segment */
-function segDist(x: number, z: number, ax: number, az: number, bx: number, bz: number) {
-  const dx = bx - ax, dz = bz - az, l = dx * dx + dz * dz, t = l > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l)) : 0;
-  return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-}
-
-/** how far inside a shape a point is, metres (less than none: how far outside it) */
-function depthIn(s: Shape, x: number, z: number): number {
-  if ('poly' in s) {
-    const p = s.poly;
-    let inside = false, d = Infinity;
-    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
-      const [xi, zi] = p[i], [xj, zj] = p[j];
-      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
-      d = Math.min(d, segDist(x, z, xi, zi, xj, zj));
-    }
-    return inside ? d : -d;
-  }
-  if ('at' in s) return s.r - Math.hypot(x - s.at[0], z - s.at[1]);
-  return s.r - segDist(x, z, s.a[0], s.a[1], s.b[0], s.b[1]);
-}
-
-/** how far inside the Zona a place is, metres (less than none: how far outside it): the deepest it is in any of its shapes */
-export function zonaDepth(x: number, z: number): number {
-  let d = -Infinity;
-  for (const s of SHAPES) d = Math.max(d, depthIn(s, x, z));
-  return d;
+/** how far inside the Zona a place is, metres (less than none: how far outside it) */
+export function zonaDepth(x: number, _z: number): number {
+  return x - ZONA_WEST;
 }
 
 /** is this place inside the Zona, by `margin` metres at least (less than none: or within that much outside it) */

@@ -193,12 +193,12 @@ export const TAG_HOLD = 20 * 60;
  */
 export const TAG_OUT = 15;
 /**
- * Whether the Zona's line voids tags carried over it. Off for now, the line and its rule kept for when there are bases
- * (the owner, 2026-10-18: "we will keep this functionality and borders but disable it for now. When we add bases we will
- * add it back ... players can cash tags anywehrre except basements"). Down a basement still voids them, after TAG_OUT,
+ * Whether the Zona's line voids tags carried over it, and keeps a tag off whoever dies outside it. On again since
+ * 2026-10-19, the line now everything east of x -1950 (src/world/zona.ts; the owner: "we should add the zona back so
+ * dogtags are void along the coast"); off from 2026-10-18 until then. Down a basement voids them, after TAG_OUT,
  * whatever this says; and while it is off the maps draw no line.
  */
-export const ZONA_VOID = false;
+export const ZONA_VOID = true;
 /**
  * Seconds somebody has to have been alive before there is a tag on their body at all. Whoever has just arrived
  * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Ten minutes since
