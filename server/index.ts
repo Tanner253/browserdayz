@@ -77,6 +77,9 @@ const RANGE_BUILD = 60_000;
 
 // (an hour, as DayZ keeps a dead player (CleanupLifetimeDeadPlayer): the owner, 2026-10-17, "bodies should last an hour yes"; it was ten minutes)
 export const CORPSE_LIFETIME = 3600; // seconds
+// (and ten minutes west of the Zona's line, where nobody's tag is worth anything and the new die by the dozen: the
+// owner, 2026-10-20, "player bodies are staying on the ground too long in the West")
+export const CORPSE_WEST = 600;
 
 // (A character is its player's until it dies: whoever comes back in a year has what they left with. It was
     // half an hour.)
