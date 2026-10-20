@@ -1195,6 +1195,13 @@ float maxH = 0.0;
 for (int s = 0; s < 3; s++) {
   hts[s] = -1.0;
   if (layerW[s] <= 0.0) continue;
+  // (A kind that could not come within 0.22 of the highest yet, however proud its picture (its height is its share
+  // and at most 0.55 more), is given nothing by the blend below: it was looked at all the same, every fetch of it, and
+  // thrown away. The kinds come most first, so where one kind is most of the ground the others are not looked at.
+  // The same picture to the bit: 2026-10-20, the ground a quarter of a forest's frame.)
+  #ifndef GROUND_ALL_KINDS
+  if (layerW[s] + 0.55 <= maxH - 0.22) continue;
+  #endif
   groundKind(pick[s], vTerrainPos, dP3x, dP3y, gN, side, nearKeep, farBlend, farShare, cols[s], leans[s], roughs[s]);
   hts[s] = layerW[s] + cols[s].a * 0.55;
   maxH = max(maxH, hts[s]);

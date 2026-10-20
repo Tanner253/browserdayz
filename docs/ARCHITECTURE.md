@@ -72,11 +72,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `input.ts` | 199 | Keyboard + mouse with pointer lock. |
 | `keys.ts` | 176 | Which key does what, and how fast the mouse turns the head: both the player's to set (2026-10-12: |
 | `leave.ts` | 79 | Whether the page is being left on purpose (2026-10-14). |
+| `light-reach.ts` | 39 | A lamp's light worked out only where it reaches (2026-10-20, the owner: |
 | `noise.ts` | 131 | Deterministic noise + RNG. |
 | `one-draw.ts` | 133 | See-through things seen from both sides, drawn in one go and not two. |
 | `perf.ts` | 202 | Frame profiler + F3 overlay. |
 | `physics.ts` | 183 | Rapier (Rust, compiled to WASM) physics. |
-| `renderer.ts` | 1071 |  |
+| `renderer.ts` | 1074 |  |
 | `settings.ts` | 154 | Graphics and sound options (Esc menu, Settings tab). |
 | `strips.ts` | 161 |  |
 | `tiny.ts` | 61 |  |
@@ -422,10 +423,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ruins.ts` | 226 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |
 | `snow.ts` | 661 | Where snow lies: by height, OR BY PLACE. |
-| `terrain.ts` | 1428 |  |
+| `terrain.ts` | 1435 |  |
 | `town-plans.ts` | 523 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
 | `towns.ts` | 216 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
-| `vegetation.ts` | 1127 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
+| `vegetation.ts` | 1157 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
 | `water.ts` | 464 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `ways-out.ts` | 115 | Nothing stands in a building's way out (the owner, 2026-10-19: |
 | `wells.ts` | 83 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |

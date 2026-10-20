@@ -17,6 +17,9 @@ import { N8AOPostPass } from 'n8ao';
 import { breathe } from './breathe';
 import { oneDraw } from './one-draw';
 import { CardKeep } from './card-keep';
+import { lightsOnlyWhereTheyReach } from './light-reach';
+
+lightsOnlyWhereTheyReach();
 
 /** a shader as the library keeps it: whether the card has finished making it, and how many materials are drawn with it */
 interface Program { id: number; isReady(): boolean; usedTimes: number; getUniforms(): unknown; getAttributes(): unknown }
