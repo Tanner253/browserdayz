@@ -57,9 +57,9 @@ export const interactMethods = {
     // sat in a jeep there is one thing to do with F
     if (this.garage.ride) {
       if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.garage.out();
-      // (the keys themselves only on a phone: on a computer they are in the corner, src/game/key-hints.ts, and were said
-      // twice, the owner, 2026-10-20: "duplicated ui when flying heli")
-      else if (!this.touch && performance.now() - this.rideAt < 7000) this.prompt = '<kbd>F</kbd>Get out';
+      // (On a phone only: on a computer every key of a seat is in the corner with the rest, Get out among them,
+      // src/game/key-hints.ts. The owner, 2026-10-20: "duplicated ui when flying heli", and of Get out over the middle
+      // and the seats' keys by the speed, "why? when you have everything else and its controls on the left?")
       else if (this.touch) this.prompt = this.garage.ride.seat === 0 ? (this.garage.ride.jeep instanceof Heli ? '<kbd>F</kbd>Get out <small>Space up · C down · W S nose · A D turn · Q E lean</small>' : (this.garage.ride.jeep.kind === POLICE_CAR.kind ? '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake · H horn · J siren</small>' : '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake · H horn</small>')) : '<kbd>F</kbd>Get out';
       return;
     }

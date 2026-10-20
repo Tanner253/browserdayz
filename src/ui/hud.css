@@ -96,9 +96,10 @@
   pointer-events: none;
 }
 .hud-acts.show { opacity: 1; }
-/* the keys that do something now: two columns of a key and its word, small, on a dark strip as the voices' are (bare
-   words were lost on snow and sand); quieter after a while, when only the moment's own are left */
-.hud-keys { display: grid; grid-template-columns: auto auto; column-gap: 18px; row-gap: 4px; padding: 7px 12px 7px 10px; background: rgba(8, 10, 9, 0.5); border-left: 2px solid rgba(233, 228, 216, 0.35); opacity: 0; transition: opacity 0.6s; }
+/* the keys that do something now: two columns of a key and its word, small, over a faint shade that fades out to the
+   right (bare words were lost on snow and sand; a grey box was too much, the owner, 2026-10-20: "i dont like the grey
+   background to it, should be subtle"); quieter after a while, when only the moment's own are left */
+.hud-keys { display: grid; grid-template-columns: auto auto; column-gap: 18px; row-gap: 4px; padding: 7px 14px 7px 10px; background: linear-gradient(to right, rgba(8, 10, 9, 0.3), rgba(8, 10, 9, 0.12) 75%, rgba(8, 10, 9, 0)); opacity: 0; transition: opacity 0.6s; }
 .hud-keys:not(.show) { display: none; }
 .hud-keys.show { opacity: 0.95; animation: hk-in 0.3s ease-out; }
 @keyframes hk-in { from { opacity: 0; } }

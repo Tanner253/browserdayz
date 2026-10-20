@@ -2041,7 +2041,8 @@ export class HUD {
       // the seats, as DayZ shows them: each by what it is and who is in it, this player's own lit, Ctrl and its number to move to it
       const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
       const seats = s.ride.seats ?? [];
-      this.set('rseats', e.ride.lastElementChild as HTMLElement, seats.map((q, k) => `<div class="${q.me ? 'me' : q.who === null ? 'free' : ''}"><kbd>Ctrl ${k + 1}</kbd><span>${q.name}</span><em>${q.who === null ? 'empty' : esc(q.who)}</em></div>`).join(''), 'html');
+      // (who sits where, and no more: how to move to another seat is in the corner with every other key, src/game/key-hints.ts)
+      this.set('rseats', e.ride.lastElementChild as HTMLElement, seats.map((q) => `<div class="${q.me ? 'me' : q.who === null ? 'free' : ''}"><span>${q.name}</span><em>${q.who === null ? 'empty' : esc(q.who)}</em></div>`).join(''), 'html');
     }
 
     if (s.weapon) {

@@ -83,8 +83,9 @@ export function keyHints(g: Game): KeyHints | null {
     }
     // (a controller has no way out of a seat yet: its □ is F only facing something, and nothing is faced from a seat)
     put(own, 'Get out', [k('KeyF')], null);
-    // (not how to change seat: the seats are listed by the speed, each with its Ctrl and number, and it was there twice,
-    // the owner, 2026-10-20: "duplicated ui when flying heli")
+    // (how to change seat here, with the rest: the seats listed by the speed say who sits where, and no longer their keys)
+    const seats = g.garage.seatList()?.length ?? 0;
+    if (seats > 1) put(own, 'Change seat', ['Ctrl', `1–${Math.min(4, seats)}`], null);
     put(rest, 'Map', [k('KeyM')], ['↑']);
     put(rest, 'Talk (hold)', [k('KeyV')], ['→ held']);
     return done(`seat ${r.jeep.kind} ${r.seat === 0 ? 0 : 1}`);
