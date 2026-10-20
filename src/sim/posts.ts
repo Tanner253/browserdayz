@@ -54,8 +54,10 @@ export const POST_ROOM = {
   case: { id: 'weapons_case', x: -1.5, z: 1.7, rot: Math.PI / 2 },
   // (and a gun rack beside the shelf on the back wall: the owner, 2026-10-18, "more of the new weapon lockers ... in
   // military locations". Half way between the case's end and the shelf, a hand clear of each: at -0.62 the case lay
-  // 15 cm into its foot)
-  gunRack: { id: 'gun_rack', x: -0.42, z: 2.56, rot: Math.PI },
+  // 15 cm into its foot; and out from the wall to the shelf's depth: stood where the shelf is, 2.56, it was 0.61 deep to
+  // the shelf's 0.2 and its back was 30 cm into the wall, seen through: the owner, 2026-10-19, "the rifle rack clips into
+  // the bunker walls", of these pillboxes)
+  gunRack: { id: 'gun_rack', x: -0.42, z: 2.2, rot: Math.PI },
   floor: [[0, 0.2], [1.2, -1.5], [-1.1, -1.7]] as [number, number][],
 };
 
