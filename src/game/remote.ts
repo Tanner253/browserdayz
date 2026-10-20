@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
-import { shadowsReach, type Atmosphere } from '../world/atmosphere';
+import { shadowFall, type Atmosphere } from '../world/atmosphere';
 import { EMOTE_BY_N, EMOTE_MASK, EMOTE_SHIFT } from '../sim/emotes';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
@@ -34,14 +34,13 @@ const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new TH
 
 /**
  * What the eye takes in this frame (`RemotePlayer.look`, once a frame before anybody is moved): from where, which way,
- * the cosine of the widest angle off that way a body can be seen at, and how near a body is seen whichever way it is
- * (its shadow may lie in sight). Before the first look, everybody is seen.
+ * and the widest angle off that way anything is seen at. Before the first look, everybody is seen.
  */
-const SIGHT = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), cos: -1, near: Infinity, zoom: 1 };
+const SIGHT = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), half: Math.PI, zoom: 1 };
 /** how far out from the hips a body and what it holds can reach, metres, lying or with a long gun up */
 const BODY = 4;
 /** how often a body out of sight is posed all the same, seconds: never further behind than this when it comes into sight */
-const REST_STEP = 0.1;
+export const REST_STEP = 0.1;
 /**
  * And one in sight but far off, how often it is posed, by how far (metres, as the eye sees them: through a scope the
  * distance over its magnification): every frame within the first; then thirty, fifteen and ten times a second. Its
@@ -55,12 +54,37 @@ const farStep = (p: THREE.Vector3) => {
   for (const [far, step] of FAR_POSE) if (d < far) return step;
   return 0.1;
 };
-const seen = (p: THREE.Vector3) => {
+/** whether anything of a body reaching BODY round (x, y, z) can be in the view */
+const inView = (x: number, y: number, z: number) => {
+  const dx = x - SIGHT.eye.x, dy = y - SIGHT.eye.y, dz = z - SIGHT.eye.z, d = Math.hypot(dx, dy, dz);
+  if (d <= BODY) return true;
+  const a = SIGHT.half + Math.asin(BODY / d);
+  return a >= Math.PI || dx * SIGHT.fwd.x + dy * SIGHT.fwd.y + dz * SIGHT.fwd.z >= Math.cos(a) * d;
+};
+const _fall = new THREE.Vector3();
+/**
+ * Whether a body standing at `p` can be seen, or its shadow: the body in the view, or anywhere along the ground from
+ * its foot as far as a man's shadow falls now (every three metres of it, each as wide as a body reaches). It was every
+ * body within sixty metres, whichever way: a crowd round the eye, or the infected about it, were all posed every frame
+ * behind it as before it (2026-10-20, in the gas with forty of the infected about: found in the game).
+ */
+export const inSight = (p: THREE.Vector3) => {
   // (development: every body posed every frame again, as it was, to measure the difference: progress/ping/rest-ab.js)
   if (import.meta.env.DEV && (globalThis as { __posedAlways?: boolean }).__posedAlways) return true;
-  const dx = p.x - SIGHT.eye.x, dy = p.y + 0.9 - SIGHT.eye.y, dz = p.z - SIGHT.eye.z, d = Math.hypot(dx, dy, dz);
-  return d < SIGHT.near || dx * SIGHT.fwd.x + dy * SIGHT.fwd.y + dz * SIGHT.fwd.z >= SIGHT.cos * d;
+  if (inView(p.x, p.y + 0.9, p.z)) return true;
+  // (and further for a body up on something, its shadow lying on the ground under it: on a roof, a man's shadow is a
+  // house's)
+  const ground = Avatar.ground?.(p.x, p.z) ?? p.y;
+  const len = shadowFall(_fall) * (1 + Math.max(0, p.y - ground) / 2.2);
+  if (!(len < Infinity)) return true;
+  const n = Math.ceil(len / 3), drop = Math.min(0, ground - p.y);
+  for (let k = 1; k <= n; k++) {
+    const t = (len * k) / n;
+    if (inView(p.x + _fall.x * t, p.y + (drop * k) / n, p.z + _fall.z * t)) return true;
+  }
+  return false;
 };
+const seen = inSight;
 
 /** metres within which what somebody's hands are doing is heard: rounds into a magazine, a box torn open (eating and the like, three less) */
 export const HANDS_HEARD = 11;
@@ -442,9 +466,7 @@ export class RemotePlayer implements Damageable {
     cam.getWorldPosition(SIGHT.eye);
     cam.getWorldDirection(SIGHT.fwd);
     // (out to the frustum's corners, and ten degrees over: the shake of a blast is laid on the eye after this)
-    const half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * Math.hypot(1, cam.aspect)) + 0.17;
-    SIGHT.near = Math.max(60, shadowsReach() + 10);
-    SIGHT.cos = Math.cos(Math.min(Math.PI, half + Math.asin(Math.min(1, BODY / SIGHT.near))));
+    SIGHT.half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * Math.hypot(1, cam.aspect)) + 0.17;
     // (how many times the view is drawn nearer than an unscoped eye's of 75 degrees)
     SIGHT.zoom = Math.max(1, Math.tan((75 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360));
   }

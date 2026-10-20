@@ -18,6 +18,7 @@ import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
 import { ZOMBIES, lookFor } from './look';
+import { REST_STEP, inSight } from './remote';
 import type { Damageable, HitZone } from './weapons';
 
 /** somebody an infected might notice */
@@ -738,9 +739,16 @@ export class Infected implements Damageable {
     // street went in steps of two or three frames.)
     this.avatar.root.position.x = this.pos.x;
     this.avatar.root.position.z = this.pos.z;
-    // posing a body is most of what one of them costs: across the street it is done every other frame, further off every third
+    // posing a body is most of what one of them costs: across the street it is done every other frame, further off every
+    // third; and out of sight, its shadow too, ten times a second and not drawn, as another player is (see inSight)
     this.poseDt += dt;
-    if ((this.frameNo++ + this.i) % (off > 70 * 70 ? 3 : off > 30 * 30 ? 2 : 1) !== 0) return;
+    const resting = !inSight(this.pos);
+    if (resting) {
+      if (this.poseDt < REST_STEP) {
+        this.avatar.root.visible = false;
+        return;
+      }
+    } else if ((this.frameNo++ + this.i) % (off > 70 * 70 ? 3 : off > 30 * 30 ? 2 : 1) !== 0) return;
     dt = this.poseDt;
     this.poseDt = 0;
     const sick = this.avatar.sick!;
@@ -769,6 +777,7 @@ export class Infected implements Damageable {
         if (d < 45) audio.infected(this.mode >= I_CHASE ? 'growl' : 'groan', this.pos, d, this.i);
       }
     }
+    if (resting) this.avatar.root.visible = false;
   }
 
   /** a head or a chest moved on the body (in its own frame): put where it is, with the body where the physics was last told it is */

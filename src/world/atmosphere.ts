@@ -191,6 +191,18 @@ export function castsAnywhere(at: THREE.Vector3, r: number): boolean {
   return _cast.lengthSq() - along * along <= across * across && along <= SEEN.toward + r + 10 && along >= -(SEEN.away + r + 10);
 }
 
+/**
+ * The way shadows fall across the ground from what throws them (level, of length one), and how far the shadow of a
+ * man's height reaches that way now, metres: Infinity until the first frame.
+ */
+export function shadowFall(out: THREE.Vector3): number {
+  out.set(-SEEN.sun.x, 0, -SEEN.sun.z);
+  const l = out.length();
+  if (l < 1e-6) out.set(0, 0, 0);
+  else out.divideScalar(l);
+  return SEEN.hi.length ? SEEN.long : Infinity;
+}
+
 /** how far from the eye a shadow can be seen, metres: the furthest cascade with its fade, and the longest shadow of a man's height now (until the first frame, everywhere) */
 export const shadowsReach = () => (SEEN.hi.length ? SEEN.hi[SEEN.hi.length - 1] + SEEN.long : Infinity);
 

@@ -438,8 +438,9 @@ export const frameMethods = {
     }
     Avatar.eye.copy(cam.position);
     Avatar.ground ??= (x, z) => heightAt(this.s.world.heights, x, z);
-    this.horde.update(dt, now, cam.position);
+    // (what the eye takes in, for the infected as for everybody else: see inSight)
     RemotePlayer.look(cam);
+    this.horde.update(dt, now, cam.position);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);
       rp.avatar.veil(this.s.buildings.hides(cam.position, rp.pos));
