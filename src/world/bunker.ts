@@ -11,7 +11,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Atmosphere } from './atmosphere';
 import { bunkerPlace, heightAt, type World } from './worldgen';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BUNKER, bunkerAt, bunkerPlan, lampBurns, levelY, type Place } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerPlan, inBunker, lampBurns, levelY, type Place } from '../sim/bunker';
 
 function painted(w: number, h: number, draw: (g: CanvasRenderingContext2D, rnd: () => number) => void, seed: number, repeat = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -897,7 +897,10 @@ export class BunkerSite {
       this.pieces = all.children.length;
       if (this.ready) void this.ready(under).catch(() => {});
     }
-    if (this.under) this.under.visible = (near < OPEN_FROM && eye.y < P.y + 4) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
+    // (and always from inside it: its back corners are over thirty metres from its middle, and the map's own ground is
+    // cut away over it, so neither of the others held there and the whole of it went, the map seen through its walls:
+    // the owner, 2026-10-20, "if you go to the back corners of the bunker it completleyd erenders")
+    if (this.under) this.under.visible = (near < OPEN_FROM && eye.y < P.y + 4) || inBunker(P, eye.x, eye.y, eye.z, 3) || (!!this.heights && eye.y < heightAt(this.heights, eye.x, eye.z) - 1);
   }
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */
