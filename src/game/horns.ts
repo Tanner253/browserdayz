@@ -2,7 +2,7 @@
 // the cars, and maybe a siren for the cop car, but siren not important definitley need honk". The one at the wheel
 // sounds them, the server passes that on to everybody ('vhorn'), and every game sounds them where the car is.
 import type * as THREE from 'three';
-import { audio, type HornVoice } from '../core/audio';
+import { audio, sirenRecording, type HornVoice } from '../core/audio';
 import { POLICE_CAR } from '../sim/vehicles';
 import type { Jeep } from './vehicle';
 
@@ -47,6 +47,8 @@ export class Horns {
       this.horn.set(j.i, performance.now());
       this.send({ t: 'vhorn', i: j.i, horn: true });
     }
+    // (the siren's recording asked for once the wheel is taken, so that it is here when J is pressed)
+    if (j.kind === POLICE_CAR.kind) void sirenRecording();
     if (sirenPressed && j.kind === POLICE_CAR.kind) {
       const on = !this.siren.has(j.i);
       this.heard(j.i, undefined, on);
