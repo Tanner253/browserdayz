@@ -117,6 +117,7 @@ export function loadingFx(root: HTMLElement) {
   const gas = mark.querySelector('.lm-gas') as HTMLElement;
   const flash = mark.querySelector('.lm-flash') as HTMLElement;
   const horns = [...mark.querySelectorAll<HTMLElement>('.lm-h0, .lm-h1, .lm-h2')];
+  const depth: [HTMLElement, number][] = [['.lm-front', 7], ['.lm-sign', 2.5], ['.lm-glow', -4]].map(([q, d]) => [mark.querySelector(q as string) as HTMLElement, d as number]);
   const shock = mark.querySelector('.lm-shock') as HTMLElement;
   const anchor = gas.appendChild(document.createElement('s'));
   const pumpkins = loadingPumpkins(title.parentElement as HTMLElement);
@@ -279,7 +280,7 @@ export function loadingFx(root: HTMLElement) {
     shock.animate([{ opacity: 0.9, transform: 'scale(.35)' }, { opacity: 0, transform: 'scale(1.45)' }], { duration: 800, delay: 260, easing: 'ease-out' });
   };
 
-  // the lean: toward the pointer, by at most 18° across and 14° up and down
+  // the lean: turned toward the pointer by at most 6°, the mask shifted 7 px its way, the glow behind 4 px the other
   let raf = 0, px = 0, py = 0, back = 0;
   const lean = (x: number, y: number) => {
     px = x;
@@ -288,7 +289,8 @@ export function loadingFx(root: HTMLElement) {
     raf = requestAnimationFrame(() => {
       raf = 0;
       const dx = clamp((px - mid.x) / (innerWidth / 2), -1, 1), dy = clamp((py - mid.y) / (innerHeight / 2), -1, 1);
-      mark.style.transform = `perspective(600px) rotateX(${(-dy * 14).toFixed(2)}deg) rotateY(${(dx * 18).toFixed(2)}deg)`;
+      mark.style.rotate = `${(dx * 6).toFixed(2)}deg`;
+      for (const [el, d] of depth) el.style.translate = `${(dx * d).toFixed(1)}px ${(dy * d * 0.7).toFixed(1)}px`;
       pumpkins?.lean(dx, dy);
     });
   };

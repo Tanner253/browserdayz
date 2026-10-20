@@ -111,11 +111,14 @@ body {
   width: 132px;
   height: 132px;
   margin: 0 auto 10px;
-  transform-style: preserve-3d;
-  /* leans toward the pointer (src/ui/loading-fx.ts) */
-  transform: perspective(600px);
-  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
+/* it leans toward the pointer (src/ui/loading-fx.ts): turned a little, its parts shifted by their depth, the mask most
+   and the glow behind against it. Flat on purpose: tilted in 3D, the browser drew it at its CSS size and kept it so,
+   blocky on any sharp screen once it had leaned. */
+.load-mark,
+.lm-glow,
+.lm-sign,
+.lm-front { transition: rotate 0.6s cubic-bezier(0.2, 0.7, 0.3, 1), translate 0.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
 .load-mark > *,
 .lm-ring,
 .lm-mask { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -126,7 +129,6 @@ body {
   height: auto;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 211, 90, 0.3) 0%, rgba(255, 190, 60, 0.12) 36%, rgba(255, 190, 60, 0) 66%);
-  transform: translateZ(-30px);
 }
 .lm-glow { animation: lm-glow 4s ease-in-out infinite; }
 .lm-flash { opacity: 0; animation: lm-flash 1.7s ease-out both; }
@@ -151,8 +153,6 @@ body {
   opacity: 0;
   animation: lm-shock-again 12s 0.5s infinite, lm-shock 1s ease-out 0.75s backwards;
 }
-/* nearer than the sign; scaled back so that, square on, the mark is exactly as drawn */
-.lm-front { transform: translateZ(20px) scale(0.9667); }
 .lm-mask { filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.7)); }
 /* gas from the filter (its middle at 50% 71.1% of the mark): puffs of real smoke (scripts/load-gas.mjs) that roll
    as they go, out to the side clear of the mask and then up, never down over the letters. The owner, of puffs that
@@ -189,7 +189,7 @@ body {
 .lm-gas b:nth-child(4) * { animation-delay: 5.8s; }
 .lm-gas b:nth-child(5) * { animation-delay: 6.02s; }
 .lm-gas b:nth-child(6) * { animation-delay: 6.3s; }
-@keyframes lm-glow { 0%, 100% { opacity: 0.35; transform: translateZ(-30px) scale(0.9); } 50% { opacity: 1; transform: translateZ(-30px) scale(1.06); } }
+@keyframes lm-glow { 0%, 100% { opacity: 0.35; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.06); } }
 @keyframes lm-breath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
 @keyframes lm-hot { 0%, 100% { opacity: 0; } 50% { opacity: 0.7; } }
 @keyframes lm-grow {
@@ -267,7 +267,7 @@ body {
 }
 #loading.off { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .load-mark { transition: none; }
+  .load-mark, .lm-glow, .lm-sign, .lm-front { transition: none; }
   .lm-glow, .lm-sign, .lm-hot, .lm-h0, .lm-h1, .lm-h2 { animation: none; }
   .lm-flash, .lm-shock { display: none; }
   .lm-gas { display: none; }
