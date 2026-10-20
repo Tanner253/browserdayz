@@ -2790,6 +2790,12 @@ export class Weapons {
     audio.click(1300, 0.35, 0.03, 0.12);
   }
 
+  /** what the fire-mode key does with this gun, for the keys in the corner (src/game/key-hints.ts); null: nothing */
+  modeKey(item: ItemInstance): string | null {
+    if (BIPODS.has(item.id)) return 'Bipod';
+    return (ITEMS[item.id].weapon?.modes?.length ?? 0) >= 2 ? 'Fire mode' : null;
+  }
+
   /** whether the gun in the hands has its bipod down */
   bipodIsDown(item: ItemInstance | null): boolean {
     return !!item && !!this.bipodDown.get(item.uid);
