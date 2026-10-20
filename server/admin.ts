@@ -23,6 +23,7 @@ import { broadcast, cleanName, clients, drop, send, type Client } from './player
 import { kill } from './acts';
 import { queue } from './queue';
 import { sendDrop } from './drops';
+import { dogtag, roleKey, tagSet } from './roles';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -74,15 +75,6 @@ export const CARRY_KEPT = new Map<string, Pick<Client['power'], CarryPower>>();
  */
 export const POWERS_KEPT = new Map<string, Client['power']>();
 export const keepPowers = (c: Client) => void POWERS_KEPT.set(keyHash(c.key), { ...c.power });
-
-/** a role as the panel's Roles names it: `r:` and the start of the key's hash it is kept under */
-export const roleId = (k: string) => `r:${k.slice(0, 16)}`;
-/** the key's hash of the one role a word names (its roleId, or the name it was given under), or null */
-function roleKey(word: string): string | null {
-  const roles = ADMIN.state.roles, w = word.toLowerCase();
-  const hits = /^r:[0-9a-f]{6,}$/i.test(word) ? Object.keys(roles).filter((k) => k.startsWith(w.slice(2))) : Object.keys(roles).filter((k) => roles[k].name.toLowerCase() === w);
-  return hits.length === 1 ? hits[0] : null;
-}
 
 export function carryKept(c: Client) {
   if (c.power.weightless || c.power.endless || c.power.bottomless) CARRY_KEPT.set(c.key, { weightless: c.power.weightless, endless: c.power.endless, bottomless: c.power.bottomless });
@@ -817,6 +809,9 @@ export async function command(c: Client, line: string) {
       kill(t, 'an admin');
       return void sys(c, `${t.name} is dead.`);
     }
+    case 'dogtag':
+      if (!admin) return need();
+      return dogtag(c, rest, above);
     case 'voidinv':
     case 'voidtag':
     case 'god':
@@ -831,6 +826,8 @@ export async function command(c: Client, line: string) {
       if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
       if (roleOf(t) !== 'admin') return void sys(c, `${t.name} is not an admin: these are an admin's.`);
       if (!outranks(c, t)) return above(t.name);
+      const set = k === 'voidTag' ? tagSet(c, t) : null;
+      if (set) return void sys(c, set);
       const on = say ? say === 'on' : !t.power[k];
       setPower(t, k, on);
       const what = { god: 'god mode', hidden: 'vanish', clip: 'noclip', voidInv: 'void inventory on death', voidTag: 'void dog tag on death' }[k];

@@ -502,6 +502,14 @@ export interface AdminState {
   roles: Record<string, { role: Role; name: string; by: string; up?: string; at: string }>;
   /** `fp`: the device they played on, where their game said it (2026-10-16: "can i ban this computr or browser at the source?") */
   bans: { key: string; ip: string; fp?: string; /** their browser (`sigOf`), kept off until `sigTill` */ sig?: string; sigTill?: number; name: string; why: string; by: string; at: string }[];
+  /**
+   * Whether somebody with a role leaves a dog tag when they die, set for them by an admin above them and no longer
+   * theirs to choose (2026-10-19, the owner: "some admins i cannot trust to self regulate their powers and turn on void
+   * dogtag or not farm them for their friends ... Dogtag:on/off is fine"). By their key's hash, apart from the roles so
+   * that taking a role away and giving it again does not clear it; `up` is the hash of who set it, and only they, or
+   * somebody above them, can change it (see `tagLock`).
+   */
+  tags?: Record<string, { on: boolean; by: string; up: string; at: string }>;
 }
 
 export const ADMIN = {
@@ -594,6 +602,11 @@ export function over(me: string, them: string): boolean {
   return top(me);
 }
 export const outranks = (c: Client, t: Client) => over(keyHash(c.key), keyHash(t.key));
+/** whether somebody leaves a dog tag, where an admin above them has set it (and they still have a role for it to bind), else undefined */
+export const tagLock = (key: string): boolean | undefined => {
+  const k = keyHash(key);
+  return ADMIN.state.roles[k] || LOCAL_ADMIN ? ADMIN.state.tags?.[k]?.on : undefined;
+};
 
 function adminBan(key: string, ip: string, fp = '', sig = ''): boolean {
   const k = keyHash(key), a = ipHash(ip), now = Date.now();
@@ -703,7 +716,7 @@ export async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boo
     if (!r.ok) return null;
     const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean; mark?: string };
     if (out.ok && out.state) {
-      ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [] };
+      ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [], tags: out.state.tags ?? {} };
       if (out.pepper) ADMIN.pepper = out.pepper;
       if (typeof out.mark === 'string') ADMIN.mark = out.mark;
       ADMIN.ready = true;

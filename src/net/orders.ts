@@ -100,6 +100,7 @@ export const ORDERS: Order[] = [
   { name: 'admin', args: ['who'], does: 'Make somebody an admin', admin: true },
   { name: 'mod', args: ['who'], does: 'Make somebody a mod: kick, timeout and say', admin: true },
   { name: 'demote', args: ['who'], does: 'Take somebody’s role away', admin: true },
+  { name: 'dogtag', args: ['who', 'on|off'], does: 'Whether somebody below you leaves a dog tag when they die, set for them: no longer theirs to choose', admin: true },
   { name: 'roles', args: [], does: 'Who has a role', admin: true },
   { name: 'help', args: [], does: 'This list, in the chat' },
 ];

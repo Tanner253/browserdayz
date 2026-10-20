@@ -418,6 +418,43 @@ if (ALL) await withServer(async () => {
   checks++;
   console.log('  ok  somebody made an admin leaves nothing when they die until they choose to; admins see the vanished; an admin puts another admin\u2019s powers on, and the admin she made can do nothing against her');
 
+  // ---- Dogtag on/off, set for an admin by one above her (2026-10-19, the owner: "some admins i cannot trust to self
+  // regulate their powers and turn on void dogtag or not farm them for their friends"): no longer hers to change, kept
+  // by the site, held while she is away and through her role being taken and given again
+  {
+    const fayKey = roleBy('Fay')![0], annKey = roleBy('Ann')![0];
+    assert.match(await ann.order(`/dogtag #${fay.id} on`), /Fay: dog tag on/);
+    assert.equal(last(fay, 'powers')?.voidTag, false, 'an admin whose tag was set on still voids it');
+    assert.deepEqual([kept().tags?.[fayKey]?.on, kept().tags?.[fayKey]?.up], [true, annKey], 'the tag set is not kept by the site, or not with who set it');
+    assert.match(await fay.order('/voidtag on'), /not yours to change/);
+    assert.match(await ann.order(`/voidtag #${fay.id} on`), /set on by Ann/);
+    assert.equal(last(fay, 'powers')?.voidTag, false, 'a tag set on was voided all the same');
+    assert.match(await fay.order(`/dogtag #${ann.id} off`), /Ann is above you/);
+    assert.match(await fay.order(`/dogtag #${fay.id} off`), /Not yourself/);
+    ann.send({ t: 'adm' });
+    await sleep(400);
+    const rows = last(ann, 'adm')!.roles;
+    const fr = rows.find((r) => r.name === 'Fay'), ar = rows.find((r) => r.name === 'Ann');
+    assert.ok(fr?.tag?.on && fr.tag.by === 'Ann' && fr.tagMine, 'the Roles panel does not show Fay\u2019s tag set on by Ann, for Ann to change');
+    assert.ok(ar?.tag && !ar.tagMine, 'an admin is offered to set her own tag');
+    // (set off while she is away, by the Roles id; she comes back to it, and cannot put it back on)
+    fay.ws.close();
+    await sleep(400);
+    assert.match(await ann.order(`/dogtag ${fr!.id} off`), /Fay: dog tag off/);
+    assert.ok(await fay.join(), 'Fay could not come back');
+    await sleep(300);
+    assert.equal(last(fay, 'powers')?.voidTag, true, 'an admin set off while away came back leaving her tag');
+    assert.match(await fay.order('/voidtag off'), /not yours to change/);
+    // (her role taken and given again does not clear it)
+    assert.match(await ann.order(`/demote #${fay.id}`), /Fay is no longer either/);
+    assert.match(await ann.order(`/admin #${fay.id}`), /Fay is an admin/);
+    await sleep(300);
+    assert.equal(last(fay, 'powers')?.voidTag, true, 'taking her role and giving it again cleared what was set');
+    assert.equal(kept().tags?.[fayKey]?.on, false, 'the tag set was lost from the site');
+    checks++;
+    console.log('  ok  an admin above sets another\u2019s dog tag on or off, online or not: it is no longer hers to change, the admin she sits under cannot touch it, and it holds through her coming back and her role given again');
+  }
+
   // ---- said to everybody, said to one, and two orders one on the heels of the other
   ann.send({ t: 'chat', ch: 'global', text: '/say hello all' });
   ann.send({ t: 'chat', ch: 'global', text: `/msg #${late.id} a word with you` });

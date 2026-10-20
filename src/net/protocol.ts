@@ -508,7 +508,8 @@ export interface AdminLists {
   turned?: { id: number; name: string; why: string; mins: number; dev?: string }[];
   /** `id`: `r:` and the start of its key's hash, what `/demote` takes for somebody not online; `low`: this admin is above
    * it and may take it away (neither said by a server from before 2026-10-19) */
-  roles: { name: string; role: 'admin' | 'mod'; by: string; at: string; id?: string; low?: true }[];
+  /** `tag`: whether they leave a dog tag when they die, `by` whoever above them set it (server/roles.ts); `tagMine`: this admin may set it */
+  roles: { name: string; role: 'admin' | 'mod'; by: string; at: string; id?: string; low?: true; tag?: { on: boolean; by?: string }; tagMine?: true }[];
   /** what the server's own checks are set to */
   checks: string;
   /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */

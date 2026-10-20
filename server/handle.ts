@@ -18,11 +18,12 @@ import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, stoppingNow, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
-import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, keyHash, over, pockets, roleOf, stayOn } from './gate';
+import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
 import { elite } from './elite';
-import { banId, command, login, offId, roleId } from './admin';
+import { banId, command, login, offId } from './admin';
+import { roleRows } from './roles';
 
 /** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
 const LYING_REACH = 4;
@@ -676,8 +677,7 @@ export function handle(c: Client, m: C2S) {
           : [],
         // (whoever was turned away at the door lately, newest first, for the Pardon button)
         ...(admin ? { turned: [...ADMIN.turned].reverse().map((t) => ({ id: t.n, name: t.name, why: t.why, mins: Math.round((now - t.at) / 60000), ...(t.fp ? { dev: shortDevice(t.fp) } : {}) })) } : {}),
-        // (each with its id, and whether this admin is above it and may take it away, online or not)
-        roles: admin ? Object.entries(ADMIN.state.roles).map(([k, r]) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10), id: roleId(k), ...(k !== keyHash(c.key) && over(keyHash(c.key), k) ? { low: true as const } : {}) })) : [],
+        roles: admin ? roleRows(c) : [],
         checks: CHECKS,
         stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length, cars: vehicles.size, wrecks: [...vehicles.values()].filter((v) => v.goneAt).length, infected: [...horde.bodies.values()].filter((b) => !b.diedAt).length },
       });

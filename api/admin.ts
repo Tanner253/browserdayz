@@ -30,6 +30,8 @@ export interface AdminState {
   roles: Record<string, { role: Role; name: string; by: string; up?: string; at: string }>;
   /** `fp`: the device they played on (a hash their game sent; since 2026-10-16), where it was known */
   bans: { key: string; ip: string; fp?: string; sig?: string; sigTill?: number; name: string; why: string; by: string; at: string }[];
+  /** whether somebody with a role leaves a dog tag, set by an admin above them (since 2026-10-19: see `tagLock` in server/gate.ts) */
+  tags?: Record<string, { on: boolean; by: string; up: string; at: string }>;
 }
 const EMPTY: AdminState = { roles: {}, bans: [] };
 
@@ -48,7 +50,11 @@ function clean(s: unknown): AdminState {
     const key = hash(b?.key), ip = hash(b?.ip), fp = hash(b?.fp), sig = hash(b?.sig), till = Number(b?.sigTill);
     return key || ip || fp ? [{ key, ip, ...(fp ? { fp } : {}), ...(sig && Number.isFinite(till) ? { sig, sigTill: till } : {}), name: text(b.name, 24), why: text(b.why, 120), by: text(b.by, 24), at: text(b.at, 30) }] : [];
   });
-  return { roles, bans };
+  const tags: NonNullable<AdminState['tags']> = {};
+  for (const [k, v] of Object.entries(src.tags ?? {}).slice(0, 200)) {
+    if (hash(k) && v && typeof v.on === 'boolean' && hash(v.up)) tags[k] = { on: v.on, by: text(v.by, 24), up: v.up, at: text(v.at, 30) };
+  }
+  return { roles, bans, tags };
 }
 
 const same = (a: string, b: string) => {

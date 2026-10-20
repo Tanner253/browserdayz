@@ -63,6 +63,39 @@ export const KITS: Kit[] = [
     things: [...WORN, { id: 'benelli', loaded: 7, mods: ['red_dot', 'suppressor_12', 'gun_light'] }, MPA,
       ...many(2, { id: 'ammo_12', qty: 30 }), { id: 'box_12' }, ...many(3, { id: 'mag_mpa', rounds: 30 }), { id: 'box_9mm' }, ...CARE],
   },
+  // The guns brought in from 2026-10-16 on, a kit each (the owner, 2026-10-19: "we have new weapons we should make some
+  // new 1 click admin kits"): two on the back and, where it suits, a pistol in the holster.
+  {
+    id: 'fifty', name: 'Fifty', does: 'The L96 .50 with its long-range scope and a can of rounds; a suppressed MP7 for close by; the best armour',
+    things: [...WORN, { id: 'sniper50', mag: 'mag_sniper50', loaded: 6, mods: ['scope_50'] }, { id: 'mp7a1', mag: 'mag_mp7', loaded: 41, mods: ['red_dot', 'mp7_suppressor'] },
+      ...many(4, { id: 'mag_sniper50', rounds: 5 }), { id: 'box_50bmg' }, ...many(3, { id: 'mag_mp7', rounds: 40 }), { id: 'box_9mm' }, ...CARE],
+  },
+  {
+    id: 'barrett', name: 'Barrett', does: 'The Barrett .50, self-loading, with its scope and ten-round magazines; an AKS-74U; a Desert Eagle; the best armour',
+    things: [...WORN, { id: 'barrett', mag: 'mag_barrett', loaded: 11, mods: ['scope_barrett'] }, { id: 'aks74u', mag: 'mag_ak', loaded: 31 },
+      { id: 'deagle', mag: 'mag_deagle_ext', loaded: 11, mods: ['gun_light'] },
+      ...many(3, { id: 'mag_barrett', rounds: 10 }), { id: 'box_50bmg' }, ...many(3, { id: 'mag_ak', rounds: 30 }), { id: 'box_739' }, { id: 'mag_deagle_ext', rounds: 10 }, ...CARE],
+  },
+  {
+    id: 'silent', name: 'Silent', does: 'The VSSK, quiet by its make, with its PSO scope; a Scorpion EVO; a suppressed M9; the best armour',
+    things: [...WORN, { id: 'vssk', mag: 'mag_vssk', loaded: 6, mods: ['scope_vssk'] }, { id: 'scorpion', mag: 'mag_scorpion', loaded: 31 }, M9,
+      ...many(4, { id: 'mag_vssk', rounds: 5 }), { id: 'box_127x55' }, ...many(3, { id: 'mag_scorpion', rounds: 30 }), { id: 'mag_m9_ext', rounds: 20 }, { id: 'box_9mm' }, ...CARE],
+  },
+  {
+    id: 'grenadier', name: 'Grenadier', does: 'The M32 grenade launcher full, and forty grenades for it; an AKS-74U with spare magazines; the best armour',
+    things: [...WORN, { id: 'm32', loaded: 6 }, { id: 'aks74u', mag: 'mag_ak', loaded: 31 },
+      ...many(2, { id: 'ammo_40mm', qty: 20 }), ...many(4, { id: 'mag_ak', rounds: 30 }), { id: 'box_739' }, ...CARE],
+  },
+  {
+    id: 'shotguns', name: 'Shotguns', does: 'The Sawn-Offs, one in each hand; the Double-Barrel; sixty shells; a Desert Eagle; the best armour',
+    things: [...WORN, { id: 'dual_sawnoff', loaded: 4 }, { id: 'db12', loaded: 2 }, { id: 'deagle', mag: 'mag_deagle_ext', loaded: 11, mods: ['gun_light'] },
+      ...many(2, { id: 'ammo_12', qty: 30 }), { id: 'box_12' }, { id: 'mag_deagle_ext', rounds: 10 }, { id: 'box_50' }, ...CARE],
+  },
+  {
+    id: 'akimbo', name: 'Akimbo', does: 'The Dual SMGs and the Dual MAC-10s with their suppressors, sixty rounds to a pair of magazines; the best armour',
+    things: [...WORN, { id: 'dual_smg', mag: 'mag_dual_smg', loaded: 61 }, { id: 'dual_mac10', mag: 'mag_dual_mac10', loaded: 61, mods: ['mac10_suppressor'] },
+      ...many(3, { id: 'mag_dual_smg', rounds: 60 }), ...many(2, { id: 'box_9mm' }), ...many(3, { id: 'mag_dual_mac10', rounds: 60 }), ...many(2, { id: 'box_45' }), ...CARE],
+  },
   {
     id: 'spawn', name: 'Spawn', does: 'What a new life begins with, and nothing else: something to eat, something to drink, one bandage',
     things: [{ id: 'beans' }, { id: 'thermos' }, { id: 'bandage', qty: 1 }],

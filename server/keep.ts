@@ -12,7 +12,7 @@ import { SITE_URL, keepTags, takeTags, type TagsKept } from './tags';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { inPokrovCourt } from '../src/sim/towns';
 import { CHECK } from './checks';
-import { ADMIN, keyHash, roleOf, siteAdmin, type AdminState } from './gate';
+import { ADMIN, keyHash, roleOf, siteAdmin, tagLock, type AdminState } from './gate';
 import { CARRY_KEPT, POWERS_KEPT, carryKeep, carryKept, keepPowers, noHold } from './admin';
 import { broadcast, cleanInventory, cleanItem, clients, info, isPose, num, records, send, type Client, type Record_ } from './players';
 import { fillFromQueue } from './queue';
@@ -628,7 +628,8 @@ export function tellRoles() {
  * @returns whether the site has it now
  */
 export async function saveAdmin(next: AdminState): Promise<boolean> {
-  ADMIN.state = next;
+  // (a change that does not name the tags set for admins keeps them)
+  ADMIN.state = { tags: ADMIN.state.tags, ...next };
   if (await trySaveAdmin()) return true;
   keepSaving();
   return false;
@@ -713,6 +714,9 @@ export function asAdmin(c: Client, fresh: boolean) {
     if (c.power.hidden) for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on: true } : { t: 'leave', id: c.id });
   }
   Object.assign(c.power, ADMIN.voids.get(c.key) ?? (kept ? {} : { voidInv: true, voidTag: true }));
+  // (and their tag, where an admin above them has set it: see tagLock)
+  const lock = tagLock(c.key);
+  if (lock !== undefined) c.power.voidTag = !lock;
   Object.assign(c.power, CARRY_KEPT.get(c.key));
   // (An admin who comes in with things in their hold has the room they lie in. Which powers were on is forgotten
   // when this server restarts, and what is carried is not: without this, a restart put everything in an admin's

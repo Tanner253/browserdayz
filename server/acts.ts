@@ -13,7 +13,7 @@ import { RACKS, rackShows } from '../src/sim/crates';
 import { CORPSE_LIFETIME, PARKS, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
 import { CHECK, dealt } from './checks';
-import { ADMIN, fellBlast } from './gate';
+import { ADMIN, fellBlast, tagLock } from './gate';
 import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
 import { scoreOf, sendBoard } from './queue';
 
@@ -352,9 +352,10 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   // within TAG_CAUSE_MS counts, so one who bleeds out from a gunshot still leaves theirs.)
   const hitter = c.lastHitBy && c.lastHitBy.id !== c.id && Date.now() - c.lastHitBy.at < TAG_CAUSE_MS ? c.lastHitBy : null;
   const nobody = TAG_NEEDS_KILLER && !hitter && !fresh;
-  // (and an admin who has chosen so leaves no tag of their own either, however long they lived; or nothing at all
-  // of what they carried but the tags they took off other people)
-  const noTag = fresh || nobody || c.power.voidTag, bare = c.power.voidInv;
+  // (and an admin who has chosen so leaves no tag of their own either, however long they lived, unless an admin above
+  // them has chosen for them (tagLock); or nothing at all of what they carried but the tags they took off other people)
+  const lock = tagLock(c.key);
+  const noTag = fresh || nobody || (lock === undefined ? c.power.voidTag : !lock), bare = c.power.voidInv;
   /** a tag that is on a body whoever's body it is: one taken off somebody else */
   const taken = (t: ItemInstance) => {
     const from = lootedTags.get(t.uid);

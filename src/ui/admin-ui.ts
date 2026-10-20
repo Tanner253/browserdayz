@@ -171,6 +171,7 @@ const ICON: Record<string, string> = {
   bolt: '<path d="M13 3L5 13.5h6L10 21l9-11h-6z"/>',
   pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0C18.5 14.8 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/>',
   trash: '<path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/>',
+  lock: '<rect x="6" y="11" width="12" height="9" rx="1"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/>',
   car: '<path d="M4 16v-4l2-5h12l2 5v4z"/><circle cx="8" cy="16.5" r="1.6"/><circle cx="16" cy="16.5" r="1.6"/>',
   moon: '<path d="M19 14.5A8 8 0 0 1 9.5 5a8 8 0 1 0 9.5 9.5z"/>',
   flag: '<path d="M6 21V4M6 5h11l-2 4 2 4H6"/>',
@@ -1545,11 +1546,22 @@ export class AdminUI {
   private roles(): HTMLElement[] {
     const list = el('div', 'adm-table roles');
     const head = el('div', 'adm-tr head');
-    for (const h of ['Name', 'Role', 'Given by', 'On', '']) head.append(el('span', '', h));
+    for (const h of ['Name', 'Role', 'Given by', 'On', 'Dog tag', '']) head.append(el('span', '', h));
     list.append(head);
     for (const r of this.lists.roles) {
       const row = el('div', 'adm-tr');
       for (const c of [r.name, r.role, r.by, r.at]) row.append(el('span', '', c));
+      // (whether they leave a dog tag when they die, set here by whoever is above them and no longer theirs to choose:
+      // the owner, 2026-10-19, "some admins i cannot trust to self regulate their powers ... Dogtag:on/off is fine")
+      const tag = el('span', 'adm-dt');
+      if (r.tag) {
+        const words = `Dogtag: ${r.tag.on ? 'on' : 'off'}`, on = r.tag.on;
+        const b = r.tagMine && r.id ? this.button(words, () => this.send(`/dogtag ${r.id} ${on ? 'off' : 'on'}`), `small${on ? ' good' : ''}`) : el('span', on ? 'ro' : 'ro off', words);
+        b.title = `${on ? 'They leave a dog tag when they die, as anybody does' : 'They leave no dog tag when they die'}. ${r.tag.by ? `Set by ${r.tag.by}: not theirs to change.` : 'Their own choice until somebody above them sets it.'}`;
+        tag.append(b);
+        if (r.tag.by) tag.append(icon('lock'));
+      }
+      row.append(tag);
       // (taken away here, online or not, from whoever this admin is above: the owner, 2026-10-19, "as an admin i should be
       // able to click offline admins via the role panel to un admin someone, assuming i am above them")
       const act = el('span', 'adm-acts');
@@ -1562,6 +1574,6 @@ export class AdminUI {
       list.append(row);
     }
     if (!this.lists.roles.length) list.append(el('div', 'adm-none', 'Nobody has a role.'));
-    return [list, el('div', 'dim', 'A role is given from a player’s own page (pick them on the left: they have to be online), and taken away there or here, from anybody you are above, online or not.')];
+    return [list, el('div', 'dim', 'A role is given from a player’s own page (pick them on the left: they have to be online), and taken away there or here, from anybody you are above, online or not. Dogtag: whether they leave a dog tag when they die. Set by you, it is no longer theirs to change (the lock), and only you or whoever is above you can change it again.')];
   }
 }
