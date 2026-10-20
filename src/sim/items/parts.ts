@@ -89,10 +89,10 @@ export const PART_ITEMS: ItemDef[] = [
     loot: { pair: 'Mag_VSS_10Rnd', at: [0, 0, 0, 1, 2], restock: 900 },
   },
   {
-    id: 'mag_a91', name: '9A-91 Magazine', model: 'a91', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'magazine',
-    desc: 'Twenty rounds of 9x39 for the 9A-91.',
-    mag: { ammo: 'ammo_9x39', capacity: 20 }, attach: { fits: ['a91'], slot: 'magazine' },
-    loot: { pair: 'Mag_Val_20Rnd', at: [0, 0, 0, 3, 1], restock: 300, usage: ARMY, keep: SOON, lean: 3 },
+    id: 'mag_a91', name: '9A-91 Magazine', model: 'a91', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'magazine',
+    desc: 'Forty rounds of 7.62x39, the AK\'s, for the 9A-91.',
+    mag: { ammo: 'ammo_739', capacity: 40 }, attach: { fits: ['a91'], slot: 'magazine' },
+    loot: { pair: 'Mag_Val_20Rnd', at: [0, 0, 0, 3, 0], restock: 300, usage: ARMY, keep: SOON, lean: 3 },
     worth: 6, sells: 2,
   },
   {
@@ -257,9 +257,9 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'a91_suppressor', name: 'PBS-9 Suppressor', model: 'a91', nodeRe: '^silencer', w: 3, h: 1, weight: 0.4, category: 'attachment',
-    desc: 'The 9A-91\'s own suppressor, and no other gun takes it. With its slow rounds the rifle is hardly heard and shows no flash; a softer kick, and a longer gun to swing.',
+    desc: 'The 9A-91\'s own suppressor, and no other gun takes it. The rifle is quietened and shows no flash; a softer kick, and a longer gun to swing.',
     attach: { fits: ['a91'], slot: 'muzzle', ergo: -6, recoil: 0.88, quiet: true },
-    loot: { pair: 'PistolSuppressor', at: [0, 0, 0, 3, 2], restock: 1800, usage: ARMY },
+    loot: { pair: 'PistolSuppressor', at: [0, 0, 0, 3, 0], restock: 1800, usage: ARMY },
     worth: 26,
   },
   {
