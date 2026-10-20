@@ -9,7 +9,7 @@
 // own, which every new item had to be added to by hand.)
 
 import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type Category } from './items';
-import { typeRule } from './items/rules';
+import { eastOnly, typeRule } from './items/rules';
 import type { Container } from './inventory';
 import type { Tier } from './tiers';
 import type { Usage } from '../world/buildings';
@@ -174,23 +174,25 @@ export const CRATE_RESTOCK = 300;
  * @param keeps how many of each the steps keep (the economy's, where there is one: see Keeps)
  * @param at the step of the map where it stands (a gun rack's: see stepNear)
  */
-export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false, keeps: Keeps = written, at?: Tier) {
+/** @param west it stands west of the Zona's line: nothing of the fourth step and up in it (see eastOnly) */
+export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false, keeps: Keeps = written, at?: Tier, west = false) {
   const spec = CRATE_SPECS[kind];
   if (!spec) return;
   const own = OWN_TABLE.has(kind);
   // (a gun rack out of the bunker holds the military's of the step it stands on, and not the bunker's)
-  const t: Tier = RACKS.has(kind) && rich !== 'bunker' && at ? at : own || !rich ? spec.tier : rich === 'bunker' ? 5 : 4;
+  const t0: Tier = RACKS.has(kind) && rich !== 'bunker' && at ? at : own || !rich ? spec.tier : rich === 'bunker' ? 5 : 4;
+  const t = (west ? Math.min(t0, 3) : t0) as Tier;
   // (one that stands under the gas or down the bunker, not of its own kind, holds what is kept there, as any crate there does)
   const main = !own && rich ? table(PLAIN, 'plain', t, keeps) : table(spec, kind, t, keeps);
-  const up = spec.up && !rich && t < 5 ? table(spec, kind, (t + 1) as Tier, keeps, true) : null;
+  const up = spec.up && !rich && t < (west ? 3 : 5) ? table(spec, kind, (t + 1) as Tier, keeps, true) : null;
   const [lo, hi] = spec.countOn?.[t] ?? spec.count;
   const n = lo + Math.floor(rnd() * (hi - lo + 1)) + (rich && !own ? 1 : 0);
   const ids: string[] = [];
   for (let i = 0; i < n; i++) {
     const id = up && rnd() < spec.up! ? pick(up, rnd) : pick(main, rnd);
-    if (id) ids.push(id);
+    if (id && !(west && eastOnly(ITEMS[id]))) ids.push(id);
   }
-  for (const [id, chance] of rich ? [] : (spec.also ?? [])) if (ITEMS[id] && rnd() < chance) ids.push(id);
+  for (const [id, chance] of rich ? [] : (spec.also ?? [])) if (ITEMS[id] && !(west && eastOnly(ITEMS[id])) && rnd() < chance) ids.push(id);
   for (const id of ids) {
     const def = ITEMS[id];
     const item = makeItem(id, def.stack ? Math.max(1, Math.round(def.stack * (0.2 + rnd() * 0.45))) : 1);

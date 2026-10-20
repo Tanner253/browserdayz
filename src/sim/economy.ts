@@ -16,7 +16,8 @@ import { RNG } from '../core/noise';
 import { APART_FILL, APART_KIND, APART_LEAN, APART_LEAST, APART_RICH, OWN, apartOf } from './apart';
 
 export { APART, APART_KIND, apartOf } from './apart';
-import { typeRule, type TypeRule } from './items/rules';
+import { eastOnly, typeRule, type TypeRule } from './items/rules';
+import { inZona } from '../world/zona';
 
 export type { TypeRule };
 
@@ -331,6 +332,7 @@ export class Economy {
   }
   /** and as its rule has it, before any cut: what a place apart's share is reckoned from, being stocked on top of the map, and a crate's (DayZ's nominal) */
   written(id: string, t: Tier): number {
+    if (TYPES[id].away?.includes(t)) return 0;
     return this.counts.get(id)?.[t - 1] ?? TYPES[id].at[t - 1];
   }
 
@@ -349,7 +351,8 @@ export class Economy {
     if (!here.length) return;
     const fair: [string, number][] = [];
     for (const [id, rule] of Object.entries(TYPES)) {
-      const at = this.written(id, t);
+      // (one kept only in places apart on this step has its count for them: see TypeRule.away)
+      const at = rule.away?.includes(t) ? rule.at[t - 1] : this.written(id, t);
       if (!at) continue;
       const sum = (list: number[]) => list.reduce((a, i) => a + (this.liesAt(id, rule, i, t) ? this.pull(rule, i, t) : 0), 0);
       const mine = sum(here), theirs = sum(there);
@@ -360,7 +363,7 @@ export class Economy {
     // enough of it.)
     const least = t >= 4 ? APART_LEAST[place] ?? {} : {};
     const base = fair.map(([id, e]) => {
-      const sure = Math.min(least[id] ?? 0, this.written(id, t));
+      const sure = Math.min(least[id] ?? 0, TYPES[id].away?.includes(t) ? TYPES[id].at[t - 1] : this.written(id, t));
       return { id, sure, spare: Math.max(0, e - sure) };
     });
     const kept = base.reduce((a, s) => a + s.sure, 0), all = base.reduce((a, s) => a + s.spare, 0), most = Math.max(0, here.length * APART_FILL - kept), k = all > most ? most / all : 1;
@@ -403,6 +406,9 @@ export class Economy {
   /** can a sort lie at this spot on this step: is the spot of a kind it is kept in, and is there room on it */
   private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
     const p = this.points[i];
+    // (nothing of the fourth step and up west of the Zona's line: see eastOnly; and on a step it is kept only in places apart, nothing on the step's own: see TypeRule.away)
+    if (eastOnly(ITEMS[id]) && !inZona(p.x, p.z)) return false;
+    if (rule.away?.includes(where) && this.apart[i] === null) return false;
     // (A place apart is sorted on every step: its spots were each said to be of a kind on purpose, an armoury's and
     // a dressing station's, where under the gas and down the bunker anything lies anywhere. A sort with no kind of
     // its own has one there: see APART_KIND.)
@@ -644,7 +650,9 @@ export class Economy {
       const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? (this.apart[i] !== null && this.tier[i] >= 5 ? ARMS_FORT : this.apart[i] !== null && this.tier[i] >= 4 ? ARMS_FOURTH : this.tier[i] >= 3 ? ARMS_TOWN : ARMS.filter(([id]) => ITEMS[id].weapon)) : ARMS;
       // (Each sort is tried once at most, by its weight. Thrown for afresh every time, the one sort that would not
       // lie there could come up six times running, and the place was left bare: one rack in fifty.)
-      const left = [...table];
+      // (and west of the Zona's line nothing of the fourth step and up, whatever the post: see eastOnly)
+      const west = !inZona(p.x, p.z);
+      const left = table.filter(([id]) => !west || !eastOnly(ITEMS[id]));
       while (left.length) {
         const total = left.reduce((s, [, w]) => s + w, 0);
         let r = this.rng.next() * total, k = 0;

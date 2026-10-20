@@ -323,7 +323,7 @@ export const enterMethods = {
       return;
     }
     const e = this.economy, keeps = keepsOf.get(e) ?? keepsOf.set(e, (id, t) => e.written(id, t)).get(e)!;
-    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z) || inCave(c.x, c.y + 0.5, c.z), keeps, RACKS.has(c.kind) ? stepNear(e.points, c.x, c.z) : undefined);
+    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z) || inCave(c.x, c.y + 0.5, c.z), keeps, RACKS.has(c.kind) ? stepNear(e.points, c.x, c.z) : undefined, !inPlay(c.x, c.z));
   },
 
   fresh(this: Game) {

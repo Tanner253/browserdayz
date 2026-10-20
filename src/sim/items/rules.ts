@@ -48,6 +48,8 @@ export interface TypeRule {
    * (0..1; unsaid, as often as anywhere: six times in ten).
    */
   on?: Partial<Record<Tier, { usage?: Usage[]; favour?: Partial<Record<Usage, number>>; restock?: number; mag?: number }>>;
+  /** the steps on which it is kept only in a place apart (the fort, on the fifth), never on the step's own spots (the bunker): its count there is the place apart's */
+  away?: Tier[];
 }
 
 /** an item's own loot rule, as written on it: the economy's numbers, and the rest of what DayZ says of a thing */
@@ -74,6 +76,16 @@ export const LIFETIME: Record<Category, number> = {
 };
 
 /** an item's rule as the economy reads it, or null where it is found nowhere */
+/**
+ * A sort kept mostly from the fourth step up (more of it there than on the first three): never found west of the
+ * Zona's line (src/world/zona.ts), whatever stands there (the owner, 2026-10-19: "there should be no T4+ on the west
+ * side of the wall, regaurlesss of military structure (i seen some bunkers in the desert with ak's)").
+ */
+export const eastOnly = (def: ItemDef | undefined) => {
+  const a = def?.loot?.at;
+  return !!a && a[3] + a[4] > a[0] + a[1] + a[2];
+};
+
 export function typeRule(def: ItemDef): TypeRule | null {
   const l = def.loot;
   if (!l?.at || l.restock === undefined) return null;

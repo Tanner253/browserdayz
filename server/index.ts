@@ -15,7 +15,7 @@ import { buildWorldData } from './world';
 import { Economy, lootPrint, type WorldLoot } from '../src/sim/economy';
 import { type SerializedInventory, Container } from '../src/sim/inventory';
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
-import { PLAN, onRidgeWall, onWorld } from '../src/world/worldgen';
+import { PLAN, inPlay, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
 import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
@@ -303,7 +303,7 @@ function fillBox(b: Box) {
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
   // (a crate under the gas, down in the bunker, on a basement's second level, or in one of the pass's caves, is filled with the best of everything)
-  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z) || inCave(b.x, b.y + 0.5, b.z), keeps, RACKS.has(b.crate!) ? stepNear(world.lootPoints, b.x, b.z) : undefined);
+  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z) || inCave(b.x, b.y + 0.5, b.z), keeps, RACKS.has(b.crate!) ? stepNear(world.lootPoints, b.x, b.z) : undefined, !inPlay(b.x, b.z));
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;

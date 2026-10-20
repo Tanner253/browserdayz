@@ -78,9 +78,9 @@ export const OWN: Record<string, { rich: number; lean: Record<string, number> }>
  */
 export const APART_LEAN: Record<string, number> = APART_LEAN_OF();
 
-/** what a named place apart never has less of on its fourth step, whatever its shares come to (where it has a spot of the kind): a magazine for each rifle of its racks, and a dressing station's own */
+/** what a named place apart never has less of on its step (the fourth and up), whatever its shares come to (where it has a spot of the kind): a magazine for each rifle of its racks, and a dressing station's own; and the fort's keycard and its pile of .50, each its one (the owner, 2026-10-19: "regular rare in T5 like the castle", "very rare in the castle") */
 export const APART_LEAST: Record<string, Record<string, number>> = {
-  castle: { mag_ak: 2, mag_ar: 2, mag_sniper: 1, pu_scope: 1, suppressor_762: 1, grenade: 2, armor_vest: 1, stim_combat: 2, blood_bag: 2, saline: 1, firstaid: 2 },
+  castle: { mag_ak: 2, mag_ar: 2, mag_sniper: 1, pu_scope: 1, suppressor_762: 1, grenade: 2, armor_vest: 1, stim_combat: 2, blood_bag: 2, saline: 1, firstaid: 2, keycard: 1, ammo_50bmg: 1 },
 };
 /**
  * The kind of spot a sort lies at in a place apart, where it has no kind of its own (under the gas such a thing

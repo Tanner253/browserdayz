@@ -11,7 +11,9 @@ export const TOOL_ITEMS: ItemDef[] = [
     // once, and one taken comes back as soon as the gas's things do, so that there is always one to be found: the
     // owner, 2026-10-18, "green keycards ONLY found in chemical works, make sure theres multiple that spawn and always 1
     // available somewhere". It was two, anywhere on the fourth step, back ten minutes after)
-    loot: { pair: 'ShippingContainerKeys_Red', at: [0, 0, 0, 3, 0], lifetime: 7200, restock: 300, usage: ['Gas'] },
+    // (under the gas, very rare, and at the fort, rare; never in the bunker it opens: the owner, 2026-10-19, "bunker cards should
+    // only be found in gas zones, and super rare T4 and regular rare in T5 like the castle. (no need for bunker to have keycards)")
+    loot: { pair: 'ShippingContainerKeys_Red', at: [0, 0, 0, 1, 1], away: [5], lifetime: 7200, restock: 300, usage: ['Gas'], on: { 4: { restock: 3600 }, 5: { usage: ['Military'], restock: 1200 } } },
   },
   { id: 'flashlight', name: 'Flashlight', model: 'vintage_flashlight', w: 1, h: 2, weight: 0.4, category: 'tool', desc: 'A battery lantern. Carried anywhere on you, L switches it on: it shines from your chest, wide and not far. It shows you the dark, and shows the dark where you are.',
     // (a lantern is a thing of sheds, yards and the shop's shelf: most of them out where anybody starts, because the night is everybody's.

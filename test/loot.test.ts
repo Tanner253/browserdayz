@@ -28,6 +28,8 @@ import { APART_KIND, Economy, TYPES, apartOf } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
+import { inZona } from '../src/world/zona';
+import { eastOnly } from '../src/sim/items/rules';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -154,8 +156,10 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
     // ("it should be possible to find an AK and an AR15 at kamenka but rarely ... you CAN get everything you need from T3 for AR's but its very rare")
     for (const [gun, mag, rounds] of [['ak', 'mag_ak', 'ammo_739'], ['ar15', 'mag_ar', 'ammo_556']]) {
       assert.equal(on(gun, 1) + on(gun, 2), 0, `a ${gun} below Kamenka`);
-      // (one in Kamenka and one in the village, since the village is of the third step)
-      assert.ok(on(gun, 3) >= 1 && on(gun, 3) <= TYPES[gun].at[2], `${on(gun, 3)} of ${gun} in Kamenka`);
+      // (one in Kamenka and one in the village, since the village is of the third step; and no AR-15 there since
+      // 2026-10-19, the owner: "AR's should only be T4+")
+      if (gun === 'ar15') assert.equal(on(gun, 3), 0, `${on(gun, 3)} of ${gun} in Kamenka`);
+      else assert.ok(on(gun, 3) >= 1 && on(gun, 3) <= TYPES[gun].at[2], `${on(gun, 3)} of ${gun} in Kamenka`);
       assert.ok(on(mag, 3) >= 1 && on(mag, 3) <= TYPES[mag].at[2], `${on(mag, 3)} of ${mag} in Kamenka`);
       // (but the AR-15's rounds, kept by a rate where the police and the army were: see TypeRule.per)
       // (light by the place: the third step has eight times the gas's places)
@@ -164,7 +168,8 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
       // ("more common in the T4")
       // (the magazines a little short, where every place is spoken for)
       assert.ok(on(gun, 4) >= 3 && on(mag, 4) >= 2, `${on(gun, 4)} of ${gun} and ${on(mag, 4)} of ${mag} under the gas`);
-      assert.ok(TYPES[gun].on![3]!.restock! >= 2400 && TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
+      // (the AR-15 is not kept on the third step at all since 2026-10-19)
+      assert.ok((gun === 'ar15' || TYPES[gun].on![3]!.restock! >= 2400) && TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
     }
     // (they lie where the army and the police kept things, and in nobody's kitchen)
     for (const { id, p } of all) if ((id === 'ak' || id === 'ar15' || id === 'mosin') && p.tier === 3 && !p.keeps) assert.ok(kind(p, ...KEPT_GUNS), `a ${id} in ${p.building}`);
@@ -175,7 +180,8 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
     for (const l of [...e.loot.values()]) if ((l.item.id === 'ak' || l.item.id === 'ar15') && every[l.point].tier === 3 && !every[l.point].keeps) eco.take(l.uid, false);
     for (let k = 0; k < 200; k++) {
       const had = new Set(eco.loot.keys());
-      if (!eco.fill(3, null, new Map([[k % 2 ? 'ak' : 'ar15', 1]])).size) continue;
+      // (the AK alone: the AR-15 is not of the third step since 2026-10-19)
+      if (!eco.fill(3, null, new Map([['ak', 1]])).size) continue;
       const [uid] = [...eco.loot.keys()].filter((u) => !had.has(u));
       rifles++;
       if (eco.loot.get(uid)!.item.mag) withMag++;
@@ -310,12 +316,13 @@ ok('the gas and the bunker hold all they are asked; a step asked for more than i
   // (2026-10-17: the gas was asked for 165 things on its 127 places and the bunker for 175 on its 145; with their new
   // places they hold all of it, and nothing is cut)
   const { e } = worlds[0];
-  for (const t of [4, 5] as Tier[]) for (const id of Object.keys(TYPES)) if (!TYPES[id].per) assert.equal(e.kept(id, t), TYPES[id].at[t - 1], `${id} cut on step ${t}`);
+  // (a sort kept only in places apart on a step, the fort's keycard, has none on the step's own: see TypeRule.away)
+  for (const t of [4, 5] as Tier[]) for (const id of Object.keys(TYPES)) if (!TYPES[id].per) assert.equal(e.kept(id, t), TYPES[id].away?.includes(t) ? 0 : TYPES[id].at[t - 1], `${id} cut on step ${t}`);
   // (and a bunker of a hundred and twenty places is cut to them)
   const few = new Economy(points.filter((p) => p.tier === 5).slice(0, 120), { spawn: () => {}, despawn: () => {} });
   const kept = Object.keys(TYPES).reduce((n, id) => n + few.kept(id, 5), 0);
   assert.ok(kept <= 120 && kept >= 118, `a bunker of 120 places keeps ${kept} things`);
-  for (const id of Object.keys(TYPES)) if (TYPES[id].at[4]) assert.ok(few.kept(id, 5) >= 1, `${id} cut to nothing`);
+  for (const id of Object.keys(TYPES)) if (TYPES[id].at[4] && !TYPES[id].away?.includes(5)) assert.ok(few.kept(id, 5) >= 1, `${id} cut to nothing`);
   // (what is the bunker's and nobody else's cut least; a dressing every village has more than a shotgun)
   assert.ok(few.kept('benelli', 5) / TYPES.benelli.at[4] > few.kept('bandage', 5) / TYPES.bandage.at[4], 'the shotgun cut more than a dressing');
   for (const id of ['sniper50', 'barrett', 'vssk']) assert.equal(few.kept(id, 5), 1, `${id} cut`);
@@ -430,6 +437,26 @@ ok('the fort on the mountain is stocked on top of the map: the army\'s things in
     const racks = own.filter((p) => p.arms === 'guns').length;
     assert.ok(racks >= 4 && fort.filter(({ p, id }) => p.arms === 'guns' && ITEMS[id].weapon).length === racks, `${racks} racks in the fort, not all with a gun`);
   }
+});
+
+ok('nothing of the fourth step and up west of the Zona’s line, not at a guard post nor in a crate; the keycard under the gas and at the fort, never in the bunker; the .50 the bunker’s, and one at the fort', () => {
+  // (the owner, 2026-10-19: "there should be no T4+ on the west side of the wall, regaurlesss of military structure (i
+  // seen some bunkers in the desert with ak's)"; "bunker cards should only be found in gas zones, and super rare T4 and
+  // regular rare in T5 like the castle"; "50 caliber ammo should only be found in the bunker and very rare in the castle")
+  for (const { all, fort, e } of worlds) {
+    const west = [...all, ...fort].filter(({ p }) => !inZona(p.x, p.z));
+    assert.ok(west.length > 200 && west.some(({ p }) => p.arms), `${west.length} things west of the line, none at an armed place`);
+    assert.deepEqual(west.filter(({ id }) => eastOnly(ITEMS[id])).map(({ id, p }) => `${id} at ${p.building}`), [], 'things of the fourth step and up west of the line');
+    assert.equal([...all, ...fort].filter(({ id, p }) => id === 'keycard' && p.usage.includes('Bunker')).length, 0, 'a keycard in the bunker');
+    assert.deepEqual([e.kept('keycard', 4), e.wanted('castle', 'keycard', 5)], [1, 1], 'the keycard is not one under the gas and one at the fort');
+    assert.deepEqual([e.kept('ammo_50bmg', 4), e.kept('box_50bmg', 4), e.wanted('castle', 'ammo_50bmg', 5)], [0, 0, 1], 'the .50 is under the gas, or not once at the fort');
+  }
+  // (a crate west of the line: a weapons case, as at the desert's posts)
+  let s = 7;
+  const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
+  const got = new Set<string>();
+  for (let k = 0; k < 500; k++) fillCrate({ add: (it: { id: string }) => (got.add(it.id), it) } as never, 'weapons_case', rnd, false, undefined, undefined, true);
+  assert.deepEqual([...got].filter((id) => eastOnly(ITEMS[id])), [], 'a crate west of the line held something of the fourth step and up');
 });
 
 console.log(`\n${n} checks passed`);

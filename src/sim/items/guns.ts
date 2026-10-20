@@ -178,7 +178,8 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
     desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
     weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] }, never: ['foregrip'] }, iconYaw: 0,
-    loot: { pair: 'M4A1', at: [0, 0, 2, 3, 1], restock: 420, usage: ARMY, loaded: [5, 20], keep: SOON, on: { 3: { restock: 3000, mag: 0.12 } }, fitted: [['red_dot', 0.2], ['foregrip', 0.2], ['gun_light', 0.15], ['suppressor_556', 0.06], ['mag_ar_60', 0.05]], rack: { fort: 2 }, lean: 3 },
+    // (from the fourth step up only: the owner, 2026-10-19, "AR's should only be T4+")
+    loot: { pair: 'M4A1', at: [0, 0, 0, 3, 1], restock: 420, usage: ARMY, loaded: [5, 20], keep: SOON, fitted: [['red_dot', 0.2], ['foregrip', 0.2], ['gun_light', 0.15], ['suppressor_556', 0.06], ['mag_ar_60', 0.05]], rack: { fort: 2 }, lean: 3 },
     worth: 60,
   },
   // The rifles' rounds (7.62x39, 5.56, 7.62x54 and their boxes) kept east, a few in the middle and none further west
@@ -225,7 +226,8 @@ export const GUN_ITEMS: ItemDef[] = [
     // ammo are too dark and the bmg ammo needs to be larger img")
     id: 'ammo_50bmg', name: '.50 BMG Rounds', model: 'round_50bmg', w: 1, h: 1, weight: 0.115, category: 'ammo', stack: 10, scale: 1, pile: 2, iconBright: true,
     desc: 'Loose .50 calibre cartridges, heavy as a fistful of bolts. They go into the .50 rifle magazine by hand.',
-    loot: { pair: 'Ammo_308WinTracer', at: [0, 0, 0, 2, 4], restock: 600, qty: [0.3, 0.8] },
+    // (in the bunker, and very rarely at the fort: the owner, 2026-10-19, "50 caliber ammo should only be found in the bunker and very rare in the castle")
+    loot: { pair: 'Ammo_308WinTracer', at: [0, 0, 0, 0, 4], restock: 600, qty: [0.3, 0.8], on: { 5: { usage: ['Military'] } }, lean: 0.25 },
   },
   {
     id: 'ammo_127x55', name: '12.7x55 Rounds', model: 'vssk', nodeRe: '^bullet', w: 1, h: 1, weight: 0.075, category: 'ammo', stack: 10, scale: 1, pile: 2, iconBright: true,
@@ -294,7 +296,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'box_50bmg', name: '.50 BMG Ammo Can', model: 'ammo_box', scale: 0.55, w: 1, h: 1, weight: 2.925, category: 'ammo',
     desc: 'A small steel can of 25 .50 BMG cartridges, for the .50 rifles. Hold it and open it to get the rounds out.',
     open: { gives: 'ammo_50bmg', qty: 25, time: 2.6 },
-    loot: { pair: 'AmmoBox_308WinTracer_20Rnd', at: [0, 0, 0, 0, 1], restock: 900 },
+    loot: { pair: 'AmmoBox_308WinTracer_20Rnd', at: [0, 0, 0, 0, 1], restock: 900, on: { 5: { usage: ['Military'] } }, lean: 0.25 },
   },
   {
     id: 'box_127x55', name: '12.7x55 Ammo Can', model: 'ammo_box', tint: 0x9a9a88, scale: 0.5, w: 1, h: 1, weight: 1.925, category: 'ammo',
