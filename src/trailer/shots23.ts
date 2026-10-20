@@ -1,6 +1,6 @@
 // The twenty-third film, 15 seconds: the 9A-91 and the Barrett's bipod (the owner, 2026-10-20: "i want a short 15
 // second trailer of the new weapon and bipod mechanic"). In first person, as it is played: the 9A-91 in the hands, B and
-// its stock folds up over the receiver, aimed folded and fired through its can; then lying down with the Barrett, B and
+// its stock folds up over the receiver, and fired through its can (7.62x39 from forty since 2026-10-20); then lying down with the Barrett, B and
 // the bipod comes down, and on it the scope holds still for a shot. Cut 16's band, as 18 and 19.
 //   node scripts/film.mjs --cut 23
 import type { Shot, Stage } from './director';
@@ -149,7 +149,7 @@ export function buildShots(S: Stage): Shot[] {
     name: 'title',
     setup: async () => {
       g.hourHeld = 0.42;
-      await armed('a91', { mag: 'mag_a91', loaded: 21, mods: ['a91_suppressor'] }, HERE.yaw, -0.04, false);
+      await armed('a91', { mag: 'mag_a91', loaded: 41, mods: ['a91_suppressor'] }, HERE.yaw, -0.04, false);
     },
     words: (t) => show(title, t, Math.min(1, ease((BAR16 - t) / 0.35))),
   });
@@ -163,7 +163,7 @@ export function buildShots(S: Stage): Shot[] {
   add(1, 'drop', {
     name: 'burst',
     at: [[0.3, 'Mouse0', true], [0.7, 'Mouse0', false], [1.1, 'Mouse0', true], [1.45, 'Mouse0', false]],
-    words: (t) => caption(t, 0.1, BAR16 - 0.05, '9x39 SUBSONIC', 'PBS-9 SUPPRESSOR', 'twenty rounds · hardly heard'),
+    words: (t) => caption(t, 0.1, BAR16 - 0.05, "7.62x39 · THE AK'S ROUNDS", 'PBS-9 SUPPRESSOR', 'forty to a magazine · quietened, no flash'),
   });
   // 4 · the Barrett looked over (I turns it side-on), and B: the bipod's legs swing down
   add(2, 'tense', {
