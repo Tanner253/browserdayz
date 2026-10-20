@@ -33,7 +33,9 @@ async function halve(sky: THREE.DataTexture) {
 }
 
 /** how thick the air itself is, to look through: three.js's own measure of it (what `FogExp2` is made with) */
-const AIR = 0.0011;
+export const AIR = 0.0011;
+/** how fast the air thins with height (per metre): what the fog's lines are written with, and the lamps' glare (Lamps) */
+export const AIR_FALL = 0.012;
 /** the colour of the gas where the light is in it (linear, before the picture is finished) */
 const GAS_COLOR = new THREE.Color(0.3, 0.36, 0.1);
 
@@ -433,7 +435,7 @@ export class Atmosphere {
   #endif
   #define ATMO_SUN_DIR ${vec3(s.x, s.y, s.z)}
   #define ATMO_SUN_COLOR ${vec3(sc.r * 1.15, sc.g * 1.05, sc.b * 0.85)}
-  #define ATMO_FALLOFF 0.012
+  #define ATMO_FALLOFF ${AIR_FALL}
   float atmoFogAmount( vec3 ro, vec3 rd, float dist ) {
     #ifdef FOG_EXP2
       // (not fogDensity: that number carries the seconds gone by, see Atmosphere.seconds)

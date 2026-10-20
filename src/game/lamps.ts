@@ -11,6 +11,7 @@
 // when the game loads (see `warm`).
 
 import * as THREE from 'three';
+import { AIR, AIR_FALL } from '../world/atmosphere';
 
 const SPOTS = 3;
 const POINTS = 5;
@@ -23,7 +24,17 @@ const POINTS = 5;
 const KEEP = 30;
 /** over how many metres the furthest of the real lights dims before it is given to a nearer lamp */
 const FADE = 3;
-const GLARES = 96;
+/** (every street lamp within LAMP_SEEN and the rest: at 96 the furthest were dropped, and came and went as the eye moved) */
+const GLARES = 160;
+/**
+ * The glare far off (the owner, 2026-10-19: "the light emitted from vehicles and light posts from a distance looks
+ * really bad. especially vehicles"). It grew with distance, to a disc 7 m across at 300 m and 18 m at 800 m: a car's
+ * two lamps were one white ball, and the road in front cut its lower half off flat. Now, past NEAR metres it keeps
+ * its size, seen smaller the further off, as the lamp is; never under FLOOR of the picture's height across, dimmer
+ * by the FALLth power of how much it was grown to that; drawn PULL of its distance nearer the eye (half its size at
+ * most), so that the lamp's own hood and the car's grille behind it neither cut it nor flicker with it far off.
+ */
+const FAR = { near: 25, floor: 1 / 260, fall: 0.5, pull: 0.004 };
 const SHAFTS = 4;
 /** how strong a beam of power 1 is (candela, as three counts it), how far it carries, and how wide it is (radians, half) */
 const BEAM = { power: 170, reach: 75, half: 0.36, soft: 0.7 };
@@ -37,6 +48,19 @@ const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 const _down = new THREE.Vector3(0, -1, 0);
+const _px = new THREE.Vector2();
+
+/**
+ * How much of a lamp's light is left after the air between it and the eye: the fog's own reckoning (atmoFogAmount in
+ * atmosphere.ts) and the haze that closes in over the last of the draw distance, as everything else seen is dimmed;
+ * its square root, as a lamp shows through haze where what it lights is lost (the owner wants towns seen from across
+ * the desert at night). The glare had no fog at all: lamps 1.5 km off as bright as at 300 m.
+ */
+function airLeft(eye: THREE.Vector3, at: THREE.Vector3, d: number, far: number) {
+  const k = ((at.y - eye.y) / d) * AIR_FALL, a = AIR * Math.exp(-Math.max(eye.y, -50) * AIR_FALL);
+  const amount = Math.abs(k) > 1e-4 ? (a * (1 - Math.exp(-d * k))) / k : a * d;
+  return Math.sqrt(Math.min(Math.exp(-amount), 1 - THREE.MathUtils.smoothstep(d, far * 0.72, far * 0.97)));
+}
 
 export class Lamps {
   /** the real lights: in the scene only while something is lit */
@@ -97,16 +121,26 @@ export class Lamps {
     this.glareColor = new THREE.InstancedBufferAttribute(new Float32Array(GLARES * 3), 3);
     this.glareColor.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('iColor', this.glareColor);
+    // (each glare's place and size are its matrix's; it is turned to the eye here, and sized for the picture: see FAR)
     const mat = new THREE.ShaderMaterial({
-      uniforms: { tMap: { value: tex } },
+      uniforms: { tMap: { value: tex }, uHeight: { value: 720 } },
       vertexShader: /* glsl */ `
         attribute vec3 iColor;
+        uniform float uHeight;
         varying vec3 vColor;
         varying vec2 vUv;
         void main() {
           vUv = uv;
-          vColor = iColor;
-          gl_Position = projectionMatrix * viewMatrix * instanceMatrix * vec4( position, 1.0 );
+          float size = length( instanceMatrix[ 0 ].xyz );
+          vec4 at = viewMatrix * vec4( instanceMatrix[ 3 ].xyz, 1.0 );
+          float d = max( length( at.xyz ), 1e-3 );
+          float px = size * projectionMatrix[ 1 ][ 1 ] * 0.5 * uHeight / max( -at.z, 1e-3 );
+          float grow = max( 1.0, ${FAR.floor.toFixed(6)} * uHeight / px );
+          vColor = iColor * pow( grow, -${FAR.fall.toFixed(3)} );
+          float near = max( 0.0, d - min( ${FAR.pull.toFixed(4)} * d, 0.5 * size * grow ) ) / d;
+          at.xyz *= near;
+          at.xy += position.xy * size * grow * near;
+          gl_Position = projectionMatrix * at;
         }`,
       fragmentShader: /* glsl */ `
         uniform sampler2D tMap;
@@ -125,6 +159,10 @@ export class Lamps {
     this.glare.count = 0;
     this.glare.frustumCulled = false;
     this.glare.renderOrder = 8;
+    // (the height of what it is drawn into, which is the picture's at its render scale)
+    this.glare.onBeforeRender = (r) => {
+      mat.uniforms.uHeight.value = r.getRenderTarget()?.height ?? r.getDrawingBufferSize(_px).y;
+    };
     scene.add(this.glare);
 
     // the shafts: an open cone from the lamp to where its beam lands (point at the origin, mouth at y -1), brightest
@@ -295,17 +333,18 @@ export class Lamps {
       if (k > 0) this.spill.r += k, this.spill.g += 0.94 * k, this.spill.b += 0.8 * k;
     }
 
-    // the glare of each, facing the eye: bigger from further off (a lamp is a point of light at any distance), and a beam's only from in front of it
+    // the glare of each, facing the eye (see FAR for how it is seen far off), and a beam's only from in front of it
     let n = 0;
     const col = this.glareColor.array as Float32Array;
-    cam.getWorldQuaternion(_q);
+    const far = (cam as THREE.PerspectiveCamera).far ?? 1800;
     const put = (pos: THREE.Vector3, d2: number, r: number, g: number, b: number, k: number) => {
       if (n >= GLARES || k <= 0.01) return;
       const d = Math.sqrt(d2);
       // (not the lamp in one's own hand: it is behind the picture)
       if (d < 0.6) return;
-      const size = (0.22 + d * 0.016) * (0.7 + 0.5 * k);
-      _m.compose(pos, _q, _s.set(size, size, size));
+      const size = (0.22 + Math.min(d, FAR.near) * 0.016) * (0.7 + 0.5 * k);
+      k *= airLeft(eye, pos, d, far);
+      _m.makeScale(size, size, size).setPosition(pos);
       this.glare.setMatrixAt(n, _m);
       col[n * 3] = r * k;
       col[n * 3 + 1] = g * k;

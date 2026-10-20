@@ -474,8 +474,12 @@ export const dropsMethods = {
       }
       // the street lamps of the village and the towns, from dusk: a point of light from as far off as the eye sees (the
       // owner, 2026-10-19: "at night you cant really tell where to go especially as a fresh spawn"). Only the nearest
-      // few light the ground (see Lamps): the rest are their glare, and no more.
-      for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < LAMP_SEEN * LAMP_SEEN) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22, 1);
+      // few light the ground (see Lamps): the rest are their glare, and no more, fading over the last 300 m of the way.
+      const lit = Math.min(1, (atmo.night - 0.3) / 0.3);
+      for (const at of this.streetLamps) {
+        const d2 = at.distanceToSquared(cam.position);
+        if (d2 < LAMP_SEEN * LAMP_SEEN) this.lamps.glow(at, STREET_LAMP, lit * Math.min(1, (LAMP_SEEN - Math.sqrt(d2)) / 300), 22, 1);
+      }
     }
     // (alone, this game keeps the door as a server would: open while it is in there, shut a minute after it has gone)
     if (!this.online && this.bunker.open) {
