@@ -66,9 +66,12 @@ export const FRAG_RULE: WeaponRule = { damage: 400, melee: false, range: 70, int
 
 export const WEAPON_RULES: Record<string, WeaponRule> = {
   ...gunRules(),
-  // The two .50s: a hit is the end of anybody, and two and a half of them the end of a jeep (the owner, 2026-10-18: "the
-  // l96 and berret should always 1 shot kill and should do lots of damage to vehicles")
-  ...Object.fromEntries((['sniper50', 'barrett'] as const).flatMap((id) => (gunRules()[id] ? [[id, { ...gunRules()[id], kill: true, car: 0.4 }]] : []))),
+  // The two .50s: a hit is the end of anybody (the owner, 2026-10-18: "the l96 and berret should always 1 shot kill and
+  // should do lots of damage to vehicles"), and a helicopter takes a whole magazine and one more (2026-10-20: "they do too
+  // much damage to vehicles currently, i think it should take 1 mag + 1 to take down a heli with 50 cal"). A helicopter
+  // has three quarters of a car's health (HELI.hp), so a hit is 0.75 / (rounds + 0.6) of a car's: six hits for the
+  // .50 sniper's five, eleven for the Barrett's ten; a jeep, eight and fifteen. (It was 0.4: two hits a helicopter.)
+  ...Object.fromEntries(([['sniper50', 5], ['barrett', 10]] as const).flatMap(([id, rounds]) => (gunRules()[id] ? [[id, { ...gunRules()[id], kill: true, car: 0.75 / (rounds + 0.6) }]] : []))),
   fists: { damage: 14, melee: true, range: 3.2, interval: 0.3, falloff: 1 },
   hatchet: { damage: 45, melee: true, range: 3.6, interval: 0.5, falloff: 1 },
   machete: { damage: 38, melee: true, range: 3.8, interval: 0.4, falloff: 1 },

@@ -34,8 +34,11 @@ export const TOOL_ITEMS: ItemDef[] = [
     worth: 6,
   },
   { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver, good for one call: use it under open sky and a supply drop comes down where you stand. Everybody hears it called.', use: { verb: 'Call a drop on the', time: 5, sound: 'bandage' }, call: true,
-    // (a field radio: good for one supply drop called down where it is used. One at the army's; the trader sells them dear.)
-    loot: { pair: 'PersonalRadio', at: [0, 1, 2, 0, 0], lifetime: 7200, restock: 2400, usage: ['Military'] },
+    // (a field radio: good for one supply drop called down where it is used. Rare, and only from the fourth step up (the
+    // owner, 2026-10-20: "field radios should not spawn in T1-T3 ... only T4 and above, and they should be rare loot"): in the
+    // places apart of the fourth and fifth steps only (Kamenka's, the fort's), the gas's and the bunker's own places being
+    // full; and now and then in a rich crate. The trader sells them dear.)
+    loot: { pair: 'PersonalRadio', at: [0, 0, 0, 1, 1], away: [4, 5], lifetime: 7200, restock: 3600, usage: ['Military'] },
     worth: 35, sells: 1,
   },
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' },
