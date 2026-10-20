@@ -8,7 +8,7 @@ import { BODY_GRID, heldIn } from '../src/sim/inventory';
 import { type ItemInstance, ITEMS } from '../src/sim/items';
 import type { NewsKept } from '../src/sim/news';
 import { BOOT, CORPSE_LIFETIME, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
-import { SITE_URL, keepTags, takeTags, type TagsKept } from './tags';
+import { SITE_URL, keepTags, tagTime, takeTags, type TagsKept } from './tags';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { inPokrovCourt } from '../src/sim/towns';
 import { CHECK } from './checks';
@@ -206,7 +206,7 @@ function takePowers(list: unknown) {
 function snapshot(): Snapshot {
   const now = Date.now(), chars = new Map<string, Record_>(KEPT.chars);
   for (const [k, r] of records) if (r.alive && r.inv) chars.set(keyHash(k), r);
-  for (const c of clients.values()) if (c.alive && c.inv) chars.set(keyHash(c.key), { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: true, leftAt: now });
+  for (const c of clients.values()) if (c.alive && c.inv) chars.set(keyHash(c.key), { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: true, leftAt: now, tagMs: tagTime(c, c.asleep || now) });
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
@@ -287,7 +287,7 @@ function takeInLate(save: KeptFile) {
       if (had && had.leftAt >= r.leftAt) continue;
       const inv = cleanInventory(r.inv);
       for (const it of things(inv)) issue(it);
-      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(remadeUnder(snap.rev, r.pose[0], r.pose[2]) || r.afresh ? { afresh: true } : {}) });
+      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(remadeUnder(snap.rev, r.pose[0], r.pose[2]) || r.afresh ? { afresh: true } : {}), ...(num(r.tagMs) && r.tagMs > 0 ? { tagMs: r.tagMs } : {}) });
       chars++;
     } catch {
       /* one that cannot be made sense of is left as this server had them */
@@ -527,7 +527,7 @@ export async function loadKept() {
         const inv = cleanInventory(r.inv);
         for (const it of things(inv)) issue(it);
         // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall if it was remade there)
-        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(remadeUnder(snap.rev, r.pose[0], r.pose[2]) || r.afresh ? { afresh: true } : {}) });
+        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(remadeUnder(snap.rev, r.pose[0], r.pose[2]) || r.afresh ? { afresh: true } : {}), ...(num(r.tagMs) && r.tagMs > 0 ? { tagMs: r.tagMs } : {}) });
       } catch {
         // (one character that cannot be made sense of is one character lost, not everybody)
         bad++;
