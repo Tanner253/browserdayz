@@ -1817,20 +1817,19 @@ export class HUD {
   }
 
   /**
-   * Standing, crouched or lying down, in the corner: three figures, the one the player is lit (the owner, 2026-10-20:
-   * "can we get crouched and standing and prone icons to show in the bottom left so the user knows when theyre
-   * crouched ... currently sometimes players dont know theyre crouched"). Low, it is lit in the warning colour.
+   * Standing, crouched or lying down, in the corner with the mouse's helpers: the figure of how the player is (the
+   * owner, 2026-10-20: "can we get crouched and standing and prone icons to show in the bottom left so the user knows
+   * when theyre crouched"; and of three figures with a word, lit yellow: "we can just show the icon, doesnt need to be
+   * yellow, can be a bit larger so its visable. bottom left like the mouse helpers").
    */
   private setStance(st: Stance | null) {
     if (st === this.stanceNow) return;
     const e = this.el.stance;
-    if (this.stanceNow === undefined) e.innerHTML = STANCES.map(([k, , svg]) => `<svg viewBox="0 0 24 24" data-s="${k}">${svg}</svg>`).join('') + '<b></b>';
     this.stanceNow = st;
     this.toggle(e, 'show', !!st);
     if (!st) return;
-    this.toggle(e, 'low', st !== 'stand');
-    for (const svg of e.querySelectorAll('svg')) svg.classList.toggle('on', svg.dataset.s === st);
-    (e.querySelector('b') as HTMLElement).textContent = STANCES.find(([k]) => k === st)![1];
+    const [, word, svg] = STANCES.find(([k]) => k === st)!;
+    e.innerHTML = `<svg viewBox="0 0 24 24" role="img" aria-label="${word}">${svg}</svg>`;
   }
 
   update(s: {

@@ -104,18 +104,11 @@
 @keyframes hk-in { from { opacity: 0; } }
 .hud-keys.show.quiet { opacity: 0.7; }
 .hud-keys.quiet .hk.gen { display: none; }
-/* how the player stands, under the keys: three small figures, the one they are lit, and its word; crouched or lying
-   down it is lit in the warning colour (the owner: "currently sometimes players dont know theyre crouched") */
-.hud-stance { display: flex; align-items: center; gap: 5px; padding: 5px 11px 5px 9px; background: rgba(8, 10, 9, 0.5); border-left: 2px solid rgba(233, 228, 216, 0.35); }
+/* how the player stands, under the keys: the one figure, bare as the mouse's helpers are (the owner: "currently
+   sometimes players dont know theyre crouched", "can be a bit larger so its visable") */
 .hud-stance:not(.show) { display: none; }
-.hud-stance svg { flex: none; width: 19px; height: 19px; fill: none; stroke: rgba(233, 228, 216, 0.3); stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
-.hud-stance svg circle { fill: rgba(233, 228, 216, 0.3); stroke: none; }
-.hud-stance svg.on { stroke: var(--ink); }
-.hud-stance svg.on circle { fill: var(--ink); }
-.hud-stance b { margin-left: 5px; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
-.hud-stance.low svg.on { stroke: #ffd35a; }
-.hud-stance.low svg.on circle { fill: #ffd35a; }
-.hud-stance.low b { color: #ffd35a; }
+.hud-stance svg { display: block; width: 34px; height: 34px; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9)); }
+.hud-stance svg circle { fill: var(--ink); stroke: none; }
 .hk { display: flex; align-items: center; gap: 7px; font-size: 12px; letter-spacing: 0.04em; color: var(--ink); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); white-space: nowrap; }
 .hk.gen1 { grid-column: 1; }
 .hk-keys { display: flex; gap: 3px; }
