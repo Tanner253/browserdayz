@@ -48,7 +48,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // drive, is told to load the page again with cars that drive.)
 // (53, 2026-10-19: a tag cashes in after twenty minutes, and is on a body after ten alive: every game open on 52's page,
 // counting thirty and twenty, is told to load the page again.)
-export const PROTOCOL = 54;
+// (55, 2026-10-20: the 9A-91, its magazine and its suppressor are new things, and the 9x39 rounds gone: a page from
+// before knows none of them.)
+export const PROTOCOL = 55;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
