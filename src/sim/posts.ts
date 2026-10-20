@@ -25,7 +25,9 @@ export const POSTS: Post[] = [
 export const PILLBOX = {
   model: 'bunker_house',
   floor: 0.305,
-  room: { x0: -2.1, x1: 2.1, z0: -2.75, z1: 2.9 },
+  // (its back wall's face where the model's is: 2.62, its room's own shell as measured in the game; at 2.9 the gun rack
+  // stood 25 cm into the wall seen and the audit, scripts/rack-audit.ts, called it square to it, 2026-10-19)
+  room: { x0: -2.1, x1: 2.1, z0: -2.75, z1: 2.62 },
   tall: 2.45,
   /** half its width and half its length, the yard with it, and the ground levelled round it beyond that */
   half: [3.18, 5.41] as [number, number],
@@ -50,14 +52,15 @@ export const postFoot = (level: number) => level - PILLBOX.floor + 0.02;
  * first of them kept with a gun as a guard post's is (see `arms` in the economy).
  */
 export const POST_ROOM = {
-  rack: { id: 'rack_small', x: 1.0, z: 2.56, rot: Math.PI, boards: [0, 1, 2, 3] },
+  // (out from its wall by its depth: at 2.56 its back stood 24 cm into the wall, as the gun rack's did, 2026-10-19)
+  rack: { id: 'rack_small', x: 1.0, z: 2.31, rot: Math.PI, boards: [0, 1, 2, 3] },
   case: { id: 'weapons_case', x: -1.5, z: 1.7, rot: Math.PI / 2 },
   // (and a gun rack beside the shelf on the back wall: the owner, 2026-10-18, "more of the new weapon lockers ... in
   // military locations". Half way between the case's end and the shelf, a hand clear of each: at -0.62 the case lay
-  // 15 cm into its foot; and out from the wall to the shelf's depth: stood where the shelf is, 2.56, it was 0.61 deep to
-  // the shelf's 0.2 and its back was 30 cm into the wall, seen through: the owner, 2026-10-19, "the rifle rack clips into
+  // 15 cm into its foot; and out from the wall by its own depth: stood where the shelf is, 2.56, it was 0.61 deep to
+  // the shelf's 0.2 and its back was 25 cm into the wall, seen through: the owner, 2026-10-19, "the rifle rack clips into
   // the bunker walls", of these pillboxes)
-  gunRack: { id: 'gun_rack', x: -0.42, z: 2.2, rot: Math.PI },
+  gunRack: { id: 'gun_rack', x: -0.42, z: 2.3, rot: Math.PI },
   floor: [[0, 0.2], [1.2, -1.5], [-1.1, -1.7]] as [number, number][],
 };
 

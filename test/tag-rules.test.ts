@@ -43,7 +43,8 @@ ok(`a dog tag on the ground is gone ${TAG_GROUND / 60} minutes on, with somebody
 
 ok(`no tag of their own round the neck of somebody alive less than ${TAG_FRESH / 60} minutes: the server takes it off what their game says`, () => {
   const src = readFileSync('server/handle.ts', 'utf8');
-  assert.ok(/c\.inv\?\.slots\?\.neck && Date\.now\(\) - c\.lifeAt < TAG_FRESH_MS\) c\.inv\.slots\.neck = null/.test(src), 'the server keeps a fresh player\'s own tag');
+  // (its time inside the Zona since 2026-10-19: tagTime in server/tags.ts)
+  assert.ok(/c\.inv\?\.slots\?\.neck && tagTime\(c\) < TAG_FRESH_MS\) c\.inv\.slots\.neck = null/.test(src), 'the server keeps a fresh player\'s own tag');
   const game = readFileSync('src/game/game/enter.ts', 'utf8');
   assert.ok(/this\.inv\.neck = null;\s*this\.inv\.neckDue = Date\.now\(\) \+ TAG_FRESH \* 1000;/.test(game), 'a new survivor is given their own tag at once');
 });

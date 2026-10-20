@@ -71,10 +71,10 @@ export const KITS: Kit[] = [
       ...many(4, { id: 'mag_sniper50', rounds: 5 }), { id: 'box_50bmg' }, ...many(3, { id: 'mag_mp7', rounds: 40 }), { id: 'box_9mm' }, ...CARE],
   },
   {
-    id: 'barrett', name: 'Barrett', does: 'The Barrett .50, self-loading, with its scope and ten-round magazines; an AKS-74U; a Desert Eagle; the best armour',
+    // (no pistol and no can of rounds: the Barrett and its magazines are heavy, and with them the kit was 67 kg, past what slows the legs)
+    id: 'barrett', name: 'Barrett', does: 'The Barrett .50, self-loading, with its scope and two more ten-round magazines; an AKS-74U; the best armour',
     things: [...WORN, { id: 'barrett', mag: 'mag_barrett', loaded: 11, mods: ['scope_barrett'] }, { id: 'aks74u', mag: 'mag_ak', loaded: 31 },
-      { id: 'deagle', mag: 'mag_deagle_ext', loaded: 11, mods: ['gun_light'] },
-      ...many(3, { id: 'mag_barrett', rounds: 10 }), { id: 'box_50bmg' }, ...many(3, { id: 'mag_ak', rounds: 30 }), { id: 'box_739' }, { id: 'mag_deagle_ext', rounds: 10 }, ...CARE],
+      ...many(2, { id: 'mag_barrett', rounds: 10 }), ...many(2, { id: 'mag_ak', rounds: 30 }), { id: 'box_739' }, ...CARE],
   },
   {
     id: 'silent', name: 'Silent', does: 'The VSSK, quiet by its make, with its PSO scope; a Scorpion EVO; a suppressed M9; the best armour',

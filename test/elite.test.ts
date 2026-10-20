@@ -11,6 +11,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
+import { generateWorld, heightAt } from '../src/world/worldgen';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { TAG_HOLD } from '../src/sim/items';
 
@@ -38,6 +39,7 @@ let logged = '';
 server.stdout!.on('data', (d) => (logged += d));
 server.stderr!.on('data', (d) => (logged += d));
 
+const HEIGHTS = generateWorld().heights;
 class Player {
   ws!: WebSocket;
   got: S2C[] = [];
@@ -55,6 +57,13 @@ class Player {
   }
   send(m: unknown) {
     this.ws.send(JSON.stringify(m));
+  }
+  /** standing at a place, as a game says where it stands (inside the Zona: only time there counts toward a tag of their own, and nobody who dies outside it leaves one, since 2026-10-19) */
+  async stand(x: number, z: number, seconds: number) {
+    for (let k = 0; k < seconds * 10; k++) {
+      this.send({ t: 's', p: [x, heightAt(HEIGHTS, x, z), z, 0, 0, 0], w: null, m: [] });
+      await sleep(100);
+    }
   }
   carry(tags: object[]) {
     this.send({ t: 'me', inv: { slots: {}, active: null, containers: [{ id: 'tags', items: tags.map((t, i) => ({ ...t, x: i, y: 0, rot: false })) }] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
@@ -83,7 +92,7 @@ try {
   console.log('  ok  nobody has a crown who has not been paid at the top rate');
 
   // ---- Bee, alive long enough, dies with her tag; Ann carries it its time and cashes it in: paid at the top rate
-  await sleep(1500);
+  await bee.stand(0, 0, 1.6);
   const tag = (owner: string) => ({ uid: `elite-test-tag-${owner}`, id: 'dogtag', qty: 1, owner, held: TAG_HOLD });
   bee.carry([tag('Bee')]);
   await sleep(300);
@@ -106,6 +115,7 @@ try {
 
   // ---- Cat, alive long enough, dies with hers; Ann cashes it in, and this time is paid less: the crown is off
   top = false;
+  await cat.stand(4, 0, 1.6);
   cat.carry([tag('Cat')]);
   await sleep(300);
   cat.send({ t: 'died', cause: 'test' });
