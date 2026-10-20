@@ -37,11 +37,24 @@ const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new TH
  * the cosine of the widest angle off that way a body can be seen at, and how near a body is seen whichever way it is
  * (its shadow may lie in sight). Before the first look, everybody is seen.
  */
-const SIGHT = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), cos: -1, near: Infinity };
+const SIGHT = { eye: new THREE.Vector3(), fwd: new THREE.Vector3(), cos: -1, near: Infinity, zoom: 1 };
 /** how far out from the hips a body and what it holds can reach, metres, lying or with a long gun up */
 const BODY = 4;
 /** how often a body out of sight is posed all the same, seconds: never further behind than this when it comes into sight */
 const REST_STEP = 0.1;
+/**
+ * And one in sight but far off, how often it is posed, by how far (metres, as the eye sees them: through a scope the
+ * distance over its magnification): every frame within the first; then thirty, fifteen and ten times a second. Its
+ * place is kept up every frame between, so that it moves as smoothly as ever: only its limbs are a frame or two behind,
+ * on a body a few dozen pixels tall. (2026-10-20, with thirty on the server: "the standard is rising".)
+ */
+const FAR_POSE: [number, number][] = [[60, 0], [150, 1 / 30], [300, 1 / 15], [Infinity, 0.1]];
+const farStep = (p: THREE.Vector3) => {
+  if (import.meta.env.DEV && (globalThis as { __poseAll?: boolean }).__poseAll) return 0;
+  const d = Math.hypot(p.x - SIGHT.eye.x, p.y + 0.9 - SIGHT.eye.y, p.z - SIGHT.eye.z) / SIGHT.zoom;
+  for (const [far, step] of FAR_POSE) if (d < far) return step;
+  return 0.1;
+};
 const seen = (p: THREE.Vector3) => {
   // (development: every body posed every frame again, as it was, to measure the difference: progress/ping/rest-ab.js)
   if (import.meta.env.DEV && (globalThis as { __posedAlways?: boolean }).__posedAlways) return true;
@@ -75,6 +88,9 @@ export class RemotePlayer implements Damageable {
   /** out of sight (see update), and the time it has not been posed for */
   private resting = false;
   private owed = 0;
+  /** in sight and far off (see FAR_POSE): the time since it was last posed, and where it was then */
+  private farOwed = 0;
+  private posedAt = new THREE.Vector3();
 
   setGhost(on: boolean) {
     this.ghost = on;
@@ -429,6 +445,8 @@ export class RemotePlayer implements Damageable {
     const half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * Math.hypot(1, cam.aspect)) + 0.17;
     SIGHT.near = Math.max(60, shadowsReach() + 10);
     SIGHT.cos = Math.cos(Math.min(Math.PI, half + Math.asin(Math.min(1, BODY / SIGHT.near))));
+    // (how many times the view is drawn nearer than an unscoped eye's of 75 degrees)
+    SIGHT.zoom = Math.max(1, Math.tan((75 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360));
   }
 
   update(dt: number, now: number, listener: THREE.Vector3) {
@@ -549,16 +567,33 @@ export class RemotePlayer implements Damageable {
       if (!this.alive) this.fall = Math.min(4, this.fall + dt * 2.1);
       return;
     }
+    let back = false;
     if (this.resting) {
       this.resting = false;
       r.visible = this.fall < 4;
       dt = Math.min(0.1, dt + this.owed);
       this.owed = 0;
+      back = true;
     }
-    this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
-    // (sat in it, they lean and tip as it does)
-    if (seat) r.quaternion.copy(seat.jeep.quat);
-    this.placeZones();
+    // (far off: between its posings it is only moved, by as far as it has gone since the last; not sat, flinching or
+    // fallen, whose bodies are turned as well as placed)
+    const step = this.alive && !seat && this.flinch === 0 ? farStep(this.pos) : 0;
+    this.farOwed += dt;
+    if (step && !back && this.farOwed < step) {
+      r.position.x += this.pos.x - this.posedAt.x;
+      r.position.y += this.pos.y - this.posedAt.y;
+      r.position.z += this.pos.z - this.posedAt.z;
+      this.posedAt.copy(this.pos);
+      this.placeZones(false);
+    } else {
+      if (step && !back) dt = Math.min(0.1, this.farOwed);
+      this.farOwed = 0;
+      this.posedAt.copy(this.pos);
+      this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
+      // (sat in it, they lean and tip as it does)
+      if (seat) r.quaternion.copy(seat.jeep.quat);
+      this.placeZones();
+    }
     if (!this.alive) {
       // they go down, lie there for a moment, then the body on the ground takes over
       this.fall = Math.min(4, this.fall + dt * 2.1);
