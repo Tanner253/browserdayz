@@ -94,7 +94,7 @@ function accept(c: Client) {
   named.set(from.key, from.name);
   for (const k of parties.get(pid)!) {
     const o = online(k);
-    if (o) sys(o, o === c ? `You joined ${from.name}'s party.` : `${c.name} joined the party.`);
+    if (o) sys(o, o === c ? `You joined ${from.name}'s party. /leave leaves it.` : `${c.name} joined the party.`);
   }
   tell(pid);
 }
@@ -114,7 +114,8 @@ export function partyCommand(c: Client, text: string): boolean {
   if (verb === 'invite') {
     const want = rest.join(' ').toLowerCase();
     const all = [...clients.values()].filter((o) => o !== c && !o.power.hidden);
-    const found = all.filter((o) => o.name.toLowerCase() === want);
+    // (by name, or by number as the chat box offers them: #12)
+    const found = all.filter((o) => o.name.toLowerCase() === want || `#${o.id}` === want.trim());
     const near = found.length ? found : all.filter((o) => want && o.name.toLowerCase().startsWith(want));
     if (near.length === 1) invite(c, near[0]);
     else sys(c, near.length ? `More than one player is called that: ${near.map((o) => o.name).join(', ')}` : `Nobody called "${rest.join(' ')}" is on the server.`);

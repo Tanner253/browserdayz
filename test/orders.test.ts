@@ -3,13 +3,16 @@
 //   npx tsx test/orders.test.ts
 
 import assert from 'node:assert/strict';
-import { ENTITIES, GROUND, ORDERS, entityBy, offer, ordersOf } from '../src/net/orders';
+import { ENTITIES, GROUND, ORDERS, PARTY_ORDERS, entityBy, offer, ordersOf } from '../src/net/orders';
 
 const here = [{ id: 4, name: 'Bob' }, { id: 12, name: 'Big Bad Wolf' }, { id: 31, name: 'cat' }];
 let checks = 0;
 
-// ---- with no role nothing is offered, and talk is never an order
-assert.equal(offer('/', null, here), null);
+// ---- with no role only the party's orders are offered (the owner, 2026-10-20: "we need commands for players to leave
+// their party"), and talk is never an order
+assert.deepEqual(offer('/', null, here)!.picks.map((p) => p.fill.trim()), PARTY_ORDERS.map((o) => `/${o.name}`));
+assert.deepEqual(offer('/le', null, here)!.picks.map((p) => [p.fill, p.whole]), [['/leave', true]]);
+assert.equal(offer('/kick', null, here), null);
 assert.equal(offer('hello /kick', 'admin', here), null);
 assert.equal(offer('', 'admin', here), null);
 checks++;
@@ -18,7 +21,7 @@ checks++;
 const mod = offer('/', 'mod', here)!, admin = offer('/', 'admin', here)!;
 assert.deepEqual(mod.picks.map((p) => p.fill.trim()), ordersOf('mod').map((o) => `/${o.name}`));
 assert.ok(!mod.picks.some((p) => /^\/(ban|unban|admin|mod|demote|roles|bans)\b/.test(p.fill)), 'a mod was offered an admin order');
-assert.equal(admin.picks.length, ORDERS.length);
+assert.equal(admin.picks.length, PARTY_ORDERS.length + ORDERS.length);
 assert.equal(offer('/ban', 'mod', here), null);
 checks++;
 

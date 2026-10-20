@@ -62,6 +62,8 @@ export class Party {
         row.style.cssText += ';padding-left:12px;background:radial-gradient(circle at 4px 50%, #86d46f 3px, transparent 3.5px)';
         return row;
       }),
+      // (and how to get out of it: "we need commands for players to leave their party once they join one")
+      Object.assign(document.createElement('div'), { textContent: '/leave to leave', style: 'margin-top:3px;font-size:10px;opacity:0.55' }),
     );
   }
 
