@@ -187,8 +187,28 @@
         </div>
       </section>
 
-      <article class="entry" id="west-cars-halloween">
+      <article class="entry" id="smoother-full-server">
         <div class="when"><time datetime="2026-10-20">20 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>Smoother with a busy server</h2>
+          <p class="lead">Other players and the infected cost your game much less, towns no longer freeze for a moment as you arrive, and turning in a fight among trees stutters less. Nothing you see has changed.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/smoother-full-server.jpg" alt="Performance card: walking through Kamenka 39 to 55 frames a second, turning in town 57 to 74, running in town 44 to 55, frames over 50 ms on the walk 45 to 0; measured in Chrome on one test PC at 1920x1080, full graphics."></figure>
+          </div>
+          <ul>
+            <li><b>Kamenka with twenty players round you:</b> 39 → 55 frames a second walking, 57 → 74 turning, 44 → 55 running, and no frames over 50 ms on the walk (45 before). Measured in Chrome on one test PC at 1920×1080 with full graphics, the same route before and after, two runs each.</li>
+            <li><b>Bodies out of sight rest:</b> players and the infected behind you, whose shadows can't fall where you're looking, are moved ten times a second and not drawn. They catch up the moment they come into view.</li>
+            <li><b>Bodies are posed more cheaply:</b> a body works out only the joints that moved, not its whole skeleton over and over, and its bones are left out of what the graphics card is asked to look through.</li>
+            <li><b>Towns:</b> the pictures of everything within 500 m are sent to the graphics card a little at a time, before you get there, so walking or driving into a town no longer stops the game for a moment while they are sent.</li>
+            <li><b>Trees in a fight:</b> the far trees are no longer sorted and re-sent to the graphics card at every small turn of the view.</li>
+            <li><b>Infected at arm's length</b> no longer make moving heavy: a body pressed into yours no longer slows every step you take.</li>
+            <li><b>A parked helicopter</b> nearby no longer has the distant shadows redrawn every frame.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="west-cars-halloween">
+        <div class="when"><time datetime="2026-10-20">20 Oct 2026</time></div>
         <div>
           <h2>The 9A-91, cars in the west, Halloween on the site</h2>
           <p class="lead">A new rifle with a folding stock, the Barrett's bipod only lying down, cars that stay in the west, your stance on screen, a way to leave a party, a recorded police siren, and the loading screen and the site's top bar come alive for Halloween.</p>
