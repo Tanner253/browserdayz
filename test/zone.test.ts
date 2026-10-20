@@ -80,9 +80,9 @@ class Player {
   }
 }
 
-// (Outside: the woods between Lipki and the works, out of the Zona as the owner drew it on 2026-10-18. It was the
-// north-west corner, -470, -470, which the drawing takes in.)
-const IN: [number, number] = [0, 0], OUT: [number, number] = [-700, 300];
+// (Outside: the desert, west of the Zona's line at x -1950 since 2026-10-19. It was the woods between Lipki and the
+// works while the Zona was the owner's drawing of 2026-10-18, and the north-west corner, -470, -470, before.)
+const IN: [number, number] = [0, 0], OUT: [number, number] = [-2200, 0];
 let failed: unknown = null;
 try {
   assert.ok(inPlay(...IN) && !inPlay(...OUT), 'the two places of this test are not one inside the Zona and one outside');
@@ -115,6 +115,8 @@ try {
   await eve.join();
   await sleep(3300);
   const old = { uid: 'zone-test-tag-eve-1', id: 'dogtag', qty: 1, owner: 'Eve' };
+  // (inside the Zona: whoever dies outside it leaves no tag at all, since 2026-10-19)
+  await eve.stand(...IN, 0.4);
   eve.carry([old]);
   await sleep(300);
   eve.send({ t: 'died', cause: 'test' });
@@ -133,6 +135,7 @@ try {
   await sleep(3200);
   // Bee dies with her own tag round her neck: the server now knows that tag as one that can be taken
   const tag = { uid: 'zone-test-tag-bee', id: 'dogtag', qty: 1, owner: 'Bee', held: TAG_HOLD };
+  await bee.stand(...IN, 0.4);
   bee.carry([tag]);
   await sleep(300);
   bee.send({ t: 'died', cause: 'test' });
