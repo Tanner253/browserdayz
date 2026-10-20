@@ -205,7 +205,8 @@ function page(book: Book, s: Snapshot, now: number): string {
   const chart = days.length
     ? `<div class="chart">${days.map(([day, d]) => `<div class="col" title="${esc(dayName(day))}: ${d.n} ${d.n === 1 ? 'tag' : 'tags'}, ${amount(d.lamports)} SOL"><b>${amount(d.lamports)}</b><i style="height:${Math.max(3, Math.round((d.lamports / most) * 100))}%"></i><span>${esc(dayName(day))}</span><small>${d.n} ${d.n === 1 ? 'tag' : 'tags'}</small></div>`).join('')}</div>`
     : '<p class="none">Nothing paid yet.</p>';
-  const top = [...byWallet.entries()].sort((p, q) => q[1].lamports - p[1].lamports).slice(0, 6);
+  // (the best fifty, the list scrolled: the owner, 2026-10-19, "our payouts panel needs a scroll wheel for best paid, render top 50 paid players")
+  const top = [...byWallet.entries()].sort((p, q) => q[1].lamports - p[1].lamports).slice(0, 50);
   const topMost = Math.max(1, ...top.map(([, v]) => v.lamports));
   const board = top.length
     ? `<ol class="board">${top.map(([wl, v]) => `<li><a href="https://solscan.io/account/${esc(wl)}" target="_blank" rel="noopener"><code>${esc(short(wl))}</code></a><span class="track"><i style="width:${Math.max(4, Math.round((v.lamports / topMost) * 100))}%"></i></span><b class="sol">${amount(v.lamports)} SOL</b><small>${v.n} ${v.n === 1 ? 'tag' : 'tags'}</small></li>`).join('')}</ol>`
@@ -325,7 +326,7 @@ function page(book: Book, s: Snapshot, now: number): string {
   .col b { margin-bottom: 5px; font: 700 15px/1 var(--cond); font-variant-numeric: tabular-nums; }
   .col span { margin-top: 7px; font: 12px/1 var(--mono); color: var(--dim); }
   .col small { margin: 3px 0 9px; font: 11px/1 var(--mono); color: var(--faint); white-space: nowrap; }
-  .board { margin: 0; padding: 6px 14px; list-style: none; counter-reset: n; background: var(--panel); border: 1px solid var(--line); }
+  .board { margin: 0; padding: 6px 14px; list-style: none; counter-reset: n; background: var(--panel); border: 1px solid var(--line); max-height: 330px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .board li { counter-increment: n; display: grid; grid-template-columns: 22px 92px minmax(0, 1fr) auto 58px; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
   .board li:last-child { border-bottom: 0; }
   .board li::before { content: counter(n); font: 700 14px/1 var(--cond); color: var(--faint); }
@@ -464,7 +465,7 @@ ${tiersSection}
       ${chart}
     </div>
     <div>
-      <h2>The best-paid wallets <small>${partial ? 'of those listed' : 'so far'}</small></h2>
+      <h2>The best-paid wallets <small>${top.length > 6 ? `the top ${top.length}, ` : ''}${partial ? 'of those listed' : 'so far'}</small></h2>
       ${board}
     </div>
   </section>
