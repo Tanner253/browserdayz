@@ -71,7 +71,7 @@ const ART = { sheet: 'assets/fx/blast.webp', figures: 'assets/fx/blast.json', th
 type Rect = [number, number, number, number];
 const tile = (i: number): Rect => [(i % 4) / 4, Math.floor(i / 4) / 4, ((i % 4) + 1) / 4, (Math.floor(i / 4) + 1) / 4];
 
-export type BlastKind = 'grenade' | 'drum' | 'vehicle';
+export type BlastKind = 'grenade' | 'frag' | 'drum' | 'vehicle';
 /** what a blast can be standing on, as far as what it throws and what dust it raises go */
 export type Ground = 'grass' | 'dirt' | 'rock' | 'gravel' | 'asphalt' | 'concrete' | 'snow' | 'wood' | 'metal' | 'other';
 
@@ -122,6 +122,20 @@ const KIND = {
     thrown: 0.7, burn: 2.0,
     light: { flash: 260, fast: 0.2, ball: 70, ballFor: 0.5, reach: 30, color: [1, 0.72, 0.4] },
     shake: 0.02, flames: 0,
+  },
+  // (the frag: the grenade's twice over, every length doubled and more of everything to fill it, as its blast reaches
+  // twice as far: the owner, 2026-10-19, "regular grenades t4-5 and do 2x damage and 2x blast radius and 2x explosion size")
+  frag: {
+    flash: [3.0, 5.0],
+    fire: { n: 18, r: [0.9, 3.8], life: [0.55, 0.9], out: 10, rise: 6, lift: 2, over: 0.1, heat: 1.7 },
+    smoke: { n: 14, r: [1.1, 5.4], life: [3.6, 5.2], out: 6.4, up: [5, 11], lift: 1.6, dark: 0.11, pale: 0.21, lit: 0.32, litFor: 0.2, over: [0.03, 0.2] },
+    column: null as null | { n: number; r: number[]; life: number[]; up: number; over: number[]; from: number },
+    dust: { n: 16, reach: 10, r: [0.9, 3.0], life: [1.8, 3.0] },
+    ring: 8.4, shock: [8, 0.16],
+    spray: 5, embers: 3, sparks: { n: 22, speed: [16, 36], life: [0.3, 0.8] },
+    thrown: 1.4, burn: 4.0,
+    light: { flash: 420, fast: 0.24, ball: 110, ballFor: 0.7, reach: 60, color: [1, 0.72, 0.4] },
+    shake: 0.035, flames: 0,
   },
   drum: {
     flash: [2.0, 3.4],

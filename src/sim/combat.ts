@@ -61,7 +61,8 @@ const gunRules = (): Record<string, WeaponRule> =>
  * a rule the server knows being one a doctored game may claim. What the server believes of a blast claimed by
  * either grenade is in src/sim/grenades.ts.
  */
-export const FRAG_RULE: WeaponRule = { damage: 200, melee: false, range: 70, interval: 0, falloff: 1, blast: 10, car: 1 };
+// (twice the damage and twice the reach it had, 200 within 10 m: the owner, 2026-10-19, "regular grenades t4-5 and do 2x damage and 2x blast radius")
+export const FRAG_RULE: WeaponRule = { damage: 400, melee: false, range: 70, interval: 0, falloff: 1, blast: 20, car: 1 };
 
 export const WEAPON_RULES: Record<string, WeaponRule> = {
   ...gunRules(),

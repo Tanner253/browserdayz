@@ -55,13 +55,14 @@ ok('"2 stick grenades or 1 frag grenade blows up a car"', () => {
   assert.ok(carDamage(WEAPON_RULES.grenade) < JEEP.hp && 2 * carDamage(WEAPON_RULES.grenade) >= JEEP.hp);
 });
 
-ok('it is found where the stick grenade is and rarer, from the third step up and never below it; the trader buys it and does not sell it', () => {
+ok('the stick grenade on the first three steps and the frag on the fourth and fifth, and nowhere else; the trader buys it and does not sell it', () => {
+  // (the owner, 2026-10-19: "stick grenades t1-3 regular grenades t4-5". It had been found where the stick grenade was, rarer, from the third step up)
   const s = TYPES.grenade, f = TYPES.frag;
   assert.ok(f, 'the frag grenade is kept nowhere');
-  assert.deepEqual(f.at.slice(0, 2), [0, 0], 'a frag grenade on the outskirts or in the village');
-  assert.ok(f.at[2] > 0 && f.at[3] > 0 && f.at[4] > 0, 'no frag grenade on a step from the third up');
-  f.at.forEach((n, k) => assert.ok(n <= s.at[k], `more frag grenades than stick grenades on step ${k + 1}`));
-  assert.ok(f.at.reduce((a, b) => a + b, 0) < s.at.reduce((a, b) => a + b, 0) / 2, 'not much rarer than the stick grenade');
+  assert.deepEqual([f.at[0], f.at[1], f.at[2]], [0, 0, 0], 'a frag grenade below the fourth step');
+  assert.ok(f.at[3] > 0 && f.at[4] > 0, 'no frag grenade on the fourth or the fifth step');
+  assert.deepEqual([s.at[3], s.at[4]], [0, 0], 'a stick grenade from the fourth step up');
+  assert.ok(s.at[0] > 0 && s.at[1] > 0 && s.at[2] > 0, 'no stick grenade on one of the first three steps');
   assert.ok(f.restock > s.restock);
   assert.deepEqual(f.usage, s.usage);
   assert.ok(worth('frag') > worth('grenade') && !STOCK.includes('frag'));
@@ -203,8 +204,9 @@ ok('the server: a blast is no further from the hand than the grenade can have fl
   assert.ok(hitDamage('frag', 'torso', got) < WEAPON_RULES.frag.damage * 0.75, 'said to be at the middle of a blast that cannot have been within four metres, and hurt as if they were');
   // (and a game that says further is taken at its word: it is never made to hurt more than it says)
   assert.equal(judge(cooked(), 'frag', 'p2', chest(18), 9, T0 + FUSE), 9);
-  // beyond its flight and its blast together: not reached at all
-  assert.equal(judge(cooked(), 'frag', 'p2', chest(30), 0, T0 + FUSE), null, 'a grenade with 0.4 s left reached somebody thirty metres off');
+  // beyond its flight and its blast together: not reached at all (thirty metres while the frag's blast was ten)
+  const beyond = Math.ceil(reach + WEAPON_RULES.frag.blast! + NADE.slack + 2);
+  assert.equal(judge(cooked(), 'frag', 'p2', chest(beyond), 0, T0 + FUSE), null, `a grenade with 0.4 s left reached somebody ${beyond} metres off`);
   // (thrown with all its fuse it can have gone a long way, and the game's word stands: this is what is on trust)
   const tap = newThrower();
   pullPin(tap, 'frag', T0);
@@ -407,7 +409,8 @@ try {
   ada.stand(60, 0);
   ben.stand(66, 0);
   cy.stand(76, 0);
-  dee.stand(90, 0);
+  // (forty metres from Ada: beyond the frag's flight and its blast of twenty since 2026-10-19; it was thirty)
+  dee.stand(100, 0);
   await sleep(600);
   const fuse = THROWN.frag.fuse * 1000;
   const hit = (to: Player, w: string, dist: number) => ada.send({ t: 'hit', to: to.id, zone: 'torso', w, dist, sup: false, bonus: 0 });
@@ -476,7 +479,7 @@ try {
     const [b, c, d] = [ben, cy, dee].map((p, k) => p.dmg(marks[k]));
     assert.equal(b.length, 1);
     near(b[0].amount, WEAPON_RULES.frag.damage, 0.01, 'somebody inside its flight, said to be at the middle of it');
-    assert.equal(d.length, 0, 'a grenade with 0.4 s left reached somebody thirty metres from the hand');
+    assert.equal(d.length, 0, 'a grenade with 0.4 s left reached somebody forty metres from the hand');
     assert.equal(c.length, 1, 'somebody sixteen metres from the hand, inside its flight and its blast together, was not reached');
     // (the server heard the throw a few ms either side of when it was sent: what it allows for the flight is within a metre or so of this)
     const least = Math.hypot(cy.x - ada.x, cy.chest()[1] - ada.hand()[1]) - travel(Math.hypot(...v), (400 + NADE.lag) / 1000) - NADE.slack;
@@ -484,7 +487,7 @@ try {
     near(c[0].amount, hitDamage('frag', 'torso', least), 30, 'what is done to somebody the blast cannot have been near, said to be at the middle of it');
     assert.ok(c[0].amount < WEAPON_RULES.frag.damage * 0.95, 'the game\'s word was taken for a blast nearer than the grenade can have got');
     checks++;
-    console.log(`  ok  over the wire: cooked to its last 0.4 s, it reaches nobody 30 m off, and somebody 16 m off as from no nearer than it can have flown (${c[0].amount.toFixed(0)}, not ${WEAPON_RULES.frag.damage})`);
+    console.log(`  ok  over the wire: cooked to its last 0.4 s, it reaches nobody 40 m off, and somebody 16 m off as from no nearer than it can have flown (${c[0].amount.toFixed(0)}, not ${WEAPON_RULES.frag.damage})`);
   }
 
   // ---- held to the end: its game says it went off in the hand, and the server puts it where it has its holder standing

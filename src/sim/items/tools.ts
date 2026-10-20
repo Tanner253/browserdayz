@@ -56,14 +56,15 @@ export const TOOL_ITEMS: ItemDef[] = [
     // (The frag grenade, 2026-10-13: where the stick grenade is and rarer, from the third step up and never below
     // it. One in Kamenka, two under the gas, two down the bunker, and half as long again coming back. Down the bunker
     // every place is spoken for: its two are two of the stick grenade's four, which are two now.)
-    loot: { pair: 'RGD5Grenade', at: [0, 2, 8, 5, 2], restock: 1200, usage: ['Military'], lean: 2 },
+    // (from the first step to the third, and the frag from the fourth: the owner, 2026-10-19, "stick grenades t1-3 regular grenades t4-5")
+    loot: { pair: 'RGD5Grenade', at: [1, 2, 8, 0, 0], restock: 1200, usage: ['Military'], lean: 2 },
     worth: 15, sells: 2,
   },
   // (The frag grenade, 2026-10-13: "i added a new frag grenade, it takes up 1x1 in the inventory and does more
   // damage as the stick grenade". An M67, life size: 0.4 kg, where the stick grenade is 0.6. Its pin is out sooner
   // than a cord is pulled.)
-  { id: 'frag', name: 'Frag Grenade', model: 'frag_grenade', w: 1, h: 1, weight: 0.4, category: 'misc', desc: 'A steel ball the size of a fist: one place in a pocket. Hold the button to pull the pin, let go to throw. Four seconds from the pull, in your hand or out of it, then everything within ten metres is hurt, and worse than by a stick grenade. One is the end of a car.', use: { verb: 'Throw', time: 0.6, sound: 'bandage' }, throw: { fuse: 4, damage: 200, radius: 10 },
-    loot: { pair: 'M67Grenade', at: [0, 0, 2, 2, 2], restock: 1800, usage: ['Military'] },
+  { id: 'frag', name: 'Frag Grenade', model: 'frag_grenade', w: 1, h: 1, weight: 0.4, category: 'misc', desc: 'A steel ball the size of a fist: one place in a pocket. Hold the button to pull the pin, let go to throw. Four seconds from the pull, in your hand or out of it, then everything within twenty metres is hurt, and twice as badly as by a stick grenade. One is the end of a car.', use: { verb: 'Throw', time: 0.6, sound: 'bandage' }, throw: { fuse: 4, damage: 400, radius: 20 },
+    loot: { pair: 'M67Grenade', at: [0, 0, 0, 6, 4], restock: 1800, usage: ['Military'] },
     worth: 22,
   },
   // ---------------------------------------------------------------- identity

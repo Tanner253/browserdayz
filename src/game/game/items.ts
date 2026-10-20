@@ -531,7 +531,7 @@ export const itemsMethods = {
     const spec = { damage: rule.damage, radius: rule.blast! };
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
-    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : 'grenade');
+    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' ? 'frag' : 'grenade');
     audio.explosion(at, far, drum);
     if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
     /** how much of the blast reaches a point: nothing through a wall, less with every metre */
