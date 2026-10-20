@@ -181,11 +181,16 @@ export const GUN_ITEMS: ItemDef[] = [
     loot: { pair: 'M4A1', at: [0, 0, 2, 3, 1], restock: 420, usage: ARMY, loaded: [5, 20], keep: SOON, on: { 3: { restock: 3000, mag: 0.12 } }, fitted: [['red_dot', 0.2], ['foregrip', 0.2], ['gun_light', 0.15], ['suppressor_556', 0.06], ['mag_ar_60', 0.05]], rack: { fort: 2 }, lean: 3 },
     worth: 60,
   },
+  // The rifles' rounds (7.62x39, 5.56, 7.62x54 and their boxes) kept east, a few in the middle and none further west
+  // (the owner, 2026-10-19: "people with powerful guns are playing in the desert shooting freshies a lot. i think if
+  // they didnt have the ammo to sustain this they would struggle to do so and would have to spend more time east").
+  // They had been kept mostly on Tier 3, and 7.62x54 on the first two as well. (Fewer in all: the fourth and fifth steps
+  // are full, and any more there cut what else they hold; they keep as many as they did.)
   {
     id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.008, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Loose rifle cartridges, for the AK. They go into its magazine by hand.',
     // 7.39 and 5.56: the rifles'. Light where the army and the police were below the gas, heavier from the gas up.
-    loot: { pair: 'Ammo_762x39', at: [0, 1, 12, 5, 3], restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
+    loot: { pair: 'Ammo_762x39', at: [0, 0, 2, 5, 3], restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
     worth: 0.7,
   },
   {
@@ -193,21 +198,21 @@ export const GUN_ITEMS: ItemDef[] = [
     desc: 'Loose rifle cartridges, small and fast, for the AR-15. They go into its magazine by hand.',
     // (the AR-15's rounds by a rate: one police or army spot in sixteen in the village, one in twelve in Kamenka, most of
     // them at the police stations; a box in sixty and in forty. See `per`.)
-    loot: { pair: 'Ammo_556x45', at: [0, 0, 26, 4, 4], per: [0, 1 / 16, 1 / 12, 0, 0], restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
+    loot: { pair: 'Ammo_556x45', at: [0, 0, 4, 6, 4], restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
     worth: 0.7,
   },
   {
     id: 'box_739', name: '7.62x39 Ammo Box', model: 'ammo_box_739', w: 1, h: 1, weight: 0.23, category: 'ammo',
     desc: 'A sealed box of 25 cartridges for the AK. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_739', qty: 25, time: 2.2 },
-    loot: { pair: 'AmmoBox_762x39_20Rnd', at: [0, 0, 3, 3, 2], restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON, lean: 3 },
+    loot: { pair: 'AmmoBox_762x39_20Rnd', at: [0, 0, 1, 3, 2], restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON, lean: 3 },
     sells: 3,
   },
   {
     id: 'box_556', name: '5.56x45 Ammo Box', model: 'ammo_box_556', w: 1, h: 1, weight: 0.13, category: 'ammo',
     desc: 'A sealed box of 25 cartridges for the AR-15. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_556', qty: 25, time: 2.2 },
-    loot: { pair: 'AmmoBox_556x45_20Rnd', at: [0, 0, 7, 2, 3], per: [0, 1 / 60, 1 / 40, 0, 0], restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON, lean: 4 },
+    loot: { pair: 'AmmoBox_556x45_20Rnd', at: [0, 0, 1, 2, 3], restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON, lean: 4 },
     sells: 3,
   },
   {
@@ -231,7 +236,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.009, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
     // 7.62: the sniper rifle's. A hunter has some.
-    loot: { pair: 'Ammo_762x54', at: [2, 2, 15, 5, 2], restock: 120, usage: [...ARMY, 'Hunting'], favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
+    loot: { pair: 'Ammo_762x54', at: [0, 0, 2, 5, 2], restock: 120, usage: [...ARMY, 'Hunting'], favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
     worth: 0.6,
   },
   {
@@ -301,7 +306,7 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box_762', w: 1, h: 1, weight: 0.255, category: 'ammo',
     desc: 'A sealed box of 25 rifle cartridges. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_762', qty: 25, time: 2.2 },
-    loot: { pair: 'AmmoBox_762x54_20Rnd', at: [0, 1, 8, 6, 2], restock: 180, usage: ARMY, favour: ARMOURY, keep: SOON, lean: 2.5 },
+    loot: { pair: 'AmmoBox_762x54_20Rnd', at: [0, 0, 1, 4, 2], restock: 180, usage: ARMY, favour: ARMOURY, keep: SOON, lean: 2.5 },
     sells: 4,
   },
   {

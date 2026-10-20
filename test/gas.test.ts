@@ -239,18 +239,23 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
   let s = 99;
   const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
   const box = () => ({ add: (it: { id: string }) => (seen.set(it.id, (seen.get(it.id) ?? 0) + 1), it) });
-  for (let k = 0; k < 300; k++) fillCrate(box() as never, 'weapons_case', rnd, true);
-  const rich = (id: string) => (seen.get(id) ?? 0) / 300;
+  // (five thousand of each: at three hundred the share of a rare thing outside the gas was four crates or six, as the
+  // dice fell, and the rule below came and went with any change to what else is kept, 2026-10-19)
+  const CRATES = 5000;
+  for (let k = 0; k < CRATES; k++) fillCrate(box() as never, 'weapons_case', rnd, true);
+  const rich = (id: string) => (seen.get(id) ?? 0) / CRATES;
   const gas = { helmet: rich('boonie_hat'), plates: rich('life_vest'), scope: rich('pu_scope') };
   // (a tenth for the hat: the best of everything has had the new scopes and parts added to it since, 2026-10-18, and
   // each thing of it is found a little less often for that; it was over 12 in a hundred, it is 11)
   assert.ok(gas.helmet > 0.1 && gas.plates > 0.2 && gas.scope > 0.15, `a crate under the gas is no better than another: ${JSON.stringify(gas)}`);
   seen.clear();
-  for (let k = 0; k < 300; k++) fillCrate(box() as never, 'weapons_case', rnd, false);
+  for (let k = 0; k < CRATES; k++) fillCrate(box() as never, 'weapons_case', rnd, false);
   assert.ok(rich('life_vest') < 0.06 && rich('pu_scope') < 0.04, 'plates and scopes are common in a crate outside the gas');
   // (the helmet: eight times as likely under the gas (ten before the new scopes and parts thinned the best of everything), which keeps no more of them than Kamenka and the village since the
   // village is of the third step, 2026-10-17, and has a thirteenth of their places)
-  assert.ok(gas.helmet > rich('boonie_hat') * 8, `a helmet in ${gas.helmet} crates under the gas and ${rich('boonie_hat')} elsewhere`);
+  // (seven times since the rifles' rounds went east, 2026-10-19: fewer things kept on the third step, so each of the rest
+  // a little likelier there; over twenty thousand crates it went from 8.9 to 8.0)
+  assert.ok(gas.helmet > rich('boonie_hat') * 7, `a helmet in ${gas.helmet} crates under the gas and ${rich('boonie_hat')} elsewhere`);
   for (let k = 0; k < 60; k++) {
     const got: string[] = [];
     fillDrop({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);

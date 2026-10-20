@@ -91,10 +91,13 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
     const short = full(t) >= 0.95 ? Math.max(Math.ceil(want / 2), Math.min(want, 3)) : full(t) >= 0.85 ? Math.max(2, Math.ceil(want * 0.2)) : 1;
     assert.ok(got >= want - short && got <= want + spare, `${id} on step ${t}: ${got}, and ${want} are wanted`);
   }
-  // (the AR-15's rounds by a rate: some at most police and army places in the village and Kamenka, the owner, 2026-10-15:
-  // "someone with an AR needs to be able to loot reliable places for ammo not set spawns, just spawn frequency")
-  // (the second step's army places the desert's post and the west's, since the valley's camp and checkpoints went to the third with the village, 2026-10-18)
-  assert.ok(e.kept('ammo_556', 2) >= 4 && e.kept('ammo_556', 3) >= 20, `5.56 kept: ${e.kept('ammo_556', 2)} at the second step's army places, ${e.kept('ammo_556', 3)} in Kamenka, the village and the valley's camp`);
+  // (the rifles' rounds kept east: none on the first two steps, a few on the third, most from the fourth on. The owner,
+  // 2026-10-19: "if they didnt have the ammo to sustain this they would struggle to do so and would have to spend more
+  // time east". It had been the other way, 2026-10-15: "someone with an AR needs to be able to loot reliable places")
+  for (const id of ['ammo_556', 'ammo_739', 'ammo_762', 'box_556', 'box_739', 'box_762']) {
+    const k = STEPS.map((t) => e.kept(id, t));
+    assert.ok(k[0] === 0 && k[1] === 0 && k[2] <= 4 && k[3] >= k[2], `${id} kept by step: ${k.join(' / ')}`);
+  }
 });
 
 const kind = (p: (typeof points)[number], ...kinds: string[]) => kinds.some((k) => p.usage.includes(k as never));
@@ -209,7 +212,8 @@ ok('every calibre where the police and the army were, from the village on: heavy
     // station has low caliber weapons and all ammos": every calibre lies at the police of the village and of Kamenka)
     for (const t of [2, 3] as Tier[]) {
       const there = new Set(all.filter(({ p }) => p.tier === t && kind(p, ...KEPT_GUNS)).map(({ id }) => id));
-      for (const [id] of OF) assert.ok(there.has(id), `no ${id} where the police and the army were on step ${t}`);
+      // (but no rifle's rounds on the second step: kept east since 2026-10-19, see the rule above)
+      for (const [id] of OF) if (t === 3 || !['ammo_762', 'ammo_739', 'ammo_556'].includes(id)) assert.ok(there.has(id), `no ${id} where the police and the army were on step ${t}`);
     }
     const hq = new Set(all.filter(({ p }) => /^police_(hq|cells|garage)/.test(p.building)).map(({ id }) => id));
     assert.ok(OF.filter(([id]) => hq.has(id)).length >= 6, `the big police station has ${OF.filter(([id]) => hq.has(id)).map(([id]) => id).join(', ')} and no more`);
