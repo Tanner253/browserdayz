@@ -27,6 +27,14 @@ import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
+export type Stance = 'stand' | 'crouch' | 'prone';
+/** the corner's three figures: which, its word, and how it is drawn (a round head and lines for the body, in 24 by 24) */
+const STANCES: [Stance, string, string][] = [
+  ['stand', 'Standing', '<circle cx="12" cy="3.6" r="2.3"/><path d="M12 7.5v7M12 9.5l-3.4 3.6M12 9.5l3.4 3.6M12 14.5l-2.6 6.8M12 14.5l2.6 6.8"/>'],
+  ['crouch', 'Crouched', '<circle cx="14.2" cy="6.6" r="2.3"/><path d="M13.2 9.6L10 15.2M10 15.2l5 1.4-.8 4.6M10 15.2L8.3 21.2M12.3 11.2l3.4 2.6"/>'],
+  ['prone', 'Prone', '<circle cx="3.9" cy="14.4" r="2.2"/><path d="M6.6 15.9l8.6 1.1M15.2 17l6.4-.9M15.2 17l5.9 2.3M8.6 16.2l1.7 3.5"/>'],
+];
+
 /**
  * The settings, a page at a time, as a game has them (2026-10-13: "tab the settings menu like a video game would be
  * tabbed"): what each page is called. The first is the one shown when the settings are opened, and that is the
@@ -182,6 +190,8 @@ export class HUD {
   /** the survivor's state: the symbols in the corner, and the same in words for the inventory (src/ui/status-view.ts) */
   private status: StatusView;
   private keys: KeysView;
+  /** the stance last drawn in the corner: the corner is written only when it changes */
+  private stanceNow: Stance | null | undefined;
 
   /** the splashes as plain pictures, once drawn (see bakeSplashes) */
   private splashes: string[] | null = null;
@@ -194,7 +204,7 @@ export class HUD {
       <div class="hud-cross"><i></i><i></i><i></i><i></i></div>
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
-      <div class="hud-side"><div class="hud-acts"></div><div class="hud-keys"></div></div>
+      <div class="hud-side"><div class="hud-acts"></div><div class="hud-keys"></div><div class="hud-stance"></div></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
       <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
@@ -373,7 +383,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'stance', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -1806,6 +1816,23 @@ export class HUD {
     (this.root.querySelector('.hud-dead .dead-btn') as HTMLButtonElement).onclick = cb;
   }
 
+  /**
+   * Standing, crouched or lying down, in the corner: three figures, the one the player is lit (the owner, 2026-10-20:
+   * "can we get crouched and standing and prone icons to show in the bottom left so the user knows when theyre
+   * crouched ... currently sometimes players dont know theyre crouched"). Low, it is lit in the warning colour.
+   */
+  private setStance(st: Stance | null) {
+    if (st === this.stanceNow) return;
+    const e = this.el.stance;
+    if (this.stanceNow === undefined) e.innerHTML = STANCES.map(([k, , svg]) => `<svg viewBox="0 0 24 24" data-s="${k}">${svg}</svg>`).join('') + '<b></b>';
+    this.stanceNow = st;
+    this.toggle(e, 'show', !!st);
+    if (!st) return;
+    this.toggle(e, 'low', st !== 'stand');
+    for (const svg of e.querySelectorAll('svg')) svg.classList.toggle('on', svg.dataset.s === st);
+    (e.querySelector('b') as HTMLElement).textContent = STANCES.find(([k]) => k === st)![1];
+  }
+
   update(s: {
     /** seconds of the game's own time this frame is: what the vitals are changing by is measured against it */
     dt: number;
@@ -1821,6 +1848,8 @@ export class HUD {
     acts?: HandAct[] | null;
     /** the keys that do something now, for the corner (src/game/key-hints.ts) */
     keys?: KeyHints | null;
+    /** how the player stands, for the corner (null: in a seat, dead, or not yet playing) */
+    stance?: Stance | null;
     /** a phone: the buttons are named, where a mouse is drawn */
     touch?: boolean;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
@@ -1955,6 +1984,7 @@ export class HUD {
     }
     this.toggle(e.acts, 'show', !!acts);
     this.keys.show(s.keys);
+    this.setStance(s.stance ?? null);
     this.toggle(e.mark, 'show', !!s.mark);
     if (s.mark) {
       const at = `${(s.mark[0] * 100).toFixed(1)}%|${(s.mark[1] * 100).toFixed(1)}%`;
