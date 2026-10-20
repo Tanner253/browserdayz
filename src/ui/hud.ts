@@ -7,6 +7,8 @@ import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
 import { bleedLevel } from './status';
 import { StatusView, figuresWanted, symbol, wantFigures } from './status-view';
+import { KeysView } from './keys-view';
+import type { KeyHints } from '../game/key-hints';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
@@ -24,6 +26,14 @@ import { dogTag } from './dogtag';
 import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
+
+export type Stance = 'stand' | 'crouch' | 'prone';
+/** the corner's three figures: which, its word, and how it is drawn (a round head and lines for the body, in 24 by 24) */
+const STANCES: [Stance, string, string][] = [
+  ['stand', 'Standing', '<circle cx="12" cy="3.6" r="2.3"/><path d="M12 7.5v7M12 9.5l-3.4 3.6M12 9.5l3.4 3.6M12 14.5l-2.6 6.8M12 14.5l2.6 6.8"/>'],
+  ['crouch', 'Crouched', '<circle cx="14.2" cy="6.6" r="2.3"/><path d="M13.2 9.6L10 15.2M10 15.2l5 1.4-.8 4.6M10 15.2L8.3 21.2M12.3 11.2l3.4 2.6"/>'],
+  ['prone', 'Prone', '<circle cx="3.9" cy="14.4" r="2.2"/><path d="M6.6 15.9l8.6 1.1M15.2 17l6.4-.9M15.2 17l5.9 2.3M8.6 16.2l1.7 3.5"/>'],
+];
 
 /**
  * The settings, a page at a time, as a game has them (2026-10-13: "tab the settings menu like a video game would be
@@ -179,6 +189,9 @@ export class HUD {
   private last: Record<string, string> = {};
   /** the survivor's state: the symbols in the corner, and the same in words for the inventory (src/ui/status-view.ts) */
   private status: StatusView;
+  private keys: KeysView;
+  /** the stance last drawn in the corner: the corner is written only when it changes */
+  private stanceNow: Stance | null | undefined;
 
   /** the splashes as plain pictures, once drawn (see bakeSplashes) */
   private splashes: string[] | null = null;
@@ -191,7 +204,7 @@ export class HUD {
       <div class="hud-cross"><i></i><i></i><i></i><i></i></div>
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
-      <div class="hud-acts"></div>
+      <div class="hud-side"><div class="hud-acts"></div><div class="hud-keys"></div><div class="hud-stance"></div></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
       <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
@@ -370,7 +383,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'acts', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'stance', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -378,6 +391,7 @@ export class HUD {
     // (set again in Emotes: the wedges drawn afresh)
     onWheelSlots((ids) => this.el.wheel.querySelector('svg')?.replaceWith(document.createRange().createContextualFragment(wheelSvg(ids))));
     this.status = new StatusView(this.el.vitals);
+    this.keys = new KeysView(this.el.keys, mouseSvg);
     this.buildCompass();
     // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it. What X
     // gave is shut into a pill the moment it is there, and the changelog is put over it: see `mountNews`.)
@@ -1223,15 +1237,18 @@ export class HUD {
    * The same number on the start / pause screen.
    * @param max how many the server holds, when known: a full server says so, and how long the line is
    * @param waiting how many are in line for it
+   * @param asleep bodies of those who just left, still in the world: in the number shown (as in the game's own count), not
+   *   in whether it is full (the server's cap counts only those playing)
    */
-  setStartOnline(count: number | null, max = 0, waiting = 0) {
+  setStartOnline(count: number | null, max = 0, waiting = 0, asleep = 0) {
     const e = this.root.querySelector('.start-online') as HTMLElement;
     const full = max > 0 && count !== null && count >= max;
+    const shown = (count ?? 0) + asleep;
     e.textContent =
       count === null ? ''
       : full ? `Full (${count}/${max})${waiting ? ` · ${waiting} waiting` : ''} · you will be put in line`
-      : count === 0 ? 'Nobody else online yet'
-      : `${count}${max ? ` / ${max}` : ''} online`;
+      : shown === 0 ? 'Nobody else online yet'
+      : `${shown}${max ? ` / ${max}` : ''} online`;
     this.toggle(e, 'show', count !== null);
     this.toggle(e, 'full', full);
   }
@@ -1799,6 +1816,22 @@ export class HUD {
     (this.root.querySelector('.hud-dead .dead-btn') as HTMLButtonElement).onclick = cb;
   }
 
+  /**
+   * Standing, crouched or lying down, in the corner with the mouse's helpers: the figure of how the player is (the
+   * owner, 2026-10-20: "can we get crouched and standing and prone icons to show in the bottom left so the user knows
+   * when theyre crouched"; and of three figures with a word, lit yellow: "we can just show the icon, doesnt need to be
+   * yellow, can be a bit larger so its visable. bottom left like the mouse helpers").
+   */
+  private setStance(st: Stance | null) {
+    if (st === this.stanceNow) return;
+    const e = this.el.stance;
+    this.stanceNow = st;
+    this.toggle(e, 'show', !!st);
+    if (!st) return;
+    const [, word, svg] = STANCES.find(([k]) => k === st)!;
+    e.innerHTML = `<svg viewBox="0 0 24 24" role="img" aria-label="${word}">${svg}</svg>`;
+  }
+
   update(s: {
     /** seconds of the game's own time this frame is: what the vitals are changing by is measured against it */
     dt: number;
@@ -1812,6 +1845,10 @@ export class HUD {
     prompt: string | null;
     /** what the hands can do with what is in them (null: nothing to say) */
     acts?: HandAct[] | null;
+    /** the keys that do something now, for the corner (src/game/key-hints.ts) */
+    keys?: KeyHints | null;
+    /** how the player stands, for the corner (null: in a seat, dead, or not yet playing) */
+    stance?: Stance | null;
     /** a phone: the buttons are named, where a mouse is drawn */
     touch?: boolean;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
@@ -1945,6 +1982,8 @@ export class HUD {
       this.set('acts', e.acts, acts.map((a) => `<div class="hud-act${a.hold ? ' hold' : ''}"><div class="hud-act-text"><b>${a.text}</b>${a.sub ? `<small>${a.sub}</small>` : ''}</div>${key(a)}</div>`).join(''), 'html');
     }
     this.toggle(e.acts, 'show', !!acts);
+    this.keys.show(s.keys);
+    this.setStance(s.stance ?? null);
     this.toggle(e.mark, 'show', !!s.mark);
     if (s.mark) {
       const at = `${(s.mark[0] * 100).toFixed(1)}%|${(s.mark[1] * 100).toFixed(1)}%`;

@@ -36,6 +36,7 @@ import { buildRoad } from './world/road';
 import { Game } from './game/game';
 import { initRotatePrompt } from './ui/rotate';
 import { LoadingScreen } from './ui/loading-screen';
+import { loadingFx } from './ui/loading-fx';
 import { gasClouds } from './sim/gas';
 import { buildWorks } from './world/works';
 import { buildWells } from './world/wells';
@@ -47,6 +48,7 @@ initRotatePrompt();
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const loading = document.getElementById('loading')!;
 const screen = new LoadingScreen(loading);
+loadingFx(loading);
 const frame = () => new Promise((res) => setTimeout(res, 0));
 
 // ------------------------------------------------------------------ the watch on the start

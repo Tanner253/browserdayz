@@ -37,7 +37,7 @@ import { createHash } from 'node:crypto';
 import { EMPTY_ACCOUNT_RENT, Keypair, LAMPORTS, SYSTEM_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM, WRAPPED_SOL, address, b58, closeTokenAccount, computeLimit, computePrice, memo, onCurve, receipt, same, seeded, signed, tokenAccount, transfer, unsigned, type Bytes, type Instruction, type Rpc, type Signed, type Status } from './solana.js';
 import { claimCurve, claimPool, state as coinState, type CoinState } from './pump.js';
 import type { Store } from './store.js';
-import { PAID_BEFORE } from './paid-before.js';
+import { PAID_BEFORE, PAID_BEFORE_REV } from './paid-before.js';
 
 // ------------------------------------------------------------------ settings
 
@@ -462,6 +462,8 @@ export interface Book {
    * the page had summed only the rows kept, 412 of 578 tags paid).
    */
   earned?: Record<string, { lamports: number; n: number }>;
+  /** which reading of the chain (PAID_BEFORE_REV) `earned` was begun from: begun again, once, from a newer one */
+  earnedRev?: number;
 }
 
 /** the book as it was read, and the mark of that version (null: there is no book yet) */
@@ -630,7 +632,12 @@ export function enter(book: Book, t: Tag, o: Outcome, day: string, five = false)
   // (read from the rows before this one is down as paid, and counted below)
   if (o.state === 'paid') {
     book.free ??= paidBy(book);
-    book.earned ??= earnedBy(book);
+    // (begun afresh, once, from a newer reading of the chain: the first was begun after the rows had moved on past
+    // where the reading stopped, and what lay between was in neither, the owner, 2026-10-20: "not rendering for the top earners")
+    if (!book.earned || (book.earnedRev ?? 1) < PAID_BEFORE_REV) {
+      book.earned = earnedBy(book);
+      book.earnedRev = PAID_BEFORE_REV;
+    }
   }
   row.state = o.state;
   row.why = 'why' in o ? o.why : undefined;
@@ -657,7 +664,7 @@ export function enter(book: Book, t: Tag, o: Outcome, day: string, five = false)
 }
 
 /** SOL paid by wallet: the book's own tally, or (before it has one) the same worked out now */
-export const earnedOf = (book: Book) => book.earned ?? earnedBy(book);
+export const earnedOf = (book: Book) => (book.earned && (book.earnedRev ?? 1) >= PAID_BEFORE_REV ? book.earned : earnedBy(book));
 /** the payments from before the rows kept, from the chain, and the rows paid (a payment in both, by its transaction, counted once) */
 function earnedBy(book: Book): Record<string, { lamports: number; n: number }> {
   const out: Record<string, { lamports: number; n: number }> = {};
@@ -666,8 +673,14 @@ function earnedBy(book: Book): Record<string, { lamports: number; n: number }> {
     e.lamports += lamports;
     e.n += n;
   };
-  const sigs = new Set(book.rows.map((r) => r.signature).filter(Boolean));
-  for (const [sig, wallet, lamports, n] of PAID_BEFORE) if (!sigs.has(sig)) add(wallet, lamports, n);
+  // (a payment of several tags at once is one transfer and a row for each tag: where only some of its rows are still
+  // kept, the chain's amount stands for the rest of it)
+  const kept = new Map<string, number>();
+  for (const r of book.rows) if (r.state === 'paid' && r.signature) kept.set(r.signature, (kept.get(r.signature) ?? 0) + (r.lamports ?? 0));
+  for (const [sig, wallet, lamports, n] of PAID_BEFORE) {
+    const had = kept.get(sig) ?? 0;
+    if (lamports - had > 1000) add(wallet, lamports - had, had ? 0 : n);
+  }
   for (const r of book.rows) if (r.state === 'paid') add(r.wallet, r.lamports ?? 0, 1);
   return out;
 }

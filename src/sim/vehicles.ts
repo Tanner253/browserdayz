@@ -40,8 +40,11 @@ export const JEEP = {
    * make sure the west has cars"). And its own counted wherever they had gone: two driven east and the place had none
    * again until those were taken away for standing idle, two hours on ("cars are still not respawning fast enough on
    * the west", the map at 87 minutes with hardly a car west of the line); and it waited fifteen minutes, not five.
+   * And the map's count of them was held full by cars driven east and left there, which stood their two hours before
+   * they were taken away: at two hours up the west had none at all again ("all the cars are not in the west lol"), so
+   * one of the west's left alone away from its place goes after `idle` seconds, and the map holds twice as many.
    */
-  refill: { after: 300, most: 2, near: 500, cap: 3 },
+  refill: { after: 300, most: 2, near: 500, cap: 6, idle: 1800 },
   /**
    * What it takes before it burns. (Three times what it was, 2026-10-11: "we need to triple the HP of cars they blow
    * up too easily": 600 to 1800. And three times that, 2026-10-13: "cars should have 3x more HP theyre too weak and

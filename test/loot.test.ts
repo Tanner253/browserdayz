@@ -224,7 +224,9 @@ ok('every calibre where the police and the army were, from the village on: heavy
       for (const [id] of OF) if (t === 3 || !['ammo_762', 'ammo_739', 'ammo_556'].includes(id)) assert.ok(there.has(id), `no ${id} where the police and the army were on step ${t}`);
     }
     const hq = new Set(all.filter(({ p }) => /^police_(hq|cells|garage)/.test(p.building)).map(({ id }) => id));
-    assert.ok(OF.filter(([id]) => hq.has(id)).length >= 6, `the big police station has ${OF.filter(([id]) => hq.has(id)).map(([id]) => id).join(', ')} and no more`);
+    // (five of the seven at least: the AK's rounds are seldom so far west since the rifles' rounds were kept east,
+    // the owner, 2026-10-19, "medium and high caliber ammos are being distirbuted to the middle and west side of the map to much")
+    assert.ok(OF.filter(([id]) => hq.has(id)).length >= 5, `the big police station has ${OF.filter(([id]) => hq.has(id)).map(([id]) => id).join(', ')} and no more`);
     for (const [id, home] of OF) {
       // (none two steps and more below its gun's but the pistols', which are everybody's; a little on the step below; most at home and above)
       if (home >= 4) {

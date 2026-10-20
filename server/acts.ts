@@ -10,7 +10,8 @@ import { JEEP, RIDE_HEIGHT, SEATS, restState, type VState } from '../src/sim/veh
 import { HELI, heliCrash, hpOf } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { RACKS, rackShows } from '../src/sim/crates';
-import { CORPSE_LIFETIME, PARKS, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
+import { CORPSE_LIFETIME, CORPSE_WEST, PARKS, WEST_FROM, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
+import { idleMs } from './west-cars';
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, tagTime, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast, tagLock } from './gate';
@@ -309,7 +310,7 @@ export const CAR_IDLE_MS = (Number(process.env.CAR_IDLE_S) || JEEP.idle.after) *
  */
 export function leftAlone(v: Veh, now: number): boolean {
   if (v.seats[0] !== null) v.drivenAt = now;
-  if (v.goneAt || v.burnAt || now - v.drivenAt < CAR_IDLE_MS || v.seats.some((s) => s !== null)) return false;
+  if (v.goneAt || v.burnAt || now - v.drivenAt < idleMs(v, PARKS, WEST_FROM, CAR_IDLE_MS) || v.seats.some((s) => s !== null)) return false;
   const p = PARKS[v.home];
   if (p && Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8) return false;
   if ([...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) < JEEP.idle.clear)) return false;
@@ -417,7 +418,7 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   if (!box.items.length) return null;
   // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
   for (const p of box.items) issue(p.item);
-  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v, ...(ride ? { ride } : {}) });
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + (inPlay(x, z) ? CORPSE_LIFETIME : CORPSE_WEST), v, ...(ride ? { ride } : {}) });
   if (ride) riders.add(uid);
   return { uid, x, y, z, rot: yaw, name: c.name, v, ...(ride ? { ride } : {}) };
 }

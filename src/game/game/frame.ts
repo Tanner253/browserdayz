@@ -29,6 +29,7 @@ import { hourAt, DAY } from '../../sim/daynight';
 import { FIRE } from '../../sim/fires';
 import { bunkerDark } from '../../sim/bunker';
 import { rackShows } from '../../sim/crates';
+import { keyHints } from '../key-hints';
 import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../game';
 
 export const frameMethods = {
@@ -609,6 +610,8 @@ export const frameMethods = {
       prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to [^<]*<\/small>/, '').replace('W A S D to drive · Space is the handbrake', 'the stick drives · the jump button is the handbrake') ?? null) : this.prompt,
       mark: this.awaitClick ? null : this.mark,
       acts: this.awaitClick ? null : this.handActs(),
+      keys: keyHints(this),
+      stance: this.awaitClick || p.dead || this.garage.ride ? null : p.prone ? 'prone' : p.crouched ? 'crouch' : 'stand',
       touch: !!this.touch,
       weapon: this.garage.ride ? null : this.weapons.status(),
       aiming: this.weapons.aiming,
@@ -654,6 +657,7 @@ export const frameMethods = {
       lit: this.lit,
       talk: this.online && this.voice.supported,
       talking: this.voice.talking,
+      low: !this.garage.ride && (p.crouched || p.prone),
     });
     this.perf.beforeRender();
     // (a blast near by throws the view off for a moment: laid on the eye last of all, so nothing aims by it)

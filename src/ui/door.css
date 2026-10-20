@@ -5,6 +5,8 @@
 .door-top { display: flex; align-items: center; gap: 12px; }
 .door-top b { font-size: 34px; font-weight: 700; letter-spacing: 0.22em; }
 .door-top em { font-style: normal; color: #ffd35a; }
+/* the season's pieces beside the word (scripts/live-mark.mjs: none, out of season, is nothing at all) */
+.door-top .door-season { width: auto; height: 32px; }
 /* the owner: "we need to make it clear this is PVP and NOT PVE" */
 .door-pvp { margin-top: -6px; font: 800 15px 'JetBrains Mono', monospace; letter-spacing: 0.42em; text-transform: uppercase; color: #f1eee6; }
 .door-pvp i { font-style: normal; color: #ff4a36; }

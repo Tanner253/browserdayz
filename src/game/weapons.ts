@@ -1149,9 +1149,9 @@ const VOICE: Record<string, Voice> = {
   colt: { rate: 0.9, gain: 1.2 },
   // (the weapons pass's, each its own: see scripts/sounds.mjs for what each is a recording of)
   aks74u: { rate: 1, gain: 1.4, rec: 'shot_aks' },
-  // (the 9A-91: the AKS's recording a little deeper, a heavier round; with its can on the VSSK's quieted one, which is a
-  // 9x39's cough as the VSS's is, and never a crack: its rounds are slower than sound)
-  a91: { rate: 0.92, gain: 1.3, rec: 'shot_aks', quiet: 'shot_vssk', quietGain: 0.3, subsonic: true },
+  // (the 9A-91: the AKS's recording a little deeper; with its can on, the VSSK's quieted one. Its rounds are the AK's,
+  // faster than sound: they crack as they pass)
+  a91: { rate: 0.92, gain: 1.3, rec: 'shot_aks', quiet: 'shot_vssk', quietGain: 0.3 },
   mp7a1: { rate: 1, gain: 1, rec: 'shot_mp7' },
   scorpion: { rate: 1, gain: 1.1, rec: 'shot_scorpion' },
   dual_smg: { rate: 1, gain: 1.1, rec: 'shot_ppsh' },
@@ -2877,6 +2877,12 @@ export class Weapons {
     this.bipodDown.set(item.uid, !this.bipodDown.get(item.uid));
     audio.click(1900, 0.4, 0.02);
     audio.click(1300, 0.35, 0.03, 0.12);
+  }
+
+  /** what the fire-mode key does with this gun, for the keys in the corner (src/game/key-hints.ts); null: nothing */
+  modeKey(item: ItemInstance): string | null {
+    if (BIPODS.has(item.id)) return 'Bipod';
+    return (ITEMS[item.id].weapon?.modes?.length ?? 0) >= 2 ? 'Fire mode' : null;
   }
 
   /** whether the gun in the hands has its bipod down */

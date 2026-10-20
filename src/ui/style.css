@@ -100,20 +100,178 @@ body {
   width: min(420px, 80vw);
   text-align: center;
 }
-/* the mark: a gas mask over the biohazard sign (scripts/brand.mjs) */
+/* the mark: a gas mask over the biohazard sign (scripts/brand.mjs), in parts. The owner, 2026-10-20: "the icon
+   background pulsing (yellow) and the white mask puffing green smoke". Every loop here is transform and opacity
+   only, run by the compositor: it keeps moving while the page's own work stalls the start. The sign first unfurls
+   out of its middle, its three horns lashing out like tentacles with a flash (the owner: "grow from the center out?
+   like tentacles almost ... somethig flashy?"), and lashes again every 12 s. One breath is 4 s: the sign glows up,
+   and as it peaks the mask puffs, to one side then the other. */
 .load-mark {
-  display: block;
+  position: relative;
   width: 132px;
   height: 132px;
   margin: 0 auto 10px;
-  filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.7));
 }
-.load-title {
+/* it leans toward the pointer (src/ui/loading-fx.ts): turned a little, its parts shifted by their depth, the mask most
+   and the glow behind against it. Flat on purpose: tilted in 3D, the browser drew it at its CSS size and kept it so,
+   blocky on any sharp screen once it had leaned. */
+.load-mark,
+.lm-glow,
+.lm-sign,
+.lm-front { transition: rotate 0.6s cubic-bezier(0.2, 0.7, 0.3, 1), translate 0.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.load-mark > *,
+.lm-ring,
+.lm-mask { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lm-glow,
+.lm-flash {
+  inset: -38%;
+  width: auto;
+  height: auto;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 211, 90, 0.3) 0%, rgba(255, 190, 60, 0.12) 36%, rgba(255, 190, 60, 0) 66%);
+}
+.lm-glow { animation: lm-glow 4s ease-in-out infinite; }
+.lm-flash { opacity: 0; animation: lm-flash 1.7s ease-out both; }
+.lm-sign { animation: lm-breath 4s ease-in-out infinite; }
+.lm-ring { color: #ffd35a; filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.7)); }
+/* (the horns turn about the sign's middle, 264 of its 512 down; the unfurling is listed last, so it wins while it runs) */
+.lm-h0, .lm-h1, .lm-h2 { transform-origin: 50% 51.5625%; animation: lm-lash 12s 0.5s infinite, lm-grow 1.5s backwards; }
+.lm-h1 { animation-delay: 0.56s, 0.12s; }
+.lm-h2 { animation-delay: 0.62s, 0.24s; }
+/* (still while the horns move: it rises from nothing at 4 s, as the breath is at its lowest) */
+.lm-hot { opacity: 0; color: #ffe9a6; filter: drop-shadow(0 0 5px rgba(255, 214, 100, 0.9)) drop-shadow(0 0 16px rgba(255, 190, 60, 0.5)); animation: lm-hot 4s ease-in-out 4s infinite; }
+.lm-shock {
+  position: absolute;
+  left: 50%;
+  top: 51.5625%;
+  width: 100%;
+  height: 100%;
+  margin: -50% 0 0 -50%;
+  border: 2px solid rgba(255, 222, 120, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(255, 200, 70, 0.7), inset 0 0 10px rgba(255, 200, 70, 0.5);
+  opacity: 0;
+  animation: lm-shock-again 12s 0.5s infinite, lm-shock 1s ease-out 0.75s backwards;
+}
+.lm-mask { filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.7)); }
+/* gas from the filter (its middle at 50% 71.1% of the mark): puffs of real smoke (scripts/load-gas.mjs) that roll
+   as they go, out to the side clear of the mask and then up, never down over the letters. The owner, of puffs that
+   were plain rounds growing: "the gas zoming from mask not nicve animation". Each part of a puff's way has its own
+   easing on a layer of its own: the sideways drift (u) slows as the rise (i) gathers, so the path curves */
+.lm-gas b,
+.lm-gas s { position: absolute; left: 50%; top: 71.1%; }
+.lm-gas b:nth-child(n + 4) { transform: scaleX(-1); }
+.lm-gas b:nth-child(3) { transform: scale(0.8); }
+.lm-gas b:nth-child(6) { transform: scale(-0.8, 0.8); }
+.lm-gas u { position: absolute; }
+.lm-gas b u { animation: lm-drift 8s infinite; }
+.lm-gas b:nth-child(3n + 2) u { rotate: 14deg; }
+.lm-gas b:nth-child(3n) u { rotate: -10deg; }
+.lm-gas i,
+.lm-burst {
+  position: absolute;
+  left: -32px;
+  top: -32px;
+  width: 64px;
+  height: 64px;
+  background: url(/brand/gas.webp) 0 0 / 400% 100% no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+.lm-gas b i { animation: lm-rise 8s infinite, lm-roll 8s linear infinite, lm-swell 8s infinite, lm-fade 8s infinite; }
+.lm-gas b:nth-child(2) i { background-position: 33.333% 0; }
+.lm-gas b:nth-child(3) i,
+.lm-gas b:nth-child(4) i { background-position: 66.667% 0; }
+.lm-gas b:nth-child(5) i { background-position: 100% 0; }
+.lm-gas b:nth-child(1) * { animation-delay: 1.8s; }
+.lm-gas b:nth-child(2) * { animation-delay: 2.02s; }
+.lm-gas b:nth-child(3) * { animation-delay: 2.3s; }
+.lm-gas b:nth-child(4) * { animation-delay: 5.8s; }
+.lm-gas b:nth-child(5) * { animation-delay: 6.02s; }
+.lm-gas b:nth-child(6) * { animation-delay: 6.3s; }
+@keyframes lm-glow { 0%, 100% { opacity: 0.35; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes lm-breath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+@keyframes lm-hot { 0%, 100% { opacity: 0; } 50% { opacity: 0.7; } }
+@keyframes lm-grow {
+  0% { transform: rotate(-160deg) scale(0); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.75, 0.35, 1); }
+  15% { opacity: 1; }
+  55% { transform: rotate(14deg) scale(1.13); animation-timing-function: ease-in-out; }
+  78% { transform: rotate(-4deg) scale(0.96); animation-timing-function: ease-in-out; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes lm-lash {
+  0%, 90% { transform: none; }
+  93% { transform: rotate(-14deg) scale(0.88); }
+  96% { transform: rotate(7deg) scale(1.07); }
+  98.5% { transform: rotate(-2deg) scale(0.99); }
+  100% { transform: none; }
+}
+@keyframes lm-flash { 0%, 38% { opacity: 0; } 52% { opacity: 1; } 100% { opacity: 0; } }
+/* (no wider than 1.45 of the mark: wider, it reaches the letters) */
+@keyframes lm-shock { 0% { opacity: 0.95; transform: scale(0.35); } 100% { opacity: 0; transform: scale(1.45); } }
+@keyframes lm-shock-again { 0%, 95% { opacity: 0; transform: scale(0.35); } 95.1% { opacity: 0.8; transform: scale(0.4); } 100% { opacity: 0; transform: scale(1.4); } }
+/* a puff lives the first 4.5 s of its 8 */
+@keyframes lm-drift { 0% { translate: 0 0; animation-timing-function: cubic-bezier(0.15, 0.6, 0.3, 1); } 56%, 100% { translate: -46px 0; } }
+@keyframes lm-rise { 0% { translate: 0 0; animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95); } 56%, 100% { translate: 0 -92px; } }
+@keyframes lm-roll { 0% { rotate: 0deg; } 56%, 100% { rotate: 75deg; } }
+@keyframes lm-swell { 0% { scale: 0.45; animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); } 56%, 100% { scale: 1.35; } }
+@keyframes lm-fade { 0% { opacity: 0; } 5% { opacity: 0.85; } 22% { opacity: 0.6; } 56%, 100% { opacity: 0; } }
+.load-name { position: relative; }
+.load-title,
+.load-blood .lb {
   font-size: 84px;
   font-weight: 700;
   letter-spacing: 0.32em;
   margin-right: -0.32em;
   color: var(--ink);
+}
+/* blood on the letters: the owner, "the zona letters with blood splatter on them". Splashes are drawn into the
+   title's own background, cut to its letters; drips hang below (src/ui/loading-fx.ts) */
+.load-title.bled,
+.load-blood .lb {
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.load-blood { position: absolute; inset: 0; pointer-events: none; }
+.load-blood .lb { position: absolute; left: 0; top: 0; right: 0; }
+.ld { position: absolute; top: 0; left: 0; }
+.ld-run,
+.ld-drop { position: absolute; left: 0; top: 0; }
+.ld-run {
+  width: 100%;
+  border-radius: 0 0 50% 50% / 0 0 3px 3px;
+  background: linear-gradient(90deg, #3e0404, #7e0e0b 38%, #9a1915 55%, #4a0505);
+  transform-origin: 50% 0;
+}
+.ld-drop {
+  border-radius: 50% 50% 50% 50% / 58% 58% 42% 42%;
+  background: radial-gradient(circle at 36% 34%, #b02622 0, #760c0b 46%, #420404 100%);
+}
+/* pumpkins either side of the word, for October (src/ui/loading-pumpkins.ts): each stands on the letters' baseline,
+   its picture's bottom there; a lantern's candle flickers (its lit picture over its dark one) and lights the ground */
+.load-pumpkins { position: absolute; inset: 0; pointer-events: none; transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.lp { position: absolute; width: 0; height: 0; scale: var(--s, 1); visibility: hidden; }
+.lp.in { visibility: visible; }
+.lp-body { position: absolute; left: 0; bottom: 0; pointer-events: auto; cursor: pointer; transform-origin: 50% 100%; filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.55)); }
+.lp-body img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lp.flip .lp-body img { transform: scaleX(-1); }
+.lp-shadow { position: absolute; left: 0; top: -5px; height: 10px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)); }
+.lp-glow { position: absolute; left: 0; top: -30px; height: 44px; translate: -50% 0; background: radial-gradient(closest-side, rgba(255, 140, 40, 0.3), rgba(255, 120, 30, 0)); }
+.lp-lit,
+.lp-glow { animation: lp-flicker 2.3s linear infinite; animation-delay: calc(var(--k) * -0.7s); }
+@keyframes lp-flicker {
+  0% { opacity: 0.85; } 8% { opacity: 0.55; } 14% { opacity: 0.95; } 22% { opacity: 0.7; } 30% { opacity: 1; } 39% { opacity: 0.72; }
+  47% { opacity: 0.92; } 56% { opacity: 0.6; } 64% { opacity: 0.97; } 73% { opacity: 0.78; } 82% { opacity: 1; } 91% { opacity: 0.66; } 100% { opacity: 0.85; }
+}
+#loading.off { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .load-mark, .lm-glow, .lm-sign, .lm-front { transition: none; }
+  .lm-glow, .lm-sign, .lm-hot, .lm-h0, .lm-h1, .lm-h2 { animation: none; }
+  .lm-flash, .lm-shock { display: none; }
+  .lm-gas { display: none; }
+  .lp-lit, .lp-glow { animation: none; opacity: 0.85; }
 }
 /* one line, wider than the bar if it must (a flex row overflows evenly both sides), smaller on a narrow screen;
    the left padding balances the letter-spacing after the last letter */

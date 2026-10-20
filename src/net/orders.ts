@@ -105,10 +105,22 @@ export const ORDERS: Order[] = [
   { name: 'help', args: [], does: 'This list, in the chat' },
 ];
 
+/**
+ * What every player can type, admin or not: the party's (server/party.ts). Offered in the chat box to everybody, so a
+ * player can find how to leave one (the owner, 2026-10-20: "we need commands for players to leave their party once
+ * they join one"; /leave was there, and nobody could know it).
+ */
+export const PARTY_ORDERS: Order[] = [
+  { name: 'leave', args: [], does: 'Leave your party' },
+  { name: 'party', args: [], does: 'Who is in your party' },
+  { name: 'invite', args: ['who'], does: 'Ask somebody to join your party (or look at them and press F)' },
+  { name: 'accept', args: [], does: 'Join the party you were asked to' },
+];
+
 /** an order as it is written out: `/timeout who minutes [why]` */
 export const written = (o: Order) => `/${o.name}${o.args.length ? ` ${o.args.join(' ')}` : ''}`;
-/** the orders somebody with this role may give */
-export const ordersOf = (role: Role | null) => (role ? ORDERS.filter((o) => !o.admin || role === 'admin') : []);
+/** the orders somebody with this role may give: the party's for everybody, then their role's */
+export const ordersOf = (role: Role | null) => [...PARTY_ORDERS, ...(role ? ORDERS.filter((o) => !o.admin || role === 'admin') : [])];
 
 /** one thing that could be meant by what is typed so far */
 export interface Pick {
@@ -142,7 +154,7 @@ export const GROUND = ['ground', 'feet', 'floor'];
  * @param things everything there is to be given
  */
 export function offer(text: string, role: Role | null, here: { id: number; name: string }[], gone: string[] = [], things: { id: string; name: string }[] = []): Offer | null {
-  if (!role || !text.startsWith('/')) return null;
+  if (!text.startsWith('/')) return null;
   const mine = ordersOf(role), words = text.slice(1).split(/\s+/);
   if (words.length === 1) {
     const w = words[0].toLowerCase();

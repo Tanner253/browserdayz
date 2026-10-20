@@ -188,6 +188,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Only its picture is used: the eighteen frames are cut out of it and set in an even grid; the planes it came on and their animation are not. Re-encoded as WebP.
 - This work is based on "Bomb Crack_Ground_00 (Free)" (https://sketchfab.com/3d-models/bomb-crack-ground-00-free-c5cb1a953d1747b0af697c004d74735d) by paulyang (https://sketchfab.com/PaulYang) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Only the pieces of it that fly, and the way they move, are used: the pieces made one shape, their movement written out as a table (`scripts/blast.mjs`). The slab they break out of and the download's own pictures are not used: the pieces are painted with the ground the blast is on.
+- This work is based on "Pumpkin Halloween Animation" (https://sketchfab.com/3d-models/pumpkin-halloween-animation-f488de12c2f740a1a835a01aeac20381) by fuckcomicsanss (https://sketchfab.com/lenumalism) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only pictures of it are used, on the loading screen in October: drawn from two sides, from in front once dark and once with a light inside it (`scripts/halloween-sprites.mjs`), and kept as small WebP pictures; the model itself is not in the game.
 
 ## Public domain (CC0)
 
@@ -211,7 +213,7 @@ two packs in the public domain: [Impact Sounds](https://kenney.nl/assets/impact-
 [100 CC0 metal and wood SFX](https://opengameart.org/content/100-cc0-metal-and-wood-sfx) by rubberduck (CC0).
 The doors, a heavy blow and steel struck are out of the same two. A fist landing is
 [Punch](https://opengameart.org/content/punch) by qubodup (CC0), and the infected are the Zombies Sound Pack by
-artisticdude (CC0).
+artisticdude (CC0). The police car's siren is [Police Siren](https://freesound.org/s/746302/) by TitanKaempfer (CC0).
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).

@@ -538,7 +538,9 @@ export class BigMap {
   private me = { x: 0, z: 0, yaw: 0 };
   private dirty = true;
   // (the cars and the legend off until asked for, the owner, 2026-10-19: "this map looks too busy")
-  private shown: Shown = { tiers: [...TIER_IDS], names: true, wells: true, cars: false, grid: true, key: false, v: 2 };
+  // (cars shown, as they always were: hidden by default for a night, 2026-10-20, they read as no cars at all, the owner:
+  // "cars are not spawning on the game")
+  private shown: Shown = { tiers: [...TIER_IDS], names: true, wells: true, cars: true, grid: true, key: false, v: 3 };
   /** the places' marks where they were last drawn (see `layNames`), and the one pointed at, whose name is written by it */
   private laid: Mark[] = [];
   private hot: MenuSpot | null = null;
@@ -626,9 +628,9 @@ export class BigMap {
     }
     try {
       const was = JSON.parse(localStorage.getItem(KEPT) ?? 'null') as Partial<Shown> | null;
-      // (every click kept the cars on with the rest: what was kept before they were off is not held to)
-      if (was && was.v !== 2) delete was.cars;
-      if (was && Array.isArray(was.tiers)) this.shown = { ...this.shown, ...was, tiers: was.tiers.filter((t) => TIER_IDS.includes(t)), v: 2 };
+      // (what was kept with the cars hidden by default, v 2, is not held to for the cars: they are shown again)
+      if (was && was.v !== 3) delete was.cars;
+      if (was && Array.isArray(was.tiers)) this.shown = { ...this.shown, ...was, tiers: was.tiers.filter((t) => TIER_IDS.includes(t)), v: 3 };
     } catch {
       /* nothing kept: everything shown */
     }

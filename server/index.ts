@@ -43,6 +43,7 @@ import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } f
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
 import { seen } from './seen';
+import { westDue } from './west-cars';
 import { TAG_PING_MS, nudge, tickDrops } from './drops';
 
 
@@ -76,6 +77,9 @@ const RANGE_BUILD = 60_000;
 
 // (an hour, as DayZ keeps a dead player (CleanupLifetimeDeadPlayer): the owner, 2026-10-17, "bodies should last an hour yes"; it was ten minutes)
 export const CORPSE_LIFETIME = 3600; // seconds
+// (and ten minutes west of the Zona's line, where nobody's tag is worth anything and the new die by the dozen: the
+// owner, 2026-10-20, "player bodies are staying on the ground too long in the West")
+export const CORPSE_WEST = 600;
 
 // (A character is its player's until it dies: whoever comes back in a year has what they left with. It was
     // half an hour.)
@@ -193,7 +197,7 @@ export type Park = { x: number; y: number; z: number; yaw: number; k: number; ks
 /** where every car stands when the world is new, by the number of its place: the jeeps, the police cars, the helicopters and the west's jeeps */
 export const PARKS: Park[] = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind })), ...world.west.map((p) => ({ ...p, k: 0 }))];
 /** the number of the west's first place, and since when each of the west's places has stood empty (JEEP.refill) */
-const WEST_FROM = PARKS.length - world.west.length, emptySince = new Map<number, number>();
+export const WEST_FROM = PARKS.length - world.west.length, emptySince = new Map<number, number>();
 
 export function standJeep(home: number): Veh {
   const p = PARKS[home], k = parkKind(p);
@@ -679,24 +683,12 @@ setInterval(() => {
     jeepsDue.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
   }
-  // and the west's places, whose cars are driven off by the first who come by (JEEP.refill): a new one once the place
-  // has stood empty its time, and nobody is on the spot
+  // and the west's places, whose cars are driven off by the first who come by (JEEP.refill, server/west-cars.ts)
   const cars = [...vehicles.values()].filter((v) => !v.goneAt);
-  let westCars = cars.filter((v) => v.home >= WEST_FROM).length;
-  const westMost = (PARKS.length - WEST_FROM) * JEEP.refill.cap;
-  for (let home = WEST_FROM; home < PARKS.length; home++) {
+  const near = (p: { x: number; z: number }) => [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear);
+  for (const home of westDue(cars, PARKS, WEST_FROM, now, emptySince, (h) => jeepsDue.has(h), near)) {
     const p = PARKS[home];
-    // (its own counted only near it: one driven east is no car for the west)
-    const own = cars.filter((v) => v.home === home && Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < JEEP.refill.near).length;
-    if (jeepsDue.has(home) || own >= JEEP.refill.most || westCars >= westMost || cars.some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) {
-      emptySince.delete(home);
-      continue;
-    }
-    const since = emptySince.get(home) ?? emptySince.set(home, now).get(home)!;
-    if (now - since < JEEP.refill.after * 1000 || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear)) continue;
-    emptySince.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
-    westCars++;
     log(`a new car at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}, the west's place ${home - WEST_FROM}: its own was driven off`);
   }
 }, 1000);

@@ -161,15 +161,17 @@ export const GUN_ITEMS: ItemDef[] = [
     loot: { pair: 'AKS74U', at: [0, 0, 0, 2, 0], restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON, rack: { town: 0.8, fort: 1.2 } },
     worth: 48,
   },
-  // The 9A-91 (2026-10-20): the compact Russian rifle in heavy subsonic 9x39, rare, an army's and the police's. Its
+  // The 9A-91 (2026-10-20): the compact Russian rifle, rare, an army's and the police's, fed the AK's 7.62x39 from one
+  // magazine of forty (the owner: "the new assault rifle should shoot 556 or AK ammo, we have enough ammo types", "a 40
+  // rn mag, 1 mag type"; it was its own 9x39 from twenty). Its
   // stock folds up over the receiver on B, as the Barrett's bipod is let down (the owner: "collapsable stock for this
   // rifle should be same key, animated"): folded it is quicker to the eye and kicks harder, nothing at the shoulder
   // (Weapons.stockFolded). Its fire mode is on B held. Its PBS-9 can is its own model's piece, fitting no other gun.
   {
     id: 'a91', name: '9A-91', model: 'a91', w: 6, h: 3, weight: 2.1, category: 'weapon', slot: 'long',
-    desc: 'A compact Russian rifle in heavy subsonic 9x39. Twenty rounds, hard-hitting and short-ranged, and with its PBS-9 suppressor hardly heard. B folds its stock up over the receiver: quicker to the eye, but it kicks harder. Hold B for single shots.',
-    weapon: { kind: 'auto', ammo: 'ammo_9x39', capacity: 20, mag: 'mag_a91', ergo: 64, modes: ['auto', 'semi'], shows: { mag_a91: ['mag'], a91_suppressor: ['silencer'] }, never: ['bullet'] }, iconYaw: 0,
-    loot: { pair: 'ASVAL', at: [0, 0, 0, 3, 1], restock: 300, usage: ARMY, favour: ARMOURY, loaded: [5, 15], keep: SOON, rack: { town: 0.8, fort: 1.2 }, fitted: [['a91_suppressor', 0.3]] },
+    desc: 'A compact Russian rifle firing the AK\'s 7.62x39 from a forty-round magazine, and with its PBS-9 suppressor quietened. B folds its stock up over the receiver: quicker to the eye, but it kicks harder. Hold B for single shots.',
+    weapon: { kind: 'auto', ammo: 'ammo_739', capacity: 40, mag: 'mag_a91', ergo: 64, modes: ['auto', 'semi'], shows: { mag_a91: ['mag'], a91_suppressor: ['silencer'] }, never: ['bullet'] }, iconYaw: 0,
+    loot: { pair: 'ASVAL', at: [0, 0, 0, 3, 0], restock: 300, usage: ARMY, favour: ARMOURY, loaded: [10, 30], keep: SOON, rack: { town: 0.8, fort: 1.2 }, fitted: [['a91_suppressor', 0.3]] },
     worth: 46,
   },
   // The MP7A1 (2026-10-17): the small personal defence weapon, rare. Its own suppressor is its own part, seen only when
@@ -257,13 +259,6 @@ export const GUN_ITEMS: ItemDef[] = [
     id: 'ammo_127x55', name: '12.7x55 Rounds', model: 'vssk', nodeRe: '^bullet', w: 1, h: 1, weight: 0.075, category: 'ammo', stack: 10, scale: 1, pile: 2, iconBright: true,
     desc: 'Heavy subsonic 12.7x55 cartridges for the VSSK Vykhlop. They go into its magazine by hand.',
     loot: { pair: 'Ammo_9x39AP', at: [0, 0, 0, 2, 3], restock: 600, qty: [0.3, 0.8] },
-  },
-  // (the 9A-91's, drawn as the round that lies beside it in its maker's scene; found where it is)
-  {
-    id: 'ammo_9x39', name: '9x39 Rounds', model: 'a91', nodeRe: '^bullet', w: 1, h: 1, weight: 0.023, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
-    desc: 'Heavy subsonic 9x39 cartridges for the 9A-91. They go into its magazine by hand.',
-    loot: { pair: 'Ammo_9x39', at: [0, 0, 0, 3, 2], restock: 300, usage: ARMY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
-    worth: 0.8,
   },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.009, category: 'ammo', stack: 30, scale: 1.3, pile: 5,

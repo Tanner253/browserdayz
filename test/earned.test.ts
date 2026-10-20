@@ -2,7 +2,7 @@
 // the chain (api/_lib/paid-before.ts), and the rows kept, a payment in both counted once; and added to with every payment.
 import assert from 'node:assert/strict';
 import { earnedOf, enter, type Book } from '../api/_lib/payouts';
-import { PAID_BEFORE } from '../api/_lib/paid-before';
+import { PAID_BEFORE, PAID_BEFORE_REV } from '../api/_lib/paid-before';
 
 const chain: Record<string, number> = {};
 for (const [, wallet, lamports] of PAID_BEFORE) chain[wallet] = (chain[wallet] ?? 0) + lamports;
@@ -27,4 +27,12 @@ enter(book, { ref: 'c', at: '2026-10-19T10:00:00Z', name: 'E', owner: 'F', walle
 assert.deepEqual(book.earned?.NewWallet111, { lamports: 35_000_000, n: 2 }, 'a payment was not added to the tally, or added twice');
 assert.equal(earnedOf(book), book.earned, 'the page does not read the book’s own tally once it has one');
 console.log('  ok  each payment is added to the tally, once');
-console.log('\n2 checks passed');
+
+// a book whose tally was begun from an older reading of the chain is begun again, once, at its next payment
+const old = { ...book, rows: [...book.rows], earned: { NewWallet111: { lamports: 1, n: 1 } }, earnedRev: PAID_BEFORE_REV - 1 } as Book;
+assert.notEqual(earnedOf(old), old.earned, 'the page reads a tally begun from an older reading');
+enter(old, { ref: 'd', at: '2026-10-20T10:00:00Z', name: 'G', owner: 'H', wallet: 'NewWallet111' }, { state: 'paid', lamports: 5_000_000, at: '2026-10-20T10:01:00Z', signature: 'sigD', receipt: '' } as never, '2026-10-20');
+assert.equal(old.earnedRev, PAID_BEFORE_REV);
+assert.deepEqual(old.earned?.NewWallet111, { lamports: 40_000_000, n: 3 }, 'not begun again from the rows and the chain, with the new payment on top');
+console.log('  ok  a tally begun from an older reading of the chain is begun again, once');
+console.log('\n3 checks passed');

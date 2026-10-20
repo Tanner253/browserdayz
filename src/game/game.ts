@@ -749,7 +749,7 @@ export class Game {
       note: (text, kind) => this.hud.note(text, kind),
     }, this.hud.root, world);
     // how many people are in the world, shown before you click Play
-    void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null, s?.max, s?.queue));
+    void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null, s?.max, s?.queue, s?.asleep));
     this.invUI = new InventoryUI(this.inv, {
       take: (w) => this.takeWorldItem(w),
       drop: (item) => {

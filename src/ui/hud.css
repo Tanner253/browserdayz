@@ -84,10 +84,9 @@
 /* what the hands can do with what is in them: in the corner, a small mouse with the button lit and the word for it */
 /* (bottom left, over the chat: "would look better in the bottom left corner than the right corner above the
    player status bars", 2026-10-12. Each is the mouse, then what it does.) */
+/* (in a column with the keys under them, src/ui/keys-view.ts: the column stands on the chat and grows up from it) */
+.hud-side { position: absolute; left: 22px; bottom: 272px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; pointer-events: none; }
 .hud-acts {
-  position: absolute;
-  left: 22px;
-  bottom: 272px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -97,6 +96,30 @@
   pointer-events: none;
 }
 .hud-acts.show { opacity: 1; }
+/* the keys that do something now: two columns of a key and its word, small, on a dark strip as the voices' are (bare
+   words were lost on snow and sand); quieter after a while, when only the moment's own are left */
+.hud-keys { display: grid; grid-template-columns: auto auto; column-gap: 18px; row-gap: 4px; padding: 7px 12px 7px 10px; background: rgba(8, 10, 9, 0.5); border-left: 2px solid rgba(233, 228, 216, 0.35); opacity: 0; transition: opacity 0.6s; }
+.hud-keys:not(.show) { display: none; }
+.hud-keys.show { opacity: 0.95; animation: hk-in 0.3s ease-out; }
+@keyframes hk-in { from { opacity: 0; } }
+.hud-keys.show.quiet { opacity: 0.7; }
+.hud-keys.quiet .hk.gen { display: none; }
+/* how the player stands, under the keys: the one figure, bare as the mouse's helpers are (the owner: "currently
+   sometimes players dont know theyre crouched", "can be a bit larger so its visable") */
+.hud-stance:not(.show) { display: none; }
+.hud-stance svg { display: block; width: 34px; height: 34px; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9)); }
+.hud-stance svg circle { fill: var(--ink); stroke: none; }
+.hk { display: flex; align-items: center; gap: 7px; font-size: 12px; letter-spacing: 0.04em; color: var(--ink); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); white-space: nowrap; }
+.hk.gen1 { grid-column: 1; }
+.hk-keys { display: flex; gap: 3px; }
+.hk kbd { display: inline-block; min-width: 18px; height: auto; margin: 0; padding: 1px 5px; font-family: var(--mono); font-size: 10px; line-height: 14px; text-align: center; color: var(--ink); background: rgba(10, 12, 11, 0.5); border: 1px solid rgba(233, 228, 216, 0.4); border-radius: 3px; }
+.hk svg { flex: none; width: 11px; height: 17px; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+.hk svg .m-body { fill: rgba(10, 12, 11, 0.5); stroke: rgba(233, 228, 216, 0.82); stroke-width: 6; }
+.hk svg .m-line { fill: none; stroke: rgba(233, 228, 216, 0.6); stroke-width: 5; }
+.hk svg .m-part { fill: transparent; }
+.hk svg .m-wheel { fill: rgba(10, 12, 11, 0.85); stroke: rgba(233, 228, 216, 0.6); stroke-width: 5; }
+.hk svg .on { fill: #ffd35a; }
+.hk svg .m-wheel.on { stroke: #ffd35a; }
 .hud-act { display: flex; flex-direction: row-reverse; align-items: center; gap: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 .hud-act-text { text-align: left; line-height: 1.2; }
 .hud-act-text b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
@@ -116,7 +139,11 @@
 .hud-act.hold svg .on { animation: act-held 1.2s ease-in-out infinite; }
 @keyframes act-held { 50% { fill-opacity: 0.45; } }
 .hud-act .act-key { flex: none; min-width: 34px; padding: 3px 6px; border: 1px solid rgba(233, 228, 216, 0.6); background: rgba(10, 12, 11, 0.5); font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; color: var(--accent); }
-body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: translateX(-50%); align-items: center; }
+/* (a phone: the hands' words over its buttons, and no keys; the column let go so they stand where they did) */
+body.touch .hud-side { display: contents; }
+body.touch .hud-keys { display: none; }
+body.touch .hud-stance { display: none; }
+body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px; transform: translateX(-50%); align-items: center; }
 /* four corners round the thing F would take: it need not be dead under the cross-hair */
 .hud-mark {
   position: absolute;
@@ -2010,6 +2037,8 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 body.touch .tc.ads { z-index: 8; }
 .tc.lamp .tc-top .tc-light { display: grid; }
 .tc.lit .tc-top .tc-light { color: #121413; background: var(--accent); border-color: var(--accent); }
+/* (crouched or lying down: the crouch button lit, so a phone says it too) */
+.tc.low .tc-crouch { color: #121413; background: var(--accent); border-color: var(--accent); }
 /* what can be called out: a list under the button that opens it */
 .tc-emotes { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 64px; display: none; grid-template-columns: repeat(4, 124px); gap: 6px; pointer-events: auto; touch-action: none; }
 .tc.emo .tc-emotes { display: grid; }

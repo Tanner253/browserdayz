@@ -27,7 +27,7 @@ export function openDoor(): Promise<Mode> {
   el.innerHTML = `
     <div class="door-in">
       <header class="door-top">
-        <img src="/brand/zona-mark.svg" alt="" width="44" height="44"><b>ZONA <em>PvP</em></b>
+        <img src="/brand/zona-mark-live.svg" alt="" width="44" height="44"><b>ZONA <em>PvP</em></b><img class="door-season" src="/brand/season.svg" alt="">
       </header>
       <div class="door-pvp">Player <i>vs</i> Player</div>
       <div class="door-paid" hidden></div>
@@ -87,7 +87,7 @@ export function openDoor(): Promise<Mode> {
     t.hidden = false;
   };
   void serverStatus(8000).then((st) => {
-    on('zona', st ? st.players : null);
+    on('zona', st ? st.players + st.asleep : null);
     if (st?.today) stat('today', `${st.today} played Zona today`);
   });
   void arenaOnline().then((a) => {

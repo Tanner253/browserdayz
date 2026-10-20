@@ -79,8 +79,10 @@ export type Ground = 'grass' | 'dirt' | 'rock' | 'gravel' | 'asphalt' | 'concret
 const MOST = 400;
 /** blasts throwing ground at once */
 const THROWS = 4;
-/** burnt patches kept on the ground: the oldest goes when there are more (six to a blast) */
+/** burnt patches kept on the ground: the oldest goes when there are more (six to a blast); and each fades out after its
+ * time, as blood does (MARK_LIFE, src/game/effects.ts: "explosive black powder residue left behind needs to be cleaned up") */
 const BURNS = 60;
+const BURN_LIFE = 120, BURN_FADE = 30;
 /** the wind smoke leans with, metres a second (the same that a fire's smoke leans with: src/game/effects.ts) */
 const WIND = { x: 0.45, z: 0.28 };
 
@@ -737,7 +739,7 @@ export class Blasts {
       shader.uniforms.uBurnNow = now;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nattribute vec4 iMark;\nuniform float uBurnNow;\nvarying vec3 vBurn;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBurn = vec3( iMark.xy + vec2( uv.x, 1.0 - uv.y ) * 0.25, iMark.w * smoothstep( 0.0, 0.4, uBurnNow - iMark.z ) );');
+        .replace('#include <begin_vertex>', `#include <begin_vertex>\nvBurn = vec3( iMark.xy + vec2( uv.x, 1.0 - uv.y ) * 0.25, iMark.w * smoothstep( 0.0, 0.4, uBurnNow - iMark.z ) * ( 1.0 - smoothstep( ${(BURN_LIFE - BURN_FADE).toFixed(1)}, ${BURN_LIFE.toFixed(1)}, uBurnNow - iMark.z ) ) );`);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', '#include <common>\nuniform sampler2D tBurnSheet;\nvarying vec3 vBurn;')
         .replace('#include <map_fragment>', 'diffuseColor = vec4( 0.016, 0.014, 0.012, clamp( texture2D( tBurnSheet, vBurn.xy ).r * 1.7, 0.0, 1.0 ) * vBurn.z );');
@@ -1218,6 +1220,21 @@ export class Blasts {
     this.clock += dt;
     this.time.value = this.clock % 4096;
     this.since.value = this.clock;
+    // (burnt ground gone out of sight shrunk to nothing, so that the card draws none of it: once a second)
+    if (Math.floor(this.clock) !== Math.floor(this.clock - dt)) {
+      const mark = this.burnMark.array as Float32Array, mats = this.burnt.instanceMatrix.array as Float32Array;
+      let changed = false;
+      for (let k = 0; k < this.burnt.count; k++) {
+        if (mark[k * 4 + 3] === 0 || this.clock - mark[k * 4 + 2] < BURN_LIFE) continue;
+        mark[k * 4 + 3] = 0;
+        mats.fill(0, k * 16, k * 16 + 16);
+        changed = true;
+      }
+      if (changed) {
+        this.burnt.instanceMatrix.needsUpdate = true;
+        this.burnMark.needsUpdate = true;
+      }
+    }
     // (Not on a phone: the thrown ground is 2.8 MB to fetch and 14 MB on the graphics card with its paints, and a
     // phone has little of that to spare. A blast there throws the spray of clods out of the sheet instead.)
     if (!this.fetched && this.clock > 3 && !TOUCH) {

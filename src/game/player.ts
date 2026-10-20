@@ -320,6 +320,12 @@ export class Player {
       this.kcc.setSlideEnabled(true);
       this.kcc.setApplyImpulsesToDynamicBodies(true);
     } else {
+      // (on their feet, however they went down: the owner, 2026-10-20, "when a user is respawned they should be
+      // standing even if they die crouched")
+      if (this.crouched || this.prone) {
+        this.crouched = this.prone = false;
+        this.collider.setShape(new R.Capsule(STAND_HALF, RADIUS));
+      }
       this.body.setTranslation({ x, y: y + STAND_HALF + RADIUS, z }, true);
     }
     this.pos.set(x, y, z);
@@ -457,6 +463,12 @@ export class Player {
       rose = this.setProne(false);
     // (C, and only C: Ctrl with a key is the browser's, and a crouch on it was a tab shut by a sprint)
     } else if (input.pressedFixed('KeyC')) this.setCrouch(!this.crouched);
+    // Space from a crouch on the ground stands the body up, and it jumps as from standing (the owner, 2026-10-20:
+    // "jumping when crouched should stand the user up"; nothing happened, and players did not know they were crouched).
+    // Only pressed on the ground: a crouch taken in the air, to tuck the legs over a ledge, is as it was, and Space
+    // pressed in the air and kept for the landing does not stand up a body that lands crouched ("dont change how
+    // crouch jumping works, its necessary for some jump spots").
+    else if (this.crouched && this.grounded && input.pressedFixed('Space')) this.setCrouch(false);
 
     const fwd = this.braced ? 0 : (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
     const str = this.braced ? 0 : (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);

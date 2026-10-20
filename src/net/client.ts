@@ -96,10 +96,12 @@ export async function serverSays<T>(base: string, timeout: number): Promise<T | 
 }
 
 /** How many people are on the server right now, how many it holds and how many are waiting to get in (for the start screen). Null if it can't be reached. */
-export async function serverStatus(timeout = 6000): Promise<{ players: number; max: number; queue: number; today: number | null } | null> {
-  const j = await serverSays<{ players?: number; max?: number; queue?: number; today?: number }>(remoteServer() ?? '', timeout);
-  // (today: how many have played in the last 24 hours; null from a server older than its count)
-  return j && typeof j.players === 'number' ? { players: j.players, max: j.max ?? 0, queue: j.queue ?? 0, today: typeof j.today === 'number' ? j.today : null } : null;
+export async function serverStatus(timeout = 6000): Promise<{ players: number; asleep: number; max: number; queue: number; today: number | null } | null> {
+  const j = await serverSays<{ players?: number; asleep?: number; max?: number; queue?: number; today?: number }>(remoteServer() ?? '', timeout);
+  // (today: how many have played in the last 24 hours; null from a server older than its count. asleep: the bodies of
+  // those who left in the last five minutes, still in the world: counted in the number shown, as the game's own count
+  // does, the owner, 2026-10-20: "we should laways use the larger number. inlcude recently left bodies")
+  return j && typeof j.players === 'number' ? { players: j.players, asleep: j.asleep ?? 0, max: j.max ?? 0, queue: j.queue ?? 0, today: typeof j.today === 'number' ? j.today : null } : null;
 }
 
 /**

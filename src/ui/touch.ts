@@ -116,7 +116,7 @@ export class TouchControls {
    * @param canUse there is something in reach to take, open or search
    * @param also what G would do here, in a word ("Fuel", "Pack up"): it gets a button of its own; whether the gun is at the eye; whether a light is carried (it gets a button), and whether it is on; whether there is anybody to talk to (the microphone gets one), and whether it is being held
    */
-  update(playing: boolean, inventory: boolean, canUse: boolean, also: { g: string | null; aiming: boolean; lamp?: boolean; lit?: boolean; talk?: boolean; talking?: boolean } = { g: null, aiming: false }) {
+  update(playing: boolean, inventory: boolean, canUse: boolean, also: { g: string | null; aiming: boolean; lamp?: boolean; lit?: boolean; talk?: boolean; talking?: boolean; low?: boolean } = { g: null, aiming: false }) {
     if (playing !== this.visible) {
       this.visible = playing;
       this.root.classList.toggle('on', playing);
@@ -129,6 +129,7 @@ export class TouchControls {
     this.root.classList.toggle('ads', playing && also.aiming);
     this.root.classList.toggle('lamp', !!also.lamp);
     this.root.classList.toggle('lit', !!also.lit);
+    this.root.classList.toggle('low', playing && !!also.low);
     // (the microphone: there where there is somebody to hear it and a browser that can send it, lit while it is held)
     this.root.classList.toggle('talk', !!also.talk);
     this.root.classList.toggle('talking', !!also.talking);
