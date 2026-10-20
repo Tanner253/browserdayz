@@ -11,9 +11,9 @@ import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GR
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
-import { bunkerAt, bunkerLocal, bunkerWays, type Place } from '../sim/bunker';
+import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
-import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, suited, type IState, type InfectedInfo } from '../sim/infected';
+import { Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, roundHouse, suited, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
@@ -117,6 +117,12 @@ export class Infected implements Damageable {
   private alertT = 0;
   /** on its way back to where it lives */
   private returning = false;
+  /** one of the bunker's still ones (InfectedInfo.w): deaf, it keeps to its spot until it sees somebody or they come near */
+  still = false;
+  /** which way it is turning to face, standing (NaN: it is not) */
+  private face = NaN;
+  /** running for the bunker's door, which has opened (it goes to look at a noise at a walk) */
+  private rushing = false;
   private side = Math.random() < 0.5 ? 1 : -1;
   private sideT = 0;
   private stuckT = 0;
@@ -154,6 +160,9 @@ export class Infected implements Damageable {
     this.mode = info.s[4];
     this.after = info.s[5];
     this.fallTo = y;
+    this.still = info.w === 1;
+    // (the still ones live on the bunker's floor, whatever height they were found at)
+    if (this.still) this.home.y = this.horde.floorY ?? y;
     // (which of the three bodies it is goes by its number: every game draws the same one. The ones of the gas and of the bunker wear the orange suit.)
     await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), suited(this.host.world(), this.home.x, this.home.z) ? 'zombie_hazmat' : ZOMBIES[this.i % ZOMBIES.length]);
     if (this.gone) return this.avatar.dispose();
@@ -243,13 +252,30 @@ export class Infected implements Damageable {
   /** a noise, or somebody it has just been hurt by: it goes to see (and if it was hurt, it knows who) */
   hearAt(at: THREE.Vector3, sure = false) {
     if (this.dead || !this.mine || this.mode >= I_CHASE) return;
+    // (the still ones hear nothing: not a shot, not the door, not another of them crying out. Hurt, they know who did it.)
+    if (this.still && !sure) return;
     if (this.mode !== I_ALERT) this.lost();
+    this.rushing = false;
+    this.face = NaN;
     this.goal.copy(at);
     if (this.mode !== I_ALERT) this.dirty = true;
     this.mode = I_ALERT;
     this.waitT = INFECTED.search * 0.6;
     this.alertT = 0;
     if (sure) this.thinkT = 0;
+  }
+
+  /**
+   * The bunker's door has moved (`out`: the way into its house, outside; `court`: the yard before the house's door).
+   * Opening, those down there come out of it at a run; the still ones hear nothing; those up top come to see, to the
+   * way in (not to the ground over the door, which is the bunker's lid: they stood about on it, against its house).
+   */
+  door(opening: boolean, out: THREE.Vector3, court: THREE.Vector3) {
+    if (this.dead || !this.mine || this.mode >= I_CHASE || this.still) return;
+    if (!this.horde.below(this.pos)) return this.hearAt(out);
+    if (!opening) return;
+    this.hearAt(court);
+    this.rushing = true;
   }
 
   /**
@@ -313,8 +339,11 @@ export class Infected implements Damageable {
       const inView = ahead && d < (p.crouched ? I.sightCrouched : I.sight);
       // (somebody it is already after is kept in sight a good deal further, and round behind it)
       const kept = this.after === p.id && d < I.sight * 1.7;
-      if ((near || inView || kept) && d < bd && this.sees(p)) [best, bd] = [p, d];
-      else if (!p.crouched && ((p.speed > 5.3 && d < I.hearSprint) || (p.speed > 3 && d < I.hearJog)) && d < hd) [heard, hd] = [p, d];
+      // (one of the bunker's still ones knows of somebody this near whatever is between: through a wall, round a door)
+      const close = this.still && d < (p.crouched ? I.wakeCrouched : I.wake) && Math.abs(p.pos.y - this.pos.y) < 2.5;
+      if (close && d < bd) [best, bd] = [p, d];
+      else if ((near || inView || kept) && d < bd && this.sees(p)) [best, bd] = [p, d];
+      else if (!this.still && !p.crouched && ((p.speed > 5.3 && d < I.hearSprint) || (p.speed > 3 && d < I.hearJog)) && d < hd) [heard, hd] = [p, d];
     };
     consider(this.host.me());
     for (const p of this.host.others()) consider(p);
@@ -327,6 +356,8 @@ export class Infected implements Damageable {
         audio.infected('alert', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
         this.horde.cry(this, seen.pos);
         this.mode = I_CHASE;
+        this.rushing = false;
+        this.face = NaN;
         this.dirty = true;
       }
       if (this.after !== seen.id) this.dirty = true;
@@ -344,11 +375,15 @@ export class Infected implements Damageable {
 
   /** where the floor is at a spot, for something standing at `y` now (null: nothing to stand on within reach) */
   private floor(x: number, z: number, y: number): number {
-    const ground = heightAt(this.host.world().heights, x, z);
+    const world = this.host.world(), ground = heightAt(world.heights, x, z);
     // (whatever a person's feet stand on: the slope laid over a flight of stairs is that and nothing else)
     const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, PLAYER_GROUPS, this.blocker);
     const f = hit ? y + 1.25 - hit.toi : -1e9;
-    return f > ground + 0.04 ? f : ground;
+    if (f > ground + 0.04) return f;
+    // Nothing under it but the ground: over the bunker that is its lid, the ground as it is seen, for one that was up
+    // on it (the bottom of the hole under the lid is five metres down: at a seam in the lid one fell through it).
+    const top = heightAt(world.surface, x, z);
+    return top > ground + 0.04 && y > top - 0.6 ? top : ground;
   }
 
   /** go there if there is room to stand, up no more than a step */
@@ -513,12 +548,37 @@ export class Infected implements Damageable {
     }
     switch (this.mode) {
       case I_IDLE:
+        if (this.face === this.face) this.yaw = turnTo(this.yaw, this.face, dt * 0.9);
         if ((this.waitT -= dt) <= 0) {
+          // Shut out of the bunker it came up out of (on its stair, in its house, or beyond), it lives up top from then
+          // on, about the way in: not at the door, beating on it for as long as anybody is near.
+          if (!this.still && !this.host.bunkerOpen() && this.horde.below(this.home) && !this.horde.inLevel(this.pos)) this.home.copy(this.horde.entrance);
+          if (this.still) {
+            // the bunker's still ones keep to their spots: back to it if led off, and there they stand, and now and then turn their heads
+            if (Math.hypot(this.home.x - this.pos.x, this.home.z - this.pos.z) > 1 || Math.abs(this.home.y - this.pos.y) > 1.5) {
+              this.goal.copy(this.home);
+              this.returning = true;
+              this.mode = I_WANDER;
+              this.waitT = 120;
+              this.face = NaN;
+              this.lost();
+            } else {
+              this.face = this.yaw + (Math.random() - 0.5) * 2.2;
+              this.waitT = 4 + Math.random() * 9;
+            }
+            this.dirty = true;
+            break;
+          }
           // Led off somewhere, it walks back to where it lives; there, it drifts about the place.
           const away = Math.hypot(this.home.x - this.pos.x, this.home.z - this.pos.z) > I.stray;
           const a = Math.random() * Math.PI * 2, r = away ? 2 + Math.random() * 5 : 3 + Math.random() * 12;
           const gx = this.home.x + Math.cos(a) * r, gz = this.home.z + Math.sin(a) * r;
-          this.goal.set(gx, heightAt(this.host.world().heights, gx, gz), gz);
+          // (Over the bunker the ground is its lid, five metres above the hole's floor: the floor's height sent those
+          // that live up top down into it, to beat on its door. Those that live in it drift about its floor.)
+          const world = this.host.world(), inside = this.horde.below(this.home);
+          this.goal.set(gx, inside ? this.home.y : heightAt(this.horde.byBunker(this.home) ? world.surface : world.heights, gx, gz), gz);
+          // (and within its walls: a drift to beyond them was a way out by the door, and a beating on it)
+          if (inside) this.horde.keepIn(this.goal);
           this.returning = away;
           this.mode = I_WANDER;
           this.waitT = away ? 120 : 14;
@@ -530,8 +590,9 @@ export class Infected implements Damageable {
         this.waitT -= dt;
         // (the way home may be out of a house and across the village: by the doors. A drift about the place is just a few steps.)
         // (and one that lives down the bunker drifts from room to room by their doors: a straight line there is a wall)
-        if (!(this.returning ? this.goTo(this.goal, I.back, dt) : this.horde.below(this.pos) ? this.goTo(this.goal, I.wander, dt) : this.walk(this.goal.x, this.goal.z, I.wander, dt))) this.waitT -= dt * 4;
-        if (this.waitT <= 0 || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < (this.returning ? 2 : 0.8)) {
+        // (and about the bunker's house up top, round it: see bunkerLeg)
+        if (!(this.returning ? this.goTo(this.goal, I.back, dt) : this.horde.byBunker(this.pos) ? this.goTo(this.goal, I.wander, dt) : this.walk(this.goal.x, this.goal.z, I.wander, dt))) this.waitT -= dt * 4;
+        if (this.waitT <= 0 || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < (this.returning ? (this.still ? 0.5 : 2) : 0.8)) {
           this.mode = I_IDLE;
           this.waitT = this.returning && this.waitT > 0 ? 1 + Math.random() * 3 : 2 + Math.random() * 7;
           this.returning = false;
@@ -543,7 +604,7 @@ export class Infected implements Damageable {
         // wall, up a blind alley. Then it gives up, and goes home.
         this.alertT += dt;
         if (Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) > 1.2 || Math.abs(this.goal.y - this.pos.y) > 1.5 || this.onSteps) {
-          if (!this.goTo(this.goal, I.look, dt)) this.waitT -= dt;
+          if (!this.goTo(this.goal, this.rushing ? I.chase : I.look, dt)) this.waitT -= dt;
         } else {
           // there: a look about, then it loses interest
           this.yaw += dt * 0.9 * this.side;
@@ -552,6 +613,7 @@ export class Infected implements Damageable {
         if (this.waitT <= 0 || this.alertT > I.patience) {
           this.mode = I_IDLE;
           this.waitT = 1 + Math.random() * 3;
+          this.rushing = false;
           this.lost();
           this.dirty = true;
         }
@@ -739,6 +801,51 @@ export class Horde {
     return this.bunkerAt_ === undefined ? (this.bunkerAt_ = bunkerPlace(this.host.world())) : this.bunkerAt_;
   }
 
+  /** the height of the bunker's floor (undefined: this world has no bunker) */
+  get floorY(): number | undefined {
+    return this.bunker ? this.bunker.y + levelY() : undefined;
+  }
+
+  /** whether a spot is in or about the bunker: down in it, or on the ground over it, round its house */
+  byBunker(at: THREE.Vector3): boolean {
+    const P = this.bunker;
+    if (!P) return false;
+    const [r, f] = bunkerLocal(P, at.x, at.y, at.z);
+    return Math.abs(r) < BUNKER.pad.r + 6 && f > BUNKER.pad.back - 6 && f < BUNKER.pad.front + 12;
+  }
+
+  /** whether a spot is in the bunker's first level proper, beyond its door (not on its stair) */
+  inLevel(at: THREE.Vector3): boolean {
+    return inBunker(this.bunker, at.x, at.y + 1, at.z);
+  }
+
+  /** the way into the bunker's house, up top, outside its yard (the middle of the map in a world with no bunker) */
+  get entrance(): THREE.Vector3 {
+    const P = this.bunker, B = BUNKER;
+    return this.entrance_ ??= P ? new THREE.Vector3(...bunkerAt(P, B.court.open * (HOUSE.r + 1.6), (B.hut.front + B.court.front) / 2, 0.1)) : new THREE.Vector3();
+  }
+  private entrance_: THREE.Vector3 | undefined;
+
+  /** a spot down in the bunker brought within its walls, if it is beyond them */
+  keepIn(at: THREE.Vector3) {
+    const P = this.bunker;
+    if (!P) return;
+    const H = BUNKER.hall, [r, f] = bunkerLocal(P, at.x, at.y, at.z);
+    const [x, , z] = bunkerAt(P, THREE.MathUtils.clamp(r, -H.r + 1, H.r - 1), THREE.MathUtils.clamp(f, H.back + 1, H.front - 1));
+    at.x = x;
+    at.z = z;
+  }
+
+  /** The bunker's door has moved: the ones this game moves within earshot of it are told (see Infected.door). */
+  doorMoved(opening: boolean) {
+    const P = this.bunker;
+    if (!P) return;
+    const B = BUNKER, out = this.entrance;
+    const [dx, , dz] = bunkerAt(P, 0, B.hall.front);
+    const court = new THREE.Vector3(...bunkerAt(P, 0, (B.hut.front + B.court.front) / 2, 0.1));
+    for (const b of this.all.values()) if (b.mine && !b.dead && Math.hypot(b.pos.x - dx, b.pos.z - dz) < B.heard) b.door(opening, out, court);
+  }
+
   /** whether a spot is down in the bunker (or on its stair) */
   below(at: THREE.Vector3): boolean {
     const P = this.bunker;
@@ -760,15 +867,29 @@ export class Horde {
     const W = bunkerWays();
     const [r, f, h] = bunkerLocal(P, from.x, from.y + 1, from.z), [tr, tf, th] = bunkerLocal(P, to.x, to.y + 1, to.z);
     const a = W.part(r, f, h), b = W.part(tr, tf, th);
-    if (a === b) return null;
+    // Up top, with the house over the stair in the way: round it, by its corners. (Straight at it, they walked into
+    // its walls and the yard's, and slid along them or stood there.)
+    const round = (gr: number, gf: number) => {
+      const c = roundHouse(r, f, gr, gf);
+      if (!c) return null;
+      const [x, , z] = bunkerAt(P, c[0], c[1]);
+      return { x, z, shut: false, dx: x, dz: z };
+    };
+    if (a === b) return a === W.world && Math.abs(h) < 4 ? round(tr, tf) : null;
     const step = W.next(a, b);
     if (!step) return null;
     const { way, dir } = step, nr = way.nr * dir, nf = way.nf * dir;
     // how far short of it (or through it) it stands, and how far to one side of the line through its middle
     const along = (r - way.r) * nr + (f - way.f) * nf, off = Math.abs((r - way.r) * nf - (f - way.f) * nr);
     const shut = !!way.gate && !this.host.bunkerOpen();
-    const lined = off < 0.45 && along > -2.4;
+    // (lined up with it, on its near side: one far round the side of the yard is on the line through its open side, and
+    // went for it straight through the house)
+    const lined = off < 0.45 && along > -2.4 && along < 0.6;
     const k = shut ? -1.0 : lined ? 1.3 : -1.1;
+    if (a === W.world && !lined) {
+      const c = round(way.r + nr * k, way.f + nf * k);
+      if (c) return c;
+    }
     const [x, , z] = bunkerAt(P, way.r + nr * k, way.f + nf * k);
     const [dx, , dz] = bunkerAt(P, way.r, way.f);
     return { x, z, shut: shut && off < 0.7 && along > -1.6, dx, dz };
@@ -937,13 +1058,17 @@ export class Horde {
     if (to === this.host.me().id) this.host.guarded(b.pos);
   }
 
-  /** A noise at a place, heard this far off: the ones this game moves go to see. */
-  noise(x: number, z: number, range: number) {
-    const at = new THREE.Vector3(x, 0, z);
+  /**
+   * A noise at a place, heard this far off: the ones this game moves go to see. (`y`: how high it was. One made down
+   * in the bunker sends those up top to the way into it, not to the spot over it: that is the lid, where they stood
+   * about over the door while somebody coughed in the gas below.)
+   */
+  noise(x: number, z: number, range: number, y?: number) {
+    const at = new THREE.Vector3(x, y ?? 0, z), under = y !== undefined && this.below(at);
     for (const b of this.all.values()) {
       if (!b.mine || b.dead) continue;
       const d = Math.hypot(b.pos.x - x, b.pos.z - z);
-      if (d < range) b.hearAt(at.set(x, b.pos.y, z));
+      if (d < range) b.hearAt(under && !this.below(b.pos) ? this.entrance : at.set(x, b.pos.y, z));
     }
   }
 

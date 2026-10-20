@@ -95,7 +95,7 @@ import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
 import { FieldPosts } from '../world/posts';
 import { Cellars } from './cellars';
-import { BUNKER, bunkerCrates } from '../sim/bunker';
+import { bunkerCrates } from '../sim/bunker';
 import { CastleSite } from '../world/castle';
 import { CASTLE_SCALE, inCastle } from '../sim/castle';
 import { WreckFire } from './wreck-fire';
@@ -474,7 +474,7 @@ export class Game {
       if (!at) return;
       const ear = r.camera.position, d = at.distanceTo(ear), near = Math.min(d, 110);
       audio.blastDoor(d > near ? ear.clone().lerp(at, near / d) : at, d, opening);
-      this.horde.noise(at.x, at.z, BUNKER.heard);
+      this.horde.doorMoved(opening);
       this.hud.note(opening ? 'The bunker is opening' : 'The bunker is shutting', 'warn');
     };
     // the street lamps: where the head of each is
@@ -624,14 +624,14 @@ export class Game {
       const from = o.clone().addScaledVector(dir, 0.7), v = dir.clone().multiplyScalar(spec.speed);
       this.grenades.throw(from, v, spec.flight, true, w, true);
       if (this.online) this.net.send({ t: 'launch', o: from.toArray() as [number, number, number], v: v.toArray() as [number, number, number], w });
-      this.horde.noise(o.x, o.z, INFECTED.hearShot);
+      this.horde.noise(o.x, o.z, INFECTED.hearShot, o.y);
     };
     this.weapons.onShot = (s) => {
       // (on the bot check's range the server is told of it as the range's own, and nobody else of anything)
       if (this.botCheck?.active) return void this.botCheck.shot(s.origin, s.dir);
       this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
       // the infected hear it as well as anybody
-      this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot);
+      this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot, s.origin.y);
     };
     // a bullet in a fuel drum. (The red drums are searched too since 2026-10-17, FURNITURE in src/sim/storage.ts, and
     // the container took the drum's collider over: a round met "a crate" and no drum went up. The owner, 2026-10-19:
@@ -739,7 +739,7 @@ export class Game {
       cough: (hard) => {
         this.weapons.flinch(hard);
         // (and it is heard: whatever of theirs is near comes to see who is choking)
-        this.horde.noise(this.player.pos.x, this.player.pos.z, GAS.heard);
+        this.horde.noise(this.player.pos.x, this.player.pos.z, GAS.heard, this.player.pos.y);
       },
       note: (text, kind) => this.hud.note(text, kind),
     }, this.hud.root, world);
