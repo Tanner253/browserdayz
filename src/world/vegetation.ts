@@ -384,6 +384,32 @@ class LodSet {
 const FRAMES = 8;
 const FRAME_W = 256;
 const FRAME_H = 384;
+
+/** A picture drawn with several samples a pixel, copied texel for texel to one without them (its mipmaps made again as
+ * three makes them, from the same level), and the first let go of. */
+function unsampled(renderer: THREE.WebGLRenderer, from: THREE.WebGLRenderTarget): THREE.WebGLRenderTarget {
+  const f = from.texture;
+  const to = new THREE.WebGLRenderTarget(from.width, from.height, { type: f.type, format: f.format as THREE.PixelFormat, depthBuffer: false, generateMipmaps: f.generateMipmaps, minFilter: f.minFilter, magFilter: f.magFilter, wrapS: f.wrapS, wrapT: f.wrapT, colorSpace: f.colorSpace as THREE.ColorSpace, anisotropy: f.anisotropy });
+  const copy = new THREE.RawShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    uniforms: { map: { value: f } },
+    vertexShader: 'in vec3 position; void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: 'precision highp float; precision highp sampler2D; uniform sampler2D map; out vec4 o; void main() { o = texelFetch(map, ivec2(gl_FragCoord.xy), 0); }',
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.NoBlending,
+  });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), copy);
+  quad.frustumCulled = false;
+  const was = renderer.getRenderTarget();
+  renderer.setRenderTarget(to);
+  renderer.render(quad, new THREE.OrthographicCamera());
+  renderer.setRenderTarget(was);
+  copy.dispose();
+  quad.geometry.dispose();
+  from.dispose();
+  return to;
+}
 /**
  * SNOW ON A TREE'S CARD. A card is a picture of the tree in leaf, lit as it stood at noon; where snow lies the
  * tree itself is white (foliagePatch lays snow on its boughs), and its card was left almost as green as it was
@@ -507,6 +533,10 @@ class Impostors {
     renderer.setClearColor(prevClear, prevAlpha);
     renderer.autoClear = prevAuto;
     sun.shadow.dispose();
+    // (Drawn with four samples a pixel, once; what the cards are drawn with after is its resolved picture. The four
+    // samples, 300 MB in half floats at 2048x3072, were kept on the card the whole game: counted by what the card was
+    // given, 2026-10-20, the owner asking what fills it. The picture is copied as it is to one without them.)
+    if (!(import.meta.env.DEV && (globalThis as { __atlasAsWas?: boolean }).__atlasAsWas)) this.atlas = unsampled(renderer, this.atlas);
   }
 
   build(scene: THREE.Scene, trees: Instance[], rows: number) {
