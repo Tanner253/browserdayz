@@ -160,9 +160,16 @@ export class ItemModels {
       });
       this.cache.set(key, p);
       void p.then((tpl) => this.done.push(tpl), () => {});
+    } else if (this.cold) {
+      // (its pictures taken off the card since, a long way off (see CardKeep): put back before anybody is handed it)
+      const cold = this.cold;
+      p = p.then((tpl) => (cold(tpl) ? this.onMade(tpl).catch(() => {}).then(() => tpl) : tpl));
     }
     return p;
   }
+
+  /** whether a model's pictures have been taken off the card since it was made (set by the game) */
+  cold: ((tpl: ItemTemplate) => boolean) | null = null;
 
   /**
    * A model has just been made, and is not yet anybody's: what has to be done before it is first drawn is done

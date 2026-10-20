@@ -16,6 +16,7 @@ import {
 import { N8AOPostPass } from 'n8ao';
 import { breathe } from './breathe';
 import { oneDraw } from './one-draw';
+import { CardKeep } from './card-keep';
 
 /** a shader as the library keeps it: whether the card has finished making it, and how many materials are drawn with it */
 interface Program { id: number; isReady(): boolean; usedTimes: number; getUniforms(): unknown; getAttributes(): unknown }
@@ -169,6 +170,8 @@ export class Renderer {
   readonly camera = new THREE.PerspectiveCamera(62, 1, 0.08, 1800);
   readonly vmScene = new THREE.Scene();
   readonly vmCamera = new THREE.PerspectiveCamera(48, 1, 0.01, 20);
+  /** what is on the graphics card of pictures, and what is taken off it (see CardKeep) */
+  readonly keep: CardKeep;
   composer!: EffectComposer;
   ao!: N8AOPostPass;
   vignette!: VignetteEffect;
@@ -204,6 +207,11 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
+    // (pictures nothing has drawn with for a while, far behind, taken off the card: and sent ahead again on the way back)
+    this.keep = new CardKeep(this.renderer, this.camera.position, (t) => {
+      this.aheadKnown.delete(t);
+      this.aheadGen++;
+    });
     // (see onceADraw)
     const render = this.renderer.render.bind(this.renderer);
     this.renderer.render = (scene, camera) => {
@@ -948,6 +956,7 @@ export class Renderer {
 
   render(dt: number) {
     if (!this.tendHeld) this.tend();
+    this.keep.tick();
     this.renderer.info.reset();
     this.composer.render(dt);
   }
@@ -970,11 +979,14 @@ export class Renderer {
       for (let k = 0; k < per; k++) {
         const o = kids[(this.tendAt[s] + k) % n];
         oneDraw(o);
+        this.keep.look(o);
         if (scene === this.scene) {
           this.sortShadows(o);
           this.lookAhead(o);
         }
       }
+      // (the whole of the world looked over once more: what of the pictures on the card it holds is known, see CardKeep)
+      if (scene === this.scene && this.tendAt[s] + per >= n) this.keep.passed();
       this.tendAt[s] = (this.tendAt[s] + per) % n;
     });
   }
@@ -982,7 +994,9 @@ export class Renderer {
   /** pictures waiting to be put on the card ahead of their first drawing, and how far off their thing was when found */
   private ahead: [THREE.Texture, number][] = [];
   private aheadKnown = new WeakSet<THREE.Texture>();
-  private aheadDone = new WeakSet<THREE.Material>();
+  /** paints all of whose pictures are on the card or on their way, as of which taking off (see CardKeep): looked at again after the next */
+  private aheadDone = new WeakMap<THREE.Material, number>();
+  private aheadGen = 0;
   private sendingAhead = false;
   /**
    * The pictures of what is within AHEAD_M of the eye and has not been drawn yet are put on the card ahead, nearest
@@ -994,14 +1008,14 @@ export class Renderer {
   private lookAhead(root: THREE.Object3D) {
     // (development: every picture left to the frame its thing is first drawn in, as it was)
     if (import.meta.env.DEV && (globalThis as { __noAhead?: boolean }).__noAhead) return;
-    const eye = this.camera.position, R = this.renderer;
+    const eye = this.camera.position, peek = this.keep.peek, gen = this.aheadGen;
     let found = false;
     root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       let waiting: THREE.Texture[] | null = null;
       for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
-        if (this.aheadDone.has(mat)) continue;
+        if (this.aheadDone.get(mat) === gen) continue;
         let left = false;
         for (const v of Object.values(mat)) {
           const t = v as THREE.Texture | null;
@@ -1009,11 +1023,11 @@ export class Renderer {
           // (a picture still coming, or one not yet sent: the paint is looked at again)
           left = true;
           if (!t.image) continue;
-          if ((R.properties.get(t) as { __webglTexture?: unknown }).__webglTexture === undefined) (waiting ??= []).push(t);
+          if (peek(t).__webglTexture === undefined) (waiting ??= []).push(t);
           else this.aheadKnown.add(t);
         }
-        // (every picture of it on the card or on its way: not looked at again)
-        if (!left) this.aheadDone.add(mat);
+        // (every picture of it on the card or on its way: not looked at again, unless pictures are taken off)
+        if (!left) this.aheadDone.set(mat, gen);
       }
       if (!waiting) return;
       const d = nearestOf(m, eye);
@@ -1035,7 +1049,7 @@ export class Renderer {
         let best = 0;
         for (let i = 1; i < this.ahead.length; i++) if (this.ahead[i][1] < this.ahead[best][1]) best = i;
         const [t] = this.ahead.splice(best, 1)[0];
-        if ((this.renderer.properties.get(t) as { __webglTexture?: unknown }).__webglTexture === undefined) this.renderer.initTexture(t);
+        if (this.keep.peek(t).__webglTexture === undefined) this.renderer.initTexture(t);
       }
     } finally {
       this.sendingAhead = false;

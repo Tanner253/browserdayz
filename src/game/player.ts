@@ -260,6 +260,8 @@ export class Player {
       if (this.crouched) this.setCrouch(false);
     }
     this.fly = on;
+    // (flying, the body is not moved with the eye: see flyStep; out of it, it is put where the eye has got to)
+    if (!on) this.body.setTranslation({ x: this.pos.x, y: this.pos.y + this.half() + RADIUS, z: this.pos.z }, true);
     this.collider.setEnabled(!on && !this.seated);
     this.vel.set(0, 0, 0);
     this.lastFallSpeed = 0;
@@ -295,7 +297,10 @@ export class Player {
     if (d.lengthSq() > 1) d.normalize();
     this.vel.copy(d).multiplyScalar(speed);
     this.pos.addScaledVector(this.vel, h);
-    this.body.setTranslation({ x: this.pos.x, y: this.pos.y + this.half() + RADIUS, z: this.pos.z }, true);
+    // (The body is left where flying began: its collider is off, and moved every step at a flier's speed, Rapier went
+    // through all 66,000 of the world's colliders each time, 2.5 to 3.5 ms a step, a fifth of the processor in a
+    // flight across the map; 2026-10-20, its own timings. setFly puts it back under the eye. `__flyBody`: as it was.)
+    if (import.meta.env.DEV && (globalThis as { __flyBody?: boolean }).__flyBody) this.body.setTranslation({ x: this.pos.x, y: this.pos.y + this.half() + RADIUS, z: this.pos.z }, true);
     this.grounded = false;
     this.moving = 0;
     this.lean += (0 - this.lean) * (1 - Math.exp(-10 * h));

@@ -241,6 +241,17 @@ class LodSet {
    * comes within its reach: coming into a town, every kind of thing in it was shown, and its pictures sent, at once.
    */
   nearest(eye: THREE.Vector3, within: number) {
+    // (asked for each of the set's lists in turn, by the same eye: worked out once)
+    const k = this.asked;
+    if (k[0] === eye.x && k[1] === eye.z && k[2] === within) return k[3];
+    k[0] = eye.x;
+    k[1] = eye.z;
+    k[2] = within;
+    return (k[3] = this.nearestNow(eye, within));
+  }
+  private asked = [NaN, NaN, NaN, NaN];
+
+  private nearestNow(eye: THREE.Vector3, within: number) {
     const c = this.cells;
     let best = within * within;
     c.span(eye.x, eye.z, within, _span);

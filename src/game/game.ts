@@ -507,6 +507,7 @@ export class Game {
     // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
     // (both ways it is drawn: by itself in the hands, and as a line of the list of its kind on the ground)
     this.loot.models.onMade = (tpl) => Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)]).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 6000))]);
+    this.loot.models.cold = (tpl) => r.keep.offCard(tpl.group);
     // (And a body is got ready before it is handed to whoever asked for it. The first of the infected and the
     // first other player to come into sight were five shaders each made in the frame: a second and a half in
     // which nothing moved. The first of a kind is what there is to wait for; each one after it has only its own
