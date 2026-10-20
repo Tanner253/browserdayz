@@ -648,9 +648,14 @@ setInterval(() => {
   }
   // and the west's places, whose cars are driven off by the first who come by (JEEP.refill): a new one once the place
   // has stood empty its time, and nobody is on the spot
+  const cars = [...vehicles.values()].filter((v) => !v.goneAt);
+  let westCars = cars.filter((v) => v.home >= WEST_FROM).length;
+  const westMost = (PARKS.length - WEST_FROM) * JEEP.refill.cap;
   for (let home = WEST_FROM; home < PARKS.length; home++) {
-    const p = PARKS[home], cars = [...vehicles.values()].filter((v) => !v.goneAt);
-    if (jeepsDue.has(home) || cars.filter((v) => v.home === home).length >= JEEP.refill.most || cars.some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) {
+    const p = PARKS[home];
+    // (its own counted only near it: one driven east is no car for the west)
+    const own = cars.filter((v) => v.home === home && Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < JEEP.refill.near).length;
+    if (jeepsDue.has(home) || own >= JEEP.refill.most || westCars >= westMost || cars.some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) {
       emptySince.delete(home);
       continue;
     }
@@ -658,6 +663,7 @@ setInterval(() => {
     if (now - since < JEEP.refill.after * 1000 || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear)) continue;
     emptySince.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
+    westCars++;
     log(`a new car at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}, the west's place ${home - WEST_FROM}: its own was driven off`);
   }
 }, 1000);
