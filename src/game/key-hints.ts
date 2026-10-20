@@ -36,7 +36,9 @@ export function keyHints(g: Game): KeyHints | null {
   const p = g.player, w = g.weapons;
   if (!g.started || g.paused || p.dead || g.touch || g.awaitClick) return null;
   if (g.invUI.isOpen || g.shop.isOpen || g.map.open || g.adminUI.isOpen || g.hud.emotes.isOpen || g.hud.chatOpen) return null;
-  const pad = g.input.pad, P = padNames(document.body.dataset.pad === 'xbox');
+  // (a controller's buttons only while it is the controller that is being used: one plugged in that was nudged once
+  // left the corner naming its buttons to somebody flying on the keyboard, the owner, 2026-10-20: "heli controls dont show Q/E ?")
+  const pad = g.input.pad && g.input.padAt >= g.input.keyAt, P = padNames(document.body.dataset.pad === 'xbox');
   const own: KeyRow[] = [], rest: KeyRow[] = [];
   /** a row with its keyboard keys and a controller's buttons (null: it has none there, and is left out) */
   const put = (to: KeyRow[], text: string, kb: string[] | null, pd: string[] | null) => {

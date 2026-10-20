@@ -23,6 +23,9 @@ export class Input {
    * means the game has the screen. Let go of as soon as the mouse is clicked.
    */
   pad = false;
+  /** when a key and when the controller were last used (performance.now): which of the two the corner's keys are shown for */
+  keyAt = 0;
+  padAt = 0;
   onLockChange: (locked: boolean) => void = () => {};
   /** keys the player has put things on: each to the name the game asks for that thing by ('' for a key that now does nothing). See src/core/keys.ts. */
   private via = new Map<string, string>();
@@ -46,6 +49,7 @@ export class Input {
       const k = this.named(e.code);
       if (e.code === 'Tab' || e.code === 'Space' || e.code === 'Slash' || e.code.startsWith('Arrow') || k === 'Tab' || k === 'Space' || (e.ctrlKey && e.code === 'KeyW') || (this.seatKeys && e.ctrlKey && /^Digit[1-4]$/.test(e.code))) e.preventDefault();
       if (e.repeat || !k) return;
+      this.keyAt = performance.now();
       this.down.add(k);
       this.pressedSet.add(k);
       this.fixedSet.add(k);

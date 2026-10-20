@@ -43,6 +43,8 @@ export interface PadHost {
 
 interface Input {
   pad: boolean;
+  /** when the controller was last used (see Input.keyAt) */
+  padAt: number;
   locked: boolean;
   wheel: number;
   held(code: string): boolean;
@@ -97,6 +99,7 @@ export class Gamepad {
     }
     const pressed = gp.buttons.map((b, i) => b.pressed || b.value > (i === B.l2 || i === B.r2 ? PULL : 0.5));
     const any = pressed.some(Boolean) || gp.axes.some((a) => Math.abs(a) > 0.5);
+    if (any) this.input.padAt = performance.now();
     if (any && !this.input.pad) {
       this.input.pad = true;
       document.body.classList.add('pad');
