@@ -39,7 +39,7 @@ import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
-import { blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
+import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
 import { seen } from './seen';
@@ -641,8 +641,16 @@ setInterval(() => {
   settleRiders();
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {
-    const p = PARKS[home];
-    if (now < at || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) continue;
+    const p = PARKS[home], pad = p.k === HELI.kind;
+    // (A helicopter's pad: none while one of its own is still about anywhere, an admin's on its books among them, and
+    // none until the pad has stood clear a while, not the moment whatever stood on it is flown off. See HELI.respawn.)
+    if (pad && [...vehicles.values()].some((v) => v.home === home && !v.goneAt)) {
+      jeepsDue.delete(home);
+      continue;
+    }
+    const taken = [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8);
+    if (pad && taken) jeepsDue.set(home, Math.max(at, now + HELI_HOLD_MS));
+    if (now < at || taken) continue;
     jeepsDue.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
   }

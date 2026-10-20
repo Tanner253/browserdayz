@@ -264,7 +264,7 @@ export function blowJeep(v: Veh, byId: number) {
   v.burnAt = 0;
   v.goneAt = now + 120_000;
   v.siren = false;
-  jeepsDue.set(v.home, now + RESPAWN_MS);
+  jeepsDue.set(v.home, now + respawnMs(v.home));
   const by = clients.get(byId);
   broadcast({ t: 'vboom', i: v.i, by: byId });
   // whoever is in it, and whoever is standing by it
@@ -294,8 +294,11 @@ export function blowJeep(v: Veh, byId: number) {
   log(`jeep #${v.i} burned out${by ? ` (${by.name})` : ''}`);
 }
 
-/** how long before a new car is stood for one burned or taken away, and how long one may be left alone (JEEP.idle) */
+/** how long before a new car is stood for one burned or taken away (a helicopter's pad its own, and its hold: HELI.respawn), and how long one may be left alone (JEEP.idle) */
 const RESPAWN_MS = (Number(process.env.JEEP_RESPAWN_S) || JEEP.respawn) * 1000;
+const HELI_RESPAWN_MS = (Number(process.env.HELI_RESPAWN_S) || HELI.respawn) * 1000;
+export const HELI_HOLD_MS = (Number(process.env.HELI_HOLD_S) || HELI.respawnHold) * 1000;
+const respawnMs = (home: number) => (PARKS[home]?.k === HELI.kind ? HELI_RESPAWN_MS : RESPAWN_MS);
 export const CAR_IDLE_MS = (Number(process.env.CAR_IDLE_S) || JEEP.idle.after) * 1000;
 
 /**
@@ -314,7 +317,7 @@ export function leftAlone(v: Veh, now: number): boolean {
   broadcast({ t: 'v-', i: v.i });
   // (unless another car stands at its place now: an admin's is booked to the nearest place of its kind, and one driven
   // off from there left the place empty, its own never to come back)
-  if (!jeepsDue.has(v.home) && ![...vehicles.values()].some((o) => o.home === v.home && !o.goneAt && p && Math.hypot(o.s[0] - p.x, o.s[2] - p.z) < 8)) jeepsDue.set(v.home, now + RESPAWN_MS);
+  if (!jeepsDue.has(v.home) && ![...vehicles.values()].some((o) => o.home === v.home && !o.goneAt && p && Math.hypot(o.s[0] - p.x, o.s[2] - p.z) < 8)) jeepsDue.set(v.home, now + respawnMs(v.home));
   log(`car #${v.i} left alone ${Math.round((now - v.drivenAt) / 60000)} min at ${v.s[0].toFixed(0)}, ${v.s[2].toFixed(0)}: taken away`);
   return true;
 }

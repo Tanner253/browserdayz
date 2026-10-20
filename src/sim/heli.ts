@@ -74,6 +74,16 @@ export const HELI = {
   burn: 2.4,
   /** how far over the ground its skids are when its middle is where the vehicles' own middle is said to be (RIDE_HEIGHT) */
   pad: { r: 6.5, clear: 7.5, building: 12 },
+  /**
+   * A pad's new one (server/index.ts): only once no helicopter of that pad is left on the map (burned out or taken
+   * away), `respawn` seconds from when it went, and after the pad has then stood `respawnHold` seconds with nothing parked
+   * on it and nobody on it. It went by a jeep's rule, three minutes and then the moment the spot was clear, so a
+   * new one that was due waited under whatever stood on the pad and came the instant that was flown off (the owner,
+   * 2026-10-19: "the heli by the castle isntantly resspawned on live server when someone got in and flew the first
+   * one away a 2nd one respawned too fast"). The server's own: HELI_RESPAWN_S says otherwise.
+   */
+  respawn: 900,
+  respawnHold: 60,
 } as const;
 
 /** the hospital's roof over its floor, metres: the ground storey, the storeys over it, and a slab under each and over the last (src/world/buildings.ts) */
