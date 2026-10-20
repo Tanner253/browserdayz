@@ -28,7 +28,7 @@ import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
 import { playEdge } from '../world/outline';
 import { ZONA_VOID } from '../sim/items';
-import { ZONA_WEST } from '../world/zona';
+import { westAt } from '../world/zona';
 import { swampShore } from '../world/worldgen/west-water';
 import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
@@ -1259,12 +1259,11 @@ export class BigMap {
     // The Zona's west line, drawn here at one width at any distance: on the sheet it is a metre or two wide, a hair
     // at the whole map's distance, and dark red down the red canyon it runs by (the owner, 2026-10-19: "the map does
     // not show the zona boundaries?"). Its words are put with the names, below.
-    const zx = ZONA_VOID ? sx(ZONA_WEST) : NaN;
-    const zonaOn = zx > -60 * u && zx < W + 60 * u;
+    const zx = ZONA_VOID ? sx(westAt(220)) : NaN;
+    const zonaOn = ZONA_VOID && sx(-2013) < W + 60 * u && sx(-1950) > -60 * u;
     if (zonaOn) {
       g.beginPath();
-      g.moveTo(zx, Math.max(0, sy(-776)));
-      g.lineTo(zx, Math.min(Hh, sy(776)));
+      for (let z = -776; z <= 776; z += 6) (z === -776 ? g.moveTo : g.lineTo).call(g, sx(westAt(z)), sy(z));
       g.lineWidth = 5 * u;
       g.strokeStyle = 'rgba(20, 8, 6, 0.55)';
       g.stroke();
