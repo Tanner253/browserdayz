@@ -30,6 +30,8 @@ export const FP_BODY_LAYER = 4;
 export const BODY_SCALE = 0.965;
 /** how far from its hips a body can reach, metres, however it is bent: what it is judged in sight by (see Avatar.make) */
 const BODY_REACH = 2.5;
+/** (development: a turned joint's branch worked out again at once, as it was, to measure the difference: see setWorldQuat) */
+const EAGER = () => import.meta.env.DEV && !!(globalThis as { __eagerTurn?: boolean }).__eagerTurn;
 /** what a bone does when its turn changes: nothing (see Avatar.load) */
 const unread = () => {};
 
@@ -1309,9 +1311,13 @@ export class Avatar {
     const rest = this.gearRest.get('Head'), eye = POSE.hold.cheek.eye[1];
     let under = Infinity, cheek = 0;
     if (rest) {
+      // (the head and what is on it made current first: see setWorldQuat)
+      rest.bone.updateWorldMatrix(true, false);
       _m1.multiplyMatrices(rest.bone.matrixWorld, rest.inv).invert();
       for (const holder of this.gearObjs) {
         if (holder.parent !== rest.bone) continue;
+        // (forced: a holder's own matrix is set once, and it is worked out only when told to be)
+        holder.updateWorldMatrix(false, true, true);
         holder.traverse((o) => {
           const m = o as THREE.Mesh;
           if (!m.isMesh) return;
@@ -1330,10 +1336,20 @@ export class Avatar {
     return this.face;
   }
 
+  /**
+   * A joint turned to face as it is told in the world. What hangs from it is not worked out again here: every
+   * question asked of a joint in the world (getWorldPosition and the rest, worldToLocal) works out its chain first,
+   * and the few places that read a joint's or a thing's matrix as it stands make it current first. Worked out here,
+   * every turn of the spine put the whole upper body together again, each finger once for every joint above it:
+   * posing a body cost a quarter to two fifths more (2026-10-20, found fighting the infected in the game; two bodies
+   * made alike and posed the same way, one each way, came out the same to the last bit over six hundred frames of
+   * walking, aiming, lying, sitting, dancing and dying, with gear and guns and as the infected).
+   */
   private setWorldQuat(bone: THREE.Object3D, world: THREE.Quaternion) {
     const pq = bone.parent!.getWorldQuaternion(_q3);
     bone.quaternion.copy(pq.invert().multiply(world));
-    bone.updateMatrixWorld(true);
+    if (EAGER()) bone.updateMatrixWorld(true);
+    else bone.updateWorldMatrix(false, false);
   }
 
   /** turn a bone about a world axis */
@@ -1355,6 +1371,7 @@ export class Avatar {
 
   /** @param slide the way a hand may move along the weapon to come within reach (unit vector), if it may */
   private solveArm(r: ArmRig, grip: HandGrip, weapon: THREE.Object3D, aimQ: THREE.Quaternion, slide?: THREE.Vector3, w = 1) {
+    weapon.updateWorldMatrix(true, false);
     const target = grip.pos.clone().applyMatrix4(weapon.matrixWorld);
     const wq = weapon.getWorldQuaternion(new THREE.Quaternion());
     if (slide) {
@@ -2250,6 +2267,8 @@ export class Avatar {
         // (the butt is where the shoulder will hold it: see the hold, below).
         const chest = this.gearRest.get('spine_03'), face = this.gearRest.get('Head');
         if (neck.parent && chest && face) {
+          chest.bone.updateWorldMatrix(true, false);
+          face.bone.updateWorldMatrix(true, false);
           const up = _k7.set(0, 1, 0).applyQuaternion(this.heldPivot.getWorldQuaternion(_kr)), a = POSE.hold.butt.aim;
           const butt = this.armR.arm.getWorldPosition(_k8).add(_k6.set(a[0], a[1], a[2]).applyQuaternion(_kr.setFromRotationMatrix(_m1.multiplyMatrices(chest.bone.matrixWorld, chest.inv))));
           _m1.multiplyMatrices(face.bone.matrixWorld, face.inv);
@@ -2320,6 +2339,7 @@ export class Avatar {
           const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] } : set.ready;
           if (butt && chest) {
             this.heldPivot.updateWorldMatrix(false, false);
+            chest.bone.updateWorldMatrix(true, false);
             _kq.setFromRotationMatrix(_m1.multiplyMatrices(chest.bone.matrixWorld, chest.inv));
             this.armR.arm.getWorldPosition(_k1);
           }
@@ -2342,6 +2362,8 @@ export class Avatar {
             // (Worked in the aim's own frame, the pivot's: x to the aim's right, y up, z back. The gun stands
             // upright in that; the head is tipped in it.)
             const c = POSE.hold.cheek, g = this.faceGear(), [half, rise] = held.sight;
+            face.bone.updateWorldMatrix(true, false);
+            chest.bone.updateWorldMatrix(true, false);
             _m1.multiplyMatrices(face.bone.matrixWorld, face.inv);
             const eye = this.heldPivot.worldToLocal(_k6.set(c.eye[0], c.eye[1], c.eye[2]).applyMatrix4(_m1));
             const a = POSE.hold.butt.aim, high = this.heldPivot.worldToLocal(_k7.set(a[0], a[1], a[2]).applyQuaternion(_kq).add(_k1)).y;
