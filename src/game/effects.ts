@@ -16,6 +16,10 @@ import { MuzzleFlash, muzzleArt } from './muzzle';
 const MAX_P = 600;
 const MAX_DECALS = 160;
 const MAX_BLOOD = 220;
+/** blood is on the ground and the walls this many seconds, and fades out over the last FADE of them (the owner,
+ * 2026-10-20: "blood splatter and explosive black powder residue left behind needs to be cleaned up"; it stayed until
+ * newer blood took its place). The same for the burnt ground a blast leaves: src/game/blast.ts BURN_LIFE. */
+export const MARK_LIFE = 120, MARK_FADE = 30;
 const _Z = new THREE.Vector3(0, 0, 1);
 const _DOWN = new THREE.Vector3(0, -1, 0);
 const _UP = new THREE.Vector3(0, 1, 0);
@@ -288,7 +292,12 @@ export class Effects {
   private holeGeo = new THREE.PlaneGeometry(1, 1);
   private blood!: THREE.InstancedMesh;
   private bloodCell!: THREE.InstancedBufferAttribute;
+  /** when each was laid (seconds of `clock`), and the clock the shader fades them by */
+  private bloodBorn!: THREE.InstancedBufferAttribute;
   private bloodIdx = 0;
+  private clock = 0;
+  private bloodNow = { value: 0 };
+  private bloodSwept = 0;
   /** where the player is looking from: far-off blood is drawn bigger so a hit still reads */
   eye = new THREE.Vector3();
   /**
@@ -433,14 +442,21 @@ export class Effects {
         roughness: 0.32,
         metalness: 0,
       });
-      atmo.register(bmat, (shader: { vertexShader: string }) => {
+      const now = this.bloodNow;
+      atmo.register(bmat, (shader: { vertexShader: string; fragmentShader: string; uniforms: Record<string, unknown> }) => {
+        shader.uniforms.uBloodNow = now;
         shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute vec2 iCell;')
-          .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\n  vMapUv = uv * 0.5 + iCell;\n#endif');
+          .replace('#include <common>', '#include <common>\nattribute vec2 iCell;\nattribute float iBorn;\nuniform float uBloodNow;\nvarying float vBloodLeft;')
+          .replace('#include <uv_vertex>', `#include <uv_vertex>\n#ifdef USE_MAP\n  vMapUv = uv * 0.5 + iCell;\n#endif\nvBloodLeft = 1.0 - smoothstep( ${(MARK_LIFE - MARK_FADE).toFixed(1)}, ${MARK_LIFE.toFixed(1)}, uBloodNow - iBorn );`);
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying float vBloodLeft;')
+          .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.a *= vBloodLeft;');
       }, 'blood');
       const geo = new THREE.PlaneGeometry(1, 1);
       this.bloodCell = new THREE.InstancedBufferAttribute(new Float32Array(MAX_BLOOD * 2), 2);
       geo.setAttribute('iCell', this.bloodCell);
+      this.bloodBorn = new THREE.InstancedBufferAttribute(new Float32Array(MAX_BLOOD), 1);
+      geo.setAttribute('iBorn', this.bloodBorn);
       this.blood = new THREE.InstancedMesh(geo, bmat, MAX_BLOOD);
       this.blood.count = 0;
       this.blood.frustumCulled = false;
@@ -813,9 +829,23 @@ export class Effects {
     this.bloodIdx = (i + 1) % MAX_BLOOD;
     this.blood.setMatrixAt(i, this._m);
     this.bloodCell.setXY(i, BLOOD_CELL[kind][0], BLOOD_CELL[kind][1]);
+    this.bloodBorn.setX(i, this.clock);
     this.blood.count = Math.min(MAX_BLOOD, this.blood.count + 1);
     this.blood.instanceMatrix.needsUpdate = true;
     this.bloodCell.needsUpdate = true;
+    this.bloodBorn.needsUpdate = true;
+  }
+
+  /** blood gone out of sight is shrunk to nothing, so that the card draws none of it (once a second) */
+  private sweepBlood() {
+    let changed = false;
+    const born = this.bloodBorn.array as Float32Array, mats = this.blood.instanceMatrix.array as Float32Array;
+    for (let i = 0; i < this.blood.count; i++) {
+      if (this.clock - born[i] < MARK_LIFE || (mats[i * 16] === 0 && mats[i * 16 + 5] === 0 && mats[i * 16 + 10] === 0)) continue;
+      mats.fill(0, i * 16, i * 16 + 16);
+      changed = true;
+    }
+    if (changed) this.blood.instanceMatrix.needsUpdate = true;
   }
 
   decal(point: THREE.Vector3, normal: THREE.Vector3, kind: HoleKind, attachTo?: THREE.Object3D, scale = 1) {
@@ -884,6 +914,12 @@ export class Effects {
   }
 
   update(dt: number) {
+    this.clock += dt;
+    this.bloodNow.value = this.clock;
+    if (this.clock - this.bloodSwept > 1) {
+      this.bloodSwept = this.clock;
+      this.sweepBlood();
+    }
     this.blasts.update(dt, this.eye);
     this.fire.update(dt, this.eye);
     for (const f of this.flames) f.update(dt);
