@@ -32,6 +32,9 @@ export const BODY_SCALE = 0.965;
 const BODY_REACH = 2.5;
 /** (development: a turned joint's branch worked out again at once, as it was, to measure the difference: see setWorldQuat) */
 const EAGER = () => import.meta.env.DEV && !!(globalThis as { __eagerTurn?: boolean }).__eagerTurn;
+/** a joint moved: it is brought up to date, and what hangs from it when next asked for (see setWorldQuat) */
+const settle = (o: THREE.Object3D) => (EAGER() ? o.updateMatrixWorld(true) : o.updateWorldMatrix(false, false));
+const settleDown = (o: THREE.Object3D) => o.updateWorldMatrix(false, EAGER());
 /** what a bone does when its turn changes: nothing (see Avatar.load) */
 const unread = () => {};
 
@@ -1427,7 +1430,7 @@ export class Avatar {
         _qb.copy(b.quaternion);
         b.quaternion.copy(before[i]).slerp(_qb, w);
       });
-      r.arm.updateMatrixWorld(true);
+      settle(r.arm);
       r.hand.getWorldQuaternion(handWorld);
     }
     this.curl(r, curl.map((c) => (typeof c === 'number' ? c * w : c.map((j) => j * w))) as Curl, handWorld);
@@ -1500,7 +1503,7 @@ export class Avatar {
         bone.quaternion.premultiply(_q1.setFromAxisAngle(_ca, a));
         pw.multiply(bone.quaternion);
       });
-      chain[0].updateMatrixWorld(true);
+      settle(chain[0]);
     });
   }
 
@@ -1622,7 +1625,7 @@ export class Avatar {
   private plant(dt: number) {
     const pelvis = this.joints.pelvis;
     if (!pelvis || this.soles.length < 2) return;
-    this.root.updateMatrixWorld(true);
+    settle(this.root);
     const ground = this.root.position.y;
     let gap = Infinity;
     for (const s of this.soles) gap = Math.min(gap, s.foot.getWorldPosition(_v1).y - ground - s.high);
@@ -1631,7 +1634,7 @@ export class Avatar {
     const up = pelvis.parent!.getWorldScale(_v2).y || 1;
     _v1.set(0, -this.sunk / up, 0).applyQuaternion(pelvis.parent!.getWorldQuaternion(_q3).invert());
     pelvis.position.add(_v1);
-    pelvis.updateWorldMatrix(false, true);
+    settleDown(pelvis);
     for (const s of this.soles) {
       const at = s.foot.getWorldPosition(_v1), off = at.y - ground - s.high;
       const down = 1 - THREE.MathUtils.smoothstep(off, 0.03, 0.14);
@@ -1648,7 +1651,7 @@ export class Avatar {
       made.premultiply(_qa.setFromAxisAngle(UP, Math.atan2(now.x, now.z) - Math.atan2(was.x, was.z)));
       here.slerp(made, down);
       s.foot.quaternion.copy(s.foot.parent!.getWorldQuaternion(_qb).invert().multiply(here));
-      s.foot.updateWorldMatrix(false, true);
+      settleDown(s.foot);
     }
   }
 
@@ -1704,7 +1707,7 @@ export class Avatar {
       for (const r of [this.armR, this.armL]) if (r) this.curl(r, [0.5, 0.58, 0.66, 0.74], r.hand.getWorldQuaternion(_qa));
       return;
     }
-    this.root.updateMatrixWorld(true);
+    settle(this.root);
     const from = head.getWorldPosition(_head);
     const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(from).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
     const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
@@ -2155,7 +2158,7 @@ export class Avatar {
     if (legs > 0.001) for (const [knee, straight] of this.knees) knee.quaternion.slerp(straight, legs);
     if (how && inCar > 0.001) {
       // (about the body's own line from side to side, wherever it has been turned: forward of it goes up, up goes back)
-      this.root.updateMatrixWorld(true);
+      settle(this.root);
       _right.setFromMatrixColumn(this.root.matrixWorld, 0).normalize();
       if (how.knees) for (const t of this.thighs) if (t) this.turn(t, _right, how.knees * inCar);
       if (how.back) {
@@ -2222,7 +2225,7 @@ export class Avatar {
     // (leaning, the hips go a little the same way: the head ends up where the eyes of whoever is leaning are)
     if (over) this.root.position.addScaledVector(_right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw)), over * POSE.leanHips);
     if (!gone && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003 || Math.abs(over) > 0.003 || pr > 0.003)) {
-      this.root.updateMatrixWorld(true);
+      settle(this.root);
       // the legs have turned; from the waist up the body still faces the aim
       const n = this.spine.length;
       const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
@@ -2277,7 +2280,7 @@ export class Avatar {
           if (g.under !== null) over = Math.min(over, _k6.set(c.plate, g.under, -0.1).applyMatrix4(_m1).sub(butt).dot(up) - held.sight[0] - 0.006);
           neck.getWorldPosition(_k6).addScaledVector(_right, c.crane[0] * k).addScaledVector(_fwd, c.crane[1] * k).addScaledVector(up, -THREE.MathUtils.clamp(over, 0, c.drop) * welded);
           neck.position.copy(neck.parent.worldToLocal(_k6));
-          neck.updateMatrixWorld(true);
+          settle(neck);
         }
       }
       // Aiming a pistol, the head goes to the sights the same way, without a stock to lay it on: forward and down.
@@ -2289,7 +2292,7 @@ export class Avatar {
         if (neck.parent) {
           neck.getWorldPosition(_k6).addScaledVector(_fwd, c.forward * sighted).addScaledVector(UP, -c.down * sighted);
           neck.position.copy(neck.parent.worldToLocal(_k6));
-          neck.updateMatrixWorld(true);
+          settle(neck);
         }
       }
       if (pr > 0.003) {
@@ -2489,7 +2492,7 @@ export class Avatar {
         else {
           // wound up behind the shoulder, then brought down across the body
           const wind = Math.sin(Math.PI * Math.min(1, u / 0.4)) * (u < 0.4 ? 1 : 0), strike = THREE.MathUtils.smoothstep(u, 0.3, 0.6) * (1 - THREE.MathUtils.smoothstep(u, 0.7, 1));
-          this.root.updateMatrixWorld(true);
+          settle(this.root);
           _right.set(1, 0, 0).applyQuaternion(_aimQ.setFromAxisAngle(UP, this.yaw));
           this.turn(r.arm, _right, 1.5 * wind + 0.9 * strike);
           this.turn(r.fore, _right, 0.9 * wind + 0.2 * strike);
@@ -2508,7 +2511,7 @@ export class Avatar {
       const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02;
       this.shoulderT += ((laid ? 1 : 0) - this.shoulderT) * ease(laid ? 6 : 14);
       if (this.shoulderT > 0.02 && this.inHand && this.armR && this.neck.length) {
-        this.root.updateMatrixWorld(true);
+        settle(this.root);
         const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
         const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
         _right.set(1, 0, 0).applyQuaternion(aimQ);
@@ -2538,7 +2541,7 @@ export class Avatar {
       const side = this.punchT >= 0 ? this.punchSide : 0;
       // the shoulder goes in behind the punch
       if (this.chest) this.turn(this.chest, UP, side * (side > 0 ? 0.38 : 0.26) * out - side * 0.08 * wind * (1 - out));
-      this.root.updateMatrixWorld(true);
+      settle(this.root);
       const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
       const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
       _right.set(1, 0, 0).applyQuaternion(aimQ);
@@ -2561,7 +2564,7 @@ export class Avatar {
 
     // --- hands busy with something that is not a weapon
     if (using && ges && this.armR && this.armL && this.neck.length) {
-      this.root.updateMatrixWorld(true);
+      settle(this.root);
       const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
       const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
       _right.set(1, 0, 0).applyQuaternion(aimQ);
@@ -2594,7 +2597,7 @@ export class Avatar {
 
     // --- a call from the wheel, or the hands kept up: the arms say it as well
     if (!dead && (mv || this.handsT > 0.02) && this.armR && this.armL && this.neck.length) {
-      this.root.updateMatrixWorld(true);
+      settle(this.root);
       const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
       const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
       _right.set(1, 0, 0).applyQuaternion(aimQ);
