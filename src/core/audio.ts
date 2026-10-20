@@ -274,29 +274,40 @@ export function recordings(): Promise<void> {
   })());
 }
 
-let rotorAsked: Promise<void> | null = null;
+const lateAsked = new Map<string, Promise<void>>();
 /**
- * Fetches the rotor of the helicopter that brings a supply drop, once: when one is first in the air (`rotor` asks),
- * not with the rest. It is a quarter of a megabyte that no game needs in its first minute and a half, and the
- * helicopter is a kilometre off when it is first wanted.
+ * Fetches one recording, once, when it is first wanted and not with the rest: the rotor of the helicopter that
+ * brings a supply drop (when one is first in the air) and the police car's siren (when one is first driven or heard).
+ * Each is a quarter of a megabyte that most games never need.
  */
-export function rotorRecording(): Promise<void> {
-  return (rotorAsked ??= (async () => {
-    const dec = new OfflineAudioContext(1, 1, 44100);
-    for (let go = 0; go < 3 && !bank.has('rotor'); go++) {
-      try {
-        const res = await fetch('assets/sounds/rotor.wav');
-        if (!res.ok) throw new Error(String(res.status));
-        const buf = await dec.decodeAudioData(await res.arrayBuffer());
-        takeOf.set(buf, 0);
-        bank.set('rotor', [buf]);
-      } catch {
-        // not there, or a bad line: again in a while (and after the third time, the helicopter is silent)
-        await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
-      }
-    }
-  })());
+function lateRecording(name: string): Promise<void> {
+  let asked = lateAsked.get(name);
+  if (!asked)
+    lateAsked.set(
+      name,
+      (asked = (async () => {
+        const dec = new OfflineAudioContext(1, 1, 44100);
+        for (let go = 0; go < 3 && !bank.has(name); go++) {
+          try {
+            const res = await fetch(`assets/sounds/${name}.wav`);
+            if (!res.ok) throw new Error(String(res.status));
+            const buf = await dec.decodeAudioData(await res.arrayBuffer());
+            takeOf.set(buf, 0);
+            bank.set(name, [buf]);
+          } catch {
+            // not there, or a bad line: again in a while (and after the third time, it is silent)
+            await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
+          }
+        }
+      })()),
+    );
+  return asked;
 }
+export const rotorRecording = () => lateRecording('rotor');
+export const sirenRecording = () => lateRecording('siren');
+
+/** how loud the siren's recording is played: as loud as the made-up wail it replaced */
+const SIREN_GAIN = 0.4;
 
 export class AudioEngine {
   ctx!: AudioContext;
@@ -2062,7 +2073,8 @@ export class AudioEngine {
   /**
    * A car's horn, and a police car's siren (src/game/horns.ts): one voice to a car, told every frame where it is and
    * which of the two are going. The horn is two notes a third apart, square and driven hard through a narrow mouth, as
-   * a car's is (the police car's higher); the siren a wail, up and down every four seconds. Both carry far.
+   * a car's is (the police car's higher); the siren a recording (`siren`, scripts/sounds.mjs), looped, and silent
+   * until it has come. Both carry far.
    */
   horn(police: boolean): HornVoice | null {
     if (!this.ready) return null;
@@ -2094,19 +2106,9 @@ export class AudioEngine {
       return o;
     });
     shape.connect(mouth).connect(hornG).connect(pan);
-    // the siren: one note swept up and down by a slow one
-    const wail = ctx.createOscillator();
-    wail.type = 'triangle';
-    wail.frequency.value = 1050;
-    const sweep = ctx.createOscillator();
-    sweep.frequency.value = 0.25;
-    const depth = ctx.createGain();
-    depth.gain.value = 450;
-    sweep.connect(depth).connect(wail.frequency);
-    const wailShape = this.filter('lowpass', 3200, 0.7);
-    wail.connect(wailShape).connect(sirenG).connect(pan);
-    wail.start();
-    sweep.start();
+    sirenG.connect(pan);
+    // the siren, begun once it is first wanted and its recording is here
+    let wail: AudioBufferSourceNode | null = null;
     let live = true;
     const ease = (g: GainNode, to: number) => g.gain.setTargetAtTime(to, ctx.currentTime, 0.012);
     return {
@@ -2116,7 +2118,18 @@ export class AudioEngine {
         pan.positionY.value = pos.y;
         pan.positionZ.value = pos.z;
         ease(hornG, horn ? 0.55 : 0);
-        ease(sirenG, siren ? 0.32 : 0);
+        if (siren && !wail) {
+          const buf = bank.get('siren')?.[0];
+          if (!buf) void sirenRecording();
+          else {
+            wail = ctx.createBufferSource();
+            wail.buffer = buf;
+            wail.loop = true;
+            wail.connect(sirenG);
+            wail.start();
+          }
+        }
+        ease(sirenG, siren && wail ? SIREN_GAIN : 0);
       },
       stop: () => {
         if (!live) return;
@@ -2124,7 +2137,7 @@ export class AudioEngine {
         ease(hornG, 0);
         ease(sirenG, 0);
         const end = ctx.currentTime + 0.15;
-        for (const o of [...oscs, wail, sweep]) o.stop(end);
+        for (const o of [...oscs, ...(wail ? [wail] : [])]) o.stop(end);
         setTimeout(() => pan.disconnect(), 300);
       },
     };

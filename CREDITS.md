@@ -211,7 +211,7 @@ two packs in the public domain: [Impact Sounds](https://kenney.nl/assets/impact-
 [100 CC0 metal and wood SFX](https://opengameart.org/content/100-cc0-metal-and-wood-sfx) by rubberduck (CC0).
 The doors, a heavy blow and steel struck are out of the same two. A fist landing is
 [Punch](https://opengameart.org/content/punch) by qubodup (CC0), and the infected are the Zombies Sound Pack by
-artisticdude (CC0).
+artisticdude (CC0). The police car's siren is [Police Siren](https://freesound.org/s/746302/) by TitanKaempfer (CC0).
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).

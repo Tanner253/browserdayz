@@ -2,6 +2,7 @@
 // magazine going out and in, a slide racked.
 //
 //   node scripts/sounds.mjs        (npm run sounds)
+//   node scripts/sounds.mjs siren  only those named (the rest's sources need not be on the machine)
 //
 // Sources, unpacked by hand into assets-src/sounds/ (gitignored):
 //   snake/              "Snake's Authentic Gun Sounds" by Snake (f8studios.itch.io): free, may be
@@ -16,6 +17,8 @@
 //                       (k-impact<Kind>-<n>.wav, q-punch-<n>.wav), and are read from here
 //   (in assets-src/ itself) "UH60 Black Hawk helicopter hover loop 1" by qubodup (freesound.org/s/854493), CC0:
 //                       the rotor of the helicopter that brings a supply drop
+//   (in assets-src/sounds/fs/) "Police Siren" by TitanKaempfer (freesound.org/s/746302), CC0: the police car's siren,
+//                       decoded from Ogg by `node scripts/ogg.mjs --dir fs 746302__titankaempfer__police-siren`
 //
 // Each is cut to begin on the sound itself (a shot that starts a tenth of a second into its
 // file is a shot that is late), let die away at its end, made one channel, brought to the
@@ -194,6 +197,10 @@ several('hit_wood', ['c-wood_hit_03', 'c-wood_hit_04', 'c-wood_hit_07', 'c-wood_
 // Hawk holding still, 2.6 seconds that join their own beginning, one channel at 48000 as it came. How loud it is
 // played, and how its pitch and its top change with distance, is ROTOR there.
 SOUNDS.rotor = { src: path.join(ROOT, 'assets-src', '854493__qubodup__uh60-black-hawk-helicopter-hover-loop-1.wav'), loop: true, rate: 48000, gain: 1 };
+// The police car's siren (the owner, 2026-10-20: "Added new sound to replace the police siren"): its wail goes up and
+// down every 3 s exactly, the first rising out of nothing and the last dying away; one whole turn out of the middle,
+// begun where it joins its own beginning to the sample, at the rate it came (a new rate would blur the seam).
+SOUNDS.siren = { src: dec('c-746302__titankaempfer__police-siren'), from: 278670 / 44100, len: 3, loop: true, rate: 44100, gain: 1 };
 
 // The weapons pass's guns, each a shot of its own (2026-10-17; the owner chose them and downloaded the Freesound ones,
 // all CC0, into assets-src/ itself; the FLAC, MP3 and 32-bit ones decoded by a browser into decoded/fs-<number>.wav).
@@ -357,7 +364,9 @@ async function writeWav(file, x, rate) {
 await fs.mkdir(OUT, { recursive: true });
 let total = 0;
 const made = [];
+const ONLY = process.argv.slice(2);
 for (const [name, cfg] of Object.entries(SOUNDS)) {
+  if (ONLY.length && !ONLY.includes(name)) continue;
   const whole = await readWav(cfg.src, cfg.side);
   // (what comes before `from` is as if it were not in the recording)
   const rate = whole.rate, x = cfg.from ? whole.x.subarray(Math.round(cfg.from * rate)) : whole.x;
