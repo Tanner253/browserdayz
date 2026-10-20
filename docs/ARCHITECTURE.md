@@ -156,7 +156,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `player.ts` | 1324 | First-person survivor: kinematic character controller (Rapier), movement model, stamina / vitals, camera feel (bob, lean, landing dip) and footsteps. |
 | `procedural.ts` | 266 | The few meshes that have no scanned model: small machined parts built from a lathe profile, with a parkerised-steel material, and the stamped dog tag. |
 | `racks.ts` | 201 | Gun racks that show what stands in them (the owner, 2026-10-17: |
-| `remote.ts` | 634 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
+| `remote.ts` | 669 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
 | `riders.ts` | 62 | The dead who ride on (2026-10-14). |
 | `rig.ts` | 561 | A weapon pack in the hands of whoever holds the gun: the pack's own arms and its own gun, moved by its own animation. |
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
@@ -282,7 +282,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `director.ts` | 901 | The trailer's director. |
+| `director.ts` | 907 | The trailer's director. |
 | `human.ts` | 258 | Movement with somebody behind it, for the films from the twenty-first on (2026-10-19, the owner: |
 | `music.ts` | 341 | The trailer's score, written as code: one row per bar (the chord, and how hard the band plays it), in D minor at 128 beats a minute, so a bar is 1.875 s and every cut in shots.ts lands on a bar line. |
 | `music10.ts` | 352 | The tenth film's score: an old fort in the snow, slow and grand. |
@@ -308,6 +308,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `shots2.ts` | 1383 | The second trailer: what has changed in the Zone. |
 | `shots21.ts` | 748 | The twenty-first film, 70 s: |
 | `shots22.ts` | 171 | The twenty-second film, 22 s: |
+| `shots23.ts` | 207 | The twenty-third film, 15 seconds: the 9A-91 and the Barrett's bipod (the owner, 2026-10-20: |
 | `shots3.ts` | 1664 | The third trailer: a story, and then how the money works. |
 | `shots4.ts` | 1452 | The fourth trailer: the Zone has grown, and everything the other three were about. |
 | `shots5.ts` | 982 | The fifth trailer: the infected, and what comes after them. |
