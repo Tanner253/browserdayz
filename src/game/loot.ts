@@ -296,9 +296,10 @@ export class ItemModels {
         const copies: THREE.BufferGeometry[] = [];
         for (let i = 0; i < def.pile; i++) {
           const g = p.geometry.clone();
-          const yaw = (hash01(id, i) - 0.5) * 0.9;
-          const off = (i - (def.pile - 1) / 2) * d;
-          const slide = (hash01(id, i + 31) - 0.5) * Math.max(sz.x, sz.z) * 0.35;
+          // (a clip's rounds stand side by side in a row, as they are held in it)
+          const yaw = def.mag ? 0 : (hash01(id, i) - 0.5) * 0.9;
+          const off = (i - (def.pile - 1) / 2) * d * (def.mag ? 0.85 : 1);
+          const slide = def.mag ? 0 : (hash01(id, i + 31) - 0.5) * Math.max(sz.x, sz.z) * 0.35;
           g.applyMatrix4(new THREE.Matrix4().makeRotationY(yaw).setPosition(alongX ? slide : off, 0, alongX ? off : slide));
           copies.push(g);
         }

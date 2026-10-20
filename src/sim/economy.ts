@@ -407,7 +407,7 @@ export class Economy {
   private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
     const p = this.points[i];
     // (nothing of the fourth step and up west of the Zona's line: see eastOnly; and on a step it is kept only in places apart, nothing on the step's own: see TypeRule.away)
-    if (eastOnly(ITEMS[id]) && !inZona(p.x, p.z)) return false;
+    if (eastOnly(ITEMS[id], where) && !inZona(p.x, p.z)) return false;
     if (rule.away?.includes(where) && this.apart[i] === null) return false;
     // (A place apart is sorted on every step: its spots were each said to be of a kind on purpose, an armoury's and
     // a dressing station's, where under the gas and down the bunker anything lies anywhere. A sort with no kind of

@@ -433,11 +433,22 @@ export class WeaponRig {
 
   /** a pack's arm, as its maker's skeleton has it: the upper arm, the forearm, and what the hand hangs on */
   private arm(side: 'L' | 'R') {
-    const upper = this.node(side === 'L' ? 'UpArm_L_03' : 'UpArm_R_09'), fore = this.node(side === 'L' ? 'Forearm_L_04' : 'Forearm_R_010');
+    let upper = this.node(side === 'L' ? 'UpArm_L_03' : 'UpArm_R_09'), fore = this.node(side === 'L' ? 'Forearm_L_04' : 'Forearm_R_010');
     let hand: THREE.Object3D | null = null;
     this.scene.traverse((o) => {
       if (!hand && new RegExp(`^IK_Hand_Cntrl_${side}`).test(o.name)) hand = o;
     });
+    // (the sniper pack's: a plain chain, the wrist on the end of the forearm, its hand on the wrist: R_arm, R_elbow, R_wrist)
+    if (!upper || !fore || !hand) {
+      const find = (re: RegExp) => {
+        let n: THREE.Object3D | null = null;
+        this.scene.traverse((o) => {
+          if (!n && re.test(o.name)) n = o;
+        });
+        return n as THREE.Object3D | null;
+      };
+      [upper, fore, hand] = [find(new RegExp(`^${side}_arm_\\d+$`)), find(new RegExp(`^${side}_elbow_\\d+$`)), find(new RegExp(`^${side}_wrist_\\d+$`))];
+    }
     // (a joint well down the forearm: which way the forearm lies is said by it)
     const tip = this.node(side === 'L' ? 'BoneTwist_01.L_07' : 'BoneTwist_01.R_013') ?? this.node(side === 'L' ? 'BoneTwist_01L_07' : 'BoneTwist_01R_013');
     return upper && fore && hand ? { upper, fore, hand: hand as THREE.Object3D, tip } : null;
@@ -497,8 +508,8 @@ export class WeaponRig {
         if (o.turn) _q.premultiply(_q2.identity().slerp(o.turn, w));
         H.compose(_p, _q, _s).premultiply(G);
         to.setFromMatrixPosition(H);
-        // (set on what it hangs on, in that one's own space)
-        _m1.copy(arm.hand.parent!.matrixWorld).invert().multiply(H).decompose(arm.hand.position, arm.hand.quaternion, arm.hand.scale);
+        // (set on what it hangs on, in that one's own space; a hand on the end of a plain chain is carried there by the forearm)
+        if (arm.hand.parent !== arm.fore) _m1.copy(arm.hand.parent!.matrixWorld).invert().multiply(H).decompose(arm.hand.position, arm.hand.quaternion, arm.hand.scale);
       }
     }
     // the arm after it: the elbow kept to the side it was on, the two bones as long as they were

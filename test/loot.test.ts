@@ -98,7 +98,8 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // time east". It had been the other way, 2026-10-15: "someone with an AR needs to be able to loot reliable places")
   for (const id of ['ammo_556', 'ammo_739', 'ammo_762', 'box_556', 'box_739', 'box_762']) {
     const k = STEPS.map((t) => e.kept(id, t));
-    assert.ok(k[0] === 0 && k[1] === 0 && k[2] <= 4 && k[3] >= k[2], `${id} kept by step: ${k.join(' / ')}`);
+    // (but a few 7.62s at the second step's hunters', for the Mosin found there: 2026-10-19)
+    assert.ok(k[0] === 0 && (k[1] === 0 || (id === 'ammo_762' && k[1] <= 3)) && k[2] <= 4 && k[3] >= k[2], `${id} kept by step: ${k.join(' / ')}`);
   }
 });
 
@@ -116,7 +117,8 @@ ok('the outskirts are for something to hit with, and no gun; past them a tool li
     for (const { id, p } of past) assert.ok(p.tier! <= 3 && ((kind(p, ...SHED) && !kind(p, 'Village', 'Town', 'Shop')) || p.tier === 2 || !!p.arms) && !kind(p, 'Medic', 'Hospital', 'Police'), `a ${id} on step ${p.tier} in ${p.building}`);
     // (by the rules of what lies about: an armed place's own, a counter or a rack, rolls what a counter holds on its step)
     for (const id of ['bat', 'machete']) assert.equal(all.filter((l) => l.id === id && (l.p.tier === 2 || l.p.tier === 3) && !l.p.arms).length, 0, `a ${id} past the outskirts`);
-    for (const id of guns) assert.equal(on(id, 1), 0, `a ${id} on the outskirts`);
+    // (but the Mosin, the first two steps' rifle: the owner, 2026-10-19, "to act as a tier 1-2 sniper")
+    for (const id of guns) if (id !== 'mosin9130') assert.equal(on(id, 1), 0, `a ${id} on the outskirts`);
     // (and what is always left at an armed place out there is something to hit with)
     for (const { id, p } of all) if (p.arms && p.tier === 1) assert.ok(melee.includes(id), `a ${id} left at an armed place on the outskirts`);
     // (by the place: the village and its sheds are of the third step now, which has six times the outskirts' places)
@@ -446,7 +448,7 @@ ok('nothing of the fourth step and up west of the Zona’s line, not at a guard 
   for (const { all, fort, e } of worlds) {
     const west = [...all, ...fort].filter(({ p }) => !inZona(p.x, p.z));
     assert.ok(west.length > 200 && west.some(({ p }) => p.arms), `${west.length} things west of the line, none at an armed place`);
-    assert.deepEqual(west.filter(({ id }) => eastOnly(ITEMS[id])).map(({ id, p }) => `${id} at ${p.building}`), [], 'things of the fourth step and up west of the line');
+    assert.deepEqual(west.filter(({ id, p }) => eastOnly(ITEMS[id], p.tier)).map(({ id, p }) => `${id} at ${p.building}`), [], 'things of the fourth step and up west of the line');
     assert.equal([...all, ...fort].filter(({ id, p }) => id === 'keycard' && p.usage.includes('Bunker')).length, 0, 'a keycard in the bunker');
     assert.deepEqual([e.kept('keycard', 4), e.wanted('castle', 'keycard', 5)], [1, 1], 'the keycard is not one under the gas and one at the fort');
     assert.deepEqual([e.kept('ammo_50bmg', 4), e.kept('box_50bmg', 4), e.wanted('castle', 'ammo_50bmg', 5)], [0, 0, 1], 'the .50 is under the gas, or not once at the fort');

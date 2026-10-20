@@ -97,6 +97,8 @@ export const GUNS: Record<string, Gun> = {
   // (the owner, 2026-10-17: "the suppressed sniper vss we have does not sound suppressed")
   vssk: { ammo: 'ammo_127x55', quiet: true, rpm: 180, barrel: 1, moa: 2.5, hip: 2.4, up: 2.6, side: 0.6, lean: 0.12, first: 1, held: 1, stays: 0.3, back: 8.5, jump: 3, heavy: true, zero: [100, 200, 300, 400], reach: 450 },
   sniper50: { ammo: 'ammo_50bmg', rpm: 60, cycle: 1.1, barrel: 1, moa: 0.5, hip: 3.4, up: 4.2, side: 0.6, lean: 0.1, first: 1, held: 1, stays: 0.3, back: 9, jump: 4.4, heavy: true, zero: [100, 200, 300, 400, 500, 600, 800, 1000], reach: 1600 },
+  // (the Mosin 91/30: the same round, a longer and lighter rifle, less true and a little more kick; its bolt as long to work)
+  mosin9130: { ammo: 'ammo_762', rpm: 300, cycle: 0.8, barrel: 1, moa: 2.4, hip: 1.4, up: 3.4, side: 0.55, lean: 0.15, first: 1, held: 1, stays: 0.26, back: 8.2, jump: 3.4, heavy: true, zero: [100, 200, 300, 400, 500, 600], reach: 800 },
   mosin: { ammo: 'ammo_762', rpm: 300, cycle: 0.8, barrel: 1, moa: 1.6, hip: 1.3, up: 3.1, side: 0.5, lean: 0.15, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 3.2, heavy: true, zero: [100, 200, 300, 400, 500, 600], reach: 900 },
   // (the Colt: a heavier round than the 9 mm's and a harder shove with each, a little slower to come back)
   colt: { ammo: 'ammo_45', rpm: 380, barrel: 1, moa: 6, hip: 1.8, up: 2.1, side: 0.5, lean: 0, first: 1, held: 1, stays: 0.26, back: 9, jump: 1.9, zero: [25], reach: 200 },
