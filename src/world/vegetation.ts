@@ -235,6 +235,22 @@ class LodSet {
 
   private cells: Cells;
 
+  /**
+   * How far across the ground the nearest of these is from the eye, metres (Infinity past `within`): for their pictures
+   * to be put on the card before the first of them is shown (see Renderer.lookAhead). A set has nothing in it till one
+   * comes within its reach: coming into a town, every kind of thing in it was shown, and its pictures sent, at once.
+   */
+  nearest(eye: THREE.Vector3, within: number) {
+    const c = this.cells;
+    let best = within * within;
+    c.span(eye.x, eye.z, within, _span);
+    for (let cz = _span[2]; cz <= _span[3]; cz++) for (let cx = _span[0]; cx <= _span[1]; cx++) {
+      const k = cz * c.w + cx;
+      if (c.start[k] !== c.start[k + 1]) best = Math.min(best, c.near2(k, eye.x, eye.z));
+    }
+    return best < within * within ? Math.sqrt(best) : Infinity;
+  }
+
   addLevel(scene: THREE.Scene, parts: { geometry: THREE.BufferGeometry; material: THREE.Material }[], near: number, nearFull: number, farFull: number, far: number, castShadow: boolean, shadowOnly = false) {
     const meshes = parts.map((p) => {
       const im = new THREE.InstancedMesh(p.geometry, p.material, Math.max(1, this.n));
@@ -253,6 +269,7 @@ class LodSet {
       // closer trees is rejected by the depth test before its (expensive) shading runs.
       im.renderOrder = -10 + this.levels.length;
       im.name = `${this.name}:${this.levels.length}${shadowOnly ? 's' : ''}`;
+      im.userData.nearest = (eye: THREE.Vector3, within: number) => this.nearest(eye, within);
       scene.add(im);
       return im;
     });

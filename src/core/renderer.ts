@@ -30,6 +30,30 @@ const LATER_APART = 120;
 const WORLD_AHEAD = 48;
 /** the layer a thing is on while it is drawn ahead (see Renderer.drawAhead): nothing else is on it */
 const AHEAD_LAYER = 29;
+/** how near a thing has to be for its pictures to be put on the card before it is first drawn, metres (see Renderer.lookAhead) */
+const AHEAD_M = 500;
+const _near = new THREE.Vector3();
+
+/** how far from the eye the nearest of a thing is, or of its copies, metres */
+function nearestOf(m: THREE.Mesh, eye: THREE.Vector3): number {
+  // (a set that shows only those of its copies near enough, and knows where all of them are: see LodSet.nearest)
+  const knows = (m.userData as { nearest?: (eye: THREE.Vector3, within: number) => number }).nearest;
+  if (knows) return knows(eye, AHEAD_M);
+  const im = m as THREE.InstancedMesh;
+  if (im.isInstancedMesh) {
+    const e = im.instanceMatrix.array as Float32Array;
+    let best = Infinity;
+    for (let i = 0; i < im.count; i++) best = Math.min(best, _near.set(e[i * 16 + 12], e[i * 16 + 13], e[i * 16 + 14]).applyMatrix4(m.matrixWorld).distanceToSquared(eye));
+    return Math.sqrt(best);
+  }
+  // (a body: where it stands, its ball being worked out through every point of it as bent; a batch: the ball it keeps
+  // round all of itself; anything else, its shape's)
+  if ((m as THREE.SkinnedMesh).isSkinnedMesh) return _near.setFromMatrixPosition(m.matrixWorld).distanceTo(eye);
+  const own = (m as unknown as { boundingSphere?: THREE.Sphere | null; computeBoundingSphere?: () => void }).boundingSphere;
+  if (own === null) (m as unknown as { computeBoundingSphere(): void }).computeBoundingSphere();
+  const s = own !== undefined ? (m as unknown as { boundingSphere: THREE.Sphere }).boundingSphere : (m.geometry.boundingSphere ?? (m.geometry.computeBoundingSphere(), m.geometry.boundingSphere!));
+  return Math.max(0, _near.copy(s.center).applyMatrix4(m.matrixWorld).distanceTo(eye) - s.radius * m.matrixWorld.getMaxScaleOnAxis());
+}
 /** development: parts of getting a thing ready left out, to see what each costs (?try=noother,noahead,nolook) */
 const TRY = new Set((import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('try') ?? '' : '').split(','));
 
@@ -946,10 +970,76 @@ export class Renderer {
       for (let k = 0; k < per; k++) {
         const o = kids[(this.tendAt[s] + k) % n];
         oneDraw(o);
-        if (scene === this.scene) this.sortShadows(o);
+        if (scene === this.scene) {
+          this.sortShadows(o);
+          this.lookAhead(o);
+        }
       }
       this.tendAt[s] = (this.tendAt[s] + per) % n;
     });
+  }
+
+  /** pictures waiting to be put on the card ahead of their first drawing, and how far off their thing was when found */
+  private ahead: [THREE.Texture, number][] = [];
+  private aheadKnown = new WeakSet<THREE.Texture>();
+  private aheadDone = new WeakSet<THREE.Material>();
+  private sendingAhead = false;
+  /**
+   * The pictures of what is within AHEAD_M of the eye and has not been drawn yet are put on the card ahead, nearest
+   * first, one to a frame's spare time. Left to the frame a thing is first drawn in, the first frame in a town was
+   * every kind of thing in it there at once: walking into Pokrov, 51 pictures and 118 MB in one frame of 131 ms; the
+   * shelves, crates, barriers and machines of a town's buildings are one set each for every copy on the map, drawn
+   * from the first time any copy is in view (found coming into towns in the game, 2026-10-20). A picture is 2 to 3 ms.
+   */
+  private lookAhead(root: THREE.Object3D) {
+    // (development: every picture left to the frame its thing is first drawn in, as it was)
+    if (import.meta.env.DEV && (globalThis as { __noAhead?: boolean }).__noAhead) return;
+    const eye = this.camera.position, R = this.renderer;
+    let found = false;
+    root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      let waiting: THREE.Texture[] | null = null;
+      for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+        if (this.aheadDone.has(mat)) continue;
+        let left = false;
+        for (const v of Object.values(mat)) {
+          const t = v as THREE.Texture | null;
+          if (!t || !t.isTexture || t.isRenderTargetTexture || this.aheadKnown.has(t)) continue;
+          // (a picture still coming, or one not yet sent: the paint is looked at again)
+          left = true;
+          if (!t.image) continue;
+          if ((R.properties.get(t) as { __webglTexture?: unknown }).__webglTexture === undefined) (waiting ??= []).push(t);
+          else this.aheadKnown.add(t);
+        }
+        // (every picture of it on the card or on its way: not looked at again)
+        if (!left) this.aheadDone.add(mat);
+      }
+      if (!waiting) return;
+      const d = nearestOf(m, eye);
+      if (d > AHEAD_M) return;
+      for (const t of waiting) {
+        this.aheadKnown.add(t);
+        this.ahead.push([t, d]);
+      }
+      found = true;
+    });
+    if (found && !this.sendingAhead) void this.sendAhead();
+  }
+
+  private async sendAhead() {
+    this.sendingAhead = true;
+    try {
+      while (this.ahead.length) {
+        await breathe();
+        let best = 0;
+        for (let i = 1; i < this.ahead.length; i++) if (this.ahead[i][1] < this.ahead[best][1]) best = i;
+        const [t] = this.ahead.splice(best, 1)[0];
+        if ((this.renderer.properties.get(t) as { __webglTexture?: unknown }).__webglTexture === undefined) this.renderer.initTexture(t);
+      }
+    } finally {
+      this.sendingAhead = false;
+    }
   }
 
   private sortShadows(root: THREE.Object3D) {

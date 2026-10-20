@@ -30,6 +30,12 @@ const waiting: (() => void)[] = [];
 
 /** one of those waiting is let go on, and when its piece is done (it asks again, or is finished) the next, while the frame's share lasts */
 function pass() {
+  // (development: how long the piece let go on last ran before it waited again, or was done)
+  if (resumed) {
+    resumed = false;
+    const ms = performance.now() - resumedAt;
+    if (ms > 8) LONG_PIECES.push({ ms: Math.round(ms), from: resumedFrom });
+  }
   if (!waiting.length) return;
   if (performance.now() - began >= share) return arm();
   waiting.shift()!();
@@ -66,13 +72,18 @@ export function steady(believed: number, seen: number) {
   return seen < believed ? seen : believed + (seen - believed) * 0.05;
 }
 
+/** (development, with `__breatheWatch` set: every piece of work let go on that ran over 8 ms, with where it was let go on from) */
+export const LONG_PIECES: { ms: number; from: string }[] = [];
+let resumed = false, resumedAt = 0, resumedFrom = '';
+
 export function breathe(): Promise<void> | void {
   // (a page nobody is looking at has no frame to keep: the work is done as fast as it can be, as it was. The game
   // loads so in a tab left in the background.)
   if (typeof document !== 'undefined' && document.hidden) return;
   if (!waiting.length && performance.now() - began < share) return;
+  const from = (globalThis as { __breatheWatch?: boolean }).__breatheWatch ? (new Error().stack ?? '') : '';
   return new Promise<void>((go) => {
-    waiting.push(go);
+    waiting.push(from ? () => ((resumed = true), (resumedAt = performance.now()), (resumedFrom = from), go()) : go);
     arm();
   });
 }
