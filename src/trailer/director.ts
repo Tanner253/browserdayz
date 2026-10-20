@@ -571,7 +571,14 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 18 || CUT === 19) {
+  if (CUT === 21 || CUT === 22) {
+    // (the twenty-first is "Walk east" and the twenty-second "Lights", for X, moved as people move: see shots21.ts,
+    // shots22.ts and human.ts)
+    const cut = CUT === 21 ? await import('./shots21') : await import('./shots22');
+    shots = cut.buildShots(S);
+    seconds = 'seconds21' in cut ? cut.seconds21() : cut.seconds22();
+    ownScore = cut.score;
+  } else if (CUT === 18 || CUT === 19) {
     // (the map three times over, two films of 15 seconds on the sixteenth's band: see shots18.ts, shots19.ts)
     const cut = CUT === 18 ? await import('./shots18') : await import('./shots19');
     shots = cut.buildShots(S);
