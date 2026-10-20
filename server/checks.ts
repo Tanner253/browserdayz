@@ -295,6 +295,9 @@ export function hillBetween(a: Pose, b: Pose): number {
   return over > CHECK.hill ? over : 0;
 }
 
+/** how long since their own hands last did something that their time in the Zona still counts toward a tag */
+const AFK_MS = (Number(process.env.AFK_S) || 60) * 1000;
+
 /**
  * Whoever carries a tag they took off somebody over the line round the Zona has TAG_OUT seconds to turn back.
  * After that every such tag they carry is void: it is forgotten here (so nothing is ever paid on it), taken
@@ -302,8 +305,10 @@ export function hillBetween(a: Pose, b: Pose): number {
  */
 export function zoneCheck(c: Client, now = Date.now()) {
   // (this life's time inside the Zona, counted here at each word of where they are: a gap of more than two seconds
-  // between words counts as two, a game that went quiet being nobody's to credit)
-  if (c.alive && c.zonaAt && inPlay(c.pose[0], c.pose[2])) c.zonaMs += Math.min(now - c.zonaAt, 2000);
+  // between words counts as two, a game that went quiet being nobody's to credit. And only while they are at the
+  // keys: idled on the beach, flown into the Zona in a helicopter and kept there till a tag was on them, was a report
+  // of 2026-10-20, the owner: "we need anti afk measures". Turning to look, a step, anything done, within AFK_MS.)
+  if (c.alive && c.zonaAt && inPlay(c.pose[0], c.pose[2]) && now - c.handAt < AFK_MS) c.zonaMs += Math.min(now - c.zonaAt, 2000);
   c.zonaAt = now;
   // (down a basement is out of it: the owner, 2026-10-18, "ad basements to the "out of bounds" area for dogtags". And over
   // the Zona's line only while ZONA_VOID says so: off until there are bases)

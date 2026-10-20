@@ -13,7 +13,7 @@ import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
 import { infectedDrop, INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
-import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
+import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, stoppingNow, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
@@ -52,7 +52,7 @@ export function handle(c: Client, m: C2S) {
   // until 2026-10-13: anybody within reach of an infected was never away, however long their hands were off the
   // keys, and was never looked at by the check below.)
   if (!SAID_BY_ITSELF.has(m.t)) {
-    c.activeAt = c.check.acted = Date.now();
+    c.activeAt = c.handAt = c.check.acted = Date.now();
     // (and whoever is doing things is not a body being walked up and down: see gaitCheck, bodyCheck)
     c.check.gait = undefined;
   }
@@ -66,7 +66,12 @@ export function handle(c: Client, m: C2S) {
       // their body; their first steps at the start were hundreds of metres from it, refused fifty times in three
       // seconds, and they were put off the server (2026-10-19: "moved 745 m in 2.36 s on foot").)
       if (c.alive && m.p[5] & F_DEAD) m.p = [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
-      if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
+      {
+        const stepped = Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02, turned = Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004;
+        if (stepped || turned) c.activeAt = Date.now();
+        // (carried in a seat is not their own doing: see zoneCheck)
+        if (turned || (stepped && !(m.p[5] & F_SEAT))) c.handAt = Date.now();
+      }
       // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
       // (heard from again after the server kept their life for them: its figure is the figure)
       if (c.kept) {
