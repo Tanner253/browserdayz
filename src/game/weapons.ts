@@ -231,6 +231,11 @@ interface VmModel {
   selector?: THREE.Object3D;
   mag?: THREE.Object3D;
   round?: THREE.Object3D;
+  /** loaded a round at a time through its open bolt, the bolt held back while they go in (the Mosin): see poseRig */
+  boltFed?: boolean;
+  /** where the hand that works the bolt goes from where its pack puts it, while it is on the bolt (the gun's own space), and how far it is on it this frame */
+  boltHand?: THREE.Vector3;
+  boltOn?: number;
   flash: MuzzleFlash;
   /** attachment meshes, shown when the item has the mod */
   scope?: THREE.Object3D;
@@ -779,6 +784,7 @@ const BLADE = {
 };
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
+const _bh = new THREE.Vector3();
 /** a stance as a place and a turn: the thing's own up is toward its head, and its edge is on its far side (-z) */
 function stanceQuat(s: Stance, out: THREE.Quaternion) {
   _sy.set(...s.tip).normalize();
@@ -809,7 +815,7 @@ const SEAT = {
  * magazine where the body's arms were too short, and its thumb through the far side.)
  */
 const FORE: Record<string, number | { post: [number, number] }> = {
-  ak: 0.28, ar15: 0.32, mosin: 0.315, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.46, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
+  ak: 0.28, ar15: 0.32, mosin: 0.315, mosin9130: 0.33, benelli: 0.5, mpa: 0.18, aks74u: 0.3, barrett: 0.32, db12: 0.46, sniper50: 0.33, vssk: 0.23, scorpion: 0.28,
   // (the double barrel: on its forearm past the breech; 0.215 had the hand under the action, off the gun, the owner,
   // 2026-10-18: "for the db shotgun the left hand is not on the gun")
   // (the owner: "the 40mm gun has a vertical grip for us to use, like the ar15")
@@ -822,7 +828,7 @@ const FORE: Record<string, number | { post: [number, number] }> = {
  * pack's own right hand, which on the M32, the Barrett and the MP7 was 5 to 8 cm ahead of the trigger.
  */
 const TRIGGER_WRIST = new THREE.Vector3(-0.095, -0.005, 0.028);
-const BY_TRIGGER: Record<string, true | [number, number]> = { barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
+const BY_TRIGGER: Record<string, true | [number, number]> = { mosin9130: true, barrett: true, m32: true, mp7a1: true, aks74u: true, sniper50: true, scorpion: true, vssk: [0.05, 0], db12: [0.03, -0.005] };
 /**
  * A pair as everybody else sees it held: the gun twice, side by side this far apart (the gun's own metres, as far as
  * its pack's two hands are), each in its own fist, held out in front as two cans would be (the owner, 2026-10-17:
@@ -928,11 +934,15 @@ const NO_SEAT = new THREE.Vector3();
 const WORK_ON: Record<string, Grips['work']> = {
   mosin: { bolt: new THREE.Vector3(-0.408, 0.036, 0.074), feed: new THREE.Vector3(-0.288, -0.091, -0.045) },
   benelli: { feed: new THREE.Vector3(-0.262, -0.088, -0.04), tube: true },
+  // (the Mosin: its bolt handle, and the top of its action, where its rounds are pushed in one at a time)
+  mosin9130: { bolt: new THREE.Vector3(-0.29, 0.03, 0.035), feed: new THREE.Vector3(-0.25, 0.065, 0), tube: true },
 };
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
 const IRON_DROP = 0.004;
 /** rifles that came with no sights of their own and are given plain ones: a post at the muzzle, a notch over the breech (see `Weapons.fitIrons`) */
 const PLAIN_SIGHTS = new Set(['mosin', 'ar15', 'sniper50', 'barrett']);
+/** guns with a scope of their own that also have irons of their own, aimed along with the scope off (the Mosin's post and leaf) */
+const OWN_IRONS = new Set(['mosin9130']);
 /** where a gun's plain sights stand along it (x in its own file), where the highest of its top is not the place for the
  * notch nor its mouth the place for the post: the Barrett's both on its rail (read off its top, progress/opt/top-profile.mjs).
  * (None on the VSSK: "we dont need iron sights on vssk", the owner, 2026-10-18.) */
@@ -1070,7 +1080,13 @@ const RISE = 40;
 const NUDGE = {
   deagle: new THREE.Vector3(0, 0, 0),
   benelli: new THREE.Vector3(0.08, -0.012, 0),
+  // (its trigger where the rifle's is, and so its bolt handle where the rifle's hand works one: fitted by its butt it was 9 cm back)
+  mosin9130: new THREE.Vector3(0.095, -0.012, 0),
 };
+/** where the hand working a bolt is moved to from where its pack has it, for a handle not the pack's own (the gun's space; set by eye) */
+const BOLT_HAND: Record<string, THREE.Vector3> = { mosin9130: new THREE.Vector3(0, -0.04, -0.03) };
+/** how far the hand is on the bolt at a point of the pack's bolt movement (it leaves the grip by 0.26, is back by 0.9) */
+const onBolt = (part: number) => THREE.MathUtils.smoothstep(part, 0.14, 0.28) * (1 - THREE.MathUtils.smoothstep(part, 0.68, 0.84));
 
 /**
  * How a gun sounds, where it is not how its kind does: the recording played slower (deeper)
@@ -1592,6 +1608,17 @@ export class Weapons {
       strip: ['base', 'scope', 'glass', 'boltrear', 'bolt', 'cheekrest', 'trigger', 'clip', 'bullet', 'silencer'],
       ride: { base: 'base', sight: 'base', silencer: 'base', forend: 'base' },
     }));
+    // The Mosin 91/30 (2026-10-19), in the same hands: its bolt on the rifle's, worked by the rifle's own hand, and its
+    // round on the body, seen only as it goes in.
+    // (its handle is shorter than the rifle's and lower when it is lifted: the hand that works it is brought down onto it)
+    const mosin = await this.packGun({
+      pack: 'sniper', item: 'mosin9130', gun: 'mosin9130', kind: 'rifle', hip: HELD.sniper, flashSize: 0.32, flash: mkFlash(), nudge: NUDGE.mosin9130, boltFed: true,
+      strip: ['base', 'scope', 'glass', 'boltrear', 'bolt', 'cheekrest', 'trigger', 'clip', 'bullet', 'silencer'],
+      ride: { base: 'base', scope: 'base', trigger: 'trigger', bolt: 'bolt', wrap: 'base', bullet: 'base' },
+    });
+    mosin.boltHand = BOLT_HAND.mosin9130;
+    mosin.rig!.reseat('R', 'base', {});
+    this.models.set('mosin9130', mosin);
 
     // The two assault rifles, in the hands that came with the AK. That pack's gun is drawn on its skeleton with
     // the arms: here it is the rifle alone, in the pieces its joints move, each hung on its joint (so that a part
@@ -1781,7 +1808,7 @@ export class Weapons {
       for (const id of carried.split(',')) {
         if (!id) continue;
         assets.warm(ITEMS[id].model);
-        assets.warm(this.models.get(id)?.rig ? (['mosin', 'benelli'].includes(id) ? 'sniper_fp' : 'ak_fp') : '');
+        assets.warm(this.models.get(id)?.rig ? (['mosin', 'mosin9130', 'benelli'].includes(id) ? 'sniper_fp' : 'ak_fp') : '');
       }
     }
     const m = this.current;
@@ -1807,7 +1834,7 @@ export class Weapons {
    * @param o.ride which of the pack's pieces each piece of that gun rides on (so: moves with)
    * @param o.nudge where that gun sits in the pack's hands, from where the fitting of one gun to the other left it (the gun's own space)
    */
-  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; /** held in our own arms (the AK's pair), the pack's own not drawn: ./hands-on.ts */ hands?: boolean; /** a second of the gun, in the left hand: its pieces on these nodes, its flash, and what of the pack moves with each hand */ twin?: { ride: Record<string, string>; flash: MuzzleFlash; roots: { L: string[]; R: string[] } }; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number; strip?: string[]; ride?: Record<string, string>; nudge?: THREE.Vector3; /** the pack's arms are its own, and not the one pair every other gun is held in */ ownArms?: boolean; /** the pack holds its gun turned in to the middle of the picture: at the eye it is squared to the line of sight */ square?: boolean; /** a second magazine: [the piece it is hung on, the piece it is hung by] */ spare?: [string, string]; /** where it sits in the pack's hands, from where the pack's own gun does (the gun's own space): only in the hands, the gun as others see it is not moved */ seat?: { move: THREE.Vector3; turn?: THREE.Euler; size?: number } }): Promise<VmModel> {
+  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; /** held in our own arms (the AK's pair), the pack's own not drawn: ./hands-on.ts */ hands?: boolean; /** a second of the gun, in the left hand: its pieces on these nodes, its flash, and what of the pack moves with each hand */ twin?: { ride: Record<string, string>; flash: MuzzleFlash; roots: { L: string[]; R: string[] } }; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number; strip?: string[]; ride?: Record<string, string>; nudge?: THREE.Vector3; /** the pack's arms are its own, and not the one pair every other gun is held in */ ownArms?: boolean; /** the pack holds its gun turned in to the middle of the picture: at the eye it is squared to the line of sight */ square?: boolean; /** a second magazine: [the piece it is hung on, the piece it is hung by] */ spare?: [string, string]; /** where it sits in the pack's hands, from where the pack's own gun does (the gun's own space): only in the hands, the gun as others see it is not moved */ seat?: { move: THREE.Vector3; turn?: THREE.Euler; size?: number }; /** loaded through its open bolt, its `bullet` the round seen going in (VmModel.boltFed) */ boltFed?: boolean }): Promise<VmModel> {
     /** a gun held at the shoulder in both hands (anything that is not a pistol) */
     const long = o.kind !== 'pistol';
     /** what the gun's own body is hung on in the pack (and so what is fitted to it) */
@@ -2361,6 +2388,7 @@ export class Weapons {
     }
     const m: VmModel = {
       root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown, marks,
+      boltFed: o.boltFed, round: o.boltFed ? hung.get('bullet') : undefined,
       bipod: hinges.length ? { hinges, t: 0 } : undefined,
       hammer: HAMMER[o.item] && hung.has('hammer') ? { piece: hung.get('hammer')!, at: new THREE.Vector3(HAMMER[o.item].at[0], HAMMER[o.item].at[1], 0).add(nudge), down: HAMMER[o.item].down } : undefined,
       scope: rig.node('scope') ?? undefined,
@@ -2375,7 +2403,7 @@ export class Weapons {
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
       // (a gun with a scope of its own has no line over its irons: it came up on one, 2 cm over its receiver and under its scope)
-      adsIron: ITEMS[o.item].weapon?.fixedSight || (ownScope && !PLAIN_SIGHTS.has(o.item)) ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      adsIron: ITEMS[o.item].weapon?.fixedSight || (ownScope && !PLAIN_SIGHTS.has(o.item) && !OWN_IRONS.has(o.item)) ? undefined : long ? (lineAt ? new THREE.Vector3(-lineAt.x, -lineAt.y, o.hip.z + (SIGHT_LINE[o.item]?.near ?? IRON_NEAR)) : tip ? new THREE.Vector3(-(ironPost ? tip.x : mouthAt ? squared(mouthAt).x : fc.x), -tip.y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       aimRot: o.square ? aimRot : undefined,
       aimRotOptic: lensRig && o.square ? opticRot : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
@@ -3245,6 +3273,23 @@ export class Weapons {
       }, { rounds: n, inserted: 0, stop: 0 });
       return;
     }
+    if (m.rig && m.boltFed && fed) {
+      // The Mosin, from its clip through the open bolt, as the old rifle was loaded: the bolt drawn back, the clip's rounds
+      // pushed down a round at a time, and the bolt run home (0.55 s, 0.48 s a round, 0.5 s: the slow reload the owner
+      // asked back, 2026-10-19). The clip that was in it goes back in a pocket with what is left in it, as a magazine does.
+      const n = Math.max(1, free ? capacityOf(item) - 1 : next?.rounds ?? 1);
+      const dur = 0.55 + n * 0.48 + 0.5;
+      audio.magOut(0.15, true);
+      for (let k = 0; k < n; k++) audio.shellIn(0.6 + k * 0.48);
+      audio.magIn(dur - 0.35, true);
+      this.onAct('reload', dur);
+      this.start('magswap', dur, () => {
+        feed();
+        this.dry.delete(item);
+        this.boltReady = true;
+      }, { bolt: n });
+      return;
+    }
     if (m.rig) {
       // A pack's gun is fed by its magazine, and its hands do it at their own pace: out with
       // the old one, in with the new, and the slide or the bolt if the gun had run dry.
@@ -4053,6 +4098,19 @@ export class Weapons {
         m.mag.visible = true;
       }
     }
+    // (the Mosin loaded through its open bolt as the old rifle was: rolled up to the eye, and each round seen going down
+    // into the action, from over it to its own place in the magazine)
+    if (a?.name === 'magswap' && a.data?.bolt) {
+      // (the old rifle's roll was half a radian: held so, this pack's hand on the lifted bolt filled the picture)
+      const tilt = THREE.MathUtils.smoothstep(a.t, 0, 0.35) * (1 - THREE.MathUtils.smoothstep(a.t, a.dur - 0.35, a.dur));
+      rot.z += tilt * 0.12;
+      pos.y += 0.01 * tilt;
+      if (m.round) {
+        const local = (a.t - 0.55) % 0.48;
+        m.round.visible = a.t > 0.55 && a.t < a.dur - 0.5 && local < 0.3;
+        m.round.position.y = 0.11 - (local / 0.3) * 0.08;
+      }
+    }
 
     // pistol slide: snaps back on fire, stays locked when empty
     this.slideKick = Math.max(0, this.slideKick - dt * 22);
@@ -4125,7 +4183,18 @@ export class Weapons {
       const k = Math.min(1, a.t / a.dur);
       if (a.name === 'equip') rig.has('holster') ? rig.pose('holster', 1 - k) : rig.has('draw') ? rig.pose('draw', k) : rig.rest();
       else if (a.name === 'unequip') rig.has('holster') ? rig.pose('holster', k) : rig.has('draw') ? rig.pose('draw', 1 - k) : rig.rest();
-      else if (a.name === 'bolt') rig.pose('bolt', k);
+      else if (a.name === 'bolt') {
+        rig.pose('bolt', k);
+        m.boltOn = onBolt(k);
+      } else if (a.name === 'magswap' && a.data?.bolt) {
+        // Round by round through the open bolt, as the old rifle was loaded: the bolt drawn back (the pack's bolt
+        // movement has it right back at 0.42 of the way and holds it there to 0.6), the hand easing on it as each
+        // round is pushed down, and run home once the last is in (see the round, where the gun is set).
+        const t = a.t, end = a.dur - 0.5;
+        const part = t < 0.55 ? 0.45 * (t / 0.55) : t > end ? THREE.MathUtils.lerp(0.55, 1, (t - end) / 0.5) : 0.45 + 0.1 * (0.5 - 0.5 * Math.cos((((t - 0.55) / 0.48) % 1) * Math.PI * 2));
+        rig.pose('bolt', part);
+        m.boltOn = onBolt(part);
+      }
       else if (a.name === 'reload' && rig.has('reload')) {
         // Shell by shell, with a movement drawn for changing a magazine: its first third turns
         // the gun over and brings the hand under it, and that hand goes in and out once for
@@ -4207,6 +4276,9 @@ export class Weapons {
       if (r.L) m.rig.reseat('L', r.body, r.L);
       if (r.R) m.rig.reseat('R', r.body, r.R);
     }
+    // (the hand on a bolt that is not the pack's own: wherever it is, by how far it is on the bolt)
+    if (m.boltHand && m.rig && m.boltOn) m.rig.reseat('R', 'base', { move: _bh.copy(m.boltHand).multiplyScalar(m.boltOn), letGo: [9, 10] });
+    m.boltOn = 0;
     m.rig?.follow();
   }
 

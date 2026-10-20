@@ -16,6 +16,17 @@ export const PART_ITEMS: ItemDef[] = [
     loot: { pair: 'Mag_CMAG_10Rnd', at: [0, 0, 2, 4, 2], restock: 300, usage: ARMY, keep: SOON, on: { 3: { restock: 1500 } }, lean: 5 },
     worth: 8, sells: 3,
   },
+  // The Mosin's stripper clip (2026-10-19): the rifle's magazine is in it, and is filled through the open bolt from a clip
+  // of five, which is what is found, carried, filled by hand and sits in its magazine's place (the owner chose it). Drawn
+  // as five of the Mosin's own rounds side by side, as they stand in a clip.
+  {
+    id: 'clip_mosin', name: 'Mosin Stripper Clip', model: 'mosin9130', nodeRe: '^bullet', pile: 5, w: 1, h: 1, weight: 0.02, category: 'magazine',
+    desc: 'A clip of five 7.62x54R rounds for the Mosin, pushed down into its magazine through the open bolt. Filled from loose rounds by hand.',
+    mag: { ammo: 'ammo_762', capacity: 5 }, attach: { fits: ['mosin9130'], slot: 'magazine' },
+    // (where the Mosin is: a hunter's and a householder's, the first two steps)
+    loot: { pair: 'Ammo_762x54Clip', at: [1, 3, 0, 0, 0], restock: 300, usage: ['Hunting', 'Village', 'Town'], keep: SOON, lean: 2 },
+    worth: 3, sells: 3,
+  },
   {
     id: 'mag_ak', name: 'AK Magazine', model: 'ak', nodeRe: '^mag', w: 1, h: 3, weight: 0.33, category: 'magazine',
     desc: 'Thirty rounds of 7.62x39 for the AK.',
@@ -133,8 +144,8 @@ export const PART_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- attachments
   {
     id: 'pu_scope', name: 'Rifle Scope 3.5x', model: 'sniper', nodeRe: '^(scope|glass)', w: 2, h: 1, weight: 0.27, category: 'attachment',
-    desc: 'A 3.5x telescopic sight for the sniper rifle. What makes the rifle a sniper, and a little slower to bring up.',
-    attach: { fits: ['mosin'], slot: 'optic', ergo: -7 },
+    desc: 'A 3.5x telescopic sight for the sniper rifle and the Mosin. What makes the rifle a sniper, and a little slower to bring up.',
+    attach: { fits: ['mosin', 'mosin9130'], slot: 'optic', ergo: -7 },
     loot: { pair: 'PUScopeOptic', at: [0, 0, 2, 6, 3], restock: 1800, usage: ARMY, lean: 2.5 },
     worth: 30,
   },
@@ -166,7 +177,7 @@ export const PART_ITEMS: ItemDef[] = [
   {
     id: 'rifle_wrap', name: 'Cheek Rest', model: 'sniper', nodeRe: '^cheekrest', w: 2, h: 1, weight: 0.2, category: 'attachment',
     desc: 'A raised rest for the cheek, strapped to the stock. Steadies the rifle: a quarter less sway, and a surer hold.',
-    attach: { fits: ['mosin'], slot: 'wrap', ergo: 6 },
+    attach: { fits: ['mosin', 'mosin9130'], slot: 'wrap', ergo: 6 },
     loot: { pair: 'GhillieAtt_Mossy', at: [0, 0, 5, 3, 1], restock: 1500, usage: ARMY },
     worth: 8,
   },

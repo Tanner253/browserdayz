@@ -108,6 +108,10 @@ const ZONE: Record<HitZone, [bullet: number, melee: number]> = { head: [3.2, 1.6
  */
 export const RIFLE_HITS: Record<string, Record<'loud' | 'quiet', Record<HitZone, number>>> = {
   mosin: { loud: { head: 140, torso: 85, legs: 50, arms: 50 }, quiet: { head: 110, torso: 65, legs: 36, arms: 36 } },
+  // (the Mosin 91/30, the first two steps' rifle: two thirds of the sniper rifle's to the body, so two at the least and
+  // most often three; a bare head still the end, a helmeted one not (the owner, 2026-10-19: "does less damage"). It
+  // takes no suppressor: the quiet figures are for one that ever does.)
+  mosin9130: { loud: { head: 120, torso: 57, legs: 33, arms: 33 }, quiet: { head: 100, torso: 44, legs: 25, arms: 25 } },
 };
 /**
  * What a gun with figures of its own does where it landed, or null for a gun that has none.

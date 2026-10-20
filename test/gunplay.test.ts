@@ -343,6 +343,12 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
       }
       for (const z of ['legs', 'arms'] as const) for (const sup of [false, true]) assert.ok(hitDamage('mosin', z, d, sup) < 100 && hitDamage('mosin', z, d, sup) < hitDamage('mosin', 'torso', d, sup), `one to the ${z} at ${d} m`);
     }
+    // (the Mosin 91/30: two thirds of it to the body, and a bare head still the end, 2026-10-19)
+    for (const d of [0, 300, 600]) {
+      assert.ok(Math.abs(hitDamage('mosin9130', 'torso', d) / hitDamage('mosin', 'torso', d) - 2 / 3) < 0.02, `the Mosin to the body at ${d} m`);
+      assert.ok(hitDamage('mosin9130', 'head', d) >= 100 && hitDamage('mosin9130', 'head', d) < hitDamage('mosin', 'head', d), `the Mosin to a bare head at ${d} m`);
+      for (const h of helmets) assert.ok(hitDamage('mosin9130', 'head', d) * worn(h, 'head') < 100, `the Mosin through the ${ITEMS[h].name} at ${d} m`);
+    }
     // (and the .50s are what kill with one to the body, up close)
     for (const id of ['sniper50', 'barrett']) assert.ok(hitDamage(id, 'torso', 30) >= 100, `${id}: one to the body up close is not the end`);
   }

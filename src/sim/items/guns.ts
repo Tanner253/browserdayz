@@ -14,6 +14,19 @@ export const GUN_ITEMS: ItemDef[] = [
     loot: { pair: 'Mosin9130', at: [0, 0, 2, 7, 2], restock: 180, usage: ARMY, loaded: [1, 4], keep: SOON, on: { 3: { restock: 1500 } }, fitted: [['pu_scope', 0.025], ['rifle_wrap', 0.12], ['suppressor_762', 0.02]], rack: { fort: 1.6 }, lean: 2.5 },
     worth: 28,
   },
+  // The Mosin 91/30 (2026-10-19), back: the first two steps' rifle, slow and lighter-hitting (the owner: "bring back the
+  // mosin with the pu scope attachment to the game with a slow reload animation that we had from earlier builds to act
+  // as a tier 1-2 sniper does less damage"). Its magazine is in it, filled through the open bolt from a stripper clip of
+  // five (the owner chose the clip, 2026-10-19, for its magazine slot: "parted out properly with magazines and scope slot").
+  // Its scope and its wrap are its own model's pieces, there when the PU scope and the cheek rest are fitted.
+  {
+    id: 'mosin9130', name: 'Mosin 91/30', model: 'mosin9130', w: 9, h: 2, weight: 4.0, category: 'weapon', slot: 'long',
+    desc: 'The old bolt-action rifle in 7.62x54R. Five rounds in its magazine, pushed down out of a stripper clip with the bolt open, and the bolt worked by hand after every shot. Slower and lighter-hitting than the sniper rifle; to a bare head it is still the end. Takes the 3.5x scope and a cheek rest.',
+    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, mag: 'clip_mosin', ergo: 34, action: 'bolt', ownScope: true, optic: 'pu_scope', shows: { pu_scope: ['scope'], rifle_wrap: ['wrap'] }, never: ['bullet'] }, iconYaw: 0,
+    // (a hunter's and a householder's, the outskirts and the valley; found with its scope on now and then)
+    loot: { pair: 'Mosin9130', at: [1, 2, 0, 0, 0], restock: 300, usage: ['Hunting', ...HOMES], loaded: [1, 4], keep: SOON, fitted: [['pu_scope', 0.35], ['rifle_wrap', 0.15]] },
+    worth: 18,
+  },
   // (The Colt 1911, 2026-10-11, in place of the Pistol 43, which is gone. It fires the .45, seven to a magazine.)
   {
     id: 'colt', name: 'Colt 1911', model: 'colt_1911', w: 3, h: 2, weight: 1.1, category: 'weapon', slot: 'holster',
@@ -236,9 +249,10 @@ export const GUN_ITEMS: ItemDef[] = [
   },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.009, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
-    desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
-    // 7.62: the sniper rifle's. A hunter has some.
-    loot: { pair: 'Ammo_762x54', at: [0, 0, 2, 5, 2], restock: 120, usage: [...ARMY, 'Hunting'], favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, lean: 1.5 },
+    desc: 'Loose full-power rifle cartridges, for the sniper rifle and the Mosin. They go into the sniper rifle\'s magazine and the Mosin\'s clip by hand.',
+    // 7.62: the sniper rifle's. A hunter has some; on the second step a hunter's are all there are, a few, so a Mosin found
+    // there can be fed (2026-10-19)
+    loot: { pair: 'Ammo_762x54', at: [0, 3, 2, 5, 2], restock: 120, usage: [...ARMY, 'Hunting'], favour: ARMOURY, qty: [0.25, 0.6], keep: SOON, on: { 2: { usage: ['Hunting'] } }, lean: 1.5 },
     worth: 0.6,
   },
   {

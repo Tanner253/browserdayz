@@ -1135,6 +1135,23 @@ export const WEAPON_PACKS = {
       changes: 'Set in rigid pieces (the gun, its fore-end, its sight, the can on its muzzle) and laid along the barrel; its shell is a model of its own. Textures re-encoded as WebP; geometry compressed.',
     },
   },
+  // The Mosin 91/30 (2026-10-19), back: the old rifle out of Poly Haven, in the rifle's hands as the shotgun is (the
+  // owner: "bring back the mosin with the pu scope attachment ... to act as a tier 1-2 sniper"). Its bolt rides the
+  // pack's bolt; its PU scope and its wrap are pieces of their own, there when the scope and the cheek rest are fitted;
+  // its round is the one seen going in as it is loaded, and what its stripper clip is drawn with.
+  mosin9130: {
+    dir: 'bolt_action_rifle_7_62',
+    file: 'bolt_action_rifle_7_62_2k.gltf',
+    tex: 2048,
+    fp: false,
+    scale: 1,
+    forward: [1, 0, 0],
+    up: [0, 1, 0],
+    fit: { to: 'sniper', piece: 'base' },
+    parts: { bolt_action_rifle_7_62: 'base', bolt_action_rifle_7_62_trigger: 'trigger', bolt_action_rifle_7_62_bolt_a: 'bolt', bolt_action_rifle_7_62_bolt_b: 'bolt', bolt_action_rifle_7_62_scope: 'scope', bolt_action_rifle_7_62_wrap: 'wrap', bolt_action_rifle_7_62_bullet_54mm: 'bullet' },
+    // (CC0, credited in CREDITS.md's Poly Haven table by this line)
+    credit: { name: 'Bolt Action Rifle 7.62', url: 'https://polyhaven.com/a/bolt_action_rifle_7_62', author: 'Mateusz Sadek', line: '[Bolt Action Rifle 7.62](https://polyhaven.com/a/bolt_action_rifle_7_62) | Mateusz Sadek |' },
+  },
   // The CZ Scorpion EVO (2026-10-17, the weapons pass: "we need to part out their attachments per gun like all the
   // rest of the guns ... be thorough we want high quality"). A first-person pack on arms of its own (Rigify, in
   // metres), with a movement to an animation: equip, idle, walk, run, fire, two reloads, an inspect and putting it

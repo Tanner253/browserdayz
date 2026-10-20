@@ -50,7 +50,7 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // (the hard case that stands wherever a military crate or an ammunition crate stood, and a little better filled)
   weapons_case: { label: 'Weapons Case', w: 8, h: 4, count: [2, 5], usage: ['Military'], tier: 2, lean: { weapon: 0.2, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
   // (a wooden crate is of the outskirts, of their farms, yards and sheds: food, tools, something to hit with, and no gun)
-  wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
+  wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
   // The steel cabinets of the hospital, of a clinic and of the police (2026-10-12: "the metal lockers found in the police
   // station and the medical station should be lootable and have inventories"): what each kind of building keeps,
   // "medkit abundant" in the hospital's, "heavy on bandages and stims" in a clinic's. The same cabinet in a police
@@ -73,8 +73,8 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, count: [1, 2], usage: ['Bunker'], tier: 5 },
   // (the furniture with no places of its own, filled as DayZ's cargo presets fill a container: a thing or two in a
   // cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
-  cardboard_box_01: { label: 'Cardboard Box', w: 4, h: 3, count: [0, 2], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
-  crate_big: { label: 'Large Crate', w: 8, h: 4, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7 } },
+  cardboard_box_01: { label: 'Cardboard Box', w: 4, h: 3, count: [0, 2], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
+  crate_big: { label: 'Large Crate', w: 8, h: 4, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
   bunker_desk: { label: 'Desk', w: 6, h: 3, count: [0, 2], usage: ['Bunker'], tier: 5 },
 };
 /** a gun rack: what stands in it is seen from outside it, by everybody (the owner, 2026-10-17: "renders guns on the 3d
@@ -112,6 +112,8 @@ function tableFor(spec: Pick<CrateSpec, 'usage' | 'lean' | 'only' | 'long'>, t: 
   for (const d of Object.values(ITEMS)) {
     const r = typeRule(d), n = r ? keeps(d.id, t) : 0;
     if (!r || n <= 0 || (spec.only && !spec.only.includes(d.category)) || (spec.long && d.weapon && d.slot !== 'long')) continue;
+    // (a crate that leans nothing toward a sort holds none: no gun in a farm's crate, though the Mosin lies on the first step, 2026-10-19)
+    if (spec.lean?.[d.category] === 0) continue;
     const kinds = r.on?.[t]?.usage ?? r.usage;
     if (t < 4 && !spec.usage.some((u) => kinds.includes(u))) continue;
     // (nothing the whole map keeps but one of: the .50s and the VSSK are the bunker's floor's, counted, and a crate that

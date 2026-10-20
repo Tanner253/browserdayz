@@ -80,10 +80,13 @@ export const LIFETIME: Record<Category, number> = {
  * A sort kept mostly from the fourth step up (more of it there than on the first three): never found west of the
  * Zona's line (src/world/zona.ts), whatever stands there (the owner, 2026-10-19: "there should be no T4+ on the west
  * side of the wall, regaurlesss of military structure (i seen some bunkers in the desert with ak's)").
+ * @param tier the step of the spot, where it is known: on the first two a sort is found where its rule puts some there on
+ *   purpose (the hunters' few 7.62s, for the Mosin found there, 2026-10-19)
  */
-export const eastOnly = (def: ItemDef | undefined) => {
+export const eastOnly = (def: ItemDef | undefined, tier?: number) => {
   const a = def?.loot?.at;
-  return !!a && a[3] + a[4] > a[0] + a[1] + a[2];
+  if (!a || (tier !== undefined && tier <= 2 && a[tier - 1] > 0)) return false;
+  return a[3] + a[4] > a[0] + a[1] + a[2];
 };
 
 export function typeRule(def: ItemDef): TypeRule | null {
