@@ -138,7 +138,9 @@ const _p = new THREE.Vector3();
 const _sphere = new THREE.Sphere();
 const _box = new THREE.Box3();
 const _span = new Int32Array(4);
-const _look = new THREE.Vector3();
+const _turn = new THREE.Quaternion();
+/** degrees the view the far trees and the cards are kept for reaches past the eye's on each side (see Vegetation.update) */
+const VIEW_SPARE = 10;
 /** a thing of some set shown or hidden since the sets were last gone through (see LodSet.show) */
 let stale = false;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -1056,24 +1058,41 @@ export class Vegetation {
     wind.uTime.value += dt;
     const cam = camera.position;
     // (what is drawn at what detail follows from where the eye is and which way it looks, nothing else: an eye that
-    // has not gone a quarter of a metre or turned a third of a degree is shown what it was, the sets not gone through
-    // again. Half a millisecond of every frame, standing or aiming, 2026-10-18; looked over twice a second all the same)
+    // has not gone a quarter of a metre is shown what it was, the sets not gone through again; looked over twice a
+    // second all the same. Which way it looks: the far trees and the cards are kept for a view ten degrees wider than
+    // the eye's on every side, and gone through again when it has turned nine. Kept for the eye's own view, every turn
+    // of a third of a degree was every set sorted and sent to the card again, three to nine megabytes a frame all
+    // through a fight in the woods, found shooting there in the game, 2026-10-20.)
     this.since += dt;
-    camera.getWorldDirection(_look);
+    const p = camera as THREE.PerspectiveCamera;
     const always = import.meta.env.DEV && (globalThis as { __vegAlways?: boolean }).__vegAlways;
-    if (!always && !stale && this.since < 0.5 && cam.distanceToSquared(this.lastAt) < 0.0625 && _look.dot(this.lastLook) > 0.99998 && (camera as THREE.PerspectiveCamera).fov === this.lastFov) return;
+    // (development: kept for the eye's own view again, as it was, to measure the difference)
+    const exact = import.meta.env.DEV && !!(globalThis as { __vegExact?: boolean }).__vegExact;
+    const turned = exact ? 0.0063 : THREE.MathUtils.degToRad(VIEW_SPARE - 1);
+    camera.getWorldQuaternion(_turn);
+    if (!always && !stale && this.since < 0.5 && cam.distanceToSquared(this.lastAt) < 0.0625 && _turn.angleTo(this.lastTurn) < turned && p.fov === this.lastFov && p.aspect === this.lastAspect) return;
     this.since = 0;
     stale = false;
     this.lastAt.copy(cam);
-    this.lastLook.copy(_look);
-    this.lastFov = (camera as THREE.PerspectiveCamera).fov;
-    this.projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.lastTurn.copy(_turn);
+    this.lastFov = p.fov;
+    this.lastAspect = p.aspect;
+    if (p.isPerspectiveCamera && !exact) {
+      // (the eye's view, its four sides each turned out by VIEW_SPARE)
+      const s = THREE.MathUtils.degToRad(VIEW_SPARE), half = THREE.MathUtils.degToRad(p.getEffectiveFOV()) / 2;
+      const across = Math.atan(Math.tan(half) * p.aspect) + s, up = Math.min(half + s, 1.5);
+      const t = p.near * Math.tan(up), r = p.near * Math.tan(Math.min(across, 1.5));
+      this.wide.makePerspective(-r, r, t, -t, p.near, p.far);
+      this.projView.multiplyMatrices(this.wide, camera.matrixWorldInverse);
+    } else this.projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projView);
     for (const s of this.sets) s.update(cam, this.frustum);
     this.impostors.update(cam, this.frustum, HANDOVER[0] * this.reachK);
   }
   private since = Infinity;
   private lastAt = new THREE.Vector3(Infinity, 0, 0);
-  private lastLook = new THREE.Vector3();
+  private lastTurn = new THREE.Quaternion();
   private lastFov = 0;
+  private lastAspect = 0;
+  private wide = new THREE.Matrix4();
 }
