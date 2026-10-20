@@ -15,6 +15,7 @@ import { controls, translation, type Controls } from '../core/keys';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
+import { BARREL } from '../sim/barrels';
 import type { Grass } from '../world/grass';
 import '../world/buildings';
 import type { Buildings } from '../world/buildings';
@@ -630,9 +631,13 @@ export class Game {
       // the infected hear it as well as anybody
       this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot);
     };
-    // a bullet in a fuel drum
+    // a bullet in a fuel drum. (The red drums are searched too since 2026-10-17, FURNITURE in src/sim/storage.ts, and
+    // the container took the drum's collider over: a round met "a crate" and no drum went up. The owner, 2026-10-19:
+    // "explosive barresls seemed to have stopped working". The drum is the one standing where the container does.)
     this.weapons.onStruck = (owner, weapon) => {
-      if (owner instanceof Barrel) this.blowBarrel(owner.i, true);
+      const drum = owner instanceof Stash && owner.kind === BARREL.kind ? this.s.veg.barrels.find((b) => b && Math.abs(b.x - owner.x) < 0.05 && Math.abs(b.z - owner.z) < 0.05) : undefined;
+      if (drum) this.blowBarrel(drum.i, true);
+      else if (owner instanceof Barrel) this.blowBarrel(owner.i, true);
       else if (owner instanceof Jeep) this.garage.struck(owner, weapon);
     };
     // the bolt, a reload: the same
