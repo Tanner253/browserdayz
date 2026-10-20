@@ -708,3 +708,7 @@ body.tr-cut16 .hud-howto { display: none !important; }
 .x18-map .words b { display: block; margin-top: 10px; font: 800 110px/0.95 var(--trailer-font); color: #f2ede2; }
 .x18-map .words b em { font-style: normal; color: #ffd35a; }
 .x18-map .words span { display: block; margin-top: 8px; font: 600 30px var(--trailer-font); color: #d8d3c4; letter-spacing: 0.04em; }
+/* (the twenty-third film: the scope's picture is the HUD's, and is seen through) */
+body.filming.tr-cut23.tr-hud-off #hud .hud-scope { visibility: visible; }
+/* (and its captions over the top of the picture: the stock swings out low on the left, and the scope is in the middle) */
+body.tr-cut23 .x16-cap { top: 80px; bottom: auto; }
