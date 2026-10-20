@@ -25,7 +25,7 @@ import { News } from '../src/sim/news';
 import { underGas, gasEdge } from '../src/sim/gas';
 import { CIV, CourseJudge, dealCourse } from '../src/sim/course';
 import { RULES, RULES_NOTE, fakeGl } from './botrules';
-import { inBunker, BUNKER } from '../src/sim/bunker';
+import { inBunker, bunkerOutside, BUNKER } from '../src/sim/bunker';
 import { BARREL } from '../src/sim/barrels';
 import { type VehicleInfo, POLICE_CAR, parkKind, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
 import { HELI, hpOf } from '../src/sim/heli';
@@ -37,7 +37,7 @@ import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
 import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
-import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
+import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
 import { blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
@@ -55,6 +55,10 @@ import { TAG_PING_MS, nudge, tickDrops } from './drops';
 export const onMap = (x: number, z: number, y?: number) => onWorld(x, z, -8) && x >= PLAN.barrier - 8 && (!onRidgeWall(x, z) || (y !== undefined && inCave(x, y, z)));
 
 const PORT = Number(process.env.PORT ?? 8080);
+/** how long the bunker's door stands open once nobody is left in it (BUNKER_SHUT_S: a test's own shorter wait) */
+const BUNKER_SHUT_MS = (Number(process.env.BUNKER_SHUT_S) || BUNKER.door.shut) * 1000;
+/** who has been found in the bunker with its door shut, since when (see the door, in the clock) */
+const shutIn = new Map<number, number>();
 
 const ROOT = process.cwd();
 
@@ -629,12 +633,33 @@ setInterval(() => {
   for (const i of turn.gone) broadcast({ t: 'i-', i });
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
-  // the bunker's door: open while anybody is in there, shut a minute after the last of them is gone
+  // the bunker's door: open while anybody is in there or in its doorway (a body left asleep in it too), shut a minute
+  // after the last of them is gone
   if (bunkerDoor.open) {
     if ([...clients.values()].some((c) => c.alive && inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], 2.5))) bunkerDoor.emptyAt = now;
-    else if (now - bunkerDoor.emptyAt > BUNKER.door.shut * 1000) {
+    else if (now - bunkerDoor.emptyAt > BUNKER_SHUT_MS) {
       bunkerDoor.open = false;
       broadcast({ t: 'bunker', open: false });
+    }
+    shutIn.clear();
+  } else if (world.bunker) {
+    // Shut, and somebody in there all the same: in by a gap, or through as it slid to. Nobody is left shut in, and
+    // nobody is in without the card: set on the ground before its house (the owner, 2026-10-19: "bunker is not
+    // suppsed to close with a player inside the bunker ... we dont want this loation being exploitable"). Two seconds
+    // first: whoever is pressed against it as it shuts is not counted in.
+    const [ox, , oz] = bunkerOutside(world.bunker);
+    for (const c of clients.values()) {
+      if (!c.alive || !inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], -0.4)) {
+        shutIn.delete(c.id);
+        continue;
+      }
+      const since = shutIn.get(c.id) ?? now;
+      shutIn.set(c.id, since);
+      if (now - since < 2000) continue;
+      shutIn.delete(c.id);
+      place(c, ox, world.coverAt(ox, oz), oz, c);
+      sys(c, "Bunker 17's door is shut: you are set outside it.");
+      log(`[bunker] ${c.name} was in it with its door shut: set outside`);
     }
   }
   // the dead who rode a helicopter down, laid beside it once it is down

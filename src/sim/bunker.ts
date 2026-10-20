@@ -86,7 +86,17 @@ export function bunkerDark(p: Place | null, x: number, y: number, z: number): nu
   return Math.min(1, Math.max(0, (-h - 0.2) / 2.5));
 }
 
-/** Whether a point is inside the first level proper: beyond the door. @param slack metres of the stair's foot counted as inside too (somebody standing in the doorway) */
+/**
+ * Where somebody is set who is not to be left in the bunker (come back into the world down there after leaving it or a
+ * restart, or found in it with its door shut): on the ground before its house, outside the walled yard by its open
+ * side, a few steps from the way in. (y: the pad's own level; the ground there is level with it.)
+ */
+export function bunkerOutside(p: Place): [number, number, number] {
+  const B = BUNKER;
+  return bunkerAt(p, B.court.open * (B.court.r + 2), (B.hut.front + B.court.front) / 2);
+}
+
+/** Whether a point is inside the first level proper: beyond the door. @param slack metres of the stair's foot counted as inside too (somebody standing in the doorway); less than 0, metres short of the door */
 export function inBunker(p: Place | null, x: number, y: number, z: number, slack = 0): boolean {
   if (!p) return false;
   const B = BUNKER, [r, f, h] = bunkerLocal(p, x, y, z);

@@ -4,7 +4,7 @@
 import type { WebSocket } from 'ws';
 import { BODY_GRID, type SerializedInventory, cleanItem as cleanThing, cleanInventory as cleanCarried } from '../src/sim/inventory';
 import type { ItemInstance } from '../src/sim/items';
-import { bunkerDark } from '../src/sim/bunker';
+import { bunkerDark, bunkerOutside } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import type { HitZone } from '../src/sim/combat';
 import { type Thrower, newThrower } from '../src/sim/grenades';
@@ -297,10 +297,13 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // (and the clock toward a tag of their own goes on where it stood, restart and all: it began again at every coming
   // back, and the tag round their neck went with it. The owner, 2026-10-19: "users complain they lose their dog tags
   // during server restart". Below, `lifeAt` and `zonaMs` from `tagMs`, and their game told it in `me.tag`.)
-  // (Somebody who left the game down in the bunker comes back with what they carried, at one
-  // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
-  const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
-  const sp = resume && !under && !resume.afresh ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
+  // (Somebody who left the game down in the bunker, or was in it when the server went down, comes back with what they
+  // carried on the ground before its house, outside it: nobody waits behind its shut door for it to be opened for them,
+  // and nobody comes back in it without a card. The owner, 2026-10-19: "if someone logs out in bunker or server
+  // restarts the server should spawn them on the surface outside the bunker". They were sent to the map's edge.)
+  const under = !!resume && !!world.bunker && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
+  const out = under ? bunkerOutside(world.bunker!) : null;
+  const sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
