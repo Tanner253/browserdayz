@@ -392,6 +392,7 @@ export const dropsMethods = {
     this.spawnAtEdge();
     this.freshKit();
     this.deathInfo = '';
+    this.hitsOn.clear();
     this.save();
     this.resume();
   },

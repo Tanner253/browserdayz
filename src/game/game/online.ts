@@ -197,6 +197,13 @@ export const onlineMethods = {
     net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
     net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
+    net.on('hitok', (m) => {
+      const h = this.hitsOn.get(m.to) ?? { amount: 0, hits: 0, head: 0 };
+      h.amount += m.amount;
+      h.hits++;
+      if (m.zone === 'head') h.head++;
+      this.hitsOn.set(m.to, h);
+    });
     net.on('death', (m) => {
       const k = m.k;
       const me = k.id === net.id;
@@ -219,7 +226,11 @@ export const onlineMethods = {
         this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
       }
       if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
-      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning wreck' : jeep ? 'the car they were driving' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
+      // (and what you did to them this life, as the server took it, before their armour: the owner, 2026-10-19, "when you
+      // die you should be able to see damage done to the player who killed you works for when 2players kill eachother")
+      const hits = k.by !== null && k.by !== net.id ? this.hitsOn.get(k.by) : undefined;
+      const back = k.by === null || k.by === net.id ? '' : hits ? ` You hit ${k.byName} ${hits.hits === 1 ? 'once' : `${hits.hits} times`}${hits.head ? `, ${hits.head === hits.hits ? (hits.hits === 1 ? 'in the head' : 'all in the head') : `${hits.head} in the head`}` : ''}: ${Math.round(hits.amount)} damage before armour.` : ` You never hit ${k.byName}.`;
+      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning wreck' : jeep ? 'the car they were driving' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}.${back} Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
       else this.remotes.get(k.id)?.setAlive(false);
       // (killed in a helicopter: the body stays sat in it, and the one that fell where they were is not drawn)
       if (m.corpse?.ride) {
@@ -327,6 +338,7 @@ export const onlineMethods = {
       this.freshKit();
       this.deathSent = false;
       this.deathInfo = '';
+      this.hitsOn.clear();
       this.meDirty = true;
       this.resume();
     });
