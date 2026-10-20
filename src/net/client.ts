@@ -184,6 +184,23 @@ export class Net {
   id = 0;
   /** round-trip time in ms */
   ping = 0;
+  /** when each ping not yet answered was sent, and when the server was last heard at all (performance.now) */
+  private pingsOut: number[] = [];
+  private heardAt = 0;
+  /**
+   * How far behind the server this game is now, ms: the last round trip, or longer while a ping has gone unanswered,
+   * or while the server has said nothing though others are on (it says where they are fifteen times a second). A
+   * round trip is only known when it is over: through a line held up for ten seconds the readout said the last good
+   * figure, and the world stood still on the screen while the player stood in plain sight in everybody else's (2026-10-20,
+   * a player: "ping sometimes spike send me to the parallel universe and you won't be able to see anyone but people
+   * can see me").
+   */
+  lag(othersOn: boolean): number {
+    const now = performance.now();
+    return Math.round(Math.max(this.ping, this.pingsOut.length ? now - this.pingsOut[0] : 0, othersOn && this.heardAt ? now - this.heardAt - 100 : 0));
+  }
+  /** the stall has been said on the screen (see Game's frame) */
+  stallSaid = false;
   private ws: WebSocket | null = null;
   private handlers = new Map<string, ((m: S2C) => void)[]>();
   /**
@@ -345,6 +362,7 @@ export class Net {
       };
       ws.binaryType = 'arraybuffer';
       ws.onmessage = (e) => {
+        this.heardAt = performance.now();
         // (what is not words is somebody's speech)
         if (typeof e.data !== 'string') return void this.onVoice(e.data as ArrayBuffer);
         let m: S2C;
@@ -358,7 +376,12 @@ export class Net {
           this.id = m.you;
           // (one a page: a second match in the Arena is a second connection, not a second clock)
           clearInterval(this.pingT);
-          this.pingT = setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000) as unknown as number;
+          this.pingsOut = [];
+          this.pingT = setInterval(() => {
+            const n = performance.now();
+            if (this.pingsOut.length < 30) this.pingsOut.push(n);
+            this.send({ t: 'ping', n });
+          }, 4000) as unknown as number;
           // (from this word on, what is said is kept for the game until it listens)
           this.held = [];
           if (this.heldTill) clearTimeout(this.heldTill);
@@ -384,6 +407,7 @@ export class Net {
         }
         if (m.t === 'pong') {
           this.ping = Math.round(performance.now() - m.n);
+          this.pingsOut = this.pingsOut.filter((t) => t > m.n);
           return;
         }
         if (this.held) return void this.held.push(m);

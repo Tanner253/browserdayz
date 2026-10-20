@@ -32,6 +32,9 @@ import { rackShows } from '../../sim/crates';
 import { keyHints } from '../key-hints';
 import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../game';
 
+/** the server unheard this long (ms), the line is said to have stalled */
+const STALLED_MS = 2000;
+
 export const frameMethods = {
   // ------------------------------------------------------------ frame
 
@@ -603,6 +606,14 @@ export const frameMethods = {
     const hasCompass = this.hasCompass;
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
     this.updateSaid(now);
+    // (a line held up is said while it is, and how long: see Net.lag. Not just after a long frame of this page's own,
+    // with what came meanwhile maybe not yet read.)
+    const lag = this.online ? this.net.lag(this.remotes.size > 0) : 0;
+    if (this.online && lag > STALLED_MS !== this.net.stallSaid && (this.net.stallSaid || dt < 0.25)) {
+      this.net.stallSaid = !this.net.stallSaid;
+      this.hud.setNet(this.net.stallSaid ? 'Connection stalled: what you see is out of date' : 'Online');
+      if (this.net.stallSaid) this.hud.note('Your connection to the server has stalled: others still see you, you do not see them move', 'warn');
+    }
     this.hud.update({
       dt,
       vitals: v,
@@ -643,7 +654,7 @@ export const frameMethods = {
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,
-      ping: this.online ? this.net.ping : null,
+      ping: this.online ? lag : null,
       dead: p.dead,
       deadText: this.deathInfo,
       hidden: uiOpen || !this.started,

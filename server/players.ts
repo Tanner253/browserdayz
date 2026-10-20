@@ -77,6 +77,8 @@ export interface Client {
   lastEmote: number;
   lastChat: number;
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
+  /** how they last died, and when (see `kill`): told them if they come back to find they start again */
+  died?: Died;
   openCid: string | null;
   /** the things lying about that hold things which this player has open with their pockets ('lopen'): theirs to set while they do */
   openLying: Set<string>;
@@ -131,7 +133,13 @@ export interface Record_ {
   afresh?: boolean;
   /** their time toward a tag of their own when they left (see tagTime): it goes on from there when they come back */
   tagMs?: number;
+  /** dead when they left: how, and when */
+  died?: Died;
 }
+
+export type Died = { of: string; at: number };
+/** a death this recent is told to whoever comes back to find they start again (ms) */
+const DIED_TOLD = 30 * 60_000;
 
 export const clients = new Map<number, Client>();
 
@@ -348,6 +356,15 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 }, tag: resume.tagMs ?? 0 } : null,
     max: MAX_PLAYERS,
   });
+  // Dead when they last left, and back to start again: told how. (2026-10-20, a player: "the server just reloads my
+  // game out of nowhere and when i get in i spawn fresh". A game whose line went quiet in a fight is seen and shot by
+  // everybody while it shows nothing new; its death reaches the server and not the game, the line drops, the page
+  // goes back in by itself, and a fresh start with no word of why was all the player saw. A body left after a lost
+  // line can be killed, or bleed out, before they are back, as well.)
+  if (!resume && rec && !rec.alive && rec.died && Date.now() - rec.died.at < DIED_TOLD) {
+    const mins = Math.round((Date.now() - rec.died.at) / 60_000);
+    send(c, { t: 'tell', kind: 'warn', text: `Your last character died ${mins < 1 ? 'just now' : `${mins} min ago`} (${rec.died.of}), so you start again.` });
+  }
   // (a restart is on its way: whoever comes in before it happens is told as the others were)
   if (RESTART.pending !== null) send(c, { t: 'restart', why: RESTART.pending, in: Math.max(0, Math.round(RESTART.about - (Date.now() - RESTART.seen) / 1000)) });
   broadcast({ t: 'join', p: info(c) }, c);
@@ -381,7 +398,7 @@ export function drop(c: Client) {
   // (left when they went: a body left sleeping after a connection was lost is not its owner on the server, and the
   // clock on a tag they took does not run for it, the owner, 2026-10-17: "the cash-in clock on a taken tag only counts
   // while the carrier is online". See the `resume` shift in `join`.)
-  records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: c.asleep || Date.now(), tagMs: tagTime(c, c.asleep || Date.now()) });
+  records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: c.asleep || Date.now(), tagMs: tagTime(c, c.asleep || Date.now()), ...(!c.alive && c.died ? { died: c.died } : {}) });
   broadcast({ t: 'leave', id: c.id });
   partyOut(c);
   log(`- ${c.name} (#${c.id}) — ${clients.size} online`);

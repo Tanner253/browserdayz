@@ -81,7 +81,10 @@ export const onlineMethods = {
     this.lockers.clear();
     for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
     this.bunker.setOpen(!!w.bunker, true);
-    for (const p of w.players) void this.addRemote(p);
+    // (the nearest first: bodies are made one at a time, a second or so each as the game comes in, and in the welcome's
+    // order the people beside a player back from a lost line were the last of twenty to be seen, twenty seconds on)
+    const from = (p: (typeof w.players)[number]) => Math.hypot(p.pose[0] - w.spawn.x, p.pose[2] - w.spawn.z);
+    for (const p of [...w.players].sort((a, b) => from(a) - from(b))) void this.addRemote(p);
     this.garage.clear();
     for (const v of w.vehicles ?? []) this.garage.add(v);
     this.garage.bind();

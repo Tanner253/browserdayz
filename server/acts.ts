@@ -491,6 +491,7 @@ export function kill(c: Client, cause: string, v = 0) {
   const now = Date.now();
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
   const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
+  c.died = { of: by ? `killed by ${by.name}` : `died of ${cause}`, at: now };
   const corpse = makeCorpse(c, v, ride);
   for (const k of [...tagSeen.keys()]) if (k.startsWith(seenOf(c.key))) tagSeen.delete(k);
   c.inv = null;
