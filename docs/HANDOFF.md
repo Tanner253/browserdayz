@@ -1,6 +1,27 @@
-# Where the work stands (handoff, 2026-10-19)
+# Where the work stands (handoff, 2026-10-20)
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
+
+## PICK UP HERE (2026-10-20; branch `held-server`, NOT deployed: the owner said "dont deploy")
+Live: server from `d8e626e` (PROTOCOL 55, `main`); site from `f783816` (`site-live`). On `held-server` past both, the
+performance round of 2026-10-20 (the owner: "get in the game yourself ... run real data, fix real problems ... dont
+stop. and dont deploy"), every change measured in the Browser pane with 20 made-up players on the local server
+(scratchpad `crowd.mts`; it must say where it stands, or the server sends it away as silent):
+- `eb5d6d2` a parked helicopter no longer redraws the wider shadow maps every frame; bones worked out only when changed
+  (`src/core/bones.ts`); bone branches with nothing on them left out of what three walks to draw; four stale tests.
+- `424cef4` far trees and tree cards culled for a view 10 degrees wider, re-culled after a 9 degree turn (the upload
+  figures in its message count whole buffers: three sends only the changed range; the frame times stand).
+- `65a9a4c` textures within 500 m sent to the card ahead of first drawing (Renderer.lookAhead; LodSet.nearest).
+- `a45ed03` a body overlapping the player's capsule is left out of that step's controller moves (Player.apart).
+- `116ba67`, `2cb9a1c` a pose leaves what hangs from a moved joint to be worked out when asked for (setWorldQuat,
+  settle): proven bit-exact with two bodies posed alike (`__eagerTurn` puts it back).
+- `87afc86` bodies (players AND the infected) whose body and shadow cannot be in view rest: posed 10/s, not drawn
+  (`inSight` in remote.ts; `__posedAlways` puts it back).
+Measured: Kamenka with 20 players 18.4 -> 14.6 ms median in the pane. Open for the owner's word: the model buildings'
+colliders are their whole visual meshes (3,460 triangles a house); the character controller costs 0.4 ms a move along
+their walls; a simplified movement collider would change what stops bodies and bullets by a centimetre or two.
+Tools: `__breatheWatch` (LONG_PIECES in core/breathe.ts) for work between frames; `__noAhead`, `__vegExact`; the frame
+recorder and the twins proof are in `progress/perf-1020/` (recorder.js, twins.js: how to run each is at its head).
 
 ## PICK UP HERE (2026-10-19 ~07:00 UTC; branch `gun-racks`, NOT deployed: the owner holds it for one full deploy)
 Live server `5716b79` (`9100439` + the bot-check fix; PROTOCOL 50; `main`, `hotfix`); live site `bc1cb91` (`site-live`).
