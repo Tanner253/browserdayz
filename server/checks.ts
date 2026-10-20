@@ -301,6 +301,10 @@ export function hillBetween(a: Pose, b: Pose): number {
  * out of this server's copy of their pockets, and they are told to take it out of their own.
  */
 export function zoneCheck(c: Client, now = Date.now()) {
+  // (this life's time inside the Zona, counted here at each word of where they are: a gap of more than two seconds
+  // between words counts as two, a game that went quiet being nobody's to credit)
+  if (c.alive && c.zonaAt && inPlay(c.pose[0], c.pose[2])) c.zonaMs += Math.min(now - c.zonaAt, 2000);
+  c.zonaAt = now;
   // (down a basement is out of it: the owner, 2026-10-18, "ad basements to the "out of bounds" area for dogtags". And over
   // the Zona's line only while ZONA_VOID says so: off until there are bases)
   const down = world.basementUnder(c.pose[0], c.pose[1], c.pose[2]);

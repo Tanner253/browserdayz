@@ -113,10 +113,10 @@ try {
   // killed at once: nothing of hers is on the second body, the new tag or the old
   const eve = new Player('zone-test-key-eve-000000000000000005', 'Eve');
   await eve.join();
-  await sleep(3300);
   const old = { uid: 'zone-test-tag-eve-1', id: 'dogtag', qty: 1, owner: 'Eve' };
-  // (inside the Zona: whoever dies outside it leaves no tag at all, since 2026-10-19)
-  await eve.stand(...IN, 0.4);
+  // (inside the Zona, long enough: whoever dies outside it leaves no tag at all, and only time inside it counts toward
+  // one, since 2026-10-19)
+  await eve.stand(...IN, 3.6);
   eve.carry([old]);
   await sleep(300);
   eve.send({ t: 'died', cause: 'test' });
@@ -128,14 +128,24 @@ try {
   await sleep(300);
   eve.send({ t: 'died', cause: 'test' });
   await sleep(500);
-  assert.ok(/Eve left no dog tag: alive \d+ s \(nor 1 older of their own, taken back\)/.test(logged), `an older tag of her own was left on somebody who had only just started again:\n${logged.split('\n').filter((l) => l.includes('Eve')).join('\n')}`);
+  assert.ok(/Eve left no dog tag: alive \d+ s( in the Zona)? \(nor 1 older of their own, taken back\)/.test(logged), `an older tag of her own was left on somebody who had only just started again:\n${logged.split('\n').filter((l) => l.includes('Eve')).join('\n')}`);
   const second = eve.got.find((m) => m.t === 'death') as { corpse: unknown } | undefined;
+  // Fay waits out the time outside the Zona, steps in and is killed at once: the time outside counts for nothing
+  // (the owner, 2026-10-19: "to prevent people from waiting in the safe zone for their tag to spawn on themselves")
+  const fay = new Player('zone-test-key-fay-000000000000000006', 'Fay');
+  await fay.join();
+  await fay.stand(...OUT, 3.6);
+  await fay.stand(...IN, 0.4);
+  fay.carry([{ uid: 'zone-test-tag-fay', id: 'dogtag', qty: 1, owner: 'Fay' }]);
+  await sleep(300);
+  fay.send({ t: 'died', cause: 'test' });
+  await sleep(400);
+  assert.ok(/Fay left no dog tag: alive [01] s in the Zona/.test(logged), `time waited outside the Zona counted toward a tag:\n${logged.split('\n').filter((l) => l.includes('Fay')).join('\n')}`);
   assert.ok(second && second.corpse === null, 'there was something on her second body, and she carried nothing but her own tags');
-  // (Bee has been alive long enough by the time she dies)
-  await sleep(3200);
+  // (Bee has been long enough in the Zona by the time she dies)
   // Bee dies with her own tag round her neck: the server now knows that tag as one that can be taken
   const tag = { uid: 'zone-test-tag-bee', id: 'dogtag', qty: 1, owner: 'Bee', held: TAG_HOLD };
-  await bee.stand(...IN, 0.4);
+  await bee.stand(...IN, 3.6);
   bee.carry([tag]);
   await sleep(300);
   bee.send({ t: 'died', cause: 'test' });

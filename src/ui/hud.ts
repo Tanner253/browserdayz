@@ -291,7 +291,7 @@ export class HUD {
             <div class="start-kicker"><span>PvP survival shooter</span><em>Play to earn</em></div>
             <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
             <p class="start-sub">Players hunt you. So do the infected.</p>
-            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive, and a tag carried ${ZONA_VOID ? 'out of the Zona' : 'down a basement'} is void.</p>
+            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive${ZONA_VOID ? ' in the Zona' : ''}, and a tag carried ${ZONA_VOID ? 'out of the Zona' : 'down a basement'} is void.</p>
             <div class="sm-enter">
               <label class="sm-name">
                 <span class="sm-name-label">Your name<em>over your head, on your dog tag</em></span>
@@ -333,7 +333,7 @@ export class HUD {
                 <li style="--i:0"><figure><img src="/howto/drop-in.jpg" alt="" loading="lazy" decoding="async"><i>01</i></figure><b>Drop in</b><span>On the west coast, bare hands. The further east, the better the loot.</span></li>
                 <li style="--i:1"><figure><img src="/howto/loot.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>Loot inward</b><span>Tier 1, where you start, holds no gun. Then tier by tier: pistols, SMGs, rifles. Police and army places hold the most.</span></li>
                 <li style="--i:2"><figure><img src="/howto/fight.jpg" alt="" loading="lazy" decoding="async"><i>03</i></figure><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></li>
-                <li style="--i:3"><figure><img src="/howto/tag.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>Take their tag</b><span>Everybody alive ${TAG_FRESH / 60} minutes carries a dog tag. Kill them and loot it.</span></li>
+                <li style="--i:3"><figure><img src="/howto/tag.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>Take their tag</b><span>Everybody alive ${TAG_FRESH / 60} minutes${ZONA_VOID ? ' in the Zona' : ''} carries a dog tag. Kill them and loot it.</span></li>
                 <li style="--i:4"><figure><img src="/howto/hold.jpg" alt="" loading="lazy" decoding="async"><i>05</i></figure><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></li>
               </ol>
               <h3 class="ht-h">What wants you dead</h3>

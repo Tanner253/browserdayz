@@ -5,7 +5,7 @@ import http from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { SerializedInventory } from '../src/sim/inventory';
-import { TAG_HOLD, TAG_FRESH, type ItemInstance } from '../src/sim/items';
+import { TAG_HOLD, TAG_FRESH, ZONA_VOID, type ItemInstance } from '../src/sim/items';
 import { paced, type Hits } from '../src/sim/hitclock';
 import { log } from './index';
 import { clients, send, type Client } from './players';
@@ -95,6 +95,13 @@ const TAG_MIN_LIFE_MS = (Number(process.env.TAG_MIN_LIFE_S) || 120) * 1000;
 
 /** and there is no tag on a body at all until its owner had lived this long (see TAG_FRESH) */
 export const TAG_FRESH_MS = (Number(process.env.TAG_FRESH_S) || TAG_FRESH) * 1000;
+/**
+ * How long somebody has been alive toward a tag of their own: only the time inside the Zona counts (the owner, 2026-10-19:
+ * "players 'survived for 10 minutes' timer does not start or count until they are in the zona. to prevent people from
+ * waiting in the safe zone for their tag to spawn on themselves then running into the zona to get farmed by their
+ * friends"). Without the Zona's line, all of the life.
+ */
+export const tagTime = (c: { lifeAt: number; zonaMs: number }, now = Date.now()) => (ZONA_VOID ? c.zonaMs : now - c.lifeAt);
 
 /** and none unless another player's hit came this soon before the death (see makeCorpse in acts.ts): a bleed-out from a gunshot counts. TAG_CAUSE_S=0: any death leaves one */
 export const TAG_CAUSE_MS = (Number(process.env.TAG_CAUSE_S) || 180) * 1000;

@@ -32,6 +32,9 @@ import { inBunker } from '../../sim/bunker';
 import { LOOT_REV, type Game } from '../game';
 import { playedAd } from '../../ui/ads';
 
+/** when the neck tag's clock was last looked at (see tagWhenDue) */
+let neckSeen = 0;
+
 export const enterMethods = {
   // ------------------------------------------------------------ entering the world
 
@@ -540,7 +543,12 @@ export const enterMethods = {
 
   /** their own tag round their neck, once it is due (asked every few seconds) */
   tagWhenDue(this: Game) {
-    if (this.inv.neck || !this.inv.neckDue || Date.now() < this.inv.neckDue || this.player.dead) return;
+    // (its clock stands still outside the Zona: only time in it counts, as the server counts it (tagTime in server/tags.ts);
+    // the owner, 2026-10-19: "players 'survived for 10 minutes' timer does not start or count until they are in the zona")
+    const now = Date.now(), step = neckSeen ? Math.min(now - neckSeen, 5000) : 0;
+    neckSeen = now;
+    if (ZONA_VOID && this.inv.neckDue && !this.inv.neck && !inPlay(this.player.pos.x, this.player.pos.z)) this.inv.neckDue += step;
+    if (this.inv.neck || !this.inv.neckDue || now < this.inv.neckDue || this.player.dead) return;
     this.inv.neck = this.makeTag();
     this.inv.neckDue = 0;
     this.inventoryChanged();

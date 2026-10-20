@@ -16,7 +16,7 @@ import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, stoppingNow, tellSeats, things, vehicles, world } from './index';
-import { TAG_FRESH_MS, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
+import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { shortDevice } from './device';
@@ -548,7 +548,7 @@ export function handle(c: Client, m: C2S) {
       c.inv = cleanInventory(m.inv);
       // (no tag of their own round the neck of somebody alive less than TAG_FRESH: their game puts it on then, and an
       // admin looking in their pockets before that sees none)
-      if (c.inv?.slots?.neck && Date.now() - c.lifeAt < TAG_FRESH_MS) c.inv.slots.neck = null;
+      if (c.inv?.slots?.neck && tagTime(c) < TAG_FRESH_MS) c.inv.slots.neck = null;
       // (nobody without the power puts a thing in a hold: see `carryOrder`)
       if (c.inv && !c.power.bottomless) holdOnlyEmpties(c.inv, had);
       pockets(c);
@@ -594,6 +594,7 @@ export function handle(c: Client, m: C2S) {
       const sp = pickSpawn({ x: c.pose[0], z: c.pose[2] });
       c.alive = true;
       c.lifeAt = Date.now();
+      c.zonaMs = 0;
       c.inv = null;
       c.vitals = null;
       c.pose = [sp.x, world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
