@@ -286,7 +286,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `director.ts` | 907 | The trailer's director. |
+| `director.ts` | 913 | The trailer's director. |
 | `human.ts` | 258 | Movement with somebody behind it, for the films from the twenty-first on (2026-10-19, the owner: |
 | `music.ts` | 341 | The trailer's score, written as code: one row per bar (the chord, and how hard the band plays it), in D minor at 128 beats a minute, so a bar is 1.875 s and every cut in shots.ts lands on a bar line. |
 | `music10.ts` | 352 | The tenth film's score: an old fort in the snow, slow and grand. |
@@ -313,6 +313,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `shots21.ts` | 748 | The twenty-first film, 70 s: |
 | `shots22.ts` | 171 | The twenty-second film, 22 s: |
 | `shots23.ts` | 207 | The twenty-third film, 15 seconds: the 9A-91 and the Barrett's bipod (the owner, 2026-10-20: |
+| `shots24.ts` | 543 | The twenty-fourth film, 26 s: |
 | `shots3.ts` | 1664 | The third trailer: a story, and then how the money works. |
 | `shots4.ts` | 1452 | The fourth trailer: the Zone has grown, and everything the other three were about. |
 | `shots5.ts` | 982 | The fifth trailer: the infected, and what comes after them. |

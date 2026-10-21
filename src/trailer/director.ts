@@ -571,7 +571,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 23) {
+  if (CUT === 24) {
+    // (the twenty-fourth is "Under the hood", the week's work nobody sees, for X: see shots24.ts)
+    const cut = await import('./shots24');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds24();
+    ownScore = cut.score;
+  } else if (CUT === 23) {
     // (the 9A-91 and the Barrett's bipod, 15 seconds in first person on the sixteenth's band: see shots23.ts)
     const cut = await import('./shots23');
     shots = cut.buildShots(S);
