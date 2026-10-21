@@ -61,12 +61,26 @@ export class BrHud {
       <div class="br-gas">IN THE GAS</div>
       <div class="br-knock">KNOCKED<small>A teammate can get you up: F, standing, 10 s</small><b class="br-kn"></b></div>
       <div class="br-end"><div class="br-end-place"></div><div class="br-end-what"></div><div class="br-end-rows"></div>
-        <div class="br-end-go"><button class="br-again">Play again</button><button class="br-menu">Main menu</button></div></div>`;
+        <div class="br-end-go"><button class="br-again">Return to Battle Royale</button><button class="br-menu">Main menu</button></div></div>`;
     root.appendChild(this.el);
     this.radar = this.q<HTMLCanvasElement>('.br-radar').getContext('2d')!;
     this.q('.br-vote').addEventListener('click', () => this.onVote());
-    this.q('.br-again').addEventListener('click', () => location.assign('/battleroyale'));
-    this.q('.br-menu').addEventListener('click', () => location.assign('/'));
+    // (back to its menu, or to the door over it, with the page as it is: no reload, nothing downloaded again)
+    this.q('.br-again').addEventListener('click', () => this.onAgain());
+    this.q('.br-menu').addEventListener('click', () => this.onMenu());
+  }
+
+  onAgain: () => void = () => location.assign('/battleroyale');
+  onMenu: () => void = () => location.assign('/');
+
+  /** as before any match: hidden until the next one says something */
+  reset() {
+    this.el.classList.remove('ended', 'won', 'lobbying');
+    this.el.classList.add('idle');
+    for (const s of ['.br-feed', '.br-hits', '.br-end-rows', '.br-mates']) this.q(s).replaceChildren();
+    this.lob = null;
+    this.voted = false;
+    this.drawn = '';
   }
 
   note(text: string, kind: 'good' | 'info' = 'info') {
@@ -78,6 +92,7 @@ export class BrHud {
   }
 
   lobby(m: Of<'lobby'>, off: number) {
+    this.el.classList.remove('idle');
     this.lob = m;
     this.off = off;
     this.voted = m.voted;
@@ -89,6 +104,7 @@ export class BrHud {
   }
 
   state(m: Of<'state'>) {
+    this.el.classList.remove('idle');
     this.el.classList.toggle('lobbying', m.phase === 'wait' || m.phase === 'count');
     this.q('.br-alive').textContent = String(m.alive);
     this.q('.br-kills').textContent = String(m.kills);

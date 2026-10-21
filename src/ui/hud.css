@@ -1633,7 +1633,9 @@ body.touch .set-page .gfx-range { height: 30px; }
 /* (its own --brand: it is not inside .hud-start, where the rest of the menu gets it) */
 .hud-howto { --brand: #ffd35a; position: fixed; inset: 0; z-index: 40; display: none; place-items: center; background: rgba(5, 6, 6, 0.72); pointer-events: auto; }
 .hud-howto.on { display: grid; }
-.howto-card { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: rgba(14, 16, 15, 0.97); border-top: 3px solid #ffd35a; padding: 20px 24px 22px; box-shadow: 0 18px 60px #000; }
+/* (sizes of the screen read through the HUD's own zoom, --ui-zoom: a card 100vh tall in a HUD zoomed 1.67 times was
+   1.67 screens tall, its head and foot cut off: the owner, 2026-10-21, "the how to play panel's are not cropped properly") */
+.howto-card { width: min(980px, calc(100vw / var(--ui-zoom, 1) - 32px)); max-height: calc(100vh / var(--ui-zoom, 1) - 48px); overflow: auto; background: rgba(14, 16, 15, 0.97); border-top: 3px solid #ffd35a; padding: 20px 24px 22px; box-shadow: 0 18px 60px #000; }
 .howto-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .howto-head h2 { font-size: 28px; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a; }
 .howto-x { background: none; border: none; color: rgba(233, 228, 216, 0.62); font-size: 28px; cursor: pointer; }
@@ -1642,7 +1644,7 @@ body.touch .set-page .gfx-range { height: 30px; }
    (2 s of a 10 s round): its card rises with a yellow edge, its picture wakes and pushes in, a light sweeps across it
    and its number kicks; the rest wait greyed. What is out to get you in pictured cards beneath. (Pictures: the
    changelog's, cropped, public/howto/) */
-.hud-howto .howto-card { width: min(1180px, calc(100vw - 32px)); }
+.hud-howto .howto-card { width: min(1180px, calc(100vw / var(--ui-zoom, 1) - 32px)); }
 .ht-steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
 .ht-steps li { --at: calc(var(--i) * 2s - 10s); }
 .ht-steps figure { position: relative; margin: 0 0 12px; aspect-ratio: 16 / 10; overflow: hidden; background: #0b0c0c; outline: 2px solid transparent; animation: ht-card 10s ease-out infinite var(--at); }

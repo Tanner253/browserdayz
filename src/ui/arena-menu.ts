@@ -15,7 +15,7 @@ import type { HUD } from './hud';
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const kitOf = (id: string) => KITS.find((k) => k.id === id);
 
-type Panel = 'play' | 'loadouts' | 'settings' | 'payouts';
+type Panel = 'play' | 'how' | 'loadouts' | 'settings' | 'payouts';
 
 export class ArenaMenu {
   private el: HTMLDivElement;
@@ -38,6 +38,7 @@ export class ArenaMenu {
         <span class="am-logo">ARE<span>NA</span></span>
         <nav class="am-nav">
           <button type="button" data-p="play" class="on">Play</button>
+          <button type="button" data-p="how">How to play</button>
           <button type="button" data-p="loadouts">Loadouts</button>
           <button type="button" data-p="settings">Settings</button>
           <button type="button" data-p="payouts">Payouts</button>
@@ -65,6 +66,16 @@ export class ArenaMenu {
             <button type="button" class="am-practice">Practice alone</button>
             <p class="am-note">No money moves yet: matches are played for nothing.</p>
           </div>
+        </section>
+        <section class="am-p am-how">
+          <!-- (in pictures, as the Zone's own How to play: the owner, 2026-10-21, "how to play is missing graphiscs") -->
+          <ol class="ht-steps" aria-label="How a match goes">
+            <li style="--i:0"><figure><img src="/howto/arena-fort.jpg" alt="" loading="lazy" decoding="async"><i>01</i></figure><b>Join or host</b><span>Pick a match from the list, or host one: 1v1 to 3v3, the rounds to win (${ARENA.kills.join(', ')}) and one loadout for everybody. Or practise alone.</span></li>
+            <li style="--i:1"><figure><img src="/howto/arena-kit.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>The same guns</b><span>Everybody gets the host's loadout, every round. Rounds never run out: R reloads. Nothing to loot.</span></li>
+            <li style="--i:2"><figure><img src="/howto/arena-fight.jpg" alt="" loading="lazy" decoding="async"><i>03</i></figure><b>Team against team</b><span>At Orlinoye, the mountain fort. A round ends when one side has nobody left standing.</span></li>
+            <li style="--i:3"><figure><img src="/howto/arena-rounds.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>First to the rounds</b><span>The first side to the rounds chosen wins the match.</span></li>
+            <li style="--i:4"><figure><img src="/howto/arena-again.jpg" alt="" loading="lazy" decoding="async"><i>05</i></figure><b>Again</b><span>Play again goes straight back to the Arena's menu, nothing loaded again.</span></li>
+          </ol>
         </section>
         <section class="am-p am-loadouts">
           <h5>The loadouts</h5>

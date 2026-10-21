@@ -16,12 +16,18 @@
   `/arena?w=br` to `/battleroyale` with one line in src/net/client.ts, on branch `br-socket` (on top of this one). It is in
   the ZONA server's build filter, so shipping it restarts the ZONA server once (everyone keeps their place): ship it with the
   next ZONA deploy. Everything on `battle-royale` itself ships with no ZONA restart.
-- LIVE 2026-10-21 (site 065628a, arena rebuilt by its host; ZONA untouched): the playable pass (doors, cars, health only,
-  ZONA's look, cheap walls). ON THE BRANCH SINCE, NOT DEPLOYED (deploy on the owner's word): a jump only over the map (the
-  time until it said); others seen in freefall and under a proper canopy (made as the airdrop's); warm-up spawns and guns
-  only in the open; the wheel through the slots; one open lobby a mode, filled first whatever its map (a page for another
-  map goes to it and straight in); each mode's waiting and playing counts on its menu; the menu laid out as the Arena's;
-  Leave the match counts a player out at once; the main menu's Arena and Battle Royale cards say how many are playing.
+- LIVE 2026-10-21 (last 1dc7a65; ZONA untouched each time): the playable pass (doors, cars, health only, ZONA's look,
+  cheap walls); a jump only over the map (the time until it said); others seen in freefall and under a proper canopy (made
+  as the airdrop's); warm-up spawns and guns only in the open; the wheel through the slots; one open lobby a mode, filled
+  first whatever its map (a page for another map goes to it and straight in); each mode's waiting and playing counts on its
+  menu; the menu laid out as the Arena's; Leave the match counts a player out at once; the main menu's Arena and Battle
+  Royale cards say how many are playing. Then: How to play in pictures for the battle royale and the Arena
+  (`public/howto/br-*`, `arena-*`; the battle royale's shot by `tools/br/howto-pics.js`), the how-to cards sized through
+  the HUD's zoom (21:9 cut them off: `tools/br/howto-look.js` shoots them at any size), and Return to Battle Royale and
+  Leave the match back at its menu with the page as it is, no reload (`Game.toBr`, `BrMode.reset`).
+- Deploys need no word from the owner while no ZONA path changes (the owner: "you dont need to ask me to deploy if it
+  doesnt affect zona server"): `git diff --name-only origin/main HEAD -- server src/sim src/world src/net src/core
+  package.json package-lock.json render.yaml` must be empty.
 - MEMORY (measured locally): the arena server 262 MB at rest; one battle royale match running 309 MB; a map's walls let go
   when no lobby is on it (227 MB after). Render's free plan (512 MB) holds it; `BOT_RULES` copied from browserdayz for
   the door; nothing else changes on Render.

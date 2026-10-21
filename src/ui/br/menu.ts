@@ -8,6 +8,7 @@ import './br.css';
 import { arenaBase } from '../../net/client';
 import { MAPS, TEAM, type BrMode } from '../../../arena/br/rules';
 import type { HUD } from '../hud';
+import { doorOver } from '../door';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const MODES: { m: BrMode; name: string; say: string }[] = [
@@ -62,12 +63,17 @@ export class BrMenu {
           </div>
         </section>
         <section class="bm-p bm-how">
-          <h5>How to play</h5>
+          <!-- (in pictures, as the Zone's own How to play: the owner, 2026-10-21, "how to play is missing graphiscs") -->
+          <ol class="ht-steps" aria-label="How a match goes">
+            <li style="--i:0"><figure><img src="/howto/br-lobby.jpg" alt="" loading="lazy" decoding="async"><i>01</i></figure><b>The lobby</b><span>Fight over the guns in the waiting area while it fills: back at once when you fall. V votes to start; two thirds is enough.</span></li>
+            <li style="--i:1"><figure><img src="/howto/br-drop.jpg" alt="" loading="lazy" decoding="async"><i>02</i></figure><b>The drop</b><span>Space to jump once the plane is over the map; hold W to dive. The canopy opens by itself, or on Space.</span></li>
+            <li style="--i:2"><figure><img src="/howto/br-loot.jpg" alt="" loading="lazy" decoding="async"><i>03</i></figure><b>Loot</b><span>Guns, armour, heals and grenades, ringed in their rarity's colour. F takes what you look at.</span></li>
+            <li style="--i:3"><figure><img src="/howto/br-circle.jpg" alt="" loading="lazy" decoding="async"><i>04</i></figure><b>The circle</b><span>The gas closes in, in phases: the top of the screen says when. Outside it you lose health, more each phase.</span></li>
+            <li style="--i:4"><figure><img src="/howto/br-win.jpg" alt="" loading="lazy" decoding="async"><i>05</i></figure><b>Last standing</b><span>The last player or team alive wins. Return to Battle Royale for the next match.</span></li>
+          </ol>
+          <h5>Keys and rules</h5>
           <div class="bm-rules">
-            <div><b>The lobby</b><span>Fight over the guns in the waiting area while it fills: you come straight back when you fall. Press V to vote to start; two thirds of the lobby is enough.</span></div>
-            <div><b>The drop</b><span>The plane crosses the map. Once it is over the map, Space to jump. Hold W to dive; the canopy opens by itself, or press Space.</span></div>
             <div><b>The slots</b><span>Six slots, 1 to 6 or the wheel: guns, heals and grenades. F takes what you look at, G drops what is in your hand. Rounds are picked up by walking over them, and every gun of a calibre shares them.</span></div>
-            <div><b>The circle</b><span>The gas closes in, in phases: the timer at the top says when. Outside it you lose health every second, more each phase.</span></div>
             <div><b>Teams</b><span>In duos and squads a teammate who falls is knocked down: stand over them and hold F for 10 seconds to get them up. No friendly fire.</span></div>
             <div><b>Leaving</b><span>Esc, then Leave the match: you are out of it at once, and what you carried is left on the ground.</span></div>
           </div>
@@ -108,6 +114,11 @@ export class BrMenu {
   }
 
   private click(e: MouseEvent) {
+    // (the door over this page, nothing loaded again: src/ui/door.ts)
+    if ((e.target as HTMLElement).closest('.bm-zona')) {
+      e.preventDefault();
+      return void doorOver('br');
+    }
     const b = (e.target as HTMLElement).closest('button') as HTMLElement | null;
     if (!b) return;
     if (b.dataset.p) return this.show(b.dataset.p as Panel);
@@ -135,8 +146,7 @@ export class BrMenu {
       return this.hud.settingsInto(on ? this.q<HTMLElement>('.bm-pause-host') : null);
     }
     if (b.classList.contains('bm-leave')) {
-      this.onLeave();
-      return void setTimeout(() => location.assign('/battleroyale'), 150);
+      return this.onLeave();
     }
   }
 

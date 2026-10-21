@@ -50,6 +50,7 @@ body.arena-mode #hud .hud-start { display: none !important; }
 .am-go:hover, .am-practice:hover, .am-row button:hover { filter: brightness(1.15); }
 .am-note { font: 12px 'JetBrains Mono', monospace; color: #9a9588; line-height: 1.5; margin: 6px 0 0; max-width: 640px; }
 
+.am-how { --brand: var(--red); max-width: 1180px; }
 .am-kits { display: grid; grid-template-columns: repeat(2, minmax(0, 340px)); gap: 10px; }
 .am-kit { background: rgba(0, 0, 0, 0.55); border-left: 3px solid var(--red); padding: 12px 14px; }
 .am-kit b { display: block; font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -60,7 +61,7 @@ body.arena-mode #hud .hud-start { display: none !important; }
 .am-umb em { font-style: normal; color: #ffd35a; font-weight: 700; }
 
 /* the Zone's settings, lent: shown as they are on the Zone's sheet */
-.am-set-host { max-width: 760px; height: calc(100vh - 150px); display: flex; flex-direction: column; }
+.am-set-host { max-width: 760px; height: calc(100vh / var(--ui-zoom, 1) - 150px); display: flex; flex-direction: column; }
 .am-set-host .pane-gfx { display: flex !important; flex: 1; flex-direction: column; min-height: 0; }
 .am-back { display: none; margin-bottom: 10px; background: none; border: 1px solid #fff; color: #fff; font: 600 14px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; padding: 5px 16px; cursor: pointer; }
 

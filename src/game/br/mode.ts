@@ -10,6 +10,7 @@ import { heightAt } from '../../world/worldgen';
 import { BR, FLIGHT, HEALS, MAPS, RARITY, capOf, circleAt, kindOf, rarityOf, stackOf, type Ground } from '../../../arena/br/rules';
 import type { BrC2S, BrS2C, Phase } from '../../../arena/br/wire';
 import { BrHud } from '../../ui/br/hud';
+import { doorOver } from '../../ui/door';
 import { BrLook } from './look';
 import type { Game } from '../game';
 
@@ -58,6 +59,11 @@ export class BrMode {
   constructor(private game: Game) {
     this.look = new BrLook(game);
     this.hud = new BrHud(game.hud.root, () => this.vote());
+    this.hud.onAgain = () => game.toBr();
+    this.hud.onMenu = () => {
+      game.toBr();
+      void doorOver('br');
+    };
     document.body.classList.add('br');
     game.hud.root.classList.add('br');
     const net = game.net as unknown as Listen;
@@ -96,6 +102,25 @@ export class BrMode {
   leave() {
     if (!this.ended) this.send({ k: 'leave' });
     this.ended = true;
+  }
+
+  /** as before any match, for the next on this page (Game.toBr) */
+  reset() {
+    this.phase = 'wait';
+    this.me = this.plane = this.zone = null;
+    this.ground.clear();
+    this.held = 0;
+    this.mirror.clear();
+    this.worn = { vest: null, helmet: null, pack: null };
+    this.air = this.airSaid = this.reviving = null;
+    this.jumped = this.ended = false;
+    this.asked.clear();
+    this.airOf.clear();
+    this.target = { g: null, mate: null };
+    this.look.clear();
+    this.look.flyPlane(null, 0, 0);
+    this.look.chute(null, 0, []);
+    this.hud.reset();
   }
 
   /** the connection is gone: the end, or why it went, with the way back */

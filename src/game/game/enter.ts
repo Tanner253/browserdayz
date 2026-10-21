@@ -215,7 +215,7 @@ export const enterMethods = {
    * people gone, and this player as before any match; the world, the fort and everything loaded stay. `note`: why,
    * where it was not by the player's own choice.
    */
-  toArena(this: Game, note = '') {
+  toArena(this: Game, note = '', to = '/arena') {
     // (a connection still open is closed from here, and its going is not shown as a result: see onClose)
     if (this.net.online) {
       this.arenaLeaving = true;
@@ -223,6 +223,7 @@ export const enterMethods = {
     }
     this.arenaHud?.destroy();
     this.arenaHud = null;
+    this.br?.reset();
     for (const r of this.remotes.values()) r.dispose();
     this.remotes.clear();
     this.weapons.take(null);
@@ -238,9 +239,17 @@ export const enterMethods = {
     this.started = false;
     this.paused = true;
     this.input.unlock();
-    history.replaceState(null, '', '/arena');
+    history.replaceState(null, '', to);
     this.hud.showStart(true);
     if (note) this.hud.note(note, 'warn');
+  },
+
+  /**
+   * Back at the battle royale's menu as toArena is back at the Arena's (the owner, 2026-10-21: "return to battle royale
+   * which should not trigger a total reload and redeownload"): the page, cut for its map, kept for the next match.
+   */
+  toBr(this: Game) {
+    this.toArena('', `/battleroyale?kills=${this.br?.map ?? 0}`);
   },
 
   /** What this player looks like follows from their name: body, first-person sleeves, inventory portrait. */

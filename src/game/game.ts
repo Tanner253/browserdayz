@@ -1506,6 +1506,7 @@ type Methods<T> = { [K in keyof T]: T[K] extends (this: Game, ...a: infer A) => 
 export interface Game {
   join: Methods<typeof enterMethods>['join'];
   toArena: Methods<typeof enterMethods>['toArena'];
+  toBr: Methods<typeof enterMethods>['toBr'];
   dress: Methods<typeof enterMethods>['dress'];
   onRange: Methods<typeof enterMethods>['onRange'];
   enterOffline: Methods<typeof enterMethods>['enterOffline'];

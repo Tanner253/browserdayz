@@ -131,6 +131,19 @@ export function openDoor(): Promise<Mode> {
   });
 }
 
+/**
+ * The door over a page already built (the owner, 2026-10-21, on leaving a match: "take me to main menu without having to
+ * reload everything"): this page's own game picked again is only the door gone; another game is a page of its own, its
+ * world made otherwise.
+ */
+export async function doorOver(here: Mode) {
+  const back = location.pathname + location.search;
+  history.replaceState(null, '', '/');
+  const mode = await openDoor();
+  if (mode === here) history.replaceState(null, '', back);
+  else location.assign(`/${mode === 'br' ? 'battleroyale' : mode}`);
+}
+
 /** this page's game, by its address: /arena or a wager is the Arena, /zona or any switch on the address is the Zone (development and test pages), and the bare site asks (null) */
 export function modeOf(wager: boolean): Mode | null {
   const path = location.pathname.replace(/\/+$/, '');
