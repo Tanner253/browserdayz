@@ -17,9 +17,17 @@
   `http://localhost:5173/br?wager=br&size=1&kills=2&loadout=find`).
 - Deploy: site (`node scripts/deploy.mjs --site`) and the arena by a push of `arena/**` (rebuilds zona-arena-1 only). Nothing
   changed under server/, src/sim, src/world, src/net, src/core, package*.json or render.yaml.
-- Known gaps: shots are stopped by the ground only (no building walls on the server yet); no jeeps; no grenades; no bot check
-  at the door yet; the plane is the airdrop's helicopter (a plane model needs the owner's yes); remote bodies are hidden in the
-  plane by distance only.
+- Since: jeeps (up to six a map, driver-run), grenades (stick grenades and frags in the loot, the blast judged by the server),
+  the bot check at the door of the battle royale AND the Arena's wagers (`arena/br/door.ts`: the open world's course and
+  judge; on with `RENDER` or `BOTCHECK`; BOT_RULES read from the host, as on browserdayz), and walls: each shot carries how
+  far the shooter's own game saw it go before a wall (`wall`), and the server stops it at the nearer of that and the ground
+  (the open world's trust level; a server bake of the buildings' solids would make it the server's own).
+  Checks: `npx tsx test/br-match.test.ts` (10: lobby, vote, plane, jeeps, loot, knock, revive, winner, board),
+  `npx tsx test/arena.test.ts` (7), `progress/br/br-look.js` and `progress/br/br-shoot.js` in the headless game.
+- Known gaps: the plane is the airdrop's helicopter (a real plane model needs the owner's yes on a download); the
+  buildings' walls on the server are the shooter's game's word; not yet tried on a phone, nor with 30 real players.
+- Render (zona-arena-1) needs: a paid instance (Standard, 1 CPU / 2 GB: the server makes the world and plans every
+  building's places for things at start, ~15 s and ~0.5 GB); `BOT_RULES` copied from browserdayz for the door; nothing else.
 
 The owner, 2026-10-21: "this is pubg + fortnite mode, we will call it battle royale, and itll play like pubg, but we want to make it
 look liek fortnite visually". Then the full go: "just build test and deploy the working battle royal with the specs ive given, do not

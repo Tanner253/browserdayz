@@ -55,6 +55,17 @@ export class BrMode {
     net.on('br', (m: { t: 'br' } & BrS2C) => this.on(m));
     net.on('kill', (m: { by: string; who: string; w: string; head: boolean; me: boolean }) => this.hud.feed(m.by, m.who, ITEMS[m.w]?.name ?? m.w, m.head, m.me));
     net.on('hitok', (m: { amount: number; zone: string }) => this.hud.hitNumber(m.amount, m.zone === 'head'));
+    // (Each shot told with how far this game's own ray went before a wall or a floor stopped it: the server has the
+    // ground and not the buildings, and holds a shot to the nearer of the two. A shot through a house is not one.)
+    const send0 = game.net.send.bind(game.net);
+    game.net.send = (m) => {
+      if (m.t === 'shot') {
+        const L = Math.hypot(m.d[0], m.d[1], m.d[2]) || 1, d = { x: m.d[0] / L, y: m.d[1] / L, z: m.d[2] / L };
+        const hit = physics.raycast({ x: m.o[0] + d.x * 0.5, y: m.o[1] + d.y * 0.5, z: m.o[2] + d.z * 0.5 }, d, 900);
+        return send0({ ...m, wall: hit ? hit.toi + 0.5 : -1 } as typeof m);
+      }
+      send0(m);
+    };
     // (rounds come out of the pools by calibre: decision 4, no magazines)
     game.weapons.freeReload = true;
     game.weapons.pool = {

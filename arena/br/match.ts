@@ -417,6 +417,8 @@ function shot(l: Lobby, me: P, m: { o: unknown; d: unknown; w: unknown; sup?: un
   for (const f of l.ps) if (f !== me) send(f, { t: 'shot', id: me.id, o: o as [number, number, number], d: d as [number, number, number], w: m.w, sup: !!m.sup });
   if (l.state === 'over') return;
   const most = Math.max(rule.range * 2, 150);
+  // (where the shooter's own game saw the round stopped by a wall: the server has the ground and not the buildings)
+  const said = Number((m as { wall?: unknown }).wall), cap = Number.isFinite(said) && said >= 0 ? said + 1.1 : Infinity;
   const back = now - Math.min(400, me.rtt / 2 + 140);
   const them = l.ps.filter((f) => f.alive && !f.gone && foes(l, me, f)).map((f) => ({ f, shapes: hitShapes(poseAt(f, back)) }));
   const { pellets, cone } = shotOf(m.w);
@@ -427,7 +429,7 @@ function shot(l: Lobby, me: P, m: { o: unknown; d: unknown; w: unknown; sup?: un
     const a = k * 2.399963, rr = pellets > 1 ? cone * Math.sqrt((k + 0.5) / pellets) : 0;
     const dk = [0, 1, 2].map((i) => d[i] + r1[i] * Math.cos(a) * rr + r2[i] * Math.sin(a) * rr), dl = Math.hypot(dk[0], dk[1], dk[2]);
     for (let i = 0; i < 3; i++) dk[i] /= dl;
-    const wall = wallAt(o, dk, most);
+    const wall = Math.min(wallAt(o, dk, most), cap);
     let first: { f: P; t: number; zone: 'head' | 'torso' | 'legs' | 'arms' } | null = null;
     for (const { f, shapes } of them) for (const s of shapes) {
       const t = rayRod(o, dk, s.a, s.b, s.r);
