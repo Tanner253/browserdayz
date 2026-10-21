@@ -137,6 +137,12 @@ export interface Controls {
 /** render jeeps driven elsewhere this far in the past: long enough that the report after the one being drawn has nearly always come */
 const INTERP_DELAY = 140;
 const CHASSIS_GROUPS = groups(G_WORLD, G_WORLD | G_PLAYER);
+/**
+ * The tub's rounded box meets the world; a plain box of its size meets a body on foot. The character controller,
+ * once within its skin of a rounded box, found it in the way of every step, straight away from it too, and the body
+ * stood stuck against the car (the owner, 2026-10-20: "when you walk up against vehicles the player gets stuck").
+ */
+const TUB_GROUPS = groups(G_WORLD, G_WORLD), TUB_FOOT_GROUPS = groups(G_WORLD, G_PLAYER);
 
 const _v = new THREE.Vector3(), _f = new THREE.Vector3(), _u = new THREE.Vector3(), _r = new THREE.Vector3(), _d = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
@@ -219,15 +225,17 @@ export class Jeep {
         )
         .setCanSleep(true),
     );
-    const add = (desc: RAPIER.ColliderDesc) => {
-      const c = physics.world.createCollider(desc.setDensity(0).setCollisionGroups(CHASSIS_GROUPS).setSolverGroups(CHASSIS_GROUPS).setFriction(0.35).setRestitution(0.05), this.body);
+    const add = (desc: RAPIER.ColliderDesc, g = CHASSIS_GROUPS) => {
+      const c = physics.world.createCollider(desc.setDensity(0).setCollisionGroups(g).setSolverGroups(g).setFriction(0.35).setRestitution(0.05), this.body);
       physics.tag(c, { surface: 'metal', owner: this });
       this.colliders.push(c);
     };
-    add(R.ColliderDesc.roundCuboid(hx - round, hy - round, hz - round, round).setTranslation(0, hullUp, 0));
+    add(R.ColliderDesc.roundCuboid(hx - round, hy - round, hz - round, round).setTranslation(0, hullUp, 0), TUB_GROUPS);
     // the roof: what it lies on when it is on its back, and what keeps the rain off. Between
     // it and the tub there is nothing: whoever sits in it can be seen, and shot.
     add(R.ColliderDesc.cuboid(D.roof[0], D.roof[1], D.roof[2]).setTranslation(0, D.roof[3], D.roof[4]));
+    // (the tub as a body on foot meets it: see TUB_FOOT_GROUPS)
+    add(R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(0, hullUp, 0), TUB_FOOT_GROUPS);
 
     this.ctrl = physics.world.createVehicleController(this.body);
     this.ctrl.indexUpAxis = 1;

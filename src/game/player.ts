@@ -724,6 +724,17 @@ export class Player {
         }
       }
       mv = kept;
+      // A step on open ground that came to nothing, and went into nothing upright, is taken again without the press
+      // down. Within the controller's skin of a face, a step away from it that also pressed down was met by the face
+      // at once, left with only its press, and the ground stopped that; and a body pressed a hair into the land
+      // against a car met the land at once with every pressing step, whichever way. On level floors there is no press
+      // (alongGround), but a car stands on the land: a body that had walked into one could not walk away (the owner,
+      // 2026-10-20: "when you walk up against vehicles the player gets stuck, like the walls fix in kamenka").
+      if (!on && !uprights.length && Math.hypot(mv.x, mv.z) < want * 0.5 && desired.y < 0) {
+        this.kcc.computeColliderMovement(this.collider, { x: pace.x, y: 0, z: pace.z }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);
+        const m = this.kcc.computedMovement();
+        if (Math.hypot(m.x, m.z) > Math.hypot(mv.x, mv.z)) mv = { x: m.x, y: m.y, z: m.z };
+      }
     }
     // What the body pressed down on in this step, for the next. On the land and on nothing else, it stands on
     // open ground; on anything that is not the land itself (a floor, a stair, a rock, a roof), it does not; and a
