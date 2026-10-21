@@ -7,7 +7,7 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL } from '../src/net/protocol';
 import { generateWorld, heightAt } from '../src/world/worldgen';
-import { kindOf, type Ground } from '../arena/br/rules';
+import { MAPS, kindOf, type Ground } from '../arena/br/rules';
 
 const PORT = 8241;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -98,7 +98,18 @@ try {
   // a gun in the open, and everybody down beside it
   const gun = loot.find((x) => x.item && kindOf(x.item.id) === 'gun' && Math.abs(x.y - g(x.x, x.z)) < 0.2 && Math.abs(g(x.x + 9, x.z) - g(x.x, x.z)) < 1.5)!;
   assert.ok(gun, 'no gun lies in the open');
+  // (out of the plane once it is over the map, and not before: the server refuses a jump over the gas)
+  const pl = plane as unknown as { a: number[]; b: number[]; t0: number; speed: number; now: number }, off = pl.now - Date.now();
+  const over = () => {
+    const L = Math.hypot(pl.b[0] - pl.a[0], pl.b[1] - pl.a[1]), s = Math.max(0, ((Date.now() + off - pl.t0) / 1000) * pl.speed);
+    const x = pl.a[0] + ((pl.b[0] - pl.a[0]) / L) * s, z = pl.a[1] + ((pl.b[1] - pl.a[1]) / L) * s, m = MAPS[2];
+    return x > m.x0 + 20 && x < m.x1 - 20 && z > m.z0 + 20 && z < m.z1 - 20;
+  };
+  a1.br({ k: 'jump' });
+  for (let k = 0; k < 400 && !over(); k++) await sleep(100);
+  assert.ok(over(), 'the plane never came over the map');
   for (const p of [a1, a2, b1, b2]) p.br({ k: 'jump' });
+  ok('out of the plane once it is over the map (a jump before that is refused)');
   await a1.land(gun.x, gun.z);
   await a2.land(gun.x - 5, gun.z);
   await b1.land(gun.x + 8, gun.z);

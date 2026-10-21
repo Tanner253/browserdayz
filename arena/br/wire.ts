@@ -25,6 +25,8 @@ export type BrS2C =
   | { k: 'state'; phase: Phase; alive: number; teams: number; kills: number; map: number; mode: BrMode }
   /** this player's team is out: where they placed */
   | { k: 'out'; place: number; kills: number; dmg: number; by: string | null }
+  /** another player is falling, under a canopy, or down (null) */
+  | { k: 'air'; id: number; s: 'fall' | 'chute' | null }
   /** that lobby (or this player's match, coming back) is on another map: the page is cut again for it */
   | { k: 'remap'; map: number; code: string; size: number }
   /** won: the winners, and everybody's place */
@@ -43,7 +45,9 @@ export type BrC2S =
   /** stand over a knocked teammate to get them up (on), or stop */
   | { k: 'rev'; id: number; on: boolean }
   /** rounds of a calibre put into a gun by a reload */
-  | { k: 'load'; ammo: string; n: number };
+  | { k: 'load'; ammo: string; n: number }
+  /** this player is falling, under a canopy, or down (null) */
+  | { k: 'air'; s: 'fall' | 'chute' | null };
 
 export type BrMsg = { t: 'br' } & BrS2C;
 export type BrSend = { t: 'br' } & BrC2S;

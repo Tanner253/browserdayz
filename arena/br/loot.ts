@@ -95,10 +95,13 @@ export function rollMatch(world: World, spots: Spot[], map: number, rnd: () => n
 }
 
 /** the waiting area's guns: anything up to purple, each with its rounds, round the ring */
-export function rollWait(world: World, map: number, rnd: () => number): Ground[] {
+export function rollWait(world: World, map: number, rnd: () => number, clear: (x: number, z: number) => boolean = () => true): Ground[] {
   const w = MAPS[map].wait, out: Ground[] = [];
-  for (let k = 0; k < 18; k++) {
-    const a = (k / 18) * Math.PI * 2 + rnd() * 0.2, d = w.r * (0.25 + 0.6 * rnd()), x = w.x + Math.cos(a) * d, z = w.z + Math.sin(a) * d;
+  for (let k = 0, tries = 0; k < 18 && tries < 200; tries++) {
+    const a = (k / 18) * Math.PI * 2 + rnd() * 0.4, d = w.r * (0.25 + 0.6 * rnd()), x = w.x + Math.cos(a) * d, z = w.z + Math.sin(a) * d;
+    // (in the open, where it can be seen and walked to: not inside a wall, a tent or a crate)
+    if (!clear(x, z)) continue;
+    k++;
     const g = pick(GUNS[1 + Math.floor(rnd() * 4)], rnd), am = ammoOf(g), y = heightAt(world.heights, x, z) + 0.02;
     out.push({ id: nextId++, x, y, z, item: freshGun(g) }, { id: nextId++, x: x + 0.4, y, z, ammo: am, n: AMMO[am]?.box ?? 30 }, { id: nextId++, x: x - 0.4, y, z, ammo: am, n: AMMO[am]?.box ?? 30 });
   }

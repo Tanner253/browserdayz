@@ -212,8 +212,25 @@ function fresh(p: P) {
 }
 
 /** in the waiting area, somewhere in its ring, whole and with only their melee weapon */
+/** whether nothing stands over the ground at a place (a roof, a wall, a piece of furniture, a rock): a ray straight down meets the ground first */
+function clearAt(x: number, z: number): boolean {
+  if (!phys) return true;
+  const g = ground(x, z), hit = phys.castRay(new RAPIER.Ray({ x, y: g + 40, z }, { x: 0, y: -1, z: 0 }), 60, true);
+  return !hit || hit.timeOfImpact >= 39.6;
+}
+
+/** a place in the waiting area's ring, in the open (the owner: "some spawns in the warm up are in side furnitiure inside buildings") */
+function waitSpot(l: Lobby): [number, number] {
+  const w = MAPS[l.map].wait;
+  for (let k = 0; k < 60; k++) {
+    const a = rnd() * Math.PI * 2, d = w.r * 0.8 * Math.sqrt(rnd()), x = w.x + Math.cos(a) * d, z = w.z + Math.sin(a) * d;
+    if (clearAt(x, z) && clearAt(x + 0.6, z) && clearAt(x - 0.6, z) && clearAt(x, z + 0.6) && clearAt(x, z - 0.6)) return [x, z];
+  }
+  return [w.x, w.z];
+}
+
 function toWait(l: Lobby, p: P) {
-  const w = MAPS[l.map].wait, a = rnd() * Math.PI * 2, d = w.r * 0.8 * Math.sqrt(rnd()), x = w.x + Math.cos(a) * d, z = w.z + Math.sin(a) * d, y = ground(x, z) + 0.1;
+  const [x, z] = waitSpot(l), y = ground(x, z) + 0.1;
   fresh(p);
   p.pose = [x, y, z, rnd() * 6.28, 0, 0];
   p.hist = [{ t: Date.now(), p: p.pose }];
@@ -727,10 +744,19 @@ function brSaid(l: Lobby, p: P, m: Record<string, unknown>) {
       p.using = { slot: k, until: Date.now() + h.secs * 1000 };
       return me(l, p);
     }
-    case 'jump':
-      if (l.state !== 'plane' || p.jumped) return;
+    case 'jump': {
+      // (only once the plane is over the map: out of it there is nothing but the gas to land in)
+      if (l.state !== 'plane' || p.jumped || !l.plane) return;
+      const pl = l.plane, L = Math.hypot(pl.b[0] - pl.a[0], pl.b[1] - pl.a[1]), s = Math.max(0, ((Date.now() - pl.t0) / 1000) * pl.speed);
+      if (!inMap(MAPS[l.map], pl.a[0] + ((pl.b[0] - pl.a[0]) / L) * s, pl.a[1] + ((pl.b[1] - pl.a[1]) / L) * s, -10)) return;
       p.jumped = true;
       return;
+    }
+    case 'air': {
+      // falling or under a canopy, said to the others so that they see it (src/game/br/look.ts)
+      const st = m.s === 'fall' || m.s === 'chute' ? m.s : null;
+      return all(l, { t: 'br', k: 'air', id: p.id, s: st }, p);
+    }
     case 'rev': {
       const v = l.ps.find((o) => o.id === m.id);
       if (!m.on) {
@@ -759,7 +785,7 @@ function tick() {
         // (the waiting area's guns laid again where taken)
         l.relaid = now;
         if (l.ground.size < 30) {
-          const add = rollWait(world, l.map, rnd);
+          const add = rollWait(world, l.map, rnd, clearAt);
           for (const g of add) l.ground.set(g.id, g);
           all(l, { t: 'br', k: 'loot', add, gone: [] });
         }
@@ -894,14 +920,13 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         }
       }
       if (l.ps.some((o) => o.key === key)) return turn('You are in that lobby already.');
-      // (the map's walls and places for things, the first time a lobby opens on it: a few seconds' work, done just after
-      // this player is let in, not before: a page waits only so long for its welcome)
-      const lm = l.map;
-      setImmediate(() => readyMap(lm));
+      // (the map's walls and places for things, the first time a lobby opens on it: half a second's reading, before
+      // anybody is set down in it, so that nobody is set down in a wall)
+      readyMap(l.map);
       const me0: P = { id: nextId++, ws, name, key, pose: [0, 0, 0, 0, 0, 0], hist: [], w: null, m: [], g: [], rtt: 150, pingAt: 0, gone: 0, team: 0, hp: 100, knocked: false, kn: 0, alive: true, place: 0, slots: starter(), vest: null, helmet: null, pack: null, pools: {}, using: null, rev: null, voted: false, jumped: false, kills: 0, knocks: 0, revives: 0, dmg: 0, longest: 0, born: Date.now(), shots: [], nades: newThrower() };
       p = me0;
       l.ps.push(me0);
-      if (!l.ground.size) for (const g of rollWait(world, l.map, rnd)) l.ground.set(g.id, g);
+      if (!l.ground.size) for (const g of rollWait(world, l.map, rnd, clearAt)) l.ground.set(g.id, g);
       toWait(l, me0);
       welcome(l, me0);
       me(l, me0);

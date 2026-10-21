@@ -12,6 +12,8 @@ import type { Game } from '../game';
 
 /** metres round the player within which things on the ground are built and drawn */
 const NEAR = 70;
+/** a canopy brought down to a body's size (its dome 12 m over its lines' meeting as the model is built), and where its lines meet over a body's feet */
+const CANOPY = 0.42, SHOULDERS = 1.55;
 
 const ringGeo = new THREE.RingGeometry(0.2, 0.28, 28).rotateX(-Math.PI / 2);
 const RING: Record<number, THREE.Material> = {};
@@ -62,8 +64,7 @@ export class BrLook {
       this.scene.add(this.plane);
     }).catch(() => {});
     void assets.model('parachute').then((m) => {
-      this.canopy = m.clone();
-      this.canopy.visible = false;
+      this.canopy = this.canopyOf(m);
       this.scene.add(this.canopy);
     }).catch(() => {});
   }
@@ -133,12 +134,31 @@ export class BrLook {
     if (this.rotor) this.rotor.rotation.y += dt * 28;
   }
 
+  /**
+   * A canopy for a body, made as the airdrop makes its own (src/game/airdrop.ts, hang): the model's origin is where its
+   * lines meet and its dome stands 12 m over that, wide and thin: never culled by its measure as built, and brought down
+   * to a body's size, its lines meeting at the shoulders.
+   */
+  private canopyOf(m: THREE.Object3D): THREE.Object3D {
+    const o = m.clone();
+    o.traverse((x) => {
+      const mesh = x as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.frustumCulled = false;
+    });
+    o.scale.setScalar(CANOPY);
+    o.visible = false;
+    this.game.s.atmo.registerObject(o);
+    return o;
+  }
+
   /** this player's own canopy over `at` (null: none), and those over others who are coming down under one */
   chute(at: THREE.Vector3 | null, yaw: number, others: { id: number; pos: THREE.Vector3; yaw: number }[]) {
     if (this.canopy) {
       this.canopy.visible = !!at;
       if (at) {
-        this.canopy.position.set(at.x, at.y + 3.2, at.z);
+        this.canopy.position.set(at.x, at.y + SHOULDERS, at.z);
         this.canopy.rotation.set(0, yaw, 0);
       }
     }
@@ -148,12 +168,13 @@ export class BrLook {
       let c = this.canopies.get(o.id);
       if (!c && this.canopy) {
         c = this.canopy.clone();
+        this.game.s.atmo.registerObject(c);
         this.scene.add(c);
         this.canopies.set(o.id, c);
       }
       if (!c) continue;
       c.visible = true;
-      c.position.set(o.pos.x, o.pos.y + 4.8, o.pos.z);
+      c.position.set(o.pos.x, o.pos.y + SHOULDERS, o.pos.z);
       c.rotation.set(0, o.yaw, 0);
     }
     for (const [id, c] of this.canopies) if (!seen.has(id)) c.visible = false;

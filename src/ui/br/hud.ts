@@ -28,6 +28,8 @@ export interface Tick {
   yaw: number;
   plane: Of<'plane'> | null;
   air: 'plane' | 'fall' | 'chute' | null;
+  /** in the plane: seconds until it is over the map (0: jump now) */
+  jumpIn: number;
 }
 
 export class BrHud {
@@ -141,7 +143,7 @@ export class BrHud {
     let phase = '', time = '';
     if (t.phase === 'wait') phase = 'Waiting for the vote';
     else if (t.phase === 'count' && this.lob) (phase = 'The plane leaves in'), (time = mmss((this.lob.at - (Date.now() + this.off)) / 1000 + 0.99));
-    else if (t.air === 'plane') phase = 'Space to jump';
+    else if (t.air === 'plane') t.jumpIn > 0 ? ((phase = 'Over the map in'), (time = mmss(t.jumpIn))) : (phase = 'Space to jump');
     else if (t.air === 'fall') phase = 'Hold W to dive · the canopy opens by itself';
     else if (t.zone && t.phase !== 'over') {
       const z = t.zone;

@@ -44,6 +44,10 @@ export class BrMode {
   private asked = new Map<number, number>();
   private reviving: number | null = null;
   private target: { g: Ground | null; mate: number | null } = { g: null, mate: null };
+  /** the others falling or under a canopy, as their games say it (arena/br/match.ts relays it) */
+  private airOf = new Map<number, 'fall' | 'chute'>();
+  /** what this game last said of its own fall */
+  private airSaid: 'plane' | 'fall' | 'chute' | null = null;
   ended = false;
 
   /** something of the battle royale's is within reach (F takes it, or gets a teammate up): the game's own F waits */
@@ -126,7 +130,7 @@ export class BrMode {
         this.plane = m;
         return this.board();
       case 'eject':
-        if (this.air === 'plane') this.jump();
+        if (this.air === 'plane') this.jump(true);
         return;
       case 'zone':
         this.clock(m.now);
@@ -144,6 +148,10 @@ export class BrMode {
       case 'over':
         this.ended = true;
         return this.hud.over(m, !!m.won);
+      case 'air':
+        if (m.s) this.airOf.set(m.id, m.s);
+        else this.airOf.delete(m.id);
+        return;
       case 'remap':
         // (that lobby, or this player's match, is on another map: the page is cut for it again)
         return location.assign(`/battleroyale?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}`);
@@ -155,7 +163,7 @@ export class BrMode {
     if (this.phase !== 'plane' || !this.plane || this.jumped || this.air === 'plane') return;
     this.air = 'plane';
     this.game.player.setFly(true);
-    this.hud.note('Space to jump', 'good');
+    this.hud.note('Space to jump, once over the map', 'good');
   }
 
   private planeAt(t: number, out: THREE.Vector3) {
@@ -163,8 +171,21 @@ export class BrMode {
     return out.set(p.a[0] + (dx / L) * s, p.y, p.a[1] + (dz / L) * s);
   }
 
-  private jump() {
-    if (this.air !== 'plane' || !this.plane) return;
+  /** whether the plane is over the map now (out of it there is nothing but the gas to land in) */
+  private overMap(t = this.now) {
+    if (!this.plane) return false;
+    const at = this.planeAt(t, _v);
+    return at.x > MAPS[this.map].x0 + 10 && at.x < MAPS[this.map].x1 - 10 && at.z > MAPS[this.map].z0 + 10 && at.z < MAPS[this.map].z1 - 10;
+  }
+
+  /** seconds until the plane is over the map (0: it is) */
+  jumpIn() {
+    for (let s = 0; s < 90; s += 0.5) if (this.overMap(this.now + s * 1000)) return s;
+    return 0;
+  }
+
+  private jump(forced = false) {
+    if (this.air !== 'plane' || !this.plane || (!forced && !this.overMap())) return;
     this.jumped = true;
     this.send({ k: 'jump' });
     const p = this.plane, L = Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1]);
@@ -239,6 +260,18 @@ export class BrMode {
   keys() {
     const input = this.game.input;
     for (let k = 0; k < BR.slots; k++) if (input.pressed(`Digit${k + 1}`)) this.select(k);
+    // the wheel: the next or the last slot with a gun or a blade in it (the game's own wheel goes through what is worn on the body)
+    if (input.wheel !== 0 && this.me && !this.me.knocked && !this.air && !this.game.weapons.aiming) {
+      const dir = input.wheel > 0 ? 1 : -1;
+      for (let k = 1; k <= BR.slots; k++) {
+        const i = (this.held + dir * k + BR.slots * 2) % BR.slots, s = this.me.slots[i];
+        if (s && (kindOf(s.id) === 'gun' || kindOf(s.id) === 'melee')) {
+          this.select(i);
+          break;
+        }
+      }
+      input.wheel = 0;
+    }
     if (input.pressed('KeyV')) this.vote();
     if (input.pressed('Space')) {
       if (this.air === 'plane') this.jump();
@@ -292,7 +325,7 @@ export class BrMode {
       return it && ITEMS[it.id]?.weapon ? { n: it.loaded ?? 0, ammo: ITEMS[it.id].weapon!.ammo } : null;
     })();
     const out = !!c && Math.hypot(p.pos.x - c.x, p.pos.z - c.z) > c.r;
-    this.hud.tick({ now, phase: this.phase, me, held: this.held, loaded, zone: z, circle: c, out, map: this.map, at: p.pos, yaw: p.yaw, plane: this.plane && this.phase === 'plane' ? this.plane : null, air: this.air });
+    this.hud.tick({ now, phase: this.phase, me, held: this.held, loaded, zone: z, circle: c, out, map: this.map, at: p.pos, yaw: p.yaw, plane: this.plane && this.phase === 'plane' ? this.plane : null, air: this.air, jumpIn: this.air === 'plane' ? this.jumpIn() : 0 });
   }
 
   /** what the eye is on within reach: a knocked teammate to get up, else the thing on the ground nearest the line of sight */
@@ -329,17 +362,25 @@ export class BrMode {
     const flying = pl && (this.phase === 'plane' || now < (pl.t0 + (Math.hypot(pl.b[0] - pl.a[0], pl.b[1] - pl.a[1]) / pl.speed) * 1000));
     const at = flying ? this.planeAt(now, _v) : null;
     this.look.flyPlane(at, pl ? Math.atan2(-(pl.b[0] - pl.a[0]), -(pl.b[1] - pl.a[1])) : 0, dt);
-    // (the others still aboard are not seen standing in the air under it; those coming down under a canopy have one)
+    // (this game's own fall said to the others, as it changes)
+    if (this.air !== this.airSaid) {
+      this.airSaid = this.air;
+      this.send({ k: 'air', s: this.air === 'fall' || this.air === 'chute' ? this.air : null });
+    }
+    // (the others still aboard are not seen standing in the air under it; those falling lie flat, face down, as a
+    // skydiver does; those under a canopy hang from one)
     const others: { id: number; pos: THREE.Vector3; yaw: number }[] = [];
     for (const [id, r] of g.remotes) {
-      const rr = r as unknown as { avatar: { root: THREE.Object3D }; vel: THREE.Vector3; yaw: number };
-      if (at && r.pos.distanceTo(at) < 40) rr.avatar.root.visible = false;
-      else if (this.phase !== 'wait' && r.pos.y - heightAt(g.s.world.heights, r.pos.x, r.pos.z) > 6 && rr.vel.y > -12 && rr.vel.y < -0.5) others.push({ id, pos: r.pos, yaw: rr.yaw });
+      const rr = r as unknown as { avatar: { root: THREE.Object3D }; yaw: number };
+      const st = this.airOf.get(id), root = rr.avatar.root;
+      if (at && r.pos.distanceTo(at) < 40 && !st) root.visible = false;
+      root.rotation.x = st === 'fall' ? -1.35 : 0;
+      if (st === 'chute') others.push({ id, pos: r.pos, yaw: rr.yaw });
     }
     this.look.chute(this.air === 'chute' ? p.pos : null, p.yaw, others);
     if (!this.air || !pl) return;
     if (this.air === 'plane') {
-      if (!at) return void this.jump();
+      if (!at) return void this.jump(true);
       p.pos.set(at.x, at.y - 7, at.z);
       p.vel.set(0, 0, 0);
       return;
