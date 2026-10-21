@@ -15,8 +15,11 @@
 - Run it: launch entries `zona-arena-local` (8090) and `zona-dev` (5173), then `http://localhost:5173/br`. A second player
   needs a second browser. Headless: `tools/br/br-look.js`-style script with `play.mjs` (address
   `http://localhost:5173/br?wager=br&size=1&kills=2&loadout=find`).
-- Deploy: site (`node scripts/deploy.mjs --site`) and the arena by a push of `arena/**` (rebuilds zona-arena-1 only). Nothing
-  changed under server/, src/sim, src/world, src/net, src/core, package*.json or render.yaml.
+- RELEASE: one command, `node scripts/deploy.mjs` from `battle-royale` (the changelog entry and the restart note are merged
+  in from `br-release`). WAITING ON THE OWNER'S WORD: Render deploys from `main`, and `main` (0b77446) lacks the evening's
+  site-only changes under src/core and src/world (CardKeep, the grass, the trees), so the push of `main` rebuilds
+  browserdayz and restarts the ZONA server once (everyone keeps their place). This branch itself changes nothing under
+  server/ but the restart note, nor under src/sim, src/world, src/net, src/core, package*.json or render.yaml.
 - Since: jeeps (up to six a map, driver-run), grenades (stick grenades and frags in the loot, the blast judged by the server),
   the bot check at the door of the battle royale AND the Arena's wagers (`arena/br/door.ts`: the open world's course and
   judge; on with `RENDER` or `BOTCHECK`; BOT_RULES read from the host, as on browserdayz), and walls: each shot carries how
