@@ -494,12 +494,28 @@ export const RESTART = {
   if (process.env.RESTART_WATCH !== 'off' && ((mine && slug) || at)) {
     const head = at ? `${at}/head` : `https://api.github.com/repos/${slug}/commits/${branch}`;
     const note = (sha: string) => (at ? `${at}/note/${sha}` : `https://raw.githubusercontent.com/${slug}/${sha}/server/restart-note.json`);
+    // A newer commit replaces this server only if it changes a file the host builds this server from (its Build Filter,
+    // the same paths as ZONA in scripts/deploy.mjs). A push of the arena or the site alone leaves it running: told
+    // otherwise, everybody was shown "Server restarting" for a restart that never came (2026-10-21, the battle royale's push).
+    const BUILT = ['server/', 'src/sim/', 'src/world/', 'src/net/', 'src/core/', 'package.json', 'package-lock.json', 'render.yaml'];
+    let passed = '';
+    const rebuilds = async (sha: string): Promise<boolean | null> => {
+      if (at) return true;
+      const c = await fetch(`https://api.github.com/repos/${slug}/compare/${mine}...${sha}`, { headers: { 'user-agent': 'zona-server' }, signal: AbortSignal.timeout(8000) });
+      if (!c.ok) return null;
+      const files = ((await c.json()) as { files?: { filename: string }[] }).files ?? [];
+      return files.some((f) => BUILT.some((p) => f.filename === p || f.filename.startsWith(p)));
+    };
     setInterval(async () => {
       if (RESTART.seen || stopping) return;
       try {
         const r = await fetch(head, { headers: { accept: 'application/vnd.github.sha', 'user-agent': 'zona-server' }, signal: AbortSignal.timeout(8000) });
         const sha = r.ok ? (await r.text()).trim() : '';
-        if (!/^[0-9a-f]{7,64}$/.test(sha) || sha === (mine ?? process.env.WATCH_MINE)) return;
+        if (!/^[0-9a-f]{7,64}$/.test(sha) || sha === (mine ?? process.env.WATCH_MINE) || sha === passed) return;
+        // (not known yet: asked again next time; not this server's build: never asked about again)
+        const rebuilt = await rebuilds(sha);
+        if (rebuilt === null) return;
+        if (!rebuilt) return void (passed = sha);
         RESTART.seen = Date.now();
         let why = '';
         try {
