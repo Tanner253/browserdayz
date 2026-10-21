@@ -528,7 +528,13 @@ export class Game {
       return Promise.race([all, new Promise<void>((done) => setTimeout(done, first ? 8000 : 2000))]);
     };
     // (and what is put on any body, for the other lighting: see Avatar.onDressed)
-    Avatar.onDressed = (parts) => void r.ready(parts);
+    // (a gun in the hands or slung is a copy with every part it could take put away on it: what is shown of it only, as
+    // RemotePlayer.readyHeld readies it; readied whole here, each gun on anybody sent all its parts)
+    Avatar.onDressed = (parts) => {
+      const guns = parts.filter((o) => o.userData.onlyShown);
+      if (guns.length) void r.ready(guns, true).then(() => guns.forEach((o) => r.keep.comeBack(o)));
+      if (guns.length < parts.length) void r.ready(parts.filter((o) => !o.userData.onlyShown));
+    };
     // (and a gun in another player's hands, likewise: see RemotePlayer.readyHeld)
     // (What is shown of it only: it is made again for whatever is fitted to it, and every part it could take hangs on it,
     // put away; all of them were sent, 527 MB over the guns. Made again each time it is shown, its pictures may go a

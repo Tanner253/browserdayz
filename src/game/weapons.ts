@@ -2637,6 +2637,8 @@ export class Weapons {
     // holding had its drum and its suppressor on.)
     const optic = PLAIN_SIGHTS.has(id) && id !== 'mosin' ? 'red_dot' : 'pu_scope';
     for (const piece of c.children) piece.visible = piece.name === 'irons' ? !mods.includes(optic) && !mods.includes(RED_DOT) : EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : ITEMS[piece.name]?.attach || ITEMS[piece.name]?.mag ? mods.includes(piece.name) : pieceShown(id, piece.name, mods);
+    // (what is put away on it is never shown on this copy: readied and kept on the card by what is shown, see walkShown)
+    c.userData.onlyShown = true;
     return c;
   }
 
