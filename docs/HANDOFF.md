@@ -2,7 +2,14 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## LIVE (2026-10-21 ~05:45 UTC): site from `4f34d13` (site-only: no server, API or wire change), server still `0b77446`
+## LIVE (2026-10-21 ~07:10 UTC): site from `2111131`, server still `0b77446`
+- ba2fae9 lean model files: assets/lean/256-128/ copies by sha1 of their source; scripts/lean.mjs; test/lean.test.ts. 178 -> 132 MB
+  into the game, 241 -> 188 s on Fast 4G.
+- The owner's recorded heli flight (replay.mjs owner-run-2.json): 114.8 fps, against 81.1 on 19 Oct (progress/flight-1021.log).
+- Changelog "Lighter, faster, smoother" with its card (marketing/x-perf-1021.html). Film 23 "Under the hood" is planned
+  (the marketing session); its plan is waiting for the owner's yes.
+
+## Earlier: site from `4f34d13` (site-only: no server, API or wire change), server still `0b77446`
 Both performance tracks merged and on the site:
 - Model pictures at 256/128 on computers, with no sharp copies (f23bd17; owner: "we can do C").
 - Far towns and ruins drop their near copies; guns readied by what is shown (93b0431, d752d9d).
