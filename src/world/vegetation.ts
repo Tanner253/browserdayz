@@ -201,6 +201,8 @@ class LodSet {
   // scratch space for sorting the visible instances nearest-first
   private order: Uint32Array;
   private dist: Float32Array;
+  /** the levels each thing shown is in (see update) */
+  private masks: Uint8Array;
   /** per-instance draw distance */
   private far: Float32Array;
   // what is on the GPU now: which instances at which level, how many, and where the camera was
@@ -213,6 +215,7 @@ class LodSet {
     this.n = instances.length;
     this.order = new Uint32Array(this.n);
     this.dist = new Float32Array(this.n);
+    this.masks = new Uint8Array(this.n);
     this.matrices = new Float32Array(this.n * 16);
     this.pos = new Float32Array(this.n * 3);
     this.scale = new Float32Array(this.n);
@@ -302,9 +305,15 @@ class LodSet {
 
   update(cam: THREE.Vector3, frustum: THREE.Frustum) {
     const { cullRadius, shadowRadius } = this.opts;
-    const { order, dist, levels, cells } = this;
+    const { order, dist, masks, levels, cells } = this;
     let m = 0;
     let sig = 0;
+    // (Within the shadows' reach a thing is kept out of view for its shadow, but only in the levels that cast one. A
+    // tree's full and middle copies cast none (its lighter copy's own list does), and every full tree within 34 m was
+    // drawn behind the eye too: 260k triangles at the worst forest spot, 2026-10-21, the owner: "we need to reduce
+    // triangles".)
+    let casts = 0;
+    for (let l = 0; l < levels.length; l++) if (levels[l].meshes[0]?.castShadow) casts |= 1 << l;
     // (nothing beyond the farthest level is drawn: only the squares within it are looked into, see Cells)
     let reach = 0;
     for (const l of levels) reach = Math.max(reach, l.far);
@@ -330,12 +339,17 @@ class LodSet {
         let mask = 0;
         for (let l = 0; l < levels.length; l++) if (d >= levels[l].near && d <= levels[l].far) mask |= 1 << l;
         if (!mask) continue;
-        if (d > shadowRadius) {
+        if ((mask & ~casts) || d > shadowRadius) {
           _sphere.center.set(x, y + cullRadius * this.scale[i] * 0.5, z);
           _sphere.radius = cullRadius * this.scale[i];
-          if (!frustum.intersectsSphere(_sphere)) continue;
+          if (!frustum.intersectsSphere(_sphere)) {
+            if (d > shadowRadius) continue;
+            mask &= casts;
+            if (!mask) continue;
+          }
         }
         dist[i] = d;
+        masks[i] = mask;
         order[m++] = i;
         sig = (Math.imul(sig, 31) + i * 8 + mask) | 0;
       }
@@ -351,9 +365,9 @@ class LodSet {
     if (m > 1) order.subarray(0, m).sort((a, b) => dist[a] - dist[b]);
     for (let k0 = 0; k0 < m; k0++) {
       const i = order[k0];
-      const d = dist[i];
-      for (const l of this.levels) {
-        if (d < l.near || d > l.far) continue;
+      for (let li = 0; li < levels.length; li++) {
+        const l = levels[li];
+        if (!((masks[i] >> li) & 1)) continue;
         const off = l.count * 16;
         const src = this.matrices;
         const so = i * 16;

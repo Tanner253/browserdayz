@@ -410,10 +410,14 @@ export const dropsMethods = {
     // about 8 m away drawn with its light model copy and no shadow". Its shadows were drawn into every one of the sun's
     // maps out to 18 m, or 26 on high: more than the things themselves near the police station.)
     this.loot.shadowDist = 8;
-    // reach of the full-detail trees, and blades of grass per patch
-    const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [1, 1] }[g.foliage];
+    // reach of the full-detail trees, and blades of grass per patch (high: the trees' full copies to three quarters of
+    // their built reach, 1.46 ms and 330k triangles less in the worst wood, and seven blades in ten, 0.39 ms and 340k;
+    // chosen by the owner from a side-by-side, 2026-10-21: "people complain about lag in the foreests maybe trees could
+    // use a tone down too")
+    const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [0.75, 0.7] }[g.foliage];
     veg.setDetail(detail);
     grass.setDensity(density);
+    grass.setShown(g.grass);
     audio.setVolume(g.volume);
   },
 

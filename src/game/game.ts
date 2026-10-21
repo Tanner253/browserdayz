@@ -508,9 +508,13 @@ export class Game {
     // (both ways it is drawn: by itself in the hands, and as a line of the list of its kind on the ground)
     // (What is shown of it only, as another player's gun: a gun lying by has every part that could be fitted to it hung
     // on it, put away, and its lines on the ground are made of what is shown. See RemotePlayer.readyHeld.)
+    // (Its lines start empty and hidden, so by what is shown they were passed over and their shaders made in the frame
+    // they were first drawn in: 360 to 410 ms each, a vest, a Beretta, a Scorpion, a bag, 2026-10-21. Their shaders
+    // only, whole: their pictures are the model's own, sent with what is shown of it.)
     this.loot.models.onMade = (tpl) => {
       tpl.group.userData.onlyShown = true;
-      return Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)], true), new Promise<void>((done) => setTimeout(done, 6000))]);
+      const both = Promise.all([r.ready(tpl.group, true), r.ready(this.loot.drawnWith(tpl), false, false)]).then(() => {});
+      return Promise.race([both, new Promise<void>((done) => setTimeout(done, 6000))]);
     };
     this.loot.models.cold = (tpl) => r.keep.offCard(tpl.group);
     // (And a body is got ready before it is handed to whoever asked for it. The first of the infected and the
