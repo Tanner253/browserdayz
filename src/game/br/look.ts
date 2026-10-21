@@ -1,7 +1,9 @@
-// What the battle royale puts in the world to be seen (2026-10-21), the owner: "we should have fortnite like glows and
-// animations". Things on the ground stand in a beam of their rarity's colour and turn slowly; the circle is a wall of
-// light round the map; the plane is the airdrop's helicopter (no plane model has been brought in: docs/BATTLE-ROYALE.md);
-// the canopy is the airdrop's parachute. Only what is near is built: a map holds two thousand things.
+// What the battle royale puts in the world to be seen (2026-10-21): a faint ring of its rarity's colour round a thing on
+// the ground, which turns slowly; the circle's edge, a faint wall in the gas's colour; the plane (the airdrop's helicopter:
+// no plane model has been brought in, docs/BATTLE-ROYALE.md) and the canopy (the airdrop's parachute). In the Zone's own
+// look (the owner: "toooo arcadey"), and only what is near is built: a map holds two thousand things.
+// (Plain see-through materials, as the game's own: a shader of light additive over everything blacked out the whole
+// frame for an eye inside the waiting area's ring.)
 import * as THREE from 'three';
 import { assets } from '../../core/assets';
 import { ITEMS, makeItem } from '../../sim/items';
@@ -11,28 +13,23 @@ import type { Game } from '../game';
 /** metres round the player within which things on the ground are built and drawn */
 const NEAR = 70;
 
-const ringGeo = new THREE.RingGeometry(0.18, 0.3, 28).rotateX(-Math.PI / 2);
-/** a soft light: fading up a beam (v: 0 at its foot), or out across a ring; brighter the rarer */
-const glow = (c: string, o: number, up: boolean) => new THREE.ShaderMaterial({
-  uniforms: { c: { value: new THREE.Color(c) }, o: { value: o } },
-  vertexShader: 'varying vec2 v; void main(){ v = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: up
-    ? 'uniform vec3 c; uniform float o; varying vec2 v; void main(){ float a = o * pow(1.0 - v.y, 2.2) * (0.55 + 0.45 * sin(v.x * 6.2832) * sin(v.x * 6.2832)); gl_FragColor = vec4(c * a, a); }'
-    : 'uniform vec3 c; uniform float o; varying vec2 v; void main(){ float d = length(v - 0.5) * 2.0; float a = o * max(0.0, 1.0 - abs(d - 0.8) / 0.2); gl_FragColor = vec4(c * a, a); }',
-  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
-});
+const ringGeo = new THREE.RingGeometry(0.2, 0.28, 28).rotateX(-Math.PI / 2);
 const RING: Record<number, THREE.Material> = {};
-for (const [t, r] of Object.entries(RARITY)) RING[Number(t)] = glow(r.colour, 0.22 + 0.05 * Number(t), false);
+for (const [t, r] of Object.entries(RARITY)) RING[Number(t)] = new THREE.MeshBasicMaterial({ color: r.colour, transparent: true, opacity: 0.3 + 0.06 * Number(t), depthWrite: false, side: THREE.DoubleSide });
 
-/** a wall of light, its alpha fading to nothing at its top: the circle's, and the waiting area's */
-function wallMat(colour: string, strength: number): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    uniforms: { c: { value: new THREE.Color(colour) }, t: { value: 0 }, k: { value: strength } },
-    vertexShader: 'varying vec2 v; void main(){ v = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform vec3 c; uniform float t; uniform float k; varying vec2 v; void main(){ float bands = 0.9 + 0.1 * sin(v.y * 60.0 - t * 0.8 + v.x * 30.0); float a = k * pow(1.0 - v.y, 1.6) * bands; gl_FragColor = vec4(c * (0.8 + 0.4 * bands), a); }',
-    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
-  });
-}
+/** a wall that fades out going up: the circle's edge and the waiting area's */
+const fade = (() => {
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 64;
+  const x = c.getContext('2d')!, g = x.createLinearGradient(0, 0, 0, 64);
+  g.addColorStop(0, '#000');
+  g.addColorStop(1, '#fff');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 4, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const wallMat = (colour: string, opacity: number) => new THREE.MeshBasicMaterial({ color: colour, alphaMap: fade, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
 
 interface Shown { g: Ground; root: THREE.Group; model: THREE.Object3D | null }
 
@@ -45,17 +42,16 @@ export class BrLook {
   private rotor: THREE.Object3D | null = null;
   canopy: THREE.Object3D | null = null;
   private canopies = new Map<number, THREE.Object3D>();
-  private t = 0;
   private sweep = 0;
 
   constructor(private game: Game) {
     this.scene = game.s.r.scene;
     const cyl = new THREE.CylinderGeometry(1, 1, 1, 160, 1, true).translate(0, 0.5, 0);
     // (the circle's edge in the gas's own colour, faint: the gas is what is outside it)
-    this.wall = new THREE.Mesh(cyl, wallMat('#a8b07a', 0.42));
+    this.wall = new THREE.Mesh(cyl, wallMat('#a8b07a', 0.35));
     this.wall.frustumCulled = false;
     this.wall.visible = false;
-    this.waitWall = new THREE.Mesh(cyl, wallMat('#c9b27c', 0.3));
+    this.waitWall = new THREE.Mesh(cyl, wallMat('#c9b27c', 0.25));
     this.waitWall.frustumCulled = false;
     this.waitWall.visible = false;
     this.scene.add(this.wall, this.waitWall);
@@ -84,8 +80,6 @@ export class BrLook {
 
   /** the things on the ground near `at`, built as they come near and let go as they go */
   ground(things: Map<number, Ground>, at: THREE.Vector3, dt: number) {
-    this.t += dt;
-    for (const m of [this.wall, this.waitWall]) (m.material as THREE.ShaderMaterial).uniforms.t.value = this.t;
     for (const s of this.shown.values()) if (s.model) s.model.rotation.y += dt * 0.9;
     // (who is near is looked at again a few times a second, not every frame)
     this.sweep -= dt;

@@ -244,6 +244,9 @@ function welcome(l: Lobby, p: P) {
     hour: 0.3, spawn: { x: sp[0], z: sp[2], yaw: sp[3], y: sp[1] }, me: null, max: BR.max,
   } as unknown as S2C);
   br(p, { k: 'loot', add: [...l.ground.values()], gone: [], all: true });
+  // (the powers again, after the welcome: a game takes what came before it as the last world's. The hold that never
+  // fills keeps a third gun from finding no room in the game's own inventory, which holds the slots' things.)
+  send(p, { t: 'powers', god: !p.alive, hidden: !p.alive, clip: !p.alive, voidInv: false, voidTag: false, bottomless: true });
 }
 
 // ------------------------------------------------------------------------------------------------- the match
