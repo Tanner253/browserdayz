@@ -1,25 +1,35 @@
 # Battle royale: the plan and its work packages (2026-10-21)
 
-## Status (branch `battle-royale`, 2026-10-21)
-- WORKS END TO END, seen in the real game (pictures `progress/br/look1/`): the door with three modes (ZONA large in the
-  middle), the battle royale's menu (solo/duo/squad, find, host, join by code, board), the lobby in the waiting area with
-  its guns, the vote, the plane, the jump, freefall, the canopy, landing, loot with rarity beams, F to take, the six slots,
-  rounds by calibre into the reload, the circle and its gas, server-traced shots, knock and the 10 s revive, the winner,
-  results and the board.
-- Server: `arena/br/` (rules.ts, wire.ts, loot.ts, match.ts) in the arena's service: `/arena?w=br&size=<1|2|4>&kills=<map
-  0-2>&loadout=<find|host|CODE>`, `/br/lobbies`, `/br/next?size=`, `/br/board`. Test: `npx tsx test/br-match.test.ts`
-  (port 8241; a duo match from lobby to winner with a knock and a revive: 9 checks).
-- Game: `src/game/br/` (mode.ts the client mode, look.ts beams/wall/plane/canopy, cut.ts the map cut), `src/ui/br/`
+## Status (branch `battle-royale`, 2026-10-21, late)
+- WORKS END TO END in the real game: the door with three modes (ZONA large in the middle), the battle royale's menu
+  (solo/duo/squad, find, host, join by code, board), the lobby in the waiting area with its guns, the vote, the plane, the
+  jump, freefall, the canopy, landing, loot, F to take, the six slots, rounds by calibre into the reload, the circle and its
+  gas, server-traced shots stopped by walls, jeeps, grenades, knock and the 10 s revive, the winner, results and the board.
+- LOOK: in ZONA's own (the owner: "you took fortnite mode too literally ... toooo arcadey"): the Zone's type, ink and square
+  panels; rarity a thin bar under a slot and a faint ring round a thing on the ground; the circle's edge in the gas's colour.
+  Before and after, 2560x1440: `progress/br/compare-*.jpg` (and `progress/br/before/`, `progress/br/after/`).
+- ENDPOINTS (the owner: "/arena still runs on the same server but for arena mode, /battleroyale runs on the same server as
+  arena but is for battleroyale mode"): one server, zona-arena-1. `wss://<arena>/battleroyale` (and `/arena?w=br`, which
+  today's game still asks: see the socket below), `GET /battleroyale/lobbies`, `/battleroyale/next?size=`,
+  `/battleroyale/board` (each also under `/br/`); the page is zonapvp.fun/battleroyale (/br still works).
+- THE SOCKET LAST (the owner: "yes we should but put it off till the end"): the game's own connection moves from
+  `/arena?w=br` to `/battleroyale` with one line in src/net/client.ts, on branch `br-socket` (on top of this one). It is in
+  the ZONA server's build filter, so shipping it restarts the ZONA server once (everyone keeps their place): ship it with the
+  next ZONA deploy. Everything on `battle-royale` itself ships with no ZONA restart.
+- MEMORY: the arena server holds 258 MB with nobody in the battle royale (fits Render's free plan, 512 MB); each map's walls
+  and places for things are made when a lobby first opens on it (a ~5 s stall, once a map, just after its first player is
+  let in): one map in play 421 MB, all three ~800 MB. So Standard (1 CPU / 2 GB) once the battle royale is played;
+  `BOT_RULES` copied from browserdayz for the door; nothing else changes on Render.
+- Server: `arena/br/` (rules.ts, wire.ts, loot.ts, match.ts, door.ts, solids/), served by `arena/server.ts`.
+  Test: `npx tsx test/br-match.test.ts` (port 8241, 11 checks).
+- Game: `src/game/br/` (mode.ts the client mode, look.ts rings/wall/plane/canopy, cut.ts the map cut), `src/ui/br/`
   (hud.ts, menu.ts, br.css); hooks in `src/game/game.ts`, `game/enter.ts`, `frame.ts`, `interact.ts`, `online.ts`,
-  `weapons.ts` (the `pool` for a free reload), `src/main.ts`, `src/ui/door.ts|css`; `/br` in vercel.json and the dev proxy.
-- Run it: launch entries `zona-arena-local` (8090) and `zona-dev` (5173), then `http://localhost:5173/br`. A second player
-  needs a second browser. Headless: `tools/br/br-look.js`-style script with `play.mjs` (address
-  `http://localhost:5173/br?wager=br&size=1&kills=2&loadout=find`).
-- RELEASE: one command, `node scripts/deploy.mjs` from `battle-royale` (the changelog entry and the restart note are merged
-  in from `br-release`). WAITING ON THE OWNER'S WORD: Render deploys from `main`, and `main` (0b77446) lacks the evening's
-  site-only changes under src/core and src/world (CardKeep, the grass, the trees), so the push of `main` rebuilds
-  browserdayz and restarts the ZONA server once (everyone keeps their place). This branch itself changes nothing under
-  server/ but the restart note, nor under src/sim, src/world, src/net, src/core, package*.json or render.yaml.
+  `weapons.ts` (the `pool` for a free reload), `src/main.ts`, `src/ui/door.ts|css`; `/battleroyale` in vercel.json and the
+  dev proxy.
+- Run it: launch entries `zona-arena-local` (8090) and `zona-dev` (5173), then `http://localhost:5173/battleroyale`. A
+  second player needs a second browser. Headless pictures: `tools/br/br-pics.js` (how to run it is at its head).
+- RELEASE: `node scripts/deploy.mjs` from `battle-royale`: the site and a push of `arena/**` (zona-arena-1 rebuilds; no ZONA
+  path is changed on this branch).
 - Since: jeeps (up to six a map, driver-run), grenades (stick grenades and frags in the loot, the blast judged by the server),
   the bot check at the door of the battle royale AND the Arena's wagers (`arena/br/door.ts`: the open world's course and
   judge; on with `RENDER` or `BOTCHECK`; BOT_RULES read from the host, as on browserdayz), and WALLS ON THE SERVER: every
@@ -32,9 +42,6 @@
   `npx tsx test/arena.test.ts` (7), `tools/br/br-look.js` and `tools/br/br-shoot.js` in the headless game.
 - Known gaps: the plane is the airdrop's helicopter (a real plane model needs the owner's yes on a download); not yet
   tried on a phone, nor with 30 real players.
-- Render (zona-arena-1) needs: a paid instance, Standard (1 CPU / 2 GB): with the battle royale and its walls the server
-  holds 813 MB at rest (measured locally; the Arena alone was 243 MB), and takes ~20 s to start; `BOT_RULES` copied from
-  browserdayz for the door; nothing else.
 
 The owner, 2026-10-21: "this is pubg + fortnite mode, we will call it battle royale, and itll play like pubg, but we want to make it
 look liek fortnite visually". Then the full go: "just build test and deploy the working battle royal with the specs ive given, do not

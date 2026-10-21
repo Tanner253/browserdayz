@@ -48,7 +48,9 @@ console.warn('br-pics: down', g.br.air);
 await T.wait(1500);
 // loot: the nearest gun, looked at from a step off; then taken, and in hand
 const p = g.player.pos;
-const gun = [...g.br.ground.values()].filter((x) => x.item && /^(m9|colt|scorpion|mpa|aks74u|mp7a1|ak|ar15|a91|deagle|mosin|benelli|vssk)$/.test(x.item.id)).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
+// (one lying in the open, on the ground itself: not on a shelf, in a cellar or up a tower)
+const { heightAt } = await import('/src/world/worldgen.ts');
+const gun = [...g.br.ground.values()].filter((x) => x.item && /^(m9|colt|scorpion|mpa|aks74u|mp7a1|ak|ar15|a91|deagle|mosin|benelli|vssk)$/.test(x.item.id) && Math.abs(x.y - heightAt(g.s.world.heights, x.x, x.z)) < 0.25).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))[0];
 if (gun) {
   await walkTo(gun.x + 1.6, gun.z + 0.6);
   await T.wait(800);
