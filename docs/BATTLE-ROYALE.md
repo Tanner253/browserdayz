@@ -1,5 +1,14 @@
 # Battle royale: the plan and its work packages (2026-10-21)
 
+## Status (branch `battle-royale`)
+- DONE: the server (P0 + P1), `arena/br/` (rules.ts, wire.ts, loot.ts, match.ts), served by `arena/server.ts` at
+  `/arena?w=br&size=<1|2|4>&kills=<map 0-2>&loadout=<find|host|CODE>`, `/br/lobbies`, `/br/next`, `/br/board`.
+  `npx tsx test/br-match.test.ts` (port 8241): a duo match from lobby to winner, with a knock and a revive: 9 checks pass.
+- NEXT: the game's side (P2 HUD and slots, P3 plane and chute, P5 the menu with three modes).
+- Run it: launch entries `zona-arena-local` (8090) + `zona-dev` (5173).
+- Known gaps: shots are stopped by the ground only (no building walls on the server yet); no jeeps, no grenades, no bot
+  check at the door yet.
+
 The owner, 2026-10-21: "this is pubg + fortnite mode, we will call it battle royale, and itll play like pubg, but we want to make it
 look liek fortnite visually". Then the full go: "just build test and deploy the working battle royal with the specs ive given, do not
 stop or ask for approval from me please. use the best optimization practices weve learned from development." Deploys of the site and
