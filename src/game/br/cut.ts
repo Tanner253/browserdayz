@@ -13,7 +13,7 @@ export async function brMapOfPage(): Promise<number> {
   const q = new URLSearchParams(location.search), said = q.get('kills');
   if (said !== null && Number.isInteger(Number(said)) && MAPS[Number(said)]) return Number(said);
   try {
-    const r = await fetch(`${arenaBase()}/br/next?size=${q.get('size') ?? 1}`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+    const r = await fetch(`${arenaBase()}/battleroyale/next?size=${q.get('size') ?? 1}`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
     const m = ((await r.json()) as { map?: number }).map;
     if (typeof m === 'number' && MAPS[m]) return m;
   } catch {

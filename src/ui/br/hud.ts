@@ -63,7 +63,7 @@ export class BrHud {
     root.appendChild(this.el);
     this.radar = this.q<HTMLCanvasElement>('.br-radar').getContext('2d')!;
     this.q('.br-vote').addEventListener('click', () => this.onVote());
-    this.q('.br-again').addEventListener('click', () => location.assign('/br'));
+    this.q('.br-again').addEventListener('click', () => location.assign('/battleroyale'));
     this.q('.br-menu').addEventListener('click', () => location.assign('/'));
   }
 

@@ -151,7 +151,7 @@ async function boot() {
   if (!mode) {
     stage('door');
     mode = await openDoor();
-    history.replaceState(null, '', `/${mode}${location.hash}`);
+    history.replaceState(null, '', `/${mode === 'br' ? 'battleroyale' : mode}${location.hash}`);
   }
   // (the battle royale's map: asked of its server while everything loads, the page cut to it once the world is made)
   const brMapP = mode === 'br' ? brMapOfPage() : null;

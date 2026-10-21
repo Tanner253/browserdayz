@@ -148,9 +148,22 @@ async function buildWorld() {
   const w = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const f = groundField(world.heights);
   w.createCollider(RAPIER.ColliderDesc.heightfield(f.rows, f.cols, f.heights, f.scale).setTranslation(f.at.x, f.at.y, f.at.z));
-  // every map's solids as the game has them (arena/br/solids/<map>.bin.gz: see tools/br/br-solids.js for the layout),
-  // kept to the map and a margin round it
-  for (const m of MAPS) {
+  w.step();
+  phys = w;
+}
+
+/**
+ * A map made ready when a lobby first opens on it, and kept: its solids as the game has them (arena/br/solids/<map>.bin.gz,
+ * see tools/br/br-solids.js for the layout), kept to the map and a margin round it; and, once, every place for a thing.
+ * Not at start: a server where nobody plays the battle royale holds none of it (the Arena's share of it fits the free plan).
+ */
+const ready = new Set<number>();
+function readyMap(map: number) {
+  if (ready.has(map) || !phys) return;
+  ready.add(map);
+  const w = phys, t0 = Date.now();
+  if (!spots.length) spots = brSpots(world);
+  for (const m of [MAPS[map]]) {
     const file = path.join(process.cwd(), 'arena/br/solids', `${m.id}.bin.gz`);
     if (!existsSync(file)) {
       log(`no solids for ${m.name}: shots there stop at the ground and the shooter's own word on walls`);
@@ -177,10 +190,9 @@ async function buildWorld() {
       w.createCollider(RAPIER.ColliderDesc.cylinder(rest[k + 7], rest[k + 8]).setTranslation(rest[k], rest[k + 1], rest[k + 2]).setRotation({ x: rest[k + 3], y: rest[k + 4], z: rest[k + 5], w: rest[k + 6] }));
       trunks++;
     }
-    log(`${m.name}: ${keep.length / 3} triangles of walls, ${hulls} rocks, ${trunks} trunks stop shots`);
+    log(`${m.name} ready in ${Date.now() - t0} ms: ${keep.length / 3} triangles of walls, ${hulls} rocks, ${trunks} trunks stop shots; ${spots.filter((s) => inMap(m, s.x, s.z)).length} places for things`);
   }
   w.step();
-  phys = w;
 }
 function wallAt(o: number[], d: number[], most: number): number {
   if (!phys) return Infinity;
@@ -885,6 +897,7 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         }
       }
       if (l.ps.some((o) => o.key === key)) return turn('You are in that lobby already.');
+      readyMap(l.map);
       const me0: P = { id: nextId++, ws, name, key, pose: [0, 0, 0, 0, 0, 0], hist: [], w: null, m: [], g: [], rtt: 150, pingAt: 0, gone: 0, team: 0, hp: 100, knocked: false, kn: 0, alive: true, place: 0, slots: starter(), vest: null, helmet: null, pack: null, pools: {}, using: null, rev: null, voted: false, jumped: false, kills: 0, knocks: 0, revives: 0, dmg: 0, longest: 0, born: Date.now(), shots: [], nades: newThrower() };
       p = me0;
       l.ps.push(me0);
@@ -938,8 +951,7 @@ export async function startBr(w: World) {
   world = w;
   const t0 = Date.now();
   await buildWorld();
-  spots = brSpots(world);
-  log(`ground and ${spots.length} places for things ready in ${Date.now() - t0} ms (${MAPS.map((m) => `${m.name} ${spots.filter((s) => inMap(m, s.x, s.z)).length}`).join(', ')})`);
+  log(`the battle royale's ground is ready in ${Date.now() - t0} ms (each map's walls and places for things when a lobby first opens on it)`);
   setInterval(tick, 250).unref();
   // where everybody is, for the others, 15 times a second (as the open world: 20 KB/s down a player at 30)
   setInterval(() => {

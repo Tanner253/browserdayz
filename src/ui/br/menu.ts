@@ -76,7 +76,7 @@ export class BrMenu {
 
   private async board() {
     try {
-      const r = (await (await fetch(`${arenaBase()}/br/board`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })).json()) as { players: { name: string; wins: number; kills: number; matches: number }[] };
+      const r = (await (await fetch(`${arenaBase()}/battleroyale/board`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })).json()) as { players: { name: string; wins: number; kills: number; matches: number }[] };
       this.q('.bm-rows').innerHTML = r.players.length ? r.players.slice(0, 10).map((p, k) => `<div><b>${k + 1}</b><span>${esc(p.name)}</span><em>${p.wins} wins · ${p.kills} kills</em></div>`).join('') : '<p>No matches played yet: be the first winner.</p>';
     } catch {
       this.q('.bm-rows').textContent = 'The board could not be reached.';
@@ -87,7 +87,7 @@ export class BrMenu {
   private go(how: string) {
     const name = this.q<HTMLInputElement>('.bm-name input').value.trim();
     if (name) this.hud.setName(name);
-    history.replaceState(null, '', `/br?${new URLSearchParams({ wager: 'br', size: String(TEAM[this.mode]), kills: String(this.map), loadout: how })}`);
+    history.replaceState(null, '', `/battleroyale?${new URLSearchParams({ wager: 'br', size: String(TEAM[this.mode]), kills: String(this.map), loadout: how })}`);
     this.hud.deploy();
   }
 }

@@ -127,7 +127,7 @@ export function openDoor(): Promise<Mode> {
 /** this page's game, by its address: /arena or a wager is the Arena, /zona or any switch on the address is the Zone (development and test pages), and the bare site asks (null) */
 export function modeOf(wager: boolean): Mode | null {
   const path = location.pathname.replace(/\/+$/, '');
-  if (new URLSearchParams(location.search).get('wager') === 'br' || path === '/br') return 'br';
+  if (new URLSearchParams(location.search).get('wager') === 'br' || path === '/battleroyale' || path === '/br') return 'br';
   if (wager || path === '/arena') return 'arena';
   if (path === '/zona' || location.search.length > 1) return 'zona';
   return null;

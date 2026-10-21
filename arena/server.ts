@@ -5,14 +5,16 @@
 // no keys. It makes the map the game makes (the same seed, so the same fort) and serves:
 //   GET /healthz          that it is up, and its protocol
 //   GET /arena/lobbies    the wagers open and being fought, for the menu's list
-//   ws  /arena            a game in a wager (arena/match.ts), or in the battle royale (?w=br: arena/br/match.ts)
-//   GET /br/lobbies       the battle royale's open lobbies;  GET /br/next?size=  the map a page should be cut to
-//   GET /br/board         the battle royale's board (wins, kills and the rest) and its last matches
+//   ws  /arena            a game in a wager (arena/match.ts)
+// and the battle royale's own (the owner: "it should have its own endpoint /battleroyale"; arena/br/match.ts):
+//   ws  /battleroyale     a game in it (also at /arena?w=br, as pages from before asked it)
+//   GET /battleroyale/lobbies   its open lobbies;  GET /battleroyale/next?size=  the map a page should be cut to
+//   GET /battleroyale/board     its board (wins, kills and the rest) and its last matches  (each also under /br/)
 import http from 'node:http';
 import { generateWorld } from '../src/world/worldgen';
 import { PROTOCOL } from '../src/net/protocol';
 import { arenaList, arenaPlayers, arenaUpgrade, startArena } from './match';
-import { brBoard, brList, brNext, brPlayers, startBr } from './br/match';
+import { brBoard, brList, brNext, brPlayers, brUpgrade, startBr } from './br/match';
 import { modeOfSize } from './br/rules';
 
 const PORT = Number(process.env.PORT) || 8090;
@@ -49,15 +51,19 @@ const server = http.createServer((req, res) => {
   // (/status as well: see the game server's, which a blocklist's `||onrender.com/health` refused)
   if (url.pathname === '/healthz' || url.pathname === '/status') return void res.writeHead(200, head).end(JSON.stringify({ ok: true, protocol: PROTOCOL, lobbies: arenaList().length, players: arenaPlayers() + brPlayers(), br: { lobbies: brList().length, players: brPlayers() }, branch: process.env.RENDER_GIT_BRANCH ?? null, commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? null }));
   if (url.pathname === '/arena/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: arenaList() }));
-  if (url.pathname === '/br/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: brList() }));
-  if (url.pathname === '/br/next') return void res.writeHead(200, head).end(JSON.stringify({ map: brNext(modeOfSize(Number(url.searchParams.get('size')) || 1)) }));
-  if (url.pathname === '/br/board') return void res.writeHead(200, head).end(JSON.stringify(brBoard()));
+  const br = url.pathname.replace(/^\/(battleroyale|br)\//, '/');
+  if (br !== url.pathname) {
+    if (br === '/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: brList() }));
+    if (br === '/next') return void res.writeHead(200, head).end(JSON.stringify({ map: brNext(modeOfSize(Number(url.searchParams.get('size')) || 1)) }));
+    if (br === '/board') return void res.writeHead(200, head).end(JSON.stringify(brBoard()));
+  }
   res.writeHead(404, head).end('{}');
 });
 
 server.on('upgrade', (req, socket, head) => {
   const path = new URL(req.url ?? '/', 'http://x').pathname;
-  if (path !== '/arena' || !fromOurPage(req)) return void socket.destroy();
+  if ((path !== '/arena' && path !== '/battleroyale') || !fromOurPage(req)) return void socket.destroy();
+  if (path === '/battleroyale') return void brUpgrade(req, socket, head as Buffer);
   arenaUpgrade(req, socket, head as Buffer);
 });
 

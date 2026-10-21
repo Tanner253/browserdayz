@@ -59,6 +59,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/battleroyale",
+      "destination": "/index.html"
+    },
+    {
       "source": "/br",
       "destination": "/index.html"
     }

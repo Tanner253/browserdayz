@@ -139,7 +139,7 @@ export class BrMode {
         return this.hud.over(m, !!this.me && m.winners.includes(this.game.hud.nameValue()) && !this.me.knocked);
       case 'remap':
         // (that lobby, or this player's match, is on another map: the page is cut for it again)
-        return location.assign(`/br?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}`);
+        return location.assign(`/battleroyale?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}`);
     }
   }
 

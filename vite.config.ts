@@ -127,7 +127,14 @@ export default defineConfig({
         bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
       },
       // (the battle royale's three, on the same arena server: its page itself, /br, is the game's page)
-      '^/br/(lobbies|next|board)(\?.*)?$': { target: process.env.ARENA_TARGET ?? 'http://localhost:8090', changeOrigin: !!process.env.ARENA_TARGET },
+      '^/(battleroyale|br)/(lobbies|next|board)(\?.*)?$': { target: process.env.ARENA_TARGET ?? 'http://localhost:8090', changeOrigin: !!process.env.ARENA_TARGET },
+      // (and its game's socket, /battleroyale?...; the page itself, /battleroyale, is the game's page)
+      '^/battleroyale(\?.*)?$': {
+        target: process.env.ARENA_TARGET ?? 'http://localhost:8090',
+        ws: true,
+        changeOrigin: !!process.env.ARENA_TARGET,
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
     },
   },
   // (Written for the browsers of the last few years, and for an iPhone back to iOS 15: built for 2022's language

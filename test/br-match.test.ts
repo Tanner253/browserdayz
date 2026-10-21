@@ -22,7 +22,7 @@ class Player {
   pose: number[] = [0, 0, 0, 0, 0, 0];
   constructor(public name: string) {}
   async open(q: string) {
-    this.ws = new WebSocket(`ws://127.0.0.1:${PORT}/arena?${q}`);
+    this.ws = new WebSocket(`ws://127.0.0.1:${PORT}/${q}`);
     this.ws.on('message', (d) => {
       const m = JSON.parse(String(d)) as M;
       if (m.t === 'welcome') this.id = m.you as number;
@@ -62,17 +62,18 @@ let n = 0;
 const ok = (name: string) => { n++; console.log('  ok  ' + name); };
 try {
   for (let k = 0; k < 1500 && !logged.includes('listening'); k++) await sleep(100);
-  assert.ok(logged.includes('places for things ready'), `the battle royale did not start:\n${logged.slice(-1200)}`);
-  ok(logged.match(/\[br\] ground and .*/)![0]);
+  assert.ok(logged.includes("battle royale's ground is ready"), `the battle royale did not start:\n${logged.slice(-1200)}`);
 
   const [a1, a2, b1, b2] = ['Ann', 'Abe', 'Bea', 'Bob'].map((s) => new Player(s));
+  // (three come in at /battleroyale, one where pages from before asked: /arena?w=br)
   for (const p of [a1, a2, b1, b2]) {
-    await p.open('w=br&size=2&kills=2&loadout=find');
+    await p.open(p === b2 ? 'arena?w=br&size=2&kills=2&loadout=find' : 'battleroyale?size=2&kills=2&loadout=find');
     await p.until('welcome', null);
   }
   const lob = await b2.until('br', 'lobby', 4000, (m) => m.have === 4);
   assert.equal(lob.need, 3);
-  const list = (await (await fetch(`http://127.0.0.1:${PORT}/br/lobbies`)).json()) as { lobbies: { have: number }[] };
+  ok(logged.match(/\[br\] Kamenka ready in .*/)![0]);
+  const list = (await (await fetch(`http://127.0.0.1:${PORT}/battleroyale/lobbies`)).json()) as { lobbies: { have: number }[] };
   assert.equal(list.lobbies[0].have, 4);
   ok('four in one duo lobby, listed; three votes of four needed');
 
@@ -141,7 +142,7 @@ try {
   assert.equal(place, 2);
   ok(`both foes out (placed ${place}); won by ${(won.winners as string[]).join(' & ')}`);
 
-  const board = (await (await fetch(`http://127.0.0.1:${PORT}/br/board`)).json()) as { players: { name: string; wins: number; kills: number }[] };
+  const board = (await (await fetch(`http://127.0.0.1:${PORT}/battleroyale/board`)).json()) as { players: { name: string; wins: number; kills: number }[] };
   const ann = board.players.find((s) => s.name === 'Ann')!;
   assert.ok(ann.wins === 1 && ann.kills === 2, JSON.stringify(ann));
   ok(`the board: Ann 1 win, ${ann.kills} kills`);
