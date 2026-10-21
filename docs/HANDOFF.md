@@ -2,7 +2,13 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## LIVE NOW (2026-10-20 ~22:34 UTC): site and server from `20e2594` (PROTOCOL 56; `main`, `site-live`, `hotfix`)
+## LIVE NOW (2026-10-21 ~00:47 UTC): server from `0b77446`, site from `4a8f542` (its changelog entry); PROTOCOL 56
+All of `held-server` shipped: the performance round's later work (CardKeep, noclip, far-tree atlas, two forest shader
+savings), the parked connection work (6e313f9), the cheat trap and anti-AFK below, and the owner's asks of 2026-10-20 night
+(29bcf6e radios T4+ in places apart only, heavy snipers rarer, a .50 takes a magazine + 1 to down a heli; aba2e44 no more
+sticking to cars). The forest's card cost (~22 ms at the worst spot) is still open: notes in `stall-and-card-memory.md`.
+
+## Earlier the same night: site and server from `20e2594` (PROTOCOL 56)
 Two emergency deploys from a clean worktree (`../Zona-hotfix`, branch `hotfix-no-global`), on top of the performance round
 below (`76726d6`), which went live earlier the same day:
 - `c721b3e`: window.__game is no longer the whole game in a player's page. Reading it bans (src/net/bait.ts; server/admin.ts
