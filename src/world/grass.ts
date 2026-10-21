@@ -2,7 +2,10 @@
 // ~1000 randomly ordered blades. Blades are placed on the exact terrain triangles in
 // the vertex shader (height texture), culled by the grass density map, bent by
 // travelling wind gusts and pushed aside by the player. Distant patches draw only the
-// first N blades (drawRange) with wider blades, so density falls off smoothly.
+// first N blades (drawRange) with wider blades, so density falls off smoothly; past the
+// nearest band each blade is one triangle. (2026-10-21, the owner, from a side-by-side,
+// "is there a better fps solution for grass?": that, the grass to 50 m and not 72, and five
+// blades in ten on high (Game.applyGraphics): 0.9 ms of its 2.0 in an open field at 2560x1440.)
 
 import * as THREE from 'three';
 import { RNG } from '../core/noise';
@@ -13,7 +16,7 @@ import { CELL, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1 } from
 
 const PATCH = 4;
 const BLADES = 2400;
-const SEGMENTS = 4;
+const SEGMENTS_NEAR = 4;
 
 interface GrassLevel {
   mesh: THREE.InstancedMesh;
@@ -21,15 +24,21 @@ interface GrassLevel {
   count: number;
   /** share of the patch's blades drawn at this distance */
   frac: number;
+  /** index entries a blade of this band has */
+  per: number;
 }
 
 export const grassUniforms = {
   uPlayer: { value: new THREE.Vector3(0, -1000, 0) },
 };
 
-function bladeGeometry(): THREE.BufferGeometry {
+/** index entries a blade of so many segments has */
+const perBlade = (segments: number) => (segments * 2 - 1) * 3;
+
+/** @param segments the same blades (the same random draws in the same order) with this many segments each */
+function bladeGeometry(segments = SEGMENTS_NEAR): THREE.BufferGeometry {
   const rng = new RNG(777);
-  const vertsPer = (SEGMENTS + 1) * 2 - 1; // tip is a single vertex
+  const vertsPer = (segments + 1) * 2 - 1; // tip is a single vertex
   const pos = new Float32Array(BLADES * vertsPer * 3);
   const blade = new Float32Array(BLADES * vertsPer * 4);
   const index: number[] = [];
@@ -40,9 +49,9 @@ function bladeGeometry(): THREE.BufferGeometry {
     const ang = rng.next() * Math.PI * 2;
     const base = b * vertsPer;
     let v = 0;
-    for (let s = 0; s <= SEGMENTS; s++) {
-      const t = s / SEGMENTS;
-      const sides = s === SEGMENTS ? [0] : [-0.5, 0.5];
+    for (let s = 0; s <= segments; s++) {
+      const t = s / segments;
+      const sides = s === segments ? [0] : [-0.5, 0.5];
       for (const side of sides) {
         const o = (base + v) * 3;
         pos[o] = side; // width coordinate
@@ -56,9 +65,9 @@ function bladeGeometry(): THREE.BufferGeometry {
         v++;
       }
     }
-    for (let s = 0; s < SEGMENTS; s++) {
+    for (let s = 0; s < segments; s++) {
       const a = base + s * 2;
-      if (s === SEGMENTS - 1) {
+      if (s === segments - 1) {
         index.push(a, a + 1, a + 2);
       } else {
         index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
@@ -83,7 +92,7 @@ export class Grass {
   private sig = 0;
   private pv = new THREE.Matrix4();
   private box = new THREE.Box3();
-  readonly radius = 72;
+  readonly radius = 50;
   private heights: Float32Array;
 
   constructor(private terrain: Terrain, private atmo: Atmosphere, heights: Float32Array) {
@@ -91,7 +100,7 @@ export class Grass {
   }
 
   build(scene: THREE.Scene) {
-    const base = bladeGeometry();
+    const base = bladeGeometry(), one = bladeGeometry(1);
     const lv: [number, number, number][] = [
       // max distance, blade fraction, width scale
       [22, 1.0, 1.0],
@@ -100,13 +109,14 @@ export class Grass {
     ];
     const maxPatches = Math.ceil(((this.radius * 2) / PATCH + 2) ** 2);
     for (const [maxDist, frac, widthScale] of lv) {
+      // (past the nearest band, the same blades one triangle each: three points and not nine, every one of which
+      // reads the ground, the grass map and the tint over again)
+      const near = !this.levels.length, from = near ? base : one;
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', base.getAttribute('position'));
-      geo.setAttribute('aBlade', base.getAttribute('aBlade'));
-      geo.setAttribute('normal', base.getAttribute('normal'));
-      geo.setIndex(base.getIndex());
-      const tris = (SEGMENTS * 2 - 1) * 3;
-      geo.setDrawRange(0, Math.floor(BLADES * frac) * tris);
+      geo.setAttribute('position', from.getAttribute('position'));
+      geo.setAttribute('aBlade', from.getAttribute('aBlade'));
+      geo.setAttribute('normal', from.getAttribute('normal'));
+      geo.setIndex(from.getIndex());
       geo.boundingSphere = base.boundingSphere;
       const mat = this.material(widthScale);
       const mesh = new THREE.InstancedMesh(geo, mat, maxPatches);
@@ -118,14 +128,14 @@ export class Grass {
       mesh.name = `grass:${this.levels.length}`;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(mesh);
-      this.levels.push({ mesh, maxDist, count: 0, frac });
+      this.levels.push({ mesh, maxDist, count: 0, frac, per: perBlade(near ? SEGMENTS_NEAR : 1) });
     }
+    this.setDensity(1);
   }
 
   /** Graphics option: how thick the grass is (1 = as built). */
   setDensity(k: number) {
-    const tris = (SEGMENTS * 2 - 1) * 3;
-    for (const l of this.levels) l.mesh.geometry.setDrawRange(0, Math.floor(BLADES * l.frac * k) * tris);
+    for (const l of this.levels) l.mesh.geometry.setDrawRange(0, Math.floor(BLADES * l.frac * k) * l.per);
   }
 
   private material(widthScale: number) {
