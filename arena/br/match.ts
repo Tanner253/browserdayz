@@ -19,6 +19,7 @@ import { F_CROUCH, F_DEAD, F_PRONE, PROTOCOL, type Pose, type S2C } from '../../
 import { groundField, heightAt, type World } from '../../src/world/worldgen';
 import { AMMO, BR, FLIGHT, HEALS, MAPS, MELEE, PHASES, TEAM, capOf, circleAt, firstCircle, inMap, kindOf, modeOfSize, nextCircle, type BrMode, type Circle, type Ground, type SlotItem } from './rules';
 import { brSpots, groundId, rollMatch, rollWait, type Spot } from './loot';
+import { atDoor, knownAtDoor } from './door';
 import type { BrS2C, Mate, Phase } from './wire';
 import { JEEP, SEATS, jeepSpots, restState, westSpots, type VState, type VehicleInfo } from '../../src/sim/vehicles';
 
@@ -760,7 +761,7 @@ const code4 = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[M
 export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
   wss.handleUpgrade(req, socket, head, (ws) => {
     const q = new URL(req.url ?? '/', 'http://x').searchParams;
-    let p: P | null = null, l: Lobby | null = null;
+    let p: P | null = null, l: Lobby | null = null, gate: ReturnType<typeof atDoor> | null = null;
     const turn = (reason: string) => {
       ws.send(JSON.stringify({ t: 'kick', reason }));
       ws.close();
@@ -773,10 +774,13 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         return;
       }
       if (p && l) return said(l, p, m);
+      if (gate?.on) return gate.said(m);
       if (m.t !== 'hello') return;
       if (m.v !== PROTOCOL) return void ws.send(JSON.stringify({ t: 'kick', reason: 'This page is out of date: load it again.', v: PROTOCOL }));
       const key = typeof m.key === 'string' ? m.key.slice(0, 80) : '', name = typeof m.name === 'string' ? m.name.slice(0, 24).trim() || 'Survivor' : 'Survivor';
       if (key.length < 16) return turn('No player key.');
+      // (the bot check first, for whoever has not passed it lately; passed, this same hello is taken again)
+      if (!knownAtDoor(key)) return void (gate = atDoor(ws, key, name, () => ws.emit('message', raw)));
       const mode = modeOfSize(Number(q.get('size')) || 1), map = Math.max(0, Math.min(MAPS.length - 1, Math.round(Number(q.get('kills')) || 0))), how = (q.get('loadout') ?? 'find').toUpperCase();
       // back after dropping, into their own match
       for (const ll of lobbies.values()) for (const pp of ll.ps) if (pp.key === key && pp.gone && ll.state !== 'over') {

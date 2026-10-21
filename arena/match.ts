@@ -17,6 +17,7 @@ import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ARENA, arenaEnds, arenaLoadout, hitShapes, inArena, rayRod, type LobbyInfo } from './rules';
 import { brUpgrade } from './br/match';
+import { atDoor, knownAtDoor } from './br/door';
 import { CASTLE_SCALE, castleAt, type FortPlace } from '../src/sim/castle';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { shotOf } from '../src/sim/gunplay';
@@ -377,7 +378,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
   if (new URL(req.url ?? '/', 'http://x').searchParams.get('w') === 'br') return brUpgrade(req, socket, head);
   wss.handleUpgrade(req, socket, head, (ws) => {
     const q = new URL(req.url ?? '/', 'http://x').searchParams;
-    let f: Fighter | null = null, l: Lobby | null = null;
+    let f: Fighter | null = null, l: Lobby | null = null, gate: ReturnType<typeof atDoor> | null = null;
     const turn = (reason: string) => {
       ws.send(JSON.stringify({ t: 'kick', reason }));
       ws.close();
@@ -390,10 +391,13 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
         return;
       }
       if (f && l) return said(l, f, m);
+      if (gate?.on) return gate.said(m);
       if (m.t !== 'hello') return;
       if (m.v !== PROTOCOL) return void ws.send(JSON.stringify({ t: 'kick', reason: 'This page is out of date: load it again.', v: PROTOCOL }));
       const key = typeof m.key === 'string' ? m.key.slice(0, 80) : '', name = typeof m.name === 'string' ? m.name.slice(0, 24).trim() || 'Survivor' : 'Survivor';
       if (key.length < 16) return turn('No player key.');
+      // (the bot check at the door, before any wager is hosted, joined or watched: the battle royale's, arena/br/door.ts)
+      if (!knownAtDoor(key)) return void (gate = atDoor(ws, key, name, () => ws.emit('message', raw)));
       const w = q.get('w') ?? '';
       // back after dropping: into their own place
       for (const ll of lobbies.values()) for (const ff of everyone(ll)) if (ff.key === key && ff.gone && ll.state === 'match') {
