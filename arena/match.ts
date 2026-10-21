@@ -16,6 +16,7 @@ import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ARENA, arenaEnds, arenaLoadout, hitShapes, inArena, rayRod, type LobbyInfo } from './rules';
+import { brUpgrade } from './br/match';
 import { CASTLE_SCALE, castleAt, type FortPlace } from '../src/sim/castle';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { shotOf } from '../src/sim/gunplay';
@@ -372,6 +373,8 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 
 /** A connection asked for at /arena: `?w=new&size=&kills=&loadout=&stake=` to open a lobby, `?w=<id>` to join one. */
 export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+  // (the battle royale shares this door: arena/br/match.ts)
+  if (new URL(req.url ?? '/', 'http://x').searchParams.get('w') === 'br') return brUpgrade(req, socket, head);
   wss.handleUpgrade(req, socket, head, (ws) => {
     const q = new URL(req.url ?? '/', 'http://x').searchParams;
     let f: Fighter | null = null, l: Lobby | null = null;
