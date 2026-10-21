@@ -16,12 +16,12 @@
   `/arena?w=br` to `/battleroyale` with one line in src/net/client.ts, on branch `br-socket` (on top of this one). It is in
   the ZONA server's build filter, so shipping it restarts the ZONA server once (everyone keeps their place): ship it with the
   next ZONA deploy. Everything on `battle-royale` itself ships with no ZONA restart.
-- HELD, NOT PUSHED (the owner, 2026-10-21: "do not push any server updates but do the work. hold the push"): the commits
-  after e6cdc87 are on this machine only. They are: cheap walls (every building a few boxes, `arena/br/solids.ts`, a
-  format ZONA's server can read later; places for things baked), and the playable pass from the owner's own game: doors
-  and jeeps usable, health only (no food, water, hunger, thirst, bleeding, broken legs, stamina), nothing carried but the
-  six slots' things, no inventory screen, a pause panel, the HUD clear of the Zone's compass, ping and notes, its own key
-  hints, the end never under a pause, the winner told by the server, loot taken only when looked at.
+- LIVE 2026-10-21 (site 065628a, arena rebuilt by its host; ZONA untouched): the playable pass (doors, cars, health only,
+  ZONA's look, cheap walls). ON THE BRANCH SINCE, NOT DEPLOYED (deploy on the owner's word): a jump only over the map (the
+  time until it said); others seen in freefall and under a proper canopy (made as the airdrop's); warm-up spawns and guns
+  only in the open; the wheel through the slots; one open lobby a mode, filled first whatever its map (a page for another
+  map goes to it and straight in); each mode's waiting and playing counts on its menu; the menu laid out as the Arena's;
+  Leave the match counts a player out at once; the main menu's Arena and Battle Royale cards say how many are playing.
 - MEMORY (measured locally): the arena server 262 MB at rest; one battle royale match running 309 MB; a map's walls let go
   when no lobby is on it (227 MB after). Render's free plan (512 MB) holds it; `BOT_RULES` copied from browserdayz for
   the door; nothing else changes on Render.
