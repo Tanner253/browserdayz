@@ -20,6 +20,7 @@ import { groundField, heightAt, type World } from '../../src/world/worldgen';
 import { AMMO, BR, FLIGHT, HEALS, MAPS, MELEE, PHASES, TEAM, capOf, circleAt, firstCircle, inMap, kindOf, modeOfSize, nextCircle, type BrMode, type Circle, type Ground, type SlotItem } from './rules';
 import { brSpots, groundId, rollMatch, rollWait, type Spot } from './loot';
 import type { BrS2C, Mate, Phase } from './wire';
+import { JEEP, SEATS, jeepSpots, restState, westSpots, type VState, type VehicleInfo } from '../../src/sim/vehicles';
 
 interface P {
   id: number;
@@ -79,6 +80,8 @@ interface Lobby {
   relaid: number;
   gas: number;
   winners: string[];
+  /** the jeeps of the match (decision 6: "yes jeeps, no helis"), each moved by its driver's game as in the open world */
+  veh: Map<number, VehicleInfo>;
 }
 
 const lobbies = new Map<string, Lobby>();
@@ -186,7 +189,7 @@ function welcome(l: Lobby, p: P) {
   const sp = p.pose;
   send(p, {
     t: 'welcome', v: PROTOCOL, you: p.id, players: l.ps.filter((o) => o !== p && !o.gone).map(info),
-    loot: [], doors: [...l.doors.entries()].map(([i, [o, s]]) => [i, o, s]), stashes: [], corpses: [], drops: [], flights: [], barrels: [], fires: [], bunker: false, ajar: [], vehicles: [], infected: [],
+    loot: [], doors: [...l.doors.entries()].map(([i, [o, s]]) => [i, o, s]), stashes: [], corpses: [], drops: [], flights: [], barrels: [], fires: [], bunker: false, ajar: [], vehicles: [...l.veh.values()], infected: [],
     // (always day: a match by night is a match nobody can see, and every match is the same length of the same day)
     hour: 0.3, spawn: { x: sp[0], z: sp[2], yaw: sp[3], y: sp[1] }, me: null, max: BR.max,
   } as unknown as S2C);
@@ -213,6 +216,10 @@ function startMatch(l: Lobby) {
   l.ground.clear();
   for (const g of rollMatch(world, spots, l.map, rnd)) l.ground.set(g.id, g);
   l.doors.clear();
+  // jeeps where the open world parks them, those on this map; six at most
+  l.veh.clear();
+  const parks = [...jeepSpots(world), ...westSpots(world)].filter((s) => inMap(m, s.x, s.z, -20)).sort(() => rnd() - 0.5).slice(0, 6);
+  parks.forEach((s, k) => l.veh.set(k + 1, { i: k + 1, s: restState(s.x, s.y, s.z, s.yaw), hp: JEEP.hp, fuel: JEEP.tank, seats: Array(SEATS).fill(null), sim: null }));
   // the plane: across the map at a random angle, through somewhere near its middle
   const cx = (m.x0 + m.x1) / 2 + (rnd() - 0.5) * (m.x1 - m.x0) * 0.4, cz = (m.z0 + m.z1) / 2 + (rnd() - 0.5) * (m.z1 - m.z0) * 0.4;
   const ang = rnd() * Math.PI * 2, dx = Math.cos(ang), dz = Math.sin(ang), L = Math.hypot(m.x1 - m.x0, m.z1 - m.z0) / 2 + FLIGHT.speed * FLIGHT.lead;
@@ -235,6 +242,7 @@ function startMatch(l: Lobby) {
     br(p, { k: 'loot', add: [...l.ground.values()], gone: [], all: true });
     br(p, { k: 'plane', ...l.plane, now });
     br(p, { k: 'zone', ...l.zone, now });
+    for (const v of l.veh.values()) send(p, { t: 'v+', v });
     me(l, p);
   }
   stateTo(l);
@@ -271,6 +279,7 @@ function spill(l: Lobby, p: P) {
 /** out of the match: dead, their things on the ground, watching from the air */
 function eliminate(l: Lobby, v: P, by: P | null, w: string, head: boolean) {
   if (!v.alive) return;
+  unseat(l, v);
   v.alive = false;
   v.knocked = false;
   v.rev = null;
@@ -451,6 +460,69 @@ function blow(l: Lobby, me: P, m: { to?: unknown; w?: unknown; zone?: unknown })
   hurt(l, v, me, dmg, w || 'fists', false);
 }
 
+// ------------------------------------------------------------------------------------------------- jeeps
+const seatsTo = (l: Lobby, v: VehicleInfo, rest = false) => all(l, { t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
+const isV = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(Number.isFinite);
+
+/** out of whatever seat they are in; a jeep left with nobody at the wheel stands where it is */
+function unseat(l: Lobby, p: P) {
+  for (const v of l.veh.values()) {
+    const k = v.seats.indexOf(p.id);
+    if (k < 0 && v.sim !== p.id) continue;
+    if (k >= 0) v.seats[k] = null;
+    if (v.sim === p.id && !v.seats[0]) {
+      v.sim = null;
+      v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+    }
+    seatsTo(l, v, !v.sim);
+  }
+}
+
+function drive(l: Lobby, p: P, m: Record<string, unknown>) {
+  if (!inMatch(l) || !p.alive) return;
+  const v = l.veh.get(Number(m.i));
+  switch (m.t) {
+    case 'vin': {
+      const seat = Number(m.seat);
+      if (!v || p.knocked || !Number.isInteger(seat) || seat < 0 || seat >= SEATS || v.seats[seat] !== null || [...l.veh.values()].some((o) => o.seats.includes(p.id))) return;
+      if (Math.hypot(p.pose[0] - v.s[0], p.pose[1] - v.s[1], p.pose[2] - v.s[2]) > JEEP.reach + 3) return;
+      v.seats[seat] = p.id;
+      if (seat === 0) v.sim = p.id;
+      return seatsTo(l, v);
+    }
+    case 'vout':
+      return unseat(l, p);
+    case 'vswap': {
+      const seat = Number(m.seat), was = [...l.veh.values()].find((o) => o.seats.includes(p.id));
+      if (!was || !Number.isInteger(seat) || seat < 0 || seat >= SEATS || was.seats[seat] !== null) return;
+      was.seats[was.seats.indexOf(p.id)] = null;
+      was.seats[seat] = p.id;
+      if (seat === 0) was.sim = p.id;
+      return seatsTo(l, was);
+    }
+    case 'v':
+      if (!v || v.sim !== p.id || !isV(m.s) || !Number.isFinite(m.at)) return;
+      v.s = m.s;
+      return all(l, { t: 'vs', s: [[v.i, m.at as number, ...m.s]] }, p);
+    case 'vrest':
+      if (!v || v.sim !== p.id || !isV(m.s)) return;
+      v.s = [m.s[0], m.s[1], m.s[2], m.s[3], m.s[4], m.s[5], m.s[6], 0, 0, 0, 0, 0];
+      if (v.seats[0] !== p.id) (v.sim = null), seatsTo(l, v, true);
+      return;
+    case 'vtake':
+      if (!v || v.sim !== null || v.seats.some((x) => x !== null)) return;
+      v.sim = p.id;
+      return seatsTo(l, v);
+    case 'vflip':
+      if (!v || v.seats.some((x) => x !== null)) return;
+      v.s = restState(v.s[0], ground(v.s[0], v.s[2]), v.s[2], Math.atan2(2 * (v.s[6] * v.s[4]), 1 - 2 * v.s[4] * v.s[4]));
+      return seatsTo(l, v, true);
+    case 'vhorn':
+      if (v && v.seats[0] === p.id) all(l, { t: 'vhorn', i: v.i, ...(m.horn !== undefined ? { horn: !!m.horn } : {}) } as S2C, p);
+      return;
+  }
+}
+
 // ------------------------------------------------------------------------------------------------- what a game says
 function take(l: Lobby, p: P, id: number, slot: number) {
   const g = l.ground.get(id);
@@ -503,7 +575,7 @@ function said(l: Lobby, p: P, m: Record<string, unknown>) {
       if (!p.alive) return;
       const now = Date.now(), was = p.pose, dt = Math.max(0.05, (now - (p.hist[p.hist.length - 1]?.t ?? now)) / 1000);
       // (falling, or in the plane, a body goes as fast as the game says; on the ground, no faster than a run, and in the waiting area never out of its ring)
-      const air = l.state === 'plane' || q[1] - ground(q[0], q[2]) > 4;
+      const air = l.state === 'plane' || q[1] - ground(q[0], q[2]) > 4 || [...l.veh.values()].some((v) => v.seats.includes(p.id));
       const w = MAPS[l.map].wait, outside = !inMatch(l) && Math.hypot(q[0] - w.x, q[2] - w.z) > w.r + 6;
       if (outside || (!air && Math.hypot(q[0] - was[0], q[2] - was[2]) > 14 * dt + 4)) {
         if (outside) {
@@ -545,6 +617,8 @@ function said(l: Lobby, p: P, m: Record<string, unknown>) {
       return void (Number.isFinite(m.n) && send(p, { t: 'pong', n: m.n as number }));
     case 'br':
       return brSaid(l, p, m);
+    case 'vin': case 'vout': case 'vswap': case 'v': case 'vrest': case 'vtake': case 'vflip': case 'vhorn':
+      return drive(l, p, m);
   }
 }
 
@@ -722,7 +796,7 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
       const open = (x: Lobby) => (x.state === 'wait' || x.state === 'count') && x.ps.length < BR.max;
       if (how === 'HOST') {
         if (lobbies.size >= BR.most * 4) return turn('Every lobby is taken: try again in a while.');
-        l = { id: Math.random().toString(36).slice(2, 8), code: code4(), private: true, mode, map, state: 'wait', ps: [], ground: new Map(), doors: new Map(), at: 0, plane: null, zone: null, opened: Date.now(), relaid: 0, gas: 0, winners: [] };
+        l = { id: Math.random().toString(36).slice(2, 8), code: code4(), private: true, mode, map, state: 'wait', ps: [], ground: new Map(), doors: new Map(), at: 0, plane: null, zone: null, opened: Date.now(), relaid: 0, gas: 0, winners: [], veh: new Map() };
         lobbies.set(l.id, l);
       } else if (how !== 'FIND') {
         const ll = [...lobbies.values()].find((x) => x.code === how);
@@ -733,7 +807,7 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         l = [...lobbies.values()].filter((x) => !x.private && x.mode === mode && x.map === map && open(x)).sort((a, b) => b.ps.length - a.ps.length)[0] ?? null;
         if (!l) {
           if ([...lobbies.values()].filter(inMatch).length >= BR.most) return turn('Every match is being played: try again in a few minutes.');
-          l = { id: Math.random().toString(36).slice(2, 8), code: code4(), private: false, mode, map, state: 'wait', ps: [], ground: new Map(), doors: new Map(), at: 0, plane: null, zone: null, opened: Date.now(), relaid: 0, gas: 0, winners: [] };
+          l = { id: Math.random().toString(36).slice(2, 8), code: code4(), private: false, mode, map, state: 'wait', ps: [], ground: new Map(), doors: new Map(), at: 0, plane: null, zone: null, opened: Date.now(), relaid: 0, gas: 0, winners: [], veh: new Map() };
           lobbies.set(l.id, l);
         }
       }

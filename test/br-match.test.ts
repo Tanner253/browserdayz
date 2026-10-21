@@ -83,6 +83,15 @@ try {
   await a1.until('br', 'zone', 2000);
   const loot = (await a1.until('br', 'loot', 2000, (m) => !!m.all)).add as Ground[];
   assert.ok(loot.length > 200, `only ${loot.length} things on the ground`);
+  await sleep(300);
+  const jeeps = a2.got.filter((m) => m.t === 'v+').map((m) => m.v as { i: number; s: number[] });
+  assert.ok(jeeps.length > 0, 'no jeeps on the map');
+  await a2.land(jeeps[0].s[0] + 1.5, jeeps[0].s[2]);
+  a2.ws.send(JSON.stringify({ t: 'vin', i: jeeps[0].i, seat: 0 }));
+  const seat = await b1.until('vseat', null, 3000);
+  assert.equal((seat.seats as number[])[0], a2.id);
+  a2.ws.send(JSON.stringify({ t: 'vout' }));
+  ok(`${jeeps.length} jeeps stand on the map; ${a2.name} got in at the wheel and out again`);
   ok(`the plane flies (${(plane.a as number[]).map(Math.round)} to ${(plane.b as number[]).map(Math.round)}), the circle is set, ${loot.length} things lie on the map`);
 
   // a gun in the open, and everybody down beside it
