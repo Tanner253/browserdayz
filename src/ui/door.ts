@@ -92,6 +92,12 @@ export function openDoor(): Promise<Mode> {
   const on = (mode: Mode, n: number | null) => {
     const t = el.querySelector(`[data-on="${mode}"]`) as HTMLElement;
     if (n === null) return;
+    // (the two arcade modes say how many are in them whenever anybody is, so that a visitor goes where the others are:
+    // the owner, 2026-10-21, "the main menu on front end needs to say how many players in arena and battleroyale if any")
+    if (mode !== 'zona') {
+      if (n > 0) (t.textContent = `${n} playing`), (t.hidden = false);
+      return;
+    }
     t.textContent = n >= LIVE_FROM ? `${n} online` : 'Live now';
     t.hidden = false;
   };
@@ -101,6 +107,7 @@ export function openDoor(): Promise<Mode> {
   });
   void arenaOnline().then((a) => {
     on('arena', a ? a.players : null);
+    on('br', a ? a.br : null);
     if (a?.matches) stat('matches', `${a.matches} Arena ${a.matches === 1 ? 'match' : 'matches'} on now`);
   });
   // (squad hour: when everybody is asked to come at once, said in the visitor's own time)
@@ -134,12 +141,13 @@ export function modeOf(wager: boolean): Mode | null {
 }
 
 /** how many are in the Arena now (its own count, or, from an arena older than that, everybody in its matches and watching them), and how many matches are being played */
-async function arenaOnline(): Promise<{ players: number; matches: number } | null> {
+async function arenaOnline(): Promise<{ players: number; matches: number; br: number } | null> {
   try {
-    const h = (await serverSays<{ players?: number }>(arenaBase(), 20_000)) ?? {};
+    // (the arena's server holds the battle royale too, and counts its players with the Arena's: told apart here)
+    const h = (await serverSays<{ players?: number; br?: { players?: number } }>(arenaBase(), 20_000)) ?? {}, br = h.br?.players ?? 0;
     const l = (await (await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })).json()) as { lobbies: LobbyInfo[] };
     const matches = l.lobbies.filter((x) => x.score).length;
-    return { players: typeof h.players === 'number' ? h.players : l.lobbies.reduce((n, x) => n + x.have + (x.watching ?? 0), 0), matches };
+    return { players: typeof h.players === 'number' ? Math.max(0, h.players - br) : l.lobbies.reduce((n, x) => n + x.have + (x.watching ?? 0), 0), matches, br };
   } catch {
     return null;
   }
