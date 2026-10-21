@@ -28,7 +28,7 @@ Both performance tracks merged and on the site:
   site-only client files (src/core, src/world: listed by `git diff --name-only main battle-royale -- src/core src/world`),
   which are in the ZONA server's build filter, so the push restarts the ZONA server once (everyone keeps their place).
   The changelog entry and the restart note are in (from br-release).
-- Render (the owner's to do): the arena service on a paid instance; copy BOT_RULES to it.
+- Render (the owner's to do, BEFORE the release): the arena service on Standard (2 GB): with every map's walls loaded it holds 813 MB at rest, past the free plan's 512 MB; copy BOT_RULES to it.
 
 ## NEXT, once both performance tracks are merged and deployed (the owner, 2026-10-21)
 - **iPhone players get "a problem occurred".** A player in the community chat: "I get 'a problem occured' on ios ...
