@@ -767,6 +767,11 @@ function brSaid(l: Lobby, p: P, m: Record<string, unknown>) {
       p.rev = { id: v.id, until: Date.now() + BR.revive * 1000 };
       return meTeam(l, p);
     }
+    case 'leave':
+      // out of the match by their own choice (the owner: "need a way to leave the match or forfeit"): out at once, their
+      // things on the ground, no grace to come back in
+      if (inMatch(l) && p.alive) eliminate(l, p, null, 'left', false);
+      return;
     case 'load': {
       const a = String(m.ammo), n = Math.max(0, Math.round(Number(m.n) || 0));
       if (AMMO[a] && p.pools[a]) p.pools[a] = Math.max(0, p.pools[a] - n);
@@ -912,7 +917,11 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         if (ll.map !== map || TEAM[ll.mode] !== TEAM[mode]) return void (ws.send(JSON.stringify({ t: 'br', k: 'remap', map: ll.map, code: ll.code, size: TEAM[ll.mode] })), ws.close());
         l = ll;
       } else {
-        l = [...lobbies.values()].filter((x) => !x.private && x.mode === mode && x.map === map && open(x)).sort((a, b) => b.ps.length - a.ps.length)[0] ?? null;
+        // the open lobby of the mode, filled before another is opened, whatever map it is on (the owner: "players should
+        // always fill open lobbies before opening new ones ... each game is spawned and ran as they come"); a page made
+        // for another map is sent to it, and comes back in made for its map
+        l = [...lobbies.values()].filter((x) => !x.private && x.mode === mode && open(x)).sort((a, b) => b.ps.length - a.ps.length)[0] ?? null;
+        if (l && l.map !== map) return void (ws.send(JSON.stringify({ t: 'br', k: 'remap', map: l.map, code: l.code, size: TEAM[l.mode] })), ws.close());
         if (!l) {
           if ([...lobbies.values()].filter(inMatch).length >= BR.most) return turn('Every match is being played: try again in a few minutes.');
           l = { id: Math.random().toString(36).slice(2, 8), code: code4(), private: false, mode, map, state: 'wait', ps: [], ground: new Map(), doors: new Map(), at: 0, plane: null, zone: null, opened: Date.now(), relaid: 0, gas: 0, winners: [], veh: new Map() };
@@ -958,6 +967,19 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
 /** the lobbies, for the menu's list (private ones are not listed) */
 export function brList() {
   return [...lobbies.values()].filter((l) => !l.private).map((l) => ({ id: l.id, mode: l.mode, map: l.map, have: l.ps.length, state: l.state }));
+}
+/**
+ * How many are in each mode: waiting in its open lobby (and on which map), and in its matches (the owner: "the battle
+ * royal menu should say how many players in each mode so the user can pick to play with other people")
+ */
+export function brModes() {
+  const out = {} as Record<BrMode, { waiting: number; playing: number; map: number | null }>;
+  for (const mode of ['solo', 'duo', 'squad'] as const) {
+    const of = [...lobbies.values()].filter((l) => l.mode === mode);
+    const open = of.filter((l) => !l.private && (l.state === 'wait' || l.state === 'count')).sort((a, b) => b.ps.length - a.ps.length)[0];
+    out[mode] = { waiting: open ? open.ps.filter((p) => !p.gone).length : 0, playing: of.filter((l) => !(l.state === 'wait' || l.state === 'count')).reduce((n, l) => n + l.ps.filter((p) => !p.gone).length, 0), map: open ? open.map : null };
+  }
+  return out;
 }
 export const brPlayers = () => [...lobbies.values()].reduce((n, l) => n + l.ps.filter((p) => !p.gone).length, 0);
 /** the map a page should be cut to: the open lobby with the most in it, else any */

@@ -326,7 +326,8 @@ async function boot() {
   }
   // (out of the wait for a match: still loading, the Deploy that waits for it is let go; connected, the place given up)
   if (arena) new ArenaMenu(game.hud).onLeave = (waiting) => (!waiting ? game.toArena() : game.wantIn ? ((game.wantIn = false), game.hud.showStart(true)) : game.net.leaveQueue());
-  if (brMap >= 0) new BrMenu(game.hud, brMap);
+  // (the battle royale's menu over it; its Leave says so to the server first, src/game/br/mode.ts)
+  if (brMap >= 0) new BrMenu(game.hud, brMap).onLeave = () => game.br?.leave();
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world

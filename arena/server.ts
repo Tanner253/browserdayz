@@ -14,7 +14,7 @@ import http from 'node:http';
 import { generateWorld } from '../src/world/worldgen';
 import { PROTOCOL } from '../src/net/protocol';
 import { arenaList, arenaPlayers, arenaUpgrade, startArena } from './match';
-import { brBoard, brList, brNext, brPlayers, brUpgrade, startBr } from './br/match';
+import { brBoard, brList, brModes, brNext, brPlayers, brUpgrade, startBr } from './br/match';
 import { modeOfSize } from './br/rules';
 
 const PORT = Number(process.env.PORT) || 8090;
@@ -53,7 +53,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/arena/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: arenaList() }));
   const br = url.pathname.replace(/^\/(battleroyale|br)\//, '/');
   if (br !== url.pathname) {
-    if (br === '/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: brList() }));
+    if (br === '/lobbies') return void res.writeHead(200, head).end(JSON.stringify({ lobbies: brList(), modes: brModes() }));
     if (br === '/next') return void res.writeHead(200, head).end(JSON.stringify({ map: brNext(modeOfSize(Number(url.searchParams.get('size')) || 1)) }));
     if (br === '/board') return void res.writeHead(200, head).end(JSON.stringify(brBoard()));
   }

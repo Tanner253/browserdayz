@@ -92,6 +92,12 @@ export class BrMode {
     };
   }
 
+  /** out of the match by this player's own choice: said to the server, which counts them out at once */
+  leave() {
+    if (!this.ended) this.send({ k: 'leave' });
+    this.ended = true;
+  }
+
   /** the connection is gone: the end, or why it went, with the way back */
   closed(reason: string) {
     if (!this.ended) this.hud.closed(reason);
@@ -154,7 +160,8 @@ export class BrMode {
         return;
       case 'remap':
         // (that lobby, or this player's match, is on another map: the page is cut for it again)
-        return location.assign(`/battleroyale?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}`);
+        // (and straight back in, to that lobby: `go`, src/ui/br/menu.ts)
+        return location.assign(`/battleroyale?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}&go=1`);
     }
   }
 

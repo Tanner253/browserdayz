@@ -11,9 +11,17 @@ const MARGIN = 60;
 /** The map this page is for: its address says (`kills`, as the arena's door carries it), else the server, else any. */
 export async function brMapOfPage(): Promise<number> {
   const q = new URLSearchParams(location.search), said = q.get('kills');
+  // (asked for the mode last played: the open lobby of that mode is the one to be cut for)
+  let size = q.get('size') ?? '1';
+  try {
+    const m = localStorage.getItem('zona-br-mode');
+    if (!q.get('size') && m) size = m === 'squad' ? '4' : m === 'duo' ? '2' : '1';
+  } catch {
+    /* not kept */
+  }
   if (said !== null && Number.isInteger(Number(said)) && MAPS[Number(said)]) return Number(said);
   try {
-    const r = await fetch(`${arenaBase()}/battleroyale/next?size=${q.get('size') ?? 1}`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+    const r = await fetch(`${arenaBase()}/battleroyale/next?size=${size}`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
     const m = ((await r.json()) as { map?: number }).map;
     if (typeof m === 'number' && MAPS[m]) return m;
   } catch {

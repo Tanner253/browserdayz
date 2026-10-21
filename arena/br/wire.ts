@@ -47,7 +47,9 @@ export type BrC2S =
   /** rounds of a calibre put into a gun by a reload */
   | { k: 'load'; ammo: string; n: number }
   /** this player is falling, under a canopy, or down (null) */
-  | { k: 'air'; s: 'fall' | 'chute' | null };
+  | { k: 'air'; s: 'fall' | 'chute' | null }
+  /** this player leaves the match, and is out of it at once */
+  | { k: 'leave' };
 
 export type BrMsg = { t: 'br' } & BrS2C;
 export type BrSend = { t: 'br' } & BrC2S;
