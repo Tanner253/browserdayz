@@ -5,7 +5,7 @@
   pointer-events: none;
   zoom: var(--ui-zoom, 1);
 }
-#hud.hidden > *:not(.hud-start):not(.hud-dead):not(.hud-esp):not(.hud-powers):not(#arena-menu):not(.hud-howto):not(.em-over) {
+#hud.hidden > *:not(.hud-start):not(.hud-dead):not(.hud-esp):not(.hud-powers):not(#arena-menu):not(#br-menu):not(.hud-howto):not(.em-over) {
   opacity: 0 !important;
 }
 .hud-cross {

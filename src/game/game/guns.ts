@@ -487,8 +487,8 @@ export const gunsMethods = {
   toggleInventory(this: Game, open?: boolean, byEscape = false) {
     const want = open ?? !this.invUI.isOpen;
     if (want === this.invUI.isOpen) return;
-    // (nor pockets: Tab is the scoreboard there)
-    if (want && this.arenaHud) return;
+    // (nor pockets: Tab is the scoreboard there; and in the battle royale its six slots are all there is)
+    if (want && (this.arenaHud || this.br)) return;
     if (want) {
       this.openStash = this.nearbyStash();
       this.openLying();

@@ -27,10 +27,12 @@ export const interactMethods = {
     this.prompt = null;
     this.mark = null;
     this.focus = null;
-    // (the battle royale says what is within reach itself: src/game/br/mode.ts)
-    if (this.br || this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
+    if (this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
+    // (the battle royale: its own things within reach first, a thing on the ground or a teammate to get up
+    // (src/game/br/mode.ts); of the game's own, only doors and cars)
+    if (this.br?.busy) return;
     // at a shop's counter, looking at the man behind it
-    if (this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
+    if (!this.br && this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
       const book = this.jobBook();
       const owed = jobsFor(book.day).some((j) => !book.done.includes(j.id) && jobDone(j, book, (id) => this.countOf(id)) >= j.n);
       this.prompt = `<kbd>F</kbd>Trade${owed ? ' <small>· he owes you for a job</small>' : ''}`;
@@ -69,6 +71,7 @@ export const interactMethods = {
     const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
     const owner = hit?.tag?.owner ?? this.nearestLoose(cam, dir, range);
     this.lookedAt = owner ?? null;
+    if (!owner && this.br) return;
     if (!owner) {
       // nobody has a name floating over their head: you only learn it by looking right at them, up close
       const c = new THREE.Vector3();
@@ -175,7 +178,7 @@ export const interactMethods = {
       const tagged = this.tagged;
       this.prompt = this.garage.prompt(owner, !!can, tagged);
       if (key) this.garage.use(owner, tagged);
-    } else if (owner instanceof Stash) {
+    } else if (owner instanceof Stash && !this.br) {
       // A crate of the map's, a body, a drop: searched. Or a place where somebody buried a case, a suitcase or a
       // bag: with a shovel in the hands, dug up by holding the left button, and what was under it lies there again.
       const shovel = !owner.fixed && owner.buried && this.weapons.equippedItem?.id === 'shovel';

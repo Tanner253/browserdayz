@@ -46,6 +46,11 @@ export class BrMode {
   private target: { g: Ground | null; mate: number | null } = { g: null, mate: null };
   ended = false;
 
+  /** something of the battle royale's is within reach (F takes it, or gets a teammate up): the game's own F waits */
+  get busy() {
+    return !!this.target.g || this.target.mate !== null;
+  }
+
   constructor(private game: Game) {
     this.look = new BrLook(game);
     this.hud = new BrHud(game.hud.root, () => this.vote());
@@ -66,6 +71,8 @@ export class BrMode {
       }
       send0(m);
     };
+    // (health only, as PUBG: no hunger, thirst, bleeding or broken legs)
+    game.player.arcade = true;
     // (rounds come out of the pools by calibre: decision 4, no magazines)
     game.weapons.freeReload = true;
     game.weapons.pool = {
@@ -174,6 +181,7 @@ export class BrMode {
   /** the game's inventory made to hold what the server says is carried (guns and blades in hand, armour and packs worn) */
   private mirrorSlots() {
     const g = this.game, m = this.me!, keep = new Set<string>(), gone: string[] = [];
+
     for (const s of m.slots) {
       if (!s || (kindOf(s.id) !== 'gun' && kindOf(s.id) !== 'melee' && kindOf(s.id) !== 'nade')) continue;
       keep.add(s.uid);
@@ -194,6 +202,11 @@ export class BrMode {
       this.worn[k] = want ? makeItem(want) : null;
       if (this.worn[k]) g.inv.add(this.worn[k]!);
     }
+    // (and nothing else: the open world's food and water that a game is given when it comes in, or anything of a life
+    // before, is not carried here; the game's inventory holds the slots' things and the worn, and the clothes it keeps on)
+    const ours = new Set([...this.mirror.keys(), ...Object.values(this.worn).flatMap((it) => (it ? [it.uid] : []))]);
+    for (const [slot, it] of Object.entries(g.inv.slots)) if (it && !ours.has(it.uid) && slot !== 'top' && slot !== 'legs') gone.push(it.uid);
+    for (const c of g.inv.containers) for (const q of c.items) if (!ours.has(q.item.uid)) gone.push(q.item.uid);
     if (gone.length) g.trashed(gone);
     g.weapons.validate();
     g.meDirty = true;

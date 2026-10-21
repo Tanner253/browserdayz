@@ -128,6 +128,12 @@ export class Player {
   seated = false;
   /** in a wager the server alone says when somebody dies (server/arena.ts): this game never lets its own health or blood go below the last of it */
   keepAlive = false;
+  /**
+   * The battle royale's: health, and nothing else to keep (the owner: "i mspawning in with food and water this doesnt
+   * make sense"). No hunger, thirst or blood to lose, no wounds that bleed, no leg broken, no fall hurting this game
+   * alone: the server holds the health, and says so.
+   */
+  arcade = false;
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
   /** lying on a bipod and aimed (set by the weapons): held where it lies until off the scope */
@@ -1134,7 +1140,7 @@ export class Player {
     // from a height your legs take the fall before you can run on
     if (s > 6.5) this.stumble = Math.min(0.5, (s - 6.5) * 0.09);
     this.onLand(s);
-    if (s > 9.5 && (had <= 0 || s > had + 0.1)) {
+    if (s > 9.5 && (had <= 0 || s > had + 0.1) && !this.arcade) {
       const dmg = (s - Math.max(9.5, had)) * 14 * this.fallMult;
       this.lastFall = { drop, speed: s };
       this.damage(dmg, 'fall');
@@ -1168,6 +1174,14 @@ export class Player {
   tickVitals(dt: number) {
     const v = this.vitals;
     if (this.dead) return;
+    if (this.arcade) {
+      v.energy = v.water = 100;
+      v.blood = BLOOD.full;
+      v.bleeding = false;
+      v.bleed = 0;
+      if (this.hurtTimer > 0) this.hurtTimer -= dt;
+      return;
+    }
     const exertion = this.god ? 0 : this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
     v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
     v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
@@ -1207,7 +1221,7 @@ export class Player {
   /** a leg breaks (nothing happens to one already broken, or to the dead) */
   breakLeg() {
     // (nor to an admin in god mode: nothing takes hold of one)
-    if (this.dead || this.vitals.broken || this.god) return;
+    if (this.dead || this.vitals.broken || this.god || this.arcade) return;
     this.vitals.broken = true;
     this.brokenT = 0;
     this.sprinting = false;
@@ -1266,7 +1280,7 @@ export class Player {
    */
   bleed(rate = BLOOD.wound.torso, spilt = 0) {
     const v = this.vitals;
-    if (this.god) return;
+    if (this.god || this.arcade) return;
     v.bleed = withWound(v.bleed, rate);
     v.bleeding = v.bleed > 0;
     v.blood = Math.max(0, v.blood - spilt);
@@ -1275,7 +1289,7 @@ export class Player {
 
   /** blood lost at a stroke, with or without a wound left open (a round takes a hundred going in) */
   spill(ml: number) {
-    if (!this.god && !this.dead) this.vitals.blood = Math.max(0, this.vitals.blood - ml);
+    if (!this.god && !this.dead && !this.arcade) this.vitals.blood = Math.max(0, this.vitals.blood - ml);
   }
 
   /** every wound closed (a dressing, or time) */
