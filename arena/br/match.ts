@@ -900,7 +900,10 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         }
       }
       if (l.ps.some((o) => o.key === key)) return turn('You are in that lobby already.');
-      readyMap(l.map);
+      // (the map's walls and places for things, the first time a lobby opens on it: a few seconds' work, done just after
+      // this player is let in, not before: a page waits only so long for its welcome)
+      const lm = l.map;
+      setImmediate(() => readyMap(lm));
       const me0: P = { id: nextId++, ws, name, key, pose: [0, 0, 0, 0, 0, 0], hist: [], w: null, m: [], g: [], rtt: 150, pingAt: 0, gone: 0, team: 0, hp: 100, knocked: false, kn: 0, alive: true, place: 0, slots: starter(), vest: null, helmet: null, pack: null, pools: {}, using: null, rev: null, voted: false, jumped: false, kills: 0, knocks: 0, revives: 0, dmg: 0, longest: 0, born: Date.now(), shots: [], nades: newThrower() };
       p = me0;
       l.ps.push(me0);
