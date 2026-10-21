@@ -200,7 +200,7 @@ export class BrHud {
     const c = this.radar, W = 200, m = MAPS[t.map], s = W / Math.max(m.x1 - m.x0, m.z1 - m.z0);
     const X = (x: number) => (x - m.x0) * s + (W - (m.x1 - m.x0) * s) / 2, Z = (z: number) => (z - m.z0) * s + (W - (m.z1 - m.z0) * s) / 2;
     c.clearRect(0, 0, W, W);
-    c.fillStyle = 'rgba(14,20,34,0.72)';
+    c.fillStyle = 'rgba(10,12,11,0.5)';
     c.fillRect(X(m.x0), Z(m.z0), (m.x1 - m.x0) * s, (m.z1 - m.z0) * s);
     const ring = (o: Circle, style: string, dash: number[], wide = 2) => {
       c.beginPath();
@@ -211,22 +211,22 @@ export class BrHud {
       c.stroke();
       c.setLineDash([]);
     };
-    if (t.phase === 'wait' || t.phase === 'count') ring(m.wait, '#4cc3ff', [], 2);
+    if (t.phase === 'wait' || t.phase === 'count') ring(m.wait, '#c9b27c', [], 1.5);
     if (t.circle) {
       // the gas outside the circle, tinted
       c.save();
       c.beginPath();
       c.rect(0, 0, W, W);
       c.arc(X(t.circle.x), Z(t.circle.z), Math.max(1, t.circle.r * s), 0, Math.PI * 2, true);
-      c.fillStyle = 'rgba(120,70,255,0.28)';
+      c.fillStyle = 'rgba(120,128,70,0.32)';
       c.fill();
       c.restore();
-      ring(t.circle, '#ffffff', []);
+      ring(t.circle, 'rgba(233,228,216,0.9)', [], 1.5);
     }
-    if (t.zone) ring(t.zone.b, 'rgba(255,255,255,0.85)', [4, 4], 1.5);
+    if (t.zone) ring(t.zone.b, 'rgba(233,228,216,0.6)', [4, 4], 1);
     if (t.plane) {
-      c.strokeStyle = '#ffd34d';
-      c.lineWidth = 2;
+      c.strokeStyle = '#c9b27c';
+      c.lineWidth = 1.5;
       c.setLineDash([6, 4]);
       c.beginPath();
       c.moveTo(X(t.plane.a[0]), Z(t.plane.a[1]));
@@ -236,7 +236,7 @@ export class BrHud {
     }
     // this player: an arrow the way they face (the game's yaw looks down -z at 0)
     const px = X(t.at.x), pz = Z(t.at.z), fx = -Math.sin(t.yaw), fz = -Math.cos(t.yaw);
-    c.fillStyle = '#ffe14d';
+    c.fillStyle = '#e9e4d8';
     c.beginPath();
     c.moveTo(px + fx * 8, pz + fz * 8);
     c.lineTo(px - fx * 4 + fz * 5, pz - fz * 4 - fx * 5);

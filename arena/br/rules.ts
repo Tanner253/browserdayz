@@ -57,13 +57,13 @@ export const FLIGHT = {
   chuteGlide: 11,
 } as const;
 
-/** Rarity: our tiers, as Fortnite's colours (the owner's yes, 2026-10-21) */
+/** Rarity: our tiers, in the familiar order of colours (the owner's yes, 2026-10-21), toned to the Zone's own ink */
 export const RARITY: Record<number, { name: string; colour: string }> = {
   1: { name: 'Common', colour: '#b9c0c8' },
-  2: { name: 'Uncommon', colour: '#43d65f' },
-  3: { name: 'Rare', colour: '#3aa6ff' },
-  4: { name: 'Epic', colour: '#b65cff' },
-  5: { name: 'Legendary', colour: '#ffb21e' },
+  2: { name: 'Uncommon', colour: '#5fbf62' },
+  3: { name: 'Rare', colour: '#4f9be0' },
+  4: { name: 'Epic', colour: '#a46ad8' },
+  5: { name: 'Legendary', colour: '#e0a536' },
 };
 
 export interface BrMap {
