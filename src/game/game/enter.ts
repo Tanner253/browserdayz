@@ -2,6 +2,7 @@
 // (Methods of Game cut out of game.ts whole on 2026-10-14, so that they can be read and worked on alone: put back on
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
+import { doorOver } from '../../ui/door';
 import { audio } from '../../core/audio';
 import { wagerQuery, watching } from '../../net/client';
 import { ArenaHud } from '../../ui/arena-hud';
@@ -65,8 +66,11 @@ export const enterMethods = {
     else if (wagerQuery() && !this.arenaHud && !brPage()) {
       this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');
       this.weapons.freeReload = true;
-      // (over: the Arena's menu again, as the page is, for another; or the door)
-      this.arenaHud.onGo = (again) => (again ? this.toArena() : location.assign('/'));
+      // (over: the Arena's menu again, as the page is, for another; or the main menu over it, src/ui/door.ts)
+      this.arenaHud.onGo = (again) => {
+        this.toArena();
+        if (!again) void doorOver('arena');
+      };
     }
     this.net.onQueue = (pos, of, max) => {
       if (!waited) {
