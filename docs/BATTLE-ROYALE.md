@@ -22,15 +22,19 @@
   server/ but the restart note, nor under src/sim, src/world, src/net, src/core, package*.json or render.yaml.
 - Since: jeeps (up to six a map, driver-run), grenades (stick grenades and frags in the loot, the blast judged by the server),
   the bot check at the door of the battle royale AND the Arena's wagers (`arena/br/door.ts`: the open world's course and
-  judge; on with `RENDER` or `BOTCHECK`; BOT_RULES read from the host, as on browserdayz), and walls: each shot carries how
-  far the shooter's own game saw it go before a wall (`wall`), and the server stops it at the nearer of that and the ground
-  (the open world's trust level; a server bake of the buildings' solids would make it the server's own).
-  Checks: `npx tsx test/br-match.test.ts` (10: lobby, vote, plane, jeeps, loot, knock, revive, winner, board),
+  judge; on with `RENDER` or `BOTCHECK`; BOT_RULES read from the host, as on browserdayz), and WALLS ON THE SERVER: every
+  map's solids as the game builds them (buildings' triangles, walls, fences, the fort, rocks, tree trunks; not doors, glass
+  or bushes), baked by `node scripts/br-solids.mjs` (headless game, `tools/br/br-solids.js`) into
+  `arena/br/solids/<map>.bin.gz` and laid into the server's own physics at start. Run the bake again after anything on a
+  map changes. (Each shot also carries how far the shooter's own game saw it go, and the nearer of the two stops it.)
+  Checks: `npx tsx test/br-match.test.ts` (11: lobby, vote, plane, jeeps, loot, knock, revive, winner, board, and a shot
+  through the middle of 131 of Kamenka's 152 buildings stopped by the server's walls; the rest are open sheds and towers),
   `npx tsx test/arena.test.ts` (7), `tools/br/br-look.js` and `tools/br/br-shoot.js` in the headless game.
-- Known gaps: the plane is the airdrop's helicopter (a real plane model needs the owner's yes on a download); the
-  buildings' walls on the server are the shooter's game's word; not yet tried on a phone, nor with 30 real players.
-- Render (zona-arena-1) needs: a paid instance (Standard, 1 CPU / 2 GB: the server makes the world and plans every
-  building's places for things at start, ~15 s and ~0.5 GB); `BOT_RULES` copied from browserdayz for the door; nothing else.
+- Known gaps: the plane is the airdrop's helicopter (a real plane model needs the owner's yes on a download); not yet
+  tried on a phone, nor with 30 real players.
+- Render (zona-arena-1) needs: a paid instance, Standard (1 CPU / 2 GB): with the battle royale and its walls the server
+  holds 813 MB at rest (measured locally; the Arena alone was 243 MB), and takes ~20 s to start; `BOT_RULES` copied from
+  browserdayz for the door; nothing else.
 
 The owner, 2026-10-21: "this is pubg + fortnite mode, we will call it battle royale, and itll play like pubg, but we want to make it
 look liek fortnite visually". Then the full go: "just build test and deploy the working battle royal with the specs ive given, do not

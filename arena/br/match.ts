@@ -4,10 +4,12 @@
 // Arena does, with the battle royale's own words beside it (./wire.ts).
 //
 // As in the Arena, THE SERVER DECIDES EVERY HIT AND EVERY HEALTH POINT: a game says where it is and where it shot; the
-// server traces the shot itself (the ground, and the others as they stood when it was fired) and holds every health,
-// knock, slot and round. What it does not have yet is the buildings' walls (docs/BATTLE-ROYALE.md, P4's solids): until
-// then a shot is stopped by the ground alone.
+// server traces the shot itself (the ground, every map's walls, rocks and trunks as the game builds them, baked by
+// scripts/br-solids.mjs, and the others as they stood when it was fired) and holds every health, knock, slot and round.
 import RAPIER from '@dimforge/rapier3d-compat';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -146,6 +148,37 @@ async function buildWorld() {
   const w = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const f = groundField(world.heights);
   w.createCollider(RAPIER.ColliderDesc.heightfield(f.rows, f.cols, f.heights, f.scale).setTranslation(f.at.x, f.at.y, f.at.z));
+  // every map's solids as the game has them (arena/br/solids/<map>.bin.gz: see tools/br/br-solids.js for the layout),
+  // kept to the map and a margin round it
+  for (const m of MAPS) {
+    const file = path.join(process.cwd(), 'arena/br/solids', `${m.id}.bin.gz`);
+    if (!existsSync(file)) {
+      log(`no solids for ${m.name}: shots there stop at the ground and the shooter's own word on walls`);
+      continue;
+    }
+    const b = gunzipSync(readFileSync(file)), head = new Uint32Array(b.buffer, b.byteOffset, 4), [nv, nt, nh, nc] = head;
+    const at = b.byteOffset + 16, verts = new Float32Array(b.buffer.slice(at, at + nv * 12)), tris = new Uint32Array(b.buffer.slice(at + nv * 12, at + nv * 12 + nt * 12));
+    const near = (x: number, z: number) => inMap(m, x, z, 60);
+    const keep: number[] = [];
+    for (let i = 0; i < tris.length; i += 3) if (near(verts[tris[i] * 3], verts[tris[i] * 3 + 2])) keep.push(tris[i], tris[i + 1], tris[i + 2]);
+    if (keep.length) w.createCollider(RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(keep)));
+    const rest = new Float32Array(b.buffer.slice(at + nv * 12 + nt * 12));
+    let k = 0, hulls = 0;
+    for (let h = 0; h < nh; h++) {
+      const n = rest[k++], pts = rest.slice(k, k + n * 3);
+      k += n * 3;
+      if (!near(pts[0], pts[2])) continue;
+      const d = RAPIER.ColliderDesc.convexHull(pts);
+      if (d) (w.createCollider(d), hulls++);
+    }
+    let trunks = 0;
+    for (let c = 0; c < nc; c++, k += 9) {
+      if (!near(rest[k], rest[k + 2])) continue;
+      w.createCollider(RAPIER.ColliderDesc.cylinder(rest[k + 7], rest[k + 8]).setTranslation(rest[k], rest[k + 1], rest[k + 2]).setRotation({ x: rest[k + 3], y: rest[k + 4], z: rest[k + 5], w: rest[k + 6] }));
+      trunks++;
+    }
+    log(`${m.name}: ${keep.length / 3} triangles of walls, ${hulls} rocks, ${trunks} trunks stop shots`);
+  }
   w.step();
   phys = w;
 }

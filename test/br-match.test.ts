@@ -106,6 +106,12 @@ try {
   const mine = await a1.until('br', 'me', 3000, (m) => (m.slots as ({ id: string } | null)[]).some((s) => s?.id === gun.item!.id));
   ok(`${a1.name} took the ${gun.item!.id} off the ground: slots ${(mine.slots as ({ id: string } | null)[]).map((s) => s?.id ?? '-').join(' ')}`);
 
+  // (the fight is held 40 m up, clear of every wall, rock and trunk the server now has: a body in the air is taken at its word)
+  for (const p of [a1, b1, b2]) {
+    p.pose = [p.pose[0], p.pose[1] + 40, p.pose[2], 0, 0, 8];
+    p.ws.send(JSON.stringify({ t: 's', p: p.pose, w: null, m: [] }));
+  }
+  await sleep(150);
   const w = gun.item!.id;
   const fire = async (at: Player, until: () => boolean, most = 60) => {
     for (let k = 0; k < most && !until(); k++) { a1.shootAt(at, w); await sleep(900); }
@@ -126,7 +132,10 @@ try {
   const dead = (p: Player) => () => p.got.some((m) => m.t === 'kill' && m.who === p.name);
   await fire(b1, dead(b1), 80);
   await fire(b2, dead(b2), 80);
-  const won = await a1.until('br', 'over', 5000);
+  const won = await a1.until('br', 'over', 5000).catch((e) => {
+    const last = (p: Player) => JSON.stringify([...p.got].reverse().find((m) => m.t === 'br' && m.k === 'me'))?.slice(0, 300);
+    throw new Error(`${e.message}; ${a1.name} landed ${a1.got.filter((m) => m.t === 'hitok').length} hits; kills heard: ${a1.got.filter((m) => m.t === 'kill').map((m) => m.who).join(', ')}; ${b1.name}: ${last(b1)}; ${b2.name}: ${last(b2)}`);
+  });
   assert.deepEqual([...(won.winners as string[])].sort(), ['Abe', 'Ann']);
   const place = (await b1.until('br', 'out', 1000)).place;
   assert.equal(place, 2);
@@ -136,6 +145,22 @@ try {
   const ann = board.players.find((s) => s.name === 'Ann')!;
   assert.ok(ann.wins === 1 && ann.kills === 2, JSON.stringify(ann));
   ok(`the board: Ann 1 win, ${ann.kills} kills`);
+  // the walls the server has: a ray at chest height through the middle of every house of Kamenka's map is stopped
+  const RAPIER = (await import('@dimforge/rapier3d-compat')).default;
+  await RAPIER.init();
+  const { gunzipSync } = await import('node:zlib');
+  const { readFileSync } = await import('node:fs');
+  const b = gunzipSync(readFileSync('arena/br/solids/village.bin.gz')), [nv, nt] = new Uint32Array(b.buffer, b.byteOffset, 4);
+  const at = b.byteOffset + 16, pw = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+  pw.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(b.buffer.slice(at, at + nv * 12)), new Uint32Array(b.buffer.slice(at + nv * 12, at + nv * 12 + nt * 12))));
+  pw.step();
+  const houses = world.buildings.filter((h) => h.x > -700 && h.x < 720 && h.z > -700 && h.z < 720);
+  const stopped = houses.filter((h) => {
+    const y = g(h.x, h.z) + 1.5, hit = pw.castRay(new RAPIER.Ray({ x: h.x - 40, y, z: h.z }, { x: 1, y: 0, z: 0 }), 40, true);
+    return !!hit;
+  }).length;
+  assert.ok(stopped / houses.length > 0.85, `${stopped} of ${houses.length}`);
+  ok(`the server's walls: a shot through the middle of ${stopped} of ${houses.length} buildings of Kamenka's map is stopped`);
   console.log(`br-match: ${n} checks passed`);
 } catch (e) {
   console.error(e, '\n--- server ---\n' + logged.slice(-2000));
