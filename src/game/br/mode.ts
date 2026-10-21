@@ -245,7 +245,9 @@ export class BrMode {
     this.look.zone(c, playing ? null : { x: w.x, z: w.z, r: w.r }, heightAt(g.s.world.heights, p.pos.x, p.pos.z));
     this.look.ground(this.ground, p.pos, dt);
     this.fly(dt, now);
-    // knocked: down on the ground, nothing in hand
+    // knocked: down on the ground, nothing in hand; and nothing in hand in the air either
+    if (this.air && g.weapons.equippedItem) g.weapons.take(null);
+    g.hud.root.classList.toggle('br-air', !!this.air);
     if (me?.knocked && p.pos) {
       p.prone = true;
       if (g.weapons.equippedItem) g.weapons.take(null);
@@ -337,6 +339,9 @@ export class BrMode {
       p.setFly(false);
       p.vel.set(0, 0, 0);
       this.look.chute(null, 0, others);
+      // (and what was in hand before the plane comes back up)
+      const s = this.me?.slots[this.held], it = s ? this.mirror.get(s.uid) : null;
+      if (it) g.weapons.take(it);
     }
   }
 }

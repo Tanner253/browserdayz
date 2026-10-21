@@ -2,7 +2,7 @@
 /* (the Zone's own HUD parts that the battle royale shows its own way) */
 #hud.br .hud-hotbar, #hud.br .hud-area, #hud.br .hud-vitals, #hud.br .hud-stamina, #hud.br .hud-arms, #hud.br .hud-online,
 #hud.br .hud-under, #hud.br .hud-weapon, #hud.br .hud-feed, #hud.br .hud-powers, #hud.br .hud-bleed, #hud.br .hud-blooddrops,
-#hud.br .hud-bleedfx, body.br .hud-minimap { display: none !important; }
+#hud.br .hud-bleedfx, body.br .hud-minimap, #hud.br.br-air .hud-keys { display: none !important; }
 
 .br-hud { position: absolute; inset: 0; pointer-events: none; font-family: 'Barlow Condensed', 'Segoe UI', sans-serif; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.55); --r1: #b9c0c8; --r2: #43d65f; --r3: #3aa6ff; --r4: #b65cff; --r5: #ffb21e; }
 .br-hud kbd { font: 700 11px/1 'Barlow Condensed', sans-serif; }

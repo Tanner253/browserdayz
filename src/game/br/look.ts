@@ -11,13 +11,22 @@ import type { Game } from '../game';
 /** metres round the player within which things on the ground are built and drawn */
 const NEAR = 70;
 
-const beamGeo = new THREE.CylinderGeometry(0.05, 0.11, 2.4, 8, 1, true).translate(0, 1.2, 0);
-const ringGeo = new THREE.RingGeometry(0.32, 0.42, 24).rotateX(-Math.PI / 2);
-const glow = (c: string, o: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+const beamGeo = new THREE.CylinderGeometry(0.035, 0.09, 3, 10, 1, true).translate(0, 1.5, 0);
+const ringGeo = new THREE.RingGeometry(0.18, 0.3, 28).rotateX(-Math.PI / 2);
+/** a soft light: fading up a beam (v: 0 at its foot), or out across a ring; brighter the rarer */
+const glow = (c: string, o: number, up: boolean) => new THREE.ShaderMaterial({
+  uniforms: { c: { value: new THREE.Color(c) }, o: { value: o } },
+  vertexShader: 'varying vec2 v; void main(){ v = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: up
+    ? 'uniform vec3 c; uniform float o; varying vec2 v; void main(){ float a = o * pow(1.0 - v.y, 2.2) * (0.55 + 0.45 * sin(v.x * 6.2832) * sin(v.x * 6.2832)); gl_FragColor = vec4(c * a, a); }'
+    : 'uniform vec3 c; uniform float o; varying vec2 v; void main(){ float d = length(v - 0.5) * 2.0; float a = o * max(0.0, 1.0 - abs(d - 0.8) / 0.2); gl_FragColor = vec4(c * a, a); }',
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+});
 const BEAM: Record<number, THREE.Material> = {}, RING: Record<number, THREE.Material> = {};
 for (const [t, r] of Object.entries(RARITY)) {
-  BEAM[Number(t)] = glow(r.colour, 0.42);
-  RING[Number(t)] = glow(r.colour, 0.75);
+  const k = Number(t);
+  BEAM[k] = glow(r.colour, 0.16 + 0.1 * k, true);
+  RING[k] = glow(r.colour, 0.3 + 0.1 * k, false);
 }
 
 /** a wall of light, its alpha fading to nothing at its top: the circle's, and the waiting area's */

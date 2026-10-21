@@ -14,7 +14,6 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { hitShapes, rayRod } from '../rules';
 import { WEAPON_RULES, hitDamage } from '../../src/sim/combat';
 import { shotOf } from '../../src/sim/gunplay';
-import { phaseOf } from '../../src/sim/daynight';
 import { ITEMS, makeItem, type ItemInstance } from '../../src/sim/items';
 import { F_CROUCH, F_DEAD, F_PRONE, PROTOCOL, type Pose, type S2C } from '../../src/net/protocol';
 import { groundField, heightAt, type World } from '../../src/world/worldgen';
@@ -188,7 +187,8 @@ function welcome(l: Lobby, p: P) {
   send(p, {
     t: 'welcome', v: PROTOCOL, you: p.id, players: l.ps.filter((o) => o !== p && !o.gone).map(info),
     loot: [], doors: [...l.doors.entries()].map(([i, [o, s]]) => [i, o, s]), stashes: [], corpses: [], drops: [], flights: [], barrels: [], fires: [], bunker: false, ajar: [], vehicles: [], infected: [],
-    hour: phaseOf(Date.now() / 1000), spawn: { x: sp[0], z: sp[2], yaw: sp[3], y: sp[1] }, me: null, max: BR.max,
+    // (always day: a match by night is a match nobody can see, and every match is the same length of the same day)
+    hour: 0.3, spawn: { x: sp[0], z: sp[2], yaw: sp[3], y: sp[1] }, me: null, max: BR.max,
   } as unknown as S2C);
   br(p, { k: 'loot', add: [...l.ground.values()], gone: [], all: true });
 }
