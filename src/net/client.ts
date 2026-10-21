@@ -68,9 +68,10 @@ export function leaveWager() {
 
 function wsUrl(): string {
   const here = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
-  // (a wager is fought in the arena, a server of its own)
+  // (a wager is fought in the arena, a server of its own; the battle royale, on the same server, at its own door: the
+  // owner, "/arena still runs on the same server but for arena mode, /battleroyale ... is for battleroyale mode")
   const wager = wagerQuery();
-  if (wager) return `${arenaBase() ? arenaBase().replace(/^http/, 'ws') : here}/arena?${wager}`;
+  if (wager) return `${arenaBase() ? arenaBase().replace(/^http/, 'ws') : here}/${new URLSearchParams(wager).get('w') === 'br' ? 'battleroyale' : 'arena'}?${wager}`;
   const remote = remoteServer();
   return `${remote ? remote.replace(/^http/, 'ws') : here}/ws`;
 }
