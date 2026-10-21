@@ -2,6 +2,17 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## LIVE (2026-10-21 ~05:45 UTC): site from `4f34d13` (site-only: no server, API or wire change), server still `0b77446`
+Both performance tracks merged and on the site:
+- Model pictures at 256/128 on computers, with no sharp copies (f23bd17; owner: "we can do C").
+- Far towns and ruins drop their near copies; guns readied by what is shown (93b0431, d752d9d).
+- Trees behind the eye no longer drawn; woods toned down on high (5b5264e); lighter grass (fb699c3); grass setting off for
+  new players (81edbe0); loot shaders made ahead (9220e4a).
+- Measured online (progress/perf-1021/report.md): game peak 6.19 -> 4.94 GB, pictures 2.71 -> 1.00 GB. fps unchanged on
+  this heat-held laptop (card held at 1035 MHz). Triangles -20% in the forest and -30% in the open field
+  (perf-1021/forest). The forest is pixel-bound: its per-pixel cost is the open fps lever.
+- No changelog entry: the owner said "skip the banner".
+
 ## NEXT, once both performance tracks are merged and deployed (the owner, 2026-10-21)
 - **iPhone players get "a problem occurred".** A player in the community chat: "I get 'a problem occured' on ios ...
   Iphone only for me. Don't own a pc". The owner: "after both sessions pass and we get to a deploy state i wanna make sure
