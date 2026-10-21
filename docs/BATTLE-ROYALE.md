@@ -16,10 +16,17 @@
   `/arena?w=br` to `/battleroyale` with one line in src/net/client.ts, on branch `br-socket` (on top of this one). It is in
   the ZONA server's build filter, so shipping it restarts the ZONA server once (everyone keeps their place): ship it with the
   next ZONA deploy. Everything on `battle-royale` itself ships with no ZONA restart.
-- MEMORY: the arena server holds 258 MB with nobody in the battle royale (fits Render's free plan, 512 MB); each map's walls
-  and places for things are made when a lobby first opens on it (a ~5 s stall, once a map, just after its first player is
-  let in): one map in play 421 MB, all three ~800 MB. So Standard (1 CPU / 2 GB) once the battle royale is played;
-  `BOT_RULES` copied from browserdayz for the door; nothing else changes on Render.
+- HELD, NOT PUSHED (the owner, 2026-10-21: "do not push any server updates but do the work. hold the push"): the commits
+  after e6cdc87 are on this machine only. They are: cheap walls (every building a few boxes, `arena/br/solids.ts`, a
+  format ZONA's server can read later; places for things baked), and the playable pass from the owner's own game: doors
+  and jeeps usable, health only (no food, water, hunger, thirst, bleeding, broken legs, stamina), nothing carried but the
+  six slots' things, no inventory screen, a pause panel, the HUD clear of the Zone's compass, ping and notes, its own key
+  hints, the end never under a pause, the winner told by the server, loot taken only when looked at.
+- MEMORY (measured locally): the arena server 262 MB at rest; one battle royale match running 309 MB; a map's walls let go
+  when no lobby is on it (227 MB after). Render's free plan (512 MB) holds it; `BOT_RULES` copied from browserdayz for
+  the door; nothing else changes on Render.
+- Played through headless (`tools/br/br-play.js`): lobby, vote, plane, fall, canopy, landing, a door opened and closed, a
+  jeep got into and driven, the pause, the end. Pictures `progress/br/play/`, `progress/br/play2/`.
 - Server: `arena/br/` (rules.ts, wire.ts, loot.ts, match.ts, door.ts, solids/), served by `arena/server.ts`.
   Test: `npx tsx test/br-match.test.ts` (port 8241, 11 checks).
 - Game: `src/game/br/` (mode.ts the client mode, look.ts rings/wall/plane/canopy, cut.ts the map cut), `src/ui/br/`
