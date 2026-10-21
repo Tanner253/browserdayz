@@ -104,7 +104,9 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
       to.uv.push(q[6], q[7]);
       if (o.attr) to.extra.push(...o.attr.of([q[0], q[1], q[2]], [q[3], q[4], q[5]]));
     };
-    for (const part of partsOf(root, p.id)) {
+    for (const [k, part] of partsOf(root, p.id).entries()) {
+      // (and a part to one: one piece of the fort's far kit was 30 to 38 ms, 2026-10-21)
+      if (k) await breathe();
       const name = part.mat.name || 'stone';
       if (!rows.has(name)) rows.set(name, { mat: paints.get(name) ?? part.mat, pos: [], nrm: [], uv: [], extra: [] });
       const repeat = o.sets?.[name]?.repeat ?? 1;
@@ -138,6 +140,7 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
   let triangles = 0;
   for (const [name, row] of rows) {
     if (!row.pos.length) continue;
+    await breathe();
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(row.pos), 3));
     const nrm = new Float32Array(row.nrm);
