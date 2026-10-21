@@ -1175,6 +1175,8 @@ export class Player {
     const v = this.vitals;
     if (this.dead) return;
     if (this.arcade) {
+      // (and a sprint that never gives out: as PUBG, with no bar to say otherwise)
+      v.stamina = MAX_STAMINA;
       v.energy = v.water = 100;
       v.blood = BLOOD.full;
       v.bleeding = false;
