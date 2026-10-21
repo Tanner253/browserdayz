@@ -146,14 +146,14 @@ try {
   const ann = board.players.find((s) => s.name === 'Ann')!;
   assert.ok(ann.wins === 1 && ann.kills === 2, JSON.stringify(ann));
   ok(`the board: Ann 1 win, ${ann.kills} kills`);
-  // the walls the server has: a ray at chest height through the middle of every house of Kamenka's map is stopped
+  // the walls the server has (boxes made of the game's own: arena/br/solids.ts): a ray at chest height through the middle
+  // of every house of Kamenka's map is stopped
   const RAPIER = (await import('@dimforge/rapier3d-compat')).default;
   await RAPIER.init();
-  const { gunzipSync } = await import('node:zlib');
   const { readFileSync } = await import('node:fs');
-  const b = gunzipSync(readFileSync('arena/br/solids/village.bin.gz')), [nv, nt] = new Uint32Array(b.buffer, b.byteOffset, 4);
-  const at = b.byteOffset + 16, pw = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  pw.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(b.buffer.slice(at, at + nv * 12)), new Uint32Array(b.buffer.slice(at + nv * 12, at + nv * 12 + nt * 12))));
+  const { addSolids, readSolids } = await import('../arena/br/solids');
+  const pw = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+  addSolids(RAPIER, pw, readSolids(readFileSync('arena/br/solids/village.bin.gz')));
   pw.step();
   const houses = world.buildings.filter((h) => h.x > -700 && h.x < 720 && h.z > -700 && h.z < 720);
   const stopped = houses.filter((h) => {

@@ -1,33 +1,32 @@
 // What is found in a battle royale, and where (2026-10-21): the open world's own places for things (every shelf,
-// table and floor the game's buildings have, Kalat's ruins and the pass's caves), read as the game server reads them
-// (server/world.ts, buildWorldData: read here, never changed), plus caches in the open, Fortnite's floor loot, so the
-// desert, with few buildings, has its share. A place's step on the map (1 to 5) leans what is there toward its
+// table and floor the game's buildings have, Kalat's ruins and the pass's caves), planned as the game server plans them
+// (server/world.ts) but once, by scripts/br-solids.ts, into arena/br/solids/spots.bin.gz: planning every building costs
+// a server some 250 MB, the places themselves 70 KB. Plus caches in the open, Fortnite's floor loot, so the desert, with
+// few buildings, has its share. A place's step on the map (1 to 5) leans what is there toward its
 // rarity. Each gun lies with two boxes of its rounds (Fortnite's way: nobody finds a gun with nothing to put in it).
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { assets } from '../../src/core/assets';
-import { Buildings } from '../../src/world/buildings';
-import { caveLootPoints } from '../../src/world/caves-carved';
-import { ruinLoot, ruinsPlan } from '../../src/sim/ruins';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { ITEMS, makeItem } from '../../src/sim/items';
 import { heightAt, type World } from '../../src/world/worldgen';
 import { AMMO, GUNS, HEALS, HELMETS, MAPS, PACKS, VESTS, freshGun, inMap, type BrMap, type Ground } from './rules';
 
 export interface Spot { x: number; y: number; z: number; tier: number }
 
-/** every place for a thing on the map, with its step (made once, when the server starts: a few seconds) */
-export function brSpots(world: World): Spot[] {
-  const root = process.cwd();
-  // (the newer of the built copy and public/'s, as the game server takes it: an old build lacks the models brought in since)
-  const at = ['dist/assets/manifest.json', 'public/assets/manifest.json'].map((p) => path.join(root, p)).filter((p) => existsSync(p)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-  if (at) (assets as { manifest: unknown }).manifest = JSON.parse(readFileSync(at, 'utf8'));
-  const b = new Buildings(world, null as never);
-  b.plan();
-  const ground = (x: number, z: number) => heightAt(world.heights, x, z);
-  if (world.kalat) for (const { piece, place } of ruinsPlan(world.kalat)) b.lootPoints.push(...ruinLoot(piece, place, ground));
-  b.lootPoints.push(...caveLootPoints());
-  return b.lootPoints.map((p) => ({ x: p.x, y: p.y, z: p.z, tier: p.tier ?? 2 }));
+const SPOTS = 'arena/br/solids/spots.bin.gz';
+
+/** every place for a thing on every map, with its step, as baked (four floats each: x y z step) */
+export function brSpots(): Spot[] {
+  const file = path.join(process.cwd(), SPOTS);
+  if (!existsSync(file)) return [];
+  const b = gunzipSync(readFileSync(file)), f = new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)), out: Spot[] = [];
+  for (let i = 0; i < f.length; i += 4) out.push({ x: f[i], y: f[i + 1], z: f[i + 2], tier: f[i + 3] });
+  return out;
 }
+
+/** the places, written as `brSpots` reads them (by scripts/br-solids.ts) */
+export const spotsFile = (spots: Spot[]) => gzipSync(Buffer.from(new Float32Array(spots.flatMap((s) => [s.x, s.y, s.z, s.tier])).buffer), { level: 9 });
+export const SPOTS_FILE = SPOTS;
 
 const pick = <T>(a: readonly T[], rnd: () => number) => a[Math.floor(rnd() * a.length)];
 const clampT = (t: number) => Math.max(1, Math.min(5, Math.round(t)));

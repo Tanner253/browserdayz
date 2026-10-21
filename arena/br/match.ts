@@ -9,7 +9,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { gunzipSync } from 'node:zlib';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -22,6 +21,7 @@ import { groundField, heightAt, type World } from '../../src/world/worldgen';
 import { AMMO, BR, FLIGHT, HEALS, MAPS, MELEE, PHASES, TEAM, capOf, stackOf, circleAt, firstCircle, inMap, kindOf, modeOfSize, nextCircle, type BrMode, type Circle, type Ground, type SlotItem } from './rules';
 import { brSpots, groundId, rollMatch, rollWait, type Spot } from './loot';
 import { atDoor, knownAtDoor } from './door';
+import { addSolids, readSolids } from './solids';
 import { THROWN, inHandDamage, judge, letGo, newThrower, pullPin, type Thrower } from '../../src/sim/grenades';
 import type { BrS2C, Mate, Phase } from './wire';
 import { JEEP, SEATS, jeepSpots, restState, westSpots, type VState, type VehicleInfo } from '../../src/sim/vehicles';
@@ -153,46 +153,34 @@ async function buildWorld() {
 }
 
 /**
- * A map made ready when a lobby first opens on it, and kept: its solids as the game has them (arena/br/solids/<map>.bin.gz,
- * see tools/br/br-solids.js for the layout), kept to the map and a margin round it; and, once, every place for a thing.
- * Not at start: a server where nobody plays the battle royale holds none of it (the Arena's share of it fits the free plan).
+ * A map's walls, laid in when a lobby first opens on it and taken out again once no lobby is on it (the owner chose
+ * walls the server checks, kept cheap): its boxes, rocks and trunks (arena/br/solids.ts), kept to the map and a margin
+ * round it. And, once, every place for a thing on every map (a few seconds; light to keep). Not at start: a server where
+ * nobody plays the battle royale holds none of it.
  */
-const ready = new Set<number>();
+const ready = new Map<number, RAPIER.Collider[]>();
 function readyMap(map: number) {
   if (ready.has(map) || !phys) return;
-  ready.add(map);
-  const w = phys, t0 = Date.now();
-  if (!spots.length) spots = brSpots(world);
-  for (const m of [MAPS[map]]) {
-    const file = path.join(process.cwd(), 'arena/br/solids', `${m.id}.bin.gz`);
-    if (!existsSync(file)) {
-      log(`no solids for ${m.name}: shots there stop at the ground and the shooter's own word on walls`);
-      continue;
-    }
-    const b = gunzipSync(readFileSync(file)), head = new Uint32Array(b.buffer, b.byteOffset, 4), [nv, nt, nh, nc] = head;
-    const at = b.byteOffset + 16, verts = new Float32Array(b.buffer.slice(at, at + nv * 12)), tris = new Uint32Array(b.buffer.slice(at + nv * 12, at + nv * 12 + nt * 12));
-    const near = (x: number, z: number) => inMap(m, x, z, 60);
-    const keep: number[] = [];
-    for (let i = 0; i < tris.length; i += 3) if (near(verts[tris[i] * 3], verts[tris[i] * 3 + 2])) keep.push(tris[i], tris[i + 1], tris[i + 2]);
-    if (keep.length) w.createCollider(RAPIER.ColliderDesc.trimesh(verts, new Uint32Array(keep)));
-    const rest = new Float32Array(b.buffer.slice(at + nv * 12 + nt * 12));
-    let k = 0, hulls = 0;
-    for (let h = 0; h < nh; h++) {
-      const n = rest[k++], pts = rest.slice(k, k + n * 3);
-      k += n * 3;
-      if (!near(pts[0], pts[2])) continue;
-      const d = RAPIER.ColliderDesc.convexHull(pts);
-      if (d) (w.createCollider(d), hulls++);
-    }
-    let trunks = 0;
-    for (let c = 0; c < nc; c++, k += 9) {
-      if (!near(rest[k], rest[k + 2])) continue;
-      w.createCollider(RAPIER.ColliderDesc.cylinder(rest[k + 7], rest[k + 8]).setTranslation(rest[k], rest[k + 1], rest[k + 2]).setRotation({ x: rest[k + 3], y: rest[k + 4], z: rest[k + 5], w: rest[k + 6] }));
-      trunks++;
-    }
-    log(`${m.name} ready in ${Date.now() - t0} ms: ${keep.length / 3} triangles of walls, ${hulls} rocks, ${trunks} trunks stop shots; ${spots.filter((s) => inMap(m, s.x, s.z)).length} places for things`);
+  const w = phys, t0 = Date.now(), m = MAPS[map];
+  if (!spots.length) spots = brSpots();
+  const file = path.join(process.cwd(), 'arena/br/solids', `${m.id}.bin.gz`);
+  if (!existsSync(file)) {
+    ready.set(map, []);
+    return log(`no solids for ${m.name}: shots there stop at the ground and the shooter's own word on walls`);
   }
+  const made = addSolids(RAPIER, w, readSolids(readFileSync(file)), (x, z) => inMap(m, x, z, 60));
+  ready.set(map, made);
   w.step();
+  log(`${m.name} ready in ${Date.now() - t0} ms: ${made.length} boxes, rocks and trunks stop shots; ${spots.filter((s) => inMap(m, s.x, s.z)).length} places for things`);
+}
+/** a map no lobby is on any more: its walls taken out */
+function dropUnused() {
+  for (const [map, made] of ready) {
+    if ([...lobbies.values()].some((l) => l.map === map)) continue;
+    for (const c of made) phys?.removeCollider(c, false);
+    ready.delete(map);
+    log(`${MAPS[map].name}: nobody plays it, its walls let go`);
+  }
 }
 function wallAt(o: number[], d: number[], most: number): number {
   if (!phys) return Infinity;
@@ -975,5 +963,6 @@ export async function startBr(w: World) {
       }
       if (l.state !== 'over' && !inMatch(l)) lobbyTo(l);
     }
+    dropUnused();
   }, 5000).unref();
 }
