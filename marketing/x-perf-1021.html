@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: smoother everywhere</title>
+<!-- An X card and the changelog's picture, 1600x900 (2026-10-21). Rendered by: node scripts/card.mjs x-perf-1021 1600 900
+     Every number is measured: the flight, assets-src/_wf/me/runs/owner-run-2.json replayed by replay.mjs (81.1 fps on
+     2026-10-19, progress/flight-1021.log today); loading, progress/lean (Fast 4G, cold cache); memory, progress/perf-1021/report.md
+     (game on the card at peak, online, 2560x1440). -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #cfc6ae; --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --green: #9fe08a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .shot { position: absolute; inset: 0; background: url('src-x-perf-1021.png') no-repeat; background-size: cover; background-position: center; filter: brightness(1.05) contrast(1.08) saturate(1.1); }
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(90deg, rgba(8, 9, 7, 0.94) 0%, rgba(8, 9, 7, 0.72) 36%, rgba(8, 9, 7, 0.12) 54%, rgba(8, 9, 7, 0.2) 100%),
+    linear-gradient(180deg, rgba(8, 9, 7, 0.3) 0%, rgba(8, 9, 7, 0) 22%, rgba(8, 9, 7, 0) 74%, rgba(8, 9, 7, 0.7) 100%); }
+  .frame { position: absolute; inset: 16px; border: 2px solid var(--line); }
+  .logo { position: absolute; left: 64px; top: 54px; font-size: 46px; font-weight: 700; letter-spacing: 0.18em; line-height: 0.9; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8); }
+  .logo small { display: block; margin-top: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+  .head { position: absolute; left: 64px; top: 170px; width: 640px; }
+  .head i { display: inline-block; padding: 6px 14px; font-style: normal; font-size: 18px; font-weight: 700; letter-spacing: 0.26em; color: #141109; background: var(--gold); }
+  .head h1 { margin-top: 20px; font-size: 100px; font-weight: 700; line-height: 0.9; letter-spacing: 0.03em; }
+  .head h1 em { font-style: normal; color: var(--gold); }
+  .head p { margin-top: 24px; font-size: 25px; font-weight: 500; line-height: 1.32; letter-spacing: 0.02em; text-transform: none; color: var(--dim); }
+  .head p b { color: var(--ink); font-weight: 700; }
+  .tiles { position: absolute; right: 64px; top: 120px; width: 720px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tile { padding: 20px 24px 18px; background: rgba(12, 13, 11, 0.84); border: 1px solid var(--line); border-top: 6px solid var(--green); }
+  .tile.big { grid-column: span 2; border-top-color: var(--gold); }
+  .tile h3 { font-size: 17px; font-weight: 700; letter-spacing: 0.22em; color: var(--dim); }
+  .tile .n { margin-top: 10px; font-size: 64px; font-weight: 700; line-height: 0.95; letter-spacing: 0.02em; }
+  .tile .n s { text-decoration: none; color: var(--dim); font-size: 40px; }
+  .tile .n em { font-style: normal; color: var(--green); }
+  .tile.big .n em { color: var(--gold); }
+  .tile p { margin-top: 8px; font-size: 19px; font-weight: 500; line-height: 1.25; text-transform: none; color: var(--dim); }
+  .note { position: absolute; left: 64px; bottom: 96px; width: 640px; font-size: 16px; font-weight: 500; line-height: 1.35; text-transform: none; color: var(--dim); opacity: 0.85; }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 50px; display: flex; justify-content: space-between; font-size: 19px; font-weight: 600; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="shot"></div><div class="shade"></div><div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+  <div class="head">
+    <i>Performance update</i>
+    <h1>Lighter.<br>Faster.<br><em>Smoother.</em></h1>
+    <p>Two days under the hood: the game asks <b>far less of your graphics card</b>, <b>loads sooner</b>, and our recorded helicopter flight runs <b>42% faster</b>. Cheat scripts are closed, and their users banned.</p>
+  </div>
+  <div class="tiles">
+    <div class="tile big"><h3>Helicopter flight, frames a second</h3><div class="n"><s>81.1</s> → <em>114.8</em></div><p>the same recorded flight, replayed (+42%)</p></div>
+    <div class="tile"><h3>Download into the game</h3><div class="n"><s>178</s> → <em>132</em></div><p>MB downloaded: 46 MB less to load</p></div>
+    <div class="tile"><h3>Graphics card memory</h3><div class="n"><s>6.2</s> → <em>4.9</em></div><p>GB at its peak, online</p></div>
+    <div class="tile big"><h3>Into the game on 4G</h3><div class="n"><s>241</s> → <em>188</em></div><p>seconds from an empty cache: 53 seconds sooner</p></div>
+  </div>
+  <div class="note">Measured on one test PC: the same recorded helicopter flight replayed on 19 Oct and today; loading on Chrome’s Fast 4G setting with an empty cache; memory online with test players at 2560×1440.</div>
+  <div class="foot"><span>X <b>@zonaSOL_</b></span><span><b>ZONAPVP.FUN</b></span></div>
+</body>
+</html>
