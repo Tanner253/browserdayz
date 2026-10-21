@@ -71,6 +71,8 @@ export class BrMenu {
       }
     });
     this.hud.onStartShown = (on, paused, text) => {
+      // (over, or out: the end has its own way on, and the mouse let go for it is no pause)
+      if (document.querySelector('#hud .br-hud.ended')) on = false;
       this.el.classList.toggle('show', on);
       this.el.classList.toggle('paused', on && paused);
       this.el.classList.toggle('waiting', on && !paused && !!text);

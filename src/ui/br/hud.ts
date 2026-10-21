@@ -130,6 +130,8 @@ export class BrHud {
     this.el.classList.toggle('won', won);
     this.q('.br-end-place').textContent = place;
     this.q('.br-end-what').innerHTML = `${what}${more ? `<small>${more}</small>` : ''}`;
+    // (the mouse let go for its buttons: the pause it brings, or one already up, is not shown over it)
+    document.getElementById('br-menu')?.classList.remove('show', 'paused', 'pset');
     document.exitPointerLock?.();
   }
 

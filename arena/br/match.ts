@@ -91,6 +91,8 @@ interface Lobby {
 }
 
 const lobbies = new Map<string, Lobby>();
+/** when each player was last told the waiting area ends where they stand */
+const toldEdge = new Map<number, number>();
 let world: World;
 let spots: Spot[] = [];
 let phys: RAPIER.World | null = null;
@@ -373,7 +375,7 @@ function over(l: Lobby) {
   }
   l.winners = win.map((p) => p.name);
   const rows = l.ps.map((p) => ({ name: p.name, place: p.place || 1, kills: p.kills, dmg: Math.round(p.dmg) })).sort((a, b) => a.place - b.place || b.kills - a.kills);
-  for (const p of l.ps) br(p, { k: 'over', winners: l.winners, board: rows });
+  for (const p of l.ps) br(p, { k: 'over', winners: l.winners, board: rows, won: win.includes(p) });
   results.push({ at: Date.now(), mode: l.mode, map: MAPS[l.map].id, players: l.ps.length, places: rows.map((r) => ({ name: r.name, place: r.place, kills: r.kills })) });
   if (results.length > 200) results.shift();
   stateTo(l);
@@ -633,7 +635,11 @@ function said(l: Lobby, p: P, m: Record<string, unknown>) {
       const w = MAPS[l.map].wait, outside = !inMatch(l) && Math.hypot(q[0] - w.x, q[2] - w.z) > w.r + 6;
       if (outside || (!air && Math.hypot(q[0] - was[0], q[2] - was[2]) > 14 * dt + 4)) {
         if (outside) {
-          send(p, { t: 'tell', text: 'The waiting area ends here', kind: 'warn' });
+          // (said once in a while, not at every step taken against the edge)
+          if (now - (toldEdge.get(p.id) ?? 0) > 4000) {
+            toldEdge.set(p.id, now);
+            send(p, { t: 'tell', text: 'The waiting area ends here', kind: 'warn' });
+          }
           const x = w.x + (q[0] - w.x) * 0.8, z = w.z + (q[2] - w.z) * 0.8;
           p.pose = [x, ground(x, z) + 0.1, z, q[3], 0, 0];
         }

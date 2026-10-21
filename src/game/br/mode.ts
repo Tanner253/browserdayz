@@ -143,7 +143,7 @@ export class BrMode {
         return this.hud.out(m);
       case 'over':
         this.ended = true;
-        return this.hud.over(m, !!this.me && m.winners.includes(this.game.hud.nameValue()) && !this.me.knocked);
+        return this.hud.over(m, !!m.won);
       case 'remap':
         // (that lobby, or this player's match, is on another map: the page is cut for it again)
         return location.assign(`/battleroyale?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}`);
@@ -185,7 +185,9 @@ export class BrMode {
     for (const s of m.slots) {
       if (!s || (kindOf(s.id) !== 'gun' && kindOf(s.id) !== 'melee' && kindOf(s.id) !== 'nade')) continue;
       keep.add(s.uid);
-      if (!this.mirror.has(s.uid)) {
+      // (and again if the game let it go: a game coming in is given the open world's kit, after the slots were filled)
+      const had = this.mirror.get(s.uid);
+      if (!had || !g.inv.find((i) => i === had)) {
         const it = structuredClone(s) as ItemInstance;
         g.inv.add(it);
         this.mirror.set(s.uid, it);
@@ -197,7 +199,7 @@ export class BrMode {
     }
     for (const k of ['vest', 'helmet', 'pack'] as const) {
       const want = m[k], has = this.worn[k];
-      if ((has?.id ?? null) === want) continue;
+      if ((has?.id ?? null) === want && (!has || g.inv.find((i) => i === has))) continue;
       if (has) gone.push(has.uid);
       this.worn[k] = want ? makeItem(want) : null;
       if (this.worn[k]) g.inv.add(this.worn[k]!);
@@ -311,8 +313,9 @@ export class BrMode {
     for (const gr of this.ground.values()) {
       if (gr.ammo || Math.abs(gr.x - p.pos.x) > 2.8 || Math.abs(gr.z - p.pos.z) > 2.8 || Math.abs(gr.y - p.pos.y) > 2.2) continue;
       _v.set(gr.x - cam.position.x, gr.y + 0.2 - cam.position.y, gr.z - cam.position.z);
-      const d = _v.length(), s = d * 0.25 + (1 - _v.normalize().dot(_f)) * 4;
-      if (d < 3.2 && s < score) (score = s), (best = gr);
+      // (only what is looked at, within a few degrees: a door or a car looked at past a thing lying by it is the door's or the car's)
+      const d = _v.length(), look = _v.normalize().dot(_f), s = d * 0.25 + (1 - look) * 4;
+      if (d < 3.2 && look > 0.93 && s < score) (score = s), (best = gr);
     }
     this.target.g = best;
     if (!best?.item) return;

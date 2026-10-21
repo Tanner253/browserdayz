@@ -28,7 +28,7 @@ export type BrS2C =
   /** that lobby (or this player's match, coming back) is on another map: the page is cut again for it */
   | { k: 'remap'; map: number; code: string; size: number }
   /** won: the winners, and everybody's place */
-  | { k: 'over'; winners: string[]; board: { name: string; place: number; kills: number; dmg: number }[] };
+  | { k: 'over'; winners: string[]; board: { name: string; place: number; kills: number; dmg: number }[]; /** this player is one of them */ won?: boolean };
 
 export type BrC2S =
   | { k: 'vote'; yes: boolean }
