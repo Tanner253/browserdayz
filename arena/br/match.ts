@@ -17,9 +17,10 @@ import { shotOf } from '../../src/sim/gunplay';
 import { ITEMS, makeItem, type ItemInstance } from '../../src/sim/items';
 import { F_CROUCH, F_DEAD, F_PRONE, PROTOCOL, type Pose, type S2C } from '../../src/net/protocol';
 import { groundField, heightAt, type World } from '../../src/world/worldgen';
-import { AMMO, BR, FLIGHT, HEALS, MAPS, MELEE, PHASES, TEAM, capOf, circleAt, firstCircle, inMap, kindOf, modeOfSize, nextCircle, type BrMode, type Circle, type Ground, type SlotItem } from './rules';
+import { AMMO, BR, FLIGHT, HEALS, MAPS, MELEE, PHASES, TEAM, capOf, stackOf, circleAt, firstCircle, inMap, kindOf, modeOfSize, nextCircle, type BrMode, type Circle, type Ground, type SlotItem } from './rules';
 import { brSpots, groundId, rollMatch, rollWait, type Spot } from './loot';
 import { atDoor, knownAtDoor } from './door';
+import { THROWN, inHandDamage, judge, letGo, newThrower, pullPin, type Thrower } from '../../src/sim/grenades';
 import type { BrS2C, Mate, Phase } from './wire';
 import { JEEP, SEATS, jeepSpots, restState, westSpots, type VState, type VehicleInfo } from '../../src/sim/vehicles';
 
@@ -61,6 +62,8 @@ interface P {
   longest: number;
   born: number;
   shots: number[];
+  /** grenades: whose pin is out, and those thrown, for the server's own count of their fuses (src/sim/grenades.ts) */
+  nades: Thrower;
 }
 
 interface Lobby {
@@ -179,6 +182,7 @@ function toWait(l: Lobby, p: P) {
   fresh(p);
   p.pose = [x, y, z, rnd() * 6.28, 0, 0];
   p.hist = [{ t: Date.now(), p: p.pose }];
+  p.nades = newThrower();
   send(p, { t: 'powers', god: false, hidden: false, clip: false, voidInv: false, voidTag: false, bottomless: true });
   send(p, { t: 'put', x, y, z, yaw: p.pose[3] });
   send(p, { t: 'mend' } as S2C);
@@ -445,10 +449,21 @@ function shot(l: Lobby, me: P, m: { o: unknown; d: unknown; w: unknown; sup?: un
 }
 
 /** a blow with the melee weapon in hand (or fists), claimed by the striker's game and held to its reach */
-function blow(l: Lobby, me: P, m: { to?: unknown; w?: unknown; zone?: unknown }) {
-  if (!me.alive || me.knocked || l.state === 'plane' || l.state === 'over') return;
+function blow(l: Lobby, me: P, m: { to?: unknown; w?: unknown; zone?: unknown; dist?: unknown }) {
+  if (l.state === 'plane' || l.state === 'over') return;
   const v = l.ps.find((o) => o.id === m.to);
   const w = typeof m.w === 'string' ? m.w : '';
+  if (THROWN[w]) {
+    // a grenade of theirs: gone off when the server's own count of its fuse says, no further than it can have flown (src/sim/grenades.ts, judge)
+    if (!v || !v.alive || !foes(l, me, v) || !Number.isFinite(m.dist)) return;
+    const far = judge(me.nades, w, `p${v.id}`, [v.pose[0], v.pose[1] + 1.1, v.pose[2]], Number(m.dist), Date.now());
+    if (far === null) return;
+    const dmg = armoured(v, 'torso', hitDamage(w, 'torso', far));
+    send(v, { t: 'dmg', from: me.id, amount: dmg, zone: 'torso', w, dir: [0, 0, 1] });
+    send(me, { t: 'hitok', to: v.id, amount: Math.round(dmg), zone: 'torso' });
+    return hurt(l, v, me, dmg, w, false);
+  }
+  if (!me.alive || me.knocked) return;
   if (!v || !v.alive || !foes(l, me, v) || (w && !ITEMS[w]?.melee && w !== 'fists')) return;
   if (Math.hypot(v.pose[0] - me.pose[0], v.pose[1] - me.pose[1], v.pose[2] - me.pose[2]) > BR.meleeReach) return;
   const now = Date.now();
@@ -545,9 +560,9 @@ function take(l: Lobby, p: P, id: number, slot: number) {
       if (was) drop({ item: makeItem(was) });
     } else {
       // a heal stacks onto a slot of the same; else the first free slot; else the slot in hand is swapped out
-      const h = HEALS[g.item.id], same = h ? p.slots.findIndex((s) => s?.id === g.item!.id && (s.qty ?? 1) < h.stack) : -1;
+      const most = stackOf(g.item.id), same = most > 1 ? p.slots.findIndex((s) => s?.id === g.item!.id && (s.qty ?? 1) < most) : -1;
       if (same >= 0) {
-        const s = p.slots[same]!, n = Math.min(h.stack - (s.qty ?? 1), g.item.qty ?? 1);
+        const s = p.slots[same]!, n = Math.min(most - (s.qty ?? 1), g.item.qty ?? 1);
         s.qty = (s.qty ?? 1) + n;
         if ((g.item.qty ?? 1) > n) add.push({ ...g, id: groundId(), item: { ...g.item, qty: (g.item.qty ?? 1) - n } });
       } else {
@@ -596,6 +611,25 @@ function said(l: Lobby, p: P, m: Record<string, unknown>) {
       return shot(l, p, m as { o: unknown; d: unknown; w: unknown; sup?: unknown });
     case 'hit':
       return blow(l, p, m);
+    case 'pin':
+      if (p.alive && !p.knocked && typeof m.w === 'string' && THROWN[m.w] && holds(p, m.w)) pullPin(p.nades, m.w, Date.now());
+      return;
+    case 'nade': {
+      const o = m.o as [number, number, number], v = m.v as [number, number, number];
+      if (!p.alive || !Array.isArray(o) || !Array.isArray(v) || o.length !== 3 || v.length !== 3 || ![...o, ...v].every(Number.isFinite)) return;
+      const out = letGo(p.nades, o, v, [p.pose[0], p.pose[1], p.pose[2]], Date.now());
+      if (!out) return;
+      // one fewer in its slot
+      const k = p.slots.findIndex((s) => s?.id === out.w);
+      if (k >= 0) {
+        const s = p.slots[k]!;
+        s.qty = (s.qty ?? 1) - 1;
+        if (s.qty <= 0) p.slots[k] = null;
+        me(l, p);
+      }
+      if (out.hand) return hurt(l, p, p, inHandDamage(out.w), out.w, false);
+      return all(l, { t: 'nade', id: p.id, o: out.o, v, w: out.w, f: out.left }, p);
+    }
     case 'swing':
       return all(l, { t: 'swing', id: p.id }, p);
     case 'emote':
@@ -816,7 +850,7 @@ export function brUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
         }
       }
       if (l.ps.some((o) => o.key === key)) return turn('You are in that lobby already.');
-      const me0: P = { id: nextId++, ws, name, key, pose: [0, 0, 0, 0, 0, 0], hist: [], w: null, m: [], g: [], rtt: 150, pingAt: 0, gone: 0, team: 0, hp: 100, knocked: false, kn: 0, alive: true, place: 0, slots: starter(), vest: null, helmet: null, pack: null, pools: {}, using: null, rev: null, voted: false, jumped: false, kills: 0, knocks: 0, revives: 0, dmg: 0, longest: 0, born: Date.now(), shots: [] };
+      const me0: P = { id: nextId++, ws, name, key, pose: [0, 0, 0, 0, 0, 0], hist: [], w: null, m: [], g: [], rtt: 150, pingAt: 0, gone: 0, team: 0, hp: 100, knocked: false, kn: 0, alive: true, place: 0, slots: starter(), vest: null, helmet: null, pack: null, pools: {}, using: null, rev: null, voted: false, jumped: false, kills: 0, knocks: 0, revives: 0, dmg: 0, longest: 0, born: Date.now(), shots: [], nades: newThrower() };
       p = me0;
       l.ps.push(me0);
       if (!l.ground.size) for (const g of rollWait(world, l.map, rnd)) l.ground.set(g.id, g);

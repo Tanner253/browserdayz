@@ -140,12 +140,19 @@ export const GUNS: Record<number, string[]> = {
   4: ['ar15', 'a91', 'vssk', 'dual_mac10'],
   5: ['barrett', 'sniper50'],
 };
+/** how many of a thing a slot holds: heals and grenades stack */
+export const stackOf = (id: string) => HEALS[id]?.stack ?? NADES[id]?.stack ?? 1;
 /** heals: rarity, health given, the most it heals to, seconds to use, how many a slot holds */
 export const HEALS: Record<string, { tier: number; hp: number; cap: number; secs: number; stack: number }> = {
   bandage: { tier: 1, hp: 15, cap: 75, secs: 3, stack: 5 },
   aid_pouch: { tier: 2, hp: 35, cap: 100, secs: 5, stack: 3 },
   firstaid: { tier: 3, hp: 100, cap: 100, secs: 8, stack: 2 },
   stim: { tier: 4, hp: 50, cap: 100, secs: 2, stack: 2 },
+};
+/** grenades: rarity, and how many a slot holds */
+export const NADES: Record<string, { tier: number; stack: number }> = {
+  grenade: { tier: 2, stack: 3 },
+  frag: { tier: 3, stack: 3 },
 };
 /** armour, helmets and packs by rarity (each worn in its own slot, as PUBG has them) */
 export const VESTS: Record<number, string> = { 1: 'chest_rig', 2: 'soft_vest', 3: 'armor_vest', 4: 'life_vest', 5: 'heavy_armor' };
@@ -175,15 +182,17 @@ export const capOf = (ammo: string, pack: string | null) => {
 export function rarityOf(id: string): number {
   for (const [t, ids] of Object.entries(GUNS)) if (ids.includes(id)) return Number(t);
   if (HEALS[id]) return HEALS[id].tier;
+  if (NADES[id]) return NADES[id].tier;
   for (const tab of [VESTS, HELMETS, PACKS]) for (const [t, v] of Object.entries(tab)) if (v === id) return Number(t);
   if (MELEE.includes(id)) return 1;
   return 1;
 }
 
-export type Kind = 'gun' | 'melee' | 'heal' | 'vest' | 'helmet' | 'pack' | 'ammo';
+export type Kind = 'gun' | 'melee' | 'heal' | 'nade' | 'vest' | 'helmet' | 'pack' | 'ammo';
 export function kindOf(id: string): Kind {
   if (AMMO[id]) return 'ammo';
   if (HEALS[id]) return 'heal';
+  if (NADES[id]) return 'nade';
   if (Object.values(VESTS).includes(id)) return 'vest';
   if (Object.values(HELMETS).includes(id)) return 'helmet';
   if (Object.values(PACKS).includes(id)) return 'pack';

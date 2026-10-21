@@ -53,7 +53,8 @@ function finds(r: number, rnd: () => number): { item?: ReturnType<typeof makeIte
     const [id, h] = pick(heals.length ? heals : Object.entries(HEALS), rnd);
     return [{ item: makeItem(id, Math.min(h.stack, 1 + Math.floor(rnd() * 2))) }];
   }
-  if (roll < 0.8) {
+  if (roll < 0.7) return [{ item: makeItem(r >= 3 ? 'frag' : 'grenade', 1 + Math.floor(rnd() * 2)) }];
+  if (roll < 0.82) {
     const a = pick(Object.keys(AMMO).filter((k) => k !== 'ammo_50bmg' || r >= 4), rnd);
     return [{ ammo: a, n: AMMO[a].box }];
   }

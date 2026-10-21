@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { ITEMS, makeItem, type ItemInstance } from '../../sim/items';
 import { heightAt } from '../../world/worldgen';
-import { BR, FLIGHT, HEALS, MAPS, RARITY, capOf, circleAt, kindOf, rarityOf, type Ground } from '../../../arena/br/rules';
+import { BR, FLIGHT, HEALS, MAPS, RARITY, capOf, circleAt, kindOf, rarityOf, stackOf, type Ground } from '../../../arena/br/rules';
 import type { BrC2S, BrS2C, Phase } from '../../../arena/br/wire';
 import { BrHud } from '../../ui/br/hud';
 import { BrLook } from './look';
@@ -164,7 +164,7 @@ export class BrMode {
   private mirrorSlots() {
     const g = this.game, m = this.me!, keep = new Set<string>(), gone: string[] = [];
     for (const s of m.slots) {
-      if (!s || (kindOf(s.id) !== 'gun' && kindOf(s.id) !== 'melee')) continue;
+      if (!s || (kindOf(s.id) !== 'gun' && kindOf(s.id) !== 'melee' && kindOf(s.id) !== 'nade')) continue;
       keep.add(s.uid);
       if (!this.mirror.has(s.uid)) {
         const it = structuredClone(s) as ItemInstance;
@@ -199,7 +199,8 @@ export class BrMode {
     if (HEALS[s.id]) return this.send({ k: 'use', slot: k });
     this.held = k;
     const it = this.mirror.get(s.uid);
-    if (it) this.game.weapons.take(it);
+    // (a grenade is taken up the game's own way, its pin and its throw as in the open world)
+    if (it) kindOf(s.id) === 'nade' ? this.game.takeUp(it) : this.game.weapons.take(it);
   }
 
   private vote() {
@@ -291,7 +292,7 @@ export class BrMode {
     }
     this.target.g = best;
     if (!best?.item) return;
-    const id = best.item.id, t = rarityOf(id), r = RARITY[t], full = me.slots.every((s) => s) && !['vest', 'helmet', 'pack'].includes(kindOf(id)) && !me.slots.some((s) => s?.id === id && HEALS[id] && (s.qty ?? 1) < HEALS[id].stack);
+    const id = best.item.id, t = rarityOf(id), r = RARITY[t], full = me.slots.every((s) => s) && !['vest', 'helmet', 'pack'].includes(kindOf(id)) && !me.slots.some((s) => s?.id === id && (s.qty ?? 1) < stackOf(id));
     g.prompt = `<kbd>F</kbd>Take <b style="color:${r.colour}">${ITEMS[id]?.name ?? id}</b> <small>${r.name}${full ? ` · swaps slot ${this.held + 1}` : ''}</small>`;
   }
 
