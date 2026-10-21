@@ -257,6 +257,8 @@ export class Atmosphere {
   }
   /** the gas seen against the sky, where there is nothing behind it to be dimmed by it */
   gasDome: THREE.Mesh | null = null;
+  /** every gas's dome: out of sight where no gas is (src/game/modes.ts) */
+  readonly gasDomes: THREE.Mesh[] = [];
   envMap!: THREE.Texture;
   background!: THREE.Texture;
   csm!: CSM;
@@ -749,6 +751,7 @@ export class Atmosphere {
     dome.updateMatrix();
     this.scene.add(dome);
     this.gasDome ??= dome;
+    this.gasDomes.push(dome);
   }
 
   /**

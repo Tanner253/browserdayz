@@ -95,15 +95,20 @@ export class Gas {
    * @param zones every gas the world has (`gasClouds`): each has its boards round it, its wisps, its dimmed day and
    * its warning, and is breathed, by the same lines
    */
+  /** the boards round every gas: out of sight where no gas is (src/game/modes.ts) */
+  readonly signGroup = new THREE.Group();
+
   constructor(
     private zones: GasCloud[],
     private atmo: Atmosphere,
-    private scene: THREE.Scene,
+    scene: THREE.Scene,
     private host: GasHost,
     hud: HTMLElement,
     world: World,
   ) {
     this.ground = (x, z) => heightAt(world.heights, x, z);
+    this.signGroup.name = 'gas signs';
+    scene.add(this.signGroup);
     for (const zone of zones) this.signs(zone, world);
     this.veil = document.createElement('div');
     this.veil.className = 'hud-gas';
@@ -237,7 +242,7 @@ export class Gas {
       mesh.castShadow = mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       mesh.name = 'gas signs';
-      this.scene.add(mesh);
+      this.signGroup.add(mesh);
     }
   }
 

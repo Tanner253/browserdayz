@@ -56,6 +56,7 @@ import '../sim/vehicles';
 import { HUD } from '../ui/hud';
 import { ArenaHud } from '../ui/arena-hud';
 import type { BrMode } from './br/mode';
+import { Modes } from './modes';
 import '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
@@ -486,7 +487,8 @@ export class Game {
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
     this.hearths = new Hearths(this.fires.spots);
     // the helicopters' pads: on the hospital's roof, and by the fort (src/world/helipad.ts)
-    for (const pad of helipads(world, (m) => atmo.register(m))) r.scene.add(pad);
+    this.pads = helipads(world, (m) => atmo.register(m));
+    for (const pad of this.pads) r.scene.add(pad);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     this.party = new Party(r.scene);
@@ -1275,6 +1277,14 @@ export class Game {
   arenaHud: ArenaHud | null = null;
   /** in the battle royale, its own mode (src/game/br/mode.ts); null elsewhere */
   br: BrMode | null = null;
+  /** the battle royale's mode, made once a page and put on again after (src/game/modes.ts) */
+  brKept: BrMode | null = null;
+  /** which game the page plays, and the way to another in place */
+  readonly modes = new Modes(this);
+  /** the helicopters' pads (src/world/helipad.ts) */
+  pads: THREE.Object3D[] = [];
+  /** the ways in begun on this page: one begun before another game was gone to comes to nothing (Game.join) */
+  joinGen = 0;
   /**
    * What is built behind the menu rather than before it (the guns, their shaders, any inventory picture that is out
    * of date): the menu is up while it is, and Deploy waits for it (`isLoaded`; pressed before, it is remembered in
@@ -1507,6 +1517,7 @@ export interface Game {
   join: Methods<typeof enterMethods>['join'];
   toArena: Methods<typeof enterMethods>['toArena'];
   toBr: Methods<typeof enterMethods>['toBr'];
+  idle: Methods<typeof enterMethods>['idle'];
   dress: Methods<typeof enterMethods>['dress'];
   onRange: Methods<typeof enterMethods>['onRange'];
   enterOffline: Methods<typeof enterMethods>['enterOffline'];
@@ -1528,6 +1539,7 @@ export interface Game {
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];
   enterOnline: Methods<typeof onlineMethods>['enterOnline'];
+  leaveOnline: Methods<typeof onlineMethods>['leaveOnline'];
   wireNet: Methods<typeof onlineMethods>['wireNet'];
   around: Methods<typeof onlineMethods>['around'];
   openLying: Methods<typeof onlineMethods>['openLying'];

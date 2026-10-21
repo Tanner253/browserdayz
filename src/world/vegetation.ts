@@ -233,10 +233,14 @@ class LodSet {
       this.pos.set([it.x, it.y, it.z], i * 3);
       this.scale[i] = it.scale;
     });
-    this.cells = new Cells(this.pos, this.n, 48, this.scale);
+    this.cells = this.allCells = new Cells(this.pos, this.n, 48, this.scale);
   }
 
+  /** the squares gone through: of every instance, or of those `only` keeps (see `sub`) */
   private cells: Cells;
+  private allCells: Cells;
+  /** each kept instance's own number, where `cells` is of those `only` keeps */
+  private sub: Uint32Array | null = null;
 
   /**
    * How far across the ground the nearest of these is from the eye, metres (Infinity past `within`): for their pictures
@@ -295,6 +299,28 @@ class LodSet {
     this.at.x = Infinity;
   }
 
+  /** only those standing where `area` says are drawn (null: all of them): a game played on part of the map, src/game/modes.ts */
+  only(area: ((x: number, z: number) => boolean) | null) {
+    // (the squares made again of those kept alone: the forest round the fort is not gone through tree by tree to be
+    // passed over, every frame)
+    if (!area) {
+      this.cells = this.allCells;
+      this.sub = null;
+    } else {
+      const keep: number[] = [];
+      this.instances.forEach((it, i) => area(it.x, it.z) && keep.push(i));
+      const pos = new Float32Array(keep.length * 3), scale = new Float32Array(keep.length);
+      keep.forEach((i, k) => {
+        pos.set(this.pos.subarray(i * 3, i * 3 + 3), k * 3);
+        scale[k] = this.scale[i];
+      });
+      this.sub = Uint32Array.from(keep);
+      this.cells = new Cells(pos, keep.length, 48, scale);
+    }
+    stale = true;
+    this.invalidate();
+  }
+
   /** take one of them out of the world, or put it back */
   show(i: number, on: boolean) {
     this.far[i] = on ? this.instances[i].far ?? Infinity : -1;
@@ -331,7 +357,7 @@ class LodSet {
         if (!frustum.intersectsBox(_box)) continue;
       }
       for (let j = cells.start[k]; j < e; j++) {
-        const i = cells.idx[j];
+        const i = this.sub ? this.sub[cells.idx[j]] : cells.idx[j];
         const x = this.pos[i * 3], y = this.pos[i * 3 + 1], z = this.pos[i * 3 + 2];
         const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
         const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -466,6 +492,8 @@ class Impostors {
   variants = new Map<string, ImpostorVariant>();
   atlas!: THREE.WebGLRenderTarget;
   private all: { x: number; y: number; z: number; s: number; v: number; r: number }[] = [];
+  /** every card, wherever it stands: `all` is those drawn (see `only`) */
+  private full: { x: number; y: number; z: number; s: number; v: number; r: number }[] = [];
   material!: THREE.ShaderMaterial;
   /** how much of the day's light there is (the atmosphere's own figure, once the cards have been photographed) */
   private daylight: { value: number } = { value: 1 };
@@ -558,18 +586,10 @@ class Impostors {
       const v = this.variants.get(t.kind);
       if (!v) continue;
       // (the card stands where the tree it is a picture of is seated)
-      this.all.push({ x: t.x, y: footY(t), z: t.z, s: t.scale, v: v.row, r: t.rot });
+      this.full.push({ x: t.x, y: footY(t), z: t.z, s: t.scale, v: v.row, r: t.rot });
     }
-    this.cells = new Cells(this.all.flatMap((t) => [t.x, t.y, t.z]), this.all.length, 64, this.all.map((t) => t.s));
-    // every card as it goes into the buffers, square by square (see `update`)
-    this.packPos = new Float32Array(this.all.length * 4);
-    this.packVar = new Float32Array(this.all.length);
-    this.all.forEach((_, j) => {
-      const t = this.all[this.cells.idx[j]];
-      this.packPos.set([t.x, t.y, t.z, t.s], j * 4);
-      this.packVar[j] = t.v;
-    });
-    this.order = new Int32Array(this.all.length + this.cells.w * this.cells.h);
+    this.all = this.full;
+    this.index();
     const quad = new THREE.PlaneGeometry(1, 1);
     quad.translate(0, 0.5, 0);
     this.geo = new THREE.InstancedBufferGeometry();
@@ -611,6 +631,29 @@ class Impostors {
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = false;
     scene.add(this.mesh);
+  }
+
+  /** the squares and the packed lists of the cards drawn (`all`) */
+  private index() {
+    this.cells = new Cells(this.all.flatMap((t) => [t.x, t.y, t.z]), this.all.length, 64, this.all.map((t) => t.s));
+    // every card as it goes into the buffers, square by square (see `update`)
+    this.packPos = new Float32Array(this.all.length * 4);
+    this.packVar = new Float32Array(this.all.length);
+    this.all.forEach((_, j) => {
+      const t = this.all[this.cells.idx[j]];
+      this.packPos.set([t.x, t.y, t.z, t.s], j * 4);
+      this.packVar[j] = t.v;
+    });
+    this.order = new Int32Array(this.all.length + this.cells.w * this.cells.h);
+    // (and the buffers written again on the next frame, whatever it draws)
+    this.sig = NaN;
+  }
+
+  /** only the cards of trees standing where `area` says (null: all of them): see LodSet.only */
+  only(area: ((x: number, z: number) => boolean) | null) {
+    if (!this.full.length) return;
+    this.all = area ? this.full.filter((t) => area(t.x, t.z)) : this.full;
+    this.index();
   }
 
   private sig = 0;
@@ -1093,6 +1136,12 @@ export class Vegetation {
   private reachK = 1;
 
   /** Graphics option: how far the full-detail trees and bushes reach (1 = as built). */
+  /** only what stands where `area` says is drawn (null: everything): a game played on part of the map, src/game/modes.ts */
+  only(area: ((x: number, z: number) => boolean) | null) {
+    for (const s of this.sets) s.only(area);
+    this.impostors.only(area);
+  }
+
   setDetail(k: number) {
     this.detailK = k;
     this.applyLods();

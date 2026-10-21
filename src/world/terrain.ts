@@ -680,6 +680,34 @@ export class Terrain {
    * maps go on drawing tile by tile. Not called (a page of its own that draws the world), the runs stay as they were
    * last chosen: a run drawn where a tile of it is now out of sight draws nothing more that is seen.
    */
+  /** the tiles not drawn (see `shown`), and the runs with any of them in, which are then never drawn at one go */
+  private hidden: Set<THREE.Mesh> | null = null;
+  private hiddenRuns: Set<Run> | null = null;
+
+  /**
+   * Only the tiles whose corners `area` takes are drawn (null: all of them): the Arena's page draws the ground about its
+   * fort out to the hills round it, as `only` had it built (src/game/modes.ts). What stops a body is all of it still.
+   */
+  shown(area: ((x0: number, z0: number, x1: number, z1: number) => boolean) | null) {
+    if (!area) {
+      this.hidden = this.hiddenRuns = null;
+      for (const t of this.tiles) t.visible = true;
+      return;
+    }
+    const hidden = new Set(this.tiles.filter((t) => {
+      const b = t.geometry.boundingBox!;
+      return !area(b.min.x, b.min.z, b.max.x, b.max.z);
+    }));
+    const runs = new Set<Run>();
+    const look = (r: Run) => {
+      if (r.of.some((t) => hidden.has(t))) runs.add(r);
+      r.parts.forEach(look);
+    };
+    this.runs.forEach(look);
+    this.hidden = hidden;
+    this.hiddenRuns = runs;
+  }
+
   update(camera: THREE.Camera) {
     if (!this.runs.length) return;
     _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -708,12 +736,19 @@ export class Terrain {
     const reach = (globalThis as { __allTiles?: boolean }).__allTiles ? Infinity : (camera as THREE.PerspectiveCamera).far ?? Infinity;
     for (const t of this.tiles) {
       const s = t.geometry.boundingSphere!;
-      t.visible = s.center.distanceTo(c) - s.radius <= reach || castsAnywhere(s.center, s.radius);
+      t.visible = !this.hidden?.has(t) && (s.center.distanceTo(c) - s.radius <= reach || castsAnywhere(s.center, s.radius));
     }
   }
 
   /** whether every tile of a run is in sight: then it is drawn at one go (and its parts and tiles not), else each part is chosen for itself */
   private choose(r: Run): boolean {
+    // (a run with a tile in it that is not drawn is never drawn at one go: its parts, or its tiles, each for itself)
+    if (this.hiddenRuns?.has(r)) {
+      r.mesh.visible = false;
+      for (const t of r.of) t.userData.inRun = false;
+      for (const p of r.parts) this.choose(p);
+      return false;
+    }
     // (far off in the west, a run is drawn whole wherever any of it is in sight: its tiles are at their coarsest, a
     // four by four of them is eleven thousand triangles, and a draw of its own for each costs more than that)
     if (this.coarse && r.of.every((t) => t.userData.lod === 2) && r.of.some((t) => _view.intersectsSphere(t.geometry.boundingSphere!))) {

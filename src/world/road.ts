@@ -30,7 +30,7 @@ export function roadLift(world: World, x: number, z: number): number {
   return 0;
 }
 
-export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene, ready?: (o: THREE.Object3D) => Promise<void>) {
+export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Object3D, ready?: (o: THREE.Object3D) => Promise<void>) {
   // (the road, and whatever roads have been laid since: one ribbon each, of the one asphalt)
   let mat: THREE.MeshStandardMaterial | null = null;
   let firstMesh: THREE.Mesh | null = null;

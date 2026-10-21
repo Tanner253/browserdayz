@@ -16,7 +16,7 @@ function tiled<T extends THREE.BufferGeometry>(geo: T, u: number, v: number): T 
   return geo;
 }
 
-export function buildWells(wells: Well[], atmo: Atmosphere, scene: THREE.Scene) {
+export function buildWells(wells: Well[], atmo: Atmosphere, scene: THREE.Object3D) {
   if (!wells.length) return;
   const of = (tex: string, o: THREE.MeshStandardMaterialParameters = {}) => {
     const t = assets.pbr(tex);

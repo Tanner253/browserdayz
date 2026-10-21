@@ -25,7 +25,7 @@ export function wreckLie(world: Pick<World, 'heights'>, w: { x: number; z: numbe
  * nobody starts: found by an independent reading, 2026-10-13). Got ready to be drawn before it is put in (Renderer.ready):
  * its shaders made in the frame it was first in sight were 720 ms of nothing moving, flying over the fort (2026-10-15).
  */
-export function buildWreck(world: World, scene: THREE.Scene, ready?: (o: THREE.Object3D) => Promise<void>): void {
+export function buildWreck(world: World, scene: THREE.Object3D, ready?: (o: THREE.Object3D) => Promise<void>): void {
   const w = world.wreck;
   if (!w) return;
   const { y, nose } = wreckLie(world, w), ax = Math.sin(w.rot), az = Math.cos(w.rot);

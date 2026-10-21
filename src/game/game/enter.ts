@@ -7,7 +7,6 @@ import { wagerQuery, watching } from '../../net/client';
 import { ArenaHud } from '../../ui/arena-hud';
 import { BrMode, brPage } from '../br/mode';
 import { reloadPage } from '../../core/leave';
-import { CUT } from '../../../arena/rules';
 import { heightAt, inPlay } from '../../world/worldgen';
 import { basementUnder } from '../../sim/basements';
 import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, ZONA_VOID, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
@@ -42,6 +41,10 @@ export const enterMethods = {
   /** First click on Play: find a server (multiplayer) or fall back to the local world. */
   async join(this: Game) {
     this.joining = true;
+    // (Another game gone to while this way in is on its way, src/game/modes.ts: what comes of it then is nobody's. A
+    // battle royale's lobby on another map was the case: its server turns the first try away, the connection's own second
+    // try went on into the new map's lobby, and the new map's own way in was then turned away as one already in it.)
+    const gen = ++this.joinGen, gone = () => gen !== this.joinGen;
     this.hud.refused('');
     const name = this.hud.nameValue() || `Survivor${Math.floor(100 + Math.random() * 900)}`;
     const renamed = name !== playerName();
@@ -51,12 +54,14 @@ export const enterMethods = {
     // A full server puts us in line. The wait can be long: the mouse goes back to the player,
     // the screen says where they stand, and they can give it up and play on their own.
     let waited = false;
-    // (a page whose world was cut down to a wager's arena, the wager over: loaded again, whole, for the open world)
-    if (CUT.arena && !wagerQuery()) return void reloadPage();
     // (in a wager the server alone says when anybody dies: arena/rules.ts; and the arena has its own screen)
     this.player.keepAlive = !!wagerQuery();
     // (the battle royale rides on the arena's door, `?wager=br`, with its own mode in place of the Arena's screen)
-    if (brPage() && !this.br) this.br = new BrMode(this);
+    // (made once a page and put on again after: src/game/modes.ts)
+    if (brPage() && !this.br) {
+      if (this.brKept) this.brKept.attach();
+      this.br = this.brKept ??= new BrMode(this);
+    }
     else if (wagerQuery() && !this.arenaHud && !brPage()) {
       this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');
       this.weapons.freeReload = true;
@@ -101,6 +106,7 @@ export const enterMethods = {
       this.hud.showStart(true, false, 'Connecting…');
     }
     let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
+    if (gone()) return;
     // (the bot check's range, if the server put this game on it, is over one way or the other: see `onRange`)
     const ranged = !!this.botCheck;
     this.botCheck?.end();
@@ -138,6 +144,7 @@ export const enterMethods = {
       this.hud.showStart(true, false, 'The server is being updated. You are let in as soon as it is up');
       await new Promise((r) => setTimeout(r, 4000));
       welcome = await this.net.connect(name);
+      if (gone()) return;
     }
     // Turned away for want of the check that this is a person (the server asks it of whoever it has not lately had
     // it from: see src/ui/person.ts). The check is shown, and the way in is asked for again with what it gave.
@@ -148,12 +155,13 @@ export const enterMethods = {
       if (!again) return void notAPerson();
       this.hud.showStart(true, false, 'Connecting…');
       welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), again);
+      if (gone()) return;
     }
     // (asked twice and still turned away for it: not into the game)
     if (!welcome && this.net.wantsProof) return void notAPerson();
     // (a wager not got into: given up while waiting, turned away, or the arena not reached. Back at the Arena's
     // menu as it was, never into the world alone)
-    if (!welcome && wagerQuery()) return void this.toArena(this.net.leftQueue ? '' : this.net.refused || 'The arena could not be reached: try again in a minute.');
+    if (!welcome && wagerQuery()) return void this.toArena(this.net.leftQueue ? '' : this.net.refused || 'The arena could not be reached: try again in a minute.', brPage() ? `/battleroyale?kills=${this.modes.brMap}` : '/arena');
     this.hud.setQueue(null);
     document.title = this.title;
     if (welcome) {
@@ -216,6 +224,14 @@ export const enterMethods = {
    * where it was not by the player's own choice.
    */
   toArena(this: Game, note = '', to = '/arena') {
+    this.idle();
+    history.replaceState(null, '', to);
+    this.hud.showStart(true);
+    if (note) this.hud.note(note, 'warn');
+  },
+
+  /** This player as before any match or life: out of it, its people gone; the world and everything loaded stay (toArena, src/game/modes.ts). */
+  idle(this: Game) {
     // (a connection still open is closed from here, and its going is not shown as a result: see onClose)
     if (this.net.online) {
       this.arenaLeaving = true;
@@ -239,14 +255,11 @@ export const enterMethods = {
     this.started = false;
     this.paused = true;
     this.input.unlock();
-    history.replaceState(null, '', to);
-    this.hud.showStart(true);
-    if (note) this.hud.note(note, 'warn');
   },
 
   /**
    * Back at the battle royale's menu as toArena is back at the Arena's (the owner, 2026-10-21: "return to battle royale
-   * which should not trigger a total reload and redeownload"): the page, cut for its map, kept for the next match.
+   * which should not trigger a total reload and redeownload"): the page as it is, for the next match.
    */
   toBr(this: Game) {
     this.toArena('', `/battleroyale?kills=${this.br?.map ?? 0}`);

@@ -36,6 +36,11 @@ export class Riders {
     r.ready = true;
   }
 
+  /** every one taken down (src/game/modes.ts) */
+  clear() {
+    for (const uid of [...this.all.keys()]) this.remove(uid);
+  }
+
   remove(uid: string) {
     const r = this.all.get(uid);
     if (!r) return;

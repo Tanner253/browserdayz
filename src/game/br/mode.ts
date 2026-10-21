@@ -10,7 +10,7 @@ import { heightAt } from '../../world/worldgen';
 import { BR, FLIGHT, HEALS, MAPS, RARITY, capOf, circleAt, kindOf, rarityOf, stackOf, type Ground } from '../../../arena/br/rules';
 import type { BrC2S, BrS2C, Phase } from '../../../arena/br/wire';
 import { BrHud } from '../../ui/br/hud';
-import { doorOver } from '../../ui/door';
+import { doorGo, doorOver } from '../../ui/door';
 import { BrLook } from './look';
 import type { Game } from '../game';
 
@@ -56,6 +56,10 @@ export class BrMode {
     return !!this.target.g || this.target.mate !== null;
   }
 
+  /**
+   * Made once a page, the first time the battle royale is gone into (Game.join), and put on and taken off after: what it
+   * listens to on the connection stays, heard only while it is the game's (src/game/modes.ts).
+   */
   constructor(private game: Game) {
     this.look = new BrLook(game);
     this.hud = new BrHud(game.hud.root, () => this.vote());
@@ -64,28 +68,23 @@ export class BrMode {
       game.toBr();
       void doorOver('br');
     };
-    document.body.classList.add('br');
-    game.hud.root.classList.add('br');
     const net = game.net as unknown as Listen;
-    net.on('br', (m: { t: 'br' } & BrS2C) => this.on(m));
-    net.on('kill', (m: { by: string; who: string; w: string; head: boolean; me: boolean }) => this.hud.feed(m.by, m.who, ITEMS[m.w]?.name ?? m.w, m.head, m.me));
-    net.on('hitok', (m: { amount: number; zone: string }) => this.hud.hitNumber(m.amount, m.zone === 'head'));
+    const mine = () => game.br === this;
+    net.on('br', (m: { t: 'br' } & BrS2C) => mine() && this.on(m));
+    net.on('kill', (m: { by: string; who: string; w: string; head: boolean; me: boolean }) => mine() && this.hud.feed(m.by, m.who, ITEMS[m.w]?.name ?? m.w, m.head, m.me));
+    net.on('hitok', (m: { amount: number; zone: string }) => mine() && this.hud.hitNumber(m.amount, m.zone === 'head'));
     // (Each shot told with how far this game's own ray went before a wall or a floor stopped it: the server has the
     // ground and not the buildings, and holds a shot to the nearer of the two. A shot through a house is not one.)
     const send0 = game.net.send.bind(game.net);
     game.net.send = (m) => {
-      if (m.t === 'shot') {
+      if (m.t === 'shot' && mine()) {
         const L = Math.hypot(m.d[0], m.d[1], m.d[2]) || 1, d = { x: m.d[0] / L, y: m.d[1] / L, z: m.d[2] / L };
         const hit = physics.raycast({ x: m.o[0] + d.x * 0.5, y: m.o[1] + d.y * 0.5, z: m.o[2] + d.z * 0.5 }, d, 900);
         return send0({ ...m, wall: hit ? hit.toi + 0.5 : -1 } as typeof m);
       }
       send0(m);
     };
-    // (health only, as PUBG: no hunger, thirst, bleeding or broken legs)
-    game.player.arcade = true;
-    // (rounds come out of the pools by calibre: decision 4, no magazines)
-    game.weapons.freeReload = true;
-    game.weapons.pool = {
+    this.pool = {
       count: (a) => this.me?.pools[a] ?? 0,
       take: (a, n) => {
         const have = this.me?.pools[a] ?? 0, k = Math.max(0, Math.min(have, n));
@@ -96,6 +95,33 @@ export class BrMode {
         return k;
       },
     };
+    this.attach();
+  }
+
+  private pool: NonNullable<Game['weapons']['pool']>;
+
+  /** the game's again (Game.join): its rules on the player and the guns, its screen */
+  attach() {
+    const g = this.game;
+    document.body.classList.add('br');
+    g.hud.root.classList.add('br');
+    // (health only, as PUBG: no hunger, thirst, bleeding or broken legs)
+    g.player.arcade = true;
+    // (rounds come out of the pools by calibre: decision 4, no magazines)
+    g.weapons.freeReload = true;
+    g.weapons.pool = this.pool;
+  }
+
+  /** another game played on the page (src/game/modes.ts): as before it was made */
+  detach() {
+    const g = this.game;
+    this.reset();
+    document.body.classList.remove('br');
+    g.hud.root.classList.remove('br');
+    g.player.arcade = false;
+    g.weapons.freeReload = false;
+    g.weapons.pool = null;
+    this.look.zone(null, null, 0);
   }
 
   /** out of the match by this player's own choice: said to the server, which counts them out at once */
@@ -186,6 +212,13 @@ export class BrMode {
       case 'remap':
         // (that lobby, or this player's match, is on another map: the page is cut for it again)
         // (and straight back in, to that lobby: `go`, src/ui/br/menu.ts)
+        // (on this page as it is, its map hidden and that one shown: src/game/modes.ts)
+        // (the way in that brought this word let go at once, its connection's own second try with it: see Game.join)
+        if (doorGo.br) {
+          this.game.joinGen++;
+          this.game.net.leaveQueue();
+          return void setTimeout(() => doorGo.br!(m.map, `wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}&go=1`), 0);
+        }
         return location.assign(`/battleroyale?wager=br&size=${m.size}&kills=${m.map}&loadout=${m.code}&go=1`);
     }
   }

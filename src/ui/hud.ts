@@ -293,7 +293,7 @@ export class HUD {
             <button type="button" data-tab="rewards" hidden>Rewards</button>
           </nav>
           <div class="sm-status">
-            <a class="sm-out sm-arena" href="/arena">Arena</a>
+            <a class="sm-out sm-arena" href="/">All games</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
             <a class="sm-out sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><span>Payouts</span><em></em></a>
             <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>

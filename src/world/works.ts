@@ -110,7 +110,7 @@ function tankPaint(seed: number) {
   }, seed);
 }
 
-export function buildWorks(world: World, atmo: Atmosphere, scene: THREE.Scene) {
+export function buildWorks(world: World, atmo: Atmosphere, scene: THREE.Object3D) {
   if (!world.solids.length) return;
   const mat = (m: THREE.MeshStandardMaterial) => atmo.register(m) as THREE.MeshStandardMaterial;
   const brick = mat(new THREE.MeshStandardMaterial({ map: stackPaint(), roughness: 0.93, metalness: 0 }));

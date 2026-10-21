@@ -132,15 +132,23 @@ export function openDoor(): Promise<Mode> {
 }
 
 /**
- * The door over a page already built (the owner, 2026-10-21, on leaving a match: "take me to main menu without having to
- * reload everything"): this page's own game picked again is only the door gone; another game is a page of its own, its
- * world made otherwise.
+ * How a page already built goes to another game as it is (src/game/modes.ts, set once the page is up): `to` a game,
+ * `br` the battle royale on a map with its address said (a lobby to go straight into). Unset, a page is loaded.
+ */
+export const doorGo: { to: ((m: Mode) => void) | null; br: ((map: number, search: string) => void) | null } = { to: null, br: null };
+
+/**
+ * The door over a page already built (the owner, 2026-10-21: "take me to main menu without having to reload
+ * everything", and "Shouldn't I be able to switch between all modes without refresh"): this page's own game picked
+ * again is only the door gone; another is gone to in place (doorGo).
  */
 export async function doorOver(here: Mode) {
   const back = location.pathname + location.search;
   history.replaceState(null, '', '/');
   const mode = await openDoor();
-  if (mode === here) history.replaceState(null, '', back);
+  history.replaceState(null, '', back);
+  if (mode === here) return;
+  if (doorGo.to) doorGo.to(mode);
   else location.assign(`/${mode === 'br' ? 'battleroyale' : mode}`);
 }
 

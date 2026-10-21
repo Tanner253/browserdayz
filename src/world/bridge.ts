@@ -640,7 +640,7 @@ function shapes(P: Plan, seed: number) {
  * stands. (The asphalt throws no shadow of its own: it lies on the slab, which throws the same one, and whatever
  * throws a shadow is drawn again into each of the sun's shadow maps.)
  */
-export function buildBridges(world: World, atmo: Atmosphere, scene: THREE.Scene): void {
+export function buildBridges(world: World, atmo: Atmosphere, scene: THREE.Object3D): void {
   if (!world.bridges.length) return;
   const stone = assets.pbr('dirty_concrete'), road = assets.pbr('asphalt_02');
   const paints = {

@@ -12,6 +12,7 @@ const NEAR = 26;
 
 export class Cellars {
   private bulbs: THREE.Vector3[] = [];
+  private meshes: THREE.InstancedMesh[] = [];
 
   constructor(scene: THREE.Scene, private list: Basement[]) {
     for (const b of list) for (const [x, y, z] of b.lamps) {
@@ -33,10 +34,28 @@ export class Cellars {
       bulb.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.06, p.z));
     });
     shade.material.side = THREE.DoubleSide;
+    this.meshes = [flex, shade, bulb];
     for (const mesh of [shade, flex, bulb]) {
       mesh.frustumCulled = false;
       mesh.name = 'cellar-bulbs';
       scene.add(mesh);
+    }
+  }
+
+  /** only the bulbs where `area` says are drawn (null: all of them): a game played on part of the map, src/game/modes.ts */
+  only(area: ((x: number, z: number) => boolean) | null) {
+    const kept = area ? this.bulbs.filter((p) => area(p.x, p.z)) : this.bulbs, m = new THREE.Matrix4();
+    const [flex, shade, bulb] = this.meshes;
+    if (!flex) return;
+    kept.forEach((p, i) => {
+      flex.setMatrixAt(i, m.makeTranslation(p.x, p.y + 0.08, p.z));
+      shade.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.02, p.z));
+      bulb.setMatrixAt(i, m.makeTranslation(p.x, p.y - 0.06, p.z));
+    });
+    for (const mesh of this.meshes) {
+      mesh.count = kept.length;
+      mesh.visible = kept.length > 0;
+      mesh.instanceMatrix.needsUpdate = true;
     }
   }
 

@@ -1320,9 +1320,9 @@ export class DoorBatch {
   /** a leaf is where its door's hinge now has it, stretched to its size; its handle on it, if the handle is near enough to be drawn */
   place(d: Door, leaf: THREE.InstancedMesh, at: number, handle: number) {
     d.pivot.updateMatrix();
-    leaf.setMatrixAt(at, DoorBatch.m.makeScale(d.size![0] - 0.02, d.size![1] - 0.02, 1).premultiply(d.pivot.matrix));
+    leaf.setMatrixAt(at, d.away ? DoorBatch.none : DoorBatch.m.makeScale(d.size![0] - 0.02, d.size![1] - 0.02, 1).premultiply(d.pivot.matrix));
     leaf.instanceMatrix.needsUpdate = true;
-    this.handles.setMatrixAt(handle, d.handleShown ? DoorBatch.m.makeTranslation(d.size![0] - 0.12, 1.0, 0).premultiply(d.pivot.matrix) : DoorBatch.none);
+    this.handles.setMatrixAt(handle, d.handleShown && !d.away ? DoorBatch.m.makeTranslation(d.size![0] - 0.12, 1.0, 0).premultiply(d.pivot.matrix) : DoorBatch.none);
     this.handles.instanceMatrix.needsUpdate = true;
   }
 }
@@ -1333,6 +1333,8 @@ export class Door {
   size: [number, number] | null = null;
   /** whether its handles are near enough to be drawn (see HANDLE_SEEN) */
   handleShown = true;
+  /** outside the ground a game is played on (Buildings.only): not drawn */
+  away = false;
   private drawn: { batch: DoorBatch; leaf: THREE.InstancedMesh; at: number; handle: number } | null = null;
 
   /** which line of which list its leaf and its handle are drawn from (see DoorBatch) */
@@ -1343,6 +1345,14 @@ export class Door {
 
   private place() {
     if (this.drawn) this.drawn.batch.place(this, this.drawn.leaf, this.drawn.at, this.drawn.handle);
+  }
+
+  /** outside the ground a game is played on, or not (Buildings.only) */
+  setAway(on: boolean) {
+    if (on === this.away) return;
+    this.away = on;
+    if (!this.drawn) this.pivot.visible = !on;
+    this.place();
   }
 
   showHandle(on: boolean) {
@@ -1523,7 +1533,7 @@ export class Buildings {
   /** how far off buildings are drawn, metres: the player's own setting (Graphics.draw) */
   drawDistance = 800;
   /** what is drawn or not by its distance: a building's part in a batch, or a thing of its own; where it stands and how far it reaches */
-  private far: { show: (on: boolean) => void; shown: boolean; x: number; z: number; r: number }[] = [];
+  private far: { show: (on: boolean) => void; shown: boolean; x: number; z: number; r: number; cover?: false }[] = [];
   private drawnFrom: { x: number; z: number } | null = null;
 
   constructor(private world: World, private atmo: Atmosphere) {}
@@ -3395,6 +3405,8 @@ export class Buildings {
       board.applyMatrix4(sg.m);
       board.castShadow = board.receiveShadow = true;
       scene.add(board);
+      // (drawn or not with the buildings, by the draw distance and by the ground a game is played on: see `only`)
+      this.far.push({ show: (on) => (board.visible = on), shown: true, x: board.position.x, z: board.position.z, r: 2 * (sg.size ?? 1), cover: false });
     }
 
     const doorMat = this.material('planks', ' doors', { patch: leafUv, key: 'leaf' }) as THREE.MeshStandardMaterial;
@@ -3599,6 +3611,14 @@ export class Buildings {
     this.drawnFrom = null;
   }
 
+  /** where what stands is drawn (null: everywhere): a game played on part of the map, src/game/modes.ts */
+  private area: ((x: number, z: number) => boolean) | null = null;
+  only(area: ((x: number, z: number) => boolean) | null) {
+    this.area = area;
+    this.drawnFrom = null;
+    for (const d of this.doors) d.setAway(!!area && !area(d.pivot.position.x, d.pivot.position.z));
+  }
+
   /** The player's draw distance, metres (Settings: Video). */
   setDrawDistance(d: number) {
     this.drawDistance = d;
@@ -3611,7 +3631,7 @@ export class Buildings {
     if (was && (eye.x - was.x) ** 2 + (eye.z - was.z) ** 2 < 16 * 16) return;
     this.drawnFrom = { x: eye.x, z: eye.z };
     for (const f of this.far) {
-      const on = Math.hypot(f.x - eye.x, f.z - eye.z) - f.r <= this.drawDistance;
+      const on = Math.hypot(f.x - eye.x, f.z - eye.z) - f.r <= this.drawDistance && (!this.area || this.area(f.x, f.z));
       if (on !== f.shown) f.show((f.shown = on));
     }
   }
@@ -3621,7 +3641,7 @@ export class Buildings {
     const dx = at.x - eye.x, dz = at.z - eye.z, len2 = dx * dx + dz * dz;
     if (len2 <= this.drawDistance * this.drawDistance) return false;
     for (const f of this.far) {
-      if (f.shown) continue;
+      if (f.shown || f.cover === false) continue;
       // (the nearest the line from the eye to it comes to the building's middle)
       const t = Math.max(0, Math.min(1, ((f.x - eye.x) * dx + (f.z - eye.z) * dz) / len2));
       if ((eye.x + dx * t - f.x) ** 2 + (eye.z + dz * t - f.z) ** 2 < f.r * f.r) return true;

@@ -4,15 +4,12 @@ import * as THREE from 'three';
 import { Renderer } from './core/renderer';
 import { assets } from './core/assets';
 import { Strips } from './core/strips';
-import { physics, GLASS_GROUPS } from './core/physics';
-import { arenaCorners, cutToArena, nearArena } from '../arena/rules';
+import { physics } from './core/physics';
+import { nearArena } from '../arena/rules';
 import { wagerQuery } from './net/client';
-import { modeOf, openDoor } from './ui/door';
+import { doorGo, doorOver, modeOf, openDoor } from './ui/door';
 import { startAds } from './ui/ads';
-import { ArenaMenu } from './ui/arena-menu';
-import { BrMenu } from './ui/br/menu';
-import { brCorners, brMapOfPage, cutToBr } from './game/br/cut';
-import { MAPS as BR_MAPS } from '../arena/br/rules';
+import { brMapOfPage } from './game/br/cut';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
 import { SEA_LEVEL, WORLD_X0, WORLD_Z0, WORLD_Z1, heightAt } from './world/worldgen';
 import { Towns } from './world/towns';
@@ -195,25 +192,22 @@ async function boot() {
   // (`?towns`: a new town of the map three times over stood on level ground in a corner of today's map: src/dev/towns.ts)
   const towns = import.meta.env.DEV && new URLSearchParams(location.search).has('towns') ? await import('./dev/towns') : null;
   towns?.lay(world);
-  // (the Arena's page builds the arena and what is seen over its wall, and nothing else: arena/rules.ts)
-  const arena = mode === 'arena' && !!world.castle;
-  if (arena) cutToArena(world);
+  // (The whole map, whichever game the page plays: the Arena and the battle royale were built cut down to their own
+  // ground, and another game was another page to load. They hide what is outside it instead, and the page goes from one
+  // game to another as it is: src/game/modes.ts. The owner, 2026-10-21: "Shouldn't I be able to switch between all
+  // modes without refresh")
+  if (mode === 'arena' && !world.castle) mode = 'zona';
   const brMap = brMapP ? await brMapP : -1;
-  if (brMap >= 0) cutToBr(world, BR_MAPS[brMap]);
-  console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}${arena ? ' (cut to the arena)' : ''}`);
+  console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}`);
 
   stage('sky');
   const atmo = new Atmosphere(r.renderer, r.scene, r.camera);
   installTiny(r.scene, r.renderer, (f) => SHADOW_FRUSTA.has(f));
   // (`?nogas` on a development build leaves it out of the shaders, to measure what it costs)
-  // (and in a wager's arena there is none: the works are far off)
-  atmo.gases = arena || (import.meta.env.DEV && new URLSearchParams(location.search).has('nogas')) ? [] : gasClouds(world);
+  atmo.gases = import.meta.env.DEV && new URLSearchParams(location.search).has('nogas') ? [] : gasClouds(world);
   await atmo.init();
   stage('ground');
   const terrain = new Terrain(world, atmo);
-  // (the ground's tiles about the arena, out to the hills round it: bare ground is cheap, and cut off at the wall it
-  // hung in the sky in pieces. A tile is kept if its middle is within 300 m and half its own breadth of the square.)
-  if (arena) terrain.only = (x0, z0, x1, z1) => nearArena(world, (x0 + x1) / 2, (z0 + z1) / 2, 300 + Math.hypot(x1 - x0, z1 - z0) / 2);
   await terrain.build(r.scene);
   stage('buildings');
   const buildings = new Buildings(world, atmo);
@@ -231,68 +225,61 @@ async function boot() {
   // the lakes and the river (src/world/ocean.ts, water.ts). Each told every frame where the eye is (Game.beside).
   const ready = (o: THREE.Object3D) => r.ready(o).then(() => r.send(o));
   const ground = (x: number, z: number) => heightAt(world.heights, x, z);
-  const westTowns = !arena && world.towns?.length ? new Towns(atmo, r.scene, world.towns, buildings, ready, world.buildings) : null;
+  // (what is the Zone's alone, out of sight in the Arena: src/game/modes.ts)
+  const zonaOnly: THREE.Object3D[] = [];
+  const westTowns = world.towns?.length ? new Towns(atmo, r.scene, world.towns, buildings, ready, world.buildings) : null;
   void westTowns?.build();
-  const kalat = !arena && world.kalat ? ruinsPlan(world.kalat) : [];
+  const kalat = world.kalat ? ruinsPlan(world.kalat) : [];
   const kalatRuins = kalat.length ? new Ruins(atmo, r.scene, kalat, ready) : null;
   for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, ground));
   // (the pass's caves, carved where the world was made (World.caves), dressed with the coast kit's rock; their places
   // for things after Kalat's, as the server lays them)
-  const caves = arena ? null : new PassCaves(r.scene, atmo, passPlan, ground);
+  const caves = new PassCaves(r.scene, atmo, passPlan, ground);
   // (the mouths opened in the ground once the caves are built and solid: opened first, a body at a mouth, or one come
   // back to a cave, had no floor until the rock models had loaded)
-  if (caves) {
-    await caves.build({ carved: world.caves, heightTex: terrain.heightTex });
-    terrain.openWells(world.basements ?? [], caveMouths(passPlan));
-    // (and its walls' rock got ready as the outcrops' is: each of its lists empty until the eye comes near, none was in
-    // the drawing of the world at the start, and the driver did its first work on each as somebody walked into the pass,
-    // the card held in Present for 80 to 650 ms at a time; 2026-10-19, traced)
-    void caves.dressed.then(() => caves.field && ready(caves.field.group));
-    if (caves.field) caves.field.camera = r.camera;
-  }
+  await caves.build({ carved: world.caves, heightTex: terrain.heightTex });
+  terrain.openWells(world.basements ?? [], caveMouths(passPlan));
+  // (and its walls' rock got ready as the outcrops' is: each of its lists empty until the eye comes near, none was in
+  // the drawing of the world at the start, and the driver did its first work on each as somebody walked into the pass,
+  // the card held in Present for 80 to 650 ms at a time; 2026-10-19, traced)
+  void caves.dressed.then(() => caves.field && ready(caves.field.group));
+  if (caves.field) caves.field.camera = r.camera;
   // (the canyon country's outcrops, read off its ground: src/world/outcrops.ts)
-  const outcrops = arena ? null : new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
-  if (outcrops) {
-    outcrops.camera = r.camera;
-    void outcrops.build().then(() => ready(outcrops.group));
-  }
-  if (caves) buildings.lootPoints.push(...caveLootPoints());
+  const outcrops = new RockField(r.scene, atmo, outcropPieces(world, passPlan), { name: 'outcrops', near: 40, solid: 50, heightTex: terrain.heightTex, flat: 'grit', tint: CANYON_ROCK_TINT });
+  outcrops.camera = r.camera;
+  void outcrops.build().then(() => ready(outcrops.group));
+  buildings.lootPoints.push(...caveLootPoints());
   // (the sea's, the lakes' and the river's water and the swamp's mist got ready as they are made: hidden at the start
   // (the mist by day) they were a shader made in the frame they were first shown. Only these few: everything the west
   // made, got ready at once, held the loot's own getting ready past its six seconds, and each new thing of loot was
   // half a second in the frame it was first drawn.)
   const beforeWater = new Set(r.scene.children);
-  const sea = arena ? null : new Ocean(r.scene, atmo, {
+  const sea = new Ocean(r.scene, atmo, {
     seaLevel: SEA_LEVEL, x0: WORLD_X0 - 300, x1: -3560, z0: WORLD_Z0, z1: WORLD_Z1, beyond: { west: 16000, north: 6000, south: 6000 },
     depthAt: (x, z) => SEA_LEVEL - heightAt(world.heights, Math.max(x, WORLD_X0), Math.min(WORLD_Z1, Math.max(WORLD_Z0, z))),
   });
-  const waters = !arena && world.water ? new Waterways(r.scene, atmo, world.water, ground, { seaLevel: SEA_LEVEL }) : null;
+  const waters = world.water ? new Waterways(r.scene, atmo, world.water, ground, { seaLevel: SEA_LEVEL }) : null;
   void r.ready(r.scene.children.filter((o) => !beforeWater.has(o)));
-  // (the road and the works are far outside the fort's arena: not built for a wager)
-  if (!arena) buildRoad(world, atmo, r.scene, (o) => r.ready(o));
-  if (!arena) buildWorks(world, atmo, r.scene);
-  buildWells(arena ? wellSpots(world).filter((w) => nearArena(world, w.x, w.z)) : wellSpots(world), atmo, r.scene);
-  if (arena) {
-    // what stops a body at the arena's edge, over its low wall: as a pane of glass does, a body and not a shot
-    const c = arenaCorners(world);
-    for (let k = 0; k < 4; k++) {
-      const [ax, az] = c[k], [bx, bz] = c[(k + 1) % 4], yaw = Math.atan2(-(bz - az), bx - ax), y = Math.max(...[[ax, az], [bx, bz]].map(([x, z]) => heightAt(world.heights, x, z)));
-      physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2, 40, 0.3), 'concrete', { x: (ax + bx) / 2, y, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, undefined, GLASS_GROUPS);
-    }
-  }
-  if (brMap >= 0) {
-    // the battle royale map's edge: a wall nobody sees and nobody walks through (its own circle of gas is what is seen)
-    const c = brCorners(BR_MAPS[brMap]);
-    for (let k = 0; k < 4; k++) {
-      const [ax, az] = c[k], [bx, bz] = c[(k + 1) % 4], yaw = Math.atan2(-(bz - az), bx - ax);
-      physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2, 400, 0.3), 'concrete', { x: (ax + bx) / 2, y: 0, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, undefined, GLASS_GROUPS);
-    }
-  }
+  // (the road, the works and the wells, each in a group of its own: the Zone's, but for any well by the fort. What
+  // they put in later, as the crest's wreck when its model has come, goes into it as well.)
+  const part = (name: string) => {
+    const g = new THREE.Group();
+    g.name = name;
+    r.scene.add(g);
+    return g;
+  };
+  const road = part('road'), works = part('works'), wellsGroup = part('wells'), wells = wellSpots(world);
+  buildRoad(world, atmo, road, (o) => r.ready(o));
+  buildWorks(world, atmo, works);
+  buildWells(wells, atmo, wellsGroup);
+  zonaOnly.push(road, works);
+  if (!world.castle || !wells.some((w) => nearArena(world, w.x, w.z))) zonaOnly.push(wellsGroup);
+  for (const o of [kalatRuins?.group, caves.group, caves.field?.group, outcrops.group, sea.group, waters?.group]) if (o) zonaOnly.push(o);
   // (a stash in a cave stands on the carved rock, whose floor is the plan's give or take most of a metre: measured once
   // the caves are solid and before what stands is drawn. The server keeps the plan's height, which opens it as well.
   // A ray finds only what a step of the world has taken in: one is taken first.)
-  if (caves) physics.step(1 / 30);
-  if (caves) for (const q of world.props) {
+  physics.step(1 / 30);
+  for (const q of world.props) {
     if (q.kind !== 'weapons_case' || !inCave(q.x, q.y + 0.5, q.z)) continue;
     const hit = physics.raycast({ x: q.x, y: q.y + 1.6, z: q.z }, { x: 0, y: -1, z: 0 }, 4);
     if (hit) q.y = hit.point.y;
@@ -306,32 +293,33 @@ async function boot() {
 
   stage('game');
   const game = new Game({ r, world, atmo, terrain, veg, grass, buildings });
-  if (westTowns) game.beside.push((_dt, eye) => westTowns.update(eye));
-  if (kalatRuins) game.beside.push((_dt, eye) => kalatRuins.update(eye));
-  if (caves) game.beside.push((_dt, eye) => caves.update(eye));
-  if (outcrops) game.beside.push((_dt, eye) => outcrops.update(eye));
-  if (caves) game.darkBeside.push((x, y, z) => caves.dark(x, y, z));
-  if (sea) game.beside.push((dt, eye, camera) => sea.update(dt, eye, camera));
+  // (each told where the eye is while it is to be seen: in the Arena none of them is, src/game/modes.ts)
+  const zona = () => game.modes.mode !== 'arena';
+  if (westTowns) game.beside.push((_dt, eye) => zona() && westTowns.update(eye));
+  if (kalatRuins) game.beside.push((_dt, eye) => zona() && kalatRuins.update(eye));
+  game.beside.push((_dt, eye) => zona() && caves.update(eye));
+  game.beside.push((_dt, eye) => zona() && outcrops.update(eye));
+  game.darkBeside.push((x, y, z) => caves.dark(x, y, z));
+  game.beside.push((dt, eye, camera) => zona() && sea.update(dt, eye, camera));
   if (waters) {
-    game.beside.push((dt, eye, camera) => waters.update(dt, eye, camera));
+    game.beside.push((dt, eye, camera) => zona() && waters.update(dt, eye, camera));
     const W = world.water!;
     game.player.water = (x, z) => waterAt(W, x, z, ground);
     game.player.onWade = (x, y, z, depth) => game.effects?.splash(new THREE.Vector3(x, y, z), depth);
   }
   await game.init(stage);
-  // (a wager's arena: its fort made whole now, not as somebody comes near it; and the Arena's own menu over it)
-  if (arena && game.castle) {
-    stage('fort');
-    await game.castle.whole();
-  }
-  // (out of the wait for a match: still loading, the Deploy that waits for it is let go; connected, the place given up)
-  if (arena) new ArenaMenu(game.hud).onLeave = (waiting) => (!waiting ? game.toArena() : game.wantIn ? ((game.wantIn = false), game.hud.showStart(true)) : game.net.leaveQueue());
-  // (the battle royale's menu over it; its Leave says so to the server first, src/game/br/mode.ts)
-  if (brMap >= 0) new BrMenu(game.hud, brMap).onLeave = () => {
-    game.br?.leave();
-    // (back at the menu with the page as it is, the word to the server sent first: Game.toBr)
-    setTimeout(() => game.toBr(), 150);
-  };
+  // (the game the page plays: what of the map is drawn, its edges and its menu; the Arena's fort made whole. Another
+  // game, picked at the main menu over this page, is gone to as it is: src/game/modes.ts)
+  game.modes.zonaOnly.push(...zonaOnly, game.gas.signGroup, ...atmo.gasDomes);
+  if (mode === 'arena') stage('fort');
+  await game.modes.enter(mode, brMap);
+  doorGo.to = (m) => void game.modes.switchTo(m);
+  doorGo.br = (map, search) => void game.modes.switchTo('br', map, search);
+  // (the Zone's own way to the other games: the main menu over the page, src/ui/door.ts)
+  document.querySelector('#hud .sm-arena')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    void doorOver(game.modes.mode);
+  });
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world
@@ -354,7 +342,7 @@ async function boot() {
   game.afterBoot();
   // (the Zone's how to play, once, on a browser's first visit; never on this machine's own runs, where every fresh
   // headless browser is a first visit: the owner, "when running locally simply disable the how to play modal")
-  if (!arena && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) game.hud.howTo(false);
+  if (mode === 'zona' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) game.hud.howTo(false);
   B.done = true;
   screen.done();
   B.stage = 'up';

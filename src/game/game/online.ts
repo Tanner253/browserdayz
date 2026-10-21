@@ -122,6 +122,41 @@ export const onlineMethods = {
     setTimeout(() => net.listen(), 0);
   },
 
+  /**
+   * Whatever the Zone's server had put down, taken up (another game played on the page, src/game/modes.ts): as a welcome
+   * takes up what was there before it (enterOnline), and with nothing to show for it.
+   */
+  leaveOnline(this: Game) {
+    for (const uid of [...this.economy.loot.keys()]) this.economy.take(uid);
+    for (const c of this.loot.crates) {
+      c.container.load({ items: [] } as never);
+      c.known = false;
+      c.emptiedAt = -1;
+    }
+    for (const d of this.s.buildings.doors) d?.setOpen(false, 1);
+    for (const uid of [...this.corpses.keys()]) this.removeCorpse(uid);
+    for (const [uid, d] of [...this.drops]) {
+      this.drops.delete(uid);
+      if (d.wreck) {
+        d.wreck.obj.removeFromParent();
+        for (const c of d.wreck.solid) physics.world.removeCollider(c as never, false);
+      }
+    }
+    this.stashComing.clear();
+    for (const st of [...this.loot.stashes]) this.loot.removeStash(st);
+    this.riders.clear();
+    this.airdrops.clear();
+    this.markDrops();
+    for (const b of this.s.veg.barrels) b?.setThere(true);
+    this.fires.clear();
+    this.lockers.clear();
+    this.bunker.setOpen(false, true);
+    this.garage.clear();
+    this.horde.clear();
+    this.party.set([], 0);
+    this.hud.setLive(false);
+  },
+
   /** Everything the game does with what the server says, set up once a page (see enterOnline). */
   wireNet(this: Game) {
     const { world, buildings } = this.s;

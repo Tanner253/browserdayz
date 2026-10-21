@@ -25,6 +25,13 @@
   (`public/howto/br-*`, `arena-*`; the battle royale's shot by `tools/br/howto-pics.js`), the how-to cards sized through
   the HUD's zoom (21:9 cut them off: `tools/br/howto-look.js` shoots them at any size), and Return to Battle Royale and
   Leave the match back at its menu with the page as it is, no reload (`Game.toBr`, `BrMode.reset`).
+- ON THE BRANCH SINCE, NOT DEPLOYED (the owner: "we should do this but not deploy since people are on now"): every game
+  on one page, switched in place (`src/game/modes.ts`): the whole map built on every page, the Arena and the battle
+  royale hiding what is outside their ground; the main menu over any page; a lobby on another map gone to in place.
+  It changes `src/world/` (ZONA's build filter), so it ships with a ZONA server deploy, on the owner's word; until then
+  the diff check below stops battle-royale-only deploys from this branch. Measured (`tools/modes/`): draws, triangles
+  and the processor as before; the graphics card about 1 ms a frame more in the Arena's and the battle royale's main
+  pass (not the gas, lights, passes or hidden geometry; not yet found).
 - Deploys need no word from the owner while no ZONA path changes (the owner: "you dont need to ask me to deploy if it
   doesnt affect zona server"): `git diff --name-only origin/main HEAD -- server src/sim src/world src/net src/core
   package.json package-lock.json render.yaml` must be empty.

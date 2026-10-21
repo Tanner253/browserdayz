@@ -127,9 +127,11 @@ export default defineConfig({
         bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
       },
       // (the battle royale's three, on the same arena server: its page itself, /br, is the game's page)
-      '^/(battleroyale|br)/(lobbies|next|board)(\?.*)?$': { target: process.env.ARENA_TARGET ?? 'http://localhost:8090', changeOrigin: !!process.env.ARENA_TARGET },
+      // (a pattern's `\\?` is the question mark itself: written `\?` in a string it is a bare `?`, and `(?.*)` is no
+      // pattern at all, so a dev server started afresh would not start)
+      '^/(battleroyale|br)/(lobbies|next|board)(\\?.*)?$': { target: process.env.ARENA_TARGET ?? 'http://localhost:8090', changeOrigin: !!process.env.ARENA_TARGET },
       // (and its game's socket, /battleroyale?...; the page itself, /battleroyale, is the game's page)
-      '^/battleroyale(\?.*)?$': {
+      '^/battleroyale(\\?.*)?$': {
         target: process.env.ARENA_TARGET ?? 'http://localhost:8090',
         ws: true,
         changeOrigin: !!process.env.ARENA_TARGET,

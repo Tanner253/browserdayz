@@ -564,7 +564,7 @@ float gateCell( vec2 c ) { vec3 q = fract( vec3( c.xyx ) * 0.1031 ); q += dot( q
  * The gatehouse stood in the world: two things to draw (its stone, its timber), each one shape made here and never
  * touched again, and what stops a body (the boxes of `gatehouseBoxes`, where there is a world to stop one in).
  */
-export function buildGatehouse(p: GatePlace, atmo: Atmosphere, scene: THREE.Scene): void {
+export function buildGatehouse(p: GatePlace, atmo: Atmosphere, scene: THREE.Object3D): void {
   const to = new THREE.Matrix4().makeRotationY(p.rot).setPosition(p.x, p.y, p.z);
   const { blocks } = plan(), stone: THREE.BufferGeometry[] = [], timber: THREE.BufferGeometry[] = [];
   blocks.forEach((b, k) => (b.stuff === 'timber' ? timber : stone).push(shape(b, k, to)));
@@ -629,7 +629,7 @@ export function drystoneBoxes(walls: WallPiece[]): { x: number; y: number; z: nu
  * lying here and there, each a stone's size and no bigger, turned as it fell; and where it has come down (`down`),
  * the stones of it lying in the gap.
  */
-export function buildDrystone(walls: WallPiece[], atmo: Atmosphere, scene: THREE.Scene): void {
+export function buildDrystone(walls: WallPiece[], atmo: Atmosphere, scene: THREE.Object3D): void {
   if (!walls.length) return;
   const shapes: THREE.BufferGeometry[] = [], level = new THREE.Matrix4();
   // (how far along its wall each length's middle is: the stone's courses run on from one length into the next)

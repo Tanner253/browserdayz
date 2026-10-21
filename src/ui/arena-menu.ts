@@ -11,6 +11,7 @@ import { KITS } from '../sim/kits';
 import { arenaBase } from '../net/client';
 import { paidLine, platformPaid } from './platform';
 import type { HUD } from './hud';
+import { doorGo } from './door';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const kitOf = (id: string) => KITS.find((k) => k.id === id);
@@ -96,6 +97,12 @@ export class ArenaMenu {
     hud.root.appendChild(this.el);
     this.drawPick();
     this.el.addEventListener('click', (e) => this.click(e));
+    // (the Zone's own page, gone to in place: src/game/modes.ts)
+    this.q('.am-zona').addEventListener('click', (e) => {
+      if (!doorGo.to) return;
+      e.preventDefault();
+      doorGo.to('zona');
+    });
     this.hud.onStartShown = (on, paused, text) => this.state(on, paused, text);
     // (and what it is doing already, if it was shown before this was made)
     const start = document.querySelector('#hud .hud-start');
@@ -106,6 +113,15 @@ export class ArenaMenu {
       n.innerHTML = `<b>ZONA PvP</b> has paid <em>${p.paidSol.toFixed(3)} SOL</em> to players${paidLine(p).replace(/^.*players/, '')}: the Zone ${p.zona.toFixed(3)}, the Arena ${p.arena.toFixed(3)}.`;
       n.hidden = false;
     });
+  }
+
+  /** taken down, another game played on the page (src/game/modes.ts) */
+  destroy() {
+    clearTimeout(this.listT);
+    this.settings(false);
+    this.hud.onStartShown = () => {};
+    this.el.remove();
+    document.body.classList.remove('arena-mode');
   }
 
   /** out of the wait for a match (true), or out of a match: the game's to do (Game.toArena) */

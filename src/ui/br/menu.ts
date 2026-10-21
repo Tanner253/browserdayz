@@ -8,7 +8,7 @@ import './br.css';
 import { arenaBase } from '../../net/client';
 import { MAPS, TEAM, type BrMode } from '../../../arena/br/rules';
 import type { HUD } from '../hud';
-import { doorOver } from '../door';
+import { doorGo, doorOver } from '../door';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const MODES: { m: BrMode; name: string; say: string }[] = [
@@ -27,6 +27,15 @@ export class BrMenu {
   private listT = 0;
   /** out of the match by the player's own choice (the pause's Leave): the game's to say to the server first */
   onLeave: () => void = () => {};
+
+  /** taken down, another game played on the page (src/game/modes.ts) */
+  destroy() {
+    clearTimeout(this.listT);
+    if (this.el.classList.contains('pset')) this.hud.settingsInto(null);
+    this.hud.onStartShown = () => {};
+    this.el.remove();
+    document.body.classList.remove('br-mode');
+  }
 
   constructor(private hud: HUD, private map: number) {
     document.body.classList.add('br-mode');
@@ -209,7 +218,11 @@ export class BrMenu {
     if (name) this.hud.setName(name);
     clearTimeout(this.listT);
     const open = how === 'find' ? this.counts?.[this.mode] : null;
-    if (open && open.map !== null && open.waiting > 0 && open.map !== this.map) return location.assign(`/battleroyale?${new URLSearchParams({ wager: 'br', size: String(TEAM[this.mode]), kills: String(open.map), loadout: 'find', go: '1' })}`);
+    if (open && open.map !== null && open.waiting > 0 && open.map !== this.map) {
+      // (on this page as it is, its map hidden and that one shown: src/game/modes.ts)
+      const search = String(new URLSearchParams({ wager: 'br', size: String(TEAM[this.mode]), kills: String(open.map), loadout: 'find', go: '1' }));
+      return doorGo.br ? doorGo.br(open.map, search) : location.assign(`/battleroyale?${search}`);
+    }
     history.replaceState(null, '', `/battleroyale?${new URLSearchParams({ wager: 'br', size: String(TEAM[this.mode]), kills: String(this.map), loadout: how })}`);
     this.hud.deploy();
   }
