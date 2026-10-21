@@ -137,9 +137,16 @@ export class Input {
   lock() {
     if (this.locked) return;
     if (this.touch || this.pad) return this.setLocked(true);
-    // raw (unaccelerated) mouse input like native shooters, where the browser supports it
-    const r = this.el.requestPointerLock({ unadjustedMovement: true } as never) as unknown as Promise<void> | undefined;
-    r?.catch?.(() => (this.el.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {}));
+    // Raw (unaccelerated) mouse input like native shooters, where the browser supports it. Asked in the same click that
+    // takes the page full screen, the browser can refuse the raw mouse while it goes there; falling straight back to the
+    // plain one gave the system's acceleration, and the aim ran two or three times as fast in full screen (a player,
+    // 2026-10-21: "when u change to full screen the sensitivity glitches or something makes it go like 3x"). So the raw
+    // mouse is asked again once the page has settled, and only then the plain one.
+    const raw = () => this.el.requestPointerLock({ unadjustedMovement: true } as never) as unknown as Promise<void> | undefined;
+    const plain = () => (this.el.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {});
+    raw()?.catch?.(() => setTimeout(() => {
+      if (!this.locked) raw()?.catch?.(plain);
+    }, 400));
   }
 
   unlock() {
