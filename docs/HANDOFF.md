@@ -2,6 +2,13 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## NEXT, once both performance tracks are merged and deployed (the owner, 2026-10-21)
+- **iPhone players get "a problem occurred".** A player in the community chat: "I get 'a problem occured' on ios ...
+  Iphone only for me. Don't own a pc". The owner: "after both sessions pass and we get to a deploy state i wanna make sure
+  this is on the todo list after, ios users error. but i dont wanan deal with this till both active tracks are done and
+  merged and we are deployed". The tracks are `vram-fps` (held-server) and `frame-cost` (branch claude/frame-cost-350a15).
+  Earlier iPhone history: memory notes load-and-phones-2026-10-11 (phone picture memory) and mobile-touch-support.
+
 ## LIVE NOW (2026-10-21 ~00:47 UTC): server from `0b77446`, site from `4a8f542` (its changelog entry); PROTOCOL 56
 All of `held-server` shipped: the performance round's later work (CardKeep, noclip, far-tree atlas, two forest shader
 savings), the parked connection work (6e313f9), the cheat trap and anti-AFK below, and the owner's asks of 2026-10-20 night
