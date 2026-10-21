@@ -286,6 +286,8 @@ export class Stage {
   trail!: THREE.Mesh;
   /** a shot's setup can run the clock on unseen (smoke building, a body settling): what the game plays meanwhile is not for the soundtrack */
   mute = false;
+  /** said every frame, after it is made and before it is photographed (a film on a server moves the server's clock on with it) */
+  onFrame: (() => Promise<void>) | null = null;
   /** clips for Actor.emote, by name (empty when tools/trailer/emotes.glb has not been built) */
   emotes = new Map<string, THREE.AnimationClip>();
 
@@ -458,13 +460,16 @@ async function stage() {
     await realSleep(20);
   }
   if (g.isLoaded === false) console.log('[tr] the guns were not built in time');
-  // the world: the game's own single-player one, from the same seed every take
+  // the world: the game's own single-player one, from the same seed every take (the twenty-fifth, the battle royale,
+  // joins a match on a server whose clock keeps step with this one's instead, in its own first shot: shots25.ts)
   clock.reseed(7001);
-  await g.enterOffline();
-  g.started = true;
-  g.paused = false;
-  g.joining = false;
-  g.hud.showStart(false);
+  if (CUT !== 25) {
+    await g.enterOffline();
+    g.started = true;
+    g.paused = false;
+    g.joining = false;
+    g.hud.showStart(false);
+  }
   g.director.t = 1;
   g.entryModal = () => {};
   // the game's own hint about a slow frame rate measures a clock that is not running at real speed here
@@ -571,7 +576,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 24) {
+  if (CUT === 25) {
+    // (the twenty-fifth is the battle royale, played on the film's own arena server: see shots25.ts)
+    const cut = await import('./shots25');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds25();
+    ownScore = cut.score;
+  } else if (CUT === 24) {
     // (the twenty-fourth is "Under the hood", the week's work nobody sees, for X: see shots24.ts)
     const cut = await import('./shots24');
     shots = cut.buildShots(S);
@@ -749,7 +760,8 @@ async function enter(shot: Shot) {
     if (shot.cam) S.cam = shot.cam(shot.lead ? (i - 24) / 60 : 0, S);
     for (const a of S.actors) a.push();
     clock.advance(1000 / 60);
-    if (i % 6 === 5) await settle();
+    if (S.onFrame) await S.onFrame();
+    else if (i % 6 === 5) await settle();
   }
   logging = was;
 }
@@ -779,6 +791,7 @@ async function step(i: number) {
   if (shot.cam) S.cam = shot.cam(t, S);
   clock.advance(1000 * dt);
   shot.after?.(t, S);
+  if (S.onFrame) await S.onFrame();
   showTitles(shot, t);
   await settle();
   clock.sync();

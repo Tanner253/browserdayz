@@ -740,3 +740,9 @@ body.tr-cut23 .x16-cap { top: 80px; bottom: auto; }
 .x23-line b { display: inline-block; padding: 8px 18px; font: 800 34px/1.1 var(--trailer-font); letter-spacing: 0.04em; color: #f2ede2; background: rgba(10, 12, 11, 0.62); text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8); }
 .x23-end h5 { margin-top: 18px; font: 700 16px var(--trailer-font); letter-spacing: 0.34em; text-transform: uppercase; color: #e8cf8a; }
 .x23-end p { margin-top: 10px; }
+
+/* the twenty-fifth film, the battle royale (shots25.ts): no head counts in the picture, the lobby's "of 30 in" and its
+   votes, the match's alive, the main menu's playing (CLAUDE.md: no player count anywhere) */
+body.tr-br25 .br-lobby-n, body.tr-br25 .br-lobby-v, body.tr-br25 .br-count, body.tr-br25 .br-lobby-code, body.tr-br25 .door-on, body.tr-br25 .door-stats, body.tr-br25 .br-end-rows { visibility: hidden !important; }
+/* (and the film's words and pointer over the main menu, which stands over everything else) */
+body.tr-br25 #tr-overlay { z-index: 2147483000; }
