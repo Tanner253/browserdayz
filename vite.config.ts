@@ -126,6 +126,8 @@ export default defineConfig({
         ...(process.env.ARENA_TARGET ? { headers: { origin: 'https://www.zonapvp.fun' } } : {}),
         bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
       },
+      // (the battle royale's three, on the same arena server: its page itself, /br, is the game's page)
+      '^/br/(lobbies|next|board)(\?.*)?$': { target: process.env.ARENA_TARGET ?? 'http://localhost:8090', changeOrigin: !!process.env.ARENA_TARGET },
     },
   },
   // (Written for the browsers of the last few years, and for an iPhone back to iOS 15: built for 2022's language

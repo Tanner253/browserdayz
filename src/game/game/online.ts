@@ -498,6 +498,13 @@ export const onlineMethods = {
       if (this.arenaLeaving) return void (this.arenaLeaving = false);
       // (a wager over, or the arena gone: its result and where to go on to, up before the mouse is let go, so that
       // its going is not taken for a pause; and any pause that was open put away, under the card)
+      if (this.br) {
+        this.br.closed(reason);
+        this.paused = true;
+        this.hud.showStart(false);
+        this.input.unlock();
+        return;
+      }
       if (this.arenaHud) {
         this.arenaHud.closed(reason);
         this.paused = true;

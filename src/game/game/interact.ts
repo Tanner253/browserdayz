@@ -27,7 +27,8 @@ export const interactMethods = {
     this.prompt = null;
     this.mark = null;
     this.focus = null;
-    if (this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
+    // (the battle royale says what is within reach itself: src/game/br/mode.ts)
+    if (this.br || this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
     // at a shop's counter, looking at the man behind it
     if (this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
       const book = this.jobBook();

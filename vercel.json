@@ -57,6 +57,10 @@
     {
       "source": "/arena",
       "destination": "/index.html"
+    },
+    {
+      "source": "/br",
+      "destination": "/index.html"
     }
   ],
   "functions": {

@@ -9,7 +9,7 @@ import { TAG_HOLD_MIN } from '../sim/items';
 import { arenaBase, serverSays, serverStatus } from '../net/client';
 import type { LobbyInfo } from '../../arena/rules';
 
-export type Mode = 'zona' | 'arena';
+export type Mode = 'zona' | 'arena' | 'br';
 
 const LAST = 'zona-last-game';
 
@@ -18,7 +18,7 @@ export function openDoor(): Promise<Mode> {
   let last: Mode | null = null;
   try {
     const v = localStorage.getItem(LAST);
-    last = v === 'zona' || v === 'arena' ? v : null;
+    last = v === 'zona' || v === 'arena' || v === 'br' ? v : null;
   } catch {
     /* no storage: nothing is lit */
   }
@@ -32,7 +32,7 @@ export function openDoor(): Promise<Mode> {
       <div class="door-pvp">Player <i>vs</i> Player</div>
       <div class="door-paid" hidden></div>
       <div class="door-stats"><span data-s="tags" hidden></span><span data-s="today" hidden></span><span data-s="matches" hidden></span><span data-s="squad"></span></div>
-      <div class="door-cards">
+      <div class="door-cards three">
         <button type="button" class="door-card zona${last === 'zona' ? ' last' : ''}" data-mode="zona">
           <i class="door-bg"></i>
           ${last === 'zona' ? '<span class="door-last">Last played</span>' : ''}
@@ -49,6 +49,15 @@ export function openDoor(): Promise<Mode> {
           <b>ARENA</b>
           <span class="door-say">Players against players, team against team at the fort, in rounds. Set loadouts, first to 3, 5 or 10. Watch any match being played.</span>
           <span class="door-go">Enter Arena</span>
+        </button>
+        <button type="button" class="door-card br${last === 'br' ? ' last' : ''}" data-mode="br">
+          <i class="door-bg"></i>
+          ${last === 'br' ? '<span class="door-last">Last played</span>' : ''}
+          <span class="door-stamp">New<small>Free to play</small></span>
+          <span class="door-what"><em>PvP</em> Battle royale</span><span class="door-on" data-on="br" hidden></span>
+          <b>BATTLE ROYALE</b>
+          <span class="door-say">Up to 30 drop from the sky. Solos, duos or squads: loot, fight, and be the last standing as the gas closes in.</span>
+          <span class="door-go">Enter Battle Royale</span>
         </button>
       </div>
       <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a><span class="door-upd" hidden></span></footer>
@@ -118,6 +127,7 @@ export function openDoor(): Promise<Mode> {
 /** this page's game, by its address: /arena or a wager is the Arena, /zona or any switch on the address is the Zone (development and test pages), and the bare site asks (null) */
 export function modeOf(wager: boolean): Mode | null {
   const path = location.pathname.replace(/\/+$/, '');
+  if (new URLSearchParams(location.search).get('wager') === 'br' || path === '/br') return 'br';
   if (wager || path === '/arena') return 'arena';
   if (path === '/zona' || location.search.length > 1) return 'zona';
   return null;

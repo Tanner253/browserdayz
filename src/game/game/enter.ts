@@ -5,6 +5,7 @@
 import { audio } from '../../core/audio';
 import { wagerQuery, watching } from '../../net/client';
 import { ArenaHud } from '../../ui/arena-hud';
+import { BrMode, brPage } from '../br/mode';
 import { reloadPage } from '../../core/leave';
 import { CUT } from '../../../arena/rules';
 import { heightAt, inPlay } from '../../world/worldgen';
@@ -54,7 +55,9 @@ export const enterMethods = {
     if (CUT.arena && !wagerQuery()) return void reloadPage();
     // (in a wager the server alone says when anybody dies: arena/rules.ts; and the arena has its own screen)
     this.player.keepAlive = !!wagerQuery();
-    if (wagerQuery() && !this.arenaHud) {
+    // (the battle royale rides on the arena's door, `?wager=br`, with its own mode in place of the Arena's screen)
+    if (brPage() && !this.br) this.br = new BrMode(this);
+    else if (wagerQuery() && !this.arenaHud && !brPage()) {
       this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');
       this.weapons.freeReload = true;
       // (over: the Arena's menu again, as the page is, for another; or the door)

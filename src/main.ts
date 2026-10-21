@@ -10,6 +10,9 @@ import { wagerQuery } from './net/client';
 import { modeOf, openDoor } from './ui/door';
 import { startAds } from './ui/ads';
 import { ArenaMenu } from './ui/arena-menu';
+import { BrMenu } from './ui/br/menu';
+import { brCorners, brMapOfPage, cutToBr } from './game/br/cut';
+import { MAPS as BR_MAPS } from '../arena/br/rules';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
 import { SEA_LEVEL, WORLD_X0, WORLD_Z0, WORLD_Z1, heightAt } from './world/worldgen';
 import { Towns } from './world/towns';
@@ -150,7 +153,14 @@ async function boot() {
     mode = await openDoor();
     history.replaceState(null, '', `/${mode}${location.hash}`);
   }
+  // (the battle royale's map: asked of its server while everything loads, the page cut to it once the world is made)
+  const brMapP = mode === 'br' ? brMapOfPage() : null;
   // (the loading screen is the game's own: the Arena's says so)
+  if (mode === 'br') {
+    (loading.querySelector('.load-title') as HTMLElement).textContent = 'BATTLE ROYALE';
+    (loading.querySelector('.load-sub') as HTMLElement).textContent = 'drop in · loot · be the last standing · zona pvp';
+    loading.classList.add('arena');
+  }
   if (mode === 'arena') {
     (loading.querySelector('.load-title') as HTMLElement).textContent = 'ARENA';
     (loading.querySelector('.load-sub') as HTMLElement).textContent = 'team matches at the fort Â· zona pvp';
@@ -188,6 +198,8 @@ async function boot() {
   // (the Arena's page builds the arena and what is seen over its wall, and nothing else: arena/rules.ts)
   const arena = mode === 'arena' && !!world.castle;
   if (arena) cutToArena(world);
+  const brMap = brMapP ? await brMapP : -1;
+  if (brMap >= 0) cutToBr(world, BR_MAPS[brMap]);
   console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}${arena ? ' (cut to the arena)' : ''}`);
 
   stage('sky');
@@ -268,6 +280,14 @@ async function boot() {
       physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2, 40, 0.3), 'concrete', { x: (ax + bx) / 2, y, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, undefined, GLASS_GROUPS);
     }
   }
+  if (brMap >= 0) {
+    // the battle royale map's edge: a wall nobody sees and nobody walks through (its own circle of gas is what is seen)
+    const c = brCorners(BR_MAPS[brMap]);
+    for (let k = 0; k < 4; k++) {
+      const [ax, az] = c[k], [bx, bz] = c[(k + 1) % 4], yaw = Math.atan2(-(bz - az), bx - ax);
+      physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2, 400, 0.3), 'concrete', { x: (ax + bx) / 2, y: 0, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, undefined, GLASS_GROUPS);
+    }
+  }
   // (a stash in a cave stands on the carved rock, whose floor is the plan's give or take most of a metre: measured once
   // the caves are solid and before what stands is drawn. The server keeps the plan's height, which opens it as well.
   // A ray finds only what a step of the world has taken in: one is taken first.)
@@ -306,6 +326,7 @@ async function boot() {
   }
   // (out of the wait for a match: still loading, the Deploy that waits for it is let go; connected, the place given up)
   if (arena) new ArenaMenu(game.hud).onLeave = (waiting) => (!waiting ? game.toArena() : game.wantIn ? ((game.wantIn = false), game.hud.showStart(true)) : game.net.leaveQueue());
+  if (brMap >= 0) new BrMenu(game.hud, brMap);
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world

@@ -317,7 +317,9 @@ export const frameMethods = {
     const seatKeys = !!ride && (input.held('ControlLeft') || input.held('ControlRight'));
     if (playing && !uiOpen && !typing && !p.dead && seatKeys) HOT_CODES.slice(0, 4).forEach((k, i) => input.pressed(k) && this.garage.swap(i));
     else if (playing && !uiOpen && !typing && !p.dead && !this.cook) {
-      HOT_CODES.forEach((k, i) => {
+      // (the battle royale's six slots are its own: src/game/br/mode.ts)
+      if (this.br) this.br.keys();
+      else HOT_CODES.forEach((k, i) => {
         if (input.pressed(k)) this.hot(i);
       });
       if (input.pressed('KeyX') && (this.inHand || this.use)) this.emptyHands();
@@ -518,6 +520,7 @@ export const frameMethods = {
       if (held?.id === 'ar15' && (held.loaded ?? 0) < 4) Object.assign(held, { mag: 'mag_ar', loaded: 31 });
     }
     this.sendState(dt);
+    this.br?.tick(dt, cam);
     // (the arena's screen: health, the gun in hand and what is in it, whether only looking on, and the scoreboard while Tab is held)
     if (this.arenaHud) {
       const gun = this.weapons.equippedItem;

@@ -55,6 +55,7 @@ import { Jeep } from './vehicle';
 import '../sim/vehicles';
 import { HUD } from '../ui/hud';
 import { ArenaHud } from '../ui/arena-hud';
+import type { BrMode } from './br/mode';
 import '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
@@ -1272,6 +1273,8 @@ export class Game {
   restartSaid: { why: string; at: number } | null = null;
   /** in a wager, the arena's own screen over the HUD (src/ui/arena-hud.ts); null in the open world */
   arenaHud: ArenaHud | null = null;
+  /** in the battle royale, its own mode (src/game/br/mode.ts); null elsewhere */
+  br: BrMode | null = null;
   /**
    * What is built behind the menu rather than before it (the guns, their shaders, any inventory picture that is out
    * of date): the menu is up while it is, and Deploy waits for it (`isLoaded`; pressed before, it is remembered in
