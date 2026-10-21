@@ -20,6 +20,16 @@ Both performance tracks merged and on the site:
   (perf-1021/forest). The forest is pixel-bound: its per-pixel cost is the open fps lever.
 - No changelog entry: the owner said "skip the banner".
 
+## BATTLE ROYALE: built, NOT deployed (2026-10-21 night); branch `battle-royale` (dc9be96, pushed)
+- Works end to end: the menu (ZONA in the middle), solo/duo/squad, the lobby and its vote, the plane, the canopy, loot,
+  the slots, the circle, server-traced shots stopped at walls, knock and revive, jeeps, grenades, the bot check at the
+  door, the board. Status and gaps are in docs/BATTLE-ROYALE.md; tests test/br-match.test.ts and test/arena.test.ts.
+- RELEASE NEEDS THE OWNER'S WORD: `node scripts/deploy.mjs` from battle-royale. main (0b77446) lacks the evening's
+  site-only client files (src/core, src/world: listed by `git diff --name-only main battle-royale -- src/core src/world`),
+  which are in the ZONA server's build filter, so the push restarts the ZONA server once (everyone keeps their place).
+  The changelog entry and the restart note are in (from br-release).
+- Render (the owner's to do): the arena service on a paid instance; copy BOT_RULES to it.
+
 ## NEXT, once both performance tracks are merged and deployed (the owner, 2026-10-21)
 - **iPhone players get "a problem occurred".** A player in the community chat: "I get 'a problem occured' on ios ...
   Iphone only for me. Don't own a pc". The owner: "after both sessions pass and we get to a deploy state i wanna make sure
