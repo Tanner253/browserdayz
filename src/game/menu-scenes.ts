@@ -48,7 +48,6 @@ import { SIGHT_GROUPS, physics } from '../core/physics';
 import { BUNKER, bunkerAt, bunkerLocal } from '../sim/bunker';
 import { fireSpots } from '../sim/fires';
 import { GAS, gasZone } from '../sim/gas';
-import { ITEMS } from '../sim/items';
 import { BURY, noBurying } from '../sim/stash';
 import type { Atmosphere } from '../world/atmosphere';
 import { hospitalPlan } from '../world/big-buildings';
@@ -98,8 +97,6 @@ interface Vignette {
    * is cut to until it is over (Assets.sharpen). The things themselves, whoever's hands they are in or out of.
    */
   close?(): THREE.Object3D[];
-  /** the models those pictures belong to: sent for a scene ahead, so that they are in the browser's keeping by then */
-  warm?: string[];
   /** what has to be going before it is cut to (smoke takes its time to stand): done each frame for the last `lead` seconds of whatever is shown before it */
   early?(dt: number): void;
   lead?: number;
@@ -689,7 +686,6 @@ export class MenuScenes {
       seconds: 7.5,
       // (the gun has a third of the picture to itself, from a pace off)
       close: () => [man.kits.get('deagle')!.obj],
-      warm: [ITEMS.deagle.model],
       setup: () => {
         last = -9;
         this.put(man, here.at.x, here.at.z, Math.atan2(-here.t.x, -here.t.z));
@@ -733,7 +729,6 @@ export class MenuScenes {
       caption: 'Benelli M3 · holographic sight, and a light under the barrel',
       seconds: 8,
       close: () => [man.kits.get('benelli')!.obj],
-      warm: [ITEMS.benelli.model],
       setup: () => {
         last = -9;
         this.put(man, here.at.x, here.at.z, Math.atan2(-here.t.x, -here.t.z));
@@ -784,7 +779,6 @@ export class MenuScenes {
       caption,
       seconds: 8,
       close: () => [man.kits.get(key)!.obj],
-      warm: [ITEMS[key].model],
       setup: () => {
         last = -9;
         left = 0;
@@ -1214,7 +1208,6 @@ export class MenuScenes {
       caption: `Out in the country · a shovel buries a stash in ${BURY.seconds} seconds`,
       seconds,
       close: () => [man.kits.get('shovel')!.obj],
-      warm: [ITEMS.shovel.model],
       setup: () => {
         struck = -1;
         under = false;
@@ -1586,11 +1579,6 @@ export class MenuScenes {
   /** the round that is shown next: what this visitor has not been shown first (see `menuOrder`) */
   private round() {
     this.order = menuOrder(this.rows, this.seen, this.last, Date.now()).map((o) => ({ ...o, v: this.rows.find((r) => r.id === o.id)!.v }));
-    this.fetchFor(this.order[0]?.v);
-  }
-  /** the full pictures of what a scene shows close are sent for: a scene ahead, so that they are in the browser's keeping when it is cut to */
-  private fetchFor(v: Vignette | undefined) {
-    for (const model of v?.warm ?? []) assets.warm(model);
   }
   /** a scene has been on long enough to count as shown: it is written down as one this visitor has seen */
   private note(id: string) {
@@ -1705,6 +1693,5 @@ export class MenuScenes {
     this.near = this.soon?.v === v ? this.soon.drops : (v.close?.() ?? []).map((o) => assets.sharpen(o, true));
     this.soon = null;
     for (const drop of was) drop();
-    this.fetchFor(this.order[k + 1]?.v);
   }
 }

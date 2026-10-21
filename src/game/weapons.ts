@@ -1863,20 +1863,8 @@ export class Weapons {
    * arms that hold it, or the thing held. Everything else in the world is drawn with the world's own copies.
    */
   private sharpGun: { of: VmModel; as: string; drop: () => void } | null = null;
-  private warmed = '';
   private sharpHeld: { of: THREE.Object3D; drop: () => void } | null = null;
   private sharpenHands() {
-    // (What is carried to fight with, and the arms it is held in, are fetched ahead: so that the pictures are in
-    // the browser's keeping when the gun comes up, and only have to be unpacked.)
-    const carried = [this.inv.slots.primary, this.inv.slots.secondary, this.inv.slots.holster].map((it) => it?.id ?? '').join();
-    if (carried !== this.warmed) {
-      this.warmed = carried;
-      for (const id of carried.split(',')) {
-        if (!id) continue;
-        assets.warm(ITEMS[id].model);
-        assets.warm(this.models.get(id)?.rig ? (['mosin', 'mosin9130', 'benelli'].includes(id) ? 'sniper_fp' : 'ak_fp') : '');
-      }
-    }
     const m = this.current;
     // (and again when what is fitted to it changes: a part put on is fetched then, one taken off is let go of)
     const as = this.currentItem ? `${this.currentItem.uid}|${fittedOf(this.currentItem).join()}` : '';

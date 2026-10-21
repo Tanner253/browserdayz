@@ -69,6 +69,13 @@ const PHONE_CAP = { colour: 1024, other: 512 };
  * far as this is seen from, on a screen that size, it is what the screen has pixels for.
  */
 const PHONE_FAR = { colour: 256, other: 128 };
+/**
+ * And on a computer every model is drawn so as well, near or far, with no copy as it came for what is close (2026-10-21,
+ * the owner, shown each thing at three sizes: "we can do C"). Six minutes online had put 1.3 GB of models' pictures on
+ * an 8 GB card, and every copy as it came was 22 to 405 MB more each time somebody walked up to the thing.
+ */
+const DESK = !TOUCH;
+const DESK_CAP = PHONE_FAR;
 /** somebody's body, on a phone: it is not one of the things made sharper when near, and is never far when it matters */
 const PHONE_BODY = { colour: 512, other: 256 };
 type Cap = typeof PHONE_CAP;
@@ -477,6 +484,8 @@ export class Assets {
           const g = await this.gltf.parseAsync(data, '');
           // (on a phone its pictures are made small before anything is drawn with them: see PHONE_FAR)
           if (TOUCH) return shrinkModel(g, this.far.has(url) ? PHONE_FAR : PHONE_BODY);
+          // (and on a computer to DESK_CAP: kept small in the page, so that a picture taken off the card can be put back)
+          if (DESK && !this.allSharp) return shrinkModel(g, DESK_CAP);
           // (its pictures are let go of here once they are on the card: see `thin`)
           if (!this.kept.has(url)) g.scene.traverse((o) => paints(o).forEach((mat) => MAPS.forEach((slot) => mat[slot] && thin(mat[slot]!))));
           return g;
@@ -514,7 +523,7 @@ export class Assets {
   /** every material of a model that has a copy as it came says which model that is, and which of its materials it is */
   private mark(id: string, g: GLTF): GLTF {
     // (on a phone every model has a sharper copy of itself: its own file, whose pictures were made small as it was read)
-    if (this.marked.has(g) || !(TOUCH || this.manifest.models[id]?.hi) || this.allSharp) return g;
+    if (this.marked.has(g) || !(TOUCH || this.manifest.models[id]?.hi) || this.allSharp || DESK) return g;
     this.marked.add(g);
     g.scene.traverse((o) => {
       for (const mat of paints(o)) {
@@ -539,7 +548,7 @@ export class Assets {
    */
   sharpen(root: THREE.Object3D | THREE.Material[], first = false): () => void {
     // (a phone the game has already failed to start on is asked for nothing more than the small pictures: see LEAN)
-    if (this.allSharp || LEAN) return () => {};
+    if (this.allSharp || LEAN || DESK) return () => {};
     const want = new Map<string, Painted[]>();
     // (or the materials themselves, where whoever asks knows them: see src/game/near.ts)
     if (Array.isArray(root)) {
@@ -765,15 +774,6 @@ export class Assets {
       void s.mats.then(gone, gone);
     }, KEEP_SHARP * 1000);
   }
-
-  /** the pictures of a thing as it came, fetched and kept by the browser against the moment they are wanted (what is carried: see `sharpen`) */
-  warm(id: string) {
-    const hi = this.manifest.models[id]?.hi;
-    if (!hi || TOUCH || this.warmed.has(id)) return;
-    this.warmed.add(id);
-    void fetch(this.url(hi)).then((r) => r.arrayBuffer()).catch(() => this.warmed.delete(id));
-  }
-  private warmed = new Set<string>();
 
   /**
    * Drop decoded glTF files once the world is built: every system works from its own
