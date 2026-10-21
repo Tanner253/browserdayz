@@ -180,7 +180,15 @@ reflectedLight.indirectSpecular *= 0.35;`,
     return mat;
   }
 
+  private shown = true;
+  /** Graphics option: grass drawn at all (the owner, 2026-10-21: "make it a graphics ssetting to enable or disable it") */
+  setShown(on: boolean) {
+    this.shown = on;
+    for (const l of this.levels) l.mesh.visible = on;
+  }
+
   update(camera: THREE.Camera, player?: THREE.Vector3) {
+    if (!this.shown) return;
     if (player) grassUniforms.uPlayer.value.copy(player);
     this.pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.pv);

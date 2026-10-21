@@ -23,10 +23,15 @@ export interface Graphics {
   volume: number;
   /** how far off buildings are drawn, metres (loot is drawn within 55 m whatever this is) */
   draw: number;
+  /**
+   * grass drawn at all (the owner, 2026-10-21: "make it a graphics ssetting to enable or disable it problably. with it
+   * default disabled for new players"): off for a browser that has kept no settings, on for one that has
+   */
+  grass: boolean;
 }
 
-/** what a preset sets: everything but the frame limit, the volume and the draw distance */
-export type Look = Omit<Graphics, 'fpsLimit' | 'volume' | 'draw'>;
+/** what a preset sets: everything but the frame limit, the volume, the draw distance and the grass */
+export type Look = Omit<Graphics, 'fpsLimit' | 'volume' | 'draw' | 'grass'>;
 
 export const PRESETS: Record<PresetName, Look> = {
   low: { scale: 0.5, msaa: 0, ao: 'off', shadows: 'low', foliage: 'low' },
@@ -67,7 +72,7 @@ const FULL = typeof location !== 'undefined' && (location.pathname.endsWith('/tr
 export const BALANCED: Look = { scale: 1, msaa: 0, ao: 'off', shadows: 'low', foliage: 'medium' };
 
 /** That on a computer; a phone starts on its own setting, and the menu has the rest either way. (One the game has already failed to start on starts on the lowest: see LEAN.) */
-export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : FULL ? PRESETS.ultra : BALANCED), fpsLimit: 0, volume: 1, draw: 800 };
+export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : FULL ? PRESETS.ultra : BALANCED), fpsLimit: 0, volume: 1, draw: 800, grass: FULL };
 
 const STORE = 'zona.gfx';
 /**
@@ -81,7 +86,8 @@ function giveRound() {
   if (FULL || TOUCH || LEAN || Number(localStorage.getItem(ROUND) ?? 0) >= THIS_ROUND) return;
   const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Graphics> | null;
   const volume = raw && typeof raw.volume === 'number' && raw.volume >= 0 && raw.volume <= 1 ? raw.volume : 1;
-  localStorage.setItem(STORE, JSON.stringify({ ...BALANCED, fpsLimit: 0, volume }));
+  // (a browser that had kept none is a new player's: no grass)
+  localStorage.setItem(STORE, JSON.stringify({ ...BALANCED, fpsLimit: 0, volume, grass: raw ? raw.grass !== false : false }));
   localStorage.setItem(ROUND, String(THIS_ROUND));
 }
 
@@ -106,6 +112,8 @@ export function loadGraphics(): Graphics {
       if (LEVELS.includes(raw.foliage as Level)) g.foliage = raw.foliage as Level;
       if (FPS_LIMITS.includes(raw.fpsLimit as number)) g.fpsLimit = raw.fpsLimit as number;
       if (DRAWS.includes(raw.draw as number)) g.draw = raw.draw as number;
+      // (kept from before there was the choice: a returning player's, who had grass)
+      g.grass = raw.grass !== false;
       // (it was one of five steps and is a slider now: whatever was kept of the five is still one of these)
       if (typeof raw.volume === 'number' && raw.volume >= 0 && raw.volume <= 1) g.volume = raw.volume;
     }

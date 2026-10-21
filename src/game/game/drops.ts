@@ -417,6 +417,7 @@ export const dropsMethods = {
     const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [0.75, 0.7] }[g.foliage];
     veg.setDetail(detail);
     grass.setDensity(density);
+    grass.setShown(g.grass);
     audio.setVolume(g.volume);
   },
 
