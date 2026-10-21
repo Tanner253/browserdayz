@@ -22,6 +22,9 @@ import { BRIGHT, PAINTS, ruinShapeInTurns, ruinSolids, type Solid, type Stuff } 
 
 /** how near the eye comes to any of it before its pictures are asked for and its real shape made; how far it goes before the far one is drawn again; and how far off a piece's small things and timber are drawn. Metres, from the edge of a piece. */
 export const COME = 380, GO = 440, NEAR = 110;
+/** the town in full let go of this far past GO, metres: its shapes and paints off the graphics card, its pictures left to
+ * CardKeep, made again on the way back as the first time (kept for good, a long session filled the card: 2026-10-21) */
+const LET_GO = 400;
 
 export interface Stood { piece: Piece; place: Place }
 /** a thing got ready to be drawn before it is put in the world: the game's own way of it (Renderer.ready, then Renderer.send) */
@@ -210,6 +213,22 @@ export class Ruins {
       });
     }
     if (!this.full) return;
+    if (this.state === 'away' && nearest > GO + LET_GO) {
+      const full = this.full;
+      this.group.remove(full);
+      const paints = new Set<THREE.Material>();
+      full.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        m.geometry.dispose();
+        for (const mat of Array.isArray(m.material) ? m.material : [m.material]) paints.add(mat);
+      });
+      for (const mat of paints) mat.dispose();
+      for (const q of this.pieces) q.detail.length = 0;
+      this.full = null;
+      this.state = 'far';
+      return;
+    }
     const away = this.state === 'near' ? nearest > GO : nearest > COME;
     this.state = away ? 'away' : 'near';
     this.full.visible = !away;

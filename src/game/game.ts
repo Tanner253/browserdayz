@@ -506,7 +506,12 @@ export class Game {
     // (no model of a thing is fetched here any more: each is, when a thing of its kind is first near. See LootManager.spawn.)
     // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
     // (both ways it is drawn: by itself in the hands, and as a line of the list of its kind on the ground)
-    this.loot.models.onMade = (tpl) => Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)]).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 6000))]);
+    // (What is shown of it only, as another player's gun: a gun lying by has every part that could be fitted to it hung
+    // on it, put away, and its lines on the ground are made of what is shown. See RemotePlayer.readyHeld.)
+    this.loot.models.onMade = (tpl) => {
+      tpl.group.userData.onlyShown = true;
+      return Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)], true), new Promise<void>((done) => setTimeout(done, 6000))]);
+    };
     this.loot.models.cold = (tpl) => r.keep.offCard(tpl.group);
     // (And a body is got ready before it is handed to whoever asked for it. The first of the infected and the
     // first other player to come into sight were five shaders each made in the frame: a second and a half in
@@ -525,7 +530,23 @@ export class Game {
     // (and what is put on any body, for the other lighting: see Avatar.onDressed)
     Avatar.onDressed = (parts) => void r.ready(parts);
     // (and a gun in another player's hands, likewise: see RemotePlayer.readyHeld)
-    RemotePlayer.readyHeld = (obj) => Promise.race([r.ready(obj).then(() => r.send(obj)), new Promise<void>((done) => setTimeout(done, 3000))]);
+    // (What is shown of it only: it is made again for whatever is fitted to it, and every part it could take hangs on it,
+    // put away; all of them were sent, 527 MB over the guns. Made again each time it is shown, its pictures may go a
+    // minute after the last of it is seen, but for the guns the player carries: see CardKeep.)
+    RemotePlayer.readyHeld = (obj) => {
+      obj.userData.onlyShown = true;
+      return Promise.race([r.ready(obj, true).then(() => r.keep.comeBack(obj)), new Promise<void>((done) => setTimeout(done, 3000))]);
+    };
+    r.keep.wanted = () => {
+      const out: THREE.Object3D[] = [];
+      const add = (it: { id: string }) => {
+        const m = ITEMS[it.id]?.weapon || ITEMS[it.id]?.melee ? this.weapons.heldModel(it.id) : null;
+        if (m) out.push(m);
+      };
+      for (const it of this.inv.topLevel()) add(it);
+      for (const c of this.inv.containers) for (const p of c.items) add(p.item);
+      return out;
+    };
     // (and a rack's guns, before the rack shows them: see GunRacks.onMade)
     GunRacks.onMade = (obj) => r.ready(obj).then(() => r.send(obj));
     this.loot.onPlaced = (l) => this.lootPlaced(l);
@@ -717,7 +738,11 @@ export class Game {
           const m = this.weapons.worldModel(id);
           if (m) held.add(m);
         }
-        await Promise.race([r.ready([held]), new Promise<void>((done) => setTimeout(done, 6000))]);
+        // (Their shaders, not their pictures: every gun with every part that could be fitted to it, 1.2 GB of pictures,
+        // went on the card in the game's first minute and stayed there, for guns nobody might ever be seen holding. A gun
+        // in somebody's hands is readied in full as it is shown: RemotePlayer.readyHeld. 2026-10-21, the owner: "my vram
+        // got maxed and throttled".)
+        await Promise.race([r.ready([held], false, false), new Promise<void>((done) => setTimeout(done, 6000))]);
         if (stale.length) Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
         assets.releaseModels();
         await other;

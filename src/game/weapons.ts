@@ -2640,6 +2640,11 @@ export class Weapons {
     return c;
   }
 
+  /** a gun's model as it is held in the hands (what must stay on the card while it is carried: see CardKeep.wanted) */
+  heldModel(id: string): THREE.Object3D | null {
+    return this.models.get(id)?.root ?? null;
+  }
+
   /** a copy of a weapon's body for showing in someone's hands in the world (third person) */
   worldModel(id: string, mods: string[] = []): THREE.Object3D | null {
     const m = this.models.get(id);

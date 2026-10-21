@@ -8,6 +8,10 @@
 //     time the eye comes within COME metres, off the frame (`ready`), and swapped in; past GO the far copy again.
 //   - Walls and domes are hidden past the player's draw distance as the buildings are (Buildings.keepFar), and
 //     count as cover for whoever is behind them (Buildings.hides).
+//   - A near copy is let go of once the eye is LET_GO past where it is shown, a far one past FAR_LET_GO: its shapes
+//     off the graphics card, its paints with them, its pictures left to CardKeep; made again on the way back as the
+//     first time. Kept for good, a session's walk round the west filled the card (2026-10-21, the owner: "after playing
+//     for a little bit ... my vram got maxed and throttled again").
 
 import * as THREE from 'three';
 import { physics } from '../core/physics';
@@ -30,6 +34,8 @@ const FACE_COME = 80, FACE_GO = 100;
 const FACE_FETCH = 1700;
 /** a run of a walkway is drawn near within so many metres */
 const WALK_COME = 60, WALK_GO = 80;
+/** a near copy let go of this far past where it is shown, metres; a far one past this (no draw distance reaches it) */
+const LET_GO = 400, FAR_LET_GO = 2000;
 /**
  * Old limewash on the walls' rubble, the brick showing where it has fallen; fresh white on their dressed stone
  * (pictures the buildings already use). The first pass had them the other way: from the road the walls were flat white.
@@ -70,6 +76,17 @@ export class Towns {
     if (name.startsWith('pier_')) (m.metalness = 0), (m.metalnessMap = null);
     return this.atmo.register(m, undefined, `town wall ${name}`) ?? m;
   };
+
+  /** a copy let go of: out of the world, and its shapes and paints (made for it alone: kitMeshes) off the card */
+  private drop(g: THREE.Group) {
+    this.scene.remove(g);
+    g.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry.dispose();
+      for (const mat of Array.isArray(m.material) ? m.material : [m.material]) mat.dispose();
+    });
+  }
 
   private show(w: Walled) {
     w.far.visible = w.shown && !(w.close && w.near);
@@ -186,6 +203,14 @@ export class Towns {
         f.close = close;
         this.showFace(f);
       }
+      if (f.near && d > f.go + LET_GO) {
+        this.drop(f.near);
+        f.near = null;
+      }
+      if (f.far && d > FAR_LET_GO) {
+        this.drop(f.far);
+        f.far = null;
+      }
     }
     for (const w of this.walled) {
       const d = Math.hypot(eye.x - w.x, eye.z - w.z) - w.r;
@@ -203,8 +228,14 @@ export class Towns {
           this.counts.near += triangles;
           this.scene.add(near);
           w.near = near;
+          w.making = false;
           this.show(w);
         });
+      }
+      if (w.near && d > GO + LET_GO) {
+        this.drop(w.near);
+        w.near = null;
+        this.show(w);
       }
       if (close !== w.close) {
         w.close = close;

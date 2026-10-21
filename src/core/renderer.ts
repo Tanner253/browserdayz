@@ -16,7 +16,7 @@ import {
 import { N8AOPostPass } from 'n8ao';
 import { breathe } from './breathe';
 import { oneDraw } from './one-draw';
-import { CardKeep } from './card-keep';
+import { CardKeep, walkShown } from './card-keep';
 import { lightsOnlyWhereTheyReach } from './light-reach';
 
 lightsOnlyWhereTheyReach();
@@ -215,6 +215,7 @@ export class Renderer {
       this.aheadKnown.delete(t);
       this.aheadGen++;
     });
+    this.keep.sendAhead = (root) => this.send(root);
     // (see onceADraw)
     const render = this.renderer.render.bind(this.renderer);
     this.renderer.render = (scene, camera) => {
@@ -392,11 +393,16 @@ export class Renderer {
    * That is for the world as it is lit now. The same is then done for the other lighting, behind everything else
    * and a little at a time (see `workLater`): nobody waits for that.
    */
-  async ready(obj: THREE.Object3D | THREE.Object3D[]) {
+  /**
+   * @param shown only what is shown now: for a thing made again whenever what is shown of it changes (another player's gun, made for what is fitted to it: every part it could take hangs on it, put away)
+   * @param pictures its pictures put on the card and each part drawn ahead too; else its shaders alone (for what is only
+   *   made ready for the day it is shown, and readied in full then)
+   */
+  async ready(obj: THREE.Object3D | THREE.Object3D[], shown = false, pictures = true) {
     const list = Array.isArray(obj) ? obj : [obj];
     const drawn: THREE.Object3D[] = [];
     for (const o of list) {
-      o.traverse((c) => {
+      o[shown ? 'traverseVisible' : 'traverse']((c) => {
         const d = c as THREE.Mesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean };
         if (d.isMesh || d.isPoints || d.isLine || d.isSprite) drawn.push(c);
       });
@@ -408,13 +414,13 @@ export class Renderer {
       // still being made and the frame waited on the card, 0.5 to 1.2 s near the gun racks, 2026-10-18)
       await made(programs, 60_000);
       if (!TRY.has('nolook')) await this.lookOver(programs);
-      for (const o of list) await this.send(o);
-      if (!TRY.has('noahead')) await this.drawAhead(entries);
+      if (pictures) for (const o of list) await this.send(o, shown);
+      if (pictures && !TRY.has('noahead')) await this.drawAhead(entries);
     } finally {
       this.readying--;
     }
     if (this.lighting && !TRY.has('noother')) {
-      this.later.push({ drawn, lit: !this.lighting.lit() });
+      this.later.push({ drawn, lit: !this.lighting.lit(), pictures });
       void this.workLater();
     }
   }
@@ -458,7 +464,7 @@ export class Renderer {
     return { programs, entries };
   }
 
-  private later: { drawn: THREE.Object3D[]; lit: boolean }[] = [];
+  private later: { drawn: THREE.Object3D[]; lit: boolean; pictures: boolean }[] = [];
   private working = false;
   /**
    * What has been got ready for the world as it is lit is got ready for the other lighting as well: when nothing
@@ -481,7 +487,7 @@ export class Renderer {
         const { programs, entries } = await this.write(job.drawn, job.lit, !this.rushing);
         await made(programs);
         if (!TRY.has('nolook')) await this.lookOver(programs);
-        if (!TRY.has('noahead')) await this.drawAhead(this.rushing ? entries.map((e) => ({ ...e, low: false })) : entries);
+        if (job.pictures && !TRY.has('noahead')) await this.drawAhead(this.rushing ? entries.map((e) => ({ ...e, low: false })) : entries);
       }
     } finally {
       this.working = false;
@@ -938,9 +944,9 @@ export class Renderer {
    * A thing's pictures are put on the graphics card before it is first drawn, one to a frame's spare time. Left to
    * the frame it is first drawn in, a thing with seven pictures was seven of them sent in that one frame.
    */
-  async send(obj: THREE.Object3D) {
+  async send(obj: THREE.Object3D, shown = false) {
     const pictures = new Set<THREE.Texture>();
-    obj.traverse((o) => {
+    obj[shown ? 'traverseVisible' : 'traverse']((o) => {
       const m = (o as THREE.Mesh).material;
       for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
         for (const v of Object.values(mat)) {
@@ -1013,7 +1019,7 @@ export class Renderer {
     if (import.meta.env.DEV && (globalThis as { __noAhead?: boolean }).__noAhead) return;
     const eye = this.camera.position, peek = this.keep.peek, gen = this.aheadGen;
     let found = false;
-    root.traverse((o) => {
+    walkShown(root, (o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       let waiting: THREE.Texture[] | null = null;
