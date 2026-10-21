@@ -76,6 +76,13 @@ const PHONE_FAR = { colour: 256, other: 128 };
  */
 const DESK = !TOUCH;
 const DESK_CAP = PHONE_FAR;
+/**
+ * Each model's file made at DESK_CAP already, for a computer (scripts/lean.mjs): the files carried their pictures at up
+ * to 2048 and a computer threw most of every one away on arrival (the owner: "we should do this"). The pixels are the
+ * ones the game would have cut (Chrome's own cut, stored lossless). A copy is named by the version of the file it was
+ * made from: a file changed since is loaded whole. A phone loads the files themselves (its near pictures come from them).
+ */
+const LEAN_DIR = `assets/lean/${DESK_CAP.colour}-${DESK_CAP.other}/`;
 /** somebody's body, on a phone: it is not one of the things made sharper when near, and is never far when it matters */
 const PHONE_BODY = { colour: 512, other: 256 };
 type Cap = typeof PHONE_CAP;
@@ -479,7 +486,7 @@ export class Assets {
   loadGLTF(url: string): Promise<GLTF> {
     let p = this.models.get(url);
     if (!p) {
-      const file = this.bytes(url).then((data) =>
+      const file = this.bytes(this.leanOf(url)).then((data) =>
         this.turn(async () => {
           const g = await this.gltf.parseAsync(data, '');
           // (on a phone its pictures are made small before anything is drawn with them: see PHONE_FAR)
@@ -495,6 +502,17 @@ export class Assets {
       this.models.set(url, p);
     }
     return p;
+  }
+
+  /** development: the files themselves, as before the copies, to compare (`?whole`; progress/lean/proof.js) */
+  whole = typeof location !== 'undefined' && new URLSearchParams(location.search).has('whole');
+
+  /** a computer's copy of a model's file, where there is one made from the file as it is now (see LEAN_DIR) */
+  private leanOf(url: string) {
+    const v = this.versions[url];
+    if (!DESK || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
+    const lean = `${LEAN_DIR}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
+    return this.versions[lean] ? lean : url;
   }
 
   /** a model whose pictures are read again after they have been drawn with (one that is repainted for another thing made of it): they are not let go of */

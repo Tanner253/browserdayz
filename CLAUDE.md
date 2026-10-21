@@ -55,7 +55,7 @@ The owner, 2026-10-18, with this machine's card and processor holding up their l
 - Never join the live game server to test (use `assets-src/_wf/me/ws-probe.mjs` / `captcha-probe.mjs`); never solve or tick a CAPTCHA; do not act in the owner's Render, Cloudflare or Canva accounts (no Canva at all).
 
 ## Traps that have cost real time
-- NEVER run `npm run assets`: it wrecks `public/assets/manifest.json`. Bring a model in as the last single model was (`node scripts/packs.mjs <id>`, `tier-now.mjs`, `lods.mjs`).
+- NEVER run `npm run assets`: it wrecks `public/assets/manifest.json`. Bring a model in as the last single model was (`node scripts/packs.mjs <id>`, `tier-now.mjs`, `lods.mjs`), then `node scripts/lean.mjs` (a computer's copies at the size it draws them; `test/lean.test.ts` says when they are behind).
 - NEVER `git worktree remove` a copy that has a `node_modules` junction: it deleted the real packages once. Order: `cmd //c "rmdir <wt>\node_modules"`, check it is gone, `rm -rf <wt>`, `git worktree prune`.
 - Edit code with the Edit tool; the project's scripts are Node (`node`, `npx tsx`). Python is only an occasional helper for a multi-part patch or for reading JSON, never the default (when used: `python -I`, and open files with `newline=''`, as its text mode writes CRLF here). Bash heredocs mangle backslashes and apostrophes: write any script with the Write tool.
 - The card's heat: the owner, 2026-10-14, with one chat working at a time: "Don't concern yourself with temps ... dont need to pause or wait." Run headless games when needed; do not read the card first or wait for it to cool. (Still keep the Browser pane closed while the owner plays, and never start the game's sound in the pane.)
