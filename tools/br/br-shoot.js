@@ -1,6 +1,6 @@
 // The battle royale's shots in the game (2026-10-21): in the waiting area, a gun off the ground, a second player 8 m
 // off in the open, fired at; then the same player behind a building's wall. Hits counted from the server's 'hitok'.
-// node assets-src/_wf/me/play.mjs progress/br/br-shoot.js progress/br/shoot 1280 720 "http://localhost:5173/br?wager=br&size=1&kills=2&loadout=find"
+// node assets-src/_wf/me/play.mjs tools/br/br-shoot.js progress/br/shoot 1280 720 "http://localhost:5173/br?wager=br&size=1&kills=2&loadout=find"
 const g = window.__game, out = { errors: T.errors };
 await T.boot();
 for (let k = 0; k < 80 && !g.net?.id; k++) await T.wait(250);

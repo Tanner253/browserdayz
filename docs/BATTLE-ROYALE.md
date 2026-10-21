@@ -13,7 +13,7 @@
   (hud.ts, menu.ts, br.css); hooks in `src/game/game.ts`, `game/enter.ts`, `frame.ts`, `interact.ts`, `online.ts`,
   `weapons.ts` (the `pool` for a free reload), `src/main.ts`, `src/ui/door.ts|css`; `/br` in vercel.json and the dev proxy.
 - Run it: launch entries `zona-arena-local` (8090) and `zona-dev` (5173), then `http://localhost:5173/br`. A second player
-  needs a second browser. Headless: `progress/br/br-look.js`-style script with `play.mjs` (address
+  needs a second browser. Headless: `tools/br/br-look.js`-style script with `play.mjs` (address
   `http://localhost:5173/br?wager=br&size=1&kills=2&loadout=find`).
 - Deploy: site (`node scripts/deploy.mjs --site`) and the arena by a push of `arena/**` (rebuilds zona-arena-1 only). Nothing
   changed under server/, src/sim, src/world, src/net, src/core, package*.json or render.yaml.
@@ -23,7 +23,7 @@
   far the shooter's own game saw it go before a wall (`wall`), and the server stops it at the nearer of that and the ground
   (the open world's trust level; a server bake of the buildings' solids would make it the server's own).
   Checks: `npx tsx test/br-match.test.ts` (10: lobby, vote, plane, jeeps, loot, knock, revive, winner, board),
-  `npx tsx test/arena.test.ts` (7), `progress/br/br-look.js` and `progress/br/br-shoot.js` in the headless game.
+  `npx tsx test/arena.test.ts` (7), `tools/br/br-look.js` and `tools/br/br-shoot.js` in the headless game.
 - Known gaps: the plane is the airdrop's helicopter (a real plane model needs the owner's yes on a download); the
   buildings' walls on the server are the shooter's game's word; not yet tried on a phone, nor with 30 real players.
 - Render (zona-arena-1) needs: a paid instance (Standard, 1 CPU / 2 GB: the server makes the world and plans every
