@@ -158,7 +158,7 @@ async function boot() {
   // (the loading screen is the game's own: the Arena's says so)
   if (mode === 'br') {
     (loading.querySelector('.load-title') as HTMLElement).textContent = 'BATTLE ROYALE';
-    (loading.querySelector('.load-sub') as HTMLElement).textContent = 'drop in · loot · be the last standing · zona pvp';
+    (loading.querySelector('.load-sub') as HTMLElement).textContent = 'drop in Â· loot Â· be the last standing Â· zona pvp';
     loading.classList.add('arena');
   }
   if (mode === 'arena') {
