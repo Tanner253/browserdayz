@@ -10,7 +10,8 @@
 .br-hud kbd { font: 400 9px/11px var(--mono); }
 .br-slot, .br-badge, .br-pools div, .br-mates div, .br-kill, .br-radar { background: rgba(10, 12, 11, 0.42); border: 1px solid rgba(233, 228, 216, 0.12); }
 
-.br-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); text-align: center; }
+.br-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); text-align: center; padding: 4px 14px 5px; background: rgba(10, 12, 11, 0.42); border: 1px solid rgba(233, 228, 216, 0.12); }
+.br-top:has(.br-phase:empty) { display: none; }
 .br-phase { font: 400 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
 .br-time { font-size: 26px; font-weight: 600; letter-spacing: 0.06em; line-height: 1.1; }
 .br-time:empty { display: none; }
@@ -52,12 +53,13 @@
 .br-hp.low .br-hp-n { color: var(--ink); }
 
 .br-slots { display: flex; gap: 5px; align-items: flex-end; }
-.br-slot { position: relative; width: 72px; height: 52px; transition: border-color 0.15s, background 0.15s; }
+.br-slot { position: relative; width: 72px; height: 52px; background: rgba(10, 12, 11, 0.55); transition: border-color 0.15s, background 0.15s; }
 .br-slot.empty { opacity: 0.45; }
 .br-slot.held { border-color: var(--accent); background: rgba(10, 12, 11, 0.62); }
 .br-slot kbd { position: absolute; left: 3px; top: 3px; min-width: 12px; padding: 0 3px; text-align: center; color: var(--ink-faint); border: 1px solid rgba(233, 228, 216, 0.3); background: rgba(0, 0, 0, 0.5); z-index: 1; }
 .br-slot.held kbd { color: var(--accent); }
-.br-slot img { position: absolute; inset: 4px 6px 12px; width: calc(100% - 12px); height: calc(100% - 16px); object-fit: contain; }
+.br-slot img { position: absolute; inset: 4px 6px 12px; width: calc(100% - 12px); height: calc(100% - 16px); object-fit: contain; filter: drop-shadow(0 0 1px rgba(233, 228, 216, 0.7)) brightness(1.25); }
+.br-badge img { filter: drop-shadow(0 0 1px rgba(233, 228, 216, 0.7)) brightness(1.25); }
 .br-slot em { display: none; }
 .br-slot b { position: absolute; right: 4px; bottom: 3px; font: 400 10px var(--mono); color: var(--ink); }
 .br-slot b small { font-size: 9px; color: var(--ink-dim); }
