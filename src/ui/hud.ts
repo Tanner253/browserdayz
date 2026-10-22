@@ -26,6 +26,7 @@ import { dogTag } from './dogtag';
 import { adBox, adBreak } from './adsense';
 import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
+import { reportPlay } from '../core/conversion';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 export type Stance = 'stand' | 'crouch' | 'prone';
@@ -508,6 +509,7 @@ export class HUD {
       e.stopPropagation();
       if (e.key !== 'Enter' || e.repeat) return;
       name.blur();
+      if (!this.el.start.classList.contains('paused')) reportPlay('zona');
       this.startClicked();
     });
     // the menu along the top: Play is the way in itself; the rest open a sheet beside it
@@ -1821,6 +1823,7 @@ export class HUD {
       if (!t.closest('.start-btn') && !(paused && bare)) return;
       if (this.el.start.classList.contains('busy')) return;
       e.preventDefault();
+      if (!paused) reportPlay('zona');
       cb();
     };
   }

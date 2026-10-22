@@ -9,6 +9,7 @@ import { arenaBase } from '../../net/client';
 import { MAPS, TEAM, type BrMode } from '../../../arena/br/rules';
 import type { HUD } from '../hud';
 import { doorGo, doorOver } from '../door';
+import { reportPlay } from '../../core/conversion';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const MODES: { m: BrMode; name: string; say: string }[] = [
@@ -217,6 +218,7 @@ export class BrMenu {
    * lobby is on another map than this page was made for is gone to on a page made for that map.
    */
   private go(how: string) {
+    reportPlay('br');
     const name = this.q<HTMLInputElement>('.bm-name input').value.trim();
     if (name) this.hud.setName(name);
     clearTimeout(this.listT);

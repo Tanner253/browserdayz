@@ -11,6 +11,7 @@ import { KITS } from '../sim/kits';
 import { arenaBase } from '../net/client';
 import type { HUD } from './hud';
 import { doorGo } from './door';
+import { reportPlay } from '../core/conversion';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const kitOf = (id: string) => KITS.find((k) => k.id === id);
@@ -219,6 +220,7 @@ export class ArenaMenu {
 
   /** into a match: put in the page's address, the name given, and Deploy pressed as the Zone presses it */
   private go(q: Record<string, string>, what = '') {
+    if (q.watch !== '1') reportPlay('arena');
     this.q<HTMLElement>('.am-wait-what').textContent = what;
     const name = this.q<HTMLInputElement>('.am-name input').value.trim();
     if (name) this.hud.setName(name);
