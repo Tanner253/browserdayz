@@ -57,9 +57,14 @@ export function openDoor(): Promise<Mode> {
           <span class="door-go">Enter Battle Royale</span>
         </button>
       </div>
-      <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/games-like-dayz/" target="_blank" rel="noopener">About ZONA</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
+      <button type="button" class="store-btn door-store">Store</button>
+      <footer class="door-foot"><a href="/store" class="door-storelink">Store</a><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/games-like-dayz/" target="_blank" rel="noopener">About ZONA</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
     </div>`;
   document.body.appendChild(el);
+  // (the store, over the door: from its button, its link, or an address of its own, /store)
+  const store = (e?: Event) => (e?.preventDefault(), void import('./store/panel').then((m) => m.openStore()));
+  for (const b of el.querySelectorAll('.door-store, .door-storelink')) b.addEventListener('click', store);
+  if (location.pathname.replace(/\/+$/, '') === '/store') store();
   // (how long ago this build of the site was made, on a computer: the owner, 2026-10-15, "for pc add last updated n(time) ago")
   const upd = el.querySelector('.door-upd') as HTMLElement;
   const ago = () => {

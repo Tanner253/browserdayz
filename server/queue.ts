@@ -6,6 +6,7 @@ import { type C2S, PROTOCOL, type S2C } from '../src/net/protocol';
 import { MAX_PLAYERS, log } from './index';
 import { awake } from './gate';
 import { KEPT } from './keep';
+import { perks } from './perks';
 import { cleanName, clients, drop, join, records, send, type Client } from './players';
 
 // ------------------------------------------------------------------ the queue
@@ -22,6 +23,8 @@ interface Waiting {
   key: string;
   /** they were in the game until a moment ago */
   back: boolean;
+  /** VIP at the store: ahead of everybody but those on their way back (the owner: "a VIP queue pass") */
+  vip: boolean;
   /** called with the player they have become, once they are in */
   enter: (c: Client) => void;
 }
@@ -67,7 +70,7 @@ export function enqueue(ws: WebSocket, hello: Extract<C2S, { t: 'hello' }>, ente
   // the same player waiting twice (a second tab): the new connection takes the old one's place
   const twice = key ? queue.findIndex((w) => w.key === key) : -1;
   const rec = key ? records.get(key) : undefined;
-  const w: Waiting = { ws, hello, key, back: !!rec && Date.now() - rec.leftAt < REJOIN_GRACE_MS, enter };
+  const w: Waiting = { ws, hello, key, back: !!rec && Date.now() - rec.leftAt < REJOIN_GRACE_MS, vip: !!key && perks.vip(key), enter };
   if (twice >= 0) {
     const old = queue[twice];
     queue[twice] = { ...w, back: old.back || w.back };
@@ -76,6 +79,10 @@ export function enqueue(ws: WebSocket, hello: Extract<C2S, { t: 'hello' }>, ente
   } else if (w.back) {
     // behind anyone else who is also on their way back in
     const at = queue.findIndex((q) => !q.back);
+    queue.splice(at < 0 ? queue.length : at, 0, w);
+  } else if (w.vip) {
+    // behind those coming back and the VIPs before them
+    const at = queue.findIndex((q) => !q.back && !q.vip);
     queue.splice(at < 0 ? queue.length : at, 0, w);
   } else queue.push(w);
   log(`~ ${cleanName(hello.name)} is waiting (${queue.indexOf(queue.find((q) => q.ws === ws)!) + 1} of ${queue.length})`);
@@ -133,7 +140,7 @@ export function scoreOf(c: Client) {
 /** tell everyone (or one player who has just joined) how the board stands */
 export function sendBoard(only?: Client) {
   const ranked = [...scores.entries()].filter(([, s]) => s.kills || s.tags).sort((a, b) => b[1].tags - a[1].tags || b[1].kills - a[1].kills || a[1].name.localeCompare(b[1].name));
-  const rows = ranked.slice(0, 5).map(([, s]) => [s.name, s.kills, s.tags] as [string, number, number]);
+  const rows = ranked.slice(0, 5).map(([k, s]) => (perks.vip(k) ? [s.name, s.kills, s.tags, 1] : [s.name, s.kills, s.tags]) as [string, number, number, 1?]);
   for (const c of only ? [only] : clients.values()) {
     const mine = scores.get(c.key);
     send(c, { t: 'board', rows, me: ranked.findIndex(([k]) => k === c.key), mine: [mine?.kills ?? 0, mine?.tags ?? 0] });

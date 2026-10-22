@@ -38,6 +38,7 @@ import type { S2C } from '../net/protocol';
 import type { ItemInstance } from '../sim/items';
 import { controls, keyOf, shown } from '../core/keys';
 import './admin.css';
+import { StoreTab } from './admin-store';
 
 export interface AdminActions {
   /** an order, as it would be typed (`/kick #12 why`) */
@@ -60,6 +61,8 @@ export interface AdminActions {
   look(): AdminLook | null;
   /** somebody has been picked on the left (0: nobody): the admin's map rings them too */
   picked(id: number): void;
+  /** an order to the store's book (src/ui/admin-store.ts) */
+  store(act: unknown): void;
   close(): void;
 }
 
@@ -105,7 +108,7 @@ export interface AdminSelf {
 }
 
 type Player = AdminPlayer;
-type View = 'who' | 'entities' | 'server' | 'bans' | 'roles';
+type View = 'who' | 'entities' | 'server' | 'bans' | 'roles' | 'store';
 type Sub = 'actions' | 'items' | 'kits' | 'pockets';
 /** where the window stands and how big it is, in pixels of the screen */
 type Box = { x: number; y: number; w: number; h: number };
@@ -159,6 +162,7 @@ const ICON: Record<string, string> = {
   clock: '<circle cx="12" cy="12" r="8.2"/><path d="M12 7.5V12l3 2"/>',
   ban: '<circle cx="12" cy="12" r="8.2"/><path d="M6.2 6.2l11.6 11.6"/>',
   star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8z"/>',
+  coin: '<circle cx="12" cy="12" r="8"/><path d="M12 7v10M14.6 9.6c-.3-.9-1.3-1.4-2.6-1.4-1.5 0-2.6.7-2.6 1.8 0 2.6 5.3 1.3 5.3 4 0 1.1-1.1 1.9-2.7 1.9-1.4 0-2.4-.6-2.7-1.6"/>',
   map: '<path d="M9 4.5l-6 2v13l6-2 6 2 6-2v-13l-6 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
   megaphone: '<path d="M4 10v4l11 4.5v-13z"/><path d="M15 9.5a2.8 2.8 0 0 1 0 5M6.5 14.5V19h3v-3.3"/>',
   box: '<path d="M3.5 8L12 4l8.5 4v8L12 20l-8.5-4z"/><path d="M3.5 8L12 12l8.5-4M12 12v8"/>',
@@ -203,6 +207,12 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
 };
 
 export class AdminUI {
+  /** the STORE tab (src/ui/admin-store.ts) */
+  private store = new StoreTab({ el, button: (l, on, c, ic) => this.button(l, on, c, ic), grave: (k, l, on, ic) => this.grave(k, l, on, ic), order: (a) => this.act.store(a), redraw: () => this.isOpen && this.draw(true) });
+  /** the server's answer to an order to the store's book */
+  storeGot(m: { ok: boolean; view?: unknown; why?: string }) {
+    this.store.got(m);
+  }
   root = el('div', 'adm');
   isOpen = false;
   private view: View = 'who';
@@ -334,7 +344,7 @@ export class AdminUI {
     if (!this.target || (self.role !== 'admin' && this.target === self.id)) this.target = self.role === 'admin' ? self.id : 0;
     if (self.role !== 'admin') {
       this.sub = 'actions';
-      if (this.view === 'entities' || this.view === 'bans' || this.view === 'roles') this.view = 'who';
+      if (this.view === 'entities' || this.view === 'bans' || this.view === 'roles' || this.view === 'store') this.view = 'who';
     }
     // (what the view is on, behind the window: asked now, while it is still what the admin was looking at)
     this.looked = self.role === 'admin' ? this.act.look() : null;
@@ -460,7 +470,7 @@ export class AdminUI {
     const same = (Object.keys(self) as (keyof AdminSelf)[]).every((k) => k === 'x' || k === 'z' || self[k] === this.self[k]);
     this.self = self;
     // (no longer an admin: the pages that are an admin's alone are left)
-    if (self.role !== 'admin' && (this.view === 'entities' || this.view === 'bans' || this.view === 'roles')) this.view = 'who';
+    if (self.role !== 'admin' && (this.view === 'entities' || this.view === 'bans' || this.view === 'roles' || this.view === 'store')) this.view = 'who';
     if (this.isOpen && !same) this.draw();
   }
 
@@ -687,6 +697,7 @@ export class AdminUI {
     if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}`;
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}|${JSON.stringify(this.lists.turned ?? [])}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
+    if (this.view === 'store') return `${base}|${this.store.n}`;
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
@@ -698,6 +709,7 @@ export class AdminUI {
     if (this.view === 'server') return this.server();
     if (this.view === 'bans') return this.bans();
     if (this.view === 'roles') return this.roles();
+    if (this.view === 'store') return this.store.body();
     const p = this.pick();
     if (!p) return [el('div', 'adm-empty', this.lists.players.length > 1 ? 'Pick somebody on the left.' : 'Nobody else is on.')];
     const tabs = el('div', 'adm-subs');
@@ -823,6 +835,7 @@ export class AdminUI {
         this.view = v;
         // (what the view is on is asked again as the page that uses it is opened)
         if (v === 'entities') this.looked = this.act.look();
+        if (v === 'store') this.store.open();
         this.draw(true);
       }, `nav${this.view === v ? ' on' : ''}`, ic);
       b.title = tip;
@@ -831,7 +844,7 @@ export class AdminUI {
     };
     if (this.admin) nav.append(go('entities', 'Entities', 'car', 'Cars and the infected: put them in the world, and take them out of it'));
     nav.append(go('server', 'Server', 'megaphone', 'A word to everybody, what the server is doing, and the keys'));
-    if (this.admin) nav.append(go('bans', 'Bans', 'ban', 'Who is banned or kept off, and lifting it', this.lists.bans.length ? String(this.lists.bans.length) : ''), go('roles', 'Roles', 'star', 'Who is an admin or a mod'));
+    if (this.admin) nav.append(go('bans', 'Bans', 'ban', 'Who is banned or kept off, and lifting it', this.lists.bans.length ? String(this.lists.bans.length) : ''), go('roles', 'Roles', 'star', 'Who is an admin or a mod'), go('store', 'Store', 'coin', 'What was bought at the store: give, revoke, refund, move', this.store.view?.looks ? String(this.store.view.looks) : ''));
     const keep = this.side.querySelector('.adm-who')?.scrollTop ?? 0;
     this.swap(this.side, [top, list, nav]);
     list.scrollTop = keep;
@@ -853,7 +866,7 @@ export class AdminUI {
     if (this.view !== 'who') {
       const t = el('div', 'adm-head-t');
       const [ic, title, sub] = this.view === 'entities' ? ['car', 'Entities', 'Cars and the infected: put them in the world, and take them out of it. Everybody sees what is done here.']
-        : this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
+        : this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'store' ? ['coin', 'Store', 'What was bought, checked on chain as it was paid. A payment that came short or late needs a look: pass it, or refund it from the store’s wallet yourself and mark it so.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
       const text = el('div', 'adm-head-text');
       text.append(el('b', '', title), el('small', '', sub));
       t.append(icon(ic, 'huge'), text);

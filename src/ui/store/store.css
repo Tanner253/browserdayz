@@ -1,0 +1,94 @@
+/* ------------------------------------------------------------ the store (src/ui/store/panel.ts) */
+#store { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; overflow: auto; padding: 24px 16px; background: rgba(6, 7, 6, 0.86); backdrop-filter: blur(6px); color: #f1eee6; }
+#store .st-in { width: min(1080px, 100%); background: #121412; border: 1px solid rgba(255, 255, 255, 0.14); padding: 20px 22px 16px; display: flex; flex-direction: column; gap: 14px; }
+#store button { font: inherit; cursor: pointer; }
+.st-top { display: flex; align-items: center; gap: 14px; }
+.st-top b { font-size: 26px; font-weight: 800; letter-spacing: 0.22em; color: #ffd35a; }
+.st-x { margin-left: auto; width: 36px; height: 36px; border: 1px solid rgba(255, 255, 255, 0.2); background: none; color: #f1eee6; font-size: 22px !important; line-height: 1; }
+.st-vip { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #101211; background: #b57bff; padding: 4px 10px; }
+.st-lead { margin: -6px 0 0; color: #b9b4a8; font-size: 15px; }
+.st-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 12px; }
+.st-card { position: relative; border: 1px solid rgba(255, 255, 255, 0.14); background: #181b18; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.st-card h3 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: 0.04em; }
+.st-card h3 em, .st-pay h3 em { font: 600 11px 'JetBrains Mono', monospace; font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: #b9b4a8; margin-left: 6px; }
+.st-card p { margin: 0; color: #cfcabe; font-size: 14px; line-height: 1.35; }
+.st-card ul { margin: 0; padding-left: 17px; font-size: 14px; line-height: 1.4; color: #ddd8cc; display: flex; flex-direction: column; gap: 4px; }
+.st-card.vip { grid-row: span 2; border-color: #b57bff; background: linear-gradient(180deg, rgba(181, 123, 255, 0.14), #181b18 55%); }
+.st-card.vip h3 { color: #c99bff; font-size: 24px; }
+.st-purple { color: #b57bff; }
+.st-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
+.st-price { font-size: 22px; font-weight: 800; color: #ffd35a; }
+.st-price small { font-size: 13px; color: #b9b4a8; font-weight: 600; }
+.st-buy, .st-paid { background: #ffd35a; color: #101211; border: 0; padding: 9px 18px; font-weight: 800 !important; letter-spacing: 0.1em; text-transform: uppercase; font-size: 13px !important; }
+.st-card.vip .st-buy { background: #b57bff; }
+.st-buy:disabled, .st-paid:disabled { opacity: 0.6; cursor: default; }
+.st-owned { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #9be37a; }
+.st-sold { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #ff8a6e; }
+.st-limit { font: 700 11px 'JetBrains Mono', monospace !important; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a !important; }
+.st-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b9b4a8; letter-spacing: 0.04em; }
+#store input { font: 14px 'JetBrains Mono', monospace; color: #f1eee6; background: #0d0f0d; border: 1px solid rgba(255, 255, 255, 0.18); padding: 7px 9px; min-width: 0; }
+.st-small { font-size: 12.5px !important; color: #9d988c !important; }
+/* a finish, shown as the metal it is until there is a picture of the gun wearing it */
+.st-swatch { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; }
+.st-card.gold .st-swatch { background: radial-gradient(circle at 35% 30%, #fff6c8, #e8b938 38%, #8a6512 80%); }
+.st-card.nickel .st-swatch { background: radial-gradient(circle at 35% 30%, #ffffff, #c9ccd0 40%, #6d7277 82%); }
+.st-card img { width: calc(100% + 32px); margin: -14px -16px 2px; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.st-card img + .st-swatch { display: none; }
+.st-card.skin h3 { padding-right: 40px; }
+.st-more { grid-column: span 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.st-more .st-card h3 { font-size: 16px; }
+.st-card.coffee { grid-column: span 2; }
+.st-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.st-chips button { border: 1px solid rgba(255, 255, 255, 0.2); background: none; color: #f1eee6; padding: 6px 12px; font-weight: 700; }
+.st-chips button.on { border-color: #ffd35a; color: #ffd35a; }
+.st-chips label { display: flex; align-items: center; gap: 4px; color: #b9b4a8; }
+.st-chips input { width: 90px; }
+.st-foot { font-size: 12.5px; color: #8f8a7e; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px; }
+.st-foot a, .st-done a { color: #ffd35a; }
+/* paying */
+.st-pay { display: flex; flex-direction: column; gap: 12px; }
+.st-back, .st-drop { align-self: flex-start; background: none; border: 0; color: #b9b4a8; padding: 0; font-size: 14px; }
+.st-drop { font-size: 12.5px; text-decoration: underline; }
+.st-pay h3 { margin: 0; font-size: 22px; display: flex; align-items: baseline; gap: 6px; }
+.st-pay h3 .st-price { margin-left: auto; }
+.st-paygrid { display: grid; grid-template-columns: 1fr 220px; gap: 18px; align-items: start; }
+.st-steps { display: flex; flex-direction: column; gap: 6px; }
+.st-label { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd35a; margin-top: 4px; }
+.st-copy { display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: #0d0f0d; color: #f1eee6; padding: 9px 12px; text-align: left; }
+.st-copy code { font: 700 17px 'JetBrains Mono', monospace; word-break: break-all; }
+.st-copy i { margin-left: auto; font: 700 11px 'JetBrains Mono', monospace; font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: #ffd35a; }
+.st-open { align-self: flex-start; color: #ffd35a; font-size: 14px; }
+.st-qr { margin: 0; background: #f1eee6; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.st-qr svg { width: 200px; height: 200px; display: block; }
+.st-qr figcaption { color: #101211; font-size: 12px; font-weight: 600; }
+.st-check { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.st-paid { padding: 12px 26px; font-size: 15px !important; }
+.st-say { font-size: 14px; color: #ddd8cc; }
+.st-say.bad { color: #ff8a6e; }
+.st-sig summary { cursor: pointer; color: #b9b4a8; font-size: 13.5px; }
+.st-sig .st-row { margin-top: 8px; }
+.st-sig input { flex: 1; }
+.st-sigb { border: 1px solid #ffd35a; background: none; color: #ffd35a; padding: 7px 14px; font-weight: 700; }
+.st-done { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 10px 0; }
+.st-done h3 { margin: 0; font-size: 30px; letter-spacing: 0.1em; color: #9be37a; }
+.st-done.look h3 { color: #ffd35a; }
+/* the moment it is theirs (panel.ts, done): the thing, its number, and a sheen run across it once */
+.st-reveal { position: relative; margin: 0; width: min(480px, 100%); aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #ffd35a; box-shadow: 0 0 40px rgba(255, 200, 70, 0.35); animation: st-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both; display: grid; place-items: center; background: #0d0f0d; }
+.st-reveal.nickel { border-color: #d4d8de; box-shadow: 0 0 40px rgba(220, 225, 235, 0.3); }
+.st-reveal.vip { border-color: #b57bff; box-shadow: 0 0 40px rgba(181, 123, 255, 0.4); aspect-ratio: 3 / 1; }
+.st-reveal.vip b { font-size: 64px; font-weight: 900; letter-spacing: 0.3em; color: #c99bff; }
+.st-reveal img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st-reveal figcaption { position: absolute; right: 12px; bottom: 10px; font: 900 34px 'JetBrains Mono', monospace; color: #ffd35a; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9); }
+.st-reveal figcaption small { font-size: 15px; color: #f1eee6; }
+.st-sheen { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%); transform: translateX(-100%); animation: st-sheen 1.1s 0.5s ease-out both; pointer-events: none; }
+@keyframes st-in { from { transform: scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes st-sheen { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .st-reveal, .st-sheen { animation: none; } }
+.st-done p { margin: 0; font-size: 16px; max-width: 640px; }
+@media (max-width: 820px) {
+  .st-grid, .st-more { grid-template-columns: 1fr; }
+  .st-card.vip { grid-row: auto; }
+  .st-more, .st-card.coffee { grid-column: auto; }
+  .st-paygrid { grid-template-columns: 1fr; }
+  .st-qr { justify-self: center; }
+}

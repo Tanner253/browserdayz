@@ -22,6 +22,8 @@ import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, ro
 import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
 import { elite } from './elite';
+import { perks } from './perks';
+import { storeOrder } from './store-admin';
 import { baited, banId, command, login, offId } from './admin';
 import { roleRows } from './roles';
 
@@ -625,7 +627,9 @@ export function handle(c: Client, m: C2S) {
       if (quiet > now) return void sys(c, `You are muted for ${Math.ceil((quiet - now) / 60000)} more minutes: what you type and say reaches nobody.`);
       // (the word before a name: their role, in the colour they chose; or nothing, for an admin who has put the tag off)
       // (and the Elite's crown, whatever their role: see elite.ts)
-      const worn = ADMIN.tints.get(c.id), crown = elite.has(c.key) ? { elite: true } : {}, badge = { ...(worn === 'off' ? {} : { role: roleOf(c) ?? undefined, tint: worn }), ...crown };
+      // (and the store's [VIP], and a coffee's cup: server/perks.ts)
+      const worn = ADMIN.tints.get(c.id), crown = elite.has(c.key) ? { elite: true } : {};
+      const badge = { ...(worn === 'off' ? {} : { role: roleOf(c) ?? undefined, tint: worn }), ...crown, ...(perks.vip(c.key) ? { vip: true } : {}), ...(perks.cup(c.key) ? { cup: true } : {}) };
       if (m.ch === 'staff') {
         // those with a role, to one another, wherever they are: nobody else is sent it, or told that anything was said
         if (!roleOf(c)) return;
@@ -644,6 +648,11 @@ export function handle(c: Client, m: C2S) {
     }
     case 'admin':
       return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
+    // (they have just bought at the store: the site's list is asked for again, so their VIP shows within a minute)
+    case 'perks':
+      return void perks.bought();
+    case 'store':
+      return void storeOrder(c, m.act);
     case 'tint': {
       if (roleOf(c) !== 'admin') return;
       // ('off': no tag at all before their name where everybody talks: they are read as anybody is)

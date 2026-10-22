@@ -49,6 +49,7 @@
     "@vercel/blob": "^2.8.1",
     "n8ao": "^2.0.1",
     "postprocessing": "^6.39.5",
+    "qrcode-generator": "2.0.4",
     "three": "^0.186.1",
     "tsx": "^4.23.15",
     "ws": "^8.22.0"

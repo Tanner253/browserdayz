@@ -111,6 +111,8 @@ import { itemsMethods } from './game/items';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
+import { MyPerks } from './my-perks';
+import { finishLighting, wearFinish, type Finish } from './finish';
 
 export const _gasHead = new THREE.Vector3();
 /** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
@@ -395,6 +397,8 @@ export class Game {
   deathSent = false;
   warned = { hunger: false, thirst: false };
   heldKey = '';
+  /** what this player has from the store (src/game/my-perks.ts) */
+  perks = new MyPerks();
   // --- multiplayer bookkeeping
   sendT = 0;
   meT = 0;
@@ -633,6 +637,20 @@ export class Game {
 
     progress('loading weapons');
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);
+    // (a finish bought at the store, on the gun in the hands and on the body: src/game/finish.ts)
+    finishLighting({ register: (m, patch, key) => atmo.register(m, patch, key), daylight: atmo.daylight });
+    this.weapons.finishOf = (gun) => this.perks.finish(gun);
+    this.perks.changed = () => {
+      // (VIP from now: the tag round their neck is gold from now, as one made later will be)
+      const neck = this.inv.neck;
+      if (this.perks.vip && neck?.id === 'dogtag' && !neck.gold) {
+        neck.gold = true;
+        this.inventoryChanged();
+      }
+      this.weapons.refinish();
+      this.heldKey = '';
+      this.syncHeld();
+    };
     // (built behind the menu, begun once the world is up and the menu shown (`buildBehind`, from src/main.ts), and
     // what wants them is done when they are: `loaded`)
     const behind = new Promise<void>((go) => (this.buildBehind = go));
@@ -773,6 +791,7 @@ export class Game {
     const doll = await renderDoll(r.renderer, atmo.envMap, lookFor(playerName()));
 
     this.hud = new HUD(icons);
+    this.hud.adsHere = () => this.modes.mode === 'zona';
     this.hud.setName(playerName());
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
@@ -980,10 +999,12 @@ export class Game {
     // The payout wallet is given in Settings, on its Account page, and nowhere else on the menu (the owner, 2026-10-22:
     // "we will not nav the user to the payouts screen anymore", "wallet will be entered in settings in the account tab
     // of the setting menu"). It was a line under the way in and a Rewards tab, opening a window of its own.
-    if (REWARDS_UI) {
-      const account = new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true);
-      this.hud.onAccount(() => account.open());
-    }
+    // (and what this browser has bought at the store, under it: src/ui/store/account-pane.ts)
+    const account = REWARDS_UI ? new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true) : null;
+    this.hud.onAccount(() => {
+      account?.open();
+      void import('../ui/store/account-pane').then((m) => m.drawStoreAccount(this.hud.accountPane()));
+    });
     // (the name fixed with the wallet: shown in the menu, and kept as the name this browser plays under)
     onPinned((p) => {
       this.hud.pinName(p?.name ?? null);
@@ -1099,6 +1120,7 @@ export class Game {
         look: () => this.adminLook(),
         // (whoever is picked in the panel is ringed on the map as well)
         picked: (id) => this.map.pick(id === this.net?.id ? 0 : id),
+        store: (act) => this.net?.send({ t: 'store', act }),
         close: () => this.toggleAdmin(false),
       }, icons);
       document.getElementById('ui')!.appendChild(this.adminUI.root);
@@ -1312,12 +1334,13 @@ export class Game {
   /** the jeep the view was last behind (so going in and out of one is a move of the view, not a cut) */
   rode: Jeep | null = null;
 
-  makeHeld = (id: string | null, mods: string[]) => {
+  makeHeld = (id: string | null, mods: string[], finish?: Finish | null) => {
     if (!id) return null;
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
     const grips = this.weapons.gripsOf(id, mods);
     if (!obj || !grips) return null;
+    if (finish) wearFinish(obj, id, finish);
     // (a pair is held out as two pistols are, one in each hand)
     if (def?.weapon) return { obj, grips, kind: def.weapon.akimbo ? ('pistol' as const) : def.weapon.kind };
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;

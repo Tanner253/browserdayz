@@ -133,7 +133,7 @@ export function setPlayerName(name: string) {
 let key = '';
 
 /** stable anonymous identity so the server can give you your character back after a reconnect */
-function playerKey(): string {
+export function playerKey(): string {
   key ||= readKey();
   return key;
 }

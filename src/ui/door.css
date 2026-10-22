@@ -75,3 +75,9 @@
 .door-card.br b { font-size: 44px; letter-spacing: 0.12em; }
 .door-card.br .door-stamp { border-color: #5b9bd5; color: #5b9bd5; box-shadow: 0 0 0 1px rgba(91, 155, 213, 0.25); }
 @media (max-width: 760px) { .door-cards.three { grid-template-columns: 1fr; } .door-cards.three .door-card { order: 0; min-height: 220px; } }
+/* the store (src/ui/store/): a button where the menus have one, here at the door's top right */
+.store-btn { font: 700 12px 'JetBrains Mono', monospace !important; letter-spacing: 0.14em; text-transform: uppercase; color: #101211 !important; background: #ffd35a; border: 0; padding: 7px 14px; cursor: pointer; }
+.store-btn.vip { background: #b57bff; }
+#door .door-store { position: absolute; top: 20px; right: 22px; }
+/* the death screen's ad (src/ui/adsense.ts), marked as one */
+.dead-ad::before { content: 'Advertisement'; display: block; font: 600 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #77736a; margin-bottom: 3px; text-align: center; }

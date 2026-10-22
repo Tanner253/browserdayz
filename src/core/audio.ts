@@ -466,6 +466,11 @@ export class AudioEngine {
     this.ready = true;
   }
 
+  /** an ad has the screen (src/ui/adsense.ts): the game is silent until it gives it back, the player's volume untouched */
+  quiet(on: boolean) {
+    if (this.ready) this.master.gain.setTargetAtTime(on ? 0 : BUS.master * this.volume, this.ctx.currentTime, 0.05);
+  }
+
   /** player setting, 0..1 */
   setVolume(v: number) {
     this.volume = Math.max(0, Math.min(1, v));

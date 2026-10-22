@@ -23,6 +23,7 @@ import { howtoMore } from './howto-more';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
+import { adBox, adBreak } from './adsense';
 import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
@@ -281,7 +282,7 @@ export class HUD {
       <div class="hud-feed"></div>
       <div class="hud-under"><div class="hud-board"></div><div class="hud-tags"></div></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
-      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
+      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a><div class="dead-ad" hidden></div></div>
       <div class="hud-start">
         <div class="sm-cut"></div>
         <header class="sm-top">
@@ -292,6 +293,7 @@ export class HUD {
             <button type="button" data-tab="gfx">Settings</button>
           </nav>
           <div class="sm-status">
+            <button type="button" class="store-btn sm-store">Store</button>
             <a class="sm-out sm-arena" href="/">All games</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
             <button class="sl-ca" type="button" title="Copy"><code>${CONTRACT.slice(0, 4)}…${CONTRACT.slice(-4)}</code></button>
@@ -381,6 +383,8 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
+    // (the store, over the menu: src/ui/store/)
+    this.root.querySelector('.sm-store')!.addEventListener('click', () => void import('./store/panel').then((m) => m.openStore()));
     for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'stance', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
@@ -1693,11 +1697,16 @@ export class HUD {
   private passMode = false;
   /** the admin password, typed: the game sends it to the server */
   onPass: (pw: string) => void = () => {};
+  /** whether the death screen may carry an ad (ZONA's only: set by the game) */
+  adsHere: () => boolean = () => false;
+  private adTried = false;
+  private deadAd = false;
 
   /** every channel lands in the one log, tagged and coloured by channel */
   /** @param role whoever said it is an admin or a mod: it is written before their name */
   /** @param tint an admin's own colour for their tag (not said: the rainbow) */
-  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean) {
+  /** @param perk from the store: [VIP] in purple before the name, a cup after it for a week after a coffee */
+  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean, perk?: { vip?: boolean; cup?: boolean }) {
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     const n = document.createElement('div');
     n.className = 'chat-line';
@@ -1713,6 +1722,12 @@ export class HUD {
         }
         n.append(rank);
       }
+      if (perk?.vip) {
+        const vip = document.createElement('em');
+        vip.className = 'vip';
+        vip.textContent = '[VIP]';
+        n.append(vip);
+      }
       const tag = document.createElement('i');
       tag.textContent = CHANNEL_LABEL[ch];
       const who = document.createElement('b');
@@ -1720,6 +1735,7 @@ export class HUD {
       n.append(tag);
       if (elite) n.append(crownEl());
       n.append(who);
+      if (perk?.cup) n.insertAdjacentHTML('beforeend', '<i class="cup" title="Bought the dev a coffee"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6h9v4.5a3.5 3.5 0 0 1-3.5 3.5H6a3.5 3.5 0 0 1-3.5-3.5z" fill="currentColor"/><path d="M11.5 7.2h1.2a1.8 1.8 0 0 1 0 3.6h-1.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5 1.8c-.6.8.6 1.4 0 2.4M8 1.8c-.6.8.6 1.4 0 2.4" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></i>');
     }
     const body = document.createElement('span');
     body.textContent = text;
@@ -1753,10 +1769,11 @@ export class HUD {
    * @param me where this player stands in the whole list (-1 = not on it)
    * @param mine their own kills and tags
    */
-  setBoard(rows: [string, number, number][] | null, me = -1, mine: [number, number] = [0, 0], name = '') {
+  setBoard(rows: [string, number, number, 1?][] | null, me = -1, mine: [number, number] = [0, 0], name = '') {
     const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
     if (!rows) return this.set('board', this.el.board, '', 'html');
-    const row = (n: number, r: [string, number, number], own: boolean) => `<div class="lb-row${own ? ' me' : ''}"><i>${n}</i><span>${esc(r[0])}</span><b>${r[1]}</b><b>${r[2]}</b></div>`;
+    // (a VIP's tag in purple before their name, as in chat: the store's)
+    const row = (n: number, r: [string, number, number, 1?], own: boolean) => `<div class="lb-row${own ? ' me' : ''}"><i>${n}</i><span>${r[3] ? '<em class="vip-tag">VIP</em>' : ''}${esc(r[0])}</span><b>${r[1]}</b><b>${r[2]}</b></div>`;
     let html = `<div class="lb-head"><span>Leaderboard</span><b title="kills">Kills</b><b title="tags cashed in">Tags</b></div>`;
     html += rows.length ? rows.map((r, i) => row(i + 1, r, i === me)).join('') : `<div class="lb-none">No kills or tags yet</div>`;
     if (me >= rows.length) html += `<div class="lb-gap"></div>` + row(me + 1, [name || 'You', mine[0], mine[1]], true);
@@ -2086,5 +2103,16 @@ export class HUD {
     }
     this.toggle(e.dead, 'show', s.dead);
     if (s.dead) this.set('dead', e.dead.querySelector('.dead-sub') as HTMLElement, s.deadText);
+    // (at each death in ZONA a break, and where none was shown the death screen's own unit, filled once and kept for
+    // every death after; none for VIP: src/ui/adsense.ts)
+    if (s.dead && !this.deadAd && this.adsHere()) {
+      this.deadAd = true;
+      void adBreak('next', 'death').then((st) => {
+        if (st === 'viewed' || st === 'dismissed' || this.adTried) return;
+        this.adTried = true;
+        void adBox(e.dead.querySelector('.dead-ad') as HTMLElement);
+      });
+    }
+    if (!s.dead) this.deadAd = false;
   }
 }

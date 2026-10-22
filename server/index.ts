@@ -38,7 +38,8 @@ import { CHECK, CHECKS, flagged, takenTag } from './checks';
 import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
-import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
+import { broadcast, cleanName, clients, join, num, perksChanged, records, round2, type Client } from './players';
+import { perks } from './perks';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
@@ -1251,6 +1252,9 @@ server.listen(PORT, () => {
 
 // (who may give orders here and who is kept off: read from the site, which keeps them between this server's restarts)
 loadAdmin();
+
+// (what players have bought at the store, from the site: server/perks.ts)
+perks.start(perksChanged);
 
 void loadKept();
 

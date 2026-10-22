@@ -2,6 +2,21 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## THE STORE: built, NOT deployed (2026-10-22); branch `claude/zona-store-a6b7b0` (on top of `battle-royale`)
+- Paid in SOL with no wallet connected: a quote sealed to the player's account (own last digits + a Solana Pay reference),
+  "I've paid" finds it on chain (read only), a pasted signature as the fallback; each signature once. `api/store.ts`,
+  `api/_lib/shop.ts`, catalogue `api/_lib/shop-items.ts`; book `store/book.json` beside the payouts' (one write a
+  purchase). Test `test/store.test.ts` (one real past mainnet payment read).
+- VIP $5/30 d (queue pass, [VIP] purple in chat and board, Discord role by hand, no ads, gold dog tag), no-ads $1.99/30 d,
+  numbered finishes (100 gold Desert Eagles and 100 gold knives at $4.99; nickel M9 and Colt $2.99), coffee. The finish is
+  a gold/nickel shine texture over the guns' metal (src/game/finish.ts); every survivor wears their dog tag on the chest,
+  gold on a VIP (src/game/worn-tag.ts). Admin: STORE tab (Players, Purchases, Numbered). PROTOCOL 58: needs a ZONA server
+  deploy, on the owner's word; it also ships the Battle Royale (merged in).
+- Before it goes live: the owner sets `STORE_WALLET` on Vercel (the public address). Ads: AdSense breaks need the owner's
+  H5 Games approval (until then the death screen's "Death" unit shows); Auto ads vignette only, set in AdSense.
+- Desk testing: `zona-store-dev` (vite on 5174, uncommitted launch entry) serves /api/store from `data/local-store`;
+  desk.json {wallet, at, rate} buys with a past mainnet payment; `.env.local-server` adds STORE_URL=http://localhost:5174.
+
 ## LIVE (2026-10-22 ~06:20 UTC): server and `main` from `2c597e1` (PROTOCOL 57), site from `abb3d90`
 - **Payouts stalled 04:02-05:29 UTC:** the paid node in `SOLANA_RPC_URL` answered reads and refused every send
   ("Internal error during preflight simulation", -32603). Now the public node is last in the list (asked only when

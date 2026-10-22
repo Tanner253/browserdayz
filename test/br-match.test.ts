@@ -9,7 +9,7 @@ import { PROTOCOL } from '../src/net/protocol';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 import { MAPS, kindOf, type Ground } from '../arena/br/rules';
 
-const PORT = 8241;
+const PORT = 8303;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const world = generateWorld();
 const g = (x: number, z: number) => heightAt(world.surface, x, z);
