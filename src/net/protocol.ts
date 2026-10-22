@@ -547,7 +547,7 @@ export interface AdminLists {
   checks: string;
   /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */
   /** (and, for the Entities page: cars standing, how many of those are burned out, and the infected on their feet) */
-  stats?: { up: number; loot: number; stashes: number; kept: number; asleep: number; cars?: number; wrecks?: number; infected?: number };
+  stats?: { up: number; /** how many have played in the last 24 hours (seen.ts): the admins' alone since 2026-10-22 */ today?: number; loot: number; stashes: number; kept: number; asleep: number; cars?: number; wrecks?: number; infected?: number };
 }
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */

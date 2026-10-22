@@ -29,7 +29,7 @@ export function openDoor(): Promise<Mode> {
         <img src="/brand/zona-mark-live.svg" alt="" width="44" height="44"><b>ZONA <em>PvP</em></b><img class="door-season" src="/brand/season.svg" alt="">
       </header>
       <div class="door-pvp">Player <i>vs</i> Player</div>
-      <div class="door-stats"><span data-s="today" hidden></span><span data-s="matches" hidden></span><span data-s="squad"></span></div>
+      <div class="door-stats"><span data-s="matches" hidden></span></div>
       <div class="door-cards three">
         <button type="button" class="door-card zona${last === 'zona' ? ' last' : ''}" data-mode="zona">
           <i class="door-bg"></i>
@@ -98,17 +98,12 @@ export function openDoor(): Promise<Mode> {
   };
   void serverStatus(8000).then((st) => {
     on('zona', st ? st.players + st.asleep : null);
-    if (st?.today) stat('today', `${st.today} played Zona today`);
   });
   void arenaOnline().then((a) => {
     on('arena', a ? a.players : null);
     on('br', a ? a.br : null);
     if (a?.matches) stat('matches', `${a.matches} Arena ${a.matches === 1 ? 'match' : 'matches'} on now`);
   });
-  // (squad hour: when everybody is asked to come at once, said in the visitor's own time)
-  const squad = () => stat('squad', squadLine(Date.now()));
-  squad();
-  const tick = setInterval(() => (el.isConnected ? squad() : clearInterval(tick)), 30_000);
   return new Promise((done) => {
     el.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-mode]') as HTMLElement | null;
@@ -171,18 +166,3 @@ async function arenaOnline(): Promise<{ players: number; matches: number; br: nu
 
 /** under this many in a game, its card says it is live and not how many (the owner: "do 1"): a count that small says empty, not live */
 const LIVE_FROM = 5;
-
-/**
- * Squad hour: one hour a day when everybody is asked to come, so the servers fill for real (the owner: "do 1 2 and
- * 3"). 01:00 UTC: 9 PM on the US east coast, 6 PM on the west. Said in the visitor's own time.
- */
-export const SQUAD_UTC = 1;
-
-/** "Squad hour: daily at 9:00 PM your time, in 3 h 12 m", or that it is on now */
-export function squadLine(now: number): string {
-  const d = new Date(now), start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), SQUAD_UTC);
-  const today = now < start ? start - 24 * 3600_000 : start;
-  if (now - today < 3600_000) return `Squad hour is on now, till ${new Date(today + 3600_000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-  const next = today + 24 * 3600_000, left = Math.max(0, next - now), h = Math.floor(left / 3600_000), m = Math.floor((left % 3600_000) / 60_000);
-  return `Squad hour daily at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} your time, in ${h ? `${h} h ` : ''}${m} m`;
-}
