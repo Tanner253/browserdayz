@@ -932,6 +932,7 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
     it.owner = name(r.owner);
     it.pid = short(r.pid);
+    if (r.gold === true) it.gold = true;
     it.holder = short(r.holder);
     it.held = Math.max(0, Math.min(TAG_HOLD, Number(r.held) || 0));
   }

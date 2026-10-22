@@ -5,6 +5,7 @@
 // platform has paid, and the two games side by side; the one picked last is lit. /zona and /arena go straight in.
 import './door.css';
 import { paidLine, platformPaid } from './platform';
+import { adBox } from './adsense';
 import { TAG_HOLD_MIN } from '../sim/items';
 import { arenaBase, serverSays, serverStatus } from '../net/client';
 import type { LobbyInfo } from '../../arena/rules';
@@ -60,9 +61,17 @@ export function openDoor(): Promise<Mode> {
           <span class="door-go">Enter Battle Royale</span>
         </button>
       </div>
-      <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a><span class="door-upd" hidden></span></footer>
+      <div class="door-ad" hidden></div>
+      <button type="button" class="store-btn door-store">Store</button>
+      <footer class="door-foot"><a href="/store" class="door-storelink">Store</a><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a><span class="door-upd" hidden></span></footer>
     </div>`;
   document.body.appendChild(el);
+  // (the store, over the door: from its button, its link, or an address of its own, /store)
+  const store = (e?: Event) => (e?.preventDefault(), void import('./store/panel').then((m) => m.openStore()));
+  for (const b of el.querySelectorAll('.door-store, .door-storelink')) b.addEventListener('click', store);
+  if (location.pathname.replace(/\/+$/, '') === '/store') store();
+  // (an ad under the games, none for VIP: src/ui/adsense.ts)
+  void adBox(el.querySelector('.door-ad') as HTMLElement);
   // (how long ago this build of the site was made, on a computer: the owner, 2026-10-15, "for pc add last updated n(time) ago")
   const upd = el.querySelector('.door-upd') as HTMLElement;
   const ago = () => {

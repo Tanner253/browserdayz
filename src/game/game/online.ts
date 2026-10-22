@@ -26,6 +26,7 @@ import { renderDoll } from '../../ui/icons';
 import { INFECTED } from '../../sim/infected';
 import { cashedTags } from '../../ui/rewards';
 import type { Game } from '../game';
+import { BOUGHT, onBought } from '../../ui/store/account';
 
 /** what holds things within reach of where somebody stands, if anything does: a crate, a cupboard or a drop is 'hard'; a body, a pack, a stash or a cardboard box 'soft' */
 function searched(g: Game, at: THREE.Vector3): 'hard' | 'soft' | null {
@@ -44,6 +45,14 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (bought at the store in the last ten minutes: the server is asked to look again, as the store itself asks it
+    // when a game is running: src/ui/store/panel.ts)
+    try {
+      if (Date.now() - Number(localStorage.getItem(BOUGHT) ?? 0) < 10 * 60_000) this.net.send({ t: 'perks' });
+    } catch {
+      /* no storage: the server looks again within five minutes */
+    }
+    onBought(() => this.net.send({ t: 'perks' }));
     // the server's hour, from which this game's clock runs on
     if (typeof w.hour === 'number') this.hourBase = { phase: w.hour, at: performance.now() };
     // Nothing of this game's own making is in a server's world: whatever it laid out or packed by itself is taken
@@ -168,6 +177,9 @@ export const onlineMethods = {
       // (said to admins only: the owner, 2026-10-18, "remove the "player joined" and "player left" messages that show to all players")
       if (this.role === 'admin') this.hud.feed(`${m.p.name} joined`);
     });
+    // (what somebody has from the store: their own, or another player's: src/game/my-perks.ts, RemotePlayer.setSkins)
+    net.on('store', (m) => this.adminUI.storeGot(m));
+    net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setSkins(m.sk)));
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
@@ -382,7 +394,7 @@ export const onlineMethods = {
       this.meDirty = true;
       this.resume();
     });
-    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint, m.elite));
+    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint, m.elite, { vip: m.vip, cup: m.cup }));
     // everyone carrying a tag they took, shown on the map for a few seconds
     net.on('tags', (m) => {
       const me = m.p.some(([id]) => id === net.id);
@@ -660,6 +672,7 @@ export const onlineMethods = {
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
+    r.skins = p.sk ?? [];
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
     this.gearOf.set(p.id, p.g ?? []);

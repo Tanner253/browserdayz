@@ -89,6 +89,35 @@ export default defineConfig({
           if (req.url === '/changelog' || req.url === '/changelog/') req.url = '/changelog/index.html';
           next();
         });
+        // The store (api/store.ts) runs here too, so that it can be bought from at a desk: its book a file in
+        // data/local-store/ (not the site's), the chain read on mainnet as live, an admin's orders asked of the local
+        // game server. data/local-store/desk.json: {"wallet": the store's, "at": a moment (ms) the desk's clock stands
+        // at, "rate": dollars a SOL}: a past payment on mainnet can be bought with as if it had just been made.
+        server.middlewares.use('/api/store', (req, res) => {
+          void (async () => {
+            try {
+              const dir = path.resolve('data/local-store');
+              const { MemoryStore } = (await server.ssrLoadModule('/api/_lib/store.ts')) as typeof import('./api/_lib/store');
+              const { storeApi } = (await server.ssrLoadModule('/api/store.ts')) as typeof import('./api/store');
+              const book = path.join(dir, 'book.json'), mem = new MemoryStore();
+              if (fs.existsSync(book)) mem.put('store/book.json', fs.readFileSync(book, 'utf8'));
+              mem.after = () => (fs.mkdirSync(dir, { recursive: true }), fs.writeFileSync(book, mem.files.get('store/book.json')!.text));
+              const desk = (fs.existsSync(path.join(dir, 'desk.json')) ? JSON.parse(fs.readFileSync(path.join(dir, 'desk.json'), 'utf8')) : {}) as { wallet?: string; at?: number; rate?: number };
+              const chunks: Buffer[] = [];
+              for await (const c of req) chunks.push(c as Buffer);
+              const r = await storeApi(new Request(`http://localhost/api/store${req.url === '/' ? '' : req.url}`, { method: req.method, headers: { 'x-forwarded-for': '127.0.0.1' }, ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}) }), {
+                store: mem, env: { STORE_WALLET: process.env.STORE_WALLET ?? desk.wallet ?? '' }, game: 'http://127.0.0.1:8080',
+                ...(desk.at ? { now: () => desk.at! } : {}), ...(desk.rate ? { rate: async () => desk.rate! } : {}),
+              });
+              res.statusCode = r.status;
+              res.setHeader('content-type', 'application/json');
+              res.end(await r.text());
+            } catch (e) {
+              res.statusCode = 500;
+              res.end(String(e));
+            }
+          })();
+        });
         server.middlewares.use('/api/updates', (_req, res) => {
           void (async () => {
             try {

@@ -25,6 +25,7 @@ import type { ItemModels } from './loot';
 
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
+import { wearFinish, type Finish } from './finish';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -2633,6 +2634,13 @@ export class Weapons {
   }
 
   /** a gun's model as it is held in the hands (what must stay on the card while it is carried: see CardKeep.wanted) */
+  /** the finish this player's own gun of this id wears (the store's: src/game/finish.ts) */
+  finishOf: (gun: string) => Finish | null = () => null;
+  /** what they own has changed: the gun in their hands plated afresh */
+  refinish() {
+    if (this.current && this.currentItem) wearFinish(this.current.root, this.currentItem.id, this.finishOf(this.currentItem.id));
+  }
+
   heldModel(id: string): THREE.Object3D | null {
     return this.models.get(id)?.root ?? null;
   }
@@ -2831,6 +2839,7 @@ export class Weapons {
       this.inv.hold(item);
       this.current = next ? this.models.get(next.id) ?? null : null;
       if (this.current) {
+        wearFinish(this.current.root, next!.id, this.finishOf(next!.id));
         this.vmRoot.add(this.current.root);
         this.boltReady = true;
         audio.equip(ITEMS[next!.id].weapon ? 'gun' : 'melee');

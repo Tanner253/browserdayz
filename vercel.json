@@ -51,6 +51,10 @@
       "destination": "/changelog/index.html"
     },
     {
+      "source": "/store",
+      "destination": "/index.html"
+    },
+    {
       "source": "/zona",
       "destination": "/index.html"
     },

@@ -473,6 +473,11 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
    word is the whole rainbow going by (their name and what they say are as anybody's) */
 .chat-line em { font-style: normal; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-right: 6px; }
 .chat-line[data-role='mod'] em { color: #6fd6a8; }
+/* the store's: a VIP's tag in purple (before a role's own colour rules, which it is not), and a coffee's cup after the name */
+.chat-line em.vip { color: #b57bff !important; animation: none !important; background: none !important; -webkit-text-fill-color: #b57bff !important; }
+.chat-line i.cup { display: inline-block; width: 12px; height: 12px; margin: 0 4px 0 -2px; color: #c8a27a; vertical-align: -1px; }
+.chat-line i.cup svg { width: 100%; height: 100%; display: block; }
+.lb-row em.vip-tag { font-style: normal; font: 700 9px var(--mono); letter-spacing: 0.08em; color: #b57bff; margin-right: 5px; }
 .chat-line[data-role='admin'] em:not(.plain) {
   color: transparent;
   background: linear-gradient(90deg, #ff3b3b, #ff9f2e, #ffe82e, #46f25a, #2ed8ff, #5b78ff, #d24dff, #ff3b3b) 0 0 / 200% 100%;
@@ -828,6 +833,8 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 .inv-item.cat-clothing { box-shadow: inset 2px 0 0 #5fa3a3; }
 .inv-item.mini { position: relative; flex: none; width: 54px; height: 42px; border-color: transparent; background: transparent; box-shadow: none; }
 .inv-item-img { background-size: 100% 100%; background-repeat: no-repeat; pointer-events: none; }
+/* a VIP's dog tag, gold (the store's): the steel tag's own picture, toned */
+.inv-item.gold .inv-item-img { filter: sepia(1) saturate(3.4) hue-rotate(-10deg) brightness(1.2) contrast(1.05); }
 .inv-item-img.fit { position: absolute; inset: 2px; background-size: contain; background-position: center; }
 /* a tall thing in the list of what lies nearby: its picture turned to lie along the row (the box is the row's own, on its side) */
 .inv-item.mini .inv-item-img.fit.lying { inset: auto; left: 50%; top: 50%; width: 40px; height: 52px; transform: translate(-50%, -50%) rotate(90deg) scale(1.2); filter: brightness(1.5) drop-shadow(0 0 1px rgba(233, 228, 216, 0.4)); }
@@ -2550,3 +2557,5 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 
 /* (a thing flying from one pile to the one it joins: Combine all, InventoryUI.combineAll) */
 .inv-fly { position: fixed; z-index: 60; pointer-events: none; background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0 0 4px rgba(201, 178, 124, 0.8)); }
+/* an ad on ZONA's death screen (src/ui/adsense.ts), under the buttons */
+.hud-dead .dead-ad { width: min(728px, 92vw); max-height: 120px; overflow: hidden; margin-top: 14px; pointer-events: auto; }

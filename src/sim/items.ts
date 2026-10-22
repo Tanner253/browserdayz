@@ -173,6 +173,8 @@ export interface ItemInstance {
   /** dog tag: the name stamped on it and that player's public id */
   owner?: string;
   pid?: string;
+  /** dog tag: gold, a VIP's (the store's: it pays the same) */
+  gold?: true;
   /** dog tag: public id of whoever carries it now, and for how many seconds they have */
   holder?: string;
   held?: number;

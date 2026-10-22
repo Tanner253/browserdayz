@@ -555,6 +555,8 @@ export const enterMethods = {
     const it = makeItem('dogtag');
     it.owner = playerName() || 'Survivor';
     it.pid = publicId();
+    // (a VIP's is gold, as their server says they are: the store's, and it pays the same)
+    if (this.perks.vip) it.gold = true;
     return it;
   },
 

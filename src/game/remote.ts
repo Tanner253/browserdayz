@@ -11,6 +11,8 @@ import { EMOTE_BY_N, EMOTE_MASK, EMOTE_SHIFT } from '../sim/emotes';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
+import { finishOf } from '../../api/_lib/shop-items';
+import type { Finish } from './finish';
 import { Avatar, type SeatPose } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
@@ -27,7 +29,7 @@ interface Snap {
 const _to = new THREE.Vector3();
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
-export type HeldFactory = (id: string | null, mods: string[]) => { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
+export type HeldFactory = (id: string | null, mods: string[], finish?: Finish | null) => { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
 
 const _along = new THREE.Vector3(), _legs = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _lie = new THREE.Quaternion();
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
@@ -244,13 +246,22 @@ export class RemotePlayer implements Damageable {
     if (this.snaps.length > 12) this.snaps.shift();
   }
 
+  /** what they have from the store: their guns' finishes (src/game/finish.ts) */
+  skins: string[] = [];
+  setSkins(sk: string[]) {
+    if (sk.join() === this.skins.join()) return;
+    this.skins = sk;
+    this.setWeapon(this.weapon, this.mods);
+  }
+
   setWeapon(id: string | null, mods: string[]) {
-    const key = `${id}|${mods.join(',')}`;
+    const finish = id ? finishOf(this.skins, id) : null;
+    const key = `${id}|${mods.join(',')}|${finish ?? ''}`;
     if (key === this.heldKey || !this.ready) return;
     this.heldKey = key;
     this.weapon = id;
     this.mods = mods;
-    const h = this.makeHeld(id, mods);
+    const h = this.makeHeld(id, mods, finish);
     const put = () => {
       if (this.heldKey === key) this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
     };

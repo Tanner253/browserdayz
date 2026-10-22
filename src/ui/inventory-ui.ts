@@ -576,6 +576,7 @@ export class InventoryUI {
     if (d.attach) s.push({ k: 'Fits', v: d.attach.fits.map((f) => ITEMS[f].name).join(', ') });
     if (it.id === 'dogtag') {
       s.push({ k: 'Owner', v: tagOwner(it) });
+      if (it.gold) s.push({ k: 'Plated', v: 'Gold: a VIP’s' });
       s.push({ k: 'Cashes in', v: it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : `after ${TAG_HOLD_MIN} min carried`, clock: this.counting(it) ? it.uid : undefined });
     }
     const key = this.actions.hotIndex(it);
@@ -790,7 +791,8 @@ export class InventoryUI {
   private itemEl(item: ItemInstance, w: number, h: number, rot: boolean) {
     const d = ITEMS[item.id];
     const el = document.createElement('div');
-    el.className = `inv-item cat-${d.category}` + this.mark(item);
+    // (a VIP's own dog tag is gold: the store's, src/game/my-perks.ts)
+    el.className = `inv-item cat-${d.category}` + this.mark(item) + (item.gold ? ' gold' : '');
     el.style.width = `${w * CELL - 2}px`;
     el.style.height = `${h * CELL - 2}px`;
     const img = document.createElement('div');

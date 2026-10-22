@@ -202,6 +202,23 @@ button.adm-p:hover { background: rgba(233, 228, 216, 0.07); }
 .adm-tr.head { position: sticky; top: 0; background: #131614; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
 .adm-table.bans .adm-tr { grid-template-columns: 36px minmax(120px, 1fr) 110px 96px minmax(120px, 2fr) auto; }
 .adm-table.roles .adm-tr { grid-template-columns: minmax(110px, 1.3fr) 64px minmax(90px, 1fr) 96px 128px minmax(236px, auto); }
+/* the STORE tab (src/ui/admin-store.ts) */
+.adm-store-top, .adm-store-grant { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; margin-bottom: 8px; }
+.adm-store-top > span:first-child { flex: 1; }
+.adm-store-look { color: #ffd35a; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+.adm-store-why { color: #ff8a6e; font-size: 13.5px; margin-bottom: 8px; }
+.adm-store-grant input, .adm-store-grant select, .store-rows input { font: 13px var(--mono); color: inherit; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--rim); padding: 4px 7px; }
+.adm-store-grant input[type='number'] { width: 64px; }
+.adm-table.store-vips { flex: none; min-height: 0; max-height: 160px; margin-bottom: 8px; }
+.adm-table.store-vips .adm-tr { grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) 130px 96px; }
+.adm-table.store-rows .adm-tr { grid-template-columns: 112px minmax(110px, 1.2fr) minmax(120px, 1.3fr) 150px 92px 78px minmax(90px, 1fr) minmax(170px, auto); }
+.store-rows small { color: var(--ink-faint); font-family: var(--mono); font-size: 11px; }
+.store-rows a { color: #ffd35a; font-family: var(--mono); font-size: 12px; }
+.adm-store-st.ok { color: #9be37a; }
+.adm-store-st.look { color: #ffd35a; }
+.adm-store-st.revoked, .adm-store-st.refunded { color: #ff8a6e; }
+.store-rows .adm-tr.st-revoked, .store-rows .adm-tr.st-refunded { opacity: 0.55; }
+.adm-store-soon { color: #ffd35a; }
 .adm-table.roles .adm-dt { display: flex; gap: 6px; align-items: center; }
 .adm-table.roles .adm-dt svg { width: 14px; height: 14px; opacity: 0.7; }
 .adm-table.roles .adm-dt .ro.off { opacity: 0.55; }

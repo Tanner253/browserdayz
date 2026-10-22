@@ -54,7 +54,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // src/net/bait.ts): every game open on 55's page, open to it, is told to load the page again.)
 // (57, 2026-10-22: a tag cashes in after thirty minutes again, and is on a body after twenty alive: every game open on
 // 56's page, counting twenty and ten, is told to load the page again.)
-export const PROTOCOL = 57;
+export const PROTOCOL = 58;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -128,6 +128,9 @@ export interface PlayerInfo {
   alive: boolean;
   /** a vanished admin: said only to other admins, who see them all the same (faintly) */
   hidden?: true;
+  /** what they have from the store (api/_lib/shop-items.ts): the finishes on their guns, and VIP */
+  sk?: string[];
+  vip?: true;
 }
 
 /** a thing slung on a back: its item, and what is fitted to it (its magazine among them) */
@@ -228,6 +231,10 @@ export type C2S =
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
   | { t: 'admin'; pw: string }
+  /** this player has just bought at the store: the server asks the site again (server/perks.ts) */
+  | { t: 'perks' }
+  /** an admin's order to the store's book (api/_lib/shop.ts, AdminAct), passed to the site */
+  | { t: 'store'; act: unknown }
   /** somebody with a role has their panel open: the lists it shows are asked for */
   | { t: 'adm' }
   /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
@@ -374,7 +381,11 @@ export type S2C =
   | { t: 'corpse@'; corpse: CorpseInfo }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
+  /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
+  | { t: 'perks'; id: number; sk: string[]; vip?: true }
+  /** the store's book for an admin's STORE tab (api/_lib/shop.ts, adminView), or why their order was not done */
+  | { t: 'store'; ok: boolean; view?: unknown; why?: string }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
@@ -384,10 +395,10 @@ export type S2C =
   /** an admin has taken these things out of what this player carries: they are gone */
   | { t: 'trash'; uids: string[]; by?: string }
   /**
-   * The leaderboard: the top five since the server started, as [name, kills, tags cashed in],
+   * The leaderboard: the top five since the server started, as [name, kills, tags cashed in, 1 for a VIP],
    * where this player stands in the whole list (-1 = not on it yet) and their own two counts.
    */
-  | { t: 'board'; rows: [string, number, number][]; me: number; mine: [number, number] }
+  | { t: 'board'; rows: [string, number, number, 1?][]; me: number; mine: [number, number] }
   /**
    * The server is full and this player is waiting to get in: their place in the line (1 =
    * next), how many are waiting, and how many the server holds. Sent again whenever the line

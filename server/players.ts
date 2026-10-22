@@ -22,11 +22,14 @@ import { leaveSeat, racksNow, releaseLock } from './acts';
 import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
 import { partyIn, partyOut } from './party';
+import { perks } from './perks';
 
 export interface Client {
   ws: WebSocket;
   id: number;
   key: string;
+  /** what they were last said to have from the store (see perksChanged) */
+  perkKey?: string;
   name: string;
   pose: Pose;
   /** when their game said that was so, by its own clock (ms) */
@@ -175,7 +178,25 @@ export function broadcastNear(m: S2C, x: number, z: number, within: number, exce
   }
 }
 
-export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}) });
+export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key) });
+
+/** what a player has from the store, as the others are told it (server/perks.ts): nothing said where there is nothing */
+function perkInfo(key: string): { sk?: string[]; vip?: true } {
+  const sk = perks.skins(key);
+  return { ...(sk.length ? { sk } : {}), ...(perks.vip(key) ? { vip: true as const } : {}) };
+}
+const perkKey = (key: string) => JSON.stringify(perkInfo(key));
+
+/** The store's list has changed: whoever's perks moved (a purchase, a month run out), everybody is told. */
+export function perksChanged() {
+  for (const c of clients.values()) {
+    const k = perkKey(c.key);
+    if (k === c.perkKey) continue;
+    c.perkKey = k;
+    const p = perkInfo(c.key);
+    broadcast({ t: 'perks', id: c.id, sk: p.sk ?? [], ...(p.vip ? { vip: true as const } : {}) });
+  }
+}
 
 /** is somebody shown to this player: everybody is, but a vanished admin, whom only admins see */
 const shown = (who: Client, to: Client) => !who.power.hidden || roleOf(to) === 'admin';
@@ -370,6 +391,9 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // (a restart is on its way: whoever comes in before it happens is told as the others were)
   if (RESTART.pending !== null) send(c, { t: 'restart', why: RESTART.pending, in: Math.max(0, Math.round(RESTART.about - (Date.now() - RESTART.seen) / 1000)) });
   broadcast({ t: 'join', p: info(c) }, c);
+  // (and they are told their own: their guns' finishes, VIP, the gold of their own dog tag)
+  c.perkKey = perkKey(c.key);
+  if (c.perkKey !== '{}') send(c, { t: 'perks', id: c.id, sk: perks.skins(c.key), ...(perks.vip(c.key) ? { vip: true as const } : {}) });
   partyIn(c);
   // back under another name: the board says so, to everybody
   const had = scores.get(c.key);
