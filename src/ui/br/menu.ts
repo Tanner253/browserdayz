@@ -51,6 +51,7 @@ export class BrMenu {
       <header class="bm-bar">
         <span class="bm-logo">BATTLE <span>ROYALE</span></span>
         <nav class="bm-nav"><button data-p="play" class="on">Play</button><button data-p="how">How to play</button><button data-p="board">Leaderboard</button><button data-p="settings">Settings</button></nav>
+        <button type="button" class="store-btn bm-store">Store</button>
         <a class="bm-zona" href="/">All games</a>
       </header>
       <main class="bm-main">
@@ -91,7 +92,7 @@ export class BrMenu {
         <section class="bm-p bm-settings"><div class="bm-set-host"></div></section>
       </main>
       <div class="bm-wait"><b>Joining</b><span class="bm-wait-text"></span></div>
-      <div class="bm-pause"><b>Paused</b><span>The match goes on without you.</span><button class="bm-resume">Resume</button><button class="bm-pause-set">Settings</button><button class="bm-leave">Leave the match</button><div class="bm-pause-host"></div></div>`;
+      <div class="bm-pause"><b>Paused</b><span>The match goes on without you.</span><button class="bm-resume">Resume</button><button class="bm-pause-set">Settings</button><button class="bm-store">Store</button><button class="bm-leave">Leave the match</button><div class="bm-pause-host"></div></div>`;
     // (inside the HUD, so that the settings it lends stay in it: HUD.settingsInto, as the Arena's menu)
     hud.root.appendChild(this.el);
     this.q<HTMLInputElement>('.bm-name input').value = hud.nameValue();
@@ -149,6 +150,8 @@ export class BrMenu {
     }
     // (the pause in a match: back in, the Zone's own settings, or out of it)
     if (b.classList.contains('bm-resume')) return this.hud.deploy();
+    // (the store, from the menu and from a match's pause: see arena-menu.ts)
+    if (b.classList.contains('bm-store')) return void import('../store/panel').then((m) => m.openStore());
     if (b.classList.contains('bm-pause-set')) {
       const on = !this.el.classList.contains('pset');
       this.el.classList.toggle('pset', on);

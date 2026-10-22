@@ -42,6 +42,7 @@ export class ArenaMenu {
           <button type="button" data-p="loadouts">Loadouts</button>
           <button type="button" data-p="settings">Settings</button>
         </nav>
+        <button type="button" class="store-btn am-store">Store</button>
         <a class="am-zona" href="/zona">ZONA</a>
       </header>
       <main class="am-main">
@@ -82,7 +83,7 @@ export class ArenaMenu {
         <section class="am-p am-settings"><button type="button" class="am-back">Back</button><div class="am-set-host"></div></section>
       </main>
       <div class="am-wait"><b>Waiting</b><em class="am-wait-what"></em><span class="am-wait-text"></span><button type="button" class="am-leave">Leave</button></div>
-      <div class="am-pause"><b>Paused</b><span>The match goes on without you.</span><button type="button" class="am-resume">Resume</button><button type="button" class="am-pause-set">Settings</button><button type="button" class="am-leave">Leave the match</button></div>`;
+      <div class="am-pause"><b>Paused</b><span>The match goes on without you.</span><button type="button" class="am-resume">Resume</button><button type="button" class="am-pause-set">Settings</button><button type="button" class="am-store">Store</button><button type="button" class="am-leave">Leave the match</button></div>`;
     // (inside the HUD, so that the settings it lends stay in it: HUD.settingsInto)
     hud.root.appendChild(this.el);
     this.drawPick();
@@ -202,6 +203,8 @@ export class ArenaMenu {
     if (b.classList.contains('am-go')) return this.go({ wager: 'new', size: String(this.pick.size), kills: String(this.pick.kills), loadout: this.pick.loadout, stake: String(ARENA.stake[0]) }, `Your match · ${this.pick.size}v${this.pick.size} · first to ${this.pick.kills} · ${kit(this.pick.loadout)}`);
     if (b.classList.contains('am-practice')) return this.go({ wager: 'practice', loadout: this.pick.loadout }, `Practice · ${kit(this.pick.loadout)}`);
     if (b.classList.contains('am-resume')) return this.hud.deploy();
+    // (the store, from the menu and from a match's pause, over whatever is behind: the owner, 2026-10-22, "im unable to open the store from within the menu while playing mid-game")
+    if (b.classList.contains('am-store')) return void import('./store/panel').then((m) => m.openStore());
     if (b.classList.contains('am-pause-set')) {
       this.el.classList.add('pset');
       return this.show('settings');
