@@ -6,6 +6,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { ITEMS } from '../sim/items';
 import { assets } from '../core/assets';
 import type { ItemModels } from '../game/loot';
+import { wearFinish, type Finish } from '../game/finish';
 import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look } from '../game/look';
 import { BODY_SCALE, GEAR, WORN, placeWorn } from '../game/avatar';
 import { made, programsOf } from '../core/renderer';
@@ -145,7 +146,8 @@ export function iconSig(id: string): string {
 }
 
 /** @param only the items to make pictures of (all of them, where not said) */
-export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemModels, env: THREE.Texture, only?: string[]): Promise<Record<string, string>> {
+/** @param finish a store finish on the gun: its picture as `<id>|<finish>`, the plate laid over it (src/game/finish.ts) */
+export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemModels, env: THREE.Texture, only?: string[], finish?: Finish): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   const scene = new THREE.Scene();
   scene.environment = env;
@@ -309,12 +311,13 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       ctx.putImageData(img, 0, 0);
       return canvas.toDataURL('image/png');
     };
-    out[id] = shoot(w * 2, h * 2, rt);
+    if (finish) wearFinish(obj, id, finish, true);
+    out[finish ? `${id}|${finish}` : id] = shoot(w * 2, h * 2, rt);
     // What is worn has a second picture, for the place on the body it is worn in: the thing by itself, as big as a
     // square will hold. (Its picture for a pocket is the shape of its place in a pocket: a pair of gloves two cells
     // wide and one tall was a small pair of gloves in the middle of a wide picture, and smaller again in a slot.
     // "when equipped the gloves and boots icons are to small", 2026-10-12.)
-    if (hasSlotIcon(id)) {
+    if (hasSlotIcon(id) && !finish) {
       // (a thing that lies low, a pair of gloves or of boots, is looked at from further over it: from near level it
       // is a thin strip across the square)
       if (size.y < Math.max(size.x, size.z) * 0.62) pivot.rotation.x = def.slot === 'hands' ? 1.02 : 0.72;

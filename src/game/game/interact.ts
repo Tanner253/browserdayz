@@ -22,6 +22,7 @@ import { jobsFor, progress as jobDone } from '../../sim/jobs';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 import { finishDay, finishOn, type Finish } from '../finish';
 import { lookOf } from '../../../api/_lib/shop-items';
+import { renderIcons } from '../../ui/icons';
 
 export const interactMethods = {
   // ------------------------------------------------------------ interaction
@@ -259,7 +260,9 @@ export const interactMethods = {
       const it = b ? this.inv.hotItem(i) : null;
       const d = it ? ITEMS[it.id] : null;
       const label = !it || !d ? '' : d.weapon ? String(it.loaded ?? 0) : d.mag ? String(it.rounds ?? 0) : d.use?.sips ? `${it.left ?? d.use.sips}/${d.use.sips}` : d.melee || d.slot ? '' : String(this.countOf(it.id));
-      return { key: String((i + 1) % 10), id: it?.id ?? b?.id ?? null, label, active: !!it && it === held, dim: !!b && !it };
+      const look = finishOn(it);
+      if (look && it) this.plateIcon(it.id, look);
+      return { key: String((i + 1) % 10), id: it?.id ?? b?.id ?? null, ...(look ? { look } : {}), label, active: !!it && it === held, dim: !!b && !it };
     });
   },
 
@@ -346,6 +349,20 @@ export const interactMethods = {
   finishFor(this: Game, it: ItemInstance): Finish | null {
     const f = this.online ? this.perks.skin(it.id) : null;
     return f && it.finish !== f ? lookOf(f) : null;
+  },
+
+  /** a plated gun's picture, drawn once from its model with the finish on (src/ui/icons.ts) and shared by the inventory and the hot keys */
+  plateIcon(this: Game, id: string, f: Finish) {
+    const key = `${id}|${f}`, icons = this.invUI.icons;
+    if (icons[key] !== undefined) return;
+    icons[key] = '';
+    void renderIcons(this.s.r.renderer, this.loot.models, this.s.atmo.envMap, [id], f).then(
+      (made) => {
+        Object.assign(icons, made);
+        this.inventoryChanged();
+      },
+      () => delete icons[key],
+    );
   },
 
   /** Apply: asked of the server, which keeps it on the gun; what it carries is told first, so that it finds the gun */

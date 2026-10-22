@@ -75,17 +75,19 @@ function ball(f: Finish): THREE.Texture {
 
 /** from a fifth at night to all of it by day: the shine, as the uniform every plated material shares */
 const shine = { value: 1 };
+/** a picture's: all of it, whatever the hour (src/ui/icons.ts) */
+const FULL = { value: 1 };
 /** each frame: the shine kept to the hour */
 export function finishDay() {
   shine.value = 0.2 + 0.8 * Math.min(1, Math.max(0, world?.daylight.value ?? 1));
 }
 
-function patchOf(f: Finish, mask?: { smooth: number }) {
+function patchOf(f: Finish, mask?: { smooth: number }, lit = shine) {
   const which = mask ? `1.0 - smoothstep(${(mask.smooth - 0.04).toFixed(3)}, ${(mask.smooth + 0.04).toFixed(3)}, roughnessFactor / max(roughness, 0.001))` : 'smoothstep(0.3, 0.6, metalnessFactor / max(metalness, 0.001))';
   const tex = ball(f);
   return (s: THREE.WebGLProgramParametersWithUniforms) => {
     s.uniforms.uPlateBall = { value: tex };
-    s.uniforms.uPlateShine = shine;
+    s.uniforms.uPlateShine = lit;
     s.fragmentShader = s.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform sampler2D uPlateBall;\nuniform float uPlateShine;\nfloat plate = 0.0;')
       // (the maps' own word on what is metal, before the material's own numbers scale them)
@@ -102,15 +104,15 @@ function patchOf(f: Finish, mask?: { smooth: number }) {
 const made = new Map<string, THREE.Material>();
 
 /** a material plated: one copy for each material and finish, shared by every gun that wears it */
-function plated(m: THREE.Material, f: Finish, gun: string): THREE.Material {
-  const key = `${m.uuid}|${f}`;
+function plated(m: THREE.Material, f: Finish, gun: string, picture = false): THREE.Material {
+  const key = `${m.uuid}|${f}${picture ? '|picture' : ''}`;
   let p = made.get(key);
   if (p) return p;
   const s = m as THREE.MeshStandardMaterial;
   if (!s.isMeshStandardMaterial || !PARTS[gun]?.test(s.name)) return m;
   const c = s.clone();
   c.name = `${s.name}|${f}`;
-  const patch = patchOf(f, MASK[gun]), tag = `${f}|${gun}`;
+  const patch = patchOf(f, MASK[gun], picture ? FULL : shine), tag = `${f}|${gun}${picture ? '|picture' : ''}`;
   // (lit in the world under cascaded shadows: the lighting composes its own hook with the plate's; in the hands' own
   // scene, plain: see plainMaterial in weapons.ts)
   if (s.defines?.USE_CSM && world) world.register(c, patch, tag);
@@ -137,13 +139,13 @@ export function polished(f: Finish): THREE.MeshMatcapMaterial {
 /** what each mesh wore before it was plated (not in its userData: a copy of the gun copies that as text) */
 const bareOf = new WeakMap<THREE.Mesh, THREE.Material | THREE.Material[]>();
 
-/** Plate a gun (null: as it came), so that a finish can be taken off again. */
-export function wearFinish(root: THREE.Object3D, gun: string, f: Finish | null) {
+/** Plate a gun (null: as it came), so that a finish can be taken off again. @param picture for its picture: as bright by night */
+export function wearFinish(root: THREE.Object3D, gun: string, f: Finish | null, picture = false) {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     let bare = bareOf.get(mesh);
     if (!bare) bareOf.set(mesh, (bare = mesh.material));
-    mesh.material = f ? (Array.isArray(bare) ? bare.map((m) => plated(m, f, gun)) : plated(bare, f, gun)) : bare;
+    mesh.material = f ? (Array.isArray(bare) ? bare.map((m) => plated(m, f, gun, picture)) : plated(bare, f, gun, picture)) : bare;
   });
 }

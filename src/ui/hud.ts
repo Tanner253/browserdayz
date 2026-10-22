@@ -90,6 +90,8 @@ const mouseSvg = (on: HandAct['on']) => `<svg viewBox="26 4 68 108" aria-hidden=
 export interface HotbarEntry {
   key: string;
   id: string | null;
+  /** a plated gun's finish: its own picture (`<id>|<finish>` in the icons) */
+  look?: string;
   label: string;
   active: boolean;
   dim: boolean;
@@ -1963,7 +1965,8 @@ export class HUD {
     // written alone. (Rebuilt with every shot, it was every slot and its picture made again, in the middle of a fight.)
     let sig = '', words = '';
     for (const h of s.hotbar) {
-      sig += `${h.id ?? ''}|${h.active ? 1 : 0}${h.dim ? 1 : 0};`;
+      // (and a plated gun's own picture, once it has been drawn)
+      sig += `${h.id ?? ''}|${h.active ? 1 : 0}${h.dim ? 1 : 0}${h.look && this.icons[`${h.id}|${h.look}`] ? h.look : ''};`;
       words += `${h.label}`;
     }
     if (sig === this.last.hotbar && words !== this.last.hotbarWords) {
@@ -1978,7 +1981,8 @@ export class HUD {
       this.last.hotbarWords = words;
       e.hotbar.innerHTML = s.hotbar
         .map((h, i) => {
-          const icon = h.id && this.icons[h.id] ? `<i style="background-image:url(${this.icons[h.id]})"></i>` : '';
+          const url = h.id ? (h.look && this.icons[`${h.id}|${h.look}`]) || this.icons[h.id] : '';
+          const icon = url ? `<i style="background-image:url(${url})"></i>` : '';
           return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}${h.id && ITEMS[h.id] ? kindIcon(h.id) : ''}<em>${h.label}</em></div>`;
         })
         .join('');
