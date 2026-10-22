@@ -18,6 +18,7 @@ import type { Emote } from '../sim/emotes';
 import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 import { keepBones, restBones } from '../core/bones';
+import { WornTag } from './worn-tag';
 
 keepBones();
 
@@ -1055,6 +1056,9 @@ export class Avatar {
       if (b) this.gearRest.set(name, { bone: b, inv: b.matrixWorld.clone().invert() });
     }
     bone('spine_03')?.attach(this.slung);
+    // the dog tag at the breastbone, over whatever is worn there (src/game/worn-tag.ts): shown once it is said which
+    const chest = this.gearRest.get('spine_03');
+    if (chest) (this.tag = new WornTag(atmo, this.layerMask)).fit(chest.bone, chest.inv, []);
 
     // hand frames measured at rest (a T-pose), like the first-person arms
     this.armR = this.makeArm(model, 'r', new THREE.Vector3(0.55, -1, 0.25));
@@ -1192,6 +1196,7 @@ export class Avatar {
     this.packOut = 0;
     for (const p of this.pieces.values()) p.visible = false;
     const ids = items.map(({ id }) => id);
+    const chest: { obj: THREE.Object3D; rest: THREE.Matrix4 }[] = [];
     for (const { id, obj } of items) {
       for (const name of WORN[id] ?? []) {
         const p = this.pieces.get(name);
@@ -1213,12 +1218,22 @@ export class Avatar {
       placeWorn(id, obj, ids, _m1);
       holder.matrix.copy(rest.inv).multiply(_m1);
       holder.add(obj);
+      if (g.bone === 'spine_03' && !g.pack) chest.push({ obj, rest: _m1.clone() });
       rest.bone.add(holder);
       this.gearObjs.push(holder);
       if (g.pack) this.packOut = 0.2;
     }
     for (const c of this.slung.children) c.position.z = 0.01 + this.packOut + (c.userData.over ?? 0);
+    // (the tag laid on what is worn over the chest now; the plate carrier of the suit is a part of the body, 4.5 cm out)
+    const at = this.gearRest.get('spine_03');
+    if (this.tag && at) this.tag.fit(at.bone, at.inv, chest, ids.includes('life_vest') ? 0.045 : 0);
     if (this.gearObjs.length) Avatar.onDressed(this.gearObjs);
+  }
+
+  /** the dog tag at the breastbone: steel, gold on a VIP, or none (see WornTag) */
+  tag: WornTag | null = null;
+  wearTag(kind: 'steel' | 'gold' | null) {
+    this.tag?.wear(kind);
   }
 
   /**

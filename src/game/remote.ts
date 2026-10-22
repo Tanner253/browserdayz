@@ -248,10 +248,18 @@ export class RemotePlayer implements Damageable {
 
   /** what they have from the store: their guns' finishes (src/game/finish.ts) */
   skins: string[] = [];
-  setSkins(sk: string[]) {
+  /** VIP: their dog tag at the breastbone is gold */
+  vip = false;
+  setSkins(sk: string[], vip: boolean) {
+    this.vip = vip;
+    this.wearTag();
     if (sk.join() === this.skins.join()) return;
     this.skins = sk;
     this.setWeapon(this.weapon, this.mods);
+  }
+  /** the dog tag at the breastbone (src/game/worn-tag.ts): steel, gold on a VIP, none on the dead */
+  wearTag() {
+    if (this.ready) this.avatar.wearTag(this.alive ? (this.vip ? 'gold' : 'steel') : null);
   }
 
   setWeapon(id: string | null, mods: string[]) {
@@ -308,6 +316,7 @@ export class RemotePlayer implements Damageable {
     // (a body still being made here has nothing yet to stand up or lay down: what their positions say settles it when it is made)
     if (alive === this.alive || !this.ready) return;
     this.alive = alive;
+    this.wearTag();
     if (!alive) this.diedAt = performance.now();
     else this.aliveAt = performance.now();
     // (Dead in the air, out of a helicopter or off a jump: the body falls to what is under it and lies there, where the

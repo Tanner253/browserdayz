@@ -179,7 +179,7 @@ export const onlineMethods = {
     });
     // (what somebody has from the store: their own, or another player's: src/game/my-perks.ts, RemotePlayer.setSkins)
     net.on('store', (m) => this.adminUI.storeGot(m));
-    net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setSkins(m.sk)));
+    net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setSkins(m.sk, !!m.vip)));
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
@@ -673,6 +673,8 @@ export const onlineMethods = {
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
     r.skins = p.sk ?? [];
+    r.vip = !!p.vip;
+    r.wearTag();
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
     this.gearOf.set(p.id, p.g ?? []);

@@ -25,6 +25,7 @@ const acct = (key: string) => {
 
 let list: PerkList = { at: 0, who: {} };
 let asked = 0;
+let soon: ReturnType<typeof setTimeout> | null = null;
 let changed: (() => void) | null = null;
 
 async function fetchList() {
@@ -49,11 +50,18 @@ export const perks = {
     void fetchList();
     setInterval(() => void fetchList(), EVERY_MS).unref();
   },
-  /** a player has just bought: asked again now and a minute on (the site's cache may be a minute behind its book) */
+  /**
+   * A player has just bought: asked again now and a minute on (the site's cache may be a minute behind its book). Not
+   * more than once in fifteen seconds: one asked for sooner waits for its turn, and is not dropped.
+   */
   bought() {
-    if (Date.now() - asked < 15_000) return;
-    void fetchList();
-    setTimeout(() => void fetchList(), 70_000).unref();
+    if (soon) return;
+    soon = setTimeout(() => {
+      soon = null;
+      void fetchList();
+      setTimeout(() => void fetchList(), 70_000).unref();
+    }, Math.max(0, asked + 15_000 - Date.now()));
+    soon.unref();
   },
   vip(key: string, now = Date.now()) {
     return (list.who[acct(key)]?.[0] ?? 0) > now;

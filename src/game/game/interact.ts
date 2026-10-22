@@ -19,6 +19,7 @@ import { WELL } from '../../sim/wells';
 import { waterName } from '../../sim/water';
 import { jobsFor, progress as jobDone } from '../../sim/jobs';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
+import { finishDay } from '../finish';
 
 export const interactMethods = {
   // ------------------------------------------------------------ interaction
@@ -319,6 +320,9 @@ export const interactMethods = {
 
   /** keep the body's hands in step with what is equipped */
   syncHeld(this: Game) {
+    // (and the dog tag at the breastbone: steel, gold on a VIP, none on the dead: src/game/worn-tag.ts)
+    this.avatar.wearTag(this.player.dead ? null : this.perks.vip ? 'gold' : 'steel');
+    finishDay();
     const it = this.weapons.equippedItem;
     const finish = it ? this.perks.finish(it.id) : null;
     const key = it ? `${it.id}|${fittedOf(it).join(',')}|${finish ?? ''}` : '';

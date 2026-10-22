@@ -100,7 +100,7 @@ function list(p: Perks) {
           <li><b class="st-purple">[VIP]</b> in purple by your name in chat and on the board</li>
           <li><b>Discord:</b> the VIP role and channel</li>
           <li><b>No ads</b> on the site or in the game's menus</li>
-          <li><b>Gold dog tag:</b> the tag a killer takes from you is gold (it pays the same)</li>
+          <li><b>Gold dog tag:</b> the tag a killer takes from you is gold-plated (only its look changes)</li>
         </ul>
         <label class="st-field">Your Discord name, for the role <input name="discord" maxlength="40" placeholder="optional" autocomplete="off"></label>
         <div class="st-row"><b class="st-price">${money(SHOP.vip.usd)}<small> / 30 days</small></b><button type="button" class="st-buy" data-buy="vip">${vip ? 'Add 30 days' : 'Buy VIP'}</button></div>
