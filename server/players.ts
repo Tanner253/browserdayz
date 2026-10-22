@@ -22,6 +22,7 @@ import { leaveSeat, racksNow, releaseLock } from './acts';
 import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
 import { partyIn, partyOut } from './party';
+import { pinned } from './pinned';
 
 export interface Client {
   ws: WebSocket;
@@ -319,7 +320,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   const byLid = !!resume && !!world.bunker && Math.hypot(resume.pose[0] - world.bunker.x, resume.pose[2] - world.bunker.z) < 50;
   const sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: byLid ? world.coverAt(resume.pose[0], resume.pose[2]) : resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
   const c: Client = {
-    ws, id: nextId++, key, name: cleanName(m.name),
+    ws, id: nextId++, key, name: pinned.of(key)?.name ?? cleanName(m.name),
     // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
     // else as somebody in the air, arms out, for as long as their game took to start, or for good if it never did)
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, F_GROUND],
@@ -336,6 +337,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   claim();
   send(c, {
     t: 'welcome', v: PROTOCOL, you: c.id, players: others,
+    ...((p) => (p ? { pinned: { name: p.name, wallet: p.wallet } } : {}))(pinned.of(key)),
     // (not what is in a piece of furniture: that is seen when it is opened, server/storages.ts)
     loot: [...economy.loot.values()].filter((l) => !(l.point >= 0 && world.lootPoints[l.point]?.inside)),
     doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),

@@ -660,7 +660,7 @@ export const enterMethods = {
       if (this.online) {
         const wallet = walletAddress();
         this.net.send({ t: 'cash', uid: it.uid, ...(wallet ? { wallet } : {}) });
-        if (!wallet && REWARDS_UI) this.hud.note('No wallet address saved: add one under Rewards in the menu', 'warn');
+        if (!wallet && REWARDS_UI) this.hud.note('No wallet address saved: add one in Settings, on the Account page', 'warn');
       }
       else {
         this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);

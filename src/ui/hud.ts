@@ -1106,6 +1106,14 @@ export class HUD {
     input.dispatchEvent(new Event('input'));
   }
 
+  /** the name fixed since the first cashed tag (server/pinned.ts): shown, and not to be typed over. null: free to change */
+  pinName(name: string | null) {
+    const input = this.root.querySelector('.start-name') as HTMLInputElement;
+    input.readOnly = name !== null;
+    input.title = name !== null ? 'Fixed since your first cashed tag. An admin can let you change it.' : '';
+    if (name !== null && input.value !== name) this.setName(name);
+  }
+
   nameValue() {
     return (this.root.querySelector('.start-name') as HTMLInputElement).value.trim().slice(0, 16);
   }

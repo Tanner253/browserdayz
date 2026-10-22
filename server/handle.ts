@@ -36,6 +36,7 @@ import { scores } from './queue';
 import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
+import { pinned } from './pinned';
 import { changed, contents } from './storages';
 import { aimWatch, looked } from './aimwatch';
 
@@ -670,7 +671,7 @@ export function handle(c: Client, m: C2S) {
           hp: Math.round(o.vitals?.health ?? 100), kills: scores.get(o.key)?.kills ?? 0, tags: scores.get(o.key)?.tags ?? 0,
           ...(o.power.hidden ? { hidden: true as const } : {}), ...(o.power.god ? { god: true as const } : {}), ...(o.power.clip ? { clip: true as const } : {}),
           ...((ADMIN.muted.get(o.key) ?? 0) > now ? { muted: true as const } : {}), ...(o.seatAt ? { seat: true as const } : {}),
-          ...(o.power.voidInv ? { voidInv: true as const } : {}), ...(o.power.voidTag ? { voidTag: true as const } : {}),
+          ...(o.power.voidInv ? { voidInv: true as const } : {}), ...(o.power.voidTag ? { voidTag: true as const } : {}), ...(pinned.of(o.key) ? { pinned: true as const } : {}),
           ...(o.power.weightless ? { weightless: true as const } : {}), ...(o.power.endless ? { endless: true as const } : {}), ...(o.power.bottomless ? { bottomless: true as const } : {}),
           ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
           ...(o.fp ? { dev: shortDevice(o.fp) } : {}),
@@ -863,7 +864,11 @@ export function handle(c: Client, m: C2S) {
       if (from && !why) {
         // one tag, one reward
         for (const a of namesOf(c.key, c.ip)) for (const b of namesOf(from.ownerKey, from.ownerIp)) pairPaidAt.set(`${a}>${b}`, now);
-        recordCashIn(c, from.owner, isWallet(m.wallet) ? m.wallet : '');
+        // (the name and wallet fixed at the first: server/pinned.ts. One given since, other than the one fixed, is told so)
+        const given = isWallet(m.wallet) ? m.wallet : '', { pin, fresh } = pinned.cash(c.key, c.name, given);
+        recordCashIn(c, from.owner, pin.wallet);
+        if (fresh) send(c, { t: 'pinned', pin: { name: pin.name, wallet: pin.wallet } });
+        else if (given && given !== pin.wallet) send(c, { t: 'tell', kind: 'warn', text: `Listed for ${pin.wallet.slice(0, 4)}…${pin.wallet.slice(-4)}: your wallet is fixed since your first cashed tag. An admin can change it.` });
       } else send(c, { t: 'tell', kind: 'warn', text: `No reward for ${owner}'s tag: ${why}.` });
       broadcast({ t: 'cashed', id: c.id, name: c.name, owner });
       return;

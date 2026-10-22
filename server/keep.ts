@@ -17,6 +17,7 @@ import { CARRY_KEPT, POWERS_KEPT, carryKeep, carryKept, keepPowers, noHold } fro
 import { broadcast, cleanInventory, cleanItem, clients, info, isPose, num, records, send, type Client, type Record_ } from './players';
 import { fillFromQueue } from './queue';
 import { seen } from './seen';
+import { pinned, type Pin } from './pinned';
 import { elite } from './elite';
 
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
@@ -120,6 +121,8 @@ interface Snapshot {
   news?: NewsKept;
   /** who has played in the last week, by key hash and when (see seen.ts) */
   seen?: [string, number][];
+  /** names and payout wallets fixed at a first cashed tag (pinned.ts) */
+  pinned?: [string, Pin][];
   /** each admin's powers, by key hash (see POWERS_KEPT) */
   powers?: [string, Client['power']][];
   /** the Elite, by key hash and when they were last paid at the top rate (see elite.ts) */
@@ -210,7 +213,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -270,6 +273,7 @@ function takeInLate(save: KeptFile) {
   }
   if ((snap.wipe ?? '') !== WIPE) return void log(`[keep] a newer copy (${save.at}) is of another world, and is written over`);
   seen.restore(snap.seen);
+  pinned.restore(snap.pinned);
   elite.restore(snap.elite);
   takePowers(snap.powers);
   // (from a last word only: see loadKept)
@@ -565,6 +569,7 @@ export async function loadKept() {
     // (what has been said under the changelog, and its hearts: kept with the rest, and no worse for a new map)
     news.restore(snap.news);
     seen.restore(snap.seen);
+    pinned.restore(snap.pinned);
     elite.restore(snap.elite);
     takePowers(snap.powers);
     // (Whose tags were whose only from a last word, written as the server stopped and after its last cash-in. Any

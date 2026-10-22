@@ -961,6 +961,8 @@ export class AdminUI {
         p.muted ? this.button('Unmute', () => this.send(`/unmute ${who}`), 'good', 'sound') : this.button('10 min', () => this.send(`/mute ${who} 10`), '', 'mute'),
         ...(p.muted ? [] : [this.button('60 min', () => this.send(`/mute ${who} 60`), '', 'mute')]),
       ),
+      // (the name and wallet fixed at their first cashed tag: server/pinned.ts)
+      ...(p.pinned ? [this.line('Name and wallet', this.button('Let them change', () => this.send(`/unlock ${who}`), '', 'check'))] : []),
       // (putting somebody off the server asks once more, as a ban does: a slip of the hand is somebody's evening)
       this.line('Kick', this.grave(`kick${p.id}`, 'Kick off the server', () => this.send(`/kick ${who}${why()}`), 'kick')),
       this.line('Keep off', ...[5, 10, 30, 60].map((m) => this.grave(`out${m}_${p.id}`, `${m} min`, () => this.send(`/timeout ${who} ${m}${why()}`), 'clock'))),

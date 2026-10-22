@@ -23,6 +23,7 @@ import { kill } from './acts';
 import { queue } from './queue';
 import { sendDrop } from './drops';
 import { dogtag, roleKey, tagSet } from './roles';
+import { pinned } from './pinned';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -461,6 +462,22 @@ export async function command(c: Client, line: string) {
       for (const it of things(t.inv)) count.set(ITEMS[it.id]?.name ?? it.id, (count.get(ITEMS[it.id]?.name ?? it.id) ?? 0) + (ITEMS[it.id]?.stack ? it.qty : 1));
       const never = [...things(t.inv)].filter(invented).map((it) => ITEMS[it.id]?.name ?? it.id);
       return void sys(c, `${t.name} carries (as their game last said, ${t.vitals ? `health ${Math.round(t.vitals.health)}` : 'health not said'}):`, worn.length ? worn.join(' · ') : 'nothing worn or slung', [...count].map(([n, q]) => (q > 1 ? `${q} × ${n}` : n)).join(' · ') || 'nothing at all', ...(never.length ? [`NOT put in the world by the server: ${never.join(', ')}`] : []));
+    }
+    case 'unlock': {
+      // (a name and payout wallet fixed at a first cashed tag, free to change again until the next: server/pinned.ts)
+      if (!admin) return need();
+      const t = whoIs(who);
+      if (t) {
+        if (!pinned.free(t.key)) return void sys(c, `${t.name}'s name and wallet are not fixed: they can change them already.`);
+        send(t, { t: 'pinned', pin: null });
+        sys(t, 'An admin has let you change your name and payout wallet: they are fixed again at your next cashed tag.');
+        log(`[admin] ${c.name} let ${t.name} change their name and wallet`);
+        return void sys(c, `${t.name} can change their name and wallet until their next cashed tag.`);
+      }
+      const freed = who ? pinned.freeName(who) : null;
+      if (!freed) return void sys(c, `Nobody on is "${who}", and no one name is fixed as that: see /players.`);
+      log(`[admin] ${c.name} let ${freed} (not on) change their name and wallet`);
+      return void sys(c, `${freed} can change their name and wallet when they next come, until their next cashed tag.`);
     }
     case 'kick': {
       const t = whoIs(who);

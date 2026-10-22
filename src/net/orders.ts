@@ -72,6 +72,7 @@ export const ORDERS: Order[] = [
   { name: 'warn', args: ['who', 'words'], does: 'Put a warning on somebody’s screen' },
   { name: 'mute', args: ['who', 'minutes'], does: 'What they type and say reaches nobody, for up to 60 minutes' },
   { name: 'unmute', args: ['who'], does: 'Let them be heard again' },
+  { name: 'unlock', args: ['who'], does: 'Let them change their name and payout wallet, fixed since their first cashed tag, until their next one (somebody not on: by the name they are fixed to)', admin: true },
   { name: 'goto', args: ['who'], does: 'Go to where somebody is', admin: true },
   { name: 'bring', args: ['who'], does: 'Bring somebody to where you are', admin: true },
   { name: 'tp', args: ['x', 'z'], does: 'Go to a place by its numbers (or right-click the map)', admin: true },

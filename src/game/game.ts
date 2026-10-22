@@ -32,7 +32,7 @@ import '../sim/gunplay';
 import '../sim/barrels';
 import '../sim/emotes';
 import '../sim/save';
-import { Net, playerName, publicId, serverStatus } from '../net/client';
+import { Net, playerName, publicId, serverStatus, setPlayerName } from '../net/client';
 import { crateId } from '../net/protocol';
 import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
@@ -80,7 +80,7 @@ import { Horde, Infected } from './infected';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
-import { REWARDS_UI, RewardsModal } from '../ui/rewards';
+import { REWARDS_UI, RewardsModal, onPinned } from '../ui/rewards';
 import { Gas } from './gas';
 import { GAS, bunkerUnder } from '../sim/gas';
 import { DAY } from '../sim/daynight';
@@ -984,6 +984,11 @@ export class Game {
       const account = new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true);
       this.hud.onAccount(() => account.open());
     }
+    // (the name fixed with the wallet: shown in the menu, and kept as the name this browser plays under)
+    onPinned((p) => {
+      this.hud.pinName(p?.name ?? null);
+      if (p) setPlayerName(p.name);
+    });
     // the menu's map: the game's own, and what is said of each place on it
     {
       const town = world.pois[0];

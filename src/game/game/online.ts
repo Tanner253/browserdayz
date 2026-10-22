@@ -24,7 +24,7 @@ import { Jeep } from '../vehicle';
 import { BACK_SHORT } from '../../ui/updates';
 import { renderDoll } from '../../ui/icons';
 import { INFECTED } from '../../sim/infected';
-import { cashedTags } from '../../ui/rewards';
+import { cashedTags, setPinned } from '../../ui/rewards';
 import type { Game } from '../game';
 
 /** what holds things within reach of where somebody stands, if anything does: a crate, a cupboard or a drop is 'hard'; a body, a pack, a stash or a cardboard box 'soft' */
@@ -44,6 +44,8 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (whether this player's name and wallet are fixed is the server's to say: server/pinned.ts)
+    setPinned(w.pinned ?? null);
     // the server's hour, from which this game's clock runs on
     if (typeof w.hour === 'number') this.hourBase = { phase: w.hour, at: performance.now() };
     // Nothing of this game's own making is in a server's world: whatever it laid out or packed by itself is taken
@@ -506,6 +508,10 @@ export const onlineMethods = {
     net.on('tell', (m) => {
       this.hud.note(m.text, m.kind);
       this.hud.chatLine('system', '', m.text);
+    });
+    net.on('pinned', (m) => {
+      setPinned(m.pin);
+      if (m.pin) this.hud.note(`Your name${m.pin.wallet ? ' and payout wallet are' : ' is'} now fixed. An admin can let you change ${m.pin.wallet ? 'them' : 'it'}.`, 'info');
     });
     // (the arena's: the score and the kills, for its own screen)
     net.on('score', (m) => this.arenaHud?.score(m));

@@ -35,6 +35,39 @@ export function walletAddress(): string {
   return isWallet(a) ? a : '';
 }
 
+/**
+ * This player's name and payout wallet, fixed since their first cashed tag, as the server last said (server/pinned.ts):
+ * kept on the device so that the menu shows them fixed before the server is reached. null: not fixed.
+ */
+export type Pin = { name: string; wallet: string } | null;
+const PIN = 'zona.pinned';
+let pin: Pin = (() => {
+  try {
+    const p = JSON.parse(read(PIN) || 'null') as Pin;
+    return p && typeof p.name === 'string' && typeof p.wallet === 'string' ? p : null;
+  } catch {
+    return null;
+  }
+})();
+const pinTold: ((p: Pin) => void)[] = [];
+/** the server's word: on joining (welcome), at a first cashed tag, and when an admin frees them (null) */
+export function setPinned(p: Pin) {
+  pin = p && typeof p.name === 'string' ? { name: p.name, wallet: typeof p.wallet === 'string' ? p.wallet : '' } : null;
+  try {
+    if (pin) localStorage.setItem(PIN, JSON.stringify(pin));
+    else localStorage.removeItem(PIN);
+  } catch {
+    /* private mode */
+  }
+  if (pin?.wallet) write(WALLET, pin.wallet);
+  for (const f of pinTold) f(pin);
+}
+/** told now, and each time it changes */
+export function onPinned(f: (p: Pin) => void) {
+  pinTold.push(f);
+  f(pin);
+}
+
 /** how many dog tags this browser's player has cashed in */
 export function cashedTags(): number {
   return Math.max(0, Math.floor(Number(read(CASHED)) || 0));
@@ -162,6 +195,7 @@ export class RewardsModal {
           <input class="rw-input" placeholder="Your Solana address" maxlength="44" spellcheck="false" autocomplete="off" aria-label="Solana wallet address">
           <button class="rw-save">Save address</button>
         </div>
+        <p class="rw-lock" hidden></p>
         <div class="rw-hold" aria-live="polite" hidden></div>
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
@@ -184,6 +218,7 @@ export class RewardsModal {
       this.showHolding(this.input.value.trim());
     });
     (this.root.querySelector('.rw-save') as HTMLButtonElement).onclick = () => this.save();
+    onPinned(() => this.showPin());
     this.root.querySelector<HTMLButtonElement>('.rw-skip')?.addEventListener('click', () => this.close());
   }
 
@@ -216,6 +251,7 @@ export class RewardsModal {
     this.root.classList.add('show');
     if (!this.inline) this.input.focus();
     this.holdFor = '';
+    this.showPin();
     this.showHolding(saved);
     if (!this.inline) this.runClock();
     void this.showPay();
@@ -274,6 +310,18 @@ export class RewardsModal {
     } catch {
       /* no site behind this page (the game served from somewhere else, or playing offline) */
     }
+  }
+
+  /** a wallet fixed since the first cashed tag is shown, and not to be typed over (server/pinned.ts) */
+  private showPin() {
+    const p = pin, fixed = !!p?.wallet, note = this.root.querySelector('.rw-lock') as HTMLElement;
+    if (fixed) this.input.value = p!.wallet;
+    this.input.readOnly = fixed;
+    (this.root.querySelector('.rw-save') as HTMLElement).hidden = fixed;
+    note.hidden = !p;
+    note.textContent = fixed
+      ? 'Fixed since your first cashed tag, with your name. An admin can let you change it.'
+      : 'Your name is fixed since your first cashed tag. The wallet you give is fixed at the next tag you cash in with it.';
   }
 
   close() {

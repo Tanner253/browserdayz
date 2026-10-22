@@ -285,6 +285,8 @@ export type S2C =
       t: 'welcome';
       v: number;
       you: number;
+      /** this player's name and payout wallet, fixed since their first cashed tag (server/pinned.ts); none: not fixed */
+      pinned?: { name: string; wallet: string };
       players: PlayerInfo[];
       loot: WorldLoot[];
       doors: [number, boolean, number][];
@@ -449,6 +451,8 @@ export type S2C =
   | { t: 'rpass' }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }
+  /** the name and wallet have just been fixed (at a first cashed tag), or freed by an admin (null) */
+  | { t: 'pinned'; pin: { name: string; wallet: string } | null }
   /**
    * The arena only (arena/match.ts; the game server never sends it): the match as it stands, said from the hearer's
    * own side (`us` first). `up`: how many of each side are standing; `phase`: a round being fought, the gap between
@@ -508,7 +512,7 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** an admin's: their inventory never fills */ bottomless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true; /** the device their game runs on, its first eight characters (protocol 44): /ban dev:xxxxxxxx takes it */ dev?: string }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** their name and wallet are fixed (server/pinned.ts): /unlock frees them */ pinned?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** an admin's: their inventory never fills */ bottomless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true; /** the device their game runs on, its first eight characters (protocol 44): /ban dev:xxxxxxxx takes it */ dev?: string }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
   /**
