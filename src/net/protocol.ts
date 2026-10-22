@@ -387,7 +387,7 @@ export type S2C =
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
   /** the store's book for an admin's STORE tab (api/_lib/shop.ts, adminView), or why their order was not done */
-  | { t: 'store'; ok: boolean; view?: unknown; why?: string }
+  | { t: 'store'; ok: boolean; view?: unknown; why?: string; /** players this server knows by name, for a gift (server/store-admin.ts) */ who?: { name: string; acct: string; online: boolean }[] }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */

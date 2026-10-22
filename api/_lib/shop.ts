@@ -303,7 +303,7 @@ export async function writeBook(store: Store, change: (b: Book) => string | null
 
 export type AdminAct =
   | { act: 'list' }
-  | { act: 'grant'; acct: string; item: ItemId; days?: number; note?: string; name?: string }
+  | { act: 'grant'; acct: string; item: ItemId; days?: number; note?: string; name?: string; serial?: number }
   | { act: 'set'; id: string; status: 'ok' | 'revoked' | 'refunded' }
   | { act: 'move'; id: string; acct: string }
   | { act: 'role'; id: string; on: boolean }
@@ -319,8 +319,8 @@ export function adminAct(v: unknown): AdminAct | null {
     case 'list':
       return { act: 'list' };
     case 'grant': {
-      const days = Math.round(Number(o.days));
-      return isAcct(o.acct) && isItem(o.item) ? { act: 'grant', acct: o.acct, item: o.item, ...(days > 0 && days <= 3650 ? { days } : {}), note: text(o.note, 120), name: text(o.name, 24) } : null;
+      const days = Math.round(Number(o.days)), serial = Math.round(Number(o.serial));
+      return isAcct(o.acct) && isItem(o.item) ? { act: 'grant', acct: o.acct, item: o.item, ...(days > 0 && days <= 3650 ? { days } : {}), ...(serial > 0 && serial <= 100_000 ? { serial } : {}), note: text(o.note, 120), name: text(o.name, 24) } : null;
     }
     case 'set':
       return id && (o.status === 'ok' || o.status === 'revoked' || o.status === 'refunded') ? { act: 'set', id, status: o.status } : null;
@@ -344,6 +344,13 @@ export function applyAct(book: Book, a: Exclude<AdminAct, { act: 'list' }>, by: 
       id: rowId(''), sig: '', item: a.item, acct: a.acct, name: a.name ?? '', usd: 0, rate: 0, quoted: 0, paid: 0, from: '', paidAt: now,
       at: new Date(now).toISOString(), how: 'hand', status: 'ok', ...(it.days ? { days: a.days ?? it.days } : {}), ...(a.note ? { note: a.note } : {}), by,
     };
+    // (a number the admin picked on the grid, if it is still free; else the lowest free one)
+    if (it.skin && a.serial) {
+      if (it.limit && a.serial > it.limit) return `There are only ${it.limit}.`;
+      if (book.rows.some((x) => x.item === a.item && holds(x) && x.serial === a.serial)) return `No. ${a.serial} is held already.`;
+      book.rows.push(Object.assign(r, { serial: a.serial }));
+      return null;
+    }
     book.rows.push(r);
     number(book, r);
     return null;
@@ -390,7 +397,7 @@ export function adminView(book: Book | null, now = Date.now()) {
     return { acct, until: p.vip, name: theirs.find((r) => r.name)?.name ?? '', discord: last?.discord ?? '', role: !!last?.role, id: last?.id ?? '' };
   }).sort((a, b) => a.until - b.until);
   // (every account that ever bought or was given anything: what it has now, what it paid, how to reach it)
-  const people = new Map<string, { acct: string; name: string; discord: string; usd: number; n: number; looks: number; last: string; vip: number; noads: number; cup: number; owned: { item: ItemId; serial?: number; id: string }[] }>();
+  const people = new Map<string, { acct: string; name: string; discord: string; usd: number; n: number; looks: number; last: string; vip: number; noads: number; cup: number; owned: { item: ItemId; serial?: number; id: string; how: Row['how']; by: string; at: string; sig: string; paid: string }[] }>();
   for (const r of rows) {
     let p = people.get(r.acct);
     if (!p) people.set(r.acct, (p = { acct: r.acct, name: '', discord: '', usd: 0, n: 0, looks: 0, last: r.at, vip: 0, noads: 0, cup: 0, owned: [] }));
@@ -399,7 +406,8 @@ export function adminView(book: Book | null, now = Date.now()) {
     p.n++;
     if (r.status === 'ok' && r.how !== 'hand') p.usd = Math.round((p.usd + r.usd) * 100) / 100;
     if (r.status === 'look') p.looks++;
-    if (r.status === 'ok' && SHOP[r.item].skin) p.owned.push({ item: r.item, ...(r.serial ? { serial: r.serial } : {}), id: r.id });
+    // (with how it came: bought, its payment; or given, by whom)
+    if (r.status === 'ok' && SHOP[r.item].skin) p.owned.push({ item: r.item, ...(r.serial ? { serial: r.serial } : {}), id: r.id, how: r.how, by: r.by ?? '', at: r.at, sig: r.sig, paid: sol(r.paid) });
   }
   for (const [acct, k] of perks) Object.assign(people.get(acct) ?? {}, { vip: k.vip, noads: k.noads, cup: k.cup });
   return { rows: rows.slice(0, 300), month: sum(paid.filter((r) => r.at.startsWith(month))), all: sum(paid), looks: rows.filter((r) => r.status === 'look').length, vips, players: [...people.values()] };

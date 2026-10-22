@@ -210,7 +210,7 @@ export class AdminUI {
   /** the STORE tab (src/ui/admin-store.ts) */
   private store = new StoreTab({ el, button: (l, on, c, ic) => this.button(l, on, c, ic), grave: (k, l, on, ic) => this.grave(k, l, on, ic), order: (a) => this.act.store(a), redraw: () => this.isOpen && this.draw(true) });
   /** the server's answer to an order to the store's book */
-  storeGot(m: { ok: boolean; view?: unknown; why?: string }) {
+  storeGot(m: { ok: boolean; view?: unknown; why?: string; who?: { name: string; acct: string; online: boolean }[] }) {
     this.store.got(m);
   }
   root = el('div', 'adm');
