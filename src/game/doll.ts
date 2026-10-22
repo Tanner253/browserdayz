@@ -153,6 +153,10 @@ export class Doll {
   private readonly rig = new THREE.Group();
   private readonly camera = new THREE.PerspectiveCamera(LENS.fov, 0.46, 1, 40);
   private readonly body = new Avatar();
+  /** the dog tag at the breastbone, as the body in the world wears it (src/game/worn-tag.ts) */
+  wearTag(kind: 'steel' | 'gold' | null) {
+    this.body.wearTag(kind);
+  }
   private readonly uniforms = lookUniforms();
   private hair: THREE.MeshStandardMaterial[] = [];
   private readonly ground: THREE.Mesh;

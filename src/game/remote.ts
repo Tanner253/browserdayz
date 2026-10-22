@@ -250,6 +250,8 @@ export class RemotePlayer implements Damageable {
   skins: string[] = [];
   /** VIP: their dog tag at the breastbone is gold */
   vip = false;
+  /** their own tag is round their neck, one a killer could take (as the server says it): only then is it drawn */
+  tagged = false;
   setSkins(sk: string[], vip: boolean) {
     this.vip = vip;
     this.wearTag();
@@ -259,7 +261,7 @@ export class RemotePlayer implements Damageable {
   }
   /** the dog tag at the breastbone (src/game/worn-tag.ts): steel, gold on a VIP, none on the dead */
   wearTag() {
-    if (this.ready) this.avatar.wearTag(this.alive ? (this.vip ? 'gold' : 'steel') : null);
+    if (this.ready) this.avatar.wearTag(this.alive && this.tagged ? (this.vip ? 'gold' : 'steel') : null);
   }
 
   setWeapon(id: string | null, mods: string[]) {
