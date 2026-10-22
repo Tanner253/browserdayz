@@ -182,10 +182,10 @@ export interface ItemInstance {
 
 /**
  * seconds somebody else's dog tag has to be carried before it is cashed in
- * (twenty minutes since 2026-10-19, the owner: "10 minutes to spawn a tag, and 20 mins to cash. the current 20min and
- * 30 min setup is too much". Thirty from 2026-10-18, fifteen from 2026-10-12, ten before that, and thirty before that.)
+ * (thirty minutes since 2026-10-22, the owner: "move the payout timer to 20/30 again as well. to let treasury grow".
+ * Twenty from 2026-10-19, thirty from 2026-10-18, fifteen from 2026-10-12, ten before that, and thirty before that.)
  */
-export const TAG_HOLD = 20 * 60;
+export const TAG_HOLD = 30 * 60;
 /**
  * The Zona is the played part of the map, the red line round it (PLAY_AREAS in the world's generator): tags are
  * earned inside it. The country outside is for stashes and for building. A tag taken off somebody and carried
@@ -201,10 +201,10 @@ export const TAG_OUT = 15;
 export const ZONA_VOID = true;
 /**
  * Seconds somebody has to have been alive before there is a tag on their body at all. Whoever has just arrived
- * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Ten minutes since
- * 2026-10-19, the owner: "10 minutes to spawn a tag"; twenty from 2026-10-18, ten from 2026-10-12, five before.)
+ * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Twenty minutes since
+ * 2026-10-22, with TAG_HOLD's thirty; ten from 2026-10-19, twenty from 2026-10-18, ten from 2026-10-12, five before.)
  */
-export const TAG_FRESH = 10 * 60;
+export const TAG_FRESH = 20 * 60;
 /**
  * Seconds a dog tag lies on the ground before it is gone, whoever is standing by it (the owner, 2026-10-17: "dogtags
  * dropped on the ground should despawn after 10 mins, so people cant leave them in the world for too long and come back

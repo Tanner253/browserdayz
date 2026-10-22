@@ -238,7 +238,7 @@ function page(book: Book, s: Snapshot, now: number): string {
   <section class="tiers" id="tiers">
     <h2>Level up: play free, earn SOL, hold $ZONA, earn more <small>${Date.parse(s.rules5From!) <= now ? 'live' : `from ${s.rules5From!.slice(11, 16)} UTC`}</small></h2>
     <div class="flow loop">
-      ${gate ? step('1', 'Play free', `your first ${gate.free} tags`, `No coin needed for your first ${gate.free} paid tags, ${amount(s.tiers[0].perTag)} SOL each. Take a dog tag, hold it twenty minutes: it pays SOL.`) : step('1', 'Play free', `${amount(s.tiers[0].perTag)} SOL a tag`, 'No coin needed. Take a dog tag, hold it twenty minutes: it pays SOL.')}
+      ${gate ? step('1', 'Play free', `your first ${gate.free} tags`, `No coin needed for your first ${gate.free} paid tags, ${amount(s.tiers[0].perTag)} SOL each. Take a dog tag, hold it thirty minutes: it pays SOL.`) : step('1', 'Play free', `${amount(s.tiers[0].perTag)} SOL a tag`, 'No coin needed. Take a dog tag, hold it thirty minutes: it pays SOL.')}
       ${gate ? step('2', `Hold ${gate.hold} $ZONA`, `to be paid past ${gate.free}`, `${gate.now ? 'After' : `From ${gate.at}, after`} your first ${gate.free}, a tag is paid only while the wallet you are paid to holds ${gate.hold} $ZONA. Your first ${gate.free} tags pay enough SOL to buy it, at the price of 19 October.`) : step('2', 'Buy $ZONA', 'with what you earn', 'Put the SOL you win into $ZONA, in the wallet you are paid to.')}
       ${step('3', 'Every tag pays more', `+${s.holderPerM} SOL per 1M`, `Each million $ZONA you hold adds ${s.holderPerM} SOL to every tag you cash in.`)}
       ${step('4', `Reach ${esc(topTier.name)}`, `${amount(topTier.perTag)} SOL a tag`, `${topTier.from}M $ZONA held: ${Math.round((topTier.perTag / s.tiers[0].perTag) * 10) / 10}× the pay, and your name on the Elite board below.`)}
@@ -445,7 +445,7 @@ function page(book: Book, s: Snapshot, now: number): string {
       <div class="big">${amount(book.paidLamports)} <span>SOL</span></div>
       <p class="under">paid to players${wallets ? ` · ${book.paid} ${book.paid === 1 ? 'tag' : 'tags'} · ${wallets}${partial ? '+' : ''} ${wallets === 1 ? 'wallet' : 'wallets'}` : ''}</p>
       <p class="under">all of ZONA PvP, the Zone and the Arena together: the Arena's matches are played for nothing so far</p>
-      <p class="lead">Take another player's dog tag, stay alive with it for twenty minutes, and it is cashed in. This page is the whole account of what is paid for that: nothing is paid that is not listed here, and every payment listed here is a transaction on Solana that anybody can look up. ${esc(state[2])}</p>
+      <p class="lead">Take another player's dog tag, stay alive with it for thirty minutes, and it is cashed in. This page is the whole account of what is paid for that: nothing is paid that is not listed here, and every payment listed here is a transaction on Solana that anybody can look up. ${esc(state[2])}</p>
       ${book.claimNote ? `<div class="note"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
     </div>
     <div class="tiles">
@@ -462,7 +462,7 @@ ${tiersSection}
     <div class="flow">
       ${step('1', 'The coin is traded', 'Creator rewards', 'Every trade of the ZONA coin on pump.fun leaves a little for the wallet that made it.')}
       ${step('2', 'Collected by the machine', `${amount(book.claimedLamports)} SOL so far`, `Into one treasury wallet, automatically${s.balance === null ? '' : `. It holds ${amount(s.balance)} SOL now`}.`)}
-      ${step('3', 'You cash a tag in', holdersNow ? `${amount(s.tiers[0].perTag)}–${amount(topTier.perTag)} SOL a tag` : `${s.tagPays === null ? (s.fives ? flat + ' SOL' : `${pct}%`) : `${amount(s.tagPays)} SOL`} a tag`, `Kill a player, take their tag, hold it twenty minutes. ${holdersNow ? `A tag pays ${flat} SOL, and up to ${amount(topTier.perTag)} SOL to a wallet that holds $ZONA.` : s.fives ? `A tag pays ${flat} SOL, whatever the treasury holds.` : `A tag pays ${pct}% of the treasury, never less than ${amount(s.floor)} SOL.`}`)}
+      ${step('3', 'You cash a tag in', holdersNow ? `${amount(s.tiers[0].perTag)}–${amount(topTier.perTag)} SOL a tag` : `${s.tagPays === null ? (s.fives ? flat + ' SOL' : `${pct}%`) : `${amount(s.tagPays)} SOL`} a tag`, `Kill a player, take their tag, hold it thirty minutes. ${holdersNow ? `A tag pays ${flat} SOL, and up to ${amount(topTier.perTag)} SOL to a wallet that holds $ZONA.` : s.fives ? `A tag pays ${flat} SOL, whatever the treasury holds.` : `A tag pays ${pct}% of the treasury, never less than ${amount(s.floor)} SOL.`}`)}
       ${step('4', 'Straight to your wallet', `${amount(book.paidLamports)} SOL paid`, s.fives && N > 1 ? `When ${N} of your tags are due: ${lot} SOL at once, with a receipt for each tag left on the chain. No tag is ever paid twice.` : 'Within a minute or so, with a receipt left on the chain: no tag is ever paid twice.')}
     </div>
   </section>
@@ -533,6 +533,11 @@ ${tiersSection}
       <div class="rule"><h3>Paid once, and the chain sees to it</h3><p>Each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</p></div>
       <div class="rule"><h3>No wallet, no payment</h3><p>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window: add it before you cash a tag in.</p></div>
 ${
+        s.rules8From
+          ? `      <div class="rule"><h3>What changes on ${new Date(s.rules8From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}</h3><p>To let the treasury grow, from ${s.rules8From.slice(11, 16)} UTC: a wallet is paid for no more than ${s.walletTags24} tags in any 24 hours, where it was ${s.walletTags24} every 12; and past its first ${s.freeTags} paid tags a wallet must hold 350,000 $ZONA, where it was 100,000. In the game a tag is cashed in after thirty minutes carried (it was twenty), and is on a body after twenty minutes alive (it was ten). Whatever was cashed in before then is judged as it was.</p></div>
+`
+          : ''
+      }${
         s.rules4From
           ? `      <div class="rule"><h3>What changes on ${new Date(s.rules4From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}</h3><p>From ${s.rules4From.slice(11, 16)} UTC a wallet is paid for ${s.walletTags24} tags every 12 hours, where it was ${s.walletTags24} in any 24: one payout of ${N}, all at once when the ${N}th is due, and the next one can come 12 hours after the first of those was cashed in. Whatever was cashed in before then is judged as it was.</p></div>
 `

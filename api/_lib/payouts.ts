@@ -142,6 +142,14 @@ export interface Config {
    */
   rules7From: number;
   holdWait: number;
+  /**
+   * The eighth cut-over (ms), the owner, 2026-10-22, to let the treasury grow: "move to 24 hours to cash extra so 5 tags
+   * a day is max" and "bump the minimum holder requirement to 350k to earn minimum payout". For a tag cashed in from this
+   * moment on, the `walletTags24` are counted over the 24 hours before it again (see `windowOf`), and past its free tags
+   * its wallet must hold `holdMin8`, not `holdMin` (see `holdOf`). What was cashed in before is judged as it was.
+   */
+  rules8From: number;
+  holdMin8: bigint;
   /** rewards are collected when at least this much is waiting */
   claimAt: bigint;
   /** what is bid per unit of work, in millionths of a lamport: enough to be taken up promptly */
@@ -181,6 +189,8 @@ export const RULES4_FROM = '2026-10-15T17:30:00Z';
 export const RULES6_FROM = '2026-10-19T01:15:00Z';
 /** The moment of the seventh (see `rules7From`), written as RULES2_FROM is; PAYOUT_RULES7_FROM is asked first. '': none yet. */
 export const RULES7_FROM = '2026-10-19T04:00:00Z';
+/** The moment of the eighth (see `rules8From`), written as RULES2_FROM is; PAYOUT_RULES8_FROM is asked first. '': none yet. */
+export const RULES8_FROM = '2026-10-22T06:15:00Z';
 /** a moment written in full, a day, a time and a zone (see `config`) */
 const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -208,6 +218,10 @@ export function config(env: Record<string, string | undefined> = process.env): C
       rpc = env.SOLANA_RPC_URL.trim();
       // (said without repeating it: the address of a paid-for node is itself a secret)
       if (!rpc.split(',').every((u) => /^https:\/\/[^\s/]+/.test(u.trim()))) throw new Error('SOLANA_RPC_URL is not an https address');
+      // (the public node last: asked only when those before it do not answer, and handed every payment with them. On
+      // 2026-10-22 the paid node answered every question and refused every payment for an hour, "Internal error during
+      // preflight simulation", while the public one took the same payment)
+      rpc = [...new Set([...rpc.split(',').map((u) => u.trim()), DEFAULT_RPC])].join(',');
     }
     if (env.TREASURY_SECRET_KEY) {
       key = new Keypair(env.TREASURY_SECRET_KEY);
@@ -241,6 +255,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
   const from6 = MOMENT.test(said6) ? Date.parse(said6) : NaN;
   const said7 = (env.PAYOUT_RULES7_FROM?.trim() ? env.PAYOUT_RULES7_FROM : RULES7_FROM).trim();
   const from7 = MOMENT.test(said7) ? Date.parse(said7) : NaN;
+  const said8 = (env.PAYOUT_RULES8_FROM?.trim() ? env.PAYOUT_RULES8_FROM : RULES8_FROM).trim();
+  const from8 = MOMENT.test(said8) ? Date.parse(said8) : NaN;
   // (each tag paid as it comes, as before the rule of five: the owner, 2026-10-15, "players no longer need to get 5 tags to
   // cash out, we will go back to cahsing them out isntantly if theres fund in streasury". It was five. Everything else of
   // the later rules holds: the holder bonus and its tiers, the five a wallet in twelve hours. What waits for a fifth in
@@ -283,6 +299,9 @@ export function config(env: Record<string, string | undefined> = process.env): C
     // (never before the sixth, whose refusals it turns into a wait)
     rules7From: Number.isFinite(from7) && Number.isFinite(from6) ? Math.max(rulesFrom, from6, from7) : Infinity,
     holdWait: num(env.PAYOUT_HOLD_WAIT_H, 12, 0, 72) * 3600_000,
+    // (never before the sixth, whose holding it raises)
+    rules8From: Number.isFinite(from8) && Number.isFinite(from6) ? Math.max(rulesFrom, from6, from8) : Infinity,
+    holdMin8: BigInt(Math.round(num(env.PAYOUT_HOLD_MIN8, 350_000, 0, 1e12))) * 10n ** COIN_DECIMALS,
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
   };
@@ -307,7 +326,7 @@ export function price(balance: bigint, cfg: Pick<Config, 'share' | 'floor' | 'ce
 }
 
 const OVER_DAY = (cfg: Config, t: Tag) =>
-  Date.parse(t.at) >= cfg.rules4From
+  windowOf(Date.parse(t.at), cfg) === 12 * 3600 * 1000
     ? `this wallet had cashed in ${cfg.walletTags24} tags already in the 12 hours before: one payout of ${cfg.minTags} every 12 hours, and no more are paid to it until 12 hours after the first of those`
     : Date.parse(t.at) >= cfg.rules3From
     ? `this wallet had cashed in ${cfg.walletTags24} tags already in the 24 hours before: one payout of ${cfg.minTags} a day, and no more are paid to it until 24 hours after the first of those`
@@ -328,8 +347,10 @@ export function overDay(book: Book, t: Tag, cfg: Config): boolean {
 
 /** how long after one player has cashed another's tag the other's cashing of theirs is not paid */
 export const TRADE_MS = 24 * 3600 * 1000;
-/** the hours over which a tag cashed in at `cashed` is counted with its wallet's others (see `overDay`): 12 from the fourth cut-over, 24 before */
-export const windowOf = (cashed: number, cfg: Pick<Config, 'rules4From'>) => (cashed >= cfg.rules4From ? 12 : 24) * 3600 * 1000;
+/** the hours over which a tag cashed in at `cashed` is counted with its wallet's others (see `overDay`): 12 from the fourth cut-over, 24 before it and from the eighth */
+export const windowOf = (cashed: number, cfg: Pick<Config, 'rules4From' | 'rules8From'>) => (cashed >= cfg.rules4From && cashed < cfg.rules8From ? 12 : 24) * 3600 * 1000;
+/** what of the coin a wallet past its free tags must hold, for a tag cashed in at `cashed`: more from the eighth cut-over */
+export const holdOf = (cashed: number, cfg: Pick<Config, 'holdMin' | 'holdMin8' | 'rules8From'>) => (cashed >= cfg.rules8From ? cfg.holdMin8 : cfg.holdMin);
 
 // ------------------------------------------------------------------ what is kept
 
@@ -704,15 +725,16 @@ export function pastFree(book: Book, t: Tag, cfg: Pick<Config, 'freeTags'>): boo
   return freeKeys(t).some((k) => (paid[k] ?? 0) + book.rows.filter((r) => r.ref !== t.ref && (r.state === 'sending' || owed(r)) && freeKeys(r).includes(k)).length >= cfg.freeTags);
 }
 const coins = (raw: bigint) => Number(raw / 10n ** COIN_DECIMALS).toLocaleString('en-US');
-const HOLD_MIN = (cfg: Config, held: bigint) =>
-  `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(cfg.holdMin)} $ZONA, and this one held ${coins(held)} (the lower of when the tag was cashed in and now)`;
+// (`need` is the tag's own, by when it was cashed in: see `holdOf`)
+const HOLD_MIN = (cfg: Config, need: bigint, held: bigint) =>
+  `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(need)} $ZONA, and this one held ${coins(held)} (the lower of when the tag was cashed in and now)`;
 /** (the same words every time it is looked at, so that the book is not written again for it: see `says`) */
-const HOLD_WAIT = (cfg: Config) =>
-  `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(cfg.holdMin)} $ZONA: this tag is paid as soon as it does, if within ${Math.round(cfg.holdWait / 3600_000)} hours of being cashed in`;
+const HOLD_WAIT = (cfg: Config, need: bigint) =>
+  `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(need)} $ZONA: this tag is paid as soon as it does, if within ${Math.round(cfg.holdWait / 3600_000)} hours of being cashed in`;
 /** (the owner, 2026-10-19, of a wallet that bought the coin after cashing in and sold it again: "if they sold thier tokens they revoke their right to be paid but we should render that, sold tokens, no payment") */
-const SOLD = (cfg: Config) => `sold tokens, no payment: this wallet held ${coins(cfg.holdMin)} $ZONA after the tag was cashed in, and sold them`;
-const HOLD_LATE = (cfg: Config) =>
-  `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(cfg.holdMin)} $ZONA, and this one did not within ${Math.round(cfg.holdWait / 3600_000)} hours of the tag being cashed in`;
+const SOLD = (need: bigint) => `sold tokens, no payment: this wallet held ${coins(need)} $ZONA after the tag was cashed in, and sold them`;
+const HOLD_LATE = (cfg: Config, need: bigint) =>
+  `past its first ${cfg.freeTags} paid tags, a wallet is paid only while it holds ${coins(need)} $ZONA, and this one did not within ${Math.round(cfg.holdWait / 3600_000)} hours of the tag being cashed in`;
 /** a tag refused under the sixth for want of the coin, cashed in recently enough to wait for it under the seventh */
 const reopens = (cfg: Config, now: number, r: Row) =>
   now >= cfg.rules7From && r.state === 'skipped' && !!r.why?.startsWith('past its first ') && r.why.includes('the lower of when the tag was cashed in and now') && Date.parse(r.at) >= cfg.rules6From && now - Date.parse(r.at) < cfg.holdWait;
@@ -720,7 +742,7 @@ const reopens = (cfg: Config, now: number, r: Row) =>
 export function reopen(cfg: Config, now: number, book: Book): number {
   const day = dayOf(now);
   const them = book.rows.filter((r) => reopens(cfg, now, r));
-  for (const r of them) enter(book, r, { state: 'waiting', why: HOLD_WAIT(cfg), hold: 'coin' }, day);
+  for (const r of them) enter(book, r, { state: 'waiting', why: HOLD_WAIT(cfg, holdOf(Date.parse(r.at), cfg)), hold: 'coin' }, day);
   return them.length;
 }
 
@@ -777,7 +799,11 @@ export const dayOf = (ms: number) => iso(ms).slice(0, 10);
 
 /** a tag older than this is not paid by the machine any more */
 const MAX_AGE_MS = 3 * 24 * 3600 * 1000;
-const MAX_TRIES = 5;
+/** (was five. A tag held for want of tries when it was raised is tried again: see `due`. Raised 2026-10-22, when the
+ * paid node refused every payment for an hour and eight tags ran out of tries that never reached the chain) */
+const MAX_TRIES = 10;
+const OUT_OF_TRIES = / attempts did not go through: this one needs looking at$/;
+const triesLeft = (r: Row) => r.hold === 'hand' && !!r.tries?.length && r.tries.length < MAX_TRIES && OUT_OF_TRIES.test(r.why ?? '');
 /** blocks past a transaction's last chance before it is given up on, on top of only counting blocks that cannot be undone */
 const DEAD_MARGIN = 20;
 /** how long one request waits to see its payment arrive (a claim and a payment in one request must both fit in the minute a request is allowed) */
@@ -900,7 +926,8 @@ async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
  */
 async function due(w: World, r: Row, book: Book): Promise<boolean> {
   if (r.state === 'sending') return true;
-  if (r.state !== 'waiting' || r.hold === 'hand') return false;
+  if (r.state !== 'waiting') return false;
+  if (r.hold === 'hand') return triesLeft(r);
   const setUp = async () => w.cfg.mode === 'on' && (await setup(w).catch(() => 'not known')) === null;
   // (waiting for its wallet's count: the book alone says when, and until then nothing is asked of anybody)
   if (r.hold === 'five') {
@@ -1139,13 +1166,14 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
       const nowHeld = await (holding ??= coinsOf(w, to)), then = t.held !== undefined ? BigInt(t.held) : nowHeld, held = then < nowHeld ? then : nowHeld;
       // (under the seventh, what it holds now, and a wait for it: see `rules7From`. A tag that waits is not owed, so it
       // is asked this again each time it is looked at)
+      const need = holdOf(Date.parse(t.at), cfg);
       if (now >= cfg.rules7From) {
-        if (nowHeld < cfg.holdMin) {
+        if (nowHeld < need) {
           // (and one that held enough since, and holds less now, has sold it: not paid, and said so)
-          if ((await soldSince(w, to, Date.parse(t.at))) >= cfg.holdMin) return only({ state: 'skipped', why: SOLD(cfg) });
-          return only(now - Date.parse(t.at) < cfg.holdWait ? { state: 'waiting', why: HOLD_WAIT(cfg), hold: 'coin' } : { state: 'skipped', why: HOLD_LATE(cfg) });
+          if ((await soldSince(w, to, Date.parse(t.at))) >= need) return only({ state: 'skipped', why: SOLD(need) });
+          return only(now - Date.parse(t.at) < cfg.holdWait ? { state: 'waiting', why: HOLD_WAIT(cfg, need), hold: 'coin' } : { state: 'skipped', why: HOLD_LATE(cfg, need) });
         }
-      } else if (held < cfg.holdMin) return only({ state: 'skipped', why: HOLD_MIN(cfg, held) });
+      } else if (held < need) return only({ state: 'skipped', why: HOLD_MIN(cfg, need, held) });
     }
     const wrong = await setup(w);
     if (wrong) return only({ state: 'waiting', why: wrong, hold: 'setup' });
@@ -1602,6 +1630,8 @@ export interface Snapshot {
   rules6From: string | null;
   freeTags: number;
   holdMin: number;
+  /** the eighth, if there is one (from it, 24 hours again and more held: `holdMin` is what holds now) */
+  rules8From: string | null;
   /** the seventh, if there is one: how many hours a tag past its free ones waits for its wallet to hold `holdMin` */
   rules7From: string | null;
   holdWaitH: number;
@@ -1612,7 +1642,7 @@ export async function snapshot(w: World): Promise<Snapshot> {
   // (what is said is what a tag cashed in at this moment is paid by)
   const fives = w.now() >= base.rules2From;
   const cfg = fives ? termsOf(base, iso(w.now()), true) : base;
-  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000, rules5From: Number.isFinite(base.rules5From) ? iso(base.rules5From) : null, holderPerM: Number(base.holderPerM) / LAMPORTS, tagMax: Number(base.tagMax) / LAMPORTS, mint: b58(base.mint), tiers: rateOf(base, 0n).tiers.map((t) => ({ name: t.name, from: t.from, perTag: Number(t.perTag) })), rules6From: Number.isFinite(base.rules6From) ? iso(base.rules6From) : null, freeTags: base.freeTags, holdMin: Number(base.holdMin / 10n ** COIN_DECIMALS), rules7From: Number.isFinite(base.rules7From) ? iso(base.rules7From) : null, holdWaitH: Math.round(base.holdWait / 3600_000) };
+  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000, rules5From: Number.isFinite(base.rules5From) ? iso(base.rules5From) : null, holderPerM: Number(base.holderPerM) / LAMPORTS, tagMax: Number(base.tagMax) / LAMPORTS, mint: b58(base.mint), tiers: rateOf(base, 0n).tiers.map((t) => ({ name: t.name, from: t.from, perTag: Number(t.perTag) })), rules6From: Number.isFinite(base.rules6From) ? iso(base.rules6From) : null, freeTags: base.freeTags, holdMin: Number(holdOf(w.now(), base) / 10n ** COIN_DECIMALS), rules8From: Number.isFinite(base.rules8From) ? iso(base.rules8From) : null, rules7From: Number.isFinite(base.rules7From) ? iso(base.rules7From) : null, holdWaitH: Math.round(base.holdWait / 3600_000) };
   try {
     const s = await coin(w);
     // with no key given yet, the treasury is taken to be the wallet that made the coin

@@ -196,18 +196,18 @@ await test('a node that refuses, and a payment that gets in and fails', async ()
   assert.equal(got(w, 8), SOL(0.02));
 });
 
-await test('five attempts and no more', async () => {
+await test('ten attempts and no more', async () => {
   const w = world(1);
   w.chain.lose = true;
   const e = tag(w, 9);
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 19; i++) {
     await handle(w, e);
     w.skip(100_000);
   }
   const o = await handle(w, e);
   assert.equal(o.state, 'waiting');
   assert.match(o.state === 'waiting' ? o.why : '', /needs looking at/);
-  assert.equal(tries(w, e.id), 5);
+  assert.equal(tries(w, e.id), 10);
   assert.equal(got(w, 9), 0n);
   // and from then on it is left for a person: asking again asks nothing of anybody
   const before = { ...w.store.ops, sent: w.chain.handedIn.length };
@@ -1622,7 +1622,7 @@ await test('five and more of one wallet, whatever goes wrong, in whatever order:
     const paid = rows.filter((r) => r?.state === 'paid').length;
     assert.deepEqual([got(w, to), receipts(), book.paid, book.paidLamports], [BigInt(paid) * SOL(0.01), paid, paid, paid * 10_000_000]);
     // each is paid; or its five attempts were used up; or it is one of fewer than five that wait for the rest
-    rows.forEach((r, i) => assert.ok(r && (r.state === 'paid' || (r.state === 'waiting' && (r.hold === 'five' || (r.hold === 'hand' && tries(w, es[i].id) === 5)))), `left ${r?.state} ${r?.hold ?? ''}: ${r?.why ?? ''}`));
+    rows.forEach((r, i) => assert.ok(r && (r.state === 'paid' || (r.state === 'waiting' && (r.hold === 'five' || (r.hold === 'hand' && tries(w, es[i].id) === 10)))), `left ${r?.state} ${r?.hold ?? ''}: ${r?.why ?? ''}`));
     assert.ok(rows.filter((r) => r!.state === 'waiting' && r!.hold === 'five').length < 5, 'five were due and were not paid');
     everyAttempt(w, es, to);
   }
@@ -1634,7 +1634,7 @@ await test('what people are told: the page before and after the moment, one line
   const status = async () => (await (await show(new Request('https://site.test/payouts?format=status'), w)).json()) as { tagPays: number; share: number; floor: number; minTags: number; next: unknown };
   const says = (html: string, wants: string[]) => wants.forEach((want) => assert.ok(html.includes(want), `the page does not say "${want}"`));
   // ---- with no moment set: nothing is different and nothing is said, long after any moment there might have been
-  const unset = world(1, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: 'never', PAYOUT_RULES3_FROM: 'never' });
+  const unset = world(1, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: 'never', PAYOUT_RULES3_FROM: 'never', PAYOUT_RULES8_FROM: 'never' });
   unset.skip(400 * 24 * 3600 * 1000);
   assert.deepEqual((await cash(unset, 439, 2)).map((x) => x.o.state), ['paid', 'paid']);
   const plain = await (await show(new Request('https://site.test/payouts'), unset)).text();
@@ -2015,7 +2015,7 @@ await test('five and more of one wallet over weeks, with payouts not set up now 
     const paid = rows.filter((r) => r?.state === 'paid').length;
     assert.deepEqual([got(w, to), receipts(), book.paid, book.paidLamports], [BigInt(paid) * SOL(0.01), paid, paid, paid * 10_000_000]);
     // each is paid; or its five attempts were used up; or, with the rule on, it is one of fewer than five that wait for the rest
-    rows.forEach((r, i) => assert.ok(r && (r.state === 'paid' || (r.state === 'waiting' && ((r.hold === 'five' && !off) || (r.hold === 'hand' && tries(w, es[i].id) === 5)))), `left ${r?.state} ${r?.hold ?? ''}: ${r?.why ?? ''} (cashed in ${r?.at})`));
+    rows.forEach((r, i) => assert.ok(r && (r.state === 'paid' || (r.state === 'waiting' && ((r.hold === 'five' && !off) || (r.hold === 'hand' && tries(w, es[i].id) === 10)))), `left ${r?.state} ${r?.hold ?? ''}: ${r?.why ?? ''} (cashed in ${r?.at})`));
     assert.ok(rows.filter((r) => r.state === 'waiting' && r.hold === 'five').length < 5, 'five were due and were not paid');
     everyAttempt(w, es, to);
   }

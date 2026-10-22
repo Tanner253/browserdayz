@@ -52,7 +52,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // before knows none of them.)
 // (56, 2026-10-20: the game is no longer open to the console as window.__game, and reading that name says so ('bait',
 // src/net/bait.ts): every game open on 55's page, open to it, is told to load the page again.)
-export const PROTOCOL = 56;
+// (57, 2026-10-22: a tag cashes in after thirty minutes again, and is on a body after twenty alive: every game open on
+// 56's page, counting twenty and ten, is told to load the page again.)
+export const PROTOCOL = 57;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
