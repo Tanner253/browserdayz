@@ -190,7 +190,7 @@ export const RULES6_FROM = '2026-10-19T01:15:00Z';
 /** The moment of the seventh (see `rules7From`), written as RULES2_FROM is; PAYOUT_RULES7_FROM is asked first. '': none yet. */
 export const RULES7_FROM = '2026-10-19T04:00:00Z';
 /** The moment of the eighth (see `rules8From`), written as RULES2_FROM is; PAYOUT_RULES8_FROM is asked first. '': none yet. */
-export const RULES8_FROM = '2026-10-22T06:15:00Z';
+export const RULES8_FROM = '2026-10-22T05:35:00Z';
 /** a moment written in full, a day, a time and a zone (see `config`) */
 const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
