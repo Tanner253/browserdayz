@@ -55,7 +55,16 @@ export async function storeApi(request: Request, d: Partial<Deps> = {}): Promise
   const secret = env.ADMIN_PASSWORD ? sealOf(env.ADMIN_PASSWORD) : env.VERCEL ? '' : 'zona store at a desk';
 
   if (request.method === 'GET') {
-    if (url.searchParams.has('perks')) return json(perkList(await store.glance<Book>(BOOK), now), 200, 'public, max-age=0, s-maxage=30');
+    if (url.searchParams.has('perks')) {
+      // (fresh: asked by the game server a few seconds after a purchase or an admin's gift, so that it lands then and not
+      // a minute on, a glance's copy being up to a minute old. A read is one of the month's counted ones, a glance costs
+      // nothing: the five-minute round glances. The owner, 2026-10-22: "make instaant ... 5 sec buffer to middle ground it")
+      if (url.searchParams.has('fresh')) {
+        const read = await store.read<Book>(BOOK).catch(() => null);
+        return json(perkList(read ? read.data : await store.glance<Book>(BOOK), now));
+      }
+      return json(perkList(await store.glance<Book>(BOOK), now), 200, 'public, max-age=0, s-maxage=30');
+    }
     const acct = url.searchParams.get('acct');
     if (!isAcct(acct)) return json({ error: 'which account?' }, 400);
     const book = await store.glance<Book>(BOOK);
