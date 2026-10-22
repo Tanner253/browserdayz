@@ -12,7 +12,7 @@
 
 import { Rpc, address } from './_lib/solana.js';
 import { blobStore, type Store } from './_lib/store.js';
-import { BOOK, adminAct, adminView, applyAct, findPayment, isSig, judge, makeQuote, payUrl, perkList, perksFrom, referenceOf, rowId, seal, sealOf, sol, solUsd, unseal, writeBook, type Book, type Row } from './_lib/shop.js';
+import { BOOK, adminAct, adminView, applyAct, findPayment, isSig, judge, makeQuote, number, owns, payUrl, perkList, perksFrom, referenceOf, rowId, seal, sealOf, sol, solUsd, stockOf, unseal, writeBook, type Book, type Row } from './_lib/shop.js';
 import { COFFEE, NO_PERKS, QUOTE_MS, SHOP, isAcct, isItem } from './_lib/shop-items.js';
 
 export interface Deps {
@@ -60,7 +60,7 @@ export async function storeApi(request: Request, d: Partial<Deps> = {}): Promise
     if (!isAcct(acct)) return json({ error: 'which account?' }, 400);
     const book = await store.glance<Book>(BOOK);
     const mine = (book?.rows ?? []).filter((r) => r.acct === acct).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 20);
-    return json({ open, perks: perksFrom(mine, now).get(acct) ?? NO_PERKS, rows: mine.map((r) => ({ id: r.id, item: r.item, at: r.at, status: r.status, sig: r.sig, sol: sol(r.paid), usd: r.usd })) }, 200, 'public, max-age=0, s-maxage=10');
+    return json({ open, perks: perksFrom(mine, now).get(acct) ?? NO_PERKS, stock: stockOf(book), rows: mine.map((r) => ({ id: r.id, item: r.item, at: r.at, status: r.status, sig: r.sig, sol: sol(r.paid), usd: r.usd, ...(r.serial ? { serial: r.serial } : {}) })) }, 200, 'public, max-age=0, s-maxage=10');
   }
   if (request.method !== 'POST') return json({ error: 'GET or POST' }, 405);
 
@@ -73,6 +73,12 @@ export async function storeApi(request: Request, d: Partial<Deps> = {}): Promise
   if (body.op === 'quote') {
     if (!isItem(body.item) || !isAcct(body.acct)) return json({ ok: false, why: 'What, and for whom?' }, 400);
     const usd = body.item === 'coffee' ? Math.round(Math.min(COFFEE.max, Math.max(COFFEE.min, Number(body.usd) || 0)) * 100) / 100 : SHOP[body.item].usd;
+    // (a finish: not one they hold already, nor one of which all are held)
+    if (SHOP[body.item].skin) {
+      const book = await store.glance<Book>(BOOK);
+      if (owns(book, body.acct, body.item)) return json({ ok: false, why: 'It is yours already.' });
+      if (stockOf(book)[body.item] === 0) return json({ ok: false, why: `Sold out: all ${SHOP[body.item].limit} are taken.` });
+    }
     const rate = await (d.rate ?? solUsd)().catch(() => 0);
     if (!rate) return json({ ok: false, why: 'The price of SOL could not be had: try again in a minute.' }, 503);
     const q = makeQuote(secret, body.item, body.acct, usd, rate, now);
@@ -102,9 +108,15 @@ export async function storeApi(request: Request, d: Partial<Deps> = {}): Promise
       ...(q.item === 'vip' && text(body.discord, 40) ? { discord: text(body.discord, 40) } : {}),
       ...(q.item === 'coffee' && text(body.note, 120) ? { note: text(body.note, 120) } : {}),
     };
-    const made = await writeBook(store, (b) => (b.rows.some((r) => r.sig === row.sig) ? 'That payment has been used already.' : (b.rows.push(row), null)));
+    const made = await writeBook(store, (b) => {
+      if (b.rows.some((r) => r.sig === row.sig)) return 'That payment has been used already.';
+      b.rows.push(row);
+      // (a finish takes its number in the same write: two buying the last one at once cannot both have it)
+      number(b, row);
+      return null;
+    });
     if (!made.ok) return json({ ok: false, why: made.why });
-    return json({ ok: true, status: row.status, why: row.why, id: row.id, sig: row.sig, perks: perksFrom(made.book.rows.filter((r) => r.acct === q.acct), now).get(q.acct) ?? NO_PERKS });
+    return json({ ok: true, status: row.status, why: row.why, id: row.id, sig: row.sig, ...(row.serial ? { serial: row.serial } : {}), perks: perksFrom(made.book.rows.filter((r) => r.acct === q.acct), now).get(q.acct) ?? NO_PERKS });
   }
   return json({ ok: false, why: 'no such thing to do' }, 400);
 }

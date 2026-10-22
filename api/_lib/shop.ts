@@ -61,6 +61,8 @@ export interface Row {
   by?: string;
   /** the account it was moved from */
   moved?: string;
+  /** a finish's own number among those sold of it (1 to its limit): kept for each, to be minted as its own later */
+  serial?: number;
 }
 
 export interface Book {
@@ -201,6 +203,52 @@ export function judge(q: Quote, p: Paid): { status: 'ok' | 'look'; why?: string 
   return { status: 'ok' };
 }
 
+// ------------------------------------------------------------------ numbered finishes
+
+/** a purchase that holds its number: granted, or paid and waiting for an admin's look */
+const holds = (r: Row) => r.status === 'ok' || r.status === 'look';
+
+/** how many of each limited finish are left to sell */
+export function stockOf(book: Book | null): Partial<Record<ItemId, number>> {
+  const out: Partial<Record<ItemId, number>> = {};
+  for (const id of Object.keys(SHOP) as ItemId[]) {
+    const limit = SHOP[id].limit;
+    if (limit) out[id] = Math.max(0, limit - (book?.rows ?? []).filter((r) => r.item === id && holds(r) && r.serial).length);
+  }
+  return out;
+}
+
+/** the lowest number of a finish nobody holds (one refunded or revoked is free again), or null when all are held */
+export function freeSerial(book: Book, item: ItemId, except?: Row): number | null {
+  const taken = new Set(book.rows.filter((r) => r !== except && r.item === item && holds(r) && r.serial).map((r) => r.serial));
+  const limit = SHOP[item].limit ?? Infinity;
+  for (let n = 1; n <= limit; n++) if (!taken.has(n)) return n;
+  return null;
+}
+
+/** whether an account holds a finish already (bought once, it is theirs: a second would be money for nothing) */
+export const owns = (book: Book | null, acct: string, item: ItemId) => (book?.rows ?? []).some((r) => r.acct === acct && r.item === item && holds(r));
+
+/**
+ * A finish being booked takes its number; sold out, or owned already, it is kept for an admin to refund (a race for
+ * the last one, between two quotes, is lost by whoever paid second). Changes the row.
+ */
+export function number(book: Book, r: Row): void {
+  if (!SHOP[r.item].skin || !holds(r)) return;
+  if (book.rows.some((o) => o !== r && o.acct === r.acct && o.item === r.item && holds(o))) {
+    r.status = 'look';
+    r.why = 'owned already: refund it';
+    delete r.serial;
+    return;
+  }
+  const n = freeSerial(book, r.item, r);
+  if (n === null) {
+    r.status = 'look';
+    r.why = `sold out (all ${SHOP[r.item].limit}): refund it`;
+    delete r.serial;
+  } else r.serial = n;
+}
+
 // ------------------------------------------------------------------ the book
 
 export const rowId = (seed: string) => createHash('sha256').update(seed || randomBytes(16)).digest('hex').slice(0, 10);
@@ -287,17 +335,29 @@ export function adminAct(v: unknown): AdminAct | null {
 export function applyAct(book: Book, a: Exclude<AdminAct, { act: 'list' }>, by: string, now: number): string | null {
   if (a.act === 'grant') {
     const it = SHOP[a.item];
-    book.rows.push({
+    if (it.skin && owns(book, a.acct, a.item)) return 'They have that already.';
+    if (it.skin && freeSerial(book, a.item) === null) return `Sold out: all ${it.limit} are held.`;
+    const r: Row = {
       id: rowId(''), sig: '', item: a.item, acct: a.acct, name: a.name ?? '', usd: 0, rate: 0, quoted: 0, paid: 0, from: '', paidAt: now,
       at: new Date(now).toISOString(), how: 'hand', status: 'ok', ...(it.days ? { days: a.days ?? it.days } : {}), ...(a.note ? { note: a.note } : {}), by,
-    });
+    };
+    book.rows.push(r);
+    number(book, r);
     return null;
   }
   const r = book.rows.find((x) => x.id === a.id);
   if (!r) return 'No such purchase.';
   if (a.act === 'set') {
+    const was = r.status, mine = r.serial;
     r.status = a.status;
     delete r.why;
+    // (passed or restored: a finish takes a number again, its own if nobody has been given it meanwhile)
+    if (SHOP[r.item].skin && a.status === 'ok' && (was !== 'ok' || !r.serial)) {
+      const free = !!mine && !book.rows.some((o) => o !== r && o.item === r.item && holds(o) && o.serial === mine);
+      number(book, r);
+      if (r.status !== 'ok') return r.why ?? 'It cannot be passed.';
+      if (free) r.serial = mine;
+    }
   } else if (a.act === 'move') {
     if (a.acct === r.acct) return 'It is that account already.';
     r.moved = r.acct;

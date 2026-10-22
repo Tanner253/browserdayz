@@ -1058,7 +1058,11 @@ export class Avatar {
     bone('spine_03')?.attach(this.slung);
     // the dog tag at the breastbone, over whatever is worn there (src/game/worn-tag.ts): shown once it is said which
     const chest = this.gearRest.get('spine_03');
-    if (chest) (this.tag = new WornTag(atmo, this.layerMask)).fit(chest.bone, chest.inv, []);
+    if (chest) {
+      this.tag = new WornTag(this.layerMask);
+      this.tag.measure(model, this.pieces);
+      this.tag.fit(chest.bone, chest.inv, []);
+    }
 
     // hand frames measured at rest (a T-pose), like the first-person arms
     this.armR = this.makeArm(model, 'r', new THREE.Vector3(0.55, -1, 0.25));
@@ -1224,9 +1228,9 @@ export class Avatar {
       if (g.pack) this.packOut = 0.2;
     }
     for (const c of this.slung.children) c.position.z = 0.01 + this.packOut + (c.userData.over ?? 0);
-    // (the tag laid on what is worn over the chest now; the plate carrier of the suit is a part of the body, 4.5 cm out)
+    // (the tag laid on what is worn over the chest now: the vest hung on the body, or the suit's own plate carrier)
     const at = this.gearRest.get('spine_03');
-    if (this.tag && at) this.tag.fit(at.bone, at.inv, chest, ids.includes('life_vest') ? 0.045 : 0);
+    if (this.tag && at) this.tag.fit(at.bone, at.inv, chest, ids.flatMap((id) => WORN[id] ?? []));
     if (this.gearObjs.length) Avatar.onDressed(this.gearObjs);
   }
 

@@ -11,17 +11,19 @@ export interface ShopItem {
   usd: number;
   /** a perk that runs out: each payment adds this many days to what is left */
   days?: number;
-  /** a finish on one of the game's own models, by its item id (src/sim/items.ts) */
+  /** a finish on one of the game's own models, by its item id (src/sim/items.ts): numbered, each one sold its own */
   skin?: { gun: string; finish: 'gold' | 'nickel' };
+  /** how many will ever be sold (the owner, 2026-10-22: "we will make these items nft's in the future so each cosmetic sold should be reserved. we will only sell 100 gold deagles and 100 gold knives") */
+  limit?: number;
   say: string;
 }
 
 export const SHOP: Record<ItemId, ShopItem> = {
   vip: { name: 'VIP', usd: 5, days: 30, say: 'Queue pass, [VIP] in purple in chat and on the board, the VIP role and channel on Discord, no ads, and a gold dog tag.' },
-  deagle_gold: { name: 'Gold-plated Desert Eagle', usd: 4.99, skin: { gun: 'deagle', finish: 'gold' }, say: 'Every Desert Eagle you find is gold-plated, as everybody sees it.' },
+  deagle_gold: { name: 'Gold-plated Desert Eagle', usd: 4.99, limit: 100, skin: { gun: 'deagle', finish: 'gold' }, say: 'Every Desert Eagle you find is gold-plated, as everybody sees it.' },
   m9_nickel: { name: 'Nickel-plated M9', usd: 2.99, skin: { gun: 'm9', finish: 'nickel' }, say: 'Every M9 you find is nickel-plated.' },
   colt_nickel: { name: 'Nickel-plated Colt', usd: 2.99, skin: { gun: 'colt', finish: 'nickel' }, say: 'Every Colt you find is nickel-plated.' },
-  knife_gold: { name: 'Gold knife', usd: 2.99, skin: { gun: 'knife', finish: 'gold' }, say: 'Every knife you find has a gold blade.' },
+  knife_gold: { name: 'Gold knife', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'gold' }, say: 'Every knife you find has a gold blade.' },
   noads: { name: 'No ads', usd: 1.99, days: 30, say: 'The site and the game with no ads (VIP has this too).' },
   coffee: { name: 'Buy the dev a coffee', usd: 0, say: 'Any amount, with a note if you like. A cup by your name in chat for a week.' },
 };

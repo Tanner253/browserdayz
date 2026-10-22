@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { storeApi, type Deps } from '../api/store';
-import { BOOK, paymentOf, sol, unseal, type Book } from '../api/_lib/shop';
+import { BOOK, paymentOf, rowId, sol, unseal, type Book } from '../api/_lib/shop';
 import { Rpc, b58 } from '../api/_lib/solana';
 import { MemoryStore } from '../api/_lib/store';
 import { SHOP, type PerkList } from '../api/_lib/shop-items';
@@ -180,6 +180,37 @@ assert.equal(book().rows[0].role, true);
 assert.equal(book().rows[0].by, 'Owner');
 assert.equal((await order({ act: 'nuke' })).error, 'no such thing to do');
 globalThis.fetch = real;
+
+// numbered finishes (the owner: "each cosmetic sold should be reserved. we will only sell 100 gold deagles and 100 gold
+// knives"): the lowest number nobody holds, none past the hundredth, and never a second of one to the same account
+{
+  const mem2 = new MemoryStore(), d2: Partial<Deps> = { ...deps, store: mem2 };
+  const held = Array.from({ length: 100 }, (_, i) => i + 1).filter((n) => n !== 7).map((n) => ({
+    id: rowId(`held ${n}`), sig: `held${n}`, item: 'deagle_gold', acct: n.toString(16).padStart(24, 'e'), name: '', usd: 4.99, rate: 100, quoted: 1, paid: 1, from: '', paidAt: 1, at: '2026-10-01T00:00:00.000Z', how: 'sig', status: 'ok', serial: n,
+  }));
+  mem2.put(BOOK, JSON.stringify({ rows: held }));
+  assert.equal((await get('acct=' + A)).stock.knife_gold, 100);
+  const q = await post({ op: 'quote', item: 'deagle_gold', acct: A }, d2);
+  assert.equal(q.ok, true, q.why);
+  clock += 10_000;
+  const r2 = await post({ op: 'claim', token: q.token, sig: pay(q.lamports, clock) }, d2);
+  assert.equal(r2.serial, 7, 'the lowest number nobody holds');
+  assert.equal((await storeApi(new Request(`http://site.test/api/store?acct=${A}`), d2).then((x) => x.json())).stock.deagle_gold, 0);
+  assert.match((await post({ op: 'quote', item: 'deagle_gold', acct: C }, d2)).why, /Sold out: all 100/);
+  assert.match((await post({ op: 'quote', item: 'deagle_gold', acct: A }, d2)).why, /yours already/);
+  // a quote made before the last one went: its payment is kept for an admin to refund, with no number
+  const book2 = JSON.parse(mem2.files.get(BOOK)!.text) as Book;
+  book2.rows = book2.rows.filter((x) => x.serial !== 50);
+  mem2.put(BOOK, JSON.stringify(book2));
+  const late = await post({ op: 'quote', item: 'deagle_gold', acct: C }, d2);
+  book2.rows.push({ ...book2.rows[0], id: rowId('x'), sig: 'another', acct: D, serial: 50 });
+  mem2.put(BOOK, JSON.stringify(book2));
+  clock += 10_000;
+  const lost = await post({ op: 'claim', token: late.token, sig: pay(late.lamports, clock) }, d2);
+  assert.equal(lost.status, 'look');
+  assert.match(lost.why, /sold out/);
+  assert.equal(lost.serial, undefined);
+}
 
 // closed until the wallet is set
 assert.equal((await post({ op: 'quote', item: 'vip', acct: A }, { ...deps, env: { ADMIN_PASSWORD: 'x' } })).why, 'The store is not open yet.');

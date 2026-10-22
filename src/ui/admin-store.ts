@@ -9,7 +9,7 @@ import { ITEM_IDS, SHOP, type ItemId } from '../../api/_lib/shop-items';
 interface Row {
   id: string; sig: string; item: ItemId; acct: string; name: string; usd: number; rate: number; quoted: number; paid: number; from: string;
   paidAt: number; at: string; how: 'ref' | 'amount' | 'sig' | 'hand'; status: 'ok' | 'look' | 'revoked' | 'refunded'; why?: string; days?: number;
-  discord?: string; note?: string; role?: boolean; by?: string; moved?: string;
+  discord?: string; note?: string; role?: boolean; by?: string; moved?: string; serial?: number;
 }
 interface Sum { n: number; usd: number; sol: string }
 export interface StoreView { rows: Row[]; month: Sum; all: Sum; looks: number; vips: { acct: string; until: number; name: string; discord: string; role: boolean; id: string }[] }
@@ -140,7 +140,7 @@ export class StoreTab {
       const who = el('span', '', p.name || '—');
       who.title = `Account ${p.acct}${p.moved ? ` (moved from ${p.moved})` : ''}${p.discord ? `\nDiscord: ${p.discord}` : ''}${p.note ? `\nNote: ${p.note}` : ''}`;
       who.append(el('small', '', ` ${short(p.acct, 4)}`));
-      const what = el('span', '', `${SHOP[p.item]?.name ?? p.item}${p.days && p.item !== 'coffee' ? ` · ${p.days} d` : ''}`);
+      const what = el('span', '', `${SHOP[p.item]?.name ?? p.item}${p.serial ? ` No. ${p.serial}` : ''}${p.days && p.item !== 'coffee' ? ` · ${p.days} d` : ''}`);
       const paid = el('span', '', p.how === 'hand' ? '—' : `$${p.usd} · ${sol(p.paid)} SOL`);
       if (p.how !== 'hand') paid.title = `Asked ${sol(p.quoted)} SOL at $${p.rate.toFixed(2)} a SOL`;
       const from = el('span');

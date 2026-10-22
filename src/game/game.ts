@@ -638,7 +638,7 @@ export class Game {
     progress('loading weapons');
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);
     // (a finish bought at the store, on the gun in the hands and on the body: src/game/finish.ts)
-    finishLighting({ register: (m, patch, key) => atmo.register(m, patch, key), renderer: r.renderer, daylight: atmo.daylight });
+    finishLighting({ register: (m, patch, key) => atmo.register(m, patch, key), daylight: atmo.daylight });
     this.weapons.finishOf = (gun) => this.perks.finish(gun);
     this.perks.changed = () => {
       // (VIP from now: the tag round their neck is gold from now, as one made later will be)

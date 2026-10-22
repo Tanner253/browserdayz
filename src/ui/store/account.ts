@@ -3,7 +3,7 @@
 // bought is the character's, in this browser, as their gear is. What it has is asked of the site and kept an hour, so
 // that the menu never waits on it before deciding whether to show an ad.
 
-import { ACCT_SALT, NO_PERKS, type Perks } from '../../../api/_lib/shop-items';
+import { ACCT_SALT, NO_PERKS, type ItemId, type Perks } from '../../../api/_lib/shop-items';
 import { playerKey } from '../../net/client';
 
 const KEPT = 'zona.store.perks';
@@ -46,6 +46,27 @@ export async function setPerks(p: Perks) {
     /* no storage: asked again next time */
   }
   for (const f of heard) f(p);
+}
+
+/** what the store page shows: what this account has, how many of each numbered finish are left, and its purchases */
+export interface StoreView {
+  perks: Perks;
+  stock: Partial<Record<ItemId, number>>;
+  rows: { item: ItemId; status: string; serial?: number }[];
+}
+
+/** What this account has and what is left, asked of the site afresh (for the store page). */
+export async function myStore(): Promise<StoreView> {
+  const a = await myAcct();
+  try {
+    const r = await fetch(`/api/store?acct=${a}`, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) throw new Error(String(r.status));
+    const j = (await r.json()) as StoreView;
+    await setPerks(j.perks);
+    return { perks: j.perks, stock: j.stock ?? {}, rows: j.rows ?? [] };
+  } catch {
+    return { perks: await myPerks(), stock: {}, rows: [] };
+  }
 }
 
 /** What this account has: kept for an hour, else asked of the site (nothing, where the site does not answer). */

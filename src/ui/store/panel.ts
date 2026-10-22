@@ -8,7 +8,7 @@ import './store.css';
 import qrcode from 'qrcode-generator';
 import { COFFEE, SHOP, type ItemId, type Perks } from '../../../api/_lib/shop-items';
 import { playerName } from '../../net/client';
-import { BOUGHT, bought, myAcct, myPerks, setPerks } from './account';
+import { BOUGHT, bought, myAcct, myStore, setPerks, type StoreView } from './account';
 
 /** (the same invite as the menu's, src/ui/hud.ts: that file is the whole HUD, too much to load for a link) */
 const DISCORD = 'https://discord.com/invite/8ECdSH2vWE';
@@ -59,7 +59,7 @@ export async function openStore() {
   document.body.appendChild(el);
   const q = pending();
   if (q) pay(q);
-  else list(await myPerks());
+  else list(await myStore());
 }
 
 addEventListener('keydown', (e) => {
@@ -77,17 +77,23 @@ function frame(inner: string, me = '') {
   void myAcct().then((a) => el?.querySelector('.st-acct') && (el.querySelector('.st-acct')!.textContent = ` (account ${a})`));
 }
 
-function list(p: Perks) {
+function list(v: StoreView) {
   clearInterval(tick);
+  const p = v.perks;
   const now = Date.now(), vip = p.vip > now;
   const me = vip ? `<span class="st-vip">VIP · ${daysLeft(p.vip)} days left</span>` : '';
   const owned = (id: ItemId) => p.skins.includes(id);
+  // (each finish sold is numbered, to be minted as its own later; the gold ones are a hundred each and no more)
+  const serial = (id: ItemId) => v.rows.find((r) => r.item === id && r.status === 'ok')?.serial;
+  const left = (id: ItemId) => v.stock[id];
   const skin = (id: ItemId) => {
-    const it = SHOP[id];
+    const it = SHOP[id], n = serial(id), l = left(id);
+    const act = owned(id) ? `<span class="st-owned">Yours${n ? ` · No. ${n}` : ''}</span>` : l === 0 ? '<span class="st-sold">Sold out</span>' : `<button type="button" class="st-buy" data-buy="${id}">Buy</button>`;
     return `<article class="st-card skin ${it.skin!.finish}">
       <img src="/shop/${id}.jpg" alt="" loading="lazy" onerror="this.remove()"><i class="st-swatch"></i>
       <h3>${it.name}</h3><p>${it.say}</p>
-      <div class="st-row"><b class="st-price">${money(it.usd)}</b>${owned(id) ? '<span class="st-owned">Yours</span>' : `<button type="button" class="st-buy" data-buy="${id}">Buy</button>`}</div>
+      ${it.limit ? `<p class="st-limit">Limited: ${l === undefined ? it.limit : l} of ${it.limit} left${n ? '' : ', each numbered'}</p>` : ''}
+      <div class="st-row"><b class="st-price">${money(it.usd)}</b>${act}</div>
     </article>`;
   };
   frame(`
@@ -183,15 +189,15 @@ function pay(q: Quote) {
   el!.querySelectorAll<HTMLButtonElement>('.st-copy').forEach((b) => {
     b.onclick = () => void navigator.clipboard?.writeText(b.dataset.copy!).then(() => ((b.querySelector('i')!.textContent = 'Copied'), setTimeout(() => b.isConnected && (b.querySelector('i')!.textContent = 'Copy'), 1500)));
   });
-  (el!.querySelector('.st-back') as HTMLElement).onclick = async () => list(await myPerks());
-  (el!.querySelector('.st-drop') as HTMLElement).onclick = async () => (keep(null), list(await myPerks()));
+  (el!.querySelector('.st-back') as HTMLElement).onclick = async () => list(await myStore());
+  (el!.querySelector('.st-drop') as HTMLElement).onclick = async () => (keep(null), list(await myStore()));
   const check = async (b: HTMLButtonElement, sig?: string) => {
     b.disabled = true;
     say.className = 'st-say';
     say.textContent = 'Looking on the chain…';
     try {
       const r = await fetch('/api/store', { method: 'POST', body: JSON.stringify({ op: 'claim', token: q.token, sig, name: playerName(), discord: q.discord, note: q.note }) });
-      const j = (await r.json()) as { ok: boolean; why?: string; status?: 'ok' | 'look'; sig?: string; perks?: Perks };
+      const j = (await r.json()) as { ok: boolean; why?: string; status?: 'ok' | 'look'; sig?: string; serial?: number; perks?: Perks };
       if (!j.ok) {
         say.className = 'st-say bad';
         say.textContent = j.why ?? 'The store could not be reached: try again.';
@@ -205,7 +211,7 @@ function pay(q: Quote) {
       }
       await setPerks(j.perks!);
       bought();
-      done(q, j.status!, j.sig!, j.perks!);
+      done(q, j.status!, j.sig!, j.perks!, j.serial);
     } catch {
       say.className = 'st-say bad';
       say.textContent = 'The store could not be reached: try again.';
@@ -219,7 +225,7 @@ function pay(q: Quote) {
   sigb.onclick = () => void check(sigb, (el!.querySelector('input[name="sig"]') as HTMLInputElement).value.trim());
 }
 
-function done(q: Quote, status: 'ok' | 'look', sig: string, p: Perks) {
+function done(q: Quote, status: 'ok' | 'look', sig: string, p: Perks, serial?: number) {
   clearInterval(tick);
   const it = SHOP[q.item];
   const what = status === 'look'
@@ -227,11 +233,11 @@ function done(q: Quote, status: 'ok' | 'look', sig: string, p: Perks) {
     : q.item === 'vip' ? `You are VIP to ${day(p.vip)}.${q.discord ? ' Your Discord role is given by hand, usually within a day.' : ' Say your Discord name on Discord for the VIP role.'}`
       : q.item === 'noads' ? `No ads to ${day(p.noads)}.`
         : q.item === 'coffee' ? 'Thank you. A cup is by your name in chat for a week.'
-          : `${it.name}: yours. Every one you find wears it, in this game and the next.`;
+          : `${it.name}${serial ? `, No. ${serial}${it.limit ? ` of ${it.limit}` : ''}` : ''}: yours. Every one you find wears it, in this game and the next.`;
   frame(`<div class="st-done ${status}">
     <h3>${status === 'ok' ? 'Paid' : 'Received'}</h3><p>${what}</p>
     <a class="st-tx" href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener noreferrer">The payment on Solscan</a>
     <button type="button" class="st-back">Back to the store</button>
   </div>`);
-  (el!.querySelector('.st-back') as HTMLElement).onclick = () => list(p);
+  (el!.querySelector('.st-back') as HTMLElement).onclick = async () => list(await myStore());
 }

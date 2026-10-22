@@ -23,6 +23,8 @@
 .st-card.vip .st-buy { background: #b57bff; }
 .st-buy:disabled, .st-paid:disabled { opacity: 0.6; cursor: default; }
 .st-owned { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #9be37a; }
+.st-sold { font: 700 12px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #ff8a6e; }
+.st-limit { font: 700 11px 'JetBrains Mono', monospace !important; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a !important; }
 .st-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b9b4a8; letter-spacing: 0.04em; }
 #store input { font: 14px 'JetBrains Mono', monospace; color: #f1eee6; background: #0d0f0d; border: 1px solid rgba(255, 255, 255, 0.18); padding: 7px 9px; min-width: 0; }
 .st-small { font-size: 12.5px !important; color: #9d988c !important; }

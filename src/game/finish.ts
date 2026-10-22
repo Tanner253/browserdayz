@@ -1,23 +1,23 @@
 // A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. The
 // owner: "a gold plated desert eagle ... and any other cosmetic ideas you come up with while keeping it realistic", then
-// of the first tries, "the gold deagle should be flashier and more golden" and "it needs to look like buffed shiny
-// metal". Plated as a real one is: only what the model's own maps say is metal takes the plate, so a grip stays rubber
-// or walnut. No texture of its own: the model's are used as they are.
+// of the first tries, "the gold deagle should be flashier and more golden", "it needs to look like buffed shiny metal"
+// and "how can you not make a shiny gold texture i think youre over complicating this".
 //
-// Buffed metal is a mirror, and a mirror is what it reflects. The world's sky, which every other metal reflects, is
-// dark below its horizon: a gun made wholly metal against it mirrored that, and was black; less metal, it was a matt
-// tan. So the plate reflects a lit room of its own (three's RoomEnvironment: a lighting set, not a model), the way a
-// polished thing is seen at its best, and that reflection is turned down as the day goes, so it never glows at night.
+// So it is a shiny gold texture: a picture of a polished ball of the metal (a matcap, painted here), looked up by which
+// way each point of the gun faces the eye, laid over the gun's metal. It shines the same under any sky. (Made truly
+// metal instead, the guns mirrored the world's reflections, which in the hands' own scene are nothing: they drew black.)
+// Only what the model's own maps say is metal is plated, so a grip stays rubber or walnut; the model's own bumps and
+// edges still turn the shine. Dimmed with the day, so it does not glow at night.
 
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export type Finish = 'gold' | 'nickel';
 
-/** the plate's colour as metal reflects it (linear light: polished gold, and nickel) */
-const PLATE: Record<Finish, THREE.Color> = { gold: new THREE.Color(1, 0.7, 0.26), nickel: new THREE.Color(0.78, 0.78, 0.8) };
-/** how much of the room it reflects, at noon */
-const SHINE: Record<Finish, number> = { gold: 1.15, nickel: 1.0 };
+/** the polished ball, from its darkest rim to the highlight (sRGB) */
+const BALL: Record<Finish, string[]> = {
+  gold: ['#3d2606', '#8a5c12', '#d99a1e', '#f5c842', '#ffe58a', '#fffbe6'],
+  nickel: ['#2a2c30', '#5d6168', '#a3a8b0', '#d4d8de', '#eef1f5', '#ffffff'],
+};
 /**
  * What of a gun is metal to be plated: what its metalness map says is, or, for the M9, whose map calls the whole of it
  * painted, what its roughness map says is smoother than its grips (`smooth`: the grips' roughness).
@@ -27,49 +27,74 @@ const MASK: Record<string, { smooth: number } | undefined> = { m9: { smooth: 0.4
 const PARTS: Record<string, RegExp> = { deagle: /^(Slide|MainBody|Magazine)$/, m9: /^beretta$/, colt: /^Scene_-_Root$/, knife: /knife/i };
 
 type Register = (m: THREE.Material, patch: (s: THREE.WebGLProgramParametersWithUniforms) => void, key: string) => void;
-let world: { register: Register; renderer: THREE.WebGLRenderer; daylight: { value: number } } | null = null;
-let room: THREE.Texture | null = null;
+let world: { register: Register; daylight: { value: number } } | null = null;
 /** the world's lighting, which a material lit by its cascaded shadows is registered with (src/world/atmosphere.ts), and how light the day is */
-export function finishLighting(w: NonNullable<typeof world>) {
-  world = w;
-  // (anything polished before there was a renderer to make the room with: the tags on bodies made before the guns)
-  for (const [m] of shining) {
-    if (m.envMap) continue;
-    m.envMap = roomMap();
-    m.needsUpdate = true;
-  }
+export const finishLighting = (w: NonNullable<typeof world>) => void (world = w);
+
+const balls = new Map<Finish, THREE.Texture>();
+/** the polished ball, painted: a dark rim, the metal's colour, a broad light from above left and a hot spot in it */
+function ball(f: Finish): THREE.Texture {
+  let t = balls.get(f);
+  if (t) return t;
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const x = c.getContext('2d')!, k = BALL[f];
+  x.fillStyle = k[0];
+  x.fillRect(0, 0, S, S);
+  const body = x.createRadialGradient(S * 0.42, S * 0.36, S * 0.04, S / 2, S / 2, S / 2);
+  body.addColorStop(0, k[4]);
+  body.addColorStop(0.35, k[3]);
+  body.addColorStop(0.7, k[2]);
+  body.addColorStop(0.9, k[1]);
+  body.addColorStop(1, k[0]);
+  x.fillStyle = body;
+  x.beginPath();
+  x.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2);
+  x.fill();
+  // (a light from below right, as off the ground, and the hot spot of the one above)
+  const rim = x.createRadialGradient(S * 0.7, S * 0.78, 0, S * 0.7, S * 0.78, S * 0.22);
+  rim.addColorStop(0, k[3]);
+  rim.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = rim;
+  x.fill();
+  const hot = x.createRadialGradient(S * 0.36, S * 0.3, 0, S * 0.36, S * 0.3, S * 0.1);
+  hot.addColorStop(0, k[5]);
+  hot.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = hot;
+  x.fill();
+  t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  balls.set(f, t);
+  return t;
 }
 
-function roomMap() {
-  if (!room && world) {
-    const pmrem = new THREE.PMREMGenerator(world.renderer);
-    room = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
-  }
-  return room;
+/** from a fifth at night to all of it by day: the shine, as the uniform every plated material shares */
+const shine = { value: 1 };
+/** each frame: the shine kept to the hour */
+export function finishDay() {
+  shine.value = 0.2 + 0.8 * Math.min(1, Math.max(0, world?.daylight.value ?? 1));
 }
 
 function patchOf(f: Finish, mask?: { smooth: number }) {
-  const c = PLATE[f];
   const which = mask ? `1.0 - smoothstep(${(mask.smooth - 0.04).toFixed(3)}, ${(mask.smooth + 0.04).toFixed(3)}, roughnessFactor / max(roughness, 0.001))` : 'smoothstep(0.3, 0.6, metalnessFactor / max(metalness, 0.001))';
+  const tex = ball(f);
   return (s: THREE.WebGLProgramParametersWithUniforms) => {
-    s.fragmentShader = s.fragmentShader.replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
-      {
-        // (the maps' own word on what is metal, before the material's own numbers scale them)
-        float plate = ${which};
-        // (the paint's marks still in it, faintly: wear, edges, the stamping)
-        float paint = clamp(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) * 3.0, 0.0, 1.0);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${c.r.toFixed(3)}, ${c.g.toFixed(3)}, ${c.b.toFixed(3)}) * mix(0.82, 1.0, paint), plate);
-        metalnessFactor = mix(metalnessFactor, 1.0, plate);
-        // (buffed: near a mirror, a little of the map's own roughness left in it)
-        roughnessFactor = mix(roughnessFactor, 0.07 + 0.18 * roughnessFactor / max(roughness, 0.001), plate);
-      }`);
+    s.uniforms.uPlateBall = { value: tex };
+    s.uniforms.uPlateShine = shine;
+    s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uPlateBall;\nuniform float uPlateShine;\nfloat plate = 0.0;')
+      // (the maps' own word on what is metal, before the material's own numbers scale them)
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\nplate = ${which};`)
+      .replace('#include <opaque_fragment>', `{
+        // (the ball looked up by the way this point faces the eye, the model's own bumps in it)
+        vec3 seen = texture2D(uPlateBall, normalize(normal).xy * 0.495 + 0.5).rgb;
+        outgoingLight = mix(outgoingLight, seen * uPlateShine, plate * 0.92);
+      }
+      #include <opaque_fragment>`);
   };
 }
 
 const made = new Map<string, THREE.Material>();
-/** each plated material and how much of the room it reflects at noon: turned down as the day goes (finishDay) */
-const shining: [THREE.MeshStandardMaterial, number][] = [];
 
 /** a material plated: one copy for each material and finish, shared by every gun that wears it */
 function plated(m: THREE.Material, f: Finish, gun: string): THREE.Material {
@@ -80,9 +105,6 @@ function plated(m: THREE.Material, f: Finish, gun: string): THREE.Material {
   if (!s.isMeshStandardMaterial || !PARTS[gun]?.test(s.name)) return m;
   const c = s.clone();
   c.name = `${s.name}|${f}`;
-  c.envMap = roomMap();
-  c.envMapIntensity = SHINE[f] * dayShine();
-  shining.push([c, SHINE[f]]);
   const patch = patchOf(f, MASK[gun]), tag = `${f}|${gun}`;
   // (lit in the world under cascaded shadows: the lighting composes its own hook with the plate's; in the hands' own
   // scene, plain: see plainMaterial in weapons.ts)
@@ -96,24 +118,14 @@ function plated(m: THREE.Material, f: Finish, gun: string): THREE.Material {
   return p;
 }
 
-/** from a fifth of it at night to all of it by day */
-const dayShine = () => 0.2 + 0.8 * Math.min(1, Math.max(0, world?.daylight.value ?? 1));
-let lastDay = -1;
-/** each frame: the plate's reflection kept to the hour */
-export function finishDay() {
-  const d = dayShine();
-  if (Math.abs(d - lastDay) < 0.01) return;
-  lastDay = d;
-  for (const [m, at] of shining) m.envMapIntensity = at * d;
-}
-
-/**
- * A whole thing of polished metal, under the same room as the plate (the dog tag worn on the chest: src/game/worn-tag.ts).
- * Registered with the world's lighting by whoever uses it.
- */
-export function polished(f: Finish, roughness: number): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ color: PLATE[f], metalness: 1, roughness, envMap: roomMap(), envMapIntensity: SHINE[f] * dayShine(), name: `polished-${f}` });
-  shining.push([m, SHINE[f]]);
+/** A whole thing of polished metal, the same shine (the dog tag worn on the chest: src/game/worn-tag.ts). */
+export function polished(f: Finish): THREE.MeshMatcapMaterial {
+  const m = new THREE.MeshMatcapMaterial({ matcap: ball(f), name: `polished-${f}` });
+  m.onBeforeCompile = (s) => {
+    s.uniforms.uPlateShine = shine;
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uPlateShine;').replace('#include <opaque_fragment>', 'outgoingLight *= uPlateShine;\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => 'polished';
   return m;
 }
 
