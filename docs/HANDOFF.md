@@ -2,7 +2,15 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## THE STORE: built, NOT deployed (2026-10-22); branch `claude/zona-store-a6b7b0` (on top of `battle-royale`)
+## LIVE (2026-10-22 ~07:55 UTC): site, server and `main` from `d635e64` (PROTOCOL 58)
+- **The store** (below) is open: STORE_WALLET set, 100 gold Desert Eagles and 100 gold knives in stock. Merged from
+  `claude/zona-store-a6b7b0` as 36f2c2b; on merging the server did not start (perks.ts read tags.ts's SITE_URL while
+  it loaded): now `storeUrl()`. All 120 test files pass; the online and join checks pass.
+- **Names and payout wallets fixed at the first cashed tag** (the owner: "admin can allow user to change from admin
+  panel"): `server/pinned.ts`, kept with the world; the player panel's "Let them change" and `/unlock <name>`.
+- Desert Eagle shot 0.75 -> 0.33 (19f6ec5). Four more search pages, linked from every page and the menu (About ZONA).
+
+## THE STORE: LIVE since 2026-10-22 07:55 UTC (the notes below are from before the release)
 - Paid in SOL with no wallet connected: a quote sealed to the player's account (own last digits + a Solana Pay reference),
   "I've paid" finds it on chain (read only), a pasted signature as the fallback; each signature once. `api/store.ts`,
   `api/_lib/shop.ts`, catalogue `api/_lib/shop-items.ts`; book `store/book.json` beside the payouts' (one write a
