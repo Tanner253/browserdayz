@@ -2541,3 +2541,9 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .rw-inline .rw-card h2 { margin: 6px 0 14px; font-size: 22px; }
 /* an ad on ZONA's death screen (src/ui/adsense.ts), under the buttons */
 .hud-dead .dead-ad { width: min(728px, 92vw); max-height: 300px; overflow: hidden; margin-top: 14px; pointer-events: auto; }
+/* the store's part of Settings' Account page (src/ui/store/account-pane.ts) */
+.acct-store { margin-top: 22px; }
+.acct-store-has { margin: 6px 0 12px; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.acct-store-has .vip { color: #b57bff; }
+.acct-store-none, .acct-store-id { font-size: 13px; color: var(--ink-faint, #9a9588); margin: 6px 0 12px; }
+.acct-store-id code { font: 12px var(--mono); color: #e9e4d8; user-select: all; }

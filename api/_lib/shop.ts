@@ -306,7 +306,8 @@ export type AdminAct =
   | { act: 'grant'; acct: string; item: ItemId; days?: number; note?: string; name?: string }
   | { act: 'set'; id: string; status: 'ok' | 'revoked' | 'refunded' }
   | { act: 'move'; id: string; acct: string }
-  | { act: 'role'; id: string; on: boolean };
+  | { act: 'role'; id: string; on: boolean }
+  | { act: 'end'; acct: string; item: ItemId };
 
 const text = (v: unknown, max: number) => String(v ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, max);
 
@@ -327,6 +328,8 @@ export function adminAct(v: unknown): AdminAct | null {
       return id && isAcct(o.acct) ? { act: 'move', id, acct: o.acct } : null;
     case 'role':
       return id ? { act: 'role', id, on: !!o.on } : null;
+    case 'end':
+      return isAcct(o.acct) && isItem(o.item) ? { act: 'end', acct: o.acct, item: o.item } : null;
   }
   return null;
 }
@@ -343,6 +346,13 @@ export function applyAct(book: Book, a: Exclude<AdminAct, { act: 'list' }>, by: 
     };
     book.rows.push(r);
     number(book, r);
+    return null;
+  }
+  if (a.act === 'end') {
+    // (every purchase of it by that account that stands, taken back at once: VIP ended, a finish taken away)
+    const theirs = book.rows.filter((x) => x.acct === a.acct && x.item === a.item && x.status === 'ok');
+    if (!theirs.length) return 'They have none of that now.';
+    for (const x of theirs) Object.assign(x, { status: 'revoked', by });
     return null;
   }
   const r = book.rows.find((x) => x.id === a.id);
@@ -379,6 +389,19 @@ export function adminView(book: Book | null, now = Date.now()) {
     const theirs = rows.filter((r) => r.acct === acct && r.item === 'vip'), last = theirs.find((r) => r.discord) ?? theirs[0];
     return { acct, until: p.vip, name: theirs.find((r) => r.name)?.name ?? '', discord: last?.discord ?? '', role: !!last?.role, id: last?.id ?? '' };
   }).sort((a, b) => a.until - b.until);
-  return { rows: rows.slice(0, 300), month: sum(paid.filter((r) => r.at.startsWith(month))), all: sum(paid), looks: rows.filter((r) => r.status === 'look').length, vips };
+  // (every account that ever bought or was given anything: what it has now, what it paid, how to reach it)
+  const people = new Map<string, { acct: string; name: string; discord: string; usd: number; n: number; looks: number; last: string; vip: number; noads: number; cup: number; owned: { item: ItemId; serial?: number; id: string }[] }>();
+  for (const r of rows) {
+    let p = people.get(r.acct);
+    if (!p) people.set(r.acct, (p = { acct: r.acct, name: '', discord: '', usd: 0, n: 0, looks: 0, last: r.at, vip: 0, noads: 0, cup: 0, owned: [] }));
+    p.name ||= r.name;
+    p.discord ||= r.discord ?? '';
+    p.n++;
+    if (r.status === 'ok' && r.how !== 'hand') p.usd = Math.round((p.usd + r.usd) * 100) / 100;
+    if (r.status === 'look') p.looks++;
+    if (r.status === 'ok' && SHOP[r.item].skin) p.owned.push({ item: r.item, ...(r.serial ? { serial: r.serial } : {}), id: r.id });
+  }
+  for (const [acct, k] of perks) Object.assign(people.get(acct) ?? {}, { vip: k.vip, noads: k.noads, cup: k.cup });
+  return { rows: rows.slice(0, 300), month: sum(paid.filter((r) => r.at.startsWith(month))), all: sum(paid), looks: rows.filter((r) => r.status === 'look').length, vips, players: [...people.values()] };
 }
 

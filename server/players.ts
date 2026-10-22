@@ -23,6 +23,7 @@ import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
 import { partyIn, partyOut } from './party';
 import { perks } from './perks';
+import { SHOP, type ItemId } from '../api/_lib/shop-items';
 
 export interface Client {
   ws: WebSocket;
@@ -192,8 +193,12 @@ export function perksChanged() {
   for (const c of clients.values()) {
     const k = perkKey(c.key);
     if (k === c.perkKey) continue;
+    const was = JSON.parse(c.perkKey || '{}') as { sk?: string[]; vip?: true };
     c.perkKey = k;
     const p = perkInfo(c.key);
+    // (told to them as it lands: what is new is theirs from now, in this life)
+    for (const id of (p.sk ?? []).filter((s) => !was.sk?.includes(s))) send(c, { t: 'tell', kind: 'good', text: `${SHOP[id as ItemId]?.name ?? id} is yours: every one you pick up wears it.` });
+    if (p.vip && !was.vip) send(c, { t: 'tell', kind: 'good', text: 'You are VIP: the queue pass, [VIP] in chat, no ads, and a gold dog tag.' });
     broadcast({ t: 'perks', id: c.id, sk: p.sk ?? [], ...(p.vip ? { vip: true as const } : {}) });
   }
 }

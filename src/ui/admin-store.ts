@@ -1,8 +1,10 @@
 // The admin panel's STORE tab (2026-10-22): every purchase, what came in, the VIPs that run out soonest, and an admin's
 // hand on the book: grant, revoke, refund, pass a payment that needs a look, move a purchase to the account a player
 // has now, tick a Discord role as given. The owner: "well need to log these payments in some sort of database and in
-// the amdin ui so i can see and validate these things". The book is the site's (api/_lib/shop.ts); each order goes
-// through the game server (server/store-admin.ts), admins only.
+// the amdin ui so i can see and validate these things", and "admin should be able to see and manage all cosmetic states
+// for users easily with good UX": so it opens on the players, each with what they have now and a hand on each thing
+// (Players), beside every payment (Purchases) and the numbered finishes, number by number (Numbered). The book is the
+// site's (api/_lib/shop.ts); each order goes through the game server (server/store-admin.ts), admins only.
 
 import { ITEM_IDS, SHOP, type ItemId } from '../../api/_lib/shop-items';
 
@@ -12,7 +14,8 @@ interface Row {
   discord?: string; note?: string; role?: boolean; by?: string; moved?: string; serial?: number;
 }
 interface Sum { n: number; usd: number; sol: string }
-export interface StoreView { rows: Row[]; month: Sum; all: Sum; looks: number; vips: { acct: string; until: number; name: string; discord: string; role: boolean; id: string }[] }
+interface Player { acct: string; name: string; discord: string; usd: number; n: number; looks: number; last: string; vip: number; noads: number; cup: number; owned: { item: ItemId; serial?: number; id: string }[] }
+export interface StoreView { rows: Row[]; month: Sum; all: Sum; looks: number; vips: { acct: string; until: number; name: string; discord: string; role: boolean; id: string }[]; players: Player[] }
 
 export interface StoreHands {
   el: <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => HTMLElementTagNameMap[K];
@@ -27,6 +30,10 @@ const HOW: Record<Row['how'], string> = { ref: 'scanned', amount: 'by amount', s
 const sol = (lamports: number) => (lamports / 1e9).toFixed(4);
 const short = (s: string, n = 6) => (s.length > n * 2 ? `${s.slice(0, n)}…${s.slice(-4)}` : s);
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const SKINS = ITEM_IDS.filter((id) => SHOP[id].skin);
+/** a finish's short name, for a chip */
+const brief = (id: ItemId) => SHOP[id].name.replace('-plated', '').replace('Desert Eagle', 'Deagle');
 
 export class StoreTab {
   view: StoreView | null = null;
@@ -37,6 +44,11 @@ export class StoreTab {
   n = 0;
   private moving = '';
   private grant = { acct: '', item: 'vip' as ItemId, days: '30' };
+  private page: 'players' | 'purchases' | 'numbered' = 'players';
+  /** what the lists are narrowed to: a name, an account, a Discord name or a signature */
+  private find = '';
+  /** the player whose things are open to be managed */
+  private managing = '';
 
   constructor(private h: StoreHands) {}
 
@@ -71,10 +83,101 @@ export class StoreTab {
     top.append(button(this.busy ? 'Asking…' : 'Refresh', () => this.send({ act: 'list' }), 'small', 'refill'));
     const out: HTMLElement[] = [top];
     if (this.why) out.push(el('div', 'adm-store-why', this.why));
-    out.push(this.grantForm());
-    if (v?.vips.length) out.push(this.vips(v));
-    out.push(this.rows(v?.rows ?? []));
+    // (the three ways of looking, and the search over all of them)
+    const bar = el('div', 'adm-store-bar');
+    for (const [id, label] of [['players', 'Players'], ['purchases', 'Purchases'], ['numbered', 'Numbered']] as const) {
+      bar.append(button(label, () => ((this.page = id), this.n++, this.h.redraw()), `small${this.page === id ? ' on' : ''}`));
+    }
+    const find = el('input');
+    find.placeholder = 'Find a name, account, Discord or signature';
+    find.value = this.find;
+    find.dataset.k = 'store-find';
+    find.oninput = () => ((this.find = find.value.trim().toLowerCase()), this.n++, this.h.redraw());
+    bar.append(find);
+    out.push(bar);
+    if (this.page === 'players') out.push(this.players(v));
+    if (this.page === 'numbered') out.push(this.numbered(v));
+    if (this.page === 'purchases') {
+      out.push(this.grantForm());
+      if (v?.vips.length) out.push(this.vips(v));
+      out.push(this.rows((v?.rows ?? []).filter((r) => this.hit(r.name, r.acct, r.discord ?? '', r.sig, r.from))));
+    }
     return out;
+  }
+
+  private hit(...about: string[]) {
+    return !this.find || about.some((a) => a.toLowerCase().includes(this.find));
+  }
+
+  /** every player who has bought or been given anything: what they have now, and a hand on each thing */
+  private players(v: StoreView | null) {
+    const { el, button, grave } = this.h;
+    const now = Date.now();
+    const t = el('div', 'adm-table store-players');
+    const head = el('div', 'adm-tr head');
+    for (const x of ['Player', 'VIP', 'No ads', 'Finishes', 'Paid', '']) head.append(el('span', '', x));
+    t.append(head);
+    const list = (v?.players ?? []).filter((p) => this.hit(p.name, p.acct, p.discord));
+    for (const p of list) {
+      const r = el('div', `adm-tr${this.managing === p.acct ? ' open' : ''}`);
+      const who = el('span', 'adm-store-who', p.name || '—');
+      who.append(el('small', '', ` ${short(p.acct, 4)}${p.discord ? ` · ${p.discord}` : ''}`));
+      who.title = `Account ${p.acct}`;
+      const vip = el('span', p.vip > now ? 'adm-store-vip' : 'adm-store-dim', p.vip > now ? `to ${day(p.vip)} (${Math.ceil((p.vip - now) / 86_400_000)} d)` : '—');
+      const noads = el('span', p.noads > now ? '' : 'adm-store-dim', p.noads > now ? `to ${day(p.noads)}` : '—');
+      const fin = el('span', 'adm-store-chips');
+      for (const o of p.owned) fin.append(el('em', `chip ${SHOP[o.item].skin?.finish ?? ''}`, `${brief(o.item)}${o.serial ? ` No. ${o.serial}` : ''}`));
+      if (!p.owned.length) fin.append(el('i', 'adm-store-dim', '—'));
+      const paid = el('span', '', `$${p.usd}${p.looks ? ` · ${p.looks} to look at` : ''}`);
+      const act = el('span', 'adm-acts');
+      act.append(button(this.managing === p.acct ? 'Close' : 'Manage', () => ((this.managing = this.managing === p.acct ? '' : p.acct), this.n++, this.h.redraw()), 'small'));
+      r.append(who, vip, noads, fin, paid, act);
+      t.append(r);
+      if (this.managing !== p.acct) continue;
+      // (their things, one click each: what they have can be taken back, what they have not given; time added or ended)
+      const m = el('div', 'adm-store-manage');
+      const line = (label: string, kids: HTMLElement[]) => {
+        const row = el('div', 'adm-store-mline');
+        row.append(el('b', '', label), ...kids);
+        m.append(row);
+      };
+      line('Finishes', SKINS.map((id) => {
+        const o = p.owned.find((x) => x.item === id);
+        return o
+          ? grave(`take:${o.id}`, `${brief(id)}${o.serial ? ` No. ${o.serial}` : ''}: take back`, () => this.send({ act: 'set', id: o.id, status: 'revoked' }))
+          : button(`+ ${brief(id)}`, () => this.send({ act: 'grant', acct: p.acct, item: id, name: p.name }), 'small good');
+      }));
+      for (const [id, until] of [['vip', p.vip], ['noads', p.noads]] as const) {
+        const kids = [button('+ 30 days', () => this.send({ act: 'grant', acct: p.acct, item: id, days: 30, name: p.name }), 'small good'), button('+ 7 days', () => this.send({ act: 'grant', acct: p.acct, item: id, days: 7, name: p.name }), 'small')];
+        if (until > now) kids.push(grave(`end:${id}:${p.acct}`, `End ${SHOP[id].name}`, () => this.send({ act: 'end', acct: p.acct, item: id })));
+        line(SHOP[id].name, kids);
+      }
+      line('Their purchases', [button('Show them', () => ((this.page = 'purchases'), (this.find = p.acct), this.n++, this.h.redraw()), 'small')]);
+      t.append(m);
+    }
+    if (!list.length) t.append(el('div', 'adm-none', this.view ? (this.find ? 'Nobody matches.' : 'Nobody has bought anything yet.') : ''));
+    return t;
+  }
+
+  /** each numbered finish, number by number: who holds which, and how many are left */
+  private numbered(v: StoreView | null) {
+    const { el } = this.h;
+    const box = el('div', 'adm-store-numbered');
+    for (const id of SKINS.filter((x) => SHOP[x].limit)) {
+      const limit = SHOP[id].limit!, held = new Map<number, Player>();
+      for (const p of v?.players ?? []) for (const o of p.owned) if (o.item === id && o.serial) held.set(o.serial, p);
+      box.append(el('h4', '', `${SHOP[id].name}: ${held.size} of ${limit} held, ${limit - held.size} left`));
+      const grid = el('div', 'adm-store-grid');
+      for (let n = 1; n <= limit; n++) {
+        const p = held.get(n), c = el('button', p ? `held ${SHOP[id].skin!.finish}` : '', String(n));
+        c.type = 'button';
+        c.title = p ? `No. ${n}: ${p.name || 'no name'} (${p.acct})` : `No. ${n}: free`;
+        if (p) c.onclick = () => ((this.page = 'players'), (this.find = p.acct), (this.managing = p.acct), this.n++, this.h.redraw());
+        grid.append(c);
+      }
+      box.append(grid);
+    }
+    return box;
   }
 
   /** a purchase given by hand: to a player online by their number (#12), or to an account */
@@ -140,7 +243,7 @@ export class StoreTab {
       const who = el('span', '', p.name || '—');
       who.title = `Account ${p.acct}${p.moved ? ` (moved from ${p.moved})` : ''}${p.discord ? `\nDiscord: ${p.discord}` : ''}${p.note ? `\nNote: ${p.note}` : ''}`;
       who.append(el('small', '', ` ${short(p.acct, 4)}`));
-      const what = el('span', '', `${SHOP[p.item]?.name ?? p.item}${p.serial ? ` No. ${p.serial}` : ''}${p.days && p.item !== 'coffee' ? ` · ${p.days} d` : ''}`);
+      const what = el('span', '', `${p.serial ? `No. ${p.serial} · ` : ''}${SHOP[p.item]?.name ?? p.item}${p.days && p.item !== 'coffee' ? ` · ${p.days} d` : ''}`);
       const paid = el('span', '', p.how === 'hand' ? '—' : `$${p.usd} · ${sol(p.paid)} SOL`);
       if (p.how !== 'hand') paid.title = `Asked ${sol(p.quoted)} SOL at $${p.rate.toFixed(2)} a SOL`;
       const from = el('span');

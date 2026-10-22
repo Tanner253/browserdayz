@@ -219,6 +219,27 @@ button.adm-p:hover { background: rgba(233, 228, 216, 0.07); }
 .adm-store-st.revoked, .adm-store-st.refunded { color: #ff8a6e; }
 .store-rows .adm-tr.st-revoked, .store-rows .adm-tr.st-refunded { opacity: 0.55; }
 .adm-store-soon { color: #ffd35a; }
+.adm-store-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.adm-store-bar .adm-b.on { border-color: #ffd35a; color: #ffd35a; }
+.adm-store-bar input { flex: 1; font: 13px var(--mono); color: inherit; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--rim); padding: 5px 8px; }
+.adm-table.store-players .adm-tr { grid-template-columns: minmax(150px, 1.3fr) 130px 90px minmax(180px, 2fr) 120px 90px; }
+.adm-table.store-players .adm-tr.open { background: rgba(255, 211, 90, 0.06); }
+.adm-store-who small { color: var(--ink-faint); font-family: var(--mono); font-size: 11px; }
+.adm-store-vip { color: #c99bff; }
+.adm-store-dim { color: var(--ink-faint); }
+.adm-store-chips { display: flex; flex-wrap: wrap; gap: 4px; white-space: normal !important; }
+.adm-store-chips .chip { font: 600 11px var(--mono); font-style: normal; padding: 2px 6px; border: 1px solid var(--rim); }
+.adm-store-chips .chip.gold { border-color: #d9a520; color: #ffd35a; }
+.adm-store-chips .chip.nickel { border-color: #a3a8b0; color: #e3e6ea; }
+.adm-store-manage { padding: 8px 12px 10px 24px; border-bottom: 1px solid var(--rim); background: rgba(255, 211, 90, 0.04); display: flex; flex-direction: column; gap: 6px; }
+.adm-store-mline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.adm-store-mline > b { width: 120px; font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.adm-store-numbered h4 { margin: 10px 0 6px; font-size: 14px; }
+.adm-store-grid { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+.adm-store-grid button { font: 600 10px var(--mono); padding: 4px 0; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--rim); color: var(--ink-faint); cursor: default; }
+.adm-store-grid button.held { cursor: pointer; color: #101211; }
+.adm-store-grid button.held.gold { background: #e8b938; border-color: #ffd35a; }
+.adm-store-grid button.held.nickel { background: #c9ccd0; border-color: #eef1f5; }
 .adm-table.roles .adm-dt { display: flex; gap: 6px; align-items: center; }
 .adm-table.roles .adm-dt svg { width: 14px; height: 14px; opacity: 0.7; }
 .adm-table.roles .adm-dt .ro.off { opacity: 0.55; }

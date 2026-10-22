@@ -234,8 +234,14 @@ function done(q: Quote, status: 'ok' | 'look', sig: string, p: Perks, serial?: n
       : q.item === 'noads' ? `No ads to ${day(p.noads)}.`
         : q.item === 'coffee' ? 'Thank you. A cup is by your name in chat for a week.'
           : `${it.name}${serial ? `, No. ${serial}${it.limit ? ` of ${it.limit}` : ''}` : ''}: yours. Every one you find wears it, in this game and the next.`;
+  // (the moment it is theirs, shown as such: the thing itself, gold or nickel or VIP's purple, and its number if it has one)
+  const look = it.skin ? it.skin.finish : q.item === 'vip' ? 'vip' : 'plain';
+  const shown = status !== 'ok' ? '' : it.skin
+    ? `<figure class="st-reveal ${look}"><img src="/shop/${q.item}.jpg" alt=""><i class="st-sheen"></i>${serial ? `<figcaption>No. ${serial}${it.limit ? `<small> of ${it.limit}</small>` : ''}</figcaption>` : ''}</figure>`
+    : q.item === 'vip' ? '<figure class="st-reveal vip"><b>VIP</b><i class="st-sheen"></i></figure>' : '';
   frame(`<div class="st-done ${status}">
-    <h3>${status === 'ok' ? 'Paid' : 'Received'}</h3><p>${what}</p>
+    ${shown}
+    <h3>${status !== 'ok' ? 'Received' : it.skin ? 'Yours' : q.item === 'coffee' ? 'Thank you' : 'Paid'}</h3><p>${what}</p>
     <a class="st-tx" href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener noreferrer">The payment on Solscan</a>
     <button type="button" class="st-back">Back to the store</button>
   </div>`);

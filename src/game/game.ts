@@ -999,10 +999,12 @@ export class Game {
     // The payout wallet is given in Settings, on its Account page, and nowhere else on the menu (the owner, 2026-10-22:
     // "we will not nav the user to the payouts screen anymore", "wallet will be entered in settings in the account tab
     // of the setting menu"). It was a line under the way in and a Rewards tab, opening a window of its own.
-    if (REWARDS_UI) {
-      const account = new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true);
-      this.hud.onAccount(() => account.open());
-    }
+    // (and what this browser has bought at the store, under it: src/ui/store/account-pane.ts)
+    const account = REWARDS_UI ? new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true) : null;
+    this.hud.onAccount(() => {
+      account?.open();
+      void import('../ui/store/account-pane').then((m) => m.drawStoreAccount(this.hud.accountPane()));
+    });
     // the menu's map: the game's own, and what is said of each place on it
     {
       const town = world.pois[0];

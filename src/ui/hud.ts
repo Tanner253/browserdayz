@@ -23,7 +23,7 @@ import { howtoMore } from './howto-more';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
-import { adBox } from './adsense';
+import { adBox, adBreak } from './adsense';
 import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
@@ -1692,6 +1692,7 @@ export class HUD {
   /** whether the death screen may carry an ad (ZONA's only: set by the game) */
   adsHere: () => boolean = () => false;
   private adTried = false;
+  private deadAd = false;
 
   /** every channel lands in the one log, tagged and coloured by channel */
   /** @param role whoever said it is an admin or a mod: it is written before their name */
@@ -2094,10 +2095,16 @@ export class HUD {
     }
     this.toggle(e.dead, 'show', s.dead);
     if (s.dead) this.set('dead', e.dead.querySelector('.dead-sub') as HTMLElement, s.deadText);
-    // (an ad on the death screen, in ZONA only, and none for VIP: src/ui/adsense.ts. One, kept for every death after)
-    if (s.dead && !this.adTried && this.adsHere()) {
-      this.adTried = true;
-      void adBox(e.dead.querySelector('.dead-ad') as HTMLElement);
+    // (at each death in ZONA a break, and where none was shown the death screen's own unit, filled once and kept for
+    // every death after; none for VIP: src/ui/adsense.ts)
+    if (s.dead && !this.deadAd && this.adsHere()) {
+      this.deadAd = true;
+      void adBreak('next', 'death').then((st) => {
+        if (st === 'viewed' || st === 'dismissed' || this.adTried) return;
+        this.adTried = true;
+        void adBox(e.dead.querySelector('.dead-ad') as HTMLElement);
+      });
     }
+    if (!s.dead) this.deadAd = false;
   }
 }

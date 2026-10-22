@@ -178,6 +178,14 @@ assert.ok((await get('perks=1')).who[D][1] > clock + 6 * DAY);
 await order({ act: 'role', id: book().rows[0].id, on: true });
 assert.equal(book().rows[0].role, true);
 assert.equal(book().rows[0].by, 'Owner');
+// the Players view: each account with what it has now; VIP ended for one at a stroke
+v = (await order({ act: 'list' })).view;
+const ghost = v.players.find((p: { acct: string }) => p.acct === A);
+assert.ok(ghost.vip > clock + 50 * DAY && ghost.usd === 10, 'two months of VIP, ten dollars');
+assert.deepEqual(v.players.find((p: { acct: string }) => p.acct === B).owned.map((o: { item: string }) => o.item), ['colt_nickel']);
+await order({ act: 'end', acct: A, item: 'vip' });
+assert.equal((await get('perks=1')).who[A], undefined, 'VIP ended');
+assert.match((await order({ act: 'end', acct: A, item: 'vip' })).why, /none of that/);
 assert.equal((await order({ act: 'nuke' })).error, 'no such thing to do');
 globalThis.fetch = real;
 
@@ -215,7 +223,7 @@ globalThis.fetch = real;
 // closed until the wallet is set
 assert.equal((await post({ op: 'quote', item: 'vip', acct: A }, { ...deps, env: { ADMIN_PASSWORD: 'x' } })).why, 'The store is not open yet.');
 assert.ok(SHOP.vip.usd === 5 && SHOP.deagle_gold.usd === 4.99, 'the owner’s prices');
-console.log(`made-up chain: ok (${mem.ops.swap} writes for ${book().rows.length} purchases and 5 admin changes)`);
+console.log(`made-up chain: ok (${mem.ops.swap} writes for ${book().rows.length} purchases and 6 admin changes)`);
 
 // ------------------------------------------------------------------ one real payment, read on mainnet
 // A payout of 0.01 SOL that went out on 2026-10-18 (api/_lib/paid-before.ts), taken as if its wallet were the store's

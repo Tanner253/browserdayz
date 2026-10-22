@@ -32,6 +32,7 @@ import { underGas } from '../../sim/gas';
 import { inBunker } from '../../sim/bunker';
 import { LOOT_REV, type Game } from '../game';
 import { playedAd } from '../../ui/ads';
+import { adBreak } from '../../ui/adsense';
 
 /** when the neck tag's clock was last looked at (see tagWhenDue) */
 let neckSeen = 0;
@@ -100,6 +101,11 @@ export const enterMethods = {
       this.net.on('rhit', (m) => this.botCheck?.hit(m.i));
       this.net.on('rpass', () => this.botCheck?.passed());
     }
+    // (once a visit, an ad before the check that it is a person and the way in: the owner, "we can serve 1 popup ad
+    // before the bot check starts as well so any stale session starts with an ad for us". Waited for: a range timed
+    // under an ad would be failed. Nothing for VIP, nor off the live site: src/ui/adsense.ts)
+    await adBreak('start', 'way-in');
+    if (gone()) return;
     let slip = '';
     const ask = await personKey();
     if (ask) {
