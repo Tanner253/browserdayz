@@ -57,7 +57,7 @@ export function openDoor(): Promise<Mode> {
           <span class="door-go">Enter Battle Royale</span>
         </button>
       </div>
-      <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
+      <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/games-like-dayz/" target="_blank" rel="noopener">About ZONA</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
     </div>`;
   document.body.appendChild(el);
   // (how long ago this build of the site was made, on a computer: the owner, 2026-10-15, "for pc add last updated n(time) ago")
