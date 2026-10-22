@@ -1139,7 +1139,11 @@ const onBolt = (part: number) => THREE.MathUtils.smoothstep(part, 0.14, 0.28) * 
  * by how loud each is against the AK's, the pistol's and the shotgun's (2026-10-17: the owner chose and downloaded them).
  */
 const VOICE: Record<string, Voice> = {
-  deagle: { rate: 1, gain: 0.75, rec: 'shot_deagle' },
+  // (its recording is near its loudest for most of a second where every other shot dies away within a fifth: at 0.75 it
+  // was the loudest gun there is, the .50 sniper's too (the owner, 2026-10-22: "desert eagle sound is too loud"). At
+  // 0.33 its crack is under the Colt's and its boom over it, the two together a hair over the Colt's (still the loudest
+  // pistol), and both under the Mosin's)
+  deagle: { rate: 1, gain: 0.33, rec: 'shot_deagle' },
   benelli: { rate: 0.9, gain: 1.5, rec: 'shot_shotgun' },
   // (each its own recording: a 7.62x39 and a 5.56, single shots)
   ak: { rate: 1, gain: 1.15, rec: 'shot_ak' },

@@ -13,7 +13,6 @@
 .door-what em { font-style: normal; margin-right: 8px; padding: 2px 7px; color: #101211; background: #f1eee6; letter-spacing: 0.12em; }
 .door-card.zona .door-what em { background: #ffd35a; }
 .door-card.arena .door-what em { background: #ff4a36; color: #fff; }
-.door-paid { font: 600 12px 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: #101211; background: #ffd35a; padding: 4px 12px; }
 .door-cards { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
 .door-card { position: relative; min-height: min(62vh, 520px); border: 1px solid rgba(255, 255, 255, 0.16); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 6px; padding: 26px 26px 24px; text-align: left; color: #f1eee6; font-family: inherit; background: #111; transition: transform 0.25s, border-color 0.25s; }
 .door-card .door-bg { position: absolute; inset: 0; background-repeat: no-repeat; transition: transform 0.6s; z-index: 0; }
@@ -80,6 +79,5 @@
 .store-btn { font: 700 12px 'JetBrains Mono', monospace !important; letter-spacing: 0.14em; text-transform: uppercase; color: #101211 !important; background: #ffd35a; border: 0; padding: 7px 14px; cursor: pointer; }
 .store-btn.vip { background: #b57bff; }
 #door .door-store { position: absolute; top: 20px; right: 22px; }
-/* an ad under the games (src/ui/adsense.ts): marked as one, and never taller than a banner */
-.door-ad { width: min(728px, 100%); min-height: 90px; max-height: 120px; overflow: hidden; position: relative; }
-.door-ad::before, .dead-ad::before { content: 'Advertisement'; display: block; font: 600 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #77736a; margin-bottom: 3px; text-align: center; }
+/* the death screen's ad (src/ui/adsense.ts), marked as one */
+.dead-ad::before { content: 'Advertisement'; display: block; font: 600 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #77736a; margin-bottom: 3px; text-align: center; }

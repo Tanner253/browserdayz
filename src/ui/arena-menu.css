@@ -55,10 +55,6 @@ body.arena-mode #hud .hud-start { display: none !important; }
 .am-kit { background: rgba(0, 0, 0, 0.55); border-left: 3px solid var(--red); padding: 12px 14px; }
 .am-kit b { display: block; font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase; }
 .am-kit span { font-size: 16px; color: #cfc9bc; }
-.am-pay-big { font-size: 46px; font-weight: 700; letter-spacing: 0.06em; margin: 0; }
-.am-umb { margin-top: 16px; max-width: 640px; padding: 10px 14px; background: #1d1b14; border-left: 3px solid #ffd35a; font-size: 17px; }
-.am-umb b { color: #ffd35a; letter-spacing: 0.06em; }
-.am-umb em { font-style: normal; color: #ffd35a; font-weight: 700; }
 
 /* the Zone's settings, lent: shown as they are on the Zone's sheet */
 .am-set-host { max-width: 760px; height: calc(100vh / var(--ui-zoom, 1) - 150px); display: flex; flex-direction: column; }
@@ -86,7 +82,5 @@ body.arena-mode #hud .hud-start { display: none !important; }
   .am-nav { gap: 12px; }
 }
 /* the stake: there, and not to be set yet */
-.am-stake { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border: 1px dashed #555; color: #77736a; cursor: not-allowed; font-size: 15px; }
-.am-stake em { font-style: normal; font: 600 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #101211; background: #ffd35a; padding: 2px 6px; }
 .am-wait-what { font-style: normal; font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase; color: #ff9a8d; }
 .am-wait-what:empty { display: none; }

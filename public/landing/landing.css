@@ -31,3 +31,5 @@ details p { color: var(--dim); margin: 8px 0 2px; }
 footer { border-top: 1px solid var(--line); padding: 22px 20px; text-align: center; color: var(--dim); font-size: 14px; }
 footer a { margin: 0 8px; }
 @media (max-width: 600px) { h1 { font-size: 34px; } .top nav a { margin-left: 10px; } }
+footer .more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin: 0 auto 12px; max-width: 900px; }
+footer .more a { margin: 0; }

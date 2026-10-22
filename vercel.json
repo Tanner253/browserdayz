@@ -81,6 +81,26 @@
     {
       "source": "/browser-battle-royale",
       "destination": "/browser-battle-royale/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
+    },
+    {
+      "source": "/dayz-alternative",
+      "destination": "/dayz-alternative/index.html"
+    },
+    {
+      "source": "/multiplayer-fps-no-download",
+      "destination": "/multiplayer-fps-no-download/index.html"
+    },
+    {
+      "source": "/games-like-pubg",
+      "destination": "/games-like-pubg/index.html"
+    },
+    {
+      "source": "/zombie-survival-game",
+      "destination": "/zombie-survival-game/index.html"
     }
   ],
   "functions": {

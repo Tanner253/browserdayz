@@ -1,11 +1,9 @@
 // The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. The owner: "now that we
 // have two menu paths instead of serving them both from the main menu perhaps we ask the visitor which game mode
 // they are here for", and "we should keep both paths seperate on this account and pretend they are 2 completely
-// different games and ecoststems ... the entire ecosysrtem is umbrellad together". So: ZONA PvP over both, what the
-// platform has paid, and the two games side by side; the one picked last is lit. /zona and /arena go straight in.
+// different games and ecoststems ... the entire ecosysrtem is umbrellad together". So: ZONA PvP over both, and the
+// games side by side; the one picked last is lit. /zona and /arena go straight in.
 import './door.css';
-import { paidLine, platformPaid } from './platform';
-import { adBox } from './adsense';
 import { TAG_HOLD_MIN } from '../sim/items';
 import { arenaBase, serverSays, serverStatus } from '../net/client';
 import type { LobbyInfo } from '../../arena/rules';
@@ -31,21 +29,19 @@ export function openDoor(): Promise<Mode> {
         <img src="/brand/zona-mark-live.svg" alt="" width="44" height="44"><b>ZONA <em>PvP</em></b><img class="door-season" src="/brand/season.svg" alt="">
       </header>
       <div class="door-pvp">Player <i>vs</i> Player</div>
-      <div class="door-paid" hidden></div>
-      <div class="door-stats"><span data-s="tags" hidden></span><span data-s="today" hidden></span><span data-s="matches" hidden></span><span data-s="squad"></span></div>
+      <div class="door-stats"><span data-s="today" hidden></span><span data-s="matches" hidden></span><span data-s="squad"></span></div>
       <div class="door-cards three">
         <button type="button" class="door-card zona${last === 'zona' ? ' last' : ''}" data-mode="zona">
           <i class="door-bg"></i>
           ${last === 'zona' ? '<span class="door-last">Last played</span>' : ''}
           <span class="door-what"><em>PvP</em> Open-world survival</span><span class="door-on" data-on="zona" hidden></span>
           <b>ZONA</b>
-          <span class="door-say">Loot, survive, and kill other players. Take a dog tag from a player you kill, hold it ${TAG_HOLD_MIN} minutes, and get paid in SOL.</span>
+          <span class="door-say">Loot, survive, and kill other players. Take a dog tag from a player you kill and hold it ${TAG_HOLD_MIN} minutes.</span>
           <span class="door-go">Enter Zona</span>
         </button>
         <button type="button" class="door-card arena${last === 'arena' ? ' last' : ''}" data-mode="arena">
           <i class="door-bg"></i>
           ${last === 'arena' ? '<span class="door-last">Last played</span>' : ''}
-          <span class="door-stamp">Wagers<small>Coming soon</small></span>
           <span class="door-what"><em>PvP</em> Team matches</span><span class="door-on" data-on="arena" hidden></span>
           <b>ARENA</b>
           <span class="door-say">Players against players, team against team at the fort, in rounds. Set loadouts, first to 3, 5 or 10. Watch any match being played.</span>
@@ -61,17 +57,14 @@ export function openDoor(): Promise<Mode> {
           <span class="door-go">Enter Battle Royale</span>
         </button>
       </div>
-      <div class="door-ad" hidden></div>
       <button type="button" class="store-btn door-store">Store</button>
-      <footer class="door-foot"><a href="/store" class="door-storelink">Store</a><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a><span class="door-upd" hidden></span></footer>
+      <footer class="door-foot"><a href="/store" class="door-storelink">Store</a><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/games-like-dayz/" target="_blank" rel="noopener">About ZONA</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
     </div>`;
   document.body.appendChild(el);
   // (the store, over the door: from its button, its link, or an address of its own, /store)
   const store = (e?: Event) => (e?.preventDefault(), void import('./store/panel').then((m) => m.openStore()));
   for (const b of el.querySelectorAll('.door-store, .door-storelink')) b.addEventListener('click', store);
   if (location.pathname.replace(/\/+$/, '') === '/store') store();
-  // (an ad under the games, none for VIP: src/ui/adsense.ts)
-  void adBox(el.querySelector('.door-ad') as HTMLElement);
   // (how long ago this build of the site was made, on a computer: the owner, 2026-10-15, "for pc add last updated n(time) ago")
   const upd = el.querySelector('.door-upd') as HTMLElement;
   const ago = () => {
@@ -89,13 +82,6 @@ export function openDoor(): Promise<Mode> {
     t.textContent = text;
     t.hidden = false;
   };
-  void platformPaid().then((p) => {
-    if (!p) return;
-    const n = el.querySelector('.door-paid') as HTMLElement;
-    n.textContent = paidLine(p);
-    n.hidden = false;
-    if (p.paid > 0) stat('tags', `${p.paid} dog tags paid`);
-  });
   // (how many are in each game now, as its own server says it; under a handful it says only that the game is up;
   // nothing said where it does not answer)
   const on = (mode: Mode, n: number | null) => {

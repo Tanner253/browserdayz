@@ -9,14 +9,13 @@ import './arena-menu.css';
 import { ARENA, arenaLoadoutSays, type LobbyInfo } from '../../arena/rules';
 import { KITS } from '../sim/kits';
 import { arenaBase } from '../net/client';
-import { paidLine, platformPaid } from './platform';
 import type { HUD } from './hud';
 import { doorGo } from './door';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const kitOf = (id: string) => KITS.find((k) => k.id === id);
 
-type Panel = 'play' | 'how' | 'loadouts' | 'settings' | 'payouts';
+type Panel = 'play' | 'how' | 'loadouts' | 'settings';
 
 export class ArenaMenu {
   private el: HTMLDivElement;
@@ -42,7 +41,6 @@ export class ArenaMenu {
           <button type="button" data-p="how">How to play</button>
           <button type="button" data-p="loadouts">Loadouts</button>
           <button type="button" data-p="settings">Settings</button>
-          <button type="button" data-p="payouts">Payouts</button>
         </nav>
         <a class="am-zona" href="/zona">ZONA</a>
       </header>
@@ -61,8 +59,6 @@ export class ArenaMenu {
             <div class="am-seg" data-k="kills">${ARENA.kills.map((n) => `<button type="button" data-v="${n}">${n}</button>`).join('')}</div>
             <small class="am-cap">Loadout, everybody's, every round</small>
             <div class="am-lo">${ARENA.loadouts.map((id) => `<button type="button" data-lo="${id}">${esc(kitOf(id)?.name ?? id)}</button>`).join('')}</div>
-            <small class="am-cap">Stake</small>
-            <div class="am-stake" aria-disabled="true" title="Matches are played for nothing for now"><span>SOL a player</span><em>Coming soon</em></div>
             <button type="button" class="am-go">Host</button>
             <button type="button" class="am-practice">Practice alone</button>
             <p class="am-note">No money moves yet: matches are played for nothing.</p>
@@ -84,12 +80,6 @@ export class ArenaMenu {
           <p class="am-note">The host picks one for the whole match. Guns only: they empty and are reloaded (R, or the trigger on an empty gun) from rounds that never run out. Nothing to loot, carry or fill.</p>
         </section>
         <section class="am-p am-settings"><button type="button" class="am-back">Back</button><div class="am-set-host"></div></section>
-        <section class="am-p am-payouts">
-          <h5>Arena payouts</h5>
-          <p class="am-pay-big">None yet.</p>
-          <p class="am-note">Matches are played for nothing for now. When real stakes come, the Arena keeps its own book of what it pays, apart from the Zone's dog tags.</p>
-          <div class="am-umb" hidden></div>
-        </section>
       </main>
       <div class="am-wait"><b>Waiting</b><em class="am-wait-what"></em><span class="am-wait-text"></span><button type="button" class="am-leave">Leave</button></div>
       <div class="am-pause"><b>Paused</b><span>The match goes on without you.</span><button type="button" class="am-resume">Resume</button><button type="button" class="am-pause-set">Settings</button><button type="button" class="am-leave">Leave the match</button></div>`;
@@ -107,12 +97,6 @@ export class ArenaMenu {
     // (and what it is doing already, if it was shown before this was made)
     const start = document.querySelector('#hud .hud-start');
     if (start?.classList.contains('show')) this.state(true, start.classList.contains('paused'), '');
-    void platformPaid().then((p) => {
-      if (!p) return;
-      const n = this.q<HTMLElement>('.am-umb');
-      n.innerHTML = `<b>ZONA PvP</b> has paid <em>${p.paidSol.toFixed(3)} SOL</em> to players${paidLine(p).replace(/^.*players/, '')}: the Zone ${p.zona.toFixed(3)}, the Arena ${p.arena.toFixed(3)}.`;
-      n.hidden = false;
-    });
   }
 
   /** taken down, another game played on the page (src/game/modes.ts) */

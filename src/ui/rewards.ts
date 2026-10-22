@@ -116,15 +116,17 @@ export class RewardsModal {
   /**
    * @param playerName what is stamped on the player's own tag in the first picture
    * @param closed told when the window is shut (an address may have been given in it)
+   * @param inline drawn into a page, Settings' Account, and not as a window over the game: the wallet and what it holds,
+   * without the pictures (the owner, 2026-10-22: "wallet will be entered in settings in the account tab")
    */
-  constructor(parent: HTMLElement, private playerName: () => string = () => '', private closed: () => void = () => {}) {
+  constructor(parent: HTMLElement, private playerName: () => string = () => '', private closed: () => void = () => {}, private inline = false) {
     this.root = document.createElement('div');
-    this.root.className = 'rw';
+    this.root.className = inline ? 'rw rw-inline show' : 'rw';
     this.root.innerHTML = `
-      <div class="rw-card" role="dialog" aria-modal="true" aria-labelledby="rw-title">
-        <div class="rw-kicker">Creator rewards</div>
-        <h2 id="rw-title">Enter your SOL wallet address to receive rewards</h2>
-        <ol class="rw-steps">
+      <div class="rw-card"${inline ? '' : ' role="dialog" aria-modal="true" aria-labelledby="rw-title"'}>
+        <div class="rw-kicker">${inline ? 'Account' : 'Creator rewards'}</div>
+        <h2 id="rw-title">${inline ? 'Payout wallet' : 'Enter your SOL wallet address to receive rewards'}</h2>
+        ${inline ? '' : `<ol class="rw-steps">
           <li>
             <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
               <path class="t-chain" d="M58 46C20 30 34 -6 80 6s64 28 22 42"/>
@@ -150,10 +152,10 @@ export class RewardsModal {
             </svg>
             <b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it. At zero it is cashed in. Die, and the clock restarts for whoever loots you.</span>
           </li>
-        </ol>
+        </ol>`}
         <div class="rw-pay">
           <svg viewBox="0 0 40 32" aria-hidden="true"><path d="M8 2h30l-6 7H2z" fill="currentColor"/><path d="M2 12.5h30l6 7H8z" fill="currentColor" opacity="0.8"/><path d="M8 23h30l-6 7H2z" fill="currentColor" opacity="0.6"/></svg>
-          <p>Cashed-in tags are what creator rewards will be paid on, in SOL, to the wallet you enter here.<small>Payouts roll out shortly after launch</small></p>
+          <p>Cashed-in tags are paid in SOL to the wallet you enter here.</p>
         </div>
         <p class="rw-umb" hidden></p>
         <div class="rw-row">
@@ -164,7 +166,7 @@ export class RewardsModal {
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
           <span class="rw-fine">Use the public Solana address of your wallet. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
-          <button class="rw-skip">Not now</button>
+          ${inline ? '' : '<button class="rw-skip">Not now</button>'}
         </div>
       </div>`;
     parent.appendChild(this.root);
@@ -174,14 +176,15 @@ export class RewardsModal {
     for (const ev of ['click', 'mousedown', 'keydown', 'keyup'] as const) this.root.addEventListener(ev, (e) => e.stopPropagation());
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.save();
-      else if (e.key === 'Escape') this.close();
+      else if (e.key === 'Escape' && !inline) this.close();
     });
     this.input.addEventListener('input', () => {
       this.err.textContent = '';
+      (this.root.querySelector('.rw-save') as HTMLButtonElement).textContent = 'Save address';
       this.showHolding(this.input.value.trim());
     });
     (this.root.querySelector('.rw-save') as HTMLButtonElement).onclick = () => this.save();
-    (this.root.querySelector('.rw-skip') as HTMLButtonElement).onclick = () => this.close();
+    this.root.querySelector<HTMLButtonElement>('.rw-skip')?.addEventListener('click', () => this.close());
   }
 
   get isOpen() {
@@ -203,18 +206,21 @@ export class RewardsModal {
     const saved = walletAddress();
     this.input.value = saved;
     this.err.textContent = '';
-    (this.root.querySelector('.rw-skip') as HTMLElement).textContent = saved ? 'Close' : 'Not now';
+    const skip = this.root.querySelector('.rw-skip');
+    if (skip) skip.textContent = saved ? 'Close' : 'Not now';
+    (this.root.querySelector('.rw-save') as HTMLButtonElement).textContent = 'Save address';
     // the player's own name on the first tag (short enough to fit the plate)
     const name = (this.playerName() || 'Survivor').replace(/[<>&"']/g, '').toUpperCase().slice(0, 8);
-    (this.root.querySelector('.rw-mine') as SVGGElement).innerHTML = tag(name);
+    const mine = this.root.querySelector('.rw-mine');
+    if (mine) mine.innerHTML = tag(name);
     this.root.classList.add('show');
-    this.input.focus();
+    if (!this.inline) this.input.focus();
     this.holdFor = '';
     this.showHolding(saved);
-    this.runClock();
+    if (!this.inline) this.runClock();
     void this.showPay();
     // (what the whole platform has paid, as every money screen of both games says it: src/ui/platform.ts)
-    void platformPaid().then((p) => {
+    if (!this.inline) void platformPaid().then((p) => {
       if (!p) return;
       const n = this.root.querySelector('.rw-umb') as HTMLElement;
       n.textContent = `ZONA PvP has paid ${paidLine(p).replace(' paid to players', ' to players')}, the Zone and the Arena together.`;
@@ -232,7 +238,7 @@ export class RewardsModal {
       if (!s.on || typeof s.tagPays !== 'number' || typeof s.share !== 'number' || typeof s.floor !== 'number') return;
       const round = (n: number) => String(Math.round(n * 10_000) / 10_000);
       const p = this.root.querySelector('.rw-pay p') as HTMLElement;
-      const listed = '<small>Every payment is listed at <a href="/payouts" target="_blank" rel="noopener">zonapvp.fun/payouts</a></small>';
+      const listed = '<small>Every payment is on the Solana chain, with a receipt for each tag</small>';
       // (the figures are the site's own: api/_lib/payouts.ts. A flat pay, and a wallet paid when so many of its tags are due.)
       const n = typeof s.minTags === 'number' ? Math.round(s.minTags) : 1;
       if (s.share === 0) {
@@ -310,8 +316,15 @@ export class RewardsModal {
     // (one that holds too little to be paid past its free tags stays in sight, saved, with that said under it)
     if (this.holdFor === v && this.holdShort) {
       this.err.textContent = '';
-      (this.root.querySelector('.rw-skip') as HTMLElement).textContent = 'Close';
+      const skip = this.root.querySelector('.rw-skip');
+      if (skip) skip.textContent = 'Close';
       (this.root.querySelector('.rw-hold') as HTMLElement).insertAdjacentHTML('afterbegin', '<em>Saved.</em> ');
+      return;
+    }
+    // (on the Account page it stays where it is, and says so)
+    if (this.inline) {
+      this.err.textContent = '';
+      (this.root.querySelector('.rw-save') as HTMLButtonElement).textContent = 'Saved';
       return;
     }
     this.close();
