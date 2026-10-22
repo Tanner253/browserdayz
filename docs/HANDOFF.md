@@ -2,7 +2,16 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## LIVE (2026-10-22 ~07:55 UTC): site, server and `main` from `d635e64` (PROTOCOL 58)
+## LIVE (2026-10-22 ~08:57 UTC): site, server and `main` from `de02380` (PROTOCOL 60)
+- **Apply a finish** (the owner: "the apply should stick with the weapon on the server ... like rust"): the item's own
+  `finish`, written only by the server; gold in hands, inventory and on the ground (test/plates.test.ts). Gold in the
+  hands not yet seen in a picture. A fully server-run inventory was planned in its own session, which stopped on the
+  weekly limit (resets Oct 23 5am PT).
+- **Worn dog tags only while live** (server/worn.ts, PlayerInfo `tag`, 'tagged'), on the inventory figure too.
+- **Admin STORE tab reworked** (chips, Gift sheet of picture cards, the numbered grid opens its holder).
+- Main menu: no played-today count (now in the admin panel), no squad hour.
+
+## Earlier (2026-10-22 ~07:55 UTC): site, server and `main` from `d635e64` (PROTOCOL 58)
 - **The store** (below) is open: STORE_WALLET set, 100 gold Desert Eagles and 100 gold knives in stock. Merged from
   `claude/zona-store-a6b7b0` as 36f2c2b; on merging the server did not start (perks.ts read tags.ts's SITE_URL while
   it loaded): now `storeUrl()`. All 120 test files pass; the online and join checks pass.
