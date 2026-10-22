@@ -80,7 +80,7 @@ import { Horde, Infected } from './infected';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
-import { REWARDS_UI, RewardsModal, onTagPay, walletAddress } from '../ui/rewards';
+import { REWARDS_UI, RewardsModal } from '../ui/rewards';
 import { Gas } from './gas';
 import { GAS, bunkerUnder } from '../sim/gas';
 import { DAY } from '../sim/daynight';
@@ -977,15 +977,12 @@ export class Game {
         return `Rendering ${cv.width} × ${cv.height} · ${((cv.width * cv.height) / 1e6).toFixed(1)} million pixels a frame`;
       },
     );
-    // Dog tags and creator rewards: a line under the way in says a wallet is wanted (or is
-    // given), and opens the window that explains it; so does Rewards in the menu. (The window
-    // used to come up by itself a few seconds after the page did, over the menu somebody had
-    // just started to read.)
+    // The payout wallet is given in Settings, on its Account page, and nowhere else on the menu (the owner, 2026-10-22:
+    // "we will not nav the user to the payouts screen anymore", "wallet will be entered in settings in the account tab
+    // of the setting menu"). It was a line under the way in and a Rewards tab, opening a window of its own.
     if (REWARDS_UI) {
-      const modal = new RewardsModal(document.getElementById('ui')!, () => this.hud.nameValue(), () => this.hud.setWallet(walletAddress()));
-      this.hud.onRewards(() => modal.open());
-      this.hud.setWallet(walletAddress());
-      onTagPay((sol) => this.hud.setPay(sol));
+      const account = new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true);
+      this.hud.onAccount(() => account.open());
     }
     // the menu's map: the game's own, and what is said of each place on it
     {

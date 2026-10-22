@@ -41,7 +41,7 @@ const STANCES: [Stance, string, string][] = [
  * controls: the mouse's sensitivity is at the head of them, where it was at the head of the settings before they had
  * pages, and is the first thing anybody opening them sees. (Game has one thing on it yet, and is last.)
  */
-const SET_TABS = [['controls', 'Controls'], ['audio', 'Audio'], ['video', 'Video'], ['game', 'Game']] as const;
+const SET_TABS = [['controls', 'Controls'], ['audio', 'Audio'], ['video', 'Video'], ['game', 'Game'], ['account', 'Account']] as const;
 type SetTab = (typeof SET_TABS)[number][0];
 /** the four groups of sound under the one volume (src/core/audio.ts, GROUPS): what each is called, and what it turns */
 const MIX_ROWS: Record<Group, [name: string, turns: string]> = {
@@ -290,18 +290,17 @@ export class HUD {
             <button type="button" data-tab="play" class="on">Play</button>
             <button type="button" data-tab="howto" class="sm-howto">How to play</button>
             <button type="button" data-tab="gfx">Settings</button>
-            <button type="button" data-tab="rewards" hidden>Rewards</button>
           </nav>
           <div class="sm-status">
             <a class="sm-out sm-arena" href="/">All games</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
-            <a class="sm-out sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><span>Payouts</span><em></em></a>
+            <button class="sl-ca" type="button" title="Copy"><code>${CONTRACT.slice(0, 4)}…${CONTRACT.slice(-4)}</code></button>
             <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>
           </div>
         </header>
         <div class="sm-main">
           <section class="sm-hero start-id">
-            <div class="start-kicker"><span>PvP survival shooter</span><em>Play to earn</em></div>
+            <div class="start-kicker"><span>PvP survival shooter</span><em>Free to play</em></div>
             <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
             <p class="start-sub">Players hunt you. So do the infected.</p>
             <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive${ZONA_VOID ? ' in the Zona' : ''}, and a tag carried ${ZONA_VOID ? 'out of the Zona' : 'down a basement'} is void.</p>
@@ -323,7 +322,6 @@ export class HUD {
             <ol class="sm-loop" aria-label="How a life goes">
               <li><i>1</i>Drop in</li><li><i>2</i>Loot</li><li><i>3</i>Take a tag</li><li><i>4</i>Hold ${TAG_HOLD_MIN}:00</li><li><i>5</i>Cash in</li>
             </ol>
-            <button class="sm-wallet" type="button" hidden><b></b><span></span></button>
           </section>
           <aside class="sm-sheet start-brief" data-tab="play">
             <div class="sm-sheet-head"><h2></h2><button class="sm-close" type="button" aria-label="Close">&times;</button></div>
@@ -370,12 +368,12 @@ export class HUD {
                 <div class="set-page" role="tabpanel" data-set="audio"></div>
                 <div class="set-page" role="tabpanel" data-set="video"></div>
                 <div class="set-page" role="tabpanel" data-set="game"></div>
+                <div class="set-page set-account" role="tabpanel" data-set="account"></div>
               </div>
             </div>
           </aside>
         </div>
         <footer class="sm-foot start-links">
-          <button class="sl-ca" type="button" title="Copy the contract address"><b>CA</b><code>${CONTRACT}</code><em>Copy</em></button>
           <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer">@${X_HANDLE}</a>
           <a class="sm-back" data-back title="${BACK_WHY}"><b>Back ZONA on X</b><em>Like · Reply · Repost</em></a>
           <div class="sm-live"><i></i><span></span></div>
@@ -463,23 +461,27 @@ export class HUD {
       if (this.chatOpen && e.target !== chat) e.preventDefault();
     });
     this.setChannel('global');
-    // the contract address, copied
-    const links = this.root.querySelector('.start-links') as HTMLElement;
-    const ca = links.querySelector('.sl-ca') as HTMLButtonElement;
+    // the contract address, copied: shortened and unlabelled in the top bar (the owner, 2026-10-22, with the site up for
+    // AdSense's review: "put the CA unlabeled in the nav with ... in the middle truncating it, click to copy it would make
+    // it more lowkey"). It was a box of its own along the bottom, CA and the whole address.
+    const ca = this.root.querySelector('.sl-ca') as HTMLButtonElement;
+    const code = ca.querySelector('code') as HTMLElement;
+    const short = code.textContent!;
     ca.addEventListener('click', () => {
-      const said = ca.querySelector('em') as HTMLElement;
       const done = (ok: boolean) => {
-        said.textContent = ok ? 'Copied' : 'Select and copy';
-        ca.classList.toggle('done', ok);
+        if (!ok) return;
+        code.textContent = 'Copied';
+        ca.classList.add('done');
         setTimeout(() => {
-          said.textContent = 'Copy';
+          code.textContent = short;
           ca.classList.remove('done');
         }, 1600);
       };
       const pick = () => {
-        // no clipboard to write to (an old browser, a page not served securely): leave it selected for the player to copy
+        // no clipboard to write to (an old browser, a page not served securely): the whole address, left selected for the player to copy
+        code.textContent = CONTRACT;
         const r = document.createRange();
-        r.selectNodeContents(ca.querySelector('code')!);
+        r.selectNodeContents(code);
         const sel = getSelection();
         sel?.removeAllRanges();
         sel?.addRange(r);
@@ -507,13 +509,11 @@ export class HUD {
     tabs.addEventListener('click', (e) => {
       const tab = (e.target as HTMLElement).closest('button')?.dataset.tab;
       if (!tab) return;
-      if (tab === 'rewards') this.rewardsClicked();
-      else if (tab === 'howto') this.howTo(true);
+      if (tab === 'howto') this.howTo(true);
       else this.sheet(tab);
     });
     (this.root.querySelector('.sm-close') as HTMLButtonElement).onclick = () => this.sheet('play');
     this.root.append(this.emotes.root);
-    (this.root.querySelector('.sm-wallet') as HTMLButtonElement).onclick = () => this.rewardsClicked();
     window.addEventListener('keydown', (e) => {
       // (Escape shuts an open sheet before it does anything else: the game's own Escape is the pause, and that is this menu)
       if (e.code === 'Escape' && this.el.start.classList.contains('sheet') && !this.el.start.classList.contains('paused')) this.sheet('play');
@@ -1024,27 +1024,6 @@ export class HUD {
     ui.again();
   }
 
-  /** The line about being paid, under the way in: whether a wallet is given yet. Pressing it opens the rewards window. */
-  setWallet(address: string | null) {
-    const b = this.root.querySelector('.sm-wallet') as HTMLButtonElement;
-    b.hidden = address === null;
-    if (address === null) return;
-    b.classList.toggle('set', !!address);
-    (b.firstElementChild as HTMLElement).textContent = address ? 'Payout wallet set' : 'Play to earn';
-    (b.lastElementChild as HTMLElement).textContent = address ? `${address.slice(0, 4)}…${address.slice(-4)} · change` : 'Add a wallet to be paid for the tags you cash in';
-  }
-
-  /**
-   * Payouts, in the row along the top beside Changelog and said as that is: what a tag pays at this moment goes
-   * small beside the word, when the site says. null: it is not paying, or did not answer, and there is the word
-   * alone. (It was a gold button at the top right for a day, made to be noticed. 2026-10-13: "the payouts thing in
-   * the top right corner is ugly i dont like it".)
-   */
-  setPay(sol: number | null) {
-    const em = this.root.querySelector('.sm-pay em');
-    if (em) em.textContent = sol === null ? '' : `${Math.round(sol * 10_000) / 10_000} SOL a tag`;
-  }
-
   /** The loading screen is lifting: play the entrance (title, panels) once. */
   entrance() {
     if (this.el.start.classList.contains('show')) this.el.start.classList.add('enter');
@@ -1308,12 +1287,12 @@ export class HUD {
       `<div class="kbs-fixed"><kbd class="wide">Esc</kbd> this menu <kbd class="wide">F3</kbd> performance <span>The wheel is the next weapon. Hold the left button to use what is in your hands.</span></div>`;
   }
 
-  // ---------------------------------------------------------------- menu: graphics, rewards
+  // ---------------------------------------------------------------- menu: graphics, account
 
   private gfx: Graphics = { ...DEFAULT_GRAPHICS };
   private gfxChanged: (g: Graphics) => void = () => {};
   private gfxInfo: () => string = () => '';
-  private rewardsClicked: () => void = () => {};
+  private accountShown: () => void = () => {};
 
   /** the current options, what to do when the player changes one, and a line describing what is rendered */
   bindGraphics(g: Graphics, changed: (g: Graphics) => void, info: () => string) {
@@ -1323,10 +1302,14 @@ export class HUD {
     this.renderGraphics();
   }
 
-  /** the Rewards button appears once there is something for it to open */
-  onRewards(cb: () => void) {
-    this.rewardsClicked = cb;
-    (this.root.querySelector('.start-tabs [data-tab="rewards"]') as HTMLElement).hidden = false;
+  /** Settings' Account page, where the payout wallet is given (its contents are src/ui/rewards.ts's, not drawn here) */
+  accountPane(): HTMLElement {
+    return this.root.querySelector('.set-account') as HTMLElement;
+  }
+
+  /** told each time the Account page is turned to, so what it says is fresh */
+  onAccount(cb: () => void) {
+    this.accountShown = cb;
   }
 
   private setGraphic(key: string, value: string) {
@@ -1379,9 +1362,10 @@ export class HUD {
     this.tab = tab;
     this.renderGraphics();
     (this.root.querySelector('.set-body') as HTMLElement).scrollTop = 0;
+    if (tab === 'account') this.accountShown();
   }
 
-  /** The settings, all four pages of them (the keys are their own: see renderKeys), and which is shown. */
+  /** The settings pages (the keys are their own: see renderKeys; the account page is rewards.ts's), and which is shown. */
   private renderGraphics() {
     const g = this.gfx, pane = this.root.querySelector('.start-gfx') as HTMLElement;
     const named = (label: string, hint = '') => `<span>${label}${hint ? `<small>${hint}</small>` : ''}</span>`;
@@ -1393,7 +1377,7 @@ export class HUD {
     const loud = (label: string, s: string, v: number, hint: string) => slide(label, s, Math.round(v * 100), [0, 100, 1], `${Math.round(v * 100)}%`, hint);
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
     const c = controls();
-    const pages: Record<SetTab, string> = {
+    const pages: Record<Exclude<SetTab, 'account'>, string> = {
       // (health, blood, food and water are symbols: whoever wants the numbers as well asks for them here)
       game:
         row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The numbers beside health, blood, food and water') +
@@ -1427,8 +1411,9 @@ export class HUD {
     };
     for (const page of pane.querySelectorAll<HTMLElement>('.set-page')) {
       const id = page.dataset.set as SetTab;
-      // (the keys are drawn into the controls' page by renderKeys, under its sliders: only the sliders are drawn here)
-      ((id === 'controls' ? page.querySelector('.set-rows') : page) as HTMLElement).innerHTML = pages[id];
+      // (the keys are drawn into the controls' page by renderKeys, under its sliders: only the sliders are drawn here.
+      // The account page is src/ui/rewards.ts's, and is never drawn over)
+      if (id !== 'account') ((id === 'controls' ? page.querySelector('.set-rows') : page) as HTMLElement).innerHTML = pages[id];
       page.hidden = id !== this.tab;
     }
     for (const b of pane.querySelectorAll<HTMLButtonElement>('.set-tabs button')) {

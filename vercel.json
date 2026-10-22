@@ -77,6 +77,10 @@
     {
       "source": "/browser-battle-royale",
       "destination": "/browser-battle-royale/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
     }
   ],
   "functions": {

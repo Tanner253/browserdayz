@@ -1356,16 +1356,8 @@ body.touch .set-page .gfx-range { height: 30px; }
 .sm-out::after { content: ' \2197'; color: var(--brand); }
 .sm-out:hover { color: var(--ink); }
 .sm-out:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-/* (Payouts is one of them: it was a gold button at the top right, with a light crossing it, and was not liked.
-   What a tag pays now is said small beside the word, when it is known.) */
-.sm-pay { display: inline-flex; align-items: baseline; gap: 9px; }
-.sm-out.sm-pay::after { content: none; }
-.sm-pay span::after { content: ' \2197'; color: var(--brand); }
-.sm-pay em { font-size: 11px; font-style: normal; letter-spacing: 0.06em; color: var(--ink); }
-.sm-pay em:empty { display: none; }
-@media (max-width: 760px), (max-height: 520px) { .sm-pay em { display: none; } }
 .sm-nav button.on { color: var(--ink); border-bottom-color: var(--brand); }
-.sm-nav button:focus-visible, .sm-close:focus-visible, .sm-wallet:focus-visible, .mm-spot:focus-visible, .hud-start .start-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sm-nav button:focus-visible, .sm-close:focus-visible, .mm-spot:focus-visible, .hud-start .start-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 /* (a window too narrow for the whole row: it is slid along, and does not run into what is at its right) */
 @media (max-width: 1000px) {
   .sm-nav { overflow-x: auto; scrollbar-width: none; }
@@ -1525,14 +1517,6 @@ body.touch .set-page .gfx-range { height: 30px; }
 .sm-loop li { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .sm-loop li:not(:last-child)::after { content: ''; width: 16px; height: 1px; margin: 0 10px 0 4px; background: var(--ink-faint); }
 .sm-loop i { font-family: var(--mono); font-size: 12px; font-style: normal; font-weight: 600; letter-spacing: 0; color: var(--brand); }
-/* being paid: whether a wallet has been given. A line under the five, in their type, underlined where it is pressed (it was a box). */
-.sm-wallet { display: flex; align-items: baseline; gap: 12px; width: fit-content; max-width: 100%; margin-top: 8px; padding: 4px 0; font-family: var(--font); font-size: 15px; text-align: left; color: var(--ink-dim); background: none; border: 0; cursor: pointer; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
-.sm-wallet[hidden] { display: none; }
-.sm-wallet span { border-bottom: 1px solid rgba(233, 228, 216, 0.24); }
-.sm-wallet:hover { color: var(--ink); }
-.sm-wallet:hover span { border-bottom-color: var(--brand); }
-.sm-wallet b { font-size: 14px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
-.sm-wallet.set b { color: var(--ok); }
 /* waiting in line for a full server */
 .start-queue { display: none; margin-top: 14px; }
 /* (turned away at the door: why, in words that stay) */
@@ -1761,12 +1745,10 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 
 /* --- the strip along the bottom: the coin's address, the game on X and the asking, and at the right what is being shown behind */
 .sm-foot { display: flex; align-items: center; gap: 22px; min-width: 0; padding: 0 40px 15px; }
-.sl-ca { display: inline-flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 11px 7px; font-family: var(--mono); color: var(--ink-dim); background: none; border: 1px solid var(--line); cursor: pointer; }
-.sl-ca:hover { border-color: var(--ink-dim); }
-.sl-ca b { font-size: 10px; font-weight: 600; letter-spacing: 0.2em; color: var(--ink-faint); }
-.sl-ca code { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 11px; white-space: nowrap; color: var(--ink); user-select: all; }
-.sl-ca em { font-size: 10px; font-style: normal; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
-.sl-ca.done em { color: var(--ok); }
+.sl-ca { display: inline-flex; align-items: center; padding: 0; background: none; border: 0; cursor: pointer; }
+.sl-ca:hover code { color: var(--ink); }
+.sl-ca.done code { color: var(--ok); }
+.sl-ca code { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; white-space: nowrap; color: var(--ink-faint); }
 .sl-x { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; color: var(--ink-dim); text-decoration: none; }
 .sl-x:hover { color: var(--brand); }
 .sm-live { display: flex; align-items: center; gap: 9px; min-width: 0; margin-left: auto; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); opacity: 0; transition: opacity 0.5s; }
@@ -1792,7 +1774,6 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 /* (the letters sit low in their line, 0.115 of their size below its middle: the number is moved down as far, by twice that in margin) */
 .hud-start.paused .start-online { grid-column: 2; grid-row: 2; margin: calc(var(--tfs, 92px) * 0.23) 0 0; }
 /* (the room the number used to take under Resume, kept above the wallet line) */
-.hud-start.paused .sm-wallet { margin-top: 28px; }
 .hud-start.paused .start-sub { font-size: 20px; color: var(--ink-dim); }
 .hud-start.paused.live .start-sub { max-width: 620px; font-size: 17px; line-height: 1.35; }
 /* leaving the proper way: a square beside Resume, as tall as it, on the pause screen when playing on a server */
@@ -1838,7 +1819,7 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 /* (the tag drops in on its chain) */
 .hud-start.enter:not(.paused) .sm-tag { animation: enter-tag 0.9s cubic-bezier(0.2, 0.8, 0.3, 1.25) both 1.15s; }
 @keyframes enter-tag { from { opacity: 0; transform: translateY(-40px) rotate(-7deg); } to { opacity: 1; transform: none; } }
-.hud-start.enter:not(.paused) .sm-loop, .hud-start.enter:not(.paused) .sm-wallet { animation: enter-fade 0.8s ease both 1.25s; }
+.hud-start.enter:not(.paused) .sm-loop { animation: enter-fade 0.8s ease both 1.25s; }
 .hud-start.enter:not(.paused) .sm-foot { animation: enter-fade 0.8s ease both 1.4s; }
 @keyframes enter-letter { from { opacity: 0; transform: translateY(26px); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes enter-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -1868,7 +1849,6 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .sm-enter { margin-top: 28px; }
   .sm-enter .start-btn { min-height: 62px; }
   .sm-loop { margin-top: 14px; }
-  .sm-wallet { margin-top: 12px; }
   .sm-sheet { position: relative; width: 100%; max-width: none; margin: 10px 0 8px; padding: 14px 66px 14px 18px; }
   .sm-sheet-head { position: absolute; right: 12px; top: 12px; margin: 0; }
   .sm-sheet-head h2 { display: none; }
@@ -1890,7 +1870,6 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .mm-spot.k-spawn { width: 22px; height: 22px; margin: -11px 0 0 -11px; }
   .start-brief[data-tab='brief'] .pane-brief { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; }
   .sm-foot { gap: 16px; padding: 0 calc(22px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(22px + env(safe-area-inset-left)); }
-  .sl-ca code { max-width: 210px; }
   .hud-start.paused .sm-hero { padding-bottom: 20px; }
   .hud-start.paused .sm-hero { --tfs: 76px; }
 }
@@ -1908,7 +1887,6 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .kb { grid-template-columns: minmax(0, 1fr); }
   .sm-foot { flex-wrap: wrap; gap: 8px 16px; }
   .sm-live { display: none; }
-  .sl-ca code { max-width: 46vw; }
 }
 
 /* ------------------------------------------------------------ rewards modal */
@@ -2550,3 +2528,7 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 
 /* (a thing flying from one pile to the one it joins: Combine all, InventoryUI.combineAll) */
 .inv-fly { position: fixed; z-index: 60; pointer-events: none; background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0 0 4px rgba(201, 178, 124, 0.8)); }
+/* the payout wallet on Settings' Account page: the rewards window's own parts, drawn into the page (rewards.ts, `inline`) */
+.rw.rw-inline { position: static; inset: auto; z-index: auto; display: block; padding: 0; overflow: visible; background: none; backdrop-filter: none; }
+.rw-inline .rw-card { zoom: 1; width: auto; padding: 4px 0 0; background: none; border: 0; animation: none; }
+.rw-inline .rw-card h2 { margin: 6px 0 14px; font-size: 22px; }
