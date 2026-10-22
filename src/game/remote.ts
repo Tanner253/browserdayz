@@ -250,7 +250,7 @@ export class RemotePlayer implements Damageable {
   skins: string[] = [];
   /** VIP: their dog tag at the breastbone is gold */
   vip = false;
-  /** their own tag is round their neck, one a killer could take (as the server says it): only then is it drawn */
+  /** their own tag is round their neck, one a killer could take (as the server says it, server/worn.ts): only then is it drawn */
   tagged = false;
   setSkins(sk: string[], vip: boolean) {
     this.vip = vip;

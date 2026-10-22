@@ -54,7 +54,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // src/net/bait.ts): every game open on 55's page, open to it, is told to load the page again.)
 // (57, 2026-10-22: a tag cashes in after thirty minutes again, and is on a body after twenty alive: every game open on
 // 56's page, counting twenty and ten, is told to load the page again.)
-export const PROTOCOL = 58;
+export const PROTOCOL = 59;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -131,6 +131,8 @@ export interface PlayerInfo {
   /** what they have from the store (api/_lib/shop-items.ts): the finishes on their guns, and VIP */
   sk?: string[];
   vip?: true;
+  /** their own dog tag is round their neck, one a killer could take (server/worn.ts): drawn on them only then */
+  tag?: true;
 }
 
 /** a thing slung on a back: its item, and what is fitted to it (its magazine among them) */
@@ -386,6 +388,8 @@ export type S2C =
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
+  /** a player's own dog tag has come round their neck, or gone (server/worn.ts) */
+  | { t: 'tagged'; id: number; on: boolean }
   /** the store's book for an admin's STORE tab (api/_lib/shop.ts, adminView), or why their order was not done */
   | { t: 'store'; ok: boolean; view?: unknown; why?: string; /** players this server knows by name, for a gift (server/store-admin.ts) */ who?: { name: string; acct: string; online: boolean }[] }
   /** somebody cashed in a dog tag: announced to everyone */
