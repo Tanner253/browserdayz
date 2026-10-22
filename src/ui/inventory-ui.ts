@@ -26,6 +26,7 @@ import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from 
 import { combinePiles, goesWith, gridWeight, pileGrids, sortGrid } from './inv-piles';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon } from './act-icons';
+import { lookOf } from '../../api/_lib/shop-items';
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
 import { TAKE_GROUPS, fitsGuns, inTakeGroup, type TakeGroup } from './inv-take';
@@ -92,6 +93,8 @@ export interface InvActions {
   finishFor(item: ItemInstance): 'gold' | 'nickel' | null;
   /** that finish put on it for good, by the server (server/plates.ts) */
   applyFinish(item: ItemInstance): void;
+  /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
+  plateIcon(id: string, f: 'gold' | 'nickel'): void;
 }
 
 type Source =
@@ -550,7 +553,7 @@ export class InventoryUI {
 
   /** the head of the card, the same at every depth (src/ui/inv-card.ts): its picture, its kind, its name */
   private cardHead(it: ItemInstance): string {
-    const d = ITEMS[it.id], url = this.icons[it.id];
+    const d = ITEMS[it.id], url = this.iconOf(it);
     return `<div class="card-head"><div class="card-img" style="${url ? `background-image:url(${url})` : ''}"></div><div><small>${kindOf(d)}${d.slot && d.category === 'clothing' ? ` · ${this.placeName(d)}` : ''}</small><b>${itemName(it)}</b></div>${kindIcon(it.id)}</div>`;
   }
 
@@ -801,7 +804,7 @@ export class InventoryUI {
     el.style.height = `${h * CELL - 2}px`;
     const img = document.createElement('div');
     img.className = 'inv-item-img';
-    const url = this.icons[item.id];
+    const url = this.iconOf(item);
     if (url) {
       if (rot) {
         // rotate the icon 90deg inside the rotated footprint
@@ -908,7 +911,7 @@ export class InventoryUI {
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + this.mark(item);
-      const url = this.icons[item.id];
+      const url = this.iconOf(item);
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
       // (how it is used from here, and that one held loose is carried nowhere else, is said on its card: see `cardHtml`)
       const src0 = this.locate(item);
@@ -985,7 +988,7 @@ export class InventoryUI {
       cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '') + (it && this.mark(it) !== ' sel' ? this.mark(it) : '');
       cell.dataset.hot = String(i);
       const id = it?.id ?? b?.id;
-      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[id] ?? ''})"></div>${kindIcon(id)}` : ''}`;
+      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${it ? this.iconOf(it) : this.icons[id] ?? ''})"></div>${kindIcon(id)}` : ''}`;
       cell.title = id ? `${ITEMS[id].name}${it ? '' : ' (none carried)'} · right-click to clear` : `Key ${(i + 1) % 10}: drag a thing here, or point at it and press ${(i + 1) % 10}`;
       cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -1019,7 +1022,7 @@ export class InventoryUI {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + this.mark(item) + (this.actions.inHands() === item ? ' active' : '');
       // (what is worn has a picture of its own for where it is worn: see `slot:` in icons.ts)
-      const url = this.icons[`slot:${item.id}`] ?? this.icons[item.id];
+      const url = this.icons[`slot:${item.id}`] ?? this.iconOf(item);
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
       this.bindItem(el, { kind: 'slot', slot, item });
       s.appendChild(el);
@@ -1070,7 +1073,7 @@ export class InventoryUI {
       // (its kind, for the faint colour each kind's cell has: see the stylesheet. Not as a `cat-` class: those are how a thing in a grid is found by what films the screen, and this is no thing in a grid.)
       ic.dataset.kind = d.category;
       // (a bat is six cells tall and one wide: stood up in this little box its picture is a hair. Long things are laid on their side here.)
-      ic.innerHTML = `<div class="inv-item-img fit${d.h > d.w ? ' lying' : ''}" style="background-image:url(${this.icons[w.loot.item.id] ?? ''})"></div>`;
+      ic.innerHTML = `<div class="inv-item-img fit${d.h > d.w ? ' lying' : ''}" style="background-image:url(${this.iconOf(w.loot.item)})"></div>`;
       row.appendChild(ic);
       // (a pack, a vest or a case lying there says whether anything is in it, and is gone through where it lies: see below)
       const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.use?.sips ? ` <span>${w.loot.item.left ?? d.use.sips}/${d.use.sips}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : holds(w.loot.item.id) ? ` <span>· ${w.loot.item.cargo?.length ? things(w.loot.item.cargo.length) : 'empty'}</span>` : '';
@@ -1303,7 +1306,7 @@ export class InventoryUI {
     // (a phone's: the card's info, and the menu's rows as buttons)
     box.innerHTML = `
       <div class="ins-head">
-        <div class="ins-img" style="background-image:url(${this.icons[it.id] ?? ''})"></div>
+        <div class="ins-img" style="background-image:url(${this.iconOf(it)})"></div>
         <div>
           <div class="ins-cat">${kindOf(d)}</div>
           <div class="ins-name">${itemName(it)}</div>
@@ -1333,6 +1336,17 @@ export class InventoryUI {
       acts.appendChild(b);
     }
     return box;
+  }
+
+  /** a thing's picture: a plated gun's own, gold or nickel, once it has been drawn (until then, the plain one) */
+  private iconOf(it: ItemInstance): string {
+    const f = lookOf(it.finish);
+    if (f) {
+      const own = this.icons[`${it.id}|${f}`];
+      if (own) return own;
+      this.actions.plateIcon(it.id, f);
+    }
+    return this.icons[it.id] ?? '';
   }
 
   /** is this thing on the survivor (and not in the crate that is open, or on the ground)? */

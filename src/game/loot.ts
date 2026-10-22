@@ -3,6 +3,7 @@
 // (shelf, table, floor, sloped ground) and manages stash crates and searchable crates.
 
 import * as THREE from 'three';
+import { finishOn, wearFinish } from './finish';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
@@ -629,7 +630,10 @@ export class WorldItem {
   }
 
   private redraw() {
-    if (this.batches.draw(this, this.model, this.within && this.seen, this.within && this.casts)) {
+    // (a gun with a store finish on it is drawn by itself, plated: src/game/finish.ts)
+    const plate = finishOn(this.loot.item);
+    if (plate) this.batches.draw(this, null, false, false);
+    else if (this.batches.draw(this, this.model, this.within && this.seen, this.within && this.casts)) {
       if (this.own) {
         this.scene.remove(this.obj);
         for (const m of this.meshes) this.obj.remove(m);
@@ -650,6 +654,7 @@ export class WorldItem {
         this.obj.add(m);
         this.meshes.push(m);
       }
+      if (plate) wearFinish(this.obj, this.loot.item.id, plate);
       if (!this.own) this.scene.add(this.obj);
       this.own = this.model;
       this.obj.updateMatrixWorld(true);

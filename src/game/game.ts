@@ -836,6 +836,7 @@ export class Game {
       note: (text) => this.hud.note(text, 'info'),
       finishFor: (item) => this.finishFor(item),
       applyFinish: (item) => this.applyFinish(item),
+      plateIcon: (id, f) => this.plateIcon(id, f),
     });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
@@ -1707,6 +1708,7 @@ export interface Game {
   syncHeld: Methods<typeof interactMethods>['syncHeld'];
   finishFor: Methods<typeof interactMethods>['finishFor'];
   applyFinish: Methods<typeof interactMethods>['applyFinish'];
+  plateIcon: Methods<typeof interactMethods>['plateIcon'];
   finished: Methods<typeof interactMethods>['finished'];
   frame: Methods<typeof frameMethods>['frame'];
 }
