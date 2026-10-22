@@ -247,13 +247,15 @@ export class RemotePlayer implements Damageable {
 
   /** VIP: their dog tag at the breastbone is gold */
   vip = false;
+  /** their own tag is round their neck, one a killer could take (as the server says it, server/worn.ts): only then is it drawn */
+  tagged = false;
   setVip(vip: boolean) {
     this.vip = vip;
     this.wearTag();
   }
   /** the dog tag at the breastbone (src/game/worn-tag.ts): steel, gold on a VIP, none on the dead */
   wearTag() {
-    if (this.ready) this.avatar.wearTag(this.alive ? (this.vip ? 'gold' : 'steel') : null);
+    if (this.ready) this.avatar.wearTag(this.alive && this.tagged ? (this.vip ? 'gold' : 'steel') : null);
   }
 
   /** @param f the finish on that gun, as the server says it ('gold', 'nickel': src/game/finish.ts) */

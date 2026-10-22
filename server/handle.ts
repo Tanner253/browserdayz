@@ -705,7 +705,7 @@ export function handle(c: Client, m: C2S) {
         ...(admin ? { turned: [...ADMIN.turned].reverse().map((t) => ({ id: t.n, name: t.name, why: t.why, mins: Math.round((now - t.at) / 60000), ...(t.fp ? { dev: shortDevice(t.fp) } : {}) })) } : {}),
         roles: admin ? roleRows(c) : [],
         checks: CHECKS,
-        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length, cars: vehicles.size, wrecks: [...vehicles.values()].filter((v) => v.goneAt).length, infected: [...horde.bodies.values()].filter((b) => !b.diedAt).length },
+        stats: { up: Math.round(process.uptime() / 60), today: seen.today(), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length, cars: vehicles.size, wrecks: [...vehicles.values()].filter((v) => v.goneAt).length, infected: [...horde.bodies.values()].filter((b) => !b.diedAt).length },
       });
     }
     case 'vin': {

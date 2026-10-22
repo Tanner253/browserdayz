@@ -40,6 +40,7 @@ import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
 import { broadcast, cleanName, clients, join, num, perksChanged, records, round2, type Client } from './players';
 import { perks } from './perks';
+import { tagsWorn } from './worn';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
@@ -1257,6 +1258,8 @@ loadAdmin();
 
 // (what players have bought at the store, from the site: server/perks.ts)
 perks.start(perksChanged);
+// (and whose own dog tag is round their neck, told to everybody as it comes and goes: server/worn.ts)
+setInterval(tagsWorn, 1000).unref();
 
 void loadKept();
 

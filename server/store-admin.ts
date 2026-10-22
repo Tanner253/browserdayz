@@ -6,9 +6,30 @@ import { randomBytes } from 'node:crypto';
 import { ADMIN, roleOf } from './gate';
 import { acctOf, perks, storeUrl } from './perks';
 import { clients, send, type Client } from './players';
+import { scores } from './queue';
+
+/**
+ * Players this server knows by name, for a gift to somebody who has bought nothing yet: who is on now, who left a while
+ * ago, and whoever is on the board since the server started. Each by the account the store keeps things under, which
+ * only this server can make (it holds their keys).
+ */
+function known(q: string) {
+  const out = new Map<string, { name: string; acct: string; online: boolean }>();
+  const add = (name: string, key: string, online: boolean) => {
+    if (!key || out.size >= 12 || (q && !name.toLowerCase().includes(q))) return;
+    const acct = acctOf(key), had = out.get(acct);
+    if (!had || (online && !had.online)) out.set(acct, { name, acct, online });
+  };
+  for (const o of clients.values()) add(o.name, o.key, true);
+  for (const g of [...ADMIN.gone].reverse()) add(g.name, g.key, false);
+  for (const [key, s] of scores) add(s.name, key, false);
+  return [...out.values()];
+}
 
 export async function storeOrder(c: Client, act: unknown) {
   if (roleOf(c) !== 'admin') return;
+  // (a search for players, answered here: the site knows only who has bought)
+  if ((act as { act?: string })?.act === 'who') return void send(c, { t: 'store', ok: true, who: known(String((act as { q?: unknown }).q ?? '').toLowerCase().trim().slice(0, 24)) });
   // (a player online named by their number, #12, is given by their account: the hash of their key, which only this server knows)
   const o = (act ?? {}) as { acct?: unknown };
   if (typeof o.acct === 'string' && /^#\d+$/.test(o.acct)) {

@@ -7,7 +7,8 @@ import { Heli } from '../heli';
 import { physics, USE_GROUPS, SIGHT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { Door } from '../../world/buildings';
-import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf } from '../../sim/items';
+import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf, ZONA_VOID } from '../../sim/items';
+import { inPlay } from '../../world/worldgen';
 import { CRATE_RESTOCK } from '../../sim/crates';
 import { POLICE_CAR } from '../../sim/vehicles';
 import type { Player } from '../player';
@@ -321,8 +322,15 @@ export const interactMethods = {
 
   /** keep the body's hands in step with what is equipped */
   syncHeld(this: Game) {
-    // (and the dog tag at the breastbone: steel, gold on a VIP, none on the dead: src/game/worn-tag.ts)
-    this.avatar.wearTag(this.player.dead ? null : this.perks.vip ? 'gold' : 'steel');
+    // (and the dog tag at the breastbone, on the body and on the inventory's figure alike: only while their own tag is
+    // round their neck and a killer could take it, the owner, 2026-10-22, "dogtags shouldnt render on the player until
+    // they can drop a tag": so not before TAG_FRESH, not outside the Zona, not on an admin who leaves none. Gold on a VIP.
+    // src/game/worn-tag.ts)
+    const p = this.player, neck = this.inv.neck;
+    const live = !p.dead && neck?.id === 'dogtag' && !this.powers.voidTag && !(ZONA_VOID && !inPlay(p.pos.x, p.pos.z));
+    const tag = live ? (this.perks.vip || neck.gold ? 'gold' : 'steel') : null;
+    this.avatar.wearTag(tag);
+    this.doll?.wearTag(tag);
     finishDay();
     const it = this.weapons.equippedItem;
     const finish = finishOn(it);

@@ -33,6 +33,8 @@ export interface Client {
   key: string;
   /** what they were last said to have from the store (see perksChanged) */
   perkKey?: string;
+  /** whether everybody was last told their own tag is round their neck (server/worn.ts) */
+  tagWorn?: boolean;
   name: string;
   pose: Pose;
   /** when their game said that was so, by its own clock (ms) */
@@ -183,7 +185,7 @@ export function broadcastNear(m: S2C, x: number, z: number, within: number, exce
   }
 }
 
-export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, ...(c.f ? { f: c.f } : {}), g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key) });
+export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, ...(c.f ? { f: c.f } : {}), g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key), ...(c.tagWorn ? { tag: true as const } : {}) });
 
 /** what a player has from the store, as the others are told it (server/perks.ts): nothing said where there is nothing */
 function perkInfo(key: string): { sk?: string[]; vip?: true } {

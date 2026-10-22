@@ -181,6 +181,13 @@ export const onlineMethods = {
     });
     // (what somebody has from the store: their own, or another player's VIP: src/game/my-perks.ts, RemotePlayer.setVip)
     net.on('store', (m) => this.adminUI.storeGot(m));
+    // (somebody's own tag come round their neck, or gone: drawn on them only while it is there, server/worn.ts)
+    net.on('tagged', (m) => {
+      const r = this.remotes.get(m.id);
+      if (!r) return;
+      r.tagged = m.on;
+      r.wearTag();
+    });
     net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setVip(!!m.vip)));
     net.on('finish', (m) => this.finished(m.uid, m.f));
     net.on('leave', (m) => {
@@ -680,6 +687,7 @@ export const onlineMethods = {
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
     r.vip = !!p.vip;
+    r.tagged = !!p.tag;
     r.wearTag();
     r.setWeapon(p.w, p.m, p.f);
     void this.wear(r.avatar, p.g ?? []);

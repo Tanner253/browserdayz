@@ -210,7 +210,7 @@ export class AdminUI {
   /** the STORE tab (src/ui/admin-store.ts) */
   private store = new StoreTab({ el, button: (l, on, c, ic) => this.button(l, on, c, ic), grave: (k, l, on, ic) => this.grave(k, l, on, ic), order: (a) => this.act.store(a), redraw: () => this.isOpen && this.draw(true) });
   /** the server's answer to an order to the store's book */
-  storeGot(m: { ok: boolean; view?: unknown; why?: string }) {
+  storeGot(m: { ok: boolean; view?: unknown; why?: string; who?: { name: string; acct: string; online: boolean }[] }) {
     this.store.got(m);
   }
   root = el('div', 'adm');
@@ -725,7 +725,7 @@ export class AdminUI {
 
   private drawBar() {
     const st = this.lists.stats;
-    const key = `${this.admin}|${this.lists.players.length}|${st?.asleep ?? ''}|${st?.up ?? ''}|${this.lists.checks}`;
+    const key = `${this.admin}|${this.lists.players.length}|${st?.asleep ?? ''}|${st?.up ?? ''}|${st?.today ?? ''}|${this.lists.checks}`;
     if (key === this.drawnBar) return;
     this.drawnBar = key;
     const title = el('div', 'adm-title');
@@ -738,6 +738,7 @@ export class AdminUI {
       return c;
     };
     chips.append(chip('user', `${this.lists.players.length} online`, 'Players on the server now'));
+    if (st?.today) chips.append(chip('eye', `${st.today} today`, 'Different players in the world in the last 24 hours (it was on the main menu)'));
     if (st?.asleep) chips.append(chip('moon', `${st.asleep} left a body`, 'Closed the game without logging out: their body is still there'));
     if (st) chips.append(chip('clock', `up ${st.up < 120 ? `${st.up} min` : `${Math.round(st.up / 60)} h`}`, 'How long the server has been running'));
     chips.append(chip('flag', `checks: ${this.lists.checks || '?'}`, 'What the server does about cheating: watch (write it down) or enforce (refuse it)'));
@@ -1446,6 +1447,7 @@ export class AdminUI {
     };
     tile(this.lists.players.length, 'online', 'user');
     if (st) {
+      if (st.today) tile(st.today, 'played today', 'eye');
       tile(st.asleep, 'bodies left', 'moon');
       tile(st.up < 120 ? `${st.up} m` : `${Math.round(st.up / 60)} h`, 'running', 'clock');
       tile(st.loot, 'things lying', 'box');

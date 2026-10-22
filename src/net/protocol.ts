@@ -54,9 +54,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // src/net/bait.ts): every game open on 55's page, open to it, is told to load the page again.)
 // (57, 2026-10-22: a tag cashes in after thirty minutes again, and is on a body after twenty alive: every game open on
 // 56's page, counting twenty and ten, is told to load the page again.)
-// (59, 2026-10-22: a store finish is put on one gun ('finish') and goes with it, drawn from the gun's own `finish`;
-// the held gun's look rides on 'ps', its uid on 's'. A page of 58 would plate every gun its owner holds.)
-export const PROTOCOL = 59;
+// (60, 2026-10-22: a store finish is put on one gun ('finish') and goes with it, drawn from the gun's own `finish`;
+// the held gun's look rides on 'ps', its uid on 's'. A page of 59 would plate every gun its owner holds.)
+export const PROTOCOL = 60;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -135,6 +135,8 @@ export interface PlayerInfo {
   /** what they have from the store (api/_lib/shop-items.ts): the finishes on their guns, and VIP */
   sk?: string[];
   vip?: true;
+  /** their own dog tag is round their neck, one a killer could take (server/worn.ts): drawn on them only then */
+  tag?: true;
 }
 
 /** a thing slung on a back: its item, and what is fitted to it (its magazine among them) */
@@ -394,8 +396,10 @@ export type S2C =
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
   /** a finish put on one of this player's guns: the shop's item id */
   | { t: 'finish'; uid: string; f: string }
+  /** a player's own dog tag has come round their neck, or gone (server/worn.ts) */
+  | { t: 'tagged'; id: number; on: boolean }
   /** the store's book for an admin's STORE tab (api/_lib/shop.ts, adminView), or why their order was not done */
-  | { t: 'store'; ok: boolean; view?: unknown; why?: string }
+  | { t: 'store'; ok: boolean; view?: unknown; why?: string; /** players this server knows by name, for a gift (server/store-admin.ts) */ who?: { name: string; acct: string; online: boolean }[] }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
@@ -551,7 +555,7 @@ export interface AdminLists {
   checks: string;
   /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */
   /** (and, for the Entities page: cars standing, how many of those are burned out, and the infected on their feet) */
-  stats?: { up: number; loot: number; stashes: number; kept: number; asleep: number; cars?: number; wrecks?: number; infected?: number };
+  stats?: { up: number; /** how many have played in the last 24 hours (seen.ts): the admins' alone since 2026-10-22 */ today?: number; loot: number; stashes: number; kept: number; asleep: number; cars?: number; wrecks?: number; infected?: number };
 }
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */
