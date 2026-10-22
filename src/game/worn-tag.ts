@@ -25,8 +25,16 @@ function materials() {
   return { steel, gold };
 }
 
-/** the plates hung upright, faces forward, hole at the top; and the chain from it to either side of the collar */
+/**
+ * The plates hung upright, faces forward, hole at the top; and the chain from it to either side of the collar. Made once
+ * and shared by every body (the owner, 2026-10-22: "make sure the dotags and finsihes dont overload memory"): each body
+ * made its own three, and none was freed when its player left.
+ */
+let shapes: { plates: THREE.BufferGeometry; chain: THREE.BufferGeometry[] } | null = null;
 function geometry() {
+  return (shapes ??= makeShapes());
+}
+function makeShapes() {
   const plates = proceduralParts('@dogtag')[0].geometry.clone();
   // (made lying flat, long side along x with the hole at -x: stood up, its face toward -z, the hole on top)
   plates.rotateX(Math.PI / 2).rotateZ(-Math.PI / 2).scale(SIZE, SIZE, SIZE);
