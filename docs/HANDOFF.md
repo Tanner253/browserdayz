@@ -2,7 +2,29 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
-## LIVE (2026-10-21 ~07:10 UTC): site from `2111131`, server still `0b77446`
+## LIVE (2026-10-22 ~06:20 UTC): server and `main` from `2c597e1` (PROTOCOL 57), site from `abb3d90`
+- **Payouts stalled 04:02-05:29 UTC:** the paid node in `SOLANA_RPC_URL` answered reads and refused every send
+  ("Internal error during preflight simulation", -32603). Now the public node is last in the list (asked only when
+  the others fail, handed every payment), MAX_TRIES is 10, and a tag held for want of tries is retried
+  (`triesLeft`). The 8 stuck were paid. Worth the owner asking their node provider.
+- **The eighth cut-over, 05:35 UTC (`RULES8_FROM`):** 5 tags a wallet in any 24 hours (was 12); 350,000 $ZONA past
+  the 10 free tags (was 100,000; `holdOf`). Tags: on a body after 20 minutes alive, cashed after 30 (PROTOCOL 57).
+- **Search:** keyword title, description, canonical and JSON-LD on index.html; `robots.txt` (keeps out `/api/` and
+  `/payouts`); `sitemap.xml`; landing pages `/games-like-dayz/`, `/free-fps-games/`, `/browser-battle-royale/`; `/privacy/`.
+- **AdSense** (pub-6477083454892612): `ads.txt` and the meta tag live; the site is in Google's review; the EU consent
+  message is published for zonapvp.fun. Ad units: "Death" slot 3773360448, "Sitepages" slot 8331552554. The owner's
+  rules: no ads during play; one before the bot check and at death/respawn (H5 Games Ads 'start'/'next', the owner
+  applying; else the Death unit); vignette between page loads; none for VIP. The ad script is NOT on the site yet:
+  the store session puts it in.
+- **For the review** (the owner: "we will not nav the user to the payouts screen anymore"): no link to `/payouts`
+  and no play-to-earn on any public page or menu; the wallet is given in Settings, on its new Account page
+  (`rewards.ts`, `inline`); the contract address shortened and unlabelled in ZONA's top bar; wagers and stakes off
+  the menus (AdSense restricts betting). Payouts still run: the game asks for `/api/tick` when one is due.
+- **The store** has its own session, zona-store (branch `claude/zona-store-a6b7b0`), waiting on the owner's yes to
+  its plan: VIP $5 a month (queue pass, purple [VIP], Discord role, ad-free), a gold Desert Eagle $4.99, a coffee,
+  paid in SOL by a pasted transaction signature checked on chain, logged in the admin panel.
+
+## Earlier (2026-10-21 ~07:10 UTC): site from `2111131`, server still `0b77446`
 - ba2fae9 lean model files: assets/lean/256-128/ copies by sha1 of their source; scripts/lean.mjs; test/lean.test.ts. 178 -> 132 MB
   into the game, 241 -> 188 s on Fast 4G.
 - The owner's recorded heli flight (replay.mjs owner-run-2.json): 114.8 fps, against 81.1 on 19 Oct (progress/flight-1021.log).
@@ -20,7 +42,7 @@ Both performance tracks merged and on the site:
   (perf-1021/forest). The forest is pixel-bound: its per-pixel cost is the open fps lever.
 - No changelog entry: the owner said "skip the banner".
 
-## BATTLE ROYALE: built, NOT deployed (2026-10-21 night); branch `battle-royale` (dc9be96, pushed)
+## BATTLE ROYALE: LIVE since 2026-10-21 (arena server, /battleroyale); notes below are from before the release
 - Works end to end: the menu (ZONA in the middle), solo/duo/squad, the lobby and its vote, the plane, the canopy, loot,
   the slots, the circle, server-traced shots stopped at walls, knock and revive, jeeps, grenades, the bot check at the
   door, the board. Status and gaps are in docs/BATTLE-ROYALE.md; tests test/br-match.test.ts and test/arena.test.ts.
