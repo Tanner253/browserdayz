@@ -222,7 +222,7 @@ export const dropsMethods = {
       // can see. (The server's rule is being changed to mind what a player DOES: this is for until that is live.)
       const sway = this.input.uiMode ? Math.sin(performance.now() / 700) * 0.0015 : 0;
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw + sway, p.pitch, flags];
-      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()) });
+      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()), ...(it?.finish ? { u: it.uid } : {}) });
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;

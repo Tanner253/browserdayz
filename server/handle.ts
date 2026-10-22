@@ -23,6 +23,7 @@ import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
 import { elite } from './elite';
 import { perks } from './perks';
+import { plating } from './plates';
 import { storeOrder } from './store-admin';
 import { baited, banId, command, login, offId } from './admin';
 import { roleRows } from './roles';
@@ -99,6 +100,7 @@ export function handle(c: Client, m: C2S) {
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
       c.m = Array.isArray(m.m) ? m.m.filter((x) => typeof x === 'string').slice(0, 4) : [];
+      c.f = plating.held(c.inv, w, m.u);
       // (when their game says this was so, by its own clock: passed on as it is, for the others to space what they are shown by)
       c.n = typeof m.n === 'number' && Number.isFinite(m.n) ? Math.round(m.n) : undefined;
       return;
@@ -653,6 +655,12 @@ export function handle(c: Client, m: C2S) {
       return void perks.bought();
     case 'store':
       return void storeOrder(c, m.act);
+    // (their finish put on a gun they carry, for good: plates.ts)
+    case 'finish': {
+      const it = c.alive ? plating.apply(c.inv, m.uid, (gun) => perks.skin(c.key, gun)) : 'Not now';
+      if (typeof it === 'string') return send(c, { t: 'tell', kind: 'warn', text: it });
+      return send(c, { t: 'finish', uid: it.uid, f: it.finish! });
+    }
     case 'tint': {
       if (roleOf(c) !== 'admin') return;
       // ('off': no tag at all before their name where everybody talks: they are read as anybody is)

@@ -7,11 +7,16 @@
 // way each point of the gun faces the eye, laid over the gun's metal. It shines the same under any sky. (Made truly
 // metal instead, the guns mirrored the world's reflections, which in the hands' own scene are nothing: they drew black.)
 // Only what the model's own maps say is metal is plated, so a grip stays rubber or walnut; the model's own bumps and
-// edges still turn the shine. Dimmed with the day, so it does not glow at night.
+// edges still turn the shine. Dimmed with the day, so it does not glow at night. Since PROTOCOL 59 a finish is put on
+// one gun and goes with it, Rust's way (server/plates.ts): the gun's own `finish` says what it wears.
 
 import * as THREE from 'three';
+import { lookOf } from '../../api/_lib/shop-items';
 
 export type Finish = 'gold' | 'nickel';
+
+/** what this gun wears, by its own word (ItemInstance.finish, the server's) */
+export const finishOn = (it: { finish?: string } | null | undefined): Finish | null => lookOf(it?.finish);
 
 /** the polished ball, from its darkest rim to the highlight (sRGB) */
 const BALL: Record<Finish, string[]> = {

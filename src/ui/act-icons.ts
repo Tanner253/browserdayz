@@ -33,6 +33,8 @@ const GLYPHS = {
   merge: 'M3 4H12V13H3ZM20 4H29V13H20ZM7.5 15.5H12V19.5L16 23.5L20 19.5V15.5H24.5V21.4L16 29.9L7.5 21.4Z',
   // one pile in two
   split: 'M3 9H13V23H3ZM19 9H29V23H19ZM15 4H17V28H15Z',
+  // a glint, and a small one by it: a finish put on
+  shine: 'M13 3L15.6 12.4L25 15L15.6 17.6L13 27L10.4 17.6L1 15L10.4 12.4ZM25 19L26.3 23.7L31 25L26.3 26.3L25 31L23.7 26.3L19 25L23.7 23.7Z',
 };
 
 export type Act = keyof typeof GLYPHS;

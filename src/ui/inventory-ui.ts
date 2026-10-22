@@ -88,6 +88,10 @@ export interface InvActions {
   sound(kind: 'pickup' | 'drop' | 'move'): void;
   /** a line said to the player */
   note(text: string): void;
+  /** the store finish of theirs this gun can be given ('gold', 'nickel'), where it does not wear it already; else null */
+  finishFor(item: ItemInstance): 'gold' | 'nickel' | null;
+  /** that finish put on it for good, by the server (server/plates.ts) */
+  applyFinish(item: ItemInstance): void;
 }
 
 type Source =
@@ -1594,6 +1598,10 @@ export class InventoryUI {
       else if ((it.loaded ?? 0) > 0) out.push({ label: 'Unload', icon: 'unload', run: () => this.actions.unload(it) });
     } else if (d.weapon && (it.loaded ?? 0) > 0) out.push({ label: `Unload (${it.loaded})`, icon: 'unload', run: () => this.actions.unload(it) });
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, icon: 'detach', run: () => this.actions.detach(it, m) });
+    // (a finish from the store, put on this one gun and kept with it, Rust's way: the owner, 2026-10-22, "maybe open a
+    // menu when we have options, but for now an apply")
+    const look = this.carried(loc) ? this.actions.finishFor(it) : null;
+    if (look) out.push({ label: `Apply ${look} finish`, icon: 'shine', id: 'finish', run: () => this.actions.applyFinish(it) });
     if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, icon: inStash ? 'take' : 'move', id: 'across', run: () => this.transfer(loc), primary: inStash });
     out.push({
       label: 'Drop',

@@ -179,9 +179,10 @@ export const onlineMethods = {
       // (said to admins only: the owner, 2026-10-18, "remove the "player joined" and "player left" messages that show to all players")
       if (this.role === 'admin') this.hud.feed(`${m.p.name} joined`);
     });
-    // (what somebody has from the store: their own, or another player's: src/game/my-perks.ts, RemotePlayer.setSkins)
+    // (what somebody has from the store: their own, or another player's VIP: src/game/my-perks.ts, RemotePlayer.setVip)
     net.on('store', (m) => this.adminUI.storeGot(m));
-    net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setSkins(m.sk, !!m.vip)));
+    net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setVip(!!m.vip)));
+    net.on('finish', (m) => this.finished(m.uid, m.f));
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
@@ -198,7 +199,7 @@ export const onlineMethods = {
         const r = this.remotes.get(s[0]);
         if (!r) continue;
         r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now, typeof s[9] === 'number' ? s[9] : undefined);
-        r.setWeapon(s[7], s[8]);
+        r.setWeapon(s[7], s[8], s[10]);
         if (!(s[6] & F_DEAD)) r.seenAlive(now);
         else r.seenDead(now);
       }
@@ -678,10 +679,9 @@ export const onlineMethods = {
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
-    r.skins = p.sk ?? [];
     r.vip = !!p.vip;
     r.wearTag();
-    r.setWeapon(p.w, p.m);
+    r.setWeapon(p.w, p.m, p.f);
     void this.wear(r.avatar, p.g ?? []);
     this.gearOf.set(p.id, p.g ?? []);
     r.setGhost(!!p.hidden);

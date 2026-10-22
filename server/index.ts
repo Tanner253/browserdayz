@@ -601,6 +601,8 @@ setInterval(() => {
   for (const c of clients.values()) {
     const p = c.pose;
     const row: (typeof s)[number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m, c.n ?? null];
+    // (the finish on the gun in their hands, said only of a plated one)
+    if (c.f) row.push(c.f);
     all.push(row);
     if (!c.power.hidden) s.push(row);
   }

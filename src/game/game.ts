@@ -639,7 +639,6 @@ export class Game {
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);
     // (a finish bought at the store, on the gun in the hands and on the body: src/game/finish.ts)
     finishLighting({ register: (m, patch, key) => atmo.register(m, patch, key), daylight: atmo.daylight });
-    this.weapons.finishOf = (gun) => this.perks.finish(gun);
     this.perks.changed = () => {
       // (VIP from now: the tag round their neck is gold from now, as one made later will be)
       const neck = this.inv.neck;
@@ -647,9 +646,8 @@ export class Game {
         neck.gold = true;
         this.inventoryChanged();
       }
-      this.weapons.refinish();
-      this.heldKey = '';
-      this.syncHeld();
+      // (and a finish just bought can be applied: the inventory's Apply shows)
+      this.inventoryChanged();
     };
     // (built behind the menu, begun once the world is up and the menu shown (`buildBehind`, from src/main.ts), and
     // what wants them is done when they are: `loaded`)
@@ -836,6 +834,8 @@ export class Game {
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
       note: (text) => this.hud.note(text, 'info'),
+      finishFor: (item) => this.finishFor(item),
+      applyFinish: (item) => this.applyFinish(item),
     });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
@@ -1705,6 +1705,9 @@ export interface Game {
   wince: Methods<typeof interactMethods>['wince'];
   bleedHint: Methods<typeof interactMethods>['bleedHint'];
   syncHeld: Methods<typeof interactMethods>['syncHeld'];
+  finishFor: Methods<typeof interactMethods>['finishFor'];
+  applyFinish: Methods<typeof interactMethods>['applyFinish'];
+  finished: Methods<typeof interactMethods>['finished'];
   frame: Methods<typeof frameMethods>['frame'];
 }
 for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods]) {

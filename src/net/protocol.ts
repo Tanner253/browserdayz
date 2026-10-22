@@ -54,7 +54,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // src/net/bait.ts): every game open on 55's page, open to it, is told to load the page again.)
 // (57, 2026-10-22: a tag cashes in after thirty minutes again, and is on a body after twenty alive: every game open on
 // 56's page, counting twenty and ten, is told to load the page again.)
-export const PROTOCOL = 58;
+// (59, 2026-10-22: a store finish is put on one gun ('finish') and goes with it, drawn from the gun's own `finish`;
+// the held gun's look rides on 'ps', its uid on 's'. A page of 58 would plate every gun its owner holds.)
+export const PROTOCOL = 59;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -121,6 +123,8 @@ export interface PlayerInfo {
   /** item id in hands (null = bare hands) and its attachments */
   w: string | null;
   m: string[];
+  /** the finish of what is in their hands ('gold', 'nickel'): not said, none */
+  f?: string;
   /** what they wear that shows: hat, vest, pack */
   g: string[];
   /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
@@ -179,7 +183,7 @@ export type C2S =
    */
   | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
-  | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
+  | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing' }
   /**
@@ -233,6 +237,8 @@ export type C2S =
   | { t: 'admin'; pw: string }
   /** this player has just bought at the store: the server asks the site again (server/perks.ts) */
   | { t: 'perks' }
+  /** a store finish this player owns put on this gun of theirs, for good: the server checks and keeps it (server/plates.ts) */
+  | { t: 'finish'; uid: string }
   /** an admin's order to the store's book (api/_lib/shop.ts, AdminAct), passed to the site */
   | { t: 'store'; act: unknown }
   /** somebody with a role has their panel open: the lists it shows are asked for */
@@ -328,7 +334,7 @@ export type S2C =
   | { t: 'join'; p: PlayerInfo }
   | { t: 'leave'; id: number }
   /** each: who, where, what is in their hands and on it, and when their game said so by its own clock (ms) */
-  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?][] }
+  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ string?][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
@@ -386,6 +392,8 @@ export type S2C =
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
+  /** a finish put on one of this player's guns: the shop's item id */
+  | { t: 'finish'; uid: string; f: string }
   /** the store's book for an admin's STORE tab (api/_lib/shop.ts, adminView), or why their order was not done */
   | { t: 'store'; ok: boolean; view?: unknown; why?: string }
   /** somebody cashed in a dog tag: announced to everyone */

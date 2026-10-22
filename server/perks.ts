@@ -1,11 +1,12 @@
 // What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): VIP's
-// place in the line and its purple tag, the cup by a coffee buyer's name, a gold dog tag, the finishes on their guns.
+// place in the line and its purple tag, the cup by a coffee buyer's name, a gold dog tag, the finishes they may put on
+// their guns (plates.ts).
 // Asked of the site every five minutes, and soon after a player says they have just bought something (each answer
 // comes from the site's cache: it costs the store nothing). Held by account, the hash of the player's key the store
 // and the payouts both use (server/tags.ts). Nothing kept here: the site's book is the record.
 
 import { createHash } from 'node:crypto';
-import { ACCT_SALT, finishOf, type ItemId, type PerkList } from '../api/_lib/shop-items';
+import { ACCT_SALT, skinFor, type ItemId, type PerkList } from '../api/_lib/shop-items';
 import { SITE_URL } from './tags';
 
 /** where the store's list is asked for: the site, or a desk's own (a local dev page: .env.local-server). Asked when
@@ -74,8 +75,9 @@ export const perks = {
   skins(key: string): ItemId[] {
     return list.who[acct(key)]?.[3] ?? [];
   },
-  finish(key: string, gun: string) {
-    return finishOf(this.skins(key), gun);
+  /** their finish for a gun of this id, if they own one */
+  skin(key: string, gun: string): ItemId | null {
+    return skinFor(this.skins(key), gun);
   },
   /** for a test: the list as given */
   set(next: PerkList) {

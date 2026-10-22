@@ -24,6 +24,7 @@ import { dropInfo, flightNow, flights } from './drops';
 import { partyIn, partyOut } from './party';
 import { pinned } from './pinned';
 import { perks } from './perks';
+import { plating } from './plates';
 import { SHOP, type ItemId } from '../api/_lib/shop-items';
 
 export interface Client {
@@ -42,6 +43,8 @@ export interface Client {
   resumed: boolean;
   w: string | null;
   m: string[];
+  /** the look of the gun in their hands, if a finish has been put on it (plates.ts) */
+  f?: string;
   g: string[];
   b: Slung[];
   alive: boolean;
@@ -180,7 +183,7 @@ export function broadcastNear(m: S2C, x: number, z: number, within: number, exce
   }
 }
 
-export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key) });
+export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, ...(c.f ? { f: c.f } : {}), g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key) });
 
 /** what a player has from the store, as the others are told it (server/perks.ts): nothing said where there is nothing */
 function perkInfo(key: string): { sk?: string[]; vip?: true } {
@@ -257,9 +260,10 @@ export const round2 = (v: number) => Math.round(v * 100) / 100;
 
 // (What makes a thing, and a whole inventory, out of what a game says is in src/sim/inventory.ts since 2026-10-13,
 // where it is tried without a server: test/clothes.test.ts. A thing's cargo is read to as many things as it has
-// cells, where it was forty; three deep, where it was two; and the hot keys are kept.)
+// cells, where it was forty; three deep, where it was two; and the hot keys are kept. Each wears the finish the
+// server's record says, and no other: plates.ts.)
 export function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
-  return cleanThing(raw, cleanName, depth);
+  return plating.stamp(cleanThing(raw, cleanName, depth));
 }
 
 export function cleanStored(list: unknown): StoredItem[] {
@@ -279,7 +283,7 @@ export function cleanStored(list: unknown): StoredItem[] {
  * theirs (upgradeInventory in src/sim/inventory.ts, the same the game itself reads a save with).
  */
 export function cleanInventory(raw: unknown): SerializedInventory | null {
-  return cleanCarried(raw, cleanName);
+  return plating.stampAll(cleanCarried(raw, cleanName));
 }
 
 export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {

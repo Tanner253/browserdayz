@@ -233,7 +233,7 @@ function done(q: Quote, status: 'ok' | 'look', sig: string, p: Perks, serial?: n
     : q.item === 'vip' ? `You are VIP to ${day(p.vip)}.${q.discord ? ' Your Discord role is given by hand, usually within a day.' : ' Say your Discord name on Discord for the VIP role.'}`
       : q.item === 'noads' ? `No ads to ${day(p.noads)}.`
         : q.item === 'coffee' ? 'Thank you. A cup is by your name in chat for a week.'
-          : `${it.name}${serial ? `, No. ${serial}${it.limit ? ` of ${it.limit}` : ''}` : ''}: yours. Every one you find wears it, in this game and the next.`;
+          : `${it.name}${serial ? `, No. ${serial}${it.limit ? ` of ${it.limit}` : ''}` : ''}: yours. Open your inventory and Apply it to any you carry: that gun keeps it, whoever holds it next.`;
   // (the moment it is theirs, shown as such: the thing itself, gold or nickel or VIP's purple, and its number if it has one)
   const look = it.skin ? it.skin.finish : q.item === 'vip' ? 'vip' : 'plain';
   const shown = status !== 'ok' ? '' : it.skin

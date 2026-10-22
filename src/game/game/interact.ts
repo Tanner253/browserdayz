@@ -19,7 +19,8 @@ import { WELL } from '../../sim/wells';
 import { waterName } from '../../sim/water';
 import { jobsFor, progress as jobDone } from '../../sim/jobs';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
-import { finishDay } from '../finish';
+import { finishDay, finishOn, type Finish } from '../finish';
+import { lookOf } from '../../../api/_lib/shop-items';
 
 export const interactMethods = {
   // ------------------------------------------------------------ interaction
@@ -324,12 +325,37 @@ export const interactMethods = {
     this.avatar.wearTag(this.player.dead ? null : this.perks.vip ? 'gold' : 'steel');
     finishDay();
     const it = this.weapons.equippedItem;
-    const finish = it ? this.perks.finish(it.id) : null;
+    const finish = finishOn(it);
     const key = it ? `${it.id}|${fittedOf(it).join(',')}|${finish ?? ''}` : '';
     if (key === this.heldKey) return;
     this.heldKey = key;
     // (with what is fitted to it and the magazine in it, and its finish from the store, as everybody else is shown it)
     const h = it ? this.makeHeld(it.id, fittedOf(it), finish) : null;
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+  },
+
+  /** the store finish of theirs this gun can be given, where it does not wear it already (server/plates.ts) */
+  finishFor(this: Game, it: ItemInstance): Finish | null {
+    const f = this.online ? this.perks.skin(it.id) : null;
+    return f && it.finish !== f ? lookOf(f) : null;
+  },
+
+  /** Apply: asked of the server, which keeps it on the gun; what it carries is told first, so that it finds the gun */
+  applyFinish(this: Game, it: ItemInstance) {
+    if (!this.finishFor(it)) return;
+    this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
+    this.net.send({ t: 'finish', uid: it.uid });
+  },
+
+  /** the server has put a finish on one of our guns: on it from now, wherever it goes */
+  finished(this: Game, uid: string, f: string) {
+    const it = this.inv.find((t) => t.uid === uid) ?? (this.inHand?.uid === uid ? this.inHand : null);
+    if (!it) return;
+    it.finish = f;
+    this.weapons.refinish();
+    this.syncHeld();
+    this.inventoryChanged();
+    audio.ui('move');
+    this.hud.note(`${itemName(it)}: yours to carry, and to lose`, 'info');
   },
 };

@@ -5,6 +5,7 @@ import { KIT_ITEMS } from './items/kit';
 import { WEAR_ITEMS } from './items/wear';
 import { TOOL_ITEMS } from './items/tools';
 import type { LootRule } from './items/rules';
+import { lookOf } from '../../api/_lib/shop-items';
 // Item database. Pure data; shared by the client UI, world spawning and the server.
 // Grid sizes follow DayZ conventions (1 cell ~ 10 cm).
 
@@ -180,6 +181,11 @@ export interface ItemInstance {
   held?: number;
   /** a bottle (see `sips`): how many drinks are left in it */
   left?: number;
+  /**
+   * a gun with a store finish put on it (the shop's item id, 'deagle_gold'): it goes with the gun until the gun is
+   * gone, Rust's way. Only ever the server's word (server/plates.ts); a game's own is not read.
+   */
+  finish?: string;
 }
 
 /**
@@ -225,7 +231,9 @@ export function tagClock(it: ItemInstance): string {
 /** what an item is called: a dog tag carries its owner's name */
 export function itemName(it: ItemInstance): string {
   const d = ITEMS[it.id];
-  return it.id === 'dogtag' && it.owner ? `${tagOwner(it)}'s Dog Tag` : d.name;
+  if (it.id === 'dogtag' && it.owner) return `${tagOwner(it)}'s Dog Tag`;
+  const look = lookOf(it.finish);
+  return look ? `${look === 'gold' ? 'Gold' : 'Nickel'}-plated ${d.name}` : d.name;
 }
 
 /** the name stamped on a tag, safe to put into markup (it was typed by another player) */

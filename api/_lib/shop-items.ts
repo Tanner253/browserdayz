@@ -20,10 +20,10 @@ export interface ShopItem {
 
 export const SHOP: Record<ItemId, ShopItem> = {
   vip: { name: 'VIP', usd: 5, days: 30, say: 'Queue pass, [VIP] in purple in chat and on the board, the VIP role and channel on Discord, no ads, and a gold dog tag.' },
-  deagle_gold: { name: 'Gold-plated Desert Eagle', usd: 4.99, limit: 100, skin: { gun: 'deagle', finish: 'gold' }, say: 'Every Desert Eagle you find is gold-plated, as everybody sees it.' },
-  m9_nickel: { name: 'Nickel-plated M9', usd: 2.99, skin: { gun: 'm9', finish: 'nickel' }, say: 'Every M9 you find is nickel-plated.' },
-  colt_nickel: { name: 'Nickel-plated Colt', usd: 2.99, skin: { gun: 'colt', finish: 'nickel' }, say: 'Every Colt you find is nickel-plated.' },
-  knife_gold: { name: 'Gold knife', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'gold' }, say: 'Every knife you find has a gold blade.' },
+  deagle_gold: { name: 'Gold-plated Desert Eagle', usd: 4.99, limit: 100, skin: { gun: 'deagle', finish: 'gold' }, say: 'Apply it to any Desert Eagle you carry: that gun is gold-plated for good, whoever holds it next.' },
+  m9_nickel: { name: 'Nickel-plated M9', usd: 2.99, skin: { gun: 'm9', finish: 'nickel' }, say: 'Apply it to any M9 you carry: that gun is nickel-plated for good.' },
+  colt_nickel: { name: 'Nickel-plated Colt', usd: 2.99, skin: { gun: 'colt', finish: 'nickel' }, say: 'Apply it to any Colt you carry: that gun is nickel-plated for good.' },
+  knife_gold: { name: 'Gold knife', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'gold' }, say: 'Apply it to any knife you carry: its blade is gold for good.' },
   noads: { name: 'No ads', usd: 1.99, days: 30, say: 'The site and the game with no ads (VIP has this too).' },
   coffee: { name: 'Buy the dev a coffee', usd: 0, say: 'Any amount, with a note if you like. A cup by your name in chat for a week.' },
 };
@@ -62,11 +62,11 @@ export const isAcct = (v: unknown): v is string => typeof v === 'string' && /^[0
 /** whether ads are kept from this account now: VIP or no-ads running */
 export const adFree = (p: Perks, now = Date.now()) => p.vip > now || p.noads > now;
 
-/** the finish a player's gun of this id wears, if they own one */
-export function finishOf(skins: readonly string[], gun: string): 'gold' | 'nickel' | null {
-  for (const id of skins) {
-    const s = (SHOP as Record<string, ShopItem>)[id]?.skin;
-    if (s && s.gun === gun) return s.finish;
-  }
+/** the finish of theirs that can be put on a gun of this id, if they own one */
+export function skinFor(skins: readonly string[], gun: string): ItemId | null {
+  for (const id of skins) if ((SHOP as Record<string, ShopItem>)[id]?.skin?.gun === gun) return id as ItemId;
   return null;
 }
+
+/** how a gun wearing this finish (a shop item id, as on the gun: ItemInstance.finish) looks, or null for none */
+export const lookOf = (id: string | undefined): 'gold' | 'nickel' | null => (id && (SHOP as Record<string, ShopItem>)[id]?.skin?.finish) || null;
