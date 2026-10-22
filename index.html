@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>ZONA — PvP survival shooter · play to earn</title>
-    <meta name="description" content="ZONA is a PvP survival shooter that runs in your browser. Loot, fight other players and the infected, take a dog tag, stay alive fifteen minutes and cash it in." />
+    <title>ZONA — Free Browser FPS Like DayZ · PvP Survival &amp; Battle Royale</title>
+    <meta name="description" content="A free-to-play FPS in your browser, like DayZ and Rust: loot, fight players and the infected, survive. Battle Royale and Arena too. No download." />
+    <link rel="canonical" href="https://www.zonapvp.fun/" />
     <meta name="theme-color" content="#0d100c" />
     <link rel="icon" type="image/svg+xml" href="/brand/zona-mark.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/brand/icon-32.png" />
     <link rel="apple-touch-icon" href="/brand/icon-180.png" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="ZONA" />
-    <meta property="og:title" content="ZONA — PvP survival shooter · play to earn" />
-    <meta property="og:description" content="A PvP survival shooter in your browser. Loot, fight other players and the infected, take a dog tag, stay alive fifteen minutes and cash it in." />
+    <meta property="og:title" content="ZONA — free browser FPS like DayZ · PvP survival &amp; battle royale" />
+    <meta property="og:description" content="A free PvP survival shooter in your browser. Loot, fight other players and the infected, take a dog tag, stay alive fifteen minutes and cash it in. Battle Royale and Arena too." />
     <meta property="og:url" content="https://www.zonapvp.fun/" />
     <meta property="og:image" content="https://www.zonapvp.fun/brand/og.jpg" />
     <meta property="og:image:width" content="1200" />
@@ -25,8 +26,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <!-- For search (the owner, 2026-10-21: "'free to play fps games' 'fps games like dayz and rust' etc... should put us up there"). No ratings or counts: nothing here that is not true. -->
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@graph":[
+        {"@type":["VideoGame","SoftwareApplication"],"name":"ZONA","url":"https://www.zonapvp.fun/","image":"https://www.zonapvp.fun/brand/og.jpg",
+         "description":"A free-to-play PvP survival FPS in your browser, in the spirit of DayZ: loot an open world, fight players and the infected, survive. Battle Royale and Arena modes.",
+         "genre":["First-person shooter","Survival","Battle royale"],"gamePlatform":["Web browser"],"applicationCategory":"GameApplication","operatingSystem":"Any (web browser)",
+         "playMode":"MultiPlayer","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+         "sameAs":["https://x.com/zonaSOL_","https://github.com/Tanner253/browserdayz"]},
+        {"@type":"WebSite","name":"ZONA","url":"https://www.zonapvp.fun/"}
+      ]}
+    </script>
   </head>
   <body>
+    <noscript>
+      <h1>ZONA: a free browser FPS like DayZ</h1>
+      <p>A free-to-play PvP survival shooter that runs in your browser: loot an open world, fight other players and the infected, survive. Battle Royale and Arena too. Turn on JavaScript to play.</p>
+      <p><a href="/games-like-dayz/">Games like DayZ and Rust</a> · <a href="/free-fps-games/">Free FPS in your browser</a> · <a href="/browser-battle-royale/">Browser battle royale</a> · <a href="/changelog/">Changelog</a></p>
+    </noscript>
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <div id="rotate" role="alert">

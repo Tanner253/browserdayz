@@ -65,6 +65,18 @@
     {
       "source": "/br",
       "destination": "/index.html"
+    },
+    {
+      "source": "/games-like-dayz",
+      "destination": "/games-like-dayz/index.html"
+    },
+    {
+      "source": "/free-fps-games",
+      "destination": "/free-fps-games/index.html"
+    },
+    {
+      "source": "/browser-battle-royale",
+      "destination": "/browser-battle-royale/index.html"
     }
   ],
   "functions": {

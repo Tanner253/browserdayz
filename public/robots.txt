@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+# The API and the payouts page are not for search (the payouts page claims pending tags when its script runs).
+Disallow: /api/
+Disallow: /payouts
+
+Sitemap: https://www.zonapvp.fun/sitemap.xml
