@@ -22,8 +22,12 @@ import WebSocket from 'ws';
 
 /** DESK_CAP in src/core/assets.ts, which looks for the copies under this name: the two out of step, the game loads the files whole */
 const CAP = { colour: 256, other: 128 };
+/** and DESK_UP there: the models a computer draws a size up (Kamenka's two downloaded buildings, the owner 2026-10-23) */
+const UP = { colour: 512, other: 256 };
+const UP_FILES = new Set(['models/house_interior.glb', 'models/shanty_mansion.glb']);
 const ROOT = path.resolve('public/assets');
-const OUT = path.join(ROOT, 'lean', `${CAP.colour}-${CAP.other}`);
+const dirOf = (cap) => path.join(ROOT, 'lean', `${cap.colour}-${cap.other}`);
+const OUTS = [dirOf(CAP), dirOf(UP)];
 const force = process.argv.includes('--force');
 
 /** the version the build gives a file (vite.config.ts, assetVersions) */
@@ -42,7 +46,7 @@ function readGlb(bytes) {
  * as colour; normal, roughness, metalness and occlusion as the rest). A picture only another slot uses (an
  * extension's) is left whole, as the game leaves it. Null: a file this does not copy (and the game loads whole).
  */
-function cuts(json) {
+function cuts(json, cap) {
   if ((json.scenes?.length ?? 1) > 1) return null;
   const source = (ti) => {
     const t = json.textures?.[ti];
@@ -64,7 +68,7 @@ function cuts(json) {
   for (const [i, k] of kind) {
     const img = json.images?.[i];
     if (img?.bufferView === undefined) return null;
-    out.set(i, CAP[k]);
+    out.set(i, cap[k]);
   }
   return out;
 }
@@ -224,7 +228,7 @@ const walk = (dir) => {
   }
 };
 walk(ROOT);
-fs.mkdirSync(OUT, { recursive: true });
+for (const out of OUTS) fs.mkdirSync(out, { recursive: true });
 
 const page = await chrome();
 const made = new Set();
@@ -234,9 +238,10 @@ try {
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
     const bytes = fs.readFileSync(file);
     const name = `${rel.slice(0, -4)}.${version(bytes)}.glb`;
-    const dest = path.join(OUT, name);
+    const cap = UP_FILES.has(rel) ? UP : CAP;
+    const dest = path.join(dirOf(cap), name);
     const { json, bin } = readGlb(bytes);
-    const caps = cuts(json);
+    const caps = cuts(json, cap);
     if (!caps) {
       console.log(`  ${rel}: left whole (a picture used two ways, or not in the file)`);
       skipped++;
@@ -298,5 +303,5 @@ const sweep = (dir) => {
     }
   }
 };
-sweep(OUT);
+for (const out of OUTS) sweep(out);
 console.log(`${made.size} copies (${copied} made now, ${stale} old ones taken away), ${whole} files small enough as they are, ${skipped} left whole: ${(was / 1048576).toFixed(1)} -> ${(now / 1048576).toFixed(1)} MB`);
