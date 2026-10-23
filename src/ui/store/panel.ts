@@ -109,6 +109,7 @@ function list(v: StoreView) {
           <li><b>Gold dog tag:</b> the tag a killer takes from you is gold-plated (only its look changes)</li>
         </ul>
         <label class="st-field">Your Discord name, for the role <input name="discord" maxlength="40" placeholder="optional" autocomplete="off"></label>
+        <figure class="st-tagpic"><img src="/shop/vip_tag.jpg" alt="A survivor wearing the gold dog tag on the chest, over a vest" loading="lazy" onerror="this.parentElement.remove()"><figcaption>The gold dog tag, as others see you wear it</figcaption></figure>
         <div class="st-row"><b class="st-price">${money(SHOP.vip.usd)}<small> / 30 days</small></b><button type="button" class="st-buy" data-buy="vip">${vip ? 'Add 30 days' : 'Buy VIP'}</button></div>
         ${vip ? `<p class="st-small">Runs to ${day(p.vip)}. Each payment adds 30 days; nothing renews by itself.</p>` : '<p class="st-small">Not a subscription: each payment adds 30 days.</p>'}
       </article>

@@ -34,6 +34,10 @@
 .st-card.nickel .st-swatch { background: radial-gradient(circle at 35% 30%, #ffffff, #c9ccd0 40%, #6d7277 82%); }
 .st-card img { width: calc(100% + 32px); margin: -14px -16px 2px; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
 .st-card img + .st-swatch { display: none; }
+/* a VIP's gold dog tag, worn (the owner, 2026-10-23: "in the store we should show a picture of the gold dogtag in the space", "player wearing the gold dogtag"): in the VIP card's middle, not along its top as the others' pictures are */
+.st-card .st-tagpic { margin: auto 0 0; }
+.st-card .st-tagpic img { width: 100%; margin: 0; border: 1px solid rgba(181, 123, 255, 0.35); }
+.st-tagpic figcaption { margin-top: 5px; font-size: 12px; text-align: center; color: #b9a6d8; }
 .st-card.skin h3 { padding-right: 40px; }
 .st-more { grid-column: span 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .st-more .st-card h3 { font-size: 16px; }
