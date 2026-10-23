@@ -3,7 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import * as THREE from 'three';
-import { rejoinSoon, reloadPage } from '../../core/leave';
+import { rejoining, rejoinSoon, reloadPage } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { shown } from '../../core/keys';
@@ -166,6 +166,34 @@ export const onlineMethods = {
     this.horde.clear();
     this.party.set([], 0);
     this.hud.setLive(false);
+  },
+
+  /**
+   * Back in after a line that dropped by itself, on the page as it is: out of the world the server had put down, as a
+   * switch to another game does it (Modes.leave), and in again as Deploy goes in, to the body the server kept. The page
+   * was loaded again for it, which took two to five minutes on the live log of 2026-10-23, and the body stood in the
+   * world all that while: DERREN's was killed 37 s after the line dropped, Xafa's after 4 min 44 s, and both came back
+   * to start again (a player, 2026-10-20: "the server just reloads my game out of nowhere and when i get in i spawn
+   * fresh"). A server not reached is tried again, more slowly each time, for two minutes before it is said.
+   */
+  async rejoin(this: Game) {
+    // (the word rejoinSoon leaves for a page loaded again is not wanted here: taken, or the next reload went in by itself)
+    rejoining();
+    this.modes.leave();
+    this.hud.showStart(true, false, 'Connection lost: getting you back in…');
+    const began = performance.now();
+    try {
+      for (let wait = 500; ; wait = Math.min(wait * 2, 8000)) {
+        const gen = this.joinGen;
+        await new Promise((r) => setTimeout(r, wait));
+        // (another way in taken meanwhile: Deploy pressed, or another game picked from the menu)
+        if (gen !== this.joinGen) return;
+        if ((await this.join(performance.now() - began < 120_000 ? 'retry' : 'last')) !== 'unreached') return;
+      }
+    } catch {
+      // (and if the way back in on this page fails, the page is loaded again, as it always used to be)
+      reloadPage();
+    }
   },
 
   /** Everything the game does with what the server says, set up once a page (see enterOnline). */
@@ -577,12 +605,8 @@ export const onlineMethods = {
       this.input.unlock();
       const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
       if (!said || this.net.refused) {
-        // (dropped by itself, not ended by the server: the page loads again and goes straight back in, see rejoinSoon)
-        if (!said && !this.net.refused && reason === 'Connection to the server was lost.' && !this.player.dead && rejoinSoon()) {
-          this.hud.fatal('Connection lost. Getting you back in…');
-          window.setTimeout(reloadPage, 1200);
-          return;
-        }
+        // (dropped by itself, not ended by the server: straight back in, see rejoin and rejoinSoon)
+        if (!said && !this.net.refused && reason === 'Connection to the server was lost.' && !this.player.dead && rejoinSoon()) return void this.rejoin();
         return void this.hud.fatal(reason);
       }
       this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);

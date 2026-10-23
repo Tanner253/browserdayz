@@ -1567,6 +1567,7 @@ export interface Game {
   save: Methods<typeof enterMethods>['save'];
   enterOnline: Methods<typeof onlineMethods>['enterOnline'];
   leaveOnline: Methods<typeof onlineMethods>['leaveOnline'];
+  rejoin: Methods<typeof onlineMethods>['rejoin'];
   wireNet: Methods<typeof onlineMethods>['wireNet'];
   around: Methods<typeof onlineMethods>['around'];
   openLying: Methods<typeof onlineMethods>['openLying'];
