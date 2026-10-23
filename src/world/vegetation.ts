@@ -8,6 +8,7 @@ import { CONTAINER, paintBlue } from './buildings';
 import { isSearchable } from '../sim/storage';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
+import { TOUCH } from '../core/device';
 import { physics, type Surface } from '../core/physics';
 import { boundsOf, extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
@@ -422,8 +423,15 @@ class LodSet {
 // ------------------------------------------------------------------ impostors
 
 const FRAMES = 8;
-const FRAME_W = 256;
-const FRAME_H = 384;
+/**
+ * On a phone each frame is half the size each way. Drawn with four samples a pixel, the whole atlas was 300 MB on the
+ * card while it was made, at the very moment iPhones closed the page (their start reports, 2026-10-22: most deaths at
+ * "forest"; a player: "I get 'a problem occured' on ios"). A card is drawn 130 m off and more, under a hundred
+ * pixels tall on a phone's screen: a frame of 192 is more than it has room to show.
+ */
+const CARD_K = TOUCH ? 0.5 : 1;
+const FRAME_W = 256 * CARD_K;
+const FRAME_H = 384 * CARD_K;
 
 /** A picture drawn with several samples a pixel, copied texel for texel to one without them (its mipmaps made again as
  * three makes them, from the same level), and the first let go of. */
@@ -516,7 +524,7 @@ class Impostors {
     scene.environmentIntensity = 0.9;
     const sun = new THREE.DirectionalLight(atmo.sunColor, atmo.sunIntensity);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(2048 * CARD_K, 2048 * CARD_K);
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.03;
     scene.add(sun, sun.target);
