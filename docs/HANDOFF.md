@@ -90,6 +90,17 @@ Both performance tracks merged and on the site:
   this is on the todo list after, ios users error. but i dont wanan deal with this till both active tracks are done and
   merged and we are deployed". The tracks are `vram-fps` (held-server) and `frame-cost` (branch claude/frame-cost-350a15).
   Earlier iPhone history: memory notes load-and-phones-2026-10-11 (phone picture memory) and mobile-touch-support.
+  **FIXED 2026-10-23 on branch claude/ecstatic-napier-41c3e5 (site only; changelog `#phones-memory`), NOT tried on a real
+  iPhone.** The phone start reports (`npx vercel logs --environment production --no-branch --since 7d --query "iPhone"
+  --limit 1000 --json`, lines `boot {...}`) put 26 of ~40 iPhone deaths at the stage "forest", the rest a lost WebGL context
+  there or at shader compile. There the tree-card atlas was baked at 2048x3072, half floats, 4 samples: 300 MB in one go.
+  Phones now (all TOUCH-gated, computers unchanged): atlas frames half size (vegetation.ts CARD_K), PHONE_CAP 512/256,
+  far models from the lean copies (assets.ts leanOf), the Renderer made at the phone's own settings (main.ts; it started
+  at scale 1, 4x MSAA, AO until Game.init). Measured at phone defaults, 844x390@3 (card + decoded pictures): forest stage
+  589 -> 169 MB, menu 982 -> 684, in game 1641 -> 1195. Left in the page, not cut: Rapier's WASM 255 MB (2.1 M trimesh
+  triangles: collisions), scene geometry ~133 MB, ~180 canvases (106 MB) that `shrink` keeps as images (iOS caps canvas
+  memory). Tools and figures: progress/ios-mem/ (mem-pre.js counts card memory by boot stage; TRAP: play.mjs puts ULTRA
+  settings in a fresh profile unless PLAY_GFX is given: give the phone's own, {"scale":0.85,"msaa":2,"ao":"off",...}).
 
 ## LIVE NOW (2026-10-21 ~00:47 UTC): server from `0b77446`, site from `4a8f542` (its changelog entry); PROTOCOL 56
 All of `held-server` shipped: the performance round's later work (CardKeep, noclip, far-tree atlas, two forest shader
