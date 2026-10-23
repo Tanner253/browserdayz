@@ -746,3 +746,43 @@ body.tr-cut23 .x16-cap { top: 80px; bottom: auto; }
 body.tr-br25 .br-lobby-n, body.tr-br25 .br-lobby-v, body.tr-br25 .br-count, body.tr-br25 .br-lobby-code, body.tr-br25 .door-on, body.tr-br25 .door-stats, body.tr-br25 .br-end-rows { visibility: hidden !important; }
 /* (and the film's words and pointer over the main menu, which stands over everything else) */
 body.tr-br25 #tr-overlay { z-index: 2147483000; }
+
+/* the twenty-seventh, the battle royale laid into the gameplay trailer (shots27.ts): of the game's screen only its end,
+   the place and what it means, over the last shot; nothing else of the HUD and none of its buttons */
+body.tr-br27 #hud > *:not(.br-hud), body.tr-br27 .br-hud > *:not(.br-end), body.tr-br27 .br-end-go { visibility: hidden !important; }
+
+/* the twenty-sixth, the gameplay trailer (shots26.ts): another take's footage full screen under the words (footage.ts),
+   the three modes side by side, its title on the first frame and its end card; upright (tr-tall) laid out for a phone */
+.x26-reel { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.x26-panel { position: absolute; top: 0; bottom: 0; width: 33.4%; height: 100%; object-fit: cover; z-index: 0; border-right: 3px solid #0b0c0b; box-sizing: border-box; }
+.x26-panel.p0 { left: 0; }
+.x26-panel.p1 { left: 33.3%; }
+.x26-panel.p2 { right: 0; border-right: 0; }
+body.tr-tall .x26-panel { left: 0; right: 0; width: 100%; height: 33.4%; border-right: 0; border-bottom: 3px solid #0b0c0b; }
+body.tr-tall .x26-panel.p0 { top: 0; bottom: auto; }
+body.tr-tall .x26-panel.p1 { top: 33.3%; bottom: auto; }
+body.tr-tall .x26-panel.p2 { top: auto; bottom: 0; border-bottom: 0; }
+.x26-words { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); align-items: end; padding-bottom: 70px; text-align: center; }
+.x26-words span { font: 800 46px/1 var(--trailer-font); letter-spacing: 0.08em; color: #f2ede2; text-shadow: 0 4px 26px rgba(0, 0, 0, 0.9); transform: translateY(calc((1 - var(--k, 1)) * 14px)); }
+.x26-words span:nth-child(2) { color: #ffd35a; }
+body.tr-tall .x26-words { grid-template-columns: 1fr; grid-template-rows: repeat(3, 1fr); align-items: end; padding-bottom: 0; }
+body.tr-tall .x26-words span { padding-bottom: 36px; }
+.x26-title { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; text-align: center; background: radial-gradient(ellipse at 50% 50%, rgba(8, 10, 9, 0.1), rgba(8, 10, 9, 0.5)); }
+.x26-title img { width: 96px; margin-bottom: 10px; filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.7)); }
+.x26-title b { font: 800 150px/0.9 var(--trailer-font); letter-spacing: 0.08em; color: #f2ede2; text-shadow: 0 6px 40px rgba(0, 0, 0, 0.7); }
+.x26-title i { margin-top: 18px; padding: 6px 16px; font: 700 19px var(--trailer-font); font-style: normal; letter-spacing: 0.24em; color: #141109; background: #ffd35a; }
+body.tr-tall .x26-title b { font-size: 132px; }
+body.tr-tall .x26-title i { font-size: 15px; letter-spacing: 0.16em; padding: 6px 12px; }
+.x26-end { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; background: #0b0c0b; }
+.x26-end img { width: 104px; margin-bottom: 12px; }
+.x26-end b { font: 800 128px/0.92 var(--trailer-font); letter-spacing: 0.08em; color: #f2ede2; }
+.x26-end p { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.x26-end p span { padding: 6px 14px; font: 700 20px var(--trailer-font); letter-spacing: 0.14em; color: #f2ede2; border: 2px solid rgba(255, 211, 90, 0.7); border-radius: 4px; }
+.x26-end h5 { margin-top: 20px; font: 700 18px var(--trailer-font); letter-spacing: 0.3em; color: #e8cf8a; }
+.x26-end u { margin-top: 22px; padding: 8px 26px; font: 800 40px var(--trailer-font); letter-spacing: 0.14em; text-decoration: none; color: #14110b; background: #ffd35a; }
+body.tr-tall .x26-end p { flex-direction: column; align-items: center; }
+body.tr-tall .x26-end h5 { font-size: 14px; letter-spacing: 0.18em; }
+body.tr-tall .x21-chip { left: 40px; bottom: 150px; }
+body.tr-tall .x21-chip b { font-size: 40px; }
+/* (the key hints' list at the foot of the left side: a trailer's HUD without the reminders a new player is shown) */
+body.tr-cut26 .hud-keys { visibility: hidden !important; }

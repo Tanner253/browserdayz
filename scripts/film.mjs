@@ -15,6 +15,10 @@
 //   node scripts/film.mjs --bitrate 2200000   the picture's bits a second, said outright
 //   node scripts/film.mjs --still             the page never hears the dev server say a file has changed (see below)
 //   node scripts/film.mjs --port 9334         Chrome's own debugging port, when another film or the headless game tool has 9333
+//   node scripts/film.mjs --frames br26       every frame kept as a picture (tools/trailer/out/br26/<frame>.jpg) with every sound the game asked for
+//                                             (sounds.json): footage one cut lays into another (the twenty-sixth lays in the twenty-seventh's match)
+//   node scripts/film.mjs --tall              upright, 1080x1920 for phones and Shorts (the page is told ?tall=1 and frames for it)
+//   node scripts/film.mjs --soft              drawn by the processor (swiftshader): slow, but nothing asked of the graphics card (for looking, not for takes)
 //
 // The dev server must not reload during a take: do not edit game source while this runs. When other hands are
 // saving files in the tree all the while, that cannot be promised: --still runs assets-src/_wf/me/still.js in the
@@ -50,7 +54,13 @@ const twice = !!arg('twice', false);
 const motion = !!arg('motion', false);
 const cut = String(arg('cut', '1'));
 const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '') + (web ? '-web' : '')));
-const URL_ = String(arg('url', `http://localhost:5173/tools/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}${web ? '&web=1' : ''}`));
+const framesDir = arg('frames', null) === null ? null : path.join(OUT, String(arg('frames')));
+const tall = !!arg('tall', false);
+const soft = !!arg('soft', false);
+// (the page is laid out at 1280x720, or 720x1280 upright, and drawn denser or sparser)
+const VW = tall ? 720 : 1280, VH = tall ? 1280 : 720;
+const URL0 = String(arg('url', `http://localhost:5173/tools/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}${web ? '&web=1' : ''}`));
+const URL_ = tall && !/[?&]tall=/.test(URL0) ? `${URL0}${URL0.includes('?') ? '&' : '?'}tall=1` : URL0;
 const still = !!arg('still', false);
 const PORT = Number(arg('port', 9333));
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
@@ -58,12 +68,13 @@ if (!CHROME) throw new Error('no Chrome or Edge found');
 fs.mkdirSync(OUT, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-await takeCard(`film.mjs ${name}`);
+if (!soft) await takeCard(`film.mjs ${name}`);
+if (framesDir) fs.mkdirSync(framesDir, { recursive: true });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'zona-film-'));
 const chrome = spawn(CHROME, [
-  '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11',
+  '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, ...(soft ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11']),
   '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--mute-audio', '--hide-scrollbars',
-  '--autoplay-policy=no-user-gesture-required', '--window-size=1280,720', 'about:blank',
+  '--autoplay-policy=no-user-gesture-required', `--window-size=${VW},${VH}`, 'about:blank',
 ], { stdio: 'ignore' });
 const quit = () => { try { chrome.kill(); } catch { /* gone */ } };
 process.on('exit', quit);
@@ -101,7 +112,7 @@ const run = async (expression) => {
 
 await cdp('Page.enable');
 await cdp('Runtime.enable');
-await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: scale, mobile: false });
+await cdp('Emulation.setDeviceMetricsOverride', { width: VW, height: VH, deviceScaleFactor: scale, mobile: false });
 // (--still: the dev server's word that a file has changed is never heard by this page)
 if (still) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: fs.readFileSync(path.join(ROOT, 'assets-src', '_wf', 'me', 'still.js'), 'utf8') });
 await cdp('Page.navigate', { url: URL_ });
@@ -119,16 +130,17 @@ console.log(`\nGPU: ${info.gpu}`);
 if (/swiftshader|software/i.test(info.gpu)) console.log('  WARNING: software rendering. The picture will be slow and may differ.');
 const total = info.seconds;
 const first = Math.round(from * fps), last = Math.round(Math.min(to ?? total, total) * fps);
-console.log(`${name}: ${(first / fps).toFixed(2)}s to ${(last / fps).toFixed(2)}s, ${last - first} frames at ${fps} fps, ${Math.round(1280 * scale)}x${Math.round(720 * scale)}`);
+console.log(`${name}: ${(first / fps).toFixed(2)}s to ${(last / fps).toFixed(2)}s, ${last - first} frames at ${fps} fps, ${Math.round(VW * scale)}x${Math.round(VH * scale)}`);
 
 const kept = [];
 async function take(pass) {
   const hashes = [];
-  await run(`window.tr.begin(${JSON.stringify({ fps, first, last, width: Math.round(1280 * scale), height: Math.round(720 * scale), video: !noVideo && pass === 0, ...(bits ? { bitrate: bits } : menu ? { bitrate: 3_000_000 } : web ? { bitrate: 2_100_000 } : {}), ...(web || menu ? { audio: 128_000 } : {}) })})`);
+  await run(`window.tr.begin(${JSON.stringify({ fps, first, last, width: Math.round(VW * scale), height: Math.round(VH * scale), video: !noVideo && pass === 0, ...(bits ? { bitrate: bits } : menu ? { bitrate: 3_000_000 } : web ? { bitrate: 2_100_000 } : {}), ...(web || menu ? { audio: 128_000 } : {}) })})`);
   const t0 = Date.now();
   for (let i = first; i < last; i++) {
     await run(`window.tr.step(${i})`);
-    const shot = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 93 });
+    const shot = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: framesDir ? 97 : 93 });
+    if (framesDir && pass === 0) fs.writeFileSync(path.join(framesDir, `${String(i).padStart(5, '0')}.jpg`), Buffer.from(shot.data, 'base64'));
     // for the two-takes test: a small grey copy of the frame (film grain averages out of it, a body in a different place does not)
     if (twice || motion) hashes.push(await sharp(Buffer.from(shot.data, 'base64')).resize(192, 108).greyscale().raw().toBuffer());
     if (pass === 0) {
@@ -152,6 +164,8 @@ async function take(pass) {
 
 const a = await take(0);
 console.log(`filmed in ${(a.seconds / 60).toFixed(1)} min`);
+// (the footage's own sounds, every call with its time in the film, listener and ambience too: laid in with its pictures)
+if (framesDir) fs.writeFileSync(path.join(framesDir, 'sounds.json'), JSON.stringify({ fps, first, last, width: Math.round(VW * scale), height: Math.round(VH * scale), sounds: await run('window.tr.soundLogAll()') }));
 if (motion) {
   // how far each frame is from the one before it (mean difference of a small grey copy, of 255), and where that falls to
   // a small part of what it is either side: the same picture photographed twice, and then two frames' worth of movement at once
@@ -177,7 +191,7 @@ if (!noVideo) {
 }
 if (kept.length) {
   // contact sheets: the cut at a glance, each still stamped with its time
-  const COLS = 5, ROWS = 4, W = 384, H = 216;
+  const COLS = tall ? 8 : 5, ROWS = tall ? 2 : 4, W = tall ? 216 : 384, H = tall ? 384 : 216;
   for (let s = 0; s * COLS * ROWS < kept.length; s++) {
     const page = kept.slice(s * COLS * ROWS, (s + 1) * COLS * ROWS);
     const tiles = await Promise.all(page.map(async (k, i) => ({

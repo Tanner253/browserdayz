@@ -393,6 +393,10 @@ export class Stage {
   feedKill(by: string, name: string, weapon: string, dist = 0, mine = true) {
     this.g.hud.feed(`${by} killed ${name} · ${weapon}${dist > 3 ? ` · ${Math.round(dist)} m` : ''}`, mine);
   }
+  /** sounds of footage made elsewhere (another cut's frames laid into this one), at their times in this film, in seconds */
+  addSounds(evs: { t: number; n: string; a: unknown[] }[]) {
+    if (logging) for (const e of evs) soundLog.push(e);
+  }
   /** the local player's own bullet in flight, if there is one */
   myBullet(): { pos: THREE.Vector3; vel: THREE.Vector3; travelled: number } | null {
     return this.g.weapons.bullets.find((b: Any) => !b.ghost) ?? null;
@@ -460,10 +464,10 @@ async function stage() {
     await realSleep(20);
   }
   if (g.isLoaded === false) console.log('[tr] the guns were not built in time');
-  // the world: the game's own single-player one, from the same seed every take (the twenty-fifth, the battle royale,
-  // joins a match on a server whose clock keeps step with this one's instead, in its own first shot: shots25.ts)
+  // the world: the game's own single-player one, from the same seed every take (the twenty-fifth and twenty-seventh, the
+  // battle royale, join a match on a server whose clock keeps step with this one's instead, in their first shot: shots25.ts)
   clock.reseed(7001);
-  if (CUT !== 25) {
+  if (CUT !== 25 && CUT !== 27) {
     await g.enterOffline();
     g.started = true;
     g.paused = false;
@@ -576,7 +580,14 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 25) {
+  if (CUT === 26 || CUT === 27) {
+    // (the twenty-sixth is the gameplay trailer, ZONA and the Arena played here and the battle royale laid in from the
+    // twenty-seventh, a match filmed on the film's own arena server and kept as pictures: see shots26.ts, shots27.ts)
+    const cut = CUT === 26 ? await import('./shots26') : await import('./shots27');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds();
+    ownScore = cut.score;
+  } else if (CUT === 25) {
     // (the twenty-fifth is the battle royale, played on the film's own arena server: see shots25.ts)
     const cut = await import('./shots25');
     shots = cut.buildShots(S);
@@ -821,7 +832,7 @@ tr.begin = async (o: { fps: number; first: number; last: number; width: number; 
   if (o.video) {
     muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: o.width, height: o.height, frameRate: fps }, audio: { codec: 'aac', sampleRate: 48000, numberOfChannels: 2 }, fastStart: 'in-memory' });
     venc = new VideoEncoder({ output: (chunk, meta) => muxer!.addVideoChunk(chunk, meta), error: (e) => console.error('[tr] video encoder', e.message) });
-    venc.configure({ codec: 'avc1.64002A', width: o.width, height: o.height, bitrate: o.bitrate ?? (o.width >= 1900 ? 14_000_000 : 5_000_000), framerate: fps, latencyMode: 'quality', avc: { format: 'avc' } });
+    venc.configure({ codec: 'avc1.64002A', width: o.width, height: o.height, bitrate: o.bitrate ?? (Math.max(o.width, o.height) >= 1900 ? 14_000_000 : 5_000_000), framerate: fps, latencyMode: 'quality', avc: { format: 'avc' } });
   }
   // a stretch from the middle: replay its shot from the top, unseen, so it arrives in the right state
   const T = o.first / fps;
@@ -918,6 +929,8 @@ tr.finish = async () => {
 };
 tr.piece = (k: number) => pieces[k];
 tr.soundLog = () => soundLog.filter((e) => e.n !== 'setListener' && e.n !== 'updateAmbience' && e.n !== 'body');
+/** every call, listener and ambience too: what footage laid into another cut needs to be heard as it was (film.mjs --frames) */
+tr.soundLogAll = () => soundLog.slice();
 
 stage().catch((e) => {
   console.error('[tr] staging failed', e);

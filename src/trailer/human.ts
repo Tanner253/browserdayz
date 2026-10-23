@@ -154,6 +154,51 @@ export class Operator {
   get speed() { return this.v.length(); }
 }
 
+/**
+ * A spectator's lens, as a game's own spectator view is (the owner, 2026-10-23: "it should be shown from 3rd person
+ * spectate"): it rides with the body it watches, so nothing is too fast for it, and where it sits round that body and
+ * where it looks (both offsets from the body, in the world's axes) are eased on springs, with a breath of wander.
+ */
+export class Spectate {
+  off = new THREE.Vector3();
+  look = new THREE.Vector3();
+  private ov = new THREE.Vector3();
+  private lv = new THREE.Vector3();
+  private fresh = true;
+  private lastT = NaN;
+  private w: Wander[];
+  constructor(seed: number, public fov = 50, public hz = 0.7, public lookHz = 1.1) {
+    this.w = [0, 1, 2].map((k) => new Wander(seed * 11 + k, 0.4));
+  }
+  reset() { this.fresh = true; }
+  update(t: number, body: THREE.Vector3, wantOff: THREE.Vector3, wantLook: THREE.Vector3): CamPose {
+    if (this.fresh) {
+      this.off.copy(wantOff);
+      this.look.copy(wantLook);
+      this.ov.set(0, 0, 0);
+      this.lv.set(0, 0, 0);
+      this.fresh = false;
+      this.lastT = t;
+    }
+    const dt = Math.min(0.1, Math.max(0, t - this.lastT));
+    this.lastT = t;
+    // (critically damped: it settles without swinging past)
+    const spring = (x: THREE.Vector3, v: THREE.Vector3, to: THREE.Vector3, hz: number) => {
+      const w = TAU * hz;
+      v.addScaledVector(to.clone().sub(x).multiplyScalar(w * w).addScaledVector(v, -2 * w), dt);
+      x.addScaledVector(v, dt);
+    };
+    if (dt > 0) {
+      spring(this.off, this.ov, wantOff, this.hz);
+      spring(this.look, this.lv, wantLook, this.lookHz);
+    }
+    const p = body.clone().add(this.off), l = body.clone().add(this.look), d = p.distanceTo(l);
+    l.x += this.w[0].at(t) * d * 0.004;
+    l.y += this.w[1].at(t) * d * 0.003;
+    return { p, l, fov: this.fov, roll: this.w[2].at(t) * 0.004 };
+  }
+}
+
 /** A target the view can look at: a world point, or a fixed heading. */
 export type Gaze = THREE.Vector3 | (() => THREE.Vector3) | { yaw: number; pitch: number };
 interface Look { at: number; to: Gaze; dur: number; over: number; y0: number; p0: number; follow: boolean }
