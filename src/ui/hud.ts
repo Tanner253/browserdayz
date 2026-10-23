@@ -103,6 +103,13 @@ export interface HotbarEntry {
 export const X_HANDLE = 'zonaSOL_';
 /** where its players talk to each other: the way in to the Discord, on the main menu */
 export const DISCORD = 'https://discord.com/invite/8ECdSH2vWE';
+/**
+ * The Discord and X, at every death and every match's end in every game (the owner, 2026-10-23: "whenever a player
+ * dies, on any game mode, we should show them the discord link and X link, to get them to join the discord. Same with
+ * game settlement on battle royale"). Each opens in a tab of its own: the game goes on behind.
+ */
+export const socialRow = () =>
+  `<div class="soc-row"><a class="soc-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer">Join the Discord</a><a class="soc-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer">Follow @${X_HANDLE}</a></div>`;
 export const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 
 /** an entry of the game's own changelog, as the menu's Updates panel lists it */
@@ -286,7 +293,7 @@ export class HUD {
       <div class="hud-feed"></div>
       <div class="hud-under"><div class="hud-board"></div><div class="hud-tags"></div></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
-      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a><div class="dead-ad" hidden></div></div>
+      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button>${socialRow()}<a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a><div class="dead-ad" hidden></div></div>
       <div class="hud-start">
         <div class="sm-cut"></div>
         <header class="sm-top">

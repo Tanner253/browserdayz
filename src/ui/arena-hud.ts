@@ -7,6 +7,7 @@
 import './arena-hud.css';
 import type { S2C } from '../net/protocol';
 import { ITEMS } from '../sim/items';
+import { socialRow } from './hud';
 
 type Score = Extract<S2C, { t: 'score' }>;
 type Kill = Extract<S2C, { t: 'kill' }>;
@@ -163,6 +164,7 @@ export class ArenaHud {
         <h2>${esc(head)}</h2>
         ${m ? `<div class="ah-final"><span>${esc(m.sides[0])}</span><b>${m.us} : ${m.them}</b><span>${esc(m.sides[1])}</span></div><div class="ah-cardboard">${this.boardHtml(m)}</div>` : ''}
         <p>${esc(reason)}</p>
+        ${socialRow()}
         <div class="ah-btns"><button type="button" class="ah-again">Back to the Arena</button><button type="button" class="ah-menu">Leave the Arena</button></div>
       </div>`;
     (end.querySelector('.ah-again') as HTMLElement).onclick = () => this.onGo(true);
