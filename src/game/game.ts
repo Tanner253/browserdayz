@@ -81,6 +81,7 @@ import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, onPinned } from '../ui/rewards';
+import { EMBED } from '../core/embed';
 import { Gas } from './gas';
 import { GAS, bunkerUnder } from '../sim/gas';
 import { DAY } from '../sim/daynight';
@@ -1001,7 +1002,7 @@ export class Game {
     // "we will not nav the user to the payouts screen anymore", "wallet will be entered in settings in the account tab
     // of the setting menu"). It was a line under the way in and a Rewards tab, opening a window of its own.
     // (and what this browser has bought at the store, under it: src/ui/store/account-pane.ts)
-    const account = REWARDS_UI ? new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true) : null;
+    const account = REWARDS_UI && !EMBED ? new RewardsModal(this.hud.accountPane(), () => this.hud.nameValue(), () => {}, true) : null;
     this.hud.onAccount(() => {
       account?.open();
       void import('../ui/store/account-pane').then((m) => m.drawStoreAccount(this.hud.accountPane()));

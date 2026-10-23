@@ -334,3 +334,6 @@ body {
   cursor: pointer;
 }
 
+/* inside itch.io's page (src/core/embed.ts): nothing that touches SOL */
+.embed-itch .sl-ca, .embed-itch .store-btn, .embed-itch .door-storelink, .embed-itch .am-store, .embed-itch .bm-store,
+.embed-itch .set-tabs [data-set="account"] { display: none !important; }

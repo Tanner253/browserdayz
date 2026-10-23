@@ -27,6 +27,7 @@ import { adBox, adBreak } from './adsense';
 import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
 import { reportPlay } from '../core/conversion';
+import { EMBED } from '../core/embed';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 export type Stance = 'stand' | 'crouch' | 'prone';
@@ -566,7 +567,8 @@ export class HUD {
       const step = arrow && !typing ? arrow : typing && (at as HTMLInputElement).type !== 'range' ? 0 : e.code === 'KeyQ' ? -1 : e.code === 'KeyE' ? 1 : 0;
       if (!step) return;
       e.preventDefault();
-      const order = SET_TABS.map(([id]) => id);
+      // (no Account page inside itch.io: src/core/embed.ts)
+      const order = SET_TABS.map(([id]) => id).filter((id) => !(EMBED && id === 'account'));
       this.setTab(order[(order.indexOf(this.tab) + step + order.length) % order.length]);
     });
     // ---- the controls: click a thing, press the key for it

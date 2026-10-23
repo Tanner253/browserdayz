@@ -1,4 +1,5 @@
 import './ui/style.css';
+import { EMBED } from './core/embed';
 import './ui/hud.css';
 import * as THREE from 'three';
 import { Renderer } from './core/renderer';
@@ -139,7 +140,7 @@ async function boot() {
   // (Google Ads' tag, on the live site only: src/ui/ads.ts. Never in the game's way: a blocker that has taken its
   // names for itself, as Brave's shields may, made setting them throw, and the game never began, 2026-10-18)
   try {
-    startAds();
+    if (!EMBED) startAds();
   } catch {
     /* no tag: the game goes on */
   }

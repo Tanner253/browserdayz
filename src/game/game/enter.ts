@@ -28,6 +28,7 @@ import type { Stash } from '../loot';
 import { askPerson } from '../../ui/person';
 import { BotCheck } from '../botcheck';
 import { addCashedTag, walletAddress, REWARDS_UI } from '../../ui/rewards';
+import { EMBED } from '../../core/embed';
 import { underGas } from '../../sim/gas';
 import { inBunker } from '../../sim/bunker';
 import { LOOT_REV, type Game } from '../game';
@@ -668,7 +669,7 @@ export const enterMethods = {
       if (this.online) {
         const wallet = walletAddress();
         this.net.send({ t: 'cash', uid: it.uid, ...(wallet ? { wallet } : {}) });
-        if (!wallet && REWARDS_UI) this.hud.note('No wallet address saved: add one in Settings, on the Account page', 'warn');
+        if (!wallet && REWARDS_UI && !EMBED) this.hud.note('No wallet address saved: add one in Settings, on the Account page', 'warn');
       }
       else {
         this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);
