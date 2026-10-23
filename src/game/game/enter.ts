@@ -41,8 +41,12 @@ let neckSeen = 0;
 export const enterMethods = {
   // ------------------------------------------------------------ entering the world
 
-  /** First click on Play: find a server (multiplayer) or fall back to the local world. */
-  async join(this: Game) {
+  /**
+   * First click on Play: find a server (multiplayer) or fall back to the local world.
+   * @param again back in after a dropped line (Game.rejoin): 'retry' answers 'unreached' where the server could not be
+   * reached, to be tried again before it is said; 'last' says it
+   */
+  async join(this: Game, again: '' | 'retry' | 'last' = ''): Promise<'unreached' | void> {
     this.joining = true;
     // (Another game gone to while this way in is on its way, src/game/modes.ts: what comes of it then is nobody's. A
     // battle royale's lobby on another map was the case: its server turns the first try away, the connection's own second
@@ -53,7 +57,7 @@ export const enterMethods = {
     const renamed = name !== playerName();
     setPlayerName(name);
     this.dress(name, renamed);
-    this.hud.showStart(true, false, 'Connecting…');
+    this.hud.showStart(true, false, again ? 'Connection lost: getting you back in…' : 'Connecting…');
     // A full server puts us in line. The wait can be long: the mouse goes back to the player,
     // the screen says where they stand, and they can give it up and play on their own.
     let waited = false;
@@ -200,12 +204,14 @@ export const enterMethods = {
         this.hud.showStart(true);
         this.hud.refused(this.net.refused);
         return;
-      } else if (remoteServer() && !serverNamed()) {
+      } else if ((remoteServer() && !serverNamed()) || again) {
         // The site's own server not reached: said on the way in where it stays said, with the likely cause and what to
         // do, and not into a world alone. (It was a note gone in four seconds, then the OFFLINE banner, and players did
         // not know why: 2026-10-18, "players who get this message still dont know why". A server named in the address,
-        // as a development page or a game played offline on purpose names one, is played without as it was.)
+        // as a development page or a game played offline on purpose names one, is played without as it was; never
+        // whoever is on their way back to their body.)
         this.joining = false;
+        if (again === 'retry') return 'unreached';
         this.input.unlock();
         this.hud.showStart(true);
         this.hud.refused(UNREACHED[this.net.unreached || 'socket']);
@@ -218,8 +224,9 @@ export const enterMethods = {
     playedAd();
     this.menu.dispose();
     this.hud.menuScene('', 0);
-    // out of the aerial shot and down into the character's eyes (in a wager, straight in: a round starts in the eyes)
-    this.director.flyIn(wagerQuery() ? 0.001 : undefined);
+    // out of the aerial shot and down into the character's eyes (in a wager, straight in: a round starts in the eyes;
+    // and back after a dropped line, where the eyes already were)
+    this.director.flyIn(wagerQuery() || again ? 0.001 : undefined);
     if (!this.weapons.equippedItem) {
       const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
       if (slot) this.weapons.equip(slot);
