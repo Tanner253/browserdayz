@@ -764,6 +764,9 @@ export class Avatar {
   private dirWas = 0;
   /** legs turned away from the chest, radians */
   private twist = 0;
+  /** face down in a free fall (the battle royale's, src/game/br/mode.ts fly): the pitch, about the body's own side, laid
+   * over its turn after that is set afresh each update (set on the root from outside, it was put back upright every frame) */
+  dive = 0;
   /** leaning out to one side, -1 (left) .. 1 (right): the body from the waist up goes over, the feet stay */
   private leanT = 0;
   /** the joints a shot is judged by (see frame) */
@@ -2226,6 +2229,7 @@ export class Avatar {
       this.root.position.y += PRONE.up * pr;
       this.root.rotation.set(tip * pr, this.yaw + this.twist + Math.sin(this.crawl) * 0.05 * going, roll * pr);
     }
+    if (this.dive) this.root.rotation.x = this.dive;
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
     if (this.inHand) this.inHand.obj.visible = !using;

@@ -436,12 +436,13 @@ export class BrMode {
     // skydiver does; those under a canopy hang from one)
     const others: { id: number; pos: THREE.Vector3; yaw: number }[] = [];
     for (const [id, r] of g.remotes) {
-      const rr = r as unknown as { avatar: { root: THREE.Object3D }; yaw: number };
+      const rr = r as unknown as { avatar: { root: THREE.Object3D; dive: number }; yaw: number };
       const st = this.airOf.get(id), root = rr.avatar.root;
       if (at && r.pos.distanceTo(at) < 40 && !st) root.visible = false;
-      root.rotation.x = st === 'fall' ? -1.35 : 0;
+      rr.avatar.dive = st === 'fall' ? -1.35 : 0;
       if (st === 'chute') others.push({ id, pos: r.pos, yaw: rr.yaw });
     }
+    g.avatar.dive = this.air === 'fall' ? -1.35 : 0;
     this.look.chute(this.air === 'chute' ? p.pos : null, p.yaw, others);
     if (!this.air || !pl) return;
     if (this.air === 'plane') {
