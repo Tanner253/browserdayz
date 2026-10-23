@@ -2,6 +2,12 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## SITE LIVE (2026-10-23): from `4b2d41c` (branch claude/kamenka-textures-0e1e26; the iPhone release 37134e6 merged in)
+- Kamenka's plank house (`shanty_mansion`) and red brick houses (`house_interior`) a size up on a computer, 512/256
+  (assets.ts DESK_UP; the owner: "bump them up by 1 incriment"). 2.5 -> 10.1 MB on the card. Lossless 512 copies
+  outweigh the files, so a computer loads those two files whole and cuts them; phones keep their 256/128 lean copies
+  (lean.mjs UP_FILES). Pictures and tools: progress/kamenka-textures/ (look.js, pairs.mjs). Changelog `#kamenka-sharper`.
+
 ## LIVE (2026-10-22 ~08:57 UTC): site, server and `main` from `de02380` (PROTOCOL 60)
 - **Apply a finish** (the owner: "the apply should stick with the weapon on the server ... like rust"): the item's own
   `finish`, written only by the server; gold in hands, inventory and on the ground (test/plates.test.ts). Gold in the
