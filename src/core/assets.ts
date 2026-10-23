@@ -59,8 +59,11 @@ type Progress = (loaded: number, total: number, label: string) => void;
  * capped like this they are under half of it. What is given up is the fine grain of the
  * light on a surface, at a size nobody sees on a screen that small: the colour of a wall is
  * as sharp as it was. (A computer keeps every picture whole.)
+ *
+ * And a size down again since 2026-10-23, iPhones still closing the page ("I get 'a problem occured' on ios"): at
+ * 1024 the walls' pictures alone were 235 MB on the card at the menu, and every one of them kept in the page as well.
  */
-const PHONE_CAP = { colour: 1024, other: 512 };
+const PHONE_CAP = { colour: 512, other: 256 };
 /**
  * And that was still more than an iPhone allows a page, by a long way: every picture in the game at that size is
  * 1.7 GB on the card, and as much again held in the page, and a page there is closed at about one. So on a phone a
@@ -80,7 +83,9 @@ const DESK_CAP = PHONE_FAR;
  * Each model's file made at DESK_CAP already, for a computer (scripts/lean.mjs): the files carried their pictures at up
  * to 2048 and a computer threw most of every one away on arrival (the owner: "we should do this"). The pixels are the
  * ones the game would have cut (Chrome's own cut, stored lossless). A copy is named by the version of the file it was
- * made from: a file changed since is loaded whole. A phone loads the files themselves (its near pictures come from them).
+ * made from: a file changed since is loaded whole. A phone loads them too for what it draws at PHONE_FAR, the same
+ * size: unpacked whole first, each file's pictures were up to 16 MB apiece in the page before they were cut, two
+ * files at a time (2026-10-23, iPhones). Its near pictures still come from the files themselves.
  */
 const leanDir = (cap: Cap) => `assets/lean/${cap.colour}-${cap.other}/`;
 /**
@@ -88,7 +93,8 @@ const leanDir = (cap: Cap) => `assets/lean/${cap.colour}-${cap.other}/`;
  * are TOO LOW of textures, we should bump them up by 1 incriment ... they are too low quality and jarring against the
  * rest of the game"): a wall walked up to is a whole picture across the screen, where a crate is a corner of one. The
  * two hold 10.1 MB on the card, against 2.5. scripts/lean.mjs (UP) would copy them at this size, but lossless at 512
- * outweighs the files' own 1024s: a computer loads the files themselves (1.5 MB, against 0.8) and cuts them here.
+ * outweighs the files' own 1024s: a computer loads the files themselves (1.5 MB, against 0.8) and cuts them here. A
+ * phone keeps their copies at PHONE_FAR.
  */
 const DESK_UP = { colour: 512, other: 256 };
 const DESK_UP_MODELS = new Set(['assets/models/house_interior.glb', 'assets/models/shanty_mansion.glb']);
@@ -517,11 +523,11 @@ export class Assets {
   /** development: the files themselves, as before the copies, to compare (`?whole`; progress/lean/proof.js) */
   whole = typeof location !== 'undefined' && new URLSearchParams(location.search).has('whole');
 
-  /** a computer's copy of a model's file, where there is one made from the file as it is now (see leanDir) */
+  /** a computer's copy of a model's file, where there is one made from the file as it is now (see leanDir); a phone's, for what it draws at PHONE_FAR */
   private leanOf(url: string) {
     const v = this.versions[url];
-    if (!DESK || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
-    const lean = `${leanDir(deskCap(url))}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
+    if ((!DESK && !this.far.has(url)) || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
+    const lean = `${leanDir(DESK ? deskCap(url) : PHONE_FAR)}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
     return this.versions[lean] ? lean : url;
   }
 
