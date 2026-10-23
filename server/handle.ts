@@ -40,6 +40,7 @@ import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { pinned } from './pinned';
+import { stashBuriedNear } from './stash-sight';
 import { changed, contents } from './storages';
 import { aimWatch, looked } from './aimwatch';
 
@@ -532,7 +533,8 @@ export function handle(c: Client, m: C2S) {
         boxes.set(m.uid, { cid: m.uid, kind: 'stash', w, h, items: cargoOf(l.item), ...st, emptiedAt: -1, touchedAt: Date.now() });
         KEPT.dirty = true;
         log(`${c.name} buried a ${def.name.toLowerCase()} at ${l.x.toFixed(0)}, ${l.z.toFixed(0)}`);
-        broadcast({ t: 'stash+', s: st });
+        // (to those near enough to see it go in, not to everybody: server/stash-sight.ts)
+        stashBuriedNear(st, clients.values(), send);
         return;
       }
       const b = boxes.get(m.uid);
