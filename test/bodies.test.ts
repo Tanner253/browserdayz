@@ -5,9 +5,8 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { bodiesWithin, bodyInfo, fellWay, zedBody, zedUid } from '../server/bodies';
+import { bodiesWithin, bodyInfo, fellWay, zedBody, zedUid, type BodyBox as Box } from '../server/bodies';
 import { ESP, espAnswer, espRows } from '../server/esp';
-import type { Box } from '../server/index';
 import { ESP_AT } from '../src/net/protocol';
 import type { WorldLoot } from '../src/sim/economy';
 import { INFECTED, INFECTED_GRID, I_DEAD, I_IDLE, type Body } from '../src/sim/infected';

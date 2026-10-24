@@ -5,11 +5,33 @@
 // body, until they are cleaned up. (5 mins)". And "admin needs a way to get rid of corpses ... and a way to delete
 // corpses in bulk like the kill zombies in bulk vicinity control".
 
-import type { CorpseInfo } from '../src/net/protocol';
+import type { CorpseInfo, StoredItem } from '../src/net/protocol';
 import { INFECTED, INFECTED_GRID, infectedDrop, type Body } from '../src/sim/infected';
 import { Container } from '../src/sim/inventory';
 import { makeItem } from '../src/sim/items';
-import type { Box } from './index';
+
+/**
+ * A body, as much of the server's Box (server/index.ts) as these rules read: said here, so that they and their test
+ * do not bring in the whole server.
+ */
+export interface BodyBox {
+  cid: string;
+  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture';
+  w: number;
+  h: number;
+  items: StoredItem[];
+  x: number;
+  y: number;
+  z: number;
+  rot: number;
+  emptiedAt: number;
+  name?: string;
+  expires?: number;
+  v?: number;
+  ride?: { i: number; seat: number };
+  zed?: number;
+  buried?: boolean;
+}
 
 /** the uid of the body of one of the infected (its number is its own for as long as the server runs, and the body is not kept through a restart) */
 export const zedUid = (i: number) => `zbody_${i}`;
@@ -26,7 +48,7 @@ export function fellWay(yaw: number, dir: [number, number]): number {
  * @param way which way it fell (`fellWay`)
  * @param time the economy's clock, seconds
  */
-export function zedBody(b: Body, way: number, time: number, rnd: () => number = Math.random): Box | null {
+export function zedBody(b: Body, way: number, time: number, rnd: () => number = Math.random): BodyBox | null {
   const had = infectedDrop(rnd);
   if (!had) return null;
   const uid = zedUid(b.i), box = new Container(uid, 'Infected', INFECTED_GRID[0], INFECTED_GRID[1]);
@@ -35,7 +57,7 @@ export function zedBody(b: Body, way: number, time: number, rnd: () => number = 
 }
 
 /** what the games are told of a body: where it lies, and whose (one of the infected's says which: it is drawn by them) */
-export function bodyInfo(b: Box): CorpseInfo {
+export function bodyInfo(b: BodyBox): CorpseInfo {
   return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, ...(b.ride ? { ride: b.ride } : {}), ...(b.zed !== undefined ? { zed: b.zed } : {}) };
 }
 
@@ -47,7 +69,7 @@ export type Lying = { box: string; zed?: number; x: number; z: number } | { zed:
  * something on them (one of the infected's with a box is one body, not two). Not one still sat in a helicopter: it
  * goes with what it rides in.
  */
-export function bodiesWithin(boxes: Iterable<Box>, horde: Iterable<Body>, x: number, z: number, r: number): Lying[] {
+export function bodiesWithin(boxes: Iterable<BodyBox>, horde: Iterable<Body>, x: number, z: number, r: number): Lying[] {
   const out: Lying[] = [], boxed = new Set<number>();
   for (const b of boxes) {
     if (b.kind !== 'corpse' || b.ride) continue;

@@ -6,13 +6,12 @@
 import { ESP_AT, type EspRow } from '../src/net/protocol';
 import type { WorldLoot } from '../src/sim/economy';
 import { ITEMS, type ItemInstance } from '../src/sim/items';
-import type { Box } from './index';
-import type { Role } from './gate';
+import type { BodyBox } from './bodies';
 
 /** how far it sees, metres; the most rows it says, the nearest; how often a game may ask, ms */
 export const ESP = { range: 150, most: 250, every: 900 };
 
-const BOX_AT: Record<Box['kind'], number> = { corpse: ESP_AT.body, crate: ESP_AT.crate, stash: ESP_AT.stash, drop: ESP_AT.drop, furniture: ESP_AT.furniture };
+const BOX_AT: Record<BodyBox['kind'], number> = { corpse: ESP_AT.body, crate: ESP_AT.crate, stash: ESP_AT.stash, drop: ESP_AT.drop, furniture: ESP_AT.furniture };
 
 /** the thing in a box that says most of what is in it: the biggest */
 const biggest = (items: ItemInstance[]) => items.reduce((a, b) => (ITEMS[b.id] && (!ITEMS[a.id] || ITEMS[b.id].w * ITEMS[b.id].h > ITEMS[a.id].w * ITEMS[a.id].h) ? b : a));
@@ -25,7 +24,7 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
  * thing and how many things in all; what somebody left in a piece of furniture as itself.
  * @param inFurniture whether a loot point is in a piece of furniture (server/storages.ts `hidden`)
  */
-export function espRows(loot: Iterable<WorldLoot>, boxes: Iterable<Box>, x: number, z: number, inFurniture: (point: number) => boolean, range = ESP.range): EspRow[] {
+export function espRows(loot: Iterable<WorldLoot>, boxes: Iterable<BodyBox>, x: number, z: number, inFurniture: (point: number) => boolean, range = ESP.range): EspRow[] {
   const out: [number, EspRow][] = [];
   const near = (px: number, pz: number) => {
     const d = Math.hypot(px - x, pz - z);
@@ -47,7 +46,7 @@ export function espRows(loot: Iterable<WorldLoot>, boxes: Iterable<Box>, x: numb
 const asked = new WeakMap<object, number>();
 
 /** what a game that asks is answered with: null if it is not an admin's, or it asked again too soon */
-export function espAnswer(who: object, role: Role | null, now: number, rows: () => EspRow[]): EspRow[] | null {
+export function espAnswer(who: object, role: string | null, now: number, rows: () => EspRow[]): EspRow[] | null {
   if (role !== 'admin' || now - (asked.get(who) ?? -Infinity) < ESP.every) return null;
   asked.set(who, now);
   return rows();

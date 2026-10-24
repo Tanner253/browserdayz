@@ -175,6 +175,7 @@ export const onlineMethods = {
     this.bunker.setOpen(false, true);
     this.garage.clear();
     this.horde.clear();
+    this.horde.laidAs.clear();
     this.party.set([], 0);
     this.hud.setLive(false);
   },
