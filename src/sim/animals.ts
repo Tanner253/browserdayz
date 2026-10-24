@@ -181,7 +181,7 @@ export interface HerdKind {
 
 export const HERDS: HerdKind[] = [
   { id: 'deer', of: [['stag', 1, 1], ['doe', 2, 4]], count: 6, range: 320, apart: 450, feed: ['field'], rest: ['forest'], hours: [[0, 0.22], [0.55, 0.8]], drinks: true, respawn: 600 },
-  { id: 'bear', of: [['bear', 1, 1]], count: 2, range: 420, apart: 1500, feed: ['forest', 'snow'], rest: ['forest', 'snow'], hours: [[0.06, 0.7]], drinks: true, respawn: 1500 },
+  { id: 'bear', of: [['bear', 1, 1]], count: 3, range: 420, apart: 1500, feed: ['forest', 'snow'], rest: ['forest', 'snow'], hours: [[0.06, 0.7]], drinks: true, respawn: 1500 },
   { id: 'wolves', of: [['wolf', 3, 5]], count: 3, range: 650, apart: 900, feed: ['forest', 'snow', 'field'], rest: ['snow', 'forest'], hours: [[0.68, 1], [0, 0.1]], drinks: true, respawn: 900 },
   { id: 'cows', of: [['cow', 2, 3]], count: 3, range: 38, apart: 0, feed: ['field', 'town'], rest: ['field', 'town'], hours: [[0.04, 0.74]], drinks: false, respawn: 1200, farm: true },
 ];

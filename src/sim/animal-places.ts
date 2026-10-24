@@ -41,21 +41,24 @@ export function* homesFor(herd: Herd, h: HerdKind, pick: () => number, out: { x:
     if (wild >= 0) found.push({ x, z, wild });
   }
   found.sort((a, b) => b.wild - a.wild);
+  // (those that live alone, the bears: as far apart as the wild ground allows, `apart` where it can be had. The
+  // wildest first, then each next the one furthest from those chosen, a wilder one a little before a nearer: the
+  // wildest first and the next by `apart` took the middle of the map, and nothing was left far enough from it)
+  if (h.of.every(([, , most]) => most <= 1)) {
+    while (out.length < h.count && out.length < found.length) {
+      let best = found[0], score = -Infinity;
+      for (const f of found) {
+        const d = out.length ? Math.min(...out.map((o) => Math.hypot(o.x - f.x, o.z - f.z))) : 0;
+        if (out.length && d < 1) continue;
+        if (d + 0.2 * f.wild > score) [best, score] = [f, d + 0.2 * f.wild];
+      }
+      out.push({ x: best.x, z: best.z });
+    }
+    return;
+  }
   for (const f of found) {
     if (out.length >= h.count) break;
     if (!out.some((o) => Math.hypot(o.x - f.x, o.z - f.z) < h.apart)) out.push({ x: f.x, z: f.z });
-  }
-  // (two that live far apart, the bears: the wildest first took the middle, and nothing was left far enough from it.
-  // The two wildest together that are far enough apart, then)
-  if (h.count === 2 && out.length < 2) {
-    let best = -1;
-    for (let i = 0; i < found.length; i++) for (let j = i + 1; j < found.length; j++) {
-      const a = found[i], b = found[j];
-      if (a.wild + b.wild > best && Math.hypot(a.x - b.x, a.z - b.z) >= h.apart) {
-        best = a.wild + b.wild;
-        out.splice(0, out.length, { x: a.x, z: a.z }, { x: b.x, z: b.z });
-      }
-    }
   }
 }
 
