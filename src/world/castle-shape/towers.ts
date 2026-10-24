@@ -104,10 +104,25 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
     // (no two stones of a broken top are at one height: each half of a stub is a little under what the plan says)
     return tw.rim[k] - (!lod && k % 2 === 0 ? 0.24 * hash(Math.floor(norm360(a) / 7.5), seed, 5) : 0);
   };
+  // WHERE AN OPENING'S HEAD AND SILL ARE CUT ACROSS, BOTH FACES OF THE WALL ARE CUT. (The head's underside was cut in
+  // sixths, and each face of the wall over it at the sixths and at the tower's own lengths too: the face's edge
+  // followed the arch more closely than the underside's, and between the two the wall's inside was seen, and the sky;
+  // and a flat sill, one straight edge, lay under the wall's round. 2026-10-23, "gaps in between walls".) So each
+  // opening is cut across at its sixths and wherever either face is cut at the tower's own lengths, the same `t` across
+  // it on both faces, and its head and sill are laid in those same pieces.
+  const across = new Map<Hole, number[]>(holes.map((h) => {
+    const ts = [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1];
+    for (const r of [T.r, rin]) for (let j = 0; j < n; j++) {
+      const t = (norm360((j * 360) / n - h.a + 180) - 180) / halfAt(h, r);
+      if (Math.abs(t) < 0.999) ts.push(t);
+    }
+    return [h, sorted(ts, 1e-4)];
+  }));
+  const pairs = (ts: number[]) => ts.slice(0, -1).map((t, i): [number, number] => [t, ts[i + 1]]);
   const columns = (r: number) => {
     const cuts = new Set<number>();
     for (let j = 0; j < n; j++) cuts.add((j * 360) / n);
-    for (const h of holes) for (let k = 0; k <= 6; k++) cuts.add(norm360(h.a - halfAt(h, r) + (2 * halfAt(h, r) * k) / 6));
+    for (const h of holes) for (const t of across.get(h)!) cuts.add(norm360(h.a + t * halfAt(h, r)));
     const as = sorted(cuts, 0.05);
     return as.map((a0, i) => ({ a0, a1: i + 1 < as.length ? as[i + 1] : as[0] + 360 }));
   };
@@ -140,15 +155,18 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
     // (nothing of it is left to line where the wall itself has come down past it)
     if (rimAt(h.a) < h.y1 + 0.05) continue;
     for (const side of [-1, 1]) stone.quad([P(h.a + side * ho, T.r, foot), P(h.a + side * hi, rin, foot), P(h.a + side * hi, rin, h.y1 - rise), P(h.a + side * ho, T.r, h.y1 - rise)], [[0, foot], [T.wall, foot], [T.wall, h.y1 - rise], [0, h.y1 - rise]], mul(round(h.a), -side), tone * 0.84);
-    if (h.round) for (let k = 0; k < 6; k++) {
-      const t0 = -1 + k / 3, t1 = -1 + (k + 1) / 3, h0 = sillAt(h.y0, h.y1, h.w / 2, true, t0), h1 = sillAt(h.y0, h.y1, h.w / 2, true, t1);
+    if (h.round) for (const [t0, t1] of pairs(across.get(h)!)) {
+      const h0 = sillAt(h.y0, h.y1, h.w / 2, true, t0), h1 = sillAt(h.y0, h.y1, h.w / 2, true, t1);
       stone.quad([P(h.a + t0 * ho, T.r, h0), P(h.a + t1 * ho, T.r, h1), P(h.a + t1 * hi, rin, h1), P(h.a + t0 * hi, rin, h0)], [[t0 * 0.3, 0], [t1 * 0.3, 0], [t1 * 0.3, T.wall], [t0 * 0.3, T.wall]], UP, tone * 0.8);
     }
-    for (let k = 0; k < 6; k++) {
-      const t0 = -1 + k / 3, t1 = -1 + (k + 1) / 3, h0 = headAt(h.y0, h.y1, h.w / 2, h.arch, t0), h1 = headAt(h.y0, h.y1, h.w / 2, h.arch, t1);
+    for (const [t0, t1] of pairs(across.get(h)!)) {
+      const h0 = headAt(h.y0, h.y1, h.w / 2, h.arch, t0), h1 = headAt(h.y0, h.y1, h.w / 2, h.arch, t1);
       stone.quad([P(h.a + t0 * ho, T.r, h0), P(h.a + t1 * ho, T.r, h1), P(h.a + t1 * hi, rin, h1), P(h.a + t0 * hi, rin, h0)], [[t0 * 0.4, 0], [t1 * 0.4, 0], [t1 * 0.4, T.wall], [t0 * 0.4, T.wall]], [0, -1, 0], tone * 0.78);
     }
-    if (h.y0 > 0.01 && !h.round) stone.quad([P(h.a - ho, T.r, h.y0), P(h.a + ho, T.r, h.y0), P(h.a + hi, rin, h.y0), P(h.a - hi, rin, h.y0)], [[-0.4, 0], [0.4, 0], [0.4, T.wall], [-0.4, T.wall]], UP, tone * 0.9);
+    // (a flat sill in the same pieces: one straight edge across, it left the wall's round under it open between)
+    if (h.y0 > 0.01 && !h.round) for (const [t0, t1] of pairs(across.get(h)!)) {
+      stone.quad([P(h.a + t0 * ho, T.r, h.y0), P(h.a + t1 * ho, T.r, h.y0), P(h.a + t1 * hi, rin, h.y0), P(h.a + t0 * hi, rin, h.y0)], [[t0 * 0.4, 0], [t1 * 0.4, 0], [t1 * 0.4, T.wall], [t0 * 0.4, T.wall]], UP, tone * 0.9);
+    }
   }
   if (lod) return;
 
@@ -211,6 +229,9 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
     const a0 = j * 7.5, a1 = a0 + 7.5, atDoor = apart(a0 + 3.75, tw.door) <= doorWide;
     ring(TOWER_FLOOR, hole, rin, a0, a1, UP);
     if (hole || !atDoor) ring(TOWER_FLOOR, rin, rin + under, a0, a1, UP);
+    // (the boards' end at the door, in their own lengths: one straight board across the doorway stood up to a hand
+    // inside the edge of the round of them, and under that edge was the void the kit's foot is cut to. 2026-10-23.)
+    else wood.quad([P(a0, rin, 0), P(a1, rin, 0), P(a1, rin, TOWER_FLOOR), P(a0, rin, TOWER_FLOOR)], [[0, 0], [0.3, 0], [0.3, TOWER_FLOOR], [0, TOWER_FLOOR]], out(a0 + 3.75), tone * 0.8);
     if (hole) {
       if (atDoor) wood.quad([P(a0, rin + under, 0), P(a1, rin + under, 0), P(a1, rin + under, TOWER_FLOOR), P(a0, rin + under, TOWER_FLOOR)], [[0, 0], [0.3, 0], [0.3, TOWER_FLOOR], [0, TOWER_FLOOR]], out(a0 + 3.75), tone * 0.8);
       ring(TOWER_FLOOR - 0.06, hole, rin, a0, a1, [0, -1, 0], 0.7);
@@ -221,9 +242,12 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
       put({ t: 'hull', pts, feet: false, surface: 'wood', name: 'tower floor' });
     }
   }
-  {
-    const half = halfAt(holes[0], rin) + 2;
-    wood.quad([P(tw.door - half, rin, 0), P(tw.door + half, rin, 0), P(tw.door + half, rin, TOWER_FLOOR), P(tw.door - half, rin, TOWER_FLOOR)], [[0, 0], [1, 0], [1, TOWER_FLOOR], [0, TOWER_FLOOR]], out(tw.door), tone * 0.8);
+  // (and the threshold, from the boards out through the wall: where the doorway runs out past the paving's square it
+  // was open, over the kit's foot that is cut away under the terrace, and the foot was looked into, a skin with
+  // nothing in it. 2026-10-23.)
+  if (!hole) {
+    const d = holes[0], ho = halfAt(d, T.r), hi = halfAt(d, rin), sill = [P(tw.door - hi, rin, 0), P(tw.door + hi, rin, 0), P(tw.door + ho, T.r, 0), P(tw.door - ho, T.r, 0)];
+    stone.quad(sill, sill.map((p): UV => [p[0], p[2]]), UP, tone * 0.9);
   }
   if (!hole) disc('tower floor', -0.2, TOWER_FLOOR, rin);
 

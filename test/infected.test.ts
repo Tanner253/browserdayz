@@ -110,17 +110,38 @@ ok('hit enough it dies, lies a while, is cleared away, and another comes when no
   assert.equal(d.hurt(b.i, 10, 3100), null);
   assert.equal(d.strikes(b.i, 7, at(7, b.s[0], b.s[2]), 9000), false);
   assert.equal(d.report(7, [[b.i, b.s[0], 0, b.s[2], 0, I_IDLE, 0]], 3200).length, 0);
+  // another, once its time has come (counted from when it went down) and the place is empty of the living: while
+  // the body still lies there, as it does for five minutes
+  assert.ok(INFECTED.respawn < INFECTED.linger);
+  assert.equal(d.tick(3000 + INFECTED.respawn * 1000 - 500, []).added.length, 0);
+  assert.equal(d.tick(3000 + INFECTED.respawn * 1000 + 500, [at(7, 20, 0)]).added.length, 0);
+  assert.equal(d.tick(3000 + INFECTED.respawn * 1000 + 1500, []).added.length, 1);
+  assert.equal(d.bodies.size, 6);
   // it lies there
   assert.deepEqual(d.tick(3000 + INFECTED.linger * 1000 - 500, [at(7, 20, 0)]).gone, []);
-  // and is cleared away
+  // and is cleared away, with nothing more owed for it
   const t = d.tick(3000 + INFECTED.linger * 1000 + 500, [at(7, 20, 0)]);
   assert.deepEqual(t.gone, [b.i]);
-  assert.equal(d.bodies.size, 4);
-  // another, once its time has come and the place is empty of the living
-  const due = 3000 + (INFECTED.linger + INFECTED.respawn) * 1000 + 1500;
-  assert.equal(d.tick(due, [at(7, 20, 0)]).added.length, 0);
-  assert.equal(d.tick(due + 1000, []).added.length, 1);
+  assert.equal(d.tick(3000 + INFECTED.linger * 1000 * 3, []).added.length, 0);
   assert.equal(d.bodies.size, 5);
+});
+
+ok('a body is cleared away by an admin before its time; one alive is not; one an admin stood is owed nobody', () => {
+  const d = make();
+  d.tick(1000, []);
+  const [b, alive] = [...d.bodies.values()];
+  assert.equal(d.clear(b.i), false);
+  d.hurt(b.i, 500, 2000);
+  assert.equal(d.clear(b.i), true);
+  assert.equal(d.bodies.has(b.i), false);
+  assert.equal(d.clear(b.i), false);
+  assert.equal(d.bodies.has(alive.i), true);
+  // (its home is still owed one, in its time)
+  assert.equal(d.tick(2000 + INFECTED.respawn * 1000 + 500, []).added.length, 1);
+  const stray = d.place(30, 0, 30, 3000);
+  d.hurt(stray.i, 500, 3000);
+  d.clear(stray.i);
+  assert.equal(d.tick(3000 + INFECTED.respawn * 1000 * 4, []).added.length, 0);
 });
 
 ok('the dead of a home that is told to wait are not put back until it no longer is (the bunker, while its door stands open)', () => {
@@ -129,21 +150,22 @@ ok('the dead of a home that is told to wait are not put back until it no longer 
   const mine = [...d.bodies.values()].filter((b) => b.home === 0);
   assert.equal(mine.length, 3);
   for (const b of mine) d.hurt(b.i, 500, 2000);
-  const cleared = 2000 + INFECTED.linger * 1000 + 500;
-  assert.equal(d.tick(cleared, []).gone.length, 3);
-  // long past their time, with nobody anywhere near: and the door is open still
   const open = (h: Home) => h === homes[0];
+  const cleared = 2000 + INFECTED.linger * 1000 + 500;
+  const t = d.tick(cleared, [], open);
+  assert.equal(t.gone.length, 3);
+  assert.equal(t.added.length, 0);
+  // long past their time, with nobody anywhere near: and the door is open still
   const late = cleared + INFECTED.respawn * 1000 * 5;
   assert.equal(d.tick(late, [], open).added.length, 0);
   assert.equal(d.tick(late + 60000, [], open).added.length, 0);
   // (the other home is nobody's to hold: one killed there comes back as it always did)
   const far = [...d.bodies.values()].find((b) => b.home === 1)!;
   d.hurt(far.i, 500, late);
-  d.tick(late + INFECTED.linger * 1000 + 500, [], open);
-  assert.equal(d.tick(late + (INFECTED.linger + INFECTED.respawn) * 1000 + 2000, [], open).added.length, 1);
-  // the door shuts: all three are back
-  assert.equal(d.tick(late + (INFECTED.linger + INFECTED.respawn) * 1000 + 3000, [], () => false).added.length, 3);
-  assert.equal(d.bodies.size, 5);
+  assert.equal(d.tick(late + INFECTED.respawn * 1000 + 2000, [], open).added.length, 1);
+  // the door shuts: all three are back (and the body of the other still lies there)
+  assert.equal(d.tick(late + INFECTED.respawn * 1000 + 3000, [], () => false).added.length, 3);
+  assert.equal(d.bodies.size, 6);
 });
 
 ok('what one has on it is a real thing, a sensible number of them, and there about as often as is said', () => {

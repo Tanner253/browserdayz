@@ -62,14 +62,14 @@ export const fillOf = (stat: Stat, v: number) => (stat === 'blood' ? bloodLeft(v
  * - blood, ml: a wound in a limb is 3.6 and one in the body 6, and every wound there is costs some multiple of 1.2,
  *   so wounds together do too: one arrow up to 4.8, two from the body's 6, three from two in the body (12). It comes
  *   back by itself at 0.5 to 1.2, from saline at 8.3, from a bag of blood at 75
- * - food goes at 0.045 at rest and 0.108 at a sprint, water at 0.07 and 0.168: at rest and at a walk there is no
- *   arrow (that is what steady is), at a run there is one; anything eaten or drunk comes all at once
+ * - food goes at 0.045 at rest and 0.108 at a sprint, water at 0.0525 and 0.126 (NEED in src/sim/wells.ts): at rest
+ *   and at a walk there is no arrow (that is what steady is), at a run there is one; anything eaten or drunk comes all at once
  */
 export const PACE: Record<Stat, { down: [number, number, number]; up: [number, number, number] }> = {
   health: { down: [0.2, 3, 10], up: [0.04, 0.5, 3] },
   blood: { down: [1, 5.4, 11.4], up: [0.3, 5, 30] },
   food: { down: [0.07, 0.5, 2], up: [0.3, 3, 8] },
-  water: { down: [0.12, 0.5, 2], up: [0.3, 3, 8] },
+  water: { down: [0.08, 0.5, 2], up: [0.3, 3, 8] },
 };
 
 /** the arrows beside an icon: -3 (falling fast) to 3 (rising fast), 0 for none */

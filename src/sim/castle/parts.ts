@@ -17,6 +17,9 @@ export function castleParts(): Part[] {
 /** the kit's wall as the fort stands it: how far its foot stands out from the face of its parapet, how deep it is at the foot, and how far along a side one length of it reaches either way from the middle */
 export const WALL = { out: 0.94, deep: 2.55, half: 7.41 };
 
+/** the angle between two sides of the kit's round tower (it has 32) */
+const SIDE = (2 * Math.PI) / 32;
+
 /** the gatehouse: the kit's gate, made this big, stood on the east wall's top over the head of the ramp */
 const GATEHOUSE = { scale: 0.63 };
 
@@ -88,13 +91,17 @@ export function castleKit(): KitPiece[] {
     if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.553, tw.hollow - 0.03, tw.hollow + 2.2));
     // (and nothing of the kit's foot is in the cellar, or within a hand of its wall, which bellies: a block of it stood out of the wall over the doorway)
     if (tw.hollow !== undefined) cut.push(cutRound(tw.cx, tw.cz, T.r - T.wall + 0.3, tw.hollow - 0.05, -0.055));
-    out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });
+    const turn = (tw.cx * 7 + tw.cz * 3) * 0.1;
+    out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn, cut, body: false });
     // ITS FOOTING: the same tower again under that one's foot, a little bigger (`under`), with everything of it over
     // that foot taken off: so its wall, at the size it has just under its platform, is where the upper one's foot is,
     // and from there it leans out and down eight metres more. The real hill falls away under the two towers on the
     // valley side to twelve metres under the terrace; a plain dark drum of the fort's own stood in the air there.
+    // (Closed with stone where it is cut: left open, a ring a few fingers wide showed down into it round the foot over
+    // it. And turned as the one over it is, but by whole sides of the kit's tower, which has 32: turned anyhow, each
+    // one's corners stood out over the other's flats all round the join.)
     const kf = -KIT_TOWER.top[0] * T.kit;
-    out.push({ id: 'fort_tower_round', name: `${tw.name} footing`, at: [tw.cx, kf - KIT_TOWER.top[0] * T.under, tw.cz], scale: T.under, turn: (tw.cx * 3 - tw.cz * 5) * 0.1 + 1.3, cut: [cutBox(tw.cx - 9, tw.cx + 9, kf + 0.01, 8, tw.cz - 9, tw.cz + 9)], body: false });
+    out.push({ id: 'fort_tower_round', name: `${tw.name} footing`, at: [tw.cx, kf - KIT_TOWER.top[0] * T.under, tw.cz], scale: T.under, turn: turn + Math.round(((tw.cx * 3 - tw.cz * 5) * 0.1 + 1.3 - turn) / SIDE) * SIDE, cut: [{ ...cutBox(tw.cx - 9, tw.cx + 9, kf + 0.01, 8, tw.cz - 9, tw.cz + 9), cap: 'all' as const }], body: false });
   }
   // blocks of the wall, lying where they came down: under the rent, and under the breach
   const block = (x: number, z: number, y: number, turn: number, tilt: [number, number], scale: number) => void out.push({ id: 'fort_wall_thick_end_01', name: 'fallen wall', at: [x, y, z], turn, tilt, scale });
@@ -354,8 +361,8 @@ function layOut(): Part[] {
     else box(paint, -C.hx - v1, -C.hx - v0, y0, y1, u0, u1, o);
   };
   const half = P.thick / 2, faceIn = half - (KIT_MERLON.x1 - KIT_MERLON.x0), sill = KIT_LEVELS.parapet - KIT_LEVELS.walk;
-  // (the kit's wall is seven metres from its walk to its foot, and on the north and the south the hill is lower than that: under each wall a footing of rough stone, a hand proud of the wall's foot, down into the ground)
-  for (const side of ['n', 's', 'e', 'w'] as Side[]) along(side, 'base', -WALL.half, WALL.half, half + WALL.out - WALL.deep, half + WALL.out + 0.12, -C.deep, -KIT_LEVELS.walk + 0.04, { name: 'footing', tone: 0.8, at: 'both' });
+  // (the kit's wall is seven metres from its walk to its foot, and on the north and the south the hill is lower than that: under each wall a footing of rough stone, a hand proud of the wall's foot, down into the ground; its inner face a centimetre inside the wall's, which it laps: in the very plane of it, unbent beside the kit, the two were drawn turn about)
+  for (const side of ['n', 's', 'e', 'w'] as Side[]) along(side, 'base', -WALL.half + 0.01, WALL.half - 0.01, half + WALL.out - WALL.deep + 0.01, half + WALL.out + 0.12, -C.deep, -KIT_LEVELS.walk + 0.04, { name: 'footing', tone: 0.8, at: 'both' });
   for (const side of ['n', 's', 'e', 'w'] as Side[]) {
     const seed = { n: 201, s: 202, e: 203, w: 204 }[side];
     for (const [u0, u1, whole] of gaps(side)) {

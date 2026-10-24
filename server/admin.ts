@@ -25,6 +25,8 @@ import { queue } from './queue';
 import { sendDrop } from './drops';
 import { dogtag, roleKey, tagSet } from './roles';
 import { pinned } from './pinned';
+import { bodyOrder, zedLying } from './admin-bodies';
+import { payingTags, wentFrom } from './custody';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -285,6 +287,8 @@ export async function command(c: Client, line: string) {
         const b = boxes.get(id);
         if (!b) return void sys(c, 'No body, drop or buried stash of that number.');
         if (b.kind === 'crate') return void sys(c, 'A crate of the map is not taken away: it is part of the place.');
+        // (a body, one of the infected's too: server/admin-bodies.ts)
+        if (b.kind === 'corpse' && !b.ride) return void sys(c, bodyOrder(c, 'delbody', [id]));
         locks.delete(id);
         boxes.delete(id);
         if (b.kind === 'stash') KEPT.dirty = true;
@@ -300,7 +304,8 @@ export async function command(c: Client, line: string) {
       }
       if (what === 'z') {
         const i = Number(id), r = Number.isInteger(i) ? horde.hurt(i, 1e6, Date.now()) : null;
-        if (!r) return void sys(c, 'None of the infected has that number.');
+        // (one already down: its body is taken away, with whatever is on it)
+        if (!r) return void sys(c, Number.isInteger(i) && zedLying(i) ? bodyOrder(c, 'delbody', [String(i)]) : 'None of the infected has that number.');
         broadcast({ t: 'ihp', i, hp: r.hp, dead: r.dead, by: c.id, zone: 'torso', dir: [0, 1], melee: false });
         return void sys(c, 'One of the infected is put down.');
       }
@@ -420,6 +425,10 @@ export async function command(c: Client, line: string) {
       if (down) log(`[admin] ${c.name} put down ${down} of the infected within ${within} m of ${c.pose[0].toFixed(0)}, ${c.pose[2].toFixed(0)}`);
       return void sys(c, down ? `Put down: ${down} of the infected within ${within} metres of you.` : `None of the infected is on its feet within ${within} metres of you.`);
     }
+    case 'delbody':
+    case 'delbodies':
+      if (!admin) return need();
+      return void sys(c, bodyOrder(c, cmd, rest));
     case 'save': {
       // everybody and every stash written to the site now: before a restart made by hand, or whenever it is wanted
       if (!admin) return need();
@@ -800,6 +809,8 @@ export async function command(c: Client, line: string) {
       const had = [...things(t.inv)].find((it) => it.uid === uid);
       if (!had) return void sys(c, `${t === c ? 'You do' : `${t.name} does`} not carry that any more.`);
       takeOut(t.inv, new Set([uid]));
+      // (a tag trashed is nobody's: said to be in their pockets again, it is not taken for it, custody.ts)
+      for (const tag of payingTags(had)) wentFrom(t.key, tag.uid, null);
       log(`[admin] ${c.name} took ${ITEMS[had.id]?.name ?? had.id} out of what ${t === c ? 'they' : t.name} carried`);
       send(t, { t: 'trash', uids: [uid], ...(t === c ? {} : { by: c.name }) });
       send(c, { t: 'inv', id: t.id, name: t.name, inv: t.inv });

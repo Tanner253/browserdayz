@@ -178,6 +178,24 @@ async function onBody(p: Player, name: string): Promise<{ uid: string }[]> {
   return d.items;
 }
 
+/** a tag taken off `name`'s body as a game takes it: opened, and set again without it (the server keeps who holds each tag that can pay, server/custody.ts) */
+async function takeOff(p: Player, name: string, uid: string) {
+  const at = p.got.length;
+  const kept = p.welcome?.corpses.find((b) => b.name === name);
+  const fresh = p.got.map((m) => (m.t === 'death' || m.t === 'corpse@' ? m.corpse : null)).find((b) => b?.name === name);
+  const cid = (fresh ?? kept)?.uid;
+  assert.ok(cid, `${p.name} sees no body of ${name}`);
+  p.say(AT);
+  await sleep(200);
+  p.send({ t: 'copen', cid });
+  for (let k = 0; k < 40 && !p.got.slice(at).some((m) => m.t === 'cdata'); k++) await sleep(100);
+  const d = p.got.slice(at).find((m) => m.t === 'cdata') as { items: { uid: string }[] } | undefined;
+  assert.ok(d?.items.some((i) => i.uid === uid), `${p.name} found no tag ${uid} on ${name}'s body`);
+  p.send({ t: 'cset', cid, items: d!.items.filter((i) => i.uid !== uid) });
+  p.send({ t: 'cclose', cid });
+  await sleep(150);
+}
+
 /** what the log says of Eli cashing a tag in */
 async function cash(log: () => string, eli: Player, tag: Tag) {
   eli.send({ t: 'cash', uid: tag.uid, wallet: '' });
@@ -204,6 +222,7 @@ await withServer('word', async (log) => {
   await sleep(300);
   await shoot(log, ann, dan);
   await shoot(log, ann, gil);
+  await takeOff(eli, 'Dan', dans.uid);
   const began = Date.now();
   eli.carry([dans]);
   await live([ann, bo, eli], HOLD * 1000 - 1400);
@@ -245,6 +264,7 @@ ${log().slice(-500)}`);
   console.log('  ok  shot dead after the restart, his tag is on his body for the taking');
   // Gil's tag: on his body, laid out again; taken off it and carried its time, it pays: whose it was outlived the restart
   assert.ok((await onBody(ann, 'Gil')).some((i) => i.uid === gils.uid), "Gil's tag is not on his body after the restart");
+  await takeOff(eli, 'Gil', gils.uid);
   eli.carry([gils]);
   await live([eli, ann], HOLD * 1000 + 600);
   const gline = await cash(log, eli, gils);

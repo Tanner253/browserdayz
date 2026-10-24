@@ -44,6 +44,68 @@ export function sortGrid(c: Container, apply = true): boolean {
   return false;
 }
 
+/**
+ * Everything carried sorted at once (Sort all, the owner, 2026-10-23: "a sort button for all inventories would be a
+ * nice addition instead of just per contianer"): piles of a kind joined across every bag, each kind into the bag set
+ * for it (`wants`), the rest into the bags set for nothing, then wherever there is room; each bag packed kind by kind.
+ * The biggest things are found room first, each in the bags it would go to, so that a gun only one bag can hold is
+ * not left out by rounds spread through it. If that leaves anything without room, every bag is put back as it was
+ * and sorted by itself instead.
+ * @returns whether anything moved
+ */
+export function sortAll(inv: PlayerInventory, wants: (c: Container, item: ItemInstance) => boolean, typed: (c: Container) => boolean): boolean {
+  const bags = inv.containers.filter((c) => c !== inv.tags && c !== inv.theHold);
+  // (a bag set for a kind takes other things only once the bags set for nothing are full)
+  const loose = bags.filter((c) => !typed(c));
+  const was = bags.map((c) => c.items.map((p) => ({ ...p, qty: p.item.qty })));
+  const ids = new Set(bags.flatMap((c) => c.items.map((p) => p.item.id)).filter((id) => ITEMS[id]?.stack));
+  for (const id of ids) combinePiles(bags, id);
+  const area = (it: ItemInstance) => ITEMS[it.id].w * ITEMS[it.id].h;
+  const things = bags.flatMap((c) => c.items.map((p) => p.item));
+  const hasBag = (it: ItemInstance) => bags.some((c) => wants(c, it));
+  const kinds = (a: ItemInstance, b: ItemInstance) => sortRank(a.id) - sortRank(b.id) || a.id.localeCompare(b.id) || b.qty - a.qty;
+  const orders = [(a: ItemInstance, b: ItemInstance) => area(b) - area(a) || Number(hasBag(b)) - Number(hasBag(a)) || kinds(a, b), (a: ItemInstance, b: ItemInstance) => Number(hasBag(b)) - Number(hasBag(a)) || area(b) - area(a) || kinds(a, b)];
+  for (const order of orders) {
+    for (const c of bags) c.items.length = 0;
+    const placed = [...things].sort(order).every((it) => {
+      for (const c of [...bags.filter((c) => wants(c, it)), ...loose, ...bags]) {
+        if (!c.accepts(it)) continue;
+        const at = c.findSpace(it);
+        if (at) {
+          c.items.push({ item: it, ...at });
+          return true;
+        }
+      }
+      return false;
+    });
+    if (!placed) continue;
+    // (each bag then laid out kind by kind, as its own sort button does)
+    for (const c of bags) sortGrid(c);
+    return bags.some((c, i) => c.items.length !== was[i].length || c.items.some((p) => { const o = was[i].find((q) => q.item === p.item); return !o || o.x !== p.x || o.y !== p.y || o.rot !== p.rot || o.qty !== p.item.qty; }));
+  }
+  // (no room for all of it packed this way: as it was, piles too, and each bag sorted by itself)
+  bags.forEach((c, i) => {
+    c.items.length = 0;
+    for (const p of was[i]) {
+      p.item.qty = p.qty;
+      c.items.push({ item: p.item, x: p.x, y: p.y, rot: p.rot });
+    }
+  });
+  return bags.map((c) => sortGrid(c)).some(Boolean);
+}
+
+const SORTS = new WeakMap<Container, { as: string; would: boolean }>();
+
+/** would sorting this grid move anything (`sortGrid` asked, and its answer kept until what is in the grid moves: it was asked of every bag on every redraw) */
+export function wouldSort(c: Container): boolean {
+  const as = c.items.map((p) => `${p.item.uid}:${p.x},${p.y},${p.rot ? 1 : 0},${p.item.qty}`).join('|');
+  const kept = SORTS.get(c);
+  if (kept?.as === as) return kept.would;
+  const would = sortGrid(c, false);
+  SORTS.set(c, { as, would });
+  return would;
+}
+
 /** what is in a grid weighs, a bag in it with all that is in that */
 export const gridWeight = (c: Container) => c.items.reduce((s, p) => s + itemWeight(p.item), 0);
 
