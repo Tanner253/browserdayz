@@ -152,6 +152,8 @@ export class Infected implements Damageable {
   variant = 0;
   laid = false;
   private deadPosed = 0;
+  /** dead and done falling: made still (see `freeze`) */
+  private frozen = false;
   /** where the physics was last told this body is, and which way it faced (see `update`) */
   private told = { x: NaN, y: NaN, z: NaN, yaw: NaN, n: 0 };
   private toldHead = new THREE.Vector3(NaN, 0, 0);
@@ -262,9 +264,44 @@ export class Infected implements Damageable {
 
   /** laid down again, the way the server says it fell */
   relay(variant: number) {
+    this.thaw();
     this.variant = variant;
     this.deadPosed = 0;
     this.avatar.layDown(variant);
+  }
+
+  /**
+   * A body done falling made as still as a player's body is (CorpseBody in remote.ts): its pose worked out once and
+   * its skeleton sent to the card once, its bones not gone through again every frame. Posed and sent every frame,
+   * twenty-five lying in view cost 2.8 ms of a 2560x1440 frame, 2026-10-23.
+   */
+  private freeze() {
+    const root = this.avatar.root;
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh) return;
+      m.skeleton.update();
+      m.skeleton.update = () => {};
+    });
+    root.matrixAutoUpdate = false;
+    root.matrixWorldAutoUpdate = false;
+    root.updateMatrixWorld = () => {};
+    this.frozen = true;
+  }
+
+  /** made to move again (laid down another way): what `freeze` stopped is its own again */
+  private thaw() {
+    if (!this.frozen) return;
+    const root = this.avatar.root;
+    root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (m.isSkinnedMesh) delete (m.skeleton as { update?: unknown }).update;
+    });
+    delete (root as { updateMatrixWorld?: unknown }).updateMatrixWorld;
+    root.matrixAutoUpdate = true;
+    root.matrixWorldAutoUpdate = true;
+    this.frozen = false;
   }
 
   /** a noise, or somebody it has just been hurt by: it goes to see (and if it was hurt, it knows who) */
@@ -766,9 +803,10 @@ export class Infected implements Damageable {
         return;
       }
     } else if ((this.frameNo++ + this.i) % (off > 70 * 70 ? 3 : off > 30 * 30 ? 2 : 1) !== 0) return;
-    // (a body that has done falling is posed no more: nothing of it moves. Bodies lie six times as long since they
-    // were searched, 2026-10-23, and as many more posed every frame cost the frame.)
+    // (a body that has done falling is posed no more, and made still: nothing of it moves. Bodies lie six times as
+    // long since they were searched, 2026-10-23, and as many more posed every frame cost the frame.)
     if (this.dead && (this.deadPosed += this.poseDt) > SETTLED) {
+      if (!this.frozen) this.freeze();
       this.poseDt = 0;
       return;
     }
