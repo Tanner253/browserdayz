@@ -162,6 +162,8 @@ export const frameMethods = {
       this.glassDown = now;
     }
     this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
+    // (the building plan and the hammer: before the hands, so that the hammer at a piece is not a swing: src/game/building)
+    this.build.update(dt, playing && !uiOpen && !typing && !p.dead && !this.wheelOn && !this.garage.ride);
     // a dance, or hands that are up, ends with the first step, shot or anything else done
     // (one of the pack's movements played once, at its end)
     if (this.hold === 'dance' && this.danced && this.avatar.emoteOver) this.setHold(null);
@@ -189,7 +191,7 @@ export const frameMethods = {
     // (slower while aiming, by what the game was made with and by the player's own multiple of that: Settings, Controls)
     const aimed = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     const sens = aimed < 1 ? aimed * controls().aim : 1;
-    if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
+    if (!uiOpen && playing && !this.wheelOn && !this.build.wheelOpen) p.look(input, sens);
     // (kept with whoever it is watching: it goes as they go, and is flown about them)
     if (this.freecam && this.watching) {
       const r = this.remotes.get(this.watching.id);
@@ -358,7 +360,8 @@ export const frameMethods = {
       // (the wheel goes on to the next thing on the hot bar from this one; with no other, it is put away)
       if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.wheelStep(input.wheel > 0 ? 1 : -1)) input.wheel = 0;
       if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
-      else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
+      // (the building plan's left button is the building's: it lays a piece)
+      else if (playing && !uiOpen && !typing && r.t > 0.3 && r.item.id !== 'building_plan' && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }
 
     // a grenade: its pin coming out, and then live in the hand until the button is let go (see `cook`)
@@ -410,7 +413,7 @@ export const frameMethods = {
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
     this.garage.frame(dt, now, physics.alpha, cam.position);
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.build.wheelOpen && !this.hold && !ride);
     this.grenades.update(dt);
     this.throwing.update(dt);
     this.updateBarrels(dt);
@@ -487,6 +490,7 @@ export const frameMethods = {
     }
 
     this.updateInteraction(cam);
+    if (this.build.prompt) this.prompt = this.build.prompt;
     this.traders?.update(dt, cam.position);
     // (whoever walks off from the counter, or is killed at it, is done trading)
     if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos))) this.shop.close();
@@ -678,7 +682,7 @@ export const frameMethods = {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? (this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
+      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? (this.ready && this.ready.item.id !== 'building_plan' ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

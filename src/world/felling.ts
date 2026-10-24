@@ -83,6 +83,7 @@ export class Felling {
 
   /** the trees down now */
   private gone = new Set<number>();
+  isDown = (i: number) => this.gone.has(i);
 
   /** tree `i` has been felled, and falls toward `a` (a yaw): seen from `eye` */
   fell(i: number, a: number, eye: THREE.Vector3) {

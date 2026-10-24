@@ -662,7 +662,7 @@ export const enterMethods = {
     if (this.invUI.isOpen) this.invUI.tickTags();
     if (!done.length) return;
     // (the server is shown the tag with its time served before it is asked to cash it: asked from a hidden tab, its last sight of it may be minutes old)
-    if (this.online) this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
+    if (this.online) this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals }, sp: this.build.sp });
     for (const it of done) {
       this.inv.remove(it);
       const n = addCashedTag();

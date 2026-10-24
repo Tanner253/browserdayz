@@ -145,6 +145,8 @@ export function buildWorldData(root: string) {
     /** the trees and the rocks, numbered as the game numbers them: felled for logs and broken for stone (server/gather.ts) */
     trees: world.trees,
     rocks: world.rocks,
+    /** the lakes and the rivers (no base is built in water: src/sim/build/land.ts) */
+    water: world.water,
     /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
     jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? parked : [],
     /** and the police cars, one beside each police station: none without the jeeps, or without a model of their own */

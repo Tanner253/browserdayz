@@ -304,6 +304,7 @@ function logParts(): MeshPart[] {
 }
 
 let galv: THREE.MeshStandardMaterial | null = null;
+let plan: THREE.MeshStandardMaterial | null = null;
 /** two sheets of corrugated galvanised steel, 90 by 60 cm, the corrugations along X */
 function sheetGeometry() {
   const one = (y: number) => {
@@ -319,6 +320,11 @@ function sheetGeometry() {
 
 export function proceduralParts(model: string): MeshPart[] {
   if (model === '@log') return logParts();
+  if (model === '@plan') {
+    // (a roll of blueprint paper, tied: a stand-in until a model of one is downloaded)
+    plan ??= new THREE.MeshStandardMaterial({ color: 0x3f6fa8, roughness: 0.9, name: 'blueprint' });
+    return [{ name: 'plan', geometry: new THREE.CylinderGeometry(0.035, 0.035, 0.6, 12).rotateZ(Math.PI / 2).translate(0.3, 0.035, 0), material: plan }];
+  }
   if (model === '@planks') return [{ name: 'planks', geometry: planksGeometry(), material: sawnPine() }];
   if (model === '@sheet') {
     galv ??= new THREE.MeshStandardMaterial({ color: 0x9aa3a8, metalness: 0.7, roughness: 0.45, side: THREE.DoubleSide, name: 'galvanised' });

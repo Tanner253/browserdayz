@@ -42,9 +42,9 @@ const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
 const sim = q.get('sim'), bb = q.get('bb');
-const { BUILD_CELLS } = bb ? await import('./sandbox-build') : { BUILD_CELLS: {} as Record<string, number> };
+const { BUILD_CELLS, BUILD_COLS } = bb ? await import('./sandbox-build') : { BUILD_CELLS: {} as Record<string, number>, BUILD_COLS: {} as Record<string, number> };
 const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : strip > 0 ? strip : views.length;
-const cols = Math.min(cells, strip > 0 || sim || bb ? 4 : 2), rows = Math.ceil(cells / cols);
+const cols = Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);

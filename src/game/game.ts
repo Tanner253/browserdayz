@@ -117,6 +117,7 @@ import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
 import { huntMethods } from './game/hunt';
 import { Gathering } from './gathering';
+import { Building } from './building';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -247,6 +248,8 @@ export class Game {
   garage!: Garage;
   /** trees felled, stone broken, logs sawn (src/game/gathering.ts) */
   gather!: Gathering;
+  /** bases: the plan, the hammer, the pieces (src/game/building/index.ts) */
+  build!: Building;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
   riders!: Riders;
   economy!: Economy;
@@ -684,6 +687,29 @@ export class Game {
       changed: () => this.inventoryChanged(),
       begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
       breakOff: () => this.breakOff(),
+    });
+    this.build = new Building({
+      scene: r.scene,
+      atmo,
+      world,
+      input: this.input,
+      camera: () => this.s.r.camera,
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      held: () => this.inv.held(),
+      me: () => this.player.pos,
+      yaw: () => this.player.yaw,
+      count: (id) => [...this.inv.everything().values()].filter((it) => it.id === id).reduce((n, it) => n + it.qty, 0),
+      take: (id, n) => void this.inv.take(id, n),
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
+      busy: () => !!this.use || this.weapons.working,
+      breakOff: () => this.breakOff(),
+      changed: () => this.inventoryChanged(),
+      felled: (i) => this.gather.felling.isDown(i),
+      hud: () => this.hud.root,
+      player: () => this.player.collider,
     });
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);

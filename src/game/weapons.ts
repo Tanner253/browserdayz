@@ -503,7 +503,8 @@ export const LIVE = {
  * bandage item needs to be larger its too small in the hand"): the roll of dressing is a 4.5 cm reel of tape.
  */
 // (firewood: a bundle half a metre long, held in front of the eye, filled the view)
-const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45 };
+// (and base building's, 2026-10-24: a roll of plan held as a roll is, a log, a bundle of boards, a sheet of steel, at a size a hand can show)
+const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45, building_plan: 0.45, log: 0.55, planks: 0.6, sheet_metal: 0.55 };
 
 /**
  * A roll of dressing in the left palm, and the right drawing lengths off it. A bag of blood or salt water being run
@@ -766,6 +767,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // (the tools of gathering, src/sim/gather.ts: the saw held as the machete is, the long axe and the pickaxe as the
   // bat, in both hands)
   styles.hand_saw = styles.machete;
+  styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };
   return styles;
@@ -1726,7 +1728,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe', 'hammer']) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();

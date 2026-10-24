@@ -10,6 +10,7 @@ import type { SerializedInventory } from '../src/sim/inventory';
 import type { C2S } from '../src/net/protocol';
 import { broadcast, clients, send, type Client } from './players';
 import { economy, things, world } from './index';
+import { bases } from './build';
 
 let made: Woods | null = null;
 /** the trees that are down and the rocks that are spent (made when first asked: this file is read before the world is built) */
@@ -27,14 +28,14 @@ const of = (c: Client) => {
 const wear = new Map<string, number>();
 
 /** the tool in the hands that this blow says it was struck with, if it is that and is fit to work with */
-function tool(c: Client, u: unknown, kinds: Record<string, number>): ItemInstance | null {
+export function tool(c: Client, u: unknown, kinds: Record<string, number>): ItemInstance | null {
   if (typeof u !== 'string' || !c.w || !kinds[c.w]) return null;
   for (const it of things(c.inv)) if (it.uid === u && it.id === c.w) return it;
   return null;
 }
 
 /** a use of a tool: worn down a step, and its owner told */
-function use(c: Client, it: ItemInstance) {
+export function use(c: Client, it: ItemInstance) {
   const was = Math.min(it.cond ?? 1, wear.get(it.uid) ?? 1);
   const now = worn(it.id, was);
   wear.set(it.uid, now);
@@ -43,7 +44,7 @@ function use(c: Client, it: ItemInstance) {
   if (now <= 0) send(c, { t: 'tell', kind: 'warn', text: `Your ${ITEMS[it.id].name.toLowerCase()} is ruined` });
 }
 
-const ruined = (c: Client, it: ItemInstance) => {
+export const ruined = (c: Client, it: ItemInstance) => {
   if (!condition(Math.min(it.cond ?? 1, wear.get(it.uid) ?? 1)).ruined) return false;
   send(c, { t: 'tell', kind: 'warn', text: `Your ${ITEMS[it.id].name.toLowerCase()} is ruined: it is no use for work` });
   return true;
@@ -134,6 +135,7 @@ export function keepWear(inv: SerializedInventory | null, had: SerializedInvento
 /** every half minute: the trees whose time is up and that nobody is near stand again */
 export function regrowing(now = Date.now()) {
   const alive = [...clients.values()].filter((c) => c.alive);
-  const back = woods().regrow(now, (x, z, within) => alive.some((c) => Math.hypot(c.pose[0] - x, c.pose[2] - z) < within));
+  // (nor one with a base built over its stump)
+  const back = woods().regrow(now, (x, z, within) => alive.some((c) => Math.hypot(c.pose[0] - x, c.pose[2] - z) < within) || bases().near(x, z, 4).length > 0);
   if (back.length) broadcast({ t: 'grow', i: back });
 }

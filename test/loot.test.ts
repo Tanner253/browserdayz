@@ -47,7 +47,8 @@ const points = every.filter((p) => !apartOf(p));
 /** is the place of this number in the whole list a place apart (since 2026-10-18 the desert's towns, the map's own, come after some places apart: src/sim/desert.ts) */
 const apartAt = (i: number) => !!apartOf(every[i]);
 const STEPS: Tier[] = [1, 2, 3, 4, 5];
-const melee = Object.values(ITEMS).filter((d) => d.category === 'melee').map((d) => d.id);
+// (not the tools a base is got and built with, 2026-10-24: swung, but tools, and found where tools are, in sheds inland)
+const melee = Object.values(ITEMS).filter((d) => d.category === 'melee' && !['hand_saw', 'felling_axe', 'pickaxe', 'hammer'].includes(d.id)).map((d) => d.id);
 const guns = Object.values(ITEMS).filter((d) => d.weapon).map((d) => d.id);
 
 /** one stocking of the map: of each sort, how many lie on each step, and where each thing lies */
@@ -308,7 +309,7 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
     lights.push([1, 2, 3].reduce((n, t) => n + sum(inside((p) => p.tier === t && kind(p, 'Shop')), 'flashlight'), 0));
     // ("sheds should spawn industrial and tools, flashlight etc": past the outskirts they were all but empty)
     // (and what a base is built with and of, 2026-10-24: src/sim/items/build.ts)
-    const TOOLS = ['hatchet', 'crowbar', 'shovel', 'knife', 'flashlight', 'jerrycan', 'work_gloves', 'rubber_boots', 'garden_gloves', 'stash_kit', 'black_bag', 'sack_pack', 'chest_rig', 'gun_light', 'hand_saw', 'felling_axe', 'pickaxe', 'nails', 'planks', 'sheet_metal'];
+    const TOOLS = ['hatchet', 'crowbar', 'shovel', 'knife', 'flashlight', 'jerrycan', 'work_gloves', 'rubber_boots', 'garden_gloves', 'stash_kit', 'black_bag', 'sack_pack', 'chest_rig', 'gun_light', 'hand_saw', 'felling_axe', 'pickaxe', 'nails', 'planks', 'sheet_metal', 'building_plan', 'hammer'];
     const sheds = inside((p) => p.tier === 3 && kind(p, ...SHED) && !kind(p, 'Military')), places = points.filter((p) => p.tier === 3 && !p.arms && kind(p, ...SHED) && !kind(p, 'Military')).length;
     assert.ok(total(sheds) >= places * 0.25 && sum(sheds, ...TOOLS) * 2 >= total(sheds), `the sheds of the village: ${total(sheds)} things on ${places} places, ${sum(sheds, ...TOOLS)} of them a shed's`);
     // (a hunter's cabin keeps its shotgun, as DayZ's hunting places keep theirs: a farm's or a works' shed keeps no gun)

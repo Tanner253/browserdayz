@@ -16,6 +16,7 @@ import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 import type { AnimalRow, Call } from '../sim/animals';
+import type { KeptBase, KeptPiece } from '../sim/build/bases';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
@@ -66,7 +67,7 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-// (64, 2026-10-24: gathering, base building's first step: trees felled and standing again ('chop', 'fell', 'grow',
+// (64, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item).)
 export const PROTOCOL = 64;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
@@ -270,7 +271,7 @@ export type C2S =
   /** a shovel put to a stash: it is buried, or dug up */
   | { t: 'bury'; uid: string; on: boolean }
   | { t: 'door'; i: number; open: boolean; swing: number }
-  | { t: 'me'; inv: SerializedInventory; vitals: Vitals }
+  | { t: 'me'; inv: SerializedInventory; vitals: Vitals; /** the last 'spent' this game has taken out of its pockets */ sp?: number }
   | { t: 'died'; cause: string; v?: number }
   | { t: 'respawn' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
@@ -331,6 +332,11 @@ export type C2S =
   | { t: 'mine'; i: number; u: string }
   /** sawing the log lying on the ground whose uid is `l`, with the saw `u`: begun (go 1), and done (go 2) */
   | { t: 'saw'; l: string; u: string; go: 1 | 2 }
+  /** a piece laid with the building plan `u` (src/sim/build/bases.ts Ask): in base `b` at its frame's place, or a new base at a world place turned `yaw` */
+  | { t: 'blay'; k: string; b?: number; x: number; y: number; z: number; r: number; yaw?: number; u: string }
+  /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
+  | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
+  | { t: 'bdel'; b: number; p: number; u: string }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -415,6 +421,15 @@ export type S2C =
   /** a tool of this player's has worn: its condition now (0 ruined) */
   | { t: 'wear'; u: string; c: number }
   | { t: 'saw'; l: string; ok: boolean; why?: string; done?: boolean }
+  /** a base in sight (whole), or out of it / gone; a piece of one laid or changed; pieces of one gone (src/sim/build/bases.ts) */
+  | { t: 'base'; b: KeptBase }
+  | { t: 'bgone'; b: number }
+  | { t: 'bpc'; b: number; p: KeptPiece }
+  | { t: 'bout'; b: number; ids: number[] }
+  /** the server's word on the hammer begun at a piece */
+  | { t: 'bup'; b: number; p: number; ok: boolean; why?: string }
+  /** materials the server took for what was built (`n` its number, said back in 'me' `sp` once they are out of the pockets) */
+  | { t: 'spent'; n: number; items: [string, number][] }
   /** a fire built by somebody (numbered after the map's own), and one cleared away */
   | { t: 'fire+'; i: number; x: number; y: number; z: number }
   | { t: 'fire-'; i: number }

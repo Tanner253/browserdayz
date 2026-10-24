@@ -78,7 +78,9 @@ export const SAW = {
 // ---- the tools wearing (DayZ's health of an item: Pristine, Worn, Damaged, Badly damaged, Ruined)
 
 /** how many uses a tool has in it, pristine to ruined: a blow, a log sawn (each use takes 1/life of its condition) */
-export const TOOL_LIFE: Record<string, number> = { hatchet: 450, felling_axe: 650, pickaxe: 500, hand_saw: 70 };
+export const TOOL_LIFE: Record<string, number> = { hatchet: 450, felling_axe: 650, pickaxe: 500, hand_saw: 70, hammer: 400 };
+/** what nails a base up and takes it down: the building hammer (Rust's), base building's second step */
+export const HAMMERS: Record<string, number> = { hammer: 1 };
 
 /** a thing's condition, 1 new: as DayZ names it, and the colour its card shows it in */
 export function condition(c: number | undefined): { name: string; colour: string; ruined: boolean } {

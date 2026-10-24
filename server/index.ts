@@ -44,6 +44,7 @@ import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
 import { animalsTick, startAnimals } from './animals';
 import { regrowing } from './gather';
+import { keepBases, restoreBases, sighting } from './build';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
@@ -353,12 +354,15 @@ function loadWorld() {
     economy: { time: number; lastRestock: Record<string, number>; loot: WorldLoot[] };
     boxes: Box[];
     doors: [number, boolean, number][];
+    bases?: import('../src/sim/build/bases').KeptBase[];
   } | null = null;
   try {
     if (existsSync(SAVE_FILE)) saved = JSON.parse(readFileSync(SAVE_FILE, 'utf8'));
   } catch (e) {
     log('could not read save, starting fresh:', (e as Error).message);
   }
+  // (the bases, kept with the world on this disk as well as in the save: a crash between saves loses none of them)
+  if (saved?.bases) restoreBases(saved.bases);
   if (saved && saved.rev === WORLD_REV) {
     economy.time = saved.economy.time;
     economy.lastRestock = saved.economy.lastRestock;
@@ -402,6 +406,7 @@ function saveWorld() {
       // (and the dead lying on the ground, not one riding in a seat: see `bodies` in keep.ts)
       boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
+      bases: keepBases(),
     };
     writeFileSync(SAVE_FILE, JSON.stringify(data));
   } catch (e) {
@@ -433,8 +438,9 @@ setInterval(() => standing(Date.now()), 500);
 
 setInterval(() => inHands(Date.now()), 250);
 
-// felled trees standing again, out of everybody's sight (server/gather.ts)
+// felled trees standing again, out of everybody's sight (server/gather.ts); bases told to whoever comes near them (server/build.ts)
 setInterval(() => regrowing(), 30_000);
+setInterval(() => sighting(), 2000);
 
 /**
  * Who is not let in. BAN_KEYS and BAN_IPS in the environment (lists, commas between) are kept off for as long as

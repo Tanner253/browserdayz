@@ -21,6 +21,8 @@ import { seen } from './seen';
 import { pinned, type Pin } from './pinned';
 import { elite } from './elite';
 import { plating } from './plates';
+import { keepBases, restoreBases } from './build';
+import type { KeptBase } from '../src/sim/build/bases';
 
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
 const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
@@ -135,6 +137,8 @@ interface Snapshot {
   tags?: TagsKept;
   /** the guns with a store finish put on them, by uid (plates.ts) */
   plates?: ReturnType<typeof plating.keep>;
+  /** every base and its pieces, said short (server/build.ts) */
+  bases?: KeptBase[];
 }
 
 /** a body as it is kept: where it lies, whose it was, how it fell, what is on it, and the seconds it has left */
@@ -217,7 +221,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags(), plates: plating.keep() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags(), plates: plating.keep(), bases: keepBases() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -280,6 +284,7 @@ function takeInLate(save: KeptFile) {
   pinned.restore(snap.pinned);
   elite.restore(snap.elite);
   plating.restore(snap.plates);
+  restoreBases(snap.bases);
   takePowers(snap.powers);
   // (from a last word only: see loadKept)
   if (save.final) takeTags(snap.tags);
@@ -532,6 +537,7 @@ export async function loadKept() {
     const moved = snap.rev !== WORLD_REV, now = Date.now();
     // (which guns are plated, before any gun is read: each is read wearing what the record says)
     plating.restore(snap.plates);
+    restoreBases(snap.bases);
     let bad = 0;
     for (const [k, r] of snap.chars ?? []) {
       try {

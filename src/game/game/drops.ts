@@ -231,7 +231,7 @@ export const dropsMethods = {
     if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
       this.meT = 0;
       this.meDirty = false;
-      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
+      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals }, sp: this.build.sp });
     }
   },
 

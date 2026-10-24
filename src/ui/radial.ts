@@ -13,8 +13,8 @@ export interface RadialEntry {
   label: string;
   /** a picture over the label (a URL) */
   icon?: string;
-  /** kept up until stopped (drawn quieter), on now (drawn in the accent), or not to be had (dimmed) */
-  mark?: 'keeps' | 'held' | 'dim';
+  /** kept up until stopped (drawn quieter), on now (drawn in the accent), not to be had (dimmed), or nothing there at all (not drawn: an outer ring only partly filled) */
+  mark?: 'keeps' | 'held' | 'dim' | 'gap';
 }
 /** a ring, of the wheel's radius of 210: from the hub out, and where its words sit */
 export interface RadialRing {
@@ -44,6 +44,8 @@ const pt = (r: number, a: number) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.c
 /** the wheel's picture: every wedge with its words, the bar round the rim, all of it in the wheel's own measure (-210..210) */
 export function radialSvg(entries: RadialEntry[], rings: RadialRing[], per: number): string {
   const wedges = entries.map((e, i) => {
+    // (an empty place keeps its number, so that the wedges after it are still pointed at by theirs)
+    if (e.mark === 'gap') return `<g class="gap" data-slot="${i}"></g>`;
     const { r0, r1, text: tr } = rings[Math.min(rings.length - 1, Math.floor(i / per))];
     const a = ((i % per) / per) * Math.PI * 2, half = Math.PI / per - 0.022 * (58 / r0);
     const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;

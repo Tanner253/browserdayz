@@ -48,6 +48,7 @@ import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
 import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
+import { hammer, lay, owing, takeDown } from './build';
 import { POISON } from '../src/sim/sickness';
 
 export function handle(c: Client, m: C2S) {
@@ -353,6 +354,12 @@ export function handle(c: Client, m: C2S) {
       return mine(c, m);
     case 'saw':
       return saw(c, m);
+    case 'blay':
+      return lay(c, m);
+    case 'bup':
+      return hammer(c, m);
+    case 'bdel':
+      return takeDown(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
@@ -559,8 +566,9 @@ export function handle(c: Client, m: C2S) {
       if (c.inv?.slots?.neck && tagTime(c) < TAG_FRESH_MS) c.inv.slots.neck = null;
       // (nobody without the power puts a thing in a hold: see `carryOrder`)
       if (c.inv && !c.power.bottomless) holdOnlyEmpties(c.inv, had);
-      // (no tool newer than the server has worn it: server/gather.ts)
+      // (no tool newer than the server has worn it: server/gather.ts; and nothing the server took to build with still in them: server/build.ts)
       keepWear(c.inv, had);
+      owing(c, m.sp);
       pockets(c);
       // (somebody with a keycard: remembered a moment, for when they put it in the bunker's reader)
       if (carries(c.inv, 'keycard')) cardSeen.set(c.id, Date.now());

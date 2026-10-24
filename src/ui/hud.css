@@ -177,6 +177,13 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
   background: rgba(0, 0, 0, 0.35);
 }
 .hud-prompt small { color: var(--ink-dim); margin-left: 6px; }
+/* base building's card (src/game/building): the piece, what it takes against what is carried, the keys under */
+.hud-prompt .bc { display: inline-block; text-align: left; padding: 7px 11px 6px; background: rgba(8, 10, 9, 0.6); border: 1px solid rgba(233, 228, 216, 0.16); border-radius: 4px; font-size: 15px; }
+.hud-prompt .bc b { color: var(--accent); letter-spacing: 0.05em; margin-right: 4px; }
+.hud-prompt .bc .ok { color: #8fe0b8; }
+.hud-prompt .bc .no { color: #f08a7e; }
+.hud-prompt .bc small { margin-left: 2px; }
+.hud-prompt .bc i { display: block; font-style: normal; font-size: 12px; letter-spacing: 0.06em; color: var(--ink-dim); margin-top: 3px; }
 
 /* Every timed thing (eating, a dressing, a throw winding up, a fuse running down, digging, drinking): one thin ring
    round the crosshair, filling clockwise from the top on a faint dark track, its name under it on a dark pill (the
