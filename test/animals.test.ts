@@ -294,8 +294,10 @@ ok('an admin stands any kind, one or a herd or pack of it, from the entity list'
     const h = herd([e.animal!, 'doe']);
     const got = h.place(e.animal!, 100, 100, 1, Math.min(4, e.most));
     assert.equal(got.length, Math.min(4, e.most), e.id);
-    assert.equal(new Set(got.map((b) => b.g)).size, 1, `${e.id}: one herd`);
-    assert.ok(got.every((b) => Math.hypot(b.x - 100, b.z - 100) < 6));
+    // (a bear lives alone: as many as are asked for, each its own; the rest one herd or pack)
+    const alone = HERDS.find((h) => h.of.some(([id]) => id === e.animal))!.of.every(([, , most]) => most <= 1);
+    assert.equal(new Set(got.map((b) => b.g)).size, alone ? got.length : 1, `${e.id}: ${alone ? 'each alone' : 'one herd'}`);
+    assert.ok(got.every((b) => Math.hypot(b.x - 100, b.z - 100) < (alone ? 4 * got.length + 2 : 6)));
   }
   // (every kind there is can be stood: the list misses none)
   for (const k of KINDS) assert.ok(ENTITIES.some((e) => e.animal === k.id), `${k.id} cannot be spawned`);

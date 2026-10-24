@@ -45,6 +45,18 @@ export function* homesFor(herd: Herd, h: HerdKind, pick: () => number, out: { x:
     if (out.length >= h.count) break;
     if (!out.some((o) => Math.hypot(o.x - f.x, o.z - f.z) < h.apart)) out.push({ x: f.x, z: f.z });
   }
+  // (two that live far apart, the bears: the wildest first took the middle, and nothing was left far enough from it.
+  // The two wildest together that are far enough apart, then)
+  if (h.count === 2 && out.length < 2) {
+    let best = -1;
+    for (let i = 0; i < found.length; i++) for (let j = i + 1; j < found.length; j++) {
+      const a = found[i], b = found[j];
+      if (a.wild + b.wild > best && Math.hypot(a.x - b.x, a.z - b.z) >= h.apart) {
+        best = a.wild + b.wild;
+        out.splice(0, out.length, { x: a.x, z: a.z }, { x: b.x, z: b.z });
+      }
+    }
+  }
 }
 
 /** its own kind of country (a cell called water may be the dry edge a herd drinks at: open() says where it is wet) */

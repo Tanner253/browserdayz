@@ -288,6 +288,9 @@ export class Herd {
     const k = KINDS.findIndex((kk) => kk.id === kindId);
     const hi = HERDS.findIndex((h) => h.of.some(([id]) => id === kindId));
     if (k < 0 || hi < 0 || n < 1) return [];
+    // (one that lives alone is stood alone, however many are asked for: side by side, each its own. The owner, of
+    // bears: "dont herd or pack")
+    if (n > 1 && HERDS[hi].of.every(([, , most]) => most <= 1)) return Array.from({ length: n }, (_, c) => this.place(kindId, x + (c - (n - 1) / 2) * 8, z, now, 1)).flat();
     const g: Group = {
       i: this.groups.length, herd: hi, home: { x, z }, mid: { x, z }, at: { x, z }, spot: 'feed', nextSpot: now + 120_000, feeding: true, drank: true,
       members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1, callAt: 0, barkAt: 0,
