@@ -22,6 +22,7 @@ import type { AdminSelf, AdminLook } from '../../ui/admin-ui';
 import { type Well, WELL } from '../../sim/wells';
 import { Infected } from '../infected';
 import { castleUnder } from '../../sim/castle';
+import { nearSig } from './frame';
 import { ESP_FAR, ESP_NEAR, ESP_SIZE, HOT_CODES, HOT_FREE, _lampPos, type Game } from '../game';
 
 export const handsMethods = {
@@ -69,7 +70,10 @@ export const handsMethods = {
     this.meDirty = true;
     this.syncOpenBox();
     this.syncLying();
-    this.save();
+    this.saveSoon();
+    // (drawn as it is now on the next frame; and what lies near is taken as seen, or the crate this changed is drawn twice)
+    if (this.invUI.isOpen) this.vicinitySig = nearSig(this.around(), this.openStash);
+    this.invUI.soon();
   },
 
   // ------------------------------------------------------------ hot keys, and the hands

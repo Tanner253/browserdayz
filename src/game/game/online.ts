@@ -303,10 +303,12 @@ export const onlineMethods = {
     net.on('alive', (m) => this.remotes.get(m.id)?.setAlive(true));
     net.on('loot+', (m) => this.economy.inject(m.l));
     net.on('loot-', (m) => {
+      // (told of everything taken anywhere on the map: only what the open inventory shows redraws it)
+      const shown = this.invUI.isOpen && this.invUI.shows(m.uid);
       this.economy.take(m.uid);
       this.lying.delete(m.uid);
       this.lyingSent.delete(m.uid);
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
+      if (shown) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('denied', (m) => {
       // someone got there first: hand it back
@@ -347,7 +349,7 @@ export const onlineMethods = {
     net.on('lcargo', (m) => {
       // (as it is now, to whoever is not going through it: theirs is what they set)
       if (this.lying.get(m.uid) === 'mine') return;
-      if (lay(m.uid, m.items) && this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
+      if (lay(m.uid, m.items) && this.invUI.isOpen && this.invUI.shows(m.uid)) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('cbusy', (m) => {
       if (this.openStash?.uid !== m.cid) return;
