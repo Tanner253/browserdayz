@@ -232,3 +232,22 @@ export function towerSolids(t: TowerPlace): KitSolid[] {
   }
   return out;
 }
+
+/**
+ * The tented roofs over the towers (2026-10-23, the owner: "the walls and corners need polish", "the church is missing
+ * character"): as the towers of these lands' monasteries are roofed, a tent of painted iron on eight posts, one on each
+ * merlon, and under it the top open all round to shoot from. Heights over the tower's foot: the eave 2.4 m over the
+ * merlons (a man on the platform stands 1.8), the tent out past the battlements' outer face.
+ */
+export const TENT = { post: 0.26, eave: 15.4, fascia: 0.32, r: 7.05, rise: 7.2, at: (RING.r0 + RING.r1) / 2, sides: 32 };
+/** where each of a tower's posts stands, at its foot on the merlon's top */
+export function tentPosts(t: TowerPlace): V3[] {
+  return Array.from({ length: 8 }, (_, k) => ringPt(t, RING.crenel + (k + 0.5) * RING.every - t.turn, TENT.at, RING.merlon));
+}
+/** what stops a body and a shot of a tower's tent: the tent itself, and each post */
+export function tentSolids(t: TowerPlace): KitSolid[] {
+  const T = TENT, ring = Array.from({ length: 16 }, (_, k) => ringPt(t, k * 22.5 * D, T.r, T.eave - T.fascia));
+  const out: KitSolid[] = [hull([...ring, ...ring.map(([x, , z]): V3 => [x, t.foot + T.eave, z]), [t.x, t.foot + T.eave + T.rise, t.z]], 'Pokrov tower tent')];
+  for (const [x, y, z] of tentPosts(t)) out.push({ t: 'box', c: [x, y + (T.eave - RING.merlon) / 2, z], h: [T.post / 2, (T.eave - RING.merlon) / 2, T.post / 2], q: [0, 0, 0, 1], name: 'Pokrov tower post' });
+  return out;
+}

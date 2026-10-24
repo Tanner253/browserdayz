@@ -15,8 +15,10 @@ import { MOKROYE, MOKROYE_GROUND, MOKROYE_WALKS, mokroyeBuildings, mokroyePosts,
 import { POKROV_GROUND, POKROV_TERRACE, POKROV_TREES, pokrovBuildings, pokrovThings } from './pokrov';
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
 import { ZASTAVA, ZASTAVA_GROUND, ZASTAVA_SLABS, zastavaBuildings, zastavaThings } from './zastava';
-import { DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
+import { DESERT_LATER, DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
 import { TOWER_ROOM, towerCuts, wallCuts, type TowerPlace } from './pokrov-towers';
+import { TOWN_PARTS, partBuildings, partGround, partPosts, partThings, partWalks } from './town-parts';
+import { OUTPOSTS, isOutpost, outpostBuildings, outpostGround, outpostThings } from './outposts';
 
 export { LIPKI };
 
@@ -28,6 +30,8 @@ export interface Town {
   /** how far its pad of level ground reaches from the middle, each way (its own x and z) */
   pad: [number, number];
   rot: number;
+  /** a part of the town of this name, laid after every town (src/sim/town-parts.ts) */
+  part?: string;
 }
 /** a building of a town, in the town's frame: `rot` turns its front (+z of its own) toward (sin, cos) */
 export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }
@@ -86,11 +90,11 @@ export function pokrovWalls(y: number): KitPiece[] {
 /**
  * The domes over Pokrov, in its frame: over which building's middle, how high over that building's floor the drum
  * stands (into its roof's ridge: a gable rises 0.32 of the building's depth over its walls), how big, and whether
- * it is gilt. The cathedral's great dome; the belfry's little one over its bells.
+ * it is gilt. The cathedral's great dome, gilt as a cathedral's is; the belfry's little one over its bells.
  */
 export const POKROV_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [
   // (the great one over the crossing, a small one along the nave's ridge to the west, one over each arm and the apse)
-  { x: 12, z: -38, over: 16.0, size: 1.45, gilt: false },
+  { x: 12, z: -38, over: 16.0, size: 1.45, gilt: true },
   { x: -4.75, z: -38, over: 16.2, size: 0.72, gilt: false },
   { x: 12, z: -50.5, over: 12.4, size: 0.65, gilt: false },
   { x: 12, z: -25.5, over: 12.4, size: 0.65, gilt: false },
@@ -105,6 +109,8 @@ export interface PlacedTown { town: Town; padY: number }
 
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
+  if (t.part) return partBuildings(t);
+  if (isOutpost(t)) return outpostBuildings(t);
   return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : t.name === MOKROYE.name ? mokroyeBuildings() : t.name === ZASTAVA.name ? zastavaBuildings() : desertBuildings(t);
 }
 
@@ -115,6 +121,8 @@ export function townTrees(t: Town): [string, number, number, number][] {
 }
 
 export function townThings(t: Town): TownThing[] {
+  if (t.part) return partThings(t);
+  if (isOutpost(t)) return outpostThings(t);
   return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : t.name === MOKROYE.name ? mokroyeThings() : t.name === ZASTAVA.name ? zastavaThings() : desertThings(t);
 }
 
@@ -136,10 +144,12 @@ export interface TownGround {
    * a swamp. For the world's water (`world.water`, a Lake at the pad's height plus this).
    */
   water?: { level: number; outline: [number, number][]; swamp: boolean };
-  /** ground raised level inside a line (x, z points), so high, its bank falling away over `out` metres round it */
+  /** ground raised level inside a line (x, z points), so high, its bank falling away over `out` metres round it; or, h below 0, sunk so deep (a dig's trench, a quarry's pit), its bank its wall */
   terraces?: { poly: [number, number][]; h: number; out: number }[];
 }
 export function townGround(t: Town): TownGround {
+  if (t.part) return partGround(t);
+  if (isOutpost(t)) return outpostGround(t) ?? { yards: [], lanes: [] };
   return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : t.name === MOKROYE.name ? MOKROYE_GROUND : t.name === ZASTAVA.name ? ZASTAVA_GROUND : desertGround(t) ?? { yards: [], lanes: [] };
 }
 
@@ -166,14 +176,18 @@ export function moundAt(t: Town, lx: number, lz: number): number {
     else down = Math.min(down, e);
   }
   for (const { poly, h, out } of g.terraces ?? []) {
-    const d = outside(poly, lx, lz), k = Math.min(1, Math.max(0, 1 - d / out));
-    up = Math.max(up, h * k * k * (3 - 2 * k));
+    const d = outside(poly, lx, lz), k = Math.min(1, Math.max(0, 1 - d / out)), e = h * k * k * (3 - 2 * k);
+    if (h > 0) up = Math.max(up, e);
+    else down = Math.min(down, e);
   }
   return up + down;
 }
 
 /** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */
 export interface SlabRun { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }
+
+/** buildings whose floors stand over open ground on legs: the water about their legs is the swamp's, not a room's */
+const OPEN_UNDER = new Set<BuildingType>(['shanty', 'tower']);
 
 /** a room of a building the water stands in (coast-kit's Waters.rooms): its middle, its turn, half its size each way; `dry` for one the water must stay out of */
 export interface WaterRoom { x: number; z: number; rot: number; hx: number; hz: number; dry?: boolean }
@@ -189,7 +203,8 @@ export function placedRooms(p: PlacedTown, sizes: Partial<Record<BuildingType, [
   if (!water) return [];
   return townBuildings(p.town).flatMap((s) => {
     const size = sizes[s.type], floor = s.up ?? moundAt(p.town, s.x, s.z) + 0.3;
-    if (!size || floor >= water.level) return [];
+    // (nor the house on piles and the high seat, open under their floors: the swamp's own water, not a square of a room's)
+    if (!size || floor >= water.level || OPEN_UNDER.has(s.type)) return [];
     const [x, z] = townPoint(p.town, s.x, s.z);
     return [{ x, z, rot: p.town.rot + s.rot, hx: size[0] / 2, hz: size[1] / 2 }];
   });
@@ -204,16 +219,20 @@ export function placedSlabs(t: Town): SlabRun[] {
 /** every new town, as it is planned (where the world sets each down is the world's) */
 // (and the desert's three on its roads, 2026-10-18: src/sim/desert.ts. First: they are the map's own steps, and the
 // map's own places come before every place apart in the list of places, see test/loot.test.ts)
-export const TOWNS: Town[] = [...DESERT_TOWNS, POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA];
+// (the towns' parts last of all, 2026-10-23: nothing laid before them is renumbered for them)
+export const TOWNS: Town[] = [...DESERT_TOWNS, POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA, ...TOWN_PARTS, ...DESERT_LATER, ...OUTPOSTS];
+/** the towns laid after everything else of the map, their places for things after every other place (Buildings.laterLoot) */
+export const LATER_TOWNS: Town[] = [...TOWN_PARTS, ...DESERT_LATER, ...OUTPOSTS];
+export const isLater = (t: Town) => LATER_TOWNS.some((l) => l.name === t.name);
 
 /** a town's kit pieces that are not walkways: the stilts under Mokroye's house on stilts (on the pad at y) */
 export function townPosts(t: Town, y: number): KitPiece[] {
-  return t.name === MOKROYE.name ? mokroyePosts(y) : [];
+  return t.part ? partPosts(t, y) : t.name === MOKROYE.name ? mokroyePosts(y) : [];
 }
 
 /** a town's walkways of boards on posts (Ozerki's piers, Mokroye's boardwalks), in its frame */
 export function townWalks(t: Town): WalkRun[] {
-  return t.name === OZERKI.name ? OZERKI_WALKS : t.name === MOKROYE.name ? MOKROYE_WALKS : [];
+  return t.part ? partWalks(t) : t.name === OZERKI.name ? OZERKI_WALKS : t.name === MOKROYE.name ? MOKROYE_WALKS : [];
 }
 
 /**

@@ -206,7 +206,7 @@ export const GUN_ITEMS: ItemDef[] = [
   {
     id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
     desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
-    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] }, never: ['foregrip'] }, iconYaw: 0,
+    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] }, never: ['foregrip', 'sight'] }, iconYaw: 0,
     // (from the fourth step up only: the owner, 2026-10-19, "AR's should only be T4+")
     loot: { pair: 'M4A1', at: [0, 0, 0, 3, 1], restock: 420, usage: ARMY, loaded: [5, 20], keep: SOON, fitted: [['red_dot', 0.2], ['foregrip', 0.2], ['gun_light', 0.15], ['suppressor_556', 0.06], ['mag_ar_60', 0.05]], rack: { fort: 2 }, lean: 3 },
     worth: 60,

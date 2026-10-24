@@ -620,7 +620,9 @@ function curtain(): Part[] {
     if (whole) {
       // a platform of boards level with the walk, and one stair to it along the outer wall: its foot a pace clear of the corner, so that it is come onto from behind
       const xf = a + 0.75, run = Math.min(b - xf - 0.15, (W - SILL) / 0.95), xh = xf + run;
-      add(floor(rect(a, 0.9, b, d), W, 'timber', { holes: [rect(xf + run * 0.45, d - 1.05, xh, d)], under: 0.12, name: `${name} platform` }));
+      // (its hole from a third of the way up: from half way, a climber's head met the boards' edge and nobody got up it,
+      // 2026-10-23: "lots of visual glitches and bugs")
+      add(floor(rect(a, 0.9, b, d), W, 'timber', { holes: [rect(xf + run * 0.3, d - 1.05, xh, d)], under: 0.12, name: `${name} platform` }));
       add(flight([xf, SILL, d - 0.52], [xh, W, d - 0.52], 0.9, 'timber'));
     } else {
       // no platform is left in it: a stair along its outer wall to a landing in the corner, and a second from that up
@@ -788,7 +790,8 @@ function spur(): Part[] {
     opening(w, E.x0 + 0.5, 0, 1.6, T, 99);
     for (const [x, z] of [[E.x1 - 0.5, -1], [E.x0 + 3, -E.half + 0.5], [E.x0 + 3, E.half - 0.5]] as V2[]) opening(w, x, z, 0.8, T + 0.95, 99);
     add(w, floor(rect(E.x0 + 1, -E.half + 1, E.x1 - 1, E.half - 1), P.plain + SILL, 'paving', { name: 'end tower floor' }));
-    add(floor(rect(E.x0 + 1, -E.half + 1, E.x1 - 1, E.half - 1), T, 'timber', { holes: [rect(E.x0 + 2.4, -E.half + 1, E.x1 - 1, -E.half + 2.05)], under: 0.12, name: 'end tower platform' }));
+    // (the hole over the stair's head: it was over its foot, and a climber's head met the boards a metre short of the top)
+    add(floor(rect(E.x0 + 1, -E.half + 1, E.x1 - 1, E.half - 1), T, 'timber', { holes: [rect(E.x0 + 1, -E.half + 1, E.x0 + 3.6, -E.half + 2.05)], under: 0.12, name: 'end tower platform' }));
     add(flight([E.x1 - 1.55, P.plain + SILL, -E.half + 1.52], [E.x0 + 1.4, T, -E.half + 1.52], 0.9, 'timber'));
     add(apron([E.x1, 0.35], [E.x1, 1.45], [1, 0], P.plain + SILL));
   }
@@ -1090,9 +1093,12 @@ export function ruinsGround(x: number, z: number): Ground {
   let hold: Hold = 0, most = 0, sum = 0, weight = 0;
   for (const st of ruinsLayout()) {
     const c = Math.cos(st.yaw), s = Math.sin(st.yaw), dx = x - st.x, dz = z - st.z, lx = dx * c - dz * s, lz = dx * s + dz * c;
-    const off = outside(lx, lz, FOOT[st.piece]);
-    if (off > 14) continue;
-    const g = ruinGround(st.piece, lx, lz), w = g.hold === 2 ? 1e6 : (1 - smooth(0, 14, off)) * (st.piece.startsWith('stu') ? 0 : 1);
+    // (the wall to the river runs down the bank at a slant: eased from its very foot, the bank stood over one of its
+    // faces and buried its stepped top, "lots of visual glitches", 2026-10-23. Its own ground is held for a few paces
+    // either side of it, a shelf it runs down, and eased out past that.)
+    const off = outside(lx, lz, FOOT[st.piece]), [held, ease] = st.piece === 'spur' ? [5, 18] : [0, 14];
+    if (off > ease) continue;
+    const g = ruinGround(st.piece, lx, lz), w = g.hold === 2 ? 1e6 : (1 - smooth(held, ease, off)) * (st.piece.startsWith('stu') ? 0 : 1);
     if (w <= 0) continue;
     sum += (g.y + st.y) * w;
     weight += w;

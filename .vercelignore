@@ -10,3 +10,6 @@ data
 tools/trailer/out
 marketing
 tools/trailer/emotes.glb
+# each model as it came (scripts/tiers.mjs, 215 MB): no player loads them since a computer draws every model from its
+# lean copy (2026-10-21) and a phone sharpens from the model's own file; kept in the repo for the tools that read them
+public/assets/models/hi

@@ -28,6 +28,7 @@ import { EmotesMenu } from './emotes-menu';
 import { crownEl, hideCrownTip } from './elite-crown';
 import { reportPlay } from '../core/conversion';
 import { EMBED } from '../core/embed';
+import { DISCORD, discordBtn } from './discord';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 export type Stance = 'stand' | 'crouch' | 'prone';
@@ -124,8 +125,7 @@ export function hotbarCells(list: HotbarEntry[], icons: Record<string, string>):
 
 /** where the game is talked about, and its token's address on Solana: both shown on the main menu */
 export const X_HANDLE = 'zonaSOL_';
-/** where its players talk to each other: the way in to the Discord, on the main menu */
-export const DISCORD = 'https://discord.com/invite/8ECdSH2vWE';
+export { DISCORD } from './discord';
 /**
  * The Discord and X, at every death and every match's end in every game (the owner, 2026-10-23: "whenever a player
  * dies, on any game mode, we should show them the discord link and X link, to get them to join the discord. Same with
@@ -334,7 +334,7 @@ export class HUD {
             <a class="sm-out sm-arena" href="/">All games</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
             <button class="sl-ca" type="button" title="Copy"><code>${CONTRACT.slice(0, 4)}…${CONTRACT.slice(-4)}</code></button>
-            <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>
+            ${discordBtn('sm-discord')}
           </div>
         </header>
         <div class="sm-main">

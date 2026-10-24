@@ -190,8 +190,8 @@ export const PART_ITEMS: ItemDef[] = [
   },
   {
     id: 'suppressor_9', name: 'Pistol Suppressor', model: '@suppressor', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'Screw-on sound suppressor for the M9, the Colt 1911 and the MPA30. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the gun is longer and slower in the hand.',
-    attach: { fits: ['colt', 'm9', 'mpa'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
+    desc: 'Screw-on sound suppressor for the M9, the Colt 1911, the Desert Eagle and the MPA30. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the gun is longer and slower in the hand.',
+    attach: { fits: ['colt', 'm9', 'deagle', 'mpa'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
     loot: { pair: 'PistolSuppressor', at: [0, 1, 10, 0, 0], restock: 1800, usage: ARMY, favour: { Police: 3 } },
     worth: 22,
   },
@@ -210,7 +210,7 @@ export const PART_ITEMS: ItemDef[] = [
     worth: 28,
   },
   {
-    id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
+    id: 'red_dot', name: 'Holographic Sight', model: 'benelli_m3', nodeRe: '^sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
     desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits the M9, the Colt 1911, the MPA30, the MP7A1, the shotgun, both assault rifles and the 9A-91. Faster to aim with than irons.',
     attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'a91'], slot: 'optic', ergo: 3 },
     loot: { pair: 'M68Optic', at: [0, 1, 7, 3, 3], restock: 1800, usage: ARMY, lean: 4 },
@@ -220,7 +220,7 @@ export const PART_ITEMS: ItemDef[] = [
   {
     id: 'red_dot_1x', name: 'Red Dot Sight', model: 'red_dot_1x', w: 2, h: 1, weight: 0.2, category: 'attachment',
     desc: 'A 1x red dot: a lit dot that lies on whatever the gun points at, with nothing to magnify it. Fits every gun that takes a sight, the pistols and the sniper rifles too. Quicker to aim with than irons, and lighter than the holographic sight.',
-    attach: { fits: ['colt', 'm9', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'a91', 'mosin', 'vssk', 'sniper50', 'barrett'], slot: 'optic', ergo: 4 },
+    attach: { fits: ['colt', 'm9', 'deagle', 'mpa', 'mp7a1', 'benelli', 'ak', 'ar15', 'a91', 'mosin', 'vssk', 'sniper50', 'barrett'], slot: 'optic', ergo: 4 },
     loot: { pair: 'M4_T3NRDSOptic', at: [0, 2, 8, 3, 2], restock: 1800, usage: ARMY, lean: 4 },
     worth: 16, sells: 1,
   },

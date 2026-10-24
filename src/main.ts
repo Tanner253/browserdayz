@@ -27,7 +27,7 @@ import { RockField } from './world/rock-field';
 import { CANYON_ROCK_TINT } from './world/ground';
 import { outcropPieces } from './world/outcrops';
 import { passPlan } from './world/worldgen';
-import { loadWorld } from './world/load-world';
+import { loadWorld, mapFrom } from './world/load-world';
 import { Atmosphere, SHADOW_FRUSTA } from './world/atmosphere';
 import { installTiny } from './core/tiny';
 import { layBait } from './net/bait';
@@ -93,6 +93,8 @@ function tell(how: 'ok' | 'failed' | 'slow' | 'died' | 'lost', err = '') {
       gl: card,
       screen: `${innerWidth}x${innerHeight}@${devicePixelRatio}`,
       mem: (navigator as { deviceMemory?: number }).deviceMemory ?? 0,
+      map: mapFrom.how,
+      mapS: mapFrom.secs,
     });
     if (!navigator.sendBeacon?.('/api/boot', new Blob([body], { type: 'application/json' }))) void fetch('/api/boot', { method: 'POST', body, keepalive: true }).catch(() => {});
   } catch {
@@ -255,6 +257,8 @@ async function boot() {
   outcrops.camera = r.camera;
   void outcrops.build().then(() => ready(outcrops.group));
   buildings.lootPoints.push(...caveLootPoints());
+  // (and the towns' parts', last: src/sim/town-parts.ts)
+  buildings.lootPoints.push(...buildings.laterLoot);
   // (the sea's, the lakes' and the river's water and the swamp's mist got ready as they are made: hidden at the start
   // (the mist by day) they were a shader made in the frame they were first shown. Only these few: everything the west
   // made, got ready at once, held the loot's own getting ready past its six seconds, and each new thing of loot was
@@ -294,7 +298,7 @@ async function boot() {
   await frame();
   const veg = new Vegetation(world, atmo, terrain.heightTex);
   await veg.build(r.renderer, r.scene);
-  const grass = new Grass(terrain, atmo, world.surface);
+  const grass = new Grass(terrain, atmo, world.surface, world.reeds);
   grass.build(r.scene);
 
   stage('game');

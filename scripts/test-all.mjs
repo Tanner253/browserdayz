@@ -8,10 +8,13 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { takeLock } from './card-lock.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const JOBS = Number(process.argv[2] ?? process.env.TEST_JOBS ?? 8);
 const LOGS = path.join(os.tmpdir(), 'zona-tests');
+// (one suite at a time across every copy of the repo: two at once took the same ports and both hung, 2026-10-24)
+await takeLock(path.join(os.tmpdir(), 'zona-tests.lock'), ROOT, 'the test suite');
 fs.rmSync(LOGS, { recursive: true, force: true });
 fs.mkdirSync(LOGS, { recursive: true });
 const tests = fs.readdirSync(path.join(ROOT, 'test')).filter((f) => f.endsWith('.test.ts') && f !== 'devnet.test.ts').sort();

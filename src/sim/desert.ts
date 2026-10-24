@@ -26,9 +26,21 @@ export const BEREG: Town = { name: 'Bereg', x: -3520, z: -380, pad: [56, 40], ro
 /** on the south coast at the end of the road round Kalat; its lane east and west, the road in from the north at x 20 */
 export const MYS: Town = { name: 'Mys', x: -3520, z: 500, pad: [56, 40], rot: 0 };
 
+/**
+ * The dig camp of the archaeologists who dug Kalat, on the flat south-west of it by the road round it (2026-10-23, the
+ * owner of the desert's plan: "Everything looks good"): the site office, the tents, the finds' and the tools' stores,
+ * the generator, the tables the finds are sorted on, and the trench. Its yard in from that road at the south.
+ */
+export const LAGER: Town = { name: 'Lager', x: -3285, z: 392, pad: [38, 26], rot: -0.1 };
+
 export const DESERT_TOWNS: Town[] = [PESKI, KARAVAN, BLOKPOST, BEREG, MYS];
+/**
+ * The desert's places since the map was numbered: laid after every other (src/sim/towns.ts LATER_TOWNS), and stocked
+ * apart, on top of the map, as Kalat that it dug is (src/sim/apart.ts): of the step, it would take the others' things.
+ */
+export const DESERT_LATER: Town[] = [LAGER];
 /** their loot steps (see westTier) */
-export const DESERT_TIERS: Record<string, 1 | 2> = { Peski: 1, Karavan: 1, Blokpost: 2, Bereg: 1, Mys: 1 };
+export const DESERT_TIERS: Record<string, 1 | 2> = { Peski: 1, Karavan: 1, Blokpost: 2, Bereg: 1, Mys: 1, Lager: 2 };
 
 // (a building north of a lane faces south, rot 0; south of it, north, rot PI)
 const N = 0, S = PI;
@@ -71,6 +83,15 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     { type: 'house_small', x: -2, z: 7, rot: S },
     { type: 'cabin', x: 36, z: 6.5, rot: S },
   ],
+  Lager: [
+    // (the site office at the west end of a row along the north, the tents the dig sleeps in east of it, the last
+    // turned to the yard; the trench to the south-east)
+    { type: 'hut', x: -24, z: -13.5, rot: N },
+    { type: 'tent', x: -7.5, z: -14, rot: N + 0.05 },
+    { type: 'tent', x: 2, z: -14.6, rot: N - 0.04 },
+    { type: 'tent', x: 11.5, z: -13.8, rot: N + 0.08 },
+    { type: 'tent', x: 28.5, z: -9, rot: -PI / 2 + 0.1 },
+  ],
   Blokpost: [
     { type: 'guardpost', x: -30, z: -6, rot: N },
     { type: 'barracks', x: -4, z: -7.5, rot: N },
@@ -94,6 +115,24 @@ const THINGS: Record<string, TownThing[]> = {
   Mys: [
     { kind: 'Barrel_01', x: -8, z: -14, rot: 0 }, { kind: 'wooden_crate_01', x: 20, z: -12, rot: 0.2 }, { kind: 'cardboard_box_01', x: 16, z: 14, rot: 0.9 }, { kind: 'covered_car', x: -50, z: 14, rot: PI / 2 },
   ],
+  Lager: [
+    // the finds' store and the tools' store, end to end with the yard
+    { kind: 'container_shell@0', x: -30, z: 7.5, rot: PI / 2 + 0.05 }, { kind: 'container_shell@1', x: -29.6, z: 14, rot: PI / 2 - 0.04 },
+    // the generator and its gas by the office, the drums of fuel
+    { kind: 'portable_generator', x: -19.5, z: -6.5, rot: 0.3 }, { kind: 'propane_tank', x: -21.2, z: -6.9, rot: 0 }, { kind: 'propane_tank', x: -21.8, z: -5.8, rot: 0 },
+    { kind: 'Barrel_01', x: -21, z: 6.5, rot: 0 }, { kind: 'Barrel_01', x: -19.9, z: 7.4, rot: 0 },
+    // the tables the finds are sorted on, and what they came up in
+    { kind: 'WoodenTable_01', x: 3, z: 1.5, rot: 0.04 }, { kind: 'WoodenTable_01', x: 6.2, z: 1.7, rot: -0.03 },
+    { kind: 'cardboard_box_01', x: 0.3, z: 2.4, rot: 0.5 }, { kind: 'wooden_crate_01', x: 9.6, z: 1.2, rot: 0.2 }, { kind: 'wooden_crate_01', x: 9.9, z: 2.6, rot: 1.3 },
+    // the fire they eat round
+    { kind: 'stone_fire_pit', x: -7, z: 5.5, rot: 0 }, { kind: 'wooden_crate_01', x: -9.4, z: 6.8, rot: 0.7 },
+    // the trench's rim: a spade left in the spoil, the ladder down into it, the buckets the spoil goes up in, the
+    // crates the day's finds go in; the truck by the tents
+    { kind: 'shovel', x: 13.2, z: 11.6, rot: 0.6 }, { kind: 'wooden_crate_01', x: 26.6, z: 9.8, rot: 0.3 },
+    { kind: 'wooden_ladder', x: 14.2, z: 15, rot: Math.PI / 2 }, { kind: 'mop_bucket', x: 14.6, z: 10.4, rot: 0.2 }, { kind: 'mop_bucket', x: 24.2, z: 9.4, rot: 1.9 },
+    { kind: 'wooden_crate_01', x: 11.4, z: 2.4, rot: 0.8 }, { kind: 'painted_wooden_stool', x: 3.6, z: 3.2, rot: 0.3 }, { kind: 'painted_wooden_stool', x: 6.6, z: 0.2, rot: 2.6 },
+    { kind: 'covered_car', x: 31, z: 6, rot: PI / 2 },
+  ],
   Blokpost: [
     { kind: 'wooden_military_crate', x: 6, z: -14, rot: 0 }, { kind: 'old_military_crate@0', x: -14, z: -14, rot: 0.1 }, { kind: 'Barrel_01', x: 18, z: 12, rot: 0 },
   ],
@@ -105,6 +144,14 @@ const GROUND: Record<string, TownGround> = {
   Blokpost: { yards: [[-20, -16, 14, 16]], lanes: [{ line: [[-46, 0], [32, 0]], w: 4 }] },
   Bereg: { yards: [], lanes: [{ line: [[-60, 0], [56, 0]], w: 4.5 }] },
   Mys: { yards: [], lanes: [{ line: [[-60, 0], [56, 0]], w: 4.5 }] },
+  // (the yard; the track in to it trodden down the bank from the road round Kalat, the ground as it is, no road's bed:
+  // the road is 4 m over the camp's flat and 30 m off, too steep for one; lamps down it, as each town has; the trench,
+  // a hollow a man's height deep, and the spoil dug out of it heaped beside it)
+  Lager: {
+    yards: [[-34, -8, 22, 9]], lanes: [{ line: [[-6, 56], [-4, 26], [-3, 6]], w: 4 }], mounds: [[31.5, 19.5, 4.5, 0.9, 1], [30, 11.5, 3.5, 0.6, 0.6]],
+    // (the trench: dug square, a man's chest deep, its walls straight)
+    terraces: [{ poly: [[13, 11], [26, 10.4], [26.6, 20.6], [13.6, 21.2]], h: -1.5, out: 0.9 }],
+  },
 };
 
 export const desertBuildings = (t: Town): TownSpot[] => BUILDINGS[t.name] ?? [];

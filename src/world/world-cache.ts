@@ -1,4 +1,5 @@
 import type { World } from './worldgen';
+import { looksWhole } from './world-file';
 
 // One generator version is kept, off the main thread. Storage trouble must never prevent generation.
 const DATABASE = 'zona-world', STORE = 'cache', SLOT = 'current', WAIT_MS = 250;
@@ -65,9 +66,7 @@ export async function cachedWorld(key: string | undefined, generate: () => World
   if (!database) return generate();
   try {
     const entry = await read(database), world = entry?.world;
-    if (entry?.key === key && world?.heights instanceof Float32Array && world.heights.length > 0 &&
-      world.grass instanceof Uint8Array && world.grass.length === world.heights.length &&
-      Array.isArray(world.buildings) && Array.isArray(world.trees)) return world;
+    if (entry?.key === key && looksWhole(world)) return world;
     const fresh = generate();
     // Complete the write before the worker transfers and detaches the original typed-array storage.
     await write(database, { key, world: fresh });

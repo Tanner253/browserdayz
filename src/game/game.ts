@@ -1099,7 +1099,10 @@ export class Game {
     // the menu's map: the game's own, and what is said of each place on it
     {
       const town = world.pois[0];
-      const spots: MenuSpot[] = world.spawns.map((sp) => ({ x: sp.x, z: sp.z, name: 'A start', tip: 'New survivors drop in here on the west coast, with bare hands. The further east, the better the loot.', kind: 'spawn' as const }));
+      // (a mark for every 60 m of the coast, not for every start: since 2026-10-23 they are spread over the beach and the
+      // dunes, hundreds of them, and a mark each was a solid band down the map)
+      const coastMarks = world.spawns.filter((sp, i, all) => all.findIndex((q) => Math.round(q.z / 60) === Math.round(sp.z / 60)) === i);
+      const spots: MenuSpot[] = coastMarks.map((sp) => ({ x: sp.x, z: sp.z, name: 'A start', tip: 'New survivors drop in here on the west coast, with bare hands. The further east, the better the loot.', kind: 'spawn' as const }));
       // (what is said of each kind of place, and which step of the map it is: see src/sim/tiers.ts. What is to be
       // had at a step is said under it, unless the place has more to say for itself.)
       const SITE: Record<SiteKind, [string, Tier, string?]> = {

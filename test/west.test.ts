@@ -17,6 +17,7 @@ import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
 import { moundAt, townPoint, townTrees } from '../src/sim/towns';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
+import { hamletClear } from '../src/world/worldgen/west-towns';
 import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
 const SQ = 769, HALF = 768, CELL = 2;
@@ -290,16 +291,18 @@ const ridge = (z: number) => RL.ridgeAt(z);
 // --- THE TOWNS and KALAT
 {
   const towns = world.towns!;
-  // (the desert's first, since 2026-10-18: src/sim/desert.ts)
-  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava']);
+  // (the desert's first, since 2026-10-18: src/sim/desert.ts; and those laid later last, since 2026-10-23: LATER_TOWNS)
+  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
     const c = Math.cos(town.rot), s = Math.sin(town.rot);
     // (but what the town planted itself: Pokrov's court has its trees, 2026-10-19)
     const planted = townTrees(town).map(([, lx, lz]) => townPoint(town, lx, lz));
-    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01); });
-    assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad`);
+    // (the swamp's hamlet is no pad since 2026-10-23: the swamp's bushes grow in it, but none at a house, on a boardwalk or by a thing)
+    const hamlet = (town.part ?? town.name) === 'Mokroye', mok = towns.find((p) => p.town.name === 'Mokroye')!.town;
+    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01) && (!hamlet || !hamletClear(mok, t.x, t.z)); });
+    assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad${hamlet ? ' by its houses, walks or things' : ''}`);
     // (but in a hollow: Mokroye's barn stands sunk to the waist, as it was drawn up)
     for (const b of ids) {
       const dx = b.x - town.x, dz = b.z - town.z;
@@ -326,7 +329,13 @@ const ridge = (z: number) => RL.ridgeAt(z);
       steep = Math.max(steep, Math.abs(p[i + 1] - p[i - 2]) / Math.hypot(p[i] - p[i - 3], p[i + 2] - p[i - 1]));
     }
     assert.ok(steep <= PLAN.road.steep + 0.02, `a new road ${steep.toFixed(3)} steep`);
-    for (let i = 0; i < p.length; i += 3 * 5) assert.ok(Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]) < 0.4, `a new road ${Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]).toFixed(2)} m off its bed at ${p[i].toFixed(0)}, ${p[i + 2].toFixed(0)}`);
+    // (every point, but where it goes down into a ford: the river's bed is carved after the road's, up to 0.66 m under
+    // it at the pass's two mouths, which a fifth of the points sampled had missed until two more points down Pokrov's
+    // lane, 2026-10-23, moved which were sampled. The road is drawn on the ground there, not over it.)
+    for (let i = 0; i < p.length; i += 3) {
+      if (river.some(([x, z]) => Math.hypot(x - p[i], z - p[i + 2]) < 20)) continue;
+      assert.ok(Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]) < 0.4, `a new road ${Math.abs(heightAt(H, p[i], p[i + 2]) - p[i + 1]).toFixed(2)} m off its bed at ${p[i].toFixed(0)}, ${p[i + 2].toFixed(0)}`);
+    }
   }
   const main = fresh[0].points, near = (p: Float32Array, x: number, z: number) => { let d = Infinity; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; };
   const mid = RL.passLine.at(RL.passLine.total / 2);
@@ -356,8 +365,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
   assert.equal(out, 0, `${out} spots of the new land outside the Zona`);
   assert.ok(!WG.inRounds(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
   // (every start on the west beach since 2026-10-18, "move all player spawns to the far west coast like DAYZ does", the
-  // coast having its own first step by then: src/sim/desert.ts)
-  assert.ok(world.spawns.length >= 16 && world.spawns.every((s) => s.x > PLAN.barrier && s.x < PLAN.barrier + 100), 'a start off the west beach');
+  // coast having its own first step by then: src/sim/desert.ts), over the beach and the dunes behind it since 2026-10-23
+  assert.ok(world.spawns.length >= 16 && world.spawns.every((s) => s.x > PLAN.barrier && s.x < PLAN.barrier + 230), 'a start off the west beach');
   ok(`the Zona over all the new land out to the barrier; the starts on the west beach (${world.spawns.length})`);
 }
 
