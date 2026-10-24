@@ -112,3 +112,74 @@ export function clearWaysOut(world: World, planOf: (plot: BuildingPlot) => Bluep
   }
   return moved;
 }
+
+/** how far round a basement's open steps nothing may stand, metres */
+const KERB = 0.6;
+
+/**
+ * Nothing on, over or before the way down to a basement (the owner, 2026-10-23: "make sure no ground lootable
+ * containers are blocking basement entrances. currently some entrances have a cardboard box floating above the
+ * entrance"). The steps' opening and a pace round it are kept clear of everything that stands out of doors, however
+ * low: over the open steps a thing stands on nothing. The basements are planned clear of what stands, but a town's
+ * things are laid after them (Buildings.plan). Each is slid out across the nearer edge, as little as clears it, and
+ * whatever lay on it with it; a place for a thing lying there by itself is moved the same way. Returns how many.
+ */
+export function clearWells(world: World, boxes: Record<string, Box>, points: LootPoint[]): number {
+  const wells = world.basements ?? [];
+  if (!wells.length) return 0;
+  const frame = (b: (typeof wells)[number], x: number, z: number): V => { const c = Math.cos(b.rot), s = Math.sin(b.rot), dx = x - b.x, dz = z - b.z; return [dx * c - dz * s, dx * s + dz * c]; };
+  const back = (b: (typeof wells)[number], lx: number, lz: number): V => { const c = Math.cos(b.rot), s = Math.sin(b.rot); return [lx * c + lz * s, -lx * s + lz * c]; };
+  const inBuilding = (x: number, z: number) => world.buildings.some((o) => {
+    const [w, d] = BUILDING_FOOTPRINT[o.type] ?? [0, 0], dx = x - o.x, dz = z - o.z, c = Math.cos(o.rot), s = Math.sin(o.rot);
+    return Math.abs(dx * c - dz * s) < w / 2 && Math.abs(dx * s + dz * c) < d / 2;
+  });
+  /** the well a thing of reach r at a place is in (out of doors and at the ground, not down in a cellar), if any */
+  const wellAt = (x: number, y: number, z: number, r: number) => wells.find((b) => {
+    if (Math.abs(x - b.x) > 30 || Math.abs(z - b.z) > 30 || y < b.well.top - 1) return false;
+    const [lx, lz] = frame(b, x, z), W = b.well;
+    return lx > W.x0 - KERB - r && lx < W.x1 + KERB + r && lz > W.z0 - KERB - r && lz < W.z1 + KERB + r;
+  });
+  const ground = (x: number, z: number) => heightAt(world.heights, x, z);
+  let moved = 0;
+  const slide = (x: number, y: number, z: number, r: number, free: (x: number, z: number) => boolean): V | null => {
+    const b = wellAt(x, y, z, r);
+    if (!b) return null;
+    const [lx, lz] = frame(b, x, z), W = b.well, edge = KERB + r + 0.1;
+    // (across the nearer edge first, a little further each time)
+    const outs: [number, number][] = [[W.x0 - edge - lx, 0], [W.x1 + edge - lx, 0], [0, W.z0 - edge - lz], [0, W.z1 + edge - lz]].sort((p, q) => Math.hypot(...p) - Math.hypot(...q)) as [number, number][];
+    for (const extra of [0, 0.5, 1, 2, 3]) for (const [ox, oz] of outs) {
+      const [dx, dz] = back(b, ox + Math.sign(ox) * extra, oz + Math.sign(oz) * extra);
+      if (!wellAt(x + dx, y, z + dz, r) && free(x + dx, z + dz)) return [dx, dz];
+    }
+    return null;
+  };
+  for (const p of world.props) {
+    if (inBuilding(p.x, p.z)) continue;
+    const bx = boxes[p.kind.split(/[#@]/)[0]], r = bx ? (Math.min(bx.max[0] - bx.min[0], bx.max[2] - bx.min[2]) * (p.scale ?? 1)) / 2 : 0.3;
+    const step = slide(p.x, p.y, p.z, r, (x, z) => !inBuilding(x, z) && !world.props.some((o) => o !== p && (o.far === undefined || o.far >= 50) && Math.hypot(o.x - x, o.z - z) < r + 0.3));
+    if (!step) continue;
+    const was = { x: p.x, z: p.z }, rise = ground(was.x + step[0], was.z + step[1]) - ground(was.x, was.z);
+    p.x += step[0];
+    p.z += step[1];
+    p.y += rise;
+    for (const q of points) if (!q.floor && Math.abs(q.x - was.x) < 0.01 && Math.abs(q.z - was.z) < 0.01) {
+      q.x += step[0];
+      q.z += step[1];
+      q.y += rise;
+      if (q.surf) { q.surf.x += step[0]; q.surf.z += step[1]; }
+    }
+    moved++;
+  }
+  for (const q of points) {
+    if (q.floor || inBuilding(q.x, q.z)) continue;
+    const step = slide(q.x, q.y, q.z, 0.2, (x, z) => !inBuilding(x, z));
+    if (!step) continue;
+    const rise = ground(q.x + step[0], q.z + step[1]) - ground(q.x, q.z);
+    q.x += step[0];
+    q.z += step[1];
+    q.y += rise;
+    if (q.surf) { q.surf.x += step[0]; q.surf.z += step[1]; }
+    moved++;
+  }
+  return moved;
+}

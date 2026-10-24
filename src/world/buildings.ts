@@ -27,7 +27,7 @@ import * as town from './town-plans';
 import * as zavod from './zavod-plans';
 import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
-import { clearWaysOut } from './ways-out';
+import { clearWaysOut, clearWells } from './ways-out';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
 import { cullBatch } from './batch-cull';
 
@@ -1729,11 +1729,15 @@ export class Buildings {
     // Nothing stands in a building's way out: what the yards, sites, village and towns set about the buildings is
     // slid clear of each door when all of it is laid (src/world/ways-out.ts). No dice: nothing else moves.
     this.waysCleared = clearWaysOut(this.world, (plot) => blueprint(plot.type, new RNG(plot.seed)), assets.manifest.models, this.lootPoints);
+    // (and from over the steps down to a basement, and their kerb: src/world/ways-out.ts)
+    this.wellsCleared = clearWells(this.world, assets.manifest.models, this.lootPoints);
     // (and which places are inside the furniture they lie on: the same here and on the server, by the same props)
     markInside(this.lootPoints, this.world.props);
   }
   /** how many things clearWaysOut slid out of a door's way, the last time the map was planned */
   waysCleared = 0;
+  /** and how many clearWells slid off the way down to a basement */
+  wellsCleared = 0;
 
   /**
    * The basements: what they are made of (src/world/basement-build.ts), what stands in them, and their places for
