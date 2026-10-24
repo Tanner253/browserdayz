@@ -26,13 +26,12 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
-- **LIVE 2026-10-24 13:29 UTC**: site, game server and `main` all from `613f731d` (PROTOCOL 62, server boot fc91453e;
-  801 characters and 133 stashes kept across the restart; payouts on). `site-live` and `hotfix` point there too.
+- **LIVE 2026-10-24 14:43 UTC**: site, game server and `main` all from `8ac66d29` (PROTOCOL 63, server boot 2187ae55;
+  802 characters and 133 stashes kept across the restart). `site-live` and `hotfix` point there too. Changelog
+  entry `#animals-shot`. (The release before, 13:29 UTC, was `613f731d`, PROTOCOL 62.)
 - **Working branch: `battle-royale`** (the name is historical: it holds everything, ZONA, Arena and Battle Royale).
-  Since `613f731d` it holds the animals and admin work of 2026-10-24 afternoon (below), a SERVER change with PROTOCOL 63:
-  a site-only deploy from it is no longer free (the page would wait for a server that is behind); the next release
-  is a full one, on the owner's word.
-- **On the branch, not live (2026-10-24 afternoon)**: animals could not be shot on live: each one's hitbox stayed
+  It is the live commit plus handoff commits, so a site-only deploy from it is free again while it holds no server change.
+- **In that release (2026-10-24 afternoon)**: animals could not be shot on live: each one's hitbox stayed
   where its model loaded (`bodyAt` began as NaN, and no comparison with NaN is true: `src/game/animals.ts`), fixed.
   Grenades (thrown and dropped from a dead hand), cars and every gun now hurt animals (`animalHit`, `animalsBlast` in
   server/animals.ts). The admin panel: one ESP list with checkboxes (Players, Loot, Animals, Infected; animals and the
