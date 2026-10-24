@@ -447,7 +447,7 @@ export const frameMethods = {
     RemotePlayer.look(cam);
     this.horde.update(dt, now, cam.position);
     if (!this.online) this.wild.tickAlone(dt);
-    this.wild.update(dt, now, cam.position);
+    this.wild.update(dt, now, cam.position, cam);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);
       rp.avatar.veil(this.s.buildings.hides(cam.position, rp.pos));

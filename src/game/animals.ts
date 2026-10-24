@@ -60,6 +60,8 @@ const DRAWN = 260;
 const MOVED = 120;
 /** how far behind the server's word it is drawn, so that there is always a word on either side of now, ms */
 const BEHIND = 320;
+/** one turn and one sphere, reused every frame */
+const TURN = new THREE.Quaternion(), SEEN = new THREE.Sphere();
 /**
  * Measuring what the animals cost (replay.mjs --flip __noAnimals): every half second they are taken out (not drawn,
  * not thought for) and put back; and meanwhile a kind with no model of its own yet is drawn as the stag is, so that
@@ -122,6 +124,9 @@ export class Beast implements Damageable {
   private model: THREE.Object3D | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private paces: Record<string, number> = {};
+  /** where its body was last set (x, y, z, turn, pitch), and whether it was in view last frame */
+  private bodyAt = [NaN, NaN, NaN, NaN, NaN];
+  private wasInView = false;
   private strikes: Record<string, number> = {};
   private floors: Record<string, number> = {};
   /** how high the model is lifted off its middle, for the movement it plays (see Kit.floors): and where it is going */
@@ -225,7 +230,7 @@ export class Beast implements Damageable {
   /** how far it is from the eye, metres (as of its last frame) */
   private away = 0;
 
-  update(dt: number, now: number, eye: THREE.Vector3) {
+  update(dt: number, now: number, eye: THREE.Vector3, view?: THREE.Frustum) {
     // where it was BEHIND ago, between the two words either side of then
     const t = now - BEHIND, s = this.snaps;
     let a = s[0], b = s[s.length - 1];
@@ -256,9 +261,11 @@ export class Beast implements Damageable {
     const y = Math.min(hf, hb, heightAt(w.heights, this.x, this.z)) + 0.02;
     this.root.position.set(this.x, y, this.z);
     this.root.rotation.set(Math.atan2(hf - hb, k.len * 0.9), this.yaw, 0);
-    if (this.body) {
+    // (its body moved only when it has moved: forty still bodies set where they were every frame were work for nothing)
+    if (this.body && (Math.abs(this.x - this.bodyAt[0]) + Math.abs(y - this.bodyAt[1]) + Math.abs(this.z - this.bodyAt[2]) > 0.005 || Math.abs(this.root.rotation.y - this.bodyAt[3]) + Math.abs(this.root.rotation.x - this.bodyAt[4]) > 0.002)) {
+      this.bodyAt = [this.x, y, this.z, this.root.rotation.y, this.root.rotation.x];
       this.body.setNextKinematicTranslation({ x: this.x, y, z: this.z });
-      this.body.setNextKinematicRotation(new THREE.Quaternion().setFromEuler(this.root.rotation));
+      this.body.setNextKinematicRotation(TURN.setFromEuler(this.root.rotation));
     }
     if (this.bleeds && !this.dead && (this.dripT -= dt) <= 0) {
       this.dripT = 0.35 + Math.random() * 0.3;
@@ -272,14 +279,18 @@ export class Beast implements Damageable {
       for (const m of this.meshes) m.castShadow = shadow;
     }
     this.play(dt);
-    // (posed every frame near the eye; further off, a few times a second)
+    // (posed every frame near the eye and in view; further off, or out of view, a few times a second, and at once on
+    // coming into view. Out of view is with room for its shadow, which falls into view from beside it.)
     this.poseT += dt;
-    const every = d < MOVED ? 0 : 0.25;
-    if (this.poseT >= every) {
+    SEEN.center.set(this.x, y + this.kind.tall * 0.5, this.z);
+    SEEN.radius = this.kind.len + 12;
+    const inView = !view || view.intersectsSphere(SEEN), every = d < MOVED && inView ? 0 : inView ? 0.25 : 0.5;
+    if (this.poseT >= every || (inView && !this.wasInView)) {
       this.mixer!.update(this.poseT);
       this.poseT = 0;
       if (!this.bounded) this.bounds();
     }
+    this.wasInView = inView;
   }
 
   /**
@@ -471,12 +482,17 @@ export class Wildlife {
     this.beasts.delete(i);
   }
 
-  update(dt: number, now: number, eye: THREE.Vector3) {
+  /** what the camera sees, worked out once a frame for all of them */
+  private view = new THREE.Frustum();
+  private viewing = new THREE.Matrix4();
+
+  update(dt: number, now: number, eye: THREE.Vector3, camera?: THREE.Camera) {
     if (out()) {
       for (const b of this.beasts.values()) b.root.visible = false;
       return;
     }
-    for (const b of this.beasts.values()) b.update(dt, now, eye);
+    if (camera) this.view.setFromProjectionMatrix(this.viewing.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    for (const b of this.beasts.values()) b.update(dt, now, eye, camera ? this.view : undefined);
   }
 
   /** everything gone (a new connection, or leaving the server) */
