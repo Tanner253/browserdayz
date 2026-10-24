@@ -43,6 +43,7 @@ import { perks } from './perks';
 import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
 import { animalsTick, startAnimals } from './animals';
+import { regrowing } from './gather';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
@@ -431,6 +432,9 @@ setInterval(() => keeping(Date.now()), 1000);
 setInterval(() => standing(Date.now()), 500);
 
 setInterval(() => inHands(Date.now()), 250);
+
+// felled trees standing again, out of everybody's sight (server/gather.ts)
+setInterval(() => regrowing(), 30_000);
 
 /**
  * Who is not let in. BAN_KEYS and BAN_IPS in the environment (lists, commas between) are kept off for as long as

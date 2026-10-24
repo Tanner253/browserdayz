@@ -66,7 +66,9 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-export const PROTOCOL = 63;
+// (64, 2026-10-24: gathering, base building's first step: trees felled and standing again ('chop', 'fell', 'grow',
+// `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item).)
+export const PROTOCOL = 64;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -324,6 +326,11 @@ export type C2S =
   | { t: 'ahit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; n?: number; p?: number }
   /** kneeling at a body to gut and skin it (go 1), and done (go 2) */
   | { t: 'askin'; i: number; go: 1 | 2 }
+  /** a blow that landed on tree `i` (world.trees) or rock `i` (world.rocks) with the tool whose uid is `u` (src/sim/gather.ts) */
+  | { t: 'chop'; i: number; u: string }
+  | { t: 'mine'; i: number; u: string }
+  /** sawing the log lying on the ground whose uid is `l`, with the saw `u`: begun (go 1), and done (go 2) */
+  | { t: 'saw'; l: string; u: string; go: 1 | 2 }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -366,6 +373,8 @@ export type S2C =
       racks?: [string, string[]][];
       /** the fireplaces that are alight: [which, seconds left] */
       fires?: [number, number][];
+      /** the trees that are down (world.trees), felled for their logs and not grown again yet */
+      felled?: number[];
       /** the fires built by players that stand now: [number, x, y, z] (told before which are alight) */
       built?: [number, number, number, number][];
       /** the jeeps: where each stands, what state it is in and who is in it */
@@ -398,6 +407,14 @@ export type S2C =
   | { t: 'barrel+'; i: number }
   /** fireplace number i is alight, with so many seconds of burning left */
   | { t: 'fire'; i: number; left: number }
+  /** tree `i` has been felled by `by`, and falls toward `a` (radians, as a yaw); trees standing again */
+  | { t: 'fell'; i: number; a: number; by: number }
+  | { t: 'grow'; i: number[] }
+  /** to the one working it: how far through a tree (k 0) or a rock's stone (k 1) they are, 0..1 */
+  | { t: 'work'; k: 0 | 1; i: number; done: number }
+  /** a tool of this player's has worn: its condition now (0 ruined) */
+  | { t: 'wear'; u: string; c: number }
+  | { t: 'saw'; l: string; ok: boolean; why?: string; done?: boolean }
   /** a fire built by somebody (numbered after the map's own), and one cleared away */
   | { t: 'fire+'; i: number; x: number; y: number; z: number }
   | { t: 'fire-'; i: number }

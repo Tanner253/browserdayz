@@ -20,6 +20,7 @@
 //   &person=0                                   no survivor beside it
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
+//   &bb=items | fell                            base building's scenes (src/dev/sandbox-build.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
 // Headless, in one pass and off the graphics card's queue:
 //   PLAY_NOWAIT=1 PLAY_GL=swiftshader node assets-src/_wf/me/play.mjs assets-src/_wf/me/stage-shot.js <out> 1280 720 "http://localhost:5173/tools/sandbox.html?..."
@@ -40,9 +41,10 @@ const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
 const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
-const sim = q.get('sim');
-const cells = sim ? 8 : strip > 0 ? strip : views.length;
-const cols = Math.min(cells, strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
+const sim = q.get('sim'), bb = q.get('bb');
+const { BUILD_CELLS } = bb ? await import('./sandbox-build') : { BUILD_CELLS: {} as Record<string, number> };
+const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : strip > 0 ? strip : views.length;
+const cols = Math.min(cells, strip > 0 || sim || bb ? 4 : 2), rows = Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);
@@ -108,7 +110,13 @@ const say = (i: number, text: string) => {
   w2.fillText(text, cx + 6, cy + 16);
 };
 
-if (sim) {
+if (bb) {
+  // (base building's scenes: src/dev/sandbox-build.ts)
+  const { stageBuild } = await import('./sandbox-build');
+  const out = window as unknown as { staged: boolean; stageInfo: unknown };
+  out.stageInfo = await stageBuild(bb, { q, scene, renderer, sun, cw, ch, cols, rows, say });
+  out.staged = true;
+} else if (sim) {
   // (the animals' own minds on the floor, their moments in one picture: src/dev/sandbox-sim.ts)
   const { stageSim } = await import('./sandbox-sim');
   const body = async () => {

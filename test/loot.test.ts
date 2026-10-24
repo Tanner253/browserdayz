@@ -79,8 +79,9 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // (the jacket and the trousers everybody starts in lie nowhere: a spare of either is room for nothing)
   // (nor the launcher and its grenades: the owner, "the grenade launcher and its ammo is an admin only weapon")
   // (nor what only comes off an animal: its meat, fat, bones, hide and pelt, as in DayZ)
+  // (nor what is only got by work: a log off a tree, stone off a boulder, src/sim/gather.ts)
   const hunted = new Set(KINDS.flatMap((k) => yieldOf(k, 1).map(([id]) => id)));
-  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
+  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm', 'log', 'stone'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
   const { ruled: on, e } = worlds[0];
   // (how full each step is: a thing short where there is room, two or a fifth where a step is nearly full (the police
@@ -306,7 +307,8 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
     }
     lights.push([1, 2, 3].reduce((n, t) => n + sum(inside((p) => p.tier === t && kind(p, 'Shop')), 'flashlight'), 0));
     // ("sheds should spawn industrial and tools, flashlight etc": past the outskirts they were all but empty)
-    const TOOLS = ['hatchet', 'crowbar', 'shovel', 'knife', 'flashlight', 'jerrycan', 'work_gloves', 'rubber_boots', 'garden_gloves', 'stash_kit', 'black_bag', 'sack_pack', 'chest_rig', 'gun_light'];
+    // (and what a base is built with and of, 2026-10-24: src/sim/items/build.ts)
+    const TOOLS = ['hatchet', 'crowbar', 'shovel', 'knife', 'flashlight', 'jerrycan', 'work_gloves', 'rubber_boots', 'garden_gloves', 'stash_kit', 'black_bag', 'sack_pack', 'chest_rig', 'gun_light', 'hand_saw', 'felling_axe', 'pickaxe', 'nails', 'planks', 'sheet_metal'];
     const sheds = inside((p) => p.tier === 3 && kind(p, ...SHED) && !kind(p, 'Military')), places = points.filter((p) => p.tier === 3 && !p.arms && kind(p, ...SHED) && !kind(p, 'Military')).length;
     assert.ok(total(sheds) >= places * 0.25 && sum(sheds, ...TOOLS) * 2 >= total(sheds), `the sheds of the village: ${total(sheds)} things on ${places} places, ${sum(sheds, ...TOOLS)} of them a shed's`);
     // (a hunter's cabin keeps its shotgun, as DayZ's hunting places keep theirs: a farm's or a works' shed keeps no gun)

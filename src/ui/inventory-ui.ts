@@ -22,6 +22,7 @@
 // which is the nearest free spot to the pointer, not only the cell under it.
 
 import { ALL_SLOTS, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
+import { TOOL_LIFE, condition } from '../sim/gather';
 import { Container, bagGrid, poured, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
@@ -690,6 +691,11 @@ export class InventoryUI {
     }
     if (d.mag) s.push({ k: 'Rounds', v: `${it.rounds ?? 0} of ${d.mag.capacity}` });
     if (d.melee) s.push({ k: 'Damage', v: String(d.melee.damage) });
+    // (a tool wears as it works, DayZ's way: src/sim/gather.ts)
+    if (TOOL_LIFE[it.id]) {
+      const c = condition(it.cond);
+      s.push({ k: 'Condition', v: `<span style="color:${c.colour}">${c.name}</span> · ${Math.round((it.cond ?? 1) * 100)}%` });
+    }
     if (holds(it.id)) s.push({ k: 'Inside', v: it.cargo?.length ? things(it.cargo.length) : 'Nothing' });
     const vs = this.against(src);
     if (vs) s.push({ k: vs.label, v: vs.change });

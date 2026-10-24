@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MeshPart } from '../core/gltf-utils';
+import { assets } from '../core/assets';
 
 let steel: THREE.MeshStandardMaterial | null = null;
 function gunSteel() {
@@ -250,7 +251,79 @@ export function dogTagGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+// ---- base building's stand-ins (2026-10-24): until real models of a bundle of planks and a sheet of corrugated steel
+// are downloaded (the owner: "make due with placeholders if needed until i get back"; listed for them)
+
+let pine: THREE.MeshStandardMaterial | null = null;
+/** sawn pine: a canvas of grain, pale with darker lines along the board */
+function sawnPine() {
+  if (!pine) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 64;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#b48a58';
+    g.fillRect(0, 0, 256, 64);
+    for (let y = 0; y < 64; y++) {
+      const v = Math.sin(y * 0.9 + Math.sin(y * 0.21) * 3) * 0.5 + 0.5;
+      g.fillStyle = `rgba(92,58,30,${0.08 + v * 0.22})`;
+      g.fillRect(0, y, 256, 1);
+    }
+    for (let k = 0; k < 3; k++) {
+      g.fillStyle = 'rgba(70,40,20,0.5)';
+      g.beginPath();
+      g.ellipse(40 + k * 80 + Math.random() * 30, 10 + Math.random() * 44, 5, 3, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    pine = new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0, name: 'sawn-pine' });
+  }
+  return pine;
+}
+
+/** six boards a metre long, two rows of three, laid along +X */
+function planksGeometry() {
+  const boards: THREE.BufferGeometry[] = [];
+  for (let r = 0; r < 2; r++)
+    for (let k = 0; k < 3; k++) boards.push(new THREE.BoxGeometry(1, 0.025, 0.12).translate(0.5 + (k - 1) * 0.012, 0.0125 + r * 0.026, (k - 1) * 0.123).toNonIndexed());
+  const g = mergeGeometries(boards, false)!;
+  g.computeVertexNormals();
+  return g;
+}
+
+let bark: THREE.MeshStandardMaterial | null = null;
+/** a sawn length of pine, 1.8 m by 30 cm, along +X: its bark (Poly Haven's pine bark), and its two cut ends */
+function logParts(): MeshPart[] {
+  bark ??= new THREE.MeshStandardMaterial({ map: assets.texture('assets/tex/pine_bark_diff.webp', { srgb: true, repeat: true }), normalMap: assets.texture('assets/tex/pine_bark_nor.webp', { repeat: true }), roughness: 0.95, name: 'log-bark' });
+  const side = new THREE.CylinderGeometry(0.15, 0.16, 1.8, 18, 1, true).rotateZ(Math.PI / 2).translate(0.9, 0.16, 0);
+  const uv = side.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 3);
+  const ends = mergeGeometries([new THREE.CircleGeometry(0.16, 18).rotateY(-Math.PI / 2).translate(0, 0.16, 0), new THREE.CircleGeometry(0.15, 18).rotateY(Math.PI / 2).translate(1.8, 0.16, 0)], false)!;
+  return [{ name: 'bark', geometry: side, material: bark }, { name: 'ends', geometry: ends, material: sawnPine() }];
+}
+
+let galv: THREE.MeshStandardMaterial | null = null;
+/** two sheets of corrugated galvanised steel, 90 by 60 cm, the corrugations along X */
+function sheetGeometry() {
+  const one = (y: number) => {
+    const p = new THREE.PlaneGeometry(0.9, 0.6, 48, 1).rotateX(-Math.PI / 2);
+    const pos = p.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) pos.setY(i, y + Math.sin(pos.getZ(i) * Math.PI * 2 * 12) * 0.009);
+    return p.translate(0.45, 0.01, 0);
+  };
+  const g = mergeGeometries([one(0), one(0.02)], false)!;
+  g.computeVertexNormals();
+  return g;
+}
+
 export function proceduralParts(model: string): MeshPart[] {
+  if (model === '@log') return logParts();
+  if (model === '@planks') return [{ name: 'planks', geometry: planksGeometry(), material: sawnPine() }];
+  if (model === '@sheet') {
+    galv ??= new THREE.MeshStandardMaterial({ color: 0x9aa3a8, metalness: 0.7, roughness: 0.45, side: THREE.DoubleSide, name: 'galvanised' });
+    return [{ name: 'sheet', geometry: sheetGeometry(), material: galv }];
+  }
   if (model === '@dogtag') {
     tagSteel ??= new THREE.MeshStandardMaterial({ color: 0xd2d0c8, metalness: 0.75, roughness: 0.48, name: 'tag-steel' });
     return [{ name: 'dogtag', geometry: dogTagGeometry(), material: tagSteel }];

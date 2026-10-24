@@ -116,6 +116,7 @@ import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
 import { huntMethods } from './game/hunt';
+import { Gathering } from './gathering';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -244,6 +245,8 @@ export class Game {
   throwing!: Throwing;
   /** the jeeps (see garage.ts) */
   garage!: Garage;
+  /** trees felled, stone broken, logs sawn (src/game/gathering.ts) */
+  gather!: Gathering;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
   riders!: Riders;
   economy!: Economy;
@@ -665,6 +668,24 @@ export class Game {
       },
     });
     await this.garage.load();
+    this.gather = new Gathering({
+      scene: r.scene,
+      forest: this.s.veg,
+      world,
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      held: () => this.weapons.equippedItem,
+      me: () => this.player.pos,
+      eye: () => this.s.r.camera.position,
+      find: (uid) => this.inv.everything().get(uid) ?? null,
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      lay: (item, at) => this.dropItem(item, at, 0.2),
+      takeUp: (uid) => !!this.economy.take(uid),
+      changed: () => this.inventoryChanged(),
+      begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
+      breakOff: () => this.breakOff(),
+    });
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
@@ -782,6 +803,8 @@ export class Game {
       this.hud.note(`No room for the ${ITEMS[item.id].name.toLowerCase()}: it is at your feet`, 'warn');
     };
     // a punch or a swing: your own body throws it, and everyone near you sees it
+    // (a swing that lands on a tree or a rock: src/game/gathering.ts)
+    this.weapons.onWhack = (owner, _at, w) => this.gather.whack(owner, w);
     this.weapons.onSwing = (seconds) => {
       this.avatar.swing(false, seconds);
       this.net.send({ t: 'swing' });

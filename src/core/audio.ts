@@ -2344,6 +2344,15 @@ export class AudioEngine {
     };
   }
 
+  /** A tree coming down (src/world/felling.ts): the trunk giving as it begins to go, and the weight of it landing. */
+  timber(pos: V3, land: boolean) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, out = this.out(pos, 10, 1, 0);
+    if (!land) return void this.rec('hit_wood', out, t, 1.3, 0.42, false, true);
+    this.rec('thud', out, t, 2.4, 0.5, false, true);
+    this.rec('hit_wood', out, t + 0.04, 1.6, 0.55, false, true);
+  }
+
   /** A jeep running into something: tin, and the weight behind it. @param k how hard, 0..1 */
   crash(pos: V3, k: number) {
     if (!this.ready) return;

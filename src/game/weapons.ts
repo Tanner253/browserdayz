@@ -632,7 +632,7 @@ function cigarette() {
 }
 
 /** melee weapons whose model is drawn with its edge toward whoever holds it */
-const EDGE_IN = new Set(['machete']);
+const EDGE_IN = new Set(['machete', 'hand_saw']);
 /**
  * A tool in the fist: where the wrist is from the point of the handle that is held (to its
  * right, up it, toward the eye), how far the fingers close, and where the fist is held from
@@ -763,6 +763,11 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // The shovel is held and swung as the bat is: in both hands, the left on the grip at its foot and the right a
   // hand's width up the shaft, carried back over the right shoulder, the same two strokes.
   styles.shovel = { ...styles.bat, grip: 0.2 };
+  // (the tools of gathering, src/sim/gather.ts: the saw held as the machete is, the long axe and the pickaxe as the
+  // bat, in both hands)
+  styles.hand_saw = styles.machete;
+  styles.felling_axe = { ...styles.bat, grip: 0.22 };
+  styles.pickaxe = { ...styles.bat, grip: 0.22 };
   return styles;
 })();
 /**
@@ -1486,6 +1491,8 @@ export class Weapons {
   onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
   /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
   onStruck: (owner: unknown, weapon: string) => void = () => {};
+  /** a swing landed on the world, not on a body: a tree, a rock (src/game/game/gather.ts); what was struck, and with what */
+  onWhack: (owner: unknown, point: THREE.Vector3, weapon: string) => void = () => {};
   /** a punch or a melee swing has started */
   /** a punch has been thrown, or what is held swung (which takes this many seconds) */
   onSwing: (seconds?: number) => void = () => {};
@@ -1719,7 +1726,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe']) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();
@@ -3782,6 +3789,7 @@ export class Weapons {
           const s = (hit.tag?.surface ?? 'dirt') as Surface;
           this.fx.impact(s, pt, n, false);
           audio.impact(s, pt, 1);
+          if (a.name === 'swing') this.onWhack(hit.tag?.owner, pt, this.currentItem?.id ?? 'fists');
         }
         // the blow lands: the view jolts
         this.kickRot.v.x -= 6;

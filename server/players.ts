@@ -26,6 +26,7 @@ import { pinned } from './pinned';
 import { perks } from './perks';
 import { plating } from './plates';
 import { bodyInfo } from './bodies';
+import { woods } from './gather';
 import { SHOP, type ItemId } from '../api/_lib/shop-items';
 import { forget } from './searched';
 
@@ -385,6 +386,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     racks: racksNow(),
     built: [...hearths.built].map(([i, b]): [number, number, number, number] => [i, b.x, b.y, b.z]),
     fires: hearths.alight(Date.now() / 1000),
+    felled: [...woods().felled.keys()],
     bunker: bunkerDoor.open,
     // (the map's containers that somebody has open at this moment: a locker among them is seen standing open)
     ajar: [...locks.keys()].filter((cid) => boxes.get(cid)?.kind === 'crate'),

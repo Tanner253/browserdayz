@@ -142,6 +142,9 @@ export function buildWorldData(root: string) {
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     /** the fireplaces, numbered as the game numbers them */
     fires: fireSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    /** the trees and the rocks, numbered as the game numbers them: felled for logs and broken for stone (server/gather.ts) */
+    trees: world.trees,
+    rocks: world.rocks,
     /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
     jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? parked : [],
     /** and the police cars, one beside each police station: none without the jeeps, or without a model of their own */

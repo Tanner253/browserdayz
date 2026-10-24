@@ -104,6 +104,8 @@ export const onlineMethods = {
     this.fires.clear();
     for (const [i, x, y, z] of w.built ?? []) this.fires.add(i, x, y, z, (gx, gz) => heightAt(this.s.world.heights, gx, gz));
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
+    // the trees that are down (src/game/gathering.ts)
+    this.gather.welcome(w.felled);
     // the lockers somebody is searching at the moment: their doors stand open
     this.lockers.clear();
     for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
@@ -172,6 +174,7 @@ export const onlineMethods = {
     }
     this.stashComing.clear();
     for (const st of [...this.loot.stashes]) this.loot.removeStash(st);
+    this.gather.welcome([]);
     this.riders.clear();
     this.airdrops.clear();
     this.markDrops();
@@ -319,6 +322,11 @@ export const onlineMethods = {
     net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('fire+', (m) => this.fires.add(m.i, m.x, m.y, m.z, (x, z) => heightAt(this.s.world.heights, x, z)));
     net.on('fire-', (m) => this.fires.remove(m.i));
+    net.on('fell', (m) => this.gather.onFell(m));
+    net.on('grow', (m) => this.gather.onGrow(m));
+    net.on('work', (m) => this.gather.onWork(m));
+    net.on('wear', (m) => this.gather.onWear(m));
+    net.on('saw', (m) => this.gather.onSaw(m));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => {
       this.gearOf.set(m.id, m.g);

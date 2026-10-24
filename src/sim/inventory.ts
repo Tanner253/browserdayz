@@ -1004,6 +1004,8 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   if (num(r.cook) && r.cook > 0) it.cook = Math.min(600, r.cook);
   if (num(r.hot) && r.hot > 0) it.hot = Math.min(wall + 300, r.hot);
   if (num(r.made) && r.made > 0) it.made = Math.min(wall, r.made);
+  // (a tool's condition, worn by work: src/sim/gather.ts; the server holds it to no newer than it wore it, server/gather.ts)
+  if (num(r.cond) && r.cond < 1) it.cond = Math.max(0, r.cond);
   if (r.id === 'dogtag') {
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
     it.owner = name(r.owner);
