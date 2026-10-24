@@ -51,9 +51,14 @@
 .inv-strip .slot-label { font-size: 8px; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* (a square with something in it shows the thing and its key, and no word: the word names an empty place) */
 .inv-strip .inv-slot:has(.inv-item) .slot-label { font-size: 0; }
-.inv-gunbox { min-width: 0; }
-.inv-gunbox > .inv-item.gun-pic { position: relative; margin: 6px 6px 0; }
-.inv-gunbox .inv-parts { padding: 0 6px 6px; }
+/* (each gun's place two squares wide, the gun across both, its parts in small squares in the two under it) */
+.inv-strip { grid-auto-flow: row dense; }
+.strip-gun { grid-column: span 2; grid-row: span 2; display: grid; grid-template-rows: 62px 62px; gap: 4px; min-width: 0; }
+.strip-gun > .inv-parts { height: 62px; margin: 0; gap: 3px; align-items: stretch; }
+.strip-gun > .inv-parts > .inv-part { flex: 1 1 0; width: auto; min-width: 0; }
+.strip-gun > .inv-parts > .inv-part span { font-size: 7px; left: 2px; right: 2px; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; }
+.strip-gun > .inv-parts > .inv-part .inv-item-img.fit { inset: 11px 2px 10px; }
+.strip-gun > .inv-parts > .inv-part em { font-size: 9px; right: 2px; }
 
 /* a gun's parts, wherever they stand (under the hands, on a gun's panel): squares big enough to see what is on it */
 .inv-parts { height: 60px; gap: 5px; }
