@@ -1,6 +1,7 @@
 // The emote wheel's sixteen slots as this player has set them (Emotes, opened from the wheel: src/ui/emotes-menu.ts), kept in
 // this browser. The owner, 2026-10-14: "we need to allow the user to assign which emote to which radial key".
 import { EMOTE, WHEEL_DEFAULT, WHEEL_RING, WHEEL_SLOTS } from '../sim/emotes';
+import type { RadialEntry } from './radial';
 
 const KEY = 'zona.wheel';
 const told: ((ids: string[]) => void)[] = [];
@@ -36,6 +37,11 @@ export const RINGS = [
   { r0: 46, r1: 122, text: 84 },
   { r0: 127, r1: 205, text: 166 },
 ];
+
+/** the slots as the wheel on T has them (src/ui/radial.ts): each emote's words, and those kept up until stopped drawn quieter */
+export function wheelEntries(slots: string[]): RadialEntry[] {
+  return slots.map((id) => ({ id, label: EMOTE[id].label, ...(EMOTE[id].hold ? { mark: 'keeps' as const } : {}) }));
+}
 
 /** the wheel: two rings of eight wedges round a hub, each ring's first at the top and the rest clockwise (the player's slots: src/ui/wheel-slots.ts) */
 export function wheelSvg(slots: string[]) {

@@ -2129,38 +2129,72 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .hud-scope .scope-read .sr-zoom { color: #e8e4d8; font-size: 2.6vmin; text-shadow: none; }
 .hud-scope.glass .scope-read { display: none; }
 
-/* the wheel (hold T): what to call out, and what to do with the body */
-.hud-wheel {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  /* a good third of the height of the screen, whatever the screen */
-  --d: clamp(380px, 58vh, 640px);
+/* A radial menu (src/ui/radial.ts): the wheel on T, and any other. It opens out of the middle with its wedges coming one
+   after another; the one pointed at is lit, stands out from the rest, and the bar round the rim turns to it; what is
+   chosen flashes as the wheel goes (the owner, 2026-10-24: "clean smooth animations and responsive fresh feedback").
+   Its size is its own box's (--d, set by whoever places it). */
+.radial {
+  --d: 420px;
   width: var(--d);
   height: var(--d);
-  margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
   opacity: 0;
-  transform: scale(0.9);
-  transition: opacity 0.08s, transform 0.1s;
+  transform: scale(0.86);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
   pointer-events: none;
 }
-.hud-wheel.show { opacity: 1; transform: none; }
-.hud-wheel svg { width: 100%; height: 100%; overflow: visible; }
-.hud-wheel path { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.06s; }
-.hud-wheel text {
+.radial.show { opacity: 1; transform: none; transition: opacity 0.14s ease-out, transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.25); }
+/* (going with a choice: a breath while the chosen one flashes, then out; hud.ts and radial.ts wait GONE for it) */
+.radial.closing.picked { transform: scale(1.04); transition: opacity 0.2s 0.1s ease-in, transform 0.3s ease-out; }
+.radial-svg, .radial svg { width: 100%; height: 100%; overflow: visible; }
+/* (an SVG's own box is placed at its origin, which is the wheel's middle: so that is where things turn and grow from) */
+.radial g {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  opacity: 0;
+  transform: scale(0.82);
+  transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.12s ease-out;
+}
+/* (each wedge comes out a little after the one before it, round the wheel) */
+.radial.show g { opacity: 1; transform: none; transition-delay: calc(var(--i, 0) * 9ms); }
+.radial path { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.09s ease-out, stroke 0.09s; }
+.radial text {
   fill: var(--ink);
   font: 600 15px var(--font);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   text-anchor: middle;
   dominant-baseline: central;
+  transition: fill 0.09s;
 }
-.hud-wheel g.keeps text { fill: var(--ink-dim); font-style: italic; }
-.hud-wheel g.held path { stroke: var(--accent); stroke-width: 2; }
-.hud-wheel g.held text { fill: var(--accent); }
-.hud-wheel g.on path { fill: var(--accent); stroke: var(--accent); }
-.hud-wheel g.on text { fill: #14120c; }
-.wheel-dot {
+.radial g.keeps text { fill: var(--ink-dim); font-style: italic; }
+.radial g.dim { opacity: 0.4; }
+.radial.closing g.chosen { opacity: 1; }
+.radial g.held path { stroke: var(--accent); stroke-width: 2; }
+.radial g.held text { fill: var(--accent); }
+/* the one pointed at: lit, and out from the others towards the rim */
+.radial.show g.on, .radial.closing g.on { transform: translate(var(--ox), var(--oy)) scale(1.02); transition-delay: 0s; }
+.radial g.on path { fill: var(--accent); stroke: #f3e3b8; stroke-width: 1.5; filter: drop-shadow(0 0 7px rgba(201, 178, 124, 0.55)); }
+.radial g.on text { fill: #14120c; }
+/* the one chosen: a flash of light as the wheel goes */
+.radial g.chosen path { animation: radial-chosen 0.3s ease-out; }
+@keyframes radial-chosen {
+  0% { fill: #fff6d8; filter: drop-shadow(0 0 16px rgba(255, 236, 170, 0.95)); }
+  100% { fill: var(--accent); filter: drop-shadow(0 0 7px rgba(201, 178, 124, 0.55)); }
+}
+/* the bar round the rim: turned to whichever is lit, the short way round */
+.radial-bar {
+  fill: none !important;
+  stroke: var(--accent) !important;
+  stroke-width: 3.5 !important;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transform: rotate(var(--turn, 0deg));
+  opacity: 0;
+  transition: transform 0.13s cubic-bezier(0.25, 0.8, 0.3, 1), opacity 0.1s;
+}
+.radial.picked .radial-bar { opacity: 1; }
+.radial-dot {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -2170,23 +2204,40 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
   border-radius: 50%;
   background: var(--ink);
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
-  /* --x and --y: where the mouse is from the middle, -1..1; it goes out over the rings, so that which ring is picked can be seen */
-  transform: translate(calc(var(--x, 0) * var(--d) * 0.47), calc(var(--y, 0) * var(--d) * 0.47));
+  /* --x and --y: where the pointer is from the middle, -1..1; it goes out over the rings, so that which ring is picked can be seen */
+  transform: translate(calc(var(--x, 0) * var(--d) * 0.466), calc(var(--y, 0) * var(--d) * 0.466));
+  transition: transform 0.05s linear;
 }
-.wheel-mid {
+/* (the words in the hub grow with the wheel) */
+.radial-hub {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 104px;
-  margin-left: -52px;
-  transform: translateY(26px);
+  width: calc(var(--d) * 0.22);
+  margin-left: calc(var(--d) * -0.11);
+  transform: translateY(calc(var(--d) * 0.04));
   text-align: center;
   text-transform: uppercase;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   line-height: 1.15;
 }
-.wheel-mid b { display: block; font-size: 13px; letter-spacing: 0.08em; color: var(--ink); }
-.wheel-mid span { display: block; font-size: 10px; letter-spacing: 0.1em; color: var(--ink-dim); }
+.radial-hub b { display: block; font-size: calc(var(--d) * 0.03); letter-spacing: 0.08em; color: var(--ink); }
+.radial-hub b.pop { animation: radial-pop 0.16s ease-out; }
+@keyframes radial-pop {
+  0% { opacity: 0.2; transform: translateY(4px) scale(0.92); }
+  100% { opacity: 1; transform: none; }
+}
+.radial-hub span { display: block; font-size: calc(var(--d) * 0.02); letter-spacing: 0.1em; color: var(--ink-dim); }
+
+/* the wheel (hold T): what to call out, and what to do with the body */
+.hud-wheel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* a good third of the height of the screen, whatever the screen */
+  --d: clamp(380px, 58vh, 640px);
+  margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+}
 
 /* what somebody near called out, over their head */
 .hud-says { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }

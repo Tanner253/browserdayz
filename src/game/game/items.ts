@@ -513,15 +513,18 @@ export const itemsMethods = {
       this.toggleEmotes(true);
       return;
     }
+    // (let go on a wedge: chosen, and the wheel shows it as it goes)
+    let chose = false;
     if (!ok || !input.held('KeyT')) {
       this.wheelOn = false;
       // (a tap, the mouse left alone, is the last call again)
       if (ok) {
-        if (pick >= 0) this.emote(slots[pick]);
+        chose = pick >= 0;
+        if (chose) this.emote(slots[pick]);
         else if (now - this.wheelSince < 220) this.emote(this.lastCall);
       }
     }
-    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.danced ?? this.hold, EMOTE[this.lastCall]?.say ?? '');
+    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.danced ?? this.hold, EMOTE[this.lastCall]?.say ?? '', chose);
   },
 
   /** The words people near have called out, over their heads: for whoever is close and can see them. */
