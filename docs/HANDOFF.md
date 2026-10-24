@@ -2,6 +2,23 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## THE WORK LIST (the owner, 2026-10-23: "do not lose sight of the work list at hand"; then base building, gathering, crafting, raiding)
+Visual quality first; keep every performance figure (heli flight replay.mjs owner-run-2.json, 114.8 fps). Never change the
+ground around buried stashes or build on them; never raise WORLD_REV. The onboarding session reviews each session's pictures
+before they go to the owner. Status as of 2026-10-23 evening:
+- [ ] World polish (session world-polish, local_c34bf24d): Pokrov (castle walls and corners, church, green houses off the road,
+      SE buildings clipping/stairs col U), Kalat (polish ALOT + new places F/G-12), the desert (more places, more and spread
+      coastal spawns), Mokroye (more buildings), Lipki (larger), the canyon (smooth, keep cliffs), the desert ruins, every
+      basement entrance clear of loot containers (no floating boxes). Needs a stash-safe way to the live stash list.
+- [ ] Mountain fort Orlinoye: every gap between walls closed, polish (session fort-polish, local_e1fb82cc).
+- [x] Kamenka's red building and two-storey shack one texture step up, everywhere they stand (live, +7.6 MB card).
+- [ ] Gameplay batch (session gameplay-batch, local_5deed9ae): infected loot in the body (5 min), thirst -25%, admin corpse
+      delete (one / all near), admin item ESP.
+- [ ] Animals and hunting (session animals-hunting, local_6551ac13): DayZ/Rust mechanics, useful drops (food + hides, bone,
+      fat for crafting); design picture first.
+- [ ] Server-run inventory + inventory lag + container QOL (session local_cbc26f80): plan waiting for the owner's yes.
+- [x] iPhone crash (live), live disconnects (live), buried-stash leak (live), Discord/X at deaths (live).
+
 ## SITE LIVE (2026-10-23): from `d9155c5` (branch claude/kamenka-textures-0e1e26 = battle-royale 03e532e plus this)
 - Kamenka's plank house (`shanty_mansion`) and red brick houses (`house_interior`) a size up on a computer, 512/256
   (assets.ts DESK_UP; the owner: "bump them up by 1 incriment"). 2.5 -> 10.1 MB on the card. Lossless 512 copies
