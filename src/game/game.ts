@@ -27,7 +27,7 @@ import '../sim/powers';
 import { Economy, lootPrint, type WorldLoot } from '../sim/economy';
 import { CRATE_SPECS, RACKS } from '../sim/crates';
 import '../sim/combat';
-import { LAUNCHED } from '../sim/grenades';
+import { LAUNCHED, THROWN } from '../sim/grenades';
 import '../sim/gunplay';
 import '../sim/barrels';
 import '../sim/emotes';
@@ -49,6 +49,7 @@ import { Effects } from './effects';
 import { Weapons, type HitInfo } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
 import { Grenades } from './grenades';
+import { Throwing } from './throwing';
 import { Garage } from './garage';
 import { Riders } from './riders';
 import { Jeep } from './vehicle';
@@ -237,6 +238,8 @@ export class Game {
   weapons!: Weapons;
   loot!: LootManager;
   grenades!: Grenades;
+  /** G: what is in the hands put down, or thrown (src/game/throwing.ts) */
+  throwing!: Throwing;
   /** the jeeps (see garage.ts) */
   garage!: Garage;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
@@ -605,6 +608,36 @@ export class Game {
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
     this.grenades.onExplode = (at, mine, id) => this.explode(at, mine, id === 'frag' ? 'frag' : id === 'ammo_40mm' ? 'ammo_40mm' : 'grenade');
+    this.throwing = new Throwing({
+      scene: r.scene,
+      models: this.loot.models,
+      // (a grenade has its own throw, on the fire button: G only puts one down)
+      throwable: () => {
+        const it = this.inv.held() ?? this.inHand;
+        return it && !THROWN[it.id] ? it : null;
+      },
+      drop: () => this.dropInHands(),
+      letGo: (item) => {
+        if (this.use) this.breakOff();
+        if (this.loose === item) this.loose = null;
+        this.stow();
+        this.inv.remove(item);
+        this.hud.note(`Threw ${ITEMS[item.id]?.name ?? item.id}`);
+        this.inventoryChanged();
+      },
+      // (from the head, whichever way the view looks: in the third person the camera is behind the body)
+      eye: () => ({ pos: this.player.pos.clone().setY(this.player.pos.y + this.player.eye), dir: new THREE.Vector3(0, 0, -1).applyQuaternion(this.s.r.camera.quaternion) }),
+      lay: (item, at, rot) => {
+        if (this.online) this.localDrops.add(item.uid);
+        // (made at once, as what a hand lets go of is, from where it came down: anything else waits for the eye to come
+        // near, and a thing thrown twenty metres off was not drawn, nor its drop told to the server, until somebody walked over)
+        this.loot.hands.set(item.uid, at.clone());
+        this.economy.drop(item, at.x, at.y + 0.005, at.z, rot);
+        this.weapons.validate();
+      },
+      send: (m) => this.net.send(m),
+      online: () => this.online,
+    });
     this.garage = new Garage({
       scene: r.scene,
       atmo,

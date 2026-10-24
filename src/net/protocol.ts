@@ -237,6 +237,8 @@ export type C2S =
   /** a field radio keyed: a supply drop is asked for where the sender stands */
   | { t: 'radio' }
   | { t: 'drop'; l: WorldLoot }
+  /** something has left the hand, thrown (src/sim/throw.ts): which (its uid and item), from where, how fast, at what power; the 'drop' of where it came to rest follows */
+  | { t: 'toss'; uid: string; id: string; o: [number, number, number]; v: [number, number, number]; pw: number }
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
@@ -371,6 +373,8 @@ export type S2C =
   | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number]; w: string; f: number }
+  /** somebody near has thrown something (an item's id): every game flies it the same way, and it is told where it lies when it does ('loot+') */
+  | { t: 'tossed'; by: number; id: string; o: [number, number, number]; v: [number, number, number] }
   | { t: 'launch'; id: number; o: [number, number, number]; v: [number, number, number]; w: string }
   | { t: 'act'; id: number; a: Act; d: number }
   | { t: 'emote'; id: number; e: string }
