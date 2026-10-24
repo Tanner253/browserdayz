@@ -439,7 +439,12 @@ export function handle(c: Client, m: C2S) {
         send(c, { t: 'ldata', uid: m.uid, items: storedOf(l.item) });
         return;
       }
+      // (a tag that was in it, dropped in a bag, and is not now came to this player, as off a body: custody.ts. None goes
+      // back into it: a tag is not stashed.)
+      const had = payingTags(l.item).map((t) => t.uid);
       l.item.cargo = grid.items;
+      const left = new Set(payingTags(l.item).map((t) => t.uid));
+      for (const uid of had) if (!left.has(uid)) cameTo(c.key, uid);
       for (const p of grid.items) issue(p.item);
       // (gone through is used: a case kept between restarts starts its time again, see Economy's containerLife)
       if (l.keptAt !== undefined) {

@@ -176,6 +176,29 @@ try {
   assert.ok(!cashedIn('Ann', 'Fay'), `a tag put back on a body was cashed in from the pockets:\n${logged.slice(-800)}`);
   checks++;
   console.log('  ok  a tag put back on a body, then said to be in the pockets still, is not cashed in');
+
+  // ---- Ann takes Fay's tag off the body again and drops it in a day pack; Bob goes through the pack where it lies,
+  // takes the tag out, carries it its time, and cashes it in (it was lost to him: taken out of a pack, it was not his)
+  await takeOff(fBody, tFay, []);
+  const pack = { uid: 'tag-custody-pack', id: 'sack_pack', qty: 1, cargo: [{ item: tFay, x: 0, y: 0, rot: false }] };
+  ann.send({ t: 'drop', l: { uid: pack.uid, item: pack, x: 30.6, y: ground(30.6, 0.2), z: 0.2, rot: 0, point: -1, spawnedAt: 0 } });
+  await sleep(200);
+  ann.carry([]);
+  bob.say(31);
+  bob.got.length = 0;
+  bob.send({ t: 'lopen', uids: [pack.uid] });
+  for (let k = 0; k < 40 && !bob.got.some((m) => m.t === 'ldata' && m.uid === pack.uid); k++) await sleep(50);
+  const inPack = bob.got.find((m) => m.t === 'ldata' && m.uid === pack.uid) as Extract<S2C, { t: 'ldata' }> | undefined;
+  assert.ok(inPack?.items.some((it) => it.uid === tFay.uid), `Fay's tag is not in the pack where it lies:\n${logged.slice(-800)}`);
+  bob.send({ t: 'lset', uid: pack.uid, items: inPack!.items.filter((it) => it.uid !== tFay.uid) });
+  bob.send({ t: 'lclose' });
+  bob.carry([tFay]);
+  await sleep(HOLD_S * 1000 + 600);
+  bob.carry([tFay]);
+  await cash(bob, tFay);
+  assert.ok(cashedIn('Bob', 'Fay'), `a tag taken out of a pack lying on the ground, and held, was not cashed in:\n${logged.slice(-800)}`);
+  checks++;
+  console.log('  ok  a tag dropped in a pack and taken out of it where it lies is the taker\'s, and is cashed in once held');
 } catch (e) {
   failed = e;
 } finally {
