@@ -195,7 +195,7 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   // like DAYZ does": inside the barrier, on dry ground, down the whole coast, none of them the ring's)
   assert.ok(world.spawns.length >= 16, `${world.spawns.length} starts on the coast`);
   for (const sp of world.spawns) {
-    assert.ok(!world.spawnRing.includes(sp) && sp.x > WG.PLAN.barrier && sp.x < WG.PLAN.barrier + 100, `a start off the west beach at ${sp.x.toFixed(0)}, ${sp.z.toFixed(0)}`);
+    assert.ok(!world.spawnRing.includes(sp) && sp.x > WG.PLAN.barrier && sp.x < WG.PLAN.barrier + 230, `a start off the west beach and its dunes at ${sp.x.toFixed(0)}, ${sp.z.toFixed(0)}`);
     assert.ok(WG.heightAt(world.heights, sp.x, sp.z) > WG.SEA_LEVEL + 0.5, `a start in the sea at ${sp.x.toFixed(0)}, ${sp.z.toFixed(0)}`);
   }
   assert.ok(Math.min(...world.spawns.map((q) => q.z)) < -500 && Math.max(...world.spawns.map((q) => q.z)) > 500, 'the starts are not down the whole coast');

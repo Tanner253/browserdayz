@@ -15,8 +15,9 @@ import { MOKROYE, MOKROYE_GROUND, MOKROYE_WALKS, mokroyeBuildings, mokroyePosts,
 import { POKROV_GROUND, POKROV_TERRACE, POKROV_TREES, pokrovBuildings, pokrovThings } from './pokrov';
 import { ZAVOD, ZAVOD_GROUND, ZAVOD_WALL, zavodBuildings, zavodThings, type TownThing } from './zavod';
 import { ZASTAVA, ZASTAVA_GROUND, ZASTAVA_SLABS, zastavaBuildings, zastavaThings } from './zastava';
-import { DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
+import { DESERT_LATER, DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
 import { TOWER_ROOM, towerCuts, wallCuts, type TowerPlace } from './pokrov-towers';
+import { TOWN_PARTS, partBuildings, partGround, partPosts, partThings, partWalks } from './town-parts';
 
 export { LIPKI };
 
@@ -28,6 +29,8 @@ export interface Town {
   /** how far its pad of level ground reaches from the middle, each way (its own x and z) */
   pad: [number, number];
   rot: number;
+  /** a part of the town of this name, laid after every town (src/sim/town-parts.ts) */
+  part?: string;
 }
 /** a building of a town, in the town's frame: `rot` turns its front (+z of its own) toward (sin, cos) */
 export interface TownSpot { type: BuildingType; x: number; z: number; rot: number; arms?: number; /** its floor so high over the pad, where it does not stand on the ground (a boathouse on a pier) */ up?: number }
@@ -105,6 +108,7 @@ export interface PlacedTown { town: Town; padY: number }
 
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
+  if (t.part) return partBuildings(t);
   return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : t.name === MOKROYE.name ? mokroyeBuildings() : t.name === ZASTAVA.name ? zastavaBuildings() : desertBuildings(t);
 }
 
@@ -115,6 +119,7 @@ export function townTrees(t: Town): [string, number, number, number][] {
 }
 
 export function townThings(t: Town): TownThing[] {
+  if (t.part) return partThings(t);
   return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : t.name === MOKROYE.name ? mokroyeThings() : t.name === ZASTAVA.name ? zastavaThings() : desertThings(t);
 }
 
@@ -140,6 +145,7 @@ export interface TownGround {
   terraces?: { poly: [number, number][]; h: number; out: number }[];
 }
 export function townGround(t: Town): TownGround {
+  if (t.part) return partGround(t);
   return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : t.name === MOKROYE.name ? MOKROYE_GROUND : t.name === ZASTAVA.name ? ZASTAVA_GROUND : desertGround(t) ?? { yards: [], lanes: [] };
 }
 
@@ -204,16 +210,20 @@ export function placedSlabs(t: Town): SlabRun[] {
 /** every new town, as it is planned (where the world sets each down is the world's) */
 // (and the desert's three on its roads, 2026-10-18: src/sim/desert.ts. First: they are the map's own steps, and the
 // map's own places come before every place apart in the list of places, see test/loot.test.ts)
-export const TOWNS: Town[] = [...DESERT_TOWNS, POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA];
+// (the towns' parts last of all, 2026-10-23: nothing laid before them is renumbered for them)
+export const TOWNS: Town[] = [...DESERT_TOWNS, POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA, ...TOWN_PARTS, ...DESERT_LATER];
+/** the towns laid after everything else of the map, their places for things after every other place (Buildings.laterLoot) */
+export const LATER_TOWNS: Town[] = [...TOWN_PARTS, ...DESERT_LATER];
+export const isLater = (t: Town) => LATER_TOWNS.some((l) => l.name === t.name);
 
 /** a town's kit pieces that are not walkways: the stilts under Mokroye's house on stilts (on the pad at y) */
 export function townPosts(t: Town, y: number): KitPiece[] {
-  return t.name === MOKROYE.name ? mokroyePosts(y) : [];
+  return t.part ? partPosts(t, y) : t.name === MOKROYE.name ? mokroyePosts(y) : [];
 }
 
 /** a town's walkways of boards on posts (Ozerki's piers, Mokroye's boardwalks), in its frame */
 export function townWalks(t: Town): WalkRun[] {
-  return t.name === OZERKI.name ? OZERKI_WALKS : t.name === MOKROYE.name ? MOKROYE_WALKS : [];
+  return t.part ? partWalks(t) : t.name === OZERKI.name ? OZERKI_WALKS : t.name === MOKROYE.name ? MOKROYE_WALKS : [];
 }
 
 /**

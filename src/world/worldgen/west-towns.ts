@@ -4,11 +4,11 @@
 // (`ruinsGround`: its top, its banks and moat, the dry river's flats), as src/dev/ruins.ts lays it on its test patch.
 
 import { Simplex, lerp, smoothstep } from '../../core/noise';
-import { DESERT_TOWNS } from '../../sim/desert';
+import { DESERT_LATER, DESERT_TOWNS } from '../../sim/desert';
 import { MOKROYE, WATER } from '../../sim/mokroye';
 import { OZERKI, SHORE } from '../../sim/ozerki';
 import { LAND, OUTLINE, outside as offTop, ruinLocal, ruinsGround, type Place } from '../../sim/ruins';
-import { moundAt, placedSlabs, placedTowers, townBuildings, townTrees, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
+import { isLater, moundAt, placedSlabs, placedTowers, townBuildings, townTrees, townGround, townPoint, townThings, townWalks, type PlacedTown, type SlabRun, type Town } from '../../sim/towns';
 import { BUILDING_FOOTPRINT, type BuildingPlot } from './layout';
 import { CELL, SEA_LEVEL, WORLD_SEED } from './places';
 import { PLACED, PLAN } from './west-plan';
@@ -21,7 +21,7 @@ export const placedTown = (name: string) => PLACED.find((t) => t.name === name)!
 /** the desert's towns lie west of this: what they set down stands on the ground as it is in the end (`fillTown`) */
 export const DESERT_EAST = -2400;
 /** the desert's own places (src/sim/desert.ts), whose pads are the last word on the ground under them (`padHeld`) */
-const DESERT = PLACED.filter((t) => DESERT_TOWNS.some((d) => d.name === t.name));
+const DESERT = PLACED.filter((t) => [...DESERT_TOWNS, ...DESERT_LATER].some((d) => d.name === t.name));
 export const desertTown = (t: Town) => DESERT.some((d) => d.name === t.name);
 /**
  * How much of a spot is a desert place's own level ground: all of it on its pad, none `out` metres past its edge.
@@ -112,6 +112,8 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     const laid = padY + moundAt(t, lx, lz);
     return foot && (all || Math.abs(on(x, z) - laid) > MOVED) ? foot(x, z) : laid;
   };
+  // (what a town laid after everything else lays is marked so: Buildings.plan puts it after every other thing)
+  const later = isLater(t) ? { later: true } : {};
   townBuildings(t).forEach((s, n) => {
     const [x, z] = townPoint(t, s.x, s.z);
     out.buildings.push({ id: `${t.name.toLowerCase()}_${n}`, type: s.type, x, z, rot: t.rot + s.rot, floorY: padY + (s.up ?? moundAt(t, s.x, s.z) + 0.3), seed: 9100 + n * 37, ...(s.arms ? { arms: s.arms } : {}) });
@@ -154,7 +156,7 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
     if (!base.has(at)) base.set(at, y);
     // (what grows in a garden is drawn only from near, a stack of logs from no farther than a street's length)
     const near = th.kind === 'pumpkin' || th.kind === 'cabbage' ? { far: 40 } : th.kind === 'log_pile' ? { far: 150 } : {};
-    out.props.push({ kind: th.kind, x, y: y + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near });
+    out.props.push({ kind: th.kind, x, y: y + (th.up ?? 0), z, rot: t.rot + th.rot, scale: 1, ...near, ...later });
   }
   for (const [kind, lx, lz, scale] of townTrees(t)) {
     const [x, z] = townPoint(t, lx, lz);
@@ -162,7 +164,7 @@ export function fillTown(t: Town, padY: number, net: Net, out: { buildings: Buil
   }
   for (const l of townLamps(t)) {
     const [x, z] = townPoint(t, l.x, l.z);
-    out.props.push({ kind: 'street_lamp_01', x, y: under(x, z, l.x, l.z), z, rot: t.rot + l.rot, scale: 1 });
+    out.props.push({ kind: 'street_lamp_01', x, y: under(x, z, l.x, l.z), z, rot: t.rot + l.rot, scale: 1, ...later });
   }
   out.slabs.push(...placedSlabs(t));
 }
@@ -195,7 +197,9 @@ export function townLamps(t: Town): { x: number; z: number; rot: number }[] {
   // (a swamp's water is shallow, a lamp stands in it, as the drowned hamlet's houses do; a lake's is not, nor its
   // shingle running down into it: Ozerki's lake is the world's, north of its shore, and three lamps beside its piers
   // stood over the water at the bank's height)
-  const homes = townBuildings(t), things = townThings(t), water = ground.water && !ground.water.swamp ? ground.water.outline : undefined;
+  // (a town's part keeps clear of the town's own houses, things and lamps as of its own)
+  const of: Town | undefined = t.part ? { ...t, name: t.part, part: undefined } : undefined, near = of ? townLamps(of) : [];
+  const homes = [...townBuildings(t), ...(of ? townBuildings(of) : [])], things = [...townThings(t), ...(of ? townThings(of) : [])], water = ground.water && !ground.water.swamp ? ground.water.outline : undefined;
   const bank = t.name === OZERKI.name ? SHORE + 2.5 : -Infinity;
   const wet = (x: number, z: number) => {
     if (z < bank) return true;
@@ -213,7 +217,7 @@ export function townLamps(t: Town): { x: number; z: number; rot: number }[] {
       const [w, d] = BUILDING_FOOTPRINT[s.type], c = Math.cos(s.rot), sn = Math.sin(s.rot), dx = x - s.x, dz = z - s.z;
       return Math.abs(dx * c - dz * sn) < w / 2 + 1.2 && Math.abs(dx * sn + dz * c) < d / 2 + 1.2;
     }) &&
-    !things.some((th) => Math.hypot(th.x - x, th.z - z) < 2.5) && !out.some((o) => Math.hypot(o.x - x, o.z - z) < LAMP.apart);
+    !things.some((th) => Math.hypot(th.x - x, th.z - z) < 2.5) && ![...out, ...near].some((o) => Math.hypot(o.x - x, o.z - z) < LAMP.apart);
   let side = 1;
   // (and beside the boardwalks, where those are the town's ways: the drowned hamlet has no lane)
   for (const { line, w } of [...ground.lanes.filter((l) => !l.dark), ...townWalks(t).map((r) => ({ line: [r.a, r.b], w: 2 }))]) {

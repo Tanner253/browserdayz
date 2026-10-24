@@ -290,8 +290,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
 // --- THE TOWNS and KALAT
 {
   const towns = world.towns!;
-  // (the desert's first, since 2026-10-18: src/sim/desert.ts)
-  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava']);
+  // (the desert's first, since 2026-10-18: src/sim/desert.ts; and those laid later last, since 2026-10-23: LATER_TOWNS)
+  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
@@ -362,8 +362,8 @@ const ridge = (z: number) => RL.ridgeAt(z);
   assert.equal(out, 0, `${out} spots of the new land outside the Zona`);
   assert.ok(!WG.inRounds(PLAN.barrier - 30, 0), 'the Zona reaches past the barrier');
   // (every start on the west beach since 2026-10-18, "move all player spawns to the far west coast like DAYZ does", the
-  // coast having its own first step by then: src/sim/desert.ts)
-  assert.ok(world.spawns.length >= 16 && world.spawns.every((s) => s.x > PLAN.barrier && s.x < PLAN.barrier + 100), 'a start off the west beach');
+  // coast having its own first step by then: src/sim/desert.ts), over the beach and the dunes behind it since 2026-10-23
+  assert.ok(world.spawns.length >= 16 && world.spawns.every((s) => s.x > PLAN.barrier && s.x < PLAN.barrier + 230), 'a start off the west beach');
   ok(`the Zona over all the new land out to the barrier; the starts on the west beach (${world.spawns.length})`);
 }
 

@@ -218,7 +218,8 @@ export function westZona(): { x: number; z: number; r: number }[] {
 }
 
 /** the towns as the map has them: where their own data plans them, but where plan v5's ground asks otherwise (PLAN.towns) */
-export const PLACED: Town[] = TOWNS.map((t) => ({ ...t, ...PLAN.towns[t.name] }));
+// (a part of a town where its town is)
+export const PLACED: Town[] = TOWNS.map((t) => ({ ...t, ...PLAN.towns[t.part ?? t.name] }));
 /** the loot step of the new places: the towns by their own, the pass's floor high (Kalat's are its own): null outside them. For buildings.ts, which says each loot point's tier. */
 export function westTier(x: number, z: number): Tier | null {
   for (const t of PLACED) {

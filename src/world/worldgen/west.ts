@@ -25,7 +25,7 @@ import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside 
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
 import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
 import { DESERT_EAST, desertTown, fillTown, footOn, hamletGround, kalatSite, layKalat, layPad, offPad, padHeld, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
-import { POKROV, moundAt, placedRooms } from '../../sim/towns';
+import { POKROV, isLater, moundAt, placedRooms, type Town } from '../../sim/towns';
 import { POKROV_LANE } from '../../sim/pokrov';
 import { HUNTING_TOWERS, WATCHTOWERS, huntingId, watchtowerId } from '../../sim/watchtowers';
 import type { Instance, POI, Site } from './types';
@@ -216,7 +216,9 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   cutLake(heights, net, PLAN.lake.outline, lake, PLAN.lake.deep);
   const hamlet = placedTown(MOKROYE.name), swamp = cutSwamp(heights, net);
   padY.set(MOKROYE.name, swampPad(swamp));
-  for (const t of PLACED) layPad(heights, net, t, padY.get(t.name)!, t.name === OZERKI.name ? lake : undefined);
+  // (a town's part on its town's pad, laid with it: src/sim/town-parts.ts)
+  for (const t of PLACED) if (t.part) padY.set(t.name, padY.get(t.part)!);
+  for (const t of PLACED) if (!t.part) layPad(heights, net, t, padY.get(t.name)!, t.name === OZERKI.name ? lake : undefined);
 
   // KALAT, on its own land in the desert
   const kalat = kalatSite(heights, net), kalatLand = layKalat(heights, net, kalat);
@@ -451,13 +453,14 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   // where the roads' beds, the river or the lake's shore have moved it off the pad
   const towns: PlacedTown[] = [], slabs: SlabRun[] = [];
   const ground = (x: number, z: number) => heightAt(heights, x, z);
-  for (const t of PLACED) {
+  const layTown = (t: Town) => {
     const y = padY.get(t.name)!;
     // (Pokrov's things too: a lamp on its north road and a barrier on its ramp's bank stood at its pad's height, off the ground)
     fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass, trees: tools.trees }, ground, t.x < DESERT_EAST || t.name === POKROV.name);
     towns.push(placed(t, y));
-    tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
-  }
+    if (!t.part) tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
+  };
+  for (const t of PLACED) if (!isLater(t)) layTown(t);
   // ---- KALAT: what lies about it, and its name on the maps
   for (const { piece, place } of ruinsPlan(kalat)) tools.props.push(...ruinProps(piece, place, footOn(ground)));
   tools.pois.push({ name: PLAN.kalat.name, x: kalat.x, z: kalat.z, radius: 240 });
@@ -633,13 +636,17 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       }
     }
   }
+  // ---- THE TOWNS LAID LATER (their parts, src/sim/town-parts.ts; the dig camp, src/sim/desert.ts): last of everything
+  // the west lays, so that not one building, thing or door laid before them is renumbered for them
+  for (const t of PLACED) if (isLater(t)) layTown(t);
   return {
     heights, surface, splat, grass, towns, kalat, slabs, sand: sands,
     water: {
       lakes: [{ name: OZERKI.name, level: lake, outline: L }, { name: 'swamp', level: swamp, outline: S, swamp: true }],
       rivers: [{ name: 'the river', pts: river }],
       // (the hamlet's houses with the swamp's water over their floors: drawn still and dark inside, src/sim/water.ts WaterRoom)
-      rooms: placedRooms(placed(hamlet, padY.get(MOKROYE.name)!), BUILDING_FOOTPRINT),
+      // (and its part's, in the same water)
+      rooms: towns.filter((p) => (p.town.part ?? p.town.name) === MOKROYE.name).flatMap((p) => placedRooms(p, BUILDING_FOOTPRINT)),
     },
   };
 }

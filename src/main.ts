@@ -255,6 +255,8 @@ async function boot() {
   outcrops.camera = r.camera;
   void outcrops.build().then(() => ready(outcrops.group));
   buildings.lootPoints.push(...caveLootPoints());
+  // (and the towns' parts', last: src/sim/town-parts.ts)
+  buildings.lootPoints.push(...buildings.laterLoot);
   // (the sea's, the lakes' and the river's water and the swamp's mist got ready as they are made: hidden at the start
   // (the mist by day) they were a shader made in the frame they were first shown. Only these few: everything the west
   // made, got ready at once, held the loot's own getting ready past its six seconds, and each new thing of loot was

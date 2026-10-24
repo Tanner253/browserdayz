@@ -26,7 +26,7 @@ export const WET_FLOOR = 0.1, STILT_FLOOR = 1.25, SUNK_FLOOR = -0.65;
 /** how deep the water is over the floor of a flooded house, and of the sunk barn (for its plans: src/world/mokroye-plans.ts) */
 export const WET_DEPTH = WATER - WET_FLOOR, SUNK_DEPTH = WATER - SUNK_FLOOR;
 /** the boardwalks' decks over the pad: a step over the water */
-const DECK = WATER + 0.35;
+export const DECK = WATER + 0.35;
 /** the islands, the hollow the barn has sunk into, and a few hummocks and pools: [x, z, foot r, height, level top r] */
 const ISLAND1: [number, number, number, number, number] = [-28, -22, 21, 0.8, 13];
 const ISLAND2: [number, number, number, number, number] = [36, 24, 10, 0.8, 4.5];
@@ -67,7 +67,11 @@ export const MOKROYE_WALKS: WalkRun[] = [
 
 /** the stilts under the house on stilts: a cluster of the kit's old posts at each corner, their tops at its floor (on the pad at y) */
 export function mokroyePosts(y: number): KitPiece[] {
-  const h = mokroyeBuildings().find((s) => s.up === STILT_FLOOR)!, c = Math.cos(h.rot), s = Math.sin(h.rot);
+  return stiltsUnder(mokroyeBuildings().find((s) => s.up === STILT_FLOOR)!, y);
+}
+/** the stilts under a house on stilts (its floor STILT_FLOOR over the pad at y) */
+export function stiltsUnder(h: TownSpot, y: number): KitPiece[] {
+  const c = Math.cos(h.rot), s = Math.sin(h.rot);
   // (a cluster of posts stands 3.85 m from 0.71 under its origin: its tops at the floor, its feet sunk in the mud)
   const foot = y + STILT_FLOOR - 3.14;
   // (a cluster's middle is (0.92, 1.45) of its own from its origin: each stood so that its middle is at its corner)
@@ -78,7 +82,7 @@ export function mokroyePosts(y: number): KitPiece[] {
 }
 
 /** a run of 2 m fence panels from a to b, panels gone here and there (the water took them) */
-function drowned(a: [number, number], b: [number, number], gone: number[] = []): TownThing[] {
+export function drowned(a: [number, number], b: [number, number], gone: number[] = []): TownThing[] {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(len / 2)), step = len / n;
   const dx = (b[0] - a[0]) / len, dz = (b[1] - a[1]) / len, rot = Math.atan2(-dz, dx), out: TownThing[] = [];
   for (let k = 0; k < n; k++) if (!gone.includes(k)) out.push({ kind: 'fence_grey', x: a[0] + dx * (k + 0.5) * step, z: a[1] + dz * (k + 0.5) * step, rot: rot + ((k * 5) % 3 - 1) * 0.05 });
