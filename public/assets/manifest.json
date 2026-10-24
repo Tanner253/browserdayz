@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T06:07:19.985Z",
+ "generated": "2026-10-24T06:27:13.170Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12557,6 +12557,11 @@
     "walk": 1.55,
     "trot": 7.23,
     "run": 11.62
+   },
+   "floors": {
+    "alert": -0.056,
+    "rest": -0.092,
+    "death": -0.111
    }
   },
   "pill_box": {
@@ -12584,7 +12589,7 @@
    "tags": [
     "animal"
    ],
-   "bytes": 860736,
+   "bytes": 860684,
    "tris": 5216,
    "min": [
     -0.185,
@@ -12612,6 +12617,10 @@
     "walk": 1.27,
     "trot": 5.92,
     "run": 9.51
+   },
+   "floors": {
+    "rest": -0.055,
+    "death": -0.054
    }
   },
   "animal_bear": {
@@ -12654,6 +12663,11 @@
    "strikes": {
     "swipe": 0.98,
     "bite": 1.88
+   },
+   "floors": {
+    "death": -0.159,
+    "trot": -0.069,
+    "rest": -0.157
    }
   },
   "animal_cow": {
@@ -12678,7 +12692,10 @@
     "idle",
     "graze",
     "death"
-   ]
+   ],
+   "floors": {
+    "death": -0.117
+   }
   },
   "meat_steak": {
    "url": "assets/models/meat_steak.glb",
@@ -12807,7 +12824,12 @@
     "idle",
     "alert",
     "rest"
-   ]
+   ],
+   "floors": {
+    "graze": -0.159,
+    "idle": -0.503,
+    "alert": -0.514
+   }
   }
  }
 }

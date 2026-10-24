@@ -76,6 +76,8 @@ interface Kit {
   paces: Record<string, number>;
   /** the moment each blow lands in its movement, seconds in (the same) */
   strikes: Record<string, number>;
+  /** how far under the ground a movement puts its lowest, metres, where its rest is not standing (the same) */
+  floors: Record<string, number>;
 }
 const kits = new Map<string, Promise<Kit | null>>();
 
@@ -85,7 +87,7 @@ function kitOf(kind: Kind): Promise<Kit | null> {
   if (!k) {
     k = (async () => {
       const model = assets.manifest.models[kind.model] ? kind.model : MEASURING ? 'animal_stag' : null;
-      const entry = model ? (assets.manifest.models[model] as { cuts?: Record<string, [number, number]>; paces?: Record<string, number>; strikes?: Record<string, number> } | undefined) : undefined;
+      const entry = model ? (assets.manifest.models[model] as { cuts?: Record<string, [number, number]>; paces?: Record<string, number>; strikes?: Record<string, number>; floors?: Record<string, number> } | undefined) : undefined;
       if (!entry || !model) return null;
       const gltf = await assets.gltfOf(model);
       const clips = new Map<string, THREE.AnimationClip>();
@@ -94,7 +96,7 @@ function kitOf(kind: Kind): Promise<Kit | null> {
         const take = gltf.animations[0];
         for (const [name, [a, b]] of Object.entries(entry.cuts)) clips.set(name, THREE.AnimationUtils.subclip(take, name, Math.round(a * 30), Math.round(b * 30), 30));
       } else for (const c of gltf.animations) clips.set(c.name, c);
-      return { scene: gltf.scene, clips, paces: entry.paces ?? {}, strikes: entry.strikes ?? {} };
+      return { scene: gltf.scene, clips, paces: entry.paces ?? {}, strikes: entry.strikes ?? {}, floors: entry.floors ?? {} };
     })().catch((e) => {
       console.warn(`animal ${kind.id}:`, e);
       return null;
@@ -121,6 +123,10 @@ export class Beast implements Damageable {
   private mixer: THREE.AnimationMixer | null = null;
   private paces: Record<string, number> = {};
   private strikes: Record<string, number> = {};
+  private floors: Record<string, number> = {};
+  /** how high the model is lifted off its middle, for the movement it plays (see Kit.floors): and where it is going */
+  private lift = 0;
+  private liftTo = 0;
   private actions = new Map<string, THREE.AnimationAction>();
   private playing: THREE.AnimationAction | null = null;
   private playingName = '';
@@ -156,6 +162,7 @@ export class Beast implements Damageable {
     this.model = model;
     this.paces = kit.paces;
     this.strikes = kit.strikes;
+    this.floors = kit.floors;
     this.root.add(model);
     this.root.rotation.order = 'YXZ';
     this.mixer = new THREE.AnimationMixer(model);
@@ -307,7 +314,11 @@ export class Beast implements Damageable {
       this.model!.position.set(mid * Math.sin(a), mid + (girth - mid) * t - mid * Math.cos(a), 0);
       return;
     }
+    // (lifted to the floor of what it plays, over the cross-fade: a wolf rising from its sleep rises from the ground)
+    this.lift += (this.liftTo - this.lift) * Math.min(1, dt * 6);
+    this.model!.position.y = this.lift;
     if (act && name !== this.playingName) {
+      this.liftTo = -(this.floors[name] ?? 0);
       act.reset().play();
       // (a blow begun where its paw or jaws are as far from landing as the wind-up is long: it lands with the damage)
       const move = this.kind.fight?.moves.find((m) => m.mode === this.mode), hit = this.strikes[name];

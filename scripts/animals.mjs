@@ -204,6 +204,34 @@ function strikeOf(doc, anim, part) {
 }
 const STRIKES = { swipe: /FLegDigit/, bite: /Jaw|Head/ };
 
+/**
+ * How far under its middle's floor a movement puts the lowest of its skin, metres (as it now stands; its lowest
+ * over the movement, a few moments of it): stood on the ground by its rest pose, a model whose rest is lying down
+ * (the owner's wolf: its rest is its sleep) put its standing legs half a metre into the ground. The game lifts it by
+ * this as the movement plays (src/game/animals.ts).
+ */
+function floorOf(doc, scene, anim) {
+  const nodes = doc.getRoot().listNodes(), keep = new Map(nodes.map((nd) => [nd, [nd.getTranslation(), nd.getRotation(), nd.getScale()]]));
+  const chans = anim.listChannels().map((c) => ({ node: c.getTargetNode(), path: c.getTargetPath(), t: c.getSampler().getInput().getArray(), v: c.getSampler().getOutput().getArray(), cubic: c.getSampler().getInterpolation() === 'CUBICSPLINE' }));
+  const end = Math.max(...chans.map((c) => c.t[c.t.length - 1]));
+  let low = Infinity;
+  for (let f = 0; f <= 6; f++) {
+    const time = (f / 6) * end;
+    for (const c of chans) {
+      const n = c.path === 'rotation' ? 4 : 3, w = c.cubic ? n * 3 : n, off = c.cubic ? n : 0;
+      let i = c.t.findIndex((x) => x >= time);
+      if (i < 0) i = c.t.length - 1;
+      const v = Array.from(c.v.slice(i * w + off, i * w + off + n));
+      if (c.path === 'translation') c.node.setTranslation(v);
+      else if (c.path === 'rotation') c.node.setRotation(v);
+      else if (c.path === 'scale') c.node.setScale(v);
+    }
+    low = Math.min(low, skinnedBounds(doc, scene).min[1]);
+  }
+  for (const [nd, [t, r, s]] of keep) nd.setTranslation(t).setRotation(r).setScale(s);
+  return +low.toFixed(3);
+}
+
 const entries = {}, credits = [];
 for (const id of ids) {
   const cfg = ANIMAL_MODELS[id];
@@ -239,6 +267,10 @@ for (const id of ids) {
     }
   }
   for (const a of anims) if (!kept.has(a)) drop(a);
+  // (a movement moves the skeleton only: a channel on a node above it is dropped. The hind's walk set the download's
+  // own top node, which stands the whole model upright, back to no turn, and she walked a metre under the ground.)
+  const joints = new Set(root.listSkins().flatMap((sk) => sk.listJoints()));
+  for (const a of kept) for (const c of a.listChannels()) if (!joints.has(c.getTargetNode())) c.dispose();
   // upright and nose to -z under one piece of its own, then to size and stood on the ground about its middle
   const top = doc.createNode(id);
   for (const child of scene.listChildren()) {
@@ -255,19 +287,22 @@ for (const id of ids) {
   b = skinnedBounds(doc, scene);
   // (each gait's own pace over the ground, measured as it now stands, scaled and turned: by its root's travel where
   // it was carried on, else by its feet; and every movement but its death walked on the spot)
-  const paces = {}, strikes = {};
+  const paces = {}, strikes = {}, floors = {};
   for (const a of root.listAnimations()) {
     const carried = a.getName() === 'death' ? null : inPlace(doc, a);
     if (['walk', 'trot', 'run'].includes(a.getName())) paces[a.getName()] = carried ?? paceOf(doc, a);
     if (STRIKES[a.getName()]) strikes[a.getName()] = strikeOf(doc, a, STRIKES[a.getName()]);
+    // (only where it is off by more than a few centimetres: a model stood up in its rest needs none)
+    const floor = floorOf(doc, scene, a);
+    if (Math.abs(floor) > 0.03) floors[a.getName()] = floor;
   }
   await doc.transform(dedup(), prune({ keepLeaves: false }), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [cfg.tex ?? 2048, cfg.tex ?? 2048], quality: 88 }), ...(process.env.ANIMAL_PLAIN ? [] : [meshopt({ encoder: MeshoptEncoder, level: 'medium' })]));
   const dest = path.join(OUT, 'models', `${id}.glb`);
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const clips = root.listAnimations().map((a) => a.getName());
-  console.log(`animal ${id.padEnd(16)} ${srcTris} tris  ${(st.size / 1024).toFixed(0)} KB  ${b.max.map((v, k) => (v - b.min[k]).toFixed(2)).join(' x ')} m  [${clips.join(' ')}]  paces ${JSON.stringify(paces)}  strikes ${JSON.stringify(strikes)}`);
-  entries[id] = { url: `assets/models/${id}.glb`, tags: ['animal'], bytes: st.size, tris: srcTris, min: b.min.map((v) => +v.toFixed(4)), max: b.max.map((v) => +v.toFixed(4)), lods: [], clips, ...(cuts ? { cuts } : {}), ...(Object.keys(paces).length ? { paces } : {}), ...(Object.keys(strikes).length ? { strikes } : {}) };
+  console.log(`animal ${id.padEnd(16)} ${srcTris} tris  ${(st.size / 1024).toFixed(0)} KB  ${b.max.map((v, k) => (v - b.min[k]).toFixed(2)).join(' x ')} m  [${clips.join(' ')}]  paces ${JSON.stringify(paces)}  strikes ${JSON.stringify(strikes)}  floors ${JSON.stringify(floors)}`);
+  entries[id] = { url: `assets/models/${id}.glb`, tags: ['animal'], bytes: st.size, tris: srcTris, min: b.min.map((v) => +v.toFixed(4)), max: b.max.map((v) => +v.toFixed(4)), lods: [], clips, ...(cuts ? { cuts } : {}), ...(Object.keys(paces).length ? { paces } : {}), ...(Object.keys(strikes).length ? { strikes } : {}), ...(Object.keys(floors).length ? { floors } : {}) };
   credits.push({ id, ...(await creditOf(dir)), changes: `Kept whole with its skeleton and ${cuts ? 'its one take of movement (the game cuts it where its movements change)' : `the movements the game plays (${clips.join(', ')}), the others left out`}; turned nose to -z, scaled to ${cfg.len} m nose to tail and stood on the ground; textures re-encoded as WebP at no more than ${cfg.tex ?? 2048} a side; geometry compressed.` });
 }
 
