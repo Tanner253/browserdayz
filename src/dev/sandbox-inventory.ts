@@ -1,5 +1,5 @@
-// The stage's screens (2026-10-24, the owner: "all sessions should use the stage for development ... then once its all
-// tested in the stage we can plug it in to the world"): the real inventory over the plain stage, with a kit on, things
+// The sandbox's screens (2026-10-24, the owner: "all sessions should use the stage for development ... then once its all
+// tested in the stage we can plug it in to the world"): the real inventory over the plain sandbox, with a kit on, things
 // lying about and a body beside to go through; or the hot bar at the foot of the screen alone. No world, no server.
 //
 //   &ui=inventory&kit=heavy        the inventory, open, as a survivor with that kit has it (src/sim/kits.ts KITS)
@@ -33,8 +33,8 @@ const made = (th: KitThing): ItemInstance => {
 const kitOf = (name: string | null) => KITS.find((k) => k.id === name) ?? KITS[0];
 
 /**
- * the screen asked for, drawn over the stage; resolves once its pictures are in
- * @param renderer, env the stage's, for the survivor's picture in the middle of the inventory (the live figure is the game's)
+ * the screen asked for, drawn over the sandbox; resolves once its pictures are in
+ * @param renderer, env the sandbox's, for the survivor's picture in the middle of the inventory (the live figure is the game's)
  */
 export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRenderer, env: THREE.Texture | null): Promise<Record<string, unknown>> {
   const touch = q.get('touch') === '1';

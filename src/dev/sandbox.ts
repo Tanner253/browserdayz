@@ -1,27 +1,28 @@
-// The stage: a plain place to look at one thing at a time, the same way every time (2026-10-24, the owner: "think when
-// you make a new project on unity, youre in a plain environment i would expect that to be our test environment";
-// sessions were losing hours retaking pictures in the world, where ground, light, weather and camera all moved).
+// The sandbox (the stage until 2026-10-24, the owner: "lets rename this to the sanbox"): a plain place to look at one
+// thing at a time, the same way every time (2026-10-24, the owner: "think when you make a new project on unity, youre in
+// a plain environment i would expect that to be our test environment"; sessions were losing hours retaking pictures in
+// the world, where ground, light, weather and camera all moved).
 // A flat floor with a 1 m grid, a fixed sun and the game's own sky light, a survivor beside the thing for its size, and
 // fixed cameras framed on it: one picture holds every view, in one pass. No world, no server, no weather.
-// Not part of the built site (tools/stage.html is not in the build).
+// Not part of the built site (tools/sandbox.html is not in the build).
 //
-//   /tools/stage.html?m=plate_carrier          models by their manifest id (as the game loads them)
+//   /tools/sandbox.html?m=plate_carrier          models by their manifest id (as the game loads them)
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
-//                                               picture (src/dev/stage-sim.ts)
+//                                               picture (src/dev/sandbox-sim.ts)
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
 //   &person=0                                   no survivor beside it
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
-//   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/stage-inventory.ts)
+//   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
 // Headless, in one pass and off the graphics card's queue:
-//   PLAY_NOWAIT=1 PLAY_GL=swiftshader node assets-src/_wf/me/play.mjs assets-src/_wf/me/stage-shot.js <out> 1280 720 "http://localhost:5173/tools/stage.html?..."
+//   PLAY_NOWAIT=1 PLAY_GL=swiftshader node assets-src/_wf/me/play.mjs assets-src/_wf/me/stage-shot.js <out> 1280 720 "http://localhost:5173/tools/sandbox.html?..."
 
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -108,8 +109,8 @@ const say = (i: number, text: string) => {
 };
 
 if (sim) {
-  // (the animals' own minds on the floor, their moments in one picture: src/dev/stage-sim.ts)
-  const { stageSim } = await import('./stage-sim');
+  // (the animals' own minds on the floor, their moments in one picture: src/dev/sandbox-sim.ts)
+  const { stageSim } = await import('./sandbox-sim');
   const body = async () => {
     const b = (await assets.loadGLTF('assets/characters/survivor.glb')).scene;
     b.traverse((o) => { if (o.name.startsWith('gear_')) o.visible = false; });
@@ -233,7 +234,7 @@ if (sim) {
   }
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   // (and a screen of the game over it, asked for: the inventory with a kit on, or the hot bar)
-  const screen = q.get('ui') ? await (await import('./stage-inventory')).stageScreen(q, renderer, scene.environment) : undefined;
+  const screen = q.get('ui') ? await (await import('./sandbox-inventory')).stageScreen(q, renderer, scene.environment) : undefined;
   out.stageInfo = { things: info, views: strip > 0 ? [views[0]] : views, strip, sun: dusk ? 'dusk' : 'day', person, ...(screen ? { screen } : {}) };
   out.staged = true;
 }

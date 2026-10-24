@@ -1,6 +1,6 @@
-// The stage's behaviour checks (2026-10-24, the owner: "all sessions should use the stage for development right?
+// The sandbox's behaviour checks (2026-10-24, the owner: "all sessions should use the stage for development right?
 // wouldnt it make it faster turn around speed? then once its all tested in the stage we can plug it in to the world").
-// The animals' own minds (src/sim/animal-mind.ts) run on the stage's flat floor with a fixed clock and seed, and the
+// The animals' own minds (src/sim/animal-mind.ts) run on the sandbox's flat floor with a fixed clock and seed, and the
 // moments that matter are drawn in one picture from a high camera, each animal posed as the game poses it
 // (stagePoser, src/game/animals.ts). No world, no wait for night, no hunting for a herd.
 //   &sim=wolves-vs-deer   a hungry pack 120 m from a herd of five: up on them, the run, the chase, the kill, the meal

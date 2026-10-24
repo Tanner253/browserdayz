@@ -138,8 +138,8 @@ develop single things on the stage first; never change the ground round buried s
   head), buildings, the fort (`castle*`).
 - The server: `server/index.ts` (start-up in order, the loops), `server/handle.ts` (every message a player sends),
   `server/admin.ts` (every admin command). Payouts: `api/_lib/payouts.ts`.
-- Seeing things: the stage `tools/stage.html` for one model or animation (headless on the processor with
-  `PLAY_NOWAIT=1 PLAY_GL=swiftshader` and `assets-src/_wf/me/stage-shot.js`); the real game headless with
+- Seeing things: the sandbox `tools/sandbox.html` (the stage until 2026-10-24) for one model, animation or screen (headless
+  on the processor with `PLAY_NOWAIT=1 PLAY_GL=swiftshader` and `assets-src/_wf/me/sandbox-shot.js`); the real game headless with
   `node assets-src/_wf/me/play.mjs <script.js> <out> 1600 900 "http://localhost:5173/zona?server=http://127.0.0.1:9"`
   (the dev page must be up: launch entry `zona-dev`). The harness in the page is `window.T` (`src/dev/harness.ts`:
   `T.boot()`, `T.kit()`, `T.give(id)`, `T.lineup({...})`, `T.tp`, `T.aim`) and the game is `window.__game`. Ready
