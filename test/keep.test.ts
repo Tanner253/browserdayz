@@ -200,7 +200,11 @@ await withServer(async (log) => {
   assert.ok(Math.hypot(w.spawn.x - at[0], w.spawn.z - at[1]) < 0.5 && Math.abs(w.spawn.yaw - 1.25) < 0.01, `she is not where she was: ${JSON.stringify(w.spawn)}`);
   assert.equal((w.me?.inv.slots as Record<string, { id: string } | null>).primary?.id, 'ak', 'she has not what she carried');
   assert.equal(w.me?.vitals.health, 64, 'she is not as she was');
-  assert.ok(w.stashes.some((s) => s.uid === stash.uid && Math.abs(s.x - stash.x) < 0.01 && s.buried && s.item === 'black_bag'), 'her stash is not where she buried it, or not buried, or not the bag it was');
+  // (a buried stash is not in the welcome: it is told to her once she is near it, server/stash-sight.ts)
+  assert.ok(!w.stashes.some((s) => s.uid === stash.uid), 'her buried stash was in the welcome, for anybody to read');
+  for (let k = 0; k < 40 && !ann.got.some((m) => m.t === 'stash+' && m.s.uid === stash.uid); k++) await sleep(50);
+  const told = ann.got.filter((m): m is Extract<S2C, { t: 'stash+' }> => m.t === 'stash+' && m.s.uid === stash.uid).pop()?.s;
+  assert.ok(told && Math.abs(told.x - stash.x) < 0.01 && told.buried && told.item === 'black_bag', 'her stash is not where she buried it, or not buried, or not the bag it was');
   ann.send({ t: 's', p: [at[0], ground(...at), at[1], 1.25, 0, 0], w: 'shovel', m: [] });
   await sleep(200);
   const left = w.loot.find((l) => l.uid === lying.uid);
