@@ -216,7 +216,7 @@ ok('a crack close by is the loudest thing whoever is shot at hears: louder than 
 });
 
 ok('through a suppressor a shot is still a shot: louder than it was, and never as loud as an open one', () => {
-  assert.deepEqual([...quieted].sort(), ['a91', 'ak', 'ar15', 'benelli', 'colt', 'dual_mac10', 'm9', 'mosin', 'mp7a1', 'mpa']);
+  assert.deepEqual([...quieted].sort(), ['a91', 'ak', 'ar15', 'benelli', 'colt', 'deagle', 'dual_mac10', 'm9', 'mosin', 'mp7a1', 'mpa']);
   // (a 9 mm or a .45 from a pistol is slower than sound once quieted, and has no crack; a rifle's round has all of its own)
   assert.ok(sonicOf('m9') === 0 && sonicOf('colt') === 0 && sonicOf('mosin') === 1 && sonicOf('ak') === 1 && sonicOf('ar15') === 1);
   assert.ok(sonicOf('mpa') > 0 && sonicOf('mpa') < 0.2 && sonicOf('benelli') < 0.3);
