@@ -159,7 +159,7 @@ export type MatKey =
   | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'cold_steel' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
   | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
   | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage'
-  | 'boards_blue' | 'boards_green' | 'boards_pale' | 'lime_brick';
+  | 'boards_blue' | 'boards_green' | 'boards_pale' | 'lime_brick' | 'roof_green_paint' | 'church_ochre';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; /** its picture lightened so many times (a colour can only darken one) */ gain?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -235,12 +235,17 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   boards_blue: { tex: 'blue_painted_planks', tile: 2.4, surface: 'wood' },
   boards_green: { tex: 'green_rough_planks', tile: 2.4, surface: 'wood' },
   boards_pale: { tex: 'distressed_painted_planks', tile: 2.4, surface: 'wood' },
-  // (the monastery's: old limewash on brick, fallen from it here and there. As the picture comes it reads grey stone in the light of the game, not a white wall)
-  lime_brick: { tex: 'white_bricks', tile: 2.6, gain: 1.45, surface: 'concrete' },
+  // (the monastery's: old limewash, the brick showing where it has fallen. It was white_bricks, which read as grey
+  // rubble in the game's light; the owner, 2026-10-23: "its ugly its textures around the walls dont look good")
+  lime_brick: { tex: 'damaged_plaster', tile: 3.4, gain: 1.3, surface: 'plaster' },
   // sheet iron not yet rusted through: bare, and painted
   roof_iron_clean: { tex: 'corrugated_iron', tile: 2, metal: true, surface: 'metal' },
   roof_iron_green: { tex: 'corrugated_iron', tile: 2, color: 0x7f9a7c, metal: true, surface: 'metal' },
   roof_iron_red: { tex: 'corrugated_iron', tile: 2, color: 0xa3604f, metal: true, surface: 'metal' },
+  // (the cathedral's: ochre limewash, its piers, bands and window surrounds white, as these churches are painted)
+  church_ochre: { tex: 'painted_plaster_wall', tile: 3.2, color: 0xeccc8a, surface: 'plaster' },
+  // (the monastery's: sheet iron painted green, as these churches' roofs are; bare metal with the sky in it came out black)
+  roof_green_paint: { tex: 'corrugated_iron', tile: 2, color: 0x739f80, surface: 'metal' },
   roof_slate: { tex: 'grey_roof_tiles_02', tile: 2.2, surface: 'concrete' },
   // the slabs of a wall round a yard; what is laid before a door; a garage's floor
   slab: { tex: 'concrete_panels', tile: 2.5, color: 0xb9b6ad, surface: 'concrete' },
@@ -278,7 +283,7 @@ const DADO = 1.45;
 /** how far under its floor a door's step reaches down to the ground at most */
 const STEP_DOWN = 0.6;
 /** what is big enough, and plain enough, for its picture to be seen coming round again */
-const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado']);
+const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado', 'lime_brick', 'church_ochre']);
 /** a slow change of tone by where in the world a thing is (see `material`) */
 const macroTone = (shader: { vertexShader: string; fragmentShader: string }) => {
   shader.vertexShader = shader.vertexShader
@@ -2691,6 +2696,30 @@ export class Buildings {
       }
     }
 
+    // (a building of one or two floors in a dress of its own: piers up its face and a band under its roof, as the big
+    // ones have. Said of the cathedral and never drawn till 2026-10-23, the owner: "the church is missing character")
+    if (!bp.levels && bp.dress && (bp.dress.piers || bp.dress.bands)) {
+      const dr = bp.dress, y0 = (dr.plinth?.h ?? 0.26) - 0.012, out = 0.075;
+      if (dr.piers) {
+        const half = dr.piers.w / 2, key = dr.piers.key;
+        for (const x of dr.piers.front ?? []) addBox(key, x - half, x + half, y0, H - 0.03, hd + 0.002, hd + out, B, false);
+        for (const x of dr.piers.back ?? []) addBox(key, x - half, x + half, y0, H - 0.03, -hd - out, -hd - 0.002, B, false);
+        for (const z of dr.piers.left ?? []) addBox(key, -hw - out, -hw - 0.002, y0, H - 0.03, z - half, z + half, B, false);
+        for (const z of dr.piers.right ?? []) addBox(key, hw + 0.002, hw + out, y0, H - 0.03, z - half, z + half, B, false);
+      }
+      if (dr.bands) {
+        // (proud of the piers, so that no face of the one lies in a face of the other)
+        const at = [H - 0.42, ...(bp.upper ? [h + SLAB / 2 - 0.16] : [])], o2 = out + 0.03;
+        for (const ya of at) {
+          const yb = ya + (ya === at[0] ? 0.42 : 0.32);
+          if (!joined.has('front')) addBox(dr.bands, -hw - o2, hw + o2, ya, yb, hd + 0.002, hd + o2, B, false);
+          if (!joined.has('back')) addBox(dr.bands, -hw - o2, hw + o2, ya, yb, -hd - o2, -hd - 0.002, B, false);
+          if (!joined.has('left')) addBox(dr.bands, -hw - o2, -hw - 0.002, ya, yb, -hd - 0.002, hd + 0.002, B, false);
+          if (!joined.has('right')) addBox(dr.bands, hw + 0.002, hw + o2, ya, yb, -hd - 0.002, hd + 0.002, B, false);
+        }
+      }
+    }
+
     // --- the floor above, and the stairs to it
     if (bp.upper && bp.stairs) {
       const up = bp.upper, st = bp.stairs;
@@ -3574,6 +3603,11 @@ export class Buildings {
 
   private matCache = new Map<string, THREE.Material>();
   /** @param apart a paint of its own, the same in every way (the doors' leaves, drawn many times over, are not drawn with the walls' own: three chose a shader again each time it went from the one to the other) */
+  /** a paint of the buildings' and how many metres its picture covers, for what is made beside them in their stuffs (Pokrov's tower tents) */
+  paintOf(key: Exclude<MatKey, 'glass'>): { mat: THREE.Material; tile: number } {
+    return { mat: this.material(key), tile: MATS[key].tile };
+  }
+
   private material(key: MatKey, apart = '', own?: { patch: ShaderPatch; key: string }): THREE.Material {
     let m = this.matCache.get(key + apart);
     if (m) return m;

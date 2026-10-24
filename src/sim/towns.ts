@@ -86,11 +86,11 @@ export function pokrovWalls(y: number): KitPiece[] {
 /**
  * The domes over Pokrov, in its frame: over which building's middle, how high over that building's floor the drum
  * stands (into its roof's ridge: a gable rises 0.32 of the building's depth over its walls), how big, and whether
- * it is gilt. The cathedral's great dome; the belfry's little one over its bells.
+ * it is gilt. The cathedral's great dome, gilt as a cathedral's is; the belfry's little one over its bells.
  */
 export const POKROV_DOMES: { x: number; z: number; over: number; size: number; gilt: boolean }[] = [
   // (the great one over the crossing, a small one along the nave's ridge to the west, one over each arm and the apse)
-  { x: 12, z: -38, over: 16.0, size: 1.45, gilt: false },
+  { x: 12, z: -38, over: 16.0, size: 1.45, gilt: true },
   { x: -4.75, z: -38, over: 16.2, size: 0.72, gilt: false },
   { x: 12, z: -50.5, over: 12.4, size: 0.65, gilt: false },
   { x: 12, z: -25.5, over: 12.4, size: 0.65, gilt: false },

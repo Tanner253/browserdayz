@@ -17,12 +17,13 @@ import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { kitSolids, type KitPiece } from '../sim/kit';
 import { placedDomes, placedKits, placedTowers, placedWalls, type PlacedTown } from '../sim/towns';
-import { stairRailSolids, towerSolids } from '../sim/pokrov-towers';
+import { stairRailSolids, tentSolids, towerSolids } from '../sim/pokrov-towers';
 import { stairRails, towerInsides } from './pokrov-towers';
 import type { Atmosphere } from './atmosphere';
 import type { Buildings } from './buildings';
 import { onionDome } from './domes';
-import { kitMeshes, type KitOptions } from './kit';
+import { tentRoofs } from './pokrov-tents';
+import { kitMeshes, stoneLook, type KitOptions } from './kit';
 import { facadePieces, movePieces } from './facade';
 import type { BuildingPlot } from './worldgen';
 import { FACADES } from './zavod-plans';
@@ -37,11 +38,16 @@ const WALK_COME = 60, WALK_GO = 80;
 /** a near copy let go of this far past where it is shown, metres; a far one past this (no draw distance reaches it) */
 const LET_GO = 400, FAR_LET_GO = 2000;
 /**
- * Old limewash on the walls' rubble, the brick showing where it has fallen; fresh white on their dressed stone
- * (pictures the buildings already use). The first pass had them the other way: from the road the walls were flat white.
+ * Old limewash on the walls, the brick showing where it has fallen (the monastery's buildings wear the same: lime_brick
+ * in buildings.ts); their copings and merlons weathered grey by the rain that stands on them. Pictures the game already
+ * has. Before 2026-10-23 they were small grey bricks and flat plaster (the owner: "its ugly its textures around the
+ * walls dont look good"); the first pass of all had them flat white.
  */
-const LIME = 1.45;
-const SKIN: KitOptions['sets'] = { fort_wall: { set: 'white_bricks', repeat: 3 }, fort_trim: { set: 'painted_plaster_wall', repeat: 3 } };
+const LIME = 1.3;
+const SKIN: KitOptions['sets'] = { fort_wall: { set: 'damaged_plaster', repeat: 2 }, fort_trim: { set: 'worn_mossy_plasterwall', repeat: 2 } };
+/** and their foot dark with the wet thrown up off the ground, as the fort's is: two numbers a corner, the sky over it and how high it is over the walls' foot */
+const FOOT = stoneLook({ damp: 0.42, attr: 'aFoot', wash: { colour: [0.86, 0.83, 0.76], size: 9 } });
+const footOf = (foot: number): KitOptions['attr'] => ({ name: 'aFoot', of: (p) => [1, p[1] - foot] });
 
 /**
  * What is fetched only when the eye comes near (a building's facade, a village's piers): its far copy within
@@ -49,7 +55,7 @@ const SKIN: KitOptions['sets'] = { fort_wall: { set: 'white_bricks', repeat: 3 }
  */
 interface Lazy { make: (near: boolean) => Promise<THREE.Group>; come: number; go: number; far: THREE.Group | null; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number }
 
-interface Walled { far: THREE.Group; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number; pieces: ReturnType<typeof placedWalls>; add: KitOptions['add'] }
+interface Walled { foot: number; far: THREE.Group; near: THREE.Group | null; making: boolean; close: boolean; shown: boolean; x: number; z: number; r: number; pieces: ReturnType<typeof placedWalls>; add: KitOptions['add'] }
 
 export class Towns {
   private walled: Walled[] = [];
@@ -67,9 +73,13 @@ export class Towns {
     private plots: BuildingPlot[] = [],
   ) {}
 
+  /** the monastery's walls: the limewash lightened as its buildings' is (see lime_brick in buildings.ts), the foot damp */
+  private dressWall = (m: THREE.MeshStandardMaterial, name: string) => {
+    if (name === 'fort_wall' || name === 'fort_trim') m.color.multiplyScalar(LIME);
+    return this.atmo.register(m, FOOT, `town wall ${name}`) ?? m;
+  };
+
   private dress = (m: THREE.MeshStandardMaterial, name: string) => {
-    // (the limewashed rubble lightened as the monastery's buildings are: see lime_brick in buildings.ts)
-    if (name === 'fort_wall') m.color.multiplyScalar(LIME);
     // (the pier's planks came with colours at their corners, which the loader paints with; the layout's meshes keep no
     // such colours, and painted with none they were black. And they are marked as metal: wood is not.)
     m.vertexColors = false;
@@ -101,14 +111,15 @@ export class Towns {
         // and the walls' stairs have a parapet up their open side)
         const towers = placedTowers(t), add = towerInsides(towers), stairs = pieces.filter((k) => k.id === 'fort_wall_stairs_straight_01');
         add.fort_trim.push(...stairRails(stairs));
-        for (const s of [...kitSolids(pieces), ...towers.flatMap(towerSolids), ...stairs.flatMap(stairRailSolids)]) {
+        for (const s of [...kitSolids(pieces), ...towers.flatMap(towerSolids), ...towers.flatMap(tentSolids), ...stairs.flatMap(stairRailSolids)]) {
           if (s.t === 'box') physics.addStaticQuat(physics.R.ColliderDesc.cuboid(s.h[0], s.h[1], s.h[2]), 'concrete', { x: s.c[0], y: s.c[1], z: s.c[2] }, { x: s.q[0], y: s.q[1], z: s.q[2], w: s.q[3] });
           else {
             const hull = physics.R.ColliderDesc.convexHull(new Float32Array(s.pts));
             if (hull) physics.addStatic(hull, 'concrete', { x: 0, y: 0, z: 0 });
           }
         }
-        const { meshes, triangles } = await kitMeshes('fort_kit', pieces, { lod: 1, sets: SKIN, dress: this.dress, add });
+        const foot = towers[0]?.foot ?? t.padY;
+        const { meshes, triangles } = await kitMeshes('fort_kit', pieces, { lod: 1, sets: SKIN, dress: this.dressWall, add, attr: footOf(foot) });
         this.counts.far += triangles;
         const far = new THREE.Group();
         far.name = `${t.town.name} walls far`;
@@ -117,7 +128,14 @@ export class Towns {
           far.add(m);
         }
         this.scene.add(far);
-        const w: Walled = { far, near: null, making: false, close: false, shown: true, x: t.town.x, z: t.town.z, r: Math.hypot(...t.town.pad), pieces, add };
+        // (the towers' tents: a few hundred triangles, one copy near and far)
+        if (towers.length) {
+          const tents = tentRoofs(this.atmo, towers, this.buildings.paintOf('roof_green_paint'), this.buildings.paintOf('boards_pale'));
+          tents.name = `${t.town.name} tower tents`;
+          this.scene.add(tents);
+          this.buildings.keepFar((on) => (tents.visible = on), t.town.x, t.town.z, Math.hypot(...t.town.pad));
+        }
+        const w: Walled = { foot, far, near: null, making: false, close: false, shown: true, x: t.town.x, z: t.town.z, r: Math.hypot(...t.town.pad), pieces, add };
         this.walled.push(w);
         this.buildings.keepFar((on) => ((w.shown = on), this.show(w)), w.x, w.z, w.r);
       }
@@ -217,7 +235,7 @@ export class Towns {
       const close = d < (w.close ? GO : COME);
       if (close && !w.near && !w.making) {
         w.making = true;
-        void kitMeshes('fort_kit', w.pieces, { sets: SKIN, dress: this.dress, add: w.add }).then(async ({ meshes, triangles }) => {
+        void kitMeshes('fort_kit', w.pieces, { sets: SKIN, dress: this.dressWall, add: w.add, attr: footOf(w.foot) }).then(async ({ meshes, triangles }) => {
           const near = new THREE.Group();
           near.name = 'town walls near';
           for (const m of meshes) {

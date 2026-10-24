@@ -16,7 +16,8 @@ function paints(atmo: Atmosphere) {
   if (made) return made;
   const white = new THREE.MeshStandardMaterial({ color: 0xe7e2d2, roughness: 0.92 });
   const green = new THREE.MeshStandardMaterial({ color: 0x3f6b58, roughness: 0.48, metalness: 0.55 });
-  const gilt = new THREE.MeshStandardMaterial({ color: 0xc9a14a, roughness: 0.32, metalness: 1 });
+  // (gold that shows as gold under any sky: wholly metal, it was black wherever the sky it gave back was dull)
+  const gilt = new THREE.MeshStandardMaterial({ color: 0xd9ac4e, roughness: 0.38, metalness: 0.45 });
   for (const m of [white, green, gilt]) atmo.register(m);
   return (made = { white, green, gilt });
 }

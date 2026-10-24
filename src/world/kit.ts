@@ -200,6 +200,12 @@ export interface StoneLook {
   attr?: string;
   /** rain has darkened the foot of what stands, by so much (needs `attr`) */
   damp?: number;
+  /**
+   * Limewash laid fresh over the old in places: the picture drawn toward this colour where a slow cloud across the
+   * world says so (patches `size` metres across), so that what has fallen from a long wall is not the same few
+   * patches over and over.
+   */
+  wash?: { colour: [number, number, number]; size: number };
   /** snow lies thinner on it by so much (boards that are walked on, which it is trodden and blown off) */
   thin?: number;
 }
@@ -240,6 +246,11 @@ float stoneCloud( vec2 p ) { vec2 i = floor( p ), u = fract( p ); u = u * u * ( 
   float stoneGrey = dot( diffuseColor.rgb, vec3( 0.3, 0.59, 0.11 ) );
   diffuseColor.rgb = mix( vec3( stoneGrey ), diffuseColor.rgb, ${f(o.keep ?? 1)} ) * vec3( ${(o.tint ?? [1, 1, 1]).map(f).join(', ')} );
   ${o.own && o.even ? `diffuseColor.rgb = mix( diffuseColor.rgb, vec3( ${o.own.map(f).join(', ')} ), ${f(o.even)} );` : ''}
+  ${o.wash ? `{
+    vec2 washAt = vec2( vStoneW.x + vStoneW.z, vStoneW.y * 1.6 ) / ${f(o.wash.size)};
+    float washed = smoothstep( 0.42, 0.62, stoneCloud( washAt ) * 0.7 + stoneCloud( washAt * 3.1 + 5.7 ) * 0.3 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( ${o.wash.colour.map(f).join(', ')} ) * ( 0.94 + 0.12 * stoneCloud( washAt * 9.0 ) ), washed * 0.85 );
+  }` : ''}
 }`,
     )
     .replace(

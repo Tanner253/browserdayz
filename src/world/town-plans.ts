@@ -68,18 +68,20 @@ export function cathedralPlan(): Blueprint {
   g.floor([-13.5, -6.8], [-9.0, 6.4]);
   const tall = (x: number) => win(x - 0.8, x + 0.8, 4.5, 9.0), arm = join(CROSS - 5.9, CROSS + 5.9, 8.0);
   return {
-    w: HW * 2, d: HD * 2, h: 11.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 11.0, ext: 'church_ochre', int: 'int_painted', floor: 'floor_wood', roof: 'roof_green_paint', roofType: 'gable',
     walls: [
-      { side: 'left', ext: 'lime_brick', int: 'int_painted', openings: [door(-1.5, 1.5, 4.2), win(-6.2, -4.6, 5.8, 9.0), win(4.6, 6.2, 5.8, 9.0), win(-0.8, 0.8, 6.0, 9.0)] },
+      { side: 'left', ext: 'church_ochre', int: 'int_painted', openings: [door(-1.5, 1.5, 4.2), win(-6.2, -4.6, 5.8, 9.0), win(4.6, 6.2, 5.8, 9.0), win(-0.8, 0.8, 6.0, 9.0)] },
       // (the east gable opens into the apse, the long walls into the arms: see cathedralArmPlan, cathedralApsePlan)
-      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [join(-5.4, 5.4, 8.0)] },
-      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [tall(-13.2), tall(-9.0), tall(-4.8), arm, win(13.6, 14.8, 4.5, 9.0), door(-16.4, -15.0, 2.6)] },
-      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [tall(-13.2), tall(-9.0), tall(-4.8), arm, door(13.7, 14.9, 2.4)] },
+      { side: 'right', ext: 'church_ochre', int: 'int_painted', openings: [join(-5.4, 5.4, 8.0)] },
+      { side: 'front', ext: 'church_ochre', int: 'int_painted', openings: [tall(-13.2), tall(-9.0), tall(-4.8), arm, win(13.6, 14.8, 4.5, 9.0), door(-16.4, -15.0, 2.6)] },
+      { side: 'back', ext: 'church_ochre', int: 'int_painted', openings: [tall(-13.2), tall(-9.0), tall(-4.8), arm, door(13.7, 14.9, 2.4)] },
       // the iconostasis: the royal doors, and a deacon's door each side
       inner([I, -HD + 0.2], [I, HD - 0.2], [gap(-1.4, 1.4, 3.6), door(-5.6, -4.6, 2.4), door(4.6, 5.6, 2.4)], 'int_painted', 'int_painted'),
     ],
     furniture: g.furniture, loot: g.loot,
-    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
+    // (white piers between the bays and at the corners, as such a church's walls are divided: the owner, 2026-10-23,
+    // "the church is missing character")
+    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white', piers: { front: [-17.6, -14.5, -11.1, -6.9, -3.4, 11.6, 17.6], back: [-17.6, -14.5, -11.1, -6.9, -3.4, 11.6, 17.6], left: [-8.6, -3.0, 3.0, 8.6], right: [-8.6, 8.6], w: 0.8, key: 'trim_white' } },
     // (what is kept in it is the army's: see above)
     usage: ['Military'],
   };
@@ -98,15 +100,15 @@ export function cathedralArmPlan(): Blueprint {
   for (const x of [-2.0, 0.2]) g.put('wooden_military_crate', x, -HD + 2.65, 0).put('wooden_military_crate', x, HD - 2.65, PI);
   g.put('painted_wooden_chair_01', 2.2, -HD + 0.6, 0).put('painted_wooden_chair_01', 2.2, HD - 0.6, PI).top('painted_wooden_cabinet', HW - 0.49, -4.2, -Q, 1.2).put('steel_locker', HW - 0.48, 4.2, -Q).floor([-0.5, 1.6], [-0.8, -1.6]);
   return {
-    w: HW * 2, d: HD * 2, h: 9.0, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 9.0, ext: 'church_ochre', int: 'int_painted', floor: 'floor_wood', roof: 'roof_green_paint', roofType: 'gable',
     walls: [
-      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [door(-0.8, 0.8, 3.0), win(-0.6, 0.6, 4.5, 7.5)] },
-      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.4, 6.8)] },
-      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.4, 6.8)] },
+      { side: 'right', ext: 'church_ochre', int: 'int_painted', openings: [door(-0.8, 0.8, 3.0), win(-0.6, 0.6, 4.5, 7.5)] },
+      { side: 'front', ext: 'church_ochre', int: 'int_painted', openings: [win(-0.6, 0.6, 3.4, 6.8)] },
+      { side: 'back', ext: 'church_ochre', int: 'int_painted', openings: [win(-0.6, 0.6, 3.4, 6.8)] },
     ],
     joined: ['left'],
     furniture: g.furniture, loot: g.loot,
-    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
+    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white', piers: { front: [-3.1, 3.1], back: [-3.1, 3.1], right: [-6.1, 6.1], w: 0.8, key: 'trim_white' } },
     usage: ['Military'],
   };
 }
@@ -118,15 +120,15 @@ export function cathedralApsePlan(): Blueprint {
   g.top('painted_wooden_table', 1.2, 0, Q, 0.98, 2).put('painted_wooden_chair_01', -1.8, 4.0, 2.6).floor([2.7, -3.6]);
   g.put('wooden_candlestick', 1.2, -1.05, 0, 0.96).put('wooden_candlestick', 1.2, 1.05, 0, 0.96).put('painted_wooden_bench', HW - 0.45, 3.6, -Q).put('painted_wooden_bench', HW - 0.45, -3.6, -Q);
   return {
-    w: HW * 2, d: HD * 2, h: 8.5, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 8.5, ext: 'church_ochre', int: 'int_painted', floor: 'floor_wood', roof: 'roof_green_paint', roofType: 'gable',
     walls: [
-      { side: 'right', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.8, 0.8, 3.2, 7.0)] },
-      { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.6, 6.2)] },
-      { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-0.6, 0.6, 3.6, 6.2)] },
+      { side: 'right', ext: 'church_ochre', int: 'int_painted', openings: [win(-0.8, 0.8, 3.2, 7.0)] },
+      { side: 'front', ext: 'church_ochre', int: 'int_painted', openings: [win(-0.6, 0.6, 3.6, 6.2)] },
+      { side: 'back', ext: 'church_ochre', int: 'int_painted', openings: [win(-0.6, 0.6, 3.6, 6.2)] },
     ],
     joined: ['left'],
     furniture: g.furniture, loot: g.loot,
-    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white' },
+    dress: { plinth: { h: 0.9, key: 'plinth' }, bands: 'trim_white', trim: 'trim_white', piers: { front: [-4.1, 4.1], back: [-4.1, 4.1], right: [-5.6, -2.0, 2.0, 5.6], w: 0.8, key: 'trim_white' } },
     usage: ['Town'],
   };
 }
@@ -155,7 +157,7 @@ export function belfryPlan(): Blueprint {
   const g = new Floor();
   g.put('Barrel_01', 2.2, -2.2).floor([1.8, 1.4]);
   return {
-    w: HW * 2, d: HW * 2, h: H, ext: 'lime_brick', int: 'int_plaster', floor: 'floor_concrete', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HW * 2, h: H, ext: 'lime_brick', int: 'int_plaster', floor: 'floor_concrete', roof: 'roof_green_paint', roofType: 'gable',
     walls: [
       { side: 'front', ext: 'lime_brick', int: 'int_plaster', openings: [door(0.9, 2.0)] },
       { side: 'back', ext: 'lime_brick', int: 'int_plaster', openings: slit },
@@ -241,7 +243,7 @@ export function refectoryPlan(): Blueprint {
   // the kitchen
   g.put('wood_stove', 10.3, -4.0, 0).top('painted_wooden_cabinet', 8.0, -4.45, 0, 1.2).case('Shelf_01', 10.65, 2.4, -Q, [0.66, 1.22, 1.75]).put('Barrel_01', 10.2, 4.2).top('WoodenTable_01', 8.6, 0.4, Q, 0.57).floor([8.2, 3.6]);
   return {
-    w: HW * 2, d: HD * 2, h: 3.6, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 3.6, ext: 'lime_brick', int: 'int_painted', floor: 'floor_wood', roof: 'roof_green_paint', roofType: 'gable',
     walls: [
       { side: 'front', ext: 'lime_brick', int: 'int_painted', openings: [win(-8.6, -7.4, 1.0, 2.6), win(-5.1, -3.9, 1.0, 2.6), door(-1.0, 1.0, 2.5), win(3.4, 4.6, 1.0, 2.6), win(8.4, 9.4)] },
       { side: 'back', ext: 'lime_brick', int: 'int_painted', openings: [win(-8.6, -7.4, 1.0, 2.6), win(-5.1, -3.9, 1.0, 2.6), win(-1.6, -0.4, 1.0, 2.6), win(1.9, 3.1, 1.0, 2.6), door(8.6, 9.6)] },
@@ -276,7 +278,7 @@ export function abbotPlan(): Blueprint {
     { side: 'right', ext, int: 'int_painted', openings: [win(-2.5, -1.5), win(1.5, 2.5)] },
   ];
   return {
-    w: HW * 2, d: HD * 2, h: 2.8, ext, int: 'int_painted', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 2.8, ext, int: 'int_painted', floor: 'floor_wood', roof: 'roof_green_paint', roofType: 'gable',
     walls: [...outer([door(-2.6, -1.6), win(1.0, 2.4)]), inner([M, -HD + 0.2], [M, HD - 0.2], [door(1.2, 2.1)], 'int_painted', 'int_painted')],
     furniture: g.furniture, loot: g.loot,
     stairs: { x0: -4.6, x1: -3.2, foot: 2.2, top: -3.0 },
@@ -359,9 +361,10 @@ export function merchantPlan(): Blueprint {
   g.put('Barrel_01', 1.4, 3.6).put('barrel_03', -4.8, 1.8, 0.3);
   const u = new Floor();
   u.top('WoodenTable_01', -3.0, 0.6, 0, 0.57).put('painted_wooden_chair_01', -3.4, 1.3, PI).put('painted_wooden_chair_01', -2.6, -0.1, 0).put('scandinavian_masonry_heater', -4.58, -3.8, 0).floor([-1.2, 2.8]);
-  // (the bed against the back wall beside the cabinet: it lay at the head of the stair, and whoever came up walked into it)
-  u.bed(2.6, -3.28).top('painted_wooden_cabinet', 0.65, -3.97, 0, 1.2).case('Shelf_01', 1.0, 4.1, PI, [0.66, 1.22]).floor([2.4, 1.0]);
-  u.put('painted_wooden_bench', -2.1, 4.05, PI).put('painted_wooden_cabinet', -1.6, -3.97, 0).put('painted_wooden_nightstand', 1.7, -4.05, 0).put('painted_wooden_stool', 0.9, 3.2, 0.7);
+  // (the bed against the back wall beside the cabinet: it lay at the head of the stair, and whoever came up walked into
+  // it; and since the stair's head came back to -2.5, a pace further from the landing, its nightstand on its far side)
+  u.bed(2.0, -3.28).top('painted_wooden_cabinet', 0.65, -3.97, 0, 1.2).case('Shelf_01', 1.0, 4.1, PI, [0.66, 1.22]).floor([2.4, 1.0]);
+  u.put('painted_wooden_bench', -2.1, 4.05, PI).put('painted_wooden_cabinet', -1.6, -3.97, 0).put('painted_wooden_nightstand', 2.85, -4.05, 0).put('painted_wooden_stool', 0.9, 3.2, 0.7);
   const ext = 'plaster_ext' as const;
   const outer = (front: Opening[]): WallDef[] => [
     { side: 'front', ext, int: 'int_painted', openings: front },
@@ -377,7 +380,9 @@ export function merchantPlan(): Blueprint {
     ],
     furniture: g.furniture, loot: g.loot,
     fittings: [{ level: 0, list: [{ key: 'planks', x0: -4.4, x1: 0.8, y0: 0, y1: 0.98, z0: 0.6, z1: 1.15 }, { key: 'trim', x0: -4.5, x1: 0.9, y0: 0.98, y1: 1.03, z0: 0.5, z1: 1.25, soft: true }] }],
-    stairs: { x0: 3.8, x1: 5.2, foot: 3.8, top: -1.4 },
+    // (its foot 1.6 m in from the front wall: at 0.5 m nobody coming in at the door could get onto it, the owner: "the
+    // stairs are inaccessible inside the buildings")
+    stairs: { x0: 3.8, x1: 5.2, foot: 2.7, top: -2.5 },
     upper: { h: 2.6, int: 'int_painted', floor: 'floor_wood', walls: [...outer([win(-4.2, -3.0), win(-1.2, 0.0), win(2.6, 3.8)]), inner([-0.5, -HD + 0.2], [-0.5, HD - 0.2], [door(1.6, 2.5)], 'int_painted', 'int_painted')], furniture: u.furniture, loot: u.loot },
     sign: { x: -1.1, y: 2.65, text: 'ЛАВКА', sub: 'SHOP' },
     dress: { plinth: { h: 0.5, key: 'plinth' }, trim: 'trim_white' },
@@ -487,7 +492,7 @@ export function chapelPlan(): Blueprint {
   g.top('WoodenTable_01', 3.95, 0, Q, 0.57).put('painted_wooden_cabinet', 4.0, 1.8, -Q).floor([3.4, -1.8]);
   g.put('wooden_candlestick', 3.95, -0.7, 0, 0.55).put('wooden_candlestick', 3.95, 0.7, 0, 0.55);
   return {
-    w: HW * 2, d: HD * 2, h: 4.6, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_iron_green', roofType: 'gable',
+    w: HW * 2, d: HD * 2, h: 4.6, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_green_paint', roofType: 'gable',
     walls: [
       { side: 'left', ext: 'planks_ext', int: 'planks', openings: [door(-0.6, 0.6, 2.4), win(-0.4, 0.4, 3.0, 3.9)] },
       { side: 'right', ext: 'planks_ext', int: 'planks', openings: [win(-0.4, 0.4, 2.2, 3.4)] },

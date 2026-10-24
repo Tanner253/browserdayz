@@ -56,11 +56,13 @@ export function pokrovBuildings(): TownSpot[] {
     cellsSpot(),
     { type: 'refectory', x: -40, z: 0, rot: 0 },
     { type: 'abbot', x: 30, z: 2, rot: 0 },
-    // the town outside: the west lane, its north side (a man's width of alley after the tavern, then wall to wall), its south side
-    north('tavern', -31), north('merchant', -45.3), north('merchant', -56.5), north('izba_two', -66.7),
+    // the town outside: the west lane, its north side, its south side. Never wall to wall: a roof's eaves stand 0.45 m
+    // out, and two houses 0.2 m apart had their roofs and gables through each other (the owner, 2026-10-23: "the
+    // buildings to the south east of pokrov are clipping into each other"); 1.2 m at least, an alley to slip down.
+    north('tavern', -31), north('merchant', -45.3), north('merchant', -57.5), north('izba_two', -68.7),
     south('smithy', -30), south('merchant', -42.6), south('izba', -53.3),
     // the east lane
-    north('merchant', 33.5), north('merchant', 44.7), north('izba_two', 56.8), north('izba', 65.6),
+    north('merchant', 33.5), north('merchant', 45.7), north('izba_two', 57.9), north('izba', 67.6),
     south('izba_two', 34), south('merchant', 45.5), south('izba', 58),
   ];
 }
@@ -77,14 +79,16 @@ export function pokrovThings(): TownThing[] {
     out.push({ kind: n % 2 ? 'wooden_crate_01' : 'Barrel_01', x: x + (n % 4 < 2 ? -1.35 : 1.35), z: z + 0.5, rot: n * 0.7 });
   };
   let n = 0;
-  for (const z of [52, 58, 66, 72]) for (const x of [-9, -3, 13, 19]) stall(x + (z % 4) * 0.6, z, n++);
+  // (two rows each side of the road, which runs down the lane at z = LANE: a row at 66 stood on it)
+  for (const z of [50, 56, 72, 78]) for (const x of [-9, -3, 13, 19]) stall(x + (z % 4) * 0.6, z, n++);
   // what is piled at the ramp's foot and along the lanes
   out.push(
     { kind: 'crate_big', x: -1.0, z: 47.5, rot: 0.2 }, { kind: 'crate_big', x: 0.1, z: 48.2, rot: 0.1 }, { kind: 'Barrel_01', x: 10.6, z: 47.2, rot: 0 }, { kind: 'barrel_03', x: 11.4, z: 48.0, rot: 0.5 },
     // (by the crates at the ramp's foot: it stood across the middle of the ramp, a hand in the air on its bank)
     { kind: 'concrete_road_barrier', x: -3.6, z: 47.2, rot: Q + 0.1 },
     { kind: 'wooden_crate_01', x: -38.4, z: 59.4, rot: 0.3 }, { kind: 'Barrel_01', x: -50.6, z: 69.2, rot: 0 }, { kind: 'trashbag', x: 39.5, z: 59.6, rot: 0.8 },
-    { kind: 'old_tyre', x: 62.6, z: 69.4, rot: 0.2 }, { kind: 'covered_car', x: -78, z: 64, rot: Q + 0.05 },
+    // (the car off the road, pulled onto the verge past the last house)
+    { kind: 'old_tyre', x: 62.6, z: 69.4, rot: 0.2 }, { kind: 'covered_car', x: -80, z: 72.5, rot: Q + 0.05 },
   );
   // THE COURT (2026-10-19, the owner: "pokrov needs a polish pass really bad"): it was a lawn with buildings on it.
   // The monks' kitchen garden north of the refectory, two beds in a white fence with its gate toward the court;
@@ -129,7 +133,7 @@ export const POKROV_TREES: [string, number, number, number][] = [
 
 /** the market and the ramp cobbled (gravel), the lanes trodden; the terrace under the monastery */
 export const POKROV_GROUND: TownGround = {
-  yards: [[-13, 47, 23, 77]],
+  yards: [[-13, 47, 23, 81]],
   lanes: [
     { line: [[5, 18], [5, 48]], w: 6 },
     { line: [[-130, LANE], [-16, LANE]], w: 6 },
