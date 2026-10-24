@@ -1647,17 +1647,21 @@ export class InventoryUI {
     // squares wide with the gun drawn across both, and the two squares under it hold its parts (the owner, 2026-10-24:
     // "move the weapons ui like so, make it take 2 squares and then make room for the attachments and remove from the
     // right panel its too big and annoying"); head to feet fill in after. The gun in the hands has its parts under
-    // the hands instead.
+    // the hands instead. Two squares under a gun with no parts to show (a shovel, the gun in the hands, an empty
+    // place) are taken by what is worn, which fills every square left (the owner, 2026-10-24: "make this take up less
+    // height its pushing the players inventory too far down").
     const strip = this.block('c:strip', ui + ALL_SLOTS.map((s) => (inv.slots[s] ? `${this.look(inv.slots[s]!)}:${this.actions.goingIn(inv.slots[s]!) ?? ''}` : '-')).join('|') + `|${held?.uid ?? ''}`, () => {
       const row = document.createElement('div');
       row.className = 'inv-strip';
-      for (const s of WEAPON_SLOTS) {
-        const gun = document.createElement('div');
-        gun.className = 'strip-gun';
-        const it = inv.slots[s];
-        gun.append(this.slotEl(s), this.partsEl(it && it !== held ? it : null));
+      WEAPON_SLOTS.forEach((s, k) => {
+        const it = inv.slots[s], gun = this.slotEl(s), parts = this.partsEl(it && it !== held ? it : null);
+        gun.classList.add('strip-gun');
+        gun.style.gridArea = `1 / ${k * 2 + 1} / 2 / span 2`;
         row.appendChild(gun);
-      }
+        if (!parts.childElementCount) return;
+        parts.style.gridArea = `2 / ${k * 2 + 1} / 3 / span 2`;
+        row.appendChild(parts);
+      });
       for (const s of [...DOLL_SLOTS[0], ...DOLL_SLOTS[1]]) row.appendChild(this.slotEl(s));
       return [row];
     });
