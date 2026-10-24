@@ -112,6 +112,30 @@ function kitOf(kind: Kind): Promise<Kit | null> {
   return k;
 }
 
+/** what each kind does, by name, for the stage's `&mode=` */
+export const MODES: Record<string, number> = {
+  idle: A_IDLE, graze: A_GRAZE, walk: A_WALK, trot: A_TROT, run: A_RUN, alert: A_ALERT, rest: A_REST, swipe: A_SWIPE, bite: A_BITE,
+  roar: A_ROAR, hit: A_HIT, death: A_DEAD, drink: A_DRINK,
+};
+
+/**
+ * One of a kind as the game draws it, for the stage (src/dev/stage.ts; onboarding, for the owner: "the stage shows
+ * exactly what the game draws"): its own model and movements as `Beast` has them, the movement it plays doing `mode`
+ * (or what stands in for it), lifted to that movement's floor. Its root stands on the ground, as a Beast's does.
+ */
+export async function stageAnimal(kindId: string, mode: number): Promise<{ root: THREE.Group; mixer: THREE.AnimationMixer; action: THREE.AnimationAction | null; clip: string } | null> {
+  const kind = KINDS.find((k) => k.id === kindId);
+  const kit = kind ? await kitOf(kind) : null;
+  if (!kit) return null;
+  const root = new THREE.Group(), model = SkeletonUtils.clone(kit.scene);
+  root.add(model);
+  const clip = (CLIPS[mode] ?? ['idle']).find((n) => kit.clips.has(n)) ?? '';
+  const mixer = new THREE.AnimationMixer(model), action = clip ? mixer.clipAction(kit.clips.get(clip)!) : null;
+  action?.play();
+  model.position.y = -(kit.floors[clip] ?? 0);
+  return { root, mixer, action, clip };
+}
+
 export class Beast implements Damageable {
   readonly name: string;
   readonly kind: Kind;

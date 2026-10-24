@@ -8,6 +8,8 @@
 //   /tools/stage.html?m=plate_carrier          models by their manifest id (as the game loads them)
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length
+//   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
+//                                               its model, the movement it plays doing that, lifted as in the game
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &yaw=90                                     the thing turned, degrees
@@ -24,10 +26,11 @@ import { assets } from '../core/assets';
 
 const q = new URLSearchParams(location.search);
 const list = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean);
-const ids = list('m'), files = list('g');
+const ids = list('m'), files = list('g'), animal = q.get('animal');
 const views = list('views').length ? list('views') : ['side', 'front', 'q', 'top'];
 const strip = Math.max(0, Math.floor(+(q.get('strip') ?? 0)));
-const yaw = (+(q.get('yaw') ?? 0) * Math.PI) / 180;
+// (an animal faces -z, as the game has them: turned a quarter by default, so that 'side' sees its side)
+const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
 const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
@@ -102,7 +105,7 @@ const triangles = (o: THREE.Object3D) => {
   return n;
 };
 let x = 0;
-const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> = {}) => {
+const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> = {}, asIs = false) => {
   o.rotation.y = yaw;
   shadowed(o);
   o.updateMatrixWorld(true);
@@ -112,7 +115,8 @@ const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> =
   const size = box.getSize(new THREE.Vector3());
   // (stood on the floor and laid next to the one before, half a metre apart)
   o.position.x += x - box.min.x;
-  o.position.y -= box.min.y;
+  // (an animal stands where the game stands it, its root on the ground, and is not set down by its box)
+  if (!asIs) o.position.y -= box.min.y;
   o.position.z -= (box.min.z + box.max.z) / 2;
   x += size.x + 0.5;
   thing.add(o);
@@ -134,7 +138,18 @@ for (const f of files) {
     mixer.setTime(clip.duration * +(q.get('t') ?? 0));
   }
 }
-if (!thing.children.length) throw new Error('nothing to stage: give m= or g=');
+if (animal) {
+  const { MODES, stageAnimal } = await import('../game/animals');
+  const mode = q.get('mode') ?? 'idle', a = await stageAnimal(animal, MODES[mode] ?? +mode);
+  if (!a) throw new Error(`no such animal: ${animal}`);
+  if (a.action) {
+    mixer = a.mixer;
+    action = a.action;
+    mixer.setTime(a.action.getClip().duration * +(q.get('t') ?? 0));
+  }
+  place(a.root, animal, { mode, playing: a.clip }, true);
+}
+if (!thing.children.length) throw new Error('nothing to stage: give m=, g= or animal=');
 
 // (the survivor for size: the player's body as its file has it, no gear, standing to one side, facing the camera)
 const subject = new THREE.Box3().setFromObject(thing);
