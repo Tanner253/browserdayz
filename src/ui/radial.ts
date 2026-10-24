@@ -2,21 +2,22 @@
 // need clean smooth animations and responsive fresh feedback"; "should have visuals and icons for the building pieces
 // and also actions of the wheel"; "the bottom option for the radial wheel should always be cancel to cancel out of
 // whatever action is being done"): the emote wheel on T, and the base-building piece wheel after it. Rings of wedges
-// round a hub, each ring's first at the top and the rest clockwise, each with an icon over its words; with `cancel`,
-// the bottom wedge of the outer ring is Cancel, always. It opens with its wedges coming out one after another, the
+// round a hub, each ring's first at the top and the rest clockwise, each with an icon over its words (one of its own, or a
+// plain one); the wedge at six o'clock on the outer ring is Cancel on every wheel, put there by this class. It opens with its wedges coming out one after another, the
 // wedge under the pointer is lit and stands out from the rest with a bar round the rim that turns to it, a soft tick
 // says each new one, and what is chosen flashes as the wheel goes. Styles: `.radial` in hud.css.
 //
-//   const r = new Radial({ rings: [{ r0: 46, r1: 205, text: 126 }], per: 8, cancel: true, tick, chose });
+//   const r = new Radial({ rings: [{ r0: 46, r1: 205, text: 126 }], per: 8, tick, chose });
 //   parent.appendChild(r.el);                        its size is the CSS variable --d on r.el
 //   r.set([{ id: 'wall', label: 'Wall', icon: '/assets/icons/wall.webp' }, ...]);   an icon: a URL, or a name in ICONS
 //   r.open();  each frame: const pick = r.pickAt([x, y]); r.point(pick, [x, y]); r.hub(title, sub);
-//   r.close(pick);                                   pick: an entry's index, Radial.CANCEL, or -1 (the hub: nothing)
+//   r.close(pick);                                   pick: an entry's index, Radial.CANCEL, or -1 (the hub)
+// Cancel, like the hub, is nothing chosen: the caller does nothing for it (the wheel only shows it flash as it goes).
 
 export interface RadialEntry {
   id: string;
   label: string;
-  /** a picture over the label: a URL, or the name of one of `ICONS` */
+  /** a picture over the label: a URL, or the name of one of `ICONS` (none given: `ICONS.item`) */
   icon?: string;
   /** kept up until stopped (drawn quieter), on now (drawn in the accent), or not to be had (dimmed) */
   mark?: 'keeps' | 'held' | 'dim';
@@ -29,10 +30,8 @@ export interface RadialRing {
 }
 export interface RadialOptions {
   rings: RadialRing[];
-  /** wedges to a ring */
+  /** wedges to a ring (the outer ring's six o'clock wedge is Cancel's) */
   per: number;
-  /** the bottom wedge of the outer ring is Cancel, and the entries fill the rest */
-  cancel?: boolean;
   /** more classes on the wheel (its size and place are the caller's) */
   className?: string;
   /** said whenever the pointer comes onto another wedge (a soft click) */
@@ -47,6 +46,7 @@ export interface RadialOptions {
  */
 export const ICONS: Record<string, string> = {
   cancel: 'M6 6l12 12M18 6L6 18',
+  item: 'M12 3l9 9-9 9-9-9z',
   call: 'M4 5h16v10H9l-5 4z',
   hey: 'M4 5h16v10H9l-5 4zM12 8v3M12 13.5v.1',
   here: 'M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11zM12 10v.1',
@@ -76,18 +76,24 @@ export const ICONS: Record<string, string> = {
 const LIFT = 7;
 /** how long the wheel takes to go once something is chosen (its flash), ms; hud.css says the same */
 const GONE = 300;
-/** the icon's size and the gap under it, of the radius of 210 */
-const ICON = 22, UNDER = 3;
+/** an icon's size and the gap under it, of the radius of 210; a picture's, which is bigger, on a soft disc */
+const ICON = 22, PIC = 32, UNDER = 3;
 
 const pt = (r: number, a: number) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
 
-/** each wedge in turn round the wheel: its ring, its place in the ring, and the entry in it (Radial.CANCEL: the Cancel wedge) */
-function layout(n: number, rings: RadialRing[], per: number, cancel: boolean): { ring: number; k: number; entry: number }[] {
+/**
+ * How far round a ring its first wedge is, in wedges: none with an even number (one at the top, one at the bottom), half
+ * a wedge with an odd one, so that one wedge still sits at six o'clock for Cancel.
+ */
+const offOf = (per: number) => (per % 2 ? 0.5 : 0);
+
+/** each wedge in turn round the wheel: its ring, its place in the ring, and the entry in it (Radial.CANCEL: the Cancel wedge, six o'clock on the outer ring) */
+function layout(n: number, rings: RadialRing[], per: number): { ring: number; k: number; entry: number }[] {
   const out: { ring: number; k: number; entry: number }[] = [];
   let next = 0;
   for (let ring = 0; ring < rings.length; ring++) {
     for (let k = 0; k < per; k++) {
-      if (cancel && ring === rings.length - 1 && k === per / 2) out.push({ ring, k, entry: Radial.CANCEL });
+      if (ring === rings.length - 1 && k === Math.floor(per / 2)) out.push({ ring, k, entry: Radial.CANCEL });
       else if (next < n) out.push({ ring, k, entry: next++ });
     }
   }
@@ -95,11 +101,12 @@ function layout(n: number, rings: RadialRing[], per: number, cancel: boolean): {
 }
 
 /** the wheel's picture: every wedge with its icon and words, the bar round the rim, all of it in the wheel's own measure (-220..220) */
-export function radialSvg(entries: RadialEntry[], rings: RadialRing[], per: number, cancel = false): string {
-  const wedges = layout(entries.length, rings, per, cancel).map(({ ring, k, entry }) => {
-    const e: RadialEntry = entry === Radial.CANCEL ? { id: 'cancel', label: 'Cancel', icon: 'cancel' } : entries[entry];
+export function radialSvg(entries: RadialEntry[], rings: RadialRing[], per: number): string {
+  const wedges = layout(entries.length, rings, per).map(({ ring, k, entry }) => {
+    const given: RadialEntry = entry === Radial.CANCEL ? { id: 'cancel', label: 'Cancel', icon: 'cancel' } : entries[entry];
+    const e = { ...given, icon: given.icon ?? 'item' };
     const { r0, r1, text: tr } = rings[ring];
-    const a = (k / per) * Math.PI * 2, half = Math.PI / per - 0.022 * (58 / r0);
+    const a = ((k + offOf(per)) / per) * Math.PI * 2, half = Math.PI / per - 0.022 * (58 / r0);
     const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;
     const [x, y] = pt(tr, a).split(' ').map(Number);
     // (two words go on two lines, and a line too long for its wedge is set smaller: by the wedge's width where its words sit)
@@ -107,14 +114,17 @@ export function radialSvg(entries: RadialEntry[], rings: RadialRing[], per: numb
     const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && e.label.length > 7 ? words : [e.label];
     const room = ((Math.PI * 2 * tr) / per) * 0.82;
     // (the icon over the words, the two of them standing about the middle of the wedge)
-    const lh = 15, tall = (e.icon ? ICON + UNDER : 0) + lines.length * lh, top = y - tall / 2;
-    const ty = top + (e.icon ? ICON + UNDER : 0) + lh / 2;
+    const glyph = !!ICONS[e.icon], size = glyph ? ICON : PIC;
+    const lh = 15, tall = size + UNDER + lines.length * lh, top = y - tall / 2;
+    const ty = top + size + UNDER + lh / 2;
     const text = lines.map((l, j) => {
       const size = Math.max(10, Math.min(14, room / (l.length * 0.68)));
       return `<text x="${x.toFixed(1)}" y="${(ty + j * lh).toFixed(1)}"${size < 14 ? ` style="font-size:${size.toFixed(1)}px"` : ''}>${l}</text>`;
     }).join('');
-    const ix = x - ICON / 2, iy = top;
-    const icon = !e.icon ? '' : ICONS[e.icon] ? `<path class="radial-ico" transform="translate(${ix.toFixed(1)} ${iy.toFixed(1)}) scale(${(ICON / 24).toFixed(3)})" d="${ICONS[e.icon]}"/>` : `<image href="${e.icon}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${ICON}" height="${ICON}"/>`;
+    const ix = x - size / 2, iy = top;
+    const icon = glyph
+      ? `<path class="radial-ico" transform="translate(${ix.toFixed(1)} ${iy.toFixed(1)}) scale(${(ICON / 24).toFixed(3)})" d="${ICONS[e.icon]}"/>`
+      : `<circle class="radial-pic" cx="${x.toFixed(1)}" cy="${(iy + size / 2).toFixed(1)}" r="${(size / 2 + 2).toFixed(1)}"/><image href="${e.icon}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${size}" height="${size}"/>`;
     // (each knows which way is out from the hub, to stand out that way when it is lit, and its turn coming out)
     const style = `--i:${ring * per + k};--ox:${(Math.sin(a) * LIFT).toFixed(2)}px;--oy:${(-Math.cos(a) * LIFT).toFixed(2)}px`;
     const cls = entry === Radial.CANCEL ? 'cancel' : (e.mark ?? '');
@@ -157,10 +167,10 @@ export class Radial {
     return this.shown;
   }
 
-  /** what is on it: ring after ring, each ring's first at the top and the rest clockwise (round Cancel, with `cancel`) */
+  /** what is on it: ring after ring, each ring's first at the top and the rest clockwise, round Cancel */
   set(entries: RadialEntry[]) {
     const box = this.el.querySelector('.radial-svg') as HTMLElement;
-    box.innerHTML = radialSvg(entries, this.o.rings, this.o.per, this.o.cancel);
+    box.innerHTML = radialSvg(entries, this.o.rings, this.o.per);
     this.count = entries.length;
     this.wedges = [];
     for (const g of box.querySelectorAll<SVGGElement>('g[data-slot]')) {
@@ -188,8 +198,8 @@ export class Radial {
     // (the ring: the last whose inside edge, or the middle of the gap before it, the pointer is past)
     let ring = 0;
     for (let i = 1; i < R.length; i++) if (r >= (R[i - 1].r1 + R[i].r0) / 2) ring = i;
-    const per = this.o.per, k = ((Math.round((Math.atan2(at[0], -at[1]) / (Math.PI * 2)) * per) % per) + per) % per;
-    const wedge = layout(this.count, R, per, !!this.o.cancel).find((w) => w.ring === ring && w.k === k);
+    const per = this.o.per, k = ((Math.round((Math.atan2(at[0], -at[1]) / (Math.PI * 2)) * per - offOf(per)) % per) + per) % per;
+    const wedge = layout(this.count, R, per).find((w) => w.ring === ring && w.k === k);
     return wedge ? wedge.entry : -1;
   }
 
@@ -226,7 +236,7 @@ export class Radial {
     if (!g) return;
     g.classList.add('on');
     // (the bar turns the short way round to it)
-    const want = (Number(g.dataset.k) / this.o.per) * 360;
+    const want = ((Number(g.dataset.k) + offOf(this.o.per)) / this.o.per) * 360;
     this.turn += ((((want - this.turn) % 360) + 540) % 360) - 180;
     this.bar?.style.setProperty('--turn', `${this.turn.toFixed(1)}deg`);
     this.el.classList.toggle('on-cancel', pick === Radial.CANCEL);

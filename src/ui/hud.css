@@ -2166,6 +2166,9 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .radial .radial-wedge { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.09s ease-out, stroke 0.09s; }
 /* an icon drawn as strokes (radial.ts ICONS): in the colour of its words */
 .radial-ico { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.09s; }
+/* (a picture of a thing, on a light disc so that a dark one reads on a dark wedge) */
+.radial-pic { fill: rgba(233, 228, 216, 0.16); stroke: none; }
+.radial g.on .radial-pic { fill: rgba(255, 255, 255, 0.5); }
 .radial text {
   fill: var(--ink);
   font: 600 15px var(--font);

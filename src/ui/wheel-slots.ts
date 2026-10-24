@@ -53,5 +53,5 @@ export function wheelEntries(slots: string[]): RadialEntry[] {
 
 /** the wheel as Emotes sets it: the one held up in the game (radialSvg), each wedge's data-slot its slot, Cancel's 'cancel' */
 export function wheelSvg(slots: string[]) {
-  return radialSvg(wheelEntries(slots), RINGS, WHEEL_RING, true);
+  return radialSvg(wheelEntries(slots), RINGS, WHEEL_RING);
 }
