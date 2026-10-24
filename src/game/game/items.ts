@@ -352,7 +352,7 @@ export const itemsMethods = {
         if (v.broken) this.player.setLeg(true);
         else if (!u.stopBleed) this.hud.note('Nothing is broken: the tape is used up all the same', 'info');
       }
-      const gained = [energy ? `${energy > 0 ? '+' : ''}${energy} energy` : '', water ? `${water > 0 ? '+' : ''}${water} water` : '', health ? `${health > 0 ? '+' : ''}${health} health` : ''].filter(Boolean).join(' · ');
+      const gained = [energy ? `${energy > 0 ? '+' : ''}${energy} food` : '', water ? `${water > 0 ? '+' : ''}${water} water` : '', health ? `${health > 0 ? '+' : ''}${health} health` : ''].filter(Boolean).join(' · ');
       if (gained) this.hud.note(meal?.hot ? `${gained} · hot` : hot > 1 ? `${gained} · warmed by the fire` : gained, health < 0 ? 'warn' : 'good');
       if (u.sound === 'smoke') {
         // what is left of it, in front of the face

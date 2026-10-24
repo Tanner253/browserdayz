@@ -82,18 +82,26 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   const hunted = new Set(KINDS.flatMap((k) => yieldOf(k, 1).map(([id]) => id)));
   for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
-  const { ruled: on, e, all } = worlds[0];
+  const { ruled: on, e } = worlds[0];
   // (how full each step is: a thing short where there is room, two or a fifth where a step is nearly full (the police
   // stations and the army's posts of Kamenka are wanted by more than they hold: of the 5.56 kept there by its rate the old
   // roll put down half, this one five in six), and where every place
   // is spoken for, under the gas and down the bunker, up to half of a sort: the bunker is asked for 175 things on its
   // 145 places, and for 23 that lie only on a floor on its 13 floors, and its guns and its own are put down first)
-  const full = (t: Tier) => all.filter(({ p }) => p.tier === t && !p.arms).length / points.filter((p) => p.tier === t && !p.arms).length;
+  // (how full are the spots a sort can lie at on that step, by the economy's own rule (its kinds of building, floor or
+  // shelf, its size): a step with room in it may have none left in a sort's own, as firewood found once food on the
+  // outskirts was made rarer, 2026-10-24. Asked only of a sort short by more than one.)
+  const liesAt = (e as unknown as { liesAt(id: string, rule: unknown, i: number, t: Tier): boolean }).liesAt.bind(e);
+  const taken = new Set([...e.loot.values()].map((l) => l.point));
+  const full = (t: Tier, id: string) => {
+    const spots = every.map((_, i) => i).filter((i) => !apartAt(i) && every[i].tier === t && !every[i].arms && liesAt(id, TYPES[id], i, t));
+    return spots.filter((i) => taken.has(i)).length / Math.max(1, spots.length);
+  };
   for (const id of Object.keys(TYPES)) for (const t of STEPS) {
     // (and never one too many beyond what is always left at an armed place)
     // (what is wanted: its count, or what its rate comes to on this map, see TypeRule.per)
     const got = on(id, t), spare = guns.includes(id) || melee.includes(id) ? 40 : 0, want = e.kept(id, t);
-    const short = full(t) >= 0.95 ? Math.max(Math.ceil(want / 2), Math.min(want, 3)) : full(t) >= 0.85 ? Math.max(2, Math.ceil(want * 0.2)) : 1;
+    const f = got >= want - 1 ? 0 : full(t, id), short = f >= 0.95 ? Math.max(Math.ceil(want / 2), Math.min(want, 3)) : f >= 0.85 ? Math.max(2, Math.ceil(want * 0.2)) : 1;
     assert.ok(got >= want - short && got <= want + spare, `${id} on step ${t}: ${got}, and ${want} are wanted`);
   }
   // (the rifles' rounds kept east: none on the first two steps, a few on the third, most from the fourth on. The owner,
@@ -288,10 +296,12 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
     // ("the hospital should be medkit abundant and lots of stims")
     const hospital = inside((p) => kind(p, 'Hospital') && !kind(p, 'Military'));
     assert.ok(cat(hospital, 'medical') === total(hospital) && sum(hospital, 'firstaid') >= 40 && sum(hospital, 'stim', 'stim_stamina') >= 45 && sum(hospital, 'firstaid') > sum(hospital, 'bandage') * 2, `the hospital: ${[...hospital].map(([id, k]) => `${id} ${k}`).join(', ')}`);
-    // ("the store should spawn supplies and food, and water, flashlight")
+    // ("the store should spawn supplies and food, and water, flashlight"): half of it food and drink at least, since food
+    // was made rarer everywhere, houses too (2026-10-24: "you would change the shelf rule to comply with the new rarity
+    // needs of food spawning"; it was three fifths)
     for (const t of [1, 3] as Tier[]) {
       const shop = inside((p) => p.tier === t && kind(p, 'Shop'));
-      assert.ok(cat(shop, 'food') >= 8 && cat(shop, 'drink') >= 4 && cat(shop, 'food', 'drink') * 5 >= total(shop) * 3, `the shop on step ${t}: ${[...shop].map(([id, k]) => `${id} ${k}`).join(', ')}`);
+      assert.ok(cat(shop, 'food') >= 8 && cat(shop, 'drink') >= 4 && cat(shop, 'food', 'drink') * 2 >= total(shop), `the shop on step ${t}: ${[...shop].map(([id, k]) => `${id} ${k}`).join(', ')}`);
       assert.equal(cat(shop, 'weapon', 'magazine', 'ammo', 'attachment', 'melee'), 0, `the shop on step ${t} holds something to fight with`);
     }
     lights.push([1, 2, 3].reduce((n, t) => n + sum(inside((p) => p.tier === t && kind(p, 'Shop')), 'flashlight'), 0));

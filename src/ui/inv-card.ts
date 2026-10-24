@@ -78,7 +78,8 @@ export function does(d: Def, it?: ItemInstance): string {
   if (u?.stopBleed) o.push('stops bleeding');
   if (u?.splint) o.push('sets a broken leg');
   if (u?.blood) o.push(`+${u.blood} ml of blood`);
-  if (energy) o.push(signed(energy, 'energy'));
+  // (the food bar, called food: "food says + energy but this is confused with stamina", 2026-10-24)
+  if (energy) o.push(signed(energy, 'food'));
   if (water) o.push(signed(water, 'water'));
   if (meal?.sick) o.push(`<b class="bad">${meal.sick >= 1 ? 'food poisoning' : `${Math.round(meal.sick * 100)}% chance of food poisoning`}</b>`);
   if (u?.stamina) o.push('fills your stamina');

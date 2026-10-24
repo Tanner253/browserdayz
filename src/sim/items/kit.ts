@@ -43,28 +43,32 @@ export const KIT_ITEMS: ItemDef[] = [
     worth: 3,
   },
   // ---------------------------------------------------------------- food & drink
-  { id: 'sprats', name: 'Tinned Sprats', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_fish', scale: 2.2, w: 1, h: 1, weight: 0.24, category: 'food', desc: 'Smoked sprats in oil. Шпроты.', use: { verb: 'Eat', time: 2.5, energy: 28, water: -2, sound: 'eat' },
-    loot: { pair: 'TunaCan', at: [8, 0, 32, 0, 0], restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
+  // (food that keeps and needs no cooking under half as common, a little of it in the villages and the army's places,
+  // and slower to come back: "since we have animals in the game we can reduce the spawn rate of food items ... we
+  // shouldnt make food absent but it should be more rare higher tier loot since it cant spoil and doesnt need to be
+  // cooked its very valuble", the owner, 2026-10-24. Sprats no longer dry you out: "sprats shouoldnt dehydrate".)
+  { id: 'sprats', name: 'Tinned Sprats', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_fish', scale: 2.2, w: 1, h: 1, weight: 0.24, category: 'food', desc: 'Smoked sprats in oil. Шпроты.', use: { verb: 'Eat', time: 2.5, energy: 28, sound: 'eat' },
+    loot: { pair: 'TunaCan', at: [4, 1, 15, 0, 0], restock: 600, usage: ['Shop', ...HOMES], favour: LARDER },
     worth: 2,
   },
   { id: 'condensed', name: 'Condensed Milk', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_cond', scale: 2, w: 1, h: 1, weight: 0.4, category: 'food', desc: 'Sweet, thick, calorie dense.', use: { verb: 'Eat', time: 2.5, energy: 34, water: 4, sound: 'eat' },
-    loot: { pair: 'Marmalade', at: [3, 1, 23, 1, 3], restock: 300, usage: ['Shop', ...HOMES, 'Military'], favour: LARDER },
+    loot: { pair: 'Marmalade', at: [2, 1, 11, 1, 2], restock: 600, usage: ['Shop', ...HOMES, 'Military'], favour: LARDER },
     worth: 3,
   },
   { id: 'beans', name: 'Baked Beans', model: 'long_life_food', node: 'long_life_food_beans', w: 1, h: 2, weight: 0.42, category: 'food', desc: 'A can of baked beans.', use: { verb: 'Eat', time: 3, energy: 36, water: 2, sound: 'eat' },
-    loot: { pair: 'BakedBeansCan', at: [9, 0, 38, 0, 1], restock: 300, usage: ['Shop', ...HOMES, 'Farm'], favour: LARDER },
+    loot: { pair: 'BakedBeansCan', at: [4, 1, 17, 0, 1], restock: 600, usage: ['Shop', ...HOMES, 'Farm'], favour: LARDER },
     worth: 3, sells: 3,
   },
   { id: 'tomatoes', name: 'Tinned Tomatoes', model: 'long_life_food', node: 'long_life_food_tomatoes', w: 1, h: 2, weight: 0.4, category: 'food', desc: 'Watery and filling.', use: { verb: 'Eat', time: 2.5, energy: 18, water: 12, sound: 'eat' },
-    loot: { pair: 'PeachesCan', at: [6, 0, 24, 0, 0], restock: 300, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
+    loot: { pair: 'PeachesCan', at: [3, 1, 11, 0, 0], restock: 600, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
     worth: 2,
   },
   { id: 'sardines', name: 'Sardines', model: 'long_life_food', node: 'long_life_food_sardines', w: 2, h: 1, weight: 0.13, category: 'food', desc: 'Flat tin of sardines.', use: { verb: 'Eat', time: 2, energy: 20, water: -1, sound: 'eat' },
-    loot: { pair: 'SardinesCan', at: [7, 0, 32, 0, 1], restock: 300, usage: ['Shop', ...HOMES, 'Hunting'], favour: LARDER },
+    loot: { pair: 'SardinesCan', at: [3, 1, 15, 0, 1], restock: 600, usage: ['Shop', ...HOMES, 'Hunting'], favour: LARDER },
     worth: 2, sells: 3,
   },
   { id: 'apple', name: 'Apple', model: 'food_apple_01', w: 1, h: 1, weight: 0.15, category: 'food', desc: 'Crisp and sour.', use: { verb: 'Eat', time: 1.5, energy: 10, water: 8, sound: 'eat' },
-    loot: { pair: 'Apple', at: [7, 0, 23, 0, 0], lifetime: 1200, restock: 300, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
+    loot: { pair: 'Apple', at: [4, 0, 12, 0, 0], lifetime: 1200, restock: 600, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
     worth: 1,
   },
   { id: 'milk', name: 'Milk Carton', model: 'long_life_food', node: 'long_life_food_milk', w: 1, h: 2, weight: 1.0, category: 'drink', desc: 'UHT milk. Still sealed.', use: { verb: 'Drink', time: 2.5, energy: 10, water: 30, sound: 'drink' },
@@ -134,7 +138,7 @@ export const KIT_ITEMS: ItemDef[] = [
   // What gives blood back (2026-10-13: "we need blood bags with iv's now to recover blood faster"; src/sim/blood.ts).
   // Two bags of a drip, out of the "IV Supplies" the user brought in for the hospital: salt water, which is slow,
   // and blood, which is not. Neither closes a wound: a bag run into somebody still bleeding runs out again.
-  { id: 'saline', name: 'Saline Bag (IV)', model: 'saline_bag', w: 1, h: 2, weight: 0.55, category: 'medical', desc: 'Half a litre of salt water and the line to run it into your arm. Gives back 750 ml of blood over a minute and a half. It closes no wound: stop the bleeding first.', use: { verb: 'Run in the', time: 5, blood: 750, over: 90, sound: 'bandage' },
+  { id: 'saline', name: 'Saline Bag (IV)', model: 'saline_bag', w: 1, h: 2, weight: 0.55, category: 'medical', desc: 'Half a litre of salt water and the line to run it into your arm. Gives back 750 ml of blood over a minute and a half, and water, as DayZ’s does. It closes no wound: stop the bleeding first.', use: { verb: 'Run in the', time: 5, blood: 750, over: 90, water: 30, sound: 'bandage' },
     // What gives blood back (2026-10-13; src/sim/blood.ts): saline in a clinic and the hospital, and with the army's
     // medics; blood in the hospital before anywhere, a bag or two in a clinic's fridge, and where the best of
     // everything is. (Under the gas every place is spoken for: a stim and a dressing there have made way for them.)
