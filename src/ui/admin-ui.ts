@@ -266,6 +266,8 @@ export class AdminUI {
   /** counted up whenever the heads change, and whenever the server says something: the parts that show them are made again */
   private headsN = 0;
   private saidN = 0;
+  /** the last answer to /stashes, its STASHES lines (server/stash-list.ts): copied in one press, as nothing said here can be selected */
+  private stashLines: string[] = [];
   private held = false;
   /** where the window was left by whoever moved or resized it (null: where it opens), and where it stands now */
   private box: Box | null = null;
@@ -502,6 +504,8 @@ export class AdminUI {
 
   /** a line the server said back: shown along the bottom */
   say(text: string) {
+    if (/^\d+ stashes kept/.test(text)) this.stashLines = [];
+    if (text.startsWith('STASHES ')) this.stashLines.push(text);
     this.said.push({ at: Date.now(), text });
     this.saidN++;
     if (this.said.length > 60) this.said.shift();
@@ -933,6 +937,27 @@ export class AdminUI {
       row.style.opacity = String(Math.max(0.4, 1 - (lines.length - 1 - k) * 0.1));
       return row;
     }) : [el('div', 'dim', 'What an order did is said here, and in the chat.')]));
+    if (this.stashLines.length) this.log.append(this.copyStashes());
+  }
+
+  /**
+   * The whole of the last answer to /stashes onto the clipboard in one press (2026-10-23: the owner pastes it to be
+   * checked against before the map changes). Where the clipboard cannot be written, the text is laid out selected.
+   */
+  private copyStashes() {
+    const text = this.stashLines.join('\n'), b = el('button', 'adm-copy', `Copy the stash list (${this.stashLines.length} lines)`);
+    b.onclick = () => {
+      const pick = () => {
+        const box = el('textarea', 'adm-copied');
+        box.value = text;
+        box.readOnly = true;
+        b.replaceWith(box);
+        box.select();
+      };
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => void (b.textContent = 'Copied: paste it where it was asked for'), pick);
+      else pick();
+    };
+    return b;
   }
 
   // ---------------------------------------------------------------- somebody else
