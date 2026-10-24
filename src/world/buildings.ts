@@ -29,7 +29,7 @@ import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
 import { clearWaysOut } from './ways-out';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
-import { cullBatch } from './batch-cull';
+import { cullBatch, letGoOnPhone } from './batch-cull';
 
 /** where the valley begins, going east: x, metres (the green west's east edge, by the big map) */
 const VALLEY_FROM = -700;
@@ -3341,6 +3341,7 @@ export class Buildings {
     // (and culled a part at a time in each drawing, the view and each shadow map, with nothing sent to the card for it:
     // see cullBatch. The one shadow shape (`bare`) is drawn into the shadow maps alone.)
     cullBatch(mesh, bare);
+    letGoOnPhone(mesh);
     return mesh;
   }
 
@@ -3356,6 +3357,7 @@ export class Buildings {
       mesh.matrixAutoUpdate = false;
       mesh.name = `building:${key}`;
       mesh.renderOrder = key === 'glass' ? 2 : WALLS_FIRST;
+      letGoOnPhone(mesh);
       group.add(mesh);
     }
     // One shape for the sun's shadow maps (2026-10-12). Every wall, floor and roof of the map is one mesh for each
@@ -3385,6 +3387,7 @@ export class Buildings {
         caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
         caster.matrixAutoUpdate = false;
         caster.name = 'buildings shadow';
+        letGoOnPhone(caster);
         group.add(caster);
         for (const m of c.of) m.castShadow = false;
       }

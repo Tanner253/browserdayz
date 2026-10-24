@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -70,6 +71,31 @@ function siteVersion(): Plugin {
   };
 }
 
+/**
+ * The map, made as the site is built (2026-10-23): the file beside the map's worker, named after it
+ * (assets/world.worker-<its hash>.bin), which the worker fetches instead of making the map (src/world/world-file.ts).
+ * The worker's name changes with the generator and everything it is made of, so a file is only ever of its own
+ * build's map. Made by scripts/world-file.ts, and kept in node_modules/.cache under that name for the next build.
+ */
+function worldFile(): Plugin {
+  let outDir = 'dist';
+  return {
+    name: 'world-file',
+    apply: 'build',
+    configResolved(c) {
+      outDir = path.resolve(c.root, c.build.outDir);
+    },
+    writeBundle(_, bundle) {
+      const worker = Object.keys(bundle).find((f) => /(^|\/)world\.worker-[\w-]+\.js$/.test(f));
+      if (!worker) return this.warn('THE MAP FILE IS NOT MADE: no world.worker-<hash>.js in the build; every browser will make the map itself');
+      const name = worker.replace(/\.js$/, '.bin');
+      const kept = path.resolve('node_modules/.cache/zona-world', path.basename(name));
+      if (!fs.existsSync(kept)) execFileSync(process.execPath, [path.resolve('node_modules/tsx/dist/cli.mjs'), 'scripts/world-file.ts', kept], { stdio: 'inherit' });
+      fs.copyFileSync(kept, path.join(outDir, name));
+    },
+  };
+}
+
 export default defineConfig({
   // (when this build of the site was made: the door says how long ago, "last updated 2 h ago", see src/ui/door.ts)
   define: { __BUILT__: JSON.stringify(new Date().toISOString()) },
@@ -78,6 +104,7 @@ export default defineConfig({
     physicsWasm(),
     assetVersions(),
     siteVersion(),
+    worldFile(),
     {
       // The site's own news (api/updates.ts) is a function of the site, which the dev page has none of: here it
       // is run in place, so the menu shows the same posts at a desk as it does live. (Nothing else under /api is:

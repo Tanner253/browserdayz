@@ -1,4 +1,27 @@
 import * as THREE from 'three';
+import { TOUCH } from '../core/device';
+
+/**
+ * On a phone, the page's copy of the buildings' shapes is let go of once the card has it, as the ground's is (2026-10-23,
+ * iPhones closing the page in the game): the walls' batches were 82 MB of it, and nothing reads them again (their bounds
+ * are taken before they are first drawn, here or by cullBatch, and nothing is added to them after). Points and the rest,
+ * not the order they are drawn in: cullBatch asks a batch's for its size every drawing. A computer keeps them.
+ */
+export function letGoOnPhone(mesh: THREE.Mesh | THREE.BatchedMesh) {
+  if (!TOUCH) return;
+  const geo = mesh.geometry;
+  if (mesh instanceof THREE.BatchedMesh) {
+    mesh.computeBoundingBox();
+    mesh.computeBoundingSphere();
+  } else {
+    if (!geo.boundingSphere) geo.computeBoundingSphere();
+    if (!geo.boundingBox) geo.computeBoundingBox();
+  }
+  for (const a of Object.values(geo.attributes)) (a as THREE.BufferAttribute).onUpload(letGo);
+}
+function letGo(this: THREE.BufferAttribute) {
+  (this as unknown as { array: unknown }).array = null;
+}
 
 /**
  * A BatchedMesh whose copies stand still, culled a copy at a time in every drawing of it (the view and each of the

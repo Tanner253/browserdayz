@@ -26,7 +26,9 @@ export async function skyBox(renderer: THREE.WebGLRenderer, eq: THREE.DataTextur
   eq.flipY = false;
   const onCard = (await assets.strips?.put(eq, 1, () => true)) ?? eq;
   const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
-  const rt = new THREE.WebGLCubeRenderTarget((eq.image as { height: number }).height, { type: eq.type, colorSpace: eq.colorSpace as THREE.ColorSpace, magFilter: eq.magFilter });
+  // (with no depth to it: one box seen from inside has nothing in front of anything, and three's own kept six sides of
+  // depth beside the picture, 96 MB of the card on a computer and 24 on a phone, for the life of the game)
+  const rt = new THREE.WebGLCubeRenderTarget((eq.image as { height: number }).height, { type: eq.type, colorSpace: eq.colorSpace as THREE.ColorSpace, magFilter: eq.magFilter, depthBuffer: false });
   rt.texture.minFilter = eq.minFilter;
   rt.texture.generateMipmaps = false;
   const box = new THREE.Mesh(
@@ -80,7 +82,7 @@ export async function skyBox(renderer: THREE.WebGLRenderer, eq: THREE.DataTextur
  */
 async function halve(sky: THREE.DataTexture) {
   const { data, width, height } = sky.image as { data: Uint16Array; width: number; height: number };
-  if (!(data instanceof Uint16Array) || width < 2048) return;
+  if (!(data instanceof Uint16Array) || width <= 2048) return;
   const w = width >> 1, h = height >> 1, out = new Uint16Array(w * h * 4);
   const light = THREE.DataUtils.fromHalfFloat, half = THREE.DataUtils.toHalfFloat;
   for (let y = 0; y < h; y++) {
@@ -309,11 +311,13 @@ export class Atmosphere {
     // the game does wait on, and took a sixth of the line from it.
     this.background = this.envMap;
     // (a phone the game has already failed to start on keeps the small sky: see LEAN)
-    this.later = () => void assets.hdri(m.background, false).then(
+    // (A phone has it at half the size each way. Drawn, the sky is laid out as the six sides of a box, each as tall as
+    // the picture: 270 MB on the card for the whole one, a quarter of everything a phone can be asked to hold, for the
+    // one thing in the game that is never looked at closely. It is sent a file of that size, made from the whole one
+    // as it used to make it here (scripts/sky-phone.mjs): fetching and unpacking the 4k one took some 130 MB of the
+    // page at once, in the game, where iPhones were closing it.)
+    this.later = () => void assets.hdri(TOUCH && m.phone ? m.phone : m.background, false).then(
       async (bg) => {
-        // (A phone has it at half the size each way. Drawn, the sky is laid out as the six sides of a box, each as
-        // tall as the picture: 270 MB on the card for the whole one, a quarter of everything a phone can be asked
-        // to hold, for the one thing in the game that is never looked at closely.)
         if (TOUCH) await halve(bg);
         bg.mapping = THREE.EquirectangularReflectionMapping;
         bg.colorSpace = THREE.LinearSRGBColorSpace;

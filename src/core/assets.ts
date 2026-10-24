@@ -32,7 +32,8 @@ export interface ModelEntry {
 export interface Manifest {
   /** when the asset pipeline last ran: used to version every asset URL */
   generated?: string;
-  hdri: { background: string; env: string };
+  /** `phone`: the sky a phone is sent, `background` at half its size each way (scripts/sky-phone.mjs) */
+  hdri: { background: string; env: string; phone?: string };
   textures: Record<string, { diff: string; nor: string; arm: string }>;
   models: Record<string, ModelEntry>;
 }
