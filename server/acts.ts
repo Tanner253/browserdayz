@@ -415,7 +415,9 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;
-    economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
+    // (at the body's height, or on what is under each about there: a base's floor, which the body may be a hair off)
+    const ix = x + Math.cos(a) * 0.9, iz = z + Math.sin(a) * 0.9, under = world.standAt(ix, y + 0.3, iz);
+    economy.drop(it, ix, Math.abs(under - y) < 0.6 ? under + 0.03 : y, iz, Math.random() * 6.28);
   }
   lieAt(spill, 'g');
   if (!box.items.length) return null;

@@ -9,7 +9,7 @@ import { toWorld, type Base } from '../src/sim/build/snap';
 import { perDay, pay, protectedFor, rot, UPKEEP } from '../src/sim/build/upkeep';
 import type { StoredItem } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
-import { boxes, economy, log } from './index';
+import { boxes, economy, log, world } from './index';
 import { tellOpeners } from './searched';
 import { bases, known, tellBase } from './build';
 import { pidOf } from './acts';
@@ -47,7 +47,8 @@ export function spill(b: number) {
   box.items.forEach((it, i) => {
     const { x: _x, y: _y, rot: _r, ...item } = it as StoredItem & { rot?: boolean };
     const a = (i / Math.max(1, box.items.length)) * Math.PI * 2;
-    economy.drop(item, box.x + Math.cos(a) * 0.8, box.y - 0.35, box.z + Math.sin(a) * 0.8, a);
+    const x = box.x + Math.cos(a) * 0.8, z = box.z + Math.sin(a) * 0.8;
+    economy.drop(item, x, world.standAt(x, box.y + 0.3, z) + 0.03, z, a);
   });
 }
 

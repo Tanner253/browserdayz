@@ -21,6 +21,7 @@ import { seatOf } from './acts';
 import { dealt } from './checks';
 import { away } from './gate';
 import { mayHit } from './tags';
+import { blastFrom, blastWalled, walled } from './solid';
 
 let ground: Ground;
 export let herd: Herd;
@@ -118,7 +119,7 @@ export function animalHit(c: Client, m: Extract<C2S, { t: 'ahit' }>) {
   if (rule.blast) {
     if (!num(m.dist)) return;
     const chest: Vec3 = [b.x, ground.height(b.x, b.z) + KINDS[b.k].tall * 0.6, b.z];
-    const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `a${m.i}`, chest, m.dist, now);
+    const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `a${m.i}`, chest, m.dist, now, undefined, blastFrom(chest));
     if (far === null) return;
     amount = hitDamage(m.w, 'torso', far);
     zone = 'torso';
@@ -130,6 +131,7 @@ export function animalHit(c: Client, m: Extract<C2S, { t: 'ahit' }>) {
   } else {
     if (m.w !== 'fists' && c.w !== m.w) return;
     if (!mayHit(c, `a${m.i}`, now, rule.interval * 700)) return;
+    if (walled(c.pose, [b.x, ground.height(b.x, b.z) + KINDS[b.k].tall * 0.6, b.z])) return;
     c.lastHit = now;
     const n = typeof m.n === 'number' && Number.isFinite(m.n) ? Math.max(1, Math.min(12, Math.round(m.n))) : 1;
     amount = hitDamage(m.w, m.zone, d, !!m.sup, 0, n) * piercedBy(m.w, m.p);
@@ -149,8 +151,9 @@ export function animalsBlast(by: Client, w: string, at: Vec3) {
   const now = Date.now();
   for (const b of [...herd.beasts.values()]) {
     if (b.diedAt) continue;
-    const amount = lyingBlast(w, at, [b.x, ground.height(b.x, b.z) + KINDS[b.k].tall * 0.6, b.z]);
-    if (amount > 0) told(b.i, herd.hurt(b.i, amount, seenOf(by, now), now), by.id, 'torso');
+    const chest: Vec3 = [b.x, ground.height(b.x, b.z) + KINDS[b.k].tall * 0.6, b.z];
+    const amount = lyingBlast(w, at, chest);
+    if (amount > 0 && !blastWalled(at, chest)) told(b.i, herd.hurt(b.i, amount, seenOf(by, now), now), by.id, 'torso');
   }
 }
 

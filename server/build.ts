@@ -136,21 +136,38 @@ export function tellBase(b: number, m: S2C) {
 
 /** every couple of seconds: the bases come into sight told whole, those gone far off forgotten */
 export function sighting() {
-  const all = bases();
-  for (const c of clients.values()) {
-    const d = of(c);
-    for (const b of all.bases.values()) {
-      const far = Math.hypot(b.ox - c.pose[0], b.oz - c.pose[2]);
-      if (!d.known.has(b.id) && far < SIGHT.tell) {
-        d.known.add(b.id);
-        send(c, { t: 'base', b: said(b) });
-      } else if (d.known.has(b.id) && far > SIGHT.forget) {
-        d.known.delete(b.id);
-        send(c, { t: 'bgone', b: b.id });
-      }
-    }
-    for (const id of d.known) if (!all.bases.has(id)) d.known.delete(id);
+  for (const c of clients.values()) sightFor(c);
+}
+
+/** the bases in sight of somebody coming in, told in their welcome (and so known to their game) */
+export function basesFor(c: Client) {
+  const d = of(c), out: KeptBase[] = [];
+  for (const b of bases().bases.values()) {
+    if (Math.hypot(b.ox - c.pose[0], b.oz - c.pose[2]) >= SIGHT.tell) continue;
+    d.known.add(b.id);
+    out.push(said(b));
   }
+  return out;
+}
+
+/**
+ * One player's bases come into sight or gone off: asked of everybody every couple of seconds, and of one who has just
+ * come in or woken somewhere new at once, before they are stood there (a floor of theirs is under them from the first
+ * moment, and nobody falls through it while it is on its way).
+ */
+export function sightFor(c: Client) {
+  const all = bases(), d = of(c);
+  for (const b of all.bases.values()) {
+    const far = Math.hypot(b.ox - c.pose[0], b.oz - c.pose[2]);
+    if (!d.known.has(b.id) && far < SIGHT.tell) {
+      d.known.add(b.id);
+      send(c, { t: 'base', b: said(b) });
+    } else if (d.known.has(b.id) && far > SIGHT.forget) {
+      d.known.delete(b.id);
+      send(c, { t: 'bgone', b: b.id });
+    }
+  }
+  for (const id of d.known) if (!all.bases.has(id)) d.known.delete(id);
 }
 
 /** a game that has come in (again): told nothing yet, and so told afresh */

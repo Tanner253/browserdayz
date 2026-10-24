@@ -5,7 +5,7 @@
 import { PIECES } from '../src/sim/build/pieces';
 import { toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import type { StoredItem } from '../src/net/protocol';
-import { boxes, economy } from './index';
+import { boxes, economy, world } from './index';
 import { bases } from './build';
 
 const cidOf = (b: number, p: number) => `bbox:${b}:${p}`;
@@ -33,7 +33,9 @@ export function spillBoxes(b: number, ids: number[]) {
     box.items.forEach((it, i) => {
       const { x: _x, y: _y, rot: _r, ...item } = it as StoredItem & { rot?: boolean };
       const a = (i / Math.max(1, box.items.length)) * Math.PI * 2;
-      economy.drop(item, box.x + Math.cos(a) * 0.7, box.y - 0.25, box.z + Math.sin(a) * 0.7, a);
+      // (on the floor it stood on, or whatever is under: server/solid.ts)
+      const x = box.x + Math.cos(a) * 0.7, z = box.z + Math.sin(a) * 0.7;
+      economy.drop(item, x, world.standAt(x, box.y + 0.3, z) + 0.03, z, a);
     });
   }
 }

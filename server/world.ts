@@ -43,6 +43,17 @@ function onRuins(plan: { piece: Piece; place: Place }[], ground: number, x: numb
   return false;
 }
 
+/**
+ * The bases, as this file knows them: what of one a body stands on, and whether one is near. Set by server/solid.ts
+ * (this file is read before any base is): a body dead on a base's floor lies there, and a thing dropped on it rests
+ * on it (the owner, 2026-10-24: "items i drop on the ground should not clip through the floor of my base").
+ */
+const based = { top: (_x: number, _y: number, _z: number) => -Infinity, near: (_x: number, _z: number) => false };
+export function baseGround(top: typeof based.top, near: typeof based.near) {
+  based.top = top;
+  based.near = near;
+}
+
 export interface CrateSpot {
   cid: string;
   kind: string;
@@ -191,7 +202,7 @@ export function buildWorldData(root: string) {
       if (inCastle(world.castle, x, y, z)) return Math.max(ground, y);
       // (and on the monastery's walls in Pokrov, a pier, and what is left of Kalat: plan v5)
       if (onTownWall(world.towns, x, y, z) || onRuins(kalat, ground, x, y, z)) return Math.max(ground, y);
-      return standAt(world.bridges, ground, x, y, z);
+      return Math.max(based.top(x, y, z), standAt(world.bridges, ground, x, y, z));
     },
     /** where the fort stands (null: the world has none) */
     castle: world.castle,
@@ -206,7 +217,7 @@ export function buildWorldData(root: string) {
     /** the bridges the road goes over */
     bridges: world.bridges,
     /** whether anything a body could stand on, climb or be up is within reach of a place: see server/bodywatch.ts */
-    supportNear: supports(world, crates),
+    supportNear: ((near) => (x: number, z: number) => near(x, z) || based.near(x, z))(supports(world, crates)),
     /** somewhere open and level to set a supply drop down */
     dropSite: (rnd?: () => number, inside = false, avoid: { x: number; z: number }[] = []) => pickDropSite(world, rnd, inside, avoid),
     /** where a drop called on a radio comes down, for somebody standing at a place and facing a way */

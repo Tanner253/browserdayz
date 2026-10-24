@@ -21,9 +21,10 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { Bases, heard, heardPiece, said, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
-import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base } from '../src/sim/build/snap';
+import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
-import { inTheWay, swept } from '../src/sim/build/doors';
+import { inBase, inTheWay, swept } from '../src/sim/build/doors';
+import { BaseSolids } from '../src/sim/build/solid';
 import { lockable, mayPass } from '../src/sim/build/locks';
 import { PRINTS, asksOf, layPrint, printCost } from '../src/sim/build/blueprints';
 
@@ -448,6 +449,61 @@ ok('every blueprint is laid whole by the rules; short of planks one lays what it
   assert.equal(first.base!.pieces.size, asksOf('bp:hut').length);
 });
 
+console.log('Building: solid (what stops a round, a step and a body: src/sim/build/solid.ts)');
+/** the two-storey house from its blueprint on flat ground, its pieces by kind, and its solids */
+const house = () => {
+  const bs = new Bases(flat), r = layPrint(bs, 'bp:house', { x: 0, z: 0, yaw: 0.4 }, ME, 0, 'Me', () => true);
+  assert.ok(r.base && r.laid.length === asksOf('bp:house').length, `the house: ${r.laid.length} ${r.why}`);
+  const b = r.base!, all = [...b.pieces.values()], piece = (k: string, x: number, z: number, y?: number) => all.find((p) => p.k === k && Math.abs(p.x - x) < 0.1 && Math.abs(p.z - z) < 0.1 && (y === undefined || Math.abs(p.y - y) < 0.6))!;
+  /** a point of a piece's own frame in the world */
+  const of = (p: Piece, x: number, y: number, z: number) => toWorld(b, ...inBase(p, [x, y, z]));
+  return { bs, b, piece, of, w: (x: number, y: number, z: number) => toWorld(b, x, y, z), solid: new BaseSolids(() => bs.bases.values()) };
+};
+
+ok('a round stops at a wall, a floor and a shut door; it goes through a window, an open door and the gaps in bars', () => {
+  const { bs, b, piece, of, w, solid } = house();
+  assert.ok(!solid.clear(w(0, 1.2, -4), w(0, 1.2, 0)), 'through a wall');
+  assert.ok(!solid.clear(w(0, STOREY + 1.5, 0), w(0, 1.5, 0)), 'down through a floor');
+  const door = piece('door_wood', 0, 4.5);
+  assert.ok(!solid.clear(w(0, 1.2, 7), w(0, 1.2, 3)), 'through the shut door');
+  door.open = true;
+  assert.ok(solid.clear(w(0, 1.2, 7), w(0, 1.2, 3)), 'not through the open door');
+  const win = piece('window', 4.5, 0, STOREY);
+  assert.ok(solid.clear(of(win, 0, 1.6, 2), of(win, 0, 1.6, -1.2)), 'not through the window upstairs');
+  assert.ok(!solid.clear(of(win, 0, 0.6, 2), of(win, 0, 0.6, -1.2)), 'through the wall under the window');
+  const bars = bs.lay({ b: b.id, k: 'bars_wood', ...spots(b, 'bars_wood').find((s) => Math.abs(s.x - 4.5) < 0.1)! }, ME, 0);
+  assert.ok(typeof bars !== 'string', `no bars: ${bars}`);
+  assert.ok(solid.clear(of(win, -0.4, 1.6, 2), of(win, -0.4, 1.6, -1.2)), 'not between two bars');
+  assert.ok(!solid.clear(of(win, -0.3, 1.6, 2), of(win, -0.3, 1.6, -1.2)), 'through a bar');
+});
+
+ok('what lies on a base lies on its floor; a step through its wall, floor, bars or shut door is refused, and out of one let go', () => {
+  const { bs, b, piece, of, w, solid } = house();
+  assert.ok(Math.abs(solid.top(...w(0, STOREY + 2, 0)) - (b.oy + STOREY)) < 0.01, `upstairs: ${solid.top(...w(0, STOREY + 2, 0))} for ${b.oy + STOREY}`);
+  assert.ok(Math.abs(solid.top(...w(0, 1, 0)) - b.oy) < 0.01, 'downstairs: the foundation\'s top');
+  assert.equal(solid.top(...w(0, 1, -6)), -Infinity, 'nothing outside');
+  assert.ok(solid.crosses(w(0, 0.45, -2.2), w(0, 0.45, -0.8)), 'in through a wall');
+  assert.ok(!solid.crosses(w(0, 0.45, -0.6), w(0, 0.45, 0.6)), 'across the floor inside');
+  assert.ok(!solid.crosses(w(0, 0.45, -1.5), w(0, 0.45, -2.5)), 'out of a wall one is in');
+  assert.ok(solid.crosses(w(0, 2.4, 0), w(0, STOREY + 0.45, 0)), 'up through a floor');
+  assert.ok(solid.crosses(w(0, 0.45, 6), w(0, 0.45, 3.6)), 'through the shut door');
+  piece('door_wood', 0, 4.5).open = true;
+  assert.ok(!solid.crosses(w(0, 0.45, 6), w(0, 0.45, 3.6)), 'not through the open door');
+  const win = piece('window', 4.5, 0, STOREY);
+  bs.lay({ b: b.id, k: 'bars_wood', ...spots(b, 'bars_wood').find((s) => Math.abs(s.x - 4.5) < 0.1)! }, ME, 0);
+  assert.ok(solid.crosses(of(win, -0.4, 1.6, 1), of(win, -0.4, 1.6, -1)), 'between two bars, a body\'s middle');
+});
+
+ok('somebody in its rooms is shut in it; on its roof or outside, not; in a wall is in a piece', () => {
+  const { b, w, solid } = house();
+  assert.equal(solid.roomOf(...w(0, 0, 0)), b, 'downstairs');
+  assert.equal(solid.roomOf(...w(0, STOREY, 0)), b, 'upstairs, under the roof');
+  assert.equal(solid.roomOf(...w(0, 2 * STOREY + 1.6, 0)), null, 'on the roof');
+  assert.equal(solid.roomOf(...w(0, -0.3, -5)), null, 'outside');
+  assert.ok(solid.within(...w(-1.5, 1, 0)) && !solid.within(...w(0, 1, 0)), 'in a wall, and not in the room');
+  assert.ok(solid.within2(b, ...([w(1.5, 0, 1.5)[0], w(1.5, 0, 1.5)[2]] as [number, number])) && !solid.within2(b, w(0, 0, -6)[0], w(0, 0, -6)[2]), 'its outline');
+});
+
 if (process.argv.includes('--server')) await serverTest();
 if (failed.length) {
   console.error(`BUILD TEST FAILED: ${failed.length} of ${n + failed.length}: ${failed.join('; ')}`);
@@ -504,6 +560,8 @@ async function serverTest() {
       this.send({ t: 'hello', v: PROTOCOL, key: `build-test-key-${this.name}-`.padEnd(40, '0'), name: this.name, fp: `fp-${this.name}`.padEnd(64, 'b') });
       for (let k = 0; k < 300 && !this.of('welcome').length; k++) await sleep(50);
       assert.ok(this.of('welcome').length, `${this.name} was not let in`);
+      // (the bases about where they come in are told in the welcome itself: taken as told)
+      for (const b of this.of('welcome')[0].bases ?? []) this.got.push({ t: 'base', b });
     }
     send(m: unknown) {
       this.ws.send(JSON.stringify(m));
@@ -761,7 +819,11 @@ async function serverTest() {
     assert.ok(door, `no door: ${JSON.stringify(me.of('tell').slice(-2))}`);
     const P = door!.p[0];
     // (standing a step out from it, clear of its swing, both of them; it opens for both)
+    // (set down there, not walked: a step from the ground through the foundation's side is refused, server/solid.ts)
     const stand = async (who: Player, x: number, z: number) => {
+      const had = who.of('put').length;
+      who.send({ t: 'chat', text: `/tp ${(D.ox + x).toFixed(3)} ${D.oy.toFixed(3)} ${(D.oz + z).toFixed(3)}` });
+      for (let k = 0; k < 160 && who.of('put').length === had; k++) await sleep(25);
       who.pos = [D.ox + x, D.oy, D.oz + z];
       who.hold(who.held);
       await sleep(120);
@@ -894,6 +956,131 @@ async function serverTest() {
     assert.ok(hutBase && hutBase.b[7].length === 7, `the hut: ${JSON.stringify(hutBase?.b[7].length)} ${JSON.stringify(me.of('tell').slice(-2))}`);
     assert.ok(me.of('spent').slice(-12).some((m) => m.items.some(([id]) => id === 'log')), 'the hut was not paid for');
     console.log('  ok  a blueprint: the 1x1 hut laid whole, frames and its door, paid for out of the pockets');
+
+    // ---- solid: a round through a wall refused, a step through one put back, nobody back inside one, and a body and
+    // a thing on a second storey's floor (the owner via the navigator, 2026-10-24: "bases need full collision, also
+    // should be communicated to server so it cant be shot through or noclipped into somehow via relogging etc...")
+    const Hb = heard(hutBase!.b)!;
+    const hw = (x: number, y: number, z: number) => toWorld(Hb, x, y, z);
+    /** set down at a place (an admin's /tp, a height and all), and saying so */
+    const goAt = async (who: Player, [x, y, z]: [number, number, number]) => {
+      const had = who.of('put').length;
+      who.send({ t: 'chat', text: `/tp ${x.toFixed(3)} ${y.toFixed(3)} ${z.toFixed(3)}` });
+      for (let k = 0; k < 160 && who.of('put').length === had; k++) await sleep(25);
+      who.pos = [x, y, z];
+      who.hold(who.held);
+      await sleep(80);
+    };
+    const meId = me.of('welcome')[0].you;
+    const gun = await them.give('m9');
+    them.held = gun.id;
+    await goAt(me, hw(0, 0, -0.6));
+    await goAt(them, [hw(0, 0, -3)[0], data.groundAt(hw(0, 0, -3)[0], hw(0, 0, -3)[2]), hw(0, 0, -3)[2]]);
+    const sinceS = them.got.length;
+    them.send({ t: 'hit', to: meId, zone: 'torso', w: 'm9', dist: 2.4, sup: false, bonus: 0 });
+    await sleep(700);
+    assert.ok(!them.of('hitok').length && !them.got.slice(sinceS).some((m) => m.t === 'hitok'), 'a round through the wall struck');
+    assert.match(logged, /hit Builder through a base: not let through/);
+    // (and through the doorway: shut, refused; open, struck)
+    await goAt(them, [hw(0, 0, 3.2)[0], data.groundAt(hw(0, 0, 3.2)[0], hw(0, 0, 3.2)[2]), hw(0, 0, 3.2)[2]]);
+    await goAt(me, hw(0, 0, 0.3));
+    await sleep(300);
+    them.send({ t: 'hit', to: meId, zone: 'torso', w: 'm9', dist: 3, sup: false, bonus: 0 });
+    await sleep(600);
+    assert.ok(!them.got.slice(sinceS).some((m) => m.t === 'hitok'), 'a round through the shut door struck');
+    const hutDoor = [...Hb.pieces.values()].find((p) => p.k === 'door_wood')!;
+    me.send({ t: 'bdoor', b: Hb.id, p: hutDoor.id, open: true });
+    assert.ok(await me.until('bdoor', (m) => m.b === Hb.id && m.o === 1, 3000), 'the hut\'s door did not open');
+    await sleep(300);
+    them.send({ t: 'hit', to: meId, zone: 'torso', w: 'm9', dist: 3, sup: false, bonus: 0 });
+    assert.ok(await them.until('hitok', () => true, 3000, sinceS), 'a round through the open door did not strike');
+    console.log('  ok  a round through a wall or a shut door is refused on the server; through the open door it strikes');
+    // a step through a wall: kept outside, and their game put back there
+    me.send({ t: 'bdoor', b: Hb.id, p: hutDoor.id, open: false });
+    await me.until('bdoor', (m) => m.b === Hb.id && m.o === 0, 3000);
+    const outside = hw(0, 0, -2.2);
+    await goAt(them, [outside[0], data.groundAt(outside[0], outside[2]), outside[2]]);
+    const sinceW = them.got.length, from = them.pos;
+    const inside = hw(0, 0, -0.8);
+    them.send({ t: 's', p: [inside[0], inside[1], inside[2], 0, 0, 0], w: gun.id, m: [] });
+    const putBack = await them.until('put', () => true, 2000, sinceW);
+    assert.ok(putBack && Math.hypot(putBack.x - from[0], putBack.z - from[2]) < 0.05, `not put back from the wall: ${JSON.stringify(putBack)}`);
+    console.log('  ok  a step through a wall is refused, and the game put back where it was');
+    // back in the world inside a wall: set down clear of it
+    const inWall = hw(-1.5, 0, 0);
+    await goAt(me, inWall);
+    me.ws.close();
+    await sleep(600);
+    const me2 = new Player('Builder');
+    await me2.join();
+    const sp1 = me2.of('welcome')[0].spawn;
+    const [lx1, , lz1] = toLocal(Hb, sp1.x, sp1.y ?? 0, sp1.z);
+    assert.ok(Math.abs(lx1 + 1.5) > 0.3 || Math.abs(lz1) > 1.7, `back in the wall at ${lx1.toFixed(2)}, ${lz1.toFixed(2)}`);
+    assert.match(logged, /came back inside a piece of a base/);
+    // and shut in somebody else's: out of it
+    await goAt(them, hw(0.4, 0, -0.4));
+    them.ws.close();
+    await sleep(600);
+    const them2 = new Player('Stranger');
+    await them2.join();
+    const sp2 = them2.of('welcome')[0].spawn;
+    assert.ok(Math.hypot(sp2.x - Hb.ox, sp2.z - Hb.oz) > 4, `the stranger woke ${Math.hypot(sp2.x - Hb.ox, sp2.z - Hb.oz).toFixed(1)} m from the hut's middle`);
+    assert.match(logged, /came back shut in base \d+, not theirs/);
+    console.log(`  ok  back in the world inside a wall: set down clear of it (${Math.hypot(lx1 + 1.5, 0).toFixed(1)} m along); shut in somebody else's base: out of it (${Math.hypot(sp2.x - Hb.ox, sp2.z - Hb.oz).toFixed(1)} m from its middle)`);
+    // a watchtower: a body dead two metres over its floor lies on the floor; a box taken down there spills onto it
+    await me2.give('suitcase');
+    const cost = printCost('bp:tower');
+    for (const [id, n] of Object.entries(cost)) for (let left = n; left > 0; left -= 20) await me2.give(id, Math.min(20, left));
+    await me2.give('planks', 20);
+    await me2.give('nails', 20);
+    const plan5 = await me2.give('building_plan');
+    let towerAt: [number, number] | null = null;
+    for (let r = 0; r < 600 && !towerAt; r += 23) for (let q = 0; q < 6.28 && !towerAt; q += 0.7) {
+      const x = sx + 150 + Math.cos(q) * r, z = sz + Math.sin(q) * r;
+      if ([D, B, Hb].some((o) => Math.hypot(o.ox - x, o.oz - z) < 80)) continue;
+      if (typeof new Bases(land).lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, ME, 0) !== 'string') towerAt = [x, z];
+    }
+    assert.ok(towerAt, 'no place for the tower');
+    await me2.go(towerAt![0], towerAt![1] + 6);
+    const sinceT2 = me2.got.length;
+    me2.send({ t: 'bprint', id: 'bp:tower', x: towerAt![0], z: towerAt![1], yaw: 0, u: plan5.uid });
+    const towerB = await me2.until('base', (m) => Math.hypot(m.b[1] - towerAt![0], m.b[3] - towerAt![1]) < 1, 5000, sinceT2);
+    assert.ok(towerB && towerB.b[7].length === asksOf('bp:tower').length, `the tower: ${towerB?.b[7].length} ${JSON.stringify(me2.of('tell').slice(-2))}`);
+    const T = heard(towerB!.b)!, floorY = T.oy + STOREY;
+    // (a claim set down on its floor by the stranger, a plank in its store, taken down: the plank on the floor. A box with
+    // anything in it is not taken down; a claim's store spills, as it does when its base rots: server/claims.ts)
+    const plan6 = await them2.give('building_plan'), ham6 = await them2.give('hammer');
+    await them2.give('log', 1);
+    await them2.give('planks', 20);
+    await them2.give('nails', 10);
+    await goAt(them2, toWorld(T, -0.6, STOREY, -0.6));
+    const tc = deployAt(T, 'claim', { x: 0.6, y: STOREY, z: 0.6 })!;
+    assert.ok(tc, "no room for a claim on the tower's floor");
+    const sinceL2 = them2.got.length;
+    them2.send({ t: 'blay', k: 'claim', b: T.id, x: tc.x, y: tc.y, z: tc.z, r: 0, u: plan6.uid });
+    const tcl = await them2.until('bpc', (m) => m.b === T.id && PIECE_IDS[m.p[1]] === 'claim', 3000, sinceL2);
+    assert.ok(tcl, `no claim on the floor: ${JSON.stringify(them2.of('tell').slice(-2))}`);
+    const tcid = `claim:${T.id}`;
+    them2.send({ t: 'copen', cid: tcid });
+    assert.ok(await them2.until('cdata', (m) => m.cid === tcid, 3000, sinceL2), 'its store did not open');
+    const plank = them2.pockets.find((it) => it.id === 'planks')!;
+    them2.send({ t: 'cset', cid: tcid, items: [{ ...plank, qty: 2, x: 0, y: 0, rot: false }] });
+    await sleep(300);
+    them2.hold('hammer');
+    them2.send({ t: 'bdel', b: T.id, p: tcl!.p[0], u: ham6.uid });
+    const spilt = await them2.until('loot+', (m) => m.l.item.id === 'planks', 3000, sinceL2);
+    assert.ok(spilt && Math.abs(spilt.l.y - floorY) < 0.1, `the store spilled at ${spilt?.l.y?.toFixed(2)} (the floor ${floorY.toFixed(2)}, the ground ${data.groundAt(spilt?.l.x ?? T.ox, spilt?.l.z ?? T.oz).toFixed(2)}): ${JSON.stringify(them2.got.slice(sinceL2).filter((m) => ['tell', 'bout', 'loot+'].includes(m.t)).slice(-4))}`);
+    // (dead in the air over the floor: the body falls to the floor, not the ground)
+    // (an admin leaves no body unless they say so: everybody is one on this server)
+    me2.send({ t: 'chat', text: '/voidinv off' });
+    await sleep(200);
+    await goAt(me2, toWorld(T, 0, STOREY + 2, 0));
+    const sinceC = them2.got.length;
+    me2.send({ t: 'died', cause: 'a test' });
+    const body = await them2.until('death', () => true, 3000, sinceC);
+    const corpse = body?.corpse;
+    assert.ok(corpse && Math.abs(corpse.y - floorY) < 0.05, `the body lies at ${corpse?.y?.toFixed(2)} (the floor ${floorY.toFixed(2)}): ${JSON.stringify(body)}`);
+    console.log(`  ok  on the tower's floor (${(floorY - data.groundAt(T.ox, T.oz)).toFixed(1)} m up): what a claim's store spills rests on it, and a body dead over it lies on it`);
   } catch (e) {
     fail = e;
   } finally {

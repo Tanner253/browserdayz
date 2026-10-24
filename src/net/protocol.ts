@@ -70,7 +70,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (64, 2026-10-24: the hands' slot, the fixes path's release.)
 // (65, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
-// 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint').)
+// 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
+// who comes in, in the welcome (`bases`: stood on from the first frame).)
 export const PROTOCOL = 65;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -412,6 +413,8 @@ export type S2C =
       bunker?: boolean;
       /** the map's containers that somebody is searching at the moment: a locker among them stands with its doors open (see 'cdoor'). Not said by a server from before 2026-10-13 */
       ajar?: string[];
+      /** the bases in sight of where they come in: there before anything is laid on them, or they on it (server/build.ts) */
+      bases?: KeptBase[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }

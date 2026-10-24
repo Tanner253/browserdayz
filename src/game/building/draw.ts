@@ -155,6 +155,11 @@ export class BaseDraw {
     }
   }
 
+  /** the pieces near a place made solid now, not at the next half second: whoever is stood there stands on them from the first frame */
+  solidNear(at: THREE.Vector3) {
+    for (const d of this.drawn.values()) if (!d.colliders && d.at.distanceTo(at) < NEAR.solid) this.solid(d);
+  }
+
   /** where each of a door's leaves is at `d.a`, drawn and solid */
   private pose(d: Drawn) {
     const s = shapeOf(d.piece.k), leaves = s.leaves ?? [];

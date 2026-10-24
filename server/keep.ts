@@ -21,7 +21,7 @@ import { seen } from './seen';
 import { pinned, type Pin } from './pinned';
 import { elite } from './elite';
 import { plating } from './plates';
-import { keepBases, restoreBases } from './build';
+import { keepBases, restoreBases, sightFor } from './build';
 import type { KeptBase } from '../src/sim/build/bases';
 
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
@@ -705,6 +705,8 @@ export function place(t: Client, x: number, y: number | null, z: number, by: Cli
   t.check.lag = 0;
   t.check.owed = 0;
   t.underAt = 0;
+  // (the bases about where they are set down told first: server/build.ts)
+  sightFor(t);
   send(t, { t: 'put', x, ...(y === null ? {} : { y }), z, ...(by === t ? {} : { by: by.name }) });
 }
 

@@ -38,6 +38,7 @@ import { LadderView, type Climber } from './ladders';
 import { PrintView } from './prints';
 import { TorchView, type TorchHost } from './torches';
 import { printCost, printOf } from '../../sim/build/blueprints';
+import { BaseSolids } from '../../sim/build/solid';
 
 export interface BuildHost {
   scene: THREE.Scene;
@@ -172,6 +173,13 @@ export class Building {
 
   private get store() {
     return this.h.online() ? this.seen : this.local;
+  }
+  /** the bases' solids as this game knows them, for what its colliders do not reach (a body laid far off: src/sim/build/solid.ts) */
+  readonly solids = new BaseSolids(() => this.store.bases.values());
+
+  /** somebody is stood somewhere new (come in, woken, put there): the pieces about them solid at once */
+  stood(at: THREE.Vector3) {
+    this.draw.solidNear(at);
   }
   /** a wheel is up: the view does not turn, and the hands do nothing else */
   get wheelOpen() {
@@ -560,6 +568,7 @@ export class Building {
     if (!b) return;
     this.seen.bases.set(b.id, b);
     this.draw.setBase(b);
+    this.draw.solidNear(this.h.me());
     this.synced(b);
     this.bump(b.id);
   }

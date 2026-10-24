@@ -48,7 +48,8 @@ import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
 import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
-import { hammer, lay, owing, print, takeDown } from './build';
+import { hammer, lay, owing, print, sightFor, takeDown } from './build';
+import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
 import { tellBeds, wakeAt } from './beds';
 import { code as lockCode, cutKey, fit as fitLock, lockLets, onOff as lockOnOff, unfit as unfitLock } from './locks';
@@ -95,6 +96,8 @@ export function handle(c: Client, m: C2S) {
       c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
+      // (nor through a base's wall, floor or shut door: server/solid.ts)
+      if (c.pose === m.p && stepWalled(c, was, m.p)) c.pose = [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       // (where they look, kept a moment for the aim's own checks: see aimwatch.ts)
       looked(c, m.p[3], m.p[4]);
       // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
@@ -259,6 +262,8 @@ export function handle(c: Client, m: C2S) {
           if (now - q.at < 4000 && bd < reach && (!best || bd < best.d)) best = { q, d: bd };
         }
         if (!best || ++best.q.hits > 12 || !num(m.dist)) return;
+        const drum = world.barrels[best.q.i];
+        if (blastWalled([drum.x, drum.y + BARREL.centre - 0.3, drum.z], [target.pose[0], target.pose[1] + 1.1, target.pose[2]])) return;
         // the game says how far off they were; it is not believed by more than a couple of metres
         amount = hitDamage(m.w, 'torso', Math.max(0, m.dist, best.d - 2));
         m.zone = 'torso';
@@ -267,7 +272,8 @@ export function handle(c: Client, m: C2S) {
         // A grenade of theirs, gone off when the server's own count of its fuse says, no further from where it left
         // the hand than it can have flown, and reaching this body for the first time: see `judge`. The game says how
         // far off they were; it is believed no nearer than the grenade can have got.
-        const far = num(m.dist) ? judge(c.nades, m.w, `p${target.id}`, [target.pose[0], target.pose[1] + 1.1, target.pose[2]], m.dist, now) : null;
+        const chest: [number, number, number] = [target.pose[0], target.pose[1] + 1.1, target.pose[2]];
+        const far = num(m.dist) ? judge(c.nades, m.w, `p${target.id}`, chest, m.dist, now, undefined, blastFrom(chest)) : null;
         if (far === null) return;
         amount = hitDamage(m.w, 'torso', far);
         m.zone = 'torso';
@@ -289,6 +295,8 @@ export function handle(c: Client, m: C2S) {
         // (a round does not go through a hill)
         const hill = rule.melee || CHECKS === 'off' ? 0 : hillBetween(c.pose, target.pose);
         if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
+        // (nor through a base's wall, floor or shut door, nor struck through one: server/solid.ts)
+        if (walled(c.pose, zoneAt(target.pose, m.zone))) return void log(`${c.name} hit ${target.name} through a base: not let through`);
         c.lastHit = now;
         // (what the round left in the bodies it went through first: see PIERCE)
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
@@ -323,7 +331,8 @@ export function handle(c: Client, m: C2S) {
         // something of theirs went off: a drum set off in the last few seconds, or a grenade, held to what any
         // blast of a grenade is held to (when, where, and each of them once: `judge`)
         if (!num(m.dist)) return;
-        const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `i${m.i}`, [b.s[0], b.s[1] + 1.2, b.s[2]], m.dist, now);
+        const chest: [number, number, number] = [b.s[0], b.s[1] + 1.2, b.s[2]];
+        const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `i${m.i}`, chest, m.dist, now, undefined, blastFrom(chest));
         if (far === null) return;
         amount = hitDamage(m.w, 'torso', far);
         m.zone = 'torso';
@@ -336,6 +345,7 @@ export function handle(c: Client, m: C2S) {
       } else {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (!mayHit(c, `i${m.i}`, now, rule.interval * 700)) return;
+        if (walled(c.pose, zoneAt([b.s[0], b.s[1], b.s[2], 0, 0, 0], m.zone))) return;
         c.lastHit = now;
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
       }
@@ -649,6 +659,8 @@ export function handle(c: Client, m: C2S) {
       c.check.hp = 100;
       c.check.hpAt = Date.now();
       c.check.downAt = 0;
+      // (the bases about a bed told before they are stood on it)
+      sightFor(c);
       send(c, { t: 'spawn', x: sp.x, z: sp.z, yaw: sp.yaw, ...(bed ? { y: bed.y } : {}) });
       broadcast({ t: 'alive', id: c.id }, c);
       return;

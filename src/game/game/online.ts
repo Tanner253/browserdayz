@@ -122,6 +122,8 @@ export const onlineMethods = {
     this.wild.leaveAlone();
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
+    // (the bases about them, solid under them before the first frame and before anything is laid on them)
+    for (const b of w.bases ?? []) this.build.onBase({ t: 'base', b });
     if (w.me) {
       for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
       this.takeVitals(w.me.vitals);
@@ -517,6 +519,7 @@ export const onlineMethods = {
       const p = this.player;
       // (at a bed, on it: its height is the server's word)
       p.spawn(m.x, m.y ?? heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      this.build.stood(p.pos);
       this.freshKit();
       this.deathSent = false;
       this.deathInfo = '';
@@ -642,6 +645,7 @@ export const onlineMethods = {
       const pitch = p.pitch;
       // (the arena faces a body set down for a round toward the other end; anybody else keeps their own way)
       p.spawn(m.x, y + 0.1, m.z, m.yaw ?? p.yaw);
+      this.build.stood(p.pos);
       p.pitch = m.yaw === undefined ? pitch : 0;
       p.landSoft();
       this.buriedT = 0;
@@ -968,8 +972,12 @@ export const onlineMethods = {
       from = under.point.y - 0.02;
       under = physics.raycast({ x: c.x, y: from, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
     }
+    // (and on a base's floor where its colliders are not made, far off: src/sim/build/solid.ts)
+    const floor = this.build.solids.top(c.x, c.y + 0.5, c.z);
+    if (floor > -Infinity && (!under || floor > under.point.y + 0.02)) under = null;
     const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
     if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
+    else if (!under && floor > -Infinity) c = { ...c, y: floor };
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);
     stash.corpse = true;
     // (dog tags lie on a body, and are taken off it: see Container.refusal)
