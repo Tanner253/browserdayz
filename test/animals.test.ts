@@ -203,13 +203,16 @@ ok('a bear roars and charges whoever comes too near, and its blows land on whoev
   const bear = h.place('bear', 0, 0, 0)[0];
   bear.yaw = Math.atan2(-1, 0);
   const man = person(1, 12, 0);
-  let roared = false;
+  let roared = false, nearest = Infinity;
   const strikes = run(h, 0, 8, [man], () => {
     if (bear.mode === A_ROAR) roared = true;
+    nearest = Math.min(nearest, Math.hypot(bear.x - man.x, bear.z - man.z));
   });
   assert.ok(roared, 'a warning first');
   assert.ok(strikes.length >= 2, `${strikes.length} blows`);
   assert.ok(strikes.every((s) => s.on === 1 && s.damage >= 20));
+  // (its muzzle at him, never its body through him: its middle was once 0.2 m from his)
+  assert.ok(nearest > KIND.bear.len / 2 + 0.4, `came within ${nearest.toFixed(2)} m`);
 });
 
 ok('outrun: away at a sprint from further than a dozen metres when it roars, and the bear never catches you', () => {

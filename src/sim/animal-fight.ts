@@ -10,6 +10,8 @@ const PI2 = Math.PI * 2;
 const turnTo = (a: number, b: number, max: number) => a + Math.max(-max, Math.min(max, Math.atan2(Math.sin(b - a), Math.cos(b - a))));
 const angleOff = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)));
 const isNight = (p: number) => p >= 0.73 || p < 0.02;
+/** how near its middle comes to whoever it fights: its muzzle at them, not in them (a bear stopped 1.2 m off had its head through the man) */
+const close = (k: Kind) => k.len / 2 + 0.45;
 
 /**
  * A bear: the warning, the rush, the chase, the blows, and giving up. A bear that
@@ -63,7 +65,7 @@ export function fighter(h: Herd, b: Beast, k: Kind, now: number, dt: number, peo
   }
   const pace = now < b.rushUntil ? f.rush : f.chase;
   if (blows(h, b, k, foe, now, dt, turn, pace)) return true;
-  h.go(b, k, b.seenX, b.seenZ, pace, dt, foe.sheltered ? 3 : 1.2);
+  h.go(b, k, b.seenX, b.seenZ, pace, dt, foe.sheltered ? 3 : close(k));
   return true;
 }
 
@@ -75,7 +77,7 @@ export function blows(h: Herd, b: Beast, k: Kind, foe: Seen, now: number, dt: nu
   const d = Math.hypot(foe.x - b.x, foe.z - b.z);
   if (b.move) {
     const mode = b.move.mode;
-    if (d > 1.2) h.go(b, k, foe.x, foe.z, pace, dt, 1.2);
+    if (d > close(k)) h.go(b, k, foe.x, foe.z, pace, dt, close(k));
     b.yaw = turnTo(b.yaw, yawTo(foe.x - b.x, foe.z - b.z), 2.4 * dt);
     b.mode = mode;
     if (now >= b.moveAt) {
@@ -89,7 +91,7 @@ export function blows(h: Herd, b: Beast, k: Kind, foe: Seen, now: number, dt: nu
     return true;
   }
   if (now < b.restUntil) {
-    if (d > 1.5) h.go(b, k, foe.x, foe.z, pace * 0.35, dt, 1.5);
+    if (d > close(k) + 0.3) h.go(b, k, foe.x, foe.z, pace * 0.35, dt, close(k) + 0.3);
     else {
       b.speed = 0;
       b.mode = A_IDLE;
@@ -103,7 +105,7 @@ export function blows(h: Herd, b: Beast, k: Kind, foe: Seen, now: number, dt: nu
   const m = moves.find((mm) => (r -= mm.weight) < 0) ?? moves[0];
   b.move = m;
   b.moveAt = now + m.windup * 1000;
-  if (d > 1.2) h.go(b, k, foe.x, foe.z, pace, dt, 1.2);
+  if (d > close(k)) h.go(b, k, foe.x, foe.z, pace, dt, close(k));
   b.mode = m.mode;
   return true;
 }
@@ -172,7 +174,7 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
       if (!b.move) b.dashUntil = 0;
       return true;
     }
-    h.go(b, k, q.x, q.z, f.rush, dt, 1.2);
+    h.go(b, k, q.x, q.z, f.rush, dt, close(k));
     return true;
   }
   // round them, each at its own place on the ring, the ring turning

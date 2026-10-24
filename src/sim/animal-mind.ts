@@ -607,7 +607,8 @@ export class Herd {
     const can = (x: number, z: number) => this.ground.open(x, z, k.steep) && (!farm || Math.hypot(x - farm.x, z - farm.z) < farm.r * 0.9) && (!!farm || inTown || this.ground.biome(x, z) !== 'town') && (home || onCountry(k.lives, this.ground.biome(x, z)));
     // (a way is open where it is clear both at the next step and further on: clear only further on, the way went
     // through a wall or a house it could not step through, and it stood there running for good)
-    const step = Math.min(d, speed * dt), next = Math.max(0.8, Math.min(3, speed * dt * 1.3));
+    // (never past where it means to stop: a bear's step at a charge's 9 m/s is nearly two metres, and it ended in the man)
+    const step = Math.min(d - near, speed * dt), next = Math.max(0.8, Math.min(3, speed * dt * 1.3));
     let yaw = NaN;
     for (const off of [0, 0.45, 0.9, 1.4, 2.0, 2.6]) {
       for (const s of off ? [b.side, -b.side] : [1]) {
