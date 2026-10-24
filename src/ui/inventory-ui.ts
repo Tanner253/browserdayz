@@ -1163,17 +1163,33 @@ export class InventoryUI {
    * The hot keys along the foot of the screen: what is on each, and a place to let a thing go to put it on one.
    * (Pointing at a thing and pressing the number does the same. A right-click on a key clears it.)
    */
+  /** what there is of the thing on a key, as the hot bar at the foot of the screen says it: rounds, drinks, how many */
+  private hotLabel(it: ItemInstance): string {
+    const d = ITEMS[it.id];
+    if (d.weapon) return String(it.loaded ?? 0);
+    if (d.mag) return String(it.rounds ?? 0);
+    if (d.use?.sips) return `${it.left ?? d.use.sips}/${d.use.sips}`;
+    return d.melee || d.slot ? '' : String(this.inv.count(it.id));
+  }
+
+  /**
+   * The hot keys, 1 to 0, as DayZ has them: one row of big squares at the foot of the screen, beneath the hands, each
+   * with its number, the thing's picture and what there is of it (the owner, 2026-10-23: "we need to make the hotbar
+   * slots much bigger now like dayz's at the bottom beneath hands"). Two rows of them in the survivor's column were
+   * cut off at the foot of a 16:9 screen. A thing is dragged onto a key to put it there; a key is dragged off to clear it, or onto
+   * another key to move it there (right-click clears it too). The keys themselves are as they were.
+   */
   private hotEl() {
     const bar = document.createElement('div');
-    bar.className = 'inv-hot';
+    bar.className = 'inv-hot big';
     this.inv.hot.forEach((b, i) => {
       const it = b ? this.inv.hotItem(i) : null;
       const cell = document.createElement('div');
       cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '') + (it && this.mark(it) !== ' sel' ? this.mark(it) : '');
       cell.dataset.hot = String(i);
       const id = it?.id ?? b?.id;
-      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${it ? this.iconOf(it) : this.icons[id] ?? ''})"></div>${kindIcon(id)}` : ''}`;
-      cell.title = id ? `${ITEMS[id].name}${it ? '' : ' (none carried)'} · right-click to clear` : `Key ${(i + 1) % 10}: drag a thing here, or point at it and press ${(i + 1) % 10}`;
+      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${it ? this.iconOf(it) : this.icons[id] ?? ''})"></div>${kindIcon(id)}<em>${it ? this.hotLabel(it) : ''}</em>` : ''}`;
+      cell.title = id ? `${ITEMS[id].name}${it ? '' : ' (none carried)'} · drag it off, or right-click, to clear` : `Key ${(i + 1) % 10}: drag a thing here, or point at it and press ${(i + 1) % 10}`;
       cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (!b) return;
@@ -1181,9 +1197,29 @@ export class InventoryUI {
         this.actions.sound('move');
         this.render();
       });
+      if (b) cell.addEventListener('pointerdown', (e) => this.dragKey(e, i));
       bar.appendChild(cell);
     });
     return bar;
+  }
+
+  /** A key's thing dragged by the key: let go off the keys, the key is bare; on another key, it is moved there. */
+  private dragKey(e: PointerEvent, i: number) {
+    if (e.button !== 0) return;
+    const from = { x: e.clientX, y: e.clientY };
+    const up = (u: PointerEvent) => {
+      window.removeEventListener('pointerup', up, true);
+      if (Math.hypot(u.clientX - from.x, u.clientY - from.y) < 8) return;
+      const onto = (document.elementFromPoint(u.clientX, u.clientY) as HTMLElement | null)?.closest<HTMLElement>('.inv-hotkey');
+      const to = onto ? Number(onto.dataset.hot) : -1;
+      if (to === i) return;
+      const it = this.inv.hotItem(i);
+      if (to >= 0 && it) this.actions.assignHot(it, to);
+      else this.actions.assignHot(null, i);
+      this.actions.sound('move');
+      this.render();
+    };
+    window.addEventListener('pointerup', up, true);
   }
 
   /** the gun carried that has this number (the one a part's place belongs to) */
@@ -1430,26 +1466,25 @@ export class InventoryUI {
       g.className = 'inv-ground';
       g.dataset.ground = '1';
       if (!this.vicinity.length) g.innerHTML = `<div class="inv-empty">Nothing on the ground nearby.<br>Drag items here to drop them.</div>`;
+      // Each thing lying about is its picture at its own size, as it would lie in a grid, with what there is of it in
+      // its corner and no line of words: its name is on the card when it is pointed at (the owner, 2026-10-23: "i do not
+      // want a row for every item it should just be a icon for the item ... 1:1"). A long thing lies on its side.
+      const tiles = document.createElement('div');
+      tiles.className = 'inv-ground-tiles';
+      if (this.vicinity.length) g.appendChild(tiles);
       for (const w of this.vicinity) {
-        const d = ITEMS[w.loot.item.id];
-        const row = document.createElement('div');
-        row.className = 'inv-ground-row';
-        const ic = document.createElement('div');
-        ic.className = 'inv-item mini';
-        // (its kind, for the faint colour each kind's cell has: see the stylesheet. Not as a `cat-` class: those are how a thing in a grid is found by what films the screen, and this is no thing in a grid.)
-        ic.dataset.kind = d.category;
-        // (a bat is six cells tall and one wide: stood up in this little box its picture is a hair. Long things are laid on their side here.)
-        ic.innerHTML = `<div class="inv-item-img fit${d.h > d.w ? ' lying' : ''}" style="background-image:url(${this.iconOf(w.loot.item)})"></div>`;
-        row.appendChild(ic);
-        // (a pack, a vest or a case lying there says whether anything is in it, and is gone through where it lies: see below)
-        const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.use?.sips ? ` <span>${w.loot.item.left ?? d.use.sips}/${d.use.sips}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : holds(w.loot.item.id) ? ` <span>· ${w.loot.item.cargo?.length ? things(w.loot.item.cargo.length) : 'empty'}</span>` : '';
-        row.insertAdjacentHTML('beforeend', `<div class="g-name">${itemName(w.loot.item)}${extra}<small>${kindOf(d)}</small></div>`);
-        this.bindItem(row, { kind: 'ground', w, item: w.loot.item });
-        g.appendChild(row);
-        // What lies there that holds things is shown open under it, as what is worn is, and gone through there: taken
-        // out of, put into, moved about in (the owner, 2026-10-15: "all inventories should be shown in vicinity pane when
-        // items are on the ground / armor, clothes, bags doesnt matter, should show like it does in the inventory"), by
-        // as many as like at once (Game.openLying).
+        const d = ITEMS[w.loot.item.id], rot = d.h > d.w;
+        const [cw, ch] = Container.size(w.loot.item, rot);
+        const el = this.itemEl(w.loot.item, cw, ch, rot);
+        el.classList.add('g-tile');
+        this.bindItem(el, { kind: 'ground', w, item: w.loot.item });
+        tiles.appendChild(el);
+      }
+      for (const w of this.vicinity) {
+        // What lies there that holds things is shown open under the pictures, as what is worn is, and gone through
+        // there: taken out of, put into, moved about in (the owner, 2026-10-15: "all inventories should be shown in
+        // vicinity pane when items are on the ground / armor, clothes, bags doesnt matter, should show like it does in
+        // the inventory"), by as many as like at once (Game.openLying).
         if (holds(w.loot.item.id)) {
           const st = this.actions.lying(w.loot.uid);
           const bag = st === 'mine' ? this.bagOf(w.loot.item, 1) : null;
@@ -1544,6 +1579,8 @@ export class InventoryUI {
       long.append(...WEAPON_SLOTS.filter(pair).map(withParts));
       return [top, long];
     });
+    // (the hot keys, big, at the foot beneath the hands: see `hotEl`)
+    const hot = this.block('f:hot', `${held?.uid ?? ''}|${inv.hot.map((b, i) => (b ? `${b.id}:${this.inv.hotItem(i) ? `${this.look(this.inv.hotItem(i)!)}:${this.hotLabel(this.inv.hotItem(i)!)}` : ''}` : '-')).join('|')}`, () => [this.hotEl()]);
     // (the tags taken off others: here under the survivor, out of the way of what is carried)
     const tags = this.block('g:tags', ui + this.gridSig(inv.tags), () => this.boxNodes(inv.tags));
     this.gridsNow.set(inv.tags.id, inv.tags);
@@ -1605,9 +1642,8 @@ export class InventoryUI {
     if (this.vitals && this.status && this.status.parentElement !== sk.status) sk.status.appendChild(this.status);
     this.fill(sk.cargo, [...head, this.findEl(), sk.scroll, ...inspect, ...(this.vitals && this.status ? [sk.status] : [])]);
 
-    // ---- the foot: the clicks, and the hot keys
-    const hot = this.block('f:hot', `${held?.uid ?? ''}|${inv.hot.map((b, i) => (b ? `${b.id}:${this.inv.hotItem(i) ? this.look(this.inv.hotItem(i)!) : ''}` : '-')).join('|')}`, () => [this.hotEl()]);
-    this.fill(sk.foot, [sk.help, ...hot]);
+    // ---- the foot: the hot keys, and the clicks
+    this.fill(sk.foot, [...hot, sk.help]);
     for (const k of [...this.built.keys()]) if (k.startsWith('c:grid:') && !this.gridsNow.has(k.slice(7))) this.built.delete(k);
     for (const f of this.rescroll) f();
     this.marks();

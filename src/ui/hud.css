@@ -393,8 +393,8 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 }
 .hb {
   position: relative;
-  width: 60px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   background: rgba(10, 12, 11, 0.42);
   border: 1px solid rgba(233, 228, 216, 0.12);
   transition: border-color 0.15s, background 0.15s;
@@ -405,7 +405,7 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 /* (the key's number drawn as a key, so that it is not read as one more count: Fettah 2026-10-18, "a square around them so they look like buttons") */
 .hb b { position: absolute; left: 3px; top: 3px; min-width: 12px; padding: 0 3px; font-family: var(--mono); font-size: 9px; font-weight: 400; line-height: 11px; text-align: center; color: var(--ink-faint); border: 1px solid rgba(233, 228, 216, 0.3); background: rgba(0, 0, 0, 0.5); z-index: 1; }
 .hb.on b { color: var(--accent); }
-.hb i { position: absolute; inset: 3px; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.hb i { position: absolute; inset: 15px 5px 13px; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .hb em { position: absolute; right: 4px; bottom: 1px; font-family: var(--mono); font-size: 10px; font-style: normal; color: var(--ink); text-shadow: 0 1px 2px #000; }
 .hb-gap { width: 12px; }
 
@@ -2073,7 +2073,7 @@ body.touch #hud.hidden .hud-hotbar, body.touch #hud.hidden .hud-minimap { pointe
    slots in the hotbar at the bottom 1 row, more if larger size can handle it". What is in a slot not shown is reached by
    the swap button and the pack, as before.) */
 body.touch .hud-hotbar { left: 46%; bottom: 8px; display: flex; gap: 4px; pointer-events: auto; touch-action: manipulation; }
-body.touch .hb { width: 62px; height: 50px; background: rgba(10, 12, 11, 0.55); border-color: rgba(233, 228, 216, 0.22); }
+body.touch .hb { width: 56px; height: 56px; background: rgba(10, 12, 11, 0.55); border-color: rgba(233, 228, 216, 0.22); }
 body.touch .hud-hotbar > div.hb:nth-of-type(n + 6) { display: none; }
 @media (min-width: 820px) { body.touch .hud-hotbar > div.hb:nth-of-type(6) { display: block; } }
 @media (min-width: 900px) { body.touch .hud-hotbar > div.hb:nth-of-type(7) { display: block; } }

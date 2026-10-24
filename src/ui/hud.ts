@@ -99,6 +99,29 @@ export interface HotbarEntry {
   dim: boolean;
 }
 
+/** The page scaled to the window, so it reads the same on a laptop, a 1440p monitor and a phone (also the stage's). */
+export function fitScreen(touch: boolean) {
+  const w = window.innerWidth, h = window.innerHeight;
+  const css = document.documentElement.style;
+  const z = Math.round(Math.max(0.7, Math.min(1.7, h / 860, w / 1400)) * 100) / 100;
+  css.setProperty('--ui-zoom', String(z));
+  // dialogs grow with a big screen but never shrink below their designed size...
+  css.setProperty('--dialog-zoom', String(touch ? Math.max(0.55, Math.min(1, h / 640, w / 760)) : Math.max(1, z)));
+  // ...except on a phone, where they and the inventory have to fit a small screen whole
+  css.setProperty('--inv-zoom', String(touch ? Math.max(0.5, Math.min(1.7, h / 700, w / 1340)) : z));
+}
+
+/** The hot bar's squares as the HUD draws them (also the stage's: src/dev/stage-inventory.ts). */
+export function hotbarCells(list: HotbarEntry[], icons: Record<string, string>): string {
+  return list
+    .map((h, i) => {
+      const url = h.id ? (h.look && icons[`${h.id}|${h.look}`]) || icons[h.id] : '';
+      const icon = url ? `<i style="background-image:url(${url})"></i>` : '';
+      return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}${h.id && ITEMS[h.id] ? kindIcon(h.id) : ''}<em>${h.label}</em></div>`;
+    })
+    .join('');
+}
+
 /** where the game is talked about, and its token's address on Solana: both shown on the main menu */
 export const X_HANDLE = 'zonaSOL_';
 /** where its players talk to each other: the way in to the Discord, on the main menu */
@@ -614,16 +637,7 @@ export class HUD {
     kbs.addEventListener('contextmenu', (e) => e.preventDefault());
     this.mapTips();
     // scale the whole HUD with the window so it reads the same on a laptop and a 1440p monitor
-    const fit = () => {
-      const w = window.innerWidth, h = window.innerHeight;
-      const css = document.documentElement.style;
-      const z = Math.round(Math.max(0.7, Math.min(1.7, h / 860, w / 1400)) * 100) / 100;
-      css.setProperty('--ui-zoom', String(z));
-      // dialogs grow with a big screen but never shrink below their designed size...
-      css.setProperty('--dialog-zoom', String(TOUCH ? Math.max(0.55, Math.min(1, h / 640, w / 760)) : Math.max(1, z)));
-      // ...except on a phone, where they and the inventory have to fit a small screen whole
-      css.setProperty('--inv-zoom', String(TOUCH ? Math.max(0.5, Math.min(1.7, h / 700, w / 1340)) : z));
-    };
+    const fit = () => fitScreen(TOUCH);
     document.body.classList.toggle('touch', TOUCH);
     this.el.hotbar.addEventListener('pointerdown', (e) => {
       const key = (e.target as HTMLElement).closest('.hb')?.querySelector('b')?.textContent;
@@ -1994,13 +2008,7 @@ export class HUD {
     if (sig !== this.last.hotbar) {
       this.last.hotbar = sig;
       this.last.hotbarWords = words;
-      e.hotbar.innerHTML = s.hotbar
-        .map((h, i) => {
-          const url = h.id ? (h.look && this.icons[`${h.id}|${h.look}`]) || this.icons[h.id] : '';
-          const icon = url ? `<i style="background-image:url(${url})"></i>` : '';
-          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}${h.id && ITEMS[h.id] ? kindIcon(h.id) : ''}<em>${h.label}</em></div>`;
-        })
-        .join('');
+      e.hotbar.innerHTML = hotbarCells(s.hotbar, this.icons);
     }
 
     this.set('prompt', e.prompt, s.prompt ? relabel(s.prompt) : '', 'html');

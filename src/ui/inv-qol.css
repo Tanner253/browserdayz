@@ -34,3 +34,21 @@
 /* painted once at nearly nothing before it is first opened (InventoryUI.paintAhead), and nothing on it can be pointed at */
 .inv.ahead { opacity: 0.004; pointer-events: none; }
 .inv.ahead * { pointer-events: none !important; }
+
+/* The hot keys at the foot of the screen beneath the hands, one row of big squares as DayZ has them (InventoryUI.hotEl):
+   the number, the picture, what there is of it. Dragged off to clear, onto another key to move. The panels end over
+   them, and the line of clicks stands under them. */
+.inv-wrap { bottom: 146px; }
+.inv-foot { height: auto; grid-template-rows: auto 60px; row-gap: 8px; }
+.inv-foot > .inv-hot.big { position: static; grid-column: 2; grid-row: 1; justify-self: center; transform: none; display: flex; gap: 6px; padding: 5px 7px; }
+.inv-foot > .inv-help { grid-row: 2; }
+.inv-hot.big .inv-hotkey { flex: none; width: 64px; height: 64px; min-width: 0; }
+.inv-hot.big .inv-hotkey:nth-child(3) { margin-right: 10px; }
+.inv-hot.big .inv-hotkey:not(.empty) { cursor: grab; }
+.inv-hot.big .inv-hotkey .inv-item-img.fit { inset: 16px 5px 14px; }
+.inv-hot.big .inv-hotkey b { font-size: 11px; line-height: 14px; }
+.inv-hot.big .inv-hotkey em { position: absolute; right: 4px; bottom: 2px; z-index: 1; font: 600 11px/13px var(--mono); font-style: normal; color: var(--ink); text-shadow: 0 1px 2px #000; pointer-events: none; }
+
+/* Vicinity: each thing lying about its own picture at its own size, as in a grid, packed in rows */
+.inv-ground-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; padding: 2px; }
+.inv-ground-tiles > .inv-item.g-tile { position: relative; flex: none; }
