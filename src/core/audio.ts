@@ -274,6 +274,15 @@ export function recordings(): Promise<void> {
   })());
 }
 
+/**
+ * Each animal sound's level, under the guns. The recordings were levelled as loud as the gunshots' (scripts/sounds.mjs)
+ * and fall off with distance as a rifle's does, so at 1 a wolf growling five metres off was as loud as your own shot.
+ * A bear's roar is the loudest thing an animal does; a growl is for whoever is close enough to hear it.
+ */
+const ANIMAL_LEVEL: Record<string, number> = {
+  bear_roar: 0.8, bear_growl: 0.6, bear_bite: 0.6, roar: 0.6, howl: 0.6, moo: 0.45, hooves: 0.45, wolf_growl: 0.4, wolf_snarl: 0.55,
+};
+
 const lateAsked = new Map<string, Promise<void>>();
 /**
  * Fetches one recording, once, when it is first wanted and not with the rest: the rotor of the helicopter that
@@ -1325,7 +1334,6 @@ export class AudioEngine {
 
   // ------------------------------------------------------------ world
 
-  /** latch click + hinge creak (opening) or a soft thud (closing) */
   /**
    * An animal heard (src/sim/animal-calls.ts, and its own movements: src/game/animals.ts): its recording,
    * assets/sounds/animal_<name>.wav, fetched when one is first heard, from where it was, as late as sound takes to come
@@ -1335,7 +1343,7 @@ export class AudioEngine {
     if (!this.ready) return;
     const rec = `animal_${name}`;
     // (one of its takes, never the one heard last, each a little different)
-    if (this.rec(rec, this.out(pos, 10, 1, distance, this.bus.ambience), this.ctx.currentTime + distance / 343, gain, 1, false, true)) return;
+    if (this.rec(rec, this.out(pos, 10, 1, distance, this.bus.ambience), this.ctx.currentTime + distance / 343, gain * (ANIMAL_LEVEL[name] ?? 0.5), 1, false, true)) return;
     // (the first is heard once it is here, if that is soon)
     if (!waited) {
       const asked = performance.now();
@@ -1349,6 +1357,7 @@ export class AudioEngine {
     if (!this.rec('vomit', this.bus.voice, this.ctx.currentTime, 0.8, 1, false, true)) void lateRecording('vomit');
   }
 
+  /** latch click + hinge creak (opening) or a soft thud (closing) */
   door(opening: boolean, pos: V3, distance = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
