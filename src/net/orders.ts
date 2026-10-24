@@ -20,8 +20,9 @@ export interface Entity {
   /** the word it is asked for by */
   id: string;
   name: string;
-  /** how the server makes it: a car (`k` says which car), or one of the infected */
-  kind: 'car' | 'infected';
+  /** how the server makes it: a car (`k` says which car), one of the infected, or an animal (`animal`: its kind, src/sim/animals.ts) */
+  kind: 'car' | 'infected' | 'animal';
+  animal?: string;
   k?: number;
   /** the most of them one order stands */
   most: number;
@@ -34,6 +35,16 @@ export const ENTITIES: Entity[] = [
   { id: 'police', name: 'Police car', kind: 'car', k: POLICE_CAR.kind, most: 4, does: 'The road car: quicker than the jeep on a road, slower off it', also: ['policecar', 'cop'] },
   { id: 'heli', name: 'Helicopter', kind: 'car', k: HELI.kind, most: 2, does: 'The MD-500: two seats; Space climbs, C drops (put it somewhere with room round it)', also: ['helicopter', 'md500', 'chopper'] },
   { id: 'infected', name: 'Infected', kind: 'infected', most: 25, does: 'They stand where they are put, and go for whoever is near. Nothing comes back in their place when they are dead', also: ['zombie', 'zombies', 'z'] },
+  // (the animals, 2026-10-23: each stood in a herd of its own that lives where it is put; src/sim/animals.ts)
+  { id: 'deer', name: 'Red deer stag', kind: 'animal', animal: 'stag', most: 8, does: 'Grazes, and bolts from anybody it sees, hears or smells', also: ['stag'] },
+  { id: 'doe', name: 'Red deer hind', kind: 'animal', animal: 'doe', most: 8, does: 'Grazes, and bolts', also: ['hind'] },
+  { id: 'bear', name: 'Brown bear', kind: 'animal', animal: 'bear', most: 4, does: 'Roars, then charges whoever comes near or hurts it' },
+  { id: 'wolf', name: 'Wolf', kind: 'animal', animal: 'wolf', most: 8, does: 'Circles whoever it hunts and comes in to bite', also: ['wolves'] },
+  { id: 'boar', name: 'Wild boar', kind: 'animal', animal: 'boar', most: 6, does: 'Runs, and charges when hurt and near' },
+  { id: 'hare', name: 'Hare', kind: 'animal', animal: 'hare', most: 8, does: 'Bolts zig-zag' },
+  { id: 'goat', name: 'Wild goat', kind: 'animal', animal: 'goat', most: 8, does: 'Bolts uphill' },
+  { id: 'fox', name: 'Red fox', kind: 'animal', animal: 'fox', most: 6, does: 'Bolts' },
+  { id: 'cow', name: 'Cow', kind: 'animal', animal: 'cow', most: 6, does: 'Wanders, and shies off' },
 ];
 /** the thing meant by a word typed after `/spawn` */
 export const entityBy = (word: string): Entity | null => {

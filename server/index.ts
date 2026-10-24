@@ -1266,6 +1266,10 @@ setInterval(tagsWorn, 1000).unref();
 setInterval(() => stashesSeen(clients.values(), boxes.values(), send), 1000).unref();
 // (the animals: the server moves every one, five times a second where anybody is near: server/animals.ts)
 startAnimals();
+// (built fires that have stood cold their while are cleared away: src/sim/fires.ts FIRE.built)
+setInterval(() => {
+  for (const i of hearths.cleared(Date.now() / 1000)) broadcast({ t: 'fire-', i });
+}, 10_000).unref();
 setInterval(() => animalsTick(Date.now()), 200).unref();
 
 void loadKept();

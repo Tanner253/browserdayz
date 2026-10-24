@@ -77,6 +77,7 @@ import { Near } from './near';
 import { Perf } from '../core/perf';
 import { loadGraphics, loadMix, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
+import { Beast, Wildlife } from './animals';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
@@ -109,6 +110,7 @@ import { onlineMethods } from './game/online';
 import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
+import { huntMethods } from './game/hunt';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -278,6 +280,13 @@ export class Game {
   hearths!: Hearths;
   /** resting by a fire that is alight: mending by it, or only warm (a wound is open, or nothing has been eaten). The HUD has a badge for it */
   byFire: 'mending' | 'warm' | null = null;
+  /** the animals near this player, as the server moves them (src/game/animals.ts) */
+  readonly wild: Wildlife = new Wildlife({
+    atmo: () => this.s.atmo,
+    scene: () => this.s.r.scene,
+    world: () => this.s.world,
+    drip: (at) => this.effects.bleed(at, new THREE.Vector3(0, -1, 0), 0.45),
+  });
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -490,7 +499,8 @@ export class Game {
     };
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
-    this.hearths = new Hearths(this.fires.spots);
+    // (a list of its own: a fire built offline is added to it by the keeper, and to what is drawn by fires.add)
+    this.hearths = new Hearths(this.fires.spots.map((s) => ({ x: s.x, z: s.z })));
     // the helicopters' pads: on the hospital's roof, and by the fort (src/world/helipad.ts)
     this.pads = helipads(world, (m) => atmo.register(m));
     for (const pad of this.pads) r.scene.add(pad);
@@ -666,7 +676,7 @@ export class Game {
       this.avatar.setSlung(obj);
       this.syncBack();
     };
-    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected ? owner : null);
+    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected || owner instanceof Beast ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     // whoever is hit carries the blood on their clothes where it landed
     this.weapons.onFlesh = (owner, pt, dir, power) => {
@@ -1665,6 +1675,9 @@ export interface Game {
   pullPin: Methods<typeof itemsMethods>['pullPin'];
   cooking: Methods<typeof itemsMethods>['cooking'];
   rawMeat: Methods<typeof itemsMethods>['rawMeat'];
+  burnWood: Methods<typeof itemsMethods>['burnWood'];
+  skinPrompt: Methods<typeof huntMethods>['skinPrompt'];
+  onSkin: Methods<typeof huntMethods>['onSkin'];
   grill: Methods<typeof itemsMethods>['grill'];
   cookShown: Methods<typeof itemsMethods>['cookShown'];
   emptyOfGrenade: Methods<typeof itemsMethods>['emptyOfGrenade'];
@@ -1722,6 +1735,6 @@ export interface Game {
   finished: Methods<typeof interactMethods>['finished'];
   frame: Methods<typeof frameMethods>['frame'];
 }
-for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods]) {
+for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods, huntMethods]) {
   for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Game.prototype, name, { ...d, enumerable: false });
 }

@@ -765,13 +765,16 @@ export const LOCAL_MODELS = {
   // worn faces -z, the way a body does and the K6-3 helmet does; what stands against a wall has its front to +z,
   // as the furniture from Poly Haven has; what goes on a gun looks along +x.
   // (The pouch leans six degrees in its file: it is stood straight. The red cross is on its +z face.)
+  // A box of pills out of the food pack the owner added (food_collection_-_game_ready.zip, unpacked to
+  // assets-src/models/food_collection/): charcoal tablets and multivitamins, told apart by their paint (2026-10-23).
+  pill_box: { dir: 'food_collection', only: /SM_Pills_Box_01/, size: 0.09, tex: 512, tags: ['loot'], changes: 'Only its box of pills is used here: stood on the ground about its own middle and scaled to nine centimetres tall; textures re-encoded as WebP at no more than 512 a side (one picture for the whole pack, of which the box is a corner); geometry compressed.' },
   aid_pouch: { dir: 'tactical_first_aid_kit', rot: [0.1013, -0.0337, -0.0034], size: 0.2, tex: 2048, tags: ['loot'], changes: 'Stood straight on the ground about its own middle and scaled to a pouch twenty centimetres tall; textures re-encoded as WebP at the size they came; geometry compressed.' },
   // (The ACOG: life size, 14.3 cm. Its objective is toward -x as it comes, the end its fibre lies along: turned
   // round. It is one shape with one material, drawn see-through: the picture's alpha is 22 in 255 on the clear lid
   // over the fibre, 224 on the objective's glass and 255 everywhere else. Cut at a half, the lid is gone and the red
   // fibre shows as it does through a clear lid; the glass is solid and dark. Drawn solid whole, the lid hid the fibre.
   // Its pictures at 1024 as the heaviest guns' are: 71,000 triangles, where the other sights are 2,000 to 30,000.)
-  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 1024, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at no more than 1024 a side; geometry compressed.' },
+  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 1024, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at no more than 512 a side (one picture for the whole pack, of which the box is a corner); geometry compressed.' },
   // (The M1: its shell, the band round it and the four cartridges tucked into the band; its chin straps and their
   // buckle hang a hand below the rim and are left off, as nothing holds them to a chin. Its brow is toward +z as it
   // comes: turned round. Its biggest picture is 1024.)

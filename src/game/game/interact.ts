@@ -98,6 +98,8 @@ export const interactMethods = {
         }
         if (this.prompt) return;
       }
+      // a dead animal at the feet, to gut and skin (src/game/game/hunt.ts)
+      if (this.skinPrompt(cam, dir)) return;
       // a fireplace stood beside and looked at
       const fi = this.fires.at(this.player.pos);
       if (fi >= 0) {

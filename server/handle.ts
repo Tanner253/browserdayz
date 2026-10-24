@@ -15,6 +15,7 @@ import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
+import { FUEL } from '../src/sim/cooking';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, stoppingNow, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
@@ -168,6 +169,22 @@ export function handle(c: Client, m: C2S) {
       // lit by somebody standing beside it (a couple of metres' grace: where they are is told a moment late)
       if (!c.alive || !hearths.light(m.i, c.pose[0], c.pose[2], Date.now() / 1000, 2.5)) return;
       broadcast({ t: 'fire', i: m.i, left: FIRE.burns });
+      return;
+    }
+    case 'build': {
+      // a fire built from firewood at the feet of whoever built it, on open ground (src/sim/fires.ts FIRE.built)
+      if (!c.alive || !isVec3([m.x, m.y, m.z]) || Math.hypot(m.x - c.pose[0], m.z - c.pose[2]) > FIRE.built.reach || Math.abs(m.y - c.pose[1]) > 2) return;
+      const now = Date.now() / 1000, i = hearths.build(m.x, m.y, m.z, c.id, now);
+      if (i < 0) return void send(c, { t: 'sys', text: 'Too many fires are standing: let one go out first.' });
+      broadcast({ t: 'fire+', i, x: m.x, y: m.y, z: m.z });
+      broadcast({ t: 'fire', i, left: hearths.left(i, now) });
+      return;
+    }
+    case 'feed': {
+      // firewood put on a fire that is alight: it burns that much longer
+      const now = Date.now() / 1000;
+      if (!c.alive || !hearths.feed(m.i, FUEL.firewood, c.pose[0], c.pose[2], now, 2.5)) return;
+      broadcast({ t: 'fire', i: m.i, left: hearths.left(m.i, now) });
       return;
     }
     case 'barrel': {

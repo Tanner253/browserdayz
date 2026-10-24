@@ -124,7 +124,7 @@ const COUNTS = [1, 2, 3, 5, 10, 25];
 /** how far about the admin the infected are put down, metres */
 const CULL = [30, 60, 120, 250];
 /** the drawing each kind of thing goes by on the Entities page (a new kind in ENTITIES is asked for one here) */
-const ENTITY_ICON: Record<Entity['kind'], string> = { car: 'car', infected: 'infected' };
+const ENTITY_ICON: Record<Entity['kind'], string> = { car: 'car', infected: 'infected', animal: 'animal' };
 /** what somebody carries, as the server last had it from their game (`/pockets`) */
 type Pockets = Extract<S2C, { t: 'inv' }>;
 const SLOT_NAME: Record<string, string> = { primary: 'On the back', secondary: 'On the back', holster: 'Holster', head: 'Head', face: 'Face', vest: 'Vest', back: 'Pack', hands: 'Hands', feet: 'Feet', neck: 'Round the neck', melee: 'Belt' };
@@ -182,6 +182,8 @@ const ICON: Record<string, string> = {
   keys: '<path d="M4 7h16v10H4z"/><path d="M7 10.5h1M10.5 10.5h1M14 10.5h1M7.5 14h9"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
   right: '<path d="M9 6l6 6-6 6"/>',
+  // (a paw: an animal, 2026-10-23)
+  animal: '<circle cx="5.5" cy="10" r="1.8"/><circle cx="9.5" cy="6" r="1.8"/><circle cx="14.5" cy="6" r="1.8"/><circle cx="18.5" cy="10" r="1.8"/><path d="M12 11.5c-2.8 0-5.5 3.6-5.5 6c0 1.8 1.8 2.3 2.9 1.8c.9-.4 1.7-.6 2.6-.6s1.7.2 2.6.6c1.1.5 2.9 0 2.9-1.8c0-2.4-2.7-6-5.5-6z"/>',
   infected: '<circle cx="9" cy="5.5" r="2.4"/><path d="M9 8v7.5M9 10.5h8.5M9 13h7.5M9 15.5l-3 5M9 15.5l3 5"/>',
   target: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/>',
   window: '<path d="M4 5.5h16v13H4z"/><path d="M4 9h16"/><path d="M10 12.5l-2 2 2 2M8 14.5h6.5"/>',

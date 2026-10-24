@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-20T08:17:53.023Z",
+ "generated": "2026-10-24T01:13:54.986Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12523,6 +12523,74 @@
      -0.04894
     ]
    }
+  },
+  "animal_stag": {
+   "url": "assets/models/animal_stag.glb",
+   "tags": [
+    "animal"
+   ],
+   "bytes": 505468,
+   "tris": 1058,
+   "min": [
+    -0.7899,
+    0,
+    -1.05
+   ],
+   "max": [
+    0.7899,
+    1.8633,
+    1.05
+   ],
+   "lods": [],
+   "clips": [
+    "take"
+   ],
+   "cuts": {
+    "run": [
+     11.6,
+     12.6
+    ],
+    "graze": [
+     1.4,
+     2.2
+    ],
+    "idle": [
+     2.6,
+     3.9
+    ],
+    "alert": [
+     6.8,
+     8.6
+    ],
+    "walk": [
+     9,
+     10.6
+    ],
+    "trot": [
+     10.8,
+     11.4
+    ]
+   }
+  },
+  "pill_box": {
+   "url": "assets/models/pill_box.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 186352,
+   "srcTris": 31796,
+   "tris": 12,
+   "min": [
+    -0.045,
+    0,
+    -0.0097
+   ],
+   "max": [
+    0.045,
+    0.0618,
+    0.0097
+   ],
+   "lods": []
   }
  }
 }

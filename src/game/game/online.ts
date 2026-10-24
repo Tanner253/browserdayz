@@ -87,6 +87,7 @@ export const onlineMethods = {
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
     for (const [cid, g] of w.racks ?? []) this.racks.show(cid, g);
     this.fires.clear();
+    for (const [i, x, y, z] of w.built ?? []) this.fires.add(i, x, y, z, (gx, gz) => heightAt(this.s.world.heights, gx, gz));
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
     // the lockers somebody is searching at the moment: their doors stand open
     this.lockers.clear();
@@ -164,6 +165,7 @@ export const onlineMethods = {
     this.bunker.setOpen(false, true);
     this.garage.clear();
     this.horde.clear();
+    this.wild.clear();
     this.party.set([], 0);
     this.hud.setLive(false);
   },
@@ -245,6 +247,14 @@ export const onlineMethods = {
     net.on('is', (m) => this.horde.states(m.s, performance.now()));
     net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee));
     net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
+    // the animals near this player, a hit on one, and gutting one (src/game/animals.ts, server/animals.ts)
+    net.on('an', (m) => this.wild.rows(m.r, !!m.all, performance.now()));
+    net.on('ahp', (m) => {
+      const b = this.wild.beasts.get(m.i);
+      this.wild.hp(m.i, m.dead);
+      if (m.dead && m.by === this.net.id && b) this.hud.note(`${b.name} down${m.zone === 'head' ? ' · headshot' : ''}`, 'good');
+    });
+    net.on('askin', (m) => this.onSkin(m));
     net.on('shot', (m) => {
       this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle(), this.remotes.get(m.id));
       this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot, m.o[1]);
@@ -279,6 +289,8 @@ export const onlineMethods = {
     net.on('boom', (m) => this.blowBarrel(m.i, false));
     net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
     net.on('fire', (m) => this.fires.set(m.i, m.left));
+    net.on('fire+', (m) => this.fires.add(m.i, m.x, m.y, m.z, (x, z) => heightAt(this.s.world.heights, x, z)));
+    net.on('fire-', (m) => this.fires.remove(m.i));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => {
       this.gearOf.set(m.id, m.g);

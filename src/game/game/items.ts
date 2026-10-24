@@ -23,7 +23,8 @@ import type { WorldItem } from '../loot';
 import { type Well, WELL } from '../../sim/wells';
 import { waterName, type Drink } from '../../sim/water';
 import { FIRE } from '../../sim/fires';
-import { COOKS, COOK_KINDS, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
+import { heightAt } from '../../world/worldgen';
+import { COOKS, COOK_KINDS, FUEL, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
 import { POISON, fallsIll } from '../../sim/sickness';
 import { WHEEL_OUTER, WHEEL_PICK, WHEEL_REACH, type TimedAction, type Game } from '../game';
 
@@ -110,6 +111,36 @@ export const itemsMethods = {
     });
     // (walk off from it and the hands stop: a fire is not lit from across the yard)
     if (this.use) Object.assign(this.use, { valid: () => this.fires.at(this.player.pos) === i, lost: 'You walked off from the fireplace' });
+  },
+
+  /**
+   * Firewood used (src/sim/fires.ts FIRE.built): at a fire that is alight, put on it, five minutes more; anywhere
+   * else on open ground, a campfire built a step ahead, alight. True: it was used.
+   */
+  burnWood(this: Game): boolean {
+    const p = this.player.pos, now = performance.now() / 1000, at = this.fires.at(p);
+    if (at >= 0 && this.fires.left[at] > 0) {
+      if (this.online) this.net.send({ t: 'feed', i: at });
+      else if (this.hearths.feed(at, FUEL.firewood, p.x, p.z, now)) this.fires.set(at, this.hearths.left(at, now));
+      this.hud.note('More wood on the fire: it burns five minutes longer', 'good');
+      return true;
+    }
+    const ground = (x: number, z: number) => heightAt(this.s.world.heights, x, z);
+    const x = p.x - Math.sin(this.player.yaw) * 1.2, z = p.z - Math.cos(this.player.yaw) * 1.2, y = ground(x, z);
+    // (on the ground, not on a floor or a roof: a fire is built out of doors)
+    if (Math.abs(p.y - y) > 0.8 || this.garage.ride) {
+      this.hud.note('Build a fire on open ground', 'warn');
+      return false;
+    }
+    if (this.online) this.net.send({ t: 'build', x, y, z });
+    else {
+      const i = this.hearths.build(x, y, z, 1, now);
+      if (i < 0) return false;
+      this.fires.add(i, x, y, z, ground);
+      this.fires.set(i, this.hearths.left(i, now));
+    }
+    this.hud.note('A fire built and lit: its smoke can be seen a long way off', 'good');
+    return true;
   },
 
   /** wherever the item currently is: player inventory or the open crate */
@@ -267,6 +298,12 @@ export const itemsMethods = {
         // kept, and held up: see the frame loop for what puts them down again
         if (from) this.inv.add(item);
         this.glass = def.look;
+        return;
+      }
+      if (item.id === 'firewood') {
+        if (this.burnWood()) this.consume(item, null);
+        else if (from) this.inv.add(item);
+        this.inventoryChanged();
         return;
       }
       const v = this.player.vitals;

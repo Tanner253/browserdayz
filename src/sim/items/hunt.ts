@@ -63,7 +63,8 @@ export const HUNT_ITEMS: ItemDef[] = [
   },
   {
     id: 'firewood', name: 'Firewood', model: 'dry_branches_medium_01', w: 2, h: 3, weight: 2.0, category: 'tool', stack: 4,
-    desc: 'Dry branches, enough for a fire. Use it to build a campfire where you stand, to cook on; more of it keeps one going.',
+    desc: 'Dry branches, enough for a fire. Use it to build a campfire where you stand, to cook on; used at a fire that is alight, it keeps it going five minutes longer.',
+    use: { verb: 'Build a fire with', time: 4, sound: 'bandage' },
     // ("t1": sheds, barns and the hunters' cabins, where wood was kept)
     loot: { pair: 'Firewood', at: [22, 4, 0, 0, 0], restock: 240, usage: [...SHEDS, 'Village'], favour: { Hunting: 3, Farm: 2 } },
     worth: 1,

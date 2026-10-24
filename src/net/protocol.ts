@@ -212,6 +212,9 @@ export type C2S =
   | { t: 'barrel'; i: number }
   /** we have lit fireplace number i (see src/sim/fires.ts), standing beside it */
   | { t: 'fire'; i: number }
+  /** a fire built from firewood where this player stands (FIRE.built), and firewood put on one that is alight */
+  | { t: 'build'; x: number; y: number; z: number }
+  | { t: 'feed'; i: number }
   /** a keycard was put to the bunker's door */
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
@@ -331,6 +334,8 @@ export type S2C =
       racks?: [string, string[]][];
       /** the fireplaces that are alight: [which, seconds left] */
       fires?: [number, number][];
+      /** the fires built by players that stand now: [number, x, y, z] (told before which are alight) */
+      built?: [number, number, number, number][];
       /** the jeeps: where each stands, what state it is in and who is in it */
       vehicles?: VehicleInfo[];
       /** the infected, standing and lying */
@@ -359,6 +364,9 @@ export type S2C =
   | { t: 'barrel+'; i: number }
   /** fireplace number i is alight, with so many seconds of burning left */
   | { t: 'fire'; i: number; left: number }
+  /** a fire built by somebody (numbered after the map's own), and one cleared away */
+  | { t: 'fire+'; i: number; x: number; y: number; z: number }
+  | { t: 'fire-'; i: number }
   /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
