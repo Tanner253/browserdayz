@@ -4,6 +4,7 @@
 // different games and ecoststems ... the entire ecosysrtem is umbrellad together". So: ZONA PvP over both, and the
 // games side by side; the one picked last is lit. /zona and /arena go straight in.
 import './door.css';
+import { DISCORD, discordBtn } from './discord';
 import { TAG_HOLD_MIN } from '../sim/items';
 import { arenaBase, serverSays, serverStatus } from '../net/client';
 import type { LobbyInfo } from '../../arena/rules';
@@ -57,8 +58,8 @@ export function openDoor(): Promise<Mode> {
           <span class="door-go">Enter Battle Royale</span>
         </button>
       </div>
-      <button type="button" class="store-btn door-store">Store</button>
-      <footer class="door-foot"><a href="/store" class="door-storelink">Store</a><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/games-like-dayz/" target="_blank" rel="noopener">About ZONA</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
+      <div class="door-corner"><button type="button" class="store-btn door-store">Store</button>${discordBtn()}</div>
+      <footer class="door-foot"><a href="/store" class="door-storelink">Store</a><a href="${DISCORD}" class="door-discordlink" target="_blank" rel="noopener noreferrer">Discord</a><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/games-like-dayz/" target="_blank" rel="noopener">About ZONA</a><a href="/privacy/" target="_blank" rel="noopener">Privacy</a><span class="door-upd" hidden></span></footer>
     </div>`;
   document.body.appendChild(el);
   // (the store, over the door: from its button, its link, or an address of its own, /store)

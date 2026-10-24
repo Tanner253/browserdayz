@@ -5,6 +5,7 @@
 // people"). It stands in for the Zone's start screen on a /battleroyale page and goes in as the Arena's does: the match
 // put in the page's address, the name given, and Deploy pressed (src/net/client.ts, wagerQuery: `?wager=br`).
 import './br.css';
+import { discordBtn } from '../discord';
 import { arenaBase } from '../../net/client';
 import { MAPS, TEAM, type BrMode } from '../../../arena/br/rules';
 import type { HUD } from '../hud';
@@ -52,7 +53,7 @@ export class BrMenu {
       <header class="bm-bar">
         <span class="bm-logo">BATTLE <span>ROYALE</span></span>
         <nav class="bm-nav"><button data-p="play" class="on">Play</button><button data-p="how">How to play</button><button data-p="board">Leaderboard</button><button data-p="settings">Settings</button></nav>
-        <button type="button" class="store-btn bm-store">Store</button>
+        <button type="button" class="store-btn bm-store">Store</button>${discordBtn('bm-discord')}
         <a class="bm-zona" href="/">All games</a>
       </header>
       <main class="bm-main">

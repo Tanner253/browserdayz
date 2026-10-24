@@ -40,6 +40,7 @@
 .door-foot { display: flex; gap: 22px; margin-top: 4px; }
 .door-foot a { font: 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #9a9588; text-decoration: none; }
 .door-foot a:hover { color: #e9e4d8; }
+.door-foot a.door-discordlink { color: #8f98ff; }
 .door-upd { font: 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #6f6b60; }
 /* (on a computer only: a phone has the changelog a tap away and no room) */
 @media (hover: none), (max-width: 760px) { .door-upd { display: none; } }
@@ -77,6 +78,19 @@
 /* the store (src/ui/store/): a button where the menus have one, here at the door's top right */
 .store-btn { font: 700 12px 'JetBrains Mono', monospace !important; letter-spacing: 0.14em; text-transform: uppercase; color: #101211 !important; background: #ffd35a; border: 0; padding: 7px 14px; cursor: pointer; }
 .store-btn.vip { background: #b57bff; }
-#door .door-store { position: absolute; top: 20px; right: 22px; }
+#door .door-corner { position: absolute; top: 20px; right: 22px; display: flex; align-items: center; gap: 10px; }
+/* (narrower, the pair would run into the title: it stands above it instead, at the right) */
+@media (max-width: 900px) { #door .door-corner { position: static; order: -1; align-self: flex-end; } }
+/* the way in to the Discord (src/ui/discord.ts): beside every Store and a size up from it, a ring breathing out of it
+   and the mark waving now and then so the eye finds it (the owner, 2026-10-24: "we want to drive more traffic to discord") */
+.discord-btn { display: inline-flex; align-items: center; gap: 9px; padding: 8px 16px 8px 13px; font: 700 13px 'JetBrains Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: #fff !important; background: #5865f2; animation: discord-ring 2.8s ease-out infinite; transition: background 0.15s, transform 0.15s; }
+.discord-btn svg { width: 22px; height: 22px; flex: none; transform-origin: 50% 85%; animation: discord-wave 2.8s ease-in-out infinite; }
+.discord-btn:hover { background: #6f7af6; transform: translateY(-1px); }
+.discord-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@keyframes discord-ring { 0% { box-shadow: 0 0 0 0 rgba(88, 101, 242, 0.65); } 70% { box-shadow: 0 0 0 11px rgba(88, 101, 242, 0); } 100% { box-shadow: 0 0 0 0 rgba(88, 101, 242, 0); } }
+@keyframes discord-wave { 0%, 58%, 100% { transform: none; } 64% { transform: rotate(-14deg) scale(1.08); } 71% { transform: rotate(12deg) scale(1.08); } 78% { transform: rotate(-7deg); } 85% { transform: rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .discord-btn, .discord-btn svg { animation: none; } }
+/* (in a game's bar on a phone, the mark alone: with its name the bar's own words broke onto two lines) */
+@media (max-width: 900px) { .am-bar .discord-btn, .bm-bar .discord-btn, .sm-status .discord-btn { padding: 8px 10px; } .am-bar .discord-btn span, .bm-bar .discord-btn span, .sm-status .discord-btn span { display: none; } }
 /* the death screen's ad (src/ui/adsense.ts), marked as one */
 .dead-ad::before { content: 'Advertisement'; display: block; font: 600 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #77736a; margin-bottom: 3px; text-align: center; }

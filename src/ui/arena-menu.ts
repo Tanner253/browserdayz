@@ -6,6 +6,7 @@
 // and the pause in a match. A match is gone into the way the Zone's Deploy goes in: the match put in the page's
 // address, the name given, and the same Deploy pressed (src/net/client.ts, wagerQuery).
 import './arena-menu.css';
+import { discordBtn } from './discord';
 import { ARENA, arenaLoadoutSays, type LobbyInfo } from '../../arena/rules';
 import { KITS } from '../sim/kits';
 import { arenaBase } from '../net/client';
@@ -43,7 +44,7 @@ export class ArenaMenu {
           <button type="button" data-p="loadouts">Loadouts</button>
           <button type="button" data-p="settings">Settings</button>
         </nav>
-        <button type="button" class="store-btn am-store">Store</button>
+        <button type="button" class="store-btn am-store">Store</button>${discordBtn('am-discord')}
         <a class="am-zona" href="/zona">ZONA</a>
       </header>
       <main class="am-main">
