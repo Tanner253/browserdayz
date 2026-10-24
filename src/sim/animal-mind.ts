@@ -395,7 +395,9 @@ export class Herd {
         g.flee = null;
         this.plan(g, now, from);
       }
-      for (const b of living) this.think(b, g, now, dt, noticed, turn, p);
+      // (only those near enough to be sensed: every animal sensing everybody on the map was most of the cost)
+      const close = noticed.filter((q) => Math.hypot(q.x - lead.x, q.z - lead.z) < ANIMALS.wake + 100);
+      for (const b of living) this.think(b, g, now, dt, close, turn, p);
     }
     return turn;
   }
