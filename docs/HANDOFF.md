@@ -14,7 +14,10 @@ want half baked things making it in but we also dont need to spend extra money a
   its audit (26707726: infected loot on the body, thirst -25%, admin bodies + loot ESP, body shadows off), Kamenka
   seating (3633a957), inventory step 1 (5aeea24e), fort gaps round one (3156d4f0), changelog #infected-bodies.
   battle-royale merged it (3a44ec3c). Earlier the same night: /stashes + the stash re-burial fix (7616a121).
-  The NEXT release waits for everything else below to be finished and reviewed. The live stash list is in the
+  The NEXT release waits for everything else below to be finished and reviewed.
+- battle-royale now holds the fort (9111ac65), the stage (75503d2d) and the ANIMALS (cfd41aaa: PROTOCOL 62, changelog
+  #animals, restart note in the branch). It is AHEAD of live (61): NO site-only deploy from battle-royale until the full
+  release goes out with the server. The live stash list is in the
   world-polish worktree (progress/world-polish/stashes-live-2026-10-23.txt, git-ignored).
 - Phone pass (session local_8b56a161, own worktree): the iPhone crash after the start (Chrome "Can't open this page"),
   cheap Androids stuck at "world", a phone sky, KTX2 textures, a ready-made map file, the xray viewer/curtain/locker a
@@ -69,6 +72,8 @@ want half baked things making it in but we also dont need to spend extra money a
       text rows. The hotbar forgets an item that leaves the player ("when i drop an item my hotbar should forget about it").
 - [x] G to drop, hold G to throw with a power bar, cancel with the wheel or a slot change (session gameplay-batch,
       claude/gameplay-batch-94414c 0bcd75b2, reviewed; a readability pill for the bar last). Changelog lines in its report.
+      Next there: one circular progress ring on the crosshair for every timed action (the owner: "a circular progress bar
+      rather than a flat horizontal bar, like dayz").
 - The stage (tools/stage.html, 75503d2d): a plain test scene for one-pass pictures, headless on the processor; pictures
   of a model or animation go there, not the world (the owner: "think when you make a new project on unity").
 - Several branches raise PROTOCOL (gameplay-batch 61, more to come): when merging them, give the merged tree one number.
