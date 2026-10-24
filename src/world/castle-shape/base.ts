@@ -370,11 +370,13 @@ export class Out {
   /** @param exact what is bent is cut along the bend's lattice (see `warp`): from near, where a crack shows; from far off each corner is only bent */
   constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private bent = 0, private hides: Hides | null = null, private low = false, private exact = false) {}
   /** whether a place has one of the fort's blocks all round it (see Hide) */
-  private hid(q: V3): boolean {
+  private hid(q: V3, corner = false): boolean {
     const H = this.hides!;
+    // (a corner may lie on the block's very edge: it is asked of the block grown by a millimetre)
+    const y = corner ? -0.001 : 0.004;
     for (const i of H.grid.get(hideKey(q[0], q[2])) ?? []) {
-      const b = H.list[i], e = b.by === this.bent ? 0.004 : 0.26;
-      if ((!b.low || this.low) && q[0] > b.x0 + e && q[0] < b.x1 - e && q[2] > b.z0 + e && q[2] < b.z1 - e && q[1] > b.y0 + 0.004 && q[1] < b.y1 - 0.004) return true;
+      const b = H.list[i], e = b.by === this.bent ? y : 0.26;
+      if ((!b.low || this.low) && q[0] > b.x0 + e && q[0] < b.x1 - e && q[2] > b.z0 + e && q[2] < b.z1 - e && q[1] > b.y0 + y && q[1] < b.y1 - y) return true;
     }
     return false;
   }
@@ -418,7 +420,10 @@ export class Out {
     const n = mul(g, 1 / twice);
     if (this.hides) {
       const mid: V3 = [(p[0][0] + p[1][0] + p[2][0]) / 3 + n[0] * 0.015, (p[0][1] + p[1][1] + p[2][1]) / 3 + n[1] * 0.015, (p[0][2] + p[1][2] + p[2][2]) / 3 + n[2] * 0.015];
-      if (this.hid(mid) && p.every((c) => this.hid([mid[0] + (c[0] - mid[0]) * 0.85 + n[0] * 0.002, mid[1] + (c[1] - mid[1]) * 0.85 + n[1] * 0.002, mid[2] + (c[2] - mid[2]) * 0.85 + n[2] * 0.002]))) return void this.hides.count++;
+      // (each corner itself, a little behind the face: asked a sixth of the way in from each, a triangle whose corner stood
+      // out over the top of a block by up to a sixth of it was left out whole, and a notch was open there into the wall:
+      // the keep's shell over the walk round its roof, 2026-10-23)
+      if (this.hid(mid) && p.every((c) => this.hid([c[0] + n[0] * 0.006, c[1] + n[1] * 0.006, c[2] + n[2] * 0.006], true))) return void this.hides.count++;
     }
     const corners = order.map((k): Corner => ({ p: p[k], t: t[k], tone: typeof tone === 'number' ? tone : tone[k], n: smooth?.[k] }));
     if (!this.exact || !this.bent || this.straight || unbentIn(Math.min(p[0][0], p[1][0], p[2][0]), Math.min(p[0][2], p[1][2], p[2][2]), Math.max(p[0][0], p[1][0], p[2][0]), Math.max(p[0][2], p[1][2], p[2][2]))) return void corners.forEach((c) => this.put(c.p, c.n ?? n, c.t, c.tone));

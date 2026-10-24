@@ -3,6 +3,7 @@
 
 import { KIT_TOWER } from '../../sim/kit';
 import { type Tower, CASTLE, type V3, towerRadius } from '../../sim/castle';
+import { WALL } from '../../sim/castle/parts';
 import { TILE, UP, add, apart, cross, dot, hash, mul, norm360, rad, sorted, sub, unit, weather, type Out, type UV } from './base';
 import { RAIL, SLOPE_HALF, boxSolid, headAt, holedFace, railRun, sillAt, squareHead, squareSill, timber, type Put } from './parts';
 
@@ -132,21 +133,38 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
       const mid = (a0 + a1) / 2, top = rimAt(mid), h = holes.find((q) => apart(mid, q.a) < halfAt(q, r));
       // (what stands in this length of it: under an opening as far as its foot or the wall's top, whichever is lower, and over it if the wall goes so high)
       const spans: [number, number, number, number][] = [];
-      if (!h) spans.push([0, 0, top, top]);
+      if (!h) spans.push([s > 0 ? DRUM_FOOT : 0, s > 0 ? DRUM_FOOT : 0, top, top]);
       else {
         const t = (a: number) => (norm360(a - h.a + 180) - 180) / halfAt(h, r), head = (a: number) => headAt(h.y0, h.y1, h.w / 2, h.arch, t(a)), foot = (a: number) => Math.min(top, sillAt(h.y0, h.y1, h.w / 2, h.round, t(a)));
-        if (Math.max(foot(a0), foot(a1)) > 0.01) spans.push([0, 0, foot(a0), foot(a1)]);
+        if (Math.max(foot(a0), foot(a1)) > 0.01) spans.push([s > 0 ? DRUM_FOOT : 0, s > 0 ? DRUM_FOOT : 0, foot(a0), foot(a1)]);
         if (top > Math.max(head(a0), head(a1)) + 0.02) spans.push([head(a0), head(a1), top, top]);
       }
       for (const [b0, b1, t0, t1] of spans) stone.quad([P(a0, r, b0), P(a1, r, b1), P(a1, r, t1), P(a0, r, t0)], [[u(a0), b0], [u(a1), b1], [u(a1), t1], [u(a0), t0]], mul(out(mid), s), tone * (s > 0 ? 1 : 0.86), [a0, a1, a1, a0].map((a) => mul(out(a), s)));
     }
     yield;
   }
-  // the top of the wall, and the faces of its stubs
+  // WHERE THE KIT'S PLATFORM WAS CUT AWAY OUTSIDE THE WALLS' SQUARE (see `castleKit`: all of a tower's top on the
+  // terrace's side of each wall's line goes, to a hand under the terrace) the broken end of its ring is closed by the
+  // kit's own caps, all but the band between the platform's top and the cut's floor, where the platform is a skin with
+  // no underside: so that band is stone of our own, on each wall's line, from the drum's face to the ring's edge.
+  if (!lod) for (const [ax, line] of [[0, CASTLE.hx + CASTLE.parapet.thick / 2 + WALL.out - WALL.deep], [2, CASTLE.hz + CASTLE.parapet.thick / 2 + WALL.out - WALL.deep]] as [0 | 2, number][]) {
+    const c = ax === 0 ? tw.cx : tw.cz, o = ax === 0 ? tw.cz : tw.cx, d = Math.sign(c) * line - c, edge = KIT_TOWER.top[1] * T.kit;
+    if (Math.abs(d) >= T.r) continue;
+    const from = Math.sign(o) * Math.sqrt(T.r * T.r - d * d), to = Math.sign(o) * Math.sqrt(edge * edge - d * d), at = (u: number, y: number): V3 => (ax === 0 ? [Math.sign(c) * line, y, o + u] : [o + u, y, Math.sign(c) * line]);
+    const n: V3 = ax === 0 ? [-Math.sign(c), 0, 0] : [0, 0, -Math.sign(c)], pts = [at(from, -0.055), at(to, -0.055), at(to, -0.0055), at(from, -0.0055)];
+    stone.quad(pts, pts.map((p): UV => [ax === 0 ? p[2] : p[0], p[1]]), n, tone * 0.8);
+  }
+  // the top of the wall, and the faces of its stubs. (Its top is laid to the very corners each face has along its top,
+  // the inner and the outer, which are cut more finely over an opening than the tower's own lengths: laid in those
+  // lengths alone, its edge stood a few millimetres in from the face's there, and the wall's inside showed between.)
+  const outer = columns(T.r).map((c) => c.a0), inner = columns(rin).map((c) => c.a0);
   for (let j = 0; j < n; j++) {
     const a0 = (j * 360) / n, a1 = ((j + 1) * 360) / n, top = rimAt((a0 + a1) / 2), next = rimAt(a1 + 180 / n);
-    const pts = [P(a0, rin, top), P(a1, rin, top), P(a1, T.r, top), P(a0, T.r, top)];
-    stone.quad(pts, pts.map((p): UV => [p[0], p[2]]), UP, tone * 0.94);
+    const along = (as: number[]) => [a0, ...as.filter((a) => a > a0 + 1e-6 && a < a1 - 1e-6), a1], os = along(outer), is = along(inner);
+    for (let i = 0, k = 0; i + 1 < os.length || k + 1 < is.length;) {
+      const pts = k + 1 >= is.length || (i + 1 < os.length && os[i + 1] <= is[k + 1]) ? [P(os[i], T.r, top), P(os[++i], T.r, top), P(is[k], rin, top)] : [P(os[i], T.r, top), P(is[++k], rin, top), P(is[k - 1], rin, top)];
+      stone.tri(pts, pts.map((p): UV => [p[0], p[2]]), UP, tone * 0.94);
+    }
     if (Math.abs(next - top) > 0.01) stone.quad([P(a1, rin, Math.min(top, next)), P(a1, T.r, Math.min(top, next)), P(a1, T.r, Math.max(top, next)), P(a1, rin, Math.max(top, next))], [[rin, Math.min(top, next)], [T.r, Math.min(top, next)], [T.r, Math.max(top, next)], [rin, Math.max(top, next)]], mul(round(a1), next < top ? 1 : -1), tone * 0.9);
   }
   if (!lod) for (const h of holes) {
@@ -231,7 +249,15 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
     if (hole || !atDoor) ring(TOWER_FLOOR, rin, rin + under, a0, a1, UP);
     // (the boards' end at the door, in their own lengths: one straight board across the doorway stood up to a hand
     // inside the edge of the round of them, and under that edge was the void the kit's foot is cut to. 2026-10-23.)
-    else wood.quad([P(a0, rin, 0), P(a1, rin, 0), P(a1, rin, TOWER_FLOOR), P(a0, rin, TOWER_FLOOR)], [[0, 0], [0.3, 0], [0.3, TOWER_FLOOR], [0, TOWER_FLOOR]], out(a0 + 3.75), tone * 0.8);
+    else {
+      wood.quad([P(a0, rin, 0), P(a1, rin, 0), P(a1, rin, TOWER_FLOOR), P(a0, rin, TOWER_FLOOR)], [[0, 0], [0.3, 0], [0.3, TOWER_FLOOR], [0, TOWER_FLOOR]], out(a0 + 3.75), tone * 0.8);
+      // (and stone under it, from a hand in under the boards out to the tower's face: the threshold in the doorway,
+      // and under the wall beside it, where nothing is seen. Where the doorway runs out past the paving's square, over
+      // the kit's foot that is cut away under the terrace, the edge of the boards was open to the hollow foot under it,
+      // a skin with nothing in it. 2026-10-23.)
+      const sill = [P(a0, rin - 0.15, 0), P(a1, rin - 0.15, 0), P(a1, T.r, 0), P(a0, T.r, 0)];
+      stone.quad(sill, sill.map((p): UV => [p[0], p[2]]), UP, tone * 0.9);
+    }
     if (hole) {
       if (atDoor) wood.quad([P(a0, rin + under, 0), P(a1, rin + under, 0), P(a1, rin + under, TOWER_FLOOR), P(a0, rin + under, TOWER_FLOOR)], [[0, 0], [0.3, 0], [0.3, TOWER_FLOOR], [0, TOWER_FLOOR]], out(a0 + 3.75), tone * 0.8);
       ring(TOWER_FLOOR - 0.06, hole, rin, a0, a1, [0, -1, 0], 0.7);
@@ -242,18 +268,13 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
       put({ t: 'hull', pts, feet: false, surface: 'wood', name: 'tower floor' });
     }
   }
-  // (and the threshold, from the boards out through the wall: where the doorway runs out past the paving's square it
-  // was open, over the kit's foot that is cut away under the terrace, and the foot was looked into, a skin with
-  // nothing in it. 2026-10-23.)
-  if (!hole) {
-    const d = holes[0], ho = halfAt(d, T.r), hi = halfAt(d, rin), sill = [P(tw.door - hi, rin, 0), P(tw.door + hi, rin, 0), P(tw.door + ho, T.r, 0), P(tw.door - ho, T.r, 0)];
-    stone.quad(sill, sill.map((p): UV => [p[0], p[2]]), UP, tone * 0.9);
-  }
   if (!hole) disc('tower floor', -0.2, TOWER_FLOOR, rin);
 
   yield;
   // ---- the stair round the inside of the wall, and the rail on its open side
-  const S = tw.stair, sg = Math.sign(S.sweep), N = Math.round(T.deck / 0.2), da = S.sweep / N, rise = T.deck / N, ri = T.stairIn, ro = rin - 0.02, mid = (ri + ro) / 2;
+  // (each tread goes a hand into the wall, as a tread built into it does: stopped two fingers short of it, for a wall that
+  // bellied, a slit ran beside the whole stair. What holds a body up is as it was.)
+  const S = tw.stair, sg = Math.sign(S.sweep), N = Math.round(T.deck / 0.2), da = S.sweep / N, rise = T.deck / N, ri = T.stairIn, ro = rin + 0.05, mid = (ri + rin - 0.02) / 2;
   /** whether the wall still stands at a place round it, to bear a tread at this height */
   const borne = (a: number, y: number) => rimAt(a) > y + 0.15;
   /** whether enough of the wall stands over the boards for there to be a platform at all */
@@ -317,8 +338,13 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
   }
   // two joists under it, where no head comes up: across the middle square to the well, and along the side away from it
   const wc = well0 + (sg * wide) / 2;
-  timber(wood, P(wc + 90, rin, D - 0.21), P(wc - 90, rin, D - 0.21), 0.18, 0.22, tone * 0.85);
-  timber(wood, P(wc + 180 - 57, rin, D - 0.21), P(wc + 180 + 57, rin, D - 0.21), 0.18, 0.22, tone * 0.85);
+  // (each a hand into the wall at both ends: ended at its face, a joist's square end stood off the round wall at its corners)
+  const joist = (a: number, b: number) => {
+    const A = P(a, rin, D - 0.21), B = P(b, rin, D - 0.21), d = mul(unit(sub(B, A)), 0.12);
+    timber(wood, sub(A, d), add(B, d), 0.18, 0.22, tone * 0.85);
+  };
+  joist(wc + 90, wc - 90);
+  joist(wc + 180 - 57, wc + 180 + 57);
   // what holds a body up there: the middle of it, and the ring in lengths; the last tread of the stair is one of them
   disc('tower platform', D - 0.1, D, ri + 0.02);
   for (let j = 0; j < 48; j++) {
@@ -342,5 +368,10 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
 export const TOWER_DOOR = { w: 1.0, h: 2.1 };
 
 export const SLIT_WIDE = 0.7;
+
+/** how far under the terrace a drum's outer face goes down: into the kit's platform it stands on, whose top is a few
+ * millimetres under the terrace (standing on the terrace, the drum's foot left a slit all round it, and the hollow of its
+ * wall was seen into: 2026-10-23) */
+const DRUM_FOOT = -0.05;
 
 export const LOST_WIDE = 0.62;

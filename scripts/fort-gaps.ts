@@ -16,7 +16,7 @@ import { NodeIO, type Node } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
 import { KitCaps, backedOut, kitMatrix, kitPoint, standTriangles, type KitPiece } from '../src/sim/kit';
-import { CASTLE_SCALE, castleAt, castleDoor, castleKit, castleLocal, castleRocks } from '../src/sim/castle';
+import { CASTLE_SCALE, castleAt, castleDoor, castleKit, castleLocal, castleRocks, castleHides, castleUnder } from '../src/sim/castle';
 import { postMade } from '../src/sim/castle-post';
 import { SHEETS, castleShapeIn, type Shape } from '../src/world/castle-shape';
 import { postShape } from '../src/world/castle-post-shape';
@@ -112,7 +112,7 @@ async function gather() {
   const T = new Float64Array(new SharedArrayBuffer(Pos.length * 8)), O = new Int32Array(new SharedArrayBuffer(Of.length * 4));
   T.set(Pos);
   O.set(Of);
-  return { T, Of: O, things, fort, P };
+  return { T, Of: O, things, fort, P, heights: world.heights };
 }
 
 // ------------------------------------------------------------------ a tree of boxes over them, and a ray through it
@@ -284,7 +284,7 @@ if (!isMainThread) {
       const list = near.get(things[Of[t]]) ?? near.set(things[Of[t]], []).get(things[Of[t]])!;
       list.push([0, 1, 2].map((q) => +(T[o + q * 3] / S).toFixed(3)).concat([0, 1, 2].map((q) => +(T[o + q * 3 + 1] / S).toFixed(3)), [0, 1, 2].map((q) => +(T[o + q * 3 + 2] / S).toFixed(3))));
     }
-    for (const [name, list] of near) console.log(`  ${name}: ${list.length} triangles with a corner within 25 cm (x x x / y y y / z z z, own measure):\n    ${list.slice(0, 8).map((r) => `[${r.slice(0, 3)} / ${r.slice(3, 6)} / ${r.slice(6)}]`).join('\n    ')}`);
+    for (const [name, list] of near) console.log(`  ${name}: ${list.length} triangles with a corner within 25 cm (x x x / y y y / z z z, own measure):\n    ${list.slice(0, 14).map((r) => `[${r.slice(0, 3)} / ${r.slice(3, 6)} / ${r.slice(6)}]`).join('\n    ')}`);
     }
     process.exit(0);
   }
@@ -302,6 +302,10 @@ if (!isMainThread) {
       cast(x, fy + 0.05, z, 1e-9, 1, 1e-9, 2);
       if (hitTri >= 0) continue;
       if (Of[t] === ground) { if (Math.hypot(x, z) < 30) footEyes.push([x, fy + 1.6, z]); break; }
+      // (under the terrace a body is only in the lower levels and the passage the server lets it be in: not inside the
+      // kit's hollow pieces, where the eye finder finds floors nobody stands on)
+      const [wx, wy, wz] = castleAt(P, x / S, z / S, (fy + 0.3) / S);
+      if (fy < -0.3 && castleHides(P, wx, wy, wz) && !castleUnder(P, wx, wy, wz, (a, b) => heightAt(soup.heights, a, b))) continue;
       fortEyes.push([x, fy + 1.6, z]);
     }
   }

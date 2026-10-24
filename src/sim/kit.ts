@@ -233,6 +233,22 @@ export function standTriangles(corners: number[][], index: ArrayLike<number> | n
 
 // ------------------------------------------------------------------ what a cut opens is closed
 
+/** what of a flat piece is inside all of some sides (its corners as for `clipOut`) */
+function within(poly: number[][], planes: Cut['planes']): number[][] {
+  let rest = poly;
+  for (const [nx, ny, nz, d] of planes) {
+    const side = rest.map((v) => nx * v[0] + ny * v[1] + nz * v[2] - d), into: number[][] = [];
+    for (let i = 0; i < rest.length; i++) {
+      const a = rest[i], b = rest[(i + 1) % rest.length], sa = side[i], sb = side[(i + 1) % rest.length];
+      if (sa <= 0) into.push(a);
+      if (sa > 0 !== sb > 0) into.push(a.map((v, j) => v + ((b[j] - v) * sa) / (sa - sb)));
+    }
+    rest = into;
+    if (rest.length < 3) return [];
+  }
+  return rest;
+}
+
 interface CapSeg { p: number[]; q: number[]; tri: number[][]; big: number; tag: string }
 interface CapLine { id: number; s0: number; t0: number; s1: number; t1: number; sign: number; seg: CapSeg }
 
@@ -287,17 +303,10 @@ export class KitCaps {
           let [p, q] = ends;
           // (the line runs one way round what is solid: the way the triangle faces, crossed with the way the side does)
           if ((q[0] - p[0]) * (gy * nz - gz * ny) + (q[1] - p[1]) * (gz * nx - gx * nz) + (q[2] - p[2]) * (gx * ny - gy * nx) < 0) [p, q] = [q, p];
-          // (and only as much of it as is on this side of the cut: within the cut's other sides)
-          let f0 = 0, f1 = 1;
-          for (let j = 0; j < cut.planes.length && f1 > f0; j++) {
-            if (j === k) continue;
-            const [ax, ay, az, ad] = cut.planes[j], sp = ax * p[0] + ay * p[1] + az * p[2] - ad, sq = ax * q[0] + ay * q[1] + az * q[2] - ad;
-            if (sp > 0 && sq > 0) f1 = -1;
-            else if (sp > 0) f0 = Math.max(f0, sp / (sp - sq));
-            else if (sq > 0) f1 = Math.min(f1, sp / (sp - sq));
-          }
-          if (f1 - f0 < 1e-9) continue;
-          const from = p, to = q, at = (f: number) => from.map((v, i) => v + (to[i] - v) * f), P = at(f0), Q = at(f1);
+          // (the whole of the line, past the cut's other sides too: what is solid is found across the whole side and only
+          // then cut to the side's own size, in `lay`. Cut first, a coping sawn off by the cut's floor had no line along
+          // that floor, its strips did not close, and its broken end was left open: 2026-10-23, the merlons' ends)
+          const P = p, Q = q;
           if (Math.hypot(Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]) < 1e-6) continue;
           const key = ci * 64 + k, list = this.segs.get(key);
           if (list) list.push({ p: P, q: Q, tri, big: twice, tag });
@@ -322,7 +331,7 @@ export class KitCaps {
       }
       const us = [...new Set(lines.flatMap((l) => [l.s0, l.s1]))].sort((p, q) => p - q).filter((u, i, all) => i === 0 || u - all[i - 1] > 1e-6);
       let open = new Map<string, { lo: CapLine; hi: CapLine; from: number }>();
-      const lay = (o: { lo: CapLine; hi: CapLine; from: number }, to: number) => this.lay(ci, n, o.lo, o.hi, o.from, to, emit);
+      const lay = (o: { lo: CapLine; hi: CapLine; from: number }, to: number) => this.lay(ci, key % 64, n, o.lo, o.hi, o.from, to, emit);
       for (let i = 0; i + 1 < us.length; i++) {
         const u0 = us[i], u1 = us[i + 1], um = (u0 + u1) / 2, now = new Map<string, { lo: CapLine; hi: CapLine; from: number }>();
         const across = lines.filter((l) => l.s0 <= u0 + 1e-6 && l.s1 >= u1 - 1e-6).map((l) => ({ l, t: l.t0 + ((l.t1 - l.t0) * (um - l.s0)) / (l.s1 - l.s0) })).sort((p, q) => p.t - q.t);
@@ -342,7 +351,7 @@ export class KitCaps {
     }
   }
   /** stone between two lines of a side, from so far along the strips to so far */
-  private lay(ci: number, n: number[], lo: CapLine, hi: CapLine, from: number, to: number, emit: (tag: string, corner: number[]) => void) {
+  private lay(ci: number, k: number, n: number[], lo: CapLine, hi: CapLine, from: number, to: number, emit: (tag: string, corner: number[]) => void) {
     const at = (l: CapLine, u: number): number[] => {
       const f = Math.min(1, Math.max(0, (u - l.s0) / (l.s1 - l.s0))), [a, b] = l.sign > 0 ? [l.seg.p, l.seg.q] : [l.seg.q, l.seg.p];
       return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
@@ -362,8 +371,9 @@ export class KitCaps {
       const x = rel(v, along) - xa, y = Math.abs(rel(v, across)) - ya, wb = (x * yc - xc * y) / det, wc = (xb * y - x * yb) / det;
       return [v[0], v[1], v[2], -n[0], -n[1], -n[2], A[6] + (B[6] - A[6]) * wb + (C[6] - A[6]) * wc, A[7] + (B[7] - A[7]) * wb + (C[7] - A[7]) * wc];
     };
-    let polys: number[][][] = [[at(lo, from), at(lo, to), at(hi, to), at(hi, from)].map(corner)];
+    let polys: number[][][] = [within([at(lo, from), at(lo, to), at(hi, to), at(hi, from)].map(corner), this.cuts[ci].planes.filter((_, j) => j !== k))];
     for (let j = 0; j < this.cuts.length; j++) if (j !== ci) polys = polys.flatMap((poly) => clipOut(poly, this.cuts[j]));
+    polys = polys.filter((poly) => poly.length > 2);
     for (const poly of polys) for (let k = 1; k + 1 < poly.length; k++) {
       const a = poly[0], b = poly[k], c = poly[k + 1];
       const fx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), fy = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), fz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
