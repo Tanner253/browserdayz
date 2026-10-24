@@ -356,13 +356,19 @@ vec3 transformed;
   // (and how far it is from the eye up included, as the patches are chosen: see Grass.update)
   float dist = length(vec3(wp.x - cameraPosition.x, max(0.0, abs(cameraPosition.y - baseY) - 1.0), wp.y - cameraPosition.z));
   float edge = 1.0 - smoothstep(uRadius * 0.72, uRadius, dist);
-  // (the swamp's reeds: the same blades a man's height and more, broader and stiff, where the reed map has them)
+  // (THE SWAMP'S REEDS, where the reed map has them: a plant of their own, not the grass grown tall. In tight clumps a
+  // stride apart, water and mud between; of the blades there a fifth, each a broad flat leaf arching over, and one
+  // stem in seven a cattail, stiff, with its brown head. The owner, 2026-10-24: "we should draw less and make them
+  // wider by default so its not the same as the regular grass")
   vec2 ruv = (wp - uReedBox.xy) / uReedBox.zw;
   float reed = (ruv.x > 0.0 && ruv.y > 0.0 && ruv.x < 1.0 && ruv.y < 1.0) ? smoothstep(0.12, 0.5, texture2D(tReed, ruv).r) : 0.0;
-  float keep = step(r2, max(density, reed) * 1.15);
+  vec2 cc = floor(wp / 1.6), cen = (cc + 0.2 + 0.6 * vec2(hash12(cc * 3.1 + 1.7), hash12(cc * 5.3 - 2.9))) * 1.6;
+  float clump = step(hash12(cc + 9.1), 0.8) * step(length(wp - cen), 0.32 + 0.3 * hash12(cc - 4.4));
+  float inReed = step(0.05, reed), leaf = inReed * clump * step(r2, 0.2), cattail = leaf * step(0.86, r1);
+  float keep = mix(step(r2, density * 1.15), leaf, inReed);
   float tall = mix(0.35, 0.95, smoothstep(0.2, 0.9, macro2.g)) * mix(0.75, 1.15, macro.b);
   float hgt = (0.22 + 0.42 * r1 * r1) * tall * keep * edge * smoothstep(0.05, 0.4, density);
-  hgt = mix(hgt, (0.8 + 1.15 * r1 * r1) * keep * edge, reed);
+  hgt = mix(hgt, (0.85 + 0.8 * r1 + 0.45 * cattail) * (0.65 + 0.35 * reed) * keep * edge, inReed);
   // pressed flat under whatever lies on it, a fifth of itself left
   float pressed = 0.0;
   for (int i = 0; i < 4; i++) {
@@ -370,13 +376,14 @@ vec3 transformed;
     pressed = max(pressed, (1.0 - smoothstep(q.w * 0.55, q.w, length(wp - q.xz))) * step(abs(q.y - baseY), 1.5));
   }
   hgt *= 1.0 - 0.8 * pressed;
-  float wid = (0.016 + 0.012 * r2) * uWidthScale * keep * mix(1.0, 1.8, reed);
+  float wid = mix(0.016 + 0.012 * r2, cattail > 0.5 ? 0.02 : 0.05 + 0.035 * r1, inReed) * uWidthScale * keep;
   float t = position.y;
   vec2 dir = vec2(cos(ang), sin(ang));
   // natural lean + wind gust waves travelling across the field
   float wave = sin(dot(wp, uWindDir.xz) * 0.21 - uTime * 1.9) * 0.5 + 0.5;
   float gust = sin(dot(wp, uWindDir.xz) * 0.043 - uTime * 0.7) * 0.5 + 0.5;
-  float bendAmt = ((0.12 + 0.35 * r2) + uWindStrength * (0.12 + 0.45 * wave * gust)) * mix(1.0, 0.38, reed);
+  float bendAmt = (0.12 + 0.35 * r2) + uWindStrength * (0.12 + 0.45 * wave * gust);
+  bendAmt = mix(bendAmt, cattail > 0.5 ? 0.06 + 0.06 * wave * uWindStrength : 0.3 + 0.8 * r1 * r1 + 0.2 * uWindStrength * wave, inReed);
   vec2 bd0 = dir * 0.6 + uWindDir.xz * (0.4 + wave);
   vec2 bendDir = bd0 / max(length(bd0), 1e-3);
   // player pushes blades aside
@@ -389,7 +396,9 @@ vec3 transformed;
   float bend = bendAmt * t * t;
   vec3 side = vec3(-dir.y, 0.0, dir.x);
   vec3 p = vec3(wp.x, baseY, wp.y);
-  p += side * position.x * wid * (1.0 - t * 0.85);
+  // (a reed's leaf broad to near its tip; a cattail's head a fat brown spike two thirds up its stem)
+  float head = cattail * smoothstep(0.55, 0.68, t) * (1.0 - smoothstep(0.82, 0.95, t));
+  p += side * position.x * wid * mix(1.0 - t * 0.85, (1.0 - t * t * 0.9) * (1.0 + 2.6 * head), inReed);
   p.xz += bendDir * bend * hgt * 0.75;
   p.y += hgt * t * (1.0 - 0.35 * bend * bend);
   transformed = p;
@@ -400,9 +409,10 @@ vec3 transformed;
   vec3 tipDry = vec3(0.55, 0.50, 0.24);
   vec3 tip = mix(tipLush, tipDry, smoothstep(0.35, 0.9, macro.r) * 0.8 + r1 * 0.15);
   vGrassColor = mix(baseCol, tip, smoothstep(0.0, 1.0, t)) * (0.85 + 0.3 * r2);
-  // (a reed's: dark at the water, olive up its stem, straw at its top, some gone over)
-  vec3 reedTip = mix(vec3(0.26, 0.33, 0.11), vec3(0.44, 0.39, 0.19), smoothstep(0.5, 1.05, r2 + 0.35 * macro.r));
-  vGrassColor = mix(vGrassColor, mix(vec3(0.08, 0.10, 0.04), reedTip, smoothstep(0.0, 1.0, t)) * (0.75 + 0.35 * r1), reed);
+  // (a reed's: dark at the water, green going tan up the leaf, near the grass's own; a cattail's head brown)
+  vec3 leafTip = mix(vec3(0.29, 0.37, 0.13), vec3(0.44, 0.41, 0.21), smoothstep(0.3, 1.0, r2 * 4.0 + 0.3 * macro.r));
+  vec3 reedCol = mix(vec3(0.09, 0.12, 0.05), leafTip, smoothstep(0.0, 0.9, t)) * (0.8 + 0.3 * r1);
+  vGrassColor = mix(vGrassColor, mix(reedCol, vec3(0.21, 0.12, 0.06), head), inReed);
   vGrassAO = mix(0.55, 1.0, t);
   gNormal = normalize(mix(vec3(0.0, 1.0, 0.0), vec3(side.z, 0.0, -side.x), 0.12));
 }
