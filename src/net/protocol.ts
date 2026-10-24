@@ -66,7 +66,7 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-export const PROTOCOL = 63;
+export const PROTOCOL = 64;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
