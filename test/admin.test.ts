@@ -522,10 +522,13 @@ if (ALL) await withServer(async () => {
 
   // ---- stood in the world by an admin, and taken out of it: cars of both kinds, the infected. Nobody else can.
   {
-    const orders = ['/spawn jeep', '/spawn infected 3', '/delcar', '/wrecks', '/delz'];
+    const orders = ['/spawn jeep', '/spawn infected 3', '/delcar', '/wrecks', '/delz', '/delbody', '/delbodies'];
     for (const o of orders) assert.match(await late.order(o), /not a thing you can do/, `somebody with no role gave ${o}`);
+    // (an admin's far sight is asked for by a player, and then by a mod: neither is ever answered)
+    late.send({ t: 'esp' });
     assert.match(await ann.order(`/mod #${late.id}`), /Gus is a mod/);
     await sleep(300);
+    late.send({ t: 'esp', x: 200, z: 200 });
     const mark = late.got.length;
     for (const o of orders) assert.match(await late.order(o), /Only an admin/, `a mod gave ${o}`);
     assert.ok(!late.got.slice(mark).some((m) => m.t === 'v+' || m.t === 'v-' || m.t === 'i+' || m.t === 'ihp'), 'a mod put something in the world, or took something out of it');
@@ -598,8 +601,30 @@ if (ALL) await withServer(async () => {
     // (and the server's clock has gone round with them there: it still answers)
     await sleep(1200);
     assert.match(await ann.order('/delz 400'), /None of the infected/);
+
+    // their bodies, taken away (2026-10-23): one by its number, those near her, then the rest; none of the 28 had
+    // anything on it (put down by an admin), and each goes for everybody
+    assert.match(await ann.order('/delbody 99999'), /No body of that number/);
+    assert.match(await ann.order(`/delbody ${stood[0].b.i}`), /^Taken away: the body of one of the infected\.$/);
+    assert.ok(late.got.slice(mark).some((m) => m.t === 'i-' && m.i === stood[0].b.i), 'a body an admin took away is still there for everybody else');
+    assert.match(await ann.order(`/del z ${stood[1].b.i}`), /^Taken away: the body of one of the infected\.$/);
+    assert.match(await ann.order('/delbodies 30'), /^Taken away: 1 body within 30 metres of you \(1 of the infected's\)\.$/);
+    assert.match(await ann.order('/delbodies 30'), /No body lies within 30 metres of you/);
+    assert.match(await ann.order('/delbodies 400'), /^Taken away: 25 bodies within 400 metres of you \(25 of the infected's\)\.$/);
+    const gone = late.got.slice(mark).filter((m) => m.t === 'i-').length;
+    assert.equal(gone, 28, 'not every body an admin took away went for everybody');
+    assert.match(await ann.order('/delbody'), /No body lies within 50 metres of you/);
+    assert.match(await ann.order('/delbodies soon'), /takes away every body within 60 metres/);
+
+    // her far sight: what lies about where her view is, from the server, to her alone (server/esp.ts)
+    ann.send({ t: 'esp', x: 200, z: 200 });
+    await sleep(500);
+    const seen = last(ann, 'esp');
+    assert.ok(seen && Array.isArray(seen.l), 'an admin who asked was not told what lies about her');
+    assert.ok(seen.l.every((r) => Math.hypot(r[0] - 200, r[2] - 200) <= 150.5 && typeof r[3] === 'string' && r[4] >= 1), 'the far sight told of something out of its reach, or nothing sensible');
+    assert.ok(!late.got.some((m) => m.t === 'esp'), 'a player or a mod who asked for the far sight was told what lies about');
     checks++;
-    console.log('  ok  an admin stands a jeep, a police car and the infected in the world and takes them out of it, for everybody; a mod and a player cannot');
+    console.log('  ok  an admin stands a jeep, a police car and the infected in the world and takes them out of it, and their bodies, for everybody; a mod and a player cannot, nor are told what lies about');
   }
 
   // ---- a ban is lifted by its own id: two bans of one name, a list that has moved since it was read, and a name that means more than one

@@ -25,6 +25,7 @@ import { partyIn, partyOut } from './party';
 import { pinned } from './pinned';
 import { perks } from './perks';
 import { plating } from './plates';
+import { bodyInfo } from './bodies';
 import { SHOP, type ItemId } from '../api/_lib/shop-items';
 
 export interface Client {
@@ -375,7 +376,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     // (no buried one: each is told to a player as they come near it, server/stash-sight.ts)
     stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && !b.buried).map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, ...(b.item ? { item: b.item } : {}), ...(b.buried ? { buried: true } : {}) })),
-    corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, ...(b.ride ? { ride: b.ride } : {}) })),
+    corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map(bodyInfo),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     // (the helicopters in the air at this moment, each with how long it has been: this game puts it where everybody else's has it)
     flights: [...flights.values()].map(flightNow),
