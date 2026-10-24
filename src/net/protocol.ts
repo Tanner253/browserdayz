@@ -14,6 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
+import type { AnimalRow } from '../sim/animals';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
@@ -56,7 +57,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // 56's page, counting twenty and ten, is told to load the page again.)
 // (60, 2026-10-22: a store finish is put on one gun ('finish') and goes with it, drawn from the gun's own `finish`;
 // the held gun's look rides on 'ps', its uid on 's'. A page of 59 would plate every gun its owner holds.)
-export const PROTOCOL = 60;
+// (61, 2026-10-23: animals, moved by the server ('an' rows, 'ahit', 'askin'); a blow from one says whether it
+// opened a wound ('dmg' bleed). A page of 60 would see none and could not hunt.)
+export const PROTOCOL = 61;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -114,6 +117,9 @@ export interface Vitals {
   bleed?: number;
   /** a broken leg (see src/sim/injury.ts) */
   broken?: boolean;
+  /** seconds of food poisoning left, and of a vitamins' guard against it (src/sim/sickness.ts) */
+  ill?: number;
+  guard?: number;
 }
 
 export interface PlayerInfo {
@@ -279,6 +285,10 @@ export type C2S =
   | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
+  /** a shot or a blow on an animal (server/animals.ts judges it as it does one on the infected) */
+  | { t: 'ahit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; n?: number; p?: number }
+  /** kneeling at a body to gut and skin it (go 1), and done (go 2) */
+  | { t: 'askin'; i: number; go: 1 | 2 }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -353,7 +363,13 @@ export type S2C =
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'back'; id: number; b: Slung[] }
-  | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
+  | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number]; /** an animal's: whether it opened a wound (the server's roll, not the game's) */ bleed?: boolean }
+  /** the animals near this player (src/sim/animals.ts AnimalRow), five times a second; once a second all within its reach (`all`: any it knows of that is not in it has gone) */
+  | { t: 'an'; r: AnimalRow[]; all?: boolean }
+  /** an animal was hit: what it has left, and who hit it */
+  | { t: 'ahp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone }
+  /** gutting and skinning: begun (ok), refused (why), or done (got: what fell by the body) */
+  | { t: 'askin'; i: number; ok: boolean; why?: string; done?: boolean }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }
   | { t: 'death'; k: KillInfo; corpse: CorpseInfo | null }
   | { t: 'alive'; id: number }

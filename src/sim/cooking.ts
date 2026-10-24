@@ -65,7 +65,7 @@
 //   JSON.stringify(spot) and readSpot(raw)                 kept, sent, and read back whatever it says
 
 import { Container } from './inventory';
-import { ITEMS, sanitizeItem, type ItemInstance, type Placed } from './items';
+import { ITEMS, NAMING, sanitizeItem, type ItemInstance, type Placed } from './items';
 
 /** the two insides a spot can have: where what burns goes, and where what cooks goes */
 export type Part = 'fuel' | 'food';
@@ -193,6 +193,8 @@ export const FUEL: Record<string, number> = {
   bandage: 20,
   // paper and tobacco, a pack at a time
   cigarettes: 15,
+  // a lump of animal fat (2026-10-23, Rust's: fat is what fuel is made of)
+  animal_fat: 180,
   // paper: 15, bark: 20,
 };
 
@@ -221,6 +223,8 @@ export interface Worth {
   energy: number;
   water: number;
   health?: number;
+  /** the chance it gives whoever eats it food poisoning (DayZ: raw meat, rotten anything) */
+  sick?: number;
 }
 
 export interface Recipe {
@@ -238,6 +242,8 @@ export interface Recipe {
   done?: Worth;
   /** and burned */
   burned: Worth;
+  /** it goes off (DayZ): seconds from when it was got until it is rotten, raw, and once it is cooked (see `rotten`) */
+  keeps?: { raw: number; done: number };
 }
 
 /** How hot food is kept, and what it is worth. */
@@ -247,6 +253,11 @@ export const HEAT = {
   /** what is eaten or drunk hot does this many times the good: what a meal beside a lit fire has always done (FIRE.meal) */
   meal: 1.4,
 };
+
+/** meat, of whatever animal (src/sim/items/hunt.ts) */
+const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: 0.25, water: 1.6, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 2400, done: 10800 } };
+/** what anything rotten is worth: little, and it makes you ill */
+export const ROTTEN: Worth = { energy: 0.2, water: 0, health: -15, sick: 1 };
 
 /** a tin: warmed in so many seconds, scorched two minutes later, and then half the food and none of the juice */
 const tin = (takes: number): Recipe => ({ how: 'warm', takes, burns: 120, burned: { energy: 0.5, water: 0 } });
@@ -264,10 +275,11 @@ export const COOKS: Record<string, Recipe> = {
   tomatoes: tin(45),
   // Baked, the water goes out of an apple and the sweetness stays: more to eat and less to drink, and it keeps so.
   apple: { how: 'cook', takes: 30, burns: 45, done: { energy: 1.5, water: 0.5 }, burned: { energy: 0.3, water: 0 } },
-  // What waits for animals and for fishing (the shares are DayZ's chicken steak: see the top of this file). The
-  // item is written as what it is worth COOKED, raw it is a quarter of that and makes whoever eats it ill, burned
-  // it is a quarter and dry. One item for each, with its stage kept on the thing itself, as a tin's is.
-  // meat: { how: 'cook', takes: 60, burns: 45, raw: { energy: 0.25, water: 1.6, health: -10 }, burned: { energy: 0.25, water: 0, health: -4 } },
+  // Meat (2026-10-23, the animals: the shares are DayZ's chicken steak, see the top of this file). The item is written as
+  // what it is worth COOKED; raw it is a quarter of that and as likely as not gives whoever eats it food poisoning;
+  // burned it is a quarter and dry. It goes off: raw in forty minutes, cooked in three hours. One item for each
+  // animal, with its stage kept on the thing itself, as a tin's is.
+  ...Object.fromEntries(['meat_venison', 'meat_bear', 'meat_wolf', 'meat_pork', 'meat_hare', 'meat_goat', 'meat_fox', 'meat_beef'].map((id) => [id, MEAT])),
   // fish: { how: 'cook', takes: 40, burns: 45, raw: { energy: 0.3, water: 1.4, health: -6 }, burned: { energy: 0.25, water: 0 } },
   // And what waits for the pot (boiled, a thing keeps three quarters of its food and gains water; water is made
   // fit to drink): a recipe will say what it has to be cooked in, as a kind says what has to be stood on it.
@@ -284,11 +296,29 @@ export interface Cooked {
   cook?: number;
   /** the moment it is cold again, seconds on the wall clock */
   hot?: number;
+  /** when it was got (a steak off a carcass), seconds on the wall clock: what goes off goes off from then */
+  made?: number;
 }
 type Food = ItemInstance & Cooked;
 
 const EPS = 1e-6;
 const PLAIN: Worth = { energy: 1, water: 1 };
+
+/** A thing that goes off is marked with when it was got. (Returns the thing.) */
+export function markMade<T extends ItemInstance>(item: T, now: number): T {
+  if (own(COOKS, item.id)?.keeps) (item as Food).made = Math.floor(now);
+  return item;
+}
+
+/** Has it gone off? Raw, after its recipe's `keeps.raw` from when it was got; cooked, after `keeps.done`. */
+export function rotten(item: ItemInstance, now: number): boolean {
+  const k = own(COOKS, item.id)?.keeps, made = (item as Food).made;
+  if (!k || !num(made)) return false;
+  return now - made > (stageOf(item) === 'raw' ? k.raw : k.done);
+}
+
+// (what goes off says what stage it is at in its name, wherever it is shown)
+NAMING.stage = (it) => (own(COOKS, it.id)?.keeps ? stateOf(it, Date.now() / 1000).word.replace(', hot', '') : '');
 
 /** Can this be put on the heat? */
 export const cookable = (item: ItemInstance): boolean => !!own(COOKS, item.id);
@@ -322,7 +352,7 @@ function stageNow(item: ItemInstance, now: number): Stage {
 export function stateOf(item: ItemInstance, now: number): { stage: Stage; hot: boolean; share: number; word: string } {
   const r = own(COOKS, item.id), stage = stageNow(item, now), hot = isHot(item, now), c = (item as Food).cook ?? 0;
   const share = !r ? 0 : stage === 'burned' ? 1 : stage === 'raw' ? (stageOf(item) === 'raw' ? c / r.takes : 0) : (c - r.takes) / r.burns;
-  const word = stage === 'burned' ? 'burned' : stage === 'raw' ? (r?.raw ? 'raw' : '') : r?.how === 'cook' ? (hot ? 'cooked, hot' : 'cooked') : 'hot';
+  const word = rotten(item, now) ? 'rotten' : stage === 'burned' ? 'burned' : stage === 'raw' ? (r?.raw ? 'raw' : '') : r?.how === 'cook' ? (hot ? 'cooked, hot' : 'cooked') : 'hot';
   return { stage, hot, share: clamp(share, 0, 1), word };
 }
 
@@ -332,12 +362,12 @@ export function stateOf(item: ItemInstance, now: number): { stage: Stage; hot: b
  * @param by the `meal` of the lit spot the eater is resting by (1: they are by none). Hot food by a fire is not
  *   hot twice over: the greater of the two counts.
  */
-export function mealOf(item: ItemInstance, now: number, by = 1): { energy: number; water: number; health: number; hot: boolean } {
+export function mealOf(item: ItemInstance, now: number, by = 1): { energy: number; water: number; health: number; hot: boolean; sick?: number } {
   const u = own(ITEMS, item.id)?.use, r = own(COOKS, item.id), stage = stageNow(item, now), hot = isHot(item, now);
-  const worth = !r ? PLAIN : stage === 'burned' ? r.burned : stage === 'done' ? r.done ?? PLAIN : r.raw ?? PLAIN;
+  const worth = !r ? PLAIN : rotten(item, now) ? ROTTEN : stage === 'burned' ? r.burned : stage === 'done' ? r.done ?? PLAIN : r.raw ?? PLAIN;
   const k = Math.max(1, num(by) ? by : 1, hot ? HEAT.meal : 1);
   const good = (v: number | undefined, share: number) => (!v ? 0 : v > 0 ? Math.round(v * share * k) : v);
-  return { energy: good(u?.energy, worth.energy), water: good(u?.water, worth.water), health: (u?.health ?? 0) + (worth.health ?? 0), hot };
+  return { energy: good(u?.energy, worth.energy), water: good(u?.water, worth.water), health: (u?.health ?? 0) + (worth.health ?? 0), hot, ...(worth.sick ? { sick: worth.sick } : {}) };
 }
 
 /**
@@ -348,9 +378,12 @@ export function mealOf(item: ItemInstance, now: number, by = 1): { energy: numbe
  */
 export function keepCooked(into: ItemInstance, raw: unknown, now?: number): ItemInstance {
   const it = into as Food, r = own(COOKS, into.id), said = (raw && typeof raw === 'object' ? raw : {}) as Cooked;
-  const cook = said.cook, hot = said.hot;
+  const cook = said.cook, hot = said.hot, made = said.made;
   delete it.cook;
   delete it.hot;
+  delete it.made;
+  // (when it was got: never later than now, so a game cannot keep its meat fresh by saying so)
+  if (r?.keeps && num(made) && made > 0) it.made = num(now) ? Math.min(made, now) : made;
   if (!r || !num(cook) || cook <= 0) return into;
   it.cook = Math.min(cook, r.takes + r.burns);
   if (num(hot) && hot > 0 && stageOf(it) !== 'burned') it.hot = num(now) ? Math.min(hot, now + HEAT.keeps) : hot;

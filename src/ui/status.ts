@@ -146,6 +146,9 @@ export interface Body {
   gas: 'bare' | 'masked' | null;
   /** resting by a fire that is alight: mending by it, or only warm */
   fire: 'mending' | 'warm' | null;
+  /** seconds of food poisoning left, and of a vitamins' guard (src/sim/sickness.ts): 0, none */
+  ill: number;
+  guard: number;
 }
 
 export interface StatView {
@@ -163,7 +166,7 @@ export interface StatView {
   line: string;
 }
 
-export type BadgeId = 'fire' | 'gas' | 'leg' | 'bleed';
+export type BadgeId = 'fire' | 'gas' | 'leg' | 'bleed' | 'ill' | 'guard';
 /** what colour a badge is: doing harm, a warning, neither, doing good */
 export type Tone = 'bad' | 'warn' | 'calm' | 'good';
 
@@ -248,6 +251,8 @@ export function reading(b: Body, rates: Record<Stat, number>): Reading {
     const bare = b.gas === 'bare';
     badges.push({ id: 'gas', tone: bare ? 'bad' : 'good', blink: bare, level: 0, figure: '', line: bare ? 'Breathing gas: it is taking your health. Get out, or put on a gas mask.' : 'Contaminated air: your mask is keeping it out.' });
   }
+  if (b.ill > 0) badges.push({ id: 'ill', tone: 'bad', blink: false, level: 0, figure: `${Math.ceil(b.ill / 60)}m`, line: `Food poisoning: you will throw up now and then for about ${Math.max(1, Math.ceil(b.ill / 60))} min, and nothing mends. Charcoal tablets end it.` });
+  if (b.guard > 0) badges.push({ id: 'guard', tone: 'good', blink: false, level: 0, figure: `${Math.ceil(b.guard / 60)}m`, line: `Vitamins: bad food is half as likely to make you ill, and illness passes twice as fast (${Math.max(1, Math.ceil(b.guard / 60))} min left).` });
   if (b.broken) badges.push({ id: 'leg', tone: 'warn', blink: false, level: 0, figure: '', line: 'Broken leg: no running, no jumping. Splint it, or use a first aid kit.' });
   if (b.bleed > 0) {
     // (how long there is, if nothing is done: a wound that will close before it kills is a warning, one that will not is worse)

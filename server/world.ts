@@ -1,6 +1,7 @@
 // The server builds the same world the clients do, from the same code and seed, so
 // loot points, crates, doors and spawn points line up exactly without sending the map.
 
+import { animalGround } from '../src/sim/animal-ground';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { bunkerPlace, generateWorld, heightAt } from '../src/world/worldgen';
@@ -147,6 +148,9 @@ export function buildWorldData(root: string) {
     /** and the west's jeeps, by the roads of its places (numbered after all the others, so none of those moves); on the coast a police car may stand instead, where the game has its model */
     west: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? westSpots(world, [...parked, ...stations]).map(({ ks, ...p }) => (ks && manifest.models?.[POLICE_CAR.model] ? { ...p, ks } : p)) : [],
     spawns: world.spawns,
+    /** the ground as the animals know it (src/sim/animal-ground.ts), and whether the game has a model to draw a kind with */
+    animalGround: () => animalGround(world),
+    hasModel: (id: string) => !!manifest.models?.[id],
     /** where the infected live, and somewhere to stand one about such a place (see src/sim/infected.ts) */
     homes: infectedHomes(world),
     homeSpot: (h: Home) => homeSpot(world, h, Math.random),

@@ -2026,7 +2026,7 @@ export class HUD {
     // numbers (2026-10-13: "We dont need to show the players blood unless its dropping, dayz just does icons and
     // symbols"). What each looks like, and when blood is there at all, is reckoned in src/ui/status.ts.
     const v = s.vitals;
-    if (this.status.due(s.dt, s.dead)) this.status.show({ health: v.health, blood: v.blood, bleed: v.bleeding ? v.bleed : 0, energy: v.energy, water: v.water, broken: !!v.broken, drip: s.drip, gas: s.gas ?? null, fire: s.fire ?? null });
+    if (this.status.due(s.dt, s.dead)) this.status.show({ health: v.health, blood: v.blood, bleed: v.bleeding ? v.bleed : 0, energy: v.energy, water: v.water, broken: !!v.broken, drip: s.drip, gas: s.gas ?? null, fire: s.fire ?? null, ill: v.ill ?? 0, guard: v.guard ?? 0 });
     // What to do about it, in words with the key to press, over the hotbar: the one thing a symbol cannot say. It
     // is there only for what will not wait: an open wound, and blood so low that health no longer mends on it (the
     // drop is red by then). How bad the wound is and how long there is, which this card also said, the badge says.

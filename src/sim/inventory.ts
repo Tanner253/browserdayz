@@ -928,6 +928,11 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   }
   if (def.mag) it.rounds = Math.max(0, Math.min(def.mag.capacity, Math.floor(Number(r.rounds) || 0)));
   if (def.use?.sips) it.left = Number.isFinite(Number(r.left)) ? Number(r.left) : def.use.sips;
+  // (what cooking and time have done to food: kept, and never said to be fresher than now, src/sim/cooking.ts)
+  const wall = Date.now() / 1000;
+  if (num(r.cook) && r.cook > 0) it.cook = Math.min(600, r.cook);
+  if (num(r.hot) && r.hot > 0) it.hot = Math.min(wall + 300, r.hot);
+  if (num(r.made) && r.made > 0) it.made = Math.min(wall, r.made);
   if (r.id === 'dogtag') {
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
     it.owner = name(r.owner);

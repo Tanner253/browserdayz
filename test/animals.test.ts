@@ -1,0 +1,263 @@
+// The animals' minds (src/sim/animal-mind.ts) on ground made for the test: forest to the west, fields to the east, a
+// lake. Herds, their day, fright, the bear's charge (and outrunning it, as the owner asked), the wolves' hunt, herds
+// leaving ground where they are hunted, gutting and skinning.
+//   npx tsx test/animals.test.ts
+
+import assert from 'node:assert/strict';
+import { ANIMALS, A_DEAD, A_REST, A_ROAR, BLADES, KIND, KINDS, SKIN, yieldOf, type Biome } from '../src/sim/animals';
+import { Herd, seeded, type Seen } from '../src/sim/animal-mind';
+import type { Ground } from '../src/sim/animal-ground';
+
+let n = 0;
+const ok = (name: string, fn: () => void) => {
+  fn();
+  n++;
+  console.log(`  ok  ${name}`);
+};
+
+const LAKE = { x: 300, z: 300, r: 30 };
+const ground: Ground = {
+  height: () => 0,
+  slope: () => 0,
+  biome: (x, z): Biome => (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r ? 'water' : Math.abs(x) > 1490 || Math.abs(z) > 1490 ? 'water' : x < 0 ? 'forest' : 'field'),
+  open: (x, z) => Math.abs(x) < 1490 && Math.abs(z) < 1490 && Math.hypot(x - LAKE.x, z - LAKE.z) >= LAKE.r,
+  roofed: () => false,
+  cover: (x) => (x < 0 ? 1 : 0),
+  clear: () => true,
+  water: (x, z, r) => (Math.hypot(x - LAKE.x, z - LAKE.z) < r + LAKE.r ? { x: LAKE.x - LAKE.r - 1, z: LAKE.z } : null),
+  farms: [],
+  bounds: { x0: -1500, x1: 1500, z0: -1500, z1: 1500 },
+};
+
+let PH = 0.1;
+const herd = (kinds: string[], seed = 1) => new Herd(ground, (k) => kinds.includes(k.id), () => PH, seeded(seed));
+const person = (id: number, x: number, z: number, o: Partial<Seen> = {}): Seen => ({ id, x, y: 0, z, crouch: false, prone: false, speed: 0, ride: '', sheltered: false, ...o });
+/** run the herd for `secs` seconds, the people moved by `move` before each step; every blow struck is returned */
+const run = (h: Herd, t0: number, secs: number, people: Seen[], move?: (t: number) => void) => {
+  const strikes: { t: number; i: number; on: number; damage: number }[] = [];
+  for (let t = 0; t <= secs * 1000; t += 200) {
+    move?.(t);
+    for (const s of h.tick(t0 + t, people).strikes) strikes.push({ t, ...s });
+  }
+  return strikes;
+};
+
+ok('deer herds are stood on ground with fields to feed in and forest to lie up in, apart from each other', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const deer = h.groups.filter((g) => g.members.length);
+  assert.ok(deer.length >= 4, `${deer.length} herds`);
+  for (const g of deer) {
+    assert.equal(KINDS[h.beasts.get(g.members[0])!.k].id, 'stag', 'a stag leads each herd');
+    assert.ok(g.members.length >= 3 && g.members.length <= 5);
+    for (const o of deer) if (o !== g) assert.ok(Math.hypot(o.home.x - g.home.x, o.home.z - g.home.z) >= 380);
+  }
+  // (the same ground at every start: the herds' ground is the map's)
+  const again = herd(['stag', 'doe'], 99);
+  again.populate(0);
+  assert.deepEqual(again.groups.map((g) => g.home), h.groups.map((g) => g.home));
+});
+
+ok('with nobody near a herd sleeps and does not move; somebody near and it goes about its day', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const before = [...h.beasts.values()].map((b) => [b.x, b.z]);
+  run(h, 1000, 20, []);
+  assert.deepEqual([...h.beasts.values()].map((b) => [b.x, b.z]), before);
+  assert.ok(h.groups.every((g) => !g.awake));
+  const g = h.groups[0], lead = h.beasts.get(g.members[0])!;
+  run(h, 1000, 60, [person(1, lead.x + 380, lead.z)]);
+  assert.ok(g.awake);
+});
+
+ok('deer feed in the open at dawn and lie up in the trees at midday', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const g = h.groups[0], lead = h.beasts.get(g.members[0])!;
+  const watcher = person(1, lead.x + 390, lead.z + 10);
+  PH = 0.1;
+  run(h, 0, 200, [watcher], () => {
+    const b = h.beasts.get(g.members[0])!;
+    watcher.x = b.x + 390;
+    watcher.z = b.z;
+  });
+  assert.equal(g.spot === 'feed' || g.spot === 'water', true, `feeding at dawn: ${g.spot}`);
+  if (g.spot === 'feed') assert.equal(ground.biome(g.at.x, g.at.z), 'field');
+  PH = 0.4;
+  run(h, 300_000, 400, [watcher], () => {
+    const b = h.beasts.get(g.members[0])!;
+    watcher.x = b.x + 390;
+    watcher.z = b.z;
+  });
+  assert.equal(g.spot, 'rest');
+  assert.equal(ground.biome(g.at.x, g.at.z), 'forest');
+  const lying = g.members.map((i) => h.beasts.get(i)!).filter((b) => b.mode === A_REST).length;
+  assert.ok(lying >= 1, 'lying down in cover');
+  PH = 0.1;
+});
+
+ok('a sprinting man near a herd sends all of it off together, and it runs on for a couple of hundred metres', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const g = h.groups[0], lead = h.beasts.get(g.members[0])!;
+  const man = person(1, lead.x + 35, lead.z, { speed: 6.2 });
+  const start = g.members.map((i) => [h.beasts.get(i)!.x, h.beasts.get(i)!.z]);
+  run(h, 0, 25, [man]);
+  g.members.forEach((i, n) => {
+    const b = h.beasts.get(i)!;
+    assert.ok(Math.hypot(b.x - start[n][0], b.z - start[n][1]) > 120, `deer ${i} ran ${Math.hypot(b.x - start[n][0], b.z - start[n][1]).toFixed(0)} m`);
+    assert.ok(Math.hypot(b.x - man.x, b.z - man.z) > 150);
+  });
+  assert.ok(g.pressure >= 1);
+});
+
+ok('crouched, still and downwind a hunter gets close; upwind the herd smells him from far off', () => {
+  const near = (dx: number, dz: number) => {
+    const h = herd(['stag', 'doe']);
+    h.populate(0);
+    const g = h.groups[0], lead = h.beasts.get(g.members[0])!;
+    // (the wind blows toward +x +z: standing at +x +z of the deer is downwind of it)
+    const man = person(1, lead.x + dx, lead.z + dz, { crouch: true, speed: 0 });
+    for (const i of g.members) h.beasts.get(i)!.yaw = Math.atan2(dx, dz); // (facing away)
+    run(h, 0, 12, [man]);
+    return g.flee !== null || g.members.some((i) => h.beasts.get(i)!.aware >= ANIMALS.alert);
+  };
+  assert.equal(near(24, 18), false, 'downwind at 30 m: not noticed');
+  assert.equal(near(-40, -30), true, 'upwind at 50 m: smelled');
+});
+
+ok('a shot within earshot frightens a herd off; a hunted herd leaves its ground for fresh ground far off', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const g = h.groups[0], lead = h.beasts.get(g.members[0])!;
+  const man = person(1, lead.x + 200, lead.z, { crouch: true });
+  run(h, 0, 2, [man]);
+  h.heard(man.x, man.z, [600, 1100], 2000);
+  run(h, 2200, 1, [man]);
+  assert.ok(g.flee, 'a rifle shot 200 m off: off they go');
+  // a kill and a few more shots: the herd is gone from here
+  h.hurt(g.members[1], 500, man, 4000);
+  for (let s = 0; s < 3; s++) h.heard(man.x, man.z, [600, 1100], 5000 + s * 100);
+  const was = { ...g.mid };
+  run(h, 6000, 5, [man]);
+  assert.ok(Math.hypot(g.mid.x - was.x, g.mid.z - was.z) >= 400, `moved ${Math.hypot(g.mid.x - was.x, g.mid.z - was.z).toFixed(0)} m`);
+  assert.ok(g.movedAt > 0);
+});
+
+ok('a hurt deer that is not killed bleeds, falls behind, and drops at the end of its blood trail', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const g = h.groups[0], b = h.beasts.get(g.members[1])!;
+  const man = person(1, b.x + 60, b.z);
+  const r = h.hurt(b.i, KIND.doe.hp * 0.6, man, 0)!;
+  assert.equal(r.dead, false);
+  assert.ok(b.bleeds);
+  const was = [b.x, b.z];
+  run(h, 0, 80, [man]);
+  assert.equal(b.mode, A_DEAD);
+  assert.ok(Math.hypot(b.x - was[0], b.z - was[1]) > 40, 'ran before it dropped');
+});
+
+ok('a bear roars and charges whoever comes too near, and its blows land on whoever stays', () => {
+  const h = herd(['bear']);
+  const bear = h.place('bear', 0, 0, 0)!;
+  bear.yaw = Math.atan2(-1, 0);
+  const man = person(1, 12, 0);
+  let roared = false;
+  const strikes = run(h, 0, 8, [man], () => {
+    if (bear.mode === A_ROAR) roared = true;
+  });
+  assert.ok(roared, 'a warning first');
+  assert.ok(strikes.length >= 2, `${strikes.length} blows`);
+  assert.ok(strikes.every((s) => s.on === 1 && s.damage >= 20));
+});
+
+ok('outrun: away at a sprint from further than a dozen metres when it roars, and the bear never catches you', () => {
+  for (const [start, caught] of [[16, false], [6, true]] as [number, boolean][]) {
+    const h = herd(['bear']);
+    const bear = h.place('bear', 0, 0, 0)!;
+    bear.yaw = Math.atan2(-1, 0);
+    const man = person(1, start, 0);
+    let ran = false;
+    const strikes = run(h, 0, 30, [man], () => {
+      if (bear.foe) ran = true;
+      if (ran) {
+        man.x += 6.2 * 0.2;
+        man.speed = 6.2;
+      }
+    });
+    assert.equal(strikes.length > 0, caught, `from ${start} m: ${strikes.length} blows`);
+    if (!caught) assert.equal(bear.foe, 0, 'it gave up');
+  }
+});
+
+ok('under a roof you are safe from a bear: it gives up and goes', () => {
+  const h = herd(['bear']);
+  const bear = h.place('bear', 0, 0, 0)!;
+  const man = person(1, 10, 0);
+  run(h, 0, 2, [man]);
+  assert.ok(bear.foe);
+  man.sheltered = true;
+  const strikes = run(h, 2000, 25, [man]);
+  assert.equal(strikes.filter((s) => s.t > 1500).length, 0);
+  assert.equal(bear.foe, 0);
+});
+
+ok('wolves circle and come in one at a time; when half the pack is down the rest run', () => {
+  const h = herd(['wolf']);
+  const first = h.place('wolf', 0, 0, 0)!, g = h.groups[first.g];
+  // (a pack of four, as the map has them)
+  for (let w = 0; w < 3; w++) {
+    const o = h.place('wolf', w * 2 + 2, 0, 0)!, og = h.groups[o.g];
+    og.members.splice(og.members.indexOf(o.i), 1);
+    o.g = g.i;
+    g.members.push(o.i);
+  }
+  PH = 0.85;
+  const man = person(1, 22, 0);
+  const strikes = run(h, 0, 30, [man]);
+  PH = 0.1;
+  assert.ok(strikes.length >= 3, `${strikes.length} bites`);
+  const by = new Set(strikes.map((s) => s.i));
+  assert.ok(by.size >= 2, 'more than one wolf bit');
+  for (let s = 1; s < strikes.length; s++) assert.ok(strikes[s].t - strikes[s - 1].t >= 400, 'one at a time');
+  assert.ok(strikes.every((s) => s.damage <= 15));
+  h.hurt(g.members[0], 999, man, 31_000);
+  h.hurt(g.members[1], 999, man, 31_000);
+  h.hurt(g.members[2], 999, man, 31_000);
+  const last = h.beasts.get(g.members[3])!, was = Math.hypot(last.x - man.x, last.z - man.z);
+  const after = run(h, 31_000, 10, [man]);
+  assert.equal(after.length, 0);
+  assert.ok(Math.hypot(last.x - man.x, last.z - man.z) > was + 30, 'the last one ran');
+});
+
+ok('gutting and skinning: a blade, six seconds at the body, and what it gives by the blade', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const b = h.beasts.get(h.groups[0].members[0])!;
+  assert.equal(h.startSkin(b.i, 1, b.x, b.z, 0), 'There is nothing here to skin.');
+  h.hurt(b.i, 999, null, 0);
+  assert.equal(h.startSkin(b.i, 1, b.x + 10, b.z, 0), 'Too far from it.');
+  assert.equal(h.startSkin(b.i, 1, b.x + 1, b.z, 1000), null);
+  assert.equal(h.endSkin(b.i, 1, b.x + 1, b.z, 2000), null, 'too soon');
+  assert.equal(h.endSkin(b.i, 2, b.x + 1, b.z, 1000 + SKIN.time * 1000), null, 'not theirs');
+  const done = h.endSkin(b.i, 1, b.x + 1, b.z, 1000 + SKIN.time * 1000)!;
+  assert.equal(done.kind.id, 'stag');
+  assert.equal(h.endSkin(b.i, 1, b.x + 1, b.z, 9000), null, 'once');
+  assert.equal(h.rows(b.x, b.z, 50).some((r) => r[0] === b.i), false, 'gone from sight');
+  const knife = Object.fromEntries(yieldOf(KIND.stag, BLADES.knife)), hatchet = Object.fromEntries(yieldOf(KIND.stag, BLADES.hatchet));
+  assert.deepEqual(knife, { meat_venison: 7, animal_fat: 2, hide: 1, bones: 5 });
+  assert.ok(hatchet.meat_venison < knife.meat_venison && hatchet.hide === 1);
+  assert.deepEqual(Object.fromEntries(yieldOf(KIND.bear, 1)), { meat_bear: 10, animal_fat: 6, pelt_bear: 1, bones: 8 });
+});
+
+ok('a game is told only of the animals within its reach', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const b = [...h.beasts.values()][0];
+  const rows = h.rows(b.x, b.z, ANIMALS.told);
+  assert.ok(rows.some((r) => r[0] === b.i));
+  assert.ok(rows.every((r) => Math.hypot(r[2] / 10 - b.x, r[3] / 10 - b.z) <= ANIMALS.told + 0.1));
+});
+
+console.log(`animals: ${n} passed`);

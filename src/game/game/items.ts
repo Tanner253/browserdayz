@@ -23,6 +23,8 @@ import type { WorldItem } from '../loot';
 import { type Well, WELL } from '../../sim/wells';
 import { waterName, type Drink } from '../../sim/water';
 import { FIRE } from '../../sim/fires';
+import { COOKS, COOK_KINDS, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
+import { POISON, fallsIll } from '../../sim/sickness';
 import { WHEEL_OUTER, WHEEL_PICK, WHEEL_REACH, type TimedAction, type Game } from '../game';
 
 export const itemsMethods = {
@@ -37,6 +39,40 @@ export const itemsMethods = {
     this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind === 'drip' ? 'bandage' : kind), dur);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
+  },
+
+  /** the raw meat carried that has not gone off: what can be put on a fire (src/sim/cooking.ts) */
+  rawMeat(this: Game): ItemInstance[] {
+    const now = Date.now() / 1000;
+    return this.inv.containers.flatMap((c) => c.items).map((p) => p.item).filter((it) => COOKS[it.id]?.how === 'cook' && stageOf(it) === 'raw' && !rotten(it, now));
+  },
+
+  /**
+   * Raw meat put on a lit fire, as many as its stones take (COOK_KINDS.campfire: four), for as long as its recipe
+   * says, by whoever stays beside it: then it is cooked, and hot (a meal hot does more good: HEAT). Walk off, or let
+   * the fire die, and it comes off as it was. DayZ's fireplace, without a screen for its slots.
+   */
+  grill(this: Game, fi: number) {
+    const kind = COOK_KINDS.campfire, many = kind.food![0] * kind.food![1];
+    const meat = this.rawMeat().slice(0, many);
+    if (!meat.length || this.use) return;
+    this.putAway();
+    this.toggleInventory(false);
+    const dur = Math.max(...meat.map((it) => COOKS[it.id].takes - (it.cook ?? 0))) / kind.speed;
+    const near = () => this.fires.left[fi] > 0 && this.fires.at(this.player.pos) === fi;
+    this.use = { label: `Cooking ${meat.length === 1 ? ITEMS[meat[0].id].name : `${meat.length} pieces of meat`} on the fire`, t: 0, dur, sound: null, soundT: 0, valid: near, lost: 'You walked off from the fire', done: () => {
+      if (!near()) return;
+      const now = Date.now() / 1000;
+      let n = 0;
+      for (const it of meat) {
+        if (!this.mine(it)) continue;
+        it.cook = COOKS[it.id].takes;
+        it.hot = now + HEAT.keeps;
+        n++;
+      }
+      if (n) this.hud.note(`Cooked ${n === 1 ? 'one piece' : `${n} pieces`} of meat: eat it hot and it does more good`, 'good');
+      this.inventoryChanged();
+    } };
   },
 
   /** every bottle carried (see `sips` in src/sim/items.ts): in the pockets, and in what is worn */
@@ -234,11 +270,32 @@ export const itemsMethods = {
         return;
       }
       const v = this.player.vitals;
-      // (hot, beside a fire, what is eaten or drunk does more good)
+      // (hot, beside a fire, what is eaten or drunk does more good; and what cooks gives what its stage is worth: raw
+      // meat a quarter, and as likely as not food poisoning; anything rotten little, and poisoning for sure: cooking.ts)
       const hot = (u.energy ?? 0) > 0 || (u.water ?? 0) > 0 ? (this.fires.warm(this.player.pos) ? FIRE.meal : 1) : 1;
-      if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + (u.energy > 0 ? Math.round(u.energy * hot) : u.energy), 0, 100);
-      if (u.water) v.water = THREE.MathUtils.clamp(v.water + (u.water > 0 ? Math.round(u.water * hot) : u.water), 0, 100);
-      if (u.health) v.health = Math.min(100, v.health + u.health);
+      const meal = cookable(item) ? mealOf(item, Date.now() / 1000, hot) : null;
+      const energy = meal ? meal.energy : u.energy ? (u.energy > 0 ? Math.round(u.energy * hot) : u.energy) : 0;
+      const water = meal ? meal.water : u.water ? (u.water > 0 ? Math.round(u.water * hot) : u.water) : 0;
+      const health = meal ? meal.health : (u.health ?? 0);
+      if (energy) v.energy = THREE.MathUtils.clamp(v.energy + energy, 0, 100);
+      if (water) v.water = THREE.MathUtils.clamp(v.water + water, 0, 100);
+      if (health > 0) v.health = Math.min(100, v.health + health);
+      else if (health < 0) this.player.sicken(-health, 'rotten food');
+      if (meal && fallsIll(meal.sick, !!v.guard, Math.random())) {
+        v.ill = Math.max(v.ill ?? 0, POISON.lasts);
+        this.hud.note('Your stomach turns: food poisoning. Charcoal tablets will settle it', 'warn');
+        this.meDirty = true;
+      }
+      if (u.cures) {
+        this.hud.note(v.ill ? 'The charcoal settles your stomach' : 'Nothing to settle: the tablets are gone all the same', v.ill ? 'good' : 'info');
+        v.ill = undefined;
+        this.meDirty = true;
+      }
+      if (u.guard) {
+        v.guard = u.guard;
+        this.hud.note(`Vitamins: for ${Math.round(u.guard / 60)} minutes bad food is half as likely to make you ill`, 'good');
+        this.meDirty = true;
+      }
       if (u.stamina) v.stamina = Math.min(MAX_STAMINA, v.stamina + (MAX_STAMINA * u.stamina) / 100);
       if (u.boost) {
         this.player.boost = u.boost;
@@ -258,9 +315,8 @@ export const itemsMethods = {
         if (v.broken) this.player.setLeg(true);
         else if (!u.stopBleed) this.hud.note('Nothing is broken: the tape is used up all the same', 'info');
       }
-      const good = (n: number) => (n > 0 ? Math.round(n * hot) : n);
-      const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${good(u.energy)} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${good(u.water)} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
-      if (gained) this.hud.note(hot > 1 ? `${gained} · warmed by the fire` : gained, 'good');
+      const gained = [energy ? `${energy > 0 ? '+' : ''}${energy} energy` : '', water ? `${water > 0 ? '+' : ''}${water} water` : '', health ? `${health > 0 ? '+' : ''}${health} health` : ''].filter(Boolean).join(' · ');
+      if (gained) this.hud.note(meal?.hot ? `${gained} · hot` : hot > 1 ? `${gained} · warmed by the fire` : gained, health < 0 ? 'warn' : 'good');
       if (u.sound === 'smoke') {
         // what is left of it, in front of the face
         const cam = this.s.r.camera;

@@ -42,6 +42,7 @@ import { broadcast, cleanName, clients, join, num, perksChanged, records, round2
 import { perks } from './perks';
 import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
+import { animalsTick, startAnimals } from './animals';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
@@ -1263,6 +1264,9 @@ perks.start(perksChanged);
 setInterval(tagsWorn, 1000).unref();
 // (buried stashes, told to each player as they come near: never all of them to everybody)
 setInterval(() => stashesSeen(clients.values(), boxes.values(), send), 1000).unref();
+// (the animals: the server moves every one, five times a second where anybody is near: server/animals.ts)
+startAnimals();
+setInterval(() => animalsTick(Date.now()), 200).unref();
 
 void loadKept();
 

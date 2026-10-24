@@ -916,6 +916,12 @@ export class Game {
       this.hud.note('The bleeding has stopped on its own', 'good');
       this.meDirty = true;
     };
+    // (food poisoning: a bout of throwing up, which costs water and food: src/sim/sickness.ts)
+    this.player.onBout = () => {
+      this.hud.note('You throw up', 'warn');
+      this.weapons.flinch(0.7);
+      this.meDirty = true;
+    };
     this.hud.people = () => [...this.remotes.values()].map((r) => ({ id: r.id, name: r.name }));
     this.hud.onLogout = (cancel) => {
       if (this.online && !this.player.dead) this.net.send(cancel ? { t: 'logout', cancel: true } : { t: 'logout' });
@@ -1658,6 +1664,8 @@ export interface Game {
   useItem: Methods<typeof itemsMethods>['useItem'];
   pullPin: Methods<typeof itemsMethods>['pullPin'];
   cooking: Methods<typeof itemsMethods>['cooking'];
+  rawMeat: Methods<typeof itemsMethods>['rawMeat'];
+  grill: Methods<typeof itemsMethods>['grill'];
   cookShown: Methods<typeof itemsMethods>['cookShown'];
   emptyOfGrenade: Methods<typeof itemsMethods>['emptyOfGrenade'];
   lagPx: Methods<typeof itemsMethods>['lagPx'];

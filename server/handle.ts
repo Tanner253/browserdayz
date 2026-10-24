@@ -43,6 +43,8 @@ import { pinned } from './pinned';
 import { stashBuriedNear } from './stash-sight';
 import { changed, contents } from './storages';
 import { aimWatch, looked } from './aimwatch';
+import { animalHit, animalSkin, animalsHear } from './animals';
+import { POISON } from '../src/sim/sickness';
 
 /** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
 function withoutTags<T extends { id: string; cargo?: { item: { id: string } }[] }>(items: T[]): T[] {
@@ -111,6 +113,8 @@ export function handle(c: Client, m: C2S) {
       stayOn(c, 'you fired');
       // (to whoever is within earshot of that gun, and a little more for those on the move: see src/sim/heard.ts)
       broadcastNear({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, m.o[0], m.o[2], shotHeard(m.w, !!m.sup)[1] + 50, c);
+      // (and every animal within earshot hears it)
+      animalsHear(m.o[0], m.o[2], shotHeard(m.w, !!m.sup));
       return;
     }
     case 'swing': {
@@ -327,6 +331,10 @@ export function handle(c: Client, m: C2S) {
       broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir: [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len], melee: !!rule.melee && !rule.blast });
       return;
     }
+    case 'ahit':
+      return animalHit(c, m);
+    case 'askin':
+      return animalSkin(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
@@ -586,7 +594,7 @@ export function handle(c: Client, m: C2S) {
         // (nor any blood, and no wound of theirs is closed by it)
         const bleeding = held ? held.bleeding || !!v.bleeding : !!v.bleeding;
         const bleed = bleeding ? Math.max(held?.bleeding ? bleedOf(held) : 0, v.bleeding ? bleedOf(v) : 0) : 0;
-        c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding, blood: held ? Math.min(bloodOf(held), bloodOf(v)) : bloodOf(v), bleed, broken: !!v.broken };
+        c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding, blood: held ? Math.min(bloodOf(held), bloodOf(v)) : bloodOf(v), bleed, broken: !!v.broken, ...(num(v.ill) && v.ill > 0 ? { ill: Math.min(POISON.lasts, v.ill) } : {}), ...(num(v.guard) && v.guard > 0 ? { guard: Math.min(1200, v.guard) } : {}) };
       }
       return;
     }

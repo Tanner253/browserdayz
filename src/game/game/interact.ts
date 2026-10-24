@@ -103,8 +103,13 @@ export const interactMethods = {
       if (fi >= 0) {
         const s = this.fires.spots[fi];
         if (c.set(s.x, s.y + 0.3, s.z).sub(cam.position).normalize().dot(dir) > 0.78) {
-          const left = this.fires.left[fi];
-          if (left > 0) this.prompt = `<small>Fire · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left · rest beside it to mend</small>`;
+          const left = this.fires.left[fi], meat = left > 0 && !this.use ? this.rawMeat().length : 0;
+          const clock = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+          if (meat) {
+            // (raw meat carried: it goes on the fire, as many as its stones take)
+            this.prompt = `<kbd>F</kbd>Cook ${Math.min(meat, 4)} raw meat <small>Fire · ${clock} left</small>`;
+            if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.grill(fi);
+          } else if (left > 0) this.prompt = `<small>Fire · ${clock} left · rest beside it to mend</small>`;
           else {
             this.prompt = '<kbd>F</kbd>Light the fire';
             if (this.input.pressed('KeyF') && !this.use) this.lightFire(fi);
