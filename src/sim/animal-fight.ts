@@ -23,6 +23,40 @@ const outOfReach = (h: Herd, b: Beast, k: Kind, foe: Seen) => {
 };
 /** and with nothing solid between: "should not be able to hit me through walls" (2026-10-24) */
 const unreached = (h: Herd, b: Beast, k: Kind, foe: Seen) => foe.sheltered || outOfReach(h, b, k, foe) || h.ground.walled(b.x, b.z, foe.x, foe.z);
+/** whether it could get at them where they stand, however far: not in a car, under a roof, up on something or behind a wall */
+const gettable = (h: Herd, b: Beast, k: Kind, q: Seen) =>
+  !q.ride && !q.sheltered && q.y - h.ground.height(q.x, q.z) < k.tall + 0.9 && !h.ground.walled(b.x, b.z, q.x, q.z);
+
+/**
+ * Shot, struck or blasted: a bear goes for whoever did it, from any distance (2026-10-24: "a bear should engage a
+ * player that shoots it"). It knows where the shot came from, and comes at its rush, which nobody outruns, until it has
+ * them or loses them; each hit after keeps it coming. It holds to whoever it has while it can get at them, so a
+ * second gun cannot pull it off ("make sure the bear commits unless the targt is unreachable so a gorup of 2 people
+ * cant ake dvantage of simple ai by taking turns shootingbear to get aggro"); a shot from somebody it cannot get at,
+ * it runs from.
+ */
+function answer(h: Herd, b: Beast, k: Kind, now: number, people: Seen[]) {
+  b.answered = b.hurtAt;
+  const f = k.fight!, by = people.find((q) => q.id === b.hurtBy && !q.unseen);
+  const held = b.foe ? people.find((q) => q.id === b.foe) : undefined;
+  if (!by || !gettable(h, b, k, by) || (held && held !== by && gettable(h, b, k, held))) return;
+  const d = Math.hypot(by.x - b.x, by.z - b.z);
+  if (b.foe !== by.id) {
+    b.foe = by.id;
+    b.fightAt = now;
+    b.fightX = b.x;
+    b.fightZ = b.z;
+    b.warnUntil = now;
+    b.move = null;
+  }
+  b.seenX = by.x;
+  b.seenZ = by.z;
+  // (and cannot lose them before it could have got to where the shot came from)
+  b.sensedAt = Math.max(b.sensedAt, now + (d / f.rush) * 1000);
+  b.rushUntil = Infinity;
+  // (as far as running down a sprinter takes from there: at its rush, three times as far as they were)
+  b.reach = Math.max(b.reach, Math.hypot(by.x - b.fightX, by.z - b.fightZ) * 3 + f.leash);
+}
 
 /**
  * A bear: the warning, the rush, the chase, the blows, and giving up. A bear that
@@ -36,41 +70,41 @@ export function fighter(h: Herd, b: Beast, k: Kind, now: number, dt: number, peo
     if (b.foe) giveUp(b, now, 60_000);
     return false;
   }
+  if (b.hurtAt > b.answered) answer(h, b, k, now, people);
   if (!b.foe) {
     if (now < b.calmUntil) return false;
-    const hurt = b.hurtBy && now - b.hurtAt < 8000 ? people.find((q) => q.id === b.hurtBy) : undefined;
     const night = isNight(h.phase(now));
-    const near = from && !from.ride && !from.sheltered && b.aware >= (k.temper === 'bear' ? ANIMALS.alert : ANIMALS.fleeAt) && Math.hypot(from.x - b.x, from.z - b.z) < f.engage[night ? 1 : 0] ? from : undefined;
-    const foe = hurt && !hurt.ride && Math.hypot(hurt.x - b.x, hurt.z - b.z) < (k.temper === 'bear' ? 60 : f.engage[1]) ? hurt : near;
+    const foe = from && !from.ride && !from.sheltered && b.aware >= ANIMALS.alert && Math.hypot(from.x - b.x, from.z - b.z) < f.engage[night ? 1 : 0] ? from : undefined;
     if (!foe) return false;
     b.foe = foe.id;
     b.fightAt = now;
     b.fightX = b.x;
     b.fightZ = b.z;
+    b.reach = f.leash;
     b.sensedAt = now;
     b.seenX = foe.x;
     b.seenZ = foe.z;
-    // (hurt, it comes at once, with no warning)
-    b.warnUntil = foe === hurt ? now : now + f.warn * 1000;
-    b.rushUntil = f.charge && foe !== hurt ? 0 : b.warnUntil + f.rushFor * 1000;
+    b.warnUntil = now + f.warn * 1000;
+    b.rushUntil = f.charge ? 0 : b.warnUntil + f.rushFor * 1000;
     b.move = null;
   }
   const foe = people.find((q) => q.id === b.foe);
-  if (!foe || foe.ride || Math.hypot(b.x - b.fightX, b.z - b.fightZ) > f.leash) return giveUp(b, now, 20_000), false;
+  if (!foe || foe.ride || Math.hypot(b.x - b.fightX, b.z - b.fightZ) > b.reach) return giveUp(b, now, 20_000), false;
   const d = Math.hypot(foe.x - b.x, foe.z - b.z);
   const eye = h.ground.height(b.x, b.z) + k.tall;
-  // (it sees whoever is in the open with no hill between; among trees not half so far: the way to lose a bear)
-  const sees = d < 70 * (1 - 0.6 * h.ground.cover(foe.x, foe.z)) && h.ground.clear(b.x, eye, b.z, foe.x, foe.y + 1.2, foe.z);
+  // (it sees whoever is in the open with no hill between, and shot, keeps its eyes on them twice as far; among trees
+  // not half so far: the way to lose a bear)
+  const sees = d < (b.rushUntil === Infinity ? 150 : 70) * (1 - 0.6 * h.ground.cover(foe.x, foe.z)) && h.ground.clear(b.x, eye, b.z, foe.x, foe.y + 1.2, foe.z);
   const high = outOfReach(h, b, k, foe);
   if (d < 6 || sees || d < smellReach(k, b.x, b.z, foe.x, foe.z) * 0.4) {
     // (one out of its reach above is no more within its grasp than one under a roof: it gives up on them as slowly)
-    if (!foe.sheltered && !high) b.sensedAt = now;
+    if (!foe.sheltered && !high) b.sensedAt = Math.max(b.sensedAt, now);
     b.seenX = foe.x;
     b.seenZ = foe.z;
   }
   if (now - b.sensedAt > f.lose * (foe.sheltered || high ? 3 : 1) * 1000) return giveUp(b, now, 20_000), false;
-  // (walking in: within `charge` of them, or hurt, and it rushes, from the end of its roar)
-  if (!b.rushUntil && (d < f.charge! || (b.hurtBy && now - b.hurtAt < 1000))) b.rushUntil = Math.max(now, b.warnUntil) + f.rushFor * 1000;
+  // (walking in: within `charge` of them and it rushes, from the end of its roar; shot, it was already rushing)
+  if (!b.rushUntil && d < f.charge!) b.rushUntil = Math.max(now, b.warnUntil) + f.rushFor * 1000;
   // (past its rush it keeps after them only so long, unless it is on them: a sprint begun far enough off gets away)
   if (b.rushUntil && now > b.rushUntil + f.chaseFor * 1000 && d > 6) return giveUp(b, now, 20_000), false;
   if (now < b.warnUntil) {
