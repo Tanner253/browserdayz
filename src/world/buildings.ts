@@ -1718,6 +1718,7 @@ export class Buildings {
     mark(townLoot);
     this.lootPoints.push(...townLoot);
     mark(this.laterLoot);
+    this.laterLoot.push(...this.laterCellars);
     // (and the new places' things, the towns' buildings' furniture first. A crate stacked on another is set a hand's
     // breadth askew, as the fort's are: what is searched is told by where it stands)
     const searched = (q: Instance) => CRATE_KINDS.has(q.kind.split(/[#@]/)[0]) || SEARCHED_KINDS.has(q.kind.split(/[#@]/)[0]);
@@ -1793,8 +1794,16 @@ export class Buildings {
     }
     mark(points);
     points.forEach((p, i) => (p.tier = Math.min(4, (p.tier ?? 1) + better[i]) as Tier));
-    this.lootPoints.push(...points);
+    // (a cellar under a house of a town laid later (LATER_TOWNS) has its places after every other place, with that
+    // town's: here they had renumbered every town's)
+    const later = new Set(list.filter((b) => LATER_PLOT.test(b.plot)).flatMap((b) => b.spots.map((s) => `${b.plot}|${s.x}|${s.z}`))), own: LootPoint[] = [], last: LootPoint[] = [];
+    let k = 0;
+    for (const b of list) for (const s of b.spots) (later.has(`${b.plot}|${s.x}|${s.z}`) ? last : own).push(points[k++]);
+    this.lootPoints.push(...own);
+    this.laterCellars = last;
   }
+  /** the later towns' cellars' places (see planBasements), added to laterLoot */
+  private laterCellars: LootPoint[] = [];
 
   /**
    * What stands in the grounds of the hospital and of the headquarters (2026-10-12: "the new buildings need more,
@@ -2851,13 +2860,17 @@ export class Buildings {
       const rise = d * (plot.type === 'barn' ? 0.36 : 0.32);
       const ang = Math.atan2(rise, hd);
       const oh = 0.45;
+      // (where a gable stands against a neighbour's, a row's houses wall to wall as Pokrov's lanes are, the roof stops
+      // at it: 0.45 m out each, two roofs went through each other where houses stood 0.2 m apart. The owner,
+      // 2026-10-23: "the buildings to the south east of pokrov are clipping into each other")
+      const [ohL, ohR] = this.abuts(plot).map((a) => (a ? 0.04 : oh));
       const slopeLen = hd / Math.cos(ang) + oh;
       for (const s of [1, -1]) {
         const R = B.clone()
           .multiply(new THREE.Matrix4().makeTranslation(0, H + rise + 0.02, 0))
           .multiply(new THREE.Matrix4().makeRotationX(s * ang));
         const z0 = s > 0 ? 0 : -slopeLen, z1 = s > 0 ? slopeLen : 0;
-        addBox(bp.roof, -hw - oh, hw + oh, 0, 0.1, z0, z1, R);
+        addBox(bp.roof, -hw - ohL, hw + ohR, 0, 0.1, z0, z1, R);
       }
       // gable ends
       for (const sx of [1, -1]) {
@@ -2865,8 +2878,8 @@ export class Buildings {
         this.push(bp.ext, prismGeo(hd, rise, T, this.tile(bp.ext), G, [-sx, hd - T, bp.upper ? bp.upper.h : h]));
       }
       // ridge cap
-      addBox('trim', -hw - oh, hw + oh, H + rise + 0.02, H + rise + 0.14, -0.12, 0.12, B, false);
-      this.eaves(B, hw, H + rise + 0.02, ang, slopeLen, oh);
+      addBox('trim', -hw - ohL, hw + ohR, H + rise + 0.02, H + rise + 0.14, -0.12, 0.12, B, false);
+      this.eaves(B, hw, H + rise + 0.02, ang, slopeLen, ohL, ohR);
     } else if (bp.roofType === 'shed') {
       // single pitch: highest over the door, falling to the back wall
       const rise = 0.55;
@@ -3221,20 +3234,41 @@ export class Buildings {
   }
 
   /** The edges of a pitched roof: a board hung along each eave, and one down each slope at either end. */
-  private eaves(B: THREE.Matrix4, hw: number, ridge: number, ang: number, slopeLen: number, oh: number) {
+  /** the boards along a gable roof's eaves and down its gables; `ohL`, `ohR`: how far it reaches past each gable (see `abuts`) */
+  private eaves(B: THREE.Matrix4, hw: number, ridge: number, ang: number, slopeLen: number, ohL: number, ohR = ohL) {
     const tile = this.tile('trim');
     for (const s of [1, -1]) {
       const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(0, ridge, 0)).multiply(new THREE.Matrix4().makeRotationX(s * ang));
       // (against the end of the roof: through the last of it, its top lay in the roof's own and the two flickered along every eave)
       const z0 = s > 0 ? slopeLen : -slopeLen - 0.06;
-      this.push('trim', boxGeo(-hw - oh, hw + oh, -0.17, 0.1, z0, z0 + 0.06, tile, R));
+      this.push('trim', boxGeo(-hw - ohL, hw + ohR, -0.17, 0.1, z0, z0 + 0.06, tile, R));
       // (the two boards down a gable cross at its peak: one of them is the thinner, so that no face of one lies in a face of the other)
       const half = s > 0 ? 0.03 : 0.022;
       for (const sx of [1, -1]) {
-        const x = sx * (hw + oh);
+        const x = sx * (hw + (sx > 0 ? ohR : ohL));
         this.push('trim', boxGeo(x - half, x + half, -0.17, 0.12, s > 0 ? 0 : -slopeLen, s > 0 ? slopeLen : 0, tile, R));
       }
     }
+  }
+
+  /** which of a building's gables (its own -x, +x) stand within a metre of a neighbour's side by side with it, turned as it is */
+  private abutting: Map<string, [boolean, boolean]> | null = null;
+  private abuts(plot: BuildingPlot): [boolean, boolean] {
+    if (!this.abutting) {
+      const list = this.world.buildings, map = new Map<string, [boolean, boolean]>();
+      for (const a of list) {
+        const [wa, da] = BUILDING_FOOTPRINT[a.type] ?? [0, 0], c = Math.cos(a.rot), s = Math.sin(a.rot), out: [boolean, boolean] = [false, false];
+        for (const b of list) {
+          if (b === a || Math.abs(b.x - a.x) > 30 || Math.abs(b.z - a.z) > 30 || Math.abs(Math.sin(b.rot - a.rot)) > 0.05) continue;
+          const [wb, db] = BUILDING_FOOTPRINT[b.type] ?? [0, 0], dx = b.x - a.x, dz = b.z - a.z, lx = dx * c - dz * s, lz = dx * s + dz * c;
+          const gap = Math.abs(lx) - (wa + wb) / 2;
+          if (Math.abs(lz) < (da + db) / 4 && gap > -0.1 && gap < 1) out[lx > 0 ? 1 : 0] = true;
+        }
+        map.set(a.id, out);
+      }
+      this.abutting = map;
+    }
+    return this.abutting.get(plot.id) ?? [false, false];
   }
 
   /** (`leaf`: it is a container's leaf, of the orange one (0) or the blue (1), and not a door of boards) */

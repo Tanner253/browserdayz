@@ -12,7 +12,7 @@ import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { wind } from './foliage';
 import { worldUniforms, type Terrain } from './terrain';
-import { CELL, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1 } from './worldgen';
+import { CELL, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, type Reeds } from './worldgen';
 
 const PATCH = 4;
 const BLADES = 2400;
@@ -95,8 +95,17 @@ export class Grass {
   readonly radius = 50;
   private heights: Float32Array;
 
-  constructor(private terrain: Terrain, private atmo: Atmosphere, heights: Float32Array) {
+  /** the swamp's reed map (World.reeds), as the blades read it: grown tall where it says (see GRASS_BEGIN) */
+  private reedTex: THREE.DataTexture;
+  private reedBox: THREE.Vector4;
+
+  constructor(private terrain: Terrain, private atmo: Atmosphere, heights: Float32Array, reeds?: Reeds) {
     this.heights = heights;
+    const r = reeds ?? { x0: 0, z0: 0, cell: 1, nx: 1, nz: 1, data: new Uint8Array(1) };
+    this.reedTex = new THREE.DataTexture(r.data, r.nx, r.nz, THREE.RedFormat);
+    this.reedTex.magFilter = this.reedTex.minFilter = THREE.LinearFilter;
+    this.reedTex.needsUpdate = true;
+    this.reedBox = new THREE.Vector4(r.x0, r.z0, (r.nx - 1) * r.cell, (r.nz - 1) * r.cell);
   }
 
   build(scene: THREE.Scene) {
@@ -145,6 +154,8 @@ export class Grass {
       tHeight: { value: t.heightTex },
       tGrass: { value: t.grassTex },
       tMacro: { value: t.macroTex },
+      tReed: { value: this.reedTex },
+      uReedBox: { value: this.reedBox },
       ...worldUniforms(),
       uWidthScale: { value: widthScale },
       uRadius: { value: this.radius },
@@ -280,6 +291,9 @@ attribute vec4 aBlade;
 uniform sampler2D tHeight;
 uniform sampler2D tGrass;
 uniform sampler2D tMacro;
+// (the swamp's reeds, and the box they are mapped over: its corner and size in metres)
+uniform sampler2D tReed;
+uniform vec4 uReedBox;
 // (the world's north-west corner and size in metres; its samples across and down; metres between samples)
 uniform vec4 uWorld;
 uniform vec2 uWorldRes;
@@ -335,16 +349,20 @@ vec3 transformed;
   // (and how far it is from the eye up included, as the patches are chosen: see Grass.update)
   float dist = length(vec3(wp.x - cameraPosition.x, max(0.0, abs(cameraPosition.y - baseY) - 1.0), wp.y - cameraPosition.z));
   float edge = 1.0 - smoothstep(uRadius * 0.72, uRadius, dist);
-  float keep = step(r2, density * 1.15);
+  // (the swamp's reeds: the same blades a man's height and more, broader and stiff, where the reed map has them)
+  vec2 ruv = (wp - uReedBox.xy) / uReedBox.zw;
+  float reed = (ruv.x > 0.0 && ruv.y > 0.0 && ruv.x < 1.0 && ruv.y < 1.0) ? smoothstep(0.12, 0.5, texture2D(tReed, ruv).r) : 0.0;
+  float keep = step(r2, max(density, reed) * 1.15);
   float tall = mix(0.35, 0.95, smoothstep(0.2, 0.9, macro2.g)) * mix(0.75, 1.15, macro.b);
   float hgt = (0.22 + 0.42 * r1 * r1) * tall * keep * edge * smoothstep(0.05, 0.4, density);
-  float wid = (0.016 + 0.012 * r2) * uWidthScale * keep;
+  hgt = mix(hgt, (0.8 + 1.15 * r1 * r1) * keep * edge, reed);
+  float wid = (0.016 + 0.012 * r2) * uWidthScale * keep * mix(1.0, 1.8, reed);
   float t = position.y;
   vec2 dir = vec2(cos(ang), sin(ang));
   // natural lean + wind gust waves travelling across the field
   float wave = sin(dot(wp, uWindDir.xz) * 0.21 - uTime * 1.9) * 0.5 + 0.5;
   float gust = sin(dot(wp, uWindDir.xz) * 0.043 - uTime * 0.7) * 0.5 + 0.5;
-  float bendAmt = (0.12 + 0.35 * r2) + uWindStrength * (0.12 + 0.45 * wave * gust);
+  float bendAmt = ((0.12 + 0.35 * r2) + uWindStrength * (0.12 + 0.45 * wave * gust)) * mix(1.0, 0.38, reed);
   vec2 bd0 = dir * 0.6 + uWindDir.xz * (0.4 + wave);
   vec2 bendDir = bd0 / max(length(bd0), 1e-3);
   // player pushes blades aside
@@ -368,6 +386,9 @@ vec3 transformed;
   vec3 tipDry = vec3(0.55, 0.50, 0.24);
   vec3 tip = mix(tipLush, tipDry, smoothstep(0.35, 0.9, macro.r) * 0.8 + r1 * 0.15);
   vGrassColor = mix(baseCol, tip, smoothstep(0.0, 1.0, t)) * (0.85 + 0.3 * r2);
+  // (a reed's: dark at the water, olive up its stem, straw at its top, some gone over)
+  vec3 reedTip = mix(vec3(0.26, 0.33, 0.11), vec3(0.44, 0.39, 0.19), smoothstep(0.5, 1.05, r2 + 0.35 * macro.r));
+  vGrassColor = mix(vGrassColor, mix(vec3(0.08, 0.10, 0.04), reedTip, smoothstep(0.0, 1.0, t)) * (0.75 + 0.35 * r1), reed);
   vGrassAO = mix(0.55, 1.0, t);
   gNormal = normalize(mix(vec3(0.0, 1.0, 0.0), vec3(side.z, 0.0, -side.x), 0.12));
 }

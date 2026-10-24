@@ -50,6 +50,9 @@ export interface Solid {
   h: number;
 }
 
+/** the swamp's reeds (World.reeds): a map over a box, `cell` metres a point from (x0, z0), nx by nz, 0 to 255 */
+export interface Reeds { x0: number; z0: number; cell: number; nx: number; nz: number; data: Uint8Array }
+
 export interface POI {
   name: string;
   x: number;
@@ -111,6 +114,8 @@ export interface World {
   kalat?: Place;
   /** the desert at each point of the net, four to a point, 0 to 255: how much of it is desert, and of that how much is the beach's dry sand, wet sand and cracked earth (the rest dune sand; its rock the canyon's): src/world/ground.ts */
   sand?: Uint8Array;
+  /** the swamp's reeds over its box, a metre a point, 0 to 255: where the grass grows tall as reeds (src/world/grass.ts), made by src/world/worldgen/west.ts */
+  reeds?: Reeds;
   /** the pass's caves as carved under the ground (src/world/cave-carve.ts): made where the world is made for the game (src/world/caves-carved.ts), not on the server */
   caves?: Carved[];
   /** the lakes and rivers (src/sim/water.ts): drawn by src/world/water.ts, waded in by the player */

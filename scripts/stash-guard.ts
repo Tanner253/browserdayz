@@ -52,7 +52,13 @@ async function print(stashes: Stash[]): Promise<Prints> {
   for (const s of world.solids) { const o = s as unknown as { x: number; z: number }; put('solid', o.x, o.z, 15, s); }
   for (const p of world.posts ?? []) put('post', p.x, p.z, 12, p);
   for (const s of world.slabs ?? []) put('slab', (s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) / 2 + 1, s);
-  for (const p of world.towns ?? []) put('town', p.town.x, p.town.z, Math.hypot(p.town.pad[0], p.town.pad[1]) / 2 + 40, { p, kits: T.placedKits(p).map((k) => k.boxes), walls: T.placedWalls(p) });
+  // (a town by what of it stands: its pad is the ground's, its buildings and things are above; here its walkways' boards
+  // and its walls, each where it is. As one thing reaching over the whole town, a part of a town laid since was a change
+  // at every stash in the town, though nothing of it stood near.)
+  for (const p of world.towns ?? []) {
+    for (const k of T.placedKits(p)) for (const b of k.boxes) put('walk', b.c[0], b.c[2], Math.hypot(b.h[0], b.h[2]) + 1, b);
+    for (const k of T.placedWalls(p)) put('town wall', k.at[0], k.at[2], 8, k);
+  }
   if (world.kalat) put('kalat', world.kalat.x, world.kalat.z, 400, world.kalat);
   for (const q of world.pois) put('place', q.x, q.z, q.radius, q);
   for (const o of outcropPieces(world, WG.passPlan)) put('outcrop', o.at[0], o.at[2], 4 * o.scale, o);
@@ -137,11 +143,23 @@ async function main(): Promise<void> {
     const o = a.stashes[i], n = b.stashes[i], at = `${Math.round(o.at.x)}, ${Math.round(o.at.z)}`;
     const dy = Math.max(0, ...o.ground.map((v, k) => Math.abs(v - n.ground[k])));
     const was = new Set(o.things.map((t) => t.k + t.s)), now = new Set(n.things.map((t) => t.k + t.s));
-    const gone = o.things.filter((t) => !now.has(t.k + t.s)), came = n.things.filter((t) => !was.has(t.k + t.s));
-    if (dy <= 0.02 && !gone.length && !came.length) continue;
+    let gone = o.things.filter((t) => !now.has(t.k + t.s)), came = n.things.filter((t) => !was.has(t.k + t.s));
+    // (a thing that stands where it stood but for its height, by no more than the ground's own 2 cm, as the ground
+    // under it may: the same thing, not a change)
+    const same = (p: Thing, q: Thing) => {
+      if (p.k !== q.k) return false;
+      const a = JSON.parse(p.s) as Record<string, unknown>, b = JSON.parse(q.s) as Record<string, unknown>;
+      return Object.keys({ ...a, ...b }).every((key) => (key === 'y' && typeof a[key] === 'number' ? Math.abs((a[key] as number) - (b[key] as number)) <= 0.021 : JSON.stringify(a[key]) === JSON.stringify(b[key])));
+    };
+    const kept = gone.filter((g) => came.some((c) => same(g, c)));
+    gone = gone.filter((g) => !kept.includes(g));
+    came = came.filter((c) => !kept.some((g) => same(g, c)));
+    // (2 cm, and no more than a rounding over: a road's bed lies 2 cm under the pad it crosses)
+    if (dy <= 0.02 + 1e-6 && !gone.length && !came.length) continue;
     bad++;
     console.log(`STASH ${at}: ground moved up to ${dy.toFixed(2)} m; ${gone.length} things gone, ${came.length} new or moved within ${R} m`);
-    for (const t of [...gone.map((q) => ['-', q] as const), ...came.map((q) => ['+', q] as const)].slice(0, 8)) console.log(`   ${t[0]} ${t[1].k} at ${Math.round(t[1].x)}, ${Math.round(t[1].z)} (${Math.round(Math.hypot(t[1].x - o.at.x, t[1].z - o.at.z))} m)`);
+    const what = (t: Thing) => { const v = JSON.parse(t.s) as { id?: string; kind?: string; type?: string; name?: string }; return v.id ?? v.kind ?? v.name ?? ''; };
+    for (const t of [...gone.map((q) => ['-', q] as const), ...came.map((q) => ['+', q] as const)].slice(0, 8)) console.log(`   ${t[0]} ${t[1].k} ${what(t[1])} at ${Math.round(t[1].x)}, ${Math.round(t[1].z)} (${Math.round(Math.hypot(t[1].x - o.at.x, t[1].z - o.at.z))} m)`);
   }
   console.log(`${a.stashes.length} stashes checked against ${ref} (${b.stashes.reduce((n, s) => n + s.things.length, 0)} things within reach of them): ${bad ? `${bad} TOUCHED` : 'every one untouched'} (ground within 2 cm out to ${R} m, nothing within ${R} m changed)`);
   const areas = changedAreas(a, b), cellsOut = opt('--cells', '');

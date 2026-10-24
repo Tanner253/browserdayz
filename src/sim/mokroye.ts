@@ -12,7 +12,7 @@
 import type { KitPiece } from './kit';
 import type { Town, TownGround, TownSpot } from './towns';
 import type { TownThing } from './zavod';
-import type { WalkRun } from './walkways';
+import { SECTION, type WalkRun } from './walkways';
 
 const PI = Math.PI;
 
@@ -49,31 +49,86 @@ export function mokroyeBuildings(): TownSpot[] {
   ];
 }
 
-/** The boardwalks: in from the swamp's east edge, branching to the houses and the little island; from the big island to the barn; the jetty off the island's west end into open water. */
-export const MOKROYE_WALKS: WalkRun[] = [
-  { a: [79, 2], b: [46, -10], deck: DECK, posts: true },
-  { a: [46, -10], b: [14, -8], deck: DECK },
-  { a: [14, -8], b: [-13, -14], deck: DECK },
-  { a: [14, -8], b: [6, 18], deck: DECK },
-  { a: [6, 18], b: [-3, 24], deck: DECK },
+/** a number in [0, 1) from two, the same in the game and on the server */
+const hash = (a: number, b: number) => {
+  const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return v - Math.floor(v);
+};
+
+/**
+ * A boardwalk along its waypoints as it would have been laid by hand and mended for years (2026-10-23, the owner's
+ * review of straight walks "branching like a circuit board"): each leg in lengths of two or three sections, each
+ * joint off the straight by up to 1.2 m, its waypoints (porches, junctions) where they are. With `gap`, its longest
+ * leg's middle length left out over a hummock, stepped across a little under the deck (see the hummocks in
+ * MOKROYE_GROUND). Its gateway and its posts by its first length.
+ */
+export function wander(pts: [number, number][], deck: number, seed: number, o: { gate?: boolean; posts?: boolean; gap?: boolean } = {}): { runs: WalkRun[]; hummocks: [number, number, number, number, number][] } {
+  const runs: WalkRun[] = [], hummocks: [number, number, number, number, number][] = [];
+  const lens = pts.slice(1).map((p, k) => Math.hypot(p[0] - pts[k][0], p[1] - pts[k][1])), longest = lens.indexOf(Math.max(...lens));
+  for (let leg = 0; leg + 1 < pts.length; leg++) {
+    const [ax, az] = pts[leg], [bx, bz] = pts[leg + 1], L = lens[leg], ux = (bx - ax) / L, uz = (bz - az) / L;
+    const joints: [number, number][] = [[ax, az]];
+    let along = 0, was = 0, k = 0;
+    while (L - along > 10.5) {
+      const n = hash(seed, leg * 31 + k) < 0.5 ? 2 : 3, off = (hash(seed + 7, leg * 31 + k) - 0.5) * 2.4, piece = n * SECTION.step;
+      along += Math.sqrt(piece * piece - (off - was) ** 2);
+      joints.push([ax + ux * along - uz * off, az + uz * along + ux * off]);
+      was = off;
+      k++;
+    }
+    joints.push([bx, bz]);
+    const gapAt = o.gap && leg === longest && joints.length >= 4 ? Math.floor((joints.length - 1) / 2) : -1;
+    for (let j = 0; j + 1 < joints.length; j++) {
+      const [p, q] = [joints[j], joints[j + 1]];
+      if (j === gapAt) {
+        const half = Math.hypot(q[0] - p[0], q[1] - p[1]) / 2;
+        hummocks.push([(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, half + 3, deck - 0.08, half + 0.4]);
+        continue;
+      }
+      const first = !runs.length;
+      runs.push({ a: p, b: q, deck, ...(o.gate && first ? { gate: true } : {}), ...(o.posts && first ? { posts: true } : {}) });
+    }
+  }
+  return { runs, hummocks };
+}
+
+/** The boardwalks: in from the swamp's east edge, branching to the houses and the little island; from the big island to the barn; the jetty off the island's west end into open water, straight as a jetty is. */
+const WALKED = [
+  wander([[79, 2], [46, -10]], DECK, 1, { posts: true, gap: true }),
+  wander([[46, -10], [14, -8], [-13, -14]], DECK, 2),
+  wander([[14, -8], [6, 18], [-3, 24]], DECK, 3),
   // (on to the stilt house's porch, the last length a step up to it: the walk ended 5 m short in the water, and the
   // door opened onto the swamp)
-  { a: [46, -10], b: [40.95, -26.34], deck: DECK },
-  { a: [40.95, -26.34], b: [40.06, -29.21], deck: STILT_FLOOR - 0.25 },
-  { a: [6, 18], b: [31, 22], deck: DECK, posts: true },
-  { a: [-31, -9], b: [-41, 26], deck: DECK },
-  { a: [-42, -24], b: [-74, -26], deck: DECK, gate: true, posts: true },
-];
+  wander([[46, -10], [40.95, -26.34]], DECK, 4),
+  { runs: [{ a: [40.95, -26.34], b: [40.06, -29.21], deck: STILT_FLOOR - 0.25 }], hummocks: [] },
+  wander([[6, 18], [31, 22]], DECK, 5, { posts: true }),
+  wander([[-31, -9], [-40, 22.5], [-41, 26]], DECK, 6, { gap: true }),
+  { runs: [{ a: [-42, -24], b: [-74, -26], deck: DECK, gate: true, posts: true }], hummocks: [] },
+] as { runs: WalkRun[]; hummocks: [number, number, number, number, number][] }[];
+export const MOKROYE_WALKS: WalkRun[] = WALKED.flatMap((w) => w.runs);
+/** the hummocks the boardwalks are broken over */
+const WALK_HUMMOCKS = WALKED.flatMap((w) => w.hummocks);
+
+/** the point of the boardwalks nearest a spot, `side` metres off their middle line (what stands on them is set so, wherever their bends now are) */
+function onBoards(x: number, z: number, side = 0.55): [number, number] {
+  let best = Infinity, at: [number, number] = [x, z];
+  for (const { a, b } of MOKROYE_WALKS) {
+    const ex = b[0] - a[0], ez = b[1] - a[1], L = Math.hypot(ex, ez) || 1, u = Math.max(0.1, Math.min(0.9, ((x - a[0]) * ex + (z - a[1]) * ez) / (L * L)));
+    const px = a[0] + ex * u, pz = a[1] + ez * u, d = Math.hypot(x - px, z - pz);
+    if (d < best) [best, at] = [d, [px - (ez / L) * side, pz + (ex / L) * side]];
+  }
+  return at;
+}
 
 /** the stilts under the house on stilts: a cluster of the kit's old posts at each corner, their tops at its floor (on the pad at y) */
 export function mokroyePosts(y: number): KitPiece[] {
   return stiltsUnder(mokroyeBuildings().find((s) => s.up === STILT_FLOOR)!, y);
 }
-/** the stilts under a house on stilts (its floor STILT_FLOOR over the pad at y) */
-export function stiltsUnder(h: TownSpot, y: number): KitPiece[] {
+/** the stilts under a house on stilts (its floor `floor` over the pad at y: STILT_FLOOR, or a boathouse's at the deck) */
+export function stiltsUnder(h: TownSpot, y: number, floor = STILT_FLOOR): KitPiece[] {
   const c = Math.cos(h.rot), s = Math.sin(h.rot);
   // (a cluster of posts stands 3.85 m from 0.71 under its origin: its tops at the floor, its feet sunk in the mud)
-  const foot = y + STILT_FLOOR - 3.14;
+  const foot = y + floor - 3.14;
   // (a cluster's middle is (0.92, 1.45) of its own from its origin: each stood so that its middle is at its corner)
   return [[-3.6, -2.9], [3.6, -2.9], [3.6, 2.9], [-3.6, 2.9]].map(([lx, lz], k) => {
     const turn = h.rot + k * 1.3, x = h.x + lx * c + lz * s, z = h.z - lx * s + lz * c;
@@ -89,16 +144,32 @@ export function drowned(a: [number, number], b: [number, number], gone: number[]
   return out;
 }
 
+/**
+ * A house's yard fence on the bank of mud round it (src/world/worldgen/west-towns.ts layHamlet), `out` metres off its
+ * walls, along its back and its two sides, its front open to its walk; some panels gone. `half`: half the house's
+ * width and depth. (Standing in the open water they were, the owner's review 2026-10-23: "take the fences out of the
+ * water, keep them on dry ground round a house".)
+ */
+export function yardFence(h: TownSpot, half: [number, number], out: number, gone: number[] = []): TownThing[] {
+  const c = Math.cos(h.rot), s = Math.sin(h.rot), at = (lx: number, lz: number): [number, number] => [h.x + lx * c + lz * s, h.z - lx * s + lz * c];
+  const X = half[0] + out, Z = half[1] + out, front = half[1] - 0.5;
+  const sides = [drowned(at(-X, front), at(-X, -Z)), drowned(at(-X, -Z), at(X, -Z)), drowned(at(X, -Z), at(X, front))].flat();
+  return sides.filter((_, k) => !gone.includes(k));
+}
+
+/** an izba's half width and depth (src/world/worldgen/layout.ts BUILDING_FOOTPRINT) */
+export const IZBA_HALF: [number, number] = [4, 3.25];
+
 export function mokroyeThings(): TownThing[] {
+  const [, , wetA, wetB] = mokroyeBuildings();
   return [
-    // the fences of yards the water came over, standing in it to the waist of a man, some panels gone
-    ...drowned([0, -40], [18, -40], [3]), ...drowned([18, -40], [20, -18], [1, 7]),
-    ...drowned([-12, 38], [10, 40], [2, 6, 7]), ...drowned([22, 4], [34, -4], [0]),
+    // the yards' fences of the two houses the water stands in, on the mud round them, some panels gone
+    ...yardFence(wetA, IZBA_HALF, 5.5, [2, 9]), ...yardFence(wetB, IZBA_HALF, 5.5, [1, 5, 10]),
     // trunks and stumps the water lifted and left
     { kind: 'dead_tree_trunk', x: 26, z: 36, rot: 0.6 }, { kind: 'dead_tree_trunk', x: -58, z: 4, rot: 2.1 }, { kind: 'dead_tree_trunk', x: 60, z: 30, rot: 1.2 },
     { kind: 'tree_stump_01', x: -60, z: -40, rot: 0.3 }, { kind: 'tree_stump_01', x: 64, z: -18, rot: 1.9 },
     // on the boardwalks, the island and by the houses
-    { kind: 'Barrel_01', x: 30, z: -9.0, rot: 0, up: DECK }, { kind: 'wooden_crate_01', x: 2, z: -10.6, rot: 0.2, up: DECK },
+    { kind: 'Barrel_01', x: onBoards(30, -9)[0], z: onBoards(30, -9)[1], rot: 0, up: DECK }, { kind: 'wooden_crate_01', x: onBoards(2, -10.6)[0], z: onBoards(2, -10.6)[1], rot: 0.2, up: DECK },
     { kind: 'wooden_crate_01', x: -36, z: -12, rot: 0.9 }, { kind: 'Barrel_01', x: -23, z: -12, rot: 0 }, { kind: 'barrel_03', x: -22.2, z: -12.8, rot: 0.4 },
     { kind: 'old_tyre', x: 12, z: 26, rot: 0.3 }, { kind: 'Barrel_01', x: -60, z: -25.5, rot: 0, up: DECK },
   ];
@@ -108,7 +179,7 @@ export function mokroyeThings(): TownThing[] {
 export const MOKROYE_GROUND: TownGround = {
   yards: [],
   lanes: [],
-  mounds: [ISLAND1, ISLAND2, HOLLOW, [58, 8, 10, 0.25, 3], [-6, -50, 9, 0.3, 2], [22, 42, 14, -0.25, 6]],
+  mounds: [ISLAND1, ISLAND2, HOLLOW, [58, 8, 10, 0.25, 3], [-6, -50, 9, 0.3, 2], [22, 42, 14, -0.25, 6], ...WALK_HUMMOCKS],
   water: {
     level: WATER,
     swamp: true,

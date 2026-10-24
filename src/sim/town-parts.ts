@@ -7,7 +7,7 @@
 // Pure numbers, the same for the game and the server.
 
 import { LIPKI, LIPKI_GROUND } from './lipki';
-import { DECK, MOKROYE, MOKROYE_GROUND, STILT_FLOOR, WET_FLOOR, drowned, stiltsUnder } from './mokroye';
+import { DECK, IZBA_HALF, MOKROYE, MOKROYE_GROUND, STILT_FLOOR, WET_FLOOR, stiltsUnder, wander, yardFence } from './mokroye';
 import type { KitPiece } from './kit';
 import type { Town, TownGround, TownSpot } from './towns';
 import type { WalkRun } from './walkways';
@@ -31,14 +31,15 @@ const LANE = -45;
 
 const BUILDINGS: Record<string, TownSpot[]> = {
   LipkiLane: [
-    // (north of the lane, fronts to it: the shop, then a house of two floors behind its garden)
-    { type: 'merchant', x: 33, z: LANE - 2.2 - 5.7, rot: 0 },
-    { type: 'izba_two', x: 47, z: LANE - 2.2 - 4 - 2.5, rot: 0 },
+    // (north of the lane, fronts to it: the shop, then a house of two floors behind its garden. Both at its east end:
+    // nothing new within 15 m of a stash kept in the village, scripts/stash-guard.ts)
+    { type: 'merchant', x: 44, z: LANE - 2.2 - 5.7, rot: 0 },
+    { type: 'izba_two', x: 55, z: LANE - 2.2 - 4 - 2.5, rot: 0 },
     // (south of it, fronts to it: a house behind its garden; the east high seat stands behind it)
     { type: 'izba', x: 31, z: LANE + 2.2 + 3.25 + 2.5, rot: PI },
-    // the farm at the north end, west of the lane in from the road: its barn and its shed
-    { type: 'barn', x: -32, z: -78, rot: 0.15 },
-    { type: 'shed', x: -18, z: -90, rot: -0.2 },
+    // the farm at the north end, west of the road: its barn and its shed
+    { type: 'barn', x: -22, z: -84, rot: 0.15 },
+    { type: 'shed', x: -10, z: -90, rot: -0.2 },
   ],
   MokroyeReeds: [
     // the plank house on piles east in the reeds, its front to the walk that comes to it from the island
@@ -69,59 +70,58 @@ function picket(a: [number, number], b: [number, number], gate?: [number, number
 
 const THINGS: Record<string, TownThing[]> = {
   LipkiLane: [
-    // the shop's yard: what came on the last cart, and a bench by its door
-    { kind: 'wooden_crate_01', x: 26.6, z: LANE - 3.4, rot: 0.2 }, { kind: 'wooden_crate_01', x: 26.7, z: LANE - 4.6, rot: 1.4 },
-    { kind: 'Barrel_01', x: 39.6, z: LANE - 3.0, rot: 0 }, { kind: 'cardboard_box_01', x: 40.6, z: LANE - 3.3, rot: 0.6 },
-    { kind: 'painted_wooden_bench', x: 31, z: LANE - 2.75, rot: 0 },
+    // the shop's yard behind it: what came on the last cart; and a bench by its door
+    { kind: 'wooden_crate_01', x: 40.5, z: LANE - 14.6, rot: 0.2 }, { kind: 'wooden_crate_01', x: 40.6, z: LANE - 15.8, rot: 1.4 },
+    { kind: 'Barrel_01', x: 47, z: LANE - 14.4, rot: 0 }, { kind: 'cardboard_box_01', x: 48, z: LANE - 14.8, rot: 0.6 },
+    { kind: 'painted_wooden_bench', x: 41.5, z: LANE - 2.75, rot: 0 },
     // the houses' gardens on the lane, in white pickets, and their wood behind them
-    ...picket([42.5, LANE - 2.6], [51.5, LANE - 2.6], [3.4, 5.4]),
+    ...picket([50.8, LANE - 2.6], [59.2, LANE - 2.6], [3.2, 5.2]),
     ...picket([27, LANE + 2.6], [35, LANE + 2.6], [3.0, 5.0]),
-    { kind: 'log_pile', x: 47, z: LANE - 14.2, rot: 0 }, { kind: 'log_pile', x: 31, z: LANE + 13.6, rot: PI },
-    { kind: 'tree_stump_01', x: 50.5, z: LANE - 13.6, rot: 0.8 },
+    { kind: 'log_pile', x: 55, z: LANE - 14.2, rot: 0 }, { kind: 'log_pile', x: 31, z: LANE + 13.6, rot: PI },
+    { kind: 'tree_stump_01', x: 58.5, z: LANE - 13.6, rot: 0.8 },
     // the farmyard: what a farm leaves lying
-    { kind: 'old_tyre', x: -40, z: -70.5, rot: 0.4 }, { kind: 'metal_jerrycan_green', x: -24.8, z: -73.2, rot: 0.3 },
-    { kind: 'wooden_crate_01', x: -23.6, z: -82.6, rot: 0.9 }, { kind: 'Barrel_01', x: -22.4, z: -84.2, rot: 0 }, { kind: 'log_pile', x: -40.5, z: -88.5, rot: 0.3 },
+    { kind: 'old_tyre', x: -30, z: -77, rot: 0.4 }, { kind: 'metal_jerrycan_green', x: -15, z: -79, rot: 0.3 },
+    { kind: 'wooden_crate_01', x: -14.4, z: -87.6, rot: 0.9 }, { kind: 'Barrel_01', x: -14.6, z: -89.4, rot: 0 }, { kind: 'log_pile', x: -27, z: -92, rot: 0.3 },
   ],
   MokroyeReeds: [
-    // the water's leavings about the new houses
-    ...drowned([-70, 8], [-54, 10], [2, 5]), ...drowned([-24, 66], [-4, 64], [1, 6]),
+    // the yards' fences of the two houses the water stands in, on the mud round them
+    ...yardFence(BUILDINGS.MokroyeReeds[1], IZBA_HALF, 5.5, [3, 8]), ...yardFence(BUILDINGS.MokroyeReeds[2], IZBA_HALF, 5.5, [0, 6]),
     { kind: 'dead_tree_trunk', x: 72, z: 50, rot: 2.4 }, { kind: 'tree_stump_01', x: -70, z: -12, rot: 1.1 },
   ],
 };
+
+/** the boardwalks to the new houses in the reeds, branching off the hamlet's own (src/sim/mokroye.ts MOKROYE_WALKS), wandering as those do */
+const REED_WALKS = [
+  // from the little island's east shore (its walk comes to its west, and the shed is on it) to the house on piles, by
+  // where the walk to the high seat leaves it
+  wander([[41.5, 22.4], [44, 22.3], [57.6, 22]], DECK, 11, { posts: true }),
+  // from the jetty north to the house in the west, and in to its door
+  wander([[-55, -24.8], [-55, -3], [-57.6, -2]], DECK, 12),
+  // from the walk to the barn, short of the barn, south-east to the house past it
+  wander([[-40, 22.5], [-14, 48.5], [-14, 52.2]], DECK, 13, { posts: true, gap: true }),
+  // north from the walk off the island to the house on stilts, the last length a step up to its porch: as the
+  // hamlet's own house on stilts is come to, to the same places of the house
+  wander([[-13, -14], [-5.96, -55.57]], DECK, 14, { posts: true, gap: true }),
+  { runs: [{ a: [-5.96, -55.57], b: [-8.12, -57.66], deck: STILT_FLOOR - 0.25 }] as WalkRun[], hummocks: [] },
+  // on out past the jetty's end to the boathouse
+  { runs: [{ a: [-74, -26], b: [-77, -26], deck: DECK }] as WalkRun[], hummocks: [] },
+  // off the walk to the house on piles, south through the reeds to the high seat
+  wander([[44, 22.3], [54.4, 51]], DECK, 15, { posts: true }),
+];
+const WALKS: Record<string, WalkRun[]> = { MokroyeReeds: REED_WALKS.flatMap((w) => w.runs) };
 
 /** what of a town's ground its part stands on as it is: its knolls and terraces (its floors over them), its water (its houses in it flooded as the town's are, src/sim/towns.ts placedRooms) */
 const under = (g: TownGround) => ({ mounds: g.mounds, terraces: g.terraces, water: g.water });
 const GROUND: Record<string, TownGround> = {
   // (the lane and the farmyard trodden)
-  LipkiLane: { ...under(LIPKI_GROUND), yards: [[-42, -86, -22, -70]], lanes: [{ line: [[3, LANE], [56, LANE]], w: 4 }] },
-  MokroyeReeds: { ...under(MOKROYE_GROUND), yards: [], lanes: [] },
-};
-
-/** the boardwalks to the new houses in the reeds, branching off the hamlet's own (src/sim/mokroye.ts MOKROYE_WALKS) */
-const WALKS: Record<string, WalkRun[]> = {
-  MokroyeReeds: [
-    // from the little island's east shore (its walk comes to its west, and the shed is on it) to the house on piles
-    { a: [41.5, 22.4], b: [57.6, 22], deck: DECK, posts: true },
-    // from the jetty north to the house in the west, and in to its door
-    { a: [-55, -25.3], b: [-55, -3], deck: DECK },
-    { a: [-55, -2], b: [-57.6, -2], deck: DECK },
-    // from the walk to the barn, short of the barn, south-east to the house past it
-    { a: [-40, 22.5], b: [-14, 48.5], deck: DECK, posts: true },
-    { a: [-14, 48.5], b: [-14, 52.2], deck: DECK },
-    // north from the walk off the island to the house on stilts, the last length a step up to its porch: as the
-    // hamlet's own house on stilts is come to (MOKROYE_WALKS), to the same places of the house
-    { a: [-13, -14], b: [-5.96, -55.57], deck: DECK, posts: true },
-    { a: [-5.96, -55.57], b: [-8.12, -57.66], deck: STILT_FLOOR - 0.25 },
-    // on out past the jetty's end to the boathouse
-    { a: [-74, -26], b: [-77, -26], deck: DECK },
-    // off the walk to the shack, south through the reeds to the high seat
-    { a: [44, 22.3], b: [54.4, 51], deck: DECK, posts: true },
-  ],
+  LipkiLane: { ...under(LIPKI_GROUND), yards: [[-30, -92, -12, -76]], lanes: [{ line: [[3, LANE], [56, LANE]], w: 4 }] },
+  // (and the hummocks its walks are broken over)
+  MokroyeReeds: { ...under(MOKROYE_GROUND), mounds: [...(MOKROYE_GROUND.mounds ?? []), ...REED_WALKS.flatMap((w) => w.hummocks)], yards: [], lanes: [] },
 };
 
 export const partBuildings = (t: Town): TownSpot[] => BUILDINGS[t.name] ?? [];
 export const partThings = (t: Town): TownThing[] => THINGS[t.name] ?? [];
 export const partGround = (t: Town): TownGround => GROUND[t.name] ?? { yards: [], lanes: [] };
 export const partWalks = (t: Town): WalkRun[] => WALKS[t.name] ?? [];
-/** the stilts under a part's houses on stilts (on the pad at y) */
-export const partPosts = (t: Town, y: number): KitPiece[] => partBuildings(t).filter((s) => s.up === STILT_FLOOR).flatMap((h) => stiltsUnder(h, y));
+/** the stilts under a part's houses on stilts, and the posts the boathouse stands on over the water (on the pad at y) */
+export const partPosts = (t: Town, y: number): KitPiece[] => partBuildings(t).filter((s) => s.up === STILT_FLOOR || s.type === 'boathouse').flatMap((h) => stiltsUnder(h, y, h.up));

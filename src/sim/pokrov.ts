@@ -57,13 +57,12 @@ export function pokrovBuildings(): TownSpot[] {
     cellsSpot(),
     { type: 'refectory', x: -40, z: 0, rot: 0 },
     { type: 'abbot', x: 30, z: 2, rot: 0 },
-    // the town outside: the west lane, its north side, its south side. Never wall to wall: a roof's eaves stand 0.45 m
-    // out, and two houses 0.2 m apart had their roofs and gables through each other (the owner, 2026-10-23: "the
-    // buildings to the south east of pokrov are clipping into each other"); 1.2 m at least, an alley to slip down.
-    north('tavern', -31), north('merchant', -45.3), north('merchant', -57.5), north('izba_two', -68.7),
+    // the town outside: the west lane, its north side (a man's width of alley after the tavern, then wall to wall: where
+    // two stand so, their roofs stop at the gables, src/world/buildings.ts `abuts`), its south side
+    north('tavern', -31), north('merchant', -45.3), north('merchant', -56.5), north('izba_two', -66.7),
     south('smithy', -30), south('merchant', -42.6), south('izba', -53.3),
     // the east lane
-    north('merchant', 33.5), north('merchant', 45.7), north('izba_two', 57.9), north('izba', 67.6),
+    north('merchant', 33.5), north('merchant', 44.7), north('izba_two', 56.8), north('izba', 65.6),
     south('izba_two', 34), south('merchant', 45.5), south('izba', 58),
   ];
 }

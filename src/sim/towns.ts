@@ -18,6 +18,7 @@ import { ZASTAVA, ZASTAVA_GROUND, ZASTAVA_SLABS, zastavaBuildings, zastavaThings
 import { DESERT_LATER, DESERT_TOWNS, desertBuildings, desertGround, desertThings } from './desert';
 import { TOWER_ROOM, towerCuts, wallCuts, type TowerPlace } from './pokrov-towers';
 import { TOWN_PARTS, partBuildings, partGround, partPosts, partThings, partWalks } from './town-parts';
+import { OUTPOSTS, isOutpost, outpostBuildings, outpostGround, outpostThings } from './outposts';
 
 export { LIPKI };
 
@@ -109,6 +110,7 @@ export interface PlacedTown { town: Town; padY: number }
 /** the buildings of a town by its name */
 export function townBuildings(t: Town): TownSpot[] {
   if (t.part) return partBuildings(t);
+  if (isOutpost(t)) return outpostBuildings(t);
   return t.name === POKROV.name ? pokrovBuildings() : t.name === LIPKI.name ? lipkiBuildings() : t.name === ZAVOD.name ? zavodBuildings() : t.name === OZERKI.name ? ozerkiBuildings() : t.name === MOKROYE.name ? mokroyeBuildings() : t.name === ZASTAVA.name ? zastavaBuildings() : desertBuildings(t);
 }
 
@@ -120,6 +122,7 @@ export function townTrees(t: Town): [string, number, number, number][] {
 
 export function townThings(t: Town): TownThing[] {
   if (t.part) return partThings(t);
+  if (isOutpost(t)) return outpostThings(t);
   return t.name === ZAVOD.name ? zavodThings() : t.name === LIPKI.name ? lipkiThings() : t.name === POKROV.name ? pokrovThings() : t.name === OZERKI.name ? ozerkiThings() : t.name === MOKROYE.name ? mokroyeThings() : t.name === ZASTAVA.name ? zastavaThings() : desertThings(t);
 }
 
@@ -146,6 +149,7 @@ export interface TownGround {
 }
 export function townGround(t: Town): TownGround {
   if (t.part) return partGround(t);
+  if (isOutpost(t)) return outpostGround(t) ?? { yards: [], lanes: [] };
   return t.name === ZAVOD.name ? ZAVOD_GROUND : t.name === LIPKI.name ? LIPKI_GROUND : t.name === POKROV.name ? POKROV_GROUND : t.name === OZERKI.name ? OZERKI_GROUND : t.name === MOKROYE.name ? MOKROYE_GROUND : t.name === ZASTAVA.name ? ZASTAVA_GROUND : desertGround(t) ?? { yards: [], lanes: [] };
 }
 
@@ -215,9 +219,9 @@ export function placedSlabs(t: Town): SlabRun[] {
 // (and the desert's three on its roads, 2026-10-18: src/sim/desert.ts. First: they are the map's own steps, and the
 // map's own places come before every place apart in the list of places, see test/loot.test.ts)
 // (the towns' parts last of all, 2026-10-23: nothing laid before them is renumbered for them)
-export const TOWNS: Town[] = [...DESERT_TOWNS, POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA, ...TOWN_PARTS, ...DESERT_LATER];
+export const TOWNS: Town[] = [...DESERT_TOWNS, POKROV, LIPKI, ZAVOD, OZERKI, MOKROYE, ZASTAVA, ...TOWN_PARTS, ...DESERT_LATER, ...OUTPOSTS];
 /** the towns laid after everything else of the map, their places for things after every other place (Buildings.laterLoot) */
-export const LATER_TOWNS: Town[] = [...TOWN_PARTS, ...DESERT_LATER];
+export const LATER_TOWNS: Town[] = [...TOWN_PARTS, ...DESERT_LATER, ...OUTPOSTS];
 export const isLater = (t: Town) => LATER_TOWNS.some((l) => l.name === t.name);
 
 /** a town's kit pieces that are not walkways: the stilts under Mokroye's house on stilts (on the pad at y) */

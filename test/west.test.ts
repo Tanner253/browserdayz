@@ -17,6 +17,7 @@ import * as WG from '../src/world/worldgen';
 import { BUNKER } from '../src/sim/bunker';
 import { moundAt, townPoint, townTrees } from '../src/sim/towns';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
+import { hamletClear } from '../src/world/worldgen/west-towns';
 import { generateWorld, heightAt, slopeAt, type World } from '../src/world/worldgen';
 
 const SQ = 769, HALF = 768, CELL = 2;
@@ -291,15 +292,17 @@ const ridge = (z: number) => RL.ridgeAt(z);
 {
   const towns = world.towns!;
   // (the desert's first, since 2026-10-18: src/sim/desert.ts; and those laid later last, since 2026-10-23: LATER_TOWNS)
-  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager']);
+  assert.deepEqual(towns.map((t) => t.town.name), ['Peski', 'Karavan', 'Blokpost', 'Bereg', 'Mys', 'Pokrov', 'Lipki', 'Zavod', 'Ozerki', 'Mokroye', 'Zastava', 'LipkiLane', 'MokroyeReeds', 'Lager', 'Kolodets', 'Aerodrom', "Kar'yer", 'Rybaki', 'Kemping', "Ust'ye", 'Nasosnaya', 'Brod', "Mel'nitsa", 'Khutor', 'Kordon']);
   for (const { town, padY } of towns) {
     const ids = world.buildings.filter((b) => b.id.startsWith(`${town.name.toLowerCase()}_`));
     assert.ok(ids.length > 0, `${town.name} has no buildings`);
     const c = Math.cos(town.rot), s = Math.sin(town.rot);
     // (but what the town planted itself: Pokrov's court has its trees, 2026-10-19)
     const planted = townTrees(town).map(([, lx, lz]) => townPoint(town, lx, lz));
-    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01); });
-    assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad`);
+    // (the swamp's hamlet is no pad since 2026-10-23: the swamp's bushes grow in it, but none at a house, on a boardwalk or by a thing)
+    const hamlet = (town.part ?? town.name) === 'Mokroye', mok = towns.find((p) => p.town.name === 'Mokroye')!.town;
+    const on = [...world.trees, ...world.rocks].filter((t) => { const dx = t.x - town.x, dz = t.z - town.z; return Math.abs(dx * c - dz * s) < town.pad[0] && Math.abs(dx * s + dz * c) < town.pad[1] && !planted.some(([x, z]) => Math.hypot(t.x - x, t.z - z) < 0.01) && (!hamlet || !hamletClear(mok, t.x, t.z)); });
+    assert.equal(on.length, 0, `${on.length} trees or rocks on ${town.name}'s pad${hamlet ? ' by its houses, walks or things' : ''}`);
     // (but in a hollow: Mokroye's barn stands sunk to the waist, as it was drawn up)
     for (const b of ids) {
       const dx = b.x - town.x, dz = b.z - town.z;

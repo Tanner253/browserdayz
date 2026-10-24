@@ -296,7 +296,7 @@ async function boot() {
   await frame();
   const veg = new Vegetation(world, atmo, terrain.heightTex);
   await veg.build(r.renderer, r.scene);
-  const grass = new Grass(terrain, atmo, world.surface);
+  const grass = new Grass(terrain, atmo, world.surface, world.reeds);
   grass.build(r.scene);
 
   stage('game');

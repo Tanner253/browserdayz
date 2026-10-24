@@ -14,6 +14,7 @@ import { CELL, SQUARE_HALF, SQUARE_RES, WORLD_SEED } from './places';
 import type { Tier } from '../../sim/tiers';
 import { TOWNS, type Town } from '../../sim/towns';
 import { DESERT_TIERS } from '../../sim/desert';
+import { OUTPOST_TIERS } from '../../sim/outposts';
 
 type P = [number, number];
 
@@ -135,6 +136,9 @@ export const PLAN = {
     deep: 1.2,
     isle: 0.34,
     pool: 0.46,
+    /** the hummocks' and the channels' (see cutSwamp) */
+    hummock: 0.12,
+    channel: 0.045,
   },
   /** KALAT, the ruined town (src/sim/ruins.ts), set down whole: its frame (its long axis north and south), and its land eased into the desert from so far to so far out of its top */
   kalat: { name: 'Kalat', x: -3215, z: 230, rot: Math.PI / 2, blend: [130, 210] as P, reach: 440 },
@@ -148,7 +152,7 @@ export const PLAN = {
   towns: { Zastava: { x: -1965, z: -452 } } as Record<string, { x?: number; z?: number; rot?: number }>,
   /** the loot steps of the new places (towns mid, the hamlets as villages; Kalat says its own, src/sim/ruins.ts) */
   // (west to east, worse to better: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)"; Pokrov, Ozerki and Zastava between, as the plan put them)
-  tiers: { Pokrov: 2, Lipki: 3, Zavod: 2, Ozerki: 3, Mokroye: 3, Zastava: 3, ...DESERT_TIERS } as Record<string, Tier>,
+  tiers: { Pokrov: 2, Lipki: 3, Zavod: 2, Ozerki: 3, Mokroye: 3, Zastava: 3, ...DESERT_TIERS, ...OUTPOST_TIERS } as Record<string, Tier>,
   /**
    * The roads: the main one from the loop's west bend through the trader and Pokrov's lane, north-west to the pass's
    * mouth, through it beside the river (`pass`: so far south of its middle) and out across the desert past Kalat to the

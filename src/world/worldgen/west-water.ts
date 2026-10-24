@@ -284,8 +284,16 @@ export function cutSwamp(H: Float32Array, net: Net): number {
       if (e > 0) {
         const n = w2.fbm(x * 0.028, z * 0.028, 3);
         let y = level - lerp(S.shallow[0], S.shallow[1], smoothstep(-0.3, 0.4, w1.fbm(x * 0.05 + 3, z * 0.05, 2)));
-        if (n > S.isle) y = level + lerp(0.1, 0.55, smoothstep(S.isle, S.isle + 0.25, n));
+        // (hummocks of sedge and moss a hand or two over the water between the islands, a stride to a room across: the
+        // water open only in its channels and pools. The owner's review, 2026-10-23: "a flat sheet ... open water only in
+        // channels and pools")
+        const hm = w1.fbm(x * 0.075 + 11, z * 0.075 - 4, 3);
+        if (hm > S.hummock) y = Math.max(y, level + lerp(0.03, 0.32, smoothstep(S.hummock, S.hummock + 0.3, hm)));
+        if (n > S.isle) y = Math.max(y, level + lerp(0.1, 0.55, smoothstep(S.isle, S.isle + 0.25, n)));
         else if (n < -S.pool) y = level - lerp(S.shallow[1], S.deep, smoothstep(S.pool, S.pool + 0.2, -n));
+        // (and the channels the water keeps open, winding through all of it)
+        const ch = Math.abs(w2.fbm(x * 0.012 + 7, z * 0.012 + 2, 2));
+        if (ch < S.channel) y = Math.min(y, level - lerp(0.3, 0.75, smoothstep(S.channel, 0, ch)));
         H[i] = lerp(level - 0.04, y, smoothstep(0, 12, e));
       } else {
         // (the land eased down to it, or where it is lower, a bank a hand over the water at the shore easing down
