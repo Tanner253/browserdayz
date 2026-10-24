@@ -60,7 +60,7 @@ const SOUNDS: Record<string, Record<string, [name: string, reach: number]>> = {
  */
 const GAP: Record<string, number> = { hooves: 2000, wolf_growl: 1500 };
 const saidAt = new Map<string, number>();
-const DRAWN = 260;
+const DRAWN = 500;
 const MOVED = 120;
 /** how far behind the server's word it is drawn, so that there is always a word on either side of now, ms */
 const BEHIND = 320;

@@ -222,10 +222,11 @@ export const CALLS = {
 export const ANIMALS = {
   /** the most there are ever at once (the herds above come to about a hundred) */
   max: 120,
-  /** nobody within this, metres: a herd is not moved and not sent (it is where it would be by now when somebody comes) */
-  wake: 400,
+  /** nobody within this, metres: a herd is not moved and not sent (it is where it would be by now when somebody comes).
+   * Past `told`, so that none is drawn standing still (2026-10-24: "the animals should render for the user 500m away instead of 300") */
+  wake: 550,
   /** a player is sent the ones within this, metres, four times a second within `near` and once a second further out */
-  told: 300,
+  told: 500,
   near: 140,
   /** a new one is never stood within this of anybody living, metres */
   clear: 200,
@@ -266,7 +267,9 @@ export const ANIMALS = {
   bleedBelow: 0.5,
   bleedRate: 0.012,
   /** a herd that is hunted leaves its ground (`move`), and comes home once things have been quiet (`home`, seconds) */
-  pressure: { shot: 1, fled: 1, killed: 3, move: 4, fade: 240, home: 3840 },
+  // (one of the herd killed is enough to send it off to fresh ground: "the remaining deer dont know what to do when one
+  // of the herd gets killed by wolves", 2026-10-24. It took a kill and a bolt before.)
+  pressure: { shot: 1, fled: 1, killed: 4, move: 4, fade: 240, home: 3840 },
   /** a wolf pack circles this far off whoever it hunts, and sends one in every so often */
   circle: [13, 19] as [number, number],
   dash: [2.2, 4] as [number, number],

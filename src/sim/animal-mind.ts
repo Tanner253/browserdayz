@@ -225,7 +225,8 @@ export class Herd {
 
 
   /** a spot of its ground for what the herd is about to do (null: none found this time) */
-  private spotFor(g: Group, what: 'feed' | 'rest' | 'water', away?: { x: number; z: number }): { x: number; z: number } | null {
+  /** @param near a feeding herd's spot: the next is looked for within a short walk of it first */
+  private spotFor(g: Group, what: 'feed' | 'rest' | 'water', away?: { x: number; z: number }, near?: { x: number; z: number }): { x: number; z: number } | null {
     const h = HERDS[g.herd], ks = (g.wants.length ? g.wants : g.members.map((i) => this.beasts.get(i)!.k)).map((k) => KINDS[k]), steep = Math.min(...ks.map((k) => k.steep)), lives = ks[0]?.lives;
     if (what === 'water') {
       const w = this.ground.water(g.mid.x, g.mid.z, h.range * 1.2);
@@ -233,8 +234,9 @@ export class Herd {
     }
     const want = what === 'feed' ? h.feed : h.rest, farm = h.farm ? this.farmOf(g) : null;
     for (let n = 0; n < 24; n++) {
-      const a = this.rnd() * PI2, d = h.range * Math.sqrt(this.rnd());
-      const x = g.mid.x + Math.cos(a) * d, z = g.mid.z + Math.sin(a) * d;
+      const a = this.rnd() * PI2, short = near && n < 12, d = short ? 25 + this.rnd() * 45 : h.range * Math.sqrt(this.rnd());
+      const x = (short ? near.x : g.mid.x) + Math.cos(a) * d, z = (short ? near.z : g.mid.z) + Math.sin(a) * d;
+      if (short && Math.hypot(x - g.mid.x, z - g.mid.z) > h.range) continue;
       if (farm && Math.hypot(x - farm.x, z - farm.z) > farm.r * 0.8) continue;
       if (away && Math.hypot(x - away.x, z - away.z) < 120) continue;
       if (want.includes(this.ground.biome(x, z)) && fit(this, x, z, steep, 'spot', !!h.farm, lives)) return { x, z };
@@ -252,11 +254,13 @@ export class Herd {
     if (feeding !== g.feeding) g.drank = false;
     g.feeding = feeding;
     const what = feeding ? (h.drinks && !g.drank && this.rnd() < 0.45 ? 'water' : 'feed') : 'rest';
-    const at = this.spotFor(g, what, away) ?? (what === 'water' ? this.spotFor(g, 'feed', away) : null);
+    // (feeding, it drifts on a little at a time, not across its whole range: "do deer herd ever stop moving to graze?", 2026-10-24)
+    const drift = what === 'feed' && g.spot === 'feed' && !away ? g.at : undefined;
+    const at = this.spotFor(g, what, away, drift) ?? (what === 'water' ? this.spotFor(g, 'feed', away) : null);
     if (at) g.at = at;
     g.spot = at && what === 'water' ? 'water' : what === 'water' ? 'feed' : what;
     // (moving on while feeding every few minutes, as a grazing herd does; lying up until the hour changes)
-    g.nextSpot = now + (feeding ? 150_000 + this.rnd() * 150_000 : 600_000);
+    g.nextSpot = now + (feeding ? 240_000 + this.rnd() * 240_000 : 600_000);
   }
 
   /** one more of a herd, where nobody living can see it turn up (null: no such spot this time) */
@@ -476,8 +480,9 @@ export class Herd {
         if (o.diedAt || o.g === b.g) continue;
         const ok = KINDS[o.k];
         if (ok.temper !== 'bear' && ok.temper !== 'pack') continue;
-        const d = Math.hypot(o.x - b.x, o.z - b.z), hunting = o.mode === A_RUN || o.mode === A_TROT || o.foe < 0;
-        const s = d < (hunting ? 70 : 30) ? 1 - d / (hunting ? 70 : 30) + 0.4 : 0;
+        // (one at rest, a pack at its kill, seen from further than before: a herd settled to graze beside it, 2026-10-24)
+        const d = Math.hypot(o.x - b.x, o.z - b.z), hunting = o.mode === A_RUN || o.mode === A_TROT || o.foe < 0, reach = hunting ? 70 : 50;
+        const s = d < reach ? 1 - d / reach + 0.4 : 0;
         if (s > fear) {
           fear = s;
           b.fearX = o.x;
@@ -633,7 +638,9 @@ export class Herd {
     const inTown = !farm && this.ground.biome(b.x, b.z) === 'town';
     // (and on its own country, fleeing too, as it would keep off a wall: only one off it already walks where it must, back)
     const home = !onCountry(k.lives, this.ground.biome(b.x, b.z));
-    const can = (x: number, z: number) => this.ground.open(x, z, k.steep) && (!farm || Math.hypot(x - farm.x, z - farm.z) < farm.r * 0.9) && (!!farm || inTown || this.ground.biome(x, z) !== 'town') && (home || onCountry(k.lives, this.ground.biome(x, z)));
+    // (and one that stands where it may not, stood there by an admin or past the edge, walks out by any way)
+    const lost = !this.ground.open(b.x, b.z, 9);
+    const can = (x: number, z: number) => (lost || this.ground.open(x, z, k.steep)) && (!farm || Math.hypot(x - farm.x, z - farm.z) < farm.r * 0.9) && (!!farm || inTown || this.ground.biome(x, z) !== 'town') && (home || onCountry(k.lives, this.ground.biome(x, z)));
     // (a way is open where it is clear both at the next step and further on: clear only further on, the way went
     // through a wall or a house it could not step through, and it stood there running for good)
     // (never past where it means to stop: a bear's step at a charge's 9 m/s is nearly two metres, and it ended in the man)

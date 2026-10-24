@@ -5,7 +5,7 @@
 // Worked out a patch at a time as it is first asked about and kept (most of the map is never asked: animals keep to
 // their own ground), so the server starts no slower for it.
 
-import { BUILDING_FOOTPRINT, heightAt, onWorld, passPlan, SEA_LEVEL, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, WORLD_NX, CELL, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, heightAt, onRidgeWall, onWorld, passPlan, PLAN, SEA_LEVEL, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, WORLD_NX, CELL, type World } from '../world/worldgen';
 import { snowOn } from '../world/snow';
 import { waterAt } from './water';
 import { caveMouths, ROCKS, type RockPiece } from './pass';
@@ -67,6 +67,8 @@ const BIOMES: Biome[] = ['field', 'forest', 'rock', 'snow', 'desert', 'water', '
 const B = 4, TILE = 32;
 /** a bin of what stands on the ground (trunks, rocks, buildings), metres */
 const BIN = 16;
+/** how far inside the edges of the land an animal keeps, metres */
+const EDGE = 12;
 
 export function animalGround(world: World, extras: GroundExtras = {}): Ground {
   const ground = (x: number, z: number) => heightAt(world.heights, x, z);
@@ -195,6 +197,12 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
     if (kinds[j * NX + i] === 255) work(Math.floor(i / TILE), Math.floor(j / TILE));
     return BIOMES[kinds[j * NX + i]];
   };
+  /**
+   * the land a player may walk, and a good way inside its edges: the map's bounds, the barrier in the west, the
+   * ridge walls (2026-10-24: "the animals are able to run off the edge of the map": they went by the bounds alone,
+   * and six metres past them)
+   */
+  const onLand = (x: number, z: number) => onWorld(x, z, EDGE) && x >= PLAN.barrier + EDGE && !onRidgeWall(x, z);
   const inSolid = (x: number, z: number, houses = false) => {
     for (const s of bins.get(binOf(x, z)) ?? []) {
       if (houses && !s.house) continue;
@@ -214,7 +222,7 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
     height: ground,
     slope,
     biome,
-    open: (x, z, steep) => onWorld(x, z, -6) && !wet(x, z) && slope(x, z) <= steep && !inSolid(x, z) && !kept(x, z),
+    open: (x, z, steep) => onLand(x, z) && !wet(x, z) && slope(x, z) <= steep && !inSolid(x, z) && !kept(x, z),
     road,
     people: (x, z) => {
       let town = Infinity, camp = Infinity, house = Infinity;
