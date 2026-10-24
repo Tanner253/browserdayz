@@ -287,6 +287,9 @@ export class Infected implements Damageable {
     root.matrixAutoUpdate = false;
     root.matrixWorldAutoUpdate = false;
     root.updateMatrixWorld = () => {};
+    // (and no shadow, as a player's body has none: the owner, 2026-10-23, "turn off bodies shadows". It stays off: what
+    // is dead does not get up.)
+    root.traverse((o) => void ((o as THREE.Mesh).isMesh && (o.castShadow = false)));
     this.frozen = true;
   }
 
