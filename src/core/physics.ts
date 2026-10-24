@@ -51,7 +51,19 @@ export class Physics {
   private acc = 0;
 
   async init() {
-    await RAPIER.init();
+    // (The binary is a file of its own, 3 MB, fetched by Rapier's start once (scripts/physics-wasm.ts): one request
+    // dropped on a slow line stopped the whole game at its first stage, "Load failed" in Safari on a Mac five starts
+    // running, 2026-10-24: "ios user cant load game on mac or iphone". It is asked for again, as every other file of the
+    // start is: Rapier fetches afresh on each call, and keeps nothing of one that failed.)
+    for (let go = 0; ; go++) {
+      try {
+        await RAPIER.init();
+        break;
+      } catch (e) {
+        if (go >= 3) throw e;
+        await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
+      }
+    }
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = this.fixedDt;
   }
