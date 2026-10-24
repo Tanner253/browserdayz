@@ -78,6 +78,11 @@ export interface Kind {
   wind: number;
   /** the steepest ground it will cross (rise over run) */
   steep: number;
+  /**
+   * the kinds of country it sets foot on, but when it flees (onboarding for the owner, 2026-10-23: "deer on bare high
+   * snow is wrong habitat, so keep deer to forest and meadow, below the tree line")
+   */
+  lives: Biome[];
   temper: Temper;
   /** metres it sees a person standing in the open by day; how well it hears (1: as a person does); metres it smells one upwind */
   sight: number;
@@ -107,17 +112,17 @@ const F = Math.PI / 180;
  */
 export const KINDS: Kind[] = [
   {
-    id: 'stag', name: 'Red Deer', model: 'animal_stag', len: 2.1, tall: 1.3, hp: 80, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95,
+    id: 'stag', name: 'Red Deer', model: 'animal_stag', len: 2.1, tall: 1.3, hp: 80, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95, lives: ['field', 'forest'],
     temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 220, lies: 600,
     gives: { meat: 'meat_venison', n: 7, fat: 2, hide: 'hide', bones: 5 },
   },
   {
-    id: 'doe', name: 'Red Deer', model: 'animal_doe', len: 1.8, tall: 1.1, hp: 70, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95,
+    id: 'doe', name: 'Red Deer', model: 'animal_doe', len: 1.8, tall: 1.1, hp: 70, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95, lives: ['field', 'forest'],
     temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 220, lies: 600,
     gives: { meat: 'meat_venison', n: 5, fat: 1, hide: 'hide', bones: 4 },
   },
   {
-    id: 'bear', name: 'Brown Bear', model: 'animal_bear', len: 2.3, tall: 1.25, hp: 420, tough: 0.9, walk: 1.2, trot: 3.6, run: 9, wind: 6, steep: 1.0,
+    id: 'bear', name: 'Brown Bear', model: 'animal_bear', len: 2.3, tall: 1.25, hp: 420, tough: 0.9, walk: 1.2, trot: 3.6, run: 9, wind: 6, steep: 1.0, lives: ['forest', 'field', 'snow', 'rock'],
     temper: 'bear', sight: 45, hear: 1, smell: 90, view: 120 * F, flee: 160, lies: 900,
     fight: {
       engage: [20, 28],
@@ -130,7 +135,7 @@ export const KINDS: Kind[] = [
     gives: { meat: 'meat_bear', n: 10, fat: 6, hide: 'pelt_bear', bones: 8 },
   },
   {
-    id: 'wolf', name: 'Wolf', model: 'animal_wolf', len: 1.5, tall: 0.8, hp: 120, tough: 1, walk: 1.5, trot: 4.5, run: 8.5, wind: 30, steep: 1.0,
+    id: 'wolf', name: 'Wolf', model: 'animal_wolf', len: 1.5, tall: 0.8, hp: 120, tough: 1, walk: 1.5, trot: 4.5, run: 8.5, wind: 30, steep: 1.0, lives: ['forest', 'field', 'snow', 'rock'],
     temper: 'pack', sight: 60, hear: 1.4, smell: 120, view: 140 * F, flee: 300, lies: 600,
     fight: {
       engage: [30, 70],
@@ -140,7 +145,7 @@ export const KINDS: Kind[] = [
     gives: { meat: 'meat_wolf', n: 4, fat: 1, hide: 'pelt_wolf', bones: 3 },
   },
   {
-    id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 220, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6,
+    id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 220, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6, lives: ['field', 'town'],
     temper: 'tame', sight: 20, hear: 0.8, smell: 10, view: 160 * F, flee: 18, lies: 900, still: true,
     gives: { meat: 'meat_beef', n: 10, fat: 5, hide: 'hide', bones: 8 },
   },
@@ -175,7 +180,7 @@ export interface HerdKind {
 }
 
 export const HERDS: HerdKind[] = [
-  { id: 'deer', of: [['stag', 1, 1], ['doe', 2, 4]], count: 6, range: 320, apart: 600, feed: ['field'], rest: ['forest'], hours: [[0, 0.22], [0.55, 0.8]], drinks: true, respawn: 600 },
+  { id: 'deer', of: [['stag', 1, 1], ['doe', 2, 4]], count: 6, range: 320, apart: 450, feed: ['field'], rest: ['forest'], hours: [[0, 0.22], [0.55, 0.8]], drinks: true, respawn: 600 },
   { id: 'bear', of: [['bear', 1, 1]], count: 3, range: 420, apart: 900, feed: ['forest', 'snow'], rest: ['forest', 'snow'], hours: [[0.06, 0.7]], drinks: true, respawn: 1500 },
   { id: 'wolves', of: [['wolf', 3, 5]], count: 3, range: 650, apart: 900, feed: ['forest', 'snow', 'field'], rest: ['snow', 'forest'], hours: [[0.68, 1], [0, 0.1]], drinks: true, respawn: 900 },
   { id: 'cows', of: [['cow', 2, 3]], count: 3, range: 38, apart: 0, feed: ['field', 'town'], rest: ['field', 'town'], hours: [[0.04, 0.74]], drinks: false, respawn: 1200, farm: true },

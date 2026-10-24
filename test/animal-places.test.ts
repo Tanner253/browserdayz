@@ -1,8 +1,8 @@
 // Where the animals are on the real map (the owner: "make sure animals dont spawn in impossible places like in the
 // deserv canyon walls etc."): every herd's ground, every animal stood, and every place each one goes through ten
 // minutes with somebody near every herd and shots among them, against the ground as the game makes it solid: water,
-// too steep for it, a rock or the canyon's rock, a building, a wall, a prop, the fort, a post, a cave's mouth; and a
-// town or a road, unless it flees. (progress/animals/audit.ts draws the same on the map, over an hour.)
+// too steep for it, a rock or the canyon's rock, a building, a wall, a prop, the fort, a post, a cave's mouth; off its
+// own kind of country; and a town or a road, unless it flees. (progress/animals/audit.ts draws the same on the map, over an hour.)
 //   npx tsx test/animal-places.test.ts
 
 import assert from 'node:assert/strict';
@@ -11,6 +11,7 @@ import { generateWorld, heightAt, passData, passPlan } from '../src/world/worldg
 import { outcropPieces } from '../src/world/outcrops';
 import { rockPieces, ROCKS } from '../src/sim/pass';
 import { animalGround } from '../src/sim/animal-ground';
+import { onCountry } from '../src/sim/animal-places';
 import { Herd, seeded, type Seen } from '../src/sim/animal-mind';
 import { ANIMALS, HERDS, KINDS } from '../src/sim/animals';
 
@@ -34,6 +35,8 @@ const fault = (x: number, z: number, k: number, g: number, moving: boolean, flee
   if (!ground.open(x, z, kind.steep + 0.05)) return ground.slope(x, z) > kind.steep + 0.05 ? 'too steep' : 'in water or something solid';
   if (!farm(g) && !fleeing && b === 'town') return 'in a town';
   if (!farm(g) && !moving && ground.road(x, z) < ANIMALS.keepOff.road.walk) return 'on a road';
+  // (each kind on its own country, fleeing too: no deer out on the high snow)
+  if (!onCountry(kind.lives, b)) return `off its country (${b})`;
   return '';
 };
 

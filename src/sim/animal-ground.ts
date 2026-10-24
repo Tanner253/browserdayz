@@ -54,6 +54,8 @@ export interface Ground {
   water(x: number, z: number, r: number): { x: number; z: number } | null;
   /** the yards of the farms, where the farm's animals live */
   farms: { x: number; z: number; r: number; name: string }[];
+  /** the hunting towers (high seats), which are no buildings to a herd: it may live under one (the owner) */
+  towers: { x: number; z: number }[];
   /** where the map's own ground is, to choose herds' ground in */
   bounds: { x0: number; x1: number; z0: number; z1: number };
 }
@@ -128,8 +130,12 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
   ];
   const kept = (x: number, z: number) => keep.some((k) => (x - k.x) ** 2 + (z - k.z) ** 2 < k.r * k.r);
   const towns = world.pois.map((p) => ({ x: p.x, z: p.z, r: p.radius, farm: /farm|kolkhoz/i.test(p.name), name: p.name }));
-  // (where people are: the towns, and every building and tower that stands by itself)
-  const settled = towns.filter((t) => t.r >= 30), lone = [...world.buildings.map((b) => ({ x: b.x, z: b.z, r: 0 })), ...towns.filter((t) => t.r < 30)];
+  // (where people are: the towns, and every building and tower that stands by itself; but a hunting tower is not
+  // where people are, the owner: "the only exception to the animal near building rule is hunting towers")
+  const towers = world.pois.filter((p) => /hunting tower/i.test(p.name)).map((p) => ({ x: p.x, z: p.z }));
+  const high = (x: number, z: number) => towers.some((t) => Math.hypot(t.x - x, t.z - z) < 12);
+  const settled = towns.filter((t) => t.r >= 30);
+  const lone = [...world.buildings.filter((b) => !high(b.x, b.z)).map((b) => ({ x: b.x, z: b.z, r: 0 })), ...towns.filter((t) => t.r < 30 && !high(t.x, t.z))];
   // the roads, as lengths binned by 32 m (a road is points x, y, z one after another)
   const RB = 32, RBX = Math.ceil((WORLD_X1 - WORLD_X0) / RB), RBZ = Math.ceil((WORLD_Z1 - WORLD_Z0) / RB);
   const rbin = (i: number, j: number) => Math.min(RBZ - 1, Math.max(0, j)) * RBX + Math.min(RBX - 1, Math.max(0, i));
@@ -243,6 +249,7 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
       return null;
     },
     farms: towns.filter((t) => t.farm).map(({ x, z, r, name }) => ({ x, z, r, name })),
+    towers,
     bounds: { x0: WORLD_X0, x1: WORLD_X1, z0: WORLD_Z0, z1: WORLD_Z1 },
   };
 }

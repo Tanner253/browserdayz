@@ -24,6 +24,7 @@ const ground: Ground = {
   open: (x, z) => Math.abs(x) < 1490 && Math.abs(z) < 1490 && Math.hypot(x - LAKE.x, z - LAKE.z) >= LAKE.r,
   road: () => 999,
   people: () => ({ town: 9999, camp: 9999, house: 9999 }),
+  towers: [],
   roofed: () => false,
   cover: (x) => (x < 0 ? 1 : 0),
   clear: () => true,
