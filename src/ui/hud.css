@@ -227,6 +227,21 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 .hud-progress.hot .hud-progress-label b i { margin-left: 3px; font-size: 14px; font-style: normal; text-transform: none; color: var(--ink); }
 .hud-progress.hot .hud-progress-bar { height: 6px; background: rgba(10, 12, 11, 0.8); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
 .hud-progress.hot .hud-progress-bar div { background: #ff6a4d; }
+/* A throw winding up: just under the crosshair, where the eye is, its words on a dark pill and its bar thicker and
+   backed in the same dark, to be read over a brick wall or the sky (the plain line was faint over both, 2026-10-24). */
+.hud-progress.throw { top: calc(50% + 30px); width: 200px; }
+.hud-progress.throw .hud-progress-label {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 4px 12px 3px;
+  border-radius: 999px;
+  background: rgba(10, 12, 11, 0.72);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hud-progress.throw .hud-progress-bar { height: 6px; border-radius: 3px; overflow: hidden; background: rgba(10, 12, 11, 0.72); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45); }
 
 .hud-compass {
   position: absolute;

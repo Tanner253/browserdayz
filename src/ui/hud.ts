@@ -1926,9 +1926,10 @@ export class HUD {
     /**
      * `hot`: it is a fuse running down and not a thing getting done (a grenade with its pin out): drawn as a warning,
      * on a dark plate, to be read at a glance over grass, snow or a wall. `figure`: the seconds left, which are then
-     * the biggest thing in the line, before its words.
+     * the biggest thing in the line, before its words. `throw`: a throw winding up (src/game/throwing.ts), just under the
+     * crosshair, its words on a dark pill.
      */
-    progress: { label: string; t: number; hot?: boolean; figure?: string } | null;
+    progress: { label: string; t: number; hot?: boolean; throw?: boolean; figure?: string } | null;
     hotbar: HotbarEntry[];
     fps: number;
     ping: number | null;
@@ -2106,6 +2107,7 @@ export class HUD {
       // (nothing under way yet: words and no bar)
       this.toggle(e.progress, 'idle', s.progress.t < 0);
       this.toggle(e.progress, 'hot', !!s.progress.hot);
+      this.toggle(e.progress, 'throw', !!s.progress.throw);
       // (a figure before the words: the seconds of a fuse, large. Both are the game's own words, never a player's.)
       if (s.progress.figure !== undefined) this.set('plabel', e.progress.firstElementChild as HTMLElement, `<b>${s.progress.figure}<i>s</i></b><span>${s.progress.label}</span>`, 'html');
       else this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
