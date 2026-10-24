@@ -100,7 +100,7 @@ export interface HotbarEntry {
   dim: boolean;
 }
 
-/** The page scaled to the window, so it reads the same on a laptop, a 1440p monitor and a phone (also the stage's). */
+/** The page scaled to the window, so it reads the same on a laptop, a 1440p monitor and a phone (also the sandbox's). */
 export function fitScreen(touch: boolean) {
   const w = window.innerWidth, h = window.innerHeight;
   const css = document.documentElement.style;
@@ -112,7 +112,7 @@ export function fitScreen(touch: boolean) {
   css.setProperty('--inv-zoom', String(touch ? Math.max(0.5, Math.min(1.7, h / 700, w / 1340)) : z));
 }
 
-/** The hot bar's squares as the HUD draws them (also the stage's: src/dev/stage-inventory.ts). */
+/** The hot bar's squares as the HUD draws them (also the sandbox's: src/dev/sandbox-inventory.ts). */
 export function hotbarCells(list: HotbarEntry[], icons: Record<string, string>): string {
   return list
     .map((h, i) => {

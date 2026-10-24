@@ -119,7 +119,7 @@ export const MODES: Record<string, number> = {
 };
 
 /**
- * One of a kind as the game draws it, for the stage (src/dev/stage.ts; onboarding, for the owner: "the stage shows
+ * One of a kind as the game draws it, for the sandbox (src/dev/sandbox.ts; onboarding, for the owner: "the stage shows
  * exactly what the game draws"): its own model and movements as `Beast` has them, the movement it plays doing `mode`
  * (or what stands in for it), lifted to that movement's floor. Its root stands on the ground, as a Beast's does.
  */
