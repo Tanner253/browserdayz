@@ -129,7 +129,7 @@ const THINGS: Record<string, TownThing[]> = {
     // the trench's rim: a spade left in the spoil, the ladder down into it, the buckets the spoil goes up in, the
     // crates the day's finds go in; the truck by the tents
     { kind: 'shovel', x: 13.2, z: 11.6, rot: 0.6 }, { kind: 'wooden_crate_01', x: 26.6, z: 9.8, rot: 0.3 },
-    { kind: 'wooden_ladder', x: 16.4, z: 12.2, rot: -0.7 }, { kind: 'mop_bucket', x: 14.6, z: 10.4, rot: 0.2 }, { kind: 'mop_bucket', x: 24.2, z: 9.4, rot: 1.9 },
+    { kind: 'wooden_ladder', x: 14.2, z: 15, rot: Math.PI / 2 }, { kind: 'mop_bucket', x: 14.6, z: 10.4, rot: 0.2 }, { kind: 'mop_bucket', x: 24.2, z: 9.4, rot: 1.9 },
     { kind: 'wooden_crate_01', x: 11.4, z: 2.4, rot: 0.8 }, { kind: 'painted_wooden_stool', x: 3.6, z: 3.2, rot: 0.3 }, { kind: 'painted_wooden_stool', x: 6.6, z: 0.2, rot: 2.6 },
     { kind: 'covered_car', x: 31, z: 6, rot: PI / 2 },
   ],
@@ -147,7 +147,11 @@ const GROUND: Record<string, TownGround> = {
   // (the yard; the track in to it trodden down the bank from the road round Kalat, the ground as it is, no road's bed:
   // the road is 4 m over the camp's flat and 30 m off, too steep for one; lamps down it, as each town has; the trench,
   // a hollow a man's height deep, and the spoil dug out of it heaped beside it)
-  Lager: { yards: [[-34, -8, 22, 9]], lanes: [{ line: [[-6, 56], [-4, 26], [-3, 6]], w: 4 }], mounds: [[20, 16, 8, -1.4, 4.5], [30.5, 19, 4.5, 0.9, 1], [29, 11.5, 3.5, 0.6, 0.6]] },
+  Lager: {
+    yards: [[-34, -8, 22, 9]], lanes: [{ line: [[-6, 56], [-4, 26], [-3, 6]], w: 4 }], mounds: [[31.5, 19.5, 4.5, 0.9, 1], [30, 11.5, 3.5, 0.6, 0.6]],
+    // (the trench: dug square, a man's chest deep, its walls straight)
+    terraces: [{ poly: [[13, 11], [26, 10.4], [26.6, 20.6], [13.6, 21.2]], h: -1.5, out: 0.9 }],
+  },
 };
 
 export const desertBuildings = (t: Town): TownSpot[] => BUILDINGS[t.name] ?? [];

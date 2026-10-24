@@ -373,8 +373,11 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
       // in beds and pocked with bumps, the tableland was rings of little cliffs and pits from end to end. The owner,
       // 2026-10-23: "i like the smoothness like we have on our ground and hills, AND i like the cliffs aesthetic")
       const face = strata(raw, x, z) + 1.6 * r3.fbm(x * 0.07, z * 0.07, 2) * smoothstep(0.02, 0.1, u), brink = smoothstep(0.64, 0.8, u);
-      const land = raw + (crestY(x, z, true) - top) * smoothstep(0.7, 0.95, u);
-      H[i] = Math.max(H[i], face + (land - face) * brink);
+      const land = raw + (crestY(x, z, true) - top) * smoothstep(0.7, 0.95, u), v = face + (land - face) * brink;
+      // (where its smooth top meets a butte standing out of it, the two run together over a few metres: the higher of
+      // the two, as its faces take it, drew a dark seam across the butte's foot where they crossed, 2026-10-23)
+      const k = 3 * brink, d = k > 0 ? clamp(0.5 + (0.5 * (v - H[i])) / k, 0, 1) : v > H[i] ? 1 : 0;
+      H[i] = k > 0 ? H[i] + (v - H[i]) * d + k * d * (1 - d) * 0.5 : Math.max(H[i], v);
     }
   }
 
@@ -387,7 +390,10 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
   passLine.each(net, reach, (i, x, z, a) => {
     const side = a.s >= 0 ? 1 : -1, y = passFloor(a.along) + passRise(Math.abs(a.s) - passHalf(a.along, side), side, a.along, passKeep(x, z));
     const cut = Math.max(y, overCaves(x, z));
-    if (cut < H[i]) H[i] = cut;
+    // (its lip rounded over a few metres where the cut meets the ground: with the tableland smooth, the knife edge it
+    // left drew a dark line along the far wall's foot, seen from the ridge, 2026-10-23)
+    const k = 3, d = clamp(0.5 + (0.5 * (H[i] - cut)) / k, 0, 1), soft = H[i] + (cut - H[i]) * d - 0.5 * k * d * (1 - d);
+    if (soft < H[i]) H[i] = soft;
   });
   return walls;
 }

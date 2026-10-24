@@ -144,7 +144,7 @@ export interface TownGround {
    * a swamp. For the world's water (`world.water`, a Lake at the pad's height plus this).
    */
   water?: { level: number; outline: [number, number][]; swamp: boolean };
-  /** ground raised level inside a line (x, z points), so high, its bank falling away over `out` metres round it */
+  /** ground raised level inside a line (x, z points), so high, its bank falling away over `out` metres round it; or, h below 0, sunk so deep (a dig's trench, a quarry's pit), its bank its wall */
   terraces?: { poly: [number, number][]; h: number; out: number }[];
 }
 export function townGround(t: Town): TownGround {
@@ -176,8 +176,9 @@ export function moundAt(t: Town, lx: number, lz: number): number {
     else down = Math.min(down, e);
   }
   for (const { poly, h, out } of g.terraces ?? []) {
-    const d = outside(poly, lx, lz), k = Math.min(1, Math.max(0, 1 - d / out));
-    up = Math.max(up, h * k * k * (3 - 2 * k));
+    const d = outside(poly, lx, lz), k = Math.min(1, Math.max(0, 1 - d / out)), e = h * k * k * (3 - 2 * k);
+    if (h > 0) up = Math.max(up, e);
+    else down = Math.min(down, e);
   }
   return up + down;
 }

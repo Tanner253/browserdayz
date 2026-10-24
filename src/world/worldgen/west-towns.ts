@@ -5,7 +5,7 @@
 
 import { Simplex, lerp, smoothstep } from '../../core/noise';
 import { DESERT_LATER, DESERT_TOWNS } from '../../sim/desert';
-import { OUTPOSTS } from '../../sim/outposts';
+import { OUTPOSTS, isOutpost } from '../../sim/outposts';
 import { MOKROYE, WATER } from '../../sim/mokroye';
 import { OZERKI, SHORE } from '../../sim/ozerki';
 import { LAND, OUTLINE, outside as offTop, ruinLocal, ruinsGround, type Place } from '../../sim/ruins';
@@ -77,7 +77,8 @@ const h1 = new Simplex(WORLD_SEED + 351);
  */
 export function layPad(H: Float32Array, net: Net, t: Town, padY: number, lake?: number) {
   if (t.name === MOKROYE.name) return layHamlet(H, net, t, padY);
-  const E = 40;
+  // (the open country's small places eased into the land over 20 m: 40 reached a stash kept in Bereg from Ust'ye)
+  const E = isOutpost(t) ? 20 : 40;
   overPad(net, t, E, (i, _x, _z, lx, lz, out) => {
     const mix = 1 - smoothstep(0, E, out), y = padY + moundAt(t, lx, lz);
     if (t.name === OZERKI.name && lake !== undefined) {

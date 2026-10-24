@@ -22,12 +22,12 @@ export const RYBAKI: Town = { name: 'Rybaki', x: -3505, z: -160, pad: [30, 24], 
 /** a campsite on the beach south of Peski */
 export const KEMPING: Town = { name: 'Kemping', x: -3505, z: 285, pad: [32, 26], rot: 0 };
 /** the fishers' huts at the river's mouth, on its north bank */
-export const USTYE: Town = { name: "Ust'ye", x: -3570, z: -485, pad: [34, 26], rot: 0 };
+export const USTYE: Town = { name: "Ust'ye", x: -3570, z: -460, pad: [34, 26], rot: 0 };
 /** the pump station that waters the desert's fields from the river, on its north bank */
-export const NASOSNAYA: Town = { name: 'Nasosnaya', x: -3240, z: -465, pad: [26, 22], rot: 0.2 };
+export const NASOSNAYA: Town = { name: 'Nasosnaya', x: -3244, z: -441, pad: [26, 22], rot: 0 };
 /** a camp at the ford below the brick works */
-export const BROD: Town = { name: 'Brod', x: -2870, z: -405, pad: [26, 22], rot: -0.15 };
-/** a watermill in the north valley */
+export const BROD: Town = { name: 'Brod', x: -2890, z: -362, pad: [26, 22], rot: -0.15 };
+/** a sawmill in the north valley, where the timber off its slopes comes down to the road */
 export const MELNITSA: Town = { name: "Mel'nitsa", x: -1760, z: -505, pad: [34, 28], rot: 0.3 };
 /** a farmstead on the north valley's rim */
 export const KHUTOR: Town = { name: 'Khutor', x: -1560, z: -575, pad: [34, 28], rot: -0.2 };
@@ -78,7 +78,7 @@ const BUILDINGS: Record<string, TownSpot[]> = {
   "Ust'ye": [
     // (two plank houses, the boathouse at the bank, the smokehouse and a shed)
     { type: 'shanty', x: -14, z: -4, rot: S },
-    { type: 'boathouse', x: 6, z: 16, rot: S },
+    { type: 'boathouse', x: 6, z: 21, rot: S },
     { type: 'smokehouse', x: 12, z: -8, rot: N + 0.2 },
     { type: 'shed', x: 22, z: 2, rot: -Q },
   ],
@@ -94,7 +94,7 @@ const BUILDINGS: Record<string, TownSpot[]> = {
     { type: 'shed', x: 14, z: 4, rot: -Q },
   ],
   "Mel'nitsa": [
-    // (the mill along the stream, the miller's house, his shed)
+    // (the mill along the road, the sawyer's house, his shed)
     { type: 'sawmill', x: 0, z: -6, rot: N },
     { type: 'izba_two', x: -4, z: 13, rot: S },
     { type: 'shed', x: 14, z: 12, rot: S + 0.2 },
@@ -139,9 +139,10 @@ const THINGS: Record<string, TownThing[]> = {
     { kind: 'heli_wreck', x: 62, z: 20, rot: 0.5 },
   ],
   "Kar'yer": [
-    // the faces of the pit, its rock stood into its walls, its floor's stones
-    { kind: 'namaqualand_cliff_02', x: 16, z: -26, rot: PI + 0.1 }, { kind: 'namaqualand_cliff_02', x: 40, z: -6, rot: -Q + 0.15 },
-    { kind: 'namaqualand_cliff_01', x: 30, z: 22, rot: 0.6 }, { kind: 'namaqualand_boulder_04', x: 20, z: 4, rot: 1.1 }, { kind: 'boulder_01', x: 12, z: 12, rot: 2.3 },
+    // the pit's own walls its faces; on its floor the rock broken out of them and left, heaped against their feet
+    { kind: 'namaqualand_boulder_04', x: 12, z: -14, rot: 0.4 }, { kind: 'namaqualand_boulder_03', x: 14.6, z: -15.2, rot: 2.2 }, { kind: 'namaqualand_boulder_02', x: 9.8, z: -12.6, rot: 1.3 },
+    { kind: 'namaqualand_boulder_04', x: 32, z: -6, rot: 1.9 }, { kind: 'namaqualand_boulder_02', x: 33.4, z: -3.4, rot: 0.2 }, { kind: 'namaqualand_boulder_03', x: 24, z: 17, rot: 2.8 },
+    { kind: 'namaqualand_boulder_04', x: 20, z: 4, rot: 1.1 }, { kind: 'boulder_01', x: 12, z: 12, rot: 2.3 }, { kind: 'boulder_01', x: 26.2, z: 18.4, rot: 0.9 },
     // the site's things on its bench
     { kind: 'container_shell@0', x: -30, z: 18, rot: 0.08 }, { kind: 'portable_generator', x: -30, z: -16, rot: 0.4 }, { kind: 'propane_tank', x: -31.6, z: -16.4, rot: 0 },
     { kind: 'Barrel_01', x: -48, z: 0, rot: 0 }, { kind: 'Barrel_01', x: -46.8, z: 0.6, rot: 0 }, { kind: 'crate_big', x: -34, z: -4, rot: 0.3 },
@@ -198,8 +199,11 @@ const GROUND: Record<string, TownGround> = {
   Kolodets: { yards: [[-14, -12, 0, 8]], lanes: [{ line: [[-30, 2], [-12, 0]], w: 4 }] },
   // (the strip, graded flat and trodden; the apron along its north side)
   Aerodrom: { yards: [[-30, -20, 42, -5]], lanes: [{ line: [[-70, 9], [70, 9]], w: 14, dark: true }, { line: [[4, -5], [4, 2]], w: 4 }] },
-  // (the pit: 6 m deep, its floor 36 m across, its walls falling from its rim over 20 m; its bench west of it trodden)
-  "Kar'yer": { yards: [[-52, -32, -24, 22]], lanes: [{ line: [[-24, 0], [-2, 4]], w: 5 }], mounds: [[16, 0, 38, -6, 18]] },
+  // (the pit: 7 m deep, worked back in faces, its walls straight; its bench west of it trodden, a ramp down into it)
+  "Kar'yer": {
+    yards: [[-52, -32, -24, 22]], lanes: [{ line: [[-24, 0], [2, 3]], w: 5 }],
+    terraces: [{ poly: [[0, -22], [22, -26], [42, -14], [44, 8], [34, 26], [12, 28], [-2, 14], [-4, -6]], h: -7, out: 3.5 }, { poly: [[-12, -2], [2, -1], [2, 7], [-12, 6]], h: -3.5, out: 8 }],
+  },
   Rybaki: { yards: [], lanes: [{ line: [[28, -2], [8, 4]], w: 3.5 }] },
   Kemping: { yards: [[-10, -4, 12, 8]], lanes: [{ line: [[32, 2], [-14, 0]], w: 4 }] },
   "Ust'ye": { yards: [[-6, -16, 16, 0]], lanes: [{ line: [[0, -28], [2, -4]], w: 3.5 }] },
