@@ -706,7 +706,7 @@ export class InventoryUI {
    * Its head is the menu's head too, so the one reads as the other turned over.
    */
   private cardHtml(src: Source): string {
-    const d = ITEMS[src.item.id], what = does(d), note = this.heldNote(src);
+    const d = ITEMS[src.item.id], what = does(d, src.item), note = this.heldNote(src);
     return this.cardHead(src.item)
       + (what ? `<p class="card-does">${what}</p>` : '')
       + `<p class="card-desc">${d.desc}</p>`
@@ -1725,7 +1725,7 @@ export class InventoryUI {
       box.innerHTML = `<div class="inv-empty">Click an item to inspect it.</div>`;
       return box;
     }
-    const d = ITEMS[it.id], what = does(d);
+    const d = ITEMS[it.id], what = does(d, it);
     const held = this.actions.inHands() === it, note = this.heldNote(loc);
     // (a phone's: the card's info, and the menu's rows as buttons)
     box.innerHTML = `

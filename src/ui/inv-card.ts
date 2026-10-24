@@ -5,7 +5,8 @@
 // ("Eat it now ··· Dbl-click"), so a click on a row teaches the key. Every deed and every key comes from the one list
 // made here (`rows`). The inspector is left only on a phone, which hovers on nothing and has no right button.
 
-import { ITEMS } from '../sim/items';
+import { ITEMS, type ItemInstance } from '../sim/items';
+import { cookable, mealOf } from '../sim/cooking';
 import type { Act } from './act-icons';
 
 type Def = (typeof ITEMS)[string];
@@ -61,16 +62,25 @@ const pct = (k: number) => Math.round(k * 100);
 const KIND: Record<string, string> = { weapon: 'Gun', ammo: 'Ammunition', magazine: 'Magazine', food: 'Food', drink: 'Drink', medical: 'Medical', melee: 'Hand weapon', tool: 'Tool', misc: 'Gear', stash: 'Storage', attachment: 'Gun part', clothing: 'Clothing' };
 export const kindOf = (d: Def) => KIND[d.category] ?? d.category;
 
-/** What a thing does, in a few words, read off the rules so that it is never out of step with them: the line under its name. */
-export function does(d: Def): string {
+/** what does harm, said in red (2026-10-24: "it should be red too") */
+const signed = (v: number, what: string) => (v > 0 ? `+${v} ${what}` : `<b class="bad">−${Math.abs(v)} ${what}</b>`);
+
+/**
+ * What a thing does, in a few words, read off the rules so that it is never out of step with them: the line under its
+ * name. Food that cooks says what it gives as it is now, raw, cooked, burned or rotten (`it`): not what a cooked one
+ * gives (the owner, 2026-10-24: "the raw meat says to the user that it gives them + energy").
+ */
+export function does(d: Def, it?: ItemInstance): string {
   const o: string[] = [];
-  const u = d.use;
-  if (u?.health) o.push(`+${u.health} health`);
+  const u = d.use, meal = it && cookable(it) ? mealOf(it, Date.now() / 1000) : null;
+  const health = meal ? meal.health : u?.health, energy = meal ? meal.energy : u?.energy, water = meal ? meal.water : u?.water;
+  if (health) o.push(signed(health, 'health'));
   if (u?.stopBleed) o.push('stops bleeding');
   if (u?.splint) o.push('sets a broken leg');
   if (u?.blood) o.push(`+${u.blood} ml of blood`);
-  if (u?.energy) o.push(`${u.energy > 0 ? '+' : '−'}${Math.abs(u.energy)} energy`);
-  if (u?.water) o.push(`${u.water > 0 ? '+' : '−'}${Math.abs(u.water)} water`);
+  if (energy) o.push(signed(energy, 'energy'));
+  if (water) o.push(signed(water, 'water'));
+  if (meal?.sick) o.push(`<b class="bad">${meal.sick >= 1 ? 'food poisoning' : `${Math.round(meal.sick * 100)}% chance of food poisoning`}</b>`);
   if (u?.stamina) o.push('fills your stamina');
   if (u?.boost) o.push(`${u.boost} s in which nothing costs breath`);
   if (u?.sips) o.push(`${u.sips} drinks, filled again at a well`);

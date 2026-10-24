@@ -245,7 +245,9 @@ ok('what counts as fuel is real, and so is what cooks: every row an item (or one
     assert.ok(!def.stack, `${id} is kept in piles: a cooked one would be lost among the raw`);
     assert.ok(r.takes > 0 && r.burns > 0, id);
     assert.ok(r.takes + r.burns < COOK_KINDS.campfire.free, `${id} cannot be burned on one lighting of the fire`);
-    for (const w of [r.raw, r.done, r.burned]) if (w) assert.ok(w.energy >= 0 && w.water >= 0, id);
+    // (cooked or burned it gives, if little; raw it may take, as raw meat does: never more than cooked gives)
+    for (const w of [r.done, r.burned]) if (w) assert.ok(w.energy >= 0 && w.water >= 0, id);
+    if (r.raw) assert.ok(r.raw.energy <= (r.done?.energy ?? 1), `${id} is better raw`);
     assert.ok(r.burned.energy < (r.done?.energy ?? 1), `${id} is no worse burned`);
     assert.ok(cookable(thing(id)));
     for (const [kind, k] of KINDS) if (k.food) assert.ok(gridOf(newSpot(kind), 'food')!.findSpace(thing(id)), `${def.name} does not go on a ${kind}`);

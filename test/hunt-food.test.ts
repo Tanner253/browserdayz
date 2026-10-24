@@ -27,11 +27,12 @@ ok('every animal gives things the game has, and every meat cooks and goes off', 
   assert.ok(FUEL.animal_fat > 0 && FUEL.firewood > 0);
 });
 
-ok('meat: raw a quarter and as likely as not poisons you; cooked all of it; burned a quarter; rotten little and poisons you', () => {
+ok('meat: raw it takes a quarter, water and health, and as likely as not poisons you; cooked all of it; burned a quarter; rotten little and poisons you', () => {
   const steak = markMade(makeItem('meat_venison'), T0);
   const full = ITEMS.meat_venison.use!.energy!;
   const raw = mealOf(steak, T0 + 10);
-  assert.equal(raw.energy, Math.round(full * 0.25));
+  assert.equal(raw.energy, -Math.round(full * 0.25));
+  assert.ok(raw.water < 0 && raw.health < 0, 'raw meat takes water and health');
   assert.equal(raw.sick, 0.5);
   assert.equal(itemName(steak), 'Venison Steak (raw)');
   steak.cook = COOKS.meat_venison.takes;

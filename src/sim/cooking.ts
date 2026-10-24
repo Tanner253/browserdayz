@@ -255,7 +255,9 @@ export const HEAT = {
 };
 
 /** meat, of whatever animal (src/sim/items/hunt.ts) */
-const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: 0.25, water: 1.6, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 2400, done: 10800 } };
+// (raw, it does harm: "the raw meat says to the user that it gives them + energy and stuff when it should be -food and
+// -water and -hp", the owner, 2026-10-24. It took a quarter of the food and gave half again the water before.)
+const MEAT: Recipe = { how: 'cook', takes: 60, burns: 45, raw: { energy: -0.25, water: -0.25, health: -10, sick: 0.5 }, burned: { energy: 0.25, water: 0 }, keeps: { raw: 2400, done: 10800 } };
 /** what anything rotten is worth: little, and it makes you ill */
 export const ROTTEN: Worth = { energy: 0.2, water: 0, health: -15, sick: 1 };
 
@@ -276,7 +278,7 @@ export const COOKS: Record<string, Recipe> = {
   // Baked, the water goes out of an apple and the sweetness stays: more to eat and less to drink, and it keeps so.
   apple: { how: 'cook', takes: 30, burns: 45, done: { energy: 1.5, water: 0.5 }, burned: { energy: 0.3, water: 0 } },
   // Meat (2026-10-23, the animals: the shares are DayZ's chicken steak, see the top of this file). The item is written as
-  // what it is worth COOKED; raw it is a quarter of that and as likely as not gives whoever eats it food poisoning;
+  // what it is worth COOKED; raw it takes a quarter of that, and water, and health, and as likely as not gives food poisoning;
   // burned it is a quarter and dry. It goes off: raw in forty minutes, cooked in three hours. One item for each
   // animal, with its stage kept on the thing itself, as a tin's is.
   ...Object.fromEntries(['meat_venison', 'meat_bear', 'meat_wolf', 'meat_beef'].map((id) => [id, MEAT])),
@@ -366,7 +368,8 @@ export function mealOf(item: ItemInstance, now: number, by = 1): { energy: numbe
   const u = own(ITEMS, item.id)?.use, r = own(COOKS, item.id), stage = stageNow(item, now), hot = isHot(item, now);
   const worth = !r ? PLAIN : rotten(item, now) ? ROTTEN : stage === 'burned' ? r.burned : stage === 'done' ? r.done ?? PLAIN : r.raw ?? PLAIN;
   const k = Math.max(1, num(by) ? by : 1, hot ? HEAT.meal : 1);
-  const good = (v: number | undefined, share: number) => (!v ? 0 : v > 0 ? Math.round(v * share * k) : v);
+  // (what a stage takes away, raw meat's, is not made worse by heat or a fire)
+  const good = (v: number | undefined, share: number) => (!v ? 0 : v > 0 ? Math.round(v * share * (share > 0 ? k : 1)) : v);
   return { energy: good(u?.energy, worth.energy), water: good(u?.water, worth.water), health: (u?.health ?? 0) + (worth.health ?? 0), hot, ...(worth.sick ? { sick: worth.sick } : {}) };
 }
 

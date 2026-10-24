@@ -317,7 +317,7 @@ export const itemsMethods = {
       if (energy) v.energy = THREE.MathUtils.clamp(v.energy + energy, 0, 100);
       if (water) v.water = THREE.MathUtils.clamp(v.water + water, 0, 100);
       if (health > 0) v.health = Math.min(100, v.health + health);
-      else if (health < 0) this.player.sicken(-health, 'rotten food');
+      else if (health < 0) this.player.sicken(-health, rotten(item, Date.now() / 1000) || !cookable(item) ? 'rotten food' : 'raw meat');
       if (meal && fallsIll(meal.sick, !!v.guard, Math.random())) {
         v.ill = Math.max(v.ill ?? 0, POISON.lasts);
         this.hud.note('Your stomach turns: food poisoning. Charcoal tablets will settle it', 'warn');
