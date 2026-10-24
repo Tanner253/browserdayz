@@ -37,8 +37,9 @@
 .inv-doll { grid-template-columns: 1fr; }
 .inv-hands-box { margin-top: 8px; }
 .inv-hands-box > .inv-slot.slot-inhands { height: 104px; }
-.inv-hot.big { position: static; transform: none; display: grid; grid-template-columns: repeat(5, 64px); justify-content: center; gap: 6px; margin: 10px 0 4px; padding: 6px; }
-.inv-hot.big .inv-hotkey { width: 64px; height: 64px; }
+/* (square, as big as the middle's width lets five stand in a row: 64 at the most) */
+.inv-hot.big { position: static; transform: none; display: grid; grid-template-columns: repeat(5, minmax(0, 64px)); justify-content: center; gap: 6px; margin: 10px 0 4px; padding: 6px; }
+.inv-hot.big .inv-hotkey { width: auto; height: auto; aspect-ratio: 1; }
 .inv-hot.big .inv-hotkey:nth-child(3) { margin-right: 0; }
 .inv-hot.big .inv-hotkey:not(.empty) { cursor: grab; }
 .inv-hot.big .inv-hotkey .inv-item-img.fit { inset: 16px 5px 14px; }
