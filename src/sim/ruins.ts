@@ -594,7 +594,7 @@ function alcazar(): Part[] {
 }
 
 /** the best stretch of the town's wall: sixty-six metres, two towers proud of it, a prow under them, and what is left of it going on east */
-export const CURTAIN = { len: 66.2, walk: 4, breach: [44.2, 48.6, 1.3] as [number, number, number], on: 91.6, turn: -6.6, t1: [14.15, 20.65] as V2, t2: [50.9, 56.5] as V2, prow: [32, 42] as V2, postern: 37, stair: [23, 29.4] as V2 };
+export const CURTAIN = { len: 66.2, walk: 4, breach: [44.2, 48.6, 1.3] as [number, number, number], on: 96.9, turn: -7.97, t1: [14.15, 20.65] as V2, t2: [50.9, 56.5] as V2, prow: [32, 42] as V2, postern: 37, stair: [23, 29.4] as V2 };
 /** the ground it is built for, across it: level inside, a fall of earth against its foot, a berm, the scarp, the moat, and the far lip */
 const CURTAIN_GROUND: [number, number][] = [[0.9, 0], [7, -3.5], [13.5, -4.4], [24, -10.4], [46, -10.4], [61, -8.8]];
 
@@ -650,9 +650,11 @@ function curtain(): Part[] {
     add(p, floor([[C.prow[0] + 0.3, 0.9], [C.prow[0] + 0.3, 8.8], [(C.prow[0] + C.prow[1]) / 2, 13.4], [C.prow[1] - 0.3, 8.8], [C.prow[1] - 0.3, 0.9]], SILL, 'sand', { name: 'prow platform' }));
     add(heap(C.prow[1] + 0.6, 6.2, -3.9, 6.8, 4.6, 4.15, 349), ...strewn(C.prow[1] + 4, 6.5, -3.6, 12, 4.5, 353));
   }
-  // where the curtain is broken off at its west end, and what is left of it on toward the palace
+  // where the curtain is broken off at its west end, and what is left of it on toward the palace, as far as the
+  // palace's south tower, into whose west face it runs (it stopped 4.6 m short and fell away to nothing over its last
+  // three: the owner, 2026-10-24, "a huge gap between the walls")
   add(heap(1.5, 0.2, -0.4, 4.4, 3.2, 1.5, 359), ...strewn(-1.5, -1.5, 0, 9, 4, 367), ...strewn(8, -2.5, 0, 6, 3, 373));
-  add(wall([[C.len, 0], [C.on, C.turn]], 1.6, -7.5, 2.4, { ruin: { seed: 379, bite: 2.5, floor: 0.2, ends: [0, 3] }, gaps: [[9, 12.5, 0.1]], name: 'low wall' }));
+  add(wall([[C.len, 0], [C.on, C.turn]], 1.6, -7.5, 2.4, { ruin: { seed: 379, bite: 2.5, floor: 0.2 }, gaps: [[9, 12.5, 0.1]], name: 'low wall' }));
   return out;
 }
 
