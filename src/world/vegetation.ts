@@ -1054,6 +1054,14 @@ export class Vegetation {
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
             joinByPaint(parts).map((p) => {
               const m = (p.material as THREE.MeshStandardMaterial).clone();
+              // (glass that lets light through, as its maker drew it for a studio (the generator's dials, 2026-10-23):
+              // with the props' patch its shader did not build, the camera's matrix declared twice. A pane seen through.)
+              const glass = m as THREE.MeshPhysicalMaterial;
+              if (glass.isMeshPhysicalMaterial && glass.transmission > 0) {
+                glass.transmission = 0;
+                glass.transparent = true;
+                glass.opacity = Math.min(glass.opacity, 0.35);
+              }
               // (the canyon country's rocks washed with its beds' red: src/world/ground.ts)
               if (desertRock) m.color.multiply(new THREE.Color(...CANYON_ROCK_TINT));
               if (isFern) {

@@ -150,9 +150,9 @@ ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boat
   // (the water stands in the houses whose floors are under it, and nowhere else: not under the stilts, not on the islands)
   const mok = TOWNS.find((t) => t.name === 'Mokroye')!, rooms = placedRooms({ town: mok, padY: 50 }, BUILDING_FOOTPRINT);
   ok(rooms.length === 3 && rooms.every((q) => !q.dry), `the water stands in the two flooded houses and the barn (${rooms.length} rooms)`);
-  // (and in its part's, 2026-10-23: its two flooded houses, the house on piles and the high seat stood in the water; not the house on stilts nor the boathouse over it)
+  // (and in its part's, 2026-10-23: its two flooded houses; not the house on stilts nor the boathouse over the water, nor the house on piles and the high seat, open under their floors)
   const reeds = TOWNS.find((t) => t.part === mok.name)!, wet = placedRooms({ town: reeds, padY: 50 }, BUILDING_FOOTPRINT);
-  ok(wet.length === 4 && wet.every((q) => !q.dry), `the water stands in the reeds' two flooded houses, the house on piles and the high seat (${wet.length} rooms)`);
+  ok(wet.length === 2 && wet.every((q) => !q.dry), `the water stands in the reeds' two flooded houses (${wet.length} rooms)`);
   ok(TOWNS.filter((t) => t !== mok && t !== reeds).every((t) => placedRooms({ town: t, padY: 0 }, BUILDING_FOOTPRINT).length === 0), 'no rooms in the towns on dry land');
 }
 

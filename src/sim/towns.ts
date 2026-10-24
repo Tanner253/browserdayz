@@ -181,6 +181,9 @@ export function moundAt(t: Town, lx: number, lz: number): number {
 /** a run of a wall of concrete slabs, from a to b: the slabs gone from it (counted from a), and of those the ones lying on the ground (World.slabs) */
 export interface SlabRun { a: [number, number]; b: [number, number]; gone?: number[]; down?: number[] }
 
+/** buildings whose floors stand over open ground on legs: the water about their legs is the swamp's, not a room's */
+const OPEN_UNDER = new Set<BuildingType>(['shanty', 'tower']);
+
 /** a room of a building the water stands in (coast-kit's Waters.rooms): its middle, its turn, half its size each way; `dry` for one the water must stay out of */
 export interface WaterRoom { x: number; z: number; rot: number; hx: number; hz: number; dry?: boolean }
 
@@ -195,7 +198,8 @@ export function placedRooms(p: PlacedTown, sizes: Partial<Record<BuildingType, [
   if (!water) return [];
   return townBuildings(p.town).flatMap((s) => {
     const size = sizes[s.type], floor = s.up ?? moundAt(p.town, s.x, s.z) + 0.3;
-    if (!size || floor >= water.level) return [];
+    // (nor the house on piles and the high seat, open under their floors: the swamp's own water, not a square of a room's)
+    if (!size || floor >= water.level || OPEN_UNDER.has(s.type)) return [];
     const [x, z] = townPoint(p.town, s.x, s.z);
     return [{ x, z, rot: p.town.rot + s.rot, hx: size[0] / 2, hz: size[1] / 2 }];
   });
