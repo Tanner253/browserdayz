@@ -223,7 +223,7 @@ export class HUD {
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
       <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
-      <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
+      <div class="hud-progress"><div class="hud-progress-label"></div><svg class="hud-ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="ring-track" cx="24" cy="24" r="20"/><circle class="ring-fill" cx="24" cy="24" r="20" pathLength="100"/></svg></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
       <div class="hud-area"></div>
@@ -1653,6 +1653,8 @@ export class HUD {
     }
   }
   private espShown = 0;
+  /** how much of the progress ring is left empty, hundredths (see `progress` in the state) */
+  private ringOff = -1;
 
   /** which of an admin's powers are on, said at the top of the screen for as long as any is ('' for none) */
   setPowers(text: string) {
@@ -1926,10 +1928,11 @@ export class HUD {
     /**
      * `hot`: it is a fuse running down and not a thing getting done (a grenade with its pin out): drawn as a warning,
      * on a dark plate, to be read at a glance over grass, snow or a wall. `figure`: the seconds left, which are then
-     * the biggest thing in the line, before its words. `throw`: a throw winding up (src/game/throwing.ts), just under the
-     * crosshair, its words on a dark pill.
+     * the biggest thing in the line, before its words. Every timed thing is this one ring round the crosshair, filling
+     * clockwise from the top, its name under it (the owner, 2026-10-24: "for actions and things that take time like
+     * eating or throwing we should render a circular progress bar rather than a flat horizontal bar, like dayz").
      */
-    progress: { label: string; t: number; hot?: boolean; throw?: boolean; figure?: string } | null;
+    progress: { label: string; t: number; hot?: boolean; figure?: string } | null;
     hotbar: HotbarEntry[];
     fps: number;
     ping: number | null;
@@ -2107,12 +2110,20 @@ export class HUD {
       // (nothing under way yet: words and no bar)
       this.toggle(e.progress, 'idle', s.progress.t < 0);
       this.toggle(e.progress, 'hot', !!s.progress.hot);
-      this.toggle(e.progress, 'throw', !!s.progress.throw);
       // (a figure before the words: the seconds of a fuse, large. Both are the game's own words, never a player's.)
       if (s.progress.figure !== undefined) this.set('plabel', e.progress.firstElementChild as HTMLElement, `<b>${s.progress.figure}<i>s</i></b><span>${s.progress.label}</span>`, 'html');
       else this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
-      ((e.progress.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.min(100, s.progress.t * 100)}%`;
-    } else this.toggle(e.progress, 'show', false);
+      // (how much of the ring is filled: written only as it changes, a hundredth at a time)
+      const off = Math.round(100 - Math.min(100, Math.max(0, s.progress.t) * 100));
+      if (off !== this.ringOff) {
+        this.ringOff = off;
+        (e.progress.querySelector('.ring-fill') as SVGElement).style.strokeDashoffset = String(off);
+      }
+    } else {
+      // (put off, or done: gone at once, and the next begins empty)
+      this.toggle(e.progress, 'show', false);
+      if (this.ringOff !== 100) (e.progress.querySelector('.ring-fill') as SVGElement).style.strokeDashoffset = String((this.ringOff = 100));
+    }
 
     // (the beat of a body near death is the page's own animation, run by the card, and the flash of a hit is written
     // only as it changes: written every frame, it was a restyle and repaint of the page every frame, 2026-10-18)
