@@ -1301,6 +1301,8 @@ export class InventoryUI {
   private dollShown: string | null = null;
   /** each block as it was last built, by its name, with what it was built from */
   private built = new Map<string, { sig: string; nodes: Node[] }>();
+  /** the crate or body open when this was last drawn ('' for none): its scroll is kept while it is the same (see render) */
+  private scrolledFor = '';
   /** what all that is carried weighed when this was last drawn (see render) */
   private weighed: number | null = null;
   /** the grids drawn, by their id (for `shares`) */
@@ -1476,6 +1478,12 @@ export class InventoryUI {
     this.rescroll = [];
     this.gridsNow.clear();
     const sk = this.skeleton();
+    // (where each column and Carried's grids are scrolled to, put back once this is drawn: a part built again under
+    // them took the scroll back to the top, 2026-10-24: "when im looting and shift click an item it resets my scrolled position")
+    // (Vicinity's only while the same crate or body is open: another starts at its top)
+    const open = this.stash?.uid ?? '', same = open === this.scrolledFor;
+    this.scrolledFor = open;
+    const scrolled = [...(same ? [sk.vic] : []), sk.gear, sk.cargo, sk.scroll].map((e) => [e, e.scrollTop] as const);
     // A body is gone through at a glance: everything it wears that holds things (its pack, its vest, its jacket
     // and trousers) is shown open at once, each a grid of its own under its own name, where it took a right-click
     // and "Open" for each. In a crate the same is done for a bag that has something in it. Each is opened by
@@ -1671,6 +1679,10 @@ export class InventoryUI {
     this.fill(sk.foot, [sk.help]);
     for (const k of [...this.built.keys()]) if (k.startsWith('c:grid:') && !this.gridsNow.has(k.slice(7))) this.built.delete(k);
     for (const f of this.rescroll) f();
+    // (and again a frame on, should what came in under them have been short of its full height when this was drawn)
+    const back = () => scrolled.forEach(([e, top]) => e.scrollTop !== top && (e.scrollTop = top));
+    back();
+    requestAnimationFrame(back);
     this.marks();
     this.shares();
     for (const [k, v] of this.gridEls) if (!v.g.isConnected) this.gridEls.delete(k);
