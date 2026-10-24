@@ -428,7 +428,7 @@ export class HUD {
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     this.el.says = this.root.querySelector('.hud-says') as HTMLElement;
     // (the wheel on T: one radial menu, src/ui/radial.ts; a soft tick for each new wedge, a firmer one for the choice)
-    this.radial = new Radial({ rings: RINGS, per: WHEEL_RING, cancel: true, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
+    this.radial = new Radial({ rings: RINGS, per: WHEEL_RING, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
     this.root.insertBefore(this.radial.el, this.el.says.nextSibling);
     this.radial.set(wheelEntries(wheelSlots()));
     // (set again in Emotes: the wedges drawn afresh)
