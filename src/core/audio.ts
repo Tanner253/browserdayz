@@ -277,8 +277,9 @@ export function recordings(): Promise<void> {
 const lateAsked = new Map<string, Promise<void>>();
 /**
  * Fetches one recording, once, when it is first wanted and not with the rest: the rotor of the helicopter that
- * brings a supply drop (when one is first in the air) and the police car's siren (when one is first driven or heard).
- * Each is a quarter of a megabyte that most games never need.
+ * brings a supply drop (when one is first in the air), the police car's siren (when one is first driven or heard),
+ * an animal's call. Each is a quarter of a megabyte and more that most games never need. Every take of it there is
+ * (name, name_2, ...: scripts/sounds.mjs) comes with it.
  */
 function lateRecording(name: string): Promise<void> {
   let asked = lateAsked.get(name);
@@ -287,17 +288,27 @@ function lateRecording(name: string): Promise<void> {
       name,
       (asked = (async () => {
         const dec = new OfflineAudioContext(1, 1, 44100);
-        for (let go = 0; go < 3 && !bank.has(name); go++) {
-          try {
-            const res = await fetch(`assets/sounds/${name}.wav`);
-            if (!res.ok) throw new Error(String(res.status));
-            const buf = await dec.decodeAudioData(await res.arrayBuffer());
-            takeOf.set(buf, 0);
-            bank.set(name, [buf]);
-          } catch {
-            // not there, or a bad line: again in a while (and after the third time, it is silent)
-            await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
+        for (let k = 0; k < 8; k++) {
+          let gone = false;
+          for (let go = 0; go < 3; go++) {
+            try {
+              const res = await fetch(`assets/sounds/${name}${k ? `_${k + 1}` : ''}.wav`);
+              if (res.status === 404) {
+                gone = true;
+                break;
+              }
+              if (!res.ok) throw new Error(String(res.status));
+              const buf = await dec.decodeAudioData(await res.arrayBuffer());
+              takeOf.set(buf, k);
+              bank.set(name, [...(bank.get(name) ?? []), buf]);
+              break;
+            } catch {
+              // a bad line: again in a while (and after the third time, that take is silent)
+              await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
+            }
           }
+          // (no more takes of it)
+          if (gone) break;
         }
       })()),
     );
@@ -1322,20 +1333,20 @@ export class AudioEngine {
    */
   animalCall(name: string, pos: V3, distance: number, gain = 1, waited = false) {
     if (!this.ready) return;
-    const buf = bank.get(`animal_${name}`)?.[0];
-    if (!buf) {
-      // (the first is heard once it is here, if that is soon)
-      if (!waited) {
-        const asked = performance.now();
-        void lateRecording(`animal_${name}`).then(() => performance.now() - asked < 1500 && this.animalCall(name, pos, distance, gain, true));
-      }
-      return;
+    const rec = `animal_${name}`;
+    // (one of its takes, never the one heard last, each a little different)
+    if (this.rec(rec, this.out(pos, 10, 1, distance, this.bus.ambience), this.ctx.currentTime + distance / 343, gain, 1, false, true)) return;
+    // (the first is heard once it is here, if that is soon)
+    if (!waited) {
+      const asked = performance.now();
+      void lateRecording(rec).then(() => performance.now() - asked < 1500 && this.animalCall(name, pos, distance, gain, true));
     }
-    const src = this.ctx.createBufferSource(), level = this.ctx.createGain();
-    src.buffer = buf;
-    level.gain.value = gain;
-    src.connect(level).connect(this.out(pos, 10, 1, distance, this.bus.ambience));
-    src.start(this.ctx.currentTime + distance / 343);
+  }
+
+  /** throwing up (food poisoning: src/sim/sickness.ts): one of its recordings, at the ears; silent until it is here */
+  retch() {
+    if (!this.ready) return;
+    if (!this.rec('vomit', this.bus.voice, this.ctx.currentTime, 0.8, 1, false, true)) void lateRecording('vomit');
   }
 
   door(opening: boolean, pos: V3, distance = 0) {

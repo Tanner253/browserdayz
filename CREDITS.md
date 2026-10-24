@@ -209,6 +209,11 @@ What is not CC0 is listed first, with the credit its licence asks for.
 - This work is based on "Pumpkin Halloween Animation" (https://sketchfab.com/3d-models/pumpkin-halloween-animation-f488de12c2f740a1a835a01aeac20381) by fuckcomicsanss (https://sketchfab.com/lenumalism) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Only pictures of it are used, on the loading screen in October: drawn from two sides, from in front once dark and once with a light inside it (`scripts/halloween-sprites.mjs`), and kept as small WebP pictures; the model itself is not in the game.
 
+- "Red deer bugles and roars, Northern Scotland. Time compressed" (https://freesound.org/s/776204/) by Robert.Crosley (https://freesound.org/people/Robert.Crosley/) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Six of its roars cut out as the red deer stag's call, each filtered of rumble and hiss, faded in and out and brought to the game's loudness (`scripts/sounds.mjs`).
+- "wolf-growl.wav" (https://freesound.org/s/338674/) by newagesoup (https://freesound.org/people/newagesoup/) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Filtered of rumble and hiss, faded out and brought to the game's loudness, as a wolf's growl (`scripts/sounds.mjs`).
+
 ## Public domain (CC0)
 
 The player character is built by `npm run character`. Its skeleton and every movement it makes are
@@ -232,6 +237,7 @@ two packs in the public domain: [Impact Sounds](https://kenney.nl/assets/impact-
 The doors, a heavy blow and steel struck are out of the same two. A fist landing is
 [Punch](https://opengameart.org/content/punch) by qubodup (CC0), and the infected are the Zombies Sound Pack by
 artisticdude (CC0). The police car's siren is [Police Siren](https://freesound.org/s/746302/) by TitanKaempfer (CC0).
+The animals' sounds are recordings cut by the same `npm run sounds` (the two credited above aside): a bear, [R19-13-Bear Roaring](https://freesound.org/s/479825/) by craigsmith; hooves, [Horse Running](https://freesound.org/s/792860/) by ebenvie; wolves, [Wolf howl](https://freesound.org/s/398430/) by NaturesTemper and [Howling wolves](https://freesound.org/s/378334/) by Kingcornz, and a snarl out of [Dog Growling Snarling Grumbling](https://freesound.org/s/122183/) by qubodup; a cow, [Cow moos](https://freesound.org/s/177253/) by JosephSardin; and a sick player throwing up, [Vomit, puking spilling water onto grass](https://freesound.org/s/338116/) by SpliceSound (all CC0).
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).

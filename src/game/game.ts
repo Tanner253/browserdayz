@@ -944,6 +944,7 @@ export class Game {
     // (food poisoning: a bout of throwing up, which costs water and food: src/sim/sickness.ts)
     this.player.onBout = () => {
       this.hud.note('You throw up', 'warn');
+      audio.retch();
       this.weapons.flinch(0.7);
       this.meDirty = true;
     };

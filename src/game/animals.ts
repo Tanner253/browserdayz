@@ -42,12 +42,14 @@ const CLIPS: Record<number, string[]> = {
 /** the movements played once and held at their end, not looped */
 const ONCE = new Set(['death', 'swipe', 'bite', 'roar', 'hit']);
 /**
- * What is heard as a movement begins, by kind and movement, and how near it has to be, metres: a bear's roar as it
- * charges, its growl and bite, a wolf's snarl as it goes in; hooves when deer or cattle break into a run.
+ * What is heard as a movement begins, by kind and what it is doing (the first of its CLIPS), and how near it has to
+ * be, metres: a bear's roar as it charges, its growl and bite; a wolf's growl and snarl; hooves when deer break into a
+ * run. The recordings: scripts/sounds.mjs.
  */
 const SOUNDS: Record<string, Record<string, [name: string, reach: number]>> = {
   bear: { roar: ['bear_roar', 300], swipe: ['bear_growl', 90], bite: ['bear_bite', 90] },
-  wolf: { bite: ['wolf_snarl', 60] },
+  // (a wolf stood watching you from close growls; going in, it snarls)
+  wolf: { alert: ['wolf_growl', 40], bite: ['wolf_snarl', 60] },
   stag: { run: ['hooves', 60] },
   doe: { run: ['hooves', 60] },
 };
@@ -310,7 +312,7 @@ export class Beast implements Damageable {
       // (a blow begun where its paw or jaws are as far from landing as the wind-up is long: it lands with the damage)
       const move = this.kind.fight?.moves.find((m) => m.mode === this.mode), hit = this.strikes[name];
       if (move && hit !== undefined) act.time = Math.max(0, hit - move.windup);
-      const sound = SOUNDS[this.kind.id]?.[name], at = performance.now();
+      const sound = SOUNDS[this.kind.id]?.[CLIPS[this.mode]?.[0] ?? name], at = performance.now();
       if (sound && this.away < sound[1] && (sound[0] !== 'hooves' || at - hoovesAt > HOOVES)) {
         if (sound[0] === 'hooves') hoovesAt = at;
         this.host.heard(sound[0], this.root.position);
