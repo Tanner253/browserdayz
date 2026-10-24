@@ -59,7 +59,7 @@ export const huntMethods = {
       const p = this.player.pos, blade = BLADES[held ?? ''] ?? 0, done = this.wild.herd?.endSkin(m.i, ME, p.x, p.z, Date.now());
       if (!done || !blade) return;
       let k = 0;
-      for (const [id, qty] of yieldOf(done.kind, blade * (done.eaten ? 0.5 : 1))) {
+      for (const [id, qty] of yieldOf(done.kind, blade, done.eaten)) {
         const pieces = id.startsWith('meat_') ? qty : 1;
         for (let n = 0; n < pieces; n++) {
           const a = (k++ / 6) * Math.PI * 2, r = 0.5 + (k % 3) * 0.3;

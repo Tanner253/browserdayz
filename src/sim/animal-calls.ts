@@ -10,7 +10,7 @@ export function herdCall(h: Herd, g: Group, living: Beast[], now: number, phase:
   const id = HERDS[g.herd].id, [call, c] = (Object.entries(CALLS) as [Call, (typeof CALLS)['roar']][]).find(([, v]) => v.herd === id) ?? [];
   // (the first of each herd's comes at a random moment of its first wait: herds woken together do not call together)
   if (!g.callAt) return void (g.callAt = now + (c ? c.every[1] * h.rnd() : 600) * 1000);
-  const quiet = !c || !!g.flee || !!g.hunt || living.some((b) => b.foe) || !c.hours.some(([a, b]) => phase >= a && phase < b);
+  const quiet = !c || !!g.flee || !!g.hunt || !!g.meal || living.some((b) => b.foe) || !c.hours.some(([a, b]) => phase >= a && phase < b);
   const who = c && !quiet ? (call === 'roar' ? living.find((b) => KINDS[b.k].id === 'stag') : living[Math.floor(h.rnd() * living.length)]) : undefined;
   if (!who || !call || !c) return void (g.callAt = now + 30_000);
   turn.calls.push({ i: who.i, call, x: who.x, z: who.z });

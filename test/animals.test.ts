@@ -4,7 +4,8 @@
 //   npx tsx test/animals.test.ts
 
 import assert from 'node:assert/strict';
-import { ANIMALS, A_DEAD, A_REST, A_ROAR, BLADES, CALLS, HERDS, KIND, KINDS, SKIN, yieldOf, type Biome } from '../src/sim/animals';
+import { ANIMALS, A_ALERT, A_DEAD, A_GRAZE, A_REST, A_ROAR, BLADES, CALLS, HERDS, KIND, KINDS, SKIN, yieldOf, type Biome } from '../src/sim/animals';
+import { HUNGRY_MS } from '../src/sim/animal-fight';
 import { Herd, seeded, type Seen } from '../src/sim/animal-mind';
 import type { Ground } from '../src/sim/animal-ground';
 import { ENTITIES, entityBy } from '../src/net/orders';
@@ -270,6 +271,69 @@ ok('wolves circle and come in one at a time; when half the pack is down the rest
   assert.ok(Math.hypot(last.x - man.x, last.z - man.z) > was + 30, 'the last one ran');
 });
 
+ok('a fed pack lets a person pass and goes only for one who comes right up; a hungry one locks on with one howl and hunts', () => {
+  // (the owner, 2026-10-24: "start howling when theyre locked in on people like how dayz wolves hunt")
+  const h = herd(['wolf']);
+  const pack = h.place('wolf', 0, 0, 0, 4), g = h.groups[pack[0].g];
+  PH = 0.1;
+  const tick = (t0: number, secs: number, man: Seen) => {
+    const out = { strikes: 0, tells: 0 };
+    for (let t = 0; t <= secs * 1000; t += 200) {
+      const turn = h.tick(t0 + t, [man]);
+      out.strikes += turn.strikes.length;
+      out.tells += turn.calls.filter((c) => c.call === 'howl' && c.tell).length;
+    }
+    return out;
+  };
+  g.ateAt = 0;
+  const fed = tick(0, 20, person(1, 20, 0, { speed: 1.4 }));
+  assert.deepEqual(fed, { strikes: 0, tells: 0 }, 'fed: a man walking by at 20 m is let be');
+  const close = tick(20_000, 10, person(1, 5, 0));
+  assert.ok(close.strikes >= 1 && close.tells === 0, `fed, a man at 5 m is gone for (${close.strikes} bites), with no howl`);
+  for (const w of pack) w.calmUntil = 0;
+  g.hunt = null;
+  g.ateAt = 30_000 - HUNGRY_MS - 1;
+  const hungry = tick(30_000, 30, person(2, 25, 0, { speed: 1.4 }));
+  assert.equal(hungry.tells, 1, 'hungry: one howl as it locks on, and no more');
+  assert.ok(hungry.strikes >= 2, `${hungry.strikes} bites`);
+});
+
+ok('a hungry pack runs down one deer of a herd, eats it where it fell, sees off whoever comes near, and is fed', () => {
+  // (the owner, 2026-10-24: "wolf pack kills 1 deer then stops persuing the herd, eats the deer on ground")
+  const h = herd(['wolf', 'stag', 'doe']);
+  const deer = h.place('doe', 150, 200, 0, 5), pack = h.place('wolf', 150, 0, 0, 4), g = h.groups[pack[0].g];
+  // (a vanished admin keeps the pack awake as it goes, and is never noticed)
+  let man = person(9, 150, -40, { unseen: true });
+  let t = 0, killedAt = 0, body = deer[0];
+  for (; t < 150_000 && !killedAt; t += 200) {
+    man = person(9, pack[0].x, pack[0].z - 40, { unseen: true });
+    for (const i of h.tick(t, [man]).died) [killedAt, body] = [t, h.beasts.get(i)!];
+  }
+  assert.ok(killedAt, 'it pulled one down');
+  assert.equal(deer.filter((d) => d.diedAt).length, 1, 'one, and only one');
+  assert.ok(body.eaten && g.meal?.i === body.i);
+  const rest = deer.filter((d) => !d.diedAt), was = rest.map((d) => Math.hypot(d.x - body.x, d.z - body.z));
+  man = person(9, body.x, body.z - 60, { unseen: true });
+  for (const end = t + 30_000; t < end; t += 200) h.tick(t, [man]);
+  assert.ok(rest.every((d, n) => !d.diedAt && Math.hypot(d.x - body.x, d.z - body.z) >= was[n]), 'the rest run on, unharmed');
+  assert.ok(pack.every((w) => Math.hypot(w.x - body.x, w.z - body.z) < 2.6 && w.mode === A_GRAZE), 'the pack at the body, eating');
+  // somebody walks up: growled at, then gone for and seen off (no howl: it is not hunting him), and back to eating
+  man = person(9, body.x + 16, body.z);
+  let growled = false, tells = 0;
+  for (const end = t + 6000; t < end; t += 200) {
+    tells += h.tick(t, [man]).calls.filter((c) => c.tell).length;
+    growled ||= pack.some((w) => w.mode === A_ALERT);
+  }
+  assert.ok(growled && g.hunt?.guard && g.hunt.foe === 9 && tells === 0, 'growled at, then gone for');
+  man = person(9, body.x + 80, body.z);
+  for (const end = t + 15_000; t < end; t += 200) h.tick(t, [man]);
+  assert.ok(!g.hunt && g.meal, 'back at its kill');
+  for (const end = killedAt + ANIMALS.hunger.eat * 1000 + 2000; t < end; t += 200) h.tick(t, [man]);
+  assert.ok(!g.meal && t - g.ateAt < 3000, 'eaten, and fed');
+  // (and what is left of it gives less: some meat gone, the hide torn)
+  assert.deepEqual(Object.fromEntries(yieldOf(KIND.doe, 1, true)), { meat_venison: 2, animal_fat: 1, bones: 4 });
+});
+
 ok('gutting and skinning: a blade, six seconds at the body, and what it gives by the blade', () => {
   const h = herd(['stag', 'doe']);
   h.populate(0);
@@ -367,7 +431,8 @@ ok('calls are rare and kept to their hours: a stag roars at dusk and first light
   for (let n = 1; n < bk.length; n++) if (bk[n].g === bk[n - 1].g) assert.ok(bk[n].t - bk[n - 1].t >= CALLS.bark.every * 1000, 'a bark a minute at most');
   // a fright: the herd bolts with one bark, and not another within the minute
   const t0 = 2 * 3_600_000 + 1000, b = near(deer), sprinter = person(9, b.x + 20, b.z, { speed: 6 }), barks: number[] = [];
-  for (let t = 0; t <= 60_000; t += 200) for (const c of h.tick(t0 + t, [sprinter]).calls) if (c.call === 'bark') barks.push(t);
+  // (that herd's: a hungry pack about may be after another)
+  for (let t = 0; t <= 60_000; t += 200) for (const c of h.tick(t0 + t, [sprinter]).calls) if (c.call === 'bark' && h.beasts.get(c.i)?.g === deer.i) barks.push(t);
   assert.equal(barks.length, 1, `${barks.length} barks in a minute of fright`);
 });
 

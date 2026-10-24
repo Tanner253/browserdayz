@@ -430,8 +430,9 @@ export class Wildlife {
     for (const k of turn.calls) {
       const reach = k.call === 'bark' ? CALLS.bark.heard : CALLS[k.call].heard;
       if (!me || Math.hypot(me.x - k.x, me.z - k.z) > reach) continue;
-      if (k.call !== 'bark' && now - this.calledAt < CALLS.apart * 1000) continue;
-      if (k.call !== 'bark') this.calledAt = now;
+      const says = k.call === 'bark' || !!k.tell;
+      if (!says && now - this.calledAt < CALLS.apart * 1000) continue;
+      if (!says) this.calledAt = now;
       this.call(k.call, k.x, k.z);
     }
     const at = me ?? { x: 0, z: 0 };

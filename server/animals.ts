@@ -74,13 +74,14 @@ export function animalsTick(now: number) {
     send(target, { t: 'dmg', from: 0, amount: s.damage, zone: 'torso', w: kind.id, dir: [(target.pose[0] - s.from[0]) / len, 0, (target.pose[2] - s.from[1]) / len], bleed: s.bleed });
   }
   // what is heard of them: by whoever is within its carry, and nobody two of the herds' calls within CALLS.apart
-  // seconds (an alarm is not held back: it says something)
+  // seconds (an alarm, or a pack's howl as it locks on, is not held back: it says something)
   for (const k of turn.calls) {
     const reach = k.call === 'bark' ? CALLS.bark.heard : CALLS[k.call].heard;
     for (const c of clients.values()) {
       if (c.ws.readyState !== 1 || Math.hypot(c.pose[0] - k.x, c.pose[2] - k.z) > reach) continue;
-      if (k.call !== 'bark' && now - (heardAt.get(c.id) ?? 0) < CALLS.apart * 1000) continue;
-      if (k.call !== 'bark') heardAt.set(c.id, now);
+      const says = k.call === 'bark' || !!k.tell;
+      if (!says && now - (heardAt.get(c.id) ?? 0) < CALLS.apart * 1000) continue;
+      if (!says) heardAt.set(c.id, now);
       send(c, { t: 'acall', i: k.i, c: k.call, x: Math.round(k.x * 10) / 10, z: Math.round(k.z * 10) / 10 });
     }
   }
@@ -135,7 +136,7 @@ export function animalSkin(c: Client, m: Extract<C2S, { t: 'askin' }>) {
   if (!done) return;
   const y = world.standAt(done.x, c.pose[1] + 1, done.z);
   let k = 0;
-  for (const [id, qty] of yieldOf(done.kind, blade * (done.eaten ? 0.5 : 1))) {
+  for (const [id, qty] of yieldOf(done.kind, blade, done.eaten)) {
     // (meat a piece at a time, as DayZ's steaks are; the rest a pile each)
     const pieces = KIND[done.kind.id] && id.startsWith('meat_') ? qty : 1;
     for (let p = 0; p < pieces; p++) {

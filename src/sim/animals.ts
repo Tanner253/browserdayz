@@ -257,8 +257,17 @@ export const ANIMALS = {
   /** a wolf pack circles this far off whoever it hunts, and sends one in every so often */
   circle: [13, 19] as [number, number],
   dash: [2.2, 4] as [number, number],
-  /** a pack hunts deer at night as well, once a night at most */
+  /** a hungry pack hunts deer (see `hunger`) */
   huntsDeer: true,
+  /**
+   * A wolf pack's hunger (the owner, 2026-10-24: "wolves should get hungry and will hunt deer and chase them and will
+   * hunt people and start howling when theyre locked in on people like how dayz wolves hunt. wolf pack kills 1 deer
+   * then stops persuing the herd, eats the deer on ground"). Zone hours from a meal until it is hungry again (an hour
+   * is 80 s); seconds it eats a kill; how near a fed pack lets anybody come before it goes for them; how far a hungry
+   * one finds a herd from, and how near it trots before it runs at them; how near a person comes to a pack at its kill
+   * before it growls, how long it growls before it goes for them (or how near), and how far it drives them off.
+   */
+  hunger: { hours: 6, eat: 180, defend: 9, scent: 450, rush: 70, growl: 22, warn: 4, drive: 11, guard: 40 },
 };
 
 /**
@@ -281,13 +290,16 @@ export function smellReach(kind: Kind, ax: number, az: number, px: number, pz: n
  */
 export const BLADES: Record<string, number> = { knife: 1, machete: 0.85, hatchet: 0.75 };
 
-/** what a body gives to a blade: [item, how many] for each thing it gives at all */
-export function yieldOf(kind: Kind, blade: number): [string, number][] {
+/**
+ * what a body gives to a blade: [item, how many] for each thing it gives at all. One a wolf pack has eaten gives less
+ * (the owner's: "some meat gone, the hide torn"): a third of its meat, half its fat, and no hide.
+ */
+export function yieldOf(kind: Kind, blade: number, eaten = false): [string, number][] {
   const g = kind.gives, out: [string, number][] = [];
   const some = (n: number) => (n > 0 ? Math.max(1, Math.round(n * blade)) : 0);
-  if (some(g.n)) out.push([g.meat, some(g.n)]);
-  if (some(g.fat)) out.push(['animal_fat', some(g.fat)]);
-  if (g.hide) out.push([g.hide, 1]);
+  if (some(g.n)) out.push([g.meat, some(g.n * (eaten ? 1 / 3 : 1))]);
+  if (some(g.fat)) out.push(['animal_fat', some(g.fat * (eaten ? 0.5 : 1))]);
+  if (g.hide && !eaten) out.push([g.hide, 1]);
   if (some(g.bones)) out.push(['bones', some(g.bones)]);
   if (g.feathers) out.push(['feathers', some(g.feathers)]);
   return out;

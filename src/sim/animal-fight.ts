@@ -1,10 +1,11 @@
-// The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt,
-// of whoever comes too near (src/sim/animal-mind.ts calls these for its own). The owner: "the bear should be dangerous,
+// The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt of whoever comes too
+// near, and, hungry, of deer (src/sim/animal-mind.ts calls these for its own). The owner: "the bear should be dangerous,
 // needs a paw swipe animation and bite for attacking, and basic ai etc... player should be able to outrun it if breaks
 // line of sight and or isnt too close when the bear first engages".
 
 import { ANIMALS, A_ALERT, A_GRAZE, A_IDLE, A_ROAR, KINDS, smellReach, yawTo, type Kind } from './animals';
 import type { Beast, Group, Herd, Seen, Turn } from './animal-mind';
+import { DAY } from './daynight';
 
 const PI2 = Math.PI * 2;
 const turnTo = (a: number, b: number, max: number) => a + Math.max(-max, Math.min(max, Math.atan2(Math.sin(b - a), Math.cos(b - a))));
@@ -117,14 +118,20 @@ export function giveUp(b: Beast, now: number, calm: number) {
   b.aware = Math.min(b.aware, ANIMALS.alert * 0.8);
 }
 
+/** how long after a meal a pack is hungry again, milliseconds (ANIMALS.hunger.hours of the Zone's day) */
+export const HUNGRY_MS = ANIMALS.hunger.hours * (DAY.length / 24) * 1000;
+
 /**
- * A wolf, in its pack. The pack hunts whoever comes inside its reach (further in the dark): it circles them a dozen
- * and more metres off and sends one in at a time to bite and break away (so it can be fought, and is not a swarm),
- * until half the pack is down, the quarry is under a roof or in a car, or it loses them. At night, with nobody to
- * hunt, it runs down a deer now and then, and stands over the kill.
+ * A wolf, in its pack (the owner, 2026-10-24, of DayZ's wolves: they get hungry, hunt deer and people, howl once
+ * they are locked on, and a pack that kills one deer stops and eats it). Fed, it lies up and goes only for whoever
+ * comes right up to it. Hungry, it hunts whoever comes inside its reach (further in the dark), howling as it locks
+ * on: it circles them a dozen and more metres off and sends one in at a time to bite and break away (so it can be
+ * fought, and is not a swarm), until half the pack is down, the quarry is under a roof or in a car, or it loses them.
+ * With nobody about, a hungry pack goes for the nearest deer herd, runs at it, singles one out and pulls it down;
+ * then the whole pack eats it where it fell, growls at whoever comes near, and drives them off.
  */
 export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, people: Seen[], turn: Turn, from: Seen | null, phase: number): boolean {
-  const f = k.fight!, wolves = g.members.map((i) => h.beasts.get(i)!);
+  const f = k.fight!, H = ANIMALS.hunger, wolves = g.members.map((i) => h.beasts.get(i)!);
   const alive = wolves.filter((w) => !w.diedAt);
   if (alive.length * 2 < wolves.length || b.hp < k.hp * f.breakAt) {
     // (the pack breaks: everybody runs, from whoever broke it)
@@ -134,29 +141,42 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
       b.fearZ = q.z;
     }
     g.hunt = null;
+    g.meal = null;
     b.aware = 1;
     if (!g.flee) g.flee = { x: b.fearX, z: b.fearZ, until: now + (k.flee / k.run + 2) * 1000 };
     return false;
   }
+  const hungry = now - g.ateAt > HUNGRY_MS;
+  if (g.meal && !g.hunt) return eat(h, b, g, k, now, dt, people);
   if (!g.hunt) {
     const night = isNight(phase);
     const hurt = b.hurtBy && now - b.hurtAt < 10_000 ? people.find((q) => q.id === b.hurtBy) : undefined;
-    const q = hurt ?? (from && b.aware >= ANIMALS.alert && Math.hypot(from.x - b.x, from.z - b.z) < f.engage[night ? 1 : 0] ? from : undefined);
+    const reach = hungry ? f.engage[night ? 1 : 0] : H.defend;
+    const q = hurt ?? (from && b.aware >= ANIMALS.alert && Math.hypot(from.x - b.x, from.z - b.z) < reach ? from : undefined);
     if (q && !q.ride && !q.sheltered && now > b.calmUntil) {
       g.hunt = { foe: q.id, since: now, x: b.x, z: b.z };
       g.nextDash = now + 2500;
-    } else if (night && ANIMALS.huntsDeer && g.huntedDay !== Math.floor(now / 1920_000)) {
-      const deer = [...h.beasts.values()].find((o) => !o.diedAt && (KINDS[o.k].id === 'doe' || KINDS[o.k].id === 'stag') && Math.hypot(o.x - b.x, o.z - b.z) < 90);
+      // (DayZ's tell: the pack howls as it locks on, once, and then it comes. A fed pack seen off is not hunting.)
+      if (hungry) turn.calls.push({ i: b.i, call: 'howl', x: b.x, z: b.z, tell: true });
+    } else if (hungry && ANIMALS.huntsDeer && now > b.calmUntil) {
+      let deer: Beast | undefined, best: number = H.scent;
+      for (const o of h.beasts.values()) {
+        const d = Math.hypot(o.x - b.x, o.z - b.z);
+        if (!o.diedAt && d < best && (KINDS[o.k].id === 'doe' || KINDS[o.k].id === 'stag')) [deer, best] = [o, d];
+      }
       if (deer) g.hunt = { foe: -deer.i, since: now, x: b.x, z: b.z };
     }
   }
   if (!g.hunt) return false;
-  if (g.hunt.foe < 0) return chaseDeer(h, b, g, k, now, dt, turn);
+  if (g.hunt.foe < 0) return chaseDeer(h, b, g, k, now, dt, turn, alive);
   const foe = people.find((q) => q.id === g.hunt!.foe);
-  const lost = !foe || foe.ride || Math.hypot(b.x - g.hunt.x, b.z - g.hunt.z) > f.leash || now - g.hunt.since > 150_000;
+  // (seen off its kill: as far as it drives them, and back to it)
+  const off = g.hunt.guard && g.meal && foe ? Math.hypot(foe.x - g.meal.x, foe.z - g.meal.z) > H.guard : false;
+  const lost = !foe || foe.ride || off || Math.hypot(b.x - g.hunt.x, b.z - g.hunt.z) > f.leash || now - g.hunt.since > 150_000;
   if (lost || (foe!.sheltered && now - b.sensedAt > 12_000)) {
     g.hunt = null;
-    for (const w of alive) giveUp(w, now, 30_000);
+    g.warnAt = 0;
+    for (const w of alive) giveUp(w, now, off ? 0 : 30_000);
     return false;
   }
   const q = foe!, d = Math.hypot(q.x - b.x, q.z - b.z);
@@ -188,34 +208,92 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
   return true;
 }
 
-export function chaseDeer(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, turn: Turn): boolean {
-  const deer = h.beasts.get(-g.hunt!.foe);
-  if (!deer || now - g.hunt!.since > 60_000) {
+/**
+ * A hungry pack after a deer herd: it trots up on the herd, runs at it from `rush` off, and the herd bolts; the deer
+ * nearest the pack as it runs is the one it means to have, and the rest it lets go. The deer tires before a wolf does
+ * (ANIMALS: its wind against theirs); one that gets clean away is let go, and the pack, hungry still, tries again.
+ */
+export function chaseDeer(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, turn: Turn, alive: Beast[]): boolean {
+  const H = ANIMALS.hunger, hunt = g.hunt!;
+  let deer = h.beasts.get(-hunt.foe);
+  if (!deer || deer.diedAt || now - hunt.since > 120_000) {
     g.hunt = null;
-    g.huntedDay = Math.floor(now / 1920_000);
+    for (const w of alive) w.calmUntil = now + 60_000;
     return false;
   }
-  if (deer.diedAt) {
-    // standing over the kill
-    if (Math.hypot(deer.x - b.x, deer.z - b.z) > 3) h.go(b, k, deer.x, deer.z, k.trot, dt);
-    else {
-      b.speed = 0;
-      b.mode = A_GRAZE;
+  if (!hunt.rush) {
+    // up on them at a trot, together; from near enough, at them, and the one to have is the nearest
+    if (Math.hypot(deer.x - b.x, deer.z - b.z) > H.rush) {
+      h.go(b, k, deer.x, deer.z, k.trot, dt, 3);
+      return true;
     }
-    if (now - deer.diedAt > 90_000) {
-      g.hunt = null;
-      g.huntedDay = Math.floor(now / 1920_000);
+    hunt.rush = true;
+    hunt.since = now;
+    let best = Infinity;
+    for (const o of h.beasts.values()) {
+      const d = Math.hypot(o.x - b.x, o.z - b.z);
+      if (!o.diedAt && o.g === deer.g && d < best) [deer, best] = [o, d];
     }
-    return true;
+    hunt.foe = -deer.i;
   }
   deer.aware = 1;
   deer.fearX = b.x;
   deer.fearZ = b.z;
-  h.go(b, k, deer.x, deer.z, k.run, dt);
+  h.go(b, k, deer.x, deer.z, k.run, dt, 0.5);
   if (Math.hypot(deer.x - b.x, deer.z - b.z) < 1.8) {
+    // down: the pack stops where it is, and the herd runs on without it
     h.die(deer, now, b);
     deer.eaten = true;
     turn.died.push(deer.i);
+    g.hunt = null;
+    g.meal = { i: deer.i, x: deer.x, z: deer.z, since: now };
+  }
+  return true;
+}
+
+/**
+ * The pack at its kill: each at its own place round it, eating, for ANIMALS.hunger.eat seconds, and then fed. Whoever
+ * comes near is growled at; whoever stays, or comes close, is gone for and driven off it.
+ */
+function eat(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, people: Seen[]): boolean {
+  const H = ANIMALS.hunger, meal = g.meal!, body = h.beasts.get(meal.i);
+  const done = now - meal.since > H.eat * 1000;
+  if (done || !body || body.skinner) {
+    // (fed as much as it ate)
+    g.ateAt = now - HUNGRY_MS * (1 - Math.min(1, (now - meal.since) / (H.eat * 1000)));
+    g.meal = null;
+    g.warnAt = 0;
+    g.spot = 'rest';
+    g.nextSpot = now + 240_000;
+    return false;
+  }
+  let near: Seen | undefined, nd: number = H.growl;
+  for (const q of people) {
+    const d = Math.hypot(q.x - meal.x, q.z - meal.z);
+    if (!q.ride && d < nd) [near, nd] = [q, d];
+  }
+  if (!near) g.warnAt = 0;
+  else if (!g.warnAt) g.warnAt = now;
+  if (near && (nd < H.drive || now - g.warnAt > H.warn * 1000) && !near.sheltered) {
+    g.hunt = { foe: near.id, since: now, x: meal.x, z: meal.z, guard: true };
+    g.nextDash = now;
+    return true;
+  }
+  // its own place round the body, facing it
+  const n = g.members.indexOf(b.i), a = (n / Math.max(1, g.members.length)) * PI2 + 0.4;
+  const tx = meal.x + Math.cos(a) * 1.5, tz = meal.z + Math.sin(a) * 1.5;
+  if (Math.hypot(tx - b.x, tz - b.z) > 0.6) {
+    h.go(b, k, tx, tz, k.trot, dt, 0.4);
+    return true;
+  }
+  b.speed = 0;
+  if (near) {
+    // (head up at them, growling)
+    b.yaw = turnTo(b.yaw, yawTo(near.x - b.x, near.z - b.z), 3 * dt);
+    b.mode = A_ALERT;
+  } else {
+    b.yaw = turnTo(b.yaw, yawTo(meal.x - b.x, meal.z - b.z), 3 * dt);
+    b.mode = A_GRAZE;
   }
   return true;
 }

@@ -15,7 +15,7 @@
 import { ANIMALS, A_ALERT, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_RUN, A_TROT, A_WALK, HERDS, KINDS, ROW_BLEEDS, SKIN, fwd, smellReach, yawTo, type AnimalRow, type Call, type HerdKind, type Kind, type Move } from './animals';
 import type { Ground } from './animal-ground';
 import { heardShare } from './heard';
-import { fighter, pack } from './animal-fight';
+import { HUNGRY_MS, fighter, pack } from './animal-fight';
 import { alarm, herdCall } from './animal-calls';
 import { apart, crowd, fit, groundFor, homesFor, onCountry, room, slotFor } from './animal-places';
 
@@ -129,20 +129,25 @@ export interface Group {
   flee: { x: number; z: number; until: number } | null;
   /** members owed it: which kind, from when */
   owed: { k: number; at: number }[];
-  /** a pack's hunt: whom (a person's number; or minus an animal's), since when */
-  hunt: { foe: number; since: number; x: number; z: number } | null;
+  /**
+   * a pack's hunt: whom (a person's number; or minus an animal's), since when, from where; whether it has run at them
+   * yet (deer), and whether it is only driving them off its kill
+   */
+  hunt: { foe: number; since: number; x: number; z: number; rush?: boolean; guard?: boolean } | null;
   nextDash: number;
   dasher: number;
-  /** the day number of its last hunt of deer */
-  huntedDay: number;
+  /** a pack's hunger: when it last ate; the kill it is eating (which body, where, since when); since when it has growled at somebody near it */
+  ateAt: number;
+  meal: { i: number; x: number; z: number; since: number } | null;
+  warnAt: number;
 }
 
 export interface Turn {
   strikes: Strike[];
   /** those that died this turn of their own (bled out, killed by wolves) */
   died: number[];
-  /** what was heard of them (src/sim/animal-calls.ts) */
-  calls: { i: number; call: Call; x: number; z: number }[];
+  /** what was heard of them (src/sim/animal-calls.ts); `tell`: a pack's howl as it locks on, heard however lately another call was */
+  calls: { i: number; call: Call; x: number; z: number; tell?: boolean }[];
 }
 
 const PI2 = Math.PI * 2;
@@ -199,7 +204,9 @@ export class Herd {
         });
         const g: Group = {
           i: this.groups.length, herd: hi, home, mid: { ...home }, at: { ...home }, spot: 'rest', nextSpot: 0, feeding: false, drank: false,
-          members: [], wants, awake: false, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1, callAt: 0, barkAt: 0,
+          members: [], wants, awake: false, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, callAt: 0, barkAt: 0,
+          // (packs not all hungry at once)
+          ateAt: now - this.rnd() * 1.3 * HUNGRY_MS, meal: null, warnAt: 0,
         };
         this.groups.push(g);
         this.plan(g, now);
@@ -293,7 +300,9 @@ export class Herd {
     if (n > 1 && HERDS[hi].of.every(([, , most]) => most <= 1)) return Array.from({ length: n }, (_, c) => this.place(kindId, x + (c - (n - 1) / 2) * 8, z, now, 1)).flat();
     const g: Group = {
       i: this.groups.length, herd: hi, home: { x, z }, mid: { x, z }, at: { x, z }, spot: 'feed', nextSpot: now + 120_000, feeding: true, drank: true,
-      members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1, callAt: 0, barkAt: 0,
+      members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, callAt: 0, barkAt: 0,
+      // (one stood by an admin is hungry: it is there to be seen hunting)
+      ateAt: now - HUNGRY_MS, meal: null, warnAt: 0,
     };
     this.groups.push(g);
     const others = HERDS[hi].of.map(([id]) => KINDS.findIndex((kk) => kk.id === id)).filter((o) => o !== k);
@@ -342,7 +351,8 @@ export class Herd {
       }
       // awake while anybody is near the herd
       const lead = living[0];
-      const near = lead ? people.some((q) => Math.hypot(q.x - lead.x, q.z - lead.z) < ANIMALS.wake) : false;
+      // (or while a pack is after it: hunted far from anybody, it would stand and be taken)
+      const near = lead ? people.some((q) => Math.hypot(q.x - lead.x, q.z - lead.z) < ANIMALS.wake) || this.groups.some((o) => o.hunt && o.hunt.foe < 0 && this.beasts.get(-o.hunt.foe)?.g === g.i) : false;
       if (near && !g.awake) this.wake(g, now, people);
       g.awake = near;
       if (!near) {
