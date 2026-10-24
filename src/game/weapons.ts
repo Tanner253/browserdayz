@@ -9,9 +9,9 @@ import { CRACK, audio, type Voice } from '../core/audio';
 import { heardShare, shotHeard } from '../sim/heard';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf, canOf } from '../sim/items';
+import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, quietOf, canOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
-import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
+import { type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Player } from './player';
 import type { Effects } from './effects';
@@ -2830,15 +2830,10 @@ export class Weapons {
     this.action = { name, t: 0, dur, done, data };
   }
 
-  /** What the body's own place holds is taken into the hands (null: the hands are emptied). */
-  equip(slot: Slot | null) {
-    this.take(slot ? this.inv.slots[slot] : null);
-  }
-
   /**
-   * Something carried is taken into the hands: off the back, out of the holster, or out of a pocket (null: the
-   * hands are emptied). A gun or a thing to hit with is this code's to draw and work; anything else is held by
-   * the game (see `ready` in game.ts), and here the hands are simply made free for it.
+   * What is in the hands is drawn: a gun or a thing to hit with put up (null, or anything else: the hands made free
+   * for it, which the game holds: see `ready` in game.ts). Only drawing: what the hands hold is the inventory's
+   * (`PlayerInventory.hold`), moved there by the game first (`Game.takeUp`, `Game.emptyHands`).
    */
   take(item: ItemInstance | null) {
     // (Asked for while another is still coming up, it waits for that: changed at once, the one half drawn was
@@ -2851,15 +2846,12 @@ export class Weapons {
     if (this.action) return;
     const armed = (it: ItemInstance | null) => (it && (ITEMS[it.id].weapon || ITEMS[it.id].melee) ? it : null);
     const next = armed(item);
-    if (next === this.currentItem) {
-      // (the same gun, or still nothing that is this code's: only what the inventory says is held changes)
-      this.inv.hold(item);
-      return;
-    }
+    if (next === this.currentItem) return;
+    this.going = next;
     const swap = () => {
       if (this.current) this.vmRoot.remove(this.current.root);
       this.currentItem = next;
-      this.inv.hold(item);
+      this.going = undefined;
       this.current = next ? this.models.get(next.id) ?? null : null;
       if (this.current) {
         wearFinish(this.current.root, next!.id, finishOn(next));
@@ -2880,11 +2872,15 @@ export class Weapons {
     else swap();
   }
 
+  /** what `take` is putting up, while the one before goes down (undefined: nothing on its way) */
+  private going: ItemInstance | null | undefined = undefined;
+
   /** inventory changed under us (item dropped / moved) */
   validate() {
     const held = this.inv.held();
     const item = held && (ITEMS[held.id].weapon || ITEMS[held.id].melee) ? held : null;
-    if (item !== this.currentItem) {
+    // (the one on its way up is left to come up as it is: drawn at once, it would cut the change short)
+    if (item !== this.currentItem && !(this.action && (item === this.going || item === this.wanted))) {
       if (this.current) this.vmRoot.remove(this.current.root);
       this.current = item ? this.models.get(item.id) ?? null : null;
       this.currentItem = item;
@@ -2901,20 +2897,22 @@ export class Weapons {
   /** what was last slung on the back, as a word (see `validate`) */
   private slungKey = '';
 
-  /** mouse wheel: next / previous occupied slot (wraps through empty hands) */
   /** the wheel's turn when nothing else takes it, the game's to say (the hot bar: Game.wheelStep); false, and the slots are gone through in turn */
   step: ((dir: 1 | -1) => boolean) | null = null;
+  /** what the game does to take a thing into the hands, or empty them (null): Game.takeUp, Game.emptyHands */
+  want: ((item: ItemInstance | null) => void) | null = null;
 
+  /**
+   * Mouse wheel: the next or last of the back and the holster in turn, and empty hands between the ends
+   * (`PlayerInventory.ring`); passed over, any the hands cannot change to for want of room for what is in them.
+   */
   cycle(dir: 1 | -1) {
     if (this.action && this.action.name !== 'equip') return;
-    const order: (Slot | null)[] = [...SLOT_ORDER, null];
-    const cur = order.indexOf(this.inv.active);
-    for (let k = 1; k <= order.length; k++) {
-      const s = order[(cur + dir * k + order.length * 2) % order.length];
-      if (s === null || this.inv.slots[s]) {
-        this.equip(s);
-        return;
-      }
+    const order: (ItemInstance | null)[] = [...this.inv.ring(), null], n = order.length, at = order.indexOf(this.currentItem);
+    for (let k = 1; k < n; k++) {
+      const next = order[(((at + dir * k) % n) + n) % n];
+      if (next === this.currentItem) return;
+      if (this.inv.hold(next, true)) return void this.want?.(next);
     }
   }
 
@@ -3020,7 +3018,7 @@ export class Weapons {
 
     if (enabled && !this.player.dead) {
       // (which thing each number key brings up is the game's to say: the keys are bound to things, see game.ts)
-      if (input.pressed('KeyX')) this.take(null);
+      if (input.pressed('KeyX') && this.currentItem) this.want?.(null);
       // (the wheel breaks off a reload before it does anything else)
       if (input.wheel !== 0 && this.abortReload()) input.wheel = 0;
       // (a scope that turns, looked through: the wheel turns it, a time a notch, up to bring it nearer)

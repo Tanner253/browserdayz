@@ -84,7 +84,7 @@ export function refusedNow(c: Client): Set<string> {
 
 const hasTag = (it: ItemInstance): boolean => it.id === 'dogtag' || (it.cargo ?? []).some((p) => hasTag(p.item));
 const madeUp = (c: Client, it: ItemInstance, where: string) =>
-  CHECKS !== 'off' && [...things({ slots: { it }, active: null, containers: [] })].some(invented) && flag(c, `put ${ITEMS[it.id].name} in ${where}, which the server never put in the world`);
+  CHECKS !== 'off' && [...things({ slots: { it }, containers: [] })].some(invented) && flag(c, `put ${ITEMS[it.id].name} in ${where}, which the server never put in the world`);
 const clean = (raw: unknown) => cleanItem(raw);
 
 /** These moves done to a crate, a body, a stash, a drop or a piece of furniture, as it is now; everybody with it open told. */

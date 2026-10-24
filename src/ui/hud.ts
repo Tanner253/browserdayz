@@ -12,10 +12,11 @@ import type { KeyHints } from '../game/key-hints';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
-import { GROUPS, type Group, type Mix } from '../core/audio';
+import { GROUPS, audio, type Group, type Mix } from '../core/audio';
 import { TOUCH } from '../core/device';
-import { EMOTE } from '../sim/emotes';
-import { onWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
+import { EMOTE, WHEEL_RING } from '../sim/emotes';
+import { RINGS, onWheelSlots, wheelEntries, wheelSlots } from './wheel-slots';
+import { Radial } from './radial';
 import { TIERS, type Tier } from '../sim/tiers';
 import { ITEMS, TAG_FRESH, TAG_HOLD_MIN, ZONA_VOID } from '../sim/items';
 import { kindIcon } from './kind-icons';
@@ -245,7 +246,6 @@ export class HUD {
       <div class="hud-side"><div class="hud-acts"></div><div class="hud-keys"></div><div class="hud-stance"></div></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
-      <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><svg class="hud-ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="ring-track" cx="24" cy="24" r="20"/><circle class="ring-fill" cx="24" cy="24" r="20" pathLength="100"/></svg></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
@@ -426,9 +426,16 @@ export class HUD {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
-    for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
+    this.el.says = this.root.querySelector('.hud-says') as HTMLElement;
+    // (the wheel on T: one radial menu, src/ui/radial.ts; a soft tick for each new wedge, a firmer one for the choice)
+    this.radial = new Radial({ rings: RINGS, per: WHEEL_RING, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
+    this.root.insertBefore(this.radial.el, this.el.says.nextSibling);
+    this.radial.set(wheelEntries(wheelSlots()));
     // (set again in Emotes: the wedges drawn afresh)
-    onWheelSlots((ids) => this.el.wheel.querySelector('svg')?.replaceWith(document.createRange().createContextualFragment(wheelSvg(ids))));
+    onWheelSlots((ids) => {
+      this.radial.set(wheelEntries(ids));
+      this.wheelHeld = undefined;
+    });
     this.status = new StatusView(this.el.vitals);
     this.keys = new KeysView(this.el.keys, mouseSvg);
     this.buildCompass();
@@ -735,23 +742,23 @@ export class HUD {
    * @param held the id of the thing the body is keeping up now (picking it again stops it)
    * @param last what a tap of T on its own repeats
    */
-  wheel(open: boolean, pick = -1, at: [number, number] = [0, 0], held: string | null = null, last = '') {
-    const w = this.el.wheel;
-    this.toggle(w, 'show', open);
-    if (!open) return;
+  wheel(open: boolean, pick = -1, at: [number, number] = [0, 0], held: string | null = null, last = '', chosen = false) {
+    const r = this.radial;
+    if (!open) return r.close(chosen ? pick : -1);
     const slots = wheelSlots();
-    w.querySelectorAll('g').forEach((g, i) => {
-      this.toggle(g as unknown as HTMLElement, 'on', i === pick);
-      this.toggle(g as unknown as HTMLElement, 'held', slots[i] === held);
-    });
-    const dot = this.el.wheelDot.style;
-    dot.setProperty('--x', at[0].toFixed(3));
-    dot.setProperty('--y', at[1].toFixed(3));
+    r.open();
+    if (held !== this.wheelHeld) {
+      this.wheelHeld = held;
+      slots.forEach((id, i) => r.mark(i, id === held ? 'held' : EMOTE[id]?.hold ? 'keeps' : null));
+    }
+    r.point(pick, at);
     const e = pick >= 0 ? EMOTE[slots[pick]] : null;
     // (in the middle with nothing picked: a click opens Emotes, where the wheel is set; the owner: "just put the 'click to edit' in the center of the radial wheel")
-    this.set('wheelB', this.el.wheelB, e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit');
-    this.set('wheelS', this.el.wheelS, e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
+    r.hub(e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit', e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
   }
+  /** the wheel on T (`wheel`), and the emote it last showed as kept up (undefined: none shown yet) */
+  private radial!: Radial;
+  private wheelHeld: string | null | undefined = undefined;
 
   private says = new Map<number, HTMLElement>();
   /**

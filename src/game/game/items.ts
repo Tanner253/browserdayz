@@ -150,7 +150,6 @@ export const itemsMethods = {
       item.qty--;
       return;
     }
-    if (this.loose === item) this.loose = null;
     this.inv.remove(item);
     from?.remove(item);
   },
@@ -168,56 +167,30 @@ export const itemsMethods = {
       this.inventoryChanged();
       return this.useItem(item);
     }
-    this.loose = item;
-    if (how === 'use') this.useItem(item);
-    else this.openBox(item);
-    if (!this.use && !this.ready) this.settle();
-  },
-
-  /** what was in the hands off the ground and is not used up: put away, or put down (a dead hand lets it fall) */
-  settle(this: Game) {
-    const item = this.loose;
-    this.loose = null;
-    if (!item) return;
-    const left = this.player.dead ? item : this.inv.add(item);
-    if (left) this.dropItem(left);
+    // (in the hands while it is used, as in DayZ, and kept there if anything is left of it; with no room to put away
+    // what the hands held, it goes back where it lay)
+    if (!this.inv.hold(item)) {
+      this.dropItem(item);
+      return void this.hud.note(this.handsFull(), 'warn');
+    }
+    this.showHands(true);
     this.inventoryChanged();
+    if (how === 'use') this.useItem(item, true);
+    else this.openBox(item);
+    if (this.use) this.ready = null;
   },
 
-  /** Is this thing the survivor's: carried somewhere on them, or held in the hands and carried nowhere? */
+  /** Is this thing the survivor's: carried somewhere on them, the hands among it? */
   mine(this: Game, item: ItemInstance) {
-    return this.loose === item || !!this.inv.find((i) => i === item);
+    return !!this.inv.find((i) => i === item);
   },
 
-  /**
-   * The inventory screen takes a thing held loose out of the hands, to put it where it was let go (a pocket that
-   * has room now, a crate, the ground): the hands are emptied and the thing is the screen's to place.
-   */
-  release(this: Game, item: ItemInstance) {
-    if (this.loose !== item) return;
-    if (this.use) {
-      this.use = null;
-      this.act('stop');
-    }
-    // (a grenade whose pin the hands were still at: they stop. One whose pin is out is no longer a thing to be placed.)
-    if (this.cook?.item === item) {
-      this.cook = null;
-      this.act('stop');
-    }
-    this.loose = null;
-    this.ready = null;
-    this.inHand = null;
-    this.holding = false;
-    this.weapons.endUse();
-    this.inv.hold(null);
-    this.weapons.validate();
-  },
-
+  /** A thing that is not a weapon, held out: put away (`emptyHands`); only no longer drawn, if it has left the hands already or the hands are dead. */
   putAway(this: Game) {
     if (!this.ready && !this.inHand) return;
+    if (this.inv.held() === this.inHand && !this.player.dead) return void this.emptyHands();
     this.stow();
-    this.inv.hold(null);
-    this.weapons.validate();
+    this.showHands();
   },
 
   /**
@@ -235,10 +208,7 @@ export const itemsMethods = {
       if (!this.player.dead && !this.holding) this.hud.note('Cancelled', 'info');
       // (a thing that was in the hands to begin with stays in them: only what the hands were doing with it stops)
       if (this.inHand) this.rest();
-      else {
-        this.weapons.endUse();
-        this.settle();
-      }
+      else this.weapons.endUse();
       return true;
     }
     if (this.ready) {
@@ -268,12 +238,15 @@ export const itemsMethods = {
     }
     const from = this.openStash?.container.has(item) ? this.openStash.container : null;
     if (from) {
-      // take it out of the crate first, so the crate can be closed while we eat
+      // (into the hands and out of the crate, so the crate can be shut while it is used: what is left of it afterwards
+      // stays in them, as in DayZ)
+      if (!def.look && !def.call) {
+        if (!this.inv.hold(item)) return void this.hud.note(this.handsFull(), 'warn');
+        this.showHands();
+        this.ready = null;
+      }
       from.remove(item);
       this.syncOpenBox();
-      // (It is in the hands and nowhere else until it is used up: broken off, it goes into the pockets, as a
-      // thing used off the ground does. It was lost: out of the crate, and never put anywhere again.)
-      if (!def.look && !def.call) this.loose = item;
     }
     // (what is used from the hand is taken into it first, and used by the button: see takeUp and handFire)
     if (u.hold && !now) {
@@ -302,7 +275,7 @@ export const itemsMethods = {
       }
       if (item.id === 'firewood') {
         if (this.burnWood()) this.consume(item, null);
-        else if (from) this.inv.add(item);
+        else if (from && !this.mine(item)) this.inv.add(item);
         this.inventoryChanged();
         return;
       }
@@ -394,10 +367,7 @@ export const itemsMethods = {
         if (stop && !p.dead) this.hud.note('Cancelled', 'info');
         // (a thing that was in the hands to begin with stays in them: only what the hands were doing with it stops)
         if (this.inHand) this.rest();
-        else {
-          this.weapons.endUse();
-          this.settle();
-        }
+        else this.weapons.endUse();
         return;
       }
       if (c.t < kind.pull) return;
@@ -458,10 +428,7 @@ export const itemsMethods = {
   emptyOfGrenade(this: Game) {
     this.cook = null;
     if (this.inHand) this.rest();
-    else {
-      this.weapons.endUse();
-      this.settle();
-    }
+    else this.weapons.endUse();
   },
 
   /** Where the gun is pointing, as pixels off the middle of the screen (see Weapons.lag). */
@@ -546,15 +513,18 @@ export const itemsMethods = {
       this.toggleEmotes(true);
       return;
     }
+    // (let go on a wedge: chosen, and the wheel shows it as it goes)
+    let chose = false;
     if (!ok || !input.held('KeyT')) {
       this.wheelOn = false;
       // (a tap, the mouse left alone, is the last call again)
       if (ok) {
-        if (pick >= 0) this.emote(slots[pick]);
+        chose = pick >= 0;
+        if (chose) this.emote(slots[pick]);
         else if (now - this.wheelSince < 220) this.emote(this.lastCall);
       }
     }
-    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.danced ?? this.hold, EMOTE[this.lastCall]?.say ?? '');
+    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.danced ?? this.hold, EMOTE[this.lastCall]?.say ?? '', chose);
   },
 
   /** The words people near have called out, over their heads: for whoever is close and can see them. */
@@ -719,7 +689,6 @@ export const itemsMethods = {
     }
     audio.ui('unbox');
     this.startUse(`Unwrapping the ${def.name.toLowerCase()}`, o.time, item.id, 'unbox', null, () => {
-      if (this.loose === item) this.loose = null;
       this.inv.remove(item);
       const left = this.inv.add(makeItem(o.gives, o.qty));
       if (left) this.dropItem(left);

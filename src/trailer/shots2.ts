@@ -773,7 +773,8 @@ export function buildShots(S: Stage): Shot[] {
         const p = g.player;
         p.yaw = yawTo(p.pos.x, p.pos.z, blast.x, blast.z);
         p.pitch = -0.05;
-        g.inv.active = 'primary';
+        g.inv.putAway();
+        g.inv.hold(g.inv.slots.primary);
         g.weapons.validate();
       },
       tick: (_t, _S, dt) => scrum(dt),

@@ -81,12 +81,11 @@ export interface InvActions {
   /** the hot key this thing is on (0-9), or -1 */
   hotIndex(item: ItemInstance): number;
   /**
-   * take a thing into the hands: what is then done with it is done with the left button, out of this screen
-   * @param loose it is carried nowhere (just taken off the ground or out of a crate, with no room for it): held, and nothing else
+   * take a thing into the hands, out of where it was (what was in them put away): what is then done with it is done with the left button, out of this screen
+   * @param loose it comes from outside (just taken off the ground or out of a crate): if the hands cannot take it, it is put away or down
+   * @returns whether it is in the hands (false: no room to put away what was in them, and the player is told so)
    */
-  hold(item: ItemInstance, loose?: boolean): void;
-  /** a thing held loose is let go of by the hands, to be put where it was dragged to */
-  release(item: ItemInstance): void;
+  hold(item: ItemInstance, loose?: boolean): boolean;
   /** what is in the hands */
   inHands(): ItemInstance | null;
   /** the magazine on its way into this gun (the gun being taken up for it, or the hands at it), or null */
@@ -109,8 +108,8 @@ type Source =
   | { kind: 'container'; c: Container; item: ItemInstance }
   | { kind: 'slot'; slot: Slot; item: ItemInstance }
   | { kind: 'ground'; w: WorldItem; item: ItemInstance }
-  // (in the hands and carried nowhere: see `hold`)
-  | { kind: 'loose'; item: ItemInstance }
+  // (in the hands, a place of its own: `PlayerInventory.held`)
+  | { kind: 'held'; item: ItemInstance }
   // (a part fitted to a gun, dragged off it: `item` is only its picture until it is let go, when the game hands the part itself back)
   | { kind: 'fitted'; weapon: ItemInstance; mod: string; item: ItemInstance };
 
@@ -164,7 +163,8 @@ const useWord = (d: Def) => (d.use?.sound === 'eat' ? 'Eat it' : d.use?.sound ==
 /** what putting a thing in its place on the body is called */
 const wearWord = (d: Def) => (d.category === 'clothing' ? 'Wear it' : d.slot === 'holster' ? 'Holster it' : 'Sling it on your back');
 /** can it be held in the hands and carried nowhere else? (A gun, a thing to hit with and clothes need a place: see `takeUp` in src/game/game.ts.) */
-const holdable = (d: Def) => d.category !== 'clothing' && !d.weapon && !d.melee;
+/** what can be held in the hands with no other place for it: anything but clothes (a third long gun among it: the owner, 2026-10-24, "2 weapons on their back and 1 more in their hand") */
+const holdable = (d: Def) => d.category !== 'clothing';
 
 export class InventoryUI {
   root: HTMLDivElement;
@@ -752,7 +752,7 @@ export class InventoryUI {
   /** said of a thing in the hands */
   private heldNote(src: Source): string {
     if (this.actions.inHands() !== src.item) return '';
-    return src.kind === 'loose' ? 'In your hands and nowhere else: put away, it goes on the ground unless there is room for it.' : 'In your hands: used with the left button, held, once this is shut.';
+    return 'In your hands: used with the left button once this is shut. Put away, it goes to its own place or wherever there is room.';
   }
 
   /**
@@ -1112,9 +1112,7 @@ export class InventoryUI {
       el.className = 'inv-item in-slot' + this.mark(item);
       const url = this.iconOf(item);
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
-      // (how it is used from here, and that one held loose is carried nowhere else, is said on its card: see `cardHtml`)
-      const src0 = this.locate(item);
-      if (src0?.kind === 'loose') s.classList.add('loose');
+      // (how it is used from here is said on its card: see `cardHtml`)
       const src = this.locate(item);
       if (src) this.bindItem(el, src);
       s.appendChild(el);
@@ -1855,7 +1853,7 @@ export class InventoryUI {
 
   /** is this thing on the survivor (and not in the crate that is open, or on the ground)? */
   private carried(src: Source) {
-    return src.kind === 'slot' || (src.kind === 'container' && this.inv.containers.includes(src.c));
+    return src.kind === 'held' || src.kind === 'slot' || (src.kind === 'container' && this.inv.containers.includes(src.c));
   }
 
   /** put an item into its equipment slot (swapping out whatever was there) */
@@ -1962,10 +1960,10 @@ export class InventoryUI {
     return { label: 'Take it out', id: 'out', icon: 'out', run: () => this.putAway(src) };
   }
 
-  /** A thing is put away wherever there is room for it among what is carried: one held in the hands and carried nowhere, or one out of a bag that lies in a pocket. */
+  /** A thing is put away wherever there is room for it among what is carried: one in the hands, or one out of a bag that lies in a pocket. */
   private putAway(src: Source) {
     const item = src.item;
-    if (!this.inv.hasRoom(item)) return void this.actions.note(src.kind === 'loose' ? `No room to put the ${ITEMS[item.id].name.toLowerCase()} away: it stays in your hands` : this.noRoom(item));
+    if (!this.inv.hasRoom(item)) return void this.actions.note(src.kind === 'held' ? `No room to put the ${ITEMS[item.id].name.toLowerCase()} away: it stays in your hands` : this.noRoom(item));
     this.detach(src);
     const left = this.inv.add(item);
     if (left) this.spill(left);
@@ -2006,7 +2004,7 @@ export class InventoryUI {
     const it = src.item, d = ITEMS[it.id], n = d.name.toLowerCase();
     if (src.kind === 'fitted') return { why: '' };
     if (src.kind === 'slot') return WEAPON_SLOTS.includes(src.slot) ? this.hands(src) : { label: 'Take it off', id: 'off', icon: 'out', run: () => this.takeOff(src) };
-    if (src.kind === 'loose') return { why: `The ${n} is in your hands already` };
+    if (src.kind === 'held') return { why: `The ${n} is in your hands already` };
     if (d.slot) return { label: wearWord(d), id: 'wear', icon: { kind: it.id }, run: () => this.equip(src) };
     if (!this.mine(src)) return { label: 'Take in hands', id: 'hands', icon: 'hand', run: () => this.intoHands(src) };
     if (src.kind === 'container' && !this.inv.containers.includes(src.c)) return this.takeOut(src);
@@ -2059,8 +2057,8 @@ export class InventoryUI {
       if (!held) out.push({ label: 'Take in hands', icon: 'hand', id: 'hands', run: () => this.actions.hold(it), primary: !eaten(d) && !d.open && !(d.attach && this.actions.attachTargets(it).length) });
     }
     // (and what a double-click does with a thing that is eaten, drunk or put on a wound, or with a box of rounds: said here too, for whoever looks for it)
-    if ((this.carried(loc) || loc.kind === 'loose') && eaten(d)) out.push({ label: `${useWord(d)} now`, icon: { kind: it.id }, id: 'use', primary: true, run: () => this.actions.use(it) });
-    if ((this.carried(loc) || loc.kind === 'loose') && d.open) out.push({ label: 'Open it now', icon: 'open', id: 'open', primary: true, run: () => this.actions.open(it) });
+    if (this.carried(loc) && eaten(d)) out.push({ label: `${useWord(d)} now`, icon: { kind: it.id }, id: 'use', primary: true, run: () => this.actions.use(it) });
+    if (this.carried(loc) && d.open) out.push({ label: 'Open it now', icon: 'open', id: 'open', primary: true, run: () => this.actions.open(it) });
     if (this.opens(loc)) {
       const open = this.opened.has(it.uid);
       out.push({ label: open ? 'Close it' : `Open (${it.cargo?.length ?? 0} inside)`, icon: open ? 'shut' : 'open', id: 'bag', primary: true, run: () => {
@@ -2323,23 +2321,21 @@ export class InventoryUI {
 
   /** where an item currently lives */
   private locate(item: ItemInstance): Source | null {
+    if (this.inv.held() === item) return { kind: 'held', item };
     for (const s of Object.keys(this.inv.slots) as Slot[]) if (this.inv.slots[s] === item) return { kind: 'slot', slot: s, item };
     for (const c of this.inv.containers) if (c.has(item)) return { kind: 'container', c, item };
     if (this.stash && this.stash.container.has(item)) return { kind: 'container', c: this.stash.container, item };
     const w = this.vicinity.find((v) => v.loot.item === item);
     if (w) return { kind: 'ground', w, item };
-    if (this.actions.inHands() === item) return { kind: 'loose', item };
     return null;
   }
 
   private detach(src: Source) {
     if (src.kind === 'fitted') return;
-    if (src.kind === 'loose') return this.actions.release(src.item);
-    if (src.kind === 'container') src.c.remove(src.item);
-    else if (src.kind === 'slot') {
-      this.inv.slots[src.slot] = null;
-      if (this.inv.active === src.slot) this.inv.active = null;
-    }
+    // (out of the hands: the game sees them empty when it is told of the change, and stops whatever they were at)
+    if (src.kind === 'held') this.inv.slots.held = null;
+    else if (src.kind === 'container') src.c.remove(src.item);
+    else if (src.kind === 'slot') this.inv.slots[src.slot] = null;
   }
 
   // ------------------------------------------------------------ interaction
@@ -2585,13 +2581,14 @@ export class InventoryUI {
     if (t.kind === 'hot') return this.carried(src) ? '' : 'Only what you carry goes on a key: pick it up first';
     if (t.kind === 'hands') {
       if (def.category === 'clothing') return 'Clothes are worn, not held: let go of it on your body';
-      if (!this.carried(src) && src.kind !== 'loose' && (def.weapon || def.melee) && !this.inv.hasRoom(item)) return `No place for the ${n}: it needs one on your back, in a holster or in a pack`;
+      // (the hands are a place: a third long gun is held in them, and only what is in them already may stand in the way)
+      if (!this.carried(src) && !this.inv.canPutAway()) return this.handsFull();
       return '';
     }
     if (t.kind === 'pockets') {
       // (dragged to what is carried, a thing that is worn or held is not put on the ground for want of room, as it is when it is told to come off: it stays)
       if (src.kind === 'slot') return this.inv.containers.some((c) => c.hasRoom(item)) ? '' : `No room for the ${n} in what you carry: it stays on you`;
-      if (src.kind === 'loose') return this.inv.hasRoom(item) ? '' : `No room to put the ${n} away: it stays in your hands`;
+      if (src.kind === 'held') return this.inv.hasRoom(item) ? '' : `No room to put the ${n} away: it stays in your hands`;
       return !this.mine(src) && !this.inv.hasRoom(item) && (!holdable(def) || !!this.actions.inHands()) ? this.noRoom(item) : '';
     }
     return '';
@@ -2642,8 +2639,8 @@ export class InventoryUI {
     // (let go over the survivor, a thing carried comes into their hands)
     if (mine) return this.actions.inHands() === it ? null : { label: 'Take in hands', icon: 'hand', run: () => this.actions.hold(it) };
     if (!this.inv.hasRoom(it)) return null;
-    // (a thing held in the hands and carried nowhere is put away: it was sent the way of a thing out of a crate, and with no crate open went nowhere)
-    return { label: src.kind === 'loose' ? 'Put away' : 'Take', icon: 'take', run: () => (src.kind === 'ground' ? this.quickMove(src) : src.kind === 'loose' ? this.putAway(src) : this.transfer(src)) };
+    // (a thing in the hands is put away: it was sent the way of a thing out of a crate, and with no crate open went nowhere)
+    return { label: src.kind === 'held' ? 'Put away' : 'Take', icon: 'take', run: () => (src.kind === 'ground' ? this.quickMove(src) : src.kind === 'held' ? this.putAway(src) : this.transfer(src)) };
   }
 
   /** Light up every place the dragged item can go. */
@@ -2850,8 +2847,7 @@ export class InventoryUI {
     if (t.kind === 'hands') {
       if (def.category === 'clothing') return this.refuse(d, t, e);
       if (d.src.kind === 'ground' || (d.src.kind === 'container' && !this.inv.containers.includes(d.src.c))) return this.intoHands(d.src);
-      if (d.src.kind === 'loose') return this.render();
-      this.actions.hold(item);
+      if (d.src.kind === 'held' || !this.actions.hold(item)) return this.render();
       return this.finish('move');
     }
     // let go on a place on a gun that takes a part: the part is fitted, if it is that gun's and that place's
@@ -2873,7 +2869,7 @@ export class InventoryUI {
       if (this.refusal(d, t, e)) return this.refuse(d, t, e);
       if (d.src.kind === 'ground') return this.pickUp(d.src);
       if (d.src.kind === 'slot') this.takeOff(d.src);
-      else if (d.src.kind === 'loose') this.putAway(d.src);
+      else if (d.src.kind === 'held') this.putAway(d.src);
       else if (!this.mine(d.src)) this.transfer(d.src);
       else if (!this.inv.containers.includes(d.src.c)) this.putAway(d.src);
       return this.render();
@@ -3003,31 +2999,27 @@ export class InventoryUI {
   }
 
   /**
-   * A thing lying about, or in a crate, is taken into the hands. With room for it, it is put away first and held
-   * from where it is carried, as ever. With none it is held and carried nowhere (see `hold`): eaten, drunk or put
-   * on from there, and put down when the hands are wanted for something else. A gun or a thing to hit with is
-   * slung or holstered, and needs a place.
+   * A thing lying about, or in a crate, is taken straight into the hands, which are a place of their own: eaten,
+   * drunk or put on from there, a gun fired, and put away or down when the hands are wanted for something else.
+   * Only what is in them already may stand in the way, if it has no room to go to.
    */
   private intoHands(src: Source) {
     const item = src.item, def = ITEMS[item.id];
-    const armed = !!(def.weapon || def.melee);
     // (each of these did nothing, and said nothing)
-    if (def.category === 'clothing' || (armed && !this.inv.hasRoom(item))) {
-      this.actions.note(def.category === 'clothing' ? 'Clothes are worn, not held: let go of it on your body' : `No place for the ${def.name.toLowerCase()}: it needs one on your back, in a holster or in a pack`);
+    if (def.category === 'clothing' || !this.inv.canPutAway()) {
+      this.actions.note(def.category === 'clothing' ? 'Clothes are worn, not held: let go of it on your body' : this.handsFull());
       return this.render();
     }
     if (!this.materialize(src)) return this.gone();
     this.removeFrom(src);
-    const left = this.inv.hasRoom(item) ? this.inv.add(item) : item;
-    if (left) {
-      if (armed) this.actions.drop(left);
-      else this.actions.hold(left, true);
-    } else {
-      // (all of it may have gone onto a pile already carried: that pile is then what is held)
-      const into = this.locate(item) ? item : [...this.inv.carried()].find((x) => x.id === item.id);
-      if (into) this.actions.hold(into);
-    }
+    this.actions.hold(item, true);
     this.finish('pickup');
+  }
+
+  /** what is said when what is in the hands has nowhere to go (as `Game.handsFull` says it) */
+  private handsFull(): string {
+    const it = this.inv.held();
+    return it ? `No room to put the ${ITEMS[it.id].name.toLowerCase()} away: drop it (G) first` : '';
   }
 
   private materialize(src: Source): boolean {

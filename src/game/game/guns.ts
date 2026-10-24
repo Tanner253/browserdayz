@@ -106,7 +106,7 @@ export const gunsMethods = {
       }
       return list.some((p) => out(p.item.cargo));
     };
-    const worn = Object.values(this.inv.slots).find((w) => w?.uid === item.uid) ?? (this.inv.hand?.uid === item.uid ? this.inv.hand : null);
+    const worn = Object.values(this.inv.slots).find((w) => w?.uid === item.uid);
     if (worn) {
       this.inv.remove(worn);
       return true;

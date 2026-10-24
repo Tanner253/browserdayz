@@ -281,6 +281,48 @@ ok('under a roof you are safe from a bear: it gives up and goes', () => {
   assert.equal(bear.foe, 0);
 });
 
+ok('a shot bear comes for whoever shot it from any distance and runs them down; a second gun cannot pull it off while it can get at the first; from up out of its reach it runs', () => {
+  // (2026-10-24: "a bear should engage a player that shoots it"; "make sure the bear commits unless the targt is unreachable")
+  {
+    const h = herd(['bear']);
+    const bear = h.place('bear', 0, 0, 0)[0];
+    const man = person(1, 100, 0);
+    run(h, 0, 1, [man]);
+    h.hurt(bear.i, 60, man, 1000);
+    const strikes = run(h, 1200, 60, [man], () => {
+      man.x += 6.2 * 0.2;
+      man.speed = 6.2;
+    });
+    assert.ok(strikes.some((s) => s.on === 1), `shot from 100 m and sprinting off: ${strikes.length} blows`);
+  }
+  {
+    const h = herd(['bear']);
+    const bear = h.place('bear', 0, 0, 0)[0];
+    const a = person(1, 40, 0), b = person(2, 0, -40);
+    run(h, 0, 1, [a, b]);
+    h.hurt(bear.i, 60, a, 1000);
+    run(h, 1200, 1, [a, b]);
+    assert.equal(bear.foe, 1, 'it goes for the first');
+    h.hurt(bear.i, 60, b, 2400);
+    run(h, 2600, 1, [a, b]);
+    assert.equal(bear.foe, 1, 'and holds to him when the second shoots');
+    a.sheltered = true;
+    h.hurt(bear.i, 60, b, 3800);
+    run(h, 4000, 1, [a, b]);
+    assert.equal(bear.foe, 2, 'until it cannot get at him');
+  }
+  {
+    const h = herd(['bear']);
+    const bear = h.place('bear', 0, 0, 0)[0];
+    const man = person(1, 30, 0, { y: 4 });
+    run(h, 0, 1, [man]);
+    h.hurt(bear.i, 60, man, 1000);
+    run(h, 1200, 6, [man]);
+    assert.equal(bear.foe, 0, 'not after one up out of its reach');
+    assert.ok(Math.hypot(bear.x - man.x, bear.z - man.z) > 60, 'it ran from him');
+  }
+});
+
 ok('wolves circle and come in one at a time; when half the pack is down the rest run', () => {
   const h = herd(['wolf']);
   // (a pack of four, as the map has them, and as an admin's /spawn wolf 4 stands them)

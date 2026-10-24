@@ -89,7 +89,7 @@ export const handsMethods = {
 
   inventoryChanged(this: Game) {
     this.slowT = 1; // refresh carried weight on the next frame
-    this.weapons.validate();
+    this.showHands();
     this.syncGear();
     this.inv.forgetGone();
     this.autoHot();
@@ -490,14 +490,19 @@ export const handsMethods = {
    * whose thing is in the hands (from the ends, with empty hands); null when there is no other.
    */
   hotStep(this: Game, dir: 1 | -1): string | null {
-    const n = this.inv.hot.length, held = this.inv.held() ?? this.inHand;
+    const n = this.inv.hot.length, held = this.inv.held();
     const at = held ? this.inv.hot.findIndex((_, i) => this.inv.hotItem(i) === held) : -1;
     const from = at >= 0 ? at : dir > 0 ? -1 : n;
+    // (one the hands cannot change to, for want of room for what is in them, is passed over; and if that is all of them, they are told why)
+    let refused = false;
     for (let k = 1; k <= n; k++) {
       const i = (((from + dir * k) % n) + n) % n;
       if (i === at) break;
-      if (this.inv.hotItem(i)) return HOT_CODES[i];
+      const it = this.inv.hotItem(i);
+      if (it && this.inv.hold(it, true)) return HOT_CODES[i];
+      if (it) refused = true;
     }
+    if (refused) this.hud.note(this.handsFull(), 'warn');
     return null;
   },
 
@@ -513,58 +518,101 @@ export const handsMethods = {
     return true;
   },
 
-  /** the hands are emptied: what was in them is put away where it is carried, and anything they were at is broken off */
-  emptyHands(this: Game) {
+  /** the hands are emptied: what was in them is put away (`PlayerInventory.putAway`), and anything they were at is broken off. False: no room for it. */
+  emptyHands(this: Game): boolean {
+    // (not in the middle of a reload or a blow: the hands are at that, as a key always found them)
+    if (this.weapons.working) return false;
     if (this.use) this.breakOff();
-    this.stow();
+    if (!this.inv.putAway()) {
+      this.hud.note(this.handsFull(), 'warn');
+      return false;
+    }
     this.handsFree = true;
-    this.weapons.take(null);
+    this.showHands(true);
+    this.inventoryChanged();
+    return true;
   },
 
-  /** a thing that is not a weapon, held: put away (it stays where it is carried), with nothing taken up in its place */
+  /** what a player is told whose hands cannot be emptied for want of room (the owner, 2026-10-24: "must put one on the ground to free up hands if no room") */
+  handsFull(this: Game): string {
+    const it = this.inv.held();
+    return it ? `No room to put the ${ITEMS[it.id].name.toLowerCase()} away: drop it (G) first` : '';
+  },
+
+  /** a thing that is not a weapon, held: no longer held out (only as it is drawn: where it is is the inventory's) */
   stow(this: Game) {
     if (!this.inHand && !this.ready) return;
     this.ready = null;
     this.inHand = null;
     this.holding = false;
     this.weapons.endUse();
-    this.settle();
   },
 
   /**
-   * Something carried is taken into the hands: a gun or a thing to hit with comes up as it always did; anything
-   * else is held out in the right hand, waiting (see `ready`), and the left button then does with it what is done
-   * with such a thing (see `handFire`). Whatever was in the hands before goes back where it is carried.
+   * What the hands are drawn holding made what the inventory says is in them (`PlayerInventory.held`), after
+   * anything that moved it there or away: a gun or a thing to hit with is the weapons' to put up (`smooth`: as a key
+   * does, not in one frame), anything else is held out in the right hand, waiting (see `ready`).
    */
-  takeUp(this: Game, item: ItemInstance, loose = false) {
-    const def = ITEMS[item.id];
-    if (this.player.dead || !def) return;
-    // (Nothing else is taken up by hands that are on a grenade's pin, or have a live one in them: see `cook`. A thing
-    // handed over that is carried nowhere is not lost for that: it goes into a pocket, or onto the ground.)
-    if (this.cook) {
-      if (loose) {
-        const left = this.inv.add(item);
-        if (left) this.dropItem(left);
-        this.inventoryChanged();
+  showHands(this: Game, smooth = false) {
+    const it = this.inv.held(), def = it ? ITEMS[it.id] : null, armed = !!(def?.weapon || def?.melee);
+    if (this.inHand && this.inHand !== it) {
+      // (what the hands were at with it is over, its grenade's pin among it)
+      if (this.use) this.breakOff();
+      if (this.cook?.item === this.inHand) {
+        this.cook = null;
+        this.act('stop');
       }
-      return;
+      this.stow();
+    }
+    if (smooth) this.weapons.take(armed ? it : null);
+    else this.weapons.validate();
+    if (it && def && !armed && this.inHand !== it) {
+      this.inHand = it;
+      this.magMode = null;
+      this.ready = { item: it, t: 0 };
+      this.weapons.beginUse(it.id, this.poseOf(it), def.use?.time ?? def.open?.time ?? 2, true);
+    }
+    if (it) this.handsFree = false;
+  },
+
+  /**
+   * Something is taken into the hands, out of wherever it was carried (or straight off the ground or out of a crate:
+   * `loose`): a gun or a thing to hit with comes up as it always did; anything else is held out in the right hand,
+   * waiting (see `ready`), and the left button then does with it what is done with such a thing (see `handFire`).
+   * Whatever was in the hands goes back to its own place or any room; with none, nothing changes and the player is
+   * told to drop it first (the owner, 2026-10-24: "when i drag something out of my backpack to my hands it should
+   * leave my backpack making those slots available for storage").
+   * @returns whether it is in the hands now
+   */
+  takeUp(this: Game, item: ItemInstance, loose = false): boolean {
+    const def = ITEMS[item.id];
+    if (this.player.dead || !def) return false;
+    if (this.inv.held() === item) {
+      this.showHands(true);
+      return true;
+    }
+    // (Nothing else is taken up by hands that are on a grenade's pin or have a live one in them (see `cook`), or are in
+    // a reload or a blow. A thing handed over from outside is not lost for that: it goes into a pocket, or onto the ground.)
+    const keep = () => {
+      if (!loose) return;
+      const left = this.inv.add(item);
+      if (left) this.dropItem(left);
+      this.inventoryChanged();
+    };
+    if (this.cook || this.weapons.working) {
+      keep();
+      return false;
     }
     if (this.use) this.breakOff();
-    this.stow();
-    // (Taken straight off the ground or out of a crate with no room for it anywhere: it is in the hands and nowhere
-    // else, as in DayZ, and is eaten, drunk or put on from there. Put away, it goes into the pockets if there is
-    // room by then and onto the ground if there is not: see `settle`. Asked for 2026-10-11: "drag things in the
-    // vicinity to their hands even if no room in inventory, so i can use a medkit or drink or eat something
-    // without it needing to go in my inventory". A gun or a thing to hit with needs a place on the body: not this.)
-    if (loose && !def.weapon && !def.melee) this.loose = item;
-    this.handsFree = false;
+    if (!this.inv.hold(item)) {
+      this.hud.note(this.handsFull(), 'warn');
+      keep();
+      return false;
+    }
     this.glass = 0;
-    this.weapons.take(item);
-    if (def.weapon || def.melee) return;
-    this.inHand = item;
-    this.magMode = null;
-    this.ready = { item, t: 0 };
-    this.weapons.beginUse(item.id, this.poseOf(item), def.use?.time ?? def.open?.time ?? 2, true);
+    this.showHands(true);
+    this.inventoryChanged();
+    return true;
   },
 
   /** how the hands hold a thing while they wait to use it, and work on it when they do */
@@ -628,21 +676,15 @@ export const handsMethods = {
   swipeCard(this: Game) {
     const at = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
     if (!at || at.distanceTo(this.s.r.camera.position) > 2.6) return void this.hud.note('The card opens the door of Bunker 17: stand at the reader beside it', 'info');
-    // (A card held loose in the hand goes into a pocket first. The server opens the door for a card it has seen
-    // carried, and what is held loose it is never told of: the reader kept such a card and the door stayed shut.)
-    if (this.loose?.id === 'keycard') {
-      if (this.inv.add(this.loose)) return void this.hud.note('Make room for the keycard in a pocket first: the reader takes it from there', 'info');
-      this.loose = null;
-      this.inventoryChanged();
-    }
     const near = () => {
       const d = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
       return !!d && d.distanceTo(this.s.r.camera.position) <= 3.1;
     };
     this.startUse('Putting the keycard in', 2.1, 'keycard', 'swipe', null, () => {
-      const held = this.loose?.id === 'keycard';
-      if (!near() || (!held && this.inv.count('keycard') < 1)) return;
-      if (held) this.loose = null;
+      // (the one in the hands, or one in a pocket: the server opens the door for a card it has seen carried, and the hands are carried)
+      const card = this.inv.held()?.id === 'keycard' ? this.inv.held() : null;
+      if (!near() || (!card && this.inv.count('keycard') < 1)) return;
+      if (card) this.inv.remove(card);
       else this.inv.take('keycard', 1);
       this.inventoryChanged();
       this.hud.note('The reader keeps the card. The door stays open while anybody is inside, and shuts a minute after', 'good');
@@ -660,12 +702,9 @@ export const handsMethods = {
     const item = this.inHand;
     this.holding = false;
     if (!item) return;
-    if (this.player.dead || !this.mine(item)) {
-      this.inHand = null;
-      this.ready = null;
-      this.inv.hold(null);
-      this.weapons.endUse();
-      this.settle();
+    if (this.player.dead || this.inv.held() !== item) {
+      this.stow();
+      if (!this.player.dead) this.showHands();
       return;
     }
     this.ready = { item, t: 0.3 };
@@ -680,7 +719,6 @@ export const handsMethods = {
     const near = () => !jeep.wreck && jeep.pos.distanceTo(this.player.pos) <= JEEP.reach + 1;
     this.startUse('Filling the tank', 4, 'jerrycan', 'open', null, () => {
       if (!near() || !this.mine(can)) return;
-      if (this.loose === can) this.loose = null;
       this.inv.remove(can);
       this.garage.refuel(jeep);
       audio.ui('drink');

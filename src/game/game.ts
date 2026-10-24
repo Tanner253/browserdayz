@@ -621,13 +621,12 @@ export class Game {
       models: this.loot.models,
       // (a grenade has its own throw, on the fire button: G only puts one down)
       throwable: () => {
-        const it = this.inv.held() ?? this.inHand;
+        const it = this.inv.held();
         return it && !THROWN[it.id] ? it : null;
       },
       drop: () => this.dropInHands(),
       letGo: (item) => {
         if (this.use) this.breakOff();
-        if (this.loose === item) this.loose = null;
         this.stow();
         this.inv.remove(item);
         this.hud.note(`Threw ${ITEMS[item.id]?.name ?? item.id}`);
@@ -762,6 +761,7 @@ export class Game {
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected || owner instanceof Beast ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     this.weapons.step = (dir) => this.wheelStep(dir);
+    this.weapons.want = (it) => void (it ? this.takeUp(it) : this.emptyHands());
     // whoever is hit carries the blood on their clothes where it landed
     this.weapons.onFlesh = (owner, pt, dir, power) => {
       if (power < 0.4) return;
@@ -926,14 +926,13 @@ export class Game {
       assignHot: (item, i) => this.assignHot(i, item),
       hotIndex: (item) => this.inv.hotOf(item),
       hold: (item, loose) => this.takeUp(item, loose),
-      inHands: () => this.inv.held() ?? this.inHand,
+      inHands: () => this.inv.held(),
       goingIn: (gun) => {
         const f = this.fitting;
         if (f?.gun === gun && f.part) return f.part;
         return this.inv.held() === gun ? this.weapons.goingIn() : null;
       },
       lying: (uid) => this.lying.get(uid) ?? null,
-      release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
       note: (text) => this.hud.note(text, 'info'),
@@ -1289,9 +1288,9 @@ export class Game {
     void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
     this.shop = new ShopUI({
       credit: () => this.credit,
-      // (what is carried, and the guns that are not in the hands: not what is worn, nor a bag with things in it)
+      // (what is carried, and the guns on the back and in the holster: not what is in the hands, nor what is worn, nor a bag with things in it)
       wares: () =>
-        [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.filter((sl) => sl !== this.inv.active).map((sl) => this.inv.slots[sl])]
+        [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.map((sl) => this.inv.slots[sl])]
           .filter((it): it is ItemInstance => !!it && !it.cargo?.length && pays(it) > 0)
           .map((item) => ({ item, pays: pays(item) })),
       stock: () => {
@@ -1597,13 +1596,6 @@ export class Game {
   inHand: ItemInstance | null = null;
 
   /**
-   * A thing being used straight off the ground. It is in the hands for as long as that takes
-   * and nowhere else; whatever is left of it afterwards (all of it, if the use was broken
-   * off) goes into the pockets, or is put down again when they are full.
-   */
-  loose: ItemInstance | null = null;
-
-  /**
    * An injector taken into the hand and not yet used. Its key (or Use, in the inventory) brings it out and a
    * click uses it; the wheel, the other button, its own key again, a weapon's key or the inventory puts it away.
    * `t` is how long it has been out: the click that chose Use in a menu is not the click that uses it.
@@ -1786,6 +1778,8 @@ export interface Game {
   emptyHands: Methods<typeof handsMethods>['emptyHands'];
   stow: Methods<typeof handsMethods>['stow'];
   takeUp: Methods<typeof handsMethods>['takeUp'];
+  showHands: Methods<typeof handsMethods>['showHands'];
+  handsFull: Methods<typeof handsMethods>['handsFull'];
   poseOf: Methods<typeof handsMethods>['poseOf'];
   countOf: Methods<typeof handsMethods>['countOf'];
   handFire: Methods<typeof handsMethods>['handFire'];
@@ -1802,9 +1796,7 @@ export interface Game {
   lightFire: Methods<typeof itemsMethods>['lightFire'];
   consume: Methods<typeof itemsMethods>['consume'];
   onGround: Methods<typeof itemsMethods>['onGround'];
-  settle: Methods<typeof itemsMethods>['settle'];
   mine: Methods<typeof itemsMethods>['mine'];
-  release: Methods<typeof itemsMethods>['release'];
   putAway: Methods<typeof itemsMethods>['putAway'];
   breakOff: Methods<typeof itemsMethods>['breakOff'];
   useItem: Methods<typeof itemsMethods>['useItem'];

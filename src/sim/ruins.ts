@@ -405,14 +405,16 @@ function alcazar(): Part[] {
     for (const z of [8, 13]) opening(west, 0.85, z, 0.5, 1.2, 2.5);
     const south = wall([[0, 18.15], [9.5, 18.15]], 1.7, -15, A.walk.west, { cap: 'paving', name: 'block south wall' });
     opening(south, 4.3, 18.15, 1.2, SILL, 2.3);
-    const east = wall([[8.65, 4.5], [8.65, 17.3]], 1.7, -15, 8.9, { ruin: { seed: 29, bite: 1.5, floor: 7.3 }, name: 'block east wall' });
-    opening(east, 8.65, 16.3, 0.8, 1.1, 2.3);
-    opening(east, 8.65, 10.6, 0.5, 4.7, 6);
+    // (its inner face is the keep's east face carried on: it stood 0.3 m off it, and the sky showed through the slot
+    // between them the whole height of the wall, the owner, 2026-10-24: "the gap in between walls is over here")
+    const east = wall([[8.5, 4.5], [8.5, 17.3]], 2, -15, 8.9, { ruin: { seed: 29, bite: 1.5, floor: 7.3 }, name: 'block east wall' });
+    opening(east, 8.5, 16.3, 0.8, 1.1, 2.3);
+    opening(east, 8.5, 10.6, 0.5, 4.7, 6);
     crenels(east, 1, 12, 3.6, 7.9);
     add(west, south, east);
-    add(floor(rect(1.7, 4.5, 7.8, 17.3), SILL, 'paving', { name: 'hall floor' }));
-    add(floor(rect(1.7, 4.5, 7.8, 17.3), 7.1, 'timber', { holes: [rect(6.7, 13, 7.8, 15.8)], under: 0.12, name: 'block roof' }));
-    add(flight([7.2, SILL, 5.4], [7.2, 3.6, 9.7], 0.9, 'timber'), floor(rect(6.5, 9.7, 7.8, 11.5), 3.6, 'timber', { under: 0.1, near: true }), flight([7.2, 3.6, 11.5], [7.2, 7.1, 15.8], 0.9, 'timber'));
+    add(floor(rect(1.7, 4.5, 7.5, 17.3), SILL, 'paving', { name: 'hall floor' }));
+    add(floor(rect(1.7, 4.5, 7.5, 17.3), 7.1, 'timber', { holes: [rect(6.55, 13, 7.5, 15.8)], under: 0.12, name: 'block roof' }));
+    add(flight([7.05, SILL, 5.4], [7.05, 3.6, 9.7], 0.9, 'timber'), floor(rect(6.5, 9.7, 7.5, 11.5), 3.6, 'timber', { under: 0.1, near: true }), flight([7.05, 3.6, 11.5], [7.05, 7.1, 15.8], 0.9, 'timber'));
     add(post(6.6, 9.8, SILL, 3.5), post(6.6, 11.4, SILL, 3.5), beam([6.6, 3.42, 9.8], [6.6, 3.42, 11.4]));
     for (const z of [7.2, 10.4, 13.6]) add(beam([1.7, 6.9, z], [7.8, 6.9, z], 0.2, 0.24));
     // the steps from the roof up to the walk over the arch

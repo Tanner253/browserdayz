@@ -158,18 +158,19 @@ export const interactMethods = {
       if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];
       if (key) {
         if (!this.inv.hasRoom(item)) {
-          // (No room for it. With the hands empty it is taken into them and carried nowhere, as in DayZ: eaten,
-          // drunk or put on from there. A gun, a blade or a thing to wear needs a place of its own.)
-          const free = !this.weapons.equippedItem && !this.inHand && !this.use && !this.cook;
-          if (d.slot || d.weapon || d.melee || !free) {
-            this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: empty your hands (X) to pick it up in them, or find a vest or a bag', 'warn');
+          // (No room for it: it is taken into the hands, which are a place of their own, as in DayZ: eaten, drunk or
+          // put on from there, a third long gun carried in them (the owner, 2026-10-24: "2 weapons on their back and 1
+          // more in their hand"). What is in them is put away first; with no room for that, nothing is taken. A thing
+          // to wear needs its place.)
+          const wear = d.category === 'clothing', busy = !!(this.use || this.cook);
+          if (wear || busy || !this.inv.canPutAway()) {
+            this.hud.note(wear ? `No free ${d.slot} slot and no room in your pockets` : busy ? 'Your hands are busy' : this.handsFull(), 'warn');
             return;
           }
           if (!this.takeWorldItem(owner)) return;
-          this.takeUp(item, true);
+          if (!this.takeUp(item, true)) return;
           audio.ui('pickup', undefined, item.id);
           this.hud.note(`${d.name}: in your hands, there is no room to put it away`, 'info');
-          this.inventoryChanged();
           return;
         }
         if (!this.takeWorldItem(owner)) return;
@@ -232,13 +233,12 @@ export const interactMethods = {
 
   /** G, held a moment: what is in the hands goes on the ground in front of you. */
   dropInHands(this: Game) {
-    const item = this.inv.held() ?? this.inHand;
+    const item = this.inv.held();
     if (!item) {
       this.hud.note('Nothing in your hands to drop', 'warn');
       return;
     }
     if (this.use) this.breakOff();
-    if (this.loose === item) this.loose = null;
     this.stow();
     this.inv.remove(item);
     this.dropItem(item);
@@ -265,7 +265,7 @@ export const interactMethods = {
 
   hotbar(this: Game): HotbarEntry[] {
     // each key, the thing on it, and what there is of it: rounds in a gun or a magazine, drinks in a bottle, how many of a thing that is used up
-    const held = this.inv.held() ?? this.inHand;
+    const held = this.inv.held();
     return this.inv.hot.map((b, i) => {
       const it = b ? this.inv.hotItem(i) : null;
       const d = it ? ITEMS[it.id] : null;

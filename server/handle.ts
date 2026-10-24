@@ -453,7 +453,7 @@ export function handle(c: Client, m: C2S) {
       // (within reach of where they stand; or thrown there, no further than that throw carries it: server/throws.ts)
       const land = landing(c, item.uid, [l.x, l.y, l.z], world.groundAt, Date.now());
       if (land === 'free' ? Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > 12 : land !== 'ok') return void (land !== 'free' && log(`${c.name} threw ${ITEMS[item.id]?.name ?? item.id} ${land}: not let through`));
-      if (CHECKS !== 'off' && [...things({ slots: { it: item }, active: null, containers: [] })].some(invented) && flag(c, `put down ${ITEMS[item.id].name}, which the server never put in the world`)) return;
+      if (CHECKS !== 'off' && [...things({ slots: { it: item }, containers: [] })].some(invented) && flag(c, `put down ${ITEMS[item.id].name}, which the server never put in the world`)) return;
       // (a tag is put down only by whoever holds it, and is then on the ground and theirs no more: custody.ts)
       const tags = payingTags(item);
       if (tags.some((t) => !holdsTag(c.key, t.uid))) return void log(`${c.name} put down a dog tag they do not hold (${tags.find((t) => !holdsTag(c.key, t.uid))!.uid.slice(0, 12)}): not let through`);

@@ -84,6 +84,8 @@ export interface Beast {
   fightAt: number;
   fightX: number;
   fightZ: number;
+  /** how far from where it set out it goes after them: its leash, or more for whoever shot it from further off */
+  reach: number;
   sensedAt: number;
   seenX: number;
   seenZ: number;
@@ -96,9 +98,10 @@ export interface Beast {
   dashUntil: number;
   /** a wolf sent in stops and snarls first, until then (DayZ) */
   snarlUntil: number;
-  /** who last hurt it, and when; and until when it will not start another fight */
+  /** who last hurt it, and when; the last hit a bear has answered; and until when it will not start another fight */
   hurtBy: number;
   hurtAt: number;
+  answered: number;
   calmUntil: number;
   /** a body being gutted: by whom, from when */
   skinner: { id: number; at: number } | null;
@@ -278,8 +281,8 @@ export class Herd {
       const b: Beast = {
         i: this.next++, k, g: g.i, x, z, yaw: this.rnd() * PI2, mode: A_IDLE, hp: kind.hp, diedAt: 0, skinned: false, bleeds: false, speed: 0,
         aware: 0, fearX: x, fearZ: z, ranFor: 0, slot, act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0, detourYaw: 0, detourT: 0,
-        foe: 0, fightAt: 0, fightX: x, fightZ: z, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0, snarlUntil: 0,
-        hurtBy: 0, hurtAt: 0, calmUntil: 0, skinner: null, eaten: false,
+        foe: 0, fightAt: 0, fightX: x, fightZ: z, reach: 0, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0, snarlUntil: 0,
+        hurtBy: 0, hurtAt: 0, answered: 0, calmUntil: 0, skinner: null, eaten: false,
       };
       // (at the start nobody is near: it stands at its own place in the herd)
       if (start && fit(this, g.at.x + slot[0], g.at.z + slot[1], kind.steep, 'walk', farm, kind.lives)) {
@@ -543,7 +546,7 @@ export class Herd {
       return;
     }
     // (a bear or a wolf whole and unhurt does not run from a person: it stands and watches. A car, a helicopter, a
-    // shot from further off than it will charge, or being hurt past bearing, and it runs like anything else.)
+    // shot from somebody it cannot get at, or being hurt past bearing, and it runs like anything else.)
     const stands = !!k.fight && b.hp >= k.hp * k.fight.breakAt && !rideFear && !(b.hurtBy && now - b.hurtAt < 8000);
     if (b.aware >= ANIMALS.fleeAt && !g.flee && !stands) {
       // (the whole herd goes at once: DayZ's deer)
