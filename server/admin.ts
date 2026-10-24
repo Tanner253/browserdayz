@@ -16,7 +16,8 @@ import { BANS, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log,
 import { ipOf, namesOf } from './tags';
 import { deviceOf, forgetDevice, shortDevice } from './device';
 import { CHECK, CHECKS } from './checks';
-import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, keptOffNow, keyHash, outranks, over, roleOf, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
+import { stashLines } from './stash-list';
+import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, isTop, keptOffNow, keyHash, outranks, over, roleOf, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
 import { KEPT, asAdmin, keepBefore, place, saveAdmin, savedWords, sayRestart, setPower, sys, whoIs } from './keep';
 import { broadcast, cleanName, clients, drop, send, type Client } from './players';
 import { kill } from './acts';
@@ -255,6 +256,15 @@ export async function command(c: Client, line: string) {
       if (!fp) return void sys(c, d ? 'No device is that.' : t ? `${t.name}'s game said nothing of its device.` : `Nobody online is "${who}" (or more than one is): see /players, or give a device as dev:xxxxxxxx.`);
       const on = [...clients.values()].filter((o) => o.fp.startsWith(fp)), gone = ADMIN.gone.filter((g) => g.fp.startsWith(fp) && !on.some((o) => o.key === g.key));
       return void sys(c, `On device ${shortDevice(fp)}: ${on.length} playing, ${gone.length} gone lately.`, ...on.map((o) => `${label(o)}  playing`), ...gone.slice(-15).map((g) => `${g.name}  gone ${Math.round((Date.now() - g.at) / 60000)} min ago`));
+    }
+    case 'stashes': {
+      // Where every stash kept on the map lies, for the owner alone (2026-10-23), before the map is changed about them
+      // (server/stash-list.ts). Since stash-sight.ts nobody is told of a buried stash further than 50 m off: only the
+      // top of the line of admins may ask, the answer goes to them alone, and the log says how many, never where.
+      if (!isTop(c)) return void sys(c, 'Only the owner can do that.');
+      const { total, buried, lines } = stashLines(boxes.values(), economy.loot.values());
+      log(`[admin] ${c.name} asked where the stashes are (${total})`);
+      return void sys(c, `${total} stashes kept (${buried} buried). Only you are told this; copy every STASHES line:`, ...lines);
     }
     case 'flagged': {
       const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
