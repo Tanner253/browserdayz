@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T06:06:32.250Z",
+ "generated": "2026-10-24T06:07:19.985Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12783,6 +12783,31 @@
    "hi": "assets/models/hi/fur_pelt.glb",
    "hiBytes": 6345500,
    "hiCard": 64
+  },
+  "animal_wolf": {
+   "url": "assets/models/animal_wolf.glb",
+   "tags": [
+    "animal"
+   ],
+   "bytes": 760244,
+   "tris": 9948,
+   "min": [
+    -0.4301,
+    0,
+    -0.8
+   ],
+   "max": [
+    0.4301,
+    0.7408,
+    0.8
+   ],
+   "lods": [],
+   "clips": [
+    "graze",
+    "idle",
+    "alert",
+    "rest"
+   ]
   }
  }
 }

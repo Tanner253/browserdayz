@@ -14,6 +14,7 @@
 //   clips  – { game name: what its own movement is called (a regular expression) }
 //   cuts   – or: { game name: [from, to] seconds of its one take }
 //   tex    – the most pixels a side of its pictures
+//   lit    – it came drawn unlit (flat, the same in sun and shade): lit as everything else is, a matte fur
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -40,6 +41,9 @@ export const ANIMAL_MODELS = {
       hit: /^Hit_Stand_F01$/, death: /^Death_Stand_R01$/,
     },
   },
+  // (victory_mirosya's wolf, the owner's choice: "I ADDED A NEW WOLF". Four movements: standing, eating, a snarl,
+  // asleep. It came unlit.)
+  animal_wolf: { dir: 'animal_wolf_victory', len: 1.6, rot: [0, Math.PI / 2, 0], lit: true, clips: { idle: /\|IDLE$/, graze: /\|eating$/, alert: /\|RRAR$/, rest: /\|SLEEP$/ } },
   // (five movements only: no gait, so a farm's cows stand in their yard, src/sim/animals.ts)
   animal_cow: { dir: 'animal_cow_rukh3d', len: 2.3, rot: [0, Math.PI, 0], clips: { idle: /idle1$/, graze: /idle2$/, death: /Death$/ } },
 };
@@ -207,6 +211,10 @@ for (const id of ids) {
   const dir = path.join(SRC, 'models', cfg.dir);
   const doc = await io.read(path.join(dir, cfg.file ?? 'scene.gltf'));
   if (doc.getRoot().listExtensionsUsed().some((e) => e.extensionName === 'KHR_materials_pbrSpecularGlossiness')) await doc.transform(metalRough());
+  if (cfg.lit) {
+    doc.getRoot().listExtensionsUsed().find((e) => e.extensionName === 'KHR_materials_unlit')?.dispose();
+    for (const m of doc.getRoot().listMaterials()) m.setMetallicFactor(0).setRoughnessFactor(0.9);
+  }
   const root = doc.getRoot(), scene = root.listScenes()[0];
   const srcTris = countTris(doc);
   // the movements the game plays, under its names; the rest thrown away (keys and all)

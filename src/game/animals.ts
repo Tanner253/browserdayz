@@ -36,7 +36,7 @@ export interface WildHost {
 /** the clip each mode plays, and what stands in for it in a model without it */
 const CLIPS: Record<number, string[]> = {
   [A_IDLE]: ['idle'], [A_GRAZE]: ['graze', 'idle'], [A_WALK]: ['walk', 'trot'], [A_TROT]: ['trot', 'run', 'walk'], [A_RUN]: ['run', 'trot'],
-  [A_ALERT]: ['alert', 'idle'], [A_REST]: ['rest', 'idle'], [A_SWIPE]: ['swipe', 'bite', 'idle'], [A_BITE]: ['bite', 'swipe', 'idle'],
+  [A_ALERT]: ['alert', 'idle'], [A_REST]: ['rest', 'idle'], [A_SWIPE]: ['swipe', 'bite', 'idle'], [A_BITE]: ['bite', 'swipe', 'alert', 'idle'],
   [A_ROAR]: ['roar', 'alert', 'idle'], [A_HIT]: ['hit', 'idle'], [A_DEAD]: ['death'], [A_DRINK]: ['drink', 'graze', 'idle'],
 };
 /** the movements played once and held at their end, not looped */
