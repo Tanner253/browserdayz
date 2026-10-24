@@ -998,10 +998,16 @@ export function ruinsLayout(): Stood[] {
   ];
   // what is left of the wall along the west and south banks: a remnant on each long side of the outline, set back from its edge
   const kinds: Piece[] = ['stubB', 'stubA', 'stump', 'stubA', 'stubB', 'stubA'];
+  // (Each four metres in from the edge, but on the stretch of the south bank where the ground falls into a hollow
+  // twelve metres deep that runs thirty-five metres in: its tower stump stood over it in the air (2026-10-24: "there is a
+  // floating map piece on the south end of the ruins"). That one stands thirty-six metres in, where the ground is as
+  // meant. Where along the edge, and how far in.)
+  const SET: Record<number, [number, number]> = { 2: [0.3, 36] };
   [0, 1, 2, 3, 4, 21, 22, 23, 24].forEach((e, k) => {
-    const a = OUTLINE[e], b = OUTLINE[(e + 1) % OUTLINE.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]), d: V2 = [(b[0] - a[0]) / l, (b[1] - a[1]) / l], t = 0.3 + 0.4 * hash(e, 1, 9);
+    const a = OUTLINE[e], b = OUTLINE[(e + 1) % OUTLINE.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]), d: V2 = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+    const [t, inset] = SET[e] ?? [0.3 + 0.4 * hash(e, 1, 9), 4];
     // (the outline runs clockwise, so its inside is on the right of somebody walking it)
-    const x = a[0] + (b[0] - a[0]) * t - d[1] * 4, z = a[1] + (b[1] - a[1]) * t + d[0] * 4;
+    const x = a[0] + (b[0] - a[0]) * t - d[1] * inset, z = a[1] + (b[1] - a[1]) * t + d[0] * inset;
     out.push({ piece: kinds[k % kinds.length], x, z, yaw: Math.atan2(-d[1], d[0]), y: Math.round(land(x, z).y * 10) / 10 - 0.2 });
   });
   return (laid = out);
