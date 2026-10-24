@@ -78,6 +78,8 @@ import { Perf } from '../core/perf';
 import { loadGraphics, loadMix, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
 import { Beast, Wildlife } from './animals';
+import { Heli } from './heli';
+import { shotHeard } from '../sim/heard';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
@@ -286,6 +288,17 @@ export class Game {
     scene: () => this.s.r.scene,
     world: () => this.s.world,
     drip: (at) => this.effects.bleed(at, new THREE.Vector3(0, -1, 0), 0.45),
+    me: () => {
+      if (!this.started || this.player.dead || this.powers.hidden) return null;
+      const p = this.player.pos, ride = this.garage.ride;
+      return { id: this.net.id || 1, x: p.x, y: p.y, z: p.z, crouch: this.player.crouched, prone: this.player.prone, speed: Math.hypot(this.player.vel.x, this.player.vel.z), ride: ride ? (ride.jeep instanceof Heli ? 'air' : 'car') : '', sheltered: false };
+    },
+    hour: () => this.hourNow(),
+    struck: (s, kind) => {
+      const p = this.player.pos, len = Math.max(0.001, Math.hypot(p.x - s.from[0], p.z - s.from[1]));
+      audio.blow(true, { x: p.x, y: p.y + 1.1, z: p.z }, 1);
+      this.takeHit({ t: 'dmg', from: 0, amount: s.damage, zone: 'torso', w: kind.id, dir: [(p.x - s.from[0]) / len, 0, (p.z - s.from[1]) / len], bleed: s.bleed });
+    },
   });
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
@@ -697,8 +710,9 @@ export class Game {
       // (on the bot check's range the server is told of it as the range's own, and nobody else of anything)
       if (this.botCheck?.active) return void this.botCheck.shot(s.origin, s.dir);
       this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
-      // the infected hear it as well as anybody
+      // the infected hear it as well as anybody; and alone, this game's own herds do (online the server tells them)
       this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot, s.origin.y);
+      if (!this.online) this.wild.heard(s.origin.x, s.origin.z, shotHeard(s.weapon, s.suppressed));
     };
     // a bullet in a fuel drum. (The red drums are searched too since 2026-10-17, FURNITURE in src/sim/storage.ts, and
     // the container took the drum's collider over: a round met "a crate" and no drum went up. The owner, 2026-10-19:

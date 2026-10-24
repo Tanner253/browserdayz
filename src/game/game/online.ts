@@ -101,6 +101,7 @@ export const onlineMethods = {
     for (const v of w.vehicles ?? []) this.garage.add(v);
     this.garage.bind();
     this.horde.online(w.infected ?? [], w.spawn);
+    this.wild.leaveAlone();
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
     if (w.me) {

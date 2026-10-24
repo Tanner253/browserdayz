@@ -5,12 +5,18 @@
 import * as THREE from 'three';
 import type { Game } from '../game';
 import type { S2C } from '../../net/protocol';
-import { BLADES, SKIN } from '../../sim/animals';
+import { BLADES, SKIN, yieldOf } from '../../sim/animals';
+import { markMade } from '../../sim/cooking';
+import { makeItem } from '../../sim/items';
+import { heightAt } from '../../world/worldgen';
+
+/** who this player is to this game's own herds, playing alone */
+const ME = 1;
 
 export const huntMethods = {
   /** looking at a body near enough to gut: what it says, and F begins it. True when there was one to say anything of. */
   skinPrompt(this: Game, cam: THREE.Camera, dir: THREE.Vector3): boolean {
-    if (!this.online) return false;
+    if (!this.online && !this.wild.herd) return false;
     const b = this.wild.bodyAt(this.player.pos, SKIN.reach);
     if (!b) return false;
     const to = new THREE.Vector3(b.x, this.player.pos.y + 0.3, b.z).sub(cam.position).normalize();
@@ -21,7 +27,14 @@ export const huntMethods = {
       return true;
     }
     this.prompt = this.use ? null : `<kbd>F</kbd>Gut and skin the ${b.name.toLowerCase()}`;
-    if (!this.use && this.input.pressed('KeyF') && !this.hud.chatOpen) this.net.send({ t: 'askin', i: b.i, go: 1 });
+    if (!this.use && this.input.pressed('KeyF') && !this.hud.chatOpen) {
+      if (this.online) this.net.send({ t: 'askin', i: b.i, go: 1 });
+      else {
+        // (alone: this game's own herds say whether it can be begun)
+        const p = this.player.pos, why = this.wild.herd!.startSkin(b.i, ME, p.x, p.z, Date.now());
+        this.onSkin({ t: 'askin', i: b.i, ok: !why, ...(why ? { why } : {}) });
+      }
+    }
     return true;
   },
 
@@ -40,7 +53,20 @@ export const huntMethods = {
     const held = this.weapons.equippedItem?.id;
     const near = () => !b.gone && Math.hypot(b.x - this.player.pos.x, b.z - this.player.pos.z) < SKIN.reach + 0.6 && this.weapons.equippedItem?.id === held;
     this.use = { label: `Gutting and skinning the ${b.name.toLowerCase()}`, t: 0, dur: SKIN.time, sound: null, soundT: 0, valid: near, lost: 'You stopped: the body is where you left it', done: () => {
-      if (near()) this.net.send({ t: 'askin', i: m.i, go: 2 });
+      if (!near()) return;
+      if (this.online) return void this.net.send({ t: 'askin', i: m.i, go: 2 });
+      // (alone: what it gives laid on the ground by it, as the server lays it: server/animals.ts)
+      const p = this.player.pos, blade = BLADES[held ?? ''] ?? 0, done = this.wild.herd?.endSkin(m.i, ME, p.x, p.z, Date.now());
+      if (!done || !blade) return;
+      let k = 0;
+      for (const [id, qty] of yieldOf(done.kind, blade * (done.eaten ? 0.5 : 1))) {
+        const pieces = id.startsWith('meat_') ? qty : 1;
+        for (let n = 0; n < pieces; n++) {
+          const a = (k++ / 6) * Math.PI * 2, r = 0.5 + (k % 3) * 0.3;
+          this.dropItem(markMade(makeItem(id, pieces > 1 ? 1 : qty), Date.now() / 1000), new THREE.Vector3(done.x + Math.cos(a) * r, heightAt(this.s.world.heights, done.x, done.z) + 0.05, done.z + Math.sin(a) * r), 0);
+        }
+      }
+      this.onSkin({ t: 'askin', i: m.i, ok: true, done: true });
     } };
   },
 };

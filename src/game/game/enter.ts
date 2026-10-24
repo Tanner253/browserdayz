@@ -357,6 +357,7 @@ export const enterMethods = {
     await this.spawnDummies();
     this.garage.startAlone();
     this.horde.alone();
+    this.wild.alone();
     this.hud.setNet('Offline · single player');
     this.hud.setOnline(null);
   },

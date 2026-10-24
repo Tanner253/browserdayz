@@ -11,7 +11,9 @@ import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import type { Atmosphere } from '../world/atmosphere';
 import { heightAt, type World } from '../world/worldgen';
-import { A_ALERT, A_BITE, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_ROAR, A_RUN, A_SWIPE, A_TROT, A_WALK, KINDS, ROW_BLEEDS, type AnimalRow, type Kind } from '../sim/animals';
+import { ANIMALS, A_ALERT, A_BITE, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_ROAR, A_RUN, A_SWIPE, A_TROT, A_WALK, KINDS, ROW_BLEEDS, type AnimalRow, type Kind } from '../sim/animals';
+import { Herd, type Seen, type Strike } from '../sim/animal-mind';
+import { animalGround } from '../sim/animal-ground';
 import type { Damageable, HitZone } from './weapons';
 
 export interface WildHost {
@@ -20,6 +22,12 @@ export interface WildHost {
   world(): World;
   /** blood where a hurt one has gone */
   drip(at: THREE.Vector3): void;
+  /** playing alone: this player as the animals know of them (null: dead, or not in the world yet) */
+  me(): Seen | null;
+  /** playing alone: the share of the day it is */
+  hour(): number;
+  /** playing alone: one of them has struck this player */
+  struck(s: Strike, kind: Kind): void;
 }
 
 /** the clip each mode plays, and what stands in for it in a model without it */
@@ -162,9 +170,12 @@ export class Beast implements Damageable {
   }
 
   /** a hit: what it did is the server's to say (`hp`, below) */
-  damage(): boolean {
-    return false;
+  damage(amount: number, _point: THREE.Vector3, _dir: THREE.Vector3, _zone: HitZone): boolean {
+    // (on a server, what it did is the server's to say; alone, this game's own herds say it)
+    return this.alone?.(amount) ?? false;
   }
+  /** playing alone: a hit taken to this game's own herds, which say whether it died */
+  alone: ((amount: number) => boolean) | null = null;
 
   /** it has died: down it goes, and nothing more is shot into it */
   die(already = false) {
@@ -268,8 +279,50 @@ export class Beast implements Damageable {
 
 export class Wildlife {
   readonly beasts = new Map<number, Beast>();
+  /** playing alone, the herds are this game's own (as the server keeps them online: src/sim/animal-mind.ts) */
+  herd: Herd | null = null;
+  private stepT = 0;
 
   constructor(private host: WildHost) {}
+
+  /** Playing alone: the herds are stood a moment after the world is up (they take most of a second), away from the player. */
+  alone() {
+    this.clear();
+    const world = this.host.world();
+    window.setTimeout(() => {
+      if (this.herd) return;
+      const herd = new Herd(animalGround(world), (k) => !!assets.manifest.models[k.model], () => this.host.hour());
+      const me = this.host.me();
+      herd.populate(Date.now(), me ? [me] : []);
+      this.herd = herd;
+    }, 1500);
+  }
+
+  /** gone online: the server keeps them from here */
+  leaveAlone() {
+    this.herd = null;
+    this.clear();
+  }
+
+  /** Playing alone, five times a second: the herds think, their blows land, and this game is told of them as a server would tell it. */
+  tickAlone(dt: number) {
+    if (!this.herd || (this.stepT -= dt) > 0) return;
+    this.stepT = ANIMALS.step;
+    const me = this.host.me(), now = Date.now();
+    if (me) me.sheltered = this.herd.ground.roofed(me.x, me.z);
+    const turn = this.herd.tick(now, me ? [me] : []);
+    for (const s of turn.strikes) {
+      const b = this.herd.beasts.get(s.i);
+      if (b) this.host.struck(s, KINDS[b.k]);
+    }
+    const at = me ?? { x: 0, z: 0 };
+    this.rows(this.herd.rows(at.x, at.z, ANIMALS.told), true, performance.now());
+  }
+
+  /** playing alone: a shot heard by everything within earshot */
+  heard(x: number, z: number, range: [number, number]) {
+    this.herd?.heard(x, z, range, Date.now());
+  }
 
   /** what the server says of the animals near this player (all: everything within reach, so any other has gone) */
   rows(rows: AnimalRow[], all: boolean, now: number) {
@@ -280,6 +333,10 @@ export class Wildlife {
       if (!b) {
         if (!KINDS[r[1]]) continue;
         b = new Beast(r[0], r[1], this.host);
+        if (this.herd) {
+          const herd = this.herd, i = r[0], me = this.host.me();
+          b.alone = (amount) => !!herd.hurt(i, amount, me, Date.now())?.dead;
+        }
         this.beasts.set(r[0], b);
         b.push(r, now);
         void b.load();
