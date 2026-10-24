@@ -63,7 +63,11 @@ export const gunsMethods = {
   /** @param loose the part is held by nothing (picked up off the ground to be fitted): there is nowhere to take it from */
   attachMod(this: Game, att: ItemInstance, weapon: ItemInstance, loose = false) {
     if (!this.attachTargets(att).includes(weapon)) return;
-    if (!this.gunInHands(weapon, () => this.attachMod(att, weapon)) || this.weapons.busy) return;
+    if (!this.gunInHands(weapon, () => this.attachMod(att, weapon)) || this.weapons.busy) {
+      // (what is waiting for the gun to come up is shown on it meanwhile: see the inventory's `goingIn`)
+      if (this.fitting?.gun === weapon) this.fitting.part = att.id;
+      return;
+    }
     // (taken from wherever it is, and not fitted if it is nowhere: left in a bag in a pocket, a part was fitted and kept
     // as well, "so you can have flash light on all of your guns with one item", a player, 2026-10-15)
     if (!loose && !this.pluck(att)) return;

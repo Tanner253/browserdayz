@@ -59,6 +59,7 @@ import type { BrMode } from './br/mode';
 import { Modes } from './modes';
 import '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
+import { wants } from '../ui/inv-types';
 import { Minimap } from '../ui/minimap';
 import { BigMap } from '../ui/bigmap';
 import { BURY } from '../sim/stash';
@@ -225,7 +226,8 @@ export class Game {
   player: Player;
   avatar = new Avatar();
   director: CameraDirector;
-  inv = new PlayerInventory();
+  /** what is carried; a thing taken goes first into a bag the player has set for its kind (src/ui/inv-types.ts) */
+  inv = Object.assign(new PlayerInventory(), { prefer: wants });
   net = new Net();
   effects!: Effects;
   weapons!: Weapons;
@@ -360,6 +362,7 @@ export class Game {
   vicinityDue: number[] = [];
   vicinityT = 0;
   vicinitySig = '';
+  saveDue: ReturnType<typeof setTimeout> | null = null;
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   awaitClick = false;
   /** the chat is open and the mouse let go for it (see frame) */
@@ -837,6 +840,11 @@ export class Game {
       hotIndex: (item) => this.inv.hotOf(item),
       hold: (item, loose) => this.takeUp(item, loose),
       inHands: () => this.inv.held() ?? this.inHand,
+      goingIn: (gun) => {
+        const f = this.fitting;
+        if (f?.gun === gun && f.part) return f.part;
+        return this.inv.held() === gun ? this.weapons.goingIn() : null;
+      },
       lying: (uid) => this.lying.get(uid) ?? null,
       release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
@@ -1532,7 +1540,7 @@ export class Game {
   drumsBack: { i: number; t: number }[] = [];
 
   /** a change to a gun's parts that is waiting on the gun coming up into the hands */
-  fitting: { gun: ItemInstance; run: () => void; t: number } | null = null;
+  fitting: { gun: ItemInstance; run: () => void; t: number; part?: string } | null = null;
 
   // ------------------------------------------------------------ magazines
 
@@ -1593,6 +1601,7 @@ export interface Game {
   tickTags: Methods<typeof enterMethods>['tickTags'];
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];
+  saveSoon: Methods<typeof enterMethods>['saveSoon'];
   enterOnline: Methods<typeof onlineMethods>['enterOnline'];
   leaveOnline: Methods<typeof onlineMethods>['leaveOnline'];
   rejoin: Methods<typeof onlineMethods>['rejoin'];

@@ -35,6 +35,10 @@ import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../gam
 /** the server unheard this long (ms), the line is said to have stalled */
 const STALLED_MS = 2000;
 
+/** what the inventory's left side shows, as a word: the things lying near, and what is in the crate open (see Game.inventoryChanged, which takes it as seen) */
+export const nearSig = (near: WorldItem[], open: Stash | null) =>
+  near.map((w) => w.loot.uid + w.loot.item.qty).join(',') + (open ? `|${open.container.items.map((p) => p.item.uid + p.item.qty).join(',')}` : '');
+
 export const frameMethods = {
   // ------------------------------------------------------------ frame
 
@@ -62,11 +66,13 @@ export const frameMethods = {
       this.vicinityDue.shift();
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     }
-    // the inventory open and the survivor on the move: what lies near comes into the list and goes out of it as they walk
+    // The inventory open: what lies near comes into the list and goes out of it as they walk, and a crate refilled
+    // while open (alone, the economy's) is shown. Nothing else redraws it on a clock: it was redrawn whole every 5 s
+    // as well, changed or not, until 2026-10-23.
     if (this.invUI.isOpen && (this.vicinityT += dt) > 0.25) {
       this.vicinityT = 0;
       const near = this.around();
-      const sig = near.map((w) => w.loot.uid).join(',');
+      const sig = nearSig(near, this.openStash);
       if (sig !== this.vicinitySig) {
         this.vicinitySig = sig;
         this.openLying();
@@ -506,7 +512,6 @@ export const frameMethods = {
       }
       this.econT = 0;
       this.tagWhenDue();
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     }
     this.saveT += dt;
     if (this.saveT > 20 && playing) {
