@@ -143,11 +143,15 @@ try {
   await sleep(300);
   assert.equal(bob.count('cdata'), opened, 'a stash was opened from under the ground');
   assert.equal(bob.count('denied'), refused + 1, 'a stash was taken from under the ground');
+  // (somebody who comes in later is told where it is buried only once they come near it: server/stash-sight.ts)
   const late = new Player('Cat');
   assert.ok(await late.join());
   const w = late.last('welcome')!;
-  assert.ok(w.stashes.some((s) => s.uid === bag.uid && s.buried && s.item === 'black_bag'), 'somebody who came in later is not shown where it is buried');
+  assert.ok(!w.stashes.some((s) => s.uid === bag.uid), 'somebody who came in later is told from afar where it is buried');
   assert.ok(!w.loot.some((l) => l.uid === bag.uid), 'somebody who came in later is shown it lying on the ground as well');
+  late.say(wx + 2, wz);
+  for (let k = 0; k < 40 && !under(late, bag.uid); k++) await sleep(50);
+  assert.ok(late.got.some((m) => m.t === 'stash+' && m.s.uid === bag.uid && m.s.buried && m.s.item === 'black_bag'), 'somebody who came in later is not shown where it is buried once near it');
   checks++;
   console.log('  ok  a shovel buries a bag that lies on the ground, bare hands do not, and a tin is not buried; under the ground it is neither taken nor opened');
 
