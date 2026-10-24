@@ -3,7 +3,8 @@
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
 ## THE WORK LIST (the owner, 2026-10-23: "do not lose sight of the work list at hand"; then base building, gathering, crafting, raiding)
-Visual quality first; keep every performance figure (heli flight replay.mjs owner-run-2.json, 114.8 fps). Never change the
+Visual quality first; build cheap (heli flight replay.mjs owner-run-2.json, 114.8 fps), but a small cost is accepted (the
+owner: "small frame cost is to be expected ... we will have to do optimizations after the fact"). Never change the
 ground around buried stashes or build on them; never raise WORLD_REV. The onboarding session reviews each session's pictures
 before they go to the owner. No corners cut (the owner: "We should not have cut any corners on anything"): a "not done"
 list is finished before a feature is called done. Status as of 2026-10-23 evening:
@@ -14,6 +15,22 @@ list is finished before a feature is called done. Status as of 2026-10-23 evenin
   passing alone. HELD (the owner, 2026-10-23: "Wait till all current work is ready for prod ... wait for everything"):
   ships once inventory 1b, the fort's tail, world polish (towns, desert 1-6, river/valley 7-12, approved "1 yes") and
   animals are finished and reviewed. Open-country places need the /stashes list, which needs a server deploy first.
+- Phone pass (session local_8b56a161, own worktree): the iPhone crash after the start (Chrome "Can't open this page"),
+  cheap Androids stuck at "world", a phone sky, KTX2 textures, a ready-made map file, the xray viewer/curtain/locker a
+  little and the ammo box "a tiny bit"; and ONE loading (players: "why does the user need to wait for 2 loadings?").
+- Animals, the owner 2026-10-23: "leave out the fox. the animals spawns and movement should make common sense. make sure
+  animals dont spawn in impossible places like in the deserv canyon walls etc. just make sure its high quality please."
+  Their downloads are in assets-src (bear, elk, doe, cow, meats, bones, rug); animated_wolf (ripper account) and the
+  AnimalMesh3D boar/rabbit/goat (personal use only) must NOT ship. Checked by onboarding (record, description, uploader's
+  uploads): cleared = bear bffc3c87, elk 787834f9, doe b6172618, cow 0e780cb5, rib 7239ceff, meat4 f49758b8, bones
+  5ec580b4, rug 3936fd14. Free boars are re-uploads; no clean goat. Clean free fallbacks: wolf 56de4df6 (rhcreations),
+  hare 948938cd (bluekiwi.dog). Every model link is licence-checked before it goes to the owner. The owner: free meshes
+  only, "if you cant find a free mesh for the animal then skip the animal": no boar, no goat, no fox. Unusable downloads
+  moved to assets-src/_not-licensed/ (README there); never import from it. FINAL roster (the owner): bear, stag, doe,
+  wolf (wolf_animated.zip, victory_mirosya, CC-BY, cleared), cow; "FORGET THE RABBIT". Sounds: only what is in
+  assets-src plus the game's own (the owner: some suggested ones were "useless garbage"). Respawn one animal at a time,
+  herds asleep when nobody is within 400 m (the owner: "this is fine"). Bears: 3 on the map, each alone, never in a
+  herd ("dont herd or pack"; "3 is fine").
 - Animal models: Sketchfab gives files only to a signed-in account. assets-src/_wf/animals/sketchfab.mjs fetches the 14
   with the owner's own SKETCHFAB_TOKEN (run by them), or they sign in to the animals session's pane.
 - Owner 2026-10-23 on the plans: "Everything looks good"; plus "the desert needs some buildings north of the river on
@@ -33,12 +50,20 @@ list is finished before a feature is called done. Status as of 2026-10-23 evenin
       SERVER deploy; never deploy the site alone from that branch, or merge it into a branch the site goes out from first.
 - [ ] Gameplay batch (session gameplay-batch, local_5deed9ae): infected loot in the body (5 min), thirst -25%, admin corpse
       delete (one / all near), admin item ESP. Done on claude/gameplay-batch-94414c (b00a1846, cbc3eade, fd708221;
-      PROTOCOL 61), reviewed (progress/gameplay-batch/*.png), all tests pass; waits for a full deploy (site + server).
+      PROTOCOL 61), reviewed (progress/gameplay-batch/*.png), all tests pass. Audit done (26707726, merged into
+      release-1023): infected bodies frozen, ESP nearest 250, lighter welcome, body shadows off (the owner's word).
 - [ ] Animals and hunting (session animals-hunting, local_6551ac13): DayZ/Rust mechanics, useful drops (food + hides, bone,
       fat for crafting). Plan v2 (progress/animals/zona-plan-animals.jpg) approved 2026-10-23: "download all animals and
       support them in the admin panel entities for spawning", "yes to animals icons and sounds". Building all six.
 - [ ] Server-run inventory + inventory lag + container QOL (session local_cbc26f80, branch claude/kind-lewin-2891bd):
       building; the payout custody holes (client-claimed inventory before 'cash', tagSeen kept after a tag leaves) with tests.
+      Next after 1b: a DayZ-style layout (progress/plans/dayz-inventory-ref.webp, the owner: "dayz ui is much better than
+      ours for looting"): equipment slot icons on top, worn containers listed in fixed panels with X to fold, the body
+      looted on the left mirroring your side. Plan (progress/plans/zona-plan-inv-layout.jpg) taken as yes with the owner's
+      change: "make the hotbar slots much bigger now like dayz's at the bottom beneath hands". Vicinity as item icons, no
+      text rows. The hotbar forgets an item that leaves the player ("when i drop an item my hotbar should forget about it").
+- [ ] G to drop, hold G to throw with a power bar, cancel with the wheel or a slot change (session gameplay-batch,
+      local_5deed9ae, its branch merged with release-1023 first).
 - Several branches raise PROTOCOL (gameplay-batch 61, more to come): when merging them, give the merged tree one number.
 - [x] iPhone crash (live), live disconnects (live), buried-stash leak (live), Discord/X at deaths (live).
 
