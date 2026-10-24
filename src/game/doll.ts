@@ -38,6 +38,7 @@ import type { Grips } from './arms';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from './avatar';
 import { lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch } from './look';
 import type { ItemModels } from './loot';
+import { HELD_FIT } from './held-size';
 
 /** a thing as it is seen in somebody's hands (`plumb`: the part of it that hangs from the hand, and is kept upright: see `inFist`) */
 type Held = { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee'; plumb?: THREE.Object3D };
@@ -707,6 +708,14 @@ export class Doll {
     model.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(model);
     if (box.isEmpty()) return null;
+    // (a building material at a tin's size, as the hands hold it in first person: src/game/held-size.ts)
+    const fit = HELD_FIT[id];
+    if (fit) {
+      const s = box.getSize(new THREE.Vector3());
+      model.scale.multiplyScalar(fit / Math.max(s.x, s.y, s.z));
+      model.updateMatrixWorld(true);
+      box.setFromObject(model);
+    }
     const size = box.getSize(new THREE.Vector3()).toArray();
     model.position.sub(box.getCenter(new THREE.Vector3()));
     // (the hand's own frame, as a club's is said: the handle along y, the fingers toward -z, the palm facing -x)

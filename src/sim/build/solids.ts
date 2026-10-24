@@ -5,19 +5,35 @@
 
 import { CELL, FLOOR_T, FOUND, PIECES, STOREY, WALL_T } from './pieces';
 
-export type Solid =
+export type Solid = (
   /** a box: its middle and its size */
   | { box: [number, number, number, number, number, number] }
   /** an upright prism: its outline on the ground (x, z) from y0 to y1 */
   | { prism: [number, number][]; y0: number; y1: number }
   /** the hull of these points */
-  | { hull: [number, number, number][] };
+  | { hull: [number, number, number][] }
+) & {
+  /** a shade its paint is drawn darker or lighter in (a strap's iron, a rivet's): white, none */
+  c?: number;
+};
+
+/**
+ * What a piece is drawn in: a tier's paint, or one of its own. The navigator, 2026-10-24, of a shut door that was the
+ * wall's own planks: "Give every leaf what makes it one ... planks of a different shade ... the metal door its own
+ * plate and rivets". A wooden door is painted boards, a metal one a plate of painted steel, a garage door galvanised
+ * sheet; an opening's frame is dark timber; the claim's flag is cloth.
+ */
+export type Paint = 0 | 1 | 2 | 3 | 'door' | 'steel' | 'galv' | 'trim' | 'flag';
 
 export interface Shape {
   /** what stops a body and a bullet, and is drawn */
   solid: Solid[];
   /** drawn, and stops nothing (a foundation's posts into the ground, a high wall's sharpened tops) */
   dress?: Solid[];
+  /** a paint of its own (none: its tier's) */
+  paint?: Paint;
+  /** drawn in another paint, and stops nothing (an opening's frame, the claim's flag) */
+  cloth?: { paint: Paint; solid: Solid[] };
   /** what swings (a door's leaves, a gate's, a hatch's lid, shutters) */
   leaves?: Leaf[];
 }
@@ -33,7 +49,7 @@ export interface Leaf {
   open: number;
   solid: Solid[];
   dress?: Solid[];
-  paint?: 0 | 1 | 2 | 3;
+  paint?: Paint;
 }
 
 const H = CELL / 2;
@@ -71,11 +87,11 @@ const SHAPES: Record<string, () => Shape> = {
   wall_half: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, STOREY / 2)] }),
   wall_low: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, 1)] }),
   // (an opening a metre wide and 2.2 m high: a door is hung in it, step four)
-  doorway: () => ({ solid: [wallBox(-LONG / 2, 0, -0.5, STOREY), wallBox(0.5, 0, LONG / 2, STOREY), wallBox(-0.5, 2.2, 0.5, STOREY)] }),
+  doorway: () => ({ solid: [wallBox(-LONG / 2, 0, -0.5, STOREY), wallBox(0.5, 0, LONG / 2, STOREY), wallBox(-0.5, 2.2, 0.5, STOREY)], cloth: frame(0.5, 0, 2.2, false) }),
   // (a window 1.2 m across, from 1.1 m to 2.1 m: shutters or bars go in it)
-  window: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, 1.1), wallBox(-LONG / 2, 2.1, LONG / 2, STOREY), wallBox(-LONG / 2, 1.1, -0.6, 2.1), wallBox(0.6, 1.1, LONG / 2, 2.1)] }),
+  window: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, 1.1), wallBox(-LONG / 2, 2.1, LONG / 2, STOREY), wallBox(-LONG / 2, 1.1, -0.6, 2.1), wallBox(0.6, 1.1, LONG / 2, 2.1)], cloth: frame(0.6, 1.1, 2.1, true) }),
   // (an opening 2.4 m across and 2.6 m high: double doors or a garage door)
-  wall_frame: () => ({ solid: [wallBox(-LONG / 2, 0, -1.2, STOREY), wallBox(1.2, 0, LONG / 2, STOREY), wallBox(-1.2, 2.6, 1.2, STOREY)] }),
+  wall_frame: () => ({ solid: [wallBox(-LONG / 2, 0, -1.2, STOREY), wallBox(1.2, 0, LONG / 2, STOREY), wallBox(-1.2, 2.6, 1.2, STOREY)], cloth: frame(1.2, 0, 2.6, false) }),
   floor: () => ({ solid: [box(-H, -FLOOR_T, -H, H, 0, H)] }),
   floor_tri: () => ({ solid: [TRI(-FLOOR_T, 0)] }),
   // (a hole 1.4 m square: a ladder hatch goes in it)
@@ -109,7 +125,7 @@ const SHAPES: Record<string, () => Shape> = {
   }),
   high_wall_stone: () => ({ solid: [box(-H, 0, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
   // (the claim: its upkeep box, and over it a pole with the flag of whoever holds it)
-  claim: () => ({ solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], dress: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] }),
+  claim: () => ({ solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], cloth: { paint: 'flag', solid: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] } }),
   // ---- fittings: each swings out to its piece's +z, which R turns about
   // (a leaf a metre wide in the doorway, hung on its -x jamb; braced on the inside, its handle both sides)
   door_wood: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, true)] }),
@@ -119,28 +135,30 @@ const SHAPES: Record<string, () => Shape> = {
   // (one panel hung from the opening's head, that tips up and in to lie under the ceiling: an up-and-over door)
   garage_door: () => ({
     solid: [],
-    leaves: [{ hinge: [0, 2.6, 0], axis: 'x', open: Math.PI / 2, solid: [box(-1.18, -2.58, -0.05, 1.18, -0.02, 0.05)], dress: [0, 1, 2, 3, 4].map((i) => box(-1.15, -2.45 + i * 0.5, -0.09, 1.15, -2.37 + i * 0.5, -0.05)) }],
+    leaves: [{ hinge: [0, 2.6, 0], axis: 'x', open: Math.PI / 2, paint: 'galv', solid: [box(-1.18, -2.58, -0.05, 1.18, -0.02, 0.05)], dress: [...[0, 1, 2, 3, 4].map((i) => box(-1.15, -2.45 + i * 0.5, -0.09, 1.15, -2.37 + i * 0.5, -0.05)), tinted(box(-0.25, -2.48, 0.05, 0.25, -2.42, 0.09), IRON)] }],
   }),
   // (a lid in the floor frame's hole, hinged at its -z side, that lifts to stand up past upright)
-  hatch: () => ({ solid: [], leaves: [{ hinge: [0, 0, -0.7], axis: 'x', open: -1.75, solid: [box(-0.68, -0.08, 0.02, 0.68, 0, 1.38)], dress: [box(-0.06, 0, 1.1, 0.06, 0.04, 1.3)] }] }),
+  hatch: () => ({ solid: [], leaves: [{ hinge: [0, 0, -0.7], axis: 'x', open: -1.75, paint: 'steel', solid: [box(-0.68, -0.08, 0.02, 0.68, 0, 1.38)], dress: [tinted(box(-0.08, 0, 1.12, 0.08, 0.04, 1.3), IRON), ...[-0.5, 0.5].map((x) => tinted(box(x - 0.06, -0.02, 0, x + 0.06, 0.02, 0.14), IRON)), ...rivets([-0.6, 0.6], [0.1, 1.3], 0, 'y')] }] }),
   // (two leaves on the wall's outside face, folded back flat against it when open)
   shutters: () => ({
     solid: [],
-    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 0.6, 1.1, WALL_T / 2 + 0.03], axis: 'y', open: s * 3.05, solid: [box(Math.min(0, -s * 0.59), 0.01, -0.03, Math.max(0, -s * 0.59), 0.99, 0.03)], dress: [0.25, 0.75].map((y) => box(Math.min(-s * 0.05, -s * 0.55), y - 0.05, 0.03, Math.max(-s * 0.05, -s * 0.55), y + 0.05, 0.06)) })),
+    // (hung clear of the window's frame, which stands proud of the wall)
+    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 0.6, 1.1, WALL_T / 2 + 0.08], axis: 'y', open: s * 3.05, paint: 'door', solid: [box(Math.min(0, -s * 0.59), 0.01, -0.03, Math.max(0, -s * 0.59), 0.99, 0.03)], dress: [0.25, 0.75].map((y) => tinted(box(Math.min(-s * 0.02, -s * 0.45), y - 0.025, 0.03, Math.max(-s * 0.02, -s * 0.45), y + 0.025, 0.045), IRON)) })),
   }),
   bars_wood: () => ({ solid: bars(6, 0.07, 0.035) }),
-  bars_metal: () => ({ solid: bars(8, 0.035, 0.02) }),
+  bars_metal: () => ({ solid: bars(8, 0.035, 0.02), paint: 'steel' }),
   // (a plate over the window with a slit to see and shoot through, 0.6 m by 0.15)
-  embrasure: () => ({ solid: [box(-0.6, 1.1, -0.04, 0.6, 1.5, 0.04), box(-0.6, 1.65, -0.04, 0.6, 2.1, 0.04), box(-0.6, 1.5, -0.04, -0.3, 1.65, 0.04), box(0.3, 1.5, -0.04, 0.6, 1.65, 0.04)] }),
+  embrasure: () => ({ solid: [box(-0.6, 1.1, -0.04, 0.6, 1.5, 0.04), box(-0.6, 1.65, -0.04, 0.6, 2.1, 0.04), box(-0.6, 1.5, -0.04, -0.3, 1.65, 0.04), box(0.3, 1.5, -0.04, 0.6, 1.65, 0.04)], paint: 'steel', dress: [...rivets([-0.54, 0.54], [1.16, 2.04], 0.04, 'z'), ...rivets([-0.54, 0.54], [1.16, 2.04], -0.04, 'z')] }),
   // (a gate the length of a high wall: its posts and head, and two leaves 1.2 m wide and 5.1 high)
   gate_wood: () => ({
     solid: [box(-1.5, 0, -0.3, -1.2, 6, 0.3), box(1.2, 0, -0.3, 1.5, 6, 0.3), box(-1.2, 5.25, -0.25, 1.2, 6, 0.25)],
     dress: [-1.35, 1.35].map((x) => ({ hull: [[x - 0.15, 6, -0.3], [x + 0.15, 6, -0.3], [x - 0.15, 6, 0.3], [x + 0.15, 6, 0.3], [x, 6.6, 0]] as [number, number, number][] })),
-    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.2, 0, 0], axis: 'y', open: s * 1.75, solid: [box(Math.min(0, -s * 1.19), 0.08, -0.1, Math.max(0, -s * 1.19), 5.2, 0.1)] })),
+    // (hung at their outside faces, as the doors are, and opening square: clear of the posts)
+    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.2, 0, 0.1], axis: 'y', open: (s * Math.PI) / 2, solid: [box(Math.min(0, -s * 1.19), 0.08, -0.2, Math.max(0, -s * 1.19), 5.2, 0)], dress: [0.7, 4.4].map((y) => tinted(box(Math.min(-s * 0.14, -s * 0.9), y, 0, Math.max(-s * 0.14, -s * 0.9), y + 0.12, 0.04), IRON)) })),
   }),
   gate_stone: () => ({
     solid: [box(-1.5, 0, -0.45, -1.15, 6, 0.45), box(1.15, 0, -0.45, 1.5, 6, 0.45), box(-1.15, 5.25, -0.4, 1.15, 6.25, 0.4)],
-    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.15, 0, 0], axis: 'y', open: s * 1.75, paint: 3, solid: [box(Math.min(0, -s * 1.14), 0.08, -0.06, Math.max(0, -s * 1.14), 5.2, 0.06)] })),
+    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.15, 0, 0.06], axis: 'y', open: (s * Math.PI) / 2, paint: 'steel', solid: [box(Math.min(0, -s * 1.14), 0.08, -0.12, Math.max(0, -s * 1.14), 5.2, 0)], dress: [0.6, 2.6, 4.6].flatMap((y) => [tinted(box(Math.min(-s * 0.12, -s * 1.1), y, 0, Math.max(-s * 0.12, -s * 1.1), y + 0.14, 0.03), IRON), tinted(box(Math.min(0, -s * 1.1), y, -0.15, Math.max(0, -s * 1.1), y + 0.14, -0.12), IRON)]) })),
   }),
   // ---- set down
   box_small: () => ({ solid: [box(-0.4, 0, -0.28, 0.4, 0.5, 0.28)], dress: [box(-0.42, 0.5, -0.3, 0.42, 0.56, 0.3)] }),
@@ -152,15 +170,54 @@ const SHAPES: Record<string, () => Shape> = {
   }),
 };
 
-/** a door's leaf hung on a jamb at x = `at` (it reaches toward the opening's middle), `w` wide and `h` high, out to +z */
+/** iron (straps, hinges, handles) and the heads of rivets, as the paint is shaded for them */
+const IRON = 0x2e2c2a, RIVET = 0xb4b0a8;
+const tinted = (s: Solid, c: number): Solid => ({ ...s, c });
+
+/** rivets round a plate: along its edges between [x0, x1] and [a0, a1], on the face at `at` (z, or y for a lid) */
+function rivets([x0, x1]: [number, number], [a0, a1]: [number, number], at: number, face: 'z' | 'y'): Solid[] {
+  const out: Solid[] = [], r = 0.018, n = (a: number, b: number) => Math.max(2, Math.round(Math.abs(b - a) / 0.3));
+  const put = (x: number, a: number) => out.push(tinted(face === 'z' ? box(x - r, a - r, at - r, x + r, a + r, at + r) : box(x - r, at - r, a - r, x + r, at + r, a + r), RIVET));
+  for (let i = 0; i <= n(x0, x1); i++) for (const a of [a0, a1]) put(x0 + ((x1 - x0) * i) / n(x0, x1), a);
+  for (let i = 1; i < n(a0, a1); i++) for (const x of [x0, x1]) put(x, a0 + ((a1 - a0) * i) / n(a0, a1));
+  return out;
+}
+
+/** an opening's frame of dark timber, standing proud of both faces: its jambs at +-`half`, from `y0` (a sill too, a window's) to `y1` */
+function frame(half: number, y0: number, y1: number, sill: boolean): { paint: Paint; solid: Solid[] } {
+  const t = 0.12, d = WALL_T / 2 + 0.04;
+  return { paint: 'trim', solid: [box(-half - t, y0, -d, -half, y1 + t, d), box(half, y0, -d, half + t, y1 + t, d), box(-half - t, y1, -d, half + t, y1 + t, d), ...(sill ? [box(-half - t - 0.04, y0 - t, -d - 0.04, half + t + 0.04, y0, d + 0.04)] : [])] };
+}
+
+/**
+ * A door's leaf hung on a jamb at x = `at` (it reaches toward the opening's middle), `w` wide and `h` high, out to +z,
+ * on hinges at its outside face, as a door is hung: it opens square without its edge turning into the frame. A wooden
+ * one is painted boards with two ledges and two iron straps from its hinges; a metal one a plate of painted steel with
+ * a frame and rivets round it and three hinges; both a handle each side. Its leaf is 8 cm thick.
+ */
 function door(at: number, w: number, h: number, wood: boolean): Leaf {
-  const s = at < 0 ? 1 : -1, x0 = Math.min(0, s * (w - 0.02)), x1 = Math.max(0, s * (w - 0.02));
-  const handle = (z: number) => box(s * (w - 0.16) - 0.03, h * 0.45 - 0.03, z - 0.03, s * (w - 0.16) + 0.03, h * 0.45 + 0.03, z + 0.03);
-  // (a wooden one's two ledges, both faces, so that it reads as a door in a wall of the same boards; a metal one's
-  // frame round its sheet)
-  const inside = wood ? [-1, 1].flatMap((f) => [box(x0 + 0.05, 0.35, Math.min(f * 0.04, f * 0.08), x1 - 0.05, 0.47, Math.max(f * 0.04, f * 0.08)), box(x0 + 0.05, h - 0.55, Math.min(f * 0.04, f * 0.08), x1 - 0.05, h - 0.43, Math.max(f * 0.04, f * 0.08))]) : [box(x0 + 0.02, 0.04, -0.07, x1 - 0.02, 0.12, -0.04), box(x0 + 0.02, h - 0.14, -0.07, x1 - 0.02, h - 0.06, -0.04)];
-  // (a pair opens a little short of square, clear of a wall meeting the frame at the corner)
-  return { hinge: [at, 0, 0], axis: 'y', open: s * -(w > 1.1 ? 1.62 : 1.75), solid: [box(x0, 0.02, -0.04, x1, h - 0.02, 0.04)], dress: [...inside, handle(0.08), handle(-0.11)] };
+  const s = at < 0 ? 1 : -1, T = 0.08;
+  const along = (a: number, b: number): [number, number] => [Math.min(s * a, s * b), Math.max(s * a, s * b)];
+  // (something laid on a face, `t` deep, from `u0` to `u1` along the leaf; the outside face (f 1) is the hinges')
+  const on = (f: number, u0: number, u1: number, y0: number, y1: number, t: number, c?: number): Solid => {
+    const [xa, xb] = along(u0, u1), [za, zb] = f > 0 ? [0, t] : [-T - t, -T];
+    const b = box(xa, y0, za, xb, y1, zb);
+    return c === undefined ? b : tinted(b, c);
+  };
+  const handles = [1, -1].map((f) => on(f, w - 0.16, w - 0.12, h * 0.42 - 0.12, h * 0.42 + 0.12, 0.06, IRON));
+  const [x0, x1] = along(0, w - 0.02);
+  // (on the outside, nothing within 12 cm of the hinges: it would turn into the jamb)
+  const dress = wood
+    ? [0.42, h - 0.5].flatMap((y) => [on(1, 0.12, w - 0.06, y - 0.06, y + 0.06, 0.03), on(-1, 0.04, w - 0.06, y - 0.06, y + 0.06, 0.03), on(1, 0.12, w * 0.62, y - 0.05, y + 0.05, 0.045, IRON)])
+    : [
+        ...[1, -1].flatMap((f) => {
+          const u0 = f > 0 ? 0.12 : 0.03;
+          return [on(f, u0, w - 0.04, 0.05, 0.13, 0.03), on(f, u0, w - 0.04, h - 0.14, h - 0.06, 0.03), on(f, w - 0.12, w - 0.04, 0.13, h - 0.14, 0.03), on(f, u0, u0 + 0.08, 0.13, h - 0.14, 0.03)];
+        }),
+        ...rivets(along(0.16, w - 0.08), [0.09, h - 0.1], 0.03, 'z'),
+        ...[0.3, h / 2, h - 0.4].map((y) => tinted(box(-0.025, y, -0.025, 0.025, y + 0.16, 0.025), IRON)),
+      ];
+  return { hinge: [at, 0, T / 2], axis: 'y', open: (s * -Math.PI) / 2, paint: wood ? 'door' : 'steel', solid: [box(x0, 0.02, -T, x1, h - 0.02, 0)], dress: [...dress, ...handles] };
 }
 
 /** `n` bars across the window, each `t` square, held by a rail top and bottom of `rail` deep */
@@ -175,15 +232,15 @@ function bars(n: number, t: number, rail: number): Solid[] {
 
 /** a solid moved by a step (a leaf's, hung shut, into its piece's frame) */
 export function moved(s: Solid, [dx, dy, dz]: [number, number, number]): Solid {
-  if ('box' in s) return { box: [s.box[0] + dx, s.box[1] + dy, s.box[2] + dz, s.box[3], s.box[4], s.box[5]] };
-  if ('prism' in s) return { prism: s.prism.map(([x, z]) => [x + dx, z + dz]), y0: s.y0 + dy, y1: s.y1 + dy };
-  return { hull: s.hull.map(([x, y, z]) => [x + dx, y + dy, z + dz]) };
+  if ('box' in s) return { ...s, box: [s.box[0] + dx, s.box[1] + dy, s.box[2] + dz, s.box[3], s.box[4], s.box[5]] };
+  if ('prism' in s) return { ...s, prism: s.prism.map(([x, z]) => [x + dx, z + dz]), y0: s.y0 + dy, y1: s.y1 + dy };
+  return { ...s, hull: s.hull.map(([x, y, z]) => [x + dx, y + dy, z + dz]) };
 }
 
 /** everything of a piece as it stands shut, in its own frame: what it is, what dresses it, and its leaves hung shut */
 export function shutOf(kind: string, dress = true): Solid[] {
   const s = shapeOf(kind);
-  return [...s.solid, ...(dress ? (s.dress ?? []) : []), ...(s.leaves ?? []).flatMap((l) => [...l.solid, ...(dress ? (l.dress ?? []) : [])].map((q) => moved(q, l.hinge)))];
+  return [...s.solid, ...(dress ? [...(s.dress ?? []), ...(s.cloth?.solid ?? [])] : []), ...(s.leaves ?? []).flatMap((l) => [...l.solid, ...(dress ? (l.dress ?? []) : [])].map((q) => moved(q, l.hinge)))];
 }
 
 const made = new Map<string, Shape>();

@@ -26,6 +26,7 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
+import { HELD_FIT } from './held-size';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -504,7 +505,7 @@ export const LIVE = {
  */
 // (firewood: a bundle half a metre long, held in front of the eye, filled the view)
 // (and base building's, 2026-10-24: a roll of plan held as a roll is, a log, a bundle of boards, a sheet of steel, at a size a hand can show)
-const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45, building_plan: 0.45, log: 0.55, planks: 0.6, sheet_metal: 0.55 };
+const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45 };
 
 /**
  * A roll of dressing in the left palm, and the right drawing lengths off it. A bag of blood or salt water being run
@@ -3643,7 +3644,8 @@ export class Weapons {
           }
         });
         const size = tpl.size.clone();
-        const big = IN_HAND[id] ?? 1;
+        // (a building material at a tin's size: src/game/held-size.ts)
+        const big = HELD_FIT[id] ? HELD_FIT[id] / Math.max(size.x, size.y, size.z) : (IN_HAND[id] ?? 1);
         if (big !== 1) {
           obj.scale.multiplyScalar(big);
           size.multiplyScalar(big);
@@ -3787,7 +3789,8 @@ export class Weapons {
           audio.blow(a.name === 'punch', pt, 1);
         } else {
           const s = (hit.tag?.surface ?? 'dirt') as Surface;
-          this.fx.impact(s, pt, n, false);
+          // (a blow throws a few chips, not a bullet's cloud)
+          this.fx.knock(s, pt, n);
           audio.impact(s, pt, 1);
           if (a.name === 'swing') this.onWhack(hit.tag?.owner, pt, this.currentItem?.id ?? 'fists');
         }

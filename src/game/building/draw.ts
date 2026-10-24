@@ -9,14 +9,11 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { BODY_QUERY, physics } from '../../core/physics';
 import type { Atmosphere } from '../../world/atmosphere';
-import { PIECES, type Tier } from '../../sim/build/pieces';
-import { shapeOf, type Leaf } from '../../sim/build/solids';
+import { PIECES } from '../../sim/build/pieces';
+import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
 import { DOOR } from '../../sim/build/doors';
-import { SURFACE, drawnAt, dressOf, flagPaint, geometryOf, leafGeometry, paintsOf } from './look';
-
-/** kinds whose dress is drawn apart, in a paint of its own (the claim's flag) */
-const CLOTH = new Set(['claim']);
+import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
 
 /** what a blow or a bullet that lands on a piece struck */
 export class PieceRef {
@@ -81,8 +78,10 @@ export class BaseDraw {
     const [x, y, z] = toWorld(base, piece.x, piece.y, piece.z);
     _q.setFromAxisAngle(_up, worldYaw(base, piece.r));
     const frame = new THREE.Matrix4().compose(_p.set(x, y, z), _q, _one);
+    // (a draw for the piece in its paint, one for what of it is in a paint of its own, and one for each leaf)
     const s = shapeOf(piece.k), t = drawnAt(piece.k, piece.t), parts: Part[] = [];
-    if (s.solid.length || s.dress?.length) parts.push({ key: `${piece.k}:${t}${CLOTH.has(piece.k) ? ':cloth' : ''}`, matrix: frame, slot: 0 });
+    if (s.solid.length || s.dress?.length) parts.push({ key: `${piece.k}:${s.paint ?? t}`, matrix: frame, slot: 0 });
+    if (s.cloth) parts.push({ key: `${piece.k}:${s.cloth.paint}:C`, matrix: frame, slot: 0 });
     (s.leaves ?? []).forEach((l, i) => parts.push({ key: `${piece.k}:${l.paint ?? t}:L${i}`, matrix: new THREE.Matrix4(), slot: 0 }));
     // (a door already drawn keeps how far it stood open, and swings on from there)
     const d: Drawn = { parts, frame, at: new THREE.Vector3(x, y, z), colliders: null, a: was ? was.a : piece.open ? 1 : 0, leafCols: null, base, piece };
@@ -220,28 +219,14 @@ export class BaseDraw {
       if (m) {
         this.scene.remove(m);
         m.dispose();
-        const f = m.userData.cloth as THREE.InstancedMesh | undefined;
-        if (f) {
-          this.scene.remove(f);
-          f.dispose();
-        }
       }
-      const [kind, t, more] = key.split(':'), leaf = more?.startsWith('L');
-      const geo = leaf ? leafGeometry(kind, Number(more.slice(1)), Number(t) as Tier) : geometryOf(kind, Number(t) as Tier, more !== 'cloth');
-      m = new THREE.InstancedMesh(geo, paintsOf(this.atmo)[Number(t)], Math.max(16, Math.ceil(list.length * 1.5)));
+      const [kind, name, more] = key.split(':'), paint = (/^\d$/.test(name) ? Number(name) : name) as Paint;
+      const geo = more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
+      m = new THREE.InstancedMesh(geo, paintFor(paint, this.atmo), Math.max(16, Math.ceil(list.length * 1.5)));
       m.castShadow = m.receiveShadow = true;
       m.name = `base:${key}`;
       this.scene.add(m);
       this.meshes.set(key, m);
-      // (and its cloth, beside it: one more draw for the kind, as many as there are)
-      const dress = more === 'cloth' && dressOf(kind);
-      if (dress) {
-        const f = new THREE.InstancedMesh(dress, flagPaint(this.atmo), m.instanceMatrix.count);
-        f.castShadow = true;
-        f.name = `base:${key}:flag`;
-        this.scene.add(f);
-        m.userData.cloth = f;
-      }
     }
     list.forEach((q, i) => {
       q.slot = i;
@@ -251,18 +236,10 @@ export class BaseDraw {
     m.instanceMatrix.needsUpdate = true;
     m.computeBoundingSphere();
     m.visible = list.length > 0;
-    const f = m.userData.cloth as THREE.InstancedMesh | undefined;
-    if (f) {
-      list.forEach((q, i) => f.setMatrixAt(i, q.matrix));
-      f.count = list.length;
-      f.instanceMatrix.needsUpdate = true;
-      f.computeBoundingSphere();
-      f.visible = list.length > 0;
-    }
   }
 
   private solid(d: Drawn) {
-    const s = shapeOf(d.piece.k), surface = SURFACE[drawnAt(d.piece.k, d.piece.t)];
+    const s = shapeOf(d.piece.k), t = drawnAt(d.piece.k, d.piece.t), surface = surfaceOf(s.paint ?? t);
     const owner = new PieceRef(d.base.id, d.piece.id);
     _q.setFromAxisAngle(_up, worldYaw(d.base, d.piece.r));
     const q = { x: _q.x, y: _q.y, z: _q.z, w: _q.w };
@@ -277,7 +254,7 @@ export class BaseDraw {
       return desc ? physics.addStaticQuat(desc, surface, { x: d.at.x, y: d.at.y, z: d.at.z }, q, owner) : null;
     }).filter((c): c is RAPIER.Collider => !!c);
     // (each leaf a box or more, put where the leaf now is)
-    d.leafCols = (s.leaves ?? []).map((l) => l.solid.map((b) => ('box' in b ? physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.box[3] / 2, b.box[4] / 2, b.box[5] / 2), SURFACE[l.paint ?? drawnAt(d.piece.k, d.piece.t)], { x: 0, y: 0, z: 0 }, q, owner) : null)).filter((c): c is RAPIER.Collider => !!c));
+    d.leafCols = (s.leaves ?? []).map((l) => l.solid.map((b) => ('box' in b ? physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.box[3] / 2, b.box[4] / 2, b.box[5] / 2), surfaceOf(l.paint ?? t), { x: 0, y: 0, z: 0 }, q, owner) : null)).filter((c): c is RAPIER.Collider => !!c));
     if (d.leafCols.length) this.placeLeaves(d);
   }
 

@@ -1,7 +1,8 @@
 // How a piece of a base looks (2026-10-24): its solids (src/sim/build/solids.ts) made into one shape for each kind and
 // tier, and one paint for each tier, from Poly Haven's pictures (the owner's yes, plan v2: "the pieces as our own shapes
 // in Poly Haven's free textures, as the map's buildings are made"). A frame is a lattice of bare timber with the light
-// through it, as Rust's twig is; wood, stone and metal are what they say.
+// through it, as Rust's twig is; wood, stone and metal are what they say. Doors, their frames and the claim's flag have
+// paints of their own (src/sim/build/solids.ts, Paint), and their straps and rivets a shade (vertex colours).
 
 import * as THREE from 'three';
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
@@ -9,11 +10,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../../core/assets';
 import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES, type Tier } from '../../sim/build/pieces';
-import { shapeOf, shutOf, type Solid } from '../../sim/build/solids';
+import { shapeOf, shutOf, type Paint, type Solid } from '../../sim/build/solids';
 import { leafPoint } from '../../sim/build/doors';
 
-/** metres of a piece to one picture of each tier's paint */
-const TILE = [3, 1.6, 2, 1.5];
+/** metres of a piece to one picture of each paint */
+const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1 };
 
 /** a box with its pictures laid on in metres (each face by its own two ways) */
 function boxGeo(c: [number, number, number, number, number, number], tile: number): THREE.BufferGeometry {
@@ -71,49 +72,53 @@ function planar(g: THREE.BufferGeometry, tile: number) {
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
 
+/** a solid as drawn: its pictures laid on in metres, and its shade (white: none) in every corner */
 function solidGeo(s: Solid, tile: number) {
-  if ('box' in s) return boxGeo(s.box, tile);
-  if ('prism' in s) return prismGeo(s.prism, s.y0, s.y1, tile);
-  return hullGeo(s.hull, tile);
-}
-
-const geos = new Map<string, THREE.BufferGeometry>();
-/** a kind's shape, its pictures laid on for a tier (`dress`: with what is only drawn) */
-export function geometryOf(kind: string, t: Tier, dress = true): THREE.BufferGeometry {
-  const key = `${kind}:${t}:${dress}`;
-  let g = geos.get(key);
-  if (!g) {
-    const s = shapeOf(kind);
-    const parts = [...s.solid, ...(dress ? (s.dress ?? []) : [])].map((q) => solidGeo(q, TILE[t]));
-    g = mergeGeometries(parts.map((q) => {
-      // (one set of attributes for all: what a box, a prism and a hull each carry)
-      for (const name of Object.keys(q.attributes)) if (!['position', 'normal', 'uv'].includes(name)) q.deleteAttribute(name);
-      return q;
-    }), false)!;
-    g.computeBoundingSphere();
-    geos.set(key, g);
-  }
+  const g = 'box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile);
+  // (one set of attributes for all: what a box, a prism and a hull each carry, and the shade)
+  for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+  const c = new THREE.Color(s.c ?? 0xffffff), n = g.getAttribute('position').count;
+  g.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n * 3 }, (_, i) => (i % 3 === 0 ? c.r : i % 3 === 1 ? c.g : c.b)), 3));
   return g;
 }
 
 /** a merge of solids, as one shape drawn with one paint */
 function merged(list: Solid[], tile: number): THREE.BufferGeometry {
-  const g = mergeGeometries(list.map((q) => {
-    const x = solidGeo(q, tile);
-    for (const name of Object.keys(x.attributes)) if (!['position', 'normal', 'uv'].includes(name)) x.deleteAttribute(name);
-    return x;
-  }), false)!;
+  const g = mergeGeometries(list.map((q) => solidGeo(q, tile)), false)!;
   g.computeBoundingSphere();
   return g;
 }
 
-/** a leaf of a kind (its `i`th), in its hinge's own frame, its pictures laid on for a tier */
-export function leafGeometry(kind: string, i: number, t: Tier): THREE.BufferGeometry {
-  const key = `${kind}:L${i}:${t}`;
+const geos = new Map<string, THREE.BufferGeometry>();
+/** a kind's shape, its pictures laid on for a paint (`dress`: with what is only drawn) */
+export function geometryOf(kind: string, p: Paint, dress = true): THREE.BufferGeometry {
+  const key = `${kind}:${p}:${dress}`;
+  let g = geos.get(key);
+  if (!g) {
+    const s = shapeOf(kind);
+    geos.set(key, (g = merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p])));
+  }
+  return g;
+}
+
+/** what of a kind is drawn in a paint of its own (an opening's frame, the claim's flag) */
+export function clothGeometry(kind: string): THREE.BufferGeometry {
+  const key = `${kind}:cloth`;
+  let g = geos.get(key);
+  if (!g) {
+    const c = shapeOf(kind).cloth!;
+    geos.set(key, (g = merged(c.solid, TILE[c.paint])));
+  }
+  return g;
+}
+
+/** a leaf of a kind (its `i`th), in its hinge's own frame, its pictures laid on for a paint */
+export function leafGeometry(kind: string, i: number, p: Paint): THREE.BufferGeometry {
+  const key = `${kind}:L${i}:${p}`;
   let g = geos.get(key);
   if (!g) {
     const l = shapeOf(kind).leaves![i];
-    geos.set(key, (g = merged([...l.solid, ...(l.dress ?? [])], TILE[t])));
+    geos.set(key, (g = merged([...l.solid, ...(l.dress ?? [])], TILE[p])));
   }
   return g;
 }
@@ -140,6 +145,7 @@ export function ghostGeometry(kind: string): THREE.BufferGeometry {
     arc.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     arc.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
     arc.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0), 2));
+    arc.setAttribute('color', new THREE.Float32BufferAttribute(new Array(pos.length).fill(1), 3));
     parts.push(arc);
   }
   g = mergeGeometries(parts, false)!;
@@ -148,27 +154,6 @@ export function ghostGeometry(kind: string): THREE.BufferGeometry {
   return g;
 }
 
-/** a kind's dress alone (what is drawn of it in a paint of its own: the claim's flag) */
-export function dressOf(kind: string): THREE.BufferGeometry | null {
-  const key = `${kind}:dress`;
-  let g = geos.get(key);
-  if (g === undefined) {
-    const d = shapeOf(kind).dress;
-    g = d?.length ? mergeGeometries(d.map((q) => solidGeo(q, 1)), false)! : (null as unknown as THREE.BufferGeometry);
-    geos.set(key, g);
-  }
-  return g ?? null;
-}
-
-let flag: THREE.MeshStandardMaterial | null = null;
-/** the claim's flag: a red cloth, both sides */
-export function flagPaint(atmo: Atmosphere | null) {
-  if (!flag) {
-    flag = new THREE.MeshStandardMaterial({ color: 0xa8322a, roughness: 0.95, side: THREE.DoubleSide, name: 'build-flag' });
-    if (atmo) atmo.register(flag);
-  }
-  return flag;
-}
 
 /** a frame's lattice: timber round the edge of every 3 m and across it corner to corner, open between */
 function lattice(): THREE.Texture {
@@ -197,14 +182,15 @@ function lattice(): THREE.Texture {
   return t;
 }
 
+const pbr = (id: string, o: THREE.MeshStandardMaterialParameters = {}) => {
+  const t = assets.pbr(id);
+  return new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, aoMap: t.armMap, metalness: 0, ...o });
+};
+
 let paints: THREE.MeshStandardMaterial[] | null = null;
 /** the paint of each tier (made once, lit as everything in the world is) */
 export function paintsOf(atmo: Atmosphere | null): THREE.MeshStandardMaterial[] {
   if (paints) return paints;
-  const pbr = (id: string, o: THREE.MeshStandardMaterialParameters = {}) => {
-    const t = assets.pbr(id);
-    return new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, aoMap: t.armMap, metalness: 0, ...o });
-  };
   paints = [
     new THREE.MeshStandardMaterial({ map: lattice(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.92, name: 'build-frame' }),
     pbr('weathered_planks', { name: 'build-wood' }),
@@ -215,8 +201,29 @@ export function paintsOf(atmo: Atmosphere | null): THREE.MeshStandardMaterial[] 
   return paints;
 }
 
-/** what a piece of each tier sounds and is struck as */
-export const SURFACE = ['wood', 'wood', 'rock', 'metal'] as const;
+const own = new Map<string, THREE.MeshStandardMaterial>();
+/**
+ * A paint by its name (src/sim/build/solids.ts, Paint): a tier's, or one of the doors', their frames' or the flag's. A
+ * wooden door is painted green boards, as Chernarus's are; a metal one painted steel; a garage door galvanised sheet;
+ * an opening's frame dark worn timber. Each takes its parts' shades (straps and handles iron, rivets bright).
+ */
+export function paintFor(p: Paint, atmo: Atmosphere | null): THREE.MeshStandardMaterial {
+  if (typeof p === 'number') return paintsOf(atmo)[p];
+  let m = own.get(p);
+  if (!m) {
+    m = p === 'door' ? pbr('green_rough_planks', { vertexColors: true, name: 'build-door' })
+      : p === 'steel' ? new THREE.MeshStandardMaterial({ color: 0x56605a, metalness: 0.6, roughness: 0.5, vertexColors: true, name: 'build-steel' })
+      : p === 'galv' ? pbr('corrugated_iron', { metalnessMap: assets.pbr('corrugated_iron').armMap, metalness: 1, vertexColors: true, name: 'build-galv' })
+      : p === 'trim' ? pbr('wood_floor_worn', { color: 0x76695e, vertexColors: true, name: 'build-trim' })
+      : new THREE.MeshStandardMaterial({ color: 0xa8322a, roughness: 0.95, side: THREE.DoubleSide, name: 'build-flag' });
+    if (atmo) atmo.register(m);
+    own.set(p, m);
+  }
+  return m;
+}
+
+/** what a piece in each paint sounds and is struck as */
+export const surfaceOf = (p: Paint) => (p === 'steel' || p === 'galv' || p === 3 ? 'metal' : p === 2 ? 'rock' : 'wood');
 
 /** the tier a kind is drawn in when it comes in one only */
 export const drawnAt = (kind: string, t: Tier): Tier => PIECES[kind].only ?? t;
