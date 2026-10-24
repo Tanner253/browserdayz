@@ -30,6 +30,12 @@ interface GrassLevel {
 
 export const grassUniforms = {
   uPlayer: { value: new THREE.Vector3(0, -1000, 0) },
+  /**
+   * where something lies in the grass and presses it flat (x, ground y, z, how far round): the four dead animals
+   * nearest the eye (src/game/animals.ts). A dead deer lies with its legs out on the ground, and grass standing
+   * through it hid them (onboarding, for the owner: it "reads as a body with no legs").
+   */
+  uPressed: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, -1000, 0, 0)) },
 };
 
 /** index entries a blade of so many segments has */
@@ -290,6 +296,7 @@ uniform float uTime;
 uniform vec3 uWindDir;
 uniform float uWindStrength;
 uniform vec3 uPlayer;
+uniform vec4 uPressed[4];
 centroid varying vec3 vGrassColor;
 centroid varying float vGrassAO;
 vec3 gWorld;
@@ -338,6 +345,13 @@ vec3 transformed;
   float keep = step(r2, density * 1.15);
   float tall = mix(0.35, 0.95, smoothstep(0.2, 0.9, macro2.g)) * mix(0.75, 1.15, macro.b);
   float hgt = (0.22 + 0.42 * r1 * r1) * tall * keep * edge * smoothstep(0.05, 0.4, density);
+  // pressed flat under whatever lies on it, a fifth of itself left
+  float pressed = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec4 q = uPressed[i];
+    pressed = max(pressed, (1.0 - smoothstep(q.w * 0.55, q.w, length(wp - q.xz))) * step(abs(q.y - baseY), 1.5));
+  }
+  hgt *= 1.0 - 0.8 * pressed;
   float wid = (0.016 + 0.012 * r2) * uWidthScale * keep;
   float t = position.y;
   vec2 dir = vec2(cos(ang), sin(ang));

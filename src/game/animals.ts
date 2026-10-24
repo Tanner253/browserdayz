@@ -11,6 +11,7 @@ import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import type { Atmosphere } from '../world/atmosphere';
 import { heightAt, type World } from '../world/worldgen';
+import { grassUniforms } from '../world/grass';
 import { ANIMALS, CALLS, type Call, A_ALERT, A_BITE, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_ROAR, A_RUN, A_SWIPE, A_TROT, A_WALK, KINDS, ROW_BLEEDS, type AnimalRow, type Kind } from '../sim/animals';
 import { Herd, type Seen, type Strike } from '../sim/animal-mind';
 import { animalGround } from '../sim/animal-ground';
@@ -229,6 +230,9 @@ export class Beast implements Damageable {
 
   /** how far it is from the eye, metres (as of its last frame) */
   private away = 0;
+  /** where it lies once it has fallen (its body's middle as drawn: its fall may carry it from where it stood), and how far round it presses the grass */
+  pressAt: THREE.Vector4 | null = null;
+  private deadFor = 0;
 
   update(dt: number, now: number, eye: THREE.Vector3, view?: THREE.Frustum) {
     // where it was BEHIND ago, between the two words either side of then
@@ -279,6 +283,17 @@ export class Beast implements Damageable {
       for (const m of this.meshes) m.castShadow = shadow;
     }
     this.play(dt);
+    // (once it has lain a moment, where its body lies: the grass under it pressed flat)
+    if (this.dead && !this.pressAt && (this.deadFor += dt) > 2.5) {
+      const mid = new THREE.Vector3();
+      for (const m of this.meshes) {
+        const sk = m as THREE.SkinnedMesh;
+        if (!sk.isSkinnedMesh) continue;
+        sk.computeBoundingSphere();
+        mid.copy(sk.boundingSphere!.center).applyMatrix4(sk.matrixWorld);
+      }
+      this.pressAt = new THREE.Vector4(mid.x, y, mid.z, this.kind.len * 0.75);
+    }
     // (posed every frame near the eye and in view; further off, or out of view, a few times a second, and at once on
     // coming into view. Out of view is with room for its shadow, which falls into view from beside it.)
     this.poseT += dt;
@@ -493,6 +508,10 @@ export class Wildlife {
     }
     if (camera) this.view.setFromProjectionMatrix(this.viewing.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     for (const b of this.beasts.values()) b.update(dt, now, eye, camera ? this.view : undefined);
+    // (the grass pressed flat under the four dead nearest the eye)
+    const far = (b: Beast) => (b.pressAt!.x - eye.x) ** 2 + (b.pressAt!.z - eye.z) ** 2;
+    const lying = [...this.beasts.values()].filter((b) => b.pressAt && !b.gone).sort((a, b) => far(a) - far(b));
+    grassUniforms.uPressed.value.forEach((v, k) => (lying[k] ? v.copy(lying[k].pressAt!) : v.set(0, -1000, 0, 0)));
   }
 
   /** everything gone (a new connection, or leaving the server) */
