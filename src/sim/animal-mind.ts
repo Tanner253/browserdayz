@@ -209,41 +209,57 @@ export class Herd {
   }
 
   /**
-   * where the herds of a kind live: ground it can stand on, with both what it feeds on and cover to lie up in, apart
-   * from each other, off the roads and away from the towns (the owner: "make sure animals dont spawn in impossible
-   * places")
+   * where the herds of a kind live: in the wilderness (the owner: "animals dont spawn in towns they spawn in
+   * wilderness's"), on ground it can stand on with both what it feeds on and cover to lie up in, apart from each
+   * other; and of all the places that will do, the furthest from people first, so that there are most where the
+   * country is wildest (the big forests, the far meadows, the mountains) and fewest near anybody
    */
   private *homesFor(h: HerdKind, pick: () => number, out: { x: number; z: number }[]): Generator<void> {
-    const { x0, x1, z0, z1 } = this.ground.bounds, steep = Math.min(...h.of.map(([id]) => KIND[id].steep));
-    for (let tries = 0; tries < 1500 && out.length < h.count; tries++) {
+    const { x0, x1, z0, z1 } = this.ground.bounds, steep = Math.min(...h.of.map(([id]) => KIND[id].steep)), K = ANIMALS.keepOff;
+    const found: { x: number; z: number; wild: number }[] = [];
+    for (let tries = 0; tries < 3000; tries++) {
       if (tries % 25 === 24) yield;
-      const x = x0 + 60 + pick() * (x1 - x0 - 120), z = z0 + 60 + pick() * (z1 - z0 - 120);
-      if (!h.feed.includes(this.ground.biome(x, z)) && !h.rest.includes(this.ground.biome(x, z))) continue;
-      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < h.apart)) continue;
-      if (!this.ground.open(x, z, steep) || this.ground.road(x, z) < ANIMALS.keepOff.home) continue;
-      let feed = 0, rest = 0, town = false;
+      const x = x0 + 60 + pick() * (x1 - x0 - 120), z = z0 + 60 + pick() * (z1 - z0 - 120), b = this.ground.biome(x, z);
+      if (!h.feed.includes(b) && !h.rest.includes(b)) continue;
+      if (!this.ground.open(x, z, steep)) continue;
+      const road = this.ground.road(x, z), near = this.ground.people(x, z);
+      if (road < K.road.home || near.town < K.town.home || near.camp < K.camp.home || near.house < K.house.home) continue;
+      let feed = 0, rest = 0;
       for (let n = 0; n < 16; n++) {
-        const a = n * 2.39996, d = h.range * Math.sqrt((n + 0.5) / 16), b = this.ground.biome(x + Math.cos(a) * d, z + Math.sin(a) * d);
-        if (h.feed.includes(b)) feed++;
-        if (h.rest.includes(b)) rest++;
+        const a = n * 2.39996, d = h.range * Math.sqrt((n + 0.5) / 16), c = this.ground.biome(x + Math.cos(a) * d, z + Math.sin(a) * d);
+        if (h.feed.includes(c)) feed++;
+        if (h.rest.includes(c)) rest++;
       }
-      for (let n = 0; n < 12 && !town; n++) town = this.ground.biome(x + Math.cos(n * 0.5236) * ANIMALS.keepOff.town, z + Math.sin(n * 0.5236) * ANIMALS.keepOff.town) === 'town';
-      if (feed >= 4 && rest >= 3 && !town) out.push({ x, z });
+      if (feed >= 4 && rest >= 3) found.push({ x, z, wild: Math.min(near.town, 1500) + 0.6 * Math.min(near.camp, 900) + 0.5 * Math.min(near.house, 600) + 0.3 * Math.min(road, 300) });
+    }
+    found.sort((a, b) => b.wild - a.wild);
+    for (const f of found) {
+      if (out.length >= h.count) break;
+      if (!out.some((o) => Math.hypot(o.x - f.x, o.z - f.z) < h.apart)) out.push({ x: f.x, z: f.z });
     }
   }
 
-  /** whether a wild one may stand or be sent to a place: ground it can stand on, its own kind of country, off the roads */
-  private fit(x: number, z: number, steep: number, road: number, farm: boolean) {
-    const b = this.ground.biome(x, z);
-    return this.ground.open(x, z, steep) && b !== 'water' && (farm || (b !== 'town' && this.ground.road(x, z) >= road));
+  /**
+   * whether a wild one may be sent to a place (`spot`: to feed or lie up there) or stand there (`walk`): ground it can
+   * stand on, not water, off the roads, out of the towns; and a spot well away from people. A farm's are let be.
+   */
+  private fit(x: number, z: number, steep: number, as: 'spot' | 'walk', farm: boolean) {
+    const b = this.ground.biome(x, z), K = ANIMALS.keepOff;
+    if (!this.ground.open(x, z, steep) || b === 'water') return false;
+    if (farm) return true;
+    if (b === 'town' || this.ground.road(x, z) < K.road[as]) return false;
+    if (as === 'walk') return true;
+    const near = this.ground.people(x, z);
+    return near.town >= K.town.spot && near.camp >= K.camp.spot && near.house >= K.house.spot;
   }
+
 
   /** a spot of its ground for what the herd is about to do (null: none found this time) */
   private spotFor(g: Group, what: 'feed' | 'rest' | 'water', away?: { x: number; z: number }): { x: number; z: number } | null {
     const h = HERDS[g.herd], steep = Math.min(...(g.wants.length ? g.wants : g.members.map((i) => this.beasts.get(i)!.k)).map((k) => KINDS[k].steep));
     if (what === 'water') {
       const w = this.ground.water(g.mid.x, g.mid.z, h.range * 1.2);
-      return w && this.fit(w.x, w.z, steep, ANIMALS.keepOff.walk, !!h.farm) ? w : null;
+      return w && this.fit(w.x, w.z, steep, 'spot', !!h.farm) ? w : null;
     }
     const want = what === 'feed' ? h.feed : h.rest, farm = h.farm ? this.farmOf(g) : null;
     for (let n = 0; n < 24; n++) {
@@ -251,7 +267,7 @@ export class Herd {
       const x = g.mid.x + Math.cos(a) * d, z = g.mid.z + Math.sin(a) * d;
       if (farm && Math.hypot(x - farm.x, z - farm.z) > farm.r * 0.8) continue;
       if (away && Math.hypot(x - away.x, z - away.z) < 120) continue;
-      if (want.includes(this.ground.biome(x, z)) && this.fit(x, z, steep, ANIMALS.keepOff.spot, !!h.farm)) return { x, z };
+      if (want.includes(this.ground.biome(x, z)) && this.fit(x, z, steep, 'spot', !!h.farm)) return { x, z };
     }
     return null;
   }
@@ -279,9 +295,9 @@ export class Herd {
     for (let n = 0; n < 12; n++) {
       const a = this.rnd() * PI2, d = 4 + this.rnd() * (start ? 30 : 60);
       // (one that never walks is stood at its own place in the herd, which no other has)
-      const farm = !!HERDS[g.herd].farm, at = kind.still ? this.slotFor(g, k, (x, z) => this.fit(x, z, kind.steep, ANIMALS.keepOff.walk, farm)) : null;
+      const farm = !!HERDS[g.herd].farm, at = kind.still ? this.slotFor(g, k, (x, z) => this.fit(x, z, kind.steep, 'walk', farm)) : null;
       const x = at ? g.at.x + at[0] : g.at.x + Math.cos(a) * d, z = at ? g.at.z + at[1] : g.at.z + Math.sin(a) * d;
-      if (!this.fit(x, z, kind.steep, ANIMALS.keepOff.walk, farm)) continue;
+      if (!this.fit(x, z, kind.steep, 'walk', farm)) continue;
       if (people.some((p) => Math.hypot(p.x - x, p.z - z) < ANIMALS.clear)) return null;
       const slot = at ?? this.slotFor(g, k);
       const b: Beast = {
@@ -291,7 +307,7 @@ export class Herd {
         hurtBy: 0, hurtAt: 0, calmUntil: 0, skinner: null, eaten: false,
       };
       // (at the start nobody is near: it stands at its own place in the herd)
-      if (start && this.fit(g.at.x + slot[0], g.at.z + slot[1], kind.steep, ANIMALS.keepOff.walk, farm)) {
+      if (start && this.fit(g.at.x + slot[0], g.at.z + slot[1], kind.steep, 'walk', farm)) {
         b.x = g.at.x + slot[0];
         b.z = g.at.z + slot[1];
       }
@@ -577,14 +593,9 @@ export class Herd {
       }
     }
     if (g.flee) {
-      // away from it, and on: toward cover, zig-zag for a hare
+      // away from it, and on
       const ax = b.x - g.flee.x, az = b.z - g.flee.z, d = Math.hypot(ax, az) || 1;
       let tx = b.x + (ax / d) * 40, tz = b.z + (az / d) * 40;
-      if (k.id === 'hare') {
-        const z = Math.sin(now / 350 + b.i) * 18;
-        tx += (-az / d) * z;
-        tz += (ax / d) * z;
-      }
       if (h.farm) {
         const f = this.farmOf(g);
         if (f && Math.hypot(tx - f.x, tz - f.z) > f.r * 0.8) {
@@ -600,7 +611,7 @@ export class Herd {
     }
     b.ranFor = Math.max(0, b.ranFor - dt * 0.5);
     // (never stopped by a road or in a town: it goes on to its own place, which is neither, and looks round there)
-    const astray = !HERDS[g.herd].farm && (this.ground.road(b.x, b.z) < ANIMALS.keepOff.walk || this.ground.biome(b.x, b.z) === 'town');
+    const astray = !HERDS[g.herd].farm && (this.ground.road(b.x, b.z) < ANIMALS.keepOff.road.walk || this.ground.biome(b.x, b.z) === 'town');
     if (b.aware >= ANIMALS.alert && !astray) {
       // head up, facing it: still for as long as the fright lasts
       b.yaw = turnTo(b.yaw, yawTo(b.fearX - b.x, b.fearZ - b.z), 2.5 * dt);

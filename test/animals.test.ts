@@ -22,7 +22,8 @@ const ground: Ground = {
   slope: () => 0,
   biome: (x, z): Biome => (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r ? 'water' : Math.abs(x) > 1490 || Math.abs(z) > 1490 ? 'water' : x < 0 ? 'forest' : 'field'),
   open: (x, z) => Math.abs(x) < 1490 && Math.abs(z) < 1490 && Math.hypot(x - LAKE.x, z - LAKE.z) >= LAKE.r,
-  road: () => 99,
+  road: () => 999,
+  people: () => ({ town: 9999, camp: 9999, house: 9999 }),
   roofed: () => false,
   cover: (x) => (x < 0 ? 1 : 0),
   clear: () => true,
@@ -303,7 +304,7 @@ ok('an admin stands any kind, one or a herd or pack of it, from the entity list'
 
 ok('herd and pack mates never stand inside each other: stood, grazing, bolting, or stood by an admin', () => {
   // (the owner: "they spawned inside eachother in the images")
-  const h = herd(['stag', 'doe', 'wolf', 'hare', 'cow'], 7);
+  const h = herd(['stag', 'doe', 'wolf', 'cow'], 7);
   h.populate(0);
   const placed = [h.place('stag', 200, -200, 1, 6), h.place('wolf', 260, -200, 1, 5), h.place('cow', 200, -260, 1, 4)];
   const near = (x: number, z: number) => [...h.beasts.values()].filter((b) => Math.hypot(b.x - x, b.z - z) < 300);

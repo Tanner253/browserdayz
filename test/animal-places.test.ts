@@ -33,7 +33,7 @@ const fault = (x: number, z: number, k: number, g: number, moving: boolean, flee
   const kind = KINDS[k], b = ground.biome(x, z);
   if (!ground.open(x, z, kind.steep + 0.05)) return ground.slope(x, z) > kind.steep + 0.05 ? 'too steep' : 'in water or something solid';
   if (!farm(g) && !fleeing && b === 'town') return 'in a town';
-  if (!farm(g) && !moving && ground.road(x, z) < ANIMALS.keepOff.walk) return 'on a road';
+  if (!farm(g) && !moving && ground.road(x, z) < ANIMALS.keepOff.road.walk) return 'on a road';
   return '';
 };
 
@@ -45,13 +45,15 @@ ok('the ground knows the canyon\'s rock: a point inside a cliff piece is not ope
   assert.equal(ground.open(...at(0, -m.back * cliff.scale * 0.5), 9), false, 'inside the rock');
 });
 
-ok('every herd lives on its own kind of country, on ground it can stand on, off the roads and away from the towns', () => {
-  assert.ok(h.groups.length >= 20, `${h.groups.length} herds`);
+ok('every herd lives in the wilderness: its own kind of country, ground it can stand on, far from roads, towns and lone buildings', () => {
+  assert.ok(h.groups.length >= 10, `${h.groups.length} herds`);
   for (const g of h.groups) {
     if (farm(g.i)) continue;
     const kind = KINDS[g.wants[0]], hk = HERDS[g.herd];
     assert.ok(ground.open(g.home.x, g.home.z, kind.steep), `${hk.id} at ${g.home.x | 0},${g.home.z | 0}: not open`);
-    assert.ok(ground.road(g.home.x, g.home.z) >= ANIMALS.keepOff.home, `${hk.id} at ${g.home.x | 0},${g.home.z | 0}: by a road`);
+    const K = ANIMALS.keepOff, near = ground.people(g.home.x, g.home.z), at = `${hk.id} at ${g.home.x | 0},${g.home.z | 0}`;
+    assert.ok(ground.road(g.home.x, g.home.z) >= K.road.home, `${at}: by a road`);
+    assert.ok(near.town >= K.town.home && near.camp >= K.camp.home && near.house >= K.house.home, `${at}: ${near.town | 0} m from a town, ${near.camp | 0} from a camp, ${near.house | 0} from a building`);
     assert.ok([...hk.feed, ...hk.rest].includes(ground.biome(g.home.x, g.home.z)), `${hk.id}: on ${ground.biome(g.home.x, g.home.z)}`);
     assert.notEqual(ground.biome(g.home.x, g.home.z), 'desert', `${hk.id} in the desert`);
   }

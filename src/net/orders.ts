@@ -40,7 +40,6 @@ export const ENTITIES: Entity[] = [
   { id: 'doe', name: 'Red deer hind', kind: 'animal', animal: 'doe', most: 8, does: 'Grazes, and bolts', also: ['hind'] },
   { id: 'bear', name: 'Brown bear', kind: 'animal', animal: 'bear', most: 4, does: 'Roars, then charges whoever comes near or hurts it' },
   { id: 'wolf', name: 'Wolf', kind: 'animal', animal: 'wolf', most: 8, does: 'Circles whoever it hunts and comes in to bite', also: ['wolves'] },
-  { id: 'hare', name: 'Hare', kind: 'animal', animal: 'hare', most: 8, does: 'Bolts zig-zag' },
   { id: 'cow', name: 'Cow', kind: 'animal', animal: 'cow', most: 6, does: 'Wanders, and shies off' },
 ];
 /** the thing meant by a word typed after `/spawn` */

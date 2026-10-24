@@ -23,7 +23,6 @@ export const HUNT_ITEMS: ItemDef[] = [
   meat('meat_venison', 'Venison Steak', 0x8a2e2a, 40, 'Red deer, cut from the haunch. Cook it: raw, it is as likely as not to make you ill.', 2),
   meat('meat_bear', 'Bear Steak', 0x5e2420, 46, 'Dark and fatty. Cook it well.', 3),
   meat('meat_wolf', 'Wolf Steak', 0x6e3a30, 32, 'Lean and stringy. Cook it.', 2),
-  meat('meat_hare', 'Hare Leg', 0x96503f, 22, 'A hind leg of hare. Cook it.', 1),
   meat('meat_beef', 'Beef Steak', 0x9e3530, 44, 'From a farm cow. Cook it.', 3),
 
   // ---------------------------------------------------------------- what things will be made of
@@ -53,11 +52,6 @@ export const HUNT_ITEMS: ItemDef[] = [
     id: 'pelt_bear', name: 'Bear Pelt', model: 'fur_pelt', tint: 0x5a4030, w: 3, h: 3, weight: 4.0, category: 'misc',
     desc: 'A brown bear\'s pelt, heavy and thick. The best thing the trader buys off a hunter.',
     worth: 16,
-  },
-  {
-    id: 'pelt_small', name: 'Small Pelt', model: 'fur_pelt', tint: 0xa0704a, scale: 0.25, w: 1, h: 2, weight: 0.3, category: 'misc',
-    desc: 'A hare\'s pelt.',
-    worth: 2,
   },
   {
     id: 'firewood', name: 'Firewood', model: 'log_pile', scale: 0.12, w: 2, h: 3, weight: 2.0, category: 'tool', stack: 4,

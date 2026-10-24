@@ -140,11 +140,6 @@ export const KINDS: Kind[] = [
     gives: { meat: 'meat_wolf', n: 4, fat: 1, hide: 'pelt_wolf', bones: 3 },
   },
   {
-    id: 'hare', name: 'Hare', model: 'animal_hare', len: 0.55, tall: 0.3, hp: 25, tough: 1, walk: 1, trot: 3, run: 12, wind: 8, steep: 0.9,
-    temper: 'prey', sight: 40, hear: 1.5, smell: 25, view: 170 * F, flee: 90, lies: 400,
-    gives: { meat: 'meat_hare', n: 2, fat: 0, hide: 'pelt_small', bones: 1 },
-  },
-  {
     id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 220, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6,
     temper: 'tame', sight: 20, hear: 0.8, smell: 10, view: 160 * F, flee: 18, lies: 900, still: true,
     gives: { meat: 'meat_beef', n: 10, fat: 5, hide: 'hide', bones: 8 },
@@ -180,10 +175,9 @@ export interface HerdKind {
 }
 
 export const HERDS: HerdKind[] = [
-  { id: 'deer', of: [['stag', 1, 1], ['doe', 2, 4]], count: 9, range: 320, apart: 380, feed: ['field'], rest: ['forest'], hours: [[0, 0.22], [0.55, 0.8]], drinks: true, respawn: 600 },
-  { id: 'bear', of: [['bear', 1, 1]], count: 5, range: 420, apart: 650, feed: ['forest', 'snow'], rest: ['forest', 'snow'], hours: [[0.06, 0.7]], drinks: true, respawn: 1500 },
+  { id: 'deer', of: [['stag', 1, 1], ['doe', 2, 4]], count: 6, range: 320, apart: 600, feed: ['field'], rest: ['forest'], hours: [[0, 0.22], [0.55, 0.8]], drinks: true, respawn: 600 },
+  { id: 'bear', of: [['bear', 1, 1]], count: 3, range: 420, apart: 900, feed: ['forest', 'snow'], rest: ['forest', 'snow'], hours: [[0.06, 0.7]], drinks: true, respawn: 1500 },
   { id: 'wolves', of: [['wolf', 3, 5]], count: 3, range: 650, apart: 900, feed: ['forest', 'snow', 'field'], rest: ['snow', 'forest'], hours: [[0.68, 1], [0, 0.1]], drinks: true, respawn: 900 },
-  { id: 'hare', of: [['hare', 1, 1]], count: 16, range: 110, apart: 160, feed: ['field'], rest: ['field'], hours: [[0, 0.15], [0.62, 0.9]], drinks: false, respawn: 300 },
   { id: 'cows', of: [['cow', 2, 3]], count: 3, range: 38, apart: 0, feed: ['field', 'town'], rest: ['field', 'town'], hours: [[0.04, 0.74]], drinks: false, respawn: 1200, farm: true },
 ];
 
@@ -224,11 +218,14 @@ export const ANIMALS = {
    */
   room: { herd: 0.6, other: 0.5 },
   /**
-   * metres off a road's edge: a herd's middle, the spots it feeds and lies up at, and where one stands or walks (it
-   * crosses a road where its way goes over, and runs along one only when it flees); and how far its middle keeps
-   * from the edge of a town or any place with a name
+   * Where people are kept off, metres (the owner, 2026-10-23: "animals dont spawn in towns they spawn in wilderness's.
+   * you have the spawwn zones backwards"): from a road's edge, a town's or village's (a place with a name sixty metres
+   * across and more), a camp's (a cabin, a post, a farm: thirty and more) and a building or tower standing alone, for
+   * a herd's middle (`home`) and the spots it feeds and lies up at (`spot`); where one stands or walks keeps off the
+   * road only (it crosses where its way goes over; it flees past a town). A farm's cows are the one herd that lives
+   * among people.
    */
-  keepOff: { home: 60, spot: 12, walk: 5, town: 250 },
+  keepOff: { road: { home: 100, spot: 12, walk: 5 }, town: { home: 400, spot: 250 }, camp: { home: 250, spot: 150 }, house: { home: 150, spot: 100 } },
   /** how often the awake ones think, seconds */
   step: 0.2,
   /** what is heard of a person moving, metres (as a person hears: an animal's `hear` scales it): sprinting, jogging, walking, crouched */

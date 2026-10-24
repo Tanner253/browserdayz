@@ -24,7 +24,7 @@ const KEEP = { fort: 55, post: 35, mouth: 14, wreck: 10 };
 /** a prop lower than this is stepped over (a pumpkin, a fern); one taller stands in the way */
 const LOW = 0.35;
 /** how far off a road is known of, metres */
-export const ROAD_REACH = 80;
+export const ROAD_REACH = 120;
 
 /** What the animals ask of the ground. A test hands in one of its own. */
 export interface Ground {
@@ -39,6 +39,11 @@ export interface Ground {
   open(x: number, z: number, steep: number): boolean;
   /** metres to the edge of the nearest road (`ROAD_REACH` and more: none near) */
   road(x: number, z: number): number;
+  /**
+   * metres to the edge of the nearest town or village (a place with a name sixty metres across and more), of the
+   * nearest camp (a cabin, a post, a farm: thirty and more), and to the nearest building or tower standing alone
+   */
+  people(x: number, z: number): { town: number; camp: number; house: number };
   /** under a roof: inside a building, where no animal can follow */
   roofed(x: number, z: number): boolean;
   /** how thick the trees are about a place, 0 to 1 (it hides whoever is in it) */
@@ -123,6 +128,8 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
   ];
   const kept = (x: number, z: number) => keep.some((k) => (x - k.x) ** 2 + (z - k.z) ** 2 < k.r * k.r);
   const towns = world.pois.map((p) => ({ x: p.x, z: p.z, r: p.radius, farm: /farm|kolkhoz/i.test(p.name), name: p.name }));
+  // (where people are: the towns, and every building and tower that stands by itself)
+  const settled = towns.filter((t) => t.r >= 30), lone = [...world.buildings.map((b) => ({ x: b.x, z: b.z, r: 0 })), ...towns.filter((t) => t.r < 30)];
   // the roads, as lengths binned by 32 m (a road is points x, y, z one after another)
   const RB = 32, RBX = Math.ceil((WORLD_X1 - WORLD_X0) / RB), RBZ = Math.ceil((WORLD_Z1 - WORLD_Z0) / RB);
   const rbin = (i: number, j: number) => Math.min(RBZ - 1, Math.max(0, j)) * RBX + Math.min(RBX - 1, Math.max(0, i));
@@ -201,6 +208,16 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
     biome,
     open: (x, z, steep) => onWorld(x, z, -6) && !wet(x, z) && slope(x, z) <= steep && !inSolid(x, z) && !kept(x, z),
     road,
+    people: (x, z) => {
+      let town = Infinity, camp = Infinity, house = Infinity;
+      for (const t of settled) {
+        const d = Math.hypot(x - t.x, z - t.z) - t.r;
+        if (t.r >= 60) town = Math.min(town, d);
+        else camp = Math.min(camp, d);
+      }
+      for (const h of lone) house = Math.min(house, Math.hypot(x - h.x, z - h.z) - h.r);
+      return { town, camp, house };
+    },
     roofed: (x, z) => inSolid(x, z, true),
     cover: (x, z) => Math.min(1, treeBins[tbin(x, z)] / 14),
     clear: (ax, ay, az, bx, by, bz) => {
