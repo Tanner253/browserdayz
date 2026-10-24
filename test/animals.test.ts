@@ -271,6 +271,45 @@ ok('wolves circle and come in one at a time; when half the pack is down the rest
   assert.ok(Math.hypot(last.x - man.x, last.z - man.z) > was + 30, 'the last one ran');
 });
 
+ok("DayZ's wolves: they come on at a walk, each stops and snarls before it lunges, and a pack shot at as it runs turns back", () => {
+  // (dayz.wiki.gg/wiki/Wolf; the owner, 2026-10-24: "only trying to enhance the exisitng dayz logic")
+  const h = herd(['wolf']);
+  const pack = h.place('wolf', 0, 0, 0, 4), g = h.groups[pack[0].g];
+  PH = 0.85;
+  // (60 m off, where the wind carries him to them)
+  const man = person(1, -48, -36);
+  let fastest = 0, snarled = 0;
+  const last = new Map<number, { t: number; snarl: boolean }[]>();
+  const strikes: { t: number; i: number }[] = [];
+  for (let t = 0; t <= 40_000; t += 200) {
+    const turn = h.tick(t, [man]);
+    for (const w of pack) {
+      const seen = last.get(w.i) ?? [];
+      seen.push({ t, snarl: w.snarlUntil > t && w.mode === A_ALERT && w.speed === 0 });
+      last.set(w.i, seen.slice(-20));
+      // (on its way in, while still far off the ring)
+      if (g.hunt && Math.hypot(w.x - man.x, w.z - man.z) > ANIMALS.circle[1] + 20) fastest = Math.max(fastest, w.speed);
+    }
+    for (const s of turn.strikes) {
+      strikes.push({ t, i: s.i });
+      if (last.get(s.i)!.some((e) => e.snarl && t - e.t <= 4000)) snarled++;
+    }
+  }
+  PH = 0.1;
+  assert.ok(g.hunt && fastest > 0 && fastest <= KIND.wolf.walk * 1.6 + 0.01, `in at a walk (${fastest.toFixed(1)} m/s at most)`);
+  assert.ok(strikes.length >= 2 && snarled === strikes.length, `${snarled} of ${strikes.length} bites came after a stop and a snarl`);
+  // three down, the last runs; shot at as it runs, it turns on whoever shot it
+  for (const w of pack.slice(0, 3)) h.hurt(w.i, 999, man, 41_000);
+  const lone = pack[3];
+  for (let t = 41_000; t <= 45_000; t += 200) h.tick(t, [man]);
+  const away = Math.hypot(lone.x - man.x, lone.z - man.z);
+  assert.ok(g.brokeAt && !g.rallied, 'the pack broke');
+  h.hurt(lone.i, 10, man, 45_200);
+  let bites = 0;
+  for (let t = 45_200; t <= 75_000; t += 200) bites += h.tick(t, [man]).strikes.length;
+  assert.ok(g.rallied && bites >= 1, `turned back from ${away.toFixed(0)} m and bit ${bites} times`);
+});
+
 ok('a fed pack lets a person pass and goes only for one who comes right up; a hungry one locks on with one howl and hunts', () => {
   // (the owner, 2026-10-24: "start howling when theyre locked in on people like how dayz wolves hunt")
   const h = herd(['wolf']);

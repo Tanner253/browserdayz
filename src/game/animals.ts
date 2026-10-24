@@ -54,9 +54,12 @@ const SOUNDS: Record<string, Record<string, [name: string, reach: number]>> = {
   stag: { run: ['hooves', 60] },
   doe: { run: ['hooves', 60] },
 };
-/** hooves at most this often, milliseconds: a whole herd breaking into a run is one sound of running, not five */
-const HOOVES = 2000;
-let hoovesAt = 0;
+/**
+ * some sounds at most this often, milliseconds, whoever makes them: a whole herd breaking into a run is one sound of
+ * running, not five; a pack circling and snarling is a growl now and then, not one from every wolf at every turn
+ */
+const GAP: Record<string, number> = { hooves: 2000, wolf_growl: 1500 };
+const saidAt = new Map<string, number>();
 const DRAWN = 260;
 const MOVED = 120;
 /** how far behind the server's word it is drawn, so that there is always a word on either side of now, ms */
@@ -350,8 +353,8 @@ export class Beast implements Damageable {
       const move = this.kind.fight?.moves.find((m) => m.mode === this.mode), hit = this.strikes[name];
       if (move && hit !== undefined) act.time = Math.max(0, hit - move.windup);
       const sound = SOUNDS[this.kind.id]?.[CLIPS[this.mode]?.[0] ?? name], at = performance.now();
-      if (sound && this.away < sound[1] && (sound[0] !== 'hooves' || at - hoovesAt > HOOVES)) {
-        if (sound[0] === 'hooves') hoovesAt = at;
+      if (sound && this.away < sound[1] && at - (saidAt.get(sound[0]) ?? -Infinity) > (GAP[sound[0]] ?? 0)) {
+        saidAt.set(sound[0], at);
         this.host.heard(sound[0], this.root.position);
       }
       if (this.playing) act.crossFadeFrom(this.playing, ONCE.has(name) ? 0.12 : 0.3, false);

@@ -94,6 +94,8 @@ export interface Beast {
   restUntil: number;
   /** a wolf's run in at whoever the pack has: until when */
   dashUntil: number;
+  /** a wolf sent in stops and snarls first, until then (DayZ) */
+  snarlUntil: number;
   /** who last hurt it, and when; and until when it will not start another fight */
   hurtBy: number;
   hurtAt: number;
@@ -140,6 +142,9 @@ export interface Group {
   ateAt: number;
   meal: { i: number; x: number; z: number; since: number } | null;
   warnAt: number;
+  /** when the pack broke and ran (0: it has not), and whether it was shot at running and turned on them (DayZ) */
+  brokeAt: number;
+  rallied: boolean;
 }
 
 export interface Turn {
@@ -206,7 +211,7 @@ export class Herd {
           i: this.groups.length, herd: hi, home, mid: { ...home }, at: { ...home }, spot: 'rest', nextSpot: 0, feeding: false, drank: false,
           members: [], wants, awake: false, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, callAt: 0, barkAt: 0,
           // (packs not all hungry at once)
-          ateAt: now - this.rnd() * 1.3 * HUNGRY_MS, meal: null, warnAt: 0,
+          ateAt: now - this.rnd() * 1.3 * HUNGRY_MS, meal: null, warnAt: 0, brokeAt: 0, rallied: false,
         };
         this.groups.push(g);
         this.plan(g, now);
@@ -268,7 +273,7 @@ export class Herd {
       const b: Beast = {
         i: this.next++, k, g: g.i, x, z, yaw: this.rnd() * PI2, mode: A_IDLE, hp: kind.hp, diedAt: 0, skinned: false, bleeds: false, speed: 0,
         aware: 0, fearX: x, fearZ: z, ranFor: 0, slot, act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0, detourYaw: 0, detourT: 0,
-        foe: 0, fightAt: 0, fightX: x, fightZ: z, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0,
+        foe: 0, fightAt: 0, fightX: x, fightZ: z, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0, snarlUntil: 0,
         hurtBy: 0, hurtAt: 0, calmUntil: 0, skinner: null, eaten: false,
       };
       // (at the start nobody is near: it stands at its own place in the herd)
@@ -302,7 +307,7 @@ export class Herd {
       i: this.groups.length, herd: hi, home: { x, z }, mid: { x, z }, at: { x, z }, spot: 'feed', nextSpot: now + 120_000, feeding: true, drank: true,
       members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, callAt: 0, barkAt: 0,
       // (one stood by an admin is hungry: it is there to be seen hunting)
-      ateAt: now - HUNGRY_MS, meal: null, warnAt: 0,
+      ateAt: now - HUNGRY_MS, meal: null, warnAt: 0, brokeAt: 0, rallied: false,
     };
     this.groups.push(g);
     const others = HERDS[hi].of.map(([id]) => KINDS.findIndex((kk) => kk.id === id)).filter((o) => o !== k);

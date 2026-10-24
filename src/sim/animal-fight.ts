@@ -122,19 +122,42 @@ export function giveUp(b: Beast, now: number, calm: number) {
 export const HUNGRY_MS = ANIMALS.hunger.hours * (DAY.length / 24) * 1000;
 
 /**
- * A wolf, in its pack (the owner, 2026-10-24, of DayZ's wolves: they get hungry, hunt deer and people, howl once
- * they are locked on, and a pack that kills one deer stops and eats it). Fed, it lies up and goes only for whoever
- * comes right up to it. Hungry, it hunts whoever comes inside its reach (further in the dark), howling as it locks
- * on: it circles them a dozen and more metres off and sends one in at a time to bite and break away (so it can be
- * fought, and is not a swarm), until half the pack is down, the quarry is under a roof or in a car, or it loses them.
- * With nobody about, a hungry pack goes for the nearest deer herd, runs at it, singles one out and pulls it down;
- * then the whole pack eats it where it fell, growls at whoever comes near, and drives them off.
+ * A wolf, in its pack. DayZ's first (the owner, 2026-10-24: "only trying to enhance the exisitng dayz logic";
+ * dayz.wiki.gg/wiki/Wolf): once it has found somebody it comes on quietly at a walk (at a run after whoever runs: they
+ * cannot be outrun), circles them a dozen and more metres off and sends one in at a time from about the ring, which
+ * stops and snarls before it lunges; the pack runs once three of it are dead, and turns on whoever shoots at it
+ * running. Ours on top: it is fed or hungry. Fed, it lies up and goes only for whoever comes right up to it. Hungry,
+ * it locks on to whoever comes inside its reach (further in the dark) with one howl (the owner: "start howling when
+ * theyre locked in on people"), and with nobody about it goes for the nearest deer herd, runs at it, singles one out
+ * and pulls it down; then the whole pack eats it where it fell (DayZ's wolves eat what they find dead), growls at
+ * whoever comes near, and drives them off. A wolf hurt past bearing breaks off on its own (Rust).
  */
 export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, people: Seen[], turn: Turn, from: Seen | null, phase: number): boolean {
   const f = k.fight!, H = ANIMALS.hunger, wolves = g.members.map((i) => h.beasts.get(i)!);
   const alive = wolves.filter((w) => !w.diedAt);
-  if (alive.length * 2 < wolves.length || b.hp < k.hp * f.breakAt) {
+  // (shot at as it runs, it turns on them, and fights on: DayZ)
+  if (g.brokeAt && !g.rallied && alive.some((w) => w.hurtBy && w.hurtAt > g.brokeAt)) {
+    g.rallied = true;
+    g.flee = null;
+  }
+  const broken = !g.rallied && wolves.length - alive.length >= Math.min(ANIMALS.packBreaks, wolves.length - 1);
+  if (!broken && b.hp < k.hp * f.breakAt) {
+    // (one hurt past bearing breaks off on its own, away from whoever hurt it; the rest fight on)
+    const q = people.find((p) => p.id === (b.hurtBy || g.hunt?.foe));
+    if (q) {
+      b.fearX = q.x;
+      b.fearZ = q.z;
+    }
+    const ax = b.x - b.fearX, az = b.z - b.fearZ, d = Math.hypot(ax, az) || 1;
+    b.foe = 0;
+    b.move = null;
+    b.dashUntil = 0;
+    h.go(b, k, b.x + (ax / d) * 30, b.z + (az / d) * 30, k.run, dt);
+    return true;
+  }
+  if (broken) {
     // (the pack breaks: everybody runs, from whoever broke it)
+    if (!g.brokeAt) g.brokeAt = now;
     const q = g.hunt && g.hunt.foe > 0 ? people.find((p) => p.id === g.hunt!.foe) : null;
     if (q) {
       b.fearX = q.x;
@@ -184,12 +207,23 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
   b.foe = q.id;
   // one at a time, in turn, runs in
   if (now > g.nextDash && !alive.some((w) => w.dashUntil > now)) {
-    const order = alive.filter((w) => w.restUntil < now);
+    // (from the ring, once it is there: none is sent in from far off)
+    const order = alive.filter((w) => w.restUntil < now && w.hp >= k.hp * f.breakAt && Math.hypot(w.x - q.x, w.z - q.z) < ANIMALS.circle[1] + 6);
     const w = order[g.dasher++ % Math.max(1, order.length)];
-    if (w) w.dashUntil = now + 3000;
+    if (w) {
+      w.snarlUntil = now + ANIMALS.snarl * 1000;
+      w.dashUntil = w.snarlUntil + 3000;
+    }
     g.nextDash = now + (ANIMALS.dash[0] + h.rnd() * (ANIMALS.dash[1] - ANIMALS.dash[0])) * 1000;
   }
   if (b.dashUntil > now || b.move) {
+    if (b.snarlUntil > now) {
+      // (stood, facing them, snarling: the moment to shoot it, as in DayZ)
+      b.speed = 0;
+      b.yaw = turnTo(b.yaw, yawTo(q.x - b.x, q.z - b.z), 4 * dt);
+      b.mode = A_ALERT;
+      return true;
+    }
     if (blows(h, b, k, q, now, dt, turn, f.rush)) {
       if (!b.move) b.dashUntil = 0;
       return true;
@@ -200,7 +234,8 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
   // round them, each at its own place on the ring, the ring turning
   const n = alive.indexOf(b), a = (n / alive.length) * PI2 + now / 9000, R = ANIMALS.circle[0] + (n % 2) * (ANIMALS.circle[1] - ANIMALS.circle[0]);
   const tx = q.x + Math.cos(a) * R, tz = q.z + Math.sin(a) * R;
-  h.go(b, k, tx, tz, d > R + 15 ? f.chase : k.trot, dt, 2);
+  // (from far off at a quiet walk, unless they run: DayZ's wolves come on at a walking pace, and are not outrun)
+  h.go(b, k, tx, tz, d > R + 15 ? (q.speed > 3.5 ? f.chase : k.walk * 1.6) : k.trot, dt, 2);
   if (Math.hypot(tx - b.x, tz - b.z) < 2.5) {
     b.yaw = turnTo(b.yaw, yawTo(q.x - b.x, q.z - b.z), 3 * dt);
     b.mode = A_ALERT;

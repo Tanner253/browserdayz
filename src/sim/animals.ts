@@ -257,6 +257,9 @@ export const ANIMALS = {
   /** a wolf pack circles this far off whoever it hunts, and sends one in every so often */
   circle: [13, 19] as [number, number],
   dash: [2.2, 4] as [number, number],
+  /** (DayZ) a wolf sent in stops and snarls this long first, seconds; and a pack runs once this many of it are dead */
+  snarl: 0.8,
+  packBreaks: 3,
   /** a hungry pack hunts deer (see `hunger`) */
   huntsDeer: true,
   /**
