@@ -585,6 +585,10 @@ export class Director {
 
   /** everything standing or lying, for somebody who has just arrived */
   list(): InfectedInfo[] {
-    return [...this.bodies.values()].map((b) => ({ i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) }));
+    // (where each is, to the centimetre, and which way it faces to the thousandth: told to the double's last digit, as
+    // the games report it, the list for somebody arriving was twice what it needed to be, and with bodies lying five
+    // minutes it holds six times as many of the dead, 2026-10-23)
+    const c = (v: number) => Math.round(v * 100) / 100;
+    return [...this.bodies.values()].map((b) => ({ i: b.i, s: [c(b.s[0]), c(b.s[1]), c(b.s[2]), Math.round(b.s[3] * 1000) / 1000, b.s[4], b.s[5]] as IState, hp: Math.round(b.hp * 10) / 10, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) }));
   }
 }

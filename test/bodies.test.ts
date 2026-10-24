@@ -5,8 +5,8 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { bodiesWithin, bodyInfo, fellWay, zedBody, zedUid, type BodyBox as Box } from '../server/bodies';
-import { ESP, espAnswer, espRows } from '../server/esp';
+import { bodiesWithin, bodyInfo, fellWay, tagsIn, zedBody, zedUid, type BodyBox as Box } from '../server/bodies';
+import { ESP, espAnswer, espRows, within } from '../server/esp';
 import { ESP_AT } from '../src/net/protocol';
 import type { WorldLoot } from '../src/sim/economy';
 import { INFECTED, INFECTED_GRID, I_DEAD, I_IDLE, type Body } from '../src/sim/infected';
@@ -99,6 +99,23 @@ ok('the far sight sees things lying, put away, and in bodies, crates and stashes
   const most = espRows(many, [], 0, 0, () => false);
   assert.equal(most.length, ESP.most);
   assert.equal(most[0][0], 0);
+});
+
+ok('a bag lying on the ground says how many things are in it, and a body counts the things in its bags too', () => {
+  const tin = makeItem('beans', 1), bag = makeItem('camping_pack', 1), pouch = makeItem('camping_pack', 1);
+  pouch.cargo = [{ item: makeItem('bandage', 1), x: 0, y: 0, rot: false }];
+  bag.cargo = [{ item: tin, x: 0, y: 0, rot: false }, { item: pouch, x: 1, y: 0, rot: false }];
+  assert.equal(within(bag), 3);
+  const lyingBag: WorldLoot = { uid: bag.uid, item: bag, x: 3, y: 0, z: 0, rot: 0, point: -1, spawnedAt: 0 };
+  const body = corpse('corpse_9', 6, 0, { items: [{ ...bag, x: 0, y: 0, rot: false }, { ...makeItem('dogtag', 1), x: 3, y: 0, rot: false }] });
+  const rows = espRows([lyingBag], [body], 0, 0, () => false);
+  assert.deepEqual(rows[0], [3, 0, 0, 'camping_pack', 1, ESP_AT.ground, 3]);
+  // (a thing with nothing in it says nothing more)
+  assert.equal(rows[1].length, 6);
+  assert.equal(rows[1][4], 5);
+  // and the dog tags on a body taken away are counted, in its pockets too
+  pouch.cargo.push({ item: makeItem('dogtag', 1), x: 1, y: 0, rot: false });
+  assert.equal(tagsIn(body.items), 2);
 });
 
 ok('the far sight is answered to an admin alone, and no oftener than it should be', () => {

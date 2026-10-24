@@ -5,27 +5,30 @@
 
 import { boxes, horde, locks, log } from './index';
 import { broadcast, type Client } from './players';
-import { bodiesWithin, zedUid, type Lying } from './bodies';
+import { bodiesWithin, tagsIn, zedUid, type Lying } from './bodies';
 
 /** the bodies about an admin cleared away, metres: as many as not said, and the most */
 export const BODIES_NEAR = 60, BODIES_MOST = 400;
 /** `/delbody` with nothing after it: the nearest body, if it is as near as this, metres */
 const NEAREST = 50;
 
-/** a body taken out of the world for everybody, with whatever is in it @returns how many things were in it */
-export function takeBody(l: Lying): number {
-  let n = 0;
+/** a body taken out of the world for everybody, with whatever is in it @returns how many things were in it, and how many of them (or in them) dog tags */
+export function takeBody(l: Lying): { n: number; tags: number } {
+  let n = 0, tags = 0;
   if ('box' in l) {
-    n = boxes.get(l.box)?.items.length ?? 0;
+    const items = boxes.get(l.box)?.items ?? [];
+    n = items.length;
+    tags = tagsIn(items);
     locks.delete(l.box);
     boxes.delete(l.box);
     broadcast({ t: 'corpse-', uid: l.box });
   }
   if (l.zed !== undefined && horde.clear(l.zed)) broadcast({ t: 'i-', i: l.zed });
-  return n;
+  return { n, tags };
 }
 
-const things = (n: number, on: string) => (n ? `, with the ${n} thing${n > 1 ? 's' : ''} on ${on}` : '');
+/** what went with them, said back: a dog tag on a body is somebody's kill that was waiting to be taken, and is gone with it */
+const things = ({ n, tags }: { n: number; tags: number }, on: string) => (n ? `, with the ${n} thing${n > 1 ? 's' : ''} on ${on}${tags ? ` (${tags} of them dog tag${tags > 1 ? 's' : ''})` : ''}` : '');
 
 /** the body of one of the infected, by its number: null if none of them lies dead with that number */
 export function zedLying(i: number): Lying | null {
@@ -47,8 +50,11 @@ export function bodyOrder(c: Client, cmd: 'delbody' | 'delbodies', rest: string[
     const within = Math.min(BODIES_MOST, Math.max(5, Number(rest[0]) || BODIES_NEAR));
     const all = bodiesWithin(boxes.values(), horde.bodies.values(), x, z, within);
     if (!all.length) return `No body lies within ${within} metres of you.`;
-    const n = all.reduce((sum, l) => sum + takeBody(l), 0), zeds = all.filter((l) => l.zed !== undefined).length;
-    log(`[admin] ${c.name} took away ${all.length} bodies (${zeds} of the infected's) within ${within} m of ${x.toFixed(0)}, ${z.toFixed(0)}, ${n} things on them`);
+    const n = all.reduce((sum, l) => {
+      const t = takeBody(l);
+      return { n: sum.n + t.n, tags: sum.tags + t.tags };
+    }, { n: 0, tags: 0 }), zeds = all.filter((l) => l.zed !== undefined).length;
+    log(`[admin] ${c.name} took away ${all.length} bodies (${zeds} of the infected's) within ${within} m of ${x.toFixed(0)}, ${z.toFixed(0)}, ${n.n} things on them, ${n.tags} dog tags`);
     return `Taken away: ${all.length} bod${all.length > 1 ? 'ies' : 'y'} within ${within} metres of you${zeds ? ` (${zeds} of the infected's)` : ''}${things(n, all.length > 1 ? 'them' : 'it')}.`;
   }
   const id = (rest[0] ?? '').replace(/^#/, '');
@@ -61,6 +67,6 @@ export function bodyOrder(c: Client, cmd: 'delbody' | 'delbodies', rest: string[
   if (!l) return id ? 'No body of that number lies anywhere.' : `No body lies within ${NEAREST} metres of you.`;
   const whose = 'box' in l && l.zed === undefined ? `${boxes.get(l.box)?.name ?? 'somebody'}'s body` : 'the body of one of the infected';
   const n = takeBody(l);
-  log(`[admin] ${c.name} took away ${whose} at ${l.x.toFixed(0)}, ${l.z.toFixed(0)} (${n} things on it)`);
+  log(`[admin] ${c.name} took away ${whose} at ${l.x.toFixed(0)}, ${l.z.toFixed(0)} (${n.n} things on it, ${n.tags} dog tags)`);
   return `Taken away: ${whose}${things(n, 'it')}.`;
 }
