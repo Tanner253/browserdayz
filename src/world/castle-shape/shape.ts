@@ -42,6 +42,11 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
   o.ground = !!p.sits || p.t === 'apron';
   o.roofed = !!p.roofed;
   o.walked = p.paint === 'paving';
+  // (straight or bent, for every stuff a piece is drawn in: a wall's broken top and a tower's sills are drawn in
+  // `base` beside it. Said for its own stuff alone, `base` stayed as the last piece laid in it had it: straight,
+  // after the parapet's stumps, and the tops and steps of every bent wall after them stood a hand off its faces,
+  // open between: 2026-10-23, "theres gaps in between walls all over that castle".)
+  for (const paint of PAINTS) of(paint).straight = false;
   o.straight = !!p.straight;
   if (p.t === 'tower') of('timber').base = of('base').base = null;
   if (p.t === 'wall' && p.paint === 'stone') Object.assign(of('base'), { base: o.base, ground: o.ground, roofed: o.roofed });
@@ -137,7 +142,7 @@ export function* castleShapeSteps(ground: (x: number, z: number) => number = cas
   // panels and textures missing".)
   const holed = (b: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }) => gaps.some((q) => q.x > b.x0 - 0.9 && q.x < b.x1 + 0.9 && q.z > b.z0 - 0.9 && q.z < b.z1 + 0.9 && q.y1 > b.y0 && q.y0 < b.y1);
   const hides = hidesOf(all.flatMap((p): Hide[] => (p.t === 'box' && !p.hidden && !p.yaw && p.paint !== 'water' && p.at !== 'far' && (p.body ?? 'all') === 'all' && !holed(p) ? [{ x0: p.x0, x1: p.x1, y0: p.y0, y1: p.y1, z0: p.z0, z1: p.z1, by: WARP[p.paint], low: !!p.low }] : [])));
-  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p], hides, low)])) as Record<Paint, Out>;
+  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p], hides, low, true)])) as Record<Paint, Out>;
   const nears = outs(near, false), unders = outs(under, true);
   const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0, WARP[p])])) as Record<Paint, Out>;
   const ways: Way[] = loose.filter((l) => l.kind === 'hatch').map((l) => ({ L: hatchLine(l, ground(l.x, l.z)), g: ground(l.x, l.z) }));
