@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T07:43:27.561Z",
+ "generated": "2026-10-24T12:59:43.267Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -3911,7 +3911,7 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 726812,
+   "bytes": 726768,
    "srcTris": 22328,
    "tris": 22328,
    "min": [
@@ -3921,15 +3921,15 @@
    ],
    "max": [
     0.8314,
-    0.148,
+    0.1463,
     0.0376
    ],
    "lods": [
     {
      "url": "assets/models/benelli_m3_lod1.glb",
-     "tris": 3776,
+     "tris": 3795,
      "far": 2,
-     "of": "726812:1792401263135"
+     "of": "726768:1792846783926"
     }
    ],
    "holds": {
@@ -3945,7 +3945,7 @@
     ]
    },
    "hi": "assets/models/hi/benelli_m3.glb",
-   "hiBytes": 2571920,
+   "hiBytes": 2571876,
    "hiCard": 192
   },
   "hospital_desk": {
@@ -12805,7 +12805,7 @@
    "tags": [
     "animal"
    ],
-   "bytes": 805220,
+   "bytes": 535724,
    "tris": 9948,
    "min": [
     -0.3952,
@@ -12839,7 +12839,10 @@
     "walk": -0.583,
     "trot": -0.527,
     "run": -0.61
-   }
+   },
+   "hi": "assets/models/hi/animal_wolf.glb",
+   "hiBytes": 805220,
+   "hiCard": 21
   }
  }
 }

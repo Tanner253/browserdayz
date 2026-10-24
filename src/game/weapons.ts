@@ -104,7 +104,9 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // that hand, as is put on a gun this short. Further back it was inside the fist.)
   mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.6 } },
   // (the M32's grip under the AR-15's rail where its own stood)
-  ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 }, grip: { at: [0.126, 0.056, 0.008], size: 0.75 } },
+  // (its holographic sight the Benelli's, as on every gun (the owner, 2026-10-24: "the benelli's sight should be used for
+  // guns that currently take a holo"), where its own stood on the rail and as big)
+  ar15: { dot: { at: [-0.055, 0.0989, 0.0011], size: 0.92 }, mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } }, elcan: { at: [-0.045, 0.0989, 0.0011], size: 1 }, grip: { at: [0.126, 0.056, 0.008], size: 0.75 } },
   // (the MP7A1: the holographic sight on its rail where its own sight stood, between its folded irons and on their line:
   // on the middle of the gun's box, 3 mm right of them, the gun was seen from one side under it, "not straight")
   mp7a1: { dot: { at: [0.049, 0.1171, -0.0085], size: 0.8 } },
@@ -137,7 +139,12 @@ const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 're
  * foot, or the Elcan's, or under the middle of the gun's own scope or sight, set by eye on each.
  */
 export const RED_DOT = 'red_dot_1x';
-const RED_DOT_AT: Record<string, { at?: [number, number, number]; size?: number }> = {};
+const RED_DOT_AT: Record<string, { at?: [number, number, number]; size?: number; /** a pistol's that is hung on its body, not its slide */ body?: boolean }> = {
+  // (the Desert Eagle's (the owner, 2026-10-24: "desert eagle should support pistol suppressor and the simple red dot
+  // sight"): on the rail along the top of its barrel, measured off the file (scripts/sight-profile.mjs), toward its back.
+  // That barrel stands still when the slide runs back, as a real one's does, so the sight is hung on the body)
+  deagle: { at: [0.18, 0.0881, 0.0035], size: 0.5, body: true },
+};
 /** the middle of its glass in its own model (measured off it), and its dot put a millimetre behind, for the eye */
 const RED_DOT_GLASS: [number, number, number] = [0.0042, 0.071, -0.0584];
 
@@ -2254,7 +2261,7 @@ export class Weapons {
         if (!box.isEmpty()) at = [(box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2];
       }
       if (at) {
-        const rd = await fitted(RED_DOT, RED_DOT, at, own?.size ?? fit?.dot?.size ?? (o.kind === 'pistol' ? 0.5 : 0.8), o.kind === 'pistol' ? o.ride?.slide ?? 'slide' : onBody, (obj) => void (obj.rotation.y = -Math.PI / 2));
+        const rd = await fitted(RED_DOT, RED_DOT, at, own?.size ?? fit?.dot?.size ?? (o.kind === 'pistol' ? 0.5 : 0.8), o.kind === 'pistol' && !own?.body ? o.ride?.slide ?? 'slide' : onBody, (obj) => void (obj.rotation.y = -Math.PI / 2));
         const dot = new THREE.Mesh(new THREE.PlaneGeometry(0.006, 0.006), dotMaterial());
         dot.name = 'reticle';
         dot.renderOrder = 20;
@@ -2451,7 +2458,8 @@ export class Weapons {
     const glassY = (eyepiece ? eyepiece.y : lensRig ? lensRig.y : THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7)) + (GLASS[o.item]?.[1] ?? 0);
     /** across: the middle of the glass, where the box of the whole sight, its knobs and its mount, is not that */
     const glassX = (eyepiece ? eyepiece.x : lensRig ? lensRig.x : c.x) + (GLASS[o.item]?.[0] ?? 0);
-    if (hung.has('sight') && this.reticle) {
+    // (not for a sight of its own that is never shown, the AR-15's: the Benelli's stands there, with its own mark)
+    if (hung.has('sight') && this.reticle && !ITEMS[o.item].weapon?.never?.includes('sight')) {
       const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.014, 0.014), this.reticle);
       mark.name = 'reticle';
       mark.renderOrder = 20;
