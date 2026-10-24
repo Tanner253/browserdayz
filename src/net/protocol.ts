@@ -14,6 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
+import type { AnimalRow, Call } from '../sim/animals';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
@@ -56,7 +57,11 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // 56's page, counting twenty and ten, is told to load the page again.)
 // (60, 2026-10-22: a store finish is put on one gun ('finish') and goes with it, drawn from the gun's own `finish`;
 // the held gun's look rides on 'ps', its uid on 's'. A page of 59 would plate every gun its owner holds.)
-export const PROTOCOL = 60;
+// (61, 2026-10-23: what one of the infected had on it lies in its body (`zed` on a body, 'ihp' `body`), not on the
+// ground: a page of 60 would draw a soldier's body over every infected's that had anything. An admin's 'esp'.)
+// (62, 2026-10-24: animals, moved by the server ('an' rows, 'ahit', 'askin'); a blow from one says whether it
+// opened a wound ('dmg' bleed). A page of 61 would see none and could not hunt.)
+export const PROTOCOL = 62;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -114,6 +119,9 @@ export interface Vitals {
   bleed?: number;
   /** a broken leg (see src/sim/injury.ts) */
   broken?: boolean;
+  /** seconds of food poisoning left, and of a vitamins' guard against it (src/sim/sickness.ts) */
+  ill?: number;
+  guard?: number;
 }
 
 export interface PlayerInfo {
@@ -163,7 +171,18 @@ export interface CorpseInfo extends StashInfo {
   v?: number;
   /** still sat in a helicopter: which (its `i`) and which seat. It is drawn there until 'corpse@' lays it on the ground. */
   ride?: { i: number; seat: number };
+  /** the body of one of the infected (its `i`): drawn by them, and only searched here */
+  zed?: number;
 }
+
+/**
+ * What an admin's far sight shows of the things about them (`esp`): where, what (an item's id; in a body, a crate, a
+ * stash or a drop, the biggest thing in it), how many (of an item; the things in anything else, those in its bags too),
+ * where it is (ESP_AT), and for a bag lying on the ground, how many things are in it.
+ */
+export type EspRow = [x: number, y: number, z: number, what: string, n: number, at: number, inside?: number];
+/** on the ground, put away in a piece of furniture, a body, a crate, a stash, a buried stash, a supply drop */
+export const ESP_AT = { ground: 0, furniture: 1, body: 2, crate: 3, stash: 4, buried: 5, drop: 6 } as const;
 
 export interface KillInfo {
   id: number;
@@ -206,6 +225,9 @@ export type C2S =
   | { t: 'barrel'; i: number }
   /** we have lit fireplace number i (see src/sim/fires.ts), standing beside it */
   | { t: 'fire'; i: number }
+  /** a fire built from firewood where this player stands (FIRE.built), and firewood put on one that is alight */
+  | { t: 'build'; x: number; y: number; z: number }
+  | { t: 'feed'; i: number }
   /** a keycard was put to the bunker's door */
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
@@ -215,6 +237,8 @@ export type C2S =
   /** a field radio keyed: a supply drop is asked for where the sender stands */
   | { t: 'radio' }
   | { t: 'drop'; l: WorldLoot }
+  /** something has left the hand, thrown (src/sim/throw.ts): which (its uid and item), from where, how fast, at what power; the 'drop' of where it came to rest follows */
+  | { t: 'toss'; uid: string; id: string; o: [number, number, number]; v: [number, number, number]; pw: number }
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
@@ -245,6 +269,8 @@ export type C2S =
   | { t: 'store'; act: unknown }
   /** somebody with a role has their panel open: the lists it shows are asked for */
   | { t: 'adm' }
+  /** an admin's far sight wants what lies about where their view is, or about them (answered to an admin alone, and no oftener than ESP.every: server/esp.ts) */
+  | { t: 'esp'; x?: number; z?: number }
   /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
   | { t: 'tint'; color: string | null }
   /** a party (server/party.ts): ask the player of that id to join yours, say yes to whoever asked you, or leave yours */
@@ -279,6 +305,10 @@ export type C2S =
   | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
+  /** a shot or a blow on an animal (server/animals.ts judges it as it does one on the infected) */
+  | { t: 'ahit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; n?: number; p?: number }
+  /** kneeling at a body to gut and skin it (go 1), and done (go 2) */
+  | { t: 'askin'; i: number; go: 1 | 2 }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -321,6 +351,8 @@ export type S2C =
       racks?: [string, string[]][];
       /** the fireplaces that are alight: [which, seconds left] */
       fires?: [number, number][];
+      /** the fires built by players that stand now: [number, x, y, z] (told before which are alight) */
+      built?: [number, number, number, number][];
       /** the jeeps: where each stands, what state it is in and who is in it */
       vehicles?: VehicleInfo[];
       /** the infected, standing and lying */
@@ -341,6 +373,8 @@ export type S2C =
   | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number]; w: string; f: number }
+  /** somebody near has thrown something (an item's id): every game flies it the same way, and it is told where it lies when it does ('loot+') */
+  | { t: 'tossed'; by: number; id: string; o: [number, number, number]; v: [number, number, number] }
   | { t: 'launch'; id: number; o: [number, number, number]; v: [number, number, number]; w: string }
   | { t: 'act'; id: number; a: Act; d: number }
   | { t: 'emote'; id: number; e: string }
@@ -349,11 +383,22 @@ export type S2C =
   | { t: 'barrel+'; i: number }
   /** fireplace number i is alight, with so many seconds of burning left */
   | { t: 'fire'; i: number; left: number }
+  /** a fire built by somebody (numbered after the map's own), and one cleared away */
+  | { t: 'fire+'; i: number; x: number; y: number; z: number }
+  | { t: 'fire-'; i: number }
   /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'back'; id: number; b: Slung[] }
-  | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
+  | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number]; /** an animal's: whether it opened a wound (the server's roll, not the game's) */ bleed?: boolean }
+  /** the animals near this player (src/sim/animals.ts AnimalRow), five times a second; once a second all within its reach (`all`: any it knows of that is not in it has gone) */
+  | { t: 'an'; r: AnimalRow[]; all?: boolean }
+  /** an animal is heard (src/sim/animal-calls.ts): which, what it said, where it was */
+  | { t: 'acall'; i: number; c: Call; x: number; z: number }
+  /** an animal was hit: what it has left, and who hit it */
+  | { t: 'ahp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone }
+  /** gutting and skinning: begun (ok), refused (why), or done (got: what fell by the body) */
+  | { t: 'askin'; i: number; ok: boolean; why?: string; done?: boolean }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }
   | { t: 'death'; k: KillInfo; corpse: CorpseInfo | null }
   | { t: 'alive'; id: number }
@@ -457,7 +502,7 @@ export type S2C =
   /** where the games that move them say they are */
   | { t: 'is'; s: [number, ...IState][] }
   /** one was hit by this player: what it has left, whether that was the end of it, where on it, which way the blow was going, and whether it was a blow and not a shot */
-  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number]; melee?: boolean }
+  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number]; melee?: boolean; /** it is down, with something on it to be searched */ body?: CorpseInfo }
   /** a blow of one's was stopped by the guard of the player it was thrown at */
   | { t: 'iblk'; i: number; to: number }
   | { t: 'pong'; n: number }
@@ -526,6 +571,7 @@ export type S2C =
   | { t: 'refill'; by?: string }
   /** the lists the panel shows (see AdminLists) */
   | ({ t: 'adm' } & AdminLists)
+  | { t: 'esp'; l: EspRow[] }
   /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
   | { t: 'restart'; why: string; in: number }
   /** (`v`: turned away for being of another version than the server, which is of this one) */

@@ -30,7 +30,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const SRC = path.join(ROOT, 'assets-src', 'sounds');
+// (ASSETS_SRC: the sources elsewhere, as for a worktree, which has no assets-src of its own)
+const SOURCES = process.env.ASSETS_SRC ?? SOURCES;
+const SRC = path.join(SOURCES, 'sounds');
 const OUT = path.join(ROOT, 'public', 'assets', 'sounds');
 const snake = (p) => path.join(SRC, 'snake', "Snake's Authentic Gun Sounds", p);
 const lib = (p) => path.join(SRC, 'firearm-library', 'Prepared SFX Library', p);
@@ -196,7 +198,7 @@ several('hit_wood', ['c-wood_hit_03', 'c-wood_hit_04', 'c-wood_hit_07', 'c-wood_
 // The rotor of the helicopter that brings a supply drop (2026-10-13; src/sim/airdrop.ts says how it is heard): a Black
 // Hawk holding still, 2.6 seconds that join their own beginning, one channel at 48000 as it came. How loud it is
 // played, and how its pitch and its top change with distance, is ROTOR there.
-SOUNDS.rotor = { src: path.join(ROOT, 'assets-src', '854493__qubodup__uh60-black-hawk-helicopter-hover-loop-1.wav'), loop: true, rate: 48000, gain: 1 };
+SOUNDS.rotor = { src: path.join(SOURCES, '854493__qubodup__uh60-black-hawk-helicopter-hover-loop-1.wav'), loop: true, rate: 48000, gain: 1 };
 // The police car's siren (the owner, 2026-10-20: "Added new sound to replace the police siren"): its wail goes up and
 // down every 3 s exactly, the first rising out of nothing and the last dying away; one whole turn out of the middle,
 // begun where it joins its own beginning to the sample, at the rate it came (a new rate would blur the seam).
@@ -205,7 +207,7 @@ SOUNDS.siren = { src: dec('c-746302__titankaempfer__police-siren'), from: 278670
 // The weapons pass's guns, each a shot of its own (2026-10-17; the owner chose them and downloaded the Freesound ones,
 // all CC0, into assets-src/ itself; the FLAC, MP3 and 32-bit ones decoded by a browser into decoded/fs-<number>.wav).
 // The library's are a muzzle's snap and want weight under them, as the pistol's does; Freesound's are made to be played.
-const fsnd = (f) => path.join(ROOT, 'assets-src', f);
+const fsnd = (f) => path.join(SOURCES, f);
 const AIR = { src: snake('Full Sound/5.56/WAV/556 Single WAV.wav'), level: 0.65, after: 0.012, die: 0.3 };
 const BORE = [
   { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), level: 1.1, low: 520 },
@@ -361,6 +363,96 @@ async function writeWav(file, x, rate) {
   await fs.writeFile(file, b);
 }
 
+// The animals (2026-10-23). The owner, of what was downloaded: "make use of the sounds we have where yuo can", and of
+// some of it: "literally actually useless garbage". So: field recordings looked at, since nobody who cut them can hear
+// (each one's spectrogram and every sound in it: progress/animals/listen), and only their clean parts kept: each take
+// cut at the times written here, its rumble and hiss filtered off, the quiet between its sounds taken down, faded in
+// and out, and brought to one loudness by the body of it (its loudest third of a second), not by one peak.
+// Left out: the roe deer's dawn chorus (99645: its barks stand barely over the nightingales singing through them),
+// the synthetic bear growl (728102: made, not recorded, a wash of noise over all of it) and a horse galloping (175356:
+// in hiss twenty decibels under its hooves). Sources in assets-src/ (the MP3 and FLAC ones decoded into
+// assets-src/sounds/decoded/ by `node scripts/ogg.mjs --dir fs <file>`), each named in CREDITS.md.
+//   cuts   – [seconds in, seconds long] of each take, written out as name, name_2, ...
+//   high   – nothing of it under this many Hz (wind, the recorder's own rumble); top: nothing over (hiss)
+//   gate   – the quiet between its sounds: what is this many dB under its loudest is brought down further
+//   level  – the loudness of its loudest third of a second, dB under full (audio.ts sets each against the rest)
+//   rise   – seconds it comes in over (0.03 if not given); fade: seconds it dies away over
+const SRCS = SOURCES, DEC = path.join(SOURCES, 'sounds', 'decoded');
+const ANIMALS = {
+  // a brown bear: its charge, the roars of craigsmith's recording; its swipe and bite, the grunts and the roars' ends
+  animal_bear_roar: { src: path.join(SRCS, '479825__craigsmith__r19-13-bear-roaring.wav'), cuts: [[0.22, 1.65], [3.2, 2.6], [6.85, 2.15]], high: 60, top: 9000, gate: -32, level: -11, fade: 0.35, rate: 32000 },
+  animal_bear_growl: { src: path.join(SRCS, '479825__craigsmith__r19-13-bear-roaring.wav'), cuts: [[1.92, 0.8], [4.4, 1.0], [7.6, 0.9]], high: 60, top: 9000, gate: -32, level: -12, rise: 0.06, fade: 0.25, rate: 32000 },
+  animal_bear_bite: { src: path.join(SRCS, '479825__craigsmith__r19-13-bear-roaring.wav'), cuts: [[0.95, 0.75], [5.05, 0.75]], high: 60, top: 9000, gate: -32, level: -12, rise: 0.04, fade: 0.2, rate: 32000 },
+  // a red deer stag at the rut: Robert.Crosley's, in Scotland (CC-BY 4.0), six of its roars
+  animal_roar: { src: path.join(SRCS, '776204__robertcrosley__red-deer-bugles-and-roars-northern-scotland-time-compressed.wav'), cuts: [[1.85, 2.35], [9.55, 2.3], [16.6, 3.6], [24.35, 3.0], [73.45, 2.3], [100.45, 2.4]], high: 70, top: 10000, gate: -36, level: -12, fade: 0.4, rate: 32000 },
+  // hooves at a run: ebenvie's horse, its clean stretches
+  animal_hooves: { src: path.join(DEC, 'c-792860__ebenvie__horse-running.wav'), cuts: [[2.5, 2.6], [8.0, 1.95], [11.6, 1.45], [18.75, 3.0]], high: 90, top: 12000, gate: -30, level: -16, rise: 0.02, fade: 0.3, rate: 32000 },
+  // a lone wolf (NaturesTemper's) and a pack together (Kingcornz's), each its whole howl
+  animal_howl: [
+    { src: path.join(DEC, 'c-398430__naturestemper__wolf-howl.wav'), cut: [0.85, 6.9] },
+    { src: path.join(SRCS, '378334__kingcornz__howling-wolves.wav'), cut: [0.2, 7.4] },
+  ],
+  // a wolf watching you from close: newagesoup's growl (CC-BY 4.0); going in: qubodup's dog, its snarls
+  animal_wolf_growl: { src: path.join(SRCS, '338674__newagesoup__wolf-growl.wav'), cuts: [[0.0, 2.7]], high: 60, top: 9000, gate: -34, level: -13, fade: 0.3, rate: 32000 },
+  animal_wolf_snarl: { src: path.join(DEC, 'c-122183__qubodup__dog-growling-snarling-grumbling.wav'), cuts: [[4.35, 1.1], [18.15, 1.1], [31.5, 1.1], [45.45, 0.75], [51.3, 1.0]], high: 80, top: 10000, gate: -30, level: -12, rise: 0.02, fade: 0.2, rate: 32000 },
+  // a cow: JosephSardin's five moos (each came cut hard at its end: ended a little before, and faded)
+  animal_moo: { src: path.join(SRCS, '177253__josephsardin__cow-moos.wav'), cuts: [[0.2, 2.05], [2.8, 2.3], [5.6, 2.35], [8.45, 3.0], [12.1, 1.95]], high: 60, top: 9000, level: -13, rise: 0.06, fade: 0.3, rate: 32000 },
+  // food poisoning: SpliceSound's, the three fullest of it
+  vomit: { src: path.join(SRCS, '338116__splicesound__vomit-puking-spilling-water-onto-grass-splat.wav'), cuts: [[10.3, 1.2], [20.65, 1.6], [4.7, 0.9]], high: 120, top: 11000, gate: -30, level: -14, rise: 0.02, fade: 0.25, rate: 32000 },
+};
+// (the howls are one take from each of two recordings)
+for (const [name, cfg] of Object.entries(ANIMALS)) {
+  if (!Array.isArray(cfg)) continue;
+  ANIMALS[name] = { many: cfg.map((c) => ({ ...c })), high: 90, top: 9000, gate: -38, level: -12, rise: 0.25, fade: 1.0, rate: 32000 };
+}
+
+/** a one-pole filter run twice: 12 dB an octave off above (`low`) or below (`high`) `hz` */
+function pass(x, rate, hz, high) {
+  const a = Math.exp((-2 * Math.PI * hz) / rate), y = Float32Array.from(x);
+  for (let round = 0; round < 2; round++) {
+    let lo = 0;
+    for (let i = 0; i < y.length; i++) {
+      lo = a * lo + (1 - a) * y[i];
+      y[i] = high ? y[i] - lo : lo;
+    }
+  }
+  return y;
+}
+
+/** one take of an animal: filtered, the quiet in it taken down, faded, and at its loudness */
+function take(raw, rate, cfg) {
+  let y = raw;
+  if (cfg.high) y = pass(y, rate, cfg.high, true);
+  if (cfg.top) y = pass(y, rate, cfg.top, false);
+  y = resample(y, rate, cfg.rate);
+  const r = cfg.rate;
+  if (cfg.gate) {
+    // (an envelope that rises in 5 ms and falls in 120; under the gate, the further under the more it is brought down)
+    const up = Math.exp(-1 / (0.005 * r)), down = Math.exp(-1 / (0.12 * r)), env = new Float32Array(y.length);
+    let e = 0, top = 0;
+    for (let i = 0; i < y.length; i++) {
+      const v = Math.abs(y[i]);
+      e = v > e ? up * e + (1 - up) * v : down * e + (1 - down) * v;
+      env[i] = e;
+      top = Math.max(top, e);
+    }
+    const at = top * 10 ** (cfg.gate / 20);
+    y = y.map((v, i) => (env[i] >= at ? v : v * (env[i] / at) ** 1.5));
+  }
+  const rise = Math.round((cfg.rise ?? 0.03) * r), fade = Math.round((cfg.fade ?? 0.18) * r);
+  y = y.map((v, i) => v * Math.min(1, i / Math.max(1, rise)) * Math.min(1, (y.length - i) / Math.max(1, fade)));
+  // its loudest third of a second to `level`; what would go over the top bent down, not cut off
+  const w = Math.round(0.33 * r);
+  let most = 0, sum = 0;
+  for (let i = 0; i < y.length; i++) {
+    sum += y[i] * y[i];
+    if (i >= w) sum -= y[i - w] * y[i - w];
+    most = Math.max(most, sum / Math.min(w, i + 1));
+  }
+  const k = 10 ** (cfg.level / 20) / Math.sqrt(most || 1e-12);
+  return y.map((v) => Math.tanh(v * k * 1.05) / 1.05);
+}
+
 await fs.mkdir(OUT, { recursive: true });
 let total = 0;
 const made = [];
@@ -411,6 +503,21 @@ for (const [name, cfg] of Object.entries(SOUNDS)) {
     await writeWav(path.join(OUT, file), cut, cfg.rate);
     total += 44 + cut.length * 2;
     made.push(`${file} ${(cut.length / cfg.rate).toFixed(2)} s (began ${(from / rate).toFixed(3)} s into ${path.basename(cfg.src)}); loud ${loud(cut, cfg.rate, 0, 0.1)} dB in its first tenth of a second, ${loud(cut, cfg.rate, 0.1, 0.4)} over the next three`);
+  }
+}
+for (const [name, cfg] of Object.entries(ANIMALS)) {
+  if (ONLY.length && !ONLY.includes(name) && !ONLY.includes('animals')) continue;
+  const parts = cfg.many ?? cfg.cuts.map((cut) => ({ src: cfg.src, cut }));
+  const read = new Map();
+  for (const [k, part] of parts.entries()) {
+    const whole = read.get(part.src) ?? (await readWav(part.src));
+    read.set(part.src, whole);
+    const [from, len] = part.cut, i0 = Math.round(from * whole.rate), i1 = Math.min(whole.x.length, Math.round((from + len) * whole.rate));
+    const cut = take(whole.x.slice(i0, i1), whole.rate, cfg);
+    const file = `${name}${k ? `_${k + 1}` : ''}.wav`;
+    await writeWav(path.join(OUT, file), cut, cfg.rate);
+    total += 44 + cut.length * 2;
+    made.push(`${file} ${(cut.length / cfg.rate).toFixed(2)} s (from ${from} s of ${path.basename(part.src)}); loudest third of a second ${loud(cut, cfg.rate, 0, cut.length / cfg.rate)} dB on the whole`);
   }
 }
 console.log(made.join('\n'));

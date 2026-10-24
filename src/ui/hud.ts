@@ -192,6 +192,9 @@ const SPLASHES = [
   splash(27, "<ellipse cx='52' cy='40' rx='32' ry='18'/>", "<circle cx='14' cy='30' r='4.5'/><circle cx='90' cy='44' r='3.5'/><circle cx='62' cy='10' r='4'/><circle cx='26' cy='62' r='3'/><circle cx='78' cy='66' r='2.5'/>", "<path d='M58 52 Q60 92 61 122 Q62 128 64 122 Q64 92 66 52 Z'/>"),
 ];
 
+/** a name over a head (a player, a dead one, a vanished one, the admin's own body), or a thing lying about by its sort (in a body, a crate or a stash: 'box') */
+export type EspKind = '' | 'dead' | 'ghost' | 'me' | 'box' | 'gun' | 'ammo' | 'med' | 'gear' | 'food' | 'item';
+
 export class HUD {
   root: HTMLDivElement;
   /** Emotes: the wheel's slots set, each watched first; opened in the game from the wheel (src/ui/emotes-menu.ts) */
@@ -220,7 +223,7 @@ export class HUD {
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
       <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
-      <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
+      <div class="hud-progress"><div class="hud-progress-label"></div><svg class="hud-ring" viewBox="0 0 48 48" aria-hidden="true"><circle class="ring-track" cx="24" cy="24" r="20"/><circle class="ring-fill" cx="24" cy="24" r="20" pathLength="100"/></svg></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
       <div class="hud-area"></div>
@@ -1616,7 +1619,7 @@ export class HUD {
    * of the screen's width and height). An empty list takes them all away.
    */
   /** @param list where each name goes, as parts of the screen across and down (0 to 1) */
-  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: '' | 'dead' | 'ghost' | 'me' }[]) {
+  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: EspKind }[]) {
     let box = this.root.querySelector('.hud-esp') as HTMLElement | null;
     if (!box) {
       if (!list.length) return;
@@ -1650,6 +1653,8 @@ export class HUD {
     }
   }
   private espShown = 0;
+  /** how much of the progress ring is left empty, hundredths (see `progress` in the state) */
+  private ringOff = -1;
 
   /** which of an admin's powers are on, said at the top of the screen for as long as any is ('' for none) */
   setPowers(text: string) {
@@ -1923,7 +1928,9 @@ export class HUD {
     /**
      * `hot`: it is a fuse running down and not a thing getting done (a grenade with its pin out): drawn as a warning,
      * on a dark plate, to be read at a glance over grass, snow or a wall. `figure`: the seconds left, which are then
-     * the biggest thing in the line, before its words.
+     * the biggest thing in the line, before its words. Every timed thing is this one ring round the crosshair, filling
+     * clockwise from the top, its name under it (the owner, 2026-10-24: "for actions and things that take time like
+     * eating or throwing we should render a circular progress bar rather than a flat horizontal bar, like dayz").
      */
     progress: { label: string; t: number; hot?: boolean; figure?: string } | null;
     hotbar: HotbarEntry[];
@@ -2026,7 +2033,7 @@ export class HUD {
     // numbers (2026-10-13: "We dont need to show the players blood unless its dropping, dayz just does icons and
     // symbols"). What each looks like, and when blood is there at all, is reckoned in src/ui/status.ts.
     const v = s.vitals;
-    if (this.status.due(s.dt, s.dead)) this.status.show({ health: v.health, blood: v.blood, bleed: v.bleeding ? v.bleed : 0, energy: v.energy, water: v.water, broken: !!v.broken, drip: s.drip, gas: s.gas ?? null, fire: s.fire ?? null });
+    if (this.status.due(s.dt, s.dead)) this.status.show({ health: v.health, blood: v.blood, bleed: v.bleeding ? v.bleed : 0, energy: v.energy, water: v.water, broken: !!v.broken, drip: s.drip, gas: s.gas ?? null, fire: s.fire ?? null, ill: v.ill ?? 0, guard: v.guard ?? 0 });
     // What to do about it, in words with the key to press, over the hotbar: the one thing a symbol cannot say. It
     // is there only for what will not wait: an open wound, and blood so low that health no longer mends on it (the
     // drop is red by then). How bad the wound is and how long there is, which this card also said, the badge says.
@@ -2106,8 +2113,17 @@ export class HUD {
       // (a figure before the words: the seconds of a fuse, large. Both are the game's own words, never a player's.)
       if (s.progress.figure !== undefined) this.set('plabel', e.progress.firstElementChild as HTMLElement, `<b>${s.progress.figure}<i>s</i></b><span>${s.progress.label}</span>`, 'html');
       else this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
-      ((e.progress.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.min(100, s.progress.t * 100)}%`;
-    } else this.toggle(e.progress, 'show', false);
+      // (how much of the ring is filled: written only as it changes, a hundredth at a time)
+      const off = Math.round(100 - Math.min(100, Math.max(0, s.progress.t) * 100));
+      if (off !== this.ringOff) {
+        this.ringOff = off;
+        (e.progress.querySelector('.ring-fill') as SVGElement).style.strokeDashoffset = String(off);
+      }
+    } else {
+      // (put off, or done: gone at once, and the next begins empty)
+      this.toggle(e.progress, 'show', false);
+      if (this.ringOff !== 100) (e.progress.querySelector('.ring-fill') as SVGElement).style.strokeDashoffset = String((this.ringOff = 100));
+    }
 
     // (the beat of a body near death is the page's own animation, run by the card, and the flash of a hit is written
     // only as it changes: written every frame, it was a restyle and repaint of the page every frame, 2026-10-18)

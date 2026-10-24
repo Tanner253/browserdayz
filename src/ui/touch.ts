@@ -78,7 +78,7 @@ export class TouchControls {
         <button class="tc-b tc-light" data-key="KeyL" aria-label="Light">${icon('<path d="M8 3h8l-1.5 6h-5zM9.5 9h5v10a2.5 2.5 0 0 1-5 0zM12 12.5v2.5"/>')}</button>
       </div>
       <button class="tc-b tc-use" data-key="KeyF" aria-label="Use">${icon('<path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5v-1a1.5 1.5 0 0 1 3 0V11m0-4.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2.4-4.3a1.5 1.5 0 0 1 2.6-1.5L8 14"/>')}</button>
-      <button class="tc-b tc-act2" data-key="KeyG"></button>
+      <button class="tc-b tc-act2" data-hold="KeyG"></button>
       <button class="tc-b tc-fire" data-hold="Mouse0" aria-label="Fire">${icon('<circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>')}</button>
       <button class="tc-b tc-aim" data-toggle="Mouse2">Aim</button>
       <button class="tc-b tc-reload" data-key="KeyR" aria-label="Reload">${icon('<path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/>')}</button>

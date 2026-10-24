@@ -41,6 +41,12 @@ export const NEED = {
   breath: [1, 0.6, 0.4],
   /** a gun held by somebody hungry wanders this much more */
   shake: [1, 1.2, 1.55],
+  /**
+   * Water and food gone a second at rest, times how hard the body works (Player.tickVitals). Water went at 0.07, until
+   * the owner, 2026-10-23: "Water drains too quickly for the user, reduce thirst by like 25%".
+   */
+  thirst: 0.07 * 0.75,
+  hunger: 0.045,
 };
 export const stage = (v: number): 0 | 1 | 2 => (v < NEED.bad ? 2 : v < NEED.wanting ? 1 : 0);
 

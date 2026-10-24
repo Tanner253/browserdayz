@@ -43,6 +43,7 @@ const HEIGHTS = generateWorld().heights;
 class Player {
   ws!: WebSocket;
   got: S2C[] = [];
+  id = 0;
   constructor(public key: string, public name: string) {}
   async join() {
     this.ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
@@ -54,6 +55,7 @@ class Player {
     this.send({ t: 'hello', v: PROTOCOL, key: this.key, name: this.name });
     for (let k = 0; k < 160 && !this.got.some((m) => m.t === 'welcome'); k++) await sleep(50);
     assert.ok(this.got.some((m) => m.t === 'welcome'), `${this.name} was not let in`);
+    this.id = (this.got.find((m) => m.t === 'welcome') as { you: number }).you;
   }
   send(m: unknown) {
     this.ws.send(JSON.stringify(m));
@@ -64,6 +66,23 @@ class Player {
       this.send({ t: 's', p: [x, heightAt(HEIGHTS, x, z), z, 0, 0, 0], w: null, m: [] });
       await sleep(100);
     }
+  }
+  /** a tag taken off a body as a game takes it: the body opened, and set again without it (the server keeps who holds each tag that can pay, server/custody.ts: a game's word that it carries one is not enough) */
+  async takeOff(cid: string, uid: string) {
+    const at = this.got.length;
+    this.send({ t: 'copen', cid });
+    for (let k = 0; k < 60 && !this.got.slice(at).some((m) => m.t === 'cdata' && m.cid === cid); k++) await sleep(50);
+    const d = this.got.slice(at).find((m) => m.t === 'cdata' && m.cid === cid) as Extract<S2C, { t: 'cdata' }> | undefined;
+    assert.ok(d?.items.some((it) => it.uid === uid), `${this.name} found no tag ${uid} on the body`);
+    this.send({ t: 'cset', cid, items: d!.items.filter((it) => it.uid !== uid) });
+    this.send({ t: 'cclose', cid });
+    await sleep(150);
+  }
+  /** the body of the player numbered `id`, as this player was told of their death */
+  bodyOf(id: number): string {
+    const d = this.got.find((m) => m.t === 'death' && m.k.id === id) as Extract<S2C, { t: 'death' }> | undefined;
+    assert.ok(d?.corpse, `${this.name} was told of no body of #${id}`);
+    return d!.corpse!.uid;
   }
   carry(tags: object[]) {
     this.send({ t: 'me', inv: { slots: {}, active: null, containers: [{ id: 'tags', items: tags.map((t, i) => ({ ...t, x: i, y: 0, rot: false })) }] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
@@ -98,6 +117,8 @@ try {
   await sleep(300);
   bee.send({ t: 'died', cause: 'test' });
   await sleep(400);
+  await ann.stand(1, 0, 0.3);
+  await ann.takeOff(ann.bodyOf(bee.id), tag('Bee').uid);
   ann.carry([tag('Bee')]);
   await sleep(1500);
   ann.send({ t: 'cash', uid: tag('Bee').uid, wallet: 'So11111111111111111111111111111111111111112' });
@@ -120,6 +141,8 @@ try {
   await sleep(300);
   cat.send({ t: 'died', cause: 'test' });
   await sleep(400);
+  await ann.stand(5, 0, 0.3);
+  await ann.takeOff(ann.bodyOf(cat.id), tag('Cat').uid);
   ann.carry([tag('Cat')]);
   await sleep(1500);
   ann.send({ t: 'cash', uid: tag('Cat').uid, wallet: 'So11111111111111111111111111111111111111112' });

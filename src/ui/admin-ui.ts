@@ -57,6 +57,8 @@ export interface AdminActions {
   tint(color: string | null): void;
   /** everybody's name shown where they are, through anything: put on or off */
   names(on: boolean): void;
+  /** every thing lying about shown where it is, through anything: put on or off */
+  loot(on: boolean): void;
   /** what the middle of the game's view is on, behind the window (null: nothing within reach) */
   look(): AdminLook | null;
   /** somebody has been picked on the left (0: nobody): the admin's map rings them too */
@@ -78,6 +80,8 @@ export interface AdminLook {
   what: string;
   /** a car: its number */
   car?: number;
+  /** a body: its number, for /delbody (a player's body's uid, or the number of one of the infected) */
+  body?: string;
 }
 /** one of those online, as the lists have them */
 export type AdminPlayer = AdminLists['players'][number];
@@ -100,6 +104,8 @@ export interface AdminSelf {
   night: boolean;
   /** everybody's name is shown where they are */
   names: boolean;
+  /** every thing lying about is shown where it is */
+  loot?: boolean;
   /** the colour chosen for the word ADMIN in the chat (null: the rainbow) */
   tint: string | null;
   freecam: boolean;
@@ -124,7 +130,7 @@ const COUNTS = [1, 2, 3, 5, 10, 25];
 /** how far about the admin the infected are put down, metres */
 const CULL = [30, 60, 120, 250];
 /** the drawing each kind of thing goes by on the Entities page (a new kind in ENTITIES is asked for one here) */
-const ENTITY_ICON: Record<Entity['kind'], string> = { car: 'car', infected: 'infected' };
+const ENTITY_ICON: Record<Entity['kind'], string> = { car: 'car', infected: 'infected', animal: 'animal' };
 /** what somebody carries, as the server last had it from their game (`/pockets`) */
 type Pockets = Extract<S2C, { t: 'inv' }>;
 const SLOT_NAME: Record<string, string> = { primary: 'On the back', secondary: 'On the back', holster: 'Holster', head: 'Head', face: 'Face', vest: 'Vest', back: 'Pack', hands: 'Hands', feet: 'Feet', neck: 'Round the neck', melee: 'Belt' };
@@ -182,6 +188,8 @@ const ICON: Record<string, string> = {
   keys: '<path d="M4 7h16v10H4z"/><path d="M7 10.5h1M10.5 10.5h1M14 10.5h1M7.5 14h9"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
   right: '<path d="M9 6l6 6-6 6"/>',
+  // (a paw: an animal, 2026-10-23)
+  animal: '<circle cx="5.5" cy="10" r="1.8"/><circle cx="9.5" cy="6" r="1.8"/><circle cx="14.5" cy="6" r="1.8"/><circle cx="18.5" cy="10" r="1.8"/><path d="M12 11.5c-2.8 0-5.5 3.6-5.5 6c0 1.8 1.8 2.3 2.9 1.8c.9-.4 1.7-.6 2.6-.6s1.7.2 2.6.6c1.1.5 2.9 0 2.9-1.8c0-2.4-2.7-6-5.5-6z"/>',
   infected: '<circle cx="9" cy="5.5" r="2.4"/><path d="M9 8v7.5M9 10.5h8.5M9 13h7.5M9 15.5l-3 5M9 15.5l3 5"/>',
   target: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/>',
   window: '<path d="M4 5.5h16v13H4z"/><path d="M4 9h16"/><path d="M10 12.5l-2 2 2 2M8 14.5h6.5"/>',
@@ -705,7 +713,7 @@ export class AdminUI {
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
-    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.bottomless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.bottomless, s.night, s.names, s.freecam, s.tint].join() : ''}`;
+    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.bottomless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.bottomless, s.night, s.names, s.loot, s.freecam, s.tint].join() : ''}`;
   }
 
   private bodyOf(): HTMLElement[] {
@@ -1075,6 +1083,7 @@ export class AdminUI {
       }, 'camera', 'K'),
       this.flip('Night vision', 'It is day, for you alone, in the bunker too', s.night, () => this.act.night(!s.night), 'sun'),
       this.flip('Names of players', 'Everybody’s name where they are, however far, through anything', s.names, () => this.act.names(!s.names), 'eye'),
+      this.flip('Loot', 'Every thing lying within 150 m of your view, through anything: on the ground, put away, on bodies, in crates and stashes', s.loot, () => this.act.loot(!s.loot), 'box'),
     );
     grid.append(this.card('Powers', 'bolt', powers,
       el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),
@@ -1419,7 +1428,19 @@ export class AdminUI {
         this.grave('wrecks', `Clear every burned-out car${st?.wrecks ? `  (${st.wrecks})` : ''}`, () => this.send('/wrecks'), 'trash'),
       ),
       this.line('Infected', el('span', '', 'Put down those within'), ...CULL.map((m) => this.grave(`delz${m}`, `${m} m`, () => this.send(`/delz ${m}`), 'infected')), el('span', '', 'of me')),
-      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected.'),
+      // (2026-10-23: "admin needs a way to get rid of corpses ... and a way to delete corpses in bulk like the kill zombies in bulk vicinity control")
+      this.line('Bodies',
+        look?.body !== undefined ? this.grave(`delbody:${look.body}`, `Delete ${look.what}`, () => {
+          this.send(`/delbody ${look.body}`);
+          window.setTimeout(() => {
+            this.looked = this.act.look();
+            if (this.isOpen) this.draw();
+          }, 900);
+        }, 'target') : this.off('The body I am looking at', 'You are not looking at a body. Shut this window, look at one, and open it again', 'target'),
+        this.grave('delbody', 'Delete the body nearest me', () => this.send('/delbody'), 'skull'),
+      ),
+      this.line('', el('span', '', 'Delete the bodies within'), ...CULL.map((m) => this.grave(`delbodies${m}`, `${m} m`, () => this.send(`/delbodies ${m}`), 'skull')), el('span', '', 'of me')),
+      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. A body goes with whatever is on it: a player’s, or one of the infected’s. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected.'),
     );
 
     const counts = el('div', 'adm-tiles');

@@ -4,7 +4,8 @@
 //   node scripts/ogg.mjs impactWood_heavy impactWood_light      Kenney's "Impact Sounds", every take of each kind:
 //        assets-src/sounds/kenney-impact/Audio/<kind>_00<n>.ogg -> assets-src/sounds/decoded/k-<kind>-<n>.wav
 //   node scripts/ogg.mjs --dir cc0-wood-metal door_open_01 wood_close_01        files of another pack, by name:
-//        assets-src/sounds/<dir>/<name>.ogg -> assets-src/sounds/decoded/c-<name>.wav
+//        assets-src/sounds/<dir>/<name>.ogg -> assets-src/sounds/decoded/c-<name>.wav (a name given with its own
+//        ending, x.mp3 or x.flac, is read as it is)
 //
 // scripts/sounds.mjs reads them from there.
 
@@ -15,7 +16,9 @@ import path from 'node:path';
 import WebSocket from 'ws';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
-const SRC = path.join(ROOT, 'assets-src', 'sounds', 'kenney-impact', 'Audio'), OUT = path.join(ROOT, 'assets-src', 'sounds', 'decoded');
+// (ASSETS_SRC: the sources elsewhere, as for a worktree, which has no assets-src of its own)
+const SOURCES = process.env.ASSETS_SRC ?? SOURCES;
+const SRC = path.join(SOURCES, 'sounds', 'kenney-impact', 'Audio'), OUT = path.join(SOURCES, 'sounds', 'decoded');
 const args = process.argv.slice(2);
 const pack = args[0] === '--dir' ? args[1] : null;
 const kinds = pack ? args.slice(2) : args;
@@ -56,7 +59,8 @@ try {
   });
   fs.mkdirSync(OUT, { recursive: true });
   // (of Kenney's pack, the five takes of each kind; of another, the one file of each name)
-  const jobs = pack ? kinds.map((name) => [path.join(ROOT, 'assets-src', 'sounds', pack, `${name}.ogg`), `c-${name}`]) : kinds.flatMap((kind) => [0, 1, 2, 3, 4].map((n) => [path.join(SRC, `${kind}_00${n}.ogg`), `k-${kind}-${n}`]));
+  // (a name with its own ending, .mp3 or .flac, is read as it is: the browser decodes those as well)
+  const jobs = pack ? kinds.map((name) => (/\.(mp3|flac|ogg|wav)$/i.test(name) ? [path.join(SOURCES, 'sounds', pack, name), `c-${name.replace(/\.\w+$/, '')}`] : [path.join(SOURCES, 'sounds', pack, `${name}.ogg`), `c-${name}`])) : kinds.flatMap((kind) => [0, 1, 2, 3, 4].map((n) => [path.join(SRC, `${kind}_00${n}.ogg`), `k-${kind}-${n}`]));
   {
     for (const [file, out] of jobs) {
       if (!fs.existsSync(file)) continue;

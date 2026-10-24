@@ -495,7 +495,8 @@ export const LIVE = {
  * Things drawn bigger in the hand than they are, or they are a speck at arm's length (the owner, 2026-10-14: "the
  * bandage item needs to be larger its too small in the hand"): the roll of dressing is a 4.5 cm reel of tape.
  */
-const IN_HAND: Record<string, number> = { bandage: 1.8 };
+// (firewood: a bundle half a metre long, held in front of the eye, filled the view)
+const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45 };
 
 /**
  * A roll of dressing in the left palm, and the right drawing lengths off it. A bag of blood or salt water being run
@@ -1351,6 +1352,11 @@ export class Weapons {
   private incoming: string | null = null;
   /** how many rounds are in the magazine that is on its way into the gun */
   private incomingRounds = 0;
+
+  /** the magazine the hands are putting in now (the inventory marks it on the gun until it is in) */
+  goingIn(): string | null {
+    return this.action?.name === 'magswap' || this.action?.name === 'reload' ? this.incoming : null;
+  }
 
   /**
    * The rounds drawn in the mouth of a magazine: the M9's top two, the row in the AR-15's. They are pieces of

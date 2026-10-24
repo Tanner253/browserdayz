@@ -20,8 +20,9 @@ export interface Entity {
   /** the word it is asked for by */
   id: string;
   name: string;
-  /** how the server makes it: a car (`k` says which car), or one of the infected */
-  kind: 'car' | 'infected';
+  /** how the server makes it: a car (`k` says which car), one of the infected, or an animal (`animal`: its kind, src/sim/animals.ts) */
+  kind: 'car' | 'infected' | 'animal';
+  animal?: string;
   k?: number;
   /** the most of them one order stands */
   most: number;
@@ -34,6 +35,12 @@ export const ENTITIES: Entity[] = [
   { id: 'police', name: 'Police car', kind: 'car', k: POLICE_CAR.kind, most: 4, does: 'The road car: quicker than the jeep on a road, slower off it', also: ['policecar', 'cop'] },
   { id: 'heli', name: 'Helicopter', kind: 'car', k: HELI.kind, most: 2, does: 'The MD-500: two seats; Space climbs, C drops (put it somewhere with room round it)', also: ['helicopter', 'md500', 'chopper'] },
   { id: 'infected', name: 'Infected', kind: 'infected', most: 25, does: 'They stand where they are put, and go for whoever is near. Nothing comes back in their place when they are dead', also: ['zombie', 'zombies', 'z'] },
+  // (the animals, 2026-10-23: each stood in a herd of its own that lives where it is put; src/sim/animals.ts)
+  { id: 'deer', name: 'Red deer stag', kind: 'animal', animal: 'stag', most: 8, does: 'Grazes, and bolts from anybody it sees, hears or smells', also: ['stag'] },
+  { id: 'doe', name: 'Red deer hind', kind: 'animal', animal: 'doe', most: 8, does: 'Grazes, and bolts', also: ['hind'] },
+  { id: 'bear', name: 'Brown bear', kind: 'animal', animal: 'bear', most: 4, does: 'Roars, then charges whoever comes near or hurts it' },
+  { id: 'wolf', name: 'Wolf', kind: 'animal', animal: 'wolf', most: 8, does: 'Circles whoever it hunts and comes in to bite', also: ['wolves'] },
+  { id: 'cow', name: 'Cow', kind: 'animal', animal: 'cow', most: 6, does: 'Wanders, and shies off' },
 ];
 /** the thing meant by a word typed after `/spawn` */
 export const entityBy = (word: string): Entity | null => {
@@ -64,6 +71,8 @@ export const ORDERS: Order[] = [
   { name: 'delcar', args: ['[number]'], does: 'Take a car out of the world: the one nearest you, or the one of that number', admin: true },
   { name: 'wrecks', args: [], does: 'Clear away every burned-out car now', admin: true },
   { name: 'delz', args: ['[metres]'], does: 'Put down every one of the infected within so many metres of you (60 if not said)', admin: true },
+  { name: 'delbody', args: ['[number]'], does: 'Take away a body and what is on it, a player’s or one of the infected’s: by its number, or the nearest. The Delete key does it for the one you are looking at', admin: true },
+  { name: 'delbodies', args: ['[metres]'], does: 'Take away every body within so many metres of you (60 if not said), players’ and the infected’s, with what is on them', admin: true },
   { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
   { name: 'save', args: [], does: 'Write everybody and every stash to the site now (a deploy does it by itself; this is for a restart made by hand)', admin: true },
   { name: 'delc', args: ['[number]'], does: 'Take a comment off the changelog by its number; with no number, the newest are read out', admin: true },

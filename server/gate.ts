@@ -3,19 +3,19 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
-import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, type ItemInstance } from '../src/sim/items';
 import { WEAPON_RULES } from '../src/sim/combat';
 import { type Vec3, inHandDamage, overdue, lyingBlast } from '../src/sim/grenades';
 import { carDamage } from '../src/sim/vehicles';
-import { INFECTED, infectedDrop } from '../src/sim/infected';
+import { INFECTED } from '../src/sim/infected';
 import { BLOOD, bloodOf, withWound, bleedOf, woundOf } from '../src/sim/blood';
 import { MAX_STAMINA, F_SIT, F_GROUND, F_BLEED } from '../src/net/protocol';
-import { BANS, LOCAL_ADMIN, economy, horde, invented, log, things, vehicles } from './index';
+import { BANS, LOCAL_ADMIN, horde, invented, log, things, vehicles } from './index';
 import { SITE_URL, ipsTellApart } from './tags';
 import { CHECK, CHECKS, dealt, flag } from './checks';
 import { DEVICE, cameWith, deviceName, isFarm, shortDevice } from './device';
 import { broadcast, clients, drop, send, type Client } from './players';
-import { hurtJeep, kill, leaveSeat, releaseLock } from './acts';
+import { hurtJeep, infectedBody, kill, leaveSeat, releaseLock } from './acts';
 
 // ------------------------------------------------------------------ a life kept by the server
 //
@@ -393,13 +393,11 @@ export function fellBlast(by: Client, w: string, at: Vec3) {
   for (const [i, b] of horde.bodies) {
     const r = b.diedAt ? null : horde.hurt(i, lyingBlast(w, at, [b.s[0], b.s[1] + 1.2, b.s[2]]), now);
     if (!r) continue;
-    if (r.dead) {
-      // what it had on it falls where it does
-      const had = infectedDrop();
-      if (had) economy.drop(makeItem(had[0], had[1]), b.s[0] + (Math.random() - 0.5) * 0.8, b.s[1] + 0.03, b.s[2] + (Math.random() - 0.5) * 0.8, Math.random() * Math.PI * 2);
-    }
     const len = Math.max(0.001, Math.hypot(b.s[0] - at[0], b.s[2] - at[2]));
-    broadcast({ t: 'ihp', i, hp: r.hp, dead: r.dead, by: by.id, zone: 'torso', dir: [(b.s[0] - at[0]) / len, (b.s[2] - at[2]) / len], melee: false });
+    const dir: [number, number] = [(b.s[0] - at[0]) / len, (b.s[2] - at[2]) / len];
+    // (what it had on it is in its body)
+    const body = r.dead ? infectedBody(b, dir) : undefined;
+    broadcast({ t: 'ihp', i, hp: r.hp, dead: r.dead, by: by.id, zone: 'torso', dir, melee: false, ...(body ? { body } : {}) });
   }
   // (a car is reached from seven tenths as far as a body, as it is by a grenade that was thrown)
   for (const v of [...vehicles.values()]) if (!v.goneAt && Math.hypot(v.s[0] - at[0], v.s[1] - at[1], v.s[2] - at[2]) < rule.blast! * 0.7) hurtJeep(v, carDamage(rule), by);

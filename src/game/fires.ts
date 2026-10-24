@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { extractParts, groundParts, joinByPaint } from '../core/gltf-utils';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics } from '../core/physics';
 import { FIRE, fireSpots, restsBy } from '../sim/fires';
 import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
@@ -84,6 +85,7 @@ export class Fires {
 
   constructor(world: World, scene: THREE.Scene, private effects: Effects, private atmo: Atmosphere) {
     this.spots = fireSpots(world.props).map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    this.mapFires = this.spots.length;
     // A ring stands on the lowest of the ground under it: on a slope its uphill stones are a little in the bank,
     // and no side of it hangs in the air. (The fireplace itself, for whoever lights it, is where it always was.)
     this.feet = this.spots.map((s) => {
@@ -142,6 +144,14 @@ export class Fires {
           return { geometry: p.geometry, paint };
         });
       });
+      this.stand = (i) => {
+        const s = this.spots[i], y = this.feet[i].y;
+        const ring = { cold: stand(cold, s, y, this.turn(i)), lit: stand(lit, s, y, this.turn(i)) };
+        ring.lit.visible = false;
+        this.rings[i] = ring;
+        // the wood stood in the middle of it stops a body, as the stones round it do already
+        if (physics.world) this.wood[i] = physics.addStatic(physics.R.ColliderDesc.cylinder(RING.logs.h / 2, RING.logs.r), 'wood', { x: s.x, y: y + RING.logs.h / 2, z: s.z });
+      };
       const stand = (parts: typeof cold, s: THREE.Vector3, y: number, turn: number) => {
         const ring = new THREE.Group();
         for (const p of parts) {
@@ -157,14 +167,8 @@ export class Fires {
         scene.add(ring);
         return ring;
       };
-      this.rings = this.spots.map((s, i) => {
-        const y = this.feet[i].y;
-        const ring = { cold: stand(cold, s, y, this.turn(i)), lit: stand(lit, s, y, this.turn(i)) };
-        ring.lit.visible = false;
-        // the wood stood in the middle of it stops a body, as the stones round it do already
-        if (physics.world) physics.addStatic(physics.R.ColliderDesc.cylinder(RING.logs.h / 2, RING.logs.r), 'wood', { x: s.x, y: y + RING.logs.h / 2, z: s.z });
-        return ring;
-      });
+      // (every fireplace there is by now: the map's, and any built before the models came)
+      for (let i = 0; i < this.spots.length; i++) if (!this.gone.has(i)) this.stand!(i);
     });
     this.left = this.spots.map(() => 0);
     this.lit = this.spots.map(() => 0);
@@ -173,6 +177,55 @@ export class Fires {
     // the scene, lit or not, so that lighting a fire never changes how many lights the world is drawn with)
     this.light = new THREE.PointLight(GLOW.color, 0, GLOW.reach, 1.7);
     scene.add(this.light);
+  }
+
+  /** how many of the fireplaces are the map's own (the rest were built by players) */
+  private readonly mapFires: number;
+  /** stands the ring at fireplace `i` (null until the rings' models are in) */
+  private stand: ((i: number) => void) | null = null;
+  /** the wood in the middle of each ring, what stops a body */
+  private wood: (RAPIER.Collider | undefined)[] = [];
+  /** fires built by players that have been cleared away */
+  private gone = new Set<number>();
+
+  /**
+   * A fire built by somebody (src/sim/fires.ts FIRE.built), numbered after the map's own: a ring of stones where it
+   * was built, on the lowest of the ground under it, as the map's are. Numbers missed in between stand nowhere.
+   */
+  add(i: number, x: number, y: number, z: number, ground: (x: number, z: number) => number) {
+    while (this.spots.length <= i) {
+      const k = this.spots.length;
+      this.spots.push(new THREE.Vector3(1e6, -1e4, 1e6));
+      this.feet.push(new THREE.Vector3(1e6, -1e4, 1e6));
+      this.left.push(0);
+      this.lit.push(0);
+      this.owed.push({ flame: 0, smoke: 0 });
+      if (k < i) this.gone.add(k);
+    }
+    this.gone.delete(i);
+    this.spots[i].set(x, y, z);
+    let low = y;
+    for (let k = 0; k < 8; k++) low = Math.min(low, ground(x + Math.cos((k * Math.PI) / 4) * RING.reach, z + Math.sin((k * Math.PI) / 4) * RING.reach));
+    this.feet[i].set(x, low, z);
+    if (this.stand && !this.rings[i]) this.stand(i);
+  }
+
+  /** a built fire cleared away: nothing stands there any more */
+  remove(i: number) {
+    if (i < 0 || i >= this.spots.length) return;
+    this.gone.add(i);
+    this.left[i] = 0;
+    const ring = this.rings[i];
+    if (ring) {
+      ring.cold.removeFromParent();
+      ring.lit.removeFromParent();
+      delete this.rings[i];
+    }
+    const w = this.wood[i];
+    if (w && physics.world) physics.world.removeCollider(w, false);
+    this.wood[i] = undefined;
+    this.spots[i].set(1e6, -1e4, 1e6);
+    this.feet[i].set(1e6, -1e4, 1e6);
   }
 
   /** how the ring at each fireplace is turned, radians (no two alike: and its flames are turned with it) */
@@ -197,6 +250,8 @@ export class Fires {
   /** everything put out (a new world, or a new connection to one) */
   clear() {
     this.left.fill(0);
+    // (and the fires players built are the server's to tell again)
+    for (let i = this.mapFires; i < this.spots.length; i++) this.remove(i);
   }
 
   /** the fireplace within reach of somebody standing at `pos` (the nearest, if there are two), or -1 */

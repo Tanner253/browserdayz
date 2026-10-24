@@ -3,7 +3,7 @@
 
 import { KIT_TOWER, kitMatrix, kitBlocks, kitPoint, inCut, kitSolids } from '../../sim/kit';
 import { type Slab, type V3, type Part, type Paint, type Body, type Rail, castleGround, type Loose, LOOSE, type FortPlace, type GroundAt, CASTLE_SCALE, castleLocal, castleAt, looseLocal, castleLoose, castleParts, looseParts, hatchLine, UNDER, CASTLE, towerRadius, castleKit, castleRocks } from '../../sim/castle';
-import { FAR_TINT, MOTTLE, Out, PAINTS, PIECE, SHEETS, STUFF, TILE, VOID, WARP, add, hidesOf, mul, skin, sub, unit, type Hide, type Shape, type Sheet, type Skin, type Solid } from './base';
+import { FAR_TINT, MOTTLE, Out, PAINTS, PIECE, SHEETS, STUFF, TILE, VOID, add, hidesOf, mul, skin, sub, unit, type Hide, type Shape, type Sheet, type Skin, type Solid } from './base';
 import { beamPart, block, boxPart, curtainPart, flightPart, railRun, slabPart, wallPart, type Gap, type Put } from './parts';
 import { apronPart, lidPart, lumpPart, moundPart, vaultPart, type LidNet, type Way } from './ground-parts';
 import { towerLater, towerPart, towerSteps } from './towers';
@@ -42,7 +42,6 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
   o.ground = !!p.sits || p.t === 'apron';
   o.roofed = !!p.roofed;
   o.walked = p.paint === 'paving';
-  o.straight = !!p.straight;
   if (p.t === 'tower') of('timber').base = of('base').base = null;
   if (p.t === 'wall' && p.paint === 'stone') Object.assign(of('base'), { base: o.base, ground: o.ground, roofed: o.roofed });
   if (p.t === 'box' && p.name === 'footing') {
@@ -136,10 +135,10 @@ export function* castleShapeSteps(ground: (x: number, z: number) => number = cas
   // it comes in under the wall's footing. 2026-10-13: "the path underground at the base of the stairs is bugged with
   // panels and textures missing".)
   const holed = (b: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }) => gaps.some((q) => q.x > b.x0 - 0.9 && q.x < b.x1 + 0.9 && q.z > b.z0 - 0.9 && q.z < b.z1 + 0.9 && q.y1 > b.y0 && q.y0 < b.y1);
-  const hides = hidesOf(all.flatMap((p): Hide[] => (p.t === 'box' && !p.hidden && !p.yaw && p.paint !== 'water' && p.at !== 'far' && (p.body ?? 'all') === 'all' && !holed(p) ? [{ x0: p.x0, x1: p.x1, y0: p.y0, y1: p.y1, z0: p.z0, z1: p.z1, by: WARP[p.paint], low: !!p.low }] : [])));
-  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p], hides, low)])) as Record<Paint, Out>;
+  const hides = hidesOf(all.flatMap((p): Hide[] => (p.t === 'box' && !p.hidden && !p.yaw && p.paint !== 'water' && p.at !== 'far' && (p.body ?? 'all') === 'all' && !holed(p) ? [{ x0: p.x0, x1: p.x1, y0: p.y0, y1: p.y1, z0: p.z0, z1: p.z1, low: !!p.low }] : [])));
+  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], hides, low)])) as Record<Paint, Out>;
   const nears = outs(near, false), unders = outs(under, true);
-  const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0, WARP[p])])) as Record<Paint, Out>;
+  const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0)])) as Record<Paint, Out>;
   const ways: Way[] = loose.filter((l) => l.kind === 'hatch').map((l) => ({ L: hatchLine(l, ground(l.x, l.z)), g: ground(l.x, l.z) }));
   const shape: Shape = { near, under, far, farOwn: 0, solids };
   // (one face to a place: see `Faces`. Each sheet's triangles are asked as far as `asked`; water is seen through, and is nobody's face)
@@ -185,7 +184,7 @@ export function* castleShapeSteps(ground: (x: number, z: number) => number = cas
     const ax = [0, 1, 2].map((k) => unit([m[k * 4], m[k * 4 + 1], m[k * 4 + 2]]));
     for (const b of kitBlocks(p.id) ?? []) {
       const c = kitPoint(m, [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2]);
-      if ((p.cut ?? []).some((k) => inCut(k, c))) continue;
+      if ((p.cut ?? []).some((k) => !k.capsOnly && inCut(k, c))) continue;
       fars.stone.base = null;
       block(fars.stone, c, ax, [((b[1] - b[0]) / 2) * sc[0], ((b[3] - b[2]) / 2) * sc[1], ((b[5] - b[4]) / 2) * sc[2]], 0.9);
     }

@@ -178,55 +178,47 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 }
 .hud-prompt small { color: var(--ink-dim); margin-left: 6px; }
 
-.hud-progress {
-  position: absolute;
-  left: 50%;
-  top: calc(50% + 70px);
-  width: 220px;
-  transform: translateX(-50%);
-  opacity: 0;
-  text-align: center;
-}
+/* Every timed thing (eating, a dressing, a throw winding up, a fuse running down, digging, drinking): one thin ring
+   round the crosshair, filling clockwise from the top on a faint dark track, its name under it on a dark pill (the
+   owner, 2026-10-24: "a circular progress bar rather than a flat horizontal bar, like dayz"). Gone at once when it is
+   put off: there is no easing on it. */
+.hud-progress { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; pointer-events: none; }
 .hud-progress.show { opacity: 1; }
+.hud-ring { position: absolute; left: -23px; top: -23px; width: 46px; height: 46px; overflow: visible; transform: rotate(-90deg); }
+.hud-ring circle { fill: none; stroke-width: 3; }
+.hud-ring .ring-track { stroke: rgba(10, 12, 11, 0.5); }
+.hud-ring .ring-fill { stroke: var(--accent); stroke-dasharray: 100 100; stroke-dashoffset: 100; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6)); }
+.hud-progress.idle .hud-ring { display: none; }
+/* (words with no ring, what a thing in the hands is used with: where they always were, lower, clear of the aim) */
+.hud-progress.idle .hud-progress-label { top: 70px; }
 .hud-progress-label {
-  font-size: 13px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-  margin-bottom: 5px;
-}
-.hud-progress-bar { height: 3px; background: rgba(255, 255, 255, 0.12); }
-.hud-progress.idle .hud-progress-bar { display: none; }
-.hud-progress-bar div { height: 100%; background: var(--accent); }
-/* A fuse running down (a grenade with its pin out, in the hand). It was thin red words on whatever was behind them,
-   and over grass could not be read, let alone over snow. It is the same line and nothing more on the screen, made
-   to be read at a glance on grass, snow or a dark wall: its words on a dark plate, the seconds left the biggest
-   thing in it and in a red that is bright on that plate, the bar under it thick and backed in the same dark. */
-.hud-progress.hot { width: 236px; }
-.hud-progress.hot .hud-progress-label {
+  position: absolute;
+  left: 0;
+  top: 32px;
+  transform: translateX(-50%);
   display: flex;
   align-items: baseline;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 0;
-  padding: 5px 10px 4px;
-  background: rgba(10, 12, 11, 0.8);
+  gap: 8px;
+  padding: 4px 12px 3px;
+  border-radius: 999px;
+  background: rgba(10, 12, 11, 0.72);
   color: var(--ink);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
-.hud-progress.hot .hud-progress-label b {
-  font-family: var(--mono);
-  font-size: 30px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0;
-  color: #ff6a4d;
-}
-.hud-progress.hot .hud-progress-label b i { margin-left: 3px; font-size: 14px; font-style: normal; text-transform: none; color: var(--ink); }
-.hud-progress.hot .hud-progress-bar { height: 6px; background: rgba(10, 12, 11, 0.8); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
-.hud-progress.hot .hud-progress-bar div { background: #ff6a4d; }
+/* (a fuse running down, a grenade with its pin out in the hand: the ring red, the seconds left the biggest thing in its
+   line, to be read at a glance over grass, snow or a dark wall) */
+.hud-progress.hot .hud-ring .ring-fill { stroke: #ff6a4d; }
+.hud-progress.hot .hud-progress-label b { font-family: var(--mono); font-size: 24px; font-weight: 600; line-height: 1; letter-spacing: 0; color: #ff6a4d; }
+.hud-progress.hot .hud-progress-label b i { margin-left: 3px; font-size: 12px; font-style: normal; text-transform: none; color: var(--ink); }
+/* (on a phone, bigger, for the view between the thumbs) */
+body.touch .hud-ring { left: -32px; top: -32px; width: 64px; height: 64px; }
+body.touch .hud-ring circle { stroke-width: 3.5; }
+body.touch .hud-progress-label { top: 42px; font-size: 12px; }
+body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 
 .hud-compass {
   position: absolute;
@@ -1811,6 +1803,15 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-esp i[data-k='dead'] b { color: #b9b4a8; }
 .hud-esp i[data-k='ghost'] b { color: #9fd0ff; }
 .hud-esp i[data-k='me'] { opacity: 0.6; }
+/* an admin's far sight of the things lying about, coloured by what sort of thing (src/game/game/hands.ts LOOT_KIND) */
+.hud-esp i[data-k='gun'] b { color: #ff7a66; }
+.hud-esp i[data-k='ammo'] b { color: #ffcf5c; }
+.hud-esp i[data-k='med'] b { color: #74e891; }
+.hud-esp i[data-k='gear'] b { color: #8ec2ff; }
+.hud-esp i[data-k='food'] b { color: #f0a868; }
+.hud-esp i[data-k='item'] b { color: #e6e0cf; font-weight: 600; }
+.hud-esp i[data-k='box'] b { color: #d2a8ff; }
+.hud-esp i:is([data-k='gun'], [data-k='ammo'], [data-k='med'], [data-k='gear'], [data-k='food'], [data-k='item'], [data-k='box']) small { color: #bdb6a6; }
 /* a line said to one player alone by an admin or a mod */
 .chat-line[data-ch='pm'] { color: #ffd58a; }
 .chat-line[data-ch='pm'] b { color: #ffd58a; }

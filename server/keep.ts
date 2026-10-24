@@ -147,7 +147,7 @@ interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; 
  */
 function bodies(): KeptBody[] {
   return [...boxes.values()]
-    .filter((b) => b.kind === 'corpse' && !b.ride && (b.expires ?? 0) > economy.time)
+    .filter((b) => b.kind === 'corpse' && !b.ride && b.zed === undefined && (b.expires ?? 0) > economy.time)
     .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items }));
 }
 
