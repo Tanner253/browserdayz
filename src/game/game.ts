@@ -27,7 +27,7 @@ import '../sim/powers';
 import { Economy, lootPrint, type WorldLoot } from '../sim/economy';
 import { CRATE_SPECS, RACKS } from '../sim/crates';
 import '../sim/combat';
-import { LAUNCHED } from '../sim/grenades';
+import { LAUNCHED, THROWN } from '../sim/grenades';
 import '../sim/gunplay';
 import '../sim/barrels';
 import '../sim/emotes';
@@ -49,6 +49,7 @@ import { Effects } from './effects';
 import { Weapons, type HitInfo } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
 import { Grenades } from './grenades';
+import { Throwing } from './throwing';
 import { Garage } from './garage';
 import { Riders } from './riders';
 import { Jeep } from './vehicle';
@@ -78,6 +79,9 @@ import { Near } from './near';
 import { Perf } from '../core/perf';
 import { loadGraphics, loadMix, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
+import { Beast, Wildlife } from './animals';
+import { Heli } from './heli';
+import { shotHeard } from '../sim/heard';
 import { INFECTED, INFECTED_GRID, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
@@ -110,6 +114,7 @@ import { onlineMethods, searchedAt } from './game/online';
 import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
+import { huntMethods } from './game/hunt';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -234,6 +239,8 @@ export class Game {
   weapons!: Weapons;
   loot!: LootManager;
   grenades!: Grenades;
+  /** G: what is in the hands put down, or thrown (src/game/throwing.ts) */
+  throwing!: Throwing;
   /** the jeeps (see garage.ts) */
   garage!: Garage;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
@@ -281,6 +288,25 @@ export class Game {
   hearths!: Hearths;
   /** resting by a fire that is alight: mending by it, or only warm (a wound is open, or nothing has been eaten). The HUD has a badge for it */
   byFire: 'mending' | 'warm' | null = null;
+  /** the animals near this player, as the server moves them (src/game/animals.ts) */
+  readonly wild: Wildlife = new Wildlife({
+    atmo: () => this.s.atmo,
+    scene: () => this.s.r.scene,
+    world: () => this.s.world,
+    drip: (at) => this.effects.bleed(at, new THREE.Vector3(0, -1, 0), 0.45),
+    me: () => {
+      if (!this.started || this.player.dead) return null;
+      const p = this.player.pos, ride = this.garage.ride;
+      return { id: this.net.id || 1, x: p.x, y: p.y, z: p.z, crouch: this.player.crouched, prone: this.player.prone, speed: Math.hypot(this.player.vel.x, this.player.vel.z), ride: ride ? (ride.jeep instanceof Heli ? 'air' : 'car') : '', sheltered: false, ...(this.powers.hidden ? { unseen: true } : {}) };
+    },
+    hour: () => this.hourNow(),
+    struck: (s, kind) => {
+      const p = this.player.pos, len = Math.max(0.001, Math.hypot(p.x - s.from[0], p.z - s.from[1]));
+      audio.blow(true, { x: p.x, y: p.y + 1.1, z: p.z }, 1);
+      this.takeHit({ t: 'dmg', from: 0, amount: s.damage, zone: 'torso', w: kind.id, dir: [(p.x - s.from[0]) / len, 0, (p.z - s.from[1]) / len], bleed: s.bleed });
+    },
+    heard: (name, at) => audio.animalCall(name, at, Math.hypot(at.x - this.player.pos.x, at.z - this.player.pos.z)),
+  });
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -504,7 +530,8 @@ export class Game {
     };
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
-    this.hearths = new Hearths(this.fires.spots);
+    // (a list of its own: a fire built offline is added to it by the keeper, and to what is drawn by fires.add)
+    this.hearths = new Hearths(this.fires.spots.map((s) => ({ x: s.x, z: s.z })));
     // the helicopters' pads: on the hospital's roof, and by the fort (src/world/helipad.ts)
     this.pads = helipads(world, (m) => atmo.register(m));
     for (const pad of this.pads) r.scene.add(pad);
@@ -585,6 +612,36 @@ export class Game {
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
     this.grenades.onExplode = (at, mine, id) => this.explode(at, mine, id === 'frag' ? 'frag' : id === 'ammo_40mm' ? 'ammo_40mm' : 'grenade');
+    this.throwing = new Throwing({
+      scene: r.scene,
+      models: this.loot.models,
+      // (a grenade has its own throw, on the fire button: G only puts one down)
+      throwable: () => {
+        const it = this.inv.held() ?? this.inHand;
+        return it && !THROWN[it.id] ? it : null;
+      },
+      drop: () => this.dropInHands(),
+      letGo: (item) => {
+        if (this.use) this.breakOff();
+        if (this.loose === item) this.loose = null;
+        this.stow();
+        this.inv.remove(item);
+        this.hud.note(`Threw ${ITEMS[item.id]?.name ?? item.id}`);
+        this.inventoryChanged();
+      },
+      // (from the head, whichever way the view looks: in the third person the camera is behind the body)
+      eye: () => ({ pos: this.player.pos.clone().setY(this.player.pos.y + this.player.eye), dir: new THREE.Vector3(0, 0, -1).applyQuaternion(this.s.r.camera.quaternion) }),
+      lay: (item, at, rot) => {
+        if (this.online) this.localDrops.add(item.uid);
+        // (made at once, as what a hand lets go of is, from where it came down: anything else waits for the eye to come
+        // near, and a thing thrown twenty metres off was not drawn, nor its drop told to the server, until somebody walked over)
+        this.loot.hands.set(item.uid, at.clone());
+        this.economy.drop(item, at.x, at.y + 0.005, at.z, rot);
+        this.weapons.validate();
+      },
+      send: (m) => this.net.send(m),
+      online: () => this.online,
+    });
     this.garage = new Garage({
       scene: r.scene,
       atmo,
@@ -680,7 +737,7 @@ export class Game {
       this.avatar.setSlung(obj);
       this.syncBack();
     };
-    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected ? owner : null);
+    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected || owner instanceof Beast ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     // whoever is hit carries the blood on their clothes where it landed
     this.weapons.onFlesh = (owner, pt, dir, power) => {
@@ -701,8 +758,9 @@ export class Game {
       // (on the bot check's range the server is told of it as the range's own, and nobody else of anything)
       if (this.botCheck?.active) return void this.botCheck.shot(s.origin, s.dir);
       this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
-      // the infected hear it as well as anybody
+      // the infected hear it as well as anybody; and alone, this game's own herds do (online the server tells them)
       this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot, s.origin.y);
+      if (!this.online) this.wild.heard(s.origin.x, s.origin.z, shotHeard(s.weapon, s.suppressed));
     };
     // a bullet in a fuel drum. (The red drums are searched too since 2026-10-17, FURNITURE in src/sim/storage.ts, and
     // the container took the drum's collider over: a round met "a crate" and no drum went up. The owner, 2026-10-19:
@@ -933,6 +991,13 @@ export class Game {
     };
     this.player.onClot = () => {
       this.hud.note('The bleeding has stopped on its own', 'good');
+      this.meDirty = true;
+    };
+    // (food poisoning: a bout of throwing up, which costs water and food: src/sim/sickness.ts)
+    this.player.onBout = () => {
+      this.hud.note('You throw up', 'warn');
+      audio.retch();
+      this.weapons.flinch(0.7);
       this.meDirty = true;
     };
     this.hud.people = () => [...this.remotes.values()].map((r) => ({ id: r.id, name: r.name }));
@@ -1700,6 +1765,11 @@ export interface Game {
   useItem: Methods<typeof itemsMethods>['useItem'];
   pullPin: Methods<typeof itemsMethods>['pullPin'];
   cooking: Methods<typeof itemsMethods>['cooking'];
+  rawMeat: Methods<typeof itemsMethods>['rawMeat'];
+  burnWood: Methods<typeof itemsMethods>['burnWood'];
+  skinPrompt: Methods<typeof huntMethods>['skinPrompt'];
+  onSkin: Methods<typeof huntMethods>['onSkin'];
+  grill: Methods<typeof itemsMethods>['grill'];
   cookShown: Methods<typeof itemsMethods>['cookShown'];
   emptyOfGrenade: Methods<typeof itemsMethods>['emptyOfGrenade'];
   lagPx: Methods<typeof itemsMethods>['lagPx'];
@@ -1756,6 +1826,6 @@ export interface Game {
   finished: Methods<typeof interactMethods>['finished'];
   frame: Methods<typeof frameMethods>['frame'];
 }
-for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods]) {
+for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods, huntMethods]) {
   for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Game.prototype, name, { ...d, enumerable: false });
 }

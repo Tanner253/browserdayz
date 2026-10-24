@@ -25,6 +25,8 @@ import { type DropInfo, CRASH, DROP, fillCrash, fillDrop, describeSpot, pickDrop
 import { planFlight } from '../../sim/airdrop';
 import type { Graphics } from '../../core/settings';
 import { Infected } from '../infected';
+import { Beast } from '../animals';
+import { KIND } from '../../sim/animals';
 import { INFECTED } from '../../sim/infected';
 import { TOUCH } from '../../core/device';
 import { phaseOf, DAY } from '../../sim/daynight';
@@ -164,8 +166,8 @@ export const dropsMethods = {
     // (a jeep that ran them down is 'jeep'; one that burned with them in it, or beside them, is 'fire')
     const blast = !!WEAPON_RULES[m.w]?.blast || m.w === 'fire';
     const melee = !blast && !ITEMS[m.w]?.weapon;
-    const sick = m.w === 'infected';
-    p.damage(amount, sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
+    const sick = m.w === 'infected', beast = KIND[m.w];
+    p.damage(amount, beast ? `a ${beast.name.toLowerCase()}` : sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
     this.glass = 0;
     this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
@@ -173,9 +175,10 @@ export const dropsMethods = {
     // (and it bleeds by what made it and where: a round in the body more than one in an arm, a bite less than a
     // blade; and a round takes a hundred of blood as it goes in, wound or no wound: src/sim/blood.ts)
     if (!melee && !blast) p.spill(BLOOD.shot);
-    if (!p.dead && Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed(woundOf(sick ? 'bite' : blast ? 'blast' : melee ? (blade ? 'cut' : 'blunt') : 'shot', m.zone));
+    // (an animal's bite or claws: whether it opened a wound is the server's roll, said with the blow)
+    if (!p.dead && (beast ? !!m.bleed : Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4))) p.bleed(woundOf(sick || beast ? 'bite' : blast ? 'blast' : melee ? (blade ? 'cut' : 'blunt') : 'shot', m.zone));
     // in the legs, a bullet as often as not breaks one, and so now and then does something swung (not their hands, and not a blast)
-    if (!blast && !sick && m.w !== 'fists' && m.w !== 'jeep' && breaksOnHit(m.zone, melee, Math.random())) p.breakLeg();
+    if (!blast && !sick && !beast && m.w !== 'fists' && m.w !== 'jeep' && breaksOnHit(m.zone, melee, Math.random())) p.breakLeg();
     this.weapons.flinch(melee ? 0.5 : 1);
     this.lastHit = { x: m.dir[0], z: m.dir[2], at: performance.now() };
     // Bullets in this world pass through your own body (the server said you were hit, not
@@ -289,7 +292,7 @@ export const dropsMethods = {
   onHit(this: Game, h: HitInfo) {
     // A shotgun: nine hits in a few hundredths of a second. The server is told once for each
     // body, a moment later: how many landed, and where most of them did.
-    if (!h.melee && shotOf(h.weapon).pellets > 1 && !this.pelletsOut && (h.victim instanceof Infected || h.victim instanceof RemotePlayer)) {
+    if (!h.melee && shotOf(h.weapon).pellets > 1 && !this.pelletsOut && (h.victim instanceof Infected || h.victim instanceof RemotePlayer || h.victim instanceof Beast)) {
       const got = this.pellets.get(h.victim) ?? { h, zones: {}, n: 0 };
       got.zones[h.zone] = (got.zones[h.zone] ?? 0) + 1;
       got.n++;
@@ -313,6 +316,11 @@ export const dropsMethods = {
       // (alone, this game has already decided what it did; on a server the server does)
       if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0, ...(h.pierced ? { p: h.pierced } : {}) });
       else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
+      return;
+    }
+    if (h.victim instanceof Beast) {
+      // (what it did to the animal is the server's to say: server/animals.ts)
+      if (this.online) this.net.send({ t: 'ahit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, ...(h.pierced ? { p: h.pierced } : {}) });
       return;
     }
     if (h.victim instanceof RemotePlayer) {

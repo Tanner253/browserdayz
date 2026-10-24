@@ -84,18 +84,29 @@ export const frameMethods = {
         this.invUI.refresh(near, this.openStash);
       }
     }
-    // G held for a third of a second drops what is in the hands (a tap next to F does nothing;
-    // looking at an empty crate of your own, G packs it up instead: see updateInteraction)
-    if (playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && input.held('KeyG') && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep)) {
-      this.dropHeld += dt;
-      if (this.dropHeld > 0.33 && !this.dropDone) {
-        this.dropDone = true;
-        this.dropInHands();
+    // (looking at an empty crate of your own, G packs it up instead: see updateInteraction)
+    const gFree = playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep);
+    if (this.br || this.arenaHud) {
+      // (the battle royale and the arena: G held a third of a second drops what is in the hands, as it always did there)
+      if (gFree && input.held('KeyG')) {
+        this.dropHeld += dt;
+        if (this.dropHeld > 0.33 && !this.dropDone) {
+          this.dropDone = true;
+          this.dropInHands();
+        }
+      } else {
+        this.dropHeld = 0;
+        this.dropDone = false;
       }
-    } else {
-      this.dropHeld = 0;
-      this.dropDone = false;
-    }
+    } else if (gFree) {
+      // G: a tap puts what is in the hands down, held it winds up a throw (src/game/throwing.ts); the wheel puts the
+      // throw off, as another slot does (a controller's bumpers are slot keys)
+      if (this.throwing.power !== null && (input.wheel !== 0 || HOT_CODES.some((k) => input.pressed(k)))) {
+        this.throwing.cancel();
+        input.wheel = 0;
+      }
+      this.throwing.key(input.held('KeyG'), dt);
+    } else this.throwing.cancel();
     // M: the map, large; any way out of play puts it away again
     if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.hud.chatOpen) this.toggleMap();
     else if (this.map.open && (!playing || this.invUI.isOpen || this.shop.isOpen)) this.toggleMap(false);
@@ -402,6 +413,7 @@ export const frameMethods = {
     this.garage.frame(dt, now, physics.alpha, cam.position);
     this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
     this.grenades.update(dt);
+    this.throwing.update(dt);
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
@@ -457,6 +469,8 @@ export const frameMethods = {
     // (what the eye takes in, for the infected as for everybody else: see inSight)
     RemotePlayer.look(cam);
     this.horde.update(dt, now, cam.position);
+    if (!this.online) this.wild.tickAlone(dt);
+    this.wild.update(dt, now, cam.position, cam);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);
       rp.avatar.veil(this.s.buildings.hides(cam.position, rp.pos));
@@ -665,7 +679,7 @@ export const frameMethods = {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
+      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,
@@ -678,7 +692,8 @@ export const frameMethods = {
     // (what G would do here gets a button of its own beside Use)
     // (the Close button it shows is the inventory's and the trader's: the map has its own way out)
     this.touch?.update(playing && !uiOpen && !typing, this.invUI.isOpen || this.shop.isOpen, !!this.prompt?.includes('<kbd>F'), {
-      g: this.prompt?.includes('G to pour') ? 'Fuel' : this.prompt?.includes('G to pack up') ? 'Pack' : null,
+      // (and with something in the hands, G's own button: a tap drops it, held it throws, 2026-10-23. Not in the battle royale or the arena.)
+      g: this.prompt?.includes('G to pour') ? 'Fuel' : this.prompt?.includes('G to pack up') ? 'Pack' : this.throwing.power !== null ? 'Throw' : !this.br && !this.arenaHud && (this.inv.held() ?? this.inHand) ? 'Drop' : null,
       aiming: this.weapons.aiming,
       lamp: this.weapons.hasLamp || this.inv.count('flashlight') > 0,
       lit: this.lit,

@@ -16,7 +16,7 @@ const ok = (name: string, fn: () => void) => {
   console.log('  ok  ' + name);
 };
 
-const well: Body = { health: 100, blood: BLOOD.full, bleed: 0, energy: 85, water: 85, broken: false, drip: false, gas: null, fire: null };
+const well: Body = { health: 100, blood: BLOOD.full, bleed: 0, energy: 85, water: 85, broken: false, drip: false, gas: null, fire: null, ill: 0, guard: 0 };
 const still: Record<Stat, number> = { health: 0, blood: 0, food: 0, water: 0 };
 const read = (b: Partial<Body>, rates: Partial<Record<Stat, number>> = {}) => reading({ ...well, ...b }, { ...still, ...rates });
 const stat = (r: ReturnType<typeof reading>, s: Stat) => r.stats.find((x) => x.stat === s)!;

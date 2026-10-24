@@ -491,7 +491,8 @@ ok('whatever is eaten that was never cooked gives exactly what it gives today, b
   let eaten = 0;
   for (const def of Object.values(ITEMS)) {
     const u = def.use;
-    if (!u) continue;
+    // (meat is the one thing worth less raw than its item says, on purpose: a quarter, and it may poison you)
+    if (!u || COOKS[def.id]?.raw) continue;
     eaten++;
     const it = thing(def.id);
     assert.deepEqual(mealOf(it, T0), { energy: u.energy ?? 0, water: u.water ?? 0, health: u.health ?? 0, hot: false }, def.id);
