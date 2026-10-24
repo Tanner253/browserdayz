@@ -3,6 +3,7 @@
 // the same way, from numbers), stood on its roof's ridge; nothing reaches it, so nothing of it stops a body.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Atmosphere } from './atmosphere';
 
 /** the onion's outline, metres at size 1: [radius, height] from where it sits on the drum to its tip */
@@ -22,27 +23,36 @@ function paints(atmo: Atmosphere) {
   return (made = { white, green, gilt });
 }
 
-/** A drum, its onion and its cross, its foot at `at`. @param gilt a gilt onion (a belfry's), else green iron */
-export function onionDome(atmo: Atmosphere, at: THREE.Vector3, size: number, gilt: boolean): THREE.Group {
-  const p = paints(atmo), g = new THREE.Group();
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(DRUM.r * size, DRUM.r * size * 1.04, DRUM.h * size, 28), p.white);
-  drum.position.y = (DRUM.h * size) / 2;
-  const onion = new THREE.Mesh(new THREE.LatheGeometry(ONION.map(([r, y]) => new THREE.Vector2(r * size, y * size)), 32), gilt ? p.gilt : p.green);
-  onion.position.y = DRUM.h * size;
-  // (a ring of the drum's cornice under the onion, and the cross on its tip)
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(DRUM.r * size * 1.1, DRUM.r * size * 1.1, 0.22 * size, 28), p.white);
-  ring.position.y = DRUM.h * size;
-  const tip = (DRUM.h + 5.0) * size, post = new THREE.Mesh(new THREE.BoxGeometry(0.12 * size, 2.0 * size, 0.12 * size), p.gilt);
-  post.position.y = tip + 1.0 * size;
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.0 * size, 0.12 * size, 0.12 * size), p.gilt);
-  bar.position.y = tip + 1.35 * size;
-  const foot = new THREE.Mesh(new THREE.BoxGeometry(0.62 * size, 0.1 * size, 0.1 * size), p.gilt);
-  foot.position.y = tip + 0.55 * size;
-  foot.rotation.z = -0.35;
-  for (const m of [drum, onion, ring, post, bar, foot]) {
+/** a dome to be stood: the foot of its drum, how big, whether its onion is gilt (a belfry's) or green iron */
+export interface Dome { at: THREE.Vector3; size: number; gilt: boolean }
+
+/**
+ * Domes, each a drum, its onion and its cross, all of them in one shape for each paint: three things to draw for a
+ * town's every dome. (Each was six of its own: Pokrov's church and towers came to sixty-six, 2026-10-23.)
+ */
+export function onionDomes(atmo: Atmosphere, list: Dome[]): THREE.Group {
+  const p = paints(atmo), g = new THREE.Group(), parts = { white: [] as THREE.BufferGeometry[], green: [] as THREE.BufferGeometry[], gilt: [] as THREE.BufferGeometry[] };
+  const put = (geo: THREE.BufferGeometry, paint: keyof typeof parts, at: THREE.Vector3, y: number, turn = 0) => {
+    geo.applyMatrix4(new THREE.Matrix4().makeRotationZ(turn).setPosition(at.x, at.y + y, at.z));
+    parts[paint].push(geo);
+  };
+  for (const { at, size, gilt } of list) {
+    put(new THREE.CylinderGeometry(DRUM.r * size, DRUM.r * size * 1.04, DRUM.h * size, 28), 'white', at, (DRUM.h * size) / 2);
+    put(new THREE.LatheGeometry(ONION.map(([r, y]) => new THREE.Vector2(r * size, y * size)), 32), gilt ? 'gilt' : 'green', at, DRUM.h * size);
+    // (a ring of the drum's cornice under the onion, and the cross on its tip)
+    put(new THREE.CylinderGeometry(DRUM.r * size * 1.1, DRUM.r * size * 1.1, 0.22 * size, 28), 'white', at, DRUM.h * size);
+    const tip = (DRUM.h + 5.0) * size;
+    put(new THREE.BoxGeometry(0.12 * size, 2.0 * size, 0.12 * size), 'gilt', at, tip + 1.0 * size);
+    put(new THREE.BoxGeometry(1.0 * size, 0.12 * size, 0.12 * size), 'gilt', at, tip + 1.35 * size);
+    put(new THREE.BoxGeometry(0.62 * size, 0.1 * size, 0.1 * size), 'gilt', at, tip + 0.55 * size, -0.35);
+  }
+  for (const [paint, geos] of Object.entries(parts) as [keyof typeof parts, THREE.BufferGeometry[]][]) {
+    if (!geos.length) continue;
+    const m = new THREE.Mesh(mergeGeometries(geos, false), p[paint]);
+    for (const q of geos) q.dispose();
+    m.name = `domes ${paint}`;
     m.castShadow = m.receiveShadow = true;
     g.add(m);
   }
-  g.position.copy(at);
   return g;
 }

@@ -1,11 +1,11 @@
 // The tented roofs over Pokrov's towers, as drawn (2026-10-23; the plan is src/sim/pokrov-towers.ts, TENT): the tent in
 // painted iron with its seams running down it, boarded under; the board round its eave; the eight timber posts it stands
-// on; and a little gilt onion on its point. Made in the buildings' own stuffs, all five towers in one shape a stuff.
+// on. Made in the buildings' own stuffs, all five towers in one shape a stuff. The little gilt onion on each point is
+// one of the town's domes (`tentOnions`, drawn with the church's: src/world/domes.ts).
 
 import * as THREE from 'three';
 import { TENT, tentPosts, type TowerPlace } from '../sim/pokrov-towers';
-import type { Atmosphere } from './atmosphere';
-import { onionDome } from './domes';
+import type { Dome } from './domes';
 
 type Paint = { mat: THREE.Material; tile: number };
 
@@ -40,7 +40,7 @@ class Shape {
 }
 
 /** every tower's tent, its boards and posts, and its onion */
-export function tentRoofs(atmo: Atmosphere, towers: TowerPlace[], iron: Paint, wood: Paint): THREE.Group {
+export function tentRoofs(towers: TowerPlace[], iron: Paint, wood: Paint): THREE.Group {
   const g = new THREE.Group(), roof = new Shape(), boards = new Shape(), T = TENT, n = T.sides, slant = Math.hypot(T.r, T.rise);
   const arc = (2 * Math.PI * T.r) / n;
   for (const t of towers) {
@@ -64,10 +64,10 @@ export function tentRoofs(atmo: Atmosphere, towers: TowerPlace[], iron: Paint, w
       boards.tri([b1, q1, q0], [ni, ni, ni], [[u1, 0], [u1, v1], [0, v1]]);
     }
     for (const [x, y, z] of tentPosts(t)) boards.post(x, y, z, T.post, t.foot + T.eave - T.fascia - y, wood.tile);
-    const knob = onionDome(atmo, new THREE.Vector3(apex[0], apex[1] - 0.35, apex[2]), 0.17, true);
-    knob.name = 'Pokrov tower tent onion';
-    g.add(knob);
   }
   g.add(roof.mesh(iron, 'Pokrov tower tents'), boards.mesh(wood, 'Pokrov tower tents boards'));
   return g;
 }
+
+/** the little gilt onion on each tent's point */
+export const tentOnions = (towers: TowerPlace[]): Dome[] => towers.map((t) => ({ at: new THREE.Vector3(t.x, t.foot + TENT.eave + TENT.rise - 0.35, t.z), size: 0.17, gilt: true }));

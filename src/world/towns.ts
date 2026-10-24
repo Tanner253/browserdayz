@@ -21,8 +21,8 @@ import { stairRailSolids, tentSolids, towerSolids } from '../sim/pokrov-towers';
 import { stairRails, towerInsides } from './pokrov-towers';
 import type { Atmosphere } from './atmosphere';
 import type { Buildings } from './buildings';
-import { onionDome } from './domes';
-import { tentRoofs } from './pokrov-tents';
+import { onionDomes } from './domes';
+import { tentOnions, tentRoofs } from './pokrov-tents';
 import { kitMeshes, stoneLook, type KitOptions } from './kit';
 import { facadePieces, movePieces } from './facade';
 import type { BuildingPlot } from './worldgen';
@@ -130,7 +130,7 @@ export class Towns {
         this.scene.add(far);
         // (the towers' tents: a few hundred triangles, one copy near and far)
         if (towers.length) {
-          const tents = tentRoofs(this.atmo, towers, this.buildings.paintOf('roof_green_paint'), this.buildings.paintOf('boards_pale'));
+          const tents = tentRoofs(towers, this.buildings.paintOf('roof_green_paint'), this.buildings.paintOf('boards_pale'));
           tents.name = `${t.town.name} tower tents`;
           this.scene.add(tents);
           this.buildings.keepFar((on) => (tents.visible = on), t.town.x, t.town.z, Math.hypot(...t.town.pad));
@@ -139,11 +139,13 @@ export class Towns {
         this.walled.push(w);
         this.buildings.keepFar((on) => ((w.shown = on), this.show(w)), w.x, w.z, w.r);
       }
-      for (const d of placedDomes(t)) {
-        const g = onionDome(this.atmo, new THREE.Vector3(d.x, d.y, d.z), d.size, d.gilt);
-        g.name = `${t.town.name} dome`;
+      // (a town's domes, its towers' onions among them, are three things to draw: src/world/domes.ts)
+      const domes = [...placedDomes(t).map((d) => ({ at: new THREE.Vector3(d.x, d.y, d.z), size: d.size, gilt: d.gilt })), ...tentOnions(placedTowers(t))];
+      if (domes.length) {
+        const g = onionDomes(this.atmo, domes);
+        g.name = `${t.town.name} domes`;
         this.scene.add(g);
-        this.buildings.keepFar((on) => (g.visible = on), d.x, d.z, 4 * d.size);
+        this.buildings.keepFar((on) => (g.visible = on), t.town.x, t.town.z, Math.hypot(...t.town.pad));
       }
     }
     // the buildings that wear a facade, and the towns' other kits (piers): nothing of theirs is fetched until the eye comes within FACE_FETCH (see update)
