@@ -8,6 +8,7 @@ import { BODY_GRID, heldIn } from '../src/sim/inventory';
 import { type ItemInstance, ITEMS } from '../src/sim/items';
 import type { NewsKept } from '../src/sim/news';
 import { BOOT, CORPSE_LIFETIME, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
+import { guardStashes } from './stash-guard';
 import { SITE_URL, keepTags, tagTime, takeTags, type TagsKept } from './tags';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { inPokrovCourt } from '../src/sim/towns';
@@ -322,6 +323,7 @@ function takeInLate(save: KeptFile) {
   for (const k of [...KEPT.chars.keys()]) if (!late.has(k) && !back.has(k)) (KEPT.chars.delete(k), gone++);
   KEPT.how += `; and the last word of the server before, written at ${save.at}, came after: ${chars} characters and ${stashes} stashes were taken from it${gone ? `, and ${gone} who had died before it are no longer kept` : ''}`;
   log(`[keep] a newer copy (${save.at}${save.final ? ', a last word' : ''}) turned up after this server had opened: ${chars} characters who have not come back yet, and ${stashes} stashes, are as it has them`);
+  guardStashes();
 }
 
 /**
@@ -449,6 +451,7 @@ export async function loadKept() {
     KEPT.ready = true;
     KEPT.how = what;
     log(`[keep] ${what}`);
+    guardStashes();
     fillFromQueue();
   };
   if (!KEEP_ON) return;

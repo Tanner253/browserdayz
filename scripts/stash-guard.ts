@@ -18,7 +18,7 @@ import path from 'node:path';
 type Stash = { x: number; y?: number; z: number };
 type Thing = { k: string; x: number; z: number; r: number; s: string };
 type Print = { at: Stash; ground: number[]; things: Thing[] };
-type Prints = { R: number; stashes: Print[]; places: { name: string; x: number; z: number }[]; map: { step: number; nx: number; nz: number; x0: number; z0: number; h: number[]; cells: Record<string, string> } };
+type Prints = { R: number; stashes: Print[]; places: { name: string; x: number; z: number }[]; all: [string, number, number, number][]; map: { step: number; nx: number; nz: number; x0: number; z0: number; h: number[]; cells: Record<string, string> } };
 
 const args = process.argv.slice(2);
 const opt = (name: string, d: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : d; };
@@ -26,7 +26,10 @@ const R = Number(opt('--r', '15'));
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 function readStashes(file: string): Stash[] {
-  const raw = JSON.parse(readFileSync(file, 'utf8').replace(/^\s*STASHES\s*/, '')) as unknown[];
+  if (file === '-') return [];
+  // (what /stashes answers, every STASHES line of it as copied, or a plain list)
+  const text = readFileSync(file, 'utf8'), lines = text.match(/STASHES\s*\[.*\]/g);
+  const raw = (lines ? lines.flatMap((l) => JSON.parse(l.replace(/^STASHES\s*/, ''))) : JSON.parse(text)) as unknown[];
   return raw.map((s) => (Array.isArray(s) ? { x: s[0], y: s[1], z: s[2] } : (s as Stash))).filter((s) => Number.isFinite(s.x) && Number.isFinite(s.z));
 }
 
@@ -67,7 +70,9 @@ async function print(stashes: Stash[]): Promise<Prints> {
   const cells: Record<string, string> = {};
   for (const t of things) { const key = `${Math.floor(t.x / 32)},${Math.floor(t.z / 32)}`; cells[key] = (cells[key] ?? '') + t.k + t.s; }
   for (const key of Object.keys(cells)) cells[key] = createHash('sha1').update(cells[key]).digest('hex').slice(0, 12);
-  return { R, stashes: stashPrints, places: world.pois.map((q) => ({ name: q.name, x: q.x, z: q.z })), map: { step, nx, nz, x0, z0, h, cells } };
+  // (and every thing, by a print of itself, where it stands and how far it reaches: what is in one world and not the other is what changed)
+  const all = things.map((t): [string, number, number, number] => [createHash('sha1').update(t.k + t.s).digest('hex').slice(0, 12), Math.round(t.x), Math.round(t.z), Math.ceil(t.r)]);
+  return { R, stashes: stashPrints, all, places: world.pois.map((q) => ({ name: q.name, x: q.x, z: q.z })), map: { step, nx, nz, x0, z0, h, cells } };
 }
 
 /** where the two worlds differ, clustered into named areas */
@@ -86,13 +91,27 @@ function changedAreas(a: Prints, b: Prints): string[] {
   });
 }
 
+/**
+ * Every 8 m square of the map where the ground moved or anything stands otherwise than in the base: what the server
+ * reads at its start (server/stash-guard.ts) to say how many of the stashes it keeps lie within 15 m of a change.
+ */
+function changedCells(a: Prints, b: Prints, ref: string): { base: string; size: number; cells: [number, number][] } {
+  const S = 8, set = new Set<string>(), mark = (x: number, z: number, r = 0) => { for (let i = Math.floor((x - r) / S); i <= Math.floor((x + r) / S); i++) for (let j = Math.floor((z - r) / S); j <= Math.floor((z + r) / S); j++) set.add(`${i},${j}`); };
+  const m = a.map;
+  for (let j = 0; j < m.nz; j++) for (let i = 0; i < m.nx; i++) if (Math.abs(m.h[j * m.nx + i] - b.map.h[j * m.nx + i]) > 0.02) mark(m.x0 + i * m.step, m.z0 + j * m.step, m.step / 2);
+  const was = new Set(a.all.map((t) => t[0])), now = new Set(b.all.map((t) => t[0]));
+  for (const [k, x, z, r] of a.all) if (!now.has(k)) mark(x, z, r);
+  for (const [k, x, z, r] of b.all) if (!was.has(k)) mark(x, z, r);
+  return { base: ref, size: S, cells: [...set].map((k) => k.split(',').map(Number) as [number, number]).sort((p, q) => p[0] - q[0] || p[1] - q[1]) };
+}
+
 async function main(): Promise<void> {
   if (args[0] === '--print') return void writeFileSync(args[1], JSON.stringify(await print(readStashes(args[2]))));
   const file = args[0];
-  if (!file || !existsSync(file)) throw new Error('usage: npx tsx scripts/stash-guard.ts <stashes.json> [--base <ref>] [--r 15]');
+  if (!file || (file !== '-' && !existsSync(file))) throw new Error('usage: npx tsx scripts/stash-guard.ts <stashes.json | -> [--base <ref>] [--r 15] [--cells server/changed-cells.json]');
   const ref = opt('--base', 'main');
   const top = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim(), base = path.join(top, '.stash-base');
-  const stashFile = path.resolve(file), out = (n: string) => path.join(top, '.stash-base-' + n + '.json');
+  const stashFile = file === '-' ? '-' : path.resolve(file), out = (n: string) => path.join(top, '.stash-base-' + n + '.json');
   rmSync(base, { recursive: true, force: true });
   mkdirSync(base, { recursive: true });
   // (the base's code as it is in git, unpacked beside this tree's node_modules so that its imports are found)
@@ -125,7 +144,8 @@ async function main(): Promise<void> {
     for (const t of [...gone.map((q) => ['-', q] as const), ...came.map((q) => ['+', q] as const)].slice(0, 8)) console.log(`   ${t[0]} ${t[1].k} at ${Math.round(t[1].x)}, ${Math.round(t[1].z)} (${Math.round(Math.hypot(t[1].x - o.at.x, t[1].z - o.at.z))} m)`);
   }
   console.log(`${a.stashes.length} stashes checked against ${ref} (${b.stashes.reduce((n, s) => n + s.things.length, 0)} things within reach of them): ${bad ? `${bad} TOUCHED` : 'every one untouched'} (ground within 2 cm out to ${R} m, nothing within ${R} m changed)`);
-  const areas = changedAreas(a, b);
+  const areas = changedAreas(a, b), cellsOut = opt('--cells', '');
+  if (cellsOut) writeFileSync(cellsOut, JSON.stringify(changedCells(a, b, ref)) + '\n');
   console.log(areas.length ? `Changed against ${ref}:\n${areas.join('\n')}` : `Nothing on the map changed against ${ref}.`);
   process.exit(bad ? 1 : 0);
 }
