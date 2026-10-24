@@ -13,7 +13,7 @@ import zlib from 'node:zlib';
 import { WebSocketServer } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, lootPrint, type WorldLoot } from '../src/sim/economy';
-import { type SerializedInventory, Container } from '../src/sim/inventory';
+import { type SerializedInventory, Container, keepHotHeld } from '../src/sim/inventory';
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { PLAN, inPlay, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
@@ -274,6 +274,7 @@ export function takeOut(inv: SerializedInventory | null, gone: Set<string>) {
     cont.items = cont.items.filter((it) => !gone.has(it.uid));
     for (const it of cont.items) strip(it);
   }
+  keepHotHeld(inv);
 }
 
 /** (what is kept is listed further down: until that list is made, nothing has changed that it does not know of) */

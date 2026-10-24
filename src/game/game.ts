@@ -120,6 +120,7 @@ import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
 import { MyPerks } from './my-perks';
 import { finishLighting, wearFinish, type Finish } from './finish';
+import type { StoredItem } from '../net/protocol';
 
 export const _gasHead = new THREE.Vector3();
 /** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
@@ -388,6 +389,7 @@ export class Game {
   vicinityDue: number[] = [];
   vicinityT = 0;
   vicinitySig = '';
+  peekT = 0;
   saveDue: ReturnType<typeof setTimeout> | null = null;
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   awaitClick = false;
@@ -425,7 +427,9 @@ export class Game {
    * word, this player's to go through, or somebody else's; and what of each was last told to the server.
    */
   lying = new Map<string, 'wait' | 'mine' | 'busy'>();
-  lyingSent = new Map<string, string>();
+  lyingSent = new Map<string, StoredItem[]>();
+  /** when each crate near was last asked what is in it (peekNear) */
+  peekedAt = new Map<string, number>();
   indoors = false;
   inForest = false;
   deathInfo = '';
@@ -1678,6 +1682,7 @@ export interface Game {
   openLying: Methods<typeof onlineMethods>['openLying'];
   closeLying: Methods<typeof onlineMethods>['closeLying'];
   syncLying: Methods<typeof onlineMethods>['syncLying'];
+  peekNear: Methods<typeof onlineMethods>['peekNear'];
   bumpDummies: Methods<typeof onlineMethods>['bumpDummies'];
   updateOnline: Methods<typeof onlineMethods>['updateOnline'];
   addRemote: Methods<typeof onlineMethods>['addRemote'];

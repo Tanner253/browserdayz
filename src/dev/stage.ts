@@ -18,6 +18,7 @@
 //   &sun=day|dusk                               default day
 //   &person=0                                   no survivor beside it
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
+//   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/stage-inventory.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
 // Headless, in one pass and off the graphics card's queue:
 //   PLAY_NOWAIT=1 PLAY_GL=swiftshader node assets-src/_wf/me/play.mjs assets-src/_wf/me/stage-shot.js <out> 1280 720 "http://localhost:5173/tools/stage.html?..."
@@ -28,7 +29,9 @@ import { assets } from '../core/assets';
 
 const q = new URLSearchParams(location.search);
 const list = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean);
-const ids = list('m'), files = list('g'), animal = q.get('animal');
+const files = list('g'), animal = q.get('animal');
+// (a screen of the game with nothing named to stand behind it: a pack on the floor, so there is something)
+const ids = list('m').length || files.length || animal || !q.get('ui') ? list('m') : ['military_backpack'];
 const views = list('views').length ? list('views') : ['side', 'front', 'q', 'top'];
 const strip = Math.max(0, Math.floor(+(q.get('strip') ?? 0)));
 // (an animal faces -z, as the game has them: turned a quarter by default, so that 'side' sees its side)
@@ -185,7 +188,8 @@ if (sim) {
   // (the survivor for size: the player's body as its file has it, no gear, standing to one side, facing the camera)
   const subject = new THREE.Box3().setFromObject(thing);
   if (person) {
-    const body = (await assets.loadGLTF('assets/characters/survivor.glb')).scene;
+    // (a copy: the file's own is the one the game's pictures of the survivor are made from, and it is moved aside here)
+    const body = cloneSkinned((await assets.loadGLTF('assets/characters/survivor.glb')).scene) as THREE.Group;
     body.traverse((o) => { if (o.name.startsWith('gear_')) o.visible = false; });
     shadowed(body);
     body.position.set(subject.max.x + 0.9, 0, 0);
@@ -228,6 +232,8 @@ if (sim) {
     say(i, strip > 0 && action ? `${view} · ${action.getClip().name} ${((i / strip) * action.getClip().duration).toFixed(2)} s` : view);
   }
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
-  out.stageInfo = { things: info, views: strip > 0 ? [views[0]] : views, strip, sun: dusk ? 'dusk' : 'day', person };
+  // (and a screen of the game over it, asked for: the inventory with a kit on, or the hot bar)
+  const screen = q.get('ui') ? await (await import('./stage-inventory')).stageScreen(q, renderer, scene.environment) : undefined;
+  out.stageInfo = { things: info, views: strip > 0 ? [views[0]] : views, strip, sun: dusk ? 'dusk' : 'day', person, ...(screen ? { screen } : {}) };
   out.staged = true;
 }

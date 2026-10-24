@@ -28,6 +28,7 @@ import { dogtag, roleKey, tagSet } from './roles';
 import { pinned } from './pinned';
 import { bodyOrder, zedLying } from './admin-bodies';
 import { payingTags, wentFrom } from './custody';
+import { goneFrom } from './searched';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -290,7 +291,7 @@ export async function command(c: Client, line: string) {
         if (b.kind === 'crate') return void sys(c, 'A crate of the map is not taken away: it is part of the place.');
         // (a body, one of the infected's too: server/admin-bodies.ts)
         if (b.kind === 'corpse' && !b.ride) return void sys(c, bodyOrder(c, 'delbody', [id]));
-        locks.delete(id);
+        goneFrom(id);
         boxes.delete(id);
         if (b.kind === 'stash') KEPT.dirty = true;
         broadcast({ t: b.kind === 'corpse' ? 'corpse-' : b.kind === 'drop' ? 'drop-' : 'stash-', uid: id });

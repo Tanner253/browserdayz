@@ -2,6 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import { TAG_OUT, ZONA_VOID, type ItemInstance } from '../src/sim/items';
+import { keepHotHeld } from '../src/sim/inventory';
 import { inPlay } from '../src/world/worldgen';
 import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
 import { BANS, SOAK, log, vehicles, world, type Box } from './index';
@@ -349,6 +350,7 @@ function voidTags(c: Client, where: string) {
     }
     // (and out of whatever else of theirs things are kept in)
     for (const cont of c.inv.containers) cont.items = cont.items.filter((it) => !gone.has((it as { uid?: string }).uid ?? ''));
+    keepHotHeld(c.inv);
   }
   send(c, { t: 'void', uids });
   log(`${c.name} carried ${uids.length} dog tag${uids.length === 1 ? '' : 's'} ${where}: void`);

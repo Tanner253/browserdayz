@@ -69,6 +69,11 @@ export const frameMethods = {
     // The inventory open: what lies near comes into the list and goes out of it as they walk, and a crate refilled
     // while open (alone, the economy's) is shown. Nothing else redraws it on a clock: it was redrawn whole every 5 s
     // as well, changed or not, until 2026-10-23.
+    // (what is in the crates within a few steps, asked for on the way to them: see peekNear)
+    if (!this.invUI.isOpen && (this.peekT += dt) > 0.3) {
+      this.peekT = 0;
+      this.peekNear();
+    }
     if (this.invUI.isOpen && (this.vicinityT += dt) > 0.25) {
       this.vicinityT = 0;
       const near = this.around();
@@ -716,6 +721,8 @@ export const frameMethods = {
       r.camera.updateProjectionMatrix();
     }
     r.render(dt);
+    // (the inventory painted unseen once, two seconds into the first play of the page, so its first Tab is like any other: InventoryUI.paintAhead)
+    this.invUI.paintAhead(this.started && !this.paused && !this.player.dead && !this.invUI.isOpen && !this.map.open, () => this.around(), this.player.vitals);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);
     // (and Emotes' survivor, doing what is picked there, made the first time it is opened)

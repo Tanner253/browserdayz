@@ -4,6 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { ITEMS, type ItemInstance } from '../src/sim/items';
+import { keepHotHeld } from '../src/sim/inventory';
 import { WEAPON_RULES } from '../src/sim/combat';
 import { type Vec3, inHandDamage, overdue, lyingBlast } from '../src/sim/grenades';
 import { carDamage } from '../src/sim/vehicles';
@@ -423,6 +424,7 @@ export function pockets(c: Client) {
   };
   for (const k of Object.keys(c.inv.slots)) c.inv.slots[k] = keep(c.inv.slots[k]);
   for (const cont of c.inv.containers) cont.items = cont.items.filter((it) => !!keep(it));
+  keepHotHeld(c.inv);
 }
 
 // ---------------------------------------------------------------- kept off the server

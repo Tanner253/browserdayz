@@ -2,7 +2,7 @@
 // kind, piles of one thing joined, a bag's weight, and which things feed one another. Kept with the screen, the only
 // thing that uses them, and not in src/sim, which the game server loads too.
 
-import { Container, bagGrid, type PlayerInventory } from '../sim/inventory';
+import { Container, bagGrid, poured, type PlayerInventory } from '../sim/inventory';
 import { ITEMS, itemWeight, magFits, type ItemInstance, type Placed } from '../sim/items';
 
 /** the order kinds stand in once a grid is sorted: guns and what feeds them first, the rest after */
@@ -138,7 +138,7 @@ export function combinePiles(grids: Container[], id: string): PileMove[] {
     to.qty += n;
     from.qty -= n;
     if (n > 0) moves.push({ from, to, n });
-    if (from.qty <= 0) { piles[j].c.remove(from); j--; }
+    if (from.qty <= 0) { piles[j].c.remove(from); poured.set(from, to); j--; }
   }
   return moves;
 }

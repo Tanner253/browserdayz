@@ -27,6 +27,10 @@ import { INFECTED, INFECTED_GRID } from '../../sim/infected';
 import { cashedTags, setPinned } from '../../ui/rewards';
 import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
+import { diffOps, laidIn, type Laid } from '../../sim/box-ops';
+
+/** how near a crate is asked what is in it, and how often again while near (peekNear) */
+const PEEK_AT = 3.5, PEEK_AGAIN = 8000;
 
 /** what holds things within reach of where somebody stands, if anything does: a crate, a cupboard or a drop is 'hard'; a body, a pack, a stash or a cardboard box 'soft' */
 function searched(g: Game, at: THREE.Vector3): 'hard' | 'soft' | null {
@@ -384,9 +388,31 @@ export const onlineMethods = {
     net.on('cdata', (m) => {
       const st = this.findBox(m.cid);
       if (!st) return;
-      st.container.load({ items: m.items });
+      // (What the server says is in it: what this game's moves are reckoned from. Its answer to this game's own moves
+      // is what this game has already, and nothing is laid out again for it.)
+      const same = st.known && JSON.stringify(st.container.serialize().items) === JSON.stringify(m.items);
+      st.sent = JSON.parse(JSON.stringify(m.items));
       st.known = true;
+      if (same) return;
+      st.container.load({ items: m.items });
       if (this.openStash === st) this.invUI.setStashState('');
+    });
+    // Moves of this player's that could not be done (server/searched.ts): what somebody else took first is out of
+    // their pockets again, and what found no room in there is back in them (or at their feet).
+    net.on('cno', (m) => {
+      for (const t of m.took) {
+        const it = this.inv.find((i) => i.uid === t.uid);
+        if (it && (t.n === undefined || t.n >= it.qty)) this.inv.remove(it);
+        else if (it && t.n) it.qty -= t.n;
+        else if (t.id) this.inv.take(t.id, t.n ?? 1);
+      }
+      for (const b of m.back) {
+        const { x: _x, y: _y, rot: _r, ...it } = b;
+        const left = this.inv.add(it);
+        if (left) this.dropItem(left);
+      }
+      this.hud.note(m.took.length ? 'Somebody else took that first' : 'No room for that in there: it is back with you', 'warn');
+      this.inventoryChanged();
     });
     // (what lies within reach that holds things: see openLying)
     const lay = (uid: string, items: StoredItem[]) => {
@@ -396,10 +422,13 @@ export const onlineMethods = {
       return l;
     };
     net.on('ldata', (m) => {
-      if (!this.lying.has(m.uid) || !lay(m.uid, m.items)) return;
+      if (!this.lying.has(m.uid)) return;
+      const l = this.economy.loot.get(m.uid);
+      const same = !!l && JSON.stringify(laidIn(l.item)) === JSON.stringify(m.items);
+      if (!same && !lay(m.uid, m.items)) return;
       this.lying.set(m.uid, 'mine');
-      this.lyingSent.set(m.uid, JSON.stringify(m.items));
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
+      this.lyingSent.set(m.uid, JSON.parse(JSON.stringify(m.items)));
+      if (!same && this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('lbusy', (m) => {
       if (!this.lying.has(m.uid)) return;
@@ -407,8 +436,10 @@ export const onlineMethods = {
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('lcargo', (m) => {
-      // (as it is now, to whoever is not going through it: theirs is what they set)
-      if (this.lying.get(m.uid) === 'mine') return;
+      // (as it is now, to everybody: several may go through one at once, server/searched.ts; what this game did is in it)
+      const l = this.economy.loot.get(m.uid);
+      if (this.lying.get(m.uid) === 'mine') this.lyingSent.set(m.uid, JSON.parse(JSON.stringify(m.items)));
+      if (!l || JSON.stringify(laidIn(l.item)) === JSON.stringify(m.items)) return;
       if (lay(m.uid, m.items) && this.invUI.isOpen && this.invUI.shows(m.uid)) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('cbusy', (m) => {
@@ -672,14 +703,18 @@ export const onlineMethods = {
   /**
    * What lies within reach that holds things (a pack, a vest, a jacket, a case) is gone through with the pockets, each
    * shown open as what is worn is (the owner, 2026-10-15: "all inventories should be shown in vicinity pane when items
-   * are on the ground"). On a server each is asked for ('lopen'), and is this player's to go through when the server
-   * says so; somebody else going through one has it until they shut their pockets. Alone, every one is.
+   * are on the ground"). Each is gone through at once, what is in it known already, by as many as like (on a server
+   * each is told it is open ('lopen'), and what is done in it is told move by move: server/searched.ts).
    */
   openLying(this: Game) {
     const want = this.around().filter((w) => holds(w.loot.item.id)).map((w) => w.loot.uid);
     const ask = want.filter((uid) => !this.lying.has(uid));
     if (!ask.length) return;
-    for (const uid of ask) this.lying.set(uid, this.online ? 'wait' : 'mine');
+    for (const uid of ask) {
+      this.lying.set(uid, 'mine');
+      const l = this.economy.loot.get(uid);
+      if (l) this.lyingSent.set(uid, JSON.parse(JSON.stringify(laidIn(l.item))));
+    }
     if (this.online) this.net.send({ t: 'lopen', uids: ask });
   },
 
@@ -693,18 +728,35 @@ export const onlineMethods = {
     this.lyingSent.clear();
   },
 
-  /** what this player has changed in what lies about is told to the server: whole, as a crate's is, and only when it has changed */
+  /** what this player has done in what lies about is told to the server, move by move, from what it last said is in it */
   syncLying(this: Game) {
     if (!this.online) return;
     for (const [uid, st] of this.lying) {
       if (st !== 'mine') continue;
       const l = this.economy.loot.get(uid);
       if (!l) continue;
-      const items: StoredItem[] = (l.item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
-      const said = JSON.stringify(items);
-      if (this.lyingSent.get(uid) === said) continue;
-      this.lyingSent.set(uid, said);
-      this.net.send({ t: 'lset', uid, items });
+      const now = laidIn(l.item);
+      const ops = diffOps((this.lyingSent.get(uid) ?? []) as Laid[], now);
+      if (!ops.length) continue;
+      this.lyingSent.set(uid, JSON.parse(JSON.stringify(now)));
+      this.net.send({ t: 'lops', uid, ops });
+    }
+  },
+
+  /**
+   * What is in the crates, bodies, stashes and drops within a few steps, asked for on the way to them (2026-10-23, the
+   * owner's list: "Opening…"), so that what is in one is shown the moment it is opened. Each again after a while,
+   * while the pockets are shut; nothing is opened or held by it (server 'cpeek').
+   */
+  peekNear(this: Game) {
+    if (!this.online || this.invUI.isOpen || this.garage.ride) return;
+    const p = this.player.pos, now = performance.now();
+    const near = [...this.loot.stashes.filter((q) => !q.buried), ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash)];
+    for (const s of near) {
+      if (!s || Math.hypot(s.x - p.x, s.z - p.z) > PEEK_AT || Math.abs(s.y - p.y) > 2.5) continue;
+      if (now - (this.peekedAt.get(s.uid) ?? -1e9) < PEEK_AGAIN) continue;
+      this.peekedAt.set(s.uid, now);
+      this.net.send({ t: 'cpeek', cid: s.uid });
     }
   },
 

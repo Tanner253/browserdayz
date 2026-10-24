@@ -3,9 +3,10 @@
 // of corpses ... and a way to delete corpses in bulk like the kill zombies in bulk vicinity control"). A player's body,
 // and one of the infected's, with or without something on it. The rules of what is a body are in server/bodies.ts.
 
-import { boxes, horde, locks, log } from './index';
+import { boxes, horde, log } from './index';
 import { broadcast, type Client } from './players';
 import { bodiesWithin, tagsIn, zedUid, type Lying } from './bodies';
+import { goneFrom } from './searched';
 
 /** the bodies about an admin cleared away, metres: as many as not said, and the most */
 export const BODIES_NEAR = 60, BODIES_MOST = 400;
@@ -19,7 +20,8 @@ export function takeBody(l: Lying): { n: number; tags: number } {
     const items = boxes.get(l.box)?.items ?? [];
     n = items.length;
     tags = tagsIn(items);
-    locks.delete(l.box);
+    // (and whoever had it open lets it go: server/searched.ts)
+    goneFrom(l.box);
     boxes.delete(l.box);
     broadcast({ t: 'corpse-', uid: l.box });
   }

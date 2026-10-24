@@ -7,6 +7,7 @@
 //   client  - its own movement and aim, its own inventory, whether its shot hit
 
 import type { ItemInstance } from '../sim/items';
+import type { BoxOp, Refused } from '../sim/box-ops';
 import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
@@ -60,7 +61,10 @@ import type { AnimalRow, Call } from '../sim/animals';
 // (61, 2026-10-23: what one of the infected had on it lies in its body (`zed` on a body, 'ihp' `body`), not on the
 // ground: a page of 60 would draw a soldier's body over every infected's that had anything. An admin's 'esp'.)
 // (62, 2026-10-24: animals, moved by the server ('an' rows, 'ahit', 'askin'); a blow from one says whether it
-// opened a wound ('dmg' bleed). A page of 61 would see none and could not hunt.)
+// opened a wound ('dmg' bleed). A page of 61 would see none and could not hunt. And in the same release: crates,
+// bodies and bags lying about are gone through by several at once, move by move ('cops', 'lops', 'cno':
+// src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
+// crate after each change, and would write over whoever else has it open.)
 export const PROTOCOL = 62;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -241,6 +245,10 @@ export type C2S =
   | { t: 'toss'; uid: string; id: string; o: [number, number, number]; v: [number, number, number]; pw: number }
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
+  /** what was done in the crate open, move by move (src/sim/box-ops.ts): any number may have one open at once */
+  | { t: 'cops'; cid: string; ops: BoxOp[] }
+  /** what is in a crate within reach, asked for on the way to it (no doors open, nothing is held): it is shown at once when it is opened */
+  | { t: 'cpeek'; cid: string }
   | { t: 'cclose'; cid: string }
   /**
    * What lies within reach that holds things (a pack, a vest, a jacket, a case), opened with the pockets: each is the
@@ -250,6 +258,8 @@ export type C2S =
    */
   | { t: 'lopen'; uids: string[] }
   | { t: 'lset'; uid: string; items: StoredItem[] }
+  /** what was done in a bag lying within reach, move by move */
+  | { t: 'lops'; uid: string; ops: BoxOp[] }
   | { t: 'lclose' }
   /** a stash put down, with whatever was in it while it was carried */
   /** a shovel put to a stash: it is buried, or dug up */
@@ -407,6 +417,8 @@ export type S2C =
   | { t: 'denied'; uid: string }
   | { t: 'cdata'; cid: string; items: StoredItem[] }
   | { t: 'cbusy'; cid: string }
+  /** what of this player's moves in a crate (`cid`) or a bag lying about (`l`) could not be done: taken by somebody else first (out of their pockets again), or no room (back into them) */
+  | ({ t: 'cno'; cid?: string; l?: string } & Refused)
   /** a thing lying within reach that holds things, opened ('lopen'): what is in it; or somebody else has it open; or what is in it now, set by whoever had it (to everybody) */
   | { t: 'ldata'; uid: string; items: StoredItem[] }
   | { t: 'lbusy'; uid: string }

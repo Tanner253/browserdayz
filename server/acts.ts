@@ -13,6 +13,7 @@ import { RACKS, rackShows } from '../src/sim/crates';
 import { CORPSE_LIFETIME, CORPSE_WEST, PARKS, WEST_FROM, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
 import { idleMs } from './west-cars';
 import { lieAt } from './custody';
+import { shutIt } from './searched';
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, tagTime, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast, tagLock } from './gate';
@@ -25,14 +26,12 @@ import type { Body } from '../src/sim/infected';
 // ------------------------------------------------------------------ gameplay
 
 export function releaseLock(c: Client, lying = true) {
-  if (c.openCid && locks.get(c.openCid) === c.id) {
-    locks.delete(c.openCid);
-    ajar(c.openCid, false);
-  }
+  // (shut by them: still open to whoever else has it open, searched.ts)
+  if (c.openCid) shutIt(c, c.openCid);
   c.openCid = null;
   // (and the things lying about they had open with their pockets, unless it is only another crate being opened)
   if (!lying) return;
-  for (const uid of c.openLying) if (locks.get(`l:${uid}`) === c.id) locks.delete(`l:${uid}`);
+  for (const uid of c.openLying) shutIt(c, `l:${uid}`);
   c.openLying.clear();
 }
 
