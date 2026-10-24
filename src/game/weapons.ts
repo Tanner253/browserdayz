@@ -495,7 +495,8 @@ export const LIVE = {
  * Things drawn bigger in the hand than they are, or they are a speck at arm's length (the owner, 2026-10-14: "the
  * bandage item needs to be larger its too small in the hand"): the roll of dressing is a 4.5 cm reel of tape.
  */
-const IN_HAND: Record<string, number> = { bandage: 1.8 };
+// (firewood: a bundle half a metre long, held in front of the eye, filled the view)
+const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45 };
 
 /**
  * A roll of dressing in the left palm, and the right drawing lengths off it. A bag of blood or salt water being run
