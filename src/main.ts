@@ -299,6 +299,8 @@ async function boot() {
 
   stage('game');
   const game = new Game({ r, world, atmo, terrain, veg, grass, buildings });
+  // (the canyon's rock, solid to the animals when the game is played alone, as the server makes it solid to its own)
+  game.wild.rocks = [...caves.pieces, ...outcrops.pieces];
   // (each told where the eye is while it is to be seen: in the Arena none of them is, src/game/modes.ts)
   const zona = () => game.modes.mode !== 'arena';
   if (westTowns) game.beside.push((_dt, eye) => zona() && westTowns.update(eye));

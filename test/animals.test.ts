@@ -22,6 +22,7 @@ const ground: Ground = {
   slope: () => 0,
   biome: (x, z): Biome => (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r ? 'water' : Math.abs(x) > 1490 || Math.abs(z) > 1490 ? 'water' : x < 0 ? 'forest' : 'field'),
   open: (x, z) => Math.abs(x) < 1490 && Math.abs(z) < 1490 && Math.hypot(x - LAKE.x, z - LAKE.z) >= LAKE.r,
+  road: () => 99,
   roofed: () => false,
   cover: (x) => (x < 0 ? 1 : 0),
   clear: () => true,

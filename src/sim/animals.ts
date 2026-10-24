@@ -202,6 +202,12 @@ export const ANIMALS = {
    * (The owner: "they spawned inside eachother in the images.")
    */
   room: { herd: 0.6, other: 0.5 },
+  /**
+   * metres off a road's edge: a herd's middle, the spots it feeds and lies up at, and where one stands or walks (it
+   * crosses a road where its way goes over, and runs along one only when it flees); and how far its middle keeps
+   * from the edge of a town or any place with a name
+   */
+  keepOff: { home: 60, spot: 12, walk: 5, town: 250 },
   /** how often the awake ones think, seconds */
   step: 0.2,
   /** what is heard of a person moving, metres (as a person hears: an animal's `hear` scales it): sprinting, jogging, walking, crouched */

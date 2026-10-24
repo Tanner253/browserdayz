@@ -5,10 +5,26 @@
 // Worked out a patch at a time as it is first asked about and kept (most of the map is never asked: animals keep to
 // their own ground), so the server starts no slower for it.
 
-import { BUILDING_FOOTPRINT, heightAt, onWorld, SEA_LEVEL, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, WORLD_NX, CELL, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, heightAt, onWorld, passPlan, SEA_LEVEL, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, WORLD_NX, CELL, type World } from '../world/worldgen';
 import { snowOn } from '../world/snow';
 import { waterAt } from './water';
+import { caveMouths, ROCKS, type RockPiece } from './pass';
 import type { Biome } from './animals';
+
+/** What the world's own list does not hold, handed in by whoever has it already (both cost seconds to read again). */
+export interface GroundExtras {
+  /** the canyon's rock: the pass's walls and the outcrops (src/sim/pass.ts rockPieces, src/world/outcrops.ts), solid in the game */
+  rocks?: RockPiece[];
+  /** a model's bounds as it came (the manifest's min and max), to make the props stood about solid */
+  boxOf?: (kind: string) => { min: number[]; max: number[] } | null;
+}
+
+/** metres kept clear round places no animal goes: the fort, an army post, a cave's mouth, the wreck */
+const KEEP = { fort: 55, post: 35, mouth: 14, wreck: 10 };
+/** a prop lower than this is stepped over (a pumpkin, a fern); one taller stands in the way */
+const LOW = 0.35;
+/** how far off a road is known of, metres */
+export const ROAD_REACH = 80;
 
 /** What the animals ask of the ground. A test hands in one of its own. */
 export interface Ground {
@@ -16,8 +32,13 @@ export interface Ground {
   /** rise over run where it stands */
   slope(x: number, z: number): number;
   biome(x: number, z: number): Biome;
-  /** whether an animal can stand there: not in water, a building, a trunk or a rock, and no steeper than it climbs */
+  /**
+   * whether an animal can stand there: not in water, a building, a trunk, a rock or the canyon's rock, a fence, a car
+   * or anything else stood about, nor at the fort, a post or a cave's mouth; and no steeper than it climbs
+   */
   open(x: number, z: number, steep: number): boolean;
+  /** metres to the edge of the nearest road (`ROAD_REACH` and more: none near) */
+  road(x: number, z: number): number;
   /** under a roof: inside a building, where no animal can follow */
   roofed(x: number, z: number): boolean;
   /** how thick the trees are about a place, 0 to 1 (it hides whoever is in it) */
@@ -38,7 +59,7 @@ const B = 4, TILE = 32;
 /** a bin of what stands on the ground (trunks, rocks, buildings), metres */
 const BIN = 16;
 
-export function animalGround(world: World): Ground {
+export function animalGround(world: World, extras: GroundExtras = {}): Ground {
   const ground = (x: number, z: number) => heightAt(world.heights, x, z);
   const NX = Math.ceil((WORLD_X1 - WORLD_X0) / B), NZ = Math.ceil((WORLD_Z1 - WORLD_Z0) / B);
   // kinds of country, one byte a cell: 255 until its patch is worked out
@@ -75,11 +96,66 @@ export function animalGround(world: World): Ground {
     // (a length runs along its own x: src/world/gatehouse.ts, drystoneBoxes)
     put({ x: w.x, z: w.z, r: w.long / 2 + 1, c, s, w: w.long / 2 + 0.4, d: w.thick / 2 + 0.4 });
   }
+  /** a box turned as three.js turns a thing about Y by `rot`, from its own frame's x0..x1 and z0..z1 */
+  const box = (ox: number, oz: number, rot: number, x0: number, x1: number, z0: number, z1: number, pad: number) => {
+    const c = Math.cos(rot), s = Math.sin(rot), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, w = (x1 - x0) / 2 + pad, d = (z1 - z0) / 2 + pad;
+    put({ x: ox + mx * c + mz * s, z: oz - mx * s + mz * c, r: Math.hypot(w, d) + 0.5, c, s, w, d });
+  };
+  // (the canyon's rock, each piece's face along its own +z from its foot: the walls the owner saw animals stood in)
+  for (const p of extras.rocks ?? []) {
+    const m = ROCKS[p.id];
+    if (p.small || !m) continue;
+    box(p.at[0], p.at[2], p.turn, (-m.long / 2) * p.scale, (m.long / 2) * p.scale, -m.back * p.scale, m.front * p.scale, 0.4);
+  }
+  if (extras.boxOf) {
+    for (const p of world.props) {
+      const b = extras.boxOf(p.kind);
+      if (!b || (b.max[1] - b.min[1]) * p.scale < LOW) continue;
+      box(p.x, p.z, p.rot, b.min[0] * p.scale, b.max[0] * p.scale, b.min[2] * p.scale, b.max[2] * p.scale, 0.3);
+    }
+  }
+  for (const s of world.solids) put({ x: s.x, z: s.z, r: s.r + 1, c: 1, s: 0 });
+  const keep: { x: number; z: number; r: number }[] = [
+    ...(world.castle ? [{ x: world.castle.x, z: world.castle.z, r: KEEP.fort }] : []),
+    ...(world.posts ?? []).map((p) => ({ x: p.x, z: p.z, r: KEEP.post })),
+    ...(world.wreck ? [{ x: world.wreck.x, z: world.wreck.z, r: KEEP.wreck }] : []),
+    ...caveMouths(passPlan).map((m) => ({ x: m.x, z: m.z, r: KEEP.mouth })),
+  ];
+  const kept = (x: number, z: number) => keep.some((k) => (x - k.x) ** 2 + (z - k.z) ** 2 < k.r * k.r);
   const towns = world.pois.map((p) => ({ x: p.x, z: p.z, r: p.radius, farm: /farm|kolkhoz/i.test(p.name), name: p.name }));
+  // the roads, as lengths binned by 32 m (a road is points x, y, z one after another)
+  const RB = 32, RBX = Math.ceil((WORLD_X1 - WORLD_X0) / RB), RBZ = Math.ceil((WORLD_Z1 - WORLD_Z0) / RB);
+  const rbin = (i: number, j: number) => Math.min(RBZ - 1, Math.max(0, j)) * RBX + Math.min(RBX - 1, Math.max(0, i));
+  const legs = new Map<number, number[]>();
+  for (const r of [world.road, ...world.roads]) {
+    const p = r.points;
+    for (let k = 0; k + 5 < p.length; k += 3) {
+      const ax = p[k], az = p[k + 2], bx = p[k + 3], bz = p[k + 5];
+      const i0 = Math.floor((Math.min(ax, bx) - WORLD_X0 - ROAD_REACH) / RB), i1 = Math.floor((Math.max(ax, bx) - WORLD_X0 + ROAD_REACH) / RB);
+      const j0 = Math.floor((Math.min(az, bz) - WORLD_Z0 - ROAD_REACH) / RB), j1 = Math.floor((Math.max(az, bz) - WORLD_Z0 + ROAD_REACH) / RB);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const key = rbin(i, j), l = legs.get(key) ?? [];
+        l.push(ax, az, bx, bz, r.width / 2);
+        legs.set(key, l);
+      }
+    }
+  }
+  const road = (x: number, z: number) => {
+    let best = ROAD_REACH;
+    const l = legs.get(rbin(Math.floor((x - WORLD_X0) / RB), Math.floor((z - WORLD_Z0) / RB)));
+    if (!l) return best;
+    for (let k = 0; k < l.length; k += 5) {
+      const ax = l[k], az = l[k + 1], ux = l[k + 2] - ax, uz = l[k + 3] - az, n = ux * ux + uz * uz;
+      const t = n ? Math.max(0, Math.min(1, ((x - ax) * ux + (z - az) * uz) / n)) : 0;
+      best = Math.min(best, Math.hypot(x - ax - ux * t, z - az - uz * t) - l[k + 4]);
+    }
+    return best;
+  };
 
+  // (the steepest of the four ways from it: one way only, the foot of a cliff on the other side read as flat)
   const slope = (x: number, z: number) => {
     const h = ground(x, z);
-    return Math.hypot(ground(x + 1.5, z) - h, ground(x, z + 1.5) - h) / 1.5;
+    return Math.max(Math.abs(ground(x + 1.5, z) - h), Math.abs(ground(x - 1.5, z) - h), Math.abs(ground(x, z + 1.5) - h), Math.abs(ground(x, z - 1.5) - h)) / 1.5;
   };
   const wet = (x: number, z: number) => ground(x, z) < SEA_LEVEL + 0.4 || (!!world.water && !!waterAt(world.water, x, z, ground));
   const kindAt = (x: number, z: number): Biome => {
@@ -123,7 +199,8 @@ export function animalGround(world: World): Ground {
     height: ground,
     slope,
     biome,
-    open: (x, z, steep) => onWorld(x, z, -6) && !wet(x, z) && slope(x, z) <= steep && !inSolid(x, z),
+    open: (x, z, steep) => onWorld(x, z, -6) && !wet(x, z) && slope(x, z) <= steep && !inSolid(x, z) && !kept(x, z),
+    road,
     roofed: (x, z) => inSolid(x, z, true),
     cover: (x, z) => Math.min(1, treeBins[tbin(x, z)] / 14),
     clear: (ax, ay, az, bx, by, bz) => {

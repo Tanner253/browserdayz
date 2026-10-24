@@ -14,6 +14,7 @@ import { heightAt, type World } from '../world/worldgen';
 import { ANIMALS, A_ALERT, A_BITE, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_ROAR, A_RUN, A_SWIPE, A_TROT, A_WALK, KINDS, ROW_BLEEDS, type AnimalRow, type Kind } from '../sim/animals';
 import { Herd, type Seen, type Strike } from '../sim/animal-mind';
 import { animalGround } from '../sim/animal-ground';
+import type { RockPiece } from '../sim/pass';
 import type { Damageable, HitZone } from './weapons';
 
 export interface WildHost {
@@ -307,6 +308,8 @@ export class Wildlife {
   /** the herds being stood, a little at a time */
   private standing: Herd | null = null;
   private stepT = 0;
+  /** the canyon's rock the game has stood (main.ts hands it over): solid to the herds played alone, as to the server's */
+  rocks: RockPiece[] = [];
 
   constructor(private host: WildHost) {}
 
@@ -315,7 +318,8 @@ export class Wildlife {
     this.clear();
     const world = this.host.world();
     // (a few milliseconds a frame, a herd's ground at a time: all at once it was most of a second)
-    const herd = new Herd(animalGround(world), (k) => MEASURING || !!assets.manifest.models[k.model], () => this.host.hour());
+    const boxOf = (kind: string) => (assets.manifest.models[kind] as { min?: number[]; max?: number[] } | undefined)?.min ? (assets.manifest.models[kind] as unknown as { min: number[]; max: number[] }) : null;
+    const herd = new Herd(animalGround(world, { rocks: this.rocks, boxOf }), (k) => MEASURING || !!assets.manifest.models[k.model], () => this.host.hour());
     const me = this.host.me(), steps = herd.populating(Date.now(), me ? [me] : []);
     this.standing = herd;
     const more = () => {

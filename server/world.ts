@@ -24,7 +24,8 @@ import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 import { onTownWall, placedKits, placedWalls } from '../src/sim/towns';
 import { ROCKS, rockPieces } from '../src/sim/pass';
 import { caveLootPoints, inCave } from '../src/world/caves-carved';
-import { passPlan } from '../src/world/worldgen';
+import { passData, passPlan } from '../src/world/worldgen';
+import { outcropPieces } from '../src/world/outcrops';
 import { ruinFoot, ruinLocal, ruinLoot, ruinsPlan, inside as inRuin, outside as offRuin, type Piece, type Place } from '../src/sim/ruins';
 
 /**
@@ -149,7 +150,12 @@ export function buildWorldData(root: string) {
     west: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? westSpots(world, [...parked, ...stations]).map(({ ks, ...p }) => (ks && manifest.models?.[POLICE_CAR.model] ? { ...p, ks } : p)) : [],
     spawns: world.spawns,
     /** the ground as the animals know it (src/sim/animal-ground.ts), and whether the game has a model to draw a kind with */
-    animalGround: () => animalGround(world),
+    animalGround: () =>
+      animalGround(world, {
+        // (the canyon's rock as the game stands it: the pass's walls found on the real ground, and the outcrops)
+        rocks: [...rockPieces(passPlan, { ramps: passData().ramps, ground: (x, z) => heightAt(world.heights, x, z) }), ...outcropPieces(world, passPlan)],
+        boxOf: (kind) => (manifest.models?.[kind] as { min?: number[]; max?: number[] } | undefined)?.min ? (manifest.models![kind] as { min: number[]; max: number[] }) : null,
+      }),
     hasModel: (id: string) => !!manifest.models?.[id],
     /** where the infected live, and somewhere to stand one about such a place (see src/sim/infected.ts) */
     homes: infectedHomes(world),
