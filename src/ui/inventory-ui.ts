@@ -482,8 +482,9 @@ export class InventoryUI {
    */
   private fitGrids() {
     for (const g of this.root.querySelectorAll<HTMLElement>('.inv-grid')) {
-      const box = g.closest<HTMLElement>('.inv-gridbox'), room = box?.parentElement;
-      if (!box || !room || !room.clientWidth) continue;
+      // (a bag's grid in its box; an open crate's or stash's, a stash case's ten squares, straight in Vicinity)
+      const box = g.closest<HTMLElement>('.inv-gridbox') ?? g, room = box.parentElement;
+      if (!room || !room.clientWidth) continue;
       const rs = getComputedStyle(room), bs = getComputedStyle(box);
       const free = room.clientWidth - parseFloat(rs.paddingLeft) - parseFloat(rs.paddingRight) - parseFloat(bs.marginLeft) - parseFloat(bs.marginRight) - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight) - parseFloat(bs.borderLeftWidth) - parseFloat(bs.borderRightWidth) - 2;
       const natural = parseFloat(g.style.width) || 0;

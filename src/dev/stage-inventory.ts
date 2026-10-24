@@ -81,6 +81,13 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   const box = Object.assign(new Container('stage-body', 'Body', BODY_GRID[0], BODY_GRID[1], [], true), { tagsHere: true });
   layOnBody(box, kitOf(q.get('body') ?? 'assault').things.map(made));
   const body = { uid: 'stage-body', label: 'Body of Sam', container: box, corpse: true, known: true } as unknown as Stash;
+  // (`&open=stash_kit`: a stash of that kind open beside them instead, the guns of a kit in it: its width against the screen's)
+  const stashId = q.get('open'), room = stashId ? ITEMS[stashId]?.stash : undefined;
+  const opened = room ? (() => {
+    const c = new Container('stage-stash', ITEMS[stashId!].name, room[0], room[1], []);
+    for (const th of kitOf('heavy').things.map(made)) c.add(th);
+    return { uid: 'stage-stash', label: ITEMS[stashId!].name, container: c, corpse: false, known: true } as unknown as Stash;
+  })() : null;
 
   let screen: InventoryUI | null = null;
   const actions: InvActions = {
@@ -121,7 +128,7 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   screen.icons = icons;
   // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
   if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
-  screen.open(vicinity, body, freshVitals());
+  screen.open(vicinity, opened ?? body, freshVitals());
   (window as unknown as { stageInv: unknown }).stageInv = { inv, screen, vicinity };
   await pictures(ui);
   shown.carried = [...inv.carried()].length;
