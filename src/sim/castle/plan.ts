@@ -120,8 +120,6 @@ interface Common {
   low?: boolean;
   /** it has a roof of its own over it (a passage under the ground): no snow lies on it */
   roofed?: boolean;
-  /** it is not bent as the rest of its stuff is (hand-laid stone bellies a hand either way): what is set into a piece of the kit, which is straight, and would come out through its face */
-  straight?: boolean;
 }
 
 /** a block, its sides square to the fort (or turned `yaw` about its own middle) */

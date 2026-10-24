@@ -28,6 +28,8 @@ export interface Cut {
    * Unsaid: nothing is laid (whoever cuts has something of their own in the hole: a doorway's own jambs, a floor).
    */
   cap?: 'all' | 'upright';
+  /** it takes nothing out of the piece, only what is laid inside it by the piece's other cuts (see `KitCaps`): stone that something else covers, and nobody sees */
+  capsOnly?: boolean;
 }
 
 /** One piece of a layout. All of it is said in the layout's own measure (metres; y up). */
@@ -108,6 +110,9 @@ export function inCut(c: Cut, p: V3): boolean {
  * (which way it faces, where it is on a picture) are carried along and worked out for each new corner.
  */
 export function clipOut(poly: number[][], cut: Cut): number[][][] {
+  // (wholly beyond any one side it is outside the cut, and is kept whole: cut along the sides before that one first, a
+  // piece nowhere near the cut came out in as many pieces as the cut has sides it crossed the line of)
+  if (cut.planes.some(([nx, ny, nz, d]) => poly.every((v) => nx * v[0] + ny * v[1] + nz * v[2] - d > 0))) return [poly];
   const kept: number[][][] = [];
   let rest = poly;
   for (const [nx, ny, nz, d] of cut.planes) {
@@ -209,8 +214,8 @@ export function backedOut(pos: ArrayLike<number>, near = 0.02): Map<number, V3[]
  * corner. `index`: which corners each triangle has, three to a triangle (null: the corners in threes, as they come).
  * The one place this is done: whoever draws a layout and whoever counts what is drawn of it both ask here.
  */
-export function standTriangles(corners: number[][], index: ArrayLike<number> | null, cuts: Cut[], backs: Map<number, V3[][]> | null, put: (corner: number[]) => void): void {
-  const count = index ? index.length : corners.length;
+export function standTriangles(corners: number[][], index: ArrayLike<number> | null, all: Cut[], backs: Map<number, V3[][]> | null, put: (corner: number[]) => void): void {
+  const count = index ? index.length : corners.length, cuts = all.filter((k) => !k.capsOnly);
   for (let t = 0; t + 2 < count; t += 3) {
     const a = corners[index ? index[t] : t], b = corners[index ? index[t + 1] : t + 1], c = corners[index ? index[t + 2] : t + 2], left = backs?.get(t / 3);
     let polys: number[][][] = left ? left.map((poly) => poly.map((w) => a.map((v, k) => v * w[0] + b[k] * w[1] + c[k] * w[2]))) : [[a, b, c]];
@@ -530,7 +535,7 @@ export function kitSolids(layout: KitPiece[], cell = 0.5): KitSolid[] {
     }
     for (const b of BLOCKS[p.id] ?? []) {
       const c = kitPoint(m, [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2]), reach = Math.hypot((b[1] - b[0]) * scale[0], (b[3] - b[2]) * scale[1], (b[5] - b[4]) * scale[2]) / 2;
-      const cuts = (p.cut ?? []).filter((k) => Math.hypot(k.mid[0] - c[0], k.mid[1] - c[1], k.mid[2] - c[2]) < k.reach + reach);
+      const cuts = (p.cut ?? []).filter((k) => !k.capsOnly && Math.hypot(k.mid[0] - c[0], k.mid[1] - c[1], k.mid[2] - c[2]) < k.reach + reach);
       if (!cuts.length) {
         put(b);
         continue;

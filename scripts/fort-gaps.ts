@@ -226,7 +226,16 @@ function look(e: number[], n: number, out: Gap[]): void {
         if (!(c > near * 1.05 + 0.3) || (wide === 2 && !(depth[(j + dj) * RES + i + di] > near * 1.05 + 0.3))) continue;
         if (Math.abs(a - b) > 0.35 * Math.min(a, b) + 0.2) continue;
         const g = across(e, dirAt(f, i - di, j - dj), dirAt(f, i + di * wide, j + dj * wide), near);
-        if (g && g.w < GAP) { out.push({ ...g, eye: n }); break tries; }
+        if (!g || g.w >= GAP) continue;
+        // (a crack goes on along itself: measured again two rays either way along it, it is as narrow there. Where two
+        // edges meet in a corner of an outline against the sky, a step of a broken top, it is narrow only at the corner)
+        const along = (k: number) => {
+          const ii = i + dj * k, jj = j + di * k;
+          if (ii < 1 || jj < 1 || ii + di * wide >= RES || jj + dj * wide >= RES) return false;
+          const h = across(e, dirAt(f, ii - di, jj - dj), dirAt(f, ii + di * wide, jj + dj * wide), Math.max(depth[(jj - dj) * RES + ii - di], depth[(jj + dj * wide) * RES + ii + di * wide]));
+          return !!h && h.w < GAP * 1.5;
+        };
+        if (along(2) && along(-2)) { out.push({ ...g, eye: n }); break tries; }
       }
     }
   }
@@ -301,11 +310,13 @@ if (!isMainThread) {
       if (normalY(t) < 0.6) continue;
       cast(x, fy + 0.05, z, 1e-9, 1, 1e-9, 2);
       if (hitTri >= 0) continue;
-      if (Of[t] === ground) { if (Math.hypot(x, z) < 30) footEyes.push([x, fy + 1.6, z]); break; }
       // (under the terrace a body is only in the lower levels and the passage the server lets it be in: not inside the
-      // kit's hollow pieces, where the eye finder finds floors nobody stands on)
+      // kit's hollow pieces, where the eye finder finds floors nobody stands on, nor on the hill where it runs on inside a
+      // tower's foot)
       const [wx, wy, wz] = castleAt(P, x / S, z / S, (fy + 0.3) / S);
-      if (fy < -0.3 && castleHides(P, wx, wy, wz) && !castleUnder(P, wx, wy, wz, (a, b) => heightAt(soup.heights, a, b))) continue;
+      const inStone = fy < -0.3 && castleHides(P, wx, wy, wz) && !castleUnder(P, wx, wy, wz, (a, b) => heightAt(soup.heights, a, b));
+      if (Of[t] === ground) { if (Math.hypot(x, z) < 30 && !inStone) footEyes.push([x, fy + 1.6, z]); break; }
+      if (inStone) continue;
       fortEyes.push([x, fy + 1.6, z]);
     }
   }

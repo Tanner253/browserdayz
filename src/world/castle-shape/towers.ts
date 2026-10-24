@@ -89,9 +89,17 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
     // (its back is a finger behind its face: the edge the kit's foot is cut to, 0.553 from the middle, is inside that finger)
     const turned = (w: number, r: number) => (Math.asin(w / r) * 180) / Math.PI;
     for (const side of [-1, 1]) for (const [w, face] of [[0.55, -side], [0.556, side]]) dark.quad([P(tw.door + side * turned(w, rin), rin, hollow), P(tw.door + side * turned(w, ro), ro, hollow), P(tw.door + side * turned(w, rt), rt, hollow + DOOR), P(tw.door + side * turned(w, rin), rin, hollow + DOOR)], [[0, hollow], [ro - rin, hollow], [rt - rin, hollow + DOOR], [0, hollow + DOOR]], mul(round(tw.door), face), tone * 0.75);
-    for (const [up, face] of [[0, -1], [0.006, 1]]) dark.quad([P(tw.door - dh, rin, hollow + DOOR + up), P(tw.door + dh, rin, hollow + DOOR + up), P(tw.door + doorHalf(rt), rt, hollow + DOOR + up), P(tw.door - doorHalf(rt), rt, hollow + DOOR + up)], [[0, 0], [1.1, 0], [1.1, rt - rin], [0, rt - rin]], [0, face, 0], tone * 0.7);
-    const sill = [P(tw.door - dh, rin, hollow), P(tw.door + dh, rin, hollow), P(tw.door + doorHalf(ro), ro, hollow), P(tw.door - doorHalf(ro), ro, hollow)];
-    dark.quad(sill, sill.map((p): UV => [p[0], p[2]]), UP, tone * 0.8);
+    // (its head and its sill in the same lengths as the wall over it and the floor at it: one straight stone across,
+    // the wall's foot over the doorway stood up to a hand off its inner edge, and the cellar was looked up into)
+    const across = round0.filter((a) => apart(a, tw.door) <= dh + 0.005), t = (a: number) => (norm360(a - tw.door + 180) - 180) / dh;
+    for (let k = 0; k + 1 < across.length; k++) {
+      const a0 = across[k], a1 = across[k + 1];
+      for (const [up, face] of [[0, -1], [0.006, 1]]) dark.quad([P(a0, rin, hollow + DOOR + up), P(a1, rin, hollow + DOOR + up), P(tw.door + t(a1) * doorHalf(rt), rt, hollow + DOOR + up), P(tw.door + t(a0) * doorHalf(rt), rt, hollow + DOOR + up)], [[(t(a0) + 1) * 0.55, 0], [(t(a1) + 1) * 0.55, 0], [(t(a1) + 1) * 0.55, rt - rin], [(t(a0) + 1) * 0.55, rt - rin]], [0, face, 0], tone * 0.7);
+      const sill = [P(a0, rin, hollow), P(a1, rin, hollow), P(tw.door + t(a1) * doorHalf(ro), ro, hollow), P(tw.door + t(a0) * doorHalf(ro), ro, hollow)];
+      dark.quad(sill, sill.map((p): UV => [p[0], p[2]]), UP, tone * 0.8);
+      // (and the floor's edge over the sill, a finger high: open, the foot was looked into under it)
+      dark.quad([P(a0, rin, hollow), P(a1, rin, hollow), P(a1, rin, hollow + 0.02), P(a0, rin, hollow + 0.02)], [[0, 0], [0.3, 0], [0.3, 0.02], [0, 0.02]], out((a0 + a1) / 2), tone * 0.8);
+    }
   }
 
   yield;
@@ -105,13 +113,16 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
     // (no two stones of a broken top are at one height: each half of a stub is a little under what the plan says)
     return tw.rim[k] - (!lod && k % 2 === 0 ? 0.24 * hash(Math.floor(norm360(a) / 7.5), seed, 5) : 0);
   };
+  // (an opening the wall has come down past is neither lined nor cut: cut out of the face and not lined, it left a notch
+  // into the wall where the next length of the broken top stood over its sill, 2026-10-23. What holds a body up keeps them all.)
+  const standing = holes.filter((h) => rimAt(h.a) >= h.y1 + 0.05);
   // WHERE AN OPENING'S HEAD AND SILL ARE CUT ACROSS, BOTH FACES OF THE WALL ARE CUT. (The head's underside was cut in
   // sixths, and each face of the wall over it at the sixths and at the tower's own lengths too: the face's edge
   // followed the arch more closely than the underside's, and between the two the wall's inside was seen, and the sky;
   // and a flat sill, one straight edge, lay under the wall's round. 2026-10-23, "gaps in between walls".) So each
   // opening is cut across at its sixths and wherever either face is cut at the tower's own lengths, the same `t` across
   // it on both faces, and its head and sill are laid in those same pieces.
-  const across = new Map<Hole, number[]>(holes.map((h) => {
+  const across = new Map<Hole, number[]>(standing.map((h) => {
     const ts = [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1];
     for (const r of [T.r, rin]) for (let j = 0; j < n; j++) {
       const t = (norm360((j * 360) / n - h.a + 180) - 180) / halfAt(h, r);
@@ -123,14 +134,14 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
   const columns = (r: number) => {
     const cuts = new Set<number>();
     for (let j = 0; j < n; j++) cuts.add((j * 360) / n);
-    for (const h of holes) for (const t of across.get(h)!) cuts.add(norm360(h.a + t * halfAt(h, r)));
+    for (const h of standing) for (const t of across.get(h)!) cuts.add(norm360(h.a + t * halfAt(h, r)));
     const as = sorted(cuts, 0.05);
     return as.map((a0, i) => ({ a0, a1: i + 1 < as.length ? as[i + 1] : as[0] + 360 }));
   };
   for (const [r, s] of [[T.r, 1], [rin, -1]] as [number, number][]) {
     const turns = Math.max(1, Math.round((2 * Math.PI * r) / tile)), u = (a: number) => (a / 360) * turns * tile;
     for (const { a0, a1 } of columns(r)) {
-      const mid = (a0 + a1) / 2, top = rimAt(mid), h = holes.find((q) => apart(mid, q.a) < halfAt(q, r));
+      const mid = (a0 + a1) / 2, top = rimAt(mid), h = standing.find((q) => apart(mid, q.a) < halfAt(q, r));
       // (what stands in this length of it: under an opening as far as its foot or the wall's top, whichever is lower, and over it if the wall goes so high)
       const spans: [number, number, number, number][] = [];
       if (!h) spans.push([s > 0 ? DRUM_FOOT : 0, s > 0 ? DRUM_FOOT : 0, top, top]);
@@ -165,13 +176,12 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
       const pts = k + 1 >= is.length || (i + 1 < os.length && os[i + 1] <= is[k + 1]) ? [P(os[i], T.r, top), P(os[++i], T.r, top), P(is[k], rin, top)] : [P(os[i], T.r, top), P(is[++k], rin, top), P(is[k - 1], rin, top)];
       stone.tri(pts, pts.map((p): UV => [p[0], p[2]]), UP, tone * 0.94);
     }
-    if (Math.abs(next - top) > 0.01) stone.quad([P(a1, rin, Math.min(top, next)), P(a1, T.r, Math.min(top, next)), P(a1, T.r, Math.max(top, next)), P(a1, rin, Math.max(top, next))], [[rin, Math.min(top, next)], [T.r, Math.min(top, next)], [T.r, Math.max(top, next)], [rin, Math.max(top, next)]], mul(round(a1), next < top ? 1 : -1), tone * 0.9);
+    // (however small the step: under a centimetre it was left open, a slit of day between two lengths of the top)
+    if (Math.abs(next - top) > 1e-4) stone.quad([P(a1, rin, Math.min(top, next)), P(a1, T.r, Math.min(top, next)), P(a1, T.r, Math.max(top, next)), P(a1, rin, Math.max(top, next))], [[rin, Math.min(top, next)], [T.r, Math.min(top, next)], [T.r, Math.max(top, next)], [rin, Math.max(top, next)]], mul(round(a1), next < top ? 1 : -1), tone * 0.9);
   }
-  if (!lod) for (const h of holes) {
+  if (!lod) for (const h of standing) {
     // the sides of each opening, its sill and its head, through the thickness of the wall
     const ho = halfAt(h, T.r), hi = halfAt(h, rin), rise = h.y1 - headAt(h.y0, h.y1, h.w / 2, h.arch, 1), foot = h.round ? h.y0 + rise : h.y0;
-    // (nothing of it is left to line where the wall itself has come down past it)
-    if (rimAt(h.a) < h.y1 + 0.05) continue;
     for (const side of [-1, 1]) stone.quad([P(h.a + side * ho, T.r, foot), P(h.a + side * hi, rin, foot), P(h.a + side * hi, rin, h.y1 - rise), P(h.a + side * ho, T.r, h.y1 - rise)], [[0, foot], [T.wall, foot], [T.wall, h.y1 - rise], [0, h.y1 - rise]], mul(round(h.a), -side), tone * 0.84);
     if (h.round) for (const [t0, t1] of pairs(across.get(h)!)) {
       const h0 = sillAt(h.y0, h.y1, h.w / 2, true, t0), h1 = sillAt(h.y0, h.y1, h.w / 2, true, t1);
@@ -329,12 +339,14 @@ export function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Pu
       wood.quad([P(a0, ri, D - 0.1), P(a1, ri, D - 0.1), P(a1, ri, D), P(a0, ri, D)], [[0, 0], [0.15, 0], [0.15, 0.1], [0, 0.1]], out(a0 + 3.75), tone * 0.8);
       continue;
     }
-    ring(D, ri, rin, a0, a1, UP);
-    ring(D - 0.1, ri, rin, a0, a1, [0, -1, 0], 0.75);
+    // (the boards run a hand into the wall that bears them, as the floor's do: ended at its face in lengths of their
+    // own, they stood off it where its face is cut more finely, by an opening, and a line of day showed along the wall)
+    ring(D, ri, rin + 0.12, a0, a1, UP);
+    ring(D - 0.1, ri, rin + 0.12, a0, a1, [0, -1, 0], 0.75);
     // THE BOARDS HAVE ENDS. Wherever the ring of them stops (at the well, at the head of the stair, at each place the
     // wall has come down) the thickness of the boards is closed: open, the top of the platform was seen from under
     // it, from behind, with the sky through it (2026-10-14: the gaps seen from below in a tower).
-    for (const [a, to, there] of [[a0, -1, boarded(j - 1)], [a1, 1, boarded(j + 1)]] as [number, number, boolean][]) if (!there) wood.quad([P(a, ri, D - 0.1), P(a, rin, D - 0.1), P(a, rin, D), P(a, ri, D)], [[ri, 0], [rin, 0], [rin, 0.1], [ri, 0.1]], mul(round(a), to), tone * 0.8);
+    for (const [a, to, there] of [[a0, -1, boarded(j - 1)], [a1, 1, boarded(j + 1)]] as [number, number, boolean][]) if (!there) wood.quad([P(a, ri, D - 0.1), P(a, rin + 0.12, D - 0.1), P(a, rin + 0.12, D), P(a, ri, D)], [[ri, 0], [rin + 0.12, 0], [rin + 0.12, 0.1], [ri, 0.1]], mul(round(a), to), tone * 0.8);
   }
   // two joists under it, where no head comes up: across the middle square to the well, and along the side away from it
   const wc = well0 + (sg * wide) / 2;
