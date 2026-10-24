@@ -19,6 +19,7 @@ import { log, things, world } from './index';
 import { tool, use, woods } from './gather';
 import { pidOf } from './acts';
 import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
+import { boxStore, boxesBack, emptyBox, heldIn, spillBoxes } from './boxes';
 
 /** how far off a base is told to a game, and how far off it is forgotten again */
 export const SIGHT = { tell: 450, forget: 650 };
@@ -171,6 +172,7 @@ export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
   const r = all.lay(ask, own(c), Date.now(), c.name);
   if (typeof r === 'string') return void send(c, { t: 'tell', kind: 'warn', text: r });
   pay(c, cost);
+  if (PIECES[m.k].store) boxStore(r.base, r.piece);
   if (m.k === 'claim') {
     storeFor(r.base);
     log(`[build] ${c.name} set down a claim in base ${r.base.id}`);
@@ -222,8 +224,11 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   if (!at) return;
   if (at.why) return void send(c, { t: 'tell', kind: 'warn', text: at.why });
   const all = bases(), back = all.refund(m.b, m.p), claimed = all.bases.get(m.b)?.claim?.p;
+  // (a box is picked up empty; what stood on a piece taken down spills what it held)
+  if (PIECES[all.bases.get(m.b)!.pieces.get(m.p)!.k].store && !emptyBox(m.b, m.p)) return void send(c, { t: 'tell', kind: 'warn', text: 'Empty it first' });
   const gone = all.remove(m.b, m.p);
   if (!gone.length) return;
+  spillBoxes(m.b, gone);
   if (claimed !== undefined && gone.includes(claimed)) {
     spill(m.b);
     const b = all.bases.get(m.b);
@@ -237,13 +242,14 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
 
 // ---- kept
 
-export const keepBases = (): KeptBase[] => bases().keep(stockOf);
+export const keepBases = (): KeptBase[] => bases().keep(stockOf, heldIn);
 /** read back from the save (only into a server that has no bases of its own yet) */
 export function restoreBases(kept: KeptBase[] | undefined) {
   const all = bases();
   if (all.bases.size || !kept?.length) return;
   all.restore(kept);
   storesBack();
+  boxesBack();
   log(`[build] ${all.bases.size} bases, ${all.count} pieces read back`);
 }
 

@@ -29,12 +29,14 @@ const TIER_COST: Record<string, number>[] = [{ planks: 4 }, { planks: 10, nails:
  *   wall   stands on an edge: a foundation's or a floor's, or on top of another wall
  *   stairs fills the storey over a square (or a triangle) of floor
  *   steps  against a foundation's edge, on the outside
- *   free   laid anywhere on the ground, end to end with its own kind (the high walls)
- *   deploy set down anywhere on a foundation or a floor, turned as the player likes (the claim; boxes, step four)
+ *   free   laid anywhere on the ground, end to end with another (the high walls and their gates)
+ *   fit    hung in an opening of its sort (a door in a doorway, bars in a window, a hatch in a floor frame)
+ *   deploy set down anywhere on a foundation or a floor, turned as the player likes (the claim, boxes, the bench)
  */
-export type Role = 'floor' | 'wall' | 'stairs' | 'steps' | 'free' | 'deploy';
+export type Role = 'floor' | 'wall' | 'stairs' | 'steps' | 'free' | 'fit' | 'deploy';
 export type Shape = 'sq' | 'tri';
-export type Cat = 'found' | 'walls' | 'floors' | 'stairs' | 'roofs' | 'outside' | 'deploy';
+export type Hole = 'door' | 'window' | 'wide' | 'hatch';
+export type Cat = 'found' | 'walls' | 'floors' | 'stairs' | 'roofs' | 'doors' | 'windows' | 'outside' | 'deploy';
 
 export interface PieceKind {
   id: string;
@@ -48,17 +50,29 @@ export interface PieceKind {
   roof?: boolean;
   /** a wall's height, m (a full wall is a storey) */
   h?: number;
-  /** what opening it has, and so what fitting it takes (doors and the like: step four) */
-  hole?: 'door' | 'window' | 'wide' | 'hatch';
+  /** what opening it has, and so what fitting it takes */
+  hole?: Hole;
+  /** a fitting: the opening it is hung in */
+  fits?: Hole;
   /** costs and takes half of a full piece */
   half?: boolean;
-  /** made in one tier only (the high walls): it is not hammered up */
+  /** made in one tier only (the high walls, the fittings, what is set down): it is not hammered up */
   only?: Tier;
+  /** what one made in one tier costs, and its health */
+  cost?: Record<string, number>;
+  hp?: number;
+  /** laid only with a workbench near (plan v2: "metal ones need a workbench in the claim") */
+  bench?: boolean;
   /** the length of a free piece along its line, m */
   long?: number;
   /** a thing set down: how far round it its foot takes, m */
   foot?: number;
+  /** a box: its store, squares across and down */
+  store?: [number, number];
 }
+
+/** how near a workbench has to be for what needs one, m */
+export const BENCH_NEAR = 30;
 
 export const PIECES: Record<string, PieceKind> = Object.fromEntries(
   ([
@@ -81,11 +95,33 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'stairs_spiral', name: 'Spiral Stairs', cat: 'stairs', role: 'stairs', shape: 'sq' },
     { id: 'roof', name: 'Roof', cat: 'roofs', role: 'floor', shape: 'sq', roof: true },
     { id: 'roof_tri', name: 'Triangle Roof', cat: 'roofs', role: 'floor', shape: 'tri', roof: true, half: true },
-    { id: 'high_wall_wood', name: 'High Wood Wall', cat: 'outside', role: 'free', only: 1, long: 3, h: 6 },
-    { id: 'high_wall_stone', name: 'High Stone Wall', cat: 'outside', role: 'free', only: 2, long: 3, h: 6 },
+    // (a row of sharpened logs, or a wall of stone)
+    { id: 'high_wall_wood', name: 'High Wood Wall', cat: 'outside', role: 'free', only: 1, long: 3, h: 6, cost: { log: 4, nails: 10 }, hp: 800 },
+    { id: 'high_wall_stone', name: 'High Stone Wall', cat: 'outside', role: 'free', only: 2, long: 3, h: 6, cost: { stone: 60, planks: 4 }, hp: 1500 },
     // (the third step: DayZ's flag over Rust's tool cupboard, plan v2: "Building rights 20 m round every piece; its members build, repair and remove")
-    { id: 'claim', name: 'Claim', cat: 'deploy', role: 'deploy', only: 1, foot: 0.55 },
-  ] satisfies PieceKind[]).map((k) => [k.id, k]),
+    { id: 'claim', name: 'Claim', cat: 'deploy', role: 'deploy', only: 1, foot: 0.55, cost: { log: 1, planks: 10, nails: 10 }, hp: 300 },
+    // (the fourth step's fittings, plan v2: "Doors: wood 250, metal 500, garage 1,000: the way in is always weaker than
+    // the wall"; "wood door 12 planks, 8 nails · metal door 4 sheet metal, 20 nails · garage door 8 sheet metal, 40
+    // nails (the metal ones need a bench); double doors twice a single". The owner: "airlock mechanics like rust has
+    // doors that swing open 1 way with collision".)
+    { id: 'door_wood', name: 'Wooden Door', cat: 'doors', role: 'fit', fits: 'door', only: 1, cost: { planks: 12, nails: 8 }, hp: 250 },
+    { id: 'door_metal', name: 'Metal Door', cat: 'doors', role: 'fit', fits: 'door', only: 3, cost: { sheet_metal: 4, nails: 20 }, hp: 500, bench: true },
+    { id: 'double_door_wood', name: 'Wooden Double Door', cat: 'doors', role: 'fit', fits: 'wide', only: 1, cost: { planks: 24, nails: 16 }, hp: 250 },
+    { id: 'double_door_metal', name: 'Metal Double Door', cat: 'doors', role: 'fit', fits: 'wide', only: 3, cost: { sheet_metal: 8, nails: 40 }, hp: 500, bench: true },
+    { id: 'garage_door', name: 'Garage Door', cat: 'doors', role: 'fit', fits: 'wide', only: 3, cost: { sheet_metal: 8, nails: 40 }, hp: 1000, bench: true },
+    { id: 'hatch', name: 'Ladder Hatch', cat: 'doors', role: 'fit', fits: 'hatch', only: 3, cost: { sheet_metal: 3, nails: 16 }, hp: 500, bench: true },
+    { id: 'shutters', name: 'Wooden Shutters', cat: 'windows', role: 'fit', fits: 'window', only: 1, cost: { planks: 8, nails: 6 }, hp: 250 },
+    { id: 'bars_wood', name: 'Wooden Bars', cat: 'windows', role: 'fit', fits: 'window', only: 1, cost: { planks: 6, nails: 6 }, hp: 250 },
+    { id: 'bars_metal', name: 'Metal Bars', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 2, nails: 10 }, hp: 500, bench: true },
+    { id: 'embrasure', name: 'Embrasure', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 3, nails: 12 }, hp: 500, bench: true },
+    { id: 'gate_wood', name: 'High Wood Gate', cat: 'outside', role: 'free', only: 1, long: 3, h: 6, cost: { log: 6, nails: 20 }, hp: 800 },
+    { id: 'gate_stone', name: 'High Stone Gate', cat: 'outside', role: 'free', only: 2, long: 3, h: 6, cost: { stone: 40, sheet_metal: 6, nails: 20 }, hp: 1500, bench: true },
+    // (what is set down, plan v2: "Small box · Large box: 12 planks, 8 nails · 25 planks, 20 nails; 6×5 and 10×8
+    // squares; health 150 and 300"; "Workbench: 2 logs, 20 planks, 20 nails. Lets metal fittings be made in its claim")
+    { id: 'box_small', name: 'Small Box', cat: 'deploy', role: 'deploy', only: 1, foot: 0.55, cost: { planks: 12, nails: 8 }, hp: 150, store: [6, 5] },
+    { id: 'box_large', name: 'Large Box', cat: 'deploy', role: 'deploy', only: 1, foot: 0.85, cost: { planks: 25, nails: 20 }, hp: 300, store: [10, 8] },
+    { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, foot: 0.95, cost: { log: 2, planks: 20, nails: 20 }, hp: 500 },
+  ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
 
 /** the pieces' numbers on the wire and in the save (never reordered: a new piece goes on the end) */
@@ -94,18 +130,17 @@ export const PIECE_IDS = Object.keys(PIECES);
 /** what bringing a piece to tier `t` takes (a frame: what laying it takes) */
 export function costOf(kind: string, t: Tier): Record<string, number> {
   const k = PIECES[kind];
+  // (one made in one tier is laid whole, at its own cost)
+  if (k.cost) return { ...k.cost };
   const of = TIER_COST[t], out: Record<string, number> = {};
   for (const [id, n] of Object.entries(of)) out[id] = k.half ? Math.ceil(n / 2) : n;
   // (a foundation's frame stands on two logs, its posts)
   if (t === 0 && k.ground) out.log = k.half ? 1 : 2;
-  // (a high wall is laid whole: a row of sharpened logs, or a wall of stone)
-  if (kind === 'claim') return { log: 1, planks: 10, nails: 10 };
-  if (k.only !== undefined) return k.only === 1 ? { log: 4, nails: 10 } : { stone: 60, planks: 4 };
   return out;
 }
 
 /** a piece's health at its tier */
-export const hpOf = (kind: string, t: Tier) => (kind === 'claim' ? 300 : PIECES[kind].only !== undefined ? (PIECES[kind].only === 1 ? 800 : 1500) : TIER_HP[t]);
+export const hpOf = (kind: string, t: Tier) => PIECES[kind].hp ?? TIER_HP[t];
 
 /** the first tier a piece is laid at: a frame, or the one tier it comes in */
 export const laidAt = (kind: string): Tier => PIECES[kind].only ?? 0;

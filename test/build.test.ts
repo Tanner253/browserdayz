@@ -19,10 +19,11 @@ import { PROTOCOL, type S2C } from '../src/net/protocol';
 import type { ItemInstance } from '../src/sim/items';
 import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
-import { Bases, heard, said, type Land } from '../src/sim/build/bases';
+import { Bases, heard, heardPiece, said, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
+import { inTheWay, swept } from '../src/sim/build/doors';
 
 let n = 0;
 const failed: string[] = [];
@@ -61,7 +62,10 @@ ok('costs and health by tier, as the plan says; half pieces half; a foundation\'
   assert.deepEqual(costOf('wall_half', 1), { planks: 5, nails: 6 });
   assert.deepEqual(costOf('foundation', 0), { planks: 4, log: 2 });
   assert.deepEqual([0, 1, 2, 3].map((t) => hpOf('wall', t as Tier)), [60, 500, 1000, 2000]);
-  assert.equal(Object.keys(PIECES).filter((k) => PIECES[k].role !== 'deploy').length, 21);
+  // (plan v2: 22 pieces, less the ladder that is set down, and 12 fittings: the doors, the windows' and the gates)
+  const fitting = (k: string) => PIECES[k].role === 'fit' || k.startsWith('gate_');
+  assert.equal(Object.keys(PIECES).filter((k) => PIECES[k].role !== 'deploy' && !fitting(k)).length, 21);
+  assert.equal(Object.keys(PIECES).filter(fitting).length, 12);
 });
 
 console.log('Building: snapping');
@@ -317,6 +321,85 @@ ok('kept and read back with its claim: its members, what is owed, and what was i
   assert.deepEqual(again.claim?.kept, [{ id: 'planks', qty: 9 }]);
   // (and what a game is told has no store in it)
   assert.equal((said(b)[8] as unknown[]).length, 4);
+});
+
+console.log('Building: doors, fittings, boxes');
+/** a 1x1 with a doorway at +z and a window at -z, and its walls; a bench beside it when asked */
+const hut = (bench = false) => {
+  const bs = new Bases(flat), b = start(bs);
+  for (const [k, x, z] of [['doorway', 0, 1.5], ['window', 0, -1.5], ['wall', -1.5, 0], ['wall', 1.5, 0]] as const) at(bs, b, k, x, 1.5, z);
+  if (bench) {
+    at(bs, b, 'foundation', 3, 0, 0);
+    assert.ok(typeof bs.lay({ b: b.id, k: 'workbench', ...deployAt(b, 'workbench', { x: 3, y: 0, z: 0 })! }, ME, 0) !== 'string');
+  }
+  return { bs, b };
+};
+
+ok('a fitting hangs in an opening of its sort, one to an opening, either way round', () => {
+  const { bs, b } = hut();
+  assert.deepEqual(spots(b, 'door_wood').map((s) => [s.x, s.z]), [[0, 1.5]], 'a door goes in the doorway only');
+  assert.equal(spots(b, 'double_door_wood').length, 0, 'a double door needs a wall frame');
+  assert.deepEqual(spots(b, 'bars_wood').map((s) => [s.x, s.z]), [[0, -1.5]]);
+  const out = spots(b, 'door_wood', 0)[0], back = spots(b, 'door_wood', 1)[0];
+  assert.equal((back.r - out.r + 12) % 12, 6, 'R hangs it the other way round');
+  const d = at(bs, b, 'door_wood', 0, 1.2, 1.5);
+  assert.deepEqual(d.on, [2], 'it rests on its doorway');
+  assert.match(String(blocked(b, 'door_wood', { ...out, on: [2] })), /hung there already/);
+  // (taken down with its doorway)
+  assert.ok(bs.remove(b.id, 2).includes(d.id));
+});
+
+ok('the metal fittings need a workbench near; the wooden ones do not', () => {
+  const { bs, b } = hut();
+  const s = spots(b, 'door_metal')[0];
+  assert.match(String(bs.lay({ b: b.id, k: 'door_metal', ...s }, ME, 0)), /needs a workbench/);
+  assert.ok(typeof bs.lay({ b: b.id, k: 'bars_wood', ...spots(b, 'bars_wood')[0] }, ME, 0) !== 'string');
+  const h = hut(true);
+  assert.ok(typeof h.bs.lay({ b: h.b.id, k: 'door_metal', ...spots(h.b, 'door_metal')[0] }, ME, 0) !== 'string');
+  assert.deepEqual(costOf('door_metal', 3), { sheet_metal: 4, nails: 20 });
+  assert.deepEqual([hpOf('door_wood', 1), hpOf('door_metal', 3), hpOf('garage_door', 3)], [250, 500, 1000]);
+});
+
+ok('a door swings one way through where it sweeps, and not through a body there', () => {
+  const { bs, b } = hut();
+  const d = at(bs, b, 'door_wood', 0, 1.2, 1.5);
+  // (it swings out, to +z: a body just outside it is in the way, one inside or a step further out is not)
+  assert.ok(inTheWay(d, [{ x: 0, y: 0, z: 2.3 }]), 'a body in its swing');
+  assert.ok(!inTheWay(d, [{ x: 0, y: 0, z: 0.6 }]), 'a body behind it');
+  assert.ok(!inTheWay(d, [{ x: 0, y: 0, z: 3.4 }]), 'a body clear of it');
+  assert.ok(!inTheWay(d, [{ x: 0, y: 4, z: 2.3 }]), 'a body on the floor above');
+  const pts = swept(d);
+  assert.ok(pts.every(([, , z]) => z > 1.4), 'it never swings in');
+});
+
+ok('nothing is set down where a door swings, nor a door hung to swing into what is set down', () => {
+  const { bs, b } = hut();
+  // (hung to swing in, then a box where it would swing)
+  at(bs, b, 'door_wood', 0, 1.2, 1.5, 1);
+  const s = deployAt(b, 'box_small', { x: 0, y: 0, z: 0.75 })!;
+  assert.match(String(blocked(b, 'box_small', s)), /door swings there/);
+  assert.equal(blocked(b, 'box_small', deployAt(b, 'box_small', { x: -0.5, y: 0, z: -0.75 })!), null);
+  const h = hut();
+  assert.ok(typeof h.bs.lay({ b: h.b.id, k: 'box_large', ...deployAt(h.b, 'box_large', { x: 0, y: 0, z: 0.5 })! }, ME, 0) !== 'string');
+  assert.match(String(blocked(h.b, 'door_wood', { ...spots(h.b, 'door_wood', 1)[0], on: [2] })), /large box is where it swings/);
+  assert.equal(blocked(h.b, 'door_wood', { ...spots(h.b, 'door_wood', 0)[0], on: [2] }), null, 'swinging out, it is clear');
+});
+
+ok('a box picked up gives back all it cost; kept with what was in its store and whether its door stood open', () => {
+  const { bs, b } = hut();
+  const d = at(bs, b, 'door_wood', 0, 1.2, 1.5);
+  d.open = true;
+  const box = bs.lay({ b: b.id, k: 'box_small', ...deployAt(b, 'box_small', { x: -0.5, y: 0, z: -0.5 })! }, ME, 0);
+  assert.ok(typeof box !== 'string');
+  assert.deepEqual(bs.refund(b.id, box.piece.id), { planks: 12, nails: 8 });
+  assert.deepEqual(bs.refund(b.id, d.id), { planks: 6, nails: 4 }, 'a door is built: half back');
+  const kept = JSON.parse(JSON.stringify(bs.keep(undefined, (_b, p) => (p.k === 'box_small' ? [{ id: 'nails', qty: 3 }] : undefined))));
+  const again = heard(kept[0])!;
+  assert.equal(again.pieces.get(d.id)?.open, true);
+  assert.deepEqual(again.pieces.get(box.piece.id)?.kept, [{ id: 'nails', qty: 3 }]);
+  assert.equal(again.pieces.get(box.piece.id)?.on.length, 1, 'it rests on its foundation again');
+  // (and what a game is told has no store in it)
+  assert.ok(!JSON.stringify(said(b)).includes('"s"'));
 });
 
 if (process.argv.includes('--server')) await serverTest();
@@ -601,6 +684,60 @@ async function serverTest() {
     assert.ok(await me.until('bhp', (m) => m.b === B.id, 5000, since), 'it did not rot');
     assert.ok(await me.until('bout', (m) => m.b === B.id, 15000, since), 'nothing broke');
     console.log('  ok  run dry, its base rots, and what comes to nothing breaks');
+
+    // ---- doors: swung open and shut for everybody near; not through a body; knocked on
+    await me.give('planks', 20);
+    await me.give('nails', 20);
+    await me.give('log', 2);
+    // (a place out in the country, well clear of the bases before)
+    let free: [number, number] | null = null;
+    for (let r = 0; r < 600 && !free; r += 23) for (let q = 0; q < 6.28 && !free; q += 0.7) {
+      const x = sx + 150 + Math.cos(q) * r, z = sz + Math.sin(q) * r;
+      if (typeof new Bases(land).lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, ME, 0) !== 'string') free = [x, z];
+    }
+    assert.ok(free, 'no place for the door');
+    const [dx, dz] = free!;
+    await me.go(dx - 3, dz);
+    const sinceD = me.got.length;
+    me.send({ t: 'blay', k: 'foundation', x: dx, y: 0, z: dz, r: 0, yaw: 0, u: plan3.uid });
+    const toldD = await me.until('base', (m) => Math.hypot(m.b[1] - dx, m.b[3] - dz) < 1, 5000, sinceD);
+    assert.ok(toldD, `no base for the door: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const D = heard(toldD!.b)!;
+    const dwy = nearestSpot(spots(D, 'doorway'), 'doorway', { x: 0, y: 1.5, z: 1.5 })!;
+    me.send({ t: 'blay', k: 'doorway', b: D.id, ...dwy, u: plan3.uid });
+    const way = await me.until('bpc', (m) => m.b === D.id && PIECE_IDS[m.p[1]] === 'doorway', 4000, sinceD);
+    assert.ok(way, `no doorway: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const wp = heardPiece(way!.p)!;
+    D.pieces.set(wp.id, wp);
+    const ds = spots(D, 'door_wood', 0)[0];
+    me.send({ t: 'blay', k: 'door_wood', b: D.id, ...ds, u: plan3.uid });
+    const door = await me.until('bpc', (m) => m.b === D.id && PIECE_IDS[m.p[1]] === 'door_wood', 4000, sinceD);
+    assert.ok(door, `no door: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const P = door!.p[0];
+    // (standing a step out from it, clear of its swing, both of them; it opens for both)
+    const stand = async (who: Player, x: number, z: number) => {
+      who.pos = [D.ox + x, D.oy, D.oz + z];
+      who.hold(who.held);
+      await sleep(120);
+    };
+    await them.go(dx + 3, dz + 3);
+    await stand(me, 0, 3.4);
+    await stand(them, 2.2, 3.4);
+    me.send({ t: 'bdoor', b: D.id, p: P, open: true });
+    assert.ok(await me.until('bdoor', (m) => m.b === D.id && m.p === P && m.o === 1, 3000, sinceD), `it did not open: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    assert.ok(await them.until('bdoor', (m) => m.b === D.id && m.p === P && m.o === 1, 3000), 'the other was not told it opened');
+    // (the other steps into its swing: it will not shut on them; they step out, and it shuts)
+    await sleep(500);
+    await stand(them, 0.2, 2.2);
+    me.send({ t: 'bdoor', b: D.id, p: P, open: false });
+    assert.ok(await me.until('tell', (m) => /in the way/.test(m.text), 3000, sinceD), 'it shut on somebody');
+    await stand(them, 2.2, 3.4);
+    me.send({ t: 'bdoor', b: D.id, p: P, open: false });
+    assert.ok(await me.until('bdoor', (m) => m.b === D.id && m.p === P && m.o === 0, 3000, sinceD), 'it did not shut');
+    // (a knock on it is heard by whoever is near)
+    them.send({ t: 'bknock', b: D.id, p: P });
+    assert.ok(await me.until('knock', () => true, 3000, sinceD), 'the knock was not heard');
+    console.log('  ok  a door opens and shuts for everybody near, will not shut on somebody in its swing, and a knock on it is heard');
   } catch (e) {
     fail = e;
   } finally {

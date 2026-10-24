@@ -2,7 +2,7 @@
 // (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. The rules
 // of where a piece goes are src/sim/build/snap.ts; what it is and costs, src/sim/build/pieces.ts.
 
-import { FOUND, PIECES, PIECE_IDS, costOf, hpOf, laidAt, type Tier } from './pieces';
+import { BENCH_NEAR, FOUND, PIECES, PIECE_IDS, costOf, hpOf, laidAt, type Tier } from './pieces';
 import { blocked, cornersOf, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
 import { ROT } from './upkeep';
 
@@ -115,6 +115,7 @@ export class Bases {
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
     if (theirs && !theirs.claim!.members.some((m) => m.pid === by)) return "Building blocked: someone else's claim";
+    if (K.bench && !this.benchNear(wx, wz)) return `It needs a workbench within ${BENCH_NEAR} m`;
     if (ask.k === 'claim') {
       if (base.claim) return 'This base has its claim already';
       if ([...this.bases.values()].filter((b) => b.claim?.members[0]?.pid === by).length >= LIMITS.claims) return 'You hold a claim already: one a player';
@@ -138,6 +139,18 @@ export class Bases {
       }
     }
     return null;
+  }
+
+  /** whether a workbench stands near a place (what a metal fitting is made at) */
+  benchNear(x: number, z: number) {
+    for (const b of this.bases.values()) {
+      for (const p of b.pieces.values()) {
+        if (p.k !== 'workbench') continue;
+        const [px, , pz] = toWorld(b, p.x, p.y, p.z);
+        if (Math.hypot(px - x, pz - z) < BENCH_NEAR) return true;
+      }
+    }
+    return false;
   }
 
   /** whether a player may work a base with the hammer: on its claim, or, with none, its first builder */
@@ -220,6 +233,8 @@ export class Bases {
     };
     add(costOf(p.k, laidAt(p.k)));
     if (p.t !== laidAt(p.k)) add(costOf(p.k, p.t));
+    // (a box or a bench is picked up whole, Rust's way: only what is built is half lost)
+    if (PIECES[p.k].role === 'deploy' && p.k !== 'claim') return out;
     for (const k of Object.keys(out)) out[k] = Math.floor(out[k] / 2);
     for (const k of Object.keys(out)) if (!out[k]) delete out[k];
     return out;
@@ -227,9 +242,9 @@ export class Bases {
 
   // ---- kept
 
-  /** every base, as short as it can be said, with what is in each claim's store (`stock`): what the save keeps */
-  keep(stock?: (b: Base) => unknown[]): KeptBase[] {
-    return [...this.bases.values()].map((b) => said(b, stock?.(b)));
+  /** every base, as short as it can be said, with what is in each claim's store (`stock`) and each box's (`held`): what the save keeps */
+  keep(stock?: (b: Base) => unknown[], held?: (b: Base, p: Piece) => unknown[] | undefined): KeptBase[] {
+    return [...this.bases.values()].map((b) => said(b, stock?.(b), held));
   }
 
   /** read back (the save's, or what the server says): every piece's rests worked out again from where it stands */
@@ -247,12 +262,17 @@ export class Bases {
 export type KeptBase = [number, number, number, number, number, string, number, KeptPiece[], KeptClaim?];
 /** a claim: [its piece, its members [public id, name], what is owed over, dry, what is in its store (the save's only, never a game's)] */
 export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, unknown[]?];
-/** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s)] */
-export type KeptPiece = [number, number, number, number, number, number, number, number, number];
+/** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s), and what more there is of it] */
+export type KeptPiece = [number, number, number, number, number, number, number, number, number, KeptMore?];
+/** what more there is of a piece: `o` it stands open; `s` what is in its store (the save's only, never a game's) */
+export interface KeptMore {
+  o?: 1;
+  s?: unknown[];
+}
 
 const cm = (v: number) => Math.round(v * 100);
-export function said(b: Base, stock?: unknown[]): KeptBase {
-  const k: KeptBase = [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map(saidPiece)];
+export function said(b: Base, stock?: unknown[], held?: (b: Base, p: Piece) => unknown[] | undefined): KeptBase {
+  const k: KeptBase = [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map((p) => saidPiece(p, held?.(b, p)))];
   if (b.claim) k.push(saidClaim(b.claim, stock));
   return k;
 }
@@ -264,7 +284,11 @@ export function heardClaim(k: unknown): Claim | undefined {
   for (const [id, n] of Object.entries((k[2] ?? {}) as Record<string, unknown>)) if (Number.isFinite(n)) due[id] = Number(n);
   return { p: k[0] as number, members, due, dry: !!k[3], ...(Array.isArray(k[4]) ? { kept: k[4] as unknown[] } : {}) };
 }
-export const saidPiece = (p: Piece): KeptPiece => [p.id, PIECE_IDS.indexOf(p.k), p.t, cm(p.x), cm(p.y), cm(p.z), p.r, Math.round(p.hp), Math.round(p.at / 1000)];
+export function saidPiece(p: Piece, store?: unknown[]): KeptPiece {
+  const k: KeptPiece = [p.id, PIECE_IDS.indexOf(p.k), p.t, cm(p.x), cm(p.y), cm(p.z), p.r, Math.round(p.hp), Math.round(p.at / 1000)];
+  if (p.open || store?.length) k.push({ ...(p.open ? { o: 1 as const } : {}), ...(store?.length ? { s: store } : {}) });
+  return k;
+}
 
 /** a base read back from what it was said as; null if it is not one */
 export function heard(k: KeptBase): Base | null {
@@ -284,9 +308,15 @@ export function heard(k: KeptBase): Base | null {
 }
 
 export function heardPiece(q: KeptPiece, by = ''): Piece | null {
-  if (!Array.isArray(q) || q.length !== 9 || !q.every(Number.isFinite)) return null;
-  const k = PIECE_IDS[q[1]];
+  if (!Array.isArray(q) || (q.length !== 9 && q.length !== 10) || !q.slice(0, 9).every(Number.isFinite)) return null;
+  const k = PIECE_IDS[q[1] as number];
   if (!k) return null;
   const t = Math.max(0, Math.min(3, Math.round(q[2]))) as Tier;
-  return { id: q[0], k, t, x: q[3] / 100, y: q[4] / 100, z: q[5] / 100, r: ((Math.round(q[6]) % 12) + 12) % 12, hp: Math.max(1, Math.min(hpOf(k, t), q[7])), at: q[8] * 1000, by, on: [] };
+  const p: Piece = { id: q[0], k, t, x: q[3] / 100, y: q[4] / 100, z: q[5] / 100, r: ((Math.round(q[6]) % 12) + 12) % 12, hp: Math.max(1, Math.min(hpOf(k, t), q[7])), at: q[8] * 1000, by, on: [] };
+  const more = q[9];
+  if (more && typeof more === 'object') {
+    if (more.o === 1) p.open = true;
+    if (Array.isArray(more.s)) p.kept = more.s;
+  }
+  return p;
 }

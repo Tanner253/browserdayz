@@ -68,7 +68,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
 // (64, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
-// `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item).)
+// `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
+// 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock').)
 export const PROTOCOL = 64;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -339,6 +340,9 @@ export type C2S =
   | { t: 'bdel'; b: number; p: number; u: string }
   /** joining a base's claim, or leaving it (stood at it) */
   | { t: 'bjoin'; b: number }
+  /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
+  | { t: 'bdoor'; b: number; p: number; open: boolean }
+  | { t: 'bknock'; b: number; p: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -435,6 +439,9 @@ export type S2C =
   | { t: 'bkeep'; b: number; s: number; dry: boolean; day: [string, number][] }
   /** the server's word on the hammer begun at a piece */
   | { t: 'bup'; b: number; p: number; ok: boolean; why?: string }
+  /** a base's door swung open or shut (by player `by`), and a knock on one, heard where it is */
+  | { t: 'bdoor'; b: number; p: number; o: 0 | 1; by: number }
+  | { t: 'knock'; x: number; y: number; z: number; metal: boolean }
   /** materials the server took for what was built (`n` its number, said back in 'me' `sp` once they are out of the pockets) */
   | { t: 'spent'; n: number; items: [string, number][] }
   /** a fire built by somebody (numbered after the map's own), and one cleared away */

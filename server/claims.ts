@@ -13,6 +13,7 @@ import { boxes, economy, log } from './index';
 import { tellOpeners } from './searched';
 import { bases, known, tellBase } from './build';
 import { pidOf } from './acts';
+import { spillBoxes } from './boxes';
 
 /** a claim's store: so many places across and down */
 export const STORE = { w: 6, h: 4 };
@@ -117,6 +118,7 @@ export function upkeep(now = Date.now(), minutes = 1) {
       const claimed = b.claim?.p;
       const gone = all.remove(b.id, id);
       if (claimed !== undefined && gone.includes(claimed)) spill(b.id);
+      spillBoxes(b.id, gone);
       if (gone.length) tellBase(b.id, { t: 'bout', b: b.id, ids: gone });
     }
   }

@@ -9,7 +9,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../../core/assets';
 import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES, type Tier } from '../../sim/build/pieces';
-import { shapeOf, type Solid } from '../../sim/build/solids';
+import { shapeOf, shutOf, type Solid } from '../../sim/build/solids';
+import { leafPoint } from '../../sim/build/doors';
 
 /** metres of a piece to one picture of each tier's paint */
 const TILE = [3, 1.6, 2, 1.5];
@@ -92,6 +93,58 @@ export function geometryOf(kind: string, t: Tier, dress = true): THREE.BufferGeo
     g.computeBoundingSphere();
     geos.set(key, g);
   }
+  return g;
+}
+
+/** a merge of solids, as one shape drawn with one paint */
+function merged(list: Solid[], tile: number): THREE.BufferGeometry {
+  const g = mergeGeometries(list.map((q) => {
+    const x = solidGeo(q, tile);
+    for (const name of Object.keys(x.attributes)) if (!['position', 'normal', 'uv'].includes(name)) x.deleteAttribute(name);
+    return x;
+  }), false)!;
+  g.computeBoundingSphere();
+  return g;
+}
+
+/** a leaf of a kind (its `i`th), in its hinge's own frame, its pictures laid on for a tier */
+export function leafGeometry(kind: string, i: number, t: Tier): THREE.BufferGeometry {
+  const key = `${kind}:L${i}:${t}`;
+  let g = geos.get(key);
+  if (!g) {
+    const l = shapeOf(kind).leaves![i];
+    geos.set(key, (g = merged([...l.solid, ...(l.dress ?? [])], TILE[t])));
+  }
+  return g;
+}
+
+/**
+ * The ghost of a kind: all of it as it stands shut, and, for what swings sideways, the arc its leaves sweep drawn on the
+ * floor (plan v2: "A door swings one way, set when it is hung: R flips it, the arc is drawn on the floor in the ghost").
+ */
+export function ghostGeometry(kind: string): THREE.BufferGeometry {
+  const key = `${kind}:ghost`;
+  let g = geos.get(key);
+  if (g) return g;
+  const parts = [merged(shutOf(kind, false), 1)];
+  for (const l of shapeOf(kind).leaves ?? []) {
+    if (l.axis !== 'y' || l.hinge[1] > 0.5 || !('box' in l.solid[0])) continue;
+    const [cx, , , sx] = l.solid[0].box, far = cx + Math.sign(cx) * sx / 2, near = far * 0.8, pos: number[] = [];
+    const at = (a: number, x: number) => leafPoint(l, a, [x, 0.03 - l.hinge[1], 0]);
+    for (let k = 0; k < 16; k++) {
+      const a0 = (l.open * k) / 16, a1 = (l.open * (k + 1)) / 16;
+      const [p, q, r, s] = [at(a0, near), at(a0, far), at(a1, far), at(a1, near)];
+      pos.push(...p, ...q, ...r, ...p, ...r, ...s);
+    }
+    const arc = new THREE.BufferGeometry();
+    arc.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    arc.setAttribute('normal', new THREE.Float32BufferAttribute(pos.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    arc.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0), 2));
+    parts.push(arc);
+  }
+  g = mergeGeometries(parts, false)!;
+  g.computeBoundingSphere();
+  geos.set(key, g);
   return g;
 }
 

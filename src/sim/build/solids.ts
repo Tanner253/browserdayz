@@ -18,6 +18,22 @@ export interface Shape {
   solid: Solid[];
   /** drawn, and stops nothing (a foundation's posts into the ground, a high wall's sharpened tops) */
   dress?: Solid[];
+  /** what swings (a door's leaves, a gate's, a hatch's lid, shutters) */
+  leaves?: Leaf[];
+}
+
+/**
+ * A part that swings on a hinge, solid at every angle (the owner: "doors that swing open 1 way with collision"). Its
+ * solids are in the hinge's own frame, hung shut; it turns about the hinge's line (`axis`) by `open` radians to stand
+ * open, the sign saying which way. `paint`: a tier of its own to be drawn in (a stone gate's leaves are metal).
+ */
+export interface Leaf {
+  hinge: [number, number, number];
+  axis: 'x' | 'y';
+  open: number;
+  solid: Solid[];
+  dress?: Solid[];
+  paint?: 0 | 1 | 2 | 3;
 }
 
 const H = CELL / 2;
@@ -94,7 +110,81 @@ const SHAPES: Record<string, () => Shape> = {
   high_wall_stone: () => ({ solid: [box(-H, 0, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
   // (the claim: its upkeep box, and over it a pole with the flag of whoever holds it)
   claim: () => ({ solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], dress: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] }),
+  // ---- fittings: each swings out to its piece's +z, which R turns about
+  // (a leaf a metre wide in the doorway, hung on its -x jamb; braced on the inside, its handle both sides)
+  door_wood: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, true)] }),
+  door_metal: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, false)] }),
+  double_door_wood: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, true), door(1.2, 1.2, 2.6, true)] }),
+  double_door_metal: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, false), door(1.2, 1.2, 2.6, false)] }),
+  // (one panel hung from the opening's head, that tips up and in to lie under the ceiling: an up-and-over door)
+  garage_door: () => ({
+    solid: [],
+    leaves: [{ hinge: [0, 2.6, 0], axis: 'x', open: Math.PI / 2, solid: [box(-1.18, -2.58, -0.05, 1.18, -0.02, 0.05)], dress: [0, 1, 2, 3, 4].map((i) => box(-1.15, -2.45 + i * 0.5, -0.09, 1.15, -2.37 + i * 0.5, -0.05)) }],
+  }),
+  // (a lid in the floor frame's hole, hinged at its -z side, that lifts to stand up past upright)
+  hatch: () => ({ solid: [], leaves: [{ hinge: [0, 0, -0.7], axis: 'x', open: -1.75, solid: [box(-0.68, -0.08, 0.02, 0.68, 0, 1.38)], dress: [box(-0.06, 0, 1.1, 0.06, 0.04, 1.3)] }] }),
+  // (two leaves on the wall's outside face, folded back flat against it when open)
+  shutters: () => ({
+    solid: [],
+    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 0.6, 1.1, WALL_T / 2 + 0.03], axis: 'y', open: s * 3.05, solid: [box(Math.min(0, -s * 0.59), 0.01, -0.03, Math.max(0, -s * 0.59), 0.99, 0.03)], dress: [0.25, 0.75].map((y) => box(Math.min(-s * 0.05, -s * 0.55), y - 0.05, 0.03, Math.max(-s * 0.05, -s * 0.55), y + 0.05, 0.06)) })),
+  }),
+  bars_wood: () => ({ solid: bars(6, 0.07, 0.035) }),
+  bars_metal: () => ({ solid: bars(8, 0.035, 0.02) }),
+  // (a plate over the window with a slit to see and shoot through, 0.6 m by 0.15)
+  embrasure: () => ({ solid: [box(-0.6, 1.1, -0.04, 0.6, 1.5, 0.04), box(-0.6, 1.65, -0.04, 0.6, 2.1, 0.04), box(-0.6, 1.5, -0.04, -0.3, 1.65, 0.04), box(0.3, 1.5, -0.04, 0.6, 1.65, 0.04)] }),
+  // (a gate the length of a high wall: its posts and head, and two leaves 1.2 m wide and 5.1 high)
+  gate_wood: () => ({
+    solid: [box(-1.5, 0, -0.3, -1.2, 6, 0.3), box(1.2, 0, -0.3, 1.5, 6, 0.3), box(-1.2, 5.25, -0.25, 1.2, 6, 0.25)],
+    dress: [-1.35, 1.35].map((x) => ({ hull: [[x - 0.15, 6, -0.3], [x + 0.15, 6, -0.3], [x - 0.15, 6, 0.3], [x + 0.15, 6, 0.3], [x, 6.6, 0]] as [number, number, number][] })),
+    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.2, 0, 0], axis: 'y', open: s * 1.75, solid: [box(Math.min(0, -s * 1.19), 0.08, -0.1, Math.max(0, -s * 1.19), 5.2, 0.1)] })),
+  }),
+  gate_stone: () => ({
+    solid: [box(-1.5, 0, -0.45, -1.15, 6, 0.45), box(1.15, 0, -0.45, 1.5, 6, 0.45), box(-1.15, 5.25, -0.4, 1.15, 6.25, 0.4)],
+    leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.15, 0, 0], axis: 'y', open: s * 1.75, paint: 3, solid: [box(Math.min(0, -s * 1.14), 0.08, -0.06, Math.max(0, -s * 1.14), 5.2, 0.06)] })),
+  }),
+  // ---- set down
+  box_small: () => ({ solid: [box(-0.4, 0, -0.28, 0.4, 0.5, 0.28)], dress: [box(-0.42, 0.5, -0.3, 0.42, 0.56, 0.3)] }),
+  box_large: () => ({ solid: [box(-0.7, 0, -0.42, 0.7, 0.75, 0.42)], dress: [box(-0.72, 0.75, -0.44, 0.72, 0.82, 0.44), box(-0.74, 0.1, -0.44, -0.7, 0.65, 0.44), box(0.7, 0.1, -0.44, 0.74, 0.65, 0.44)] }),
+  // (a heavy table: its top, its four legs and a shelf between them)
+  workbench: () => ({
+    solid: [box(-0.85, 0.82, -0.45, 0.85, 0.94, 0.45), box(-0.8, 0.15, -0.4, 0.8, 0.22, 0.4), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.78 - 0.05, 0, sz * 0.38 - 0.05, sx * 0.78 + 0.05, 0.82, sz * 0.38 + 0.05)))],
+    dress: [box(0.45, 0.94, -0.42, 0.7, 1.12, -0.24), box(-0.8, 0.94, 0.38, 0.8, 1.4, 0.44)],
+  }),
 };
+
+/** a door's leaf hung on a jamb at x = `at` (it reaches toward the opening's middle), `w` wide and `h` high, out to +z */
+function door(at: number, w: number, h: number, wood: boolean): Leaf {
+  const s = at < 0 ? 1 : -1, x0 = Math.min(0, s * (w - 0.02)), x1 = Math.max(0, s * (w - 0.02));
+  const handle = (z: number) => box(s * (w - 0.16) - 0.03, h * 0.45 - 0.03, z - 0.03, s * (w - 0.16) + 0.03, h * 0.45 + 0.03, z + 0.03);
+  // (a wooden one's two ledges, both faces, so that it reads as a door in a wall of the same boards; a metal one's
+  // frame round its sheet)
+  const inside = wood ? [-1, 1].flatMap((f) => [box(x0 + 0.05, 0.35, Math.min(f * 0.04, f * 0.08), x1 - 0.05, 0.47, Math.max(f * 0.04, f * 0.08)), box(x0 + 0.05, h - 0.55, Math.min(f * 0.04, f * 0.08), x1 - 0.05, h - 0.43, Math.max(f * 0.04, f * 0.08))]) : [box(x0 + 0.02, 0.04, -0.07, x1 - 0.02, 0.12, -0.04), box(x0 + 0.02, h - 0.14, -0.07, x1 - 0.02, h - 0.06, -0.04)];
+  // (a pair opens a little short of square, clear of a wall meeting the frame at the corner)
+  return { hinge: [at, 0, 0], axis: 'y', open: s * -(w > 1.1 ? 1.62 : 1.75), solid: [box(x0, 0.02, -0.04, x1, h - 0.02, 0.04)], dress: [...inside, handle(0.08), handle(-0.11)] };
+}
+
+/** `n` bars across the window, each `t` square, held by a rail top and bottom of `rail` deep */
+function bars(n: number, t: number, rail: number): Solid[] {
+  const out: Solid[] = [box(-0.6, 1.1, -rail, 0.6, 1.18, rail), box(-0.6, 2.02, -rail, 0.6, 2.1, rail)];
+  for (let i = 0; i < n; i++) {
+    const x = -0.6 + (1.2 * (i + 0.5)) / n;
+    out.push(box(x - t / 2, 1.18, -t / 2, x + t / 2, 2.02, t / 2));
+  }
+  return out;
+}
+
+/** a solid moved by a step (a leaf's, hung shut, into its piece's frame) */
+export function moved(s: Solid, [dx, dy, dz]: [number, number, number]): Solid {
+  if ('box' in s) return { box: [s.box[0] + dx, s.box[1] + dy, s.box[2] + dz, s.box[3], s.box[4], s.box[5]] };
+  if ('prism' in s) return { prism: s.prism.map(([x, z]) => [x + dx, z + dz]), y0: s.y0 + dy, y1: s.y1 + dy };
+  return { hull: s.hull.map(([x, y, z]) => [x + dx, y + dy, z + dz]) };
+}
+
+/** everything of a piece as it stands shut, in its own frame: what it is, what dresses it, and its leaves hung shut */
+export function shutOf(kind: string, dress = true): Solid[] {
+  const s = shapeOf(kind);
+  return [...s.solid, ...(dress ? (s.dress ?? []) : []), ...(s.leaves ?? []).flatMap((l) => [...l.solid, ...(dress ? (l.dress ?? []) : [])].map((q) => moved(q, l.hinge)))];
+}
 
 const made = new Map<string, Shape>();
 /** a piece's solids */

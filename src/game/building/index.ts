@@ -28,8 +28,10 @@ import { BaseDraw, PieceRef } from './draw';
 import { ClaimView } from './claims';
 import { publicId } from '../../net/client';
 import type { Stash } from '../loot';
-import { geometryOf } from './look';
-import { CATS, HAMMER_WHEEL, PER, RINGS, hammerEntries, outerOf, piecesOf, planEntries } from './wheel';
+import { ghostGeometry } from './look';
+import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, hammerEntries, outerOf, piecesOf, planEntries } from './wheel';
+import { DoorView } from './doors';
+import { BoxView } from './boxes';
 
 export interface BuildHost {
   scene: THREE.Scene;
@@ -86,13 +88,15 @@ export class Building {
   /** the ghost: one for each kind, its paint pale blue or red */
   private ghost: THREE.Mesh | null = null;
   private ghostKind = '';
-  private ok = new THREE.MeshBasicMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0.34, depthWrite: false });
-  private bad = new THREE.MeshBasicMaterial({ color: 0xee7a6e, transparent: true, opacity: 0.34, depthWrite: false });
+  private ok = new THREE.MeshBasicMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide });
+  private bad = new THREE.MeshBasicMaterial({ color: 0xee7a6e, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide });
   /** spots worked out for a base, kept until it or the choice changes */
   private cache: { key: string; list: Spot[] } | null = null;
   private versions = new Map<number, number>();
   /** the last 'spent' taken out of the pockets (said back to the server in 'me') */
   sp = 0;
+  /** the plan's wheel and the hammer's, and whichever was opened last */
+  private wheels: { plan: Radial; hammer: Radial };
   private wheel: Radial;
   private wheelFor: 'plan' | 'hammer' | null = null;
   private wheelAt = new THREE.Vector2();
@@ -114,7 +118,11 @@ export class Building {
     this.seen = new Bases(land);
     this.draw = new BaseDraw(h.scene, h.atmo);
     this.claims = new ClaimView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, who: () => this.me, name: h.name, open: h.open, hud: h.hud, broke: (b, ids) => this.draw.remove(b.id, ids), changed: (b) => this.bump(b.id) }, () => this.store);
-    this.wheel = new Radial({ rings: RINGS, per: PER, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
+    const wheel = (per: number) => new Radial({ rings: RINGS, per, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
+    this.wheels = { plan: wheel(PER), hammer: wheel(HAMMER_PER) };
+    this.wheel = this.wheels.plan;
+    this.boxes = new BoxView(h.input, h.open);
+    this.doors = new DoorView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, camera: h.camera }, () => this.store, this.draw);
   }
 
   private get store() {
@@ -131,6 +139,16 @@ export class Building {
   }
   /** claims: their stores, joining, the chip at the top (src/game/building/claims.ts) */
   readonly claims: ClaimView;
+  /** doors, hatches, shutters and gates: F swings them (src/game/building/doors.ts) */
+  readonly doors: DoorView;
+  /** boxes: F opens their stores (src/game/building/boxes.ts) */
+  readonly boxes: BoxView;
+
+  /** a base's stores (its claim's, its boxes') as it now stands */
+  private synced(b: Base) {
+    this.claims.sync(b);
+    this.boxes.sync(b);
+  }
 
   // ---- every frame
 
@@ -144,9 +162,13 @@ export class Building {
     if (plan && !this.wheel.isOpen) this.planFrame(held!);
     else this.hideGhost();
     if (hammer && !this.wheel.isOpen) this.hammerFrame(held!);
-    // (a claim looked at: F opens its store, held it joins: whatever is in the hands)
-    const claim = this.claims.frame(dt, ok && !this.wheel.isOpen && !this.h.busy(), ok ? this.target() : null);
+    // (a claim looked at: F opens its store, held it joins; a door: F swings it. Whatever is in the hands, though the
+    // plan's and the hammer's cards say more of what is looked at than that)
+    const free = ok && !this.wheel.isOpen && !this.h.busy(), t = ok ? this.target() : null;
+    const claim = this.claims.frame(dt, free, t);
     if (claim) this.prompt = claim;
+    const door = this.doors.frame(free, t) ?? this.boxes.frame(free, t);
+    if (door && !plan && !hammer) this.prompt = door;
     // (while the hands are at it, the ring round the crosshair says what they are doing: the card stands aside)
     if (this.h.busy()) this.prompt = null;
   }
@@ -238,7 +260,7 @@ export class Building {
     for (const [id, n] of Object.entries(costOf(ask.k, laidAt(ask.k)))) this.h.take(id, n);
     this.bump(r.base.id);
     this.draw.put(r.base, r.piece);
-    this.claims.sync(r.base);
+    this.synced(r.base);
     this.h.changed();
   }
 
@@ -261,7 +283,7 @@ export class Building {
   private placeGhost(x: number, y: number, z: number, yaw: number, good: boolean) {
     if (!this.ghost || this.ghostKind !== this.kind) {
       this.hideGhost();
-      this.ghost = new THREE.Mesh(geometryOf(this.kind, 0, false), good ? this.ok : this.bad);
+      this.ghost = new THREE.Mesh(ghostGeometry(this.kind), good ? this.ok : this.bad);
       this.ghost.renderOrder = 5;
       this.ghostKind = this.kind;
       this.h.scene.add(this.ghost);
@@ -329,13 +351,15 @@ export class Building {
   private takeDown(hammer: ItemInstance, base: Base, id: number) {
     const p = base.pieces.get(id);
     if (!p) return;
+    if (this.boxes.byCid(`bbox:${base.id}:${id}`)?.container.serialize().items.length) return void this.h.note('Empty it first', 'warn');
     const still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
-    this.h.begin(`Taking the ${PIECES[p.k].name.toLowerCase()} down`, 2, still, () => {
+    const up = PIECES[p.k].role === 'deploy' && p.k !== 'claim';
+    this.h.begin(up ? `Picking the ${PIECES[p.k].name.toLowerCase()} up` : `Taking the ${PIECES[p.k].name.toLowerCase()} down`, 2, still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bdel', b: base.id, p: id, u: hammer.uid });
       const back = this.local.refund(base.id, id), gone = this.local.remove(base.id, id);
       this.draw.remove(base.id, gone);
-      this.claims.sync(base);
+      this.synced(base);
       this.bump(base.id);
       const items = Object.entries(back).map(([k, n]) => makeItem(k, n));
       if (items.length) this.h.give(items, Object.entries(back).map(([k, n]) => `${n} ${ITEMS[k].name}`).join(', '));
@@ -347,6 +371,7 @@ export class Building {
   // ---- the wheels
 
   private openWheel(what: 'plan' | 'hammer') {
+    this.wheel = this.wheels[what];
     if (!this.wheel.el.parentElement) this.h.hud().appendChild(this.wheel.el);
     this.wheelFor = what;
     this.wheelAt.set(0, 0);
@@ -369,7 +394,8 @@ export class Building {
     at.x += input.mouseDX / RING.reach;
     at.y += input.mouseDY / RING.reach;
     if (at.length() > 1) at.normalize();
-    const far = at.length(), k = ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * PER) % PER) + PER) % PER;
+    const per = this.wheelFor === 'plan' ? PER : HAMMER_PER;
+    const far = at.length(), k = ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * per) % per) + per) % per;
     let pick = -1;
     if (this.wheelFor === 'plan') {
       if (far > RING.outer) pick = outerOf(this.wheelCat)[k] ? PER + k : -1;
@@ -454,13 +480,14 @@ export class Building {
     if (!b) return;
     this.seen.bases.set(b.id, b);
     this.draw.setBase(b);
-    this.claims.sync(b);
+    this.synced(b);
     this.bump(b.id);
   }
   onGone(m: Extract<S2C, { t: 'bgone' }>) {
     this.seen.bases.delete(m.b);
     this.draw.forget(m.b);
     this.claims.forget(m.b);
+    this.boxes.forget(m.b);
   }
   onPiece(m: Extract<S2C, { t: 'bpc' }>) {
     const b = this.seen.bases.get(m.b), p = heardPiece(m.p);
@@ -470,7 +497,7 @@ export class Building {
     p.on = restsOn(b, p.k, p).filter((id) => id !== p.id);
     b.next = Math.max(b.next, p.id + 1);
     this.draw.put(b, p);
-    this.claims.sync(b);
+    this.synced(b);
     this.bump(b.id);
   }
   onOut(m: Extract<S2C, { t: 'bout' }>) {
@@ -479,7 +506,7 @@ export class Building {
     for (const id of m.ids) b.pieces.delete(id);
     for (const p of b.pieces.values()) p.on = p.on.filter((q) => !m.ids.includes(q));
     this.draw.remove(m.b, m.ids);
-    this.claims.sync(b);
+    this.synced(b);
     if (!b.pieces.size) this.seen.bases.delete(m.b);
     this.bump(m.b);
   }
@@ -516,9 +543,10 @@ export class Building {
     this.sp = 0;
     this.draw.clear();
     this.claims.clear();
+    this.boxes.clear();
     if (!this.h.online()) for (const b of this.local.bases.values()) {
       this.draw.setBase(b);
-      this.claims.sync(b);
+      this.synced(b);
     }
   }
 

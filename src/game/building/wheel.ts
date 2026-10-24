@@ -8,8 +8,9 @@ import { PIECES, TIERS, type Cat, type Tier } from '../../sim/build/pieces';
 import type { Piece } from '../../sim/build/snap';
 import { TIER_INK, actionIcon, pieceIcon } from './icons';
 
-export const PER = 8;
-export const CANCEL = 4;
+/** the plan's wheel: ten wedges to a ring, its bottom one (the sixth) Cancel */
+export const PER = 10;
+export const CANCEL = 5;
 export const RINGS: RadialRing[] = [{ r0: 46, r1: 120, text: 84 }, { r0: 126, r1: 200, text: 163 }];
 /** the groups round the inside ring, its bottom Cancel */
 export const CATS: { cat: Cat | null; label: string; icon: string }[] = [
@@ -17,12 +18,15 @@ export const CATS: { cat: Cat | null; label: string; icon: string }[] = [
   { cat: 'walls', label: 'Walls', icon: 'wall' },
   { cat: 'floors', label: 'Floors', icon: 'floor' },
   { cat: 'stairs', label: 'Stairs', icon: 'stairs_u' },
-  { cat: null, label: 'Cancel', icon: '' },
   { cat: 'roofs', label: 'Roofs', icon: 'roof' },
+  { cat: null, label: 'Cancel', icon: '' },
+  { cat: 'doors', label: 'Doors', icon: 'door_wood' },
+  { cat: 'windows', label: 'Windows', icon: 'bars_wood' },
   { cat: 'outside', label: 'Outside', icon: 'high_wall_wood' },
   { cat: 'deploy', label: 'Set down', icon: 'claim' },
 ];
-/** what each wedge of the hammer's wheel does (its bottom Cancel) */
+/** the hammer's wheel: eight wedges, its bottom one Cancel; what each does */
+export const HAMMER_PER = 8;
 export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'repair', 'cancel', 'remove', 'rotate', ''] as const;
 
 export const piecesOf = (cat: Cat | null) => Object.values(PIECES).filter((k) => k.cat === cat);
@@ -49,7 +53,7 @@ const iconOf = (id: string) => {
 /** the plan's wheel with group `cat` open and `kind` the piece chosen */
 export function planEntries(cat: number, kind: string): RadialEntry[] {
   const inner: RadialEntry[] = CATS.map((c, i) => (c.cat ? { id: `cat:${i}`, label: c.label, icon: iconOf(c.icon), mark: i === cat ? 'held' : undefined } : c.label ? { id: 'cancel', label: 'Cancel', icon: actionIcon('cancel') } : { id: 'none', label: '', mark: 'dim' }));
-  const outer: RadialEntry[] = outerOf(cat).map((id) => (id ? { id, label: PIECES[id].name.replace(/ (Foundation|Floor|Stairs)$/, ''), icon: iconOf(id), mark: id === kind ? 'held' : undefined } : { id: 'none', label: '', mark: 'gap' }));
+  const outer: RadialEntry[] = outerOf(cat).map((id) => (id ? { id, label: PIECES[id].name.replace(/ (Foundation|Floor|Stairs)$/, '').replace(/^(Wooden|High) /, ''), icon: iconOf(id), mark: id === kind ? 'held' : undefined } : { id: 'none', label: '', mark: 'gap' }));
   return [...inner, ...outer];
 }
 

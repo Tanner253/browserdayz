@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
-import { shapeOf, type Solid } from '../../sim/build/solids';
+import { shutOf, type Solid } from '../../sim/build/solids';
 
 const YAW = 0.55, PITCH = 0.5;
 const V = new THREE.Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
@@ -40,8 +40,7 @@ const shade = (hex: string, k: number) => `rgb(${[1, 3, 5].map((i) => Math.min(2
 
 /** a piece drawn as an SVG picture (a data URL), in the colour of a tier */
 export function pieceIcon(kind: string, ink = TIER_INK[1]): string {
-  const s = shapeOf(kind);
-  const solids = [...s.solid, ...(s.dress ?? [])];
+  const solids = shutOf(kind);
   const cy = Math.cos(YAW), sy = Math.sin(YAW), cp = Math.cos(PITCH), sp = Math.sin(PITCH);
   const P = (p: THREE.Vector3) => [(p.x * cy - p.z * sy) * 20, ((p.x * sy + p.z * cy) * sp - p.y * cp) * 20];
   const drawn: { d: number; pts: number[][]; k: number }[] = [];

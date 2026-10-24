@@ -126,7 +126,7 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 
 export interface Box {
   cid: string;
-  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim';
+  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox';
   /** furniture: where in its grid each of the economy's things inside it was last put, by uid (server/storages.ts) */
   layout?: Record<string, [number, number, boolean]>;
   /** a drop that is the cargo of a helicopter that came down */
@@ -406,8 +406,8 @@ function saveWorld() {
       rev: WORLD_REV,
       economy: economy.serialize(),
       // (and the dead lying on the ground, not one riding in a seat: see `bodies` in keep.ts)
-      // (and no claim's store: it is kept with its base)
-      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && b.kind !== 'claim' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
+      // (and no claim's store, nor a base's box: they are kept with their base)
+      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && b.kind !== 'claim' && b.kind !== 'bbox' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
       bases: keepBases(),
     };

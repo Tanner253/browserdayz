@@ -339,7 +339,7 @@ export const gunsMethods = {
     const p = this.player.pos;
     let best: Stash | null = null;
     let bd = 2.2;
-    for (const s of [...this.loot.stashes.filter((q) => !q.buried), ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash), ...this.build.claims.all()]) {
+    for (const s of [...this.loot.stashes.filter((q) => !q.buried), ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash), ...this.build.claims.all(), ...this.build.boxes.all()]) {
       const d = Math.hypot(s.x - p.x, s.z - p.z);
       if (d < bd && Math.abs(s.y - p.y) < 1.5) {
         bd = d;
