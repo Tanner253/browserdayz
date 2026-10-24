@@ -216,7 +216,7 @@ export const handsMethods = {
   },
 
   adminSelf(this: Game): AdminSelf {
-    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, loot: this.lootWanted, animals: this.animalsWanted, infected: this.infectedWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
+    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, loot: this.lootWanted, animals: this.animalsWanted, infected: this.infectedWanted, animalsFar: Math.min(this.animalsFar, this.gfx.draw), draw: this.gfx.draw, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
   },
 
   showPowers(this: Game) {

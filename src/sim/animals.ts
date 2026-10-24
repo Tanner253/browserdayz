@@ -223,11 +223,15 @@ export const ANIMALS = {
   /** the most there are ever at once (the herds above come to about a hundred) */
   max: 120,
   /** nobody within this, metres: a herd is not moved and not sent (it is where it would be by now when somebody comes).
-   * Past `told`, so that none is drawn standing still (2026-10-24: "the animals should render for the user 500m away instead of 300") */
-  wake: 550,
-  /** a player is sent the ones within this, metres, four times a second within `near` and once a second further out */
-  told: 500,
-  near: 140,
+   * Past `told`, so that none is drawn standing still */
+  wake: 650,
+  /**
+   * A player is sent the ones within this, metres, five times a second whatever the distance, each only when it has
+   * changed (2026-10-24: "the animals not rendering or updating within 600m smoothly and cleanly is not good UX"). An
+   * admin may ask for more, to `admin` (the admin panel), never past their own draw distance.
+   */
+  told: 600,
+  admin: 1500,
   /** a new one is never stood within this of anybody living, metres */
   clear: 200,
   /**
@@ -283,10 +287,11 @@ export const ANIMALS = {
    * hunt people and start howling when theyre locked in on people like how dayz wolves hunt. wolf pack kills 1 deer
    * then stops persuing the herd, eats the deer on ground"). Zone hours from a meal until it is hungry again (an hour
    * is 80 s); seconds it eats a kill; how near a fed pack lets anybody come before it goes for them; how far a hungry
-   * one finds a herd from, and how near it trots before it runs at them; how near a person comes to a pack at its kill
+   * one finds a herd from, how near it trots before it runs at them, and how far past its range it hunts and runs after
+   * them before it lets them go; how near a person comes to a pack at its kill
    * before it growls, how long it growls before it goes for them (or how near), and how far it drives them off.
    */
-  hunger: { hours: 6, eat: 180, defend: 9, scent: 450, rush: 70, growl: 22, warn: 4, drive: 11, guard: 40 },
+  hunger: { hours: 6, eat: 180, defend: 9, scent: 450, rush: 70, chase: 600, growl: 22, warn: 4, drive: 11, guard: 40 },
 };
 
 /**

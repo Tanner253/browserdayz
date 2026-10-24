@@ -66,7 +66,7 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-export const PROTOCOL = 64;
+export const PROTOCOL = 65;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -286,6 +286,8 @@ export type C2S =
   | { t: 'esp'; x?: number; z?: number }
   /** the same far sight wants every animal (`a`) and every one of the infected (`z`) on the map, wherever they are (answered as 'esp' is: server/esp.ts) */
   | { t: 'aesp'; a?: boolean; z?: boolean }
+  /** how far off this game draws animals, metres: ANIMALS.told at most, ANIMALS.admin for an admin, and never past its draw distance (server/animals.ts) */
+  | { t: 'adist'; m: number }
   /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
   | { t: 'tint'; color: string | null }
   /** a party (server/party.ts): ask the player of that id to join yours, say yes to whoever asked you, or leave yours */
