@@ -220,6 +220,12 @@ export const ANIMALS = {
   near: 140,
   /** a new one is never stood within this of anybody living, metres */
   clear: 200,
+  /**
+   * Room between two, centre to centre, as a share of their two lengths together: half of it is touching nose to
+   * tail. Of one herd a little more than that, as a herd grazes; of strangers only what keeps them out of each other.
+   * (The owner: "they spawned inside eachother in the images.")
+   */
+  room: { herd: 0.6, other: 0.5 },
   /** how often the awake ones think, seconds */
   step: 0.2,
   /** what is heard of a person moving, metres (as a person hears: an animal's `hear` scales it): sprinting, jogging, walking, crouched */

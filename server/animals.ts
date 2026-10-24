@@ -35,9 +35,9 @@ export function startAnimals() {
 const was = new Map<number, { x: number; z: number; t: number; v: number }>();
 let beat = 0;
 
-/** a player as the animals know of them (null: nobody they can know of, dead, hidden, or under the ground) */
+/** a player as the animals know of them (null: nobody they can know of, dead or under the ground; a vanished admin is there and never noticed) */
 function seenOf(c: Client, now: number): Seen | null {
-  if (!c.alive || c.power.hidden) return null;
+  if (!c.alive) return null;
   const [x, y, z] = c.pose, flags = c.pose[5] ?? 0;
   if (world.castleUnder(x, y, z) || world.basementUnder(x, y, z) || world.caveUnder(x, y, z) || (world.bunker && inBunker(world.bunker, x, y + 1, z, 1))) return null;
   const w = was.get(c.id);
@@ -51,6 +51,7 @@ function seenOf(c: Client, now: number): Seen | null {
     id: c.id, x, y, z, crouch: !!(flags & F_CROUCH), prone: !!(flags & F_PRONE), speed: v,
     ride: at ? (at.v.k === HELI.kind ? 'air' : 'car') : '',
     sheltered: ground.roofed(x, z),
+    ...(c.power.hidden ? { unseen: true } : {}),
   };
 }
 

@@ -107,6 +107,8 @@ export class Beast implements Damageable {
   private dripT = 0;
   private poseT = 0;
   private meshes: THREE.Mesh[] = [];
+  /** its bounds are worked out (see `bounds`) */
+  private bounded = false;
   private shadow = false;
 
   constructor(readonly i: number, k: number, private host: WildHost) {
@@ -124,13 +126,6 @@ export class Beast implements Damageable {
       if (!m.isMesh) return;
       m.receiveShadow = true;
       this.meshes.push(m);
-      // (a skinned body's bounds, worked out once in its rest pose and given room for its movements: worked out every
-      // frame they would cost more than the body; and it is left out of the picture when it is out of view)
-      const sk = m as THREE.SkinnedMesh;
-      if (sk.isSkinnedMesh) {
-        sk.computeBoundingSphere();
-        sk.boundingSphere!.radius *= 1.6;
-      }
       const mats = Array.isArray(m.material) ? m.material : [m.material];
       mats.forEach((mat) => this.host.atmo().register(mat));
     });
@@ -246,6 +241,24 @@ export class Beast implements Damageable {
     if (this.poseT >= every) {
       this.mixer!.update(this.poseT);
       this.poseT = 0;
+      if (!this.bounded) this.bounds();
+    }
+  }
+
+  /**
+   * A skinned body's bounds, worked out once it stands posed in the world (worked out before its bones were, they lay
+   * somewhere else, and it was left out of the picture as out of view), and given room for its movements: worked out
+   * every frame they would cost more than the body. From then it is left out of the picture only when out of view.
+   */
+  private bounds() {
+    this.bounded = true;
+    this.root.updateMatrixWorld(true);
+    for (const m of this.meshes) {
+      const sk = m as THREE.SkinnedMesh;
+      if (!sk.isSkinnedMesh) continue;
+      sk.skeleton.update();
+      sk.computeBoundingSphere();
+      sk.boundingSphere!.radius *= 1.6;
     }
   }
 

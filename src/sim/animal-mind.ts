@@ -257,18 +257,59 @@ export class Herd {
       const x = g.at.x + Math.cos(a) * d, z = g.at.z + Math.sin(a) * d;
       if (!this.ground.open(x, z, kind.steep)) continue;
       if (people.some((p) => Math.hypot(p.x - x, p.z - z) < ANIMALS.clear)) return null;
-      const slotA = this.rnd() * PI2, slotD = g.wants.length > 1 ? 2 + this.rnd() * (2 + g.wants.length * 1.8) : 0;
+      const slot = this.slotFor(g, k);
       const b: Beast = {
         i: this.next++, k, g: g.i, x, z, yaw: this.rnd() * PI2, mode: A_IDLE, hp: kind.hp, diedAt: 0, skinned: false, bleeds: false, speed: 0,
-        aware: 0, fearX: x, fearZ: z, ranFor: 0, slot: [Math.cos(slotA) * slotD, Math.sin(slotA) * slotD], act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0,
+        aware: 0, fearX: x, fearZ: z, ranFor: 0, slot, act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0,
         foe: 0, fightAt: 0, fightX: x, fightZ: z, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0,
         hurtBy: 0, hurtAt: 0, calmUntil: 0, skinner: null, eaten: false,
       };
+      // (at the start nobody is near: it stands at its own place in the herd)
+      if (start && this.ground.open(g.at.x + slot[0], g.at.z + slot[1], kind.steep)) {
+        b.x = g.at.x + slot[0];
+        b.z = g.at.z + slot[1];
+      }
       this.beasts.set(b.i, b);
       g.members.push(b.i);
       return b;
     }
     return null;
+  }
+
+  /** room for two, centre to centre (`herd`: of one herd) */
+  private room(a: number, b: number, herd: boolean) {
+    return (KINDS[a].len + KINDS[b].len) * (herd ? ANIMALS.room.herd : ANIMALS.room.other);
+  }
+
+  /**
+   * Its place in the herd, off the herd's spot: the first free one along a sunflower spiral, so that no two places
+   * ever fall within room of each other (they were thrown at random, and two herd mates stood in one another).
+   */
+  private slotFor(g: Group, k: number): [number, number] {
+    const taken = g.members.map((i) => this.beasts.get(i)!).filter((o) => !o.diedAt);
+    if (!taken.length && g.wants.length <= 1) return [0, 0];
+    const turn = (g.i * 2.39996) % PI2;
+    for (let n = 0; n < 64; n++) {
+      const r = KINDS[k].len * 1.05 * Math.sqrt(n + 0.5), a = turn + n * 2.39996;
+      const s: [number, number] = [Math.cos(a) * r, Math.sin(a) * r];
+      if (taken.every((o) => Math.hypot(o.slot[0] - s[0], o.slot[1] - s[1]) >= this.room(o.k, k, true))) return s;
+    }
+    return [0, 0];
+  }
+
+  /** the nearest living one it stands too close to, and how far it should step to make room (null: it has room) */
+  private crowd(b: Beast): { o: Beast; by: number } | null {
+    let best: { o: Beast; by: number } | null = null;
+    const hunts = (x: Beast) => KINDS[x.k].temper === 'pack' || KINDS[x.k].temper === 'bear';
+    for (const o of this.beasts.values()) {
+      // (a wolf at the deer it pulls down is meant to be on it)
+      if (o === b || o.diedAt || (o.g !== b.g && (hunts(o) || hunts(b)))) continue;
+      const ox = b.x - o.x, oz = b.z - o.z;
+      if (Math.abs(ox) > 6 || Math.abs(oz) > 6) continue;
+      const by = this.room(o.k, b.k, o.g === b.g) - Math.hypot(ox, oz);
+      if (by > 0 && (!best || by > best.by)) best = { o, by };
+    }
+    return best;
   }
 
   /**
@@ -289,9 +330,9 @@ export class Herd {
     for (let c = 0; c < n; c++) {
       const b = this.stand(g, c === 0 || !others.length || KINDS[k].id !== 'stag' ? k : others[0], now, []);
       if (!b) continue;
-      const a = c * 2.39996, r = c ? 2.2 * Math.sqrt(c) : 0;
-      b.x = x + Math.cos(a) * r;
-      b.z = z + Math.sin(a) * r;
+      // (each at its own place in the herd, which keeps them apart)
+      b.x = x + b.slot[0];
+      b.z = z + b.slot[1];
       out.push(b);
     }
     return out;
@@ -302,7 +343,7 @@ export class Herd {
   /** Five times a second or so. `people` is everybody alive, as the animals know of them. */
   tick(now: number, people: Seen[]): Turn {
     const turn: Turn = { strikes: [], died: [] };
-    const dt = Math.min(0.5, this.lastTick ? (now - this.lastTick) / 1000 : ANIMALS.step);
+    const dt = Math.max(0, Math.min(0.5, this.lastTick ? (now - this.lastTick) / 1000 : ANIMALS.step));
     this.lastTick = now;
     const p = this.phase(now), noticed = people.filter((q) => !q.unseen);
     for (const g of this.groups) {
@@ -551,10 +592,19 @@ export class Herd {
       b.act = g.spot === 'rest' ? (r < 0.8 ? A_REST : A_IDLE) : g.spot === 'water' ? (r < 0.7 ? A_DRINK : A_IDLE) : r < 0.6 ? A_GRAZE : r < 0.85 ? A_IDLE : A_ALERT;
       b.next = now + (b.act === A_REST ? 20_000 : 4000) + this.rnd() * 8000;
       if (g.spot === 'water' && b.act === A_DRINK) g.drank = true;
-      // (a step or two on as it grazes)
+      // (a step or two on as it grazes, never onto a herd mate's place)
       if (b.act === A_GRAZE && this.rnd() < 0.4) {
-        b.slot = [b.slot[0] + (this.rnd() - 0.5) * 4, b.slot[1] + (this.rnd() - 0.5) * 4];
+        const s: [number, number] = [b.slot[0] + (this.rnd() - 0.5) * 4, b.slot[1] + (this.rnd() - 0.5) * 4];
+        const mates = g.members.map((i) => this.beasts.get(i)!).filter((o) => o !== b && !o.diedAt);
+        if (mates.every((o) => Math.hypot(o.slot[0] - s[0], o.slot[1] - s[1]) >= this.room(o.k, b.k, true))) b.slot = s;
       }
+    }
+    // (and should another stand in it, it steps aside to make room, as a grazing herd shuffles apart)
+    const c = this.crowd(b);
+    if (c) {
+      const ox = b.x - c.o.x, oz = b.z - c.o.z, a = Math.hypot(ox, oz) > 0.01 ? Math.atan2(oz, ox) : this.rnd() * PI2;
+      this.go(b, k, b.x + Math.cos(a) * (c.by + 0.5), b.z + Math.sin(a) * (c.by + 0.5), k.walk, dt, 0.1);
+      return;
     }
     b.speed = 0;
     b.mode = b.act;
@@ -619,10 +669,11 @@ export class Herd {
     for (const i of this.groups[b.g].members) {
       const o = this.beasts.get(i)!;
       if (o === b || o.diedAt) continue;
-      const ox = b.x - o.x, oz = b.z - o.z, od = Math.hypot(ox, oz), min = (KINDS[o.k].len + k.len) * 0.35;
-      if (od > 0.01 && od < min && can(b.x + (ox / od) * (min - od) * 0.5, b.z + (oz / od) * (min - od) * 0.5)) {
-        b.x += (ox / od) * (min - od) * 0.5;
-        b.z += (oz / od) * (min - od) * 0.5;
+      const ox = b.x - o.x, oz = b.z - o.z, od = Math.hypot(ox, oz), min = this.room(o.k, b.k, true);
+      // (the whole way out, not half: at a bolt's 11 m/s half a gap a step left them in each other for a second)
+      if (od > 0.01 && od < min && can(b.x + (ox / od) * (min - od), b.z + (oz / od) * (min - od))) {
+        b.x += (ox / od) * (min - od);
+        b.z += (oz / od) * (min - od);
       }
     }
     b.speed = speed;

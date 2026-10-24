@@ -300,6 +300,42 @@ ok('an admin stands any kind, one or a herd or pack of it, from the entity list'
   assert.deepEqual(deer.map((b) => KINDS[b.k].id), ['stag', 'doe', 'doe', 'doe', 'doe'], 'a stag asked for with others comes with hinds');
 });
 
+ok('herd and pack mates never stand inside each other: stood, grazing, bolting, or stood by an admin', () => {
+  // (the owner: "they spawned inside eachother in the images")
+  const h = herd(['stag', 'doe', 'wolf', 'boar', 'goat', 'cow'], 7);
+  h.populate(0);
+  const placed = [h.place('stag', 200, -200, 1, 6), h.place('wolf', 260, -200, 1, 5), h.place('cow', 200, -260, 1, 4), h.place('boar', 260, -260, 1, 3)];
+  const near = (x: number, z: number) => [...h.beasts.values()].filter((b) => Math.hypot(b.x - x, b.z - z) < 300);
+  /** the closest two of one herd come, as a share of their two lengths together (0.5: nose touching tail) */
+  const closest = (list: ReturnType<typeof near>) => {
+    let m = Infinity;
+    for (const a of list) for (const b of list) {
+      if (a.i >= b.i || a.g !== b.g || a.diedAt || b.diedAt) continue;
+      m = Math.min(m, Math.hypot(a.x - b.x, a.z - b.z) / (KINDS[a.k].len + KINDS[b.k].len));
+    }
+    return m;
+  };
+  const at = [...h.beasts.values()][0];
+  const watchers = [person(1, at.x + 250, at.z), person(2, 230, -120)];
+  assert.ok(closest(placed.flat()) >= ANIMALS.room.herd - 1e-9, `an admin's herd stood apart (${closest(placed.flat()).toFixed(2)})`);
+  assert.ok(closest(near(at.x, at.z)) >= ANIMALS.room.herd - 1e-9, 'herds stood apart at the start');
+  let worst = Infinity, settled = Infinity;
+  for (let t = 0; t <= 240_000; t += 200) {
+    // (a shot among them half way, so that they bolt and come back together)
+    if (t === 120_000) {
+      h.heard(at.x + 40, at.z, [400, 400], 1_000_000 + t);
+      h.heard(230, -230, [400, 400], 1_000_000 + t);
+    }
+    h.tick(1_000_000 + t, watchers);
+    const all = [...near(at.x, at.z), ...placed.flat()];
+    const m = closest(all);
+    worst = Math.min(worst, m);
+    if (t > 100_000 && t < 120_000) settled = Math.min(settled, m);
+  }
+  assert.ok(worst >= 0.5, `never touching, bolting included (closest ${worst.toFixed(2)} of their lengths)`);
+  assert.ok(settled >= 0.55, `grazing, room between them (closest ${settled.toFixed(2)})`);
+});
+
 ok('a game is told only of the animals within its reach', () => {
   const h = herd(['stag', 'doe']);
   h.populate(0);
