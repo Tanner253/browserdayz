@@ -5,6 +5,7 @@
 //   &ui=inventory&kit=heavy        the inventory, open, as a survivor with that kit has it (src/sim/kits.ts KITS)
 //   &body=marksman                 the kit on the body beside (default: assault)
 //   &ui=hud                        the hot bar at the foot of the screen, as in play
+//   &ui=wheel                      the wheel on T (src/ui/radial.ts) by itself: window.wheel is it, to be pointed by a script
 //   &touch=1                       as a phone has it
 // What is done in it (a drag, a key, a drop) is done to these pockets alone, and nothing is kept.
 
@@ -12,6 +13,9 @@ import '../ui/style.css';
 import '../ui/hud.css';
 import { InventoryUI, type InvActions } from '../ui/inventory-ui';
 import { fitScreen, hotbarCells, type HotbarEntry } from '../ui/hud';
+import { Radial } from '../ui/radial';
+import { RINGS, wheelEntries, wheelSlots } from '../ui/wheel-slots';
+import { WHEEL_RING } from '../sim/emotes';
 import { BODY_GRID, Container, PlayerInventory, layOnBody } from '../sim/inventory';
 import { ITEMS, makeItem, type ItemInstance } from '../sim/items';
 import { KITS, type KitThing } from '../sim/kits';
@@ -62,6 +66,16 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   }
 
   const shown: Record<string, unknown> = { kit: kit.id };
+  if (q.get('ui') === 'wheel') {
+    const hud = document.createElement('div');
+    hud.id = 'hud';
+    ui.appendChild(hud);
+    const wheel = new Radial({ rings: RINGS, per: WHEEL_RING, className: 'hud-wheel' });
+    wheel.set(wheelEntries(wheelSlots()));
+    hud.appendChild(wheel.el);
+    (window as unknown as { wheel: Radial }).wheel = wheel;
+    return shown;
+  }
   if (q.get('ui') === 'hud') {
     const hud = document.createElement('div');
     hud.id = 'hud';
