@@ -24,6 +24,7 @@ import { queue } from './queue';
 import { sendDrop } from './drops';
 import { dogtag, roleKey, tagSet } from './roles';
 import { pinned } from './pinned';
+import { payingTags, wentFrom } from './custody';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -790,6 +791,8 @@ export async function command(c: Client, line: string) {
       const had = [...things(t.inv)].find((it) => it.uid === uid);
       if (!had) return void sys(c, `${t === c ? 'You do' : `${t.name} does`} not carry that any more.`);
       takeOut(t.inv, new Set([uid]));
+      // (a tag trashed is nobody's: said to be in their pockets again, it is not taken for it, custody.ts)
+      for (const tag of payingTags(had)) wentFrom(t.key, tag.uid, null);
       log(`[admin] ${c.name} took ${ITEMS[had.id]?.name ?? had.id} out of what ${t === c ? 'they' : t.name} carried`);
       send(t, { t: 'trash', uids: [uid], ...(t === c ? {} : { by: c.name }) });
       send(c, { t: 'inv', id: t.id, name: t.name, inv: t.inv });

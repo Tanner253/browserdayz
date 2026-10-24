@@ -12,6 +12,7 @@ import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { RACKS, rackShows } from '../src/sim/crates';
 import { CORPSE_LIFETIME, CORPSE_WEST, PARKS, WEST_FROM, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
 import { idleMs } from './west-cars';
+import { lieAt } from './custody';
 import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, tagTime, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast, tagLock } from './gate';
@@ -415,10 +416,13 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
     const a = Math.random() * Math.PI * 2;
     economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
   }
+  lieAt(spill, 'g');
   if (!box.items.length) return null;
   // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
   for (const p of box.items) issue(p.item);
   boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + (inPlay(x, z) ? CORPSE_LIFETIME : CORPSE_WEST), v, ...(ride ? { ride } : {}) });
+  // (the tags on it are on this body now: custody.ts)
+  lieAt(box.items.map((p) => p.item), `b:${uid}`);
   if (ride) riders.add(uid);
   return { uid, x, y, z, rot: yaw, name: c.name, v, ...(ride ? { ride } : {}) };
 }
