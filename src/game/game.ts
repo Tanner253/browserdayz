@@ -740,6 +740,7 @@ export class Game {
     };
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected || owner instanceof Beast ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
+    this.weapons.step = (dir) => this.wheelStep(dir);
     // whoever is hit carries the blood on their clothes where it landed
     this.weapons.onFlesh = (owner, pt, dir, power) => {
       if (power < 0.4) return;
@@ -1758,6 +1759,7 @@ export interface Game {
   flyCamera: Methods<typeof handsMethods>['flyCamera'];
   hot: Methods<typeof handsMethods>['hot'];
   hotStep: Methods<typeof handsMethods>['hotStep'];
+  wheelStep: Methods<typeof handsMethods>['wheelStep'];
   emptyHands: Methods<typeof handsMethods>['emptyHands'];
   stow: Methods<typeof handsMethods>['stow'];
   takeUp: Methods<typeof handsMethods>['takeUp'];

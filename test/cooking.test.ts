@@ -425,9 +425,9 @@ ok('a tin is warmed, not cooked: hot for five minutes wherever it is taken, then
   // hot: what a meal by the fire has always been worth, with no fire in sight
   assert.deepEqual(mealOf(beans, off), { energy: Math.round(u.energy! * FIRE.meal), water: Math.round(u.water! * FIRE.meal), health: 0, hot: true });
   assert.equal(stateOf(beans, off).word, 'hot');
-  // (salt fish takes water from whoever eats it, hot or cold: only what a thing GIVES is made more of)
-  assert.ok(s.water! < 0);
-  assert.deepEqual(mealOf(sprats, off), { energy: Math.round(s.energy! * FIRE.meal), water: s.water, health: 0, hot: true });
+  // (sprats give no water and take none since 2026-10-24, "sprats shouoldnt dehydrate the player": only what a thing GIVES is made more of)
+  assert.ok(!s.water);
+  assert.deepEqual(mealOf(sprats, off), { energy: Math.round(s.energy! * FIRE.meal), water: 0, health: 0, hot: true });
   // by a fire as well, it is not hot twice over
   assert.deepEqual(mealOf(beans, off, FIRE.meal), mealOf(beans, off));
   assert.equal(isHot(beans, off + HEAT.keeps - 1), true);

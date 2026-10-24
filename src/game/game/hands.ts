@@ -501,6 +501,18 @@ export const handsMethods = {
     return null;
   },
 
+  /**
+   * The wheel, with nothing else to do: the next (1) or last thing on the hot bar taken up, every key of it, as the
+   * bumpers do (the owner, 2026-10-24: "scrolling mouse wheel should go through all the slots not just the primary
+   * weapons"). False when the bar has no other thing on it, and in the battle royale, whose six slots are its own.
+   */
+  wheelStep(this: Game, dir: 1 | -1): boolean {
+    const code = this.br ? null : this.hotStep(dir);
+    if (!code) return false;
+    this.hot(HOT_CODES.indexOf(code));
+    return true;
+  },
+
   /** the hands are emptied: what was in them is put away where it is carried, and anything they were at is broken off */
   emptyHands(this: Game) {
     if (this.use) this.breakOff();

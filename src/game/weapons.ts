@@ -2895,6 +2895,9 @@ export class Weapons {
   private slungKey = '';
 
   /** mouse wheel: next / previous occupied slot (wraps through empty hands) */
+  /** the wheel's turn when nothing else takes it, the game's to say (the hot bar: Game.wheelStep); false, and the slots are gone through in turn */
+  step: ((dir: 1 | -1) => boolean) | null = null;
+
   cycle(dir: 1 | -1) {
     if (this.action && this.action.name !== 'equip') return;
     const order: (Slot | null)[] = [...SLOT_ORDER, null];
@@ -3020,7 +3023,7 @@ export class Weapons {
         this.zoomed.set(zk, THREE.MathUtils.clamp((this.zoom ?? lo) - Math.sign(input.wheel), lo, hi));
         input.wheel = 0;
       }
-      if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);
+      if (input.wheel !== 0 && !this.aiming && !this.step?.(input.wheel > 0 ? 1 : -1)) this.cycle(input.wheel > 0 ? 1 : -1);
       const it = this.currentItem;
       if (it && STOCKS[it.id]) {
         // (a gun of a folding stock and fire modes both: B let go folds or opens the stock, B held changes the mode)

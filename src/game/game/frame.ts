@@ -355,6 +355,8 @@ export const frameMethods = {
       const kept = this.loose === r.item || this.inv.containers.some((c) => c.has(r.item));
       // (a magazine: the wheel turns over what the button does with it, filling or emptying, and it stays in the hand)
       if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.turnMagWork()) input.wheel = 0;
+      // (the wheel goes on to the next thing on the hot bar from this one; with no other, it is put away)
+      if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.wheelStep(input.wheel > 0 ? 1 : -1)) input.wheel = 0;
       if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
       else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }

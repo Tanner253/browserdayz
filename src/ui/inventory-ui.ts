@@ -2974,7 +2974,10 @@ export class InventoryUI {
   private quickMove(src: Source) {
     // pick up: wear it / sling it if the slot is free, else into the pockets (see `pickUp`)
     if (src.kind === 'ground') return this.pickUp(src);
-    if (this.stash && !this.stashState) {
+    // (a thing in a bag lying about, as one in a crate: taken. It ran the thing's own first deed, and a tin in a bag on
+    // the ground was eaten, a dressing nothing at all: 2026-10-24, "iam unable to shift click items from vicinity that
+    // are in a container into my inventory")
+    if ((this.stash && !this.stashState) || !this.mine(src)) {
       this.transfer(src);
       this.render();
       return;
