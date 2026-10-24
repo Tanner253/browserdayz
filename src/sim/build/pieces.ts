@@ -30,10 +30,11 @@ const TIER_COST: Record<string, number>[] = [{ planks: 4 }, { planks: 10, nails:
  *   stairs fills the storey over a square (or a triangle) of floor
  *   steps  against a foundation's edge, on the outside
  *   free   laid anywhere on the ground, end to end with its own kind (the high walls)
+ *   deploy set down anywhere on a foundation or a floor, turned as the player likes (the claim; boxes, step four)
  */
-export type Role = 'floor' | 'wall' | 'stairs' | 'steps' | 'free';
+export type Role = 'floor' | 'wall' | 'stairs' | 'steps' | 'free' | 'deploy';
 export type Shape = 'sq' | 'tri';
-export type Cat = 'found' | 'walls' | 'floors' | 'stairs' | 'roofs' | 'outside';
+export type Cat = 'found' | 'walls' | 'floors' | 'stairs' | 'roofs' | 'outside' | 'deploy';
 
 export interface PieceKind {
   id: string;
@@ -55,6 +56,8 @@ export interface PieceKind {
   only?: Tier;
   /** the length of a free piece along its line, m */
   long?: number;
+  /** a thing set down: how far round it its foot takes, m */
+  foot?: number;
 }
 
 export const PIECES: Record<string, PieceKind> = Object.fromEntries(
@@ -80,6 +83,8 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'roof_tri', name: 'Triangle Roof', cat: 'roofs', role: 'floor', shape: 'tri', roof: true, half: true },
     { id: 'high_wall_wood', name: 'High Wood Wall', cat: 'outside', role: 'free', only: 1, long: 3, h: 6 },
     { id: 'high_wall_stone', name: 'High Stone Wall', cat: 'outside', role: 'free', only: 2, long: 3, h: 6 },
+    // (the third step: DayZ's flag over Rust's tool cupboard, plan v2: "Building rights 20 m round every piece; its members build, repair and remove")
+    { id: 'claim', name: 'Claim', cat: 'deploy', role: 'deploy', only: 1, foot: 0.55 },
   ] satisfies PieceKind[]).map((k) => [k.id, k]),
 );
 
@@ -94,12 +99,13 @@ export function costOf(kind: string, t: Tier): Record<string, number> {
   // (a foundation's frame stands on two logs, its posts)
   if (t === 0 && k.ground) out.log = k.half ? 1 : 2;
   // (a high wall is laid whole: a row of sharpened logs, or a wall of stone)
+  if (kind === 'claim') return { log: 1, planks: 10, nails: 10 };
   if (k.only !== undefined) return k.only === 1 ? { log: 4, nails: 10 } : { stone: 60, planks: 4 };
   return out;
 }
 
 /** a piece's health at its tier */
-export const hpOf = (kind: string, t: Tier) => (PIECES[kind].only !== undefined ? (PIECES[kind].only === 1 ? 800 : 1500) : TIER_HP[t]);
+export const hpOf = (kind: string, t: Tier) => (kind === 'claim' ? 300 : PIECES[kind].only !== undefined ? (PIECES[kind].only === 1 ? 800 : 1500) : TIER_HP[t]);
 
 /** the first tier a piece is laid at: a frame, or the one tier it comes in */
 export const laidAt = (kind: string): Tier => PIECES[kind].only ?? 0;

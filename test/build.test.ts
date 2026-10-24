@@ -21,7 +21,8 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { Bases, heard, said, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
-import { blocked, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base } from '../src/sim/build/snap';
+import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base } from '../src/sim/build/snap';
+import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 
 let n = 0;
 const failed: string[] = [];
@@ -60,7 +61,7 @@ ok('costs and health by tier, as the plan says; half pieces half; a foundation\'
   assert.deepEqual(costOf('wall_half', 1), { planks: 5, nails: 6 });
   assert.deepEqual(costOf('foundation', 0), { planks: 4, log: 2 });
   assert.deepEqual([0, 1, 2, 3].map((t) => hpOf('wall', t as Tier)), [60, 500, 1000, 2000]);
-  assert.equal(Object.keys(PIECES).length, 21);
+  assert.equal(Object.keys(PIECES).filter((k) => PIECES[k].role !== 'deploy').length, 21);
 });
 
 console.log('Building: snapping');
@@ -228,6 +229,96 @@ ok('kept and read back: every piece where it was, and what each rests on worked 
   console.log(`      a base of ${b.pieces.size} pieces kept in ${JSON.stringify(said(b)).length} characters`);
 });
 
+console.log('Building: claims, upkeep and rot');
+ok('a claim is set down on a floor, wholly on it, never over its edge; one to a base, one a player', () => {
+  const bs = new Bases(flat), b = start(bs);
+  const s = deployAt(b, 'claim', { x: 0.1, y: 0, z: 0.2 })!;
+  assert.deepEqual([s.x, s.z], [0, 0.25], 'to a quarter metre');
+  assert.equal(deployAt(b, 'claim', { x: 1.4, y: 0, z: 0 }), null, 'over the edge');
+  const r = bs.lay({ b: b.id, k: 'claim', ...s }, ME, 0, 'Me');
+  assert.ok(typeof r !== 'string' && b.claim?.p === r.piece.id && b.claim.members[0].pid === ME, `the claim: ${typeof r === 'string' ? r : 'laid'}`);
+  assert.match(String(bs.check({ b: b.id, k: 'claim', ...deployAt(b, 'claim', { x: 0.75, y: 0, z: -0.75 })! }, ME)), /has its claim already/);
+  const far = new Bases(flat);
+  far.bases = bs.bases;
+  const b2 = start(bs, 200, 0);
+  assert.match(String(bs.check({ b: b2.id, k: 'claim', ...deployAt(b2, 'claim', { x: 0, y: 0, z: 0 })! }, ME)), /hold a claim already/);
+  assert.ok(typeof bs.check({ b: b2.id, k: 'claim', ...deployAt(b2, 'claim', { x: 0, y: 0, z: 0 })! }, 'you') !== 'string', 'somebody else may set one in another base');
+  // (and it falls with its floor)
+  bs.remove(b.id, 1);
+  assert.equal(b.claim, undefined);
+});
+
+ok('within 20 m of a claimed base only its members build; whoever reaches the claim may join it, and leave', () => {
+  const bs = new Bases(flat), b = start(bs);
+  bs.lay({ b: b.id, k: 'claim', ...deployAt(b, 'claim', { x: 0, y: 0, z: 0 })! }, ME, 0, 'Me');
+  const wall = nearestSpot(spots(b, 'wall'), 'wall', { x: 0, y: 1.5, z: 1.5 })!;
+  assert.match(String(bs.lay({ b: b.id, k: 'wall', ...wall }, 'you', 0)), /Building blocked/);
+  assert.match(String(bs.lay({ k: 'foundation', x: 15, y: 0, z: 0, r: 0 }, 'you', 0)), /Building blocked/);
+  assert.ok(typeof bs.lay({ k: 'foundation', x: 30, y: 0, z: 0, r: 0 }, 'you', 0) !== 'string', 'out of its reach, anybody builds');
+  assert.ok(!bs.mayWork(b, 'you'));
+  assert.equal(bs.join(b, 'you', 'You'), true);
+  assert.ok(bs.mayWork(b, 'you') && typeof bs.lay({ b: b.id, k: 'wall', ...wall }, 'you', 0) !== 'string', 'a member builds');
+  assert.equal(bs.join(b, 'you', 'You'), false);
+  assert.ok(!bs.mayWork(b, 'you'));
+});
+
+ok("upkeep by Rust's brackets: a wood 1x1 costs 6 planks and 7 nails a day; a week's store keeps it a week", () => {
+  const bs = new Bases(flat), b = start(bs);
+  for (const [k, x, z] of [['wall', 0, -1.5], ['wall', -1.5, 0], ['wall', 1.5, 0], ['doorway', 0, 1.5]] as const) at(bs, b, k, x, 1.5, z);
+  at(bs, b, 'floor', 0, 3, 0);
+  bs.lay({ b: b.id, k: 'claim', ...deployAt(b, 'claim', { x: 0, y: 0, z: 0 })! }, ME, 0, 'Me');
+  for (const p of b.pieces.values()) if (p.k !== 'claim') bs.upgrade(b.id, p.id, 1);
+  const day = perDay(b);
+  assert.ok(Math.abs(day.planks - 6) < 1e-9 && Math.abs(day.nails - 7.2) < 1e-9, JSON.stringify(day));
+  assert.ok(Math.abs(protectedFor({ planks: 42, nails: 51 }, day) / 86400 - 7) < 0.1);
+  assert.equal(protectedFor({ planks: 42 }, day), 0, 'no nails: nothing keeps it');
+  assert.deepEqual([0, 14, 15, 49, 50, 99, 100].map(bracket), [0.1, 0.1, 0.15, 0.15, 0.2, 0.2, 0.3]);
+  // (a big stone base: 90 pieces)
+  const big = { ...b, pieces: new Map(Array.from({ length: 90 }, (_, i) => [i + 1, { ...b.pieces.get(2)!, id: i + 1, t: 2 as Tier }])) };
+  const d = perDay(big);
+  console.log(`      a day: the 1x1 in wood ${Math.round(day.planks)} planks, ${Math.round(day.nails)} nails; 90 stone pieces ${Math.round(d.stone)} stone`);
+  assert.ok(d.stone > 300 && d.stone < 600);
+});
+
+ok('upkeep is paid a whole thing at a time, the parts owed over; short, the store is dry', () => {
+  const due: Record<string, number> = {}, store = { planks: 2 };
+  assert.equal(pay({ planks: 12 }, 1, due, store), true);
+  assert.equal(store.planks, 2, 'half a plank owed, none taken');
+  assert.equal(pay({ planks: 12 }, 1, due, store), true);
+  assert.equal(store.planks, 1);
+  for (let h = 0; h < 2; h++) pay({ planks: 12 }, 1, due, store);
+  assert.equal(store.planks, 0);
+  assert.equal(pay({ planks: 12 }, 2, due, store), false);
+});
+
+ok('rot: a frame is gone in 2 h, wood 12 h, stone 24 h, metal 36 h; with no claim, after 10 minutes of grace', () => {
+  for (const [t, h] of [[0, 2], [1, 12], [2, 24], [3, 36]] as const) {
+    const bs = new Bases(flat), b = start(bs);
+    bs.upgrade(b.id, 1, t);
+    b.pieces.get(1)!.at = 0;
+    assert.equal(rot(b, h * 0.99, 1e9, true).broken.length, 0, `tier ${t} gone before ${h} h`);
+    assert.deepEqual(rot(b, h * 0.02, 1e9, true).broken, [1], `tier ${t} not gone at ${h} h`);
+  }
+  const bs = new Bases(flat), b = start(bs);
+  assert.equal(rot(b, 5, ROT.grace - 1, false).hurt.length, 0, 'rotted inside its grace');
+  assert.equal(rot(b, 0.5, ROT.grace + 1001, false).hurt.length, 1);
+  assert.equal(saidTime(3 * 86400 + 4 * 3600), '3 d 4 h');
+});
+
+ok('kept and read back with its claim: its members, what is owed, and what was in its store', () => {
+  const bs = new Bases(flat), b = start(bs);
+  bs.lay({ b: b.id, k: 'claim', ...deployAt(b, 'claim', { x: 0, y: 0, z: 0 })! }, ME, 0, 'Me');
+  bs.join(b, 'you', 'You');
+  b.claim!.due = { planks: 0.4 };
+  const kept = JSON.parse(JSON.stringify(bs.keep(() => [{ id: 'planks', qty: 9 }])));
+  const again = heard(kept[0])!;
+  assert.deepEqual(again.claim?.members.map((m) => m.pid), [ME, 'you']);
+  assert.equal(again.claim?.due.planks, 0.4);
+  assert.deepEqual(again.claim?.kept, [{ id: 'planks', qty: 9 }]);
+  // (and what a game is told has no store in it)
+  assert.equal((said(b)[8] as unknown[]).length, 4);
+});
+
 if (process.argv.includes('--server')) await serverTest();
 if (failed.length) {
   console.error(`BUILD TEST FAILED: ${failed.length} of ${n + failed.length}: ${failed.join('; ')}`);
@@ -257,9 +348,9 @@ async function serverTest() {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-build-'));
   let logged = '';
   // (stopped by a word on its input, as a deploy stops it: it writes its world on the way out)
-  const start = () => {
+  const start = (more: Record<string, string> = {}) => {
     const s = spawn(process.execPath, ['--env-file=.env.local-server', path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-      env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off', STOP_BY_WORD: '1' },
+      env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off', STOP_BY_WORD: '1', ...more },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     s.stdout!.on('data', (d) => (logged += d));
@@ -291,9 +382,10 @@ async function serverTest() {
     of<T extends S2C['t']>(t: T) {
       return this.got.filter((m) => m.t === t) as Extract<S2C, { t: T }>[];
     }
-    async until<T extends S2C['t']>(t: T, test: (m: Extract<S2C, { t: T }>) => boolean = () => true, ms = 4000) {
+    /** the first message of a kind that passes `test`, of those since the `from`th of all it has been sent */
+    async until<T extends S2C['t']>(t: T, test: (m: Extract<S2C, { t: T }>) => boolean = () => true, ms = 4000, from = 0) {
       for (let k = 0; k < ms / 25; k++) {
-        const m = this.of(t).find(test);
+        const m = (this.got.slice(from).filter((q) => q.t === t) as Extract<S2C, { t: T }>[]).find(test);
         if (m) return m;
         await sleep(25);
       }
@@ -434,6 +526,81 @@ async function serverTest() {
     back.send({ t: 'bup', b: kept.id, p: 2, to: 1, go: 1, u: ham2.uid });
     assert.ok((await back.until('bup'))?.ok, `not the builder's after the restart: ${JSON.stringify(back.of('bup'))}`);
     console.log('  ok  stopped and started again: the base is back whole, turned as it was, and still its builder\'s to work');
+
+    // ---- claims, on a server that lives an hour of upkeep each second
+    server.stdin!.write('stop\n');
+    for (let k = 0; k < 400 && server.exitCode === null; k++) await sleep(50);
+    const was = logged.length;
+    server = start({ UPKEEP_EVERY_S: '1', UPKEEP_SPEED: '3600', ROT_GRACE_S: '600' });
+    for (let k = 0; k < 1500 && !logged.slice(was).includes('listening'); k++) await sleep(100);
+    const me = new Player('Builder'), them = new Player('Stranger');
+    await me.join();
+    const plan3 = await me.give('building_plan'), ham3 = await me.give('hammer');
+    await me.give('planks', 20);
+    await me.give('planks', 20);
+    await me.give('log', 2);
+    await me.give('log', 1);
+    await me.give('nails', 20);
+    const [cx, cz] = [sx + 60, sz];
+    await me.go(cx - 2, cz);
+    // the base from before is out of its grace and has no claim: it is rotting already, and is no matter here
+    me.send({ t: 'blay', k: 'foundation', x: cx, y: 0, z: cz, r: 0, yaw: 0, u: plan3.uid });
+    const told3 = await me.until('base', (m) => m.b[1] > sx + 30);
+    assert.ok(told3, `no base at the claim's place: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const B = heard(told3!.b)!;
+    me.send({ t: 'blay', k: 'claim', b: B.id, x: 0, y: 0, z: 0, r: 0, u: plan3.uid });
+    const cl = await me.until('bclaim', (m) => m.b === B.id && !!m.c);
+    assert.ok(cl && cl.c![1][0][1] === 'Builder', `no claim: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    for (const [x, z] of [[0, -1.5], [-1.5, 0]]) {
+      const w = nearestSpot(spots(B, 'wall'), 'wall', { x, y: 1.5, z })!;
+      me.send({ t: 'blay', k: 'wall', b: B.id, ...w, u: plan3.uid });
+      await sleep(150);
+    }
+    console.log('  ok  a claim set down in a base: its builder on it');
+    // a stranger: building blocked, until they join it at the claim; then it is theirs to build on too
+    await them.join();
+    const plan4 = await them.give('building_plan');
+    await them.give('planks', 8);
+    await them.go(cx + 1.6, cz + 1.6);
+    const w3 = nearestSpot(spots(B, 'wall'), 'wall', { x: 1.5, y: 1.5, z: 0 })!;
+    them.send({ t: 'blay', k: 'wall', b: B.id, ...w3, u: plan4.uid });
+    assert.ok(await them.until('tell', (m) => /Building blocked/.test(m.text)), `a stranger built in a claim: ${JSON.stringify(them.of('tell').slice(-2))}`);
+    assert.ok(await them.until('base', (m) => m.b[0] === B.id, 5000), 'the stranger was not told the base');
+    them.send({ t: 'bjoin', b: B.id });
+    assert.ok(await them.until('tell', (m) => /on this claim/.test(m.text)), 'not joined');
+    them.send({ t: 'blay', k: 'wall', b: B.id, ...w3, u: plan4.uid });
+    assert.ok(await them.until('bpc', (m) => m.b === B.id && PIECE_IDS[m.p[1]] === 'wall'), `a member could not build: ${JSON.stringify(them.of('tell').slice(-2))}`);
+    them.send({ t: 'bjoin', b: B.id });
+    console.log('  ok  a stranger is blocked from building in it, joins it at the claim, builds, and leaves');
+    // its store: planks put in pay its upkeep, a plank every so often, and it says how long it is kept
+    const cid = `claim:${B.id}`;
+    me.send({ t: 'copen', cid });
+    assert.ok(await me.until('cdata', (m) => m.cid === cid), 'the store did not open');
+    const pile = me.pockets.find((it) => it.id === 'planks' && it.qty >= 10)!;
+    me.send({ t: 'cset', cid, items: [{ ...pile, qty: 10, x: 0, y: 0, rot: false }] });
+    const keep1 = await me.until('bkeep', (m) => m.b === B.id && m.s > 0, 6000);
+    assert.ok(keep1, `no word of how long it is kept: ${JSON.stringify(me.of('bkeep').slice(-1))}`);
+    const fewer = await me.until('cdata', (m) => m.cid === cid && (m.items.find((it) => it.id === 'planks')?.qty ?? 0) < 10, 40000);
+    assert.ok(fewer, 'no plank was taken for upkeep');
+    console.log(`  ok  its store pays the upkeep a plank at a time, and its members are told how long it keeps the base (${Math.round(keep1!.s / 3600)} h)`);
+    // the claim taken down: what was in its store lies on the ground
+    me.hold('hammer');
+    const lootBefore = me.of('loot+').length;
+    me.send({ t: 'bdel', b: B.id, p: 2, u: ham3.uid });
+    assert.ok(await me.until('bclaim', (m) => m.b === B.id && m.c === null, 5000), `the claim did not go: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    await sleep(300);
+    assert.ok(me.of('loot+').slice(lootBefore).some((m) => m.l.item.id === 'planks'), 'its store did not spill');
+    console.log('  ok  the claim taken down: what was in its store lies on the ground');
+    // a claim again, with nothing in its store: run dry, its base rots, and what comes to nothing breaks
+    await me.give('log', 1);
+    const since = me.got.length;
+    me.send({ t: 'blay', k: 'claim', b: B.id, x: 0, y: 0, z: 0, r: 0, u: plan3.uid });
+    assert.ok(await me.until('bclaim', (m) => m.b === B.id && !!m.c, 5000, since), `no claim again: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const dry = await me.until('bclaim', (m) => m.b === B.id && !!m.c?.[3], 60000, since);
+    assert.ok(dry, 'never dry');
+    assert.ok(await me.until('bhp', (m) => m.b === B.id, 5000, since), 'it did not rot');
+    assert.ok(await me.until('bout', (m) => m.b === B.id, 15000, since), 'nothing broke');
+    console.log('  ok  run dry, its base rots, and what comes to nothing breaks');
   } catch (e) {
     fail = e;
   } finally {

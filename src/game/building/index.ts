@@ -17,14 +17,17 @@ import type { Input } from '../../core/input';
 import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
-import { Bases, heard, heardPiece, said, type KeptBase } from '../../sim/build/bases';
+import { Bases, heard, heardClaim, heardPiece, said, type KeptBase } from '../../sim/build/bases';
 import { PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, type Tier } from '../../sim/build/pieces';
-import { nearestSpot, nearestToRay, restsOn, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
+import { deployAt, nearestSpot, nearestToRay, restsOn, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../../sim/items';
 import type { C2S, S2C } from '../../net/protocol';
 import { BaseDraw, PieceRef } from './draw';
+import { ClaimView } from './claims';
+import { publicId } from '../../net/client';
+import type { Stash } from '../loot';
 import { geometryOf } from './look';
 import { CATS, HAMMER_WHEEL, PER, RINGS, hammerEntries, outerOf, piecesOf, planEntries } from './wheel';
 
@@ -53,6 +56,10 @@ export interface BuildHost {
   /** where the wheels go (asked when one is first opened: the game makes its screen after this) */
   hud: () => HTMLElement;
   player: () => import('@dimforge/rapier3d-compat').Collider | undefined;
+  /** a store opened in the inventory (a claim's) */
+  open: (s: Stash) => void;
+  /** the player's name, as their claim's members are listed */
+  name: () => string;
 }
 
 /** how far the pointer goes to reach each ring (of the wheel's reach) */
@@ -106,6 +113,7 @@ export class Building {
     this.local = new Bases(land);
     this.seen = new Bases(land);
     this.draw = new BaseDraw(h.scene, h.atmo);
+    this.claims = new ClaimView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, who: () => this.me, name: h.name, open: h.open, hud: h.hud, broke: (b, ids) => this.draw.remove(b.id, ids), changed: (b) => this.bump(b.id) }, () => this.store);
     this.wheel = new Radial({ rings: RINGS, per: PER, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
   }
 
@@ -117,8 +125,12 @@ export class Building {
     return this.wheel.isOpen;
   }
 
-  /** what the player is: the store's word for who laid a piece (alone: 'me') */
-  private readonly me = 'me';
+  /** who the player is to a base: their public id online (as their dog tag has it), 'me' alone */
+  private get me() {
+    return this.h.online() ? publicId() : 'me';
+  }
+  /** claims: their stores, joining, the chip at the top (src/game/building/claims.ts) */
+  readonly claims: ClaimView;
 
   // ---- every frame
 
@@ -132,6 +144,9 @@ export class Building {
     if (plan && !this.wheel.isOpen) this.planFrame(held!);
     else this.hideGhost();
     if (hammer && !this.wheel.isOpen) this.hammerFrame(held!);
+    // (a claim looked at: F opens its store, held it joins: whatever is in the hands)
+    const claim = this.claims.frame(dt, ok && !this.wheel.isOpen && !this.h.busy(), ok ? this.target() : null);
+    if (claim) this.prompt = claim;
     // (while the hands are at it, the ring round the crosshair says what they are doing: the card stands aside)
     if (this.h.busy()) this.prompt = null;
   }
@@ -160,6 +175,14 @@ export class Building {
       if (!best || d < best.d) best = { base: b, s, d };
     }
     let ask: { b?: number; k: string; x: number; y: number; z: number; r: number; yaw?: number } | null = null;
+    // (a thing set down goes where the aim meets a floor, turned as R turns it)
+    if (K.role === 'deploy') {
+      best = null;
+      for (const b of near) {
+        const [lx, ly, lz] = toLocal(b, at.x, at.y, at.z), s = deployAt(b, this.kind, { x: lx, y: ly, z: lz }, this.turn);
+        if (s) best = { base: b, s, d: 0 };
+      }
+    }
     if (best) ask = { b: best.base.id, k: this.kind, x: best.s.x, y: best.s.y, z: best.s.z, r: best.s.r };
     else if ((K.ground || K.role === 'free') && hit) ask = { k: this.kind, x: at.x, y: 0, z: at.z, r: 0, yaw: this.h.yaw() + Math.PI };
     if (!ask) {
@@ -210,11 +233,12 @@ export class Building {
     const [x, y, z] = this.ghost ? [this.ghost.position.x, this.ghost.position.y, this.ghost.position.z] : [ask.x, 0, ask.z];
     audio.impact('wood', { x, y, z }, 1);
     if (this.h.online()) return void this.h.send({ t: 'blay', ...ask, u: plan.uid });
-    const r = this.local.lay(ask, this.me, Date.now());
+    const r = this.local.lay(ask, this.me, Date.now(), this.h.name());
     if (typeof r === 'string') return void this.h.note(r, 'warn');
     for (const [id, n] of Object.entries(costOf(ask.k, laidAt(ask.k)))) this.h.take(id, n);
     this.bump(r.base.id);
     this.draw.put(r.base, r.piece);
+    this.claims.sync(r.base);
     this.h.changed();
   }
 
@@ -311,6 +335,7 @@ export class Building {
       if (this.h.online()) return void this.h.send({ t: 'bdel', b: base.id, p: id, u: hammer.uid });
       const back = this.local.refund(base.id, id), gone = this.local.remove(base.id, id);
       this.draw.remove(base.id, gone);
+      this.claims.sync(base);
       this.bump(base.id);
       const items = Object.entries(back).map(([k, n]) => makeItem(k, n));
       if (items.length) this.h.give(items, Object.entries(back).map(([k, n]) => `${n} ${ITEMS[k].name}`).join(', '));
@@ -429,11 +454,13 @@ export class Building {
     if (!b) return;
     this.seen.bases.set(b.id, b);
     this.draw.setBase(b);
+    this.claims.sync(b);
     this.bump(b.id);
   }
   onGone(m: Extract<S2C, { t: 'bgone' }>) {
     this.seen.bases.delete(m.b);
     this.draw.forget(m.b);
+    this.claims.forget(m.b);
   }
   onPiece(m: Extract<S2C, { t: 'bpc' }>) {
     const b = this.seen.bases.get(m.b), p = heardPiece(m.p);
@@ -443,6 +470,7 @@ export class Building {
     p.on = restsOn(b, p.k, p).filter((id) => id !== p.id);
     b.next = Math.max(b.next, p.id + 1);
     this.draw.put(b, p);
+    this.claims.sync(b);
     this.bump(b.id);
   }
   onOut(m: Extract<S2C, { t: 'bout' }>) {
@@ -451,8 +479,25 @@ export class Building {
     for (const id of m.ids) b.pieces.delete(id);
     for (const p of b.pieces.values()) p.on = p.on.filter((q) => !m.ids.includes(q));
     this.draw.remove(m.b, m.ids);
+    this.claims.sync(b);
     if (!b.pieces.size) this.seen.bases.delete(m.b);
     this.bump(m.b);
+  }
+  onClaim(m: Extract<S2C, { t: 'bclaim' }>) {
+    this.claims.onClaim(m, this.seen.bases.get(m.b), heardClaim);
+    this.bump(m.b);
+  }
+  onKeep(m: Extract<S2C, { t: 'bkeep' }>) {
+    this.claims.onKeep(m);
+  }
+  /** the health of a base's pieces as they rot */
+  onHp(m: Extract<S2C, { t: 'bhp' }>) {
+    const b = this.seen.bases.get(m.b);
+    if (!b) return;
+    for (const [id, hp] of m.hp) {
+      const p = b.pieces.get(id);
+      if (p) p.hp = hp;
+    }
   }
   onSpent(m: Extract<S2C, { t: 'spent' }>) {
     for (const [id, n] of m.items) this.h.take(id, n);
@@ -470,12 +515,16 @@ export class Building {
     this.seen = new Bases(this.seen.land);
     this.sp = 0;
     this.draw.clear();
-    if (!this.h.online()) for (const b of this.local.bases.values()) this.draw.setBase(b);
+    this.claims.clear();
+    if (!this.h.online()) for (const b of this.local.bases.values()) {
+      this.draw.setBase(b);
+      this.claims.sync(b);
+    }
   }
 
   /** alone: what was built, kept with the game's own save (src/sim/save.ts) */
   keepLocal(): KeptBase[] {
-    return [...this.local.bases.values()].map(said);
+    return [...this.local.bases.values()].map((b) => said(b));
   }
   restoreLocal(kept: KeptBase[] | undefined) {
     this.local.restore(kept);

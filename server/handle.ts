@@ -49,6 +49,7 @@ import { aimWatch, looked } from './aimwatch';
 import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
 import { hammer, lay, owing, takeDown } from './build';
+import { join as joinClaim } from './claims';
 import { POISON } from '../src/sim/sickness';
 
 export function handle(c: Client, m: C2S) {
@@ -360,6 +361,8 @@ export function handle(c: Client, m: C2S) {
       return hammer(c, m);
     case 'bdel':
       return takeDown(c, m);
+    case 'bjoin':
+      return joinClaim(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);

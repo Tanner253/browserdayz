@@ -92,6 +92,8 @@ const SHAPES: Record<string, () => Shape> = {
     dress: Array.from({ length: 6 }, (_, i) => ({ hull: [[-H + i * 0.5 + 0.02, 6, -0.23], [-H + i * 0.5 + 0.48, 6, -0.23], [-H + i * 0.5 + 0.02, 6, 0.23], [-H + i * 0.5 + 0.48, 6, 0.23], [-H + i * 0.5 + 0.25, 6.6, 0]] as [number, number, number][] })),
   }),
   high_wall_stone: () => ({ solid: [box(-H, 0, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
+  // (the claim: its upkeep box, and over it a pole with the flag of whoever holds it)
+  claim: () => ({ solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], dress: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] }),
 };
 
 const made = new Map<string, Shape>();

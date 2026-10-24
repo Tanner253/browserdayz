@@ -1,0 +1,200 @@
+// A base's claim as the game has it (2026-10-24, base building's third step; the server's side server/claims.ts). Its
+// store is a box opened with F and filled as a crate is (only with what a base is kept with); F held a moment joins the
+// claim, or leaves it (Rust's: whoever reaches it may). Inside a claim's reach a chip at the top says whose it is and
+// how long its store keeps it; run dry, it says so in red. Played alone, this game's own claims pay their upkeep from
+// their stores and the bases rot as the server would have them.
+
+import * as THREE from 'three';
+import { Stash } from '../loot';
+import { toWorld, type Base } from '../../sim/build/snap';
+import { perDay, pay, protectedFor, rot, saidTime, UPKEEP } from '../../sim/build/upkeep';
+import type { Bases } from '../../sim/build/bases';
+import type { S2C, C2S, StoredItem } from '../../net/protocol';
+import type { Input } from '../../core/input';
+
+export interface ClaimHost {
+  input: Input;
+  online: () => boolean;
+  send: (m: C2S) => void;
+  note: (text: string, kind: 'good' | 'warn' | 'info') => void;
+  me: () => THREE.Vector3;
+  /** who this player is to a base (their public id online, 'me' alone), and their name */
+  who: () => string;
+  name: () => string;
+  /** a store opened in the inventory */
+  open: (s: Stash) => void;
+  hud: () => HTMLElement;
+  /** pieces lost to rot, played alone: drawn away */
+  broke: (b: Base, ids: number[]) => void;
+  changed: (b: Base) => void;
+}
+
+/** what the store holds (the server's word for it), and how long it keeps its base */
+interface Kept {
+  s: number;
+  dry: boolean;
+  day: [string, number][];
+}
+
+/** F held this long joins the claim or leaves it; let go before, it opens the store */
+const HOLD = 0.8;
+
+export class ClaimView {
+  private stores = new Map<number, Stash>();
+  private kept = new Map<number, Kept>();
+  private chip: HTMLDivElement | null = null;
+  private chipText = '';
+  private fT = -1;
+  private fDone = false;
+  private aloneT = 0;
+
+  constructor(private h: ClaimHost, private store: () => Bases) {}
+
+  /** a base's store as its claim is now: made, moved or taken away */
+  sync(b: Base) {
+    const p = b.claim && b.pieces.get(b.claim.p), had = this.stores.get(b.id);
+    if (!p) {
+      if (had) this.stores.delete(b.id);
+      return;
+    }
+    const [x, y, z] = toWorld(b, p.x, p.y, p.z);
+    if (had && Math.hypot(had.x - x, had.z - z) < 0.05) return;
+    const s = new Stash(`claim:${b.id}`, x, y + 0.4, z, 0, 6, 4, 'Claim');
+    if (had) s.container.load({ items: had.container.serialize().items });
+    this.stores.set(b.id, s);
+  }
+  forget(b: number) {
+    this.stores.delete(b);
+    this.kept.delete(b);
+  }
+  clear() {
+    this.stores.clear();
+    this.kept.clear();
+  }
+  all(): Stash[] {
+    return [...this.stores.values()];
+  }
+  byCid(cid: string): Stash | undefined {
+    return cid.startsWith('claim:') ? this.stores.get(Number(cid.slice(6))) : undefined;
+  }
+
+  onClaim(m: Extract<S2C, { t: 'bclaim' }>, b: Base | undefined, heard: (k: unknown) => Base['claim']) {
+    if (!b) return;
+    b.claim = m.c ? heard(m.c) : undefined;
+    this.sync(b);
+    this.h.changed(b);
+  }
+  onKeep(m: Extract<S2C, { t: 'bkeep' }>) {
+    this.kept.set(m.b, { s: m.s, dry: m.dry, day: m.day });
+  }
+
+  /** the player looks at a piece (`at`): if it is a claim within reach, what F does to it */
+  frame(dt: number, ok: boolean, at: { base: Base; id: number } | null): string | null {
+    this.chipFrame();
+    if (!this.h.online()) this.alone(dt);
+    const b = at?.base, p = b?.pieces.get(at!.id);
+    if (!ok || !b || !p || p.k !== 'claim' || !b.claim) {
+      this.fT = -1;
+      return null;
+    }
+    const on = b.claim.members.some((m) => m.pid === this.h.who()), input = this.h.input;
+    if (input.pressed('KeyF')) {
+      this.fT = 0;
+      this.fDone = false;
+    }
+    if (this.fT >= 0) {
+      if (input.held('KeyF')) {
+        this.fT += dt;
+        if (this.fT >= HOLD && !this.fDone) {
+          this.fDone = true;
+          this.toggle(b);
+        }
+      } else {
+        if (!this.fDone && this.stores.get(b.id)) this.h.open(this.stores.get(b.id)!);
+        this.fT = -1;
+      }
+    }
+    const who = b.claim.members.map((m) => m.name || 'someone').slice(0, 3).join(', ') + (b.claim.members.length > 3 ? ` and ${b.claim.members.length - 3} more` : '');
+    const holding = this.fT >= 0 && !this.fDone && this.fT > 0.15;
+    return `<span class="bc"><kbd>F</kbd><b>Claim</b> ${on ? 'yours' : `${who || 'nobody'}'s`}<i>${holding ? (on ? 'leaving…' : 'joining…') : `F opens its store · hold F to ${on ? 'leave it' : 'join it'}`}</i></span>`;
+  }
+
+  private toggle(b: Base) {
+    if (this.h.online()) return void this.h.send({ t: 'bjoin', b: b.id });
+    const on = this.store().join(b, this.h.who(), this.h.name());
+    this.h.note(on ? 'You are on this claim: you may build here' : 'You have left this claim', on ? 'good' : 'info');
+    this.h.changed(b);
+  }
+
+  /** the chip at the top: inside a claim's reach, whose it is and how long it is kept */
+  private chipFrame() {
+    const me = this.h.me(), b = this.store().claimAt(me.x, me.z);
+    let text = '', cls = '';
+    if (b?.claim) {
+      const on = b.claim.members.some((m) => m.pid === this.h.who());
+      const k = this.kept.get(b.id) ?? this.alonesKeep(b);
+      if (!on) {
+        text = `${b.claim.members[0]?.name || 'Someone'}'s claim · you may not build here`;
+        cls = 'theirs';
+      } else if (k?.dry || b.claim.dry) {
+        text = 'Your claim · no upkeep: the base is rotting';
+        cls = 'dry';
+      } else {
+        text = k?.s === 0 ? 'Your claim · its store is empty: put materials in it' : `Your claim · protected ${k ? (k.s < 0 ? 'for ever' : saidTime(k.s)) : '…'}`;
+        cls = k && k.s >= 0 && k.s < 12 * 3600 ? 'low' : 'ok';
+      }
+    }
+    const key = `${cls}|${text}`;
+    if (key === this.chipText) return;
+    this.chipText = key;
+    if (!this.chip) {
+      this.chip = document.createElement('div');
+      this.chip.className = 'hud-claim';
+      this.h.hud().appendChild(this.chip);
+    }
+    this.chip.textContent = text;
+    this.chip.className = `hud-claim ${cls}${text ? ' show' : ''}`;
+  }
+
+  /** played alone: what the store keeps, worked out from what is in it */
+  private alonesKeep(b: Base): Kept | null {
+    if (this.h.online()) return null;
+    const s = this.stores.get(b.id);
+    if (!s) return null;
+    const day = perDay(b), have = counts(s.container.serialize().items);
+    const left = protectedFor(have, day);
+    return { s: Number.isFinite(left) ? left : -1, dry: !!b.claim?.dry, day: Object.entries(day) };
+  }
+
+  /** played alone, every minute: upkeep out of each claim's store, and rot where there is none to pay with */
+  private alone(dt: number) {
+    if ((this.aloneT += dt) < 60) return;
+    this.aloneT = 0;
+    const store = this.store(), now = Date.now();
+    for (const b of [...store.bases.values()]) {
+      if (b.claim) {
+        const s = this.stores.get(b.id), items = s ? s.container.serialize().items : [];
+        const have = counts(items), before = { ...have };
+        b.claim.dry = !pay(perDay(b), 1 / 60, b.claim.due, have);
+        if (s) for (const [id, n] of Object.entries(before)) if (n > (have[id] ?? 0)) s.container.take(id, n - (have[id] ?? 0));
+        if (!b.claim.dry) continue;
+      }
+      const { broken } = rot(b, 1 / 60, now, !!b.claim);
+      for (const id of broken) {
+        if (!b.pieces.has(id)) continue;
+        const gone = store.remove(b.id, id);
+        this.h.broke(b, gone);
+      }
+      if (!b.claim) this.sync(b);
+      this.h.changed(b);
+    }
+  }
+}
+
+/** counts of what a store holds of what a base is kept with */
+function counts(items: StoredItem[]) {
+  const n: Record<string, number> = {};
+  for (const it of items) if (UPKEEP.has(it.id)) n[it.id] = (n[it.id] ?? 0) + it.qty;
+  return n;
+}
+

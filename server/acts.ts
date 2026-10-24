@@ -59,7 +59,7 @@ export function ajar(cid: string, open: boolean, by?: Client) {
 }
 
 /** The short public mark of a key, as a player's own game stamps it on their tag (publicId in src/net/client.ts: the same sum). */
-function pidOf(key: string): string {
+export function pidOf(key: string): string {
   let a = 2166136261, b = 5381;
   for (let i = 0; i < key.length; i++) {
     a = Math.imul(a ^ key.charCodeAt(i), 16777619);

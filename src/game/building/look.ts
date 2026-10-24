@@ -95,6 +95,28 @@ export function geometryOf(kind: string, t: Tier, dress = true): THREE.BufferGeo
   return g;
 }
 
+/** a kind's dress alone (what is drawn of it in a paint of its own: the claim's flag) */
+export function dressOf(kind: string): THREE.BufferGeometry | null {
+  const key = `${kind}:dress`;
+  let g = geos.get(key);
+  if (g === undefined) {
+    const d = shapeOf(kind).dress;
+    g = d?.length ? mergeGeometries(d.map((q) => solidGeo(q, 1)), false)! : (null as unknown as THREE.BufferGeometry);
+    geos.set(key, g);
+  }
+  return g ?? null;
+}
+
+let flag: THREE.MeshStandardMaterial | null = null;
+/** the claim's flag: a red cloth, both sides */
+export function flagPaint(atmo: Atmosphere | null) {
+  if (!flag) {
+    flag = new THREE.MeshStandardMaterial({ color: 0xa8322a, roughness: 0.95, side: THREE.DoubleSide, name: 'build-flag' });
+    if (atmo) atmo.register(flag);
+  }
+  return flag;
+}
+
 /** a frame's lattice: timber round the edge of every 3 m and across it corner to corner, open between */
 function lattice(): THREE.Texture {
   const c = document.createElement('canvas');

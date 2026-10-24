@@ -38,10 +38,24 @@ export interface Base {
   oy: number;
   oz: number;
   yaw: number;
-  /** who laid its first piece (their key's hash, as the server keeps characters) */
+  /** who laid its first piece (their public id, as their dog tag has it: never their key) */
   owner: string;
   pieces: Map<number, Piece>;
   next: number;
+  /** its claim, if one is set down in it (src/sim/build/upkeep.ts): which piece, who is on it, what is owed over */
+  claim?: Claim;
+}
+
+export interface Claim {
+  p: number;
+  /** who may build here, by public id, with the name they had when they joined; the first set it down */
+  members: { pid: string; name: string }[];
+  /** upkeep owed in parts of a thing, kept until they make a whole one */
+  due: Record<string, number>;
+  /** its store ran dry: the base is rotting */
+  dry: boolean;
+  /** what was in its store when it was kept (read back by whoever keeps the store: the server's boxes) */
+  kept?: unknown[];
 }
 
 export interface Spot {
@@ -207,6 +221,40 @@ export function spots(base: Base, kind: string, turn = 0): Spot[] {
   return out;
 }
 
+/** whether a point is inside a convex outline */
+function within(poly: [number, number][], x: number, z: number) {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x1, z1] = poly[i], [x2, z2] = poly[(i + 1) % poly.length];
+    const c = (x2 - x1) * (z - z1) - (z2 - z1) * (x - x1);
+    if (Math.abs(c) < 1e-9) continue;
+    if (sign && Math.sign(c) !== sign) return false;
+    sign = Math.sign(c);
+  }
+  return true;
+}
+
+/** the floor a thing set down at a place would stand on: a foundation's or a floor's top, its foot wholly on it */
+function floorUnder(base: Base, kind: string, x: number, y: number, z: number): Piece | null {
+  const foot = PIECES[kind].foot ?? 0.5;
+  for (const p of base.pieces.values()) {
+    const P = kindOf(p);
+    if (!isFloor(p) || P.roof || Math.abs(p.y - y) > 0.7) continue;
+    if (within(cornersOf(P.shape!, p.x, p.z, p.r, foot), x, z)) return p;
+  }
+  return null;
+}
+
+/**
+ * Where a thing set down (a claim, a box) would go for an aim at a place in the base's frame: on the floor under it,
+ * to a quarter of a metre, turned as the player turns it. Null: no floor there for it.
+ */
+export function deployAt(base: Base, kind: string, aim: { x: number; y: number; z: number }, turn = 0): Spot | null {
+  const x = Math.round(aim.x * 4) / 4, z = Math.round(aim.z * 4) / 4;
+  const f = floorUnder(base, kind, x, aim.y, z);
+  return f ? { x, y: f.y, z, r: mod12(turn), on: [f.id] } : null;
+}
+
 /** what a piece of `kind` at `s` would rest on (an empty list: nothing, unless it is a foundation or free) */
 export function restsOn(base: Base, kind: string, s: { x: number; y: number; z: number; r: number }): number[] {
   const K = PIECES[kind];
@@ -224,6 +272,8 @@ export function restsOn(base: Base, kind: string, s: { x: number; y: number; z: 
       if (isWall(p) && near(topOf(p), s)) on.push(p.id);
     } else if (K.role === 'stairs') {
       if (isFloor(p) && !P.roof && near(p, s)) on.push(p.id);
+    } else if (K.role === 'deploy') {
+      if (isFloor(p) && !P.roof && Math.abs(p.y - s.y) < SAME && within(cornersOf(P.shape!, p.x, p.z, p.r, K.foot ?? 0.5), s.x, s.z)) on.push(p.id);
     } else if (K.role === 'steps') {
       const back = K.half ? CELL / 4 : CELL / 2;
       if (P.ground && edgesOf(P.shape!, p.x, p.y, p.z, p.r).some((e) => near(e, { x: s.x - sin(s.r) * back, y: s.y, z: s.z - cos(s.r) * back }))) on.push(p.id);
@@ -247,6 +297,8 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     if (P.role === 'stairs' && K.role === 'stairs' && near(p, s)) return 'Stairs stand there already';
     if (P.role === 'steps' && K.role === 'steps' && near(p, s)) return 'Something stands there already';
     if (P.role === 'free' && K.role === 'free' && Math.hypot(p.x - s.x, p.z - s.z) < 1 && Math.abs(p.y - s.y) < 2) return 'A wall stands there already';
+    if (K.role === 'deploy' && P.role === 'deploy' && Math.abs(p.y - s.y) < 1 && Math.hypot(p.x - s.x, p.z - s.z) < (P.foot ?? 0.5) + (K.foot ?? 0.5)) return `The ${P.name.toLowerCase()} is in the way`;
+    if (K.role === 'deploy' && P.role === 'stairs' && Math.abs(p.y - s.y) < 0.3 && within(cornersOf(P.shape!, p.x, p.z, p.r), s.x, s.z)) return 'The stairs are in the way';
   }
   if (K.role === 'floor') {
     const mine = cornersOf(K.shape!, s.x, s.z, s.r, 0.06);
@@ -265,7 +317,7 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
   const lowest = Math.min(0, ...all.filter((p) => kindOf(p).ground).map(level));
   if (s.y - lowest > STOREYS * STOREY + (K.role === 'floor' ? 0.1 : -0.1)) return `Too high: ${STOREYS} storeys at most`;
   if (K.role !== 'floor' || !K.ground) {
-    if (K.role !== 'free' && !s.on.length) return K.role === 'wall' ? 'It needs a foundation or a floor under it' : K.role === 'floor' ? 'It needs walls to rest on' : 'It needs a foundation under it';
+    if (K.role !== 'free' && !s.on.length) return K.role === 'wall' ? 'It needs a foundation or a floor under it' : K.role === 'floor' ? 'It needs walls to rest on' : K.role === 'deploy' ? 'It is set down on a foundation or a floor' : 'It needs a foundation under it';
     // (a floor holds on walls on two sides, or beside a floor that does: one cell past its walls, no more)
     if (K.role === 'floor' && !K.ground && !held(base, s.on)) return s.on.some((id) => isFloor(base.pieces.get(id)!)) ? 'Too far out: a floor reaches one cell past its walls' : 'It needs walls on two sides, or a floor beside it';
   }
@@ -326,6 +378,11 @@ export function nearestToRay(list: Spot[], kind: string, from: { x: number; y: n
 
 /** whether a spot asked for is one the base offers (the server's test of what a game says it laid) */
 export function offered(base: Base, kind: string, want: { x: number; y: number; z: number; r: number }): Spot | null {
+  // (a thing set down goes anywhere on a floor: it is where the game says, if a floor is there for it)
+  if (PIECES[kind].role === 'deploy') {
+    const s = deployAt(base, kind, want, want.r);
+    return s && Math.abs(s.x - want.x) < SAME && Math.abs(s.z - want.z) < SAME ? s : null;
+  }
   for (const turn of [0, 1, 2, 3]) {
     for (const s of spots(base, kind, turn)) if (near(s, want) && sameTurn(kind, s.r, want.r)) return s;
   }

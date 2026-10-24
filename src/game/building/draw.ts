@@ -10,7 +10,10 @@ import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES, type Tier } from '../../sim/build/pieces';
 import { shapeOf } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
-import { SURFACE, drawnAt, geometryOf, paintsOf } from './look';
+import { SURFACE, drawnAt, dressOf, flagPaint, geometryOf, paintsOf } from './look';
+
+/** kinds whose dress is drawn apart, in a paint of its own (the claim's flag) */
+const CLOTH = new Set(['claim']);
 
 /** what a blow or a bullet that lands on a piece struck */
 export class PieceRef {
@@ -47,7 +50,7 @@ export class BaseDraw {
 
   /** a piece laid or changed (its tier, where it is) */
   put(base: Base, piece: Piece) {
-    const id = this.id(base.id, piece.id), key = `${piece.k}:${drawnAt(piece.k, piece.t)}`;
+    const id = this.id(base.id, piece.id), key = `${piece.k}:${drawnAt(piece.k, piece.t)}${CLOTH.has(piece.k) ? ':cloth' : ''}`;
     const was = this.drawn.get(id);
     if (was) {
       this.dirty.add(was.key);
@@ -115,19 +118,41 @@ export class BaseDraw {
       if (m) {
         this.scene.remove(m);
         m.dispose();
+        const f = m.userData.cloth as THREE.InstancedMesh | undefined;
+        if (f) {
+          this.scene.remove(f);
+          f.dispose();
+        }
       }
-      const [kind, t] = key.split(':');
-      m = new THREE.InstancedMesh(geometryOf(kind, Number(t) as Tier), paintsOf(this.atmo)[Number(t)], Math.max(16, Math.ceil(list.length * 1.5)));
+      const [kind, t, cloth] = key.split(':');
+      m = new THREE.InstancedMesh(geometryOf(kind, Number(t) as Tier, !cloth), paintsOf(this.atmo)[Number(t)], Math.max(16, Math.ceil(list.length * 1.5)));
       m.castShadow = m.receiveShadow = true;
       m.name = `base:${key}`;
       this.scene.add(m);
       this.meshes.set(key, m);
+      // (and its cloth, beside it: one more draw for the kind, as many as there are)
+      const dress = cloth && dressOf(kind);
+      if (dress) {
+        const f = new THREE.InstancedMesh(dress, flagPaint(this.atmo), m.instanceMatrix.count);
+        f.castShadow = true;
+        f.name = `base:${key}:flag`;
+        this.scene.add(f);
+        m.userData.cloth = f;
+      }
     }
     list.forEach((d, i) => m!.setMatrixAt(i, d.matrix));
     m.count = list.length;
     m.instanceMatrix.needsUpdate = true;
     m.computeBoundingSphere();
     m.visible = list.length > 0;
+    const f = m.userData.cloth as THREE.InstancedMesh | undefined;
+    if (f) {
+      list.forEach((d, i) => f.setMatrixAt(i, d.matrix));
+      f.count = list.length;
+      f.instanceMatrix.needsUpdate = true;
+      f.computeBoundingSphere();
+      f.visible = list.length > 0;
+    }
   }
 
   private solid(d: Drawn) {

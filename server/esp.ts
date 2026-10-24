@@ -11,7 +11,7 @@ import type { BodyBox } from './bodies';
 /** how far it sees, metres; the most rows it says, the nearest; how often a game may ask, ms */
 export const ESP = { range: 150, most: 250, every: 900 };
 
-const BOX_AT: Record<BodyBox['kind'], number> = { corpse: ESP_AT.body, crate: ESP_AT.crate, stash: ESP_AT.stash, drop: ESP_AT.drop, furniture: ESP_AT.furniture };
+const BOX_AT: Record<BodyBox['kind'], number> = { corpse: ESP_AT.body, crate: ESP_AT.crate, stash: ESP_AT.stash, drop: ESP_AT.drop, furniture: ESP_AT.furniture, claim: ESP_AT.stash };
 
 /** the thing in a box that says most of what is in it: the biggest */
 const biggest = (items: ItemInstance[]) => items.reduce((a, b) => (ITEMS[b.id] && (!ITEMS[a.id] || ITEMS[b.id].w * ITEMS[b.id].h > ITEMS[a.id].w * ITEMS[a.id].h) ? b : a));

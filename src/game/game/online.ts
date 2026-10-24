@@ -335,6 +335,9 @@ export const onlineMethods = {
     net.on('bout', (m) => this.build.onOut(m));
     net.on('spent', (m) => this.build.onSpent(m));
     net.on('bup', (m) => this.build.onUp(m));
+    net.on('bclaim', (m) => this.build.onClaim(m));
+    net.on('bkeep', (m) => this.build.onKeep(m));
+    net.on('bhp', (m) => this.build.onHp(m));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => {
       this.gearOf.set(m.id, m.g);
@@ -990,6 +993,6 @@ export const onlineMethods = {
 
   /** any server-held container by id: map crate, stash or body */
   findBox(this: Game, cid: string): Stash | undefined {
-    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash;
+    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash ?? this.build.claims.byCid(cid);
   },
 };

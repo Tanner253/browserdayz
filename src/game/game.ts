@@ -710,6 +710,11 @@ export class Game {
       felled: (i) => this.gather.felling.isDown(i),
       hud: () => this.hud.root,
       player: () => this.player.collider,
+      open: (s) => {
+        this.focus = s;
+        this.toggleInventory(true);
+      },
+      name: () => playerName(),
     });
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);

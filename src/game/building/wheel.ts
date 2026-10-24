@@ -20,7 +20,7 @@ export const CATS: { cat: Cat | null; label: string; icon: string }[] = [
   { cat: null, label: 'Cancel', icon: '' },
   { cat: 'roofs', label: 'Roofs', icon: 'roof' },
   { cat: 'outside', label: 'Outside', icon: 'high_wall_wood' },
-  { cat: null, label: '', icon: '' },
+  { cat: 'deploy', label: 'Set down', icon: 'claim' },
 ];
 /** what each wedge of the hammer's wheel does (its bottom Cancel) */
 export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'repair', 'cancel', 'remove', 'rotate', ''] as const;

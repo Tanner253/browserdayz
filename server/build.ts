@@ -16,8 +16,9 @@ import type { SerializedInventory } from '../src/sim/inventory';
 import type { C2S, S2C } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
 import { log, things, world } from './index';
-import { keyHash } from './gate';
 import { tool, use, woods } from './gather';
+import { pidOf } from './acts';
+import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
 
 /** how far off a base is told to a game, and how far off it is forgotten again */
 export const SIGHT = { tell: 450, forget: 650 };
@@ -110,13 +111,16 @@ export function owing(c: Client, sp: unknown) {
   for (const o of d.owed) for (const [id, n] of o.items) takeFrom(c.inv, id, n);
 }
 
-/** a player's own, by the key the server keeps them by */
-const own = (c: Client) => keyHash(c.key);
+/** who a player is to a base: their public id, as their dog tag has it (never their key: a base is told to everybody near) */
+const own = (c: Client) => pidOf(c.key);
 
 // ---- what each game is told
 
+/** whether a player's game has been told of base `b` */
+export const known = (c: Client, b: number) => !!doing.get(c)?.known.has(b);
+
 /** to each game that has been told of base `b` */
-function tellBase(b: number, m: S2C) {
+export function tellBase(b: number, m: S2C) {
   for (const c of clients.values()) if (doing.get(c)?.known.has(b)) send(c, m);
 }
 
@@ -164,13 +168,18 @@ export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
   const cost = costOf(m.k, PIECES[m.k].only ?? 0);
   const no = short(c.inv, cost);
   if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
-  const r = all.lay(ask, own(c), Date.now());
+  const r = all.lay(ask, own(c), Date.now(), c.name);
   if (typeof r === 'string') return void send(c, { t: 'tell', kind: 'warn', text: r });
   pay(c, cost);
+  if (m.k === 'claim') {
+    storeFor(r.base);
+    log(`[build] ${c.name} set down a claim in base ${r.base.id}`);
+  }
   if (r.fresh) {
     log(`[build] ${c.name} began base ${r.base.id} at ${r.base.ox.toFixed(0)}, ${r.base.oz.toFixed(0)} (${all.bases.size} bases, ${all.count} pieces)`);
     sighting();
   } else tellBase(r.base.id, { t: 'bpc', b: r.base.id, p: saidPiece(r.piece) });
+  if (m.k === 'claim') tellClaim(r.base);
 }
 
 /** the hammer at a piece: whose it is to work, near enough, and the hammer fit to work with */
@@ -182,8 +191,8 @@ function atPiece(c: Client, b: number, p: number, u: unknown): { it: ItemInstanc
   const [x, , z] = toWorld(base, piece.x, piece.y, piece.z);
   if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.hammer) return { it, why: 'Too far off' };
   if (condition(it.cond).ruined) return { it, why: 'Your hammer is ruined' };
-  // (until claims come, the base is its first builder's to work: step three makes it its claim's)
-  if (base.owner !== own(c)) return { it, why: 'It is not yours' };
+  // (its claim's members' to work; with no claim, its first builder's)
+  if (!bases().mayWork(base, own(c))) return { it, why: base.claim ? 'You are not on its claim' : 'It is not yours' };
   return { it, why: null };
 }
 
@@ -212,9 +221,14 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   const at = atPiece(c, m.b, m.p, m.u);
   if (!at) return;
   if (at.why) return void send(c, { t: 'tell', kind: 'warn', text: at.why });
-  const all = bases(), back = all.refund(m.b, m.p);
+  const all = bases(), back = all.refund(m.b, m.p), claimed = all.bases.get(m.b)?.claim?.p;
   const gone = all.remove(m.b, m.p);
   if (!gone.length) return;
+  if (claimed !== undefined && gone.includes(claimed)) {
+    spill(m.b);
+    const b = all.bases.get(m.b);
+    if (b) tellClaim(b);
+  }
   use(c, at.it);
   tellBase(m.b, { t: 'bout', b: m.b, ids: gone });
   const items = Object.entries(back).map(([id, n]) => makeItem(id, n));
@@ -223,12 +237,13 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
 
 // ---- kept
 
-export const keepBases = (): KeptBase[] => bases().keep();
+export const keepBases = (): KeptBase[] => bases().keep(stockOf);
 /** read back from the save (only into a server that has no bases of its own yet) */
 export function restoreBases(kept: KeptBase[] | undefined) {
   const all = bases();
   if (all.bases.size || !kept?.length) return;
   all.restore(kept);
+  storesBack();
   log(`[build] ${all.bases.size} bases, ${all.count} pieces read back`);
 }
 

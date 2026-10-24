@@ -16,7 +16,7 @@ import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 import type { AnimalRow, Call } from '../sim/animals';
-import type { KeptBase, KeptPiece } from '../sim/build/bases';
+import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
@@ -337,6 +337,8 @@ export type C2S =
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
   | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
   | { t: 'bdel'; b: number; p: number; u: string }
+  /** joining a base's claim, or leaving it (stood at it) */
+  | { t: 'bjoin'; b: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -426,6 +428,11 @@ export type S2C =
   | { t: 'bgone'; b: number }
   | { t: 'bpc'; b: number; p: KeptPiece }
   | { t: 'bout'; b: number; ids: number[] }
+  /** a base's claim as it is now (null: gone), with no store; the health of its pieces rotting */
+  | { t: 'bclaim'; b: number; c: KeptClaim | null }
+  | { t: 'bhp'; b: number; hp: [number, number][] }
+  /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */
+  | { t: 'bkeep'; b: number; s: number; dry: boolean; day: [string, number][] }
   /** the server's word on the hammer begun at a piece */
   | { t: 'bup'; b: number; p: number; ok: boolean; why?: string }
   /** materials the server took for what was built (`n` its number, said back in 'me' `sp` once they are out of the pockets) */

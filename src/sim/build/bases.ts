@@ -3,7 +3,8 @@
 // of where a piece goes are src/sim/build/snap.ts; what it is and costs, src/sim/build/pieces.ts.
 
 import { FOUND, PIECES, PIECE_IDS, costOf, hpOf, laidAt, type Tier } from './pieces';
-import { blocked, cornersOf, offered, restsOn, standing, toLocal, toWorld, type Base, type Piece, type Spot } from './snap';
+import { blocked, cornersOf, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
+import { ROT } from './upkeep';
 
 export const LIMITS = {
   /** pieces a base holds (the owner's yes to "150 pieces a claim"), and the server holds in all */
@@ -11,6 +12,8 @@ export const LIMITS = {
   all: 6000,
   /** how near another base a new one may be begun: nearer, it is built onto that one */
   apart: 8,
+  /** claims a player may hold (the owner's yes: "One claim a player") */
+  claims: 1,
 };
 
 /** what a world says of the ground to a base (the server's world and the game's are the same, from one seed) */
@@ -109,6 +112,13 @@ export class Bases {
     const [wx, , wz] = toWorld(base, spot.x, spot.y, spot.z);
     const no = this.land.why(wx, wz);
     if (no) return no;
+    // (nor inside somebody else's claim: Rust's building blocked)
+    const theirs = this.claimAt(wx, wz);
+    if (theirs && !theirs.claim!.members.some((m) => m.pid === by)) return "Building blocked: someone else's claim";
+    if (ask.k === 'claim') {
+      if (base.claim) return 'This base has its claim already';
+      if ([...this.bases.values()].filter((b) => b.claim?.members[0]?.pid === by).length >= LIMITS.claims) return 'You hold a claim already: one a player';
+    }
     if (K.ground || K.role === 'free' || K.role === 'steps') {
       for (const s of this.land.solids?.(wx, wz, 3) ?? []) {
         const [lx, , lz] = toLocal(base, s.x, 0, s.z);
@@ -118,8 +128,38 @@ export class Bases {
     return { base, spot, fresh };
   }
 
+  /** the base whose claim's rights reach a place (null: none's) */
+  claimAt(x: number, z: number): Base | null {
+    for (const b of this.bases.values()) {
+      if (!b.claim) continue;
+      for (const p of b.pieces.values()) {
+        const [px, , pz] = toWorld(b, p.x, p.y, p.z);
+        if (Math.hypot(px - x, pz - z) < ROT.reach) return b;
+      }
+    }
+    return null;
+  }
+
+  /** whether a player may work a base with the hammer: on its claim, or, with none, its first builder */
+  mayWork(b: Base, by: string) {
+    return b.claim ? b.claim.members.some((m) => m.pid === by) : b.owner === by;
+  }
+
+  /** a player joins a base's claim, or, on it already, leaves it: true now on it */
+  join(b: Base, by: string, name: string): boolean {
+    const c = b.claim;
+    if (!c) return false;
+    const i = c.members.findIndex((m) => m.pid === by);
+    if (i >= 0) {
+      c.members.splice(i, 1);
+      return false;
+    }
+    c.members.push({ pid: by, name });
+    return true;
+  }
+
   /** a piece laid (`check` first said it may): the base, and the piece */
-  lay(ask: Ask, by: string, now: number): { base: Base; piece: Piece; fresh: boolean } | string {
+  lay(ask: Ask, by: string, now: number, name = ''): { base: Base; piece: Piece; fresh: boolean } | string {
     const c = this.check(ask, by);
     if (typeof c === 'string') return c;
     const { base, spot, fresh } = c;
@@ -131,6 +171,7 @@ export class Bases {
     // (to the centimetre, as every game is told it: the server's copy and theirs are the same to the last figure)
     const piece: Piece = { id: base.next++, k: ask.k, t, x: cm(spot.x) / 100, y: cm(spot.y) / 100, z: cm(spot.z) / 100, r: spot.r, hp: hpOf(ask.k, t), at: now, by, on: spot.on };
     base.pieces.set(piece.id, piece);
+    if (ask.k === 'claim') base.claim = { p: piece.id, members: [{ pid: by, name }], due: {}, dry: false };
     return { base, piece, fresh };
   }
 
@@ -164,6 +205,7 @@ export class Bases {
       base.pieces.delete(p.id);
       gone.push(p.id);
     }
+    if (base.claim && gone.includes(base.claim.p)) base.claim = undefined;
     if (!base.pieces.size) this.bases.delete(b);
     return gone;
   }
@@ -185,9 +227,9 @@ export class Bases {
 
   // ---- kept
 
-  /** every base, as short as it can be said: what the save keeps and what a game is told */
-  keep(): KeptBase[] {
-    return [...this.bases.values()].map(said);
+  /** every base, as short as it can be said, with what is in each claim's store (`stock`): what the save keeps */
+  keep(stock?: (b: Base) => unknown[]): KeptBase[] {
+    return [...this.bases.values()].map((b) => said(b, stock?.(b)));
   }
 
   /** read back (the save's, or what the server says): every piece's rests worked out again from where it stands */
@@ -201,20 +243,32 @@ export class Bases {
   }
 }
 
-/** a base said short: [id, x, y, z, yaw, owner, next piece's number, pieces] */
-export type KeptBase = [number, number, number, number, number, string, number, KeptPiece[]];
+/** a base said short: [id, x, y, z, yaw, owner, next piece's number, pieces, and its claim] */
+export type KeptBase = [number, number, number, number, number, string, number, KeptPiece[], KeptClaim?];
+/** a claim: [its piece, its members [public id, name], what is owed over, dry, what is in its store (the save's only, never a game's)] */
+export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, unknown[]?];
 /** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s)] */
 export type KeptPiece = [number, number, number, number, number, number, number, number, number];
 
 const cm = (v: number) => Math.round(v * 100);
-export function said(b: Base): KeptBase {
-  return [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map(saidPiece)];
+export function said(b: Base, stock?: unknown[]): KeptBase {
+  const k: KeptBase = [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map(saidPiece)];
+  if (b.claim) k.push(saidClaim(b.claim, stock));
+  return k;
+}
+export const saidClaim = (c: Claim, stock?: unknown[]): KeptClaim => [c.p, c.members.map((m) => [m.pid, m.name]), Object.fromEntries(Object.entries(c.due).map(([k, n]) => [k, Math.round(n * 1000) / 1000])), c.dry, ...(stock ? [stock] : [])] as KeptClaim;
+export function heardClaim(k: unknown): Claim | undefined {
+  if (!Array.isArray(k) || !Number.isFinite(k[0]) || !Array.isArray(k[1])) return undefined;
+  const members = (k[1] as unknown[]).filter((m): m is [string, string] => Array.isArray(m) && typeof m[0] === 'string' && typeof m[1] === 'string').map(([pid, name]) => ({ pid, name }));
+  const due: Record<string, number> = {};
+  for (const [id, n] of Object.entries((k[2] ?? {}) as Record<string, unknown>)) if (Number.isFinite(n)) due[id] = Number(n);
+  return { p: k[0] as number, members, due, dry: !!k[3], ...(Array.isArray(k[4]) ? { kept: k[4] as unknown[] } : {}) };
 }
 export const saidPiece = (p: Piece): KeptPiece => [p.id, PIECE_IDS.indexOf(p.k), p.t, cm(p.x), cm(p.y), cm(p.z), p.r, Math.round(p.hp), Math.round(p.at / 1000)];
 
 /** a base read back from what it was said as; null if it is not one */
 export function heard(k: KeptBase): Base | null {
-  if (!Array.isArray(k) || k.length !== 8 || !Array.isArray(k[7])) return null;
+  if (!Array.isArray(k) || (k.length !== 8 && k.length !== 9) || !Array.isArray(k[7])) return null;
   const [id, ox, oy, oz, yaw, owner, next, ps] = k;
   if (![id, ox, oy, oz, yaw, next].every(Number.isFinite) || typeof owner !== 'string') return null;
   const b: Base = { id, ox, oy, oz, yaw, owner, pieces: new Map(), next };
@@ -224,6 +278,8 @@ export function heard(k: KeptBase): Base | null {
   }
   // (what each rests on is where it stands: worked out again, in the order they were laid)
   for (const p of [...b.pieces.values()].sort((a, c) => a.id - c.id)) p.on = restsOn(b, p.k, p).filter((id) => id !== p.id);
+  const claim = heardClaim(k[8]);
+  if (claim && b.pieces.get(claim.p)?.k === 'claim') b.claim = claim;
   return b.pieces.size ? b : null;
 }
 
