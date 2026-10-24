@@ -307,4 +307,15 @@ export function vaultPart(v: Vault, o: Out) {
       o.quad([at(u0, t0), at(u1, t0), at(u1, t1), at(u0, t1)], [[u0, round[k]], [u1, round[k]], [u1, round[k + 1]], [u0, round[k + 1]]], face((t0 + t1) / 2), tone, [face(t0), face(t0), face(t1), face(t1)]);
     }
   }
+  // (where it has fallen, its broken end is stone from its underside up to the floor over it, two fingers over its
+  // crown: open, the underside was a sheet with no thickness, and a slit of the next room showed between its edge and
+  // the wall it springs from, 2026-10-23)
+  for (const [g0, g1] of v.gone ?? []) for (const [u, way] of [[g0, 1], [g1, -1]]) {
+    if (u <= 0.02 || u >= L - 0.02) continue;
+    const top = (p: V3): V3 => [p[0], v.crown + 0.02 + ((v.lift ?? 0) * u) / L, p[2]];
+    for (let k = 0; k < N; k++) {
+      const p0 = at(u, (Math.PI * k) / N), p1 = at(u, (Math.PI * (k + 1)) / N), q = [p0, p1, top(p1), top(p0)];
+      o.quad(q, q.map((p): UV => [dot(p, side), p[1]]), mul(d, way), tone * 0.9);
+    }
+  }
 }

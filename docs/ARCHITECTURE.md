@@ -41,7 +41,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `admin-bodies.ts` | 73 | Bodies cleared away by an admin, with whatever is on them: one (the one looked at, by its number, or the nearest), or every one within so many metres, as /delz puts down the infected (the owner, 2026-10-23: |
 | `admin.ts` | 962 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
-| `animals.ts` | 157 | The server: the animals (2026-10-23). |
+| `animals.ts` | 158 | The server: the animals (2026-10-23). |
 | `bodies.ts` | 87 | The bodies of the infected, searched as a player's is, and bodies cleared away by an admin. |
 | `bodywatch.ts` | 201 | How a body moves, watched for a program walking it: standing on nothing, or to and fro on one spot doing nothing. |
 | `botrules.ts` | 51 | The server: the numbers the bot rules go by, kept off the public code (the owner, 2026-10-18: |
@@ -115,6 +115,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
+| `stage.ts` | 202 | The stage: a plain place to look at one thing at a time, the same way every time (2026-10-24, the owner: |
 | `stance.ts` | 553 | Development-only measure of how a gun is held by a body seen from outside (window.ST), beside the harness that drives the game (window.T). |
 | `sweep.ts` | 313 | Development-only numbers for every animation (window.S), beside the harness that drives the game (window.T) and the tools that photograph it (window.D). |
 | `towns.ts` | 130 | `?towns` on a development build: a new town (src/sim/towns.ts) stood on level ground of its own in the north-west corner of today's map, in the game as it is, to be walked and looked at before it has its place in the... |
@@ -125,7 +126,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
-| `animals.ts` | 522 | The animals as the game draws them (2026-10-23). |
+| `animals.ts` | 526 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
 | `avatar.ts` | 2777 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 | `blast.ts` | 1420 | A blast: a grenade, a drum of fuel, a car going up. |
@@ -227,11 +228,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `airdrop.ts` | 484 | The supply drop comes by helicopter (2026-10-13: |
 | `animal-calls.ts` | 26 | The animals' calls (2026-10-23): when a herd is heard, and which of it. |
-| `animal-fight.ts` | 220 | The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt, of whoever comes too near (src/sim/animal-mind.ts calls these for its own). |
+| `animal-fight.ts` | 335 | The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt of whoever comes too near, and, hungry, of deer (src/sim/animal-mind.ts calls these for its own). |
 | `animal-ground.ts` | 269 | The ground as the animals know it (2026-10-23): what kind of country a place is (field, forest, rock, snow, desert, water, a town), whether an animal can stand there, and whether it can see from one place to another. |
-| `animal-mind.ts` | 782 | The animals' minds (2026-10-23): the herds, their ground and their day, what frightens them, the bear's charge and the wolves' hunt. |
+| `animal-mind.ts` | 798 | The animals' minds (2026-10-23): the herds, their ground and their day, what frightens them, the bear's charge and the wolves' hunt. |
 | `animal-places.ts` | 144 | Where the animals are (2026-10-23): the herds' ground, each one's place in its herd and room from the rest, and whether a place will do for one (src/sim/animal-mind.ts calls these for its own). |
-| `animals.ts` | 309 | Animals (2026-10-23). The owner: "We also need animals ... it may be time to implement hunting as a food source", and of how: "regarding animal logic just ask what does dayz or rust do and copy/revamp their... |
+| `animals.ts` | 324 | Animals (2026-10-23). The owner: "We also need animals ... it may be time to implement hunting as a food source", and of how: "regarding animal logic just ask what does dayz or rust do and copy/revamp their... |
 | `apart.ts` | 90 | The places stocked apart from the rest of the map, on top of it: the fort, the hamlet on its track, the wreck under the bridge, every cellar, Kalat and the new towns, the canyon pass. |
 | `barrels.ts` | 31 | Fuel drums. The red barrels standing about the yards and sheds go up when a bullet finds them, and take whoever is standing near with them: a thing to shoot at instead of the man behind it, and a reason to look at... |
 | `basements.ts` | 553 | Basements (2026-10-14). |
@@ -248,8 +249,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ask.ts` | 215 | Questions asked of the fort at a point: under it, in its dark, what it cuts out of the ground, what it hides, its foot; and where the world set its loose pieces. |
 | `loose.ts` | 283 | The fort's loose pieces: the ruined houses below it, the curved and long walls, the rocks, and the hatch with its passage under the ground. |
 | `loot.ts` | 336 | What is in the fort and about it: its loot places by tier, the burning jeep before its gate, its props and lamps as the world has them, where the infected start, and where a thing may be stood. |
-| `parts.ts` | 688 | The fort's parts: its whole layout (walls, keep, gatehouse, stairs, vaults), the kit pieces, its door, the rock it stands on, its fire baskets, furniture and lamps. |
-| `plan.ts` | 454 | The fort's plan, its measures and words: where everything of it is (CASTLE, UNDER), what a part is, how its own measure is turned into the world's, its ground and its towers' girth. |
+| `parts.ts` | 694 | The fort's parts: its whole layout (walls, keep, gatehouse, stairs, vaults), the kit pieces, its door, the rock it stands on, its fire baskets, furniture and lamps. |
+| `plan.ts` | 452 | The fort's plan, its measures and words: where everything of it is (CASTLE, UNDER), what a part is, how its own measure is turned into the world's, its ground and its towers' girth. |
 
 ## src/sim/
 
@@ -281,7 +282,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `guns.ts` | 352 | The guns, what they fire and the boxes it comes in. |
-| `hunt.ts` | 82 | What a hunt gives, and what keeps a hunter well (2026-10-23, with the animals: src/sim/animals.ts). |
+| `hunt.ts` | 83 | What a hunt gives, and what keeps a hunter well (2026-10-23, with the animals: src/sim/animals.ts). |
 | `kit.ts` | 186 | What you hit with, eat, drink and mend with. |
 | `parts.ts` | 290 | Magazines, and what is fitted to a gun. |
 | `rules.ts` | 139 | What an item's `loot` says: |
@@ -293,7 +294,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `jobs.ts` | 64 | Work the trader has. Three jobs a day, the same three for everybody (they come out of the date): the infected to be put down, something common to be brought in, something that has to be gone and got. He pays in... |
-| `kit.ts` | 550 | A KIT of building pieces, and a LAYOUT made of them. |
+| `kit.ts` | 565 | A KIT of building pieces, and a LAYOUT made of them. |
 | `kits.ts` | 113 | Whole sets of gear an admin can hand out in one go (2026-10-11): |
 | `lipki.ts` | 114 | Lipki, the woodcutters' hamlet in the birch woods (2026-10-16, reworked): where its houses and what lies about them stand. |
 | `load.ts` | 70 | What a load does to whoever carries it (2026-10-13: |
@@ -462,12 +463,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `base.ts` | 455 | The fort's shape, its ground floor: what a shape is made of (sheets, paints, pictures), the little sums every part uses, the weathering and the sky on its stone, what hides what. |
+| `base.ts` | 362 | The fort's shape, its ground floor: what a shape is made of (sheets, paints, pictures), the little sums every part uses, the weathering and the sky on its stone, what hides what. |
 | `faces.ts` | 185 | The fort's shape: the one-plane pass (faces of two parts in one plane: which one is drawn). |
-| `ground-parts.ts` | 311 | The fort's shape: the parts that meet the ground (mounds, the apron round a hatch, the lid over cut ground, lumps of rock, vaults). |
+| `ground-parts.ts` | 322 | The fort's shape: the parts that meet the ground (mounds, the apron round a hatch, the lid over cut ground, lumps of rock, vaults). |
 | `parts.ts` | 339 | The fort's shape: the plain parts (blocks, boxes, slabs, beams, rails, flights of steps, walls with their openings, curtain walls). |
-| `shape.ts` | 221 | The fort's shape put together: every part laid where the world stands it, a piece at a time (castleShape, castleShapeIn, castleShapeSteps). |
-| `towers.ts` | 347 | The fort's shape: its towers, their floors, doors, slits and stairs. |
+| `shape.ts` | 215 | The fort's shape put together: every part laid where the world stands it, a piece at a time (castleShape, castleShapeIn, castleShapeSteps). |
+| `towers.ts` | 390 | The fort's shape: its towers, their floors, doors, slits and stairs. |
 
 ## src/world/
 

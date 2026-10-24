@@ -11,6 +11,17 @@
       "port": 5173
     },
     {
+      "name": "zona-stage",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5179",
+        "--strictPort"
+      ],
+      "port": 5179
+    },
+    {
       "name": "zona-server-local",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
