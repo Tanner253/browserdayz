@@ -2,6 +2,29 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## THE WORK LIST (the owner, 2026-10-23: "do not lose sight of the work list at hand"; then base building, gathering, crafting, raiding)
+Visual quality first; keep every performance figure (heli flight replay.mjs owner-run-2.json, 114.8 fps). Never change the
+ground around buried stashes or build on them; never raise WORLD_REV. The onboarding session reviews each session's pictures
+before they go to the owner. Status as of 2026-10-23 evening:
+- [ ] World polish (session world-polish, local_c34bf24d): Pokrov (castle walls and corners, church, green houses off the road,
+      SE buildings clipping/stairs col U), Kalat (polish ALOT + new places F/G-12), the desert (more places, more and spread
+      coastal spawns), Mokroye (more buildings), Lipki (larger), the canyon (smooth, keep cliffs), the desert ruins, every
+      basement entrance clear of loot containers (no floating boxes). Needs a stash-safe way to the live stash list.
+- [ ] Mountain fort Orlinoye: every gap between walls closed, polish (session fort-polish, local_e1fb82cc).
+- [x] Kamenka's red building and two-storey shack one texture step up, everywhere they stand (live, +7.6 MB card).
+- [ ] Gameplay batch (session gameplay-batch, local_5deed9ae): infected loot in the body (5 min), thirst -25%, admin corpse
+      delete (one / all near), admin item ESP.
+- [ ] Animals and hunting (session animals-hunting, local_6551ac13): DayZ/Rust mechanics, useful drops (food + hides, bone,
+      fat for crafting); design picture first.
+- [ ] Server-run inventory + inventory lag + container QOL (session local_cbc26f80): plan waiting for the owner's yes.
+- [x] iPhone crash (live), live disconnects (live), buried-stash leak (live), Discord/X at deaths (live).
+
+## SITE LIVE (2026-10-23): from `d9155c5` (branch claude/kamenka-textures-0e1e26 = battle-royale 03e532e plus this)
+- Kamenka's plank house (`shanty_mansion`) and red brick houses (`house_interior`) a size up on a computer, 512/256
+  (assets.ts DESK_UP; the owner: "bump them up by 1 incriment"). 2.5 -> 10.1 MB on the card. Lossless 512 copies
+  outweigh the files, so a computer loads those two files whole and cuts them; phones keep their 256/128 lean copies
+  (lean.mjs UP_FILES). Pictures and tools: progress/kamenka-textures/ (look.js, pairs.mjs). Changelog `#kamenka-sharper`.
+
 ## LIVE (2026-10-22 ~08:57 UTC): site, server and `main` from `de02380` (PROTOCOL 60)
 - **Apply a finish** (the owner: "the apply should stick with the weapon on the server ... like rust"): the item's own
   `finish`, written only by the server; gold in hands, inventory and on the ground (test/plates.test.ts). Gold in the
@@ -90,6 +113,17 @@ Both performance tracks merged and on the site:
   this is on the todo list after, ios users error. but i dont wanan deal with this till both active tracks are done and
   merged and we are deployed". The tracks are `vram-fps` (held-server) and `frame-cost` (branch claude/frame-cost-350a15).
   Earlier iPhone history: memory notes load-and-phones-2026-10-11 (phone picture memory) and mobile-touch-support.
+  **FIXED 2026-10-23 on branch claude/ecstatic-napier-41c3e5 (site only; changelog `#phones-memory`), NOT tried on a real
+  iPhone.** The phone start reports (`npx vercel logs --environment production --no-branch --since 7d --query "iPhone"
+  --limit 1000 --json`, lines `boot {...}`) put 26 of ~40 iPhone deaths at the stage "forest", the rest a lost WebGL context
+  there or at shader compile. There the tree-card atlas was baked at 2048x3072, half floats, 4 samples: 300 MB in one go.
+  Phones now (all TOUCH-gated, computers unchanged): atlas frames half size (vegetation.ts CARD_K), PHONE_CAP 512/256,
+  far models from the lean copies (assets.ts leanOf), the Renderer made at the phone's own settings (main.ts; it started
+  at scale 1, 4x MSAA, AO until Game.init). Measured at phone defaults, 844x390@3 (card + decoded pictures): forest stage
+  589 -> 169 MB, menu 982 -> 684, in game 1641 -> 1195. Left in the page, not cut: Rapier's WASM 255 MB (2.1 M trimesh
+  triangles: collisions), scene geometry ~133 MB, ~180 canvases (106 MB) that `shrink` keeps as images (iOS caps canvas
+  memory). Tools and figures: progress/ios-mem/ (mem-pre.js counts card memory by boot stage; TRAP: play.mjs puts ULTRA
+  settings in a fresh profile unless PLAY_GFX is given: give the phone's own, {"scale":0.85,"msaa":2,"ao":"off",...}).
 
 ## LIVE NOW (2026-10-21 ~00:47 UTC): server from `0b77446`, site from `4a8f542` (its changelog entry); PROTOCOL 56
 All of `held-server` shipped: the performance round's later work (CardKeep, noclip, far-tree atlas, two forest shader

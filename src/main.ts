@@ -12,6 +12,7 @@ import { doorGo, doorOver, modeOf, openDoor } from './ui/door';
 import { startAds } from './ui/ads';
 import { brMapOfPage } from './game/br/cut';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
+import { loadGraphics } from './core/settings';
 import { SEA_LEVEL, WORLD_X0, WORLD_Z0, WORLD_Z1, heightAt } from './world/worldgen';
 import { Towns } from './world/towns';
 import { Ruins } from './world/ruins';
@@ -169,7 +170,11 @@ async function boot() {
   // page makes it a stage at a time, as it did.
   const worldReady = loadWorld();
   stage('renderer');
-  const r = new Renderer(canvas);
+  // (a phone starts at its own settings: at the renderer's full ones, the whole start was drawn into buffers of four
+  // samples a pixel at twice the screen's size, a hundred megabytes more on the card until the game put its own in,
+  // and iPhones closed the page before that, 2026-10-23)
+  const g0 = TOUCH ? loadGraphics() : null;
+  const r = new Renderer(canvas, g0 ? { renderScale: g0.scale, msaa: g0.msaa, ao: g0.ao !== 'off', aoHalfRes: g0.ao === 'half' } : {});
   try {
     const gl = r.renderer.getContext();
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
