@@ -380,9 +380,9 @@ export const handsMethods = {
     if (loot) {
       const at = new THREE.Vector3(), wide = innerWidth, tall = innerHeight;
       const shown: { l: number; r: number; t: number; b: number; k: number; more: number }[] = [];
-      for (const [x, y, z, what, n, where] of this.espLoot) {
+      for (const [x, y, z, what, n, where, inside] of this.espLoot) {
         const it = ITEMS[what], name = it?.name ?? what, held = HELD_IN[where], k = out.length;
-        label(held ? `${held}: ${name}${n > 1 ? ` +${n - 1}` : ''}` : `${name}${n > 1 ? ` ×${n}` : ''}`, at.set(x, y, z), 0.3, held ? 'box' : (it && LOOT_KIND[it.category]) || 'item', where === ESP_AT.furniture ? ' · put away' : '', 4, 60);
+        label(held ? `${held}: ${name}${n > 1 ? ` +${n - 1}` : ''}` : `${name}${n > 1 ? ` ×${n}` : ''}`, at.set(x, y, z), 0.3, held ? 'box' : (it && LOOT_KIND[it.category]) || 'item', `${where === ESP_AT.furniture ? ' · put away' : ''}${inside ? ` · ${inside} inside` : ''}`, 4, 60);
         const q = out[k];
         if (!q) continue;
         const half = q.name.length * q.size * 0.31, px = q.x * wide, py = q.y * tall, high = q.size * 2.3;

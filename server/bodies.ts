@@ -8,7 +8,7 @@
 import type { CorpseInfo, StoredItem } from '../src/net/protocol';
 import { INFECTED, INFECTED_GRID, infectedDrop, type Body } from '../src/sim/infected';
 import { Container } from '../src/sim/inventory';
-import { makeItem } from '../src/sim/items';
+import { makeItem, type ItemInstance } from '../src/sim/items';
 
 /**
  * A body, as much of the server's Box (server/index.ts) as these rules read: said here, so that they and their test
@@ -53,13 +53,18 @@ export function zedBody(b: Body, way: number, time: number, rnd: () => number = 
   if (!had) return null;
   const uid = zedUid(b.i), box = new Container(uid, 'Infected', INFECTED_GRID[0], INFECTED_GRID[1]);
   if (box.add(makeItem(had[0], had[1]))) return null;
-  return { cid: uid, kind: 'corpse', w: INFECTED_GRID[0], h: INFECTED_GRID[1], items: box.serialize().items, x: b.s[0], y: b.s[1], z: b.s[2], rot: b.s[3], emptiedAt: -1, name: 'Infected', v: way, zed: b.i, expires: time + INFECTED.linger };
+  // (where, to the centimetre: as the games report it, to the double's last digit, it was a third of what is told of it)
+  const c = (v: number) => Math.round(v * 100) / 100;
+  return { cid: uid, kind: 'corpse', w: INFECTED_GRID[0], h: INFECTED_GRID[1], items: box.serialize().items, x: c(b.s[0]), y: c(b.s[1]), z: c(b.s[2]), rot: Math.round(b.s[3] * 1000) / 1000, emptiedAt: -1, name: 'Infected', v: way, zed: b.i, expires: time + INFECTED.linger };
 }
 
 /** what the games are told of a body: where it lies, and whose (one of the infected's says which: it is drawn by them) */
 export function bodyInfo(b: BodyBox): CorpseInfo {
   return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, ...(b.ride ? { ride: b.ride } : {}), ...(b.zed !== undefined ? { zed: b.zed } : {}) };
 }
+
+/** the dog tags in what a body holds, in its bags and pockets too (a body taken away says how many went with it) */
+export const tagsIn = (items: ItemInstance[]): number => items.reduce((n, it) => n + (it.id === 'dogtag' ? 1 : 0) + tagsIn((it.cargo ?? []).map((p) => p.item)), 0);
 
 /** a body lying: a player's or one of the infected's with something on it (a box), or one of the infected's with nothing (a number) */
 export type Lying = { box: string; zed?: number; x: number; z: number } | { zed: number; x: number; z: number };

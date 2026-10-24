@@ -1328,6 +1328,14 @@ if (ALL) await withServer(async (log) => {
     assert.ok(log().includes(`Ann died with 10 things in an admin's hold: ${heldOn} lie on the body, and ${10 - heldOn} found no room there and are gone`), `it was not written down what became of her hold:\n${log().split('\n').filter((l) => l.includes('hold')).join('\n')}`);
     checks++;
     console.log(`  ok  nobody was flagged by any of it; and an admin who dies with ten rifles in her hold leaves a body with a body's load: ${heldOn} of them, and the rest gone`);
+
+    // her body taken away by its number, with all on it, for everybody, though Ned has it open (2026-10-23)
+    const gone = ned.got.length;
+    assert.match(await tell(ann, `/delbody ${corpse.uid}`), new RegExp(`^Taken away: Ann's body, with the ${body.length} things on it\\.$`));
+    await until(() => ned.got.slice(gone).some((m) => m.t === 'corpse-' && m.uid === corpse.uid), 'a body an admin took away by its number is still there for everybody else');
+    assert.match(await tell(ann, `/delbody ${corpse.uid}`), /No body of that number lies anywhere/);
+    checks++;
+    console.log(`  ok  an admin takes a player's body away by its number, with the ${body.length} things on it, from under the hands of whoever had it open`);
   }, KEEPS);
 }
 

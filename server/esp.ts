@@ -18,6 +18,9 @@ const biggest = (items: ItemInstance[]) => items.reduce((a, b) => (ITEMS[b.id] &
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
 
+/** how many things are in a thing, in the bags in it too */
+export const within = (it: ItemInstance): number => (it.cargo ?? []).reduce((n, p) => n + 1 + within(p.item), 0);
+
 /**
  * What lies within `range` of x, z, nearest first: a thing on the ground as itself (what, how many, and whether it is
  * put away in a piece of furniture); a body, a crate, a stash or a drop with something in it as one row, its biggest
@@ -25,22 +28,31 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
  * @param inFurniture whether a loot point is in a piece of furniture (server/storages.ts `hidden`)
  */
 export function espRows(loot: Iterable<WorldLoot>, boxes: Iterable<BodyBox>, x: number, z: number, inFurniture: (point: number) => boolean, range = ESP.range): EspRow[] {
-  const out: [number, EspRow][] = [];
-  const near = (px: number, pz: number) => {
-    const d = Math.hypot(px - x, pz - z);
-    return d <= range ? d : -1;
-  };
+  // (what is in reach found first, by the square of how far, and a row made only for the ESP.most nearest: a street of
+  // a town holds two thousand things, and making a row of each took the 1 CPU server 1.7 ms a request, 2026-10-23)
+  const r2 = range * range, found: { d: number; l?: WorldLoot; b?: BodyBox; it?: ItemInstance }[] = [];
   for (const l of loot) {
-    const d = near(l.x, l.z);
-    if (d >= 0) out.push([d, [r1(l.x), r1(l.y), r1(l.z), l.item.id, l.item.qty, inFurniture(l.point) ? ESP_AT.furniture : ESP_AT.ground]]);
+    const dx = l.x - x, dz = l.z - z, d = dx * dx + dz * dz;
+    if (d <= r2) found.push({ d, l });
   }
   for (const b of boxes) {
-    const d = b.items.length ? near(b.x, b.z) : -1;
-    if (d < 0) continue;
-    if (b.kind === 'furniture') for (const it of b.items) out.push([d, [r1(b.x), r1(b.y), r1(b.z), it.id, it.qty, ESP_AT.furniture]]);
-    else out.push([d, [r1(b.x), r1(b.y), r1(b.z), biggest(b.items).id, b.items.length, b.buried ? ESP_AT.buried : BOX_AT[b.kind]]]);
+    if (!b.items.length) continue;
+    const dx = b.x - x, dz = b.z - z, d = dx * dx + dz * dz;
+    if (d > r2) continue;
+    if (b.kind === 'furniture') for (const it of b.items) found.push({ d, b, it });
+    else found.push({ d, b });
   }
-  return out.sort((a, b) => a[0] - b[0]).slice(0, ESP.most).map((o) => o[1]);
+  found.sort((p, q) => p.d - q.d);
+  const out: EspRow[] = [];
+  for (const { l, b, it } of found.slice(0, ESP.most)) {
+    if (l) {
+      const row: EspRow = [r1(l.x), r1(l.y), r1(l.z), l.item.id, l.item.qty, inFurniture(l.point) ? ESP_AT.furniture : ESP_AT.ground], inside = within(l.item);
+      if (inside) row.push(inside);
+      out.push(row);
+    } else if (b && it) out.push([r1(b.x), r1(b.y), r1(b.z), it.id, it.qty, ESP_AT.furniture]);
+    else if (b) out.push([r1(b.x), r1(b.y), r1(b.z), biggest(b.items).id, b.items.reduce((n, q) => n + 1 + within(q), 0), b.buried ? ESP_AT.buried : BOX_AT[b.kind]]);
+  }
+  return out;
 }
 
 const asked = new WeakMap<object, number>();

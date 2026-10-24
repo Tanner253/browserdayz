@@ -170,10 +170,11 @@ export interface CorpseInfo extends StashInfo {
 }
 
 /**
- * What an admin's far sight shows of the things about them (`esp`): where, what (an item's id; a body's name; a crate's
- * kind; a stash's item), how many (of an item; the things in anything else), and where it is: EspAt.
+ * What an admin's far sight shows of the things about them (`esp`): where, what (an item's id; in a body, a crate, a
+ * stash or a drop, the biggest thing in it), how many (of an item; the things in anything else, those in its bags too),
+ * where it is (ESP_AT), and for a bag lying on the ground, how many things are in it.
  */
-export type EspRow = [x: number, y: number, z: number, what: string, n: number, at: number];
+export type EspRow = [x: number, y: number, z: number, what: string, n: number, at: number, inside?: number];
 /** on the ground, put away in a piece of furniture, a body, a crate, a stash, a buried stash, a supply drop */
 export const ESP_AT = { ground: 0, furniture: 1, body: 2, crate: 3, stash: 4, buried: 5, drop: 6 } as const;
 
