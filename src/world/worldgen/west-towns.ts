@@ -291,5 +291,24 @@ export function layKalat(H: Float32Array, net: Net, site: Place): { share: Uint8
       // (its flats, its moat and its dry river's bed are cracked earth)
       if (g.kind === 'flats' || g.kind === 'moat' || g.kind === 'river') wash[i] = Math.round(mix * 255);
     }
+  // (and the edge of the cracked earth eased over some 8 m: a sample of the net either cracked or not drew its edge
+  // as the net's own steps, square by square, "lots of visual glitches", 2026-10-23)
+  const ix0 = Math.max(0, Math.floor((site.x - R - net.x0) / CELL)), ix1 = Math.min(net.nx - 1, Math.ceil((site.x + R - net.x0) / CELL));
+  const iz0 = Math.max(0, Math.floor((site.z - R - net.z0) / CELL)), iz1 = Math.min(net.nz - 1, Math.ceil((site.z + R - net.z0) / CELL));
+  for (let pass = 0; pass < 2; pass++) for (const along of [1, net.nx]) {
+    const was = wash.slice();
+    for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
+      const i = iz * net.nx + ix;
+      if (!share[i]) continue;
+      let s = 0, c = 0;
+      for (let k = -2; k <= 2; k++) {
+        const j = i + k * along, jx = along === 1 ? ix + k : ix, jz = along === 1 ? iz : iz + k;
+        if (jx < ix0 || jx > ix1 || jz < iz0 || jz > iz1) continue;
+        s += was[j];
+        c++;
+      }
+      wash[i] = Math.round(s / c);
+    }
+  }
   return { share, wash };
 }
