@@ -15,6 +15,11 @@
 //   cuts   – or: { game name: [from, to] seconds of its one take }
 //   tex    – the most pixels a side of its pictures
 //   lit    – it came drawn unlit (flat, the same in sun and shade): lit as everything else is, a matte fur
+//   drop   – pieces of it (meshes, by name) left out: the wolf's came with a plain white copy of part of its body
+//   tint   – its colour multiplied by this ([r, g, b]): the wolf's neutral grey, with no shading of its own painted in,
+//            read pale and blue under the sky beside the stag's brown: darkened and warmed to a grey wolf's grey-brown
+//   rough  – how rough its fur is when it is made lit (0.9 if not said; 1, no sheen at all)
+//   borrow – movements it has not, lent by another made before it (scripts/borrow.mjs): { from, clips, base, map, hips, bob }
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -24,7 +29,10 @@ import { prune, textureCompress, meshopt, getBounds, metalRough, dedup } from '@
 import { MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import { creditOf } from './props.mjs';
+import { borrow } from './borrow.mjs';
 
+/** how much more than the hind's its back bends between hips and chest, by movement (on its hips, which carry it all, the whole wolf pitched) */
+const BACK = { walk: 1, trot: 1.3, run: 1.8 };
 // (WildMesh's three, each with its own movements by name: the owner, 2026-10-23, "just make sure its high quality")
 const WILDMESH_DEER = {
   idle: /^Stand_Breathing_01$/, graze: /^Stand_Eating_01$/, walk: /^Walk$/, trot: /^Trot$/, run: /^Run$/,
@@ -43,7 +51,30 @@ export const ANIMAL_MODELS = {
   },
   // (victory_mirosya's wolf, the owner's choice: "I ADDED A NEW WOLF". Four movements: standing, eating, a snarl,
   // asleep. It came unlit.)
-  animal_wolf: { dir: 'animal_wolf_victory', len: 1.6, rot: [0, Math.PI / 2, 0], lit: true, clips: { idle: /\|IDLE$/, graze: /\|eating$/, alert: /\|RRAR$/, rest: /\|SLEEP$/ } },
+  animal_wolf: {
+    // (Plane.013: a white copy, untextured, of the body's Plane.014: drawn over the fur, it made the wolf pale and
+    // bluish, as if it glowed; the download's own viewer hides it)
+    // (1.47 m in its rest, lying: standing, 0.84 m at the shoulder and 1.41 m nose to tail root, a grey wolf's)
+    dir: 'animal_wolf_victory', len: 1.47, rot: [0, Math.PI / 2, 0], lit: true, drop: /^Plane\.013/, tint: [0.74, 0.64, 0.52], rough: 1, clips: { idle: /\|IDLE$/, graze: /\|eating$/, alert: /\|RRAR$/, rest: /\|SLEEP$/ },
+    // (and no gait: the hind's, joint by joint, onboarding for the owner. Its neck and head take half the hind's
+    // swing, so that its head is carried low as a dog's is; its back bends more than hers, the faster the more (a
+    // dog's back works in its run); its hips bob as far as its legs are long, and a little less, a lighter foot)
+    borrow: {
+      from: 'animal_doe', clips: ['walk', 'trot', 'run'], base: 'idle', hips: ['^RigPelvis_', '^spine\\.004_'], bob: 0.7, lower: ['^spine\\.009_', 30],
+      // (its back has one joint more than hers and its neck one fewer: spine.004 its hips, .005 to .008 its back to
+      // its chest, where its shoulders hang; .009 and .010 its neck, .011 its head. Its .007 is not lent a turn of its
+      // own: it goes with what is either side of it.)
+      map: [
+        ['^RigPelvis_', '^spine\\.004_'], ['^RigSpine1_', '^spine\\.005_', BACK], ['^RigSpine2_', '^spine\\.006_', BACK], ['^RigChest_', '^spine\\.008_', BACK],
+        ['^RigNeck1_', '^spine\\.009_', 0.5], ['^RigNeck3_', '^spine\\.010_', 0.5], ['^RigHead_', '^spine\\.011_', 0.5],
+        ['^RigTail1_', '^spine\\.003_', 0.6], ['^RigTail2_', '^spine\\.002_', 0.6],
+        ['^RigLBLeg1_', '^thigh\\.L_'], ['^RigLBLeg2_', '^shin\\.L_'], ['^RigLBLeg3_', '^foot\\.L_'], ['^RigLBLegAnkle_', '^toe\\.L_'],
+        ['^RigRBLeg1_', '^thigh\\.R_'], ['^RigRBLeg2_', '^shin\\.R_'], ['^RigRBLeg3_', '^foot\\.R_'], ['^RigRBLegAnkle_', '^toe\\.R_'],
+        ['^RigLFLegCollarbone_', '^shoulder\\.L_'], ['^RigLFLeg1_', '^front_thigh\\.L_'], ['^RigLFLeg2_', '^front_shin\\.L_'], ['^RigLFLeg3_', '^front_foot\\.L_'], ['^RigLFLegAnkle_', '^front_toe\\.L_'],
+        ['^RigRFLegCollarbone_', '^shoulder\\.R_'], ['^RigRFLeg1_', '^front_thigh\\.R_'], ['^RigRFLeg2_', '^front_shin\\.R_'], ['^RigRFLeg3_', '^front_foot\\.R_'], ['^RigRFLegAnkle_', '^front_toe\\.R_'],
+      ],
+    },
+  },
   // (five movements only: no gait, so a farm's cows stand in their yard, src/sim/animals.ts)
   animal_cow: { dir: 'animal_cow_rukh3d', len: 2.3, rot: [0, Math.PI, 0], clips: { idle: /idle1$/, graze: /idle2$/, death: /Death$/ } },
 };
@@ -67,7 +98,7 @@ const quat = ([x, y, z]) => {
  * joints that carry it, as the game draws it), not where the mesh's own numbers say; for the downloads whose skeleton
  * is scaled (WildMesh's), those numbers made a bear three centimetres long.
  */
-function skinnedBounds(doc, scene) {
+function skinnedBounds(doc, scene, only = null) {
   const skinned = doc.getRoot().listNodes().filter((n) => n.getMesh() && n.getSkin());
   if (!skinned.length) return getBounds(scene);
   const mul = (a, b) => {
@@ -79,6 +110,7 @@ function skinnedBounds(doc, scene) {
   for (const node of skinned) {
     const skin = node.getSkin(), ibm = skin.getInverseBindMatrices();
     const mats = skin.listJoints().map((j, i) => mul(j.getWorldMatrix(), ibm ? ibm.getElement(i, []) : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
+    const names = skin.listJoints().map((j) => j.getName());
     for (const prim of node.getMesh().listPrimitives()) {
       const pos = prim.getAttribute('POSITION'), js = prim.getAttribute('JOINTS_0'), ws = prim.getAttribute('WEIGHTS_0');
       if (!pos || !js || !ws) continue;
@@ -87,6 +119,8 @@ function skinnedBounds(doc, scene) {
         pos.getElement(i, v);
         js.getElement(i, j);
         ws.getElement(i, w);
+        // (only the points carried most by the joints asked for, if any are)
+        if (only && !only.test(names[j[w.indexOf(Math.max(...w))]] ?? '')) continue;
         const out = [0, 0, 0];
         for (let k = 0; k < 4; k++) {
           if (!w[k]) continue;
@@ -142,10 +176,12 @@ function tracks(doc, anim, joints, n = 120) {
 }
 
 function paceOf(doc, anim) {
-  // its feet: the joints lowest in its rest pose, under a fifth of its height
+  // its feet: its toes by name; else the joints lowest in its rest pose, under a fifth of its height (a rest lying
+  // down, as the wolf's is, has half its joints that low)
   const joints = [...new Set(doc.getRoot().listSkins().flatMap((sk) => sk.listJoints()))];
   const ys = joints.map((j) => j.getWorldTranslation()[1]), lo = Math.min(...ys), hi = Math.max(...ys);
-  const feet = joints.filter((j, i) => ys[i] < lo + (hi - lo) * 0.2);
+  const toes = joints.filter((j) => /toe|digit/i.test(j.getName()) && !/end|nub/i.test(j.getName()));
+  const feet = toes.length >= 4 ? toes : joints.filter((j, i) => ys[i] < lo + (hi - lo) * 0.2);
   const { out: tr0, dt } = tracks(doc, anim, feet), speeds = [];
   for (const tr of tr0) {
     const low = Math.min(...tr.map((p) => p[1]));
@@ -203,6 +239,8 @@ function strikeOf(doc, anim, part) {
   return +(at * dt).toFixed(2);
 }
 const STRIKES = { swipe: /FLegDigit/, bite: /Jaw|Head/ };
+/** the joints of a leg, in the rigs the animals came with (WildMesh's Leg, the wolf's thigh and toe, the cow's) */
+const LEGS = /leg|thigh|shin|foot|feet|toe|ankle|digit|hoof|paw|calf|knee|hock|^l[bf][lr]\d|^tw[bf]/i;
 
 /**
  * How far under its middle's floor a movement puts the lowest of its skin, metres (as it now stands; its lowest
@@ -226,7 +264,9 @@ function floorOf(doc, scene, anim) {
       else if (c.path === 'rotation') c.node.setRotation(v);
       else if (c.path === 'scale') c.node.setScale(v);
     }
-    low = Math.min(low, skinnedBounds(doc, scene).min[1]);
+    // (its legs: a head carried low, or a nose to the ground, is not what it stands on; all of it, if no leg is named)
+    const legs = skinnedBounds(doc, scene, LEGS).min[1];
+    low = Math.min(low, Number.isFinite(legs) ? legs : skinnedBounds(doc, scene).min[1]);
   }
   for (const [nd, [t, r, s]] of keep) nd.setTranslation(t).setRotation(r).setScale(s);
   return +low.toFixed(3);
@@ -239,9 +279,19 @@ for (const id of ids) {
   const dir = path.join(SRC, 'models', cfg.dir);
   const doc = await io.read(path.join(dir, cfg.file ?? 'scene.gltf'));
   if (doc.getRoot().listExtensionsUsed().some((e) => e.extensionName === 'KHR_materials_pbrSpecularGlossiness')) await doc.transform(metalRough());
+  if (cfg.drop) {
+    for (const n of doc.getRoot().listNodes()) {
+      const m = n.getMesh();
+      if (m && cfg.drop.test(m.getName())) {
+        n.setMesh(null);
+        n.dispose();
+      }
+    }
+  }
+  if (cfg.tint) for (const m of doc.getRoot().listMaterials()) m.setBaseColorFactor([...cfg.tint, 1]);
   if (cfg.lit) {
     doc.getRoot().listExtensionsUsed().find((e) => e.extensionName === 'KHR_materials_unlit')?.dispose();
-    for (const m of doc.getRoot().listMaterials()) m.setMetallicFactor(0).setRoughnessFactor(0.9);
+    for (const m of doc.getRoot().listMaterials()) m.setMetallicFactor(0).setRoughnessFactor(cfg.rough ?? 0.9);
   }
   const root = doc.getRoot(), scene = root.listScenes()[0];
   const srcTris = countTris(doc);
@@ -285,6 +335,8 @@ for (const id of ids) {
   b = skinnedBounds(doc, scene);
   top.setTranslation([-(b.min[0] + b.max[0]) / 2, -b.min[1], -(b.min[2] + b.max[2]) / 2]);
   b = skinnedBounds(doc, scene);
+  const lent = cfg.borrow ? await borrow(doc, path.join(OUT, 'models', `${cfg.borrow.from}.glb`), cfg.borrow) : [];
+  if (lent.length) console.log(`  ${id}: lent by ${cfg.borrow.from}: ${lent.join(', ')}`);
   // (each gait's own pace over the ground, measured as it now stands, scaled and turned: by its root's travel where
   // it was carried on, else by its feet; and every movement but its death walked on the spot)
   const paces = {}, strikes = {}, floors = {};
