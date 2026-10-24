@@ -185,23 +185,12 @@ export const MOTTLE: Record<Paint, number> = { stone: 0.36, ashlar: 0.36, base: 
 /** a flat face is cut for it until no piece is longer than this: finely where the picture is plain (dressed blocks, paving), coarsely where it is busy; 0: not at all */
 export const PIECE: Record<Paint, number> = { stone: 2.3, ashlar: 2.3, base: 2.6, paving: 1.25, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0, water: 0 };
 
-/**
- * How far a point of the masonry stands off where the plan has it: a few centimetres, sideways, by a slow pattern.
- * Nothing a mason built eight hundred years ago is flat or plumb to the eye any more: a wall bellies, a tower is
- * not quite round. It goes by where the point is on the plan and by nothing else: so two faces that meet still
- * meet, and a wall's upright edges stay straight (its faces are cut into pieces of different heights side by side,
- * and a point half way up one piece's edge must stay on its neighbour's: moved by its height as well, every such
- * place opened as a crack). And never up or down: what is level to walk on stays level. (What stops a body is not
- * moved: it is the plan's.)
+/*
+ * THE MASONRY IS LAID WHERE THE PLAN HAS IT. (It was bent a few centimetres sideways by a slow pattern, a wall
+ * bellying as old stone does; every join of it then had to be cut along a lattice to stay closed, which was twice the
+ * triangles, and laid flat it cannot be told from it: the owner, 2026-10-23, "fort should have no gaps", "we want to
+ * make sure all new additions are performant". So what meets in the plan meets as drawn, and costs nothing for it.)
  */
-function warp(p: V3, by: number): V3 {
-  // (slow: a belly four or five metres long, which pieces of wall two metres long can follow; quicker than that and it is a wall of facets)
-  const a = clouds([p[0] * 0.55 + 17, 0.5, p[2] * 0.55]) - 0.5, b = clouds([p[0] * 0.55, 41.5, p[2] * 0.55 + 9]) - 0.5;
-  return [p[0] + a * 2.6 * by, p[1], p[2] + b * 2.6 * by];
-}
-
-/** how far, for each stuff, metres (none for what is sawn or forged, or is ground already) */
-export const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.09, base: 0.1, paving: 0, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0, water: 0 };
 
 let towers: Tower[] | null = null;
 
@@ -263,11 +252,10 @@ export type UV = [number, number];
  * a triangle that lies against one or inside one, with stone before it all the way across (asked at its middle and
  * toward each of its corners, a finger's breadth off its face), is left out: the end of a wall in another wall, the
  * foot of a block on the block under it, two floors edge to edge. No eye is ever in a block, so what one hides is
- * hidden from every eye. Two things are bent alike only if they are of stuffs bent by as much (see WARP): against
- * a block of another stuff a face is left out only where it is deep in it, further than the bending moves either.
+ * hidden from every eye.
  * `low`: the block is of the lower levels, which are not always drawn: it hides nothing that is drawn without them.
  */
-export interface Hide { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; by: number; low: boolean }
+export interface Hide { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; low: boolean }
 
 interface Hides { list: Hide[]; grid: Map<number, number[]>; count: number }
 
@@ -288,13 +276,17 @@ export function hidesOf(list: Hide[]): Hides {
 /** Where triangles are put, for one stuff: it knows the size of that stuff's picture. */
 export class Out {
   /** @param mottle how much the tone wanders over it; @param cut big faces are cut into pieces no longer than this for that to show (0: they are not) */
-  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private bent = 0, private hides: Hides | null = null, private low = false) {}
-  /** whether a place has one of the fort's blocks all round it (see Hide) */
-  private hid(q: V3): boolean {
+  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private hides: Hides | null = null, private low = false) {}
+  /** whether one of the fort's blocks has a whole triangle in it (see Hide): its middle, and each corner a little out in front of the face */
+  private hid(p: V3[], mid: V3, n: V3): boolean {
     const H = this.hides!;
-    for (const i of H.grid.get(hideKey(q[0], q[2])) ?? []) {
-      const b = H.list[i], e = b.by === this.bent ? 0.004 : 0.26;
-      if ((!b.low || this.low) && q[0] > b.x0 + e && q[0] < b.x1 - e && q[2] > b.z0 + e && q[2] < b.z1 - e && q[1] > b.y0 + 0.004 && q[1] < b.y1 - 0.004) return true;
+    // (a corner may lie on the block's very edge: it is asked of the block grown by a millimetre)
+    const inside = (b: Hide, q: V3, e: number) => q[0] > b.x0 + e && q[0] < b.x1 - e && q[2] > b.z0 + e && q[2] < b.z1 - e && q[1] > b.y0 + e && q[1] < b.y1 - e;
+    // (all in ONE block: with each corner in some block, a floor's corner in one wall and the rest in the wall across
+    // the corner, the strip of floor between the two was open: by the head of the keep's stair down, 2026-10-23)
+    for (const i of H.grid.get(hideKey(mid[0], mid[2])) ?? []) {
+      const b = H.list[i];
+      if ((!b.low || this.low) && inside(b, mid, 0.004) && p.every((c) => inside(b, [c[0] + n[0] * 0.006, c[1] + n[1] * 0.006, c[2] + n[2] * 0.006], -0.001))) return true;
     }
     return false;
   }
@@ -305,8 +297,6 @@ export class Out {
   roofed = false;
   /** it is paving: a floor that is walked on */
   walked = false;
-  /** what is being put now is not bent with the rest of its stuff (see `straight` in the rules) */
-  straight = false;
   /** where a rail's post has been stood already (see `railRun`) */
   posts = new Set<string>();
   private put(q: V3, n: V3, t: UV, tone: number) {
@@ -315,8 +305,8 @@ export class Out {
     const floor = this.ground || (Math.abs(q[0] + n[0] * 0.4) < CASTLE.hx + CASTLE.parapet.thick / 2 - 0.05 && Math.abs(q[2] + n[2] * 0.4) < CASTLE.hz + CASTLE.parapet.thick / 2 - 0.05);
     // (the second number: of an upright face, how high over its foot; of a floor that is walked on, how far from the nearest wall)
     this.s.snow.push(this.roofed ? 0 : sky(q, n), n[1] > 0.9 && this.walked ? fromWall(q) : this.base === null || !floor ? 9 : Math.max(0, q[1] - this.base));
-    const k = tone * (this.mottle ? 1 - this.mottle / 2 + this.mottle * clouds(q) : 1), p = this.bent && !this.straight ? warp(q, this.bent) : q;
-    this.s.pos.push(p[0], p[1], p[2]);
+    const k = tone * (this.mottle ? 1 - this.mottle / 2 + this.mottle * clouds(q) : 1);
+    this.s.pos.push(q[0], q[1], q[2]);
     this.s.nrm.push(n[0], n[1], n[2]);
     this.s.uv.push(t[0] / this.tile, t[1] / this.tile);
     this.s.col.push(this.tint[0] * k, this.tint[1] * k, this.tint[2] * k);
@@ -338,7 +328,10 @@ export class Out {
     const n = mul(g, 1 / twice);
     if (this.hides) {
       const mid: V3 = [(p[0][0] + p[1][0] + p[2][0]) / 3 + n[0] * 0.015, (p[0][1] + p[1][1] + p[2][1]) / 3 + n[1] * 0.015, (p[0][2] + p[1][2] + p[2][2]) / 3 + n[2] * 0.015];
-      if (this.hid(mid) && p.every((c) => this.hid([mid[0] + (c[0] - mid[0]) * 0.85 + n[0] * 0.002, mid[1] + (c[1] - mid[1]) * 0.85 + n[1] * 0.002, mid[2] + (c[2] - mid[2]) * 0.85 + n[2] * 0.002]))) return void this.hides.count++;
+      // (each corner itself: asked a sixth of the way in from each, a triangle whose corner stood out over the top of a
+      // block by up to a sixth of it was left out whole, and a notch was open there into the wall: the keep's shell over
+      // the walk round its roof, 2026-10-23)
+      if (this.hid(p, mid, n)) return void this.hides.count++;
     }
     for (const k of order) this.put(p[k], smooth ? smooth[k] : n, t[k], typeof tone === 'number' ? tone : tone[k]);
   }

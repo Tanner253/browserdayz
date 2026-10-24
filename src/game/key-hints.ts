@@ -121,7 +121,7 @@ export function keyHints(g: Game): KeyHints | null {
   } else if (g.inHand) {
     // (the mouse for what is held is drawn above, by handActs)
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
-    put(own, 'Drop it (hold)', [k('KeyG')], ['← held']);
+    put(own, 'Drop it · held, throw it', [k('KeyG')], ['← held']);
   } else if (!it) {
     click(own, 'Punch', 'l', P.r2);
     click(own, 'Guard', 'r', P.l2);

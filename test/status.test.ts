@@ -16,7 +16,7 @@ const ok = (name: string, fn: () => void) => {
   console.log('  ok  ' + name);
 };
 
-const well: Body = { health: 100, blood: BLOOD.full, bleed: 0, energy: 85, water: 85, broken: false, drip: false, gas: null, fire: null };
+const well: Body = { health: 100, blood: BLOOD.full, bleed: 0, energy: 85, water: 85, broken: false, drip: false, gas: null, fire: null, ill: 0, guard: 0 };
 const still: Record<Stat, number> = { health: 0, blood: 0, food: 0, water: 0 };
 const read = (b: Partial<Body>, rates: Partial<Record<Stat, number>> = {}) => reading({ ...well, ...b }, { ...still, ...rates });
 const stat = (r: ReturnType<typeof reading>, s: Stat) => r.stats.find((x) => x.stat === s)!;
@@ -108,15 +108,15 @@ ok('arrows: none when steady, one to three by how fast, by the rates the rules h
   assert.equal(arrowsOf('health', 0.12), 1);
   assert.equal(arrowsOf('health', 0.06), 1);
   assert.equal(arrowsOf('health', FIRE.heal), 2);
-  // food and water: nothing at rest or at a walk (0.045 and 0.07 a second, 1.3 times that walking), one at a run (2.4 times)
-  assert.equal(arrowsOf('food', -0.045), 0);
-  assert.equal(arrowsOf('food', -0.045 * 1.3), 0);
-  assert.equal(arrowsOf('food', -0.045 * 1.8), -1);
-  assert.equal(arrowsOf('food', -0.045 * 2.4), -1);
-  assert.equal(arrowsOf('water', -0.07), 0);
-  assert.equal(arrowsOf('water', -0.07 * 1.3), 0);
-  assert.equal(arrowsOf('water', -0.07 * 1.8), -1);
-  assert.equal(arrowsOf('water', -0.07 * 2.4), -1);
+  // food and water: nothing at rest or at a walk (NEED.hunger and NEED.thirst a second, 1.3 times that walking), one at a run (1.8 times) and a sprint (2.4)
+  for (const [stat, rate] of [['food', NEED.hunger], ['water', NEED.thirst]] as [Stat, number][]) {
+    assert.equal(arrowsOf(stat, -rate), 0);
+    assert.equal(arrowsOf(stat, -rate * 1.3), 0);
+    assert.equal(arrowsOf(stat, -rate * 1.8), -1);
+    assert.equal(arrowsOf(stat, -rate * 2.4), -1);
+  }
+  // (water a quarter slower than it was: the owner, 2026-10-23)
+  assert.equal(NEED.thirst, 0.07 * 0.75);
 });
 
 ok('how fast a thing is changing is told from what it was a few seconds ago', () => {

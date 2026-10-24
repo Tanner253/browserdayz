@@ -73,6 +73,23 @@ class Player {
       await sleep(100);
     }
   }
+  /** a tag taken off a body as a game takes it: the body opened, and set again without it (the server keeps who holds each tag that can pay, server/custody.ts: a game's word that it carries one is not enough) */
+  async takeOff(cid: string, uid: string) {
+    const at = this.got.length;
+    this.send({ t: 'copen', cid });
+    for (let k = 0; k < 60 && !this.got.slice(at).some((m) => m.t === 'cdata' && m.cid === cid); k++) await sleep(50);
+    const d = this.got.slice(at).find((m) => m.t === 'cdata' && m.cid === cid) as Extract<S2C, { t: 'cdata' }> | undefined;
+    assert.ok(d?.items.some((it) => it.uid === uid), `${this.name} found no tag ${uid} on the body`);
+    this.send({ t: 'cset', cid, items: d!.items.filter((it) => it.uid !== uid) });
+    this.send({ t: 'cclose', cid });
+    await sleep(150);
+  }
+  /** the body of the player numbered `id`, as this player was told of their death */
+  bodyOf(id: number): string {
+    const d = this.got.find((m) => m.t === 'death' && m.k.id === id) as Extract<S2C, { t: 'death' }> | undefined;
+    assert.ok(d?.corpse, `${this.name} was told of no body of #${id}`);
+    return d!.corpse!.uid;
+  }
   carry(tags: object[]) {
     // (in the tag pouch, where a game carries them. They were said to be in places a body has not got, `s0`, `s1`: the
     // server keeps only the places a body has since 2026-10-13, so it saw no tag at all and this test saw no rule.)
@@ -121,9 +138,13 @@ try {
   await sleep(300);
   eve.send({ t: 'died', cause: 'test' });
   await sleep(400);
+  const first = eve.bodyOf(eve.id);
   eve.send({ t: 'respawn' });
   await sleep(300);
   eve.got.length = 0;
+  // (back at her body, the old tag taken off it as a game takes it)
+  await eve.stand(...IN, 0.2);
+  await eve.takeOff(first, old.uid);
   eve.carry([{ uid: 'zone-test-tag-eve-2', id: 'dogtag', qty: 1, owner: 'Eve' }, old]);
   await sleep(300);
   eve.send({ t: 'died', cause: 'test' });
@@ -150,7 +171,9 @@ try {
   await sleep(300);
   bee.send({ t: 'died', cause: 'test' });
   await sleep(500);
-  // Ann has it in her pockets, and her own as well (which is nobody's business)
+  // Ann takes it off the body and has it in her pockets, and her own as well (which is nobody's business)
+  await ann.stand(...IN, 0.2);
+  await ann.takeOff(ann.bodyOf(bee.id), tag.uid);
   const hers = { uid: 'zone-test-tag-ann', id: 'dogtag', qty: 1, owner: 'Ann' };
   ann.carry([tag, hers, fresh]);
   assert.ok(!/Bee left no dog tag/.test(logged), 'no tag on somebody who had lived long enough');

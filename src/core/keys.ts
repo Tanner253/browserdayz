@@ -38,7 +38,7 @@ export const ACTIONS: Action[] = [
   { code: 'PageUp', does: 'Sights: further', group: 'Fight' },
   { code: 'PageDown', does: 'Sights: nearer', group: 'Fight' },
   { code: 'KeyF', does: 'Take · doors · search', group: 'Gear' },
-  { code: 'KeyG', does: 'Drop what you hold (hold)', group: 'Gear' },
+  { code: 'KeyG', does: 'Drop what you hold; held, throw it (the wheel puts it off)', group: 'Gear' },
   { code: 'KeyL', does: 'Light', group: 'Gear' },
   { code: 'Tab', does: 'Inventory', group: 'Gear' },
   { code: 'KeyM', does: 'Map', group: 'Gear' },

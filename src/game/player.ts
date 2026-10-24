@@ -10,6 +10,7 @@ import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
 import { LEAN_REACH, MAX_STAMINA } from '../net/protocol';
 import { BLOOD, bloodBack, greyOf, mendsOn, withWound, woundOf } from '../sim/blood';
+import { POISON, illFor } from '../sim/sickness';
 import { LEG, breaksOnLanding } from '../sim/injury';
 import { paceOf, runCost } from '../sim/load';
 import { LEGS, SLIDE, SLOPE, degOf, legs, riseOf, slideFall, slideGoesOn, slideJolt, slideOn, type Footing, type Legs } from '../sim/slopes';
@@ -86,6 +87,9 @@ export interface Vitals {
   bleed: number;
   /** a broken leg: no running and no jumping until it is set, or has knitted (see src/sim/injury.ts) */
   broken?: boolean;
+  /** seconds of food poisoning left, and of a vitamins' guard (src/sim/sickness.ts) */
+  ill?: number;
+  guard?: number;
 }
 
 /** somebody whole: what a new life starts with */
@@ -178,6 +182,9 @@ export class Player {
   private staminaDelay = 0;
   /** seconds left in which nothing costs any breath (the adrenaline injector) */
   boost = 0;
+  /** seconds to the next bout of throwing up, while ill; and what the game does at one */
+  private boutT = POISON.every[0];
+  onBout: () => void = () => {};
   /** out of breath: no sprinting until some stamina is back (see step) */
   private winded = false;
   /**
@@ -1185,8 +1192,8 @@ export class Player {
       return;
     }
     const exertion = this.god ? 0 : this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
-    v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
-    v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
+    v.energy = Math.max(0, v.energy - NEED.hunger * exertion * dt);
+    v.water = Math.max(0, v.water - NEED.thirst * exertion * this.thirstMult * dt);
     // An open wound costs blood, and no health: the two are two things (src/sim/blood.ts). Left alone it closes
     // in the end, five minutes on; a dressing closes it there and then.
     if (v.bleeding) {
@@ -1211,13 +1218,25 @@ export class Player {
     v.blood = Math.min(BLOOD.full, v.blood + bloodBack(v.energy, v.water, v.bleeding) * dt);
     if (v.energy <= 0 || v.water <= 0) this.damageQuiet(0.35 * dt, v.water <= 0 ? 'thirst' : 'hunger');
     // (health mends on good blood, at half on poor, and not at all on bad)
-    else if (v.energy > 60 && v.water > 60 && !v.bleeding && v.health < 100) v.health = Math.min(100, v.health + 0.12 * mendsOn(v.blood) * dt);
+    else if (v.energy > 60 && v.water > 60 && !v.bleeding && !v.ill && v.health < 100) v.health = Math.min(100, v.health + 0.12 * mendsOn(v.blood) * dt);
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
     // a broken leg knits by itself in the end: nobody is left a cripple for the want of a roll of tape
     if (v.broken) {
       this.brokenT += dt;
       if (this.brokenT > LEG.knits) this.setLeg();
     } else this.brokenT = 0;
+    // food poisoning: bouts of throwing up, and nothing mends until it passes (src/sim/sickness.ts)
+    if (v.ill || v.guard) {
+      const r = illFor(v, this.boutT, dt, Math.random);
+      v.ill = r.ill || undefined;
+      v.guard = r.guard || undefined;
+      this.boutT = r.bout;
+      for (let n = 0; n < r.bouts && !this.god; n++) {
+        v.water = Math.max(0, v.water - POISON.water);
+        v.energy = Math.max(0, v.energy - POISON.energy);
+        this.onBout();
+      }
+    }
   }
 
   /** a leg breaks (nothing happens to one already broken, or to the dead) */

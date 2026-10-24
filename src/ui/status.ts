@@ -62,14 +62,14 @@ export const fillOf = (stat: Stat, v: number) => (stat === 'blood' ? bloodLeft(v
  * - blood, ml: a wound in a limb is 3.6 and one in the body 6, and every wound there is costs some multiple of 1.2,
  *   so wounds together do too: one arrow up to 4.8, two from the body's 6, three from two in the body (12). It comes
  *   back by itself at 0.5 to 1.2, from saline at 8.3, from a bag of blood at 75
- * - food goes at 0.045 at rest and 0.108 at a sprint, water at 0.07 and 0.168: at rest and at a walk there is no
- *   arrow (that is what steady is), at a run there is one; anything eaten or drunk comes all at once
+ * - food goes at 0.045 at rest and 0.108 at a sprint, water at 0.0525 and 0.126 (NEED in src/sim/wells.ts): at rest
+ *   and at a walk there is no arrow (that is what steady is), at a run there is one; anything eaten or drunk comes all at once
  */
 export const PACE: Record<Stat, { down: [number, number, number]; up: [number, number, number] }> = {
   health: { down: [0.2, 3, 10], up: [0.04, 0.5, 3] },
   blood: { down: [1, 5.4, 11.4], up: [0.3, 5, 30] },
   food: { down: [0.07, 0.5, 2], up: [0.3, 3, 8] },
-  water: { down: [0.12, 0.5, 2], up: [0.3, 3, 8] },
+  water: { down: [0.08, 0.5, 2], up: [0.3, 3, 8] },
 };
 
 /** the arrows beside an icon: -3 (falling fast) to 3 (rising fast), 0 for none */
@@ -146,6 +146,9 @@ export interface Body {
   gas: 'bare' | 'masked' | null;
   /** resting by a fire that is alight: mending by it, or only warm */
   fire: 'mending' | 'warm' | null;
+  /** seconds of food poisoning left, and of a vitamins' guard (src/sim/sickness.ts): 0, none */
+  ill: number;
+  guard: number;
 }
 
 export interface StatView {
@@ -163,7 +166,7 @@ export interface StatView {
   line: string;
 }
 
-export type BadgeId = 'fire' | 'gas' | 'leg' | 'bleed';
+export type BadgeId = 'fire' | 'gas' | 'leg' | 'bleed' | 'ill' | 'guard';
 /** what colour a badge is: doing harm, a warning, neither, doing good */
 export type Tone = 'bad' | 'warn' | 'calm' | 'good';
 
@@ -248,6 +251,8 @@ export function reading(b: Body, rates: Record<Stat, number>): Reading {
     const bare = b.gas === 'bare';
     badges.push({ id: 'gas', tone: bare ? 'bad' : 'good', blink: bare, level: 0, figure: '', line: bare ? 'Breathing gas: it is taking your health. Get out, or put on a gas mask.' : 'Contaminated air: your mask is keeping it out.' });
   }
+  if (b.ill > 0) badges.push({ id: 'ill', tone: 'bad', blink: false, level: 0, figure: `${Math.ceil(b.ill / 60)}m`, line: `Food poisoning: you will throw up now and then for about ${Math.max(1, Math.ceil(b.ill / 60))} min, and nothing mends. Charcoal tablets end it.` });
+  if (b.guard > 0) badges.push({ id: 'guard', tone: 'good', blink: false, level: 0, figure: `${Math.ceil(b.guard / 60)}m`, line: `Vitamins: bad food is half as likely to make you ill, and illness passes twice as fast (${Math.max(1, Math.ceil(b.guard / 60))} min left).` });
   if (b.broken) badges.push({ id: 'leg', tone: 'warn', blink: false, level: 0, figure: '', line: 'Broken leg: no running, no jumping. Splint it, or use a first aid kit.' });
   if (b.bleed > 0) {
     // (how long there is, if nothing is done: a wound that will close before it kills is a warning, one that will not is worse)

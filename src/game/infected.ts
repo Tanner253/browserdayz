@@ -49,8 +49,10 @@ export interface HordeHost {
   guarded(from: THREE.Vector3): void;
   /** one of them is dead, by this player's hand */
   killed(zone: HitZone, distance: number): void;
-  /** playing alone: one went down with this on it (on a server the server puts it in the world) */
-  dropped(id: string, qty: number, at: THREE.Vector3): void;
+  /** playing alone: one went down with this on it, which is in its body (on a server the server puts it there: server/bodies.ts) */
+  bodied(b: Infected, id: string, qty: number): void;
+  /** playing alone: a body is cleared away, with what is left on it */
+  cleared(i: number): void;
   /** the bunker's door stands open */
   bunkerOpen(): boolean;
 }
@@ -60,6 +62,8 @@ export interface HordeHost {
 const INTERP_DELAY = 210;
 /** drawn and moved in full within this of the eye; past it they are not there to be seen */
 const DRAWN = 150;
+/** seconds of posing after which a body has done falling (the longest fall, the backwards one, takes 2.1) */
+const SETTLED = 4;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
 /** as near as two of them stand to each other, metres */
@@ -144,6 +148,12 @@ export class Infected implements Damageable {
   /** time its body has not been moved for (the far ones are posed every second or third frame) */
   private poseDt = 0;
   private frameNo = 0;
+  /** dead: which way it fell (see `die`), whether it was laid down as this game came in, and how long it has been posed since */
+  variant = 0;
+  laid = false;
+  private deadPosed = 0;
+  /** dead and done falling: made still (see `freeze`) */
+  private frozen = false;
   /** where the physics was last told this body is, and which way it faced (see `update`) */
   private told = { x: NaN, y: NaN, z: NaN, yaw: NaN, n: 0 };
   private toldHead = new THREE.Vector3(NaN, 0, 0);
@@ -192,7 +202,7 @@ export class Infected implements Damageable {
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
     this.ready = true;
     this.avatar.update(0, this.pos, this.vel, this.yaw, false, false);
-    if (info.s[4] === I_DEAD || info.hp <= 0) this.die(0, true);
+    if (info.s[4] === I_DEAD || info.hp <= 0) this.die(this.horde.laidAs.get(this.i) ?? 0, true);
   }
 
   /** where its owner says it is */
@@ -236,6 +246,8 @@ export class Infected implements Damageable {
   die(variant: number, already = false) {
     if (this.dead) return;
     this.dead = true;
+    this.variant = variant;
+    this.laid = already;
     this.mode = I_DEAD;
     this.after = 0;
     this.mine = false;
@@ -248,6 +260,51 @@ export class Infected implements Damageable {
       this.avatar.setDeath(variant);
       audio.infected('die', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
     }
+  }
+
+  /** laid down again, the way the server says it fell */
+  relay(variant: number) {
+    this.thaw();
+    this.variant = variant;
+    this.deadPosed = 0;
+    this.avatar.layDown(variant);
+  }
+
+  /**
+   * A body done falling made as still as a player's body is (CorpseBody in remote.ts): its pose worked out once and
+   * its skeleton sent to the card once, its bones not gone through again every frame. Posed and sent every frame,
+   * twenty-five lying in view cost 2.8 ms of a 2560x1440 frame, 2026-10-23.
+   */
+  private freeze() {
+    const root = this.avatar.root;
+    root.updateMatrixWorld(true);
+    root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh) return;
+      m.skeleton.update();
+      m.skeleton.update = () => {};
+    });
+    root.matrixAutoUpdate = false;
+    root.matrixWorldAutoUpdate = false;
+    root.updateMatrixWorld = () => {};
+    // (and no shadow, as a player's body has none: the owner, 2026-10-23, "turn off bodies shadows". It stays off: what
+    // is dead does not get up.)
+    root.traverse((o) => void ((o as THREE.Mesh).isMesh && (o.castShadow = false)));
+    this.frozen = true;
+  }
+
+  /** made to move again (laid down another way): what `freeze` stopped is its own again */
+  private thaw() {
+    if (!this.frozen) return;
+    const root = this.avatar.root;
+    root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (m.isSkinnedMesh) delete (m.skeleton as { update?: unknown }).update;
+    });
+    delete (root as { updateMatrixWorld?: unknown }).updateMatrixWorld;
+    root.matrixAutoUpdate = true;
+    root.matrixWorldAutoUpdate = true;
+    this.frozen = false;
   }
 
   /** a noise, or somebody it has just been hurt by: it goes to see (and if it was hurt, it knows who) */
@@ -749,6 +806,13 @@ export class Infected implements Damageable {
         return;
       }
     } else if ((this.frameNo++ + this.i) % (off > 70 * 70 ? 3 : off > 30 * 30 ? 2 : 1) !== 0) return;
+    // (a body that has done falling is posed no more, and made still: nothing of it moves. Bodies lie six times as
+    // long since they were searched, 2026-10-23, and as many more posed every frame cost the frame.)
+    if (this.dead && (this.deadPosed += this.poseDt) > SETTLED) {
+      if (!this.frozen) this.freeze();
+      this.poseDt = 0;
+      return;
+    }
     dt = this.poseDt;
     this.poseDt = 0;
     const sick = this.avatar.sick!;
@@ -952,6 +1016,23 @@ export class Horde {
   remove(i: number) {
     this.all.get(i)?.dispose();
     this.all.delete(i);
+    this.laidAs.delete(i);
+  }
+
+  /** which way the server says ones laid down as this game came in fell: they are laid that way (see `lying`) */
+  readonly laidAs = new Map<number, number>();
+
+  /**
+   * The body of one with something on it, to be searched where it lies (addCorpse in src/game/game/online.ts): `v`, which
+   * way it fell, as the server says. One that fell in this game lies as it fell here, and is returned; one laid down
+   * as this game came in, or still to come, is laid the way it fell.
+   */
+  lying(i: number, v: number): Infected | null {
+    const b = this.all.get(i);
+    if (b?.dead && !b.laid) return b;
+    this.laidAs.set(i, v);
+    if (b?.dead && b.ready && b.variant !== v) b.relay(v);
+    return null;
   }
 
   own(i: number, to: number | null) {
@@ -1094,10 +1175,10 @@ export class Horde {
     if (!this.director) return false;
     const r = this.director.hurt(b.i, amount, this.now);
     if (!r?.dead) return false;
-    const had = infectedDrop();
-    if (had) this.host.dropped(had[0], had[1], b.pos);
     const along = -Math.sin(b.yaw) * dir.x - Math.cos(b.yaw) * dir.z;
     b.die(along > 0.4 ? 1 : along < -0.4 ? 0 : 2);
+    const had = infectedDrop();
+    if (had) this.host.bodied(b, had[0], had[1]);
     return true;
   }
 
@@ -1126,7 +1207,10 @@ export class Horde {
       if (this.dirT > 1) {
         this.dirT = 0;
         const turn = this.director.tick(now, me.alive ? [{ id: me.id, x: me.pos.x, z: me.pos.z }] : []);
-        for (const i of turn.gone) this.remove(i);
+        for (const i of turn.gone) {
+          this.remove(i);
+          this.host.cleared(i);
+        }
         for (const b of turn.added) this.add(b);
         for (const [i, to] of turn.owned) this.own(i, to);
       }

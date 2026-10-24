@@ -42,12 +42,14 @@ import { broadcast, cleanName, clients, join, num, perksChanged, records, round2
 import { perks } from './perks';
 import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
+import { animalsTick, startAnimals } from './animals';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
 import { seen } from './seen';
 import { westDue } from './west-cars';
 import { TAG_PING_MS, nudge, tickDrops } from './drops';
+import { zedUid } from './bodies';
 
 
 /**
@@ -149,6 +151,8 @@ export interface Box {
   v?: number;
   /** a corpse still sat in a helicopter's seat, until it is down (see `riders` in server/acts.ts): not to be searched until then */
   ride?: { i: number; seat: number };
+  /** the body of one of the infected (its number): not kept through a restart, as its body is not (server/bodies.ts) */
+  zed?: number;
 }
 
 export const boxes = new Map<string, Box>();
@@ -393,7 +397,7 @@ function saveWorld() {
       rev: WORLD_REV,
       economy: economy.serialize(),
       // (and the dead lying on the ground, not one riding in a seat: see `bodies` in keep.ts)
-      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && b.ride)),
+      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     };
     writeFileSync(SAVE_FILE, JSON.stringify(data));
@@ -655,7 +659,15 @@ setInterval(() => {
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
   // (the bunker's are not put back while its door stands open; by its own mark, as the caves' homes are no open ground either)
   const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.bunker && bunkerDoor.open);
-  for (const i of turn.gone) broadcast({ t: 'i-', i });
+  for (const i of turn.gone) {
+    broadcast({ t: 'i-', i });
+    // (and what is left in its body goes with it; with somebody in it, when they are done, as a player's body does)
+    const cid = zedUid(i);
+    if (boxes.has(cid) && !locks.has(cid)) {
+      boxes.delete(cid);
+      broadcast({ t: 'corpse-', uid: cid });
+    }
+  }
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
   // the bunker's door: open while anybody is in there or in its doorway (a body left asleep in it too), shut a minute
@@ -1263,6 +1275,13 @@ perks.start(perksChanged);
 setInterval(tagsWorn, 1000).unref();
 // (buried stashes, told to each player as they come near: never all of them to everybody)
 setInterval(() => stashesSeen(clients.values(), boxes.values(), send), 1000).unref();
+// (the animals: the server moves every one, five times a second where anybody is near: server/animals.ts)
+startAnimals();
+// (built fires that have stood cold their while are cleared away: src/sim/fires.ts FIRE.built)
+setInterval(() => {
+  for (const i of hearths.cleared(Date.now() / 1000)) broadcast({ t: 'fire-', i });
+}, 10_000).unref();
+setInterval(() => animalsTick(Date.now()), 200).unref();
 
 void loadKept();
 

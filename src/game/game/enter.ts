@@ -357,6 +357,7 @@ export const enterMethods = {
     await this.spawnDummies();
     this.garage.startAlone();
     this.horde.alone();
+    this.wild.alone();
     this.hud.setNet('Offline · single player');
     this.hud.setOnline(null);
   },
@@ -735,6 +736,16 @@ export const enterMethods = {
   },
 
   /** Offline only: the server owns the world and your character when you play online. */
+  /** Alone, a change of the pockets is saved a second after the last of a run of them, not on each (the whole save,
+   * the world's loot and every crate, cost 6 ms a move, 2026-10-23); leaving the page saves at once. */
+  saveSoon(this: Game) {
+    if (this.online || this.saveDue) return;
+    this.saveDue = setTimeout(() => {
+      this.saveDue = null;
+      this.save();
+    }, 1000);
+  },
+
   save(this: Game) {
     if (!this.economy || this.online || !this.started || this.botCheck?.active) return;
     const p = this.player;
