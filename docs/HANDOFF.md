@@ -72,8 +72,9 @@ want half baked things making it in but we also dont need to spend extra money a
       text rows. The hotbar forgets an item that leaves the player ("when i drop an item my hotbar should forget about it").
 - [x] G to drop, hold G to throw with a power bar, cancel with the wheel or a slot change (session gameplay-batch,
       claude/gameplay-batch-94414c 0bcd75b2, reviewed; a readability pill for the bar last). Changelog lines in its report.
-      Next there: one circular progress ring on the crosshair for every timed action (the owner: "a circular progress bar
-      rather than a flat horizontal bar, like dayz").
+      The throw and one circular progress ring for every timed action (the owner: "a circular progress bar rather than a
+      flat horizontal bar, like dayz") are DONE and merged into battle-royale (0ad14012); throw, tag-custody and
+      animals tests pass on the merged tree.
 - The stage (tools/stage.html, 75503d2d): a plain test scene for one-pass pictures, headless on the processor; pictures
   of a model or animation go there, not the world (the owner: "think when you make a new project on unity").
 - Several branches raise PROTOCOL (gameplay-batch 61, more to come): when merging them, give the merged tree one number.
