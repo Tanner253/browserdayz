@@ -90,6 +90,8 @@ export class Beast implements Damageable {
   private fall = 0;
   private dripT = 0;
   private poseT = 0;
+  private meshes: THREE.Mesh[] = [];
+  private shadow = false;
 
   constructor(readonly i: number, k: number, private host: WildHost) {
     this.kind = KINDS[k];
@@ -104,10 +106,15 @@ export class Beast implements Damageable {
     model.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
-      m.castShadow = true;
       m.receiveShadow = true;
-      // (a skinned body's own bounds are its rest pose: it is never left out of the picture for being somewhere else)
-      m.frustumCulled = false;
+      this.meshes.push(m);
+      // (a skinned body's bounds, worked out once in its rest pose and given room for its movements: worked out every
+      // frame they would cost more than the body; and it is left out of the picture when it is out of view)
+      const sk = m as THREE.SkinnedMesh;
+      if (sk.isSkinnedMesh) {
+        sk.computeBoundingSphere();
+        sk.boundingSphere!.radius *= 1.6;
+      }
       const mats = Array.isArray(m.material) ? m.material : [m.material];
       mats.forEach((mat) => this.host.atmo().register(mat));
     });
@@ -207,6 +214,12 @@ export class Beast implements Damageable {
       this.host.drip(new THREE.Vector3(this.x, y + k.tall * 0.6, this.z));
     }
     if (!this.root.visible) return;
+    // (its shadow only near the eye, where it is seen)
+    const shadow = d < 90;
+    if (shadow !== this.shadow) {
+      this.shadow = shadow;
+      for (const m of this.meshes) m.castShadow = shadow;
+    }
     this.play(dt);
     // (posed every frame near the eye; further off, a few times a second)
     this.poseT += dt;
