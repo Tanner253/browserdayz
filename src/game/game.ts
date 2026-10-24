@@ -605,6 +605,9 @@ export class Game {
       eye: () => ({ pos: this.player.pos.clone().setY(this.player.pos.y + this.player.eye), dir: new THREE.Vector3(0, 0, -1).applyQuaternion(this.s.r.camera.quaternion) }),
       lay: (item, at, rot) => {
         if (this.online) this.localDrops.add(item.uid);
+        // (made at once, as what a hand lets go of is, from where it came down: anything else waits for the eye to come
+        // near, and a thing thrown twenty metres off was not drawn, nor its drop told to the server, until somebody walked over)
+        this.loot.hands.set(item.uid, at.clone());
         this.economy.drop(item, at.x, at.y + 0.005, at.z, rot);
         this.weapons.validate();
       },

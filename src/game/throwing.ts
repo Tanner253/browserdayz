@@ -11,7 +11,7 @@ import { audio } from '../core/audio';
 import type { C2S } from '../net/protocol';
 import type { ItemInstance } from '../sim/items';
 import { THROW, flightStep, powerOf, throwReach, throwSpeed, type Met, type V3 } from '../sim/throw';
-import type { ItemModels } from './loot';
+import type { ItemModels, ItemTemplate } from './loot';
 
 export interface ThrowHost {
   scene: THREE.Scene;
@@ -52,6 +52,8 @@ export class Throwing {
   private winding = false;
   private off = false;
   private flying: Flying[] = [];
+  /** the model of what is being wound up to throw, asked for as the wind-up begins (see `key`) */
+  private model: Promise<ItemTemplate> | null = null;
 
   constructor(private host: ThrowHost) {}
 
@@ -68,7 +70,14 @@ export class Throwing {
     if (down) {
       if (this.off) return;
       this.held += dt;
-      if (!this.winding && this.held >= THROW.tap && this.host.throwable()) this.winding = true;
+      if (!this.winding && this.held >= THROW.tap) {
+        const it = this.host.throwable();
+        if (!it) return;
+        this.winding = true;
+        // (a gun with what is fitted to it is made the first time it is wanted, one model at a time: asked for now,
+        // it is there by the time it leaves the hand. Asked for then, it was not there for the whole of its flight.)
+        this.model = this.host.models.getFor(it);
+      }
       return;
     }
     if (!this.off && this.held > 0) {
@@ -78,6 +87,7 @@ export class Throwing {
     this.held = 0;
     this.winding = false;
     this.off = false;
+    this.model = null;
   }
 
   /** put off (the wheel, another slot, the hands taken up with something else): nothing more until G is let go of */
@@ -113,7 +123,7 @@ export class Throwing {
     const obj = new THREE.Group();
     obj.position.set(pos[0], pos[1], pos[2]);
     this.host.scene.add(obj);
-    void (item ? this.host.models.getFor(item) : this.host.models.get(id)).then((tpl) => obj.add(tpl.group.clone()), () => {});
+    void (item ? (this.model ?? this.host.models.getFor(item)) : this.host.models.get(id)).then((tpl) => obj.add(tpl.group.clone()), () => {});
     this.flying.push({ item, obj, pos, vel, from: [...pos], power, spin: new THREE.Vector3(5 + Math.random() * 4, 2, 3), age: 0 });
   }
 
