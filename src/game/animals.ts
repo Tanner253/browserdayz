@@ -247,11 +247,13 @@ export class Beast implements Damageable {
     const name = names.find((n) => this.actions.has(n)) ?? '';
     const act = this.actions.get(name) ?? null;
     if (this.dead && !act) {
-      // (a body with no movement of its dying: it goes over on its side)
-      this.fall = Math.min(1, this.fall + dt * 2.2);
-      this.model!.rotation.z = this.fall * 1.45;
-      this.model!.position.y = this.fall * this.kind.len * 0.12;
-      if (this.playing && this.fall >= 1) this.playing.paused = true;
+      // (A body with no movement of its dying goes over onto its side, faster as it goes, its legs as they were, and
+      // lies flat where it stood: its middle comes down from where it was to half its girth over the ground.)
+      if (this.playing) this.playing.paused = true;
+      this.fall = Math.min(1, this.fall + dt * 2.4);
+      const t = this.fall * this.fall, a = -t * Math.PI / 2, mid = this.kind.tall * 0.72, girth = this.kind.len * 0.11;
+      this.model!.rotation.z = a;
+      this.model!.position.set(mid * Math.sin(a), mid + (girth - mid) * t - mid * Math.cos(a), 0);
       return;
     }
     if (act && name !== this.playingName) {

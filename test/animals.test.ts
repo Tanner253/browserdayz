@@ -145,6 +145,42 @@ ok('a shot within earshot frightens a herd off; a hunted herd leaves its ground 
   assert.ok(g.movedAt > 0);
 });
 
+ok('one of a herd shot dead, the rest bolt away from the shooter; a vanished admin keeps herds awake and is never noticed', () => {
+  const h = herd(['stag', 'doe']);
+  h.populate(0);
+  const g = h.groups[0], lead = h.beasts.get(g.members[0])!;
+  const admin = person(1, lead.x + 25, lead.z, { unseen: true, speed: 6.2 });
+  run(h, 0, 6, [admin]);
+  assert.ok(g.awake, 'awake with an admin near');
+  assert.equal(g.flee, null, 'a vanished admin sprinting by is not noticed');
+  const start = g.members.map((i) => [h.beasts.get(i)!.x, h.beasts.get(i)!.z]);
+  h.heard(admin.x, admin.z, [600, 1100], 6100);
+  h.hurt(g.members[1], 999, admin, 6200);
+  run(h, 6200, 12, [admin]);
+  g.members.forEach((i, n) => {
+    const b = h.beasts.get(i)!;
+    if (b.diedAt) return;
+    const was = Math.hypot(start[n][0] - admin.x, start[n][1] - admin.z), now = Math.hypot(b.x - admin.x, b.z - admin.z);
+    assert.ok(now > was + 60, `${i} ran away from the shot: ${was.toFixed(0)} -> ${now.toFixed(0)} m`);
+  });
+});
+
+ok('a herd bolting through close-set trunks keeps going: none stands running on one spot', () => {
+  // (trunks every three metres, half a metre round: the stand of pines a hind froze in, 2026-10-23)
+  const trunks: Ground = { ...ground, open: (x, z) => ground.open(x, z, 1) && Math.hypot(x - Math.round(x / 3) * 3, z - Math.round(z / 3) * 3) > 0.5 };
+  const h = new Herd(trunks, (k) => ['stag', 'doe'].includes(k.id), () => PH, seeded(3));
+  const deer = h.place('stag', -300, 0, 1, 4);
+  const admin = person(1, -275, 2, { unseen: true });
+  run(h, 1, 2, [admin]);
+  h.heard(admin.x, admin.z, [600, 1100], 2100);
+  let last = deer.map((b) => [b.x, b.z]);
+  for (let s = 0; s < 8; s++) {
+    run(h, 2200 + s * 1000, 1, [admin]);
+    deer.forEach((b, n) => assert.ok(Math.hypot(b.x - last[n][0], b.z - last[n][1]) > 2, `${b.i} stood still in second ${s}`));
+    last = deer.map((b) => [b.x, b.z]);
+  }
+});
+
 ok('a hurt deer that is not killed bleeds, falls behind, and drops at the end of its blood trail', () => {
   const h = herd(['stag', 'doe']);
   h.populate(0);

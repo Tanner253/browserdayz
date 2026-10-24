@@ -31,6 +31,8 @@ export interface Seen {
   ride: '' | 'car' | 'air';
   /** under a roof the animals cannot get into */
   sheltered: boolean;
+  /** there, and never noticed (an admin vanished): the herds about them are awake and hear shots, and nothing sees, smells or goes for them */
+  unseen?: boolean;
 }
 
 /** A blow that landed on somebody: who struck it, on whom, how hard, whether it opened a wound, and from where. */
@@ -69,8 +71,9 @@ export interface Beast {
   /** what it is doing standing about, and when it next changes */
   act: number;
   next: number;
-  /** which way it goes round what is in its way */
+  /** which way it goes round what is in its way, and how long it has been getting nowhere */
   side: number;
+  stuckT: number;
   // --- a fight (a bear, a wolf, a boar)
   foe: number;
   fightAt: number;
@@ -249,7 +252,7 @@ export class Herd {
       const slotA = this.rnd() * PI2, slotD = g.wants.length > 1 ? 2 + this.rnd() * (2 + g.wants.length * 1.8) : 0;
       const b: Beast = {
         i: this.next++, k, g: g.i, x, z, yaw: this.rnd() * PI2, mode: A_IDLE, hp: kind.hp, diedAt: 0, skinned: false, bleeds: false, speed: 0,
-        aware: 0, fearX: x, fearZ: z, ranFor: 0, slot: [Math.cos(slotA) * slotD, Math.sin(slotA) * slotD], act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1,
+        aware: 0, fearX: x, fearZ: z, ranFor: 0, slot: [Math.cos(slotA) * slotD, Math.sin(slotA) * slotD], act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0,
         foe: 0, fightAt: 0, fightX: x, fightZ: z, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0,
         hurtBy: 0, hurtAt: 0, calmUntil: 0, skinner: null, eaten: false,
       };
@@ -293,7 +296,7 @@ export class Herd {
     const turn: Turn = { strikes: [], died: [] };
     const dt = Math.min(0.5, this.lastTick ? (now - this.lastTick) / 1000 : ANIMALS.step);
     this.lastTick = now;
-    const p = this.phase(now);
+    const p = this.phase(now), noticed = people.filter((q) => !q.unseen);
     for (const g of this.groups) {
       // clearing away the dead, and what is owed for them
       for (const i of [...g.members]) {
@@ -343,7 +346,7 @@ export class Herd {
         g.flee = null;
         this.plan(g, now, from);
       }
-      for (const b of living) this.think(b, g, now, dt, people, turn, p);
+      for (const b of living) this.think(b, g, now, dt, noticed, turn, p);
     }
     return turn;
   }
@@ -560,12 +563,17 @@ export class Herd {
     }
     const want = yawTo(dx, dz), look = Math.max(1.6, speed * 0.7);
     const farm = HERDS[this.groups[b.g].herd].farm ? this.farmOf(this.groups[b.g]) : null;
-    const can = (x: number, z: number) => this.ground.open(x, z, k.steep) && (!farm || Math.hypot(x - farm.x, z - farm.z) < farm.r * 0.9) && (!!farm || this.ground.biome(x, z) !== 'town');
+    // (out of the towns; one that is in one already, stood there by an admin or chased in, may walk on through it and out)
+    const inTown = !farm && this.ground.biome(b.x, b.z) === 'town';
+    const can = (x: number, z: number) => this.ground.open(x, z, k.steep) && (!farm || Math.hypot(x - farm.x, z - farm.z) < farm.r * 0.9) && (!!farm || inTown || this.ground.biome(x, z) !== 'town');
+    // (a way is open where it is clear both at the next step and further on: clear only further on, the way went
+    // through a wall or a house it could not step through, and it stood there running for good)
+    const step = Math.min(d, speed * dt), next = Math.max(0.8, Math.min(3, speed * dt * 1.3));
     let yaw = NaN;
     for (const off of [0, 0.45, 0.9, 1.4, 2.0, 2.6]) {
       for (const s of off ? [b.side, -b.side] : [1]) {
         const y = want + off * s, [fx, fz] = fwd(y);
-        if (can(b.x + fx * look, b.z + fz * look)) {
+        if (can(b.x + fx * step, b.z + fz * step) && can(b.x + fx * next, b.z + fz * next) && can(b.x + fx * look, b.z + fz * look)) {
           yaw = y;
           if (off > 1) b.side = s;
           break;
@@ -579,11 +587,25 @@ export class Herd {
       speed *= 0.3;
     }
     b.yaw = turnTo(b.yaw, yaw, (speed > 5 ? 3.2 : 2.4) * dt);
-    const [fx, fz] = fwd(b.yaw), step = Math.min(d, speed * dt);
-    const nx = b.x + fx * step, nz = b.z + fz * step;
-    if (can(nx, nz)) {
-      b.x = nx;
-      b.z = nz;
+    // (the step the way it faces; or, where that is blocked while it is still turning, the way it is turning to; or
+    // half of either, to slip between two trunks)
+    let moved = false;
+    stepping: for (const k2 of [1, 0.5]) {
+      for (const y of [b.yaw, yaw]) {
+        const [fx, fz] = fwd(y), nx = b.x + fx * step * k2, nz = b.z + fz * step * k2;
+        if (!can(nx, nz)) continue;
+        b.x = nx;
+        b.z = nz;
+        moved = true;
+        break stepping;
+      }
+    }
+    // (and should it still get nowhere for a second, it turns about and tries another line: nothing stands running on one spot)
+    b.stuckT = moved ? 0 : b.stuckT + dt;
+    if (b.stuckT > 1) {
+      b.stuckT = 0;
+      b.side = -b.side;
+      b.yaw += Math.PI * (0.5 + this.rnd());
     }
     // (apart from the rest of its herd)
     for (const i of this.groups[b.g].members) {
@@ -600,7 +622,8 @@ export class Herd {
     return false;
   }
 
-  die(b: Beast, now: number) {
+  /** it is dead: and the rest of its herd near it bolt, away from what killed it (`from`: where that was, else where it fell) */
+  die(b: Beast, now: number, from?: { x: number; z: number }) {
     b.diedAt = now || 1;
     b.hp = 0;
     b.mode = A_DEAD;
@@ -610,9 +633,16 @@ export class Herd {
     b.foe = 0;
     const g = this.groups[b.g];
     this.press(g, ANIMALS.pressure.killed, now);
-    for (const i of g.members) {
-      const o = this.beasts.get(i)!;
-      if (!o.diedAt && Math.hypot(o.x - b.x, o.z - b.z) < 120 && KINDS[o.k].temper !== 'pack') o.aware = 1;
+    const fx = from?.x ?? b.x, fz = from?.z ?? b.z;
+    for (const o of this.beasts.values()) {
+      if (o.diedAt || KINDS[o.k].temper === 'pack' || KINDS[o.k].temper === 'bear') continue;
+      // (its own herd within a long shot of it, and anything else close enough to see it go down)
+      const d = Math.hypot(o.x - b.x, o.z - b.z);
+      if ((o.g === b.g && d < 120) || d < 40) {
+        o.aware = 1;
+        o.fearX = fx;
+        o.fearZ = fz;
+      }
     }
   }
 
@@ -654,7 +684,7 @@ export class Herd {
     }
     b.aware = 1;
     if (b.hp <= 0) {
-      this.die(b, now);
+      this.die(b, now, by ?? undefined);
       return { hp: 0, dead: true };
     }
     if (b.hp < k.hp * ANIMALS.bleedBelow && k.temper !== 'bear') b.bleeds = true;

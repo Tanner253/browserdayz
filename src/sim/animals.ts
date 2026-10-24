@@ -98,24 +98,25 @@ export interface Kind {
 const F = Math.PI / 180;
 
 /**
- * Every kind. Health against a person's 100 (a rifle round to the chest of a deer drops it, as in DayZ). The bear is
+ * Every kind. Health against a person's 100: a hunting rifle's round to the chest drops a deer, as in DayZ (the Mosin's
+ * does 82; the AR's two do it); a bear takes six of those, or a dozen of the AR's, as Rust's does. The bear is
  * the danger the owner asked for: it charges faster than anybody sprints, for six seconds, after a roar; whoever was
  * more than about a dozen metres off when it roared, and kept running, is still ahead when it tires to less than a
  * sprint; in the trees it loses sight of them sooner.
  */
 export const KINDS: Kind[] = [
   {
-    id: 'stag', name: 'Red Deer', model: 'animal_stag', len: 2.1, tall: 1.3, hp: 110, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95,
+    id: 'stag', name: 'Red Deer', model: 'animal_stag', len: 2.1, tall: 1.3, hp: 80, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95,
     temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 220, lies: 600,
     gives: { meat: 'meat_venison', n: 7, fat: 2, hide: 'hide', bones: 5 },
   },
   {
-    id: 'doe', name: 'Red Deer', model: 'animal_doe', len: 1.8, tall: 1.1, hp: 90, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95,
+    id: 'doe', name: 'Red Deer', model: 'animal_doe', len: 1.8, tall: 1.1, hp: 70, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95,
     temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 220, lies: 600,
     gives: { meat: 'meat_venison', n: 5, fat: 1, hide: 'hide', bones: 4 },
   },
   {
-    id: 'bear', name: 'Brown Bear', model: 'animal_bear', len: 2.3, tall: 1.25, hp: 600, tough: 0.85, walk: 1.2, trot: 3.6, run: 9, wind: 6, steep: 1.0,
+    id: 'bear', name: 'Brown Bear', model: 'animal_bear', len: 2.3, tall: 1.25, hp: 420, tough: 0.9, walk: 1.2, trot: 3.6, run: 9, wind: 6, steep: 1.0,
     temper: 'bear', sight: 45, hear: 1, smell: 90, view: 120 * F, flee: 160, lies: 900,
     fight: {
       engage: [20, 28],

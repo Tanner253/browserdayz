@@ -211,7 +211,7 @@ export function chaseDeer(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt:
   deer.fearZ = b.z;
   h.go(b, k, deer.x, deer.z, k.run, dt);
   if (Math.hypot(deer.x - b.x, deer.z - b.z) < 1.8) {
-    h.die(deer, now);
+    h.die(deer, now, b);
     deer.eaten = true;
     turn.died.push(deer.i);
   }

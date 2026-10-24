@@ -289,9 +289,9 @@ export class Game {
     world: () => this.s.world,
     drip: (at) => this.effects.bleed(at, new THREE.Vector3(0, -1, 0), 0.45),
     me: () => {
-      if (!this.started || this.player.dead || this.powers.hidden) return null;
+      if (!this.started || this.player.dead) return null;
       const p = this.player.pos, ride = this.garage.ride;
-      return { id: this.net.id || 1, x: p.x, y: p.y, z: p.z, crouch: this.player.crouched, prone: this.player.prone, speed: Math.hypot(this.player.vel.x, this.player.vel.z), ride: ride ? (ride.jeep instanceof Heli ? 'air' : 'car') : '', sheltered: false };
+      return { id: this.net.id || 1, x: p.x, y: p.y, z: p.z, crouch: this.player.crouched, prone: this.player.prone, speed: Math.hypot(this.player.vel.x, this.player.vel.z), ride: ride ? (ride.jeep instanceof Heli ? 'air' : 'car') : '', sheltered: false, ...(this.powers.hidden ? { unseen: true } : {}) };
     },
     hour: () => this.hourNow(),
     struck: (s, kind) => {
