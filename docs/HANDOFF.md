@@ -26,17 +26,14 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
-- **LIVE 2026-10-24 14:43 UTC**: site, game server and `main` all from `8ac66d29` (PROTOCOL 63, server boot 2187ae55;
-  802 characters and 133 stashes kept across the restart). `site-live` and `hotfix` point there too. Changelog
-  entry `#animals-shot`. (The release before, 13:29 UTC, was `613f731d`, PROTOCOL 62.)
-- **Working branch: `battle-royale`** (the name is historical: it holds everything, ZONA, Arena and Battle Royale).
-  SITE LIVE from `8f3dfe25` (site-only, 2026-10-24 evening; `site-live` there, server and `main` still `8ac66d29`): the
-  physics file asked for again if its download fails (a Mac on Safari could not start on a slow line: /api/boot
-  showed "Load failed" at the assets stage), Carried's strip shorter, raw meat's harm and food's card as it is now,
-  "food" for energy, sprats no longer drying, saline giving water. Changelog `#safari-carried-food`.
-  On the branch, SERVER side, NOT LIVE (the owner, players on: "no server restarts for now just front end things"):
-  animals kept on the land, a herd leaving after a kill, deer grazing in place, animals told to 500 m (`ccc9189a`);
-  food rarer in the loot (`46560206`). PROTOCOL 63 still: the next server release takes them.
+- **LIVE 2026-10-24 16:05 UTC**: site, game server and `main` all from `44bd0e60` (PROTOCOL 63, server boot 722015f9;
+  805 characters and 136 stashes kept). `site-live` and `hotfix` there too. Changelog entries `#equipment-wheel-herds`,
+  `#safari-carried-food`, `#animals-shot`. That release: Carried's equipment folds under its own bar, grids drawn
+  smaller to fit (no sideways scroll, a stash case too), moves keep the scroll, shift-click from a bag lying about, the
+  wheel through every hot key, raw meat harmful and food's card as it is, "food" for energy, sprats and saline, the
+  physics file asked for again (Safari on a slow line), animals kept to the land, herds leaving after a kill, deer
+  grazing in place, animals to 500 m, tinned food rarer. The full suite passed (135 files).
+- **Working branch: `battle-royale`**, the live commit plus handoff commits.
 - **In that release (2026-10-24 afternoon)**: animals could not be shot on live: each one's hitbox stayed
   where its model loaded (`bodyAt` began as NaN, and no comparison with NaN is true: `src/game/animals.ts`), fixed.
   Grenades (thrown and dropped from a dead hand), cars and every gun now hurt animals (`animalHit`, `animalsBlast` in
