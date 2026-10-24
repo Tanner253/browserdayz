@@ -767,7 +767,7 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .inv-col h4 span { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0; margin-left: 6px; }
 
 /* vicinity */
-.inv-ground { min-height: 150px; max-height: 38vh; overflow: auto; border: 1px dashed var(--line); padding: 5px; background: rgba(0, 0, 0, 0.18); }
+.inv-ground { min-height: 150px; max-height: 38vh; overflow-x: hidden; overflow-y: auto; border: 1px dashed var(--line); padding: 5px; background: rgba(0, 0, 0, 0.18); }
 .inv-ground.inv-has-lying { max-height: none; } /* (what lies there open as grids: the column scrolls, not the list) */
 .inv-ground-row { display: flex; align-items: center; gap: 12px; padding: 4px 6px; cursor: grab; border-left: 2px solid transparent; }
 .inv-ground-row:hover { background: rgba(255, 255, 255, 0.05); border-left-color: var(--accent); }
@@ -1157,7 +1157,8 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
    of 1920x1080 or 1366x768 a rucksack opened on a body then stands whole on the left, beside the bar that side
    scrolls by, and on the right a jacket and a vest still stand side by side, and the rucksack and the hold whole.) */
 .inv-wrap { grid-template-columns: minmax(402px, 1.1fr) 408px minmax(420px, 1.2fr); }
-.inv-gridbox.wide { max-width: 100%; padding-right: 1px; padding-bottom: 1px; margin-right: -1px; margin-bottom: -1px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+/* (a grid too wide for its side is drawn smaller to fit, never scrolled sideways: see fitGrids in inventory-ui.ts) */
+.inv-gridbox.wide { max-width: 100%; padding-right: 1px; padding-bottom: 1px; margin-right: -1px; margin-bottom: -1px; overflow-x: hidden; }
 .inv-gridbox.wide:not(.inv-bag) { padding-left: 1px; margin-left: -1px; }
 /* (opened where it lies, it stands in from the edge by its mark down the left: that much less room) */
 .inv-gridbox.wide.inv-bag { max-width: calc(100% - 9px); }

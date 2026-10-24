@@ -347,7 +347,10 @@ export class InventoryUI {
     this.veil[0].className = 'inv-veil';
     this.veil[1].className = 'inv-veil inv-veil-band';
     // (where the figure stands on the page is found again when the window is another size, or the column it is in is scrolled)
-    window.addEventListener('resize', () => (this.figMoved = true));
+    window.addEventListener('resize', () => {
+      this.figMoved = true;
+      if (this.isOpen) this.fitGrids();
+    });
     this.root.addEventListener('scroll', () => (this.figMoved = true), true);
     // (The hole is cut in a veil that blurs what is behind it. That the blur keeps to the veil's cut shape has been
     // seen in Chrome and what is built on it; elsewhere it has not, and a blur that did not would lie over the
@@ -463,6 +466,28 @@ export class InventoryUI {
   private get z() {
     const w = this.root.offsetWidth;
     return w ? this.root.getBoundingClientRect().width / w : 1;
+  }
+
+  /** how much smaller than its squares' own size the grid a thing is in is drawn, to fit (see `fitGrids`): 1, as it is */
+  private scaleOf(el: Element): number {
+    return parseFloat(el.closest<HTMLElement>('.inv-grid')?.style.zoom ?? '') || 1;
+  }
+
+  /**
+   * Every grid as wide as the side it stands in has room for, or narrower: one that would not fit is drawn smaller,
+   * every square alike (the owner, 2026-10-24: "i dont want horizontal scroll bars in the inventory or vicinity can we
+   * make sure all containers and their widths fit properly, shrink them if needed"). It scrolled sideways before.
+   */
+  private fitGrids() {
+    for (const g of this.root.querySelectorAll<HTMLElement>('.inv-grid')) {
+      const box = g.closest<HTMLElement>('.inv-gridbox'), room = box?.parentElement;
+      if (!box || !room || !room.clientWidth) continue;
+      const rs = getComputedStyle(room), bs = getComputedStyle(box);
+      const free = room.clientWidth - parseFloat(rs.paddingLeft) - parseFloat(rs.paddingRight) - parseFloat(bs.marginLeft) - parseFloat(bs.marginRight) - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight) - parseFloat(bs.borderLeftWidth) - parseFloat(bs.borderRightWidth) - 2;
+      const natural = parseFloat(g.style.width) || 0;
+      const zoom = natural > free && free > 0 ? String(Math.max(0.35, Math.floor((free / natural) * 1000) / 1000)) : '';
+      if (g.style.zoom !== zoom) g.style.zoom = zoom;
+    }
   }
 
   open(vicinity: WorldItem[], stash: Stash | null, vitals: Vitals) {
@@ -1679,6 +1704,7 @@ export class InventoryUI {
     this.fill(sk.foot, [sk.help]);
     for (const k of [...this.built.keys()]) if (k.startsWith('c:grid:') && !this.gridsNow.has(k.slice(7))) this.built.delete(k);
     for (const f of this.rescroll) f();
+    this.fitGrids();
     // (and again a frame on, should what came in under them have been short of its full height when this was drawn)
     const back = () => scrolled.forEach(([e, top]) => e.scrollTop !== top && (e.scrollTop = top));
     back();
@@ -2306,7 +2332,7 @@ export class InventoryUI {
       const twice = this.last.uid === src.item.uid && now - this.last.t < 500 && Math.hypot(e.clientX - this.last.x, e.clientY - this.last.y) < 8;
       this.last = { uid: src.item.uid, t: twice ? 0 : now, x: e.clientX, y: e.clientY };
       this.twice = twice ? src : null;
-      const z = this.z;
+      const z = this.z * this.scaleOf(el);
       const rect = el.getBoundingClientRect();
       const rot = src.kind === 'container' ? !!src.c.items.find((p) => p.item === src.item)?.rot : false;
       const ghost = document.createElement('div');
@@ -2423,7 +2449,7 @@ export class InventoryUI {
 
   /** grid cell under the dragged item's top-left corner */
   private cellAt(e: { clientX: number; clientY: number }, grid: HTMLElement, d: Drag): [number, number] {
-    const z = this.z;
+    const z = this.z * this.scaleOf(grid);
     const rect = grid.getBoundingClientRect();
     const lx = (e.clientX - rect.left) / z - d.offX;
     const ly = (e.clientY - rect.top) / z - d.offY;
@@ -2492,7 +2518,7 @@ export class InventoryUI {
     if (t.kind === 'grid') {
       const c = this.containerById(t.id);
       if (!c) return '';
-      const z = this.z, rect = t.el.getBoundingClientRect();
+      const z = this.z * this.scaleOf(t.el), rect = t.el.getBoundingClientRect();
       const onto = this.under(c, Math.floor((e.clientX - rect.left) / z / CELL), Math.floor((e.clientY - rect.top) / z / CELL));
       if (onto && c.joinable(item, src.kind === 'container' ? src.c : null) && this.joins(d, onto.item)) return '';
       const [cx, cy] = this.cellAt(e, t.el, d);
@@ -2652,10 +2678,13 @@ export class InventoryUI {
     // (held where it will not go, the reason is said by the pointer before it is let go, and not only after)
     this.hint(t ? this.refusal(d, t, e) : '');
     // (rot, where given: a faded picture of the thing is drawn where it would land, turned as it would lie there. Fettah 2026-10-18, idea 8 on Fettah's board)
+    // (over a grid drawn smaller to fit, the outline is drawn at its size: see `fitGrids`)
+    let k = 1;
     const box = (rect: DOMRect, x: number, y: number, w: number, h: number, cls: string, label = '', rot?: boolean) => {
       o.style.display = 'block';
-      o.style.left = `${rect.left / z + x * CELL}px`;
-      o.style.top = `${rect.top / z + y * CELL}px`;
+      o.style.zoom = k === 1 ? '' : String(k);
+      o.style.left = `${rect.left / z / k + x * CELL}px`;
+      o.style.top = `${rect.top / z / k + y * CELL}px`;
       o.style.width = `${w * CELL}px`;
       o.style.height = `${h * CELL}px`;
       o.className = 'inv-outline ' + cls;
@@ -2667,8 +2696,9 @@ export class InventoryUI {
       if (!c) return;
       const rect = t.el.getBoundingClientRect();
       const [cx, cy] = this.cellAt(e, t.el, d);
+      k = this.scaleOf(t.el);
       // over something it goes into: that thing is what lights up
-      const [px, py] = [Math.floor(((e.clientX - rect.left) / z) / CELL), Math.floor(((e.clientY - rect.top) / z) / CELL)];
+      const [px, py] = [Math.floor(((e.clientX - rect.left) / z / k) / CELL), Math.floor(((e.clientY - rect.top) / z / k) / CELL)];
       const onto = this.under(c, px, py);
       // (onto a pile, into a magazine, onto a gun: only where the thing could be put at all. Nothing goes into a bag that is itself in a pocket or a pack: Container.accepts)
       const how = onto && c.joinable(d.src.item, d.src.kind === 'container' ? d.src.c : null) ? this.joins(d, onto.item) : null;
@@ -2803,7 +2833,7 @@ export class InventoryUI {
     if (t.kind === 'grid') {
       const c = this.containerById(t.id!);
       if (!c) return this.render();
-      const z = this.z;
+      const z = this.z * this.scaleOf(t.el);
       const rect = t.el.getBoundingClientRect();
       const [cx, cy] = this.cellAt(e, t.el, d);
       const onto = this.under(c, Math.floor(((e.clientX - rect.left) / z) / CELL), Math.floor(((e.clientY - rect.top) / z) / CELL));
