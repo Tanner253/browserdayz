@@ -120,7 +120,7 @@ const F = Math.PI / 180;
  * sprint; in the trees it loses sight of them sooner.
  */
 // (their health half as much again, a bear's twice and more, once they could be shot at all: "the bear needs more HP
-// and the other animals", 2026-10-24. A bear: twenty rounds of an AK in the body, six in the head, three grenades.)
+// and the other animals", 2026-10-24. A bear: twenty rounds of an AK in the body, seven in the head, three grenades.)
 export const KINDS: Kind[] = [
   // (deer, 2026-10-24: "deer should be faster than person running and can run for longer so if hunter misses its
   // shots the deer will get some good distance away": winded, still faster than a sprint, 6.2, and slower than a wolf, 7)
