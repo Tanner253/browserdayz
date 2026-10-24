@@ -13,6 +13,16 @@ const angleOff = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(b - a), 
 const isNight = (p: number) => p >= 0.73 || p < 0.02;
 /** how near its middle comes to whoever it fights: its muzzle at them, not in them (a bear stopped 1.2 m off had its head through the man) */
 const close = (k: Kind) => k.len / 2 + 0.45;
+/**
+ * Whoever it fights is up out of its reach (on a roof, a rock, in the air) or well below it: no blow lands (2026-10-24:
+ * "when im flying the bear can hit me its ignoring height"). A bear stood up reaches its own height and most of a metre more.
+ */
+const outOfReach = (h: Herd, b: Beast, k: Kind, foe: Seen) => {
+  const up = foe.y - h.ground.height(b.x, b.z);
+  return up > k.tall + 0.9 || up < -1.5;
+};
+/** and with nothing solid between: "should not be able to hit me through walls" (2026-10-24) */
+const unreached = (h: Herd, b: Beast, k: Kind, foe: Seen) => foe.sheltered || outOfReach(h, b, k, foe) || h.ground.walled(b.x, b.z, foe.x, foe.z);
 
 /**
  * A bear: the warning, the rush, the chase, the blows, and giving up. A bear that
@@ -40,8 +50,9 @@ export function fighter(h: Herd, b: Beast, k: Kind, now: number, dt: number, peo
     b.sensedAt = now;
     b.seenX = foe.x;
     b.seenZ = foe.z;
-    b.warnUntil = now + f.warn * 1000;
-    b.rushUntil = b.warnUntil + f.rushFor * 1000;
+    // (hurt, it comes at once, with no warning)
+    b.warnUntil = foe === hurt ? now : now + f.warn * 1000;
+    b.rushUntil = f.charge && foe !== hurt ? 0 : b.warnUntil + f.rushFor * 1000;
     b.move = null;
   }
   const foe = people.find((q) => q.id === b.foe);
@@ -50,18 +61,28 @@ export function fighter(h: Herd, b: Beast, k: Kind, now: number, dt: number, peo
   const eye = h.ground.height(b.x, b.z) + k.tall;
   // (it sees whoever is in the open with no hill between; among trees not half so far: the way to lose a bear)
   const sees = d < 70 * (1 - 0.6 * h.ground.cover(foe.x, foe.z)) && h.ground.clear(b.x, eye, b.z, foe.x, foe.y + 1.2, foe.z);
+  const high = outOfReach(h, b, k, foe);
   if (d < 6 || sees || d < smellReach(k, b.x, b.z, foe.x, foe.z) * 0.4) {
-    if (!foe.sheltered) b.sensedAt = now;
+    // (one out of its reach above is no more within its grasp than one under a roof: it gives up on them as slowly)
+    if (!foe.sheltered && !high) b.sensedAt = now;
     b.seenX = foe.x;
     b.seenZ = foe.z;
   }
-  if (now - b.sensedAt > f.lose * (foe.sheltered ? 3 : 1) * 1000) return giveUp(b, now, 20_000), false;
+  if (now - b.sensedAt > f.lose * (foe.sheltered || high ? 3 : 1) * 1000) return giveUp(b, now, 20_000), false;
+  // (walking in: within `charge` of them, or hurt, and it rushes, from the end of its roar)
+  if (!b.rushUntil && (d < f.charge! || (b.hurtBy && now - b.hurtAt < 1000))) b.rushUntil = Math.max(now, b.warnUntil) + f.rushFor * 1000;
   // (past its rush it keeps after them only so long, unless it is on them: a sprint begun far enough off gets away)
-  if (now > b.rushUntil + f.chaseFor * 1000 && d > 6) return giveUp(b, now, 20_000), false;
+  if (b.rushUntil && now > b.rushUntil + f.chaseFor * 1000 && d > 6) return giveUp(b, now, 20_000), false;
   if (now < b.warnUntil) {
     b.yaw = turnTo(b.yaw, yawTo(foe.x - b.x, foe.z - b.z), 3 * dt);
     b.speed = 0;
     b.mode = A_ROAR;
+    return true;
+  }
+  if (!b.rushUntil) {
+    // (and whoever backs well off while it walks is let go)
+    if (d > f.engage[1] + 12) return giveUp(b, now, 20_000), false;
+    h.go(b, k, b.seenX, b.seenZ, f.stalk!, dt, close(k));
     return true;
   }
   const pace = now < b.rushUntil ? f.rush : f.chase;
@@ -85,7 +106,7 @@ export function blows(h: Herd, b: Beast, k: Kind, foe: Seen, now: number, dt: nu
       const m = b.move, hd = Math.hypot(foe.x - b.x, foe.z - b.z);
       b.move = null;
       b.restUntil = now + m.recover * 1000;
-      if (!foe.sheltered && hd < m.reach + 0.6 && angleOff(b.yaw, yawTo(foe.x - b.x, foe.z - b.z)) < 1.3) {
+      if (!unreached(h, b, k, foe) && hd < m.reach + 0.6 && angleOff(b.yaw, yawTo(foe.x - b.x, foe.z - b.z)) < 1.3) {
         turn.strikes.push({ i: b.i, on: foe.id, damage: Math.round(m.damage * (0.85 + h.rnd() * 0.3)), bleed: h.rnd() < m.bleed, mode: m.mode, from: [b.x, b.z] });
       }
     }
@@ -101,7 +122,7 @@ export function blows(h: Herd, b: Beast, k: Kind, foe: Seen, now: number, dt: nu
   }
   // (it starts its swing as it closes, by as much as it covers in the windup)
   const moves = k.fight!.moves.filter((m) => d < m.reach + pace * m.windup * 0.6);
-  if (!moves.length || foe.sheltered) return false;
+  if (!moves.length || unreached(h, b, k, foe)) return false;
   let r = h.rnd() * moves.reduce((a, m) => a + m.weight, 0);
   const m = moves.find((mm) => (r -= mm.weight) < 0) ?? moves[0];
   b.move = m;

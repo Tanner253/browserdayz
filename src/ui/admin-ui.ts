@@ -55,10 +55,8 @@ export interface AdminActions {
   night(on: boolean): void;
   /** the colour of the word ADMIN before this admin's name in the chat (null: the rainbow; 'off': no tag at all) */
   tint(color: string | null): void;
-  /** everybody's name shown where they are, through anything: put on or off */
-  names(on: boolean): void;
-  /** every thing lying about shown where it is, through anything: put on or off */
-  loot(on: boolean): void;
+  /** one of the far sight's switches (the ESP list) put on or off: everybody's name, every thing lying about, every animal, every one of the infected */
+  esp(which: EspSwitch, on: boolean): void;
   /** what the middle of the game's view is on, behind the window (null: nothing within reach) */
   look(): AdminLook | null;
   /** somebody has been picked on the left (0: nobody): the admin's map rings them too */
@@ -67,6 +65,16 @@ export interface AdminActions {
   store(act: unknown): void;
   close(): void;
 }
+
+/** the far sight's switches: what each shows, through anything */
+export type EspSwitch = 'names' | 'loot' | 'animals' | 'infected';
+const ESP_LIST: { k: EspSwitch; label: string; does: string; ic: string }[] = [
+  { k: 'names', label: 'Players', does: 'Everybody’s name where they are, however far', ic: 'eye' },
+  { k: 'loot', label: 'Loot', does: 'Every thing within 150 m of your view: on the ground, put away, on bodies, in crates and stashes', ic: 'box' },
+  // (2026-10-24: "admin panel needs a toggle for show animals")
+  { k: 'animals', label: 'Animals', does: 'Every animal on the map, however far: down or bleeding too', ic: 'animal' },
+  { k: 'infected', label: 'Infected', does: 'Every one of the infected on the map, however far, and those down', ic: 'infected' },
+];
 
 /** what the middle of the view is on: where, how far off, and what it is */
 export interface AdminLook {
@@ -80,6 +88,8 @@ export interface AdminLook {
   what: string;
   /** a car: its number */
   car?: number;
+  /** an animal: its number, for /del animal */
+  animal?: number;
   /** a body: its number, for /delbody (a player's body's uid, or the number of one of the infected) */
   body?: string;
 }
@@ -106,6 +116,10 @@ export interface AdminSelf {
   names: boolean;
   /** every thing lying about is shown where it is */
   loot?: boolean;
+  /** every animal is shown where it is */
+  animals?: boolean;
+  /** and every one of the infected */
+  infected?: boolean;
   /** the colour chosen for the word ADMIN in the chat (null: the rainbow) */
   tint: string | null;
   freecam: boolean;
@@ -283,6 +297,10 @@ export class AdminUI {
   /** the Entities page: where a new thing is put, how many of each, and what the view was on when it was last asked */
   private spawnAt: 'front' | 'look' = 'front';
   private spawnN: Record<string, number> = {};
+  /** the animal the one Animal tile on the Entities page stands */
+  private spawnBeast = '';
+  /** the far sight's list is open */
+  private espOpen = false;
   private looked: AdminLook | null = null;
 
   constructor(private places: { name: string; x: number; z: number; kind?: string }[], private act: AdminActions, private pictures: Record<string, string> = {}) {
@@ -618,6 +636,44 @@ export class AdminUI {
     return b;
   }
 
+  /**
+   * The far sight's switches in one list that opens (2026-10-24: "can we put the ESP stuff in one dropdown that when
+   * oppened shows a checkbox of all the toptions for players, animals, loot, zombies etc."): shut, it says which are on.
+   */
+  private espList() {
+    const s = this.self, on = ESP_LIST.filter((e) => s[e.k]);
+    const box = el('div', `adm-esp${this.espOpen ? ' open' : ''}`);
+    const head = el('button', 'adm-esp-head');
+    head.type = 'button';
+    head.dataset.k = 'esp';
+    head.setAttribute('aria-expanded', String(this.espOpen));
+    const text = el('span', 'adm-sw-text');
+    text.append(el('b', '', 'ESP'), el('small', '', on.length ? `On: ${on.map((e) => e.label).join(', ')}` : 'See through anything: players, loot, animals, the infected'));
+    head.append(icon('eye'), text, el('i', 'adm-esp-arrow'));
+    head.onclick = () => {
+      this.espOpen = !this.espOpen;
+      this.draw(true);
+    };
+    box.append(head);
+    if (this.espOpen) {
+      const list = el('div', 'adm-esp-list');
+      for (const e of ESP_LIST) {
+        const row = el('label', 'adm-esp-row');
+        const tick = el('input');
+        tick.type = 'checkbox';
+        tick.checked = !!s[e.k];
+        tick.dataset.k = `esp:${e.k}`;
+        tick.onchange = () => this.act.esp(e.k, tick.checked);
+        const t = el('span', 'adm-sw-text');
+        t.append(el('b', '', e.label), el('small', '', e.does));
+        row.append(tick, icon(e.ic), t);
+        list.append(row);
+      }
+      box.append(list);
+    }
+    return box;
+  }
+
   /** @param k the name it goes by, when what it says in its box changes with who is picked */
   private input(value: string, hint: string, set: (v: string) => void, cls = '', enter?: () => void, k = hint) {
     const i = el('input', `adm-i ${cls}`.trim());
@@ -705,7 +761,7 @@ export class AdminUI {
   private bodyKey() {
     const p = this.pick(), s = this.self;
     const base = `${this.view}|${this.sub}|${this.target}|${s.role}|${this.sure?.key ?? ''}`;
-    if (this.view === 'entities') return `${base}|${this.spawnAt}|${JSON.stringify(this.spawnN)}|${JSON.stringify(this.looked ? [this.looked.what, Math.round(this.looked.x), Math.round(this.looked.z), Math.round(this.looked.dist)] : null)}|${JSON.stringify(this.lists.stats ?? {})}`;
+    if (this.view === 'entities') return `${base}|${this.spawnAt}|${this.spawnBeast}|${JSON.stringify(this.spawnN)}|${JSON.stringify(this.looked ? [this.looked.what, Math.round(this.looked.x), Math.round(this.looked.z), Math.round(this.looked.dist)] : null)}|${JSON.stringify(this.lists.stats ?? {})}`;
     if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}`;
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}|${JSON.stringify(this.lists.turned ?? [])}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
@@ -855,7 +911,7 @@ export class AdminUI {
       if (n) b.append(el('em', '', n));
       return b;
     };
-    if (this.admin) nav.append(go('entities', 'Entities', 'car', 'Cars and the infected: put them in the world, and take them out of it'));
+    if (this.admin) nav.append(go('entities', 'Entities', 'car', 'Cars, the infected and animals: put them in the world, and take them out of it'));
     nav.append(go('server', 'Server', 'megaphone', 'A word to everybody, what the server is doing, and the keys'));
     if (this.admin) nav.append(go('bans', 'Bans', 'ban', 'Who is banned or kept off, and lifting it', this.lists.bans.length ? String(this.lists.bans.length) : ''), go('roles', 'Roles', 'star', 'Who is an admin or a mod'), go('store', 'Store', 'coin', 'What was bought at the store: give, revoke, refund, move', this.store.view?.looks ? String(this.store.view.looks) : ''));
     const keep = this.side.querySelector('.adm-who')?.scrollTop ?? 0;
@@ -878,7 +934,7 @@ export class AdminUI {
     this.drawnHead = key;
     if (this.view !== 'who') {
       const t = el('div', 'adm-head-t');
-      const [ic, title, sub] = this.view === 'entities' ? ['car', 'Entities', 'Cars and the infected: put them in the world, and take them out of it. Everybody sees what is done here.']
+      const [ic, title, sub] = this.view === 'entities' ? ['car', 'Entities', 'Cars, the infected and animals: put them in the world, and take them out of it. Everybody sees what is done here.']
         : this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'store' ? ['coin', 'Store', 'What was bought, checked on chain as it was paid. A payment that came short or late needs a look: pass it, or refund it from the store’s wallet yourself and mark it so.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
       const text = el('div', 'adm-head-text');
       text.append(el('b', '', title), el('small', '', sub));
@@ -1082,8 +1138,7 @@ export class AdminUI {
         this.act.close();
       }, 'camera', 'K'),
       this.flip('Night vision', 'It is day, for you alone, in the bunker too', s.night, () => this.act.night(!s.night), 'sun'),
-      this.flip('Names of players', 'Everybody’s name where they are, however far, through anything', s.names, () => this.act.names(!s.names), 'eye'),
-      this.flip('Loot', 'Every thing lying within 150 m of your view, through anything: on the ground, put away, on bodies, in crates and stashes', s.loot, () => this.act.loot(!s.loot), 'box'),
+      this.espList(),
     );
     grid.append(this.card('Powers', 'bolt', powers,
       el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),
@@ -1366,7 +1421,8 @@ export class AdminUI {
   /**
    * Cars and the infected: put in the world, and taken out of it (2026-10-13: "add more admin tools that might be
    * useful like spawn entities like cars and zombies and future entities would go here etc, make sure delete car is
-   * on there"). A tile for every row of ENTITIES in src/net/orders.ts: a kind of thing added there is here by itself.
+   * on there"). A tile for every row of ENTITIES in src/net/orders.ts, the animals one between them: a kind of thing
+   * added there is here by itself.
    */
   private entities(): HTMLElement[] {
     const st = this.lists.stats, look = this.looked, there = this.spawnAt === 'look' && !!look;
@@ -1393,10 +1449,24 @@ export class AdminUI {
       el('div', 'dim', this.spawnAt === 'look' && !look ? 'Nothing is in the middle of your view: a new thing is put in front of you instead.' : 'What you are looking at is whatever is in the middle of your view, behind this window: shut it, look, and open it again to change that.'));
 
     const tiles = el('div', 'adm-ents');
-    for (const e of ENTITIES) {
+    // (the animals one tile, the kind picked from a list: "make the animal spawns a dropdown option so we dont need a
+    // panel for every single animal entity", 2026-10-24)
+    const beasts = ENTITIES.filter((e) => e.kind === 'animal'), beast = beasts.find((e) => e.id === this.spawnBeast) ?? beasts[0];
+    for (const row of ENTITIES) {
+      if (row.kind === 'animal' && row !== beasts[0]) continue;
+      const e = row.kind === 'animal' ? beast : row;
       const n = Math.min(this.spawnN[e.id] ?? 1, e.most), t = el('div', 'adm-ent');
       const text = el('div', 'adm-ent-text');
-      text.append(el('b', '', e.name), el('small', '', e.does));
+      if (e.kind === 'animal') {
+        const pick = el('select', 'adm-pick');
+        for (const b of beasts) pick.append(Object.assign(document.createElement('option'), { value: b.id, textContent: b.name, selected: b === e }));
+        pick.dataset.k = 'beast';
+        pick.onchange = () => {
+          this.spawnBeast = pick.value;
+          this.draw(true);
+        };
+        text.append(pick, el('small', '', e.does));
+      } else text.append(el('b', '', e.name), el('small', '', e.does));
       const many = el('div', 'adm-seg');
       many.append(el('span', 'adm-label', 'How many'));
       for (const c of [...new Set([...COUNTS.filter((v) => v < e.most), e.most])]) {
@@ -1440,7 +1510,18 @@ export class AdminUI {
         this.grave('delbody', 'Delete the body nearest me', () => this.send('/delbody'), 'skull'),
       ),
       this.line('', el('span', '', 'Delete the bodies within'), ...CULL.map((m) => this.grave(`delbodies${m}`, `${m} m`, () => this.send(`/delbodies ${m}`), 'skull')), el('span', '', 'of me')),
-      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. A body goes with whatever is on it: a player’s, or one of the infected’s. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected.'),
+      // (2026-10-24: "the delete key is not working on it and i cant desapawn it in the menu")
+      this.line('Animals',
+        look?.animal !== undefined ? this.grave(`delanimal:${look.animal}`, `Take away ${look.what}`, () => {
+          this.send(`/del animal ${look.animal}`);
+          window.setTimeout(() => {
+            this.looked = this.act.look();
+            if (this.isOpen) this.draw();
+          }, 1400);
+        }, 'target') : this.off('The animal I am looking at', 'You are not looking at an animal. Shut this window, look at one, and open it again', 'target'),
+        el('span', '', 'Those within'), ...CULL.map((m) => this.grave(`delanimals${m}`, `${m} m`, () => this.send(`/delanimals ${m}`), 'animal')), el('span', '', 'of me'),
+      ),
+      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. A body goes with whatever is on it: a player’s, or one of the infected’s. An animal taken away is gone at once, alive or dead; a herd of the map has another in its time. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected, an animal.'),
     );
 
     const counts = el('div', 'adm-tiles');

@@ -260,14 +260,15 @@ export class Herd {
   }
 
   /** one more of a herd, where nobody living can see it turn up (null: no such spot this time) */
-  private stand(g: Group, k: number, now: number, people: Seen[], start = false): Beast | null {
+  /** @param anywhere an admin's: on any ground, whether its kind lives there or not */
+  private stand(g: Group, k: number, now: number, people: Seen[], start = false, anywhere = false): Beast | null {
     const kind = KINDS[k];
     for (let n = 0; n < 12; n++) {
       const a = this.rnd() * PI2, d = 4 + this.rnd() * (start ? 30 : 60);
       // (one that never walks is stood at its own place in the herd, which no other has)
       const farm = !!HERDS[g.herd].farm, at = kind.still ? slotFor(this, g, k, (x, z) => fit(this, x, z, kind.steep, 'walk', farm, kind.lives)) : null;
       const x = at ? g.at.x + at[0] : g.at.x + Math.cos(a) * d, z = at ? g.at.z + at[1] : g.at.z + Math.sin(a) * d;
-      if (!fit(this, x, z, kind.steep, 'walk', farm, kind.lives)) continue;
+      if (!anywhere && !fit(this, x, z, kind.steep, 'walk', farm, kind.lives)) continue;
       if (people.some((p) => Math.hypot(p.x - x, p.z - z) < ANIMALS.clear)) return null;
       const slot = at ?? slotFor(this, g, k);
       const b: Beast = {
@@ -313,7 +314,8 @@ export class Herd {
     const others = HERDS[hi].of.map(([id]) => KINDS.findIndex((kk) => kk.id === id)).filter((o) => o !== k);
     const out: Beast[] = [];
     for (let c = 0; c < n; c++) {
-      const b = this.stand(g, c === 0 || !others.length || KINDS[k].id !== 'stag' ? k : others[0], now, []);
+      // (wherever the admin asks: "as admin i should be able to spawn a bear anywhere", 2026-10-24)
+      const b = this.stand(g, c === 0 || !others.length || KINDS[k].id !== 'stag' ? k : others[0], now, [], false, true);
       if (!b) continue;
       // (each at its own place in the herd, which keeps them apart)
       b.x = x + b.slot[0];
@@ -321,6 +323,18 @@ export class Herd {
       out.push(b);
     }
     return out;
+  }
+
+  /**
+   * An admin's `/del animal` and `/delanimals`: taken out of the world at once, alive or dead (2026-10-24: "the delete
+   * key is not working on it and i cant desapawn it in the menu"). A herd of the map is owed it, as for one that died.
+   */
+  remove(i: number): Beast | null {
+    const b = this.beasts.get(i), g = b && this.groups[b.g];
+    if (!b) return null;
+    this.beasts.delete(i);
+    if (g?.members.includes(i)) g.members.splice(g.members.indexOf(i), 1);
+    return b;
   }
 
   // ------------------------------------------------------------------ time
@@ -549,7 +563,7 @@ export class Herd {
         }
       }
       const tired = b.ranFor > k.wind, slow = b.bleeds ? 0.75 : 1;
-      const speed = (h.farm ? k.trot : tired ? k.trot * 1.2 : k.run) * slow;
+      const speed = (h.farm ? k.trot : tired ? (k.spent ?? k.trot * 1.2) : k.run) * slow;
       if (speed >= k.run * 0.8) b.ranFor += dt;
       this.go(b, k, tx, tz, speed, dt);
       return;

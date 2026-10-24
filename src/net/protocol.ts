@@ -65,7 +65,8 @@ import type { AnimalRow, Call } from '../sim/animals';
 // bodies and bags lying about are gone through by several at once, move by move ('cops', 'lops', 'cno':
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
-export const PROTOCOL = 62;
+// (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
+export const PROTOCOL = 63;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -186,6 +187,8 @@ export interface CorpseInfo extends StashInfo {
  */
 export type EspRow = [x: number, y: number, z: number, what: string, n: number, at: number, inside?: number];
 /** on the ground, put away in a piece of furniture, a body, a crate, a stash, a buried stash, a supply drop */
+/** one of the infected as an admin's far sight is told of it: its number, where it is, and whether it is down (1) */
+export type ZedSpot = [i: number, x: number, y: number, z: number, down: number];
 export const ESP_AT = { ground: 0, furniture: 1, body: 2, crate: 3, stash: 4, buried: 5, drop: 6 } as const;
 
 export interface KillInfo {
@@ -281,6 +284,8 @@ export type C2S =
   | { t: 'adm' }
   /** an admin's far sight wants what lies about where their view is, or about them (answered to an admin alone, and no oftener than ESP.every: server/esp.ts) */
   | { t: 'esp'; x?: number; z?: number }
+  /** the same far sight wants every animal (`a`) and every one of the infected (`z`) on the map, wherever they are (answered as 'esp' is: server/esp.ts) */
+  | { t: 'aesp'; a?: boolean; z?: boolean }
   /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
   | { t: 'tint'; color: string | null }
   /** a party (server/party.ts): ask the player of that id to join yours, say yes to whoever asked you, or leave yours */
@@ -584,6 +589,8 @@ export type S2C =
   /** the lists the panel shows (see AdminLists) */
   | ({ t: 'adm' } & AdminLists)
   | { t: 'esp'; l: EspRow[] }
+  /** every animal on the map, as 'an' rows are, and every one of the infected, to an admin who asked */
+  | { t: 'aesp'; r?: AnimalRow[]; z?: ZedSpot[] }
   /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
   | { t: 'restart'; why: string; in: number }
   /** (`v`: turned away for being of another version than the server, which is of this one) */

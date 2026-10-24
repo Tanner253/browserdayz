@@ -17,6 +17,7 @@ import { CHECK, CHECKS, dealt, flag } from './checks';
 import { DEVICE, cameWith, deviceName, isFarm, shortDevice } from './device';
 import { broadcast, clients, drop, send, type Client } from './players';
 import { hurtJeep, infectedBody, kill, leaveSeat, releaseLock } from './acts';
+import { animalsBlast } from './animals';
 
 // ------------------------------------------------------------------ a life kept by the server
 //
@@ -402,6 +403,7 @@ export function fellBlast(by: Client, w: string, at: Vec3) {
   }
   // (a car is reached from seven tenths as far as a body, as it is by a grenade that was thrown)
   for (const v of [...vehicles.values()]) if (!v.goneAt && Math.hypot(v.s[0] - at[0], v.s[1] - at[1], v.s[2] - at[2]) < rule.blast! * 0.7) hurtJeep(v, carDamage(rule), by);
+  animalsBlast(by, w, at);
 }
 
 /** What somebody says they carry, asked of the server's own list: an invented gun is written down once, and (enforcing) is not in the copy the server keeps of their pockets. */

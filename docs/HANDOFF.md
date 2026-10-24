@@ -29,7 +29,19 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 - **LIVE 2026-10-24 13:29 UTC**: site, game server and `main` all from `613f731d` (PROTOCOL 62, server boot fc91453e;
   801 characters and 133 stashes kept across the restart; payouts on). `site-live` and `hotfix` point there too.
 - **Working branch: `battle-royale`** (the name is historical: it holds everything, ZONA, Arena and Battle Royale).
-  It is `613f731d` plus handoff commits only, so a site-only deploy from it is free again while it holds no server change.
+  Since `613f731d` it holds the animals and admin work of 2026-10-24 afternoon (below), a SERVER change with PROTOCOL 63:
+  a site-only deploy from it is no longer free (the page would wait for a server that is behind); the next release
+  is a full one, on the owner's word.
+- **On the branch, not live (2026-10-24 afternoon)**: animals could not be shot on live: each one's hitbox stayed
+  where its model loaded (`bodyAt` began as NaN, and no comparison with NaN is true: `src/game/animals.ts`), fixed.
+  Grenades (thrown and dropped from a dead hand), cars and every gun now hurt animals (`animalHit`, `animalsBlast` in
+  server/animals.ts). The admin panel: one ESP list with checkboxes (Players, Loot, Animals, Infected; animals and the
+  infected wherever they are, from the server: 'aesp'), one Animal spawn tile with a dropdown, `/del animal`, the
+  Delete key on an animal or a carcass, `/delanimals [m]`, and an admin stands an animal anywhere. DayZ's bear (the
+  owner): it roars at 20 m (28 by night), walks in at 1.8 m/s, and inside 12 m or hurt sprints at 9 m/s for 8 s,
+  which cannot be outrun; backing well off while it walks loses it. No blow lands through a wall (`Ground.walled`)
+  or on whoever is up out of reach (a flying admin). Deer: 25 s at 11 m/s, then 6.8 (above a sprint, 6.2, below a
+  wolf, 7), and 300 m before they stop.
 - That release held: the DayZ-style inventory (guns two squares wide in the equipment strip, their parts under them; the
   ten hot keys big under HANDS; Vicinity as pictures), the animals (bear, stag, doe, wolf packs, cow; hunting, gutting,
   cooking), Mokroye in the swamp and twelve new places, Pokrov, Kalat and the canyon reworked, the phone fixes (phone sky,
@@ -44,7 +56,7 @@ The owner's rules for all of it: visual quality first; no corners cut, but once 
 polishing or analysis); build cheap by design, and NO performance measuring (the owner optimizes in a pass of their own);
 develop single things on the stage first; never change the ground round buried stashes; never raise WORLD_REV.
 
-1. **Admin panel: a "show animals" toggle** (the owner, 2026-10-24: "admin panel needs a toggle for show animals").
+1. DONE on the branch (section 2): **Admin panel: a "show animals" toggle** (the owner, 2026-10-24: "admin panel needs a toggle for show animals").
    Beside "Names of players" and "Loot" in the admin panel's own powers (`src/ui/admin-ui.ts`, the `this.flip(...)` list
    near line 1085): every animal where it is, through anything, as those two show players and loot. Look at how the
    loot overlay is drawn and switched (`this.act.*`) and do the same for animals (their positions reach the game in

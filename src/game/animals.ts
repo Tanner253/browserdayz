@@ -169,8 +169,13 @@ export class Beast implements Damageable {
   private model: THREE.Object3D | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private paces: Record<string, number> = {};
-  /** where its body was last set (x, y, z, turn, pitch), and whether it was in view last frame */
-  private bodyAt = [NaN, NaN, NaN, NaN, NaN];
+  /**
+   * where its body was last set (x, y, z, turn, pitch), and whether it was in view last frame. Nowhere at first, and
+   * so set on its first frame: NaN here (as it was) is no further from anywhere than nothing, every comparison with it
+   * is false, and the body was never moved from where it was made: shots went through every animal that had walked
+   * off (2026-10-24: "i am still not able to shoot damage or kill animals").
+   */
+  private bodyAt = [Infinity, Infinity, Infinity, Infinity, Infinity];
   private wasInView = false;
   private strikes: Record<string, number> = {};
   private floors: Record<string, number> = {};

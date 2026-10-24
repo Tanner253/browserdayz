@@ -49,6 +49,13 @@ export interface Fight {
   /** the rush: metres a second, and for how long it can keep it up */
   rush: number;
   rushFor: number;
+  /**
+   * DayZ's bear (the owner, 2026-10-24: "in a certain proximity makes a roar then walks towards the player until a
+   * closer proximity where the bear goes in full sprint and is not outrunnable"): after its warning it walks at them
+   * at `stalk` metres a second, and rushes once they are within `charge` metres, or it is hurt. Without: it rushes at once.
+   */
+  stalk?: number;
+  charge?: number;
   /** what it keeps up after that (a sprint is 6.2), and for how long more unless it is on them */
   chase: number;
   chaseFor: number;
@@ -76,6 +83,8 @@ export interface Kind {
   run: number;
   /** seconds it can run flat out; after that it trots */
   wind: number;
+  /** how fast it keeps going once winded, metres a second (a trot and a fifth if not said) */
+  spent?: number;
   /** the steepest ground it will cross (rise over run) */
   steep: number;
   /**
@@ -110,19 +119,23 @@ const F = Math.PI / 180;
  * more than about a dozen metres off when it roared, and kept running, is still ahead when it tires to less than a
  * sprint; in the trees it loses sight of them sooner.
  */
+// (their health half as much again, a bear's twice and more, once they could be shot at all: "the bear needs more HP
+// and the other animals", 2026-10-24. A bear: twenty rounds of an AK in the body, six in the head, three grenades.)
 export const KINDS: Kind[] = [
+  // (deer, 2026-10-24: "deer should be faster than person running and can run for longer so if hunter misses its
+  // shots the deer will get some good distance away": winded, still faster than a sprint, 6.2, and slower than a wolf, 7)
   {
-    id: 'stag', name: 'Red Deer', model: 'animal_stag', len: 2.1, tall: 1.3, hp: 80, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95, lives: ['field', 'forest'],
-    temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 220, lies: 600,
+    id: 'stag', name: 'Red Deer', model: 'animal_stag', len: 2.1, tall: 1.3, hp: 120, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 25, spent: 6.8, steep: 0.95, lives: ['field', 'forest'],
+    temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 300, lies: 600,
     gives: { meat: 'meat_venison', n: 7, fat: 2, hide: 'hide', bones: 5 },
   },
   {
-    id: 'doe', name: 'Red Deer', model: 'animal_doe', len: 1.8, tall: 1.1, hp: 70, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 18, steep: 0.95, lives: ['field', 'forest'],
-    temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 220, lies: 600,
+    id: 'doe', name: 'Red Deer', model: 'animal_doe', len: 1.8, tall: 1.1, hp: 105, tough: 1, walk: 1.3, trot: 4.2, run: 11, wind: 25, spent: 6.8, steep: 0.95, lives: ['field', 'forest'],
+    temper: 'prey', sight: 75, hear: 1.3, smell: 70, view: 150 * F, flee: 300, lies: 600,
     gives: { meat: 'meat_venison', n: 5, fat: 1, hide: 'hide', bones: 4 },
   },
   {
-    id: 'bear', name: 'Brown Bear', model: 'animal_bear', len: 2.3, tall: 1.25, hp: 420, tough: 0.9, walk: 1.2, trot: 3.6, run: 9, wind: 6, steep: 1.0, lives: ['forest', 'field', 'snow', 'rock'],
+    id: 'bear', name: 'Brown Bear', model: 'animal_bear', len: 2.3, tall: 1.25, hp: 900, tough: 0.9, walk: 1.2, trot: 3.6, run: 9, wind: 6, steep: 1.0, lives: ['forest', 'field', 'snow', 'rock'],
     temper: 'bear', sight: 45, hear: 1, smell: 90, view: 120 * F, flee: 160, lies: 900,
     fight: {
       engage: [20, 28],
@@ -130,12 +143,12 @@ export const KINDS: Kind[] = [
         { mode: A_SWIPE, reach: 2.4, windup: 0.45, recover: 0.8, damage: 28, bleed: 0.5, weight: 2 },
         { mode: A_BITE, reach: 2.1, windup: 0.6, recover: 1.0, damage: 42, bleed: 0.85, weight: 1 },
       ],
-      warn: 1.3, rush: 9, rushFor: 6, chase: 5.6, chaseFor: 10, lose: 5, leash: 160, breakAt: 0.25,
+      warn: 1.3, rush: 9, rushFor: 8, stalk: 1.8, charge: 12, chase: 5.6, chaseFor: 10, lose: 5, leash: 160, breakAt: 0.25,
     },
     gives: { meat: 'meat_bear', n: 10, fat: 6, hide: 'pelt_bear', bones: 8 },
   },
   {
-    id: 'wolf', name: 'Wolf', model: 'animal_wolf', len: 1.5, tall: 0.8, hp: 120, tough: 1, walk: 1.5, trot: 4.5, run: 8.5, wind: 30, steep: 1.0, lives: ['forest', 'field', 'snow', 'rock'],
+    id: 'wolf', name: 'Wolf', model: 'animal_wolf', len: 1.5, tall: 0.8, hp: 180, tough: 1, walk: 1.5, trot: 4.5, run: 8.5, wind: 30, steep: 1.0, lives: ['forest', 'field', 'snow', 'rock'],
     temper: 'pack', sight: 60, hear: 1.4, smell: 120, view: 140 * F, flee: 300, lies: 600,
     fight: {
       engage: [30, 70],
@@ -145,7 +158,7 @@ export const KINDS: Kind[] = [
     gives: { meat: 'meat_wolf', n: 4, fat: 1, hide: 'pelt_wolf', bones: 3 },
   },
   {
-    id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 220, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6, lives: ['field', 'town'],
+    id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 330, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6, lives: ['field', 'town'],
     temper: 'tame', sight: 20, hear: 0.8, smell: 10, view: 160 * F, flee: 18, lies: 900, still: true,
     gives: { meat: 'meat_beef', n: 10, fat: 5, hide: 'hide', bones: 8 },
   },

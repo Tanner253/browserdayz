@@ -1,7 +1,7 @@
 // The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off).
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
-import { spawnAnimal } from './animals';
+import { spawnAnimal, takeAnimal, takeAnimals } from './animals';
 import { createHash } from 'node:crypto';
 import { heldIn } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
@@ -311,7 +311,12 @@ export async function command(c: Client, line: string) {
         broadcast({ t: 'ihp', i, hp: r.hp, dead: r.dead, by: c.id, zone: 'torso', dir: [0, 1], melee: false });
         return void sys(c, 'One of the infected is put down.');
       }
-      return void sys(c, 'Take away what? /del item, box, car or z, and its number. The Delete key does it for whatever you are looking at.');
+      if (what === 'animal') {
+        const name = Number.isInteger(Number(id)) ? takeAnimal(Number(id)) : null;
+        if (name) log(`[admin] ${c.name} took away an animal (${name})`);
+        return void sys(c, name ? `Taken away: ${name}.` : 'No animal of that number.');
+      }
+      return void sys(c, 'Take away what? /del item, box, car, z or animal, and its number. The Delete key does it for whatever you are looking at.');
     }
     case 'airdrop': {
       // The helicopter sent now by an admin, to look at it and to try it (2026-10-13): to a few steps in front of
@@ -433,6 +438,15 @@ export async function command(c: Client, line: string) {
       }
       if (down) log(`[admin] ${c.name} put down ${down} of the infected within ${within} m of ${c.pose[0].toFixed(0)}, ${c.pose[2].toFixed(0)}`);
       return void sys(c, down ? `Put down: ${down} of the infected within ${within} metres of you.` : `None of the infected is on its feet within ${within} metres of you.`);
+    }
+    case 'delanimals': {
+      // (the animals about whoever asks, taken away as `/del animal` takes one: a herd of the map is owed them in its time)
+      if (!admin) return need();
+      if (rest[0] && !(Number(rest[0]) > 0)) return void sys(c, '/delanimals takes away the animals within 60 metres of you; /delanimals 120, those within 120 (up to 400).');
+      const within = Math.min(400, Math.max(5, Number(rest[0]) || 60));
+      const n = takeAnimals(c.pose[0], c.pose[2], within);
+      if (n) log(`[admin] ${c.name} took away ${n} animals within ${within} m of ${c.pose[0].toFixed(0)}, ${c.pose[2].toFixed(0)}`);
+      return void sys(c, n ? `Taken away: ${n} animal${n > 1 ? 's' : ''} within ${within} metres of you.` : `No animal within ${within} metres of you.`);
     }
     case 'delbody':
     case 'delbodies':

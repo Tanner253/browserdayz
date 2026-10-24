@@ -681,6 +681,17 @@ export const itemsMethods = {
       if (b.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note(drum ? 'Infected down · fuel drum' : 'Infected down · grenade', 'good');
       if (this.online && !jeep) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: what, dist: chest.distanceTo(at), sup: false, bonus: 0 });
     }
+    // the animals in it (2026-10-24: "i should be able to damage animals, obviously. all damage should work. like
+    // grenades"): on a server the server decides, alone this game's own herds do
+    if (mine && !jeep) for (const a of this.wild.beasts.values()) {
+      if (a.dead || a.gone) continue;
+      const chest = new THREE.Vector3(a.x, heightAt(this.s.world.heights, a.x, a.z) + a.kind.tall * 0.6, a.z);
+      const k = reach(chest);
+      if (k <= 0) continue;
+      this.effects.bleed(chest, chest.clone().sub(at).normalize(), 0.8);
+      if (this.online) this.net.send({ t: 'ahit', i: a.i, zone: 'torso', w: what, dist: chest.distanceTo(at), sup: false });
+      else a.damage(spec.damage * k, chest, chest.clone().sub(at).normalize(), 'torso');
+    }
     for (const d of this.dummies) {
       const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
       const k = reach(chest);

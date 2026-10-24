@@ -7,13 +7,15 @@ import { Herd, type Seen } from '../src/sim/animal-mind';
 import type { Ground } from '../src/sim/animal-ground';
 import { ANIMALS, BLADES, CALLS, KINDS, KIND, yieldOf } from '../src/sim/animals';
 import { phaseOf } from '../src/sim/daynight';
-import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
+import { WEAPON_RULES, hitDamage, piercedBy, type HitZone } from '../src/sim/combat';
 import { makeItem } from '../src/sim/items';
 import { markMade } from '../src/sim/cooking';
 import { F_CROUCH, F_PRONE, type C2S } from '../src/net/protocol';
 import { HELI } from '../src/sim/heli';
 import { inBunker } from '../src/sim/bunker';
-import { clients, send, type Client } from './players';
+import { judge, lyingBlast, type Vec3 } from '../src/sim/grenades';
+import { JEEP } from '../src/sim/vehicles';
+import { clients, num, send, type Client } from './players';
 import { economy, log, world } from './index';
 import { seatOf } from './acts';
 import { dealt } from './checks';
@@ -101,22 +103,55 @@ export function animalsHear(x: number, z: number, range: [number, number]) {
   herd.heard(x, z, range, Date.now());
 }
 
-/** A shot or a blow on an animal, judged as one on the infected is: in range, with what is in the hands, no faster than it fires. */
+/**
+ * A shot, a blow, a blast or a car on an animal, judged as one on the infected is ('ihit' in server/handle.ts): a
+ * blast of theirs held to what any is (`judge`), a car only from its driver's seat beside it, and the rest in range,
+ * with what is in the hands, no faster than it fires. (2026-10-24: "all damage should work. like grenades".)
+ */
 export function animalHit(c: Client, m: Extract<C2S, { t: 'ahit' }>) {
   const b = herd.beasts.get(m.i), rule = WEAPON_RULES[m.w];
-  if (!b || b.diedAt || !c.alive || !rule || rule.blast) return;
+  if (!b || b.diedAt || !c.alive || !rule) return;
   if (!['head', 'torso', 'legs', 'arms'].includes(m.zone)) return;
   const now = Date.now(), d = Math.hypot(c.pose[0] - b.x, c.pose[2] - b.z);
   if (d > rule.range + 6) return;
-  if (m.w !== 'fists' && c.w !== m.w) return;
-  if (!mayHit(c, `a${m.i}`, now, rule.interval * 700)) return;
-  c.lastHit = now;
-  const n = typeof m.n === 'number' && Number.isFinite(m.n) ? Math.max(1, Math.min(12, Math.round(m.n))) : 1;
-  const amount = hitDamage(m.w, m.zone, d, !!m.sup, 0, n) * piercedBy(m.w, m.p);
-  const r = herd.hurt(m.i, amount, seenOf(c, now), now);
-  if (!r) return;
-  // (told to whoever can see it: its fall, its flinch)
-  for (const o of clients.values()) if (Math.hypot(o.pose[0] - b.x, o.pose[2] - b.z) < ANIMALS.told) send(o, { t: 'ahp', i: m.i, hp: Math.round(r.hp), dead: r.dead, by: c.id, zone: m.zone });
+  let amount: number, zone = m.zone;
+  if (rule.blast) {
+    if (!num(m.dist)) return;
+    const chest: Vec3 = [b.x, ground.height(b.x, b.z) + KINDS[b.k].tall * 0.6, b.z];
+    const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `a${m.i}`, chest, m.dist, now);
+    if (far === null) return;
+    amount = hitDamage(m.w, 'torso', far);
+    zone = 'torso';
+  } else if (m.w === 'jeep') {
+    const at = seatOf(c);
+    if (!at || at.seat !== 0 || !num(m.dist) || Math.hypot(at.v.s[0] - b.x, at.v.s[2] - b.z) > 7) return;
+    amount = Math.max(0, Math.min(m.dist, Math.hypot(at.v.s[7], at.v.s[8], at.v.s[9]) + 3) - JEEP.bumpFrom) * JEEP.bumpPer;
+    zone = 'torso';
+  } else {
+    if (m.w !== 'fists' && c.w !== m.w) return;
+    if (!mayHit(c, `a${m.i}`, now, rule.interval * 700)) return;
+    c.lastHit = now;
+    const n = typeof m.n === 'number' && Number.isFinite(m.n) ? Math.max(1, Math.min(12, Math.round(m.n))) : 1;
+    amount = hitDamage(m.w, m.zone, d, !!m.sup, 0, n) * piercedBy(m.w, m.p);
+  }
+  told(m.i, herd.hurt(m.i, amount, seenOf(c, now), now), c.id, zone);
+}
+
+/** what a hit did, told to whoever can see it: its fall, its flinch */
+function told(i: number, r: { hp: number; dead: boolean } | null, by: number, zone: HitZone) {
+  const b = herd.beasts.get(i);
+  if (!r || !b) return;
+  for (const o of clients.values()) if (Math.hypot(o.pose[0] - b.x, o.pose[2] - b.z) < ANIMALS.told) send(o, { t: 'ahp', i, hp: Math.round(r.hp), dead: r.dead, by, zone });
+}
+
+/** A grenade gone off where it lay (`fellBlast` in server/gate.ts): every animal in its reach takes it, by how far it stands, as a body does. */
+export function animalsBlast(by: Client, w: string, at: Vec3) {
+  const now = Date.now();
+  for (const b of [...herd.beasts.values()]) {
+    if (b.diedAt) continue;
+    const amount = lyingBlast(w, at, [b.x, ground.height(b.x, b.z) + KINDS[b.k].tall * 0.6, b.z]);
+    if (amount > 0) told(b.i, herd.hurt(b.i, amount, seenOf(by, now), now), by.id, 'torso');
+  }
 }
 
 /**
@@ -146,6 +181,19 @@ export function animalSkin(c: Client, m: Extract<C2S, { t: 'askin' }>) {
     }
   }
   send(c, { t: 'askin', i: m.i, ok: true, done: true });
+}
+
+/** An admin's `/del animal <number>` (the Delete key on one): taken out of the world. Its name; null, none of that number. */
+export function takeAnimal(i: number): string | null {
+  const b = herd.remove(i);
+  return b ? KINDS[b.k].name : null;
+}
+
+/** An admin's `/delanimals [metres]`: every animal within so far of a place taken out of the world; how many */
+export function takeAnimals(x: number, z: number, within: number): number {
+  let n = 0;
+  for (const b of [...herd.beasts.values()]) if (Math.hypot(b.x - x, b.z - z) <= within && herd.remove(b.i)) n++;
+  return n;
 }
 
 /** An admin's `/spawn <kind> [n]` at a place: `n` of it as one herd or pack (how many were stood: 0, no such kind or no model for it) */

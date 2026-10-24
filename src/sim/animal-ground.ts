@@ -50,6 +50,8 @@ export interface Ground {
   cover(x: number, z: number): number;
   /** whether the ground between two eyes is clear (a hill between hides one from the other) */
   clear(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean;
+  /** something solid stands across the line between two places (a wall, a house, a rock, a big prop, a trunk): no blow reaches through it */
+  walled(ax: number, az: number, bx: number, bz: number): boolean;
   /** water to drink from within `r` of a place: its edge, on dry ground */
   water(x: number, z: number, r: number): { x: number; z: number } | null;
   /** the yards of the farms, where the farm's animals live */
@@ -233,6 +235,15 @@ export function animalGround(world: World, extras: GroundExtras = {}): Ground {
         if (ground(x, z) > ay + (by - ay) * t - 0.2) return false;
       }
       return true;
+    },
+    walled: (ax, az, bx, bz) => {
+      // (each end's own half metre left out: whoever stands against a wall is not behind it)
+      const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / 0.25);
+      for (let k = 1; k < n; k++) {
+        const along = (k / n) * d;
+        if (along > 0.5 && d - along > 0.5 && inSolid(ax + (bx - ax) * (k / n), az + (bz - az) * (k / n))) return true;
+      }
+      return false;
     },
     water: (x, z, r) => {
       if (!world.water) return null;

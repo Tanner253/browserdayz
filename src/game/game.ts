@@ -33,7 +33,7 @@ import '../sim/barrels';
 import '../sim/emotes';
 import '../sim/save';
 import { Net, playerName, publicId, serverStatus, setPlayerName } from '../net/client';
-import { crateId, type EspRow } from '../net/protocol';
+import { crateId, type EspRow, type ZedSpot } from '../net/protocol';
 import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
 import '../sim/blood';
@@ -80,6 +80,7 @@ import { Perf } from '../core/perf';
 import { loadGraphics, loadMix, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
 import { Beast, Wildlife } from './animals';
+import type { AnimalRow } from '../sim/animals';
 import { Heli } from './heli';
 import { shotHeard } from '../sim/heard';
 import { INFECTED, INFECTED_GRID, guarded } from '../sim/infected';
@@ -1197,20 +1198,16 @@ export class Game {
           this.adminUI.setSelf(this.adminSelf());
         },
         tint: (color) => this.setTint(color),
-        names: (on) => {
-          this.namesWanted = on && this.role === 'admin';
+        // (the far sight's switches, the panel's ESP list: each remembered from one day to the next; see `drawNames`)
+        esp: (which, on) => {
+          on = on && this.role === 'admin';
+          if (which === 'names') this.namesWanted = on;
+          // (and what was last seen of it goes with it: not shown again, out of date, when it is next put on)
+          else if (which === 'loot') [this.lootWanted, this.espLoot] = [on, []];
+          else if (which === 'animals') [this.animalsWanted, this.espAnimals] = [on, []];
+          else [this.infectedWanted, this.espZeds] = [on, []];
           try {
-            localStorage.setItem('zona.admin.names', this.namesWanted ? '1' : '0');
-          } catch {
-            /* not kept: it is as it was the next time */
-          }
-          this.adminUI.setSelf(this.adminSelf());
-        },
-        loot: (on) => {
-          this.lootWanted = on && this.role === 'admin';
-          if (!this.lootWanted) this.espLoot = [];
-          try {
-            localStorage.setItem('zona.admin.loot', this.lootWanted ? '1' : '0');
+            localStorage.setItem(`zona.admin.${which}`, on ? '1' : '0');
           } catch {
             /* not kept: it is as it was the next time */
           }
@@ -1537,6 +1534,26 @@ export class Game {
   lootAsked = 0;
   /** what the server last said lies about the view (server/esp.ts) */
   espLoot: EspRow[] = [];
+  /** an admin wants every animal on the map shown where it is (the panel's switch; remembered) */
+  animalsWanted = (() => {
+    try {
+      return localStorage.getItem('zona.admin.animals') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  /** and every one of the infected */
+  infectedWanted = (() => {
+    try {
+      return localStorage.getItem('zona.admin.infected') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  farAsked = 0;
+  /** every animal and every one of the infected, as the server last said (server/esp.ts) */
+  espAnimals: AnimalRow[] = [];
+  espZeds: ZedSpot[] = [];
   freeView = (cam: THREE.PerspectiveCamera) => {
     const f = this.freecam;
     if (!f) return;

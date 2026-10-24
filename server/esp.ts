@@ -55,11 +55,14 @@ export function espRows(loot: Iterable<WorldLoot>, boxes: Iterable<BodyBox>, x: 
   return out;
 }
 
-const asked = new WeakMap<object, number>();
+// (the animals and the infected, 2026-10-24: "admin panel needs a toggle for show animals": all of them, wherever
+// they are, asked for apart from the loot so that one switch never uses up the other's turn)
+const asked = { loot: new WeakMap<object, number>(), far: new WeakMap<object, number>() };
 
 /** what a game that asks is answered with: null if it is not an admin's, or it asked again too soon */
-export function espAnswer(who: object, role: string | null, now: number, rows: () => EspRow[]): EspRow[] | null {
-  if (role !== 'admin' || now - (asked.get(who) ?? -Infinity) < ESP.every) return null;
-  asked.set(who, now);
+export function espAnswer<T>(who: object, role: string | null, now: number, rows: () => T, what: keyof typeof asked = 'loot'): T | null {
+  const book = asked[what];
+  if (role !== 'admin' || now - (book.get(who) ?? -Infinity) < ESP.every) return null;
+  book.set(who, now);
   return rows();
 }

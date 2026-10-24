@@ -17,7 +17,7 @@ import { stagePoser } from '../game/animals';
 /** the floor, to the animals: open grass everywhere, flat, nobody's, nothing in the way */
 const FLAT: Ground = {
   height: () => 0, slope: () => 0, biome: (): Biome => 'field', open: () => true, road: () => 999,
-  people: () => ({ town: 9999, camp: 9999, house: 9999 }), towers: [], roofed: () => false, cover: () => 0, clear: () => true,
+  people: () => ({ town: 9999, camp: 9999, house: 9999 }), towers: [], roofed: () => false, cover: () => 0, clear: () => true, walled: () => false,
   water: () => null, farms: [], bounds: { x0: -3000, x1: 3000, z0: -3000, z1: 3000 },
 };
 

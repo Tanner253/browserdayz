@@ -13,7 +13,7 @@ import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
 import { INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
-import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
+import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE, type ZedSpot } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { FUEL } from '../src/sim/cooking';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
@@ -46,7 +46,7 @@ import { hidden } from './storages';
 import { espAnswer, espRows } from './esp';
 import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
-import { animalHit, animalSkin, animalsHear } from './animals';
+import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { POISON } from '../src/sim/sickness';
 
 export function handle(c: Client, m: C2S) {
@@ -671,6 +671,17 @@ export function handle(c: Client, m: C2S) {
       const x = num(m.x) ? m.x : c.pose[0], z = num(m.z) ? m.z : c.pose[2];
       const l = espAnswer(c, roleOf(c), Date.now(), () => espRows(economy.loot.values(), boxes.values(), x, z, hidden));
       if (l) send(c, { t: 'esp', l });
+      return;
+    }
+    case 'aesp': {
+      // and of every animal on the map (a hundred and twenty at most: src/sim/animals.ts ANIMALS.max), and every one
+      // of the infected, as asked
+      const r1 = (v: number) => Math.round(v * 10) / 10;
+      const r = espAnswer(c, roleOf(c), Date.now(), () => ({
+        ...(m.a ? { r: herd.rows(0, 0, Infinity) } : {}),
+        ...(m.z ? { z: [...horde.bodies.values()].map((b): ZedSpot => [b.i, r1(b.s[0]), r1(b.s[1]), r1(b.s[2]), b.diedAt ? 1 : 0]) } : {}),
+      }), 'far');
+      if (r) send(c, { t: 'aesp', ...r });
       return;
     }
     case 'adm': {

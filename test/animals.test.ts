@@ -29,6 +29,7 @@ const ground: Ground = {
   roofed: () => false,
   cover: (x) => (x < 0 ? 1 : 0),
   clear: () => true,
+  walled: () => false,
   water: (x, z, r) => (Math.hypot(x - LAKE.x, z - LAKE.z) < r + LAKE.r ? { x: LAKE.x - LAKE.r - 1, z: LAKE.z } : null),
   farms: [],
   bounds: { x0: -1500, x1: 1500, z0: -1500, z1: 1500 },
@@ -216,8 +217,41 @@ ok('a bear roars and charges whoever comes too near, and its blows land on whoev
   assert.ok(nearest > KIND.bear.len / 2 + 0.4, `came within ${nearest.toFixed(2)} m`);
 });
 
-ok('outrun: away at a sprint from further than a dozen metres when it roars, and the bear never catches you', () => {
-  for (const [start, caught] of [[16, false], [6, true]] as [number, boolean][]) {
+ok('no blow lands on whoever is up out of its reach (a flying admin) or behind a wall; one above it is given up on; an admin stands one anywhere', () => {
+  for (const [what, g, man] of [
+    ['above', ground, person(1, 12, 0, { y: 4 })],
+    ['walled', { ...ground, walled: () => true }, person(1, 12, 0)],
+  ] as [string, Ground, Seen][]) {
+    const h = new Herd(g, (k) => k.id === 'bear', () => PH, seeded(1));
+    const bear = h.place('bear', 0, 0, 0)[0];
+    bear.yaw = Math.atan2(-1, 0);
+    let went = false;
+    const strikes = run(h, 0, 30, [man], () => (went ||= !!bear.foe));
+    assert.ok(went, `${what}: it went for him`);
+    assert.equal(strikes.length, 0, `${what}: ${strikes.length} blows`);
+    if (what === 'above') assert.equal(bear.foe, 0, 'it gave up on him');
+  }
+  // (on ground no bear lives on: the desert)
+  const sand = new Herd({ ...ground, biome: () => 'desert' }, (k) => k.id === 'bear', () => PH, seeded(1));
+  assert.equal(sand.place('bear', 0, 0, 0).length, 1, 'a bear in the desert');
+});
+
+ok('DayZ\'s bear: it roars, walks in, and within a dozen metres sprints and cannot be outrun; away at once from further and it is lost', () => {
+  // (stood still: it walks in after its roar, and only near breaks into its rush)
+  {
+    const h = herd(['bear']);
+    const bear = h.place('bear', 0, 0, 0)[0];
+    bear.yaw = Math.atan2(-1, 0);
+    const man = person(1, 18, 0);
+    let walked = 0, fastFar = 0;
+    const strikes = run(h, 0, 30, [man], () => {
+      const d = Math.hypot(man.x - bear.x, man.z - bear.z);
+      if (bear.foe && d > KIND.bear.fight!.charge! + 1) bear.speed > KIND.bear.fight!.stalk! + 0.2 ? fastFar++ : bear.speed > 0.5 && walked++;
+    });
+    assert.ok(walked > 5 && !fastFar, `walked in ${walked} steps, ${fastFar} faster`);
+    assert.ok(strikes.length > 0, 'and its blows land');
+  }
+  for (const [start, caught] of [[16, false], [10, true]] as [number, boolean][]) {
     const h = herd(['bear']);
     const bear = h.place('bear', 0, 0, 0)[0];
     bear.yaw = Math.atan2(-1, 0);
@@ -409,6 +443,14 @@ ok('an admin stands any kind, one or a herd or pack of it, from the entity list'
   for (const k of KINDS) assert.ok(ENTITIES.some((e) => e.animal === k.id), `${k.id} cannot be spawned`);
   const deer = herd(['stag', 'doe']).place('stag', 0, 0, 1, 5);
   assert.deepEqual(deer.map((b) => KINDS[b.k].id), ['stag', 'doe', 'doe', 'doe', 'doe'], 'a stag asked for with others comes with hinds');
+  // (and taken away by an admin, alive or dead: gone from the herd, which goes on about its day)
+  const h = herd(['stag', 'doe']), pack = h.place('stag', 0, 0, 1, 3), man = person(1, 30, 0);
+  h.hurt(pack[1].i, 1e6, null, 1);
+  assert.ok(h.remove(pack[0].i) && h.remove(pack[1].i), 'taken away');
+  assert.equal(h.remove(pack[0].i), null, 'only once');
+  run(h, 1, 10, [man]);
+  assert.deepEqual([...h.beasts.keys()], [pack[2].i]);
+  assert.equal(h.rows(0, 0, Infinity).length, 1, 'the far sight sees the one left');
 });
 
 ok('herd and pack mates never stand inside each other: stood, grazing, bolting, or stood by an admin', () => {

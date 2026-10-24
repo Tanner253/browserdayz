@@ -12,6 +12,7 @@ import { SEA_LEVEL, heightAt } from '../../world/worldgen';
 import { drinkable, type Drink } from '../../sim/water';
 import { type Category, type ItemInstance, ITEMS, isBag } from '../../sim/items';
 import { ESP_AT } from '../../net/protocol';
+import { A_DEAD, KINDS, ROW_BLEEDS } from '../../sim/animals';
 import { RemotePlayer } from '../remote';
 import type { UseKind } from '../weapons';
 import { WorldItem, Stash } from '../loot';
@@ -22,6 +23,7 @@ import type { MapPerson } from '../../ui/bigmap';
 import type { AdminSelf, AdminLook } from '../../ui/admin-ui';
 import { type Well, WELL } from '../../sim/wells';
 import { Infected } from '../infected';
+import { Beast } from '../animals';
 import { castleUnder } from '../../sim/castle';
 import { nearSig } from './frame';
 import { ESP_FAR, ESP_NEAR, ESP_SIZE, HOT_CODES, HOT_FREE, _lampPos, type Game } from '../game';
@@ -34,6 +36,12 @@ function bodyNear(g: Game, at: { x: number; y: number; z: number }): { n: string
   const near = (x: number, y: number, z: number) => (x - at.x) ** 2 + (y - at.y) ** 2 + (z - at.z) ** 2 < 1.8 * 1.8;
   for (const [uid, c] of g.corpses) if (near(c.stash.x, c.stash.y, c.stash.z)) return { n: uid, what: c.body ? c.stash.label : 'the body of one of the infected' };
   for (const b of g.horde.all.values()) if (b.dead && near(b.pos.x, b.pos.y, b.pos.z)) return { n: String(b.i), what: 'the body of one of the infected' };
+  return null;
+}
+
+/** An animal lying dead about a point, found as a body is (a dead one stops no shot): for /del animal */
+function carcassNear(g: Game, at: { x: number; z: number }): Beast | null {
+  for (const b of g.wild.beasts.values()) if (b.dead && !b.gone && Math.hypot(b.x - at.x, b.z - at.z) < b.kind.len * 0.6 + 1) return b;
   return null;
 }
 
@@ -205,7 +213,7 @@ export const handsMethods = {
   },
 
   adminSelf(this: Game): AdminSelf {
-    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, loot: this.lootWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
+    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, loot: this.lootWanted, animals: this.animalsWanted, infected: this.infectedWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
   },
 
   showPowers(this: Game) {
@@ -281,8 +289,8 @@ export const handsMethods = {
    * An admin's Delete key: whatever the middle of the view is on is taken out of the world, by the order that does
    * it (`/del`), which says back what was taken. From the eyes, or from the free camera, as far as a hundred and
    * twenty metres. A thing on the ground, a body, a supply drop, a place where something is buried, a car, one of
-   * the infected. Not a player (they are kicked, from the panel), and not the map itself: its buildings, its trees
-   * and its crates are the same in every game and are not anybody's to take away.
+   * the infected, an animal, alive or dead. Not a player (they are kicked, from the panel), and not the map itself:
+   * its buildings, its trees and its crates are the same in every game and are not anybody's to take away.
    */
   deleteLooked(this: Game) {
     const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
@@ -294,10 +302,12 @@ export const handsMethods = {
     else if (o instanceof Stash) line = o.fixed && !o.corpse ? '' : `/del box ${o.uid}`;
     else if (o instanceof Jeep) line = `/del car ${o.i}`;
     else if (o instanceof Infected) line = `/del z ${o.i}`;
+    else if (o instanceof Beast) line = `/del animal ${o.i}`;
     else if (o instanceof RemotePlayer) return void this.hud.note(`That is ${o.name}: a player is kicked from the panel, not taken away`, 'warn');
-    const body = !line && hit ? bodyNear(this, hit.point) : null;
+    const body = !line && hit ? bodyNear(this, hit.point) : null, carcass = !line && !body && hit ? carcassNear(this, hit.point) : null;
     if (body) line = `/delbody ${body.n}`;
-    if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car or one of the infected', 'info');
+    else if (carcass) line = `/del animal ${carcass.i}`;
+    if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car, one of the infected or an animal', 'info');
     this.order(line);
   },
 
@@ -309,14 +319,15 @@ export const handsMethods = {
     const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const hit = physics.raycast(cam.position, dir, 300, SHOT_GROUPS, this.freecam ? undefined : this.player.collider);
     if (!hit) return null;
-    const o = hit.tag?.owner, body = o instanceof Jeep || o instanceof Infected || o instanceof RemotePlayer;
+    const o = hit.tag?.owner, body = o instanceof Jeep || o instanceof Infected || o instanceof RemotePlayer || o instanceof Beast;
     // (level enough to stand a thing on, and not somebody or something that moves; if not, a pace and a half short of it)
     const flat = !body && hit.normal.y > 0.7, back = flat ? 0 : 1.5;
-    const lying = body ? null : bodyNear(this, hit.point);
+    const lying = body ? null : bodyNear(this, hit.point), beast = o instanceof Beast ? o : body || lying ? null : carcassNear(this, hit.point);
     return {
       x: hit.point.x - dir.x * back, y: hit.point.y, z: hit.point.z - dir.z * back, dist: hit.toi, flat,
-      what: o instanceof Jeep ? `car number ${o.i}` : o instanceof Infected ? 'one of the infected' : o instanceof RemotePlayer ? o.name : lying ? lying.what : flat ? 'the ground' : 'a wall or a slope',
+      what: o instanceof Jeep ? `car number ${o.i}` : o instanceof Infected ? 'one of the infected' : beast ? `${beast.dead ? 'the body of ' : ''}a ${beast.kind.name.toLowerCase()}` : o instanceof RemotePlayer ? o.name : lying ? lying.what : flat ? 'the ground' : 'a wall or a slope',
       ...(o instanceof Jeep ? { car: o.i } : {}),
+      ...(beast ? { animal: beast.i } : {}),
       ...(lying ? { body: lying.n } : {}),
     };
   },
@@ -350,8 +361,8 @@ export const handsMethods = {
    * HUD. (It is left in sight now: see `#hud.hidden` in hud.css.) And it was never on while flying.
    */
   drawNames(this: Game, cam: THREE.PerspectiveCamera) {
-    const names = this.namesWanted, loot = this.lootWanted;
-    if (this.role !== 'admin' || !this.started || (!names && !loot)) {
+    const names = this.namesWanted, loot = this.lootWanted, animals = this.animalsWanted, infected = this.infectedWanted;
+    if (this.role !== 'admin' || !this.started || (!names && !loot && !animals && !infected)) {
       if (this.namesOn) this.hud.esp([]);
       this.namesOn = false;
       return;
@@ -367,6 +378,10 @@ export const handsMethods = {
     if (loot && this.online && now - this.lootAsked > 1000) {
       this.lootAsked = now;
       this.net.send({ t: 'esp', x: Math.round(cam.position.x), z: Math.round(cam.position.z) });
+    }
+    if ((animals || infected) && this.online && now - this.farAsked > 1000) {
+      this.farAsked = now;
+      this.net.send({ t: 'aesp', a: animals, z: infected });
     }
     const out: Parameters<HUD['esp']>[0] = [], v = new THREE.Vector3();
     const label = (name: string, at: THREE.Vector3, up: number, kind: EspKind, more: string, near = ESP_NEAR, far = ESP_FAR) => {
@@ -397,6 +412,34 @@ export const handsMethods = {
         } else shown.push({ l: px - half, r: px + half, t: py - high, b: py, k, more: 0 });
       }
       for (const o of shown) if (o.more) out[o.k].sub += ` · ${o.more} more`;
+    }
+    // (2026-10-24: "admin panel needs a toggle for show animals": every one the server says of, wherever it is; one
+    // this game draws is labelled where it is drawn, the rest where they were a second ago. Alone, those it draws.)
+    if (animals) {
+      const at = new THREE.Vector3(), w = this.s.world.heights, told = new Set<number>();
+      const mark = (k: number, x: number, z: number, dead: boolean, bleeds: boolean) => {
+        const kind = KINDS[k];
+        if (kind) label(kind.name, at.set(x, heightAt(w, x, z), z), dead ? 0.5 : kind.tall + 0.4, dead ? 'dead' : 'beast', `${dead ? ' · down' : bleeds ? ' · bleeding' : ''}`);
+      };
+      for (const [i, k, x, z, , mode, marks] of this.espAnimals) {
+        told.add(i);
+        const b = this.wild.beasts.get(i);
+        if (b && !b.gone) mark(k, b.x, b.z, b.dead, b.bleeds);
+        else mark(k, x / 10, z / 10, mode === A_DEAD, !!(marks & ROW_BLEEDS));
+      }
+      for (const [i, b] of this.wild.beasts) if (!told.has(i) && !b.gone) mark(KINDS.indexOf(b.kind), b.x, b.z, b.dead, b.bleeds);
+    }
+    // (and the infected, the same way: "can we put the ESP stuff in one dropdown ... players, animals, loot, zombies")
+    if (infected) {
+      const at = new THREE.Vector3(), told = new Set<number>();
+      const mark = (x: number, y: number, z: number, down: boolean) => label('Infected', at.set(x, y, z), down ? 0.4 : 1.9, down ? 'dead' : 'zed', down ? ' · down' : '');
+      for (const [i, x, y, z, down] of this.espZeds) {
+        told.add(i);
+        const b = this.horde.all.get(i);
+        if (b?.ready) mark(b.pos.x, b.pos.y, b.pos.z, b.dead);
+        else mark(x, y, z, !!down);
+      }
+      for (const [i, b] of this.horde.all) if (!told.has(i) && b.ready) mark(b.pos.x, b.pos.y, b.pos.z, b.dead);
     }
     if (names) for (const r of this.remotes.values()) {
       const q = this.admPlayers.get(r.id);

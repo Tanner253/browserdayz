@@ -264,6 +264,10 @@ export const onlineMethods = {
     net.on('iown', (m) => this.horde.own(m.i, m.to));
     net.on('is', (m) => this.horde.states(m.s, performance.now()));
     net.on('esp', (m) => (this.espLoot = this.lootWanted ? m.l : []));
+    net.on('aesp', (m) => {
+      this.espAnimals = this.animalsWanted ? (m.r ?? []) : [];
+      this.espZeds = this.infectedWanted ? (m.z ?? []) : [];
+    });
     net.on('tossed', (m) => this.throwing.seen(m.id, m.o, m.v));
     net.on('ihp', (m) => {
       this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee);
@@ -774,6 +778,16 @@ export const onlineMethods = {
       this.effects.bleed(chest, dir, 0.8);
       if (b.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Infected down · run down', 'good');
       if (this.online) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: 'jeep', dist: Math.round(speed * 10) / 10, sup: false, bonus: 0 });
+    }
+    // and the animals (2026-10-24: "all damage should work")
+    for (const a of this.wild.beasts.values()) {
+      if (a.dead || a.gone) continue;
+      rel.set(a.x, a.root.position.y, a.z).sub(at).applyQuaternion(inv);
+      if (Math.abs(rel.x) > half.x + a.kind.len * 0.3 || Math.abs(rel.z) > half.z + a.kind.len * 0.3 || rel.y > 0.6 || rel.y < -2.6) continue;
+      const chest = new THREE.Vector3(a.x, a.root.position.y + a.kind.tall * 0.6, a.z), dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
+      this.effects.bleed(chest, dir, 0.8);
+      if (this.online) this.net.send({ t: 'ahit', i: a.i, zone: 'torso', w: 'jeep', dist: Math.round(speed * 10) / 10, sup: false });
+      else a.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso');
     }
     for (const d of this.dummies) {
       if (d.dead) continue;

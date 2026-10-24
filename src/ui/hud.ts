@@ -216,7 +216,7 @@ const SPLASHES = [
 ];
 
 /** a name over a head (a player, a dead one, a vanished one, the admin's own body), or a thing lying about by its sort (in a body, a crate or a stash: 'box') */
-export type EspKind = '' | 'dead' | 'ghost' | 'me' | 'box' | 'gun' | 'ammo' | 'med' | 'gear' | 'food' | 'item';
+export type EspKind = '' | 'dead' | 'ghost' | 'me' | 'box' | 'gun' | 'ammo' | 'med' | 'gear' | 'food' | 'item' | 'beast' | 'zed';
 
 export class HUD {
   root: HTMLDivElement;
