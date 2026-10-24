@@ -21,7 +21,7 @@ export const HUNT_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- meat
   // (a tin of beans is 36: a cooked steak is the best one thing to eat in the game, and a deer is seven of them. One
   // model dyed, and a dye only darkens it: beef bright, venison deep red, wolf dull and brown, bear near black)
-  meat('meat_venison', 'Venison Steak', 0x9a3a36, 40, 'Red deer, cut from the haunch. Cook it: raw, it is as likely as not to make you ill.', 2),
+  meat('meat_venison', 'Venison Steak', 0x9a3a36, 40, 'Red deer, cut from the haunch. Cook it: raw, it does you harm, and as likely as not makes you ill.', 2),
   meat('meat_bear', 'Bear Steak', 0x5a3028, 46, 'Dark and fatty. Cook it well.', 3),
   meat('meat_wolf', 'Wolf Steak', 0x9a6a58, 32, 'Lean and stringy. Cook it.', 2),
   meat('meat_beef', 'Beef Steak', 0xffb0a0, 44, 'From a farm cow. Cook it.', 3),
