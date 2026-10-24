@@ -24,6 +24,8 @@ import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOT
 
 const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(['held', ...ALL_SLOTS].map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
 /** the places whose things are looked into for room, in the order they are filled: jacket and trousers first, as ever, then the rest of what is worn */
+/** the two places on the back, whose things keys 1 and 2 bring up (`PlayerInventory.backItem`) */
+const BACK: Slot[] = ['primary', 'secondary'];
 const POCKET_ORDER: Slot[] = [...new Set<Slot>([...CLOTHES.map(([slot]) => slot), ...GEAR_SLOTS])];
 /** the body's own places for weapons, in the order of the keys they are first put on: the two on the back, and the holster */
 export const SLOT_ORDER: Slot[] = WEAPON_SLOTS;
@@ -569,7 +571,46 @@ export class PlayerInventory {
     }
     if (was) this.putAway();
     this.slots.held = item;
+    this.came = slot === 'primary' || slot === 'secondary' ? { slot, item } : null;
+    this.syncBack();
     return true;
+  }
+
+  /** the place on the back the thing in the hands was taken from (see `home`) */
+  private came: { slot: Slot; item: ItemInstance } | null = null;
+
+  /**
+   * The place on the back a long thing in the hands goes back to: the one it came out of, if that is free still, else
+   * the first free one (null: none, or nothing long in the hands). Its key is that place's (`backItem`).
+   */
+  private home(): Slot | null {
+    const h = this.slots.held;
+    if (!h || ITEMS[h.id].slot !== 'long') return null;
+    if (this.came?.item === h && !this.slots[this.came.slot]) return this.came.slot;
+    return BACK.find((s) => !this.slots[s]) ?? null;
+  }
+
+  /**
+   * What key 1 (0) or key 2 (1) brings up: the long thing on that place on the back, or the one in the hands that goes
+   * back to it. Those two keys are the back's, whatever is moved in or out (the owner, 2026-10-24: "the 1 and 2 hotkey
+   * slots should always be paired to the back slots no matter what").
+   */
+  backItem(i: number): ItemInstance | null {
+    const s = BACK[i];
+    return s ? (this.slots[s] ?? (this.home() === s ? this.slots.held : null)) : null;
+  }
+
+  /**
+   * Keys 1 and 2 said as the back has them; and whatever is on the back (or came off it into the hands) is on no other
+   * key, so that a gun put from the back into a bag is on none at all (the owner: "if i stow something from my back to
+   * my bag then it should be removed from the hotbar").
+   */
+  private syncBack() {
+    const back = BACK.map((_, i) => this.backItem(i));
+    this.hot = this.hot.map((b, i) => {
+      if (i < BACK.length) return back[i] ? { uid: back[i]!.uid, id: back[i]!.id } : null;
+      return b && back.some((it) => it?.uid === b.uid) ? null : b;
+    });
   }
 
   /** What is in the hands goes into its own free place (the back, the holster), onto its own kind, or into any room (`add`): false, and it stays there, if there is none. */
@@ -577,7 +618,13 @@ export class PlayerInventory {
     const it = this.slots.held;
     if (!it) return true;
     if (!this.hasRoom(it)) return false;
+    // (a long thing to the place on the back it came from, if that is free still: it keeps its key)
+    const home = this.home();
     this.slots.held = null;
+    if (home) {
+      this.slots[home] = it;
+      return true;
+    }
     // (room said, but a pile that was poured in part: what is left of it stays in the hands)
     const left = this.add(it);
     this.slots.held = left;
@@ -586,8 +633,8 @@ export class PlayerInventory {
 
   /**
    * What the wheel and a thumb go round, one after another, whichever of them is held: what is on the back and in the
-   * holster and a gun or a thing to hit with in the hands, in the order of their hot keys (which go with the things:
-   * 1 and 2 the back, 3 the holster, as `autoBind` gives them), and any on no key after those, the hands' last.
+   * holster and a gun or a thing to hit with in the hands, in the order of their hot keys (1 and 2 the back's, 3 the
+   * holster's as `autoBind` gives it), and any on no key after those, the hands' last.
    */
   ring(): ItemInstance[] {
     const h = this.slots.held, armed = h && (ITEMS[h.id].weapon || ITEMS[h.id].melee) ? h : null;
@@ -609,17 +656,18 @@ export class PlayerInventory {
     for (const c of this.containers) if (c !== this.tags) for (const p of c.items) yield p.item;
   }
 
-  /** The thing a hot key brings up: the very one it was given (null: it is not carried where it can be taken up). */
+  /** The thing a hot key brings up: 1 and 2 the back's (`backItem`), the rest the very one each was given (null: it is not carried where it can be taken up). */
   hotItem(i: number): ItemInstance | null {
+    if (i < BACK.length) return this.backItem(i);
     const b = this.hot[i];
     if (!b) return null;
     for (const it of this.carried()) if (it.uid === b.uid) return it;
     return null;
   }
 
-  /** Put a thing on a hot key (it comes off any other it was on), or clear the key. */
+  /** Put a thing on a hot key (it comes off any other it was on), or clear the key. Not 1 or 2, which are the back's, nor for what is on the back: it has its key there. */
   bind(i: number, item: ItemInstance | null) {
-    if (i < 0 || i >= HOT_KEYS) return;
+    if (i < BACK.length || i >= HOT_KEYS || (item && BACK.some((_, k) => this.backItem(k) === item))) return;
     if (item) this.hot = this.hot.map((b) => (b && b.uid === item.uid ? null : b));
     this.hot[i] = item ? { uid: item.uid, id: item.id } : null;
     if (item) this.boundSeen.set(item.uid, item);
@@ -627,7 +675,8 @@ export class PlayerInventory {
 
   /** the hot key this thing is on (-1: none) */
   hotOf(item: ItemInstance): number {
-    return this.hot.findIndex((b) => b?.uid === item.uid);
+    const back = BACK.findIndex((_, i) => this.backItem(i) === item);
+    return back >= 0 ? back : this.hot.findIndex((b, i) => i >= BACK.length && b?.uid === item.uid);
   }
 
   /**
@@ -637,9 +686,10 @@ export class PlayerInventory {
    * place. Only a pile poured into another pile still carried takes its key on with it.
    */
   forgetGone() {
+    this.syncBack();
     const on = this.everything(), taken = new Set<string>();
-    this.hot = this.hot.map((b) => {
-      if (!b || on.has(b.uid)) return b;
+    this.hot = this.hot.map((b, i) => {
+      if (i < BACK.length || !b || on.has(b.uid)) return b;
       let o = this.boundSeen.get(b.uid);
       while (o && !on.has(o.uid)) o = poured.get(o);
       if (!o || on.get(o.uid) !== o || this.hotOf(o) >= 0 || taken.has(o.uid)) return null;
@@ -655,14 +705,13 @@ export class PlayerInventory {
   }
 
   /**
-   * What goes on the back or into the holster takes the key of its place if that key is free and the thing is on
-   * none: 1 and 2 for the back, 3 for the holster. (Any of them can be given to something else afterwards.)
+   * Keys 1 and 2 as the back has them (`syncBack`), and what goes into the holster takes key 3 if that is free and the
+   * thing is on no key. (Key 3 can be given to something else afterwards.)
    */
   autoBind() {
-    WEAPON_SLOTS.forEach((s, i) => {
-      const it = this.slots[s];
-      if (it && this.hotOf(it) < 0 && !this.hotItem(i)) this.bind(i, it);
-    });
+    this.syncBack();
+    const it = this.slots.holster;
+    if (it && this.hotOf(it) < 0 && !this.hotItem(2)) this.bind(2, it);
   }
   private gearCargo = new Map<string, Container>();
 
@@ -699,6 +748,7 @@ export class PlayerInventory {
    */
   clear() {
     this.slots = EMPTY_SLOTS();
+    this.came = null;
     this.hot = Array.from({ length: HOT_KEYS }, () => null);
     this.boundSeen.clear();
     this.autoGiven.clear();
@@ -856,6 +906,7 @@ export class PlayerInventory {
     d = up.inv;
     const raw = d.slots as Record<string, ItemInstance | null>;
     this.slots = EMPTY_SLOTS();
+    this.came = null;
     this.gearCargo.clear();
     const overflow: ItemInstance[] = [...up.left];
     // migrate saves from the single 'shoulder' slot layout

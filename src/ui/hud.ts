@@ -428,7 +428,7 @@ export class HUD {
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     this.el.says = this.root.querySelector('.hud-says') as HTMLElement;
     // (the wheel on T: one radial menu, src/ui/radial.ts; a soft tick for each new wedge, a firmer one for the choice)
-    this.radial = new Radial({ rings: RINGS, per: WHEEL_RING, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
+    this.radial = new Radial({ rings: RINGS, per: WHEEL_RING, cancel: true, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
     this.root.insertBefore(this.radial.el, this.el.says.nextSibling);
     this.radial.set(wheelEntries(wheelSlots()));
     // (set again in Emotes: the wedges drawn afresh)
@@ -754,7 +754,12 @@ export class HUD {
     r.point(pick, at);
     const e = pick >= 0 ? EMOTE[slots[pick]] : null;
     // (in the middle with nothing picked: a click opens Emotes, where the wheel is set; the owner: "just put the 'click to edit' in the center of the radial wheel")
-    r.hub(e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit', e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
+    if (pick === Radial.CANCEL) r.hub('Cancel', 'let go of T');
+    else r.hub(e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit', e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
+  }
+  /** the wedge of the wheel on T a pointer is on (`Radial.pickAt`): a slot, `Radial.CANCEL`, or -1 */
+  wheelPick(at: [number, number]): number {
+    return this.radial.pickAt(at);
   }
   /** the wheel on T (`wheel`), and the emote it last showed as kept up (undefined: none shown yet) */
   private radial!: Radial;

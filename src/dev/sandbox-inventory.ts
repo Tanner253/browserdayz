@@ -70,7 +70,7 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     const hud = document.createElement('div');
     hud.id = 'hud';
     ui.appendChild(hud);
-    const wheel = new Radial({ rings: RINGS, per: WHEEL_RING, className: 'hud-wheel' });
+    const wheel = new Radial({ rings: RINGS, per: WHEEL_RING, cancel: true, className: 'hud-wheel' });
     wheel.set(wheelEntries(wheelSlots()));
     hud.appendChild(wheel.el);
     (window as unknown as { wheel: Radial }).wheel = wheel;

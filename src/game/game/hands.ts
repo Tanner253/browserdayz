@@ -105,6 +105,9 @@ export const handsMethods = {
   // ------------------------------------------------------------ hot keys, and the hands
 
   assignHot(this: Game, i: number, item: ItemInstance | null) {
+    // (1 and 2 are the back's: what is slung there is on them, and nothing else is put on them)
+    if (i < 2) return void (item && this.hud.note(`Keys 1 and 2 are the two places on your back: sling a long gun there to have it on ${i + 1}`, 'info'));
+    if (item && (this.inv.backItem(0) === item || this.inv.backItem(1) === item)) return void this.hud.note(`The ${ITEMS[item.id].name.toLowerCase()} is on your back's key ${this.inv.hotOf(item) + 1}`, 'info');
     this.inv.bind(i, item);
     this.save();
   },
@@ -478,6 +481,7 @@ export const handsMethods = {
   hot(this: Game, i: number) {
     const key = (i + 1) % 10, bound = this.inv.hot[i], item = this.inv.hotItem(i);
     if (!item) {
+      if (i < 2) return void this.hud.note(`Key ${key} is the ${i ? 'second' : 'first'} place on your back: nothing is slung there`, 'info');
       this.hud.note(bound ? `No ${ITEMS[bound.id].name.toLowerCase()} left` : `Key ${key} has nothing on it: point at a thing in your inventory and press ${key}`, bound ? 'warn' : 'info');
       return;
     }

@@ -1553,13 +1553,19 @@ body.touch .set-page .gfx-range { height: 30px; }
 /* the wheel as it is held up in the game (wheelSvg), its wedges to click */
 .em-wheel { position: relative; width: var(--emw); height: var(--emw); align-self: center; }
 .em-svg, .em-svg svg { width: 100%; height: 100%; overflow: visible; }
-.em-svg path { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.1s, stroke 0.1s; }
+.em-svg .radial-wedge { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.1s, stroke 0.1s; }
+.em-svg g { color: var(--ink); }
+.em-svg g.on { color: #14120c; }
+.em-svg .radial-bar { display: none; }
+/* (Cancel is fixed at the bottom: nothing to set there) */
+.em-svg g.cancel { cursor: default; color: var(--ink-dim); }
+.em-svg g.cancel .radial-wedge { fill: rgba(44, 17, 14, 0.6); }
 .em-svg text { font: 600 13px var(--font); letter-spacing: 0.06em; text-transform: uppercase; text-anchor: middle; dominant-baseline: central; fill: var(--ink); pointer-events: none; }
 .em-svg g { cursor: pointer; }
-.em-svg g:hover path { fill: rgba(255, 255, 255, 0.1); stroke: rgba(255, 255, 255, 0.4); }
-.em-svg g.on path { fill: var(--brand); stroke: var(--brand); }
+.em-svg g:not(.cancel):hover .radial-wedge { fill: rgba(255, 255, 255, 0.1); stroke: rgba(255, 255, 255, 0.4); }
+.em-svg g.on .radial-wedge { fill: var(--brand); stroke: var(--brand); }
 .em-svg g.on text { fill: #14120c; }
-.em-svg g.flash path { animation: em-flash 0.6s ease-out; }
+.em-svg g.flash .radial-wedge { animation: em-flash 0.6s ease-out; }
 @keyframes em-flash { 0% { fill: #fff; } 100% { fill: var(--brand); } }
 .em-mid { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 92px; margin: -26px 0 0 -46px; pointer-events: none; }
 .em-zoom { position: absolute; right: 8px; top: 64px; display: grid; gap: 4px; }
@@ -2156,7 +2162,10 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 }
 /* (each wedge comes out a little after the one before it, round the wheel) */
 .radial.show g { opacity: 1; transform: none; transition-delay: calc(var(--i, 0) * 9ms); }
-.radial path { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.09s ease-out, stroke 0.09s; }
+.radial g { color: var(--ink); }
+.radial .radial-wedge { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.09s ease-out, stroke 0.09s; }
+/* an icon drawn as strokes (radial.ts ICONS): in the colour of its words */
+.radial-ico { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.09s; }
 .radial text {
   fill: var(--ink);
   font: 600 15px var(--font);
@@ -2166,26 +2175,36 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
   dominant-baseline: central;
   transition: fill 0.09s;
 }
+.radial g.keeps { color: var(--ink-dim); }
 .radial g.keeps text { fill: var(--ink-dim); font-style: italic; }
 .radial g.dim { opacity: 0.4; }
 .radial.closing g.chosen { opacity: 1; }
-.radial g.held path { stroke: var(--accent); stroke-width: 2; }
+.radial g.held { color: var(--accent); }
+.radial g.held .radial-wedge { stroke: var(--accent); stroke-width: 2; }
 .radial g.held text { fill: var(--accent); }
 /* the one pointed at: lit, and out from the others towards the rim */
 .radial.show g.on, .radial.closing g.on { transform: translate(var(--ox), var(--oy)) scale(1.02); transition-delay: 0s; }
-.radial g.on path { fill: var(--accent); stroke: #f3e3b8; stroke-width: 1.5; filter: drop-shadow(0 0 7px rgba(201, 178, 124, 0.55)); }
+.radial g.on { color: #14120c; }
+.radial g.on .radial-wedge { fill: var(--accent); stroke: #f3e3b8; stroke-width: 1.5; filter: drop-shadow(0 0 7px rgba(201, 178, 124, 0.55)); }
 .radial g.on text { fill: #14120c; }
+/* Cancel, always the bottom of the outer ring: red when pointed at */
+.radial g.cancel .radial-wedge { fill: rgba(44, 17, 14, 0.8); }
+.radial g.cancel.on { color: #fff1ec; }
+.radial g.cancel.on .radial-wedge { fill: #b0473a; stroke: #f0b2a4; filter: drop-shadow(0 0 7px rgba(176, 71, 58, 0.6)); }
+.radial g.cancel.on text { fill: #fff1ec; }
+.radial.on-cancel .radial-bar { stroke: #d86a58; }
 /* the one chosen: a flash of light as the wheel goes */
-.radial g.chosen path { animation: radial-chosen 0.3s ease-out; }
+.radial g.chosen .radial-wedge { animation: radial-chosen 0.3s ease-out; }
+.radial g.cancel.chosen .radial-wedge { animation: none; }
 @keyframes radial-chosen {
   0% { fill: #fff6d8; filter: drop-shadow(0 0 16px rgba(255, 236, 170, 0.95)); }
   100% { fill: var(--accent); filter: drop-shadow(0 0 7px rgba(201, 178, 124, 0.55)); }
 }
 /* the bar round the rim: turned to whichever is lit, the short way round */
 .radial-bar {
-  fill: none !important;
-  stroke: var(--accent) !important;
-  stroke-width: 3.5 !important;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3.5;
   stroke-linecap: round;
   transform-box: view-box;
   transform-origin: 0 0;
@@ -2213,21 +2232,22 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(var(--d) * 0.22);
-  margin-left: calc(var(--d) * -0.11);
-  transform: translateY(calc(var(--d) * 0.04));
+  width: calc(var(--d) * 0.2);
+  margin-left: calc(var(--d) * -0.1);
+  transform: translateY(calc(var(--d) * 0.018));
+  white-space: nowrap;
   text-align: center;
   text-transform: uppercase;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   line-height: 1.15;
 }
-.radial-hub b { display: block; font-size: calc(var(--d) * 0.03); letter-spacing: 0.08em; color: var(--ink); }
+.radial-hub b { display: block; font-size: calc(var(--d) * 0.025); letter-spacing: 0.06em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
 .radial-hub b.pop { animation: radial-pop 0.16s ease-out; }
 @keyframes radial-pop {
   0% { opacity: 0.2; transform: translateY(4px) scale(0.92); }
   100% { opacity: 1; transform: none; }
 }
-.radial-hub span { display: block; font-size: calc(var(--d) * 0.02); letter-spacing: 0.1em; color: var(--ink-dim); }
+.radial-hub span { display: block; font-size: calc(var(--d) * 0.017); letter-spacing: 0.08em; color: var(--ink-dim); }
 
 /* the wheel (hold T): what to call out, and what to do with the body */
 .hud-wheel {
