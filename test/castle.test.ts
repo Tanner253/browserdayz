@@ -180,10 +180,8 @@ ok('it is cheap to draw: six things from near, as many again under the terrace w
   const near = SHEETS.reduce((t, p) => t + tris(shape.near[p]), 0), under = SHEETS.reduce((t, p) => t + tris(shape.under[p]), 0);
   // (seven sheets: six of them from near, and the water with the rest of what is under the terrace)
   assert.ok(SHEETS.length <= 7 && SHEETS.every((p) => tris(shape.near[p]) > 0 || p === 'water') && tris(shape.under.water) > 0 && tris(shape.near.water) === 0);
-  // (2026-10-23: 45,000 and 7,300 until the bend was laid on its lattice, every bent face cut along it so that what
-  // meets meets: 84,000 and 15,000 since, at no cost seen in the owner's flight)
-  assert.ok(near < 90000, `${near} triangles from near`);
-  assert.ok(under > 1500 && under < 16000, `${under} triangles under the terrace`);
+  assert.ok(near < 70000, `${near} triangles from near`);
+  assert.ok(under > 1500 && under < 9000, `${under} triangles under the terrace`);
   assert.ok(tris(shape.far) < 9000 && tris(shape.far) > 1500, `${tris(shape.far)} triangles from far`);
   // from far it is the same outline: as tall, and broken where it is broken (the stump is a stump from far off too)
   const top = (k: Skin, by: (x: number, z: number) => boolean = () => true) => k.pos.reduce((m, v, i) => (i % 3 === 1 && by(k.pos[i - 1], k.pos[i + 1]) ? Math.max(m, v) : m), -Infinity);
