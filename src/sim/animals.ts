@@ -13,7 +13,7 @@
 //   DayZ: herds that graze and bolt together; wolves in packs; a blade to gut and skin; raw meat and rotten meat make
 //     you ill; meat goes off; pieces fall on the ground by the body.
 //   Rust: the better the blade, the more is got; animal fat as fuel; hide and bone as the stuff things are made of;
-//     a hurt animal breaks off; a boar charges when hurt.
+//     a hurt animal breaks off.
 //   Ours: scent carried on the wind; herds that leave ground where they are hunted.
 
 /** What an animal is doing, as every game is told (the clip it plays goes by this). */
@@ -22,11 +22,10 @@ export const A_IDLE = 0, A_GRAZE = 1, A_WALK = 2, A_TROT = 3, A_RUN = 4, A_ALERT
 export type Biome = 'field' | 'forest' | 'rock' | 'snow' | 'desert' | 'water' | 'town';
 
 /**
- * How it meets a person: `prey` runs; `defend` runs, but turns on whoever hurt it when they are near (Rust's boar);
- * `bear` holds its ground and charges whoever comes too close or hurts it; `pack` hunts together (DayZ's wolves);
- * `tame` keeps to its farm and only shies off.
+ * How it meets a person: `prey` runs; `bear` holds its ground and charges whoever comes too close or hurts it;
+ * `pack` hunts together (DayZ's wolves); `tame` keeps to its farm and only shies off.
  */
-export type Temper = 'prey' | 'defend' | 'bear' | 'pack' | 'tame';
+export type Temper = 'prey' | 'bear' | 'pack' | 'tame';
 
 /** One way it hurts somebody: what it is shown as, how far it reaches, how long it winds up and then stands after, what it does. */
 export interface Move {
@@ -77,7 +76,7 @@ export interface Kind {
   run: number;
   /** seconds it can run flat out; after that it trots */
   wind: number;
-  /** the steepest ground it will cross (rise over run): a goat goes where nothing else does */
+  /** the steepest ground it will cross (rise over run) */
   steep: number;
   temper: Temper;
   /** metres it sees a person standing in the open by day; how well it hears (1: as a person does); metres it smells one upwind */
@@ -139,29 +138,9 @@ export const KINDS: Kind[] = [
     gives: { meat: 'meat_wolf', n: 4, fat: 1, hide: 'pelt_wolf', bones: 3 },
   },
   {
-    id: 'boar', name: 'Wild Boar', model: 'animal_boar', len: 1.5, tall: 0.9, hp: 150, tough: 0.9, walk: 1.1, trot: 3.8, run: 8, wind: 10, steep: 0.8,
-    temper: 'defend', sight: 35, hear: 1.2, smell: 80, view: 140 * F, flee: 140, lies: 600,
-    fight: {
-      engage: [7, 9],
-      moves: [{ mode: A_BITE, reach: 1.7, windup: 0.35, recover: 1.1, damage: 18, bleed: 0.45, weight: 1 }],
-      warn: 0, rush: 7.5, rushFor: 4, chase: 4.5, chaseFor: 4, lose: 3, leash: 40, breakAt: 0.4,
-    },
-    gives: { meat: 'meat_pork', n: 6, fat: 4, hide: 'hide', bones: 4 },
-  },
-  {
     id: 'hare', name: 'Hare', model: 'animal_hare', len: 0.55, tall: 0.3, hp: 25, tough: 1, walk: 1, trot: 3, run: 12, wind: 8, steep: 0.9,
     temper: 'prey', sight: 40, hear: 1.5, smell: 25, view: 170 * F, flee: 90, lies: 400,
     gives: { meat: 'meat_hare', n: 2, fat: 0, hide: 'pelt_small', bones: 1 },
-  },
-  {
-    id: 'goat', name: 'Wild Goat', model: 'animal_goat', len: 1.3, tall: 0.8, hp: 70, tough: 1, walk: 1.1, trot: 3.6, run: 9, wind: 14, steep: 2.4,
-    temper: 'prey', sight: 70, hear: 1.2, smell: 60, view: 160 * F, flee: 160, lies: 600,
-    gives: { meat: 'meat_goat', n: 4, fat: 2, hide: 'hide', bones: 3 },
-  },
-  {
-    id: 'fox', name: 'Red Fox', model: 'animal_fox', len: 0.9, tall: 0.4, hp: 40, tough: 1, walk: 1.2, trot: 4, run: 10, wind: 12, steep: 1.0,
-    temper: 'prey', sight: 45, hear: 1.6, smell: 60, view: 150 * F, flee: 120, lies: 400,
-    gives: { meat: 'meat_fox', n: 1, fat: 1, hide: 'pelt_small', bones: 1 },
   },
   {
     id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 220, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6,
@@ -177,8 +156,8 @@ export const kindNo = (id: string) => KINDS.findIndex((k) => k.id === id);
  * A herd as it lives: which kinds are in it and how many of each, how many such herds there are, how far its ground
  * reaches, which kinds of ground it feeds and lies up on, and when in the day it is up and feeding (shares of DAY,
  * src/sim/daynight.ts: 0 first light, 0.71 dusk, 0.75 night). Outside its feeding hours it lies up in cover.
- * Deer feed at dawn and dusk and lie in the woods through the middle of the day and the night; boar and foxes are out
- * at night; a bear keeps the day; wolves travel at dusk and in the dark.
+ * Deer feed at dawn and dusk and lie in the woods through the middle of the day and the night; a bear
+ * keeps the day; wolves travel at dusk and in the dark.
  */
 export interface HerdKind {
   id: string;
@@ -202,10 +181,7 @@ export const HERDS: HerdKind[] = [
   { id: 'deer', of: [['stag', 1, 1], ['doe', 2, 4]], count: 9, range: 320, apart: 380, feed: ['field'], rest: ['forest'], hours: [[0, 0.22], [0.55, 0.8]], drinks: true, respawn: 600 },
   { id: 'bear', of: [['bear', 1, 1]], count: 5, range: 420, apart: 650, feed: ['forest', 'snow'], rest: ['forest', 'snow'], hours: [[0.06, 0.7]], drinks: true, respawn: 1500 },
   { id: 'wolves', of: [['wolf', 3, 5]], count: 3, range: 650, apart: 900, feed: ['forest', 'snow', 'field'], rest: ['snow', 'forest'], hours: [[0.68, 1], [0, 0.1]], drinks: true, respawn: 900 },
-  { id: 'boar', of: [['boar', 2, 3]], count: 5, range: 260, apart: 350, feed: ['forest'], rest: ['forest'], hours: [[0.7, 1], [0, 0.08]], drinks: true, respawn: 600 },
   { id: 'hare', of: [['hare', 1, 1]], count: 16, range: 110, apart: 160, feed: ['field'], rest: ['field'], hours: [[0, 0.15], [0.62, 0.9]], drinks: false, respawn: 300 },
-  { id: 'goats', of: [['goat', 3, 5]], count: 4, range: 260, apart: 400, feed: ['rock', 'desert'], rest: ['rock'], hours: [[0.05, 0.7]], drinks: false, respawn: 600 },
-  { id: 'fox', of: [['fox', 1, 1]], count: 6, range: 220, apart: 300, feed: ['field', 'forest'], rest: ['forest'], hours: [[0.7, 1], [0, 0.12]], drinks: false, respawn: 400 },
   { id: 'cows', of: [['cow', 2, 3]], count: 3, range: 38, apart: 0, feed: ['field', 'town'], rest: ['field', 'town'], hours: [[0.04, 0.74]], drinks: false, respawn: 1200, farm: true },
 ];
 

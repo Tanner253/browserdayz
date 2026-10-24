@@ -1,5 +1,5 @@
 // The server: the animals (2026-10-23). It moves every one itself (src/sim/animal-mind.ts): five times a second the
-// herds near anybody think, each player is told of the ones near them, and a blow from a bear, a wolf or a boar is
+// herds near anybody think, each player is told of the ones near them, and a blow from a bear or a wolf is
 // dealt here. A shot on one is judged as a shot on the infected is; a body is gutted here, and what it gives falls on
 // the ground by it, as loot does, for anyone there to take (DayZ).
 

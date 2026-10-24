@@ -23,10 +23,7 @@ export const HUNT_ITEMS: ItemDef[] = [
   meat('meat_venison', 'Venison Steak', 0x8a2e2a, 40, 'Red deer, cut from the haunch. Cook it: raw, it is as likely as not to make you ill.', 2),
   meat('meat_bear', 'Bear Steak', 0x5e2420, 46, 'Dark and fatty. Cook it well.', 3),
   meat('meat_wolf', 'Wolf Steak', 0x6e3a30, 32, 'Lean and stringy. Cook it.', 2),
-  meat('meat_pork', 'Boar Steak', 0x9a4a42, 42, 'Wild boar. Cook it through.', 2),
   meat('meat_hare', 'Hare Leg', 0x96503f, 22, 'A hind leg of hare. Cook it.', 1),
-  meat('meat_goat', 'Goat Steak', 0x8c3c34, 36, 'Wild goat. Cook it.', 2),
-  meat('meat_fox', 'Fox Meat', 0x7a4234, 20, 'Not much on a fox. Cook it.', 1),
   meat('meat_beef', 'Beef Steak', 0x9e3530, 44, 'From a farm cow. Cook it.', 3),
 
   // ---------------------------------------------------------------- what things will be made of
@@ -43,7 +40,7 @@ export const HUNT_ITEMS: ItemDef[] = [
   },
   {
     id: 'hide', name: 'Animal Hide', model: 'animal_hide', w: 2, h: 2, weight: 1.2, category: 'misc',
-    desc: 'A raw hide off a deer, a boar or a goat. Leather is made of it one day: clothes, bags, armour. The trader takes it.',
+    desc: 'A raw hide off a deer or a cow. Leather is made of it one day: clothes, bags, armour. The trader takes it.',
     worth: 4,
   },
   {
@@ -58,7 +55,7 @@ export const HUNT_ITEMS: ItemDef[] = [
   },
   {
     id: 'pelt_small', name: 'Small Pelt', model: 'fur_pelt', tint: 0xa0704a, scale: 0.6, w: 1, h: 2, weight: 0.3, category: 'misc',
-    desc: 'A hare\'s or a fox\'s pelt.',
+    desc: 'A hare\'s pelt.',
     worth: 2,
   },
   {

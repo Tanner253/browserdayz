@@ -54,13 +54,13 @@ ok('meat: raw a quarter and as likely as not poisons you; cooked all of it; burn
 });
 
 ok('a game cannot keep its meat fresh or its cooking from the server: both are kept, and never fresher than now', () => {
-  const steak = markMade(makeItem('meat_pork'), T0);
+  const steak = markMade(makeItem('meat_beef'), T0);
   steak.cook = 30;
   const back = cleanItem(JSON.parse(JSON.stringify({ ...steak, made: Date.now() / 1000 + 9e6 })), (v) => String(v))!;
   assert.equal(back.cook, 30);
   assert.ok(back.made! <= Date.now() / 1000 + 1);
-  const kept = keepCooked(makeItem('meat_pork'), { cook: 9999, made: T0 + 100 }, T0 + 50);
-  assert.equal(kept.cook, COOKS.meat_pork.takes + COOKS.meat_pork.burns);
+  const kept = keepCooked(makeItem('meat_beef'), { cook: 9999, made: T0 + 100 }, T0 + 50);
+  assert.equal(kept.cook, COOKS.meat_beef.takes + COOKS.meat_beef.burns);
   assert.equal(kept.made, T0 + 50);
 });
 

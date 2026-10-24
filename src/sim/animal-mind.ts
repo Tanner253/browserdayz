@@ -74,7 +74,7 @@ export interface Beast {
   /** which way it goes round what is in its way, and how long it has been getting nowhere */
   side: number;
   stuckT: number;
-  // --- a fight (a bear, a wolf, a boar)
+  // --- a fight (a bear, a wolf)
   foe: number;
   fightAt: number;
   fightX: number;
@@ -492,7 +492,6 @@ export class Herd {
     if (fear >= 0.95) b.aware = Math.max(b.aware, ANIMALS.fleeAt);
     switch (k.temper) {
       case 'bear':
-      case 'defend':
         if (fighter(this, b, k, now, dt, people, turn, from)) return;
         break;
       case 'pack':
@@ -528,7 +527,7 @@ export class Herd {
     const h = HERDS[g.herd];
     // (a bear or a wolf whole and unhurt does not run from a person: it stands and watches. A car, a helicopter, a
     // shot from further off than it will charge, or being hurt past bearing, and it runs like anything else.)
-    const stands = !!k.fight && k.temper !== 'defend' && b.hp >= k.hp * k.fight.breakAt && !rideFear && !(b.hurtBy && now - b.hurtAt < 8000);
+    const stands = !!k.fight && b.hp >= k.hp * k.fight.breakAt && !rideFear && !(b.hurtBy && now - b.hurtAt < 8000);
     if (b.aware >= ANIMALS.fleeAt && !g.flee && !stands) {
       // (the whole herd goes at once: DayZ's deer)
       const run = k.flee / k.run;
@@ -540,18 +539,13 @@ export class Herd {
       }
     }
     if (g.flee) {
-      // away from it, and on: toward cover, uphill for a goat, zig-zag for a hare
+      // away from it, and on: toward cover, zig-zag for a hare
       const ax = b.x - g.flee.x, az = b.z - g.flee.z, d = Math.hypot(ax, az) || 1;
       let tx = b.x + (ax / d) * 40, tz = b.z + (az / d) * 40;
       if (k.id === 'hare') {
         const z = Math.sin(now / 350 + b.i) * 18;
         tx += (-az / d) * z;
         tz += (ax / d) * z;
-      }
-      if (k.id === 'goat') {
-        const up = this.ground.height(b.x + (ax / d) * 20 + 10, b.z + (az / d) * 20) > this.ground.height(b.x + (ax / d) * 20 - 10, b.z + (az / d) * 20) ? 1 : -1;
-        tx += (-az / d) * 12 * up;
-        tz += (ax / d) * 12 * up;
       }
       if (h.farm) {
         const f = this.farmOf(g);

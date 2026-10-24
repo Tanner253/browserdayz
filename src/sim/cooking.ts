@@ -279,7 +279,7 @@ export const COOKS: Record<string, Recipe> = {
   // what it is worth COOKED; raw it is a quarter of that and as likely as not gives whoever eats it food poisoning;
   // burned it is a quarter and dry. It goes off: raw in forty minutes, cooked in three hours. One item for each
   // animal, with its stage kept on the thing itself, as a tin's is.
-  ...Object.fromEntries(['meat_venison', 'meat_bear', 'meat_wolf', 'meat_pork', 'meat_hare', 'meat_goat', 'meat_fox', 'meat_beef'].map((id) => [id, MEAT])),
+  ...Object.fromEntries(['meat_venison', 'meat_bear', 'meat_wolf', 'meat_hare', 'meat_beef'].map((id) => [id, MEAT])),
   // fish: { how: 'cook', takes: 40, burns: 45, raw: { energy: 0.3, water: 1.4, health: -6 }, burned: { energy: 0.25, water: 0 } },
   // And what waits for the pot (boiled, a thing keeps three quarters of its food and gains water; water is made
   // fit to drink): a recipe will say what it has to be cooked in, as a kind says what has to be stood on it.

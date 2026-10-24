@@ -302,9 +302,9 @@ ok('an admin stands any kind, one or a herd or pack of it, from the entity list'
 
 ok('herd and pack mates never stand inside each other: stood, grazing, bolting, or stood by an admin', () => {
   // (the owner: "they spawned inside eachother in the images")
-  const h = herd(['stag', 'doe', 'wolf', 'boar', 'goat', 'cow'], 7);
+  const h = herd(['stag', 'doe', 'wolf', 'hare', 'cow'], 7);
   h.populate(0);
-  const placed = [h.place('stag', 200, -200, 1, 6), h.place('wolf', 260, -200, 1, 5), h.place('cow', 200, -260, 1, 4), h.place('boar', 260, -260, 1, 3)];
+  const placed = [h.place('stag', 200, -200, 1, 6), h.place('wolf', 260, -200, 1, 5), h.place('cow', 200, -260, 1, 4)];
   const near = (x: number, z: number) => [...h.beasts.values()].filter((b) => Math.hypot(b.x - x, b.z - z) < 300);
   /** the closest two of one herd come, as a share of their two lengths together (0.5: nose touching tail) */
   const closest = (list: ReturnType<typeof near>) => {

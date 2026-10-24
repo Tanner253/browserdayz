@@ -1,4 +1,4 @@
-// The animals that fight (2026-10-23): a bear's warning, rush and chase, a hurt boar's charge, and a wolf pack's hunt,
+// The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt,
 // of whoever comes too near (src/sim/animal-mind.ts calls these for its own). The owner: "the bear should be dangerous,
 // needs a paw swipe animation and bite for attacking, and basic ai etc... player should be able to outrun it if breaks
 // line of sight and or isnt too close when the bear first engages".
@@ -12,7 +12,7 @@ const angleOff = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(b - a), 
 const isNight = (p: number) => p >= 0.73 || p < 0.02;
 
 /**
- * A bear, and a boar that has been hurt: the warning, the rush, the chase, the blows, and giving up. A bear that
+ * A bear: the warning, the rush, the chase, the blows, and giving up. A bear that
  * has lost sight and smell of whoever it was after for `lose` seconds, or been led `leash` metres off, gives up;
  * so does one whose quarry has got under a roof or into a car.
  */
