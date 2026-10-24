@@ -64,18 +64,19 @@ export const HUNT_ITEMS: ItemDef[] = [
   },
 
   // ---------------------------------------------------------------- what keeps a hunter well (DayZ)
+  // (not in the gas or the bunker: their places are all taken, and a stim was cut for them)
   {
     id: 'charcoal', name: 'Charcoal Tablets', model: 'pill_box', paint: 0x2b2b2b, w: 1, h: 1, weight: 0.05, category: 'medical', stack: 6, fresh: 3,
     desc: 'Activated charcoal. Ends food poisoning.',
     use: { verb: 'Take', time: 2, cures: true, sound: 'eat' },
-    loot: { pair: 'CharcoalTablets', at: [10, 2, 30, 1, 1], lifetime: 3000, restock: 300, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Hunting'], favour: { Medic: 8, Hospital: 3, Hunting: 2 } },
+    loot: { pair: 'CharcoalTablets', at: [10, 2, 30, 0, 0], lifetime: 3000, restock: 300, usage: ['Medic', 'Hospital', ...HOMES], favour: { Medic: 8, Hospital: 3 } },
     worth: 3, sells: 2,
   },
   {
     id: 'vitamins', name: 'Multivitamins', model: 'pill_box', paint: 0xe0a020, w: 1, h: 1, weight: 0.05, category: 'medical', stack: 5, fresh: 2,
     desc: 'A day\'s vitamins. For twenty minutes after, bad food is half as likely to make you ill, and illness passes twice as fast.',
     use: { verb: 'Take', time: 2, guard: 1200, sound: 'eat' },
-    loot: { pair: 'VitaminBottle', at: [8, 2, 26, 1, 1], lifetime: 3000, restock: 300, usage: ['Medic', 'Hospital', 'Shop', ...HOMES], favour: { Medic: 8, Hospital: 3 } },
+    loot: { pair: 'VitaminBottle', at: [8, 2, 26, 0, 0], lifetime: 3000, restock: 300, usage: ['Medic', 'Hospital', ...HOMES], favour: { Medic: 8, Hospital: 3 } },
     worth: 3,
   },
 ];
