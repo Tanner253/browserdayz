@@ -17,6 +17,9 @@ import { ITEMS, makeItem, type ItemInstance } from '../sim/items';
 import { KITS, type KitThing } from '../sim/kits';
 import { freshVitals } from '../game/player';
 import { assets } from '../core/assets';
+import { renderDoll } from '../ui/icons';
+import { lookFor } from '../game/look';
+import type * as THREE from 'three';
 import type { Stash, WorldItem } from '../game/loot';
 
 const made = (th: KitThing): ItemInstance => {
@@ -29,8 +32,11 @@ const made = (th: KitThing): ItemInstance => {
 };
 const kitOf = (name: string | null) => KITS.find((k) => k.id === name) ?? KITS[0];
 
-/** the screen asked for, drawn over the stage; resolves once its pictures are in */
-export async function stageScreen(q: URLSearchParams): Promise<Record<string, unknown>> {
+/**
+ * the screen asked for, drawn over the stage; resolves once its pictures are in
+ * @param renderer, env the stage's, for the survivor's picture in the middle of the inventory (the live figure is the game's)
+ */
+export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRenderer, env: THREE.Texture | null): Promise<Record<string, unknown>> {
   const touch = q.get('touch') === '1';
   document.body.classList.toggle('touch', touch);
   // (the page scaled to the window as the game scales it)
@@ -113,6 +119,8 @@ export async function stageScreen(q: URLSearchParams): Promise<Record<string, un
   };
   screen = new InventoryUI(inv, actions);
   screen.icons = icons;
+  // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
+  if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
   screen.open(vicinity, body, freshVitals());
   (window as unknown as { stageInv: unknown }).stageInv = { inv, screen, vicinity };
   await pictures(ui);

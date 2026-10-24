@@ -188,7 +188,8 @@ if (sim) {
   // (the survivor for size: the player's body as its file has it, no gear, standing to one side, facing the camera)
   const subject = new THREE.Box3().setFromObject(thing);
   if (person) {
-    const body = (await assets.loadGLTF('assets/characters/survivor.glb')).scene;
+    // (a copy: the file's own is the one the game's pictures of the survivor are made from, and it is moved aside here)
+    const body = cloneSkinned((await assets.loadGLTF('assets/characters/survivor.glb')).scene) as THREE.Group;
     body.traverse((o) => { if (o.name.startsWith('gear_')) o.visible = false; });
     shadowed(body);
     body.position.set(subject.max.x + 0.9, 0, 0);
@@ -232,7 +233,7 @@ if (sim) {
   }
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   // (and a screen of the game over it, asked for: the inventory with a kit on, or the hot bar)
-  const screen = q.get('ui') ? await (await import('./stage-inventory')).stageScreen(q) : undefined;
+  const screen = q.get('ui') ? await (await import('./stage-inventory')).stageScreen(q, renderer, scene.environment) : undefined;
   out.stageInfo = { things: info, views: strip > 0 ? [views[0]] : views, strip, sun: dusk ? 'dusk' : 'day', person, ...(screen ? { screen } : {}) };
   out.staged = true;
 }

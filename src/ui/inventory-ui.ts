@@ -21,7 +21,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
+import { ALL_SLOTS, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, poured, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
@@ -142,6 +142,7 @@ type Target =
   | { kind: 'slot'; el: HTMLElement; slot: Slot }
   | { kind: 'ground'; el: HTMLElement }
   | { kind: 'pockets'; el: HTMLElement }
+  | { kind: 'into'; el: HTMLElement }
   | { kind: 'char'; el: HTMLElement }
   | { kind: 'out'; el: HTMLElement };
 
@@ -1163,6 +1164,73 @@ export class InventoryUI {
    * The hot keys along the foot of the screen: what is on each, and a place to let a thing go to put it on one.
    * (Pointing at a thing and pressing the number does the same. A right-click on a key clears it.)
    */
+  /**
+   * Each gun slung or holstered (not the one in the hands: its parts are under the hands) as a panel of its own, with its
+   * parts: its name, its rounds and where it is carried; folded by its bar, as a grid is.
+   */
+  private gunPanels(ui: string, held: ItemInstance | null): Node[] {
+    const out: Node[] = [];
+    for (const slot of WEAPON_SLOTS) {
+      const gun = this.inv.slots[slot];
+      if (!gun || gun === held) continue;
+      const key = `gun:${slot}`, shut = this.folded.has(key);
+      out.push(...this.block(`c:${key}`, `${ui}|${this.look(gun)}:${this.actions.goingIn(gun) ?? ''}|${shut ? 1 : 0}`, () => {
+        const box = document.createElement('div');
+        box.className = 'inv-gridbox inv-gunbox' + (shut ? ' shut' : '');
+        const d = ITEMS[gun.id];
+        const rounds = d.weapon ? `${gun.loaded ?? 0}/${d.weapon.mag ? (gun.mag ? magRoom(gun) : '–') : capacityOf(gun)}` : '';
+        box.innerHTML = `<h4 title="${shut ? 'Open it' : 'Fold it away'}" data-tail="${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${itemName(gun)}<small>${SLOT_LABEL[slot]}</small> <span>${rounds}</span></h4>`;
+        box.querySelector('h4')!.addEventListener('click', () => {
+          if (!this.folded.delete(key)) this.folded.add(key);
+          this.render();
+        });
+        if (!shut) box.appendChild(this.partsEl(gun));
+        return [box];
+      }));
+    }
+    return out;
+  }
+
+  /**
+   * A body as your own side is drawn: a strip of what it wears and carries slung, then each thing it wears that has
+   * room as a panel (`openBags`), then whatever else lies on it, loose (the owner, 2026-10-23, the plan: "looting a
+   * body mirrors your own side"). Every thing is the body's own, dragged out as from its grid; what is let go on the
+   * loose part goes on the body wherever there is room.
+   */
+  private bodyNodes(box: Container): Node[] {
+    const out: Node[] = [];
+    const worn = (it: ItemInstance) => { const d = ITEMS[it.id]; return !!(d.slot || d.weapon || d.wear); };
+    const row = document.createElement('div');
+    row.className = 'inv-strip inv-body-strip';
+    for (const p of box.items) {
+      if (!worn(p.item)) continue;
+      const el = this.itemEl(p.item, 1, 1, false);
+      el.classList.add('strip-tile');
+      this.bindItem(el, { kind: 'container', c: box, item: p.item });
+      row.appendChild(el);
+    }
+    if (row.childNodes.length) out.push(row);
+    this.openBags(out, box);
+    const loose = box.items.filter((p) => !worn(p.item));
+    const panel = document.createElement('div');
+    panel.className = 'inv-gridbox inv-loose';
+    panel.dataset.into = '1';
+    panel.innerHTML = `<h4>On the body${loose.length ? ` <span>${loose.length}</span>` : ''}</h4>`;
+    const tiles = document.createElement('div');
+    tiles.className = 'inv-ground-tiles';
+    for (const p of loose) {
+      const [w, h] = Container.size(p.item, false);
+      const el = this.itemEl(p.item, w, h, false);
+      el.classList.add('g-tile');
+      this.bindItem(el, { kind: 'container', c: box, item: p.item });
+      tiles.appendChild(el);
+    }
+    if (!loose.length) tiles.innerHTML = '<div class="inv-empty">Nothing loose on it. Let a thing go here to put it on the body.</div>';
+    panel.appendChild(tiles);
+    out.push(panel);
+    return out;
+  }
+
   /** what there is of the thing on a key, as the hot bar at the foot of the screen says it: rounds, drinks, how many */
   private hotLabel(it: ItemInstance): string {
     const d = ITEMS[it.id];
@@ -1517,74 +1585,45 @@ export class InventoryUI {
           // not a screen's height further down. It is as deep as it is all the same: a thing let go on it lands
           // wherever there is room, and the rows are counted again.)
           out.push(this.takeBar());
-          const low = box.items.reduce((n, p) => Math.max(n, p.y + Container.size(p.item, p.rot)[1]), 0);
-          out.push(this.gridEl(box, body ? Math.min(box.h, Math.max(3, low + 2)) : box.h));
-          // (a pack on a body or in a crate is opened where it lies, and gone through)
+          if (body) return [...out, ...this.bodyNodes(box)];
+          out.push(this.gridEl(box, box.h));
+          // (a pack in a crate is opened where it lies, and gone through)
           this.openBags(out, box);
           return out;
         });
     if (st) this.gridsNow.set(st.container.id, st.container);
     this.fill(sk.vic, [sk.vicHead, ...ground, ...stashPart]);
 
-    // ---- character: paper doll with gear slots, weapons underneath
+    // ---- character: the survivor, HANDS under them, the hot keys under those, and the tags (the plan the owner said
+    // yes to, 2026-10-23: what is worn is a strip at the top of the right, and the guns slung are panels there)
     // The figure stands for good, its still picture put on it only when that changes (it was some 300 KB of what the
-    // doll's part was told apart by, and built again with it on every move); the places beside it are a column each.
+    // doll's part was told apart by, and built again with it on every move).
     if (this.dollShown !== this.doll) {
       this.dollShown = this.doll;
       sk.dollFig.style.backgroundImage = this.doll ? `url(${this.doll})` : '';
     }
-    // (the places for what is worn are listed in src/sim/items.ts: eleven of them since 2026-10-13, as DayZ has; each
-    // lower than it was, so that no place lies over what is under the figure)
-    const slotCol = (key: string, slots: Slot[]) =>
-      this.block(key, ui + slots.map((s) => (inv.slots[s] ? this.look(inv.slots[s]!) : '-')).join('|'), () => {
-        const col = document.createElement('div');
-        col.className = 'doll-col';
-        col.style.gap = '6px';
-        for (const s of slots) {
-          const el = this.slotEl(s);
-          el.style.height = '56px';
-          col.appendChild(el);
-        }
-        return [col];
-      });
-    this.fill(sk.doll, [...slotCol('g:dollL', DOLL_SLOTS[0]), sk.dollFig, ...slotCol('g:dollR', DOLL_SLOTS[1])]);
+    this.fill(sk.doll, [sk.dollFig]);
     const neck = this.block('g:neck', `${inv.neck ? this.look(inv.neck) : ''}|${inv.neck ? '' : Math.ceil((inv.neckDue - Date.now()) / 60000)}`, () => {
       const tmp = document.createElement('div');
       tmp.innerHTML = this.neckEl();
       return [...tmp.childNodes];
     });
-    // The hands, and beside them the holster; under those the two places on the back. Under each gun are the
-    // places on it that take a part, each a slot of its own: a part is dragged onto one and dragged off it.
-    // (A gun in the hands has its parts under the hands, wherever it is slung: under its slot they were not where a player
-    // looked for its magazine. The owner, 2026-10-23: "when they have the gun in their hand and then want to pull the
-    // magazine out they are confused".)
+    // The hands, and under them the places on the gun in them that take a part, each a slot of its own: a part is
+    // dragged onto one and dragged off it. (A gun in the hands has its parts under the hands, wherever it is slung:
+    // the owner, 2026-10-23, "when they have the gun in their hand and then want to pull the magazine out they are confused".)
     const held = this.actions.inHands();
-    const armed = this.block('g:armed', `${ui}|${held ? `${this.look(held)}:${this.actions.goingIn(held) ?? ''}` : '-'}|${WEAPON_SLOTS.map((s) => (inv.slots[s] ? `${this.look(inv.slots[s]!)}:${this.actions.goingIn(inv.slots[s]!) ?? ''}` : '-')).join('|')}`, () => {
-      const withParts = (slot: Slot) => {
-        const box = document.createElement('div');
-        box.className = 'inv-armed';
-        box.append(this.slotEl(slot), this.partsEl(inv.slots[slot] === held ? null : inv.slots[slot]));
-        return box;
-      };
-      const top = document.createElement('div');
-      top.className = 'inv-slots';
-      const handBox = document.createElement('div');
-      handBox.className = 'inv-armed';
-      handBox.append(this.handsEl(), this.partsEl(held));
-      // (which places those are is the rules' to say, WEAPON_SLOTS: the ones there are two of a kind of are the back, and stand together)
-      const pair = (s: Slot) => WEAPON_SLOTS.some((x) => x !== s && SLOT_KIND[x] === SLOT_KIND[s]);
-      top.append(handBox, ...WEAPON_SLOTS.filter((s) => !pair(s)).map(withParts));
-      const long = document.createElement('div');
-      long.className = 'inv-slots';
-      long.append(...WEAPON_SLOTS.filter(pair).map(withParts));
-      return [top, long];
+    const hands = this.block('g:hands', `${ui}|${held ? `${this.look(held)}:${this.actions.goingIn(held) ?? ''}` : '-'}`, () => {
+      const box = document.createElement('div');
+      box.className = 'inv-armed inv-hands-box';
+      box.append(this.handsEl(), this.partsEl(held));
+      return [box];
     });
-    // (the hot keys, big, at the foot beneath the hands: see `hotEl`)
-    const hot = this.block('f:hot', `${held?.uid ?? ''}|${inv.hot.map((b, i) => (b ? `${b.id}:${this.inv.hotItem(i) ? `${this.look(this.inv.hotItem(i)!)}:${this.hotLabel(this.inv.hotItem(i)!)}` : ''}` : '-')).join('|')}`, () => [this.hotEl()]);
+    // (the hot keys, big, under the hands: see `hotEl`)
+    const hot = this.block('g:hot', `${held?.uid ?? ''}|${inv.hot.map((b, i) => (b ? `${b.id}:${this.inv.hotItem(i) ? `${this.look(this.inv.hotItem(i)!)}:${this.hotLabel(this.inv.hotItem(i)!)}` : ''}` : '-')).join('|')}`, () => [this.hotEl()]);
     // (the tags taken off others: here under the survivor, out of the way of what is carried)
     const tags = this.block('g:tags', ui + this.gridSig(inv.tags), () => this.boxNodes(inv.tags));
     this.gridsNow.set(inv.tags.id, inv.tags);
-    this.fill(sk.gear, [sk.gearHead, sk.doll, ...neck, ...armed, ...tags]);
+    this.fill(sk.gear, [sk.gearHead, sk.doll, ...hands, ...hot, ...neck, ...tags]);
 
     // ---- carried: every cargo grid, which scroll by themselves; under them, always in sight, the inspector and the body's state
     // (what is carried and, where the game has said a load weighs on anybody, what it leaves of a sprint: the rule is
@@ -1620,7 +1659,7 @@ export class InventoryUI {
     // (an admin's hold stands last, under everything that is worn: it is where what those cannot take goes)
     const rank = (c: Container, slot: Slot | null) => (c === inv.theHold ? places.length + 2 : slot ? (places.indexOf(slot) + 1 || places.length + 1) : 0);
     carried.sort((a, b) => rank(a.c, a.slot) - rank(b.c, b.slot) || a.i - b.i);
-    const grids: Node[] = [];
+    const grids: Node[] = [...this.gunPanels(ui, held)];
     for (const { c, slot } of carried) {
       const where = slot ? SLOT_LABEL[slot] : c === inv.theHold ? 'admin' : '';
       grids.push(...this.block(`c:grid:${c.id}`, `${ui}|${where}|${this.gridSig(c)}`, () => this.boxNodes(c, where)));
@@ -1640,10 +1679,17 @@ export class InventoryUI {
     // (The body's state is the row of symbols the game has in its corner, which this screen covers: the same row,
     // and no key to it beside it, the HUD's own element, which the HUD keeps up to date while this screen is open.)
     if (this.vitals && this.status && this.status.parentElement !== sk.status) sk.status.appendChild(this.status);
-    this.fill(sk.cargo, [...head, this.findEl(), sk.scroll, ...inspect, ...(this.vitals && this.status ? [sk.status] : [])]);
+    // (what is worn, every place a body has, as a strip of squares at the top: guns, then head to feet, as DayZ has it)
+    const strip = this.block('c:strip', ui + ALL_SLOTS.map((s) => (inv.slots[s] ? this.look(inv.slots[s]!) : '-')).join('|') + `|${held?.uid ?? ''}`, () => {
+      const row = document.createElement('div');
+      row.className = 'inv-strip';
+      for (const s of [...WEAPON_SLOTS, ...DOLL_SLOTS[0], ...DOLL_SLOTS[1]]) row.appendChild(this.slotEl(s));
+      return [row];
+    });
+    this.fill(sk.cargo, [...head, ...strip, this.findEl(), sk.scroll, ...inspect, ...(this.vitals && this.status ? [sk.status] : [])]);
 
-    // ---- the foot: the hot keys, and the clicks
-    this.fill(sk.foot, [...hot, sk.help]);
+    // ---- the foot: the clicks
+    this.fill(sk.foot, [sk.help]);
     for (const k of [...this.built.keys()]) if (k.startsWith('c:grid:') && !this.gridsNow.has(k.slice(7))) this.built.delete(k);
     for (const f of this.rescroll) f();
     this.marks();
@@ -2326,6 +2372,7 @@ export class InventoryUI {
       if (h.dataset?.slot) return { kind: 'slot' as const, el: h, slot: h.dataset.slot as Slot };
       if (h.dataset?.ground) return { kind: 'ground' as const, el: h };
       if (h.dataset?.pockets) return { kind: 'pockets' as const, el: h };
+      if (h.dataset?.into) return { kind: 'into' as const, el: h };
       if (h.dataset?.char) return { kind: 'char' as const, el: h };
     }
     // off the edge of the inventory altogether: let go there and it is dropped
@@ -2748,6 +2795,11 @@ export class InventoryUI {
       return this.refuse(d, t, e);
     }
     // let go on the right-hand side, on no grid: it is put away wherever there is room for it (what is worn comes off)
+    if (t.kind === 'into') {
+      // (on the loose part of a body: what is yours goes on it wherever there is room, as Ctrl-click moves it across)
+      if (this.mine(d.src)) this.transfer(d.src);
+      return this.render();
+    }
     if (t.kind === 'pockets') {
       if (this.refusal(d, t, e)) return this.refuse(d, t, e);
       if (d.src.kind === 'ground') return this.pickUp(d.src);

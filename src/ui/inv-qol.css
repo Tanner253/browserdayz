@@ -35,19 +35,31 @@
 .inv.ahead { opacity: 0.004; pointer-events: none; }
 .inv.ahead * { pointer-events: none !important; }
 
-/* The hot keys at the foot of the screen beneath the hands, one row of big squares as DayZ has them (InventoryUI.hotEl):
-   the number, the picture, what there is of it. Dragged off to clear, onto another key to move. The panels end over
-   them, and the line of clicks stands under them. */
-.inv-wrap { bottom: 146px; }
-.inv-foot { height: auto; grid-template-rows: auto 60px; row-gap: 8px; }
-.inv-foot > .inv-hot.big { position: static; grid-column: 2; grid-row: 1; justify-self: center; transform: none; display: flex; gap: 6px; padding: 5px 7px; }
-.inv-foot > .inv-help { grid-row: 2; }
-.inv-hot.big .inv-hotkey { flex: none; width: 64px; height: 64px; min-width: 0; }
-.inv-hot.big .inv-hotkey:nth-child(3) { margin-right: 10px; }
+/* The DayZ layout (the owner's yes, 2026-10-23). The middle: the survivor, HANDS, the hot keys big under them, two rows
+   of five (InventoryUI.hotEl): the number, the picture, what there is of it; dragged off to clear, onto another to move. */
+.inv-doll { grid-template-columns: 1fr; }
+.inv-hands-box { margin-top: 8px; }
+.inv-hot.big { position: static; transform: none; display: grid; grid-template-columns: repeat(5, 64px); justify-content: center; gap: 6px; margin: 10px 0 4px; padding: 6px; }
+.inv-hot.big .inv-hotkey { width: 64px; height: 64px; }
+.inv-hot.big .inv-hotkey:nth-child(3) { margin-right: 0; }
 .inv-hot.big .inv-hotkey:not(.empty) { cursor: grab; }
 .inv-hot.big .inv-hotkey .inv-item-img.fit { inset: 16px 5px 14px; }
 .inv-hot.big .inv-hotkey b { font-size: 11px; line-height: 14px; }
 .inv-hot.big .inv-hotkey em { position: absolute; right: 4px; bottom: 2px; z-index: 1; font: 600 11px/13px var(--mono); font-style: normal; color: var(--ink); text-shadow: 0 1px 2px #000; pointer-events: none; }
+
+/* your side: what is worn as a strip of squares at the top, guns first; the guns slung as panels with their parts */
+.inv-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 4px 0 8px; }
+.inv-strip .inv-slot { height: 62px; min-width: 0; }
+.inv-strip .slot-label { font-size: 8px; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (a square with something in it shows the thing and its key, and no word: the word names an empty place) */
+.inv-strip .inv-slot:has(.inv-item) .slot-label { font-size: 0; }
+.inv-gunbox .inv-parts { padding: 4px 6px 6px; }
+
+/* a body, as your side is: its strip, its panels, and what is loose on it */
+.inv-body-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.inv-body-strip > .inv-item.strip-tile { position: relative; flex: none; width: 60px !important; height: 60px !important; }
+.inv-loose { margin-top: 8px; }
+.inv-loose .inv-ground-tiles { min-height: 54px; padding: 4px; }
 
 /* Vicinity: each thing lying about its own picture at its own size, as in a grid, packed in rows */
 .inv-ground-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; padding: 2px; }
