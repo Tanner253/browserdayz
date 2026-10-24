@@ -189,19 +189,98 @@ export const PIECE: Record<Paint, number> = { stone: 2.3, ashlar: 2.3, base: 2.6
  * How far a point of the masonry stands off where the plan has it: a few centimetres, sideways, by a slow pattern.
  * Nothing a mason built eight hundred years ago is flat or plumb to the eye any more: a wall bellies, a tower is
  * not quite round. It goes by where the point is on the plan and by nothing else: so two faces that meet still
- * meet, and a wall's upright edges stay straight (its faces are cut into pieces of different heights side by side,
- * and a point half way up one piece's edge must stay on its neighbour's: moved by its height as well, every such
- * place opened as a crack). And never up or down: what is level to walk on stays level. (What stops a body is not
- * moved: it is the plan's.)
+ * meet, and a wall's upright edges stay straight. And never up or down: what is level to walk on stays level. (What
+ * stops a body is not moved: it is the plan's.)
+ *
+ * MEETING STILL MEANS MEETING (2026-10-23: "theres gaps in between walls all over that castle"). Three things kept
+ * that from being so, and each opened cracks of a finger to a hand along the joins:
+ *  - bent at its corners alone, a face's edge was a straight line between two points of a curve, and where two faces
+ *    met along one line but were cut at different places along it (a wall's foot on the wall under it, a top cut
+ *    every 0.42 m on a face cut every 2.3) the two lines parted. So the bend is worked out only at the corners of a
+ *    lattice over the plan (x, z and x + z every `BEND_GRID`), plain between them, and every face that is bent is
+ *    cut along the lattice's lines (`Out.tri`): between two of its corners an edge lies in one of the lattice's
+ *    triangles, where the bend is a plain shift and stretch, and any two faces that meet in the plan meet as bent.
+ *  - stone was bent and the floors, boards and paving that run up to it were not: a tower's floor stood off its
+ *    wall, the paving off a drum's foot. One bend now for everything of the fort's own but its earth, which meets
+ *    the world's ground (a floor moved sideways in its own plane looks no different).
+ *  - the kit's pieces (the walls, the towers' feet, the gatehouse) are not bent at all: so near them the bend fades
+ *    to nothing (`still`), and what of the fort's own meets them meets them where the plan has it.
  */
+const BEND_GRID = 3;
+/** where the kit stands, in the plan: the four walls' feet (along each side, from the inner face of the wall at its foot to its outer face) and the towers' feet (their spread at the bottom); and how far from it the bend is nothing, and over how much more it comes in */
+const KIT_PLAN = { inX: 8.64, inZ: 8.74, outX: 11.19, outZ: 11.29, tower: 4.44, clear: 0.6, fade: 2.5 };
+/** how much of the bend there is at a place of the plan: 0 at the kit, 1 away from it */
+function still(x: number, z: number): number {
+  const K = KIT_PLAN, ax = Math.abs(x), az = Math.abs(z);
+  // (out of the ring of the walls in plan: from their insides to their outsides)
+  const inside = Math.max(0, Math.min(K.inX - ax, K.inZ - az)), outside = Math.max(0, ax - K.outX, az - K.outZ, Math.hypot(Math.max(0, ax - K.outX), Math.max(0, az - K.outZ)));
+  const tower = Math.hypot(ax - CASTLE.hx, az - CASTLE.hz) - K.tower, d = Math.min(Math.max(inside, outside), Math.max(0, tower));
+  const t = Math.min(1, Math.max(0, (d - K.clear) / K.fade));
+  return t * t * (3 - 2 * t);
+}
+const bendNodes = new Map<number, [number, number]>();
+/** the bend at a corner of the lattice (as the slow pattern has it there, for a stuff bent by a metre) */
+function bendNode(i: number, j: number): [number, number] {
+  const k = (i + 4096) * 8192 + j + 4096;
+  let v = bendNodes.get(k);
+  if (!v) {
+    // (slow: a belly four or five metres long; quicker than that and it is a wall of facets)
+    const x = i * BEND_GRID, z = j * BEND_GRID, s = still(x, z) * 2.6;
+    bendNodes.set(k, (v = [(clouds([x * 0.55 + 17, 0.5, z * 0.55]) - 0.5) * s, (clouds([x * 0.55, 41.5, z * 0.55 + 9]) - 0.5) * s]));
+  }
+  return v;
+}
+/** whether nothing in a stretch of the plan is bent (each corner of the lattice under it is still): a face there is not cut for it */
+function unbentIn(x0: number, z0: number, x1: number, z1: number): boolean {
+  for (let i = Math.floor(x0 / BEND_GRID); i <= Math.floor(x1 / BEND_GRID) + 1; i++) for (let j = Math.floor(z0 / BEND_GRID); j <= Math.floor(z1 / BEND_GRID) + 1; j++) {
+    const v = bendNode(i, j);
+    if (v[0] || v[1]) return false;
+  }
+  return true;
+}
 function warp(p: V3, by: number): V3 {
-  // (slow: a belly four or five metres long, which pieces of wall two metres long can follow; quicker than that and it is a wall of facets)
-  const a = clouds([p[0] * 0.55 + 17, 0.5, p[2] * 0.55]) - 0.5, b = clouds([p[0] * 0.55, 41.5, p[2] * 0.55 + 9]) - 0.5;
-  return [p[0] + a * 2.6 * by, p[1], p[2] + b * 2.6 * by];
+  const gx = p[0] / BEND_GRID, gz = p[2] / BEND_GRID, i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
+  // (the lattice's triangle the point is in: its square's lower one, or its upper, across the diagonal x + z)
+  const [A, B, C, wa, wb, wc] = fx + fz <= 1 ? [bendNode(i, j), bendNode(i + 1, j), bendNode(i, j + 1), 1 - fx - fz, fx, fz] : [bendNode(i + 1, j + 1), bendNode(i + 1, j), bendNode(i, j + 1), fx + fz - 1, 1 - fz, 1 - fx];
+  return [p[0] + (A[0] * wa + B[0] * wb + C[0] * wc) * by, p[1], p[2] + (A[1] * wa + B[1] * wb + C[1] * wc) * by];
+}
+/** a corner of a face being cut along the lattice: where it is, where on the picture, how light, which way it faces where it is round */
+interface Corner { p: V3; t: UV; tone: number; n?: V3 }
+const between = (a: Corner, b: Corner, s: number): Corner => ({ p: [a.p[0] + (b.p[0] - a.p[0]) * s, a.p[1] + (b.p[1] - a.p[1]) * s, a.p[2] + (b.p[2] - a.p[2]) * s], t: [a.t[0] + (b.t[0] - a.t[0]) * s, a.t[1] + (b.t[1] - a.t[1]) * s], tone: a.tone + (b.tone - a.tone) * s, n: a.n && b.n ? unit([a.n[0] + (b.n[0] - a.n[0]) * s, a.n[1] + (b.n[1] - a.n[1]) * s, a.n[2] + (b.n[2] - a.n[2]) * s]) : undefined });
+/** a flat piece cut along the lattice's lines, into pieces each in one of its triangles (corners kept in their order round) */
+function onLattice(poly: Corner[]): Corner[][] {
+  let polys = [poly];
+  for (const along of [(p: V3) => p[0], (p: V3) => p[2], (p: V3) => p[0] + p[2]]) {
+    const next: Corner[][] = [];
+    for (const piece of polys) {
+      let rest = piece, vs = rest.map((c) => along(c.p) / BEND_GRID);
+      const hi = Math.max(...vs);
+      for (let k = Math.floor(Math.min(...vs) + 1e-9) + 1; k < hi - 1e-9; k++) {
+        const below: Corner[] = [], above: Corner[] = [];
+        for (let i = 0; i < rest.length; i++) {
+          const a = rest[i], b = rest[(i + 1) % rest.length], va = vs[i] - k, vb = vs[(i + 1) % rest.length] - k;
+          if (va <= 0) below.push(a);
+          if (va >= 0) above.push(a);
+          if ((va < 0 && vb > 0) || (va > 0 && vb < 0)) {
+            const c = between(a, b, va / (va - vb));
+            below.push(c);
+            above.push(c);
+          }
+        }
+        if (below.length > 2) next.push(below);
+        rest = above;
+        vs = rest.map((c) => along(c.p) / BEND_GRID);
+        if (rest.length < 3) break;
+      }
+      if (rest.length > 2) next.push(rest);
+    }
+    polys = next;
+  }
+  return polys;
 }
 
-/** how far, for each stuff, metres (none for what is sawn or forged, or is ground already) */
-export const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.09, base: 0.1, paving: 0, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0, water: 0 };
+/** how far, for each stuff, metres (one bend for all of it, see `warp`: none for the earth, which meets the world's ground, nor for water) */
+export const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.09, base: 0.09, paving: 0.09, timber: 0.09, iron: 0.09, rock: 0.09, scree: 0.09, earth: 0, water: 0 };
 
 let towers: Tower[] | null = null;
 
@@ -288,7 +367,8 @@ export function hidesOf(list: Hide[]): Hides {
 /** Where triangles are put, for one stuff: it knows the size of that stuff's picture. */
 export class Out {
   /** @param mottle how much the tone wanders over it; @param cut big faces are cut into pieces no longer than this for that to show (0: they are not) */
-  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private bent = 0, private hides: Hides | null = null, private low = false) {}
+  /** @param exact what is bent is cut along the bend's lattice (see `warp`): from near, where a crack shows; from far off each corner is only bent */
+  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private bent = 0, private hides: Hides | null = null, private low = false, private exact = false) {}
   /** whether a place has one of the fort's blocks all round it (see Hide) */
   private hid(q: V3): boolean {
     const H = this.hides!;
@@ -340,7 +420,13 @@ export class Out {
       const mid: V3 = [(p[0][0] + p[1][0] + p[2][0]) / 3 + n[0] * 0.015, (p[0][1] + p[1][1] + p[2][1]) / 3 + n[1] * 0.015, (p[0][2] + p[1][2] + p[2][2]) / 3 + n[2] * 0.015];
       if (this.hid(mid) && p.every((c) => this.hid([mid[0] + (c[0] - mid[0]) * 0.85 + n[0] * 0.002, mid[1] + (c[1] - mid[1]) * 0.85 + n[1] * 0.002, mid[2] + (c[2] - mid[2]) * 0.85 + n[2] * 0.002]))) return void this.hides.count++;
     }
-    for (const k of order) this.put(p[k], smooth ? smooth[k] : n, t[k], typeof tone === 'number' ? tone : tone[k]);
+    const corners = order.map((k): Corner => ({ p: p[k], t: t[k], tone: typeof tone === 'number' ? tone : tone[k], n: smooth?.[k] }));
+    if (!this.exact || !this.bent || this.straight || unbentIn(Math.min(p[0][0], p[1][0], p[2][0]), Math.min(p[0][2], p[1][2], p[2][2]), Math.max(p[0][0], p[1][0], p[2][0]), Math.max(p[0][2], p[1][2], p[2][2]))) return void corners.forEach((c) => this.put(c.p, c.n ?? n, c.t, c.tone));
+    for (const piece of onLattice(corners)) for (let k = 1; k + 1 < piece.length; k++) {
+      // (a sliver where a line of the lattice runs along an edge: nothing to draw)
+      if (len(cross(sub(piece[k].p, piece[0].p), sub(piece[k + 1].p, piece[0].p))) < 2e-7) continue;
+      for (const c of [piece[0], piece[k], piece[k + 1]]) this.put(c.p, c.n ?? n, c.t, c.tone);
+    }
   }
   /** Four corners, in order round it. */
   quad(p: V3[], t: UV[], out: V3, tone: number | number[] = 1, smooth?: V3[], deep = 0): void {
