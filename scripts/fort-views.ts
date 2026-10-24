@@ -16,7 +16,15 @@ const rock: [string, At, At][] = [
   ['rock-w1', [-17, -3, 'g1.6'], [-11.8, -3, -5.2]],
   ['rock-sw', [-15, 16, 'g1.6'], [-11, 12, -5]],
 ];
-const views: [string, At, At][] = process.argv.includes('--rock') ? rock : [
+const bend: [string, At, At][] = [
+  // where the masonry's bend shows most: the keep from the terrace and from the walk, a house, the cistern
+  ['keep-terrace', [8.2, 7.6, 1.65], [2, 1, 4]],
+  ['keep-walk', [-7.5, -8.4, 1.65], [-2, -5.6, 6]],
+  ['keep-close', [3.4, -7.2, 1.65], [3.4, -5.5, 3.5]],
+  ['house', [19, -16, 'g1.7'], [14.5, -25, 'g1.5']],
+  ['cistern', [-6, -6.6, -2.2], [3, -6.6, -2.4]],
+];
+const views: [string, At, At][] = process.argv.includes('--bend') ? bend : process.argv.includes('--rock') ? rock : [
   // the walls' feet outside, where they meet the hill and the rock
   ['foot-north', [0, -24, 'g1.7'], [0, -12, 'g0.5']],
   ['foot-south', [-2, 24, 'g1.7'], [-2, 12, 'g0.5']],
