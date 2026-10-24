@@ -704,6 +704,8 @@ export const frameMethods = {
       r.camera.updateProjectionMatrix();
     }
     r.render(dt);
+    // (the inventory painted unseen once, two seconds into the first play of the page, so its first Tab is like any other: InventoryUI.paintAhead)
+    this.invUI.paintAhead(this.started && !this.paused && !this.player.dead && !this.invUI.isOpen && !this.map.open, () => this.around(), this.player.vitals);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);
     // (and Emotes' survivor, doing what is picked there, made the first time it is opened)

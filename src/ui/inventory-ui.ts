@@ -37,6 +37,8 @@ import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
 
 const CELL = 46;
+/** the inventory painted once, with what is carried, before it is first opened (`paintAhead`): how long into play, and for how many frames */
+const AHEAD_AFTER = 2000, AHEAD_FRAMES = 6;
 /** the hot key a thing in a place is on, as a key before the place's name (nothing for none) */
 const slotKey = (i: number) => (i >= 0 ? `<span class="slot-key">${(i + 1) % 10}</span>` : '');
 /** weight, as a weight is drawn (idea 6: "instead of kg ... an icon"): a ring over a block, read at 11 px */
@@ -163,6 +165,10 @@ const holdable = (d: Def) => d.category !== 'clothing' && !d.weapon && !d.melee;
 export class InventoryUI {
   root: HTMLDivElement;
   isOpen = false;
+  /** `paintAhead`: the frames it has still to stand, when it may begin, and whether it has been done in this page */
+  private aheadLeft = 0;
+  private aheadFrom = 0;
+  private aheadDone = false;
   icons: Record<string, string> = {};
   /** portrait of the survivor for the paper doll */
   doll = '';
@@ -459,6 +465,7 @@ export class InventoryUI {
   }
 
   open(vicinity: WorldItem[], stash: Stash | null, vitals: Vitals) {
+    this.endAhead();
     this.cancelDrag();
     this.vicinity = vicinity;
     this.stash = stash;
@@ -531,6 +538,48 @@ export class InventoryUI {
   setStashState(text: string) {
     this.stashState = text;
     if (this.isOpen && !this.drag) this.render();
+  }
+
+  /**
+   * What `warm` began behind the menu, finished two seconds into the first play of a page: the inventory itself
+   * painted where nobody sees it, with what is carried in it (behind the menu there is nothing in it to paint). The
+   * first time the browser painted its columns, pictures and outlines, its graphics process wrote what it draws them
+   * with: the first Tab's frame was 320 to 390 ms against 55 to 110 for every Tab after (traced 2026-10-24, the card's
+   * raster 292 ms of it). Shown at nearly nothing for a few frames, as it is laid over the world when it is opened,
+   * most of that is paid where nobody is looking: 190 to 200 ms after it, the raster 175. Nothing of the game's is
+   * told it is open: the hands, the keys and the map go on as they were.
+   * (Not the figure: it is drawn into the game's own picture, whole, however faint the page is. Its first drawing is
+   * 13 ms with the card's part, measured, and the veil round it was got ready by `warm`.)
+   * @param may it may be done now (in play, alive, nothing open)
+   */
+  paintAhead(may: boolean, vicinity: () => WorldItem[], vitals: Vitals) {
+    if (this.aheadLeft) {
+      if (--this.aheadLeft === 0) this.endAhead();
+      return;
+    }
+    if (this.aheadDone || !may) {
+      this.aheadFrom = 0;
+      return;
+    }
+    const now = performance.now();
+    if (!this.aheadFrom) this.aheadFrom = now + AHEAD_AFTER;
+    if (now < this.aheadFrom) return;
+    this.aheadDone = true;
+    this.aheadLeft = AHEAD_FRAMES;
+    this.vicinity = vicinity();
+    this.vitals = vitals;
+    // (and as it is laid over the world when the figure is in it, as it is the first time it is opened)
+    this.root.classList.add('show', 'ahead', 'fig-live');
+    this.render();
+  }
+
+  /** done standing unseen (or opened in earnest meanwhile) */
+  private endAhead() {
+    if (!this.root.classList.contains('ahead')) return;
+    this.aheadLeft = 0;
+    this.root.classList.remove('ahead');
+    if (!this.figLive) this.root.classList.remove('fig-live');
+    if (!this.isOpen) this.root.classList.remove('show');
   }
 
   close() {

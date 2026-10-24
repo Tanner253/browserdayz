@@ -30,3 +30,7 @@
 /* Each part laid out by itself (2026-10-23): a move rebuilds one grid, and without this the browser laid the whole
    screen out again for it (8-10 ms a move). Layout and style only: nothing is clipped, menus still hang over. */
 .inv-col, .inv-gridbox, .inv-armed, .inv-slots, .doll-col, .inv-ground, .inv-hot, .inv-help { contain: layout style; }
+
+/* painted once at nearly nothing before it is first opened (InventoryUI.paintAhead), and nothing on it can be pointed at */
+.inv.ahead { opacity: 0.004; pointer-events: none; }
+.inv.ahead * { pointer-events: none !important; }
