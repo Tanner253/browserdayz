@@ -10,36 +10,41 @@ const LOCK = path.join(os.tmpdir(), 'zona-card.lock');
 // (the holder writes the lock again every minute; one not written for five is left by a run that was killed)
 const BEAT_MS = 60_000, STALE_MS = 5 * 60_000;
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
-const read = () => { try { return JSON.parse(fs.readFileSync(LOCK, 'utf8')); } catch { return null; } };
+const read = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 
 /** waits until no other headless run holds the card, then holds it until this process ends */
 export async function takeCard(label) {
   if (process.env.PLAY_LOCK === '0') return;
+  return takeLock(LOCK, label, 'the graphics card', ' (PLAY_LOCK=0 runs alongside)');
+}
+
+/** the same wait for any one-at-a-time thing (test-all: two suites at once share ports and hang) */
+export async function takeLock(LOCK, label, what, hint = '') {
   let told = 0;
   for (;;) {
     const at = Date.now();
     try {
       fs.writeFileSync(LOCK, JSON.stringify({ pid: process.pid, label, since: at, at }), { flag: 'wx' });
       setInterval(() => {
-        const held = read();
+        const held = read(LOCK);
         if (held?.pid === process.pid) fs.writeFileSync(LOCK, JSON.stringify({ ...held, at: Date.now() }));
       }, BEAT_MS).unref();
-      process.on('exit', () => { if (read()?.pid === process.pid) try { fs.rmSync(LOCK); } catch { /* gone */ } });
+      process.on('exit', () => { if (read(LOCK)?.pid === process.pid) try { fs.rmSync(LOCK); } catch { /* gone */ } });
       return;
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
     }
-    const held = read();
+    const held = read(LOCK);
     let stale = held ? !alive(held.pid) || at - held.at > STALE_MS : false;
     // (a lock that cannot be read and is not new was half written by a run that died)
     if (!held) try { stale = at - fs.statSync(LOCK).mtimeMs > 5000; } catch { continue; }
     if (stale) {
-      if (JSON.stringify(read()) === JSON.stringify(held)) try { fs.rmSync(LOCK); } catch { /* taken already */ }
+      if (JSON.stringify(read(LOCK)) === JSON.stringify(held)) try { fs.rmSync(LOCK); } catch { /* taken already */ }
       continue;
     }
     if (held && at - told > 30_000) {
       told = at;
-      console.log(`waiting for the graphics card: ${held.label} (pid ${held.pid}) has had it ${Math.round((at - held.since) / 1000)} s (PLAY_LOCK=0 runs alongside)`);
+      console.log(`waiting for ${what}: ${held.label} (pid ${held.pid}) has had it ${Math.round((at - held.since) / 1000)} s${hint}`);
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
