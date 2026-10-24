@@ -586,10 +586,7 @@ export function over(me: string, them: string): boolean {
   const roles = ADMIN.state.roles;
   if (LOCAL_ADMIN || me === them || !roles[them]) return true;
   if (!roles[me]) return false;
-  // (a password role is marked by its own hash for who gave it, which no player's name can be; one from before the marks
-  // by the word alone, given before the old server could hand out another's role under the name "password")
-  const top = (k: string) => roles[k]?.role === 'admin' && roles[k].by === 'password' && (roles[k].up === k || (!roles[k].up && roles[k].at < RANKS_FROM));
-  if (top(them)) return false;
+  if (topRole(them)) return false;
   const seen = new Set<string>();
   for (let k: string | undefined = them; k && !seen.has(k); ) {
     seen.add(k);
@@ -600,8 +597,19 @@ export function over(me: string, them: string): boolean {
     if (up === me) return true;
     k = up;
   }
-  return top(me);
+  return topRole(me);
 }
+/**
+ * Whether a role is the top of the line: an admin by the password. A password role is marked by its own hash for who
+ * gave it, which no player's name can be; one from before the marks by the word alone, given before the old server
+ * could hand out another's role under the name "password".
+ */
+function topRole(k: string) {
+  const r = ADMIN.state.roles[k];
+  return r?.role === 'admin' && r.by === 'password' && (r.up === k || (!r.up && r.at < RANKS_FROM));
+}
+/** whether somebody is at the top of the line (the owner, and nobody they made: see `over`) */
+export const isTop = (c: Client) => LOCAL_ADMIN || topRole(keyHash(c.key));
 export const outranks = (c: Client, t: Client) => over(keyHash(c.key), keyHash(t.key));
 /** whether somebody leaves a dog tag, where an admin above them has set it (and they still have a role for it to bind), else undefined */
 export const tagLock = (key: string): boolean | undefined => {
