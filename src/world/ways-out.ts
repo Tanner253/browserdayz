@@ -113,8 +113,17 @@ export function clearWaysOut(world: World, planOf: (plot: BuildingPlot) => Bluep
   return moved;
 }
 
-/** how far round a basement's open steps nothing may stand, metres */
-const KERB = 0.6;
+/**
+ * How far round a basement's open steps nothing may stand, metres: along their sides; past their deep end; and before
+ * their head, where whoever goes down comes to them (its +z: the steps rise toward it, src/sim/basements.ts)
+ */
+export const WELL_CLEAR = { side: 0.6, back: 1.5, head: 2.2 };
+
+/** whether a thing reaching r from a place stands on, over or before the way down to a basement (in its frame) */
+export function inWellWay(b: { x: number; z: number; rot: number; well: { x0: number; x1: number; z0: number; z1: number } }, x: number, z: number, r: number): boolean {
+  const c = Math.cos(b.rot), s = Math.sin(b.rot), dx = x - b.x, dz = z - b.z, lx = dx * c - dz * s, lz = dx * s + dz * c, W = b.well, C = WELL_CLEAR;
+  return lx > W.x0 - C.side - r && lx < W.x1 + C.side + r && lz > W.z0 - C.back - r && lz < W.z1 + C.head + r;
+}
 
 /**
  * Nothing on, over or before the way down to a basement (the owner, 2026-10-23: "make sure no ground lootable
@@ -134,19 +143,15 @@ export function clearWells(world: World, boxes: Record<string, Box>, points: Loo
     return Math.abs(dx * c - dz * s) < w / 2 && Math.abs(dx * s + dz * c) < d / 2;
   });
   /** the well a thing of reach r at a place is in (out of doors and at the ground, not down in a cellar), if any */
-  const wellAt = (x: number, y: number, z: number, r: number) => wells.find((b) => {
-    if (Math.abs(x - b.x) > 30 || Math.abs(z - b.z) > 30 || y < b.well.top - 1) return false;
-    const [lx, lz] = frame(b, x, z), W = b.well;
-    return lx > W.x0 - KERB - r && lx < W.x1 + KERB + r && lz > W.z0 - KERB - r && lz < W.z1 + KERB + r;
-  });
+  const wellAt = (x: number, y: number, z: number, r: number) => wells.find((b) => Math.abs(x - b.x) < 30 && Math.abs(z - b.z) < 30 && y > b.well.top - 1 && inWellWay(b, x, z, r));
   const ground = (x: number, z: number) => heightAt(world.heights, x, z);
   let moved = 0;
   const slide = (x: number, y: number, z: number, r: number, free: (x: number, z: number) => boolean): V | null => {
     const b = wellAt(x, y, z, r);
     if (!b) return null;
-    const [lx, lz] = frame(b, x, z), W = b.well, edge = KERB + r + 0.1;
+    const [lx, lz] = frame(b, x, z), W = b.well, C = WELL_CLEAR, e = r + 0.1;
     // (across the nearer edge first, a little further each time)
-    const outs: [number, number][] = [[W.x0 - edge - lx, 0], [W.x1 + edge - lx, 0], [0, W.z0 - edge - lz], [0, W.z1 + edge - lz]].sort((p, q) => Math.hypot(...p) - Math.hypot(...q)) as [number, number][];
+    const outs: [number, number][] = [[W.x0 - C.side - e - lx, 0], [W.x1 + C.side + e - lx, 0], [0, W.z0 - C.back - e - lz], [0, W.z1 + C.head + e - lz]].sort((p, q) => Math.hypot(...p) - Math.hypot(...q)) as [number, number][];
     for (const extra of [0, 0.5, 1, 2, 3]) for (const [ox, oz] of outs) {
       const [dx, dz] = back(b, ox + Math.sign(ox) * extra, oz + Math.sign(oz) * extra);
       if (!wellAt(x + dx, y, z + dz, r) && free(x + dx, z + dz)) return [dx, dz];
