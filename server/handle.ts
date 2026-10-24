@@ -2,7 +2,7 @@
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
 import { bagGrid, holdOnlyEmpties } from '../src/sim/inventory';
-import { ITEMS, GEAR_SLOTS, holds, makeItem, TAG_HOLD, type ItemInstance } from '../src/sim/items';
+import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/sim/items';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
@@ -10,7 +10,7 @@ import { THROWN, LAUNCHED, pullPin, letGo, judge, launch } from '../src/sim/gren
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
 import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
-import { infectedDrop, INFECTED, guarded } from '../src/sim/infected';
+import { INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
@@ -34,14 +34,15 @@ const LYING_REACH = 4;
 const storedOf = (item: ItemInstance): StoredItem[] => (item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
 import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { shotHeard } from '../src/sim/heard';
-import { ajar, findCarried, hurtJeep, kill, leaveSeat, rackChanged, releaseLock, seatOf } from './acts';
+import { ajar, findCarried, hurtJeep, infectedBody, kill, leaveSeat, rackChanged, releaseLock, seatOf } from './acts';
 import { scores } from './queue';
 import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { pinned } from './pinned';
 import { stashBuriedNear } from './stash-sight';
-import { changed, contents } from './storages';
+import { changed, contents, hidden } from './storages';
+import { espAnswer, espRows } from './esp';
 import { aimWatch, looked } from './aimwatch';
 
 /** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
@@ -318,13 +319,11 @@ export function handle(c: Client, m: C2S) {
       }
       const r = horde.hurt(m.i, amount, now);
       if (!r) return;
-      if (r.dead) {
-        // what it had on it falls where it does
-        const had = infectedDrop();
-        if (had) economy.drop(makeItem(had[0], had[1]), b.s[0] + (Math.random() - 0.5) * 0.8, b.s[1] + 0.03, b.s[2] + (Math.random() - 0.5) * 0.8, Math.random() * Math.PI * 2);
-      }
       const len = Math.max(0.001, Math.hypot(b.s[0] - c.pose[0], b.s[2] - c.pose[2]));
-      broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir: [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len], melee: !!rule.melee && !rule.blast });
+      const dir: [number, number] = [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len];
+      // (what it had on it is in its body)
+      const body = r.dead ? infectedBody(b, dir) : undefined;
+      broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir, melee: !!rule.melee && !rule.blast, ...(body ? { body } : {}) });
       return;
     }
     case 'iatk': {
@@ -677,6 +676,13 @@ export function handle(c: Client, m: C2S) {
       c.logoutAt = Date.now() + LOGOUT_MS;
       c.logoutFrom = [c.pose[0], c.pose[2]];
       return void send(c, { t: 'logout', left: Math.round(LOGOUT_MS / 1000) });
+    }
+    case 'esp': {
+      // an admin's far sight, about wherever their view is (server/esp.ts)
+      const x = num(m.x) ? m.x : c.pose[0], z = num(m.z) ? m.z : c.pose[2];
+      const l = espAnswer(c, roleOf(c), Date.now(), () => espRows(economy.loot.values(), boxes.values(), x, z, hidden));
+      if (l) send(c, { t: 'esp', l });
+      return;
     }
     case 'adm': {
       const role = roleOf(c), now = Date.now();

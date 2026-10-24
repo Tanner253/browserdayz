@@ -23,7 +23,7 @@ import { JEEP } from '../../sim/vehicles';
 import { Jeep } from '../vehicle';
 import { BACK_SHORT } from '../../ui/updates';
 import { renderDoll } from '../../ui/icons';
-import { INFECTED } from '../../sim/infected';
+import { INFECTED, INFECTED_GRID } from '../../sim/infected';
 import { cashedTags, setPinned } from '../../ui/rewards';
 import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
@@ -36,6 +36,17 @@ function searched(g: Game, at: THREE.Vector3): 'hard' | 'soft' | null {
   if ([...g.drops.values()].some((d) => near(d.stash))) return 'hard';
   if (g.loot.stashes.some((s) => !s.buried && near(s)) || [...g.corpses.values()].some((c) => near(c.stash))) return 'soft';
   return [...g.economy.loot.values()].some((l) => holds(l.item.id) && near(l)) ? 'soft' : null;
+}
+
+/**
+ * The box to search on a body is where the body lies: behind where they stood if they went over backwards, ahead if
+ * they went down on their face, beside it if they folded up. @returns how far ahead and to the left that is
+ */
+export function searchedAt(stash: Stash, v: number): [number, number] {
+  const [ahead, left] = DEATH_REST[v] ?? DEATH_REST[0];
+  if (v === 2) stash.trigger(0.6, 0.25, 0.6, -ahead, left);
+  else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
+  return [ahead, left];
 }
 
 export const onlineMethods = {
@@ -164,6 +175,7 @@ export const onlineMethods = {
     this.bunker.setOpen(false, true);
     this.garage.clear();
     this.horde.clear();
+    this.horde.laidAs.clear();
     this.party.set([], 0);
     this.hud.setLive(false);
   },
@@ -243,7 +255,11 @@ export const onlineMethods = {
     net.on('i-', (m) => this.horde.remove(m.i));
     net.on('iown', (m) => this.horde.own(m.i, m.to));
     net.on('is', (m) => this.horde.states(m.s, performance.now()));
-    net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee));
+    net.on('esp', (m) => (this.espLoot = this.lootWanted ? m.l : []));
+    net.on('ihp', (m) => {
+      this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee);
+      if (m.body) void this.addCorpse(m.body);
+    });
     net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
     net.on('shot', (m) => {
       this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle(), this.remotes.get(m.id));
@@ -824,6 +840,15 @@ export const onlineMethods = {
   /** @param wait ms to let the fall animation of the player finish before the body appears (none for one that rode a helicopter down) */
   async addCorpse(this: Game, c: CorpseInfo, wait = 1800) {
     if (this.corpses.has(c.uid)) return;
+    // One of the infected's, with something on it (server/bodies.ts): searched where its body lies, which they draw
+    if (c.zed !== undefined) {
+      const b = this.horde.lying(c.zed, c.v ?? 0);
+      const stash = new Stash(c.uid, b?.pos.x ?? c.x, b?.pos.y ?? c.y, b?.pos.z ?? c.z, b?.yaw ?? c.rot, INFECTED_GRID[0], INFECTED_GRID[1], 'Infected');
+      stash.corpse = true;
+      searchedAt(stash, b ? b.variant : c.v ?? 0);
+      this.corpses.set(c.uid, { stash });
+      return;
+    }
     // Where somebody died is where their feet were, and that can be in the air (a jump, a fall, a roof's edge): the
     // body lies on whatever is under that place, and along it if it slopes. ("dead bodies somtimes hover above the
     // ground", 2026-10-12. Every game works this out the same, from the same ground.)
@@ -840,12 +865,8 @@ export const onlineMethods = {
     stash.corpse = true;
     // (dog tags lie on a body, and are taken off it: see Container.refusal)
     stash.container.tagsHere = true;
-    // the box to search is where the body lies: behind where they stood if they went over
-    // backwards, ahead if they went down on their face, beside it if they folded up
     const v = c.v ?? 0;
-    const [ahead, left] = DEATH_REST[v] ?? DEATH_REST[0];
-    if (v === 2) stash.trigger(0.6, 0.25, 0.6, -ahead, left);
-    else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
+    const [ahead, left] = searchedAt(stash, v);
     const body = new CorpseBody();
     this.corpses.set(c.uid, { stash, body });
     if (wait) await new Promise((r) => setTimeout(r, wait));
@@ -861,7 +882,7 @@ export const onlineMethods = {
     if (this.openStash === c.stash) this.toggleInventory(false);
     physics.tags.delete(c.stash.collider.handle);
     physics.world.removeCollider(c.stash.collider, false);
-    c.body.dispose();
+    c.body?.dispose();
     this.corpses.delete(uid);
   },
 

@@ -10,19 +10,36 @@ import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import { SEA_LEVEL, heightAt } from '../../world/worldgen';
 import { drinkable, type Drink } from '../../sim/water';
-import { type ItemInstance, ITEMS, isBag } from '../../sim/items';
+import { type Category, type ItemInstance, ITEMS, isBag } from '../../sim/items';
+import { ESP_AT } from '../../net/protocol';
 import { RemotePlayer } from '../remote';
 import type { UseKind } from '../weapons';
 import { WorldItem, Stash } from '../loot';
 import { Jeep } from '../vehicle';
 import { JEEP } from '../../sim/vehicles';
-import type { HUD } from '../../ui/hud';
+import type { EspKind, HUD } from '../../ui/hud';
 import type { MapPerson } from '../../ui/bigmap';
 import type { AdminSelf, AdminLook } from '../../ui/admin-ui';
 import { type Well, WELL } from '../../sim/wells';
 import { Infected } from '../infected';
 import { castleUnder } from '../../sim/castle';
 import { ESP_FAR, ESP_NEAR, ESP_SIZE, HOT_CODES, HOT_FREE, _lampPos, type Game } from '../game';
+
+/**
+ * A body lying within a pace or two of a point: nothing of a body stops the view, so it is found by where the view
+ * falls. Its number for /delbody (a body's uid; one of the infected's own number), and what it is, in words.
+ */
+function bodyNear(g: Game, at: { x: number; y: number; z: number }): { n: string; what: string } | null {
+  const near = (x: number, y: number, z: number) => (x - at.x) ** 2 + (y - at.y) ** 2 + (z - at.z) ** 2 < 1.8 * 1.8;
+  for (const [uid, c] of g.corpses) if (near(c.stash.x, c.stash.y, c.stash.z)) return { n: uid, what: c.body ? c.stash.label : 'the body of one of the infected' };
+  for (const b of g.horde.all.values()) if (b.dead && near(b.pos.x, b.pos.y, b.pos.z)) return { n: String(b.i), what: 'the body of one of the infected' };
+  return null;
+}
+
+/** an admin's far sight of the things lying about: the colour of each by what sort of thing it is (hud.css) */
+const LOOT_KIND: Partial<Record<Category, EspKind>> = { weapon: 'gun', melee: 'gun', ammo: 'ammo', magazine: 'ammo', attachment: 'ammo', medical: 'med', clothing: 'gear', food: 'food', drink: 'food' };
+/** what a thing is in, said before it (one on the ground, or put away in furniture, is said by itself) */
+const HELD_IN: Record<number, string> = { [ESP_AT.body]: 'Body', [ESP_AT.crate]: 'Crate', [ESP_AT.stash]: 'Stash', [ESP_AT.buried]: 'Buried stash', [ESP_AT.drop]: 'Supply drop' };
 
 export const handsMethods = {
   // ------------------------------------------------------------ inventory ops
@@ -180,7 +197,7 @@ export const handsMethods = {
   },
 
   adminSelf(this: Game): AdminSelf {
-    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
+    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, loot: this.lootWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
   },
 
   showPowers(this: Game) {
@@ -270,6 +287,8 @@ export const handsMethods = {
     else if (o instanceof Jeep) line = `/del car ${o.i}`;
     else if (o instanceof Infected) line = `/del z ${o.i}`;
     else if (o instanceof RemotePlayer) return void this.hud.note(`That is ${o.name}: a player is kicked from the panel, not taken away`, 'warn');
+    const body = !line && hit ? bodyNear(this, hit.point) : null;
+    if (body) line = `/delbody ${body.n}`;
     if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car or one of the infected', 'info');
     this.order(line);
   },
@@ -285,10 +304,12 @@ export const handsMethods = {
     const o = hit.tag?.owner, body = o instanceof Jeep || o instanceof Infected || o instanceof RemotePlayer;
     // (level enough to stand a thing on, and not somebody or something that moves; if not, a pace and a half short of it)
     const flat = !body && hit.normal.y > 0.7, back = flat ? 0 : 1.5;
+    const lying = body ? null : bodyNear(this, hit.point);
     return {
       x: hit.point.x - dir.x * back, y: hit.point.y, z: hit.point.z - dir.z * back, dist: hit.toi, flat,
-      what: o instanceof Jeep ? `car number ${o.i}` : o instanceof Infected ? 'one of the infected' : o instanceof RemotePlayer ? o.name : flat ? 'the ground' : 'a wall or a slope',
+      what: o instanceof Jeep ? `car number ${o.i}` : o instanceof Infected ? 'one of the infected' : o instanceof RemotePlayer ? o.name : lying ? lying.what : flat ? 'the ground' : 'a wall or a slope',
       ...(o instanceof Jeep ? { car: o.i } : {}),
+      ...(lying ? { body: lying.n } : {}),
     };
   },
 
@@ -321,7 +342,8 @@ export const handsMethods = {
    * HUD. (It is left in sight now: see `#hud.hidden` in hud.css.) And it was never on while flying.
    */
   drawNames(this: Game, cam: THREE.PerspectiveCamera) {
-    if (this.role !== 'admin' || !this.started || !this.namesWanted) {
+    const names = this.namesWanted, loot = this.lootWanted;
+    if (this.role !== 'admin' || !this.started || (!names && !loot)) {
       if (this.namesOn) this.hud.esp([]);
       this.namesOn = false;
       return;
@@ -329,26 +351,51 @@ export const handsMethods = {
     this.namesOn = true;
     // (blood and flags come with the panel's lists: asked for every three seconds while this is up)
     const now = performance.now();
-    if (this.online && now - this.espAsked > 3000) {
+    if (names && this.online && now - this.espAsked > 3000) {
       this.espAsked = now;
       this.net.send({ t: 'adm' });
     }
+    // (and what lies about the view, every second, from the server alone: server/esp.ts)
+    if (loot && this.online && now - this.lootAsked > 1000) {
+      this.lootAsked = now;
+      this.net.send({ t: 'esp', x: Math.round(cam.position.x), z: Math.round(cam.position.z) });
+    }
     const out: Parameters<HUD['esp']>[0] = [], v = new THREE.Vector3();
-    const label = (name: string, at: THREE.Vector3, up: number, kind: '' | 'dead' | 'ghost' | 'me', more: string) => {
+    const label = (name: string, at: THREE.Vector3, up: number, kind: EspKind, more: string, near = ESP_NEAR, far = ESP_FAR) => {
       const d = at.distanceTo(cam.position);
       v.set(at.x, at.y + up, at.z).project(cam);
       if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
       const x = v.x * 0.5 + 0.5, y = -v.y * 0.5 + 0.5;
       // (the farther off, the smaller the lettering, down to what can still be read; and no bigger than this, however near)
-      const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / ESP_NEAR) / Math.log(ESP_FAR / ESP_NEAR), 0, 1);
+      const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / near) / Math.log(far / near), 0, 1);
       out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size: Math.round(size * 2) / 2, kind });
     };
-    for (const r of this.remotes.values()) {
+    // (2026-10-23: "ESP for items on the ground (think cheat mode)": under the names, which are drawn over them, and
+    // small soon, a street's worth of them being a crowd of words. One that would lie over a nearer one on the screen
+    // is counted on that one, "2 more", and not drawn: they come apart as the view comes nearer.)
+    if (loot) {
+      const at = new THREE.Vector3(), wide = innerWidth, tall = innerHeight;
+      const shown: { l: number; r: number; t: number; b: number; k: number; more: number }[] = [];
+      for (const [x, y, z, what, n, where] of this.espLoot) {
+        const it = ITEMS[what], name = it?.name ?? what, held = HELD_IN[where], k = out.length;
+        label(held ? `${held}: ${name}${n > 1 ? ` +${n - 1}` : ''}` : `${name}${n > 1 ? ` ×${n}` : ''}`, at.set(x, y, z), 0.3, held ? 'box' : (it && LOOT_KIND[it.category]) || 'item', where === ESP_AT.furniture ? ' · put away' : '', 4, 60);
+        const q = out[k];
+        if (!q) continue;
+        const half = q.name.length * q.size * 0.31, px = q.x * wide, py = q.y * tall, high = q.size * 2.3;
+        const under = shown.find((o) => px + half > o.l && px - half < o.r && py > o.t && py - high < o.b);
+        if (under) {
+          under.more++;
+          out.pop();
+        } else shown.push({ l: px - half, r: px + half, t: py - high, b: py, k, more: 0 });
+      }
+      for (const o of shown) if (o.more) out[o.k].sub += ` · ${o.more} more`;
+    }
+    if (names) for (const r of this.remotes.values()) {
       const q = this.admPlayers.get(r.id);
       label(r.name, r.pos, r.alive ? 1.95 : 0.5, !r.alive ? 'dead' : r.ghost ? 'ghost' : '', `${r.alive ? (q?.hp !== undefined ? ` · ${Math.round(q.hp)} hp` : '') : ' · dead'}${r.ghost ? ' · vanished' : ''}${q?.flags ? ` · ${q.flags} flags` : ''}`);
     }
     // (their own body, when the view has left it)
-    if (this.freecam) label('your body', this.player.pos, 1.95, 'me', '');
+    if (names && this.freecam) label('your body', this.player.pos, 1.95, 'me', '');
     this.hud.esp(out);
   },
 
