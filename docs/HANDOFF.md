@@ -30,11 +30,13 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
   802 characters and 133 stashes kept across the restart). `site-live` and `hotfix` point there too. Changelog
   entry `#animals-shot`. (The release before, 13:29 UTC, was `613f731d`, PROTOCOL 62.)
 - **Working branch: `battle-royale`** (the name is historical: it holds everything, ZONA, Arena and Battle Royale).
-  Past the live commit, NOT LIVE (the owner, 2026-10-24 evening, players on: "no server restarts for now just front
-  end things"): the inventory's Carried strip shorter (`9fa681d9`, page only); raw meat does harm and food's card
-  says what it does as it is now, harm in red (`d63d35e4`, page only); animals kept on the land, a herd leaving after
-  a kill, deer grazing in place, animals drawn and told to 500 m (`ccc9189a`, SERVER side: the next server release).
-  PROTOCOL is still 63: a site-only deploy works, the animal part simply waits for the server.
+  SITE LIVE from `8f3dfe25` (site-only, 2026-10-24 evening; `site-live` there, server and `main` still `8ac66d29`): the
+  physics file asked for again if its download fails (a Mac on Safari could not start on a slow line: /api/boot
+  showed "Load failed" at the assets stage), Carried's strip shorter, raw meat's harm and food's card as it is now,
+  "food" for energy, sprats no longer drying, saline giving water. Changelog `#safari-carried-food`.
+  On the branch, SERVER side, NOT LIVE (the owner, players on: "no server restarts for now just front end things"):
+  animals kept on the land, a herd leaving after a kill, deer grazing in place, animals told to 500 m (`ccc9189a`);
+  food rarer in the loot (`46560206`). PROTOCOL 63 still: the next server release takes them.
 - **In that release (2026-10-24 afternoon)**: animals could not be shot on live: each one's hitbox stayed
   where its model loaded (`bodyAt` began as NaN, and no comparison with NaN is true: `src/game/animals.ts`), fixed.
   Grenades (thrown and dropped from a dead hand), cars and every gun now hurt animals (`animalHit`, `animalsBlast` in
