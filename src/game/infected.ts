@@ -62,7 +62,7 @@ export interface HordeHost {
 const INTERP_DELAY = 210;
 /** drawn and moved in full within this of the eye; past it they are not there to be seen */
 const DRAWN = 150;
-/** seconds of posing after which a body has done falling (the longest fall is under two) */
+/** seconds of posing after which a body has done falling (the longest fall, the backwards one, takes 2.1) */
 const SETTLED = 4;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();

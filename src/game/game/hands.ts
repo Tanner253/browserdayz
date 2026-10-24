@@ -361,22 +361,34 @@ export const handsMethods = {
       this.net.send({ t: 'esp', x: Math.round(cam.position.x), z: Math.round(cam.position.z) });
     }
     const out: Parameters<HUD['esp']>[0] = [], v = new THREE.Vector3();
-    const label = (name: string, at: THREE.Vector3, up: number, kind: EspKind, more: string, scale = 1) => {
+    const label = (name: string, at: THREE.Vector3, up: number, kind: EspKind, more: string, near = ESP_NEAR, far = ESP_FAR) => {
       const d = at.distanceTo(cam.position);
       v.set(at.x, at.y + up, at.z).project(cam);
       if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
       const x = v.x * 0.5 + 0.5, y = -v.y * 0.5 + 0.5;
       // (the farther off, the smaller the lettering, down to what can still be read; and no bigger than this, however near)
-      const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / ESP_NEAR) / Math.log(ESP_FAR / ESP_NEAR), 0, 1);
-      out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size: Math.round(size * scale * 2) / 2, kind });
+      const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / near) / Math.log(far / near), 0, 1);
+      out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size: Math.round(size * 2) / 2, kind });
     };
-    // (2026-10-23: "ESP for items on the ground (think cheat mode)": under the names, which are drawn over them)
+    // (2026-10-23: "ESP for items on the ground (think cheat mode)": under the names, which are drawn over them, and
+    // small soon, a street's worth of them being a crowd of words. One that would lie over a nearer one on the screen
+    // is counted on that one, "2 more", and not drawn: they come apart as the view comes nearer.)
     if (loot) {
-      const at = new THREE.Vector3();
+      const at = new THREE.Vector3(), wide = innerWidth, tall = innerHeight;
+      const shown: { l: number; r: number; t: number; b: number; k: number; more: number }[] = [];
       for (const [x, y, z, what, n, where] of this.espLoot) {
-        const it = ITEMS[what], name = it?.name ?? what, held = HELD_IN[where];
-        label(held ? `${held}: ${name}${n > 1 ? ` +${n - 1}` : ''}` : `${name}${n > 1 ? ` ×${n}` : ''}`, at.set(x, y, z), 0.3, held ? 'box' : (it && LOOT_KIND[it.category]) || 'item', where === ESP_AT.furniture ? ' · put away' : '', 0.85);
+        const it = ITEMS[what], name = it?.name ?? what, held = HELD_IN[where], k = out.length;
+        label(held ? `${held}: ${name}${n > 1 ? ` +${n - 1}` : ''}` : `${name}${n > 1 ? ` ×${n}` : ''}`, at.set(x, y, z), 0.3, held ? 'box' : (it && LOOT_KIND[it.category]) || 'item', where === ESP_AT.furniture ? ' · put away' : '', 4, 60);
+        const q = out[k];
+        if (!q) continue;
+        const half = q.name.length * q.size * 0.31, px = q.x * wide, py = q.y * tall, high = q.size * 2.3;
+        const under = shown.find((o) => px + half > o.l && px - half < o.r && py > o.t && py - high < o.b);
+        if (under) {
+          under.more++;
+          out.pop();
+        } else shown.push({ l: px - half, r: px + half, t: py - high, b: py, k, more: 0 });
       }
+      for (const o of shown) if (o.more) out[o.k].sub += ` · ${o.more} more`;
     }
     if (names) for (const r of this.remotes.values()) {
       const q = this.admPlayers.get(r.id);
