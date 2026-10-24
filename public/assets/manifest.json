@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T05:39:57.388Z",
+ "generated": "2026-10-24T06:06:32.250Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12650,6 +12650,10 @@
     "run": 7.32,
     "trot": 4.39,
     "walk": 0.94
+   },
+   "strikes": {
+    "swipe": 0.98,
+    "bite": 1.88
    }
   },
   "animal_cow": {
