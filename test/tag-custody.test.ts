@@ -71,12 +71,12 @@ let checks = 0, failed: unknown = null;
 try {
   for (let k = 0; k < 600 && !logged.includes('listening'); k++) await sleep(100);
   assert.ok(logged.includes('listening'), `the server did not start:\n${logged.slice(-600)}`);
-  const ann = new Player('Ann'), bob = new Player('Bob'), dan = new Player('Dan'), eve = new Player('Eve'), fay = new Player('Fay');
-  for (const p of [ann, bob, dan, eve, fay]) await p.join();
-  const spot = new Map([[ann, 30], [bob, 31], [dan, 32], [eve, 33], [fay, 34]]);
+  const ann = new Player('Ann'), bob = new Player('Bob'), dan = new Player('Dan'), eve = new Player('Eve'), fay = new Player('Fay'), gus = new Player('Gus');
+  for (const p of [ann, bob, dan, eve, fay, gus]) await p.join();
+  const spot = new Map([[ann, 30], [bob, 31], [dan, 32], [eve, 33], [fay, 34], [gus, 35]]);
   for (let t = 0; t < 2400; t += 400) {
     for (const [p, x] of spot) p.say(x);
-    for (const p of [dan, eve, fay]) p.carry();
+    for (const p of [dan, eve, fay, gus]) p.carry();
     await sleep(400);
   }
 
@@ -199,6 +199,35 @@ try {
   assert.ok(cashedIn('Bob', 'Fay'), `a tag taken out of a pack lying on the ground, and held, was not cashed in:\n${logged.slice(-800)}`);
   checks++;
   console.log('  ok  a tag dropped in a pack and taken out of it where it lies is the taker\'s, and is cashed in once held');
+
+  // ---- Gus's tag, thrown (2026-10-23, server/throws.ts): a throw too weak for where it is said to have come down is not
+  // believed, and the tag is still Ann's; a full one is, the tag lies on the ground for everybody and is hers no more
+  const tGus: Tag = { uid: 'own-Gus', id: 'dogtag', qty: 1, owner: 'Gus' };
+  const gBody = await kill(gus);
+  await takeOff(gBody, tGus, []);
+  ann.say(30);
+  await sleep(300);
+  const hand: [number, number, number] = [30, ground(30, 0) + 1.4, 0], far = { uid: tGus.uid, item: tGus, x: 45, y: ground(45, 0), z: 0, rot: 0, point: -1, spawnedAt: 0 };
+  bob.got.length = 0;
+  ann.send({ t: 'toss', uid: tGus.uid, id: 'dogtag', o: hand, v: [4, 2, 0], pw: 0.1 });
+  await sleep(300);
+  ann.send({ t: 'drop', l: far });
+  await sleep(400);
+  assert.ok(logged.includes('Ann threw Dog Tag further than the throw carries'), `a throw too weak for where it came down was believed:\n${logged.slice(-800)}`);
+  assert.ok(!bob.got.some((m) => m.t === 'loot+' && m.l.uid === tGus.uid), 'a tag thrown too weakly for where it was said to lie lies there for everybody');
+  ann.send({ t: 'toss', uid: tGus.uid, id: 'dogtag', o: hand, v: [13, 2, 0], pw: 1 });
+  await sleep(300);
+  ann.send({ t: 'drop', l: far });
+  for (let k = 0; k < 40 && !bob.got.some((m) => m.t === 'loot+' && m.l.uid === tGus.uid); k++) await sleep(50);
+  assert.ok(bob.got.some((m) => m.t === 'tossed' && m.by === ann.id && m.id === 'dogtag'), 'Bob, beside her, was not shown the throw');
+  assert.ok(bob.got.some((m) => m.t === 'loot+' && m.l.uid === tGus.uid && Math.abs(m.l.x - 45) < 0.01), 'a tag thrown hard enough does not lie where it came down');
+  ann.carry([tGus]);
+  await sleep(HOLD_S * 1000 + 600);
+  ann.carry([{ ...tGus, held: 99999 }]);
+  await cash(ann, tGus);
+  assert.ok(!cashedIn('Ann', 'Gus'), `a tag thrown to the ground was cashed in from the pockets:\n${logged.slice(-800)}`);
+  checks++;
+  console.log('  ok  a tag thrown too weakly for where it came down is not believed there; thrown hard enough it lies there, is shown, and is the thrower\'s no more');
 } catch (e) {
   failed = e;
 } finally {

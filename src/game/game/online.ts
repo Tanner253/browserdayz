@@ -176,6 +176,7 @@ export const onlineMethods = {
     this.garage.clear();
     this.horde.clear();
     this.horde.laidAs.clear();
+    this.throwing.clear();
     this.party.set([], 0);
     this.hud.setLive(false);
   },
@@ -256,6 +257,7 @@ export const onlineMethods = {
     net.on('iown', (m) => this.horde.own(m.i, m.to));
     net.on('is', (m) => this.horde.states(m.s, performance.now()));
     net.on('esp', (m) => (this.espLoot = this.lootWanted ? m.l : []));
+    net.on('tossed', (m) => this.throwing.seen(m.id, m.o, m.v));
     net.on('ihp', (m) => {
       this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee);
       if (m.body) void this.addCorpse(m.body);

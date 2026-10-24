@@ -44,6 +44,7 @@ import { pinned } from './pinned';
 import { stashBuriedNear } from './stash-sight';
 import { changed, contents, hidden } from './storages';
 import { espAnswer, espRows } from './esp';
+import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
 
 /** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
@@ -463,7 +464,9 @@ export function handle(c: Client, m: C2S) {
       const l = m.l;
       const item = cleanItem(l?.item);
       if (!item || !num(l.x) || !num(l.y) || !num(l.z) || !num(l.rot) || economy.loot.has(item.uid)) return;
-      if (Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > 12) return;
+      // (within reach of where they stand; or thrown there, no further than that throw carries it: server/throws.ts)
+      const land = landing(c, item.uid, [l.x, l.y, l.z], world.groundAt, Date.now());
+      if (land === 'free' ? Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > 12 : land !== 'ok') return void (land !== 'free' && log(`${c.name} threw ${ITEMS[item.id]?.name ?? item.id} ${land}: not let through`));
       if (CHECKS !== 'off' && [...things({ slots: { it: item }, active: null, containers: [] })].some(invented) && flag(c, `put down ${ITEMS[item.id].name}, which the server never put in the world`)) return;
       // (a tag is put down only by whoever holds it, and is then on the ground and theirs no more: custody.ts)
       const tags = payingTags(item);
@@ -471,6 +474,13 @@ export function handle(c: Client, m: C2S) {
       for (const t of tags) wentFrom(c.key, t.uid, 'g');
       if (tags.length) takeOut(c.inv, new Set(tags.map((t) => t.uid)));
       economy.drop(item, l.x, l.y, l.z, l.rot);
+      return;
+    }
+    case 'toss': {
+      // something thrown from the hands: believed from where they stand and no faster than its power throws it, and shown to whoever is near
+      if (!c.alive || c.seatAt || typeof m.id !== 'string' || !ITEMS[m.id]) return;
+      const t = tossed(c, m.uid, m.o, m.v, m.pw, [c.pose[0], c.pose[1], c.pose[2]], Date.now());
+      if (t) broadcastNear({ t: 'tossed', by: c.id, id: findCarried(c, m.uid)?.id ?? m.id, o: m.o, v: m.v }, c.pose[0], c.pose[2], 160, c);
       return;
     }
     case 'copen': {
