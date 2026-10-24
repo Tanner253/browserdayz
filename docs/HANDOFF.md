@@ -7,7 +7,8 @@ Visual quality first; build cheap (heli flight replay.mjs owner-run-2.json, 114.
 owner: "small frame cost is to be expected ... we will have to do optimizations after the fact"). Never change the
 ground around buried stashes or build on them; never raise WORLD_REV. The onboarding session reviews each session's pictures
 before they go to the owner. No corners cut (the owner: "We should not have cut any corners on anything"): a "not done"
-list is finished before a feature is called done. Status as of 2026-10-23 evening:
+list is finished before a feature is called done. But once it is up to standard, move on (the owner, 2026-10-24: "i dont
+want half baked things making it in but we also dont need to spend extra money and usage over polishing and analyzing"). Status as of 2026-10-23 evening:
 - LIVE 2026-10-24 ~08:30 UTC: site, server and `main` from 4393197a (release-1023, PROTOCOL 61, boot f2951bc5, 798
   characters and 138 stashes kept; the owner: "If its worth it go ahead"): tag custody (46d23c71), gameplay batch with
   its audit (26707726: infected loot on the body, thirst -25%, admin bodies + loot ESP, body shadows off), Kamenka
@@ -30,7 +31,8 @@ list is finished before a feature is called done. Status as of 2026-10-23 evenin
   wolf (wolf_animated.zip, victory_mirosya, CC-BY, cleared), cow; "FORGET THE RABBIT". Sounds: only what is in
   assets-src plus the game's own (the owner: some suggested ones were "useless garbage"). Respawn one animal at a time,
   herds asleep when nobody is within 400 m (the owner: "this is fine"). Bears: 3 on the map, each alone, never in a
-  herd ("dont herd or pack"; "3 is fine").
+  herd ("dont herd or pack"; "3 is fine"). Wolves (the owner): hunger; a hungry pack chases a deer herd, kills ONE,
+  stops chasing and eats it on the ground; it hunts people too and howls when it locks on, as DayZ's do.
 - Animal models: Sketchfab gives files only to a signed-in account. assets-src/_wf/animals/sketchfab.mjs fetches the 14
   with the owner's own SKETCHFAB_TOKEN (run by them), or they sign in to the animals session's pane.
 - Owner 2026-10-23 on the plans: "Everything looks good"; plus "the desert needs some buildings north of the river on
@@ -40,7 +42,10 @@ list is finished before a feature is called done. Status as of 2026-10-23 evenin
       coastal spawns), Mokroye (more buildings), Lipki (larger), the canyon (smooth, keep cliffs), the desert ruins, every
       basement entrance clear of loot containers (no floating boxes). Needs a stash-safe way to the live stash list.
 - [ ] Mountain fort Orlinoye: every gap between walls closed, polish (session fort-polish, local_e1fb82cc). 3156d4f0
-      (claude/fort-polish-dc07f1) reviewed: gap sightings 3,181 -> 922 (scripts/fort-gaps.ts), flight no loss; the tail next.
+      (claude/fort-polish-dc07f1) reviewed: gap sightings 3,181 -> 922 (scripts/fort-gaps.ts), flight no loss. DONE:
+      0e5e4c16 (flat walls, 0 gaps between stone, 85,049 triangles vs 85,079 before) merged into battle-royale 9111ac65.
+      Its changelog line and figure for the next release are in the shared notes fort-polish.md (figure:
+      progress/castle/gaps/final/fort-gaps-2.jpg -> public/changelog/media/fort-gaps-2.jpg).
 - World polish so far (reviewed): Pokrov kremlin whitewashed + church, Kalat stone re-laid, canyon ridge smoothed. Open:
   Pokrov close-ups (greenhouses, SE clipping, col U stairs), Kalat ledges, desert + towns plans (owner's yes), an owner-only
   /stashes command for the stash-safe list (next full deploy); ground changes in open country wait for that list.
@@ -62,8 +67,10 @@ list is finished before a feature is called done. Status as of 2026-10-23 evenin
       looted on the left mirroring your side. Plan (progress/plans/zona-plan-inv-layout.jpg) taken as yes with the owner's
       change: "make the hotbar slots much bigger now like dayz's at the bottom beneath hands". Vicinity as item icons, no
       text rows. The hotbar forgets an item that leaves the player ("when i drop an item my hotbar should forget about it").
-- [ ] G to drop, hold G to throw with a power bar, cancel with the wheel or a slot change (session gameplay-batch,
-      local_5deed9ae, its branch merged with release-1023 first).
+- [x] G to drop, hold G to throw with a power bar, cancel with the wheel or a slot change (session gameplay-batch,
+      claude/gameplay-batch-94414c 0bcd75b2, reviewed; a readability pill for the bar last). Changelog lines in its report.
+- The stage (tools/stage.html, 75503d2d): a plain test scene for one-pass pictures, headless on the processor; pictures
+  of a model or animation go there, not the world (the owner: "think when you make a new project on unity").
 - Several branches raise PROTOCOL (gameplay-batch 61, more to come): when merging them, give the merged tree one number.
 - [x] iPhone crash (live), live disconnects (live), buried-stash leak (live), Discord/X at deaths (live).
 
