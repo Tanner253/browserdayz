@@ -156,10 +156,8 @@ export const PLAN = {
    */
   road: {
     // (along Ozerki's lane, past the trader, along Pokrov's lane; out of the pass south of the river, past Zavod's east end)
-    // (held straight down Pokrov's lane by points along it, its turn north past the town rounded: between the lane's
-    // ends alone the curve bowed 8 m south, and the owner saw "the green houses south of pokrov sit on the pavement of
-    // the road rather than to either side of it")
-    east: [[-680, -61], [-1100, -80], [-1170, -90], [-1330, -90], [-1450, -62], [-1640, 10], [-1715, 34], [-1765, 34], [-1935, 34], [-1975, 32], [-2000, 10], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
+    // (down Pokrov's lane it is held to the lane inside the town: see west.ts, `lay`)
+    east: [[-680, -61], [-1100, -80], [-1170, -90], [-1330, -90], [-1450, -62], [-1640, 10], [-1715, 34], [-1985, 34], [-2015, -60], [-2022, -250], [-2028, -400]] as P[],
     west: [[-2540, -390], [-2575, -330], [-2625, -280], [-2700, -240], [-2860, -150], [-2990, -60], [-3300, -50], [-3500, -10], [-3640, 25]] as P[],
     width: 6.5,
     /** from Pokrov's north gate (outside it) to the edge of the bunker's hollow, where its way out comes to it */

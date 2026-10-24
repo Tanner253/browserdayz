@@ -18,7 +18,8 @@ const PI = Math.PI, Q = PI / 2;
 export const POKROV_TERRACE = { poly: [[-78, 31], [83, 31], [88, -66], [0, -108], [-93, -60]] as [number, number][], h: 4, out: 14 };
 
 /** the lanes of the town outside, both along z = LANE: the fronts of the houses stand back from it either side */
-const LANE = 64, NORTH = 58, SOUTH = 70;
+export const POKROV_LANE = 64;
+const LANE = POKROV_LANE, NORTH = 58, SOUTH = 70;
 /** how high a market table's top is (WoodenTable_01) */
 const TABLE = 0.55;
 /** a kind's depth (the houses are said by where their fronts stand: the middle is half the depth back from it) */

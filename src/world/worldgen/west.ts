@@ -26,6 +26,7 @@ import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-re
 import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
 import { DESERT_EAST, desertTown, fillTown, footOn, hamletGround, kalatSite, layKalat, layPad, offPad, padHeld, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
 import { POKROV, moundAt, placedRooms } from '../../sim/towns';
+import { POKROV_LANE } from '../../sim/pokrov';
 import { HUNTING_TOWERS, WATCHTOWERS, huntingId, watchtowerId } from '../../sim/watchtowers';
 import type { Instance, POI, Site } from './types';
 
@@ -266,8 +267,18 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const [lx, lz] = townLocal(t, x, z), m = desertTown(t) ? 0 : 10;
     return Math.abs(lx) < t.pad[0] - m && Math.abs(lz) < t.pad[1] - m;
   });
+  // (Down Pokrov's lane the road IS the lane: as its points alone lay it, it bowed 8 m south between the lane's ends,
+  // over the fronts of the houses on its south side; the owner, 2026-10-23: "the green houses south of pokrov sit on the
+  // pavement of the road rather than to either side of it". Inside the town's pad only, eased in from its ends, so that
+  // nothing of the road outside the town moves, and it keeps every point it had.)
+  const pokrov = placedTown(POKROV.name), lane = ([x, z]: [number, number]): [number, number] => {
+    const [lx, lz] = townLocal(pokrov, x, z);
+    if (Math.abs(lx) >= pokrov.pad[0] || Math.abs(lz - POKROV_LANE) > 20) return [x, z];
+    const w = 1 - smoothstep(pokrov.pad[0] - 45, pokrov.pad[0] - 5, Math.abs(lx)), c = Math.cos(pokrov.rot), s = Math.sin(pokrov.rot), to = lz + (POKROV_LANE - lz) * w;
+    return [pokrov.x + lx * c + to * s, pokrov.z - lx * s + to * c];
+  };
   const lay = (pts: [number, number][], from: { points: Float32Array; width: number } | null, width: number, side: boolean) => {
-    const line = catmullRom(pts, 4), raw = line.map(([x, z]) => heightAt(heights, x, z)), nL = line.length;
+    const line = catmullRom(pts, 4).map(lane), raw = line.map(([x, z]) => heightAt(heights, x, z)), nL = line.length;
     const ys = raw.map((_, k) => { let s = 0, c = 0; for (let j = -12; j <= 12; j++) { const q = 1 - Math.abs(j) / 13; s += raw[clamp(k + j, 0, nL - 1)] * q; c += q; } return s / c; });
     // (and a road leaves the one it leaves level with it: across that one's own bed and a little more, it is that
     // one's height, as its bed will be, laid after it)
