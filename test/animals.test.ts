@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { ANIMALS, A_DEAD, A_REST, A_ROAR, BLADES, KIND, KINDS, SKIN, yieldOf, type Biome } from '../src/sim/animals';
 import { Herd, seeded, type Seen } from '../src/sim/animal-mind';
 import type { Ground } from '../src/sim/animal-ground';
+import { ENTITIES, entityBy } from '../src/net/orders';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -160,7 +161,7 @@ ok('a hurt deer that is not killed bleeds, falls behind, and drops at the end of
 
 ok('a bear roars and charges whoever comes too near, and its blows land on whoever stays', () => {
   const h = herd(['bear']);
-  const bear = h.place('bear', 0, 0, 0)!;
+  const bear = h.place('bear', 0, 0, 0)[0];
   bear.yaw = Math.atan2(-1, 0);
   const man = person(1, 12, 0);
   let roared = false;
@@ -175,7 +176,7 @@ ok('a bear roars and charges whoever comes too near, and its blows land on whoev
 ok('outrun: away at a sprint from further than a dozen metres when it roars, and the bear never catches you', () => {
   for (const [start, caught] of [[16, false], [6, true]] as [number, boolean][]) {
     const h = herd(['bear']);
-    const bear = h.place('bear', 0, 0, 0)!;
+    const bear = h.place('bear', 0, 0, 0)[0];
     bear.yaw = Math.atan2(-1, 0);
     const man = person(1, start, 0);
     let ran = false;
@@ -193,7 +194,7 @@ ok('outrun: away at a sprint from further than a dozen metres when it roars, and
 
 ok('under a roof you are safe from a bear: it gives up and goes', () => {
   const h = herd(['bear']);
-  const bear = h.place('bear', 0, 0, 0)!;
+  const bear = h.place('bear', 0, 0, 0)[0];
   const man = person(1, 10, 0);
   run(h, 0, 2, [man]);
   assert.ok(bear.foe);
@@ -205,14 +206,10 @@ ok('under a roof you are safe from a bear: it gives up and goes', () => {
 
 ok('wolves circle and come in one at a time; when half the pack is down the rest run', () => {
   const h = herd(['wolf']);
-  const first = h.place('wolf', 0, 0, 0)!, g = h.groups[first.g];
-  // (a pack of four, as the map has them)
-  for (let w = 0; w < 3; w++) {
-    const o = h.place('wolf', w * 2 + 2, 0, 0)!, og = h.groups[o.g];
-    og.members.splice(og.members.indexOf(o.i), 1);
-    o.g = g.i;
-    g.members.push(o.i);
-  }
+  // (a pack of four, as the map has them, and as an admin's /spawn wolf 4 stands them)
+  const pack = h.place('wolf', 0, 0, 0, 4), g = h.groups[pack[0].g];
+  assert.equal(pack.length, 4);
+  assert.ok(pack.every((w) => w.g === g.i), 'one pack');
   PH = 0.85;
   const man = person(1, 22, 0);
   const strikes = run(h, 0, 30, [man]);
@@ -249,6 +246,22 @@ ok('gutting and skinning: a blade, six seconds at the body, and what it gives by
   assert.deepEqual(knife, { meat_venison: 7, animal_fat: 2, hide: 1, bones: 5 });
   assert.ok(hatchet.meat_venison < knife.meat_venison && hatchet.hide === 1);
   assert.deepEqual(Object.fromEntries(yieldOf(KIND.bear, 1)), { meat_bear: 10, animal_fat: 6, pelt_bear: 1, bones: 8 });
+});
+
+ok('an admin stands any kind, one or a herd or pack of it, from the entity list', () => {
+  for (const e of ENTITIES.filter((x) => x.kind === 'animal')) {
+    assert.ok(KIND[e.animal!], `${e.id} is no kind`);
+    assert.equal(entityBy(e.id), e);
+    const h = herd([e.animal!, 'doe']);
+    const got = h.place(e.animal!, 100, 100, 1, Math.min(4, e.most));
+    assert.equal(got.length, Math.min(4, e.most), e.id);
+    assert.equal(new Set(got.map((b) => b.g)).size, 1, `${e.id}: one herd`);
+    assert.ok(got.every((b) => Math.hypot(b.x - 100, b.z - 100) < 6));
+  }
+  // (every kind there is can be stood: the list misses none)
+  for (const k of KINDS) assert.ok(ENTITIES.some((e) => e.animal === k.id), `${k.id} cannot be spawned`);
+  const deer = herd(['stag', 'doe']).place('stag', 0, 0, 1, 5);
+  assert.deepEqual(deer.map((b) => KINDS[b.k].id), ['stag', 'doe', 'doe', 'doe', 'doe'], 'a stag asked for with others comes with hinds');
 });
 
 ok('a game is told only of the animals within its reach', () => {

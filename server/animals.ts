@@ -132,10 +132,10 @@ export function animalSkin(c: Client, m: Extract<C2S, { t: 'askin' }>) {
   send(c, { t: 'askin', i: m.i, ok: true, done: true });
 }
 
-/** An admin's `/spawn <kind>` at a place: one more, in a herd of its own (false: there is no such kind, or no model for it) */
-export function spawnAnimal(kind: string, x: number, z: number): boolean {
+/** An admin's `/spawn <kind> [n]` at a place: `n` of it as one herd or pack (how many were stood: 0, no such kind or no model for it) */
+export function spawnAnimal(kind: string, x: number, z: number, n = 1): number {
   const k = KIND[kind];
-  if (!k || !world.hasModel(k.model)) return false;
-  return !!herd.place(kind, x, z, Date.now());
+  if (!k || !(process.env.ANIMALS === 'all' || world.hasModel(k.model))) return 0;
+  return herd.place(kind, x, z, Date.now(), n).length;
 }
 

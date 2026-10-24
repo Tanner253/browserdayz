@@ -260,22 +260,30 @@ export class Herd {
     return null;
   }
 
-  /** one stood where an admin asks (`/spawn deer`), in a herd of its own that lives there */
-  place(kindId: string, x: number, z: number, now: number): Beast | null {
+  /**
+   * An admin's (`/spawn wolf 4`): `n` of a kind stood where they ask, as ONE herd or pack that lives there (a stag
+   * asked for with others comes with hinds, as a herd of deer is). Nothing is owed for them when they die.
+   */
+  place(kindId: string, x: number, z: number, now: number, n = 1): Beast[] {
     const k = KINDS.findIndex((kk) => kk.id === kindId);
     const hi = HERDS.findIndex((h) => h.of.some(([id]) => id === kindId));
-    if (k < 0 || hi < 0) return null;
+    if (k < 0 || hi < 0 || n < 1) return [];
     const g: Group = {
       i: this.groups.length, herd: hi, home: { x, z }, mid: { x, z }, at: { x, z }, spot: 'feed', nextSpot: now + 120_000, feeding: true, drank: true,
       members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1,
     };
     this.groups.push(g);
-    const b = this.stand(g, k, now, []);
-    if (b) {
-      b.x = x;
-      b.z = z;
+    const others = HERDS[hi].of.map(([id]) => KINDS.findIndex((kk) => kk.id === id)).filter((o) => o !== k);
+    const out: Beast[] = [];
+    for (let c = 0; c < n; c++) {
+      const b = this.stand(g, c === 0 || !others.length || KINDS[k].id !== 'stag' ? k : others[0], now, []);
+      if (!b) continue;
+      const a = c * 2.39996, r = c ? 2.2 * Math.sqrt(c) : 0;
+      b.x = x + Math.cos(a) * r;
+      b.z = z + Math.sin(a) * r;
+      out.push(b);
     }
-    return b;
+    return out;
   }
 
   // ------------------------------------------------------------------ time

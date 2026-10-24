@@ -353,11 +353,8 @@ export async function command(c: Client, line: string) {
         return void sys(c, `${made.length > 1 ? `${made.length} × ` : ''}${e.name} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which}). /delcar takes the nearest car away.`);
       }
       if (e.kind === 'animal') {
-        let made = 0;
-        for (let k = 0; k < count; k++) {
-          const r = 2.5 * Math.sqrt(k), a = k * 2.39996;
-          if (spawnAnimal(e.animal!, x + Math.cos(a) * r, z + Math.sin(a) * r)) made++;
-        }
+        // (all of them one herd or pack: wolves stood together hunt together)
+        const made = spawnAnimal(e.animal!, x, z, count);
         if (!made) return void sys(c, `No ${e.name.toLowerCase()} can be stood: the game has no model for it yet.`);
         log(`[admin] ${c.name} stood ${made} × ${e.name.toLowerCase()} at ${x.toFixed(0)}, ${z.toFixed(0)}`);
         return void sys(c, `${made > 1 ? `${made} × ` : ''}${e.name} at ${x.toFixed(0)}, ${z.toFixed(0)}.`);
