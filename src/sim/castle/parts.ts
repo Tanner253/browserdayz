@@ -17,6 +17,9 @@ export function castleParts(): Part[] {
 /** the kit's wall as the fort stands it: how far its foot stands out from the face of its parapet, how deep it is at the foot, and how far along a side one length of it reaches either way from the middle */
 export const WALL = { out: 0.94, deep: 2.55, half: 7.41 };
 
+/** the angle between two sides of the kit's round tower (it has 32) */
+const SIDE = (2 * Math.PI) / 32;
+
 /** the gatehouse: the kit's gate, made this big, stood on the east wall's top over the head of the ramp */
 const GATEHOUSE = { scale: 0.63 };
 
@@ -70,8 +73,11 @@ export function castleKit(): KitPiece[] {
   out.push({ id: wall, name: 'north wall', at: [WALL.half, y0, -zo], turn: -Math.PI / 2, cut: top('n') });
   out.push({ id: wall, name: 'south wall', at: [-WALL.half, y0, zo], turn: Math.PI / 2, cut: top('s') });
   out.push({ id: wall, name: 'west wall', at: [-xo, y0, -WALL.half], turn: 0, cut: [...top('w'), cutBox(-xo - 0.3, -U.x + 0.1, U.floor - 0.02, U.floor + 2.07, U.goat.z0, U.goat.z1)] });
-  // (the east wall: its parapet is gone under the gatehouse, which stands in its place; and a length of it fell out to the cellars' floor)
-  out.push({ id: wall, name: 'east wall', at: [xo, y0, WALL.half], turn: Math.PI, cut: [...top('e'), cutBox(ex - 1.3, ex + 0.2, gone, 4, g0 - 7.41 * gh, g0), cutBox(U.x - 0.3, xo + 0.5, U.floor + 0.1, 4, U.rent.z0, U.rent.z1)] });
+  // (the east wall: its parapet is gone under the gatehouse, which stands in its place; and a length of it fell out to the cellars' floor.
+  // All of the parapet's thickness goes, to two fingers short of the gatehouse's ends, and its broken ends are closed:
+  // cut short of its outer face and left open, a strip of it stood along the gatehouse's front with a channel behind,
+  // and its hollow showed at either end of the gatehouse. 2026-10-23.)
+  out.push({ id: wall, name: 'east wall', at: [xo, y0, WALL.half], turn: Math.PI, cut: [...top('e'), { ...cutBox(ex - 1.3, ex + C.parapet.thick / 2 + 0.15, gone, 4, g0 - 7.41 * gh + 0.02, g0 - 0.02), cap: 'upright' as const }, cutBox(U.x - 0.3, xo + 0.5, U.floor + 0.1, 4, U.rent.z0, U.rent.z1)] });
   // the gatehouse: its foot is the east wall's top; the sill across its passage is taken out, and the ramp's boards run through
   out.push({ id: 'fort_wall_thin_gate_01', name: 'gatehouse', at: [ex, 0, g0], turn: Math.PI, scale: gh, cut: [cutBox(ex - WALL.deep * gh - 0.1, ex + 0.2, -0.05, (KIT_GATE.sill + 0.06) * gh + 0.02, g0 - KIT_GATE.z1 * gh - 0.02, g0 - KIT_GATE.z0 * gh + 0.02)] });
   // the foot of each tower: the kit's round tower, its platform level with the terrace. Taken out of it: its middle
@@ -84,17 +90,24 @@ export function castleKit(): KitPiece[] {
     // ends of its ring of wall, and its top a hand under the terrace. Not the round one: the drum's own floor is there.)
     const cut: Cut[] = [cutRound(tw.cx, tw.cz, T.r - T.wall + 0.04, -0.06, 4), { ...(tw.cx > 0 ? cutBox(-60, px, -0.05, 4, -60, 60) : cutBox(-px, 60, -0.05, 4, -60, 60)), cap: 'all' }, { ...(tw.cz > 0 ? cutBox(-60, 60, -0.05, 4, -60, pz) : cutBox(-60, 60, -0.05, 4, -pz, 60)), cap: 'all' }];
     const d = (tw.door * Math.PI) / 180;
-    // (as wide as the doorway's own lining and a hair more, 0.55 either side: wider, and beside the lining the foot was looked into. See the cellar in `towerSteps`.)
-    if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.553, tw.hollow - 0.03, tw.hollow + 2.2));
+    // (as wide as the doorway's own lining and a hair more, 0.55 either side: wider, and beside the lining the foot was looked into. See the cellar in `towerSteps`.
+    // And from the sill up: from three fingers under it, a slot under the sill showed into the foot.)
+    if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.553, tw.hollow - 0.002, tw.hollow + 2.2));
     // (and nothing of the kit's foot is in the cellar, or within a hand of its wall, which bellies: a block of it stood out of the wall over the doorway)
     if (tw.hollow !== undefined) cut.push(cutRound(tw.cx, tw.cz, T.r - T.wall + 0.3, tw.hollow - 0.05, -0.055));
-    out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });
+    // (what of that stone lies under the terrace's paving is not laid: nobody sees it, and it was most of it)
+    cut.push({ ...cutBox(-px - 0.02, px + 0.02, -1.2, -0.004, -pz - 0.02, pz + 0.02), capsOnly: true });
+    const turn = (tw.cx * 7 + tw.cz * 3) * 0.1;
+    out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn, cut, body: false });
     // ITS FOOTING: the same tower again under that one's foot, a little bigger (`under`), with everything of it over
     // that foot taken off: so its wall, at the size it has just under its platform, is where the upper one's foot is,
     // and from there it leans out and down eight metres more. The real hill falls away under the two towers on the
     // valley side to twelve metres under the terrace; a plain dark drum of the fort's own stood in the air there.
+    // (Taken off from just over its platform's coping, which is a finger wider than the foot over it and stands out
+    // round it whole: cut through, the coping was open all round the join. And turned as the one over it is, but by
+    // whole sides of the kit's tower, which has 32: turned anyhow, each one's corners stood out over the other's flats.)
     const kf = -KIT_TOWER.top[0] * T.kit;
-    out.push({ id: 'fort_tower_round', name: `${tw.name} footing`, at: [tw.cx, kf - KIT_TOWER.top[0] * T.under, tw.cz], scale: T.under, turn: (tw.cx * 3 - tw.cz * 5) * 0.1 + 1.3, cut: [cutBox(tw.cx - 9, tw.cx + 9, kf + 0.01, 8, tw.cz - 9, tw.cz + 9)], body: false });
+    out.push({ id: 'fort_tower_round', name: `${tw.name} footing`, at: [tw.cx, kf - KIT_TOWER.top[0] * T.under, tw.cz], scale: T.under, turn: turn + Math.round(((tw.cx * 3 - tw.cz * 5) * 0.1 + 1.3 - turn) / SIDE) * SIDE, cut: [cutBox(tw.cx - 9, tw.cx + 9, kf + 0.025, 8, tw.cz - 9, tw.cz + 9)], body: false });
   }
   // blocks of the wall, lying where they came down: under the rent, and under the breach
   const block = (x: number, z: number, y: number, turn: number, tilt: [number, number], scale: number) => void out.push({ id: 'fort_wall_thick_end_01', name: 'fallen wall', at: [x, y, z], turn, tilt, scale });
@@ -354,19 +367,19 @@ function layOut(): Part[] {
     else box(paint, -C.hx - v1, -C.hx - v0, y0, y1, u0, u1, o);
   };
   const half = P.thick / 2, faceIn = half - (KIT_MERLON.x1 - KIT_MERLON.x0), sill = KIT_LEVELS.parapet - KIT_LEVELS.walk;
-  // (the kit's wall is seven metres from its walk to its foot, and on the north and the south the hill is lower than that: under each wall a footing of rough stone, a hand proud of the wall's foot, down into the ground)
-  for (const side of ['n', 's', 'e', 'w'] as Side[]) along(side, 'base', -WALL.half, WALL.half, half + WALL.out - WALL.deep, half + WALL.out + 0.12, -C.deep, -KIT_LEVELS.walk + 0.04, { name: 'footing', tone: 0.8, at: 'both' });
+  // (the kit's wall is seven metres from its walk to its foot, and on the north and the south the hill is lower than that: under each wall a footing of rough stone, a hand proud of the wall's foot, down into the ground; its inner face a centimetre inside the wall's, which it laps: in the very plane of it, unbent beside the kit, the two were drawn turn about)
+  for (const side of ['n', 's', 'e', 'w'] as Side[]) along(side, 'base', -WALL.half + 0.01, WALL.half - 0.01, half + WALL.out - WALL.deep + 0.01, half + WALL.out + 0.12, -C.deep, -KIT_LEVELS.walk + 0.04, { name: 'footing', tone: 0.8, at: 'both' });
   for (const side of ['n', 's', 'e', 'w'] as Side[]) {
     const seed = { n: 201, s: 202, e: 203, w: 204 }[side];
     for (const [u0, u1, whole] of gaps(side)) {
       // (where a merlon stood there is no top to the parapet under it: what shows is the wall's core, a course or two of it left)
       if (whole) {
-        // (set a hand inside the kit's parapet on both its faces, and straight as the kit is: laid two fingers inside it and bent as rough stone is, it came out through the parapet's face and lay in the plane of it by turns)
-        along(side, 'base', u0 + 0.04, u1 - 0.04, faceIn + 0.09, half - 0.09, sill - 0.3, sill + 0.04 + hash(Math.round(u0 * 7), seed, 1) * 0.22, { name: 'merlon stump', tone: 0.85, body: 'none', straight: true });
+        // (set a hand inside the kit's parapet on both its faces)
+        along(side, 'base', u0 + 0.04, u1 - 0.04, faceIn + 0.09, half - 0.09, sill - 0.3, sill + 0.04 + hash(Math.round(u0 * 7), seed, 1) * 0.22, { name: 'merlon stump', tone: 0.85, body: 'none' });
         continue;
       }
       // (a length of parapet gone to the walk: a broken end of it either side)
-      for (const [a, b] of [[u0 - 0.28, u0 + 0.02], [u1 - 0.02, u1 + 0.28]]) if (!(side === 'e' && a > UNDER.rent.z0 - 0.4)) along(side, 'base', a, b, faceIn + 0.05, half - 0.05, 0.03, sill - 0.04 - hash(Math.round(a * 9), seed, 2) * 0.2, { name: 'broken parapet', tone: 0.85, straight: true });
+      for (const [a, b] of [[u0 - 0.28, u0 + 0.02], [u1 - 0.02, u1 + 0.28]]) if (!(side === 'e' && a > UNDER.rent.z0 - 0.4)) along(side, 'base', a, b, faceIn + 0.05, half - 0.05, 0.03, sill - 0.04 - hash(Math.round(a * 9), seed, 2) * 0.2, { name: 'broken parapet', tone: 0.85 });
     }
     // the stone of what is gone: flat on the paving inside (low enough to be walked over), and tumbled outside
     for (const [a, b, whole] of gaps(side)) for (let k = 0; k < (whole ? 2 : 5); k++) {

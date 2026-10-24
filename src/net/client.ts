@@ -180,6 +180,9 @@ export const UNREACHED: Record<'blocked' | 'asleep' | 'socket', string> = {
   socket: "Can't connect to the game server. An ad blocker, privacy extension, VPN or school or work network can stop it: allow zonapvp.fun and browserdayz.onrender.com, or try another browser or network, then press Deploy.",
 };
 
+/** the server unheard this long (ms), the line is given up and made again (Net.dead); a hold-up of a few seconds comes back by itself */
+const DEAD_MS = 12_000;
+
 export class Net {
   online = false;
   id = 0;
@@ -202,6 +205,39 @@ export class Net {
   }
   /** the stall has been said on the screen (see Game's frame) */
   stallSaid = false;
+  /** when the line was first found silent past DEAD_MS on a page that was keeping up (see `dead`) */
+  private deadFrom = 0;
+  /**
+   * Whether the line has been silent so long, on a page that has been keeping up for two seconds of it, that it is
+   * given up and made again (Game.rejoin). After a hold-up TCP waits ever longer before it sends again, and one way can
+   * stay stuck while the other flows: the game went on telling the server where it stood, and was shown nothing new
+   * (2026-10-20, a player: "ping sometimes spike send me to the parallel universe and you won't be able to see
+   * anyone but people can see me"). A new connection carries none of that wait.
+   * @param steady this frame was not a long one: what came while the page was busy has had its chance to be read
+   */
+  dead(othersOn: boolean, steady: boolean): boolean {
+    if (!this.online || !steady || this.lag(othersOn) < DEAD_MS) {
+      this.deadFrom = 0;
+      return false;
+    }
+    this.deadFrom ||= performance.now();
+    return performance.now() - this.deadFrom > 2000;
+  }
+  /** Give up this connection (see `dead`): shut, and said to be lost at once, as its own close can take long on a dead line. */
+  giveUp() {
+    const ws = this.ws;
+    if (!ws || !this.online) return;
+    ws.onmessage = ws.onclose = ws.onerror = null;
+    try {
+      ws.close(4000, 'silent');
+    } catch {
+      /* already closed */
+    }
+    this.online = false;
+    this.deadFrom = 0;
+    clearInterval(this.pingT);
+    this.onClose('Connection to the server was lost.');
+  }
   private ws: WebSocket | null = null;
   private handlers = new Map<string, ((m: S2C) => void)[]>();
   /**

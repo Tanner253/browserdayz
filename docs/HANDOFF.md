@@ -2,6 +2,81 @@
 
 Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
 
+## THE WORK LIST (the owner, 2026-10-23: "do not lose sight of the work list at hand"; then base building, gathering, crafting, raiding)
+Visual quality first; build cheap (heli flight replay.mjs owner-run-2.json, 114.8 fps), but a small cost is accepted (the
+owner: "small frame cost is to be expected ... we will have to do optimizations after the fact"). Never change the
+ground around buried stashes or build on them; never raise WORLD_REV. The onboarding session reviews each session's pictures
+before they go to the owner. No corners cut (the owner: "We should not have cut any corners on anything"): a "not done"
+list is finished before a feature is called done. Status as of 2026-10-23 evening:
+- LIVE 2026-10-24 ~08:30 UTC: site, server and `main` from 4393197a (release-1023, PROTOCOL 61, boot f2951bc5, 798
+  characters and 138 stashes kept; the owner: "If its worth it go ahead"): tag custody (46d23c71), gameplay batch with
+  its audit (26707726: infected loot on the body, thirst -25%, admin bodies + loot ESP, body shadows off), Kamenka
+  seating (3633a957), inventory step 1 (5aeea24e), fort gaps round one (3156d4f0), changelog #infected-bodies.
+  battle-royale merged it (3a44ec3c). Earlier the same night: /stashes + the stash re-burial fix (7616a121).
+  The NEXT release waits for everything else below to be finished and reviewed. The live stash list is in the
+  world-polish worktree (progress/world-polish/stashes-live-2026-10-23.txt, git-ignored).
+- Phone pass (session local_8b56a161, own worktree): the iPhone crash after the start (Chrome "Can't open this page"),
+  cheap Androids stuck at "world", a phone sky, KTX2 textures, a ready-made map file, the xray viewer/curtain/locker a
+  little and the ammo box "a tiny bit"; and ONE loading (players: "why does the user need to wait for 2 loadings?").
+- Animals, the owner 2026-10-23: "leave out the fox. the animals spawns and movement should make common sense. make sure
+  animals dont spawn in impossible places like in the deserv canyon walls etc. just make sure its high quality please."
+  Their downloads are in assets-src (bear, elk, doe, cow, meats, bones, rug); animated_wolf (ripper account) and the
+  AnimalMesh3D boar/rabbit/goat (personal use only) must NOT ship. Checked by onboarding (record, description, uploader's
+  uploads): cleared = bear bffc3c87, elk 787834f9, doe b6172618, cow 0e780cb5, rib 7239ceff, meat4 f49758b8, bones
+  5ec580b4, rug 3936fd14. Free boars are re-uploads; no clean goat. Clean free fallbacks: wolf 56de4df6 (rhcreations),
+  hare 948938cd (bluekiwi.dog). Every model link is licence-checked before it goes to the owner. The owner: free meshes
+  only, "if you cant find a free mesh for the animal then skip the animal": no boar, no goat, no fox. Unusable downloads
+  moved to assets-src/_not-licensed/ (README there); never import from it. FINAL roster (the owner): bear, stag, doe,
+  wolf (wolf_animated.zip, victory_mirosya, CC-BY, cleared), cow; "FORGET THE RABBIT". Sounds: only what is in
+  assets-src plus the game's own (the owner: some suggested ones were "useless garbage"). Respawn one animal at a time,
+  herds asleep when nobody is within 400 m (the owner: "this is fine"). Bears: 3 on the map, each alone, never in a
+  herd ("dont herd or pack"; "3 is fine").
+- Animal models: Sketchfab gives files only to a signed-in account. assets-src/_wf/animals/sketchfab.mjs fetches the 14
+  with the owner's own SKETCHFAB_TOKEN (run by them), or they sign in to the animals session's pane.
+- Owner 2026-10-23 on the plans: "Everything looks good"; plus "the desert needs some buildings north of the river on
+  spawn. And up alongside it", "The valley that runs up the map on the north side needs some buildings too maybe".
+- [ ] World polish (session world-polish, local_c34bf24d): Pokrov (castle walls and corners, church, green houses off the road,
+      SE buildings clipping/stairs col U), Kalat (polish ALOT + new places F/G-12), the desert (more places, more and spread
+      coastal spawns), Mokroye (more buildings), Lipki (larger), the canyon (smooth, keep cliffs), the desert ruins, every
+      basement entrance clear of loot containers (no floating boxes). Needs a stash-safe way to the live stash list.
+- [ ] Mountain fort Orlinoye: every gap between walls closed, polish (session fort-polish, local_e1fb82cc). 3156d4f0
+      (claude/fort-polish-dc07f1) reviewed: gap sightings 3,181 -> 922 (scripts/fort-gaps.ts), flight no loss; the tail next.
+- World polish so far (reviewed): Pokrov kremlin whitewashed + church, Kalat stone re-laid, canyon ridge smoothed. Open:
+  Pokrov close-ups (greenhouses, SE clipping, col U stairs), Kalat ledges, desert + towns plans (owner's yes), an owner-only
+  /stashes command for the stash-safe list (next full deploy); ground changes in open country wait for that list.
+- [x] Kamenka's red building and two-storey shack one texture step up, everywhere they stand (live, +7.6 MB card).
+      The plank house floating 0.27 m in the desert (Peski, Bereg x2, Mys) is let down: claude/kamenka-textures-0e1e26
+      3633a957, reviewed (progress/kamenka-textures/seat-*.jpg). It moves server loot places, so it ships with the next
+      SERVER deploy; never deploy the site alone from that branch, or merge it into a branch the site goes out from first.
+- [ ] Gameplay batch (session gameplay-batch, local_5deed9ae): infected loot in the body (5 min), thirst -25%, admin corpse
+      delete (one / all near), admin item ESP. Done on claude/gameplay-batch-94414c (b00a1846, cbc3eade, fd708221;
+      PROTOCOL 61), reviewed (progress/gameplay-batch/*.png), all tests pass. Audit done (26707726, merged into
+      release-1023): infected bodies frozen, ESP nearest 250, lighter welcome, body shadows off (the owner's word).
+- [ ] Animals and hunting (session animals-hunting, local_6551ac13): DayZ/Rust mechanics, useful drops (food + hides, bone,
+      fat for crafting). Plan v2 (progress/animals/zona-plan-animals.jpg) approved 2026-10-23: "download all animals and
+      support them in the admin panel entities for spawning", "yes to animals icons and sounds". Building all six.
+- [ ] Server-run inventory + inventory lag + container QOL (session local_cbc26f80, branch claude/kind-lewin-2891bd):
+      building; the payout custody holes (client-claimed inventory before 'cash', tagSeen kept after a tag leaves) with tests.
+      Next after 1b: a DayZ-style layout (progress/plans/dayz-inventory-ref.webp, the owner: "dayz ui is much better than
+      ours for looting"): equipment slot icons on top, worn containers listed in fixed panels with X to fold, the body
+      looted on the left mirroring your side. Plan (progress/plans/zona-plan-inv-layout.jpg) taken as yes with the owner's
+      change: "make the hotbar slots much bigger now like dayz's at the bottom beneath hands". Vicinity as item icons, no
+      text rows. The hotbar forgets an item that leaves the player ("when i drop an item my hotbar should forget about it").
+- [ ] G to drop, hold G to throw with a power bar, cancel with the wheel or a slot change (session gameplay-batch,
+      local_5deed9ae, its branch merged with release-1023 first).
+- Several branches raise PROTOCOL (gameplay-batch 61, more to come): when merging them, give the merged tree one number.
+- [x] iPhone crash (live), live disconnects (live), buried-stash leak (live), Discord/X at deaths (live).
+
+## SITE LIVE (2026-10-23): from `d9155c5` (branch claude/kamenka-textures-0e1e26 = battle-royale 03e532e plus this)
+- Kamenka's plank house (`shanty_mansion`) and red brick houses (`house_interior`) a size up on a computer, 512/256
+  (assets.ts DESK_UP; the owner: "bump them up by 1 incriment"). 2.5 -> 10.1 MB on the card. Lossless 512 copies
+  outweigh the files, so a computer loads those two files whole and cuts them; phones keep their 256/128 lean copies
+  (lean.mjs UP_FILES). Pictures and tools: progress/kamenka-textures/ (look.js, pairs.mjs). Changelog `#kamenka-sharper`.
+- NOT DEPLOYED, on the same branch after it: the plank house let down 0.27 m onto the sand at its four desert copies
+  (Peski, Bereg x2, Mys; buildings.ts `seatDrop`, the owner: "the building is floating off the ground"), with its
+  floors and its 48 loot places (each 0.27 lower; nothing else of the 4,243 moved). The server makes those places too:
+  site and server go out together, on the owner's word ("don't deploy the server until I say"). No WORLD_REV.
+
 ## LIVE (2026-10-22 ~08:57 UTC): site, server and `main` from `de02380` (PROTOCOL 60)
 - **Apply a finish** (the owner: "the apply should stick with the weapon on the server ... like rust"): the item's own
   `finish`, written only by the server; gold in hands, inventory and on the ground (test/plates.test.ts). Gold in the
@@ -90,6 +165,17 @@ Both performance tracks merged and on the site:
   this is on the todo list after, ios users error. but i dont wanan deal with this till both active tracks are done and
   merged and we are deployed". The tracks are `vram-fps` (held-server) and `frame-cost` (branch claude/frame-cost-350a15).
   Earlier iPhone history: memory notes load-and-phones-2026-10-11 (phone picture memory) and mobile-touch-support.
+  **FIXED 2026-10-23 on branch claude/ecstatic-napier-41c3e5 (site only; changelog `#phones-memory`), NOT tried on a real
+  iPhone.** The phone start reports (`npx vercel logs --environment production --no-branch --since 7d --query "iPhone"
+  --limit 1000 --json`, lines `boot {...}`) put 26 of ~40 iPhone deaths at the stage "forest", the rest a lost WebGL context
+  there or at shader compile. There the tree-card atlas was baked at 2048x3072, half floats, 4 samples: 300 MB in one go.
+  Phones now (all TOUCH-gated, computers unchanged): atlas frames half size (vegetation.ts CARD_K), PHONE_CAP 512/256,
+  far models from the lean copies (assets.ts leanOf), the Renderer made at the phone's own settings (main.ts; it started
+  at scale 1, 4x MSAA, AO until Game.init). Measured at phone defaults, 844x390@3 (card + decoded pictures): forest stage
+  589 -> 169 MB, menu 982 -> 684, in game 1641 -> 1195. Left in the page, not cut: Rapier's WASM 255 MB (2.1 M trimesh
+  triangles: collisions), scene geometry ~133 MB, ~180 canvases (106 MB) that `shrink` keeps as images (iOS caps canvas
+  memory). Tools and figures: progress/ios-mem/ (mem-pre.js counts card memory by boot stage; TRAP: play.mjs puts ULTRA
+  settings in a fresh profile unless PLAY_GFX is given: give the phone's own, {"scale":0.85,"msaa":2,"ao":"off",...}).
 
 ## LIVE NOW (2026-10-21 ~00:47 UTC): server from `0b77446`, site from `4a8f542` (its changelog entry); PROTOCOL 56
 All of `held-server` shipped: the performance round's later work (CardKeep, noclip, far-tree atlas, two forest shader

@@ -103,6 +103,13 @@ export interface HotbarEntry {
 export const X_HANDLE = 'zonaSOL_';
 /** where its players talk to each other: the way in to the Discord, on the main menu */
 export const DISCORD = 'https://discord.com/invite/8ECdSH2vWE';
+/**
+ * The Discord and X, at every death and every match's end in every game (the owner, 2026-10-23: "whenever a player
+ * dies, on any game mode, we should show them the discord link and X link, to get them to join the discord. Same with
+ * game settlement on battle royale"). Each opens in a tab of its own: the game goes on behind.
+ */
+export const socialRow = () =>
+  `<div class="soc-row"><a class="soc-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer">Join the Discord</a><a class="soc-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer">Follow @${X_HANDLE}</a></div>`;
 export const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 
 /** an entry of the game's own changelog, as the menu's Updates panel lists it */
@@ -184,6 +191,9 @@ const SPLASHES = [
   splash(11, "<ellipse cx='48' cy='38' rx='22' ry='27'/>", "<circle cx='80' cy='30' r='6'/><circle cx='16' cy='40' r='4'/><circle cx='30' cy='8' r='3'/><circle cx='84' cy='64' r='3'/>", "<path d='M40 58 Q41 88 42 110 Q43 115 45 110 Q46 88 47 58 Z'/><path d='M54 56 Q56 76 57 92 Q58 96 60 92 Q60 76 61 56 Z'/>"),
   splash(27, "<ellipse cx='52' cy='40' rx='32' ry='18'/>", "<circle cx='14' cy='30' r='4.5'/><circle cx='90' cy='44' r='3.5'/><circle cx='62' cy='10' r='4'/><circle cx='26' cy='62' r='3'/><circle cx='78' cy='66' r='2.5'/>", "<path d='M58 52 Q60 92 61 122 Q62 128 64 122 Q64 92 66 52 Z'/>"),
 ];
+
+/** a name over a head (a player, a dead one, a vanished one, the admin's own body), or a thing lying about by its sort (in a body, a crate or a stash: 'box') */
+export type EspKind = '' | 'dead' | 'ghost' | 'me' | 'box' | 'gun' | 'ammo' | 'med' | 'gear' | 'food' | 'item';
 
 export class HUD {
   root: HTMLDivElement;
@@ -286,7 +296,7 @@ export class HUD {
       <div class="hud-feed"></div>
       <div class="hud-under"><div class="hud-board"></div><div class="hud-tags"></div></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
-      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a><div class="dead-ad" hidden></div></div>
+      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button>${socialRow()}<a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a><div class="dead-ad" hidden></div></div>
       <div class="hud-start">
         <div class="sm-cut"></div>
         <header class="sm-top">
@@ -1609,7 +1619,7 @@ export class HUD {
    * of the screen's width and height). An empty list takes them all away.
    */
   /** @param list where each name goes, as parts of the screen across and down (0 to 1) */
-  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: '' | 'dead' | 'ghost' | 'me' }[]) {
+  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: EspKind }[]) {
     let box = this.root.querySelector('.hud-esp') as HTMLElement | null;
     if (!box) {
       if (!list.length) return;

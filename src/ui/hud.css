@@ -1811,6 +1811,15 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-esp i[data-k='dead'] b { color: #b9b4a8; }
 .hud-esp i[data-k='ghost'] b { color: #9fd0ff; }
 .hud-esp i[data-k='me'] { opacity: 0.6; }
+/* an admin's far sight of the things lying about, coloured by what sort of thing (src/game/game/hands.ts LOOT_KIND) */
+.hud-esp i[data-k='gun'] b { color: #ff7a66; }
+.hud-esp i[data-k='ammo'] b { color: #ffcf5c; }
+.hud-esp i[data-k='med'] b { color: #74e891; }
+.hud-esp i[data-k='gear'] b { color: #8ec2ff; }
+.hud-esp i[data-k='food'] b { color: #f0a868; }
+.hud-esp i[data-k='item'] b { color: #e6e0cf; font-weight: 600; }
+.hud-esp i[data-k='box'] b { color: #d2a8ff; }
+.hud-esp i:is([data-k='gun'], [data-k='ammo'], [data-k='med'], [data-k='gear'], [data-k='food'], [data-k='item'], [data-k='box']) small { color: #bdb6a6; }
 /* a line said to one player alone by an admin or a mod */
 .chat-line[data-ch='pm'] { color: #ffd58a; }
 .chat-line[data-ch='pm'] b { color: #ffd58a; }
@@ -2550,3 +2559,9 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .acct-store-has .vip { color: #b57bff; }
 .acct-store-none, .acct-store-id { font-size: 13px; color: var(--ink-faint, #9a9588); margin: 6px 0 12px; }
 .acct-store-id code { font: 12px var(--mono); color: #e9e4d8; user-select: all; }
+
+/* the Discord and X at a death and at a match's end (socialRow in hud.ts) */
+.soc-row { display: flex; justify-content: center; gap: 10px; margin: 12px 0 4px; pointer-events: auto; }
+.soc-row a { display: inline-flex; align-items: center; padding: 9px 16px; font: 700 13px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; border: 1px solid rgba(233, 228, 216, 0.3); color: #e9e4d8; background: rgba(5, 7, 6, 0.6); }
+.soc-row a:hover { border-color: currentColor; }
+.soc-row .soc-discord { color: #fff; background: #5865f2; border-color: #5865f2; }

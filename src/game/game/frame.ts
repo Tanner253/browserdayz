@@ -627,6 +627,8 @@ export const frameMethods = {
       this.hud.setNet(this.net.stallSaid ? 'Connection stalled: what you see is out of date' : 'Online');
       if (this.net.stallSaid) this.hud.note('Your connection to the server has stalled: others still see you, you do not see them move', 'warn');
     }
+    // (and stalled for good: given up and made again, see Net.dead and Game.rejoin)
+    if (this.online && this.net.dead(this.remotes.size > 0, dt < 0.25)) this.net.giveUp();
     this.hud.update({
       dt,
       vitals: v,

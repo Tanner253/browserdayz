@@ -64,6 +64,8 @@ export const ORDERS: Order[] = [
   { name: 'delcar', args: ['[number]'], does: 'Take a car out of the world: the one nearest you, or the one of that number', admin: true },
   { name: 'wrecks', args: [], does: 'Clear away every burned-out car now', admin: true },
   { name: 'delz', args: ['[metres]'], does: 'Put down every one of the infected within so many metres of you (60 if not said)', admin: true },
+  { name: 'delbody', args: ['[number]'], does: 'Take away a body and what is on it, a player’s or one of the infected’s: by its number, or the nearest. The Delete key does it for the one you are looking at', admin: true },
+  { name: 'delbodies', args: ['[metres]'], does: 'Take away every body within so many metres of you (60 if not said), players’ and the infected’s, with what is on them', admin: true },
   { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
   { name: 'save', args: [], does: 'Write everybody and every stash to the site now (a deploy does it by itself; this is for a restart made by hand)', admin: true },
   { name: 'delc', args: ['[number]'], does: 'Take a comment off the changelog by its number; with no number, the newest are read out', admin: true },

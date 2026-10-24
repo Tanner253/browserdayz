@@ -146,7 +146,7 @@ interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; 
  */
 function bodies(): KeptBody[] {
   return [...boxes.values()]
-    .filter((b) => b.kind === 'corpse' && !b.ride && (b.expires ?? 0) > economy.time)
+    .filter((b) => b.kind === 'corpse' && !b.ride && b.zed === undefined && (b.expires ?? 0) > economy.time)
     .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items }));
 }
 
@@ -312,8 +312,7 @@ function takeInLate(save: KeptFile) {
     const box: Box = { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now };
     if (Math.abs(box.y - b.y) > 1) log(`[keep] a stash at ${Math.round(b.x)}, ${Math.round(b.z)} lies on ground that has moved ${(box.y - b.y).toFixed(1)} m: it is set on the new ground`);
     boxes.set(b.cid, box);
-    // (and everybody on is shown it, as they are shown one that is buried while they watch)
-    broadcast({ t: 'stash+', s: { uid: box.cid, x: box.x, y: box.y, z: box.z, rot: box.rot, ...(box.item ? { item: box.item } : {}), buried: true } });
+    // (told to whoever comes near it, as every buried one is: server/stash-sight.ts)
     stashes++;
   }
   // (Whoever this server had from the older copy and the later one has not: they died, or their time ran out,
