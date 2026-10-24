@@ -17,7 +17,7 @@ import { watchtowerTier } from '../sim/watchtowers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_NX, WORLD_NZ, WORLD_X0, WORLD_Z0, bunkerPlace, westTier, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
-import { TOWNS } from '../sim/towns';
+import { LATER_TOWNS, TOWNS } from '../sim/towns';
 import { castleLoot, castleProps } from '../sim/castle';
 import { CRATE_KINDS, SEARCHED_KINDS, markInside } from '../sim/storage';
 import { frameToWorld, planBasements, type RoomKind } from '../sim/basements';
@@ -27,7 +27,7 @@ import * as town from './town-plans';
 import * as zavod from './zavod-plans';
 import * as ozerki from './ozerki-plans';
 import { flooded, painted } from './mokroye-plans';
-import { clearWaysOut } from './ways-out';
+import { clearWaysOut, clearWells } from './ways-out';
 import { SUNK_DEPTH, WET_DEPTH } from '../sim/mokroye';
 import { cullBatch, letGoOnPhone } from './batch-cull';
 
@@ -76,6 +76,8 @@ const CELLAR_USAGE: Record<RoomKind, Usage[]> = {
 export { CRATE_KINDS, SEARCHED_KINDS } from '../sim/storage';
 /** the new towns' building ids (`<town>_<n>`): their plots are the last of the world's, and what they make comes after everything older (see `plan`) */
 export const TOWN_PLOT = new RegExp(`^(${TOWNS.map((t) => t.name.toLowerCase()).join('|')})_\\d+$`);
+/** the plots of the towns laid last of all (LATER_TOWNS): the last of the world's buildings */
+const LATER_PLOT = new RegExp(`^(${LATER_TOWNS.map((t) => t.name.toLowerCase()).join('|')})_\\d+$`);
 /** how far from Kalat's middle the things set down in it lie (its pieces reach some 200 m) */
 const KALAT_REACH = 260;
 
@@ -159,7 +161,7 @@ export type MatKey =
   | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'cold_steel' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
   | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
   | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage'
-  | 'boards_blue' | 'boards_green' | 'boards_pale' | 'lime_brick';
+  | 'boards_blue' | 'boards_green' | 'boards_pale' | 'lime_brick' | 'roof_green_paint' | 'church_ochre';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; /** its picture lightened so many times (a colour can only darken one) */ gain?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -235,12 +237,17 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   boards_blue: { tex: 'blue_painted_planks', tile: 2.4, surface: 'wood' },
   boards_green: { tex: 'green_rough_planks', tile: 2.4, surface: 'wood' },
   boards_pale: { tex: 'distressed_painted_planks', tile: 2.4, surface: 'wood' },
-  // (the monastery's: old limewash on brick, fallen from it here and there. As the picture comes it reads grey stone in the light of the game, not a white wall)
-  lime_brick: { tex: 'white_bricks', tile: 2.6, gain: 1.45, surface: 'concrete' },
+  // (the monastery's: old limewash, the brick showing where it has fallen. It was white_bricks, which read as grey
+  // rubble in the game's light; the owner, 2026-10-23: "its ugly its textures around the walls dont look good")
+  lime_brick: { tex: 'damaged_plaster', tile: 3.4, gain: 1.3, surface: 'plaster' },
   // sheet iron not yet rusted through: bare, and painted
   roof_iron_clean: { tex: 'corrugated_iron', tile: 2, metal: true, surface: 'metal' },
   roof_iron_green: { tex: 'corrugated_iron', tile: 2, color: 0x7f9a7c, metal: true, surface: 'metal' },
   roof_iron_red: { tex: 'corrugated_iron', tile: 2, color: 0xa3604f, metal: true, surface: 'metal' },
+  // (the cathedral's: ochre limewash, its piers, bands and window surrounds white, as these churches are painted)
+  church_ochre: { tex: 'painted_plaster_wall', tile: 3.2, color: 0xeccc8a, surface: 'plaster' },
+  // (the monastery's: sheet iron painted green, as these churches' roofs are; bare metal with the sky in it came out black)
+  roof_green_paint: { tex: 'corrugated_iron', tile: 2, color: 0x739f80, surface: 'metal' },
   roof_slate: { tex: 'grey_roof_tiles_02', tile: 2.2, surface: 'concrete' },
   // the slabs of a wall round a yard; what is laid before a door; a garage's floor
   slab: { tex: 'concrete_panels', tile: 2.5, color: 0xb9b6ad, surface: 'concrete' },
@@ -278,7 +285,7 @@ const DADO = 1.45;
 /** how far under its floor a door's step reaches down to the ground at most */
 const STEP_DOWN = 0.6;
 /** what is big enough, and plain enough, for its picture to be seen coming round again */
-const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado']);
+const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado', 'lime_brick', 'church_ochre']);
 /** a slow change of tone by where in the world a thing is (see `material`) */
 const macroTone = (shader: { vertexShader: string; fragmentShader: string }) => {
   shader.vertexShader = shader.vertexShader
@@ -1552,16 +1559,17 @@ export class Buildings {
     // that no place for a thing, fire pit or drum before them is renumbered: what the towns' plots make (places,
     // racks' places, furniture) is taken out as it is made, and the things the west set down in the towns and Kalat
     // are taken out now; all of it goes back at the very end. (Their plots are the last of the world's buildings.)
-    const firstTown = this.world.buildings.findIndex((b) => TOWN_PLOT.test(b.id));
+    const firstTown = this.world.buildings.findIndex((b) => TOWN_PLOT.test(b.id)), firstLater = this.world.buildings.findIndex((b) => LATER_PLOT.test(b.id));
     const site = this.world.kalat, inPlace = (q: Instance) => (!!site && Math.hypot(q.x - site.x, q.z - site.z) < KALAT_REACH) || (this.world.towns ?? []).some(({ town: t }) => {
       const c = Math.cos(t.rot), s = Math.sin(t.rot), dx = q.x - t.x, dz = q.z - t.z;
       return Math.abs(dx * c - dz * s) < t.pad[0] + 10 && Math.abs(dx * s + dz * c) < t.pad[1] + 10;
     });
     const placed = this.world.props.filter(inPlace);
     if (placed.length) this.world.props = this.world.props.filter((q) => !inPlace(q));
-    let cut = -1, rackCut = -1, propCut = -1;
+    let cut = -1, rackCut = -1, propCut = -1, laterCut = -1, laterRack = -1, laterProp = -1, laterDoor = -1;
     for (const [i, plot] of this.world.buildings.entries()) {
       if (i === firstTown) [cut, rackCut, propCut] = [this.lootPoints.length, this.racked.length, this.world.props.length];
+      if (i === firstLater) [laterCut, laterRack, laterProp, laterDoor] = [this.lootPoints.length, this.racked.length, this.world.props.length, this.doorSpecs.length];
       // (for scripts/overlap-audit.ts: every piece of the first building of each kind, as it is laid)
       if (this.pieces && !this.piecesOf.has(plot.type)) {
         this.piecesOf.add(plot.type);
@@ -1572,12 +1580,18 @@ export class Buildings {
       this.owner = -1;
       this.noting = null;
     }
+    // (the later towns' places, furniture and doors taken out first: the last made, they go after every other, the
+    // places after Kalat's and the caves' too. Their things the west laid are marked `later`.)
+    this.laterLoot = laterCut < 0 ? [] : [...this.lootPoints.splice(laterCut), ...this.racked.splice(laterRack)];
+    const laterProps = laterProp < 0 ? [] : this.world.props.splice(laterProp), laterDoors = laterDoor < 0 ? [] : this.doorSpecs.splice(laterDoor);
+    laterProps.push(...placed.filter((q) => q.later));
+    placed.splice(0, placed.length, ...placed.filter((q) => !q.later));
     const townLoot = cut < 0 ? [] : [...this.lootPoints.splice(cut), ...this.racked.splice(rackCut)], townProps = cut < 0 ? [] : this.world.props.splice(propCut);
     this.planVillageProps();
     this.planSiteProps();
     // (the new towns' containers, laid among the props with the rest of a town's things: stood after the sites', so
     // no door before them is renumbered. One whose foot is well over the ground is stacked on another, and stands level where it is put.)
-    for (const it of [...this.world.props, ...townProps, ...placed]) {
+    for (const it of [...this.world.props, ...townProps, ...placed, ...laterProps]) {
       if (!it.kind.startsWith(CONTAINER.id) || it.lean) continue;
       if (it.y > heightAt(this.world.heights, it.x, it.z) + 1) {
         it.lean = [0, 0, it.y];
@@ -1711,6 +1725,8 @@ export class Buildings {
     // town's (see APART in the economy). (Kalat's come after these: main.ts and server/world.ts add them.)
     mark(townLoot);
     this.lootPoints.push(...townLoot);
+    mark(this.laterLoot);
+    this.laterLoot.push(...this.laterCellars);
     // (and the new places' things, the towns' buildings' furniture first. A crate stacked on another is set a hand's
     // breadth askew, as the fort's are: what is searched is told by where it stands)
     const searched = (q: Instance) => CRATE_KINDS.has(q.kind.split(/[#@]/)[0]) || SEARCHED_KINDS.has(q.kind.split(/[#@]/)[0]);
@@ -1729,14 +1745,29 @@ export class Buildings {
         this.world.props.push({ kind: q.id, x, y, z, rot: yaw + q.rot, scale: 1, far: 46 });
       }
     }
+    // (and the later towns' furniture and things, last of all)
+    for (const q of laterProps) {
+      while (searched(q) && taken.has(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`)) q.x += 0.11;
+      if (searched(q)) taken.add(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`);
+      this.world.props.push(q);
+    }
     // Nothing stands in a building's way out: what the yards, sites, village and towns set about the buildings is
     // slid clear of each door when all of it is laid (src/world/ways-out.ts). No dice: nothing else moves.
-    this.waysCleared = clearWaysOut(this.world, (plot) => blueprint(plot.type, new RNG(plot.seed)), assets.manifest.models, this.lootPoints);
+    const all = [...this.lootPoints, ...this.laterLoot];
+    this.waysCleared = clearWaysOut(this.world, (plot) => blueprint(plot.type, new RNG(plot.seed)), assets.manifest.models, all);
+    // (and from over the steps down to a basement, and their kerb: src/world/ways-out.ts)
+    this.wellsCleared = clearWells(this.world, assets.manifest.models, all);
     // (and which places are inside the furniture they lie on: the same here and on the server, by the same props)
-    markInside(this.lootPoints, this.world.props);
+    markInside(all, this.world.props);
+    // (and the later towns' doors after every other door)
+    this.doorSpecs.push(...laterDoors);
   }
+  /** the later towns' places for things (LATER_TOWNS), for whoever plans the map to add after every other (main.ts, server/world.ts) */
+  laterLoot: LootPoint[] = [];
   /** how many things clearWaysOut slid out of a door's way, the last time the map was planned */
   waysCleared = 0;
+  /** and how many clearWells slid off the way down to a basement */
+  wellsCleared = 0;
 
   /**
    * The basements: what they are made of (src/world/basement-build.ts), what stands in them, and their places for
@@ -1771,8 +1802,16 @@ export class Buildings {
     }
     mark(points);
     points.forEach((p, i) => (p.tier = Math.min(4, (p.tier ?? 1) + better[i]) as Tier));
-    this.lootPoints.push(...points);
+    // (a cellar under a house of a town laid later (LATER_TOWNS) has its places after every other place, with that
+    // town's: here they had renumbered every town's)
+    const later = new Set(list.filter((b) => LATER_PLOT.test(b.plot)).flatMap((b) => b.spots.map((s) => `${b.plot}|${s.x}|${s.z}`))), own: LootPoint[] = [], last: LootPoint[] = [];
+    let k = 0;
+    for (const b of list) for (const s of b.spots) (later.has(`${b.plot}|${s.x}|${s.z}`) ? last : own).push(points[k++]);
+    this.lootPoints.push(...own);
+    this.laterCellars = last;
   }
+  /** the later towns' cellars' places (see planBasements), added to laterLoot */
+  private laterCellars: LootPoint[] = [];
 
   /**
    * What stands in the grounds of the hospital and of the headquarters (2026-10-12: "the new buildings need more,
@@ -2718,6 +2757,30 @@ export class Buildings {
       }
     }
 
+    // (a building of one or two floors in a dress of its own: piers up its face and a band under its roof, as the big
+    // ones have. Said of the cathedral and never drawn till 2026-10-23, the owner: "the church is missing character")
+    if (!bp.levels && bp.dress && (bp.dress.piers || bp.dress.bands)) {
+      const dr = bp.dress, y0 = (dr.plinth?.h ?? 0.26) - 0.012, out = 0.075;
+      if (dr.piers) {
+        const half = dr.piers.w / 2, key = dr.piers.key;
+        for (const x of dr.piers.front ?? []) addBox(key, x - half, x + half, y0, H - 0.03, hd + 0.002, hd + out, B, false);
+        for (const x of dr.piers.back ?? []) addBox(key, x - half, x + half, y0, H - 0.03, -hd - out, -hd - 0.002, B, false);
+        for (const z of dr.piers.left ?? []) addBox(key, -hw - out, -hw - 0.002, y0, H - 0.03, z - half, z + half, B, false);
+        for (const z of dr.piers.right ?? []) addBox(key, hw + 0.002, hw + out, y0, H - 0.03, z - half, z + half, B, false);
+      }
+      if (dr.bands) {
+        // (proud of the piers, so that no face of the one lies in a face of the other)
+        const at = [H - 0.42, ...(bp.upper ? [h + SLAB / 2 - 0.16] : [])], o2 = out + 0.03;
+        for (const ya of at) {
+          const yb = ya + (ya === at[0] ? 0.42 : 0.32);
+          if (!joined.has('front')) addBox(dr.bands, -hw - o2, hw + o2, ya, yb, hd + 0.002, hd + o2, B, false);
+          if (!joined.has('back')) addBox(dr.bands, -hw - o2, hw + o2, ya, yb, -hd - o2, -hd - 0.002, B, false);
+          if (!joined.has('left')) addBox(dr.bands, -hw - o2, -hw - 0.002, ya, yb, -hd - 0.002, hd + 0.002, B, false);
+          if (!joined.has('right')) addBox(dr.bands, hw + 0.002, hw + o2, ya, yb, -hd - 0.002, hd + 0.002, B, false);
+        }
+      }
+    }
+
     // --- the floor above, and the stairs to it
     if (bp.upper && bp.stairs) {
       const up = bp.upper, st = bp.stairs;
@@ -2824,13 +2887,17 @@ export class Buildings {
       const rise = d * (plot.type === 'barn' ? 0.36 : 0.32);
       const ang = Math.atan2(rise, hd);
       const oh = 0.45;
+      // (where a gable stands against a neighbour's, a row's houses wall to wall as Pokrov's lanes are, the roof stops
+      // at it: 0.45 m out each, two roofs went through each other where houses stood 0.2 m apart. The owner,
+      // 2026-10-23: "the buildings to the south east of pokrov are clipping into each other")
+      const [ohL, ohR] = this.abuts(plot).map((a) => (a ? 0.04 : oh));
       const slopeLen = hd / Math.cos(ang) + oh;
       for (const s of [1, -1]) {
         const R = B.clone()
           .multiply(new THREE.Matrix4().makeTranslation(0, H + rise + 0.02, 0))
           .multiply(new THREE.Matrix4().makeRotationX(s * ang));
         const z0 = s > 0 ? 0 : -slopeLen, z1 = s > 0 ? slopeLen : 0;
-        addBox(bp.roof, -hw - oh, hw + oh, 0, 0.1, z0, z1, R);
+        addBox(bp.roof, -hw - ohL, hw + ohR, 0, 0.1, z0, z1, R);
       }
       // gable ends
       for (const sx of [1, -1]) {
@@ -2838,8 +2905,8 @@ export class Buildings {
         this.push(bp.ext, prismGeo(hd, rise, T, this.tile(bp.ext), G, [-sx, hd - T, bp.upper ? bp.upper.h : h]));
       }
       // ridge cap
-      addBox('trim', -hw - oh, hw + oh, H + rise + 0.02, H + rise + 0.14, -0.12, 0.12, B, false);
-      this.eaves(B, hw, H + rise + 0.02, ang, slopeLen, oh);
+      addBox('trim', -hw - ohL, hw + ohR, H + rise + 0.02, H + rise + 0.14, -0.12, 0.12, B, false);
+      this.eaves(B, hw, H + rise + 0.02, ang, slopeLen, ohL, ohR);
     } else if (bp.roofType === 'shed') {
       // single pitch: highest over the door, falling to the back wall
       const rise = 0.55;
@@ -3194,20 +3261,41 @@ export class Buildings {
   }
 
   /** The edges of a pitched roof: a board hung along each eave, and one down each slope at either end. */
-  private eaves(B: THREE.Matrix4, hw: number, ridge: number, ang: number, slopeLen: number, oh: number) {
+  /** the boards along a gable roof's eaves and down its gables; `ohL`, `ohR`: how far it reaches past each gable (see `abuts`) */
+  private eaves(B: THREE.Matrix4, hw: number, ridge: number, ang: number, slopeLen: number, ohL: number, ohR = ohL) {
     const tile = this.tile('trim');
     for (const s of [1, -1]) {
       const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(0, ridge, 0)).multiply(new THREE.Matrix4().makeRotationX(s * ang));
       // (against the end of the roof: through the last of it, its top lay in the roof's own and the two flickered along every eave)
       const z0 = s > 0 ? slopeLen : -slopeLen - 0.06;
-      this.push('trim', boxGeo(-hw - oh, hw + oh, -0.17, 0.1, z0, z0 + 0.06, tile, R));
+      this.push('trim', boxGeo(-hw - ohL, hw + ohR, -0.17, 0.1, z0, z0 + 0.06, tile, R));
       // (the two boards down a gable cross at its peak: one of them is the thinner, so that no face of one lies in a face of the other)
       const half = s > 0 ? 0.03 : 0.022;
       for (const sx of [1, -1]) {
-        const x = sx * (hw + oh);
+        const x = sx * (hw + (sx > 0 ? ohR : ohL));
         this.push('trim', boxGeo(x - half, x + half, -0.17, 0.12, s > 0 ? 0 : -slopeLen, s > 0 ? slopeLen : 0, tile, R));
       }
     }
+  }
+
+  /** which of a building's gables (its own -x, +x) stand within a metre of a neighbour's side by side with it, turned as it is */
+  private abutting: Map<string, [boolean, boolean]> | null = null;
+  private abuts(plot: BuildingPlot): [boolean, boolean] {
+    if (!this.abutting) {
+      const list = this.world.buildings, map = new Map<string, [boolean, boolean]>();
+      for (const a of list) {
+        const [wa, da] = BUILDING_FOOTPRINT[a.type] ?? [0, 0], c = Math.cos(a.rot), s = Math.sin(a.rot), out: [boolean, boolean] = [false, false];
+        for (const b of list) {
+          if (b === a || Math.abs(b.x - a.x) > 30 || Math.abs(b.z - a.z) > 30 || Math.abs(Math.sin(b.rot - a.rot)) > 0.05) continue;
+          const [wb, db] = BUILDING_FOOTPRINT[b.type] ?? [0, 0], dx = b.x - a.x, dz = b.z - a.z, lx = dx * c - dz * s, lz = dx * s + dz * c;
+          const gap = Math.abs(lx) - (wa + wb) / 2;
+          if (Math.abs(lz) < (da + db) / 4 && gap > -0.1 && gap < 1) out[lx > 0 ? 1 : 0] = true;
+        }
+        map.set(a.id, out);
+      }
+      this.abutting = map;
+    }
+    return this.abutting.get(plot.id) ?? [false, false];
   }
 
   /** (`leaf`: it is a container's leaf, of the orange one (0) or the blue (1), and not a door of boards) */
@@ -3604,6 +3692,11 @@ export class Buildings {
 
   private matCache = new Map<string, THREE.Material>();
   /** @param apart a paint of its own, the same in every way (the doors' leaves, drawn many times over, are not drawn with the walls' own: three chose a shader again each time it went from the one to the other) */
+  /** a paint of the buildings' and how many metres its picture covers, for what is made beside them in their stuffs (Pokrov's tower tents) */
+  paintOf(key: Exclude<MatKey, 'glass'>): { mat: THREE.Material; tile: number } {
+    return { mat: this.material(key), tile: MATS[key].tile };
+  }
+
   private material(key: MatKey, apart = '', own?: { patch: ShaderPatch; key: string }): THREE.Material {
     let m = this.matCache.get(key + apart);
     if (m) return m;

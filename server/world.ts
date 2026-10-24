@@ -110,6 +110,8 @@ export function buildWorldData(root: string) {
   for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, (x, z) => heightAt(world.heights, x, z)));
   // (and the pass's caves' and its floor's cache, after those: src/sim/pass.ts)
   buildings.lootPoints.push(...caveLootPoints());
+  // (and the towns' parts', last: src/sim/town-parts.ts)
+  buildings.lootPoints.push(...buildings.laterLoot);
   // (what is searched: the crates and lockers, and the furniture that holds things, src/sim/storage.ts)
   const crates: CrateSpot[] = world.props
     .map((p) => ({ p, kind: p.kind.split(/[#@]/)[0] }))

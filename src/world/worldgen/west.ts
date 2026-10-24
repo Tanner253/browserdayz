@@ -24,10 +24,12 @@ import { catmullRom, heightAt, slopeAt } from './ground';
 import { PLACED, PLAN, bed, inBox, inside, movedPost, onLine, openness, outside } from './west-plan';
 import { passFloor, passLine, ridgeAt, shapeRelief, valleyLine } from './west-relief';
 import { carveRiver, cutLake, cutSwamp, holdShore, lakeLevel, riverMask, riverWater, swampIn, swampShore } from './west-water';
-import { DESERT_EAST, desertTown, fillTown, footOn, hamletGround, kalatSite, layKalat, layPad, offPad, padHeld, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
-import { POKROV, moundAt, placedRooms } from '../../sim/towns';
+import { DESERT_EAST, desertTown, fillTown, footOn, hamletClear, reedsOf, kalatSite, layKalat, layPad, offPad, padHeld, padLevel, placed, placedTown, swampPad, townLocal } from './west-towns';
+import { POKROV, isLater, moundAt, placedRooms, townGround, townPoint, type Town } from '../../sim/towns';
+import { isOutpost } from '../../sim/outposts';
+import { POKROV_LANE } from '../../sim/pokrov';
 import { HUNTING_TOWERS, WATCHTOWERS, huntingId, watchtowerId } from '../../sim/watchtowers';
-import type { Instance, POI, Site } from './types';
+import type { Instance, POI, Reeds, Site } from './types';
 
 /** the shape of the new ground, in metres west of the square's edge (`d`) or from the shore (`c`, + inland) */
 export const WEST = {
@@ -87,6 +89,7 @@ export interface WestFields extends SquareFields {
   slabs: SlabRun[];
   water: Waters;
   sand: Uint8Array;
+  reeds: Reeds;
 }
 
 export interface WestTools {
@@ -215,7 +218,9 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   cutLake(heights, net, PLAN.lake.outline, lake, PLAN.lake.deep);
   const hamlet = placedTown(MOKROYE.name), swamp = cutSwamp(heights, net);
   padY.set(MOKROYE.name, swampPad(swamp));
-  for (const t of PLACED) layPad(heights, net, t, padY.get(t.name)!, t.name === OZERKI.name ? lake : undefined);
+  // (a town's part on its town's pad, laid with it: src/sim/town-parts.ts)
+  for (const t of PLACED) if (t.part) padY.set(t.name, padY.get(t.part)!);
+  for (const t of PLACED) if (!t.part) layPad(heights, net, t, padY.get(t.name)!, t.name === OZERKI.name ? lake : undefined);
 
   // KALAT, on its own land in the desert
   const kalat = kalatSite(heights, net), kalatLand = layKalat(heights, net, kalat);
@@ -266,8 +271,18 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
     const [lx, lz] = townLocal(t, x, z), m = desertTown(t) ? 0 : 10;
     return Math.abs(lx) < t.pad[0] - m && Math.abs(lz) < t.pad[1] - m;
   });
+  // (Down Pokrov's lane the road IS the lane: as its points alone lay it, it bowed 8 m south between the lane's ends,
+  // over the fronts of the houses on its south side; the owner, 2026-10-23: "the green houses south of pokrov sit on the
+  // pavement of the road rather than to either side of it". Inside the town's pad only, eased in from its ends, so that
+  // nothing of the road outside the town moves, and it keeps every point it had.)
+  const pokrov = placedTown(POKROV.name), lane = ([x, z]: [number, number]): [number, number] => {
+    const [lx, lz] = townLocal(pokrov, x, z);
+    if (Math.abs(lx) >= pokrov.pad[0] || Math.abs(lz - POKROV_LANE) > 20) return [x, z];
+    const w = 1 - smoothstep(pokrov.pad[0] - 45, pokrov.pad[0] - 5, Math.abs(lx)), c = Math.cos(pokrov.rot), s = Math.sin(pokrov.rot), to = lz + (POKROV_LANE - lz) * w;
+    return [pokrov.x + lx * c + to * s, pokrov.z - lx * s + to * c];
+  };
   const lay = (pts: [number, number][], from: { points: Float32Array; width: number } | null, width: number, side: boolean) => {
-    const line = catmullRom(pts, 4), raw = line.map(([x, z]) => heightAt(heights, x, z)), nL = line.length;
+    const line = catmullRom(pts, 4).map(lane), raw = line.map(([x, z]) => heightAt(heights, x, z)), nL = line.length;
     const ys = raw.map((_, k) => { let s = 0, c = 0; for (let j = -12; j <= 12; j++) { const q = 1 - Math.abs(j) / 13; s += raw[clamp(k + j, 0, nL - 1)] * q; c += q; } return s / c; });
     // (and a road leaves the one it leaves level with it: across that one's own bed and a little more, it is that
     // one's height, as its bed will be, laid after it)
@@ -434,26 +449,41 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
   for (const y of yard) clearYard(grass, y);
   // (Kalat's land bare, as the desert is)
   for (let i = 0; i < n; i++) if (kalatLand.share[i] > 76) grass[i] = 0;
+  // (the swamp's reeds: where its ground is from a man's knee under its water to a hand over it, in clumps, and down
+  // both sides of the hamlet's boardwalks a stride off them; none at a house, a thing or on the boards. The owner's
+  // review, 2026-10-23: "reeds and cattails in clumps, rushes along the boardwalks". The grass's own blades grown tall
+  // there, src/world/grass.ts: Poly Haven has no reed, and its grass clumps are a million triangles each)
+  const reeds = reedsOf(heights, swamp, hamlet);
+  // (and the ground under a reed bed dark with their litter, the forest floor's paint: a bed is seen from the sky too)
+  for (let j = 0; j < reeds.nz; j += 2) for (let k = 0; k < reeds.nx; k += 2) {
+    const r = reeds.data[j * reeds.nx + k] / 255;
+    if (r < 0.2) continue;
+    const ix = Math.round((reeds.x0 + k * reeds.cell - WORLD_X0) / CELL), iz = Math.round((reeds.z0 + j * reeds.cell - WORLD_Z0) / CELL);
+    if (ix < 0 || iz < 0 || ix >= NX || iz >= NZ) continue;
+    const i = iz * NX + ix, w = 0.55 * smoothstep(0.2, 0.7, r);
+    for (let ch = 0; ch < 4; ch++) splat[i * 4 + ch] = Math.round(splat[i * 4 + ch] * (1 - w) + (ch === 1 ? 255 * w : 0));
+  }
 
   // ---- THE TOWNS: their buildings, things and slab walls, and their yards and lanes painted (west-towns.ts); a desert
   // town's things on the ground as it is now, its last (nothing after this moves the ground under them), another's
   // where the roads' beds, the river or the lake's shore have moved it off the pad
   const towns: PlacedTown[] = [], slabs: SlabRun[] = [];
   const ground = (x: number, z: number) => heightAt(heights, x, z);
-  for (const t of PLACED) {
+  const layTown = (t: Town) => {
     const y = padY.get(t.name)!;
     // (Pokrov's things too: a lamp on its north road and a barrier on its ramp's bank stood at its pad's height, off the ground)
-    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass, trees: tools.trees }, ground, t.x < DESERT_EAST || t.name === POKROV.name);
+    fillTown(t, y, net, { buildings: tools.buildings, props: tools.props, slabs, splat, grass, trees: tools.trees, sands }, ground, t.x < DESERT_EAST || t.name === POKROV.name);
     towns.push(placed(t, y));
-    tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
-  }
+    if (!t.part) tools.pois.push({ name: t.name, x: t.x, z: t.z, radius: Math.round(Math.hypot(t.pad[0], t.pad[1])) });
+  };
+  for (const t of PLACED) if (!isLater(t)) layTown(t);
   // ---- KALAT: what lies about it, and its name on the maps
   for (const { piece, place } of ruinsPlan(kalat)) tools.props.push(...ruinProps(piece, place, footOn(ground)));
   tools.pois.push({ name: PLAN.kalat.name, x: kalat.x, z: kalat.z, radius: 240 });
   // ---- THE WATCHTOWERS: Pokrov's bell tower stood alone where the owner dotted the map (src/sim/watchtowers.ts), its
   // door to the nearest road, on ground levelled for it, and nothing growing in it
   /** a foot trail trodden from (x0, z0) to (x1, z1): earth through the grass, a pace and a half wide, wandering a little and ragged at its edges */
-  const trail = (x0: number, z0: number, x1: number, z1: number, seed: number) => {
+  const trail = (x0: number, z0: number, x1: number, z1: number, seed: number, desert = false) => {
     const L = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / L, uz = (z1 - z0) / L;
     for (let d = 0; d <= L; d += CELL * 0.5) {
       // (it bends about as a walker does: never more than a few metres off the straight)
@@ -466,6 +496,8 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
         const i = iz * NX + ix;
         for (let ch = 0; ch < 4; ch++) splat[i * 4 + ch] = Math.max(Math.round(splat[i * 4 + ch] * (1 - bare * 0.85)), ch === 1 ? Math.round(255 * bare * 0.85) : 0);
         grass[i] = Math.round(grass[i] * (1 - bare));
+        // (in the desert, wheel ruts in its cracked earth: the sand lies over the paint)
+        if (desert) sands[i * 4 + 3] = Math.max(sands[i * 4 + 3], Math.round(bare * 170));
       }
     }
   };
@@ -561,10 +593,20 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       const y = heightAt(heights, x, z), rot = hx * Math.PI * 2, scale = 0.85 + hz * 0.35;
       const sIn = inBounds(SB, x, z, 50) ? swampIn(x, z) : -50;
       if (sIn > 0) {
-        // (the swamp: none on the hamlet's ground, which is its own)
-        if (hamletGround(hamlet, x, z) > 0.2) continue;
-        if (y < swamp - 0.05 && hv < 0.035) tools.props.push({ kind: 'dead_tree_trunk', x, y: y - 0.1, z, rot, scale: 0.9 + hz * 0.5 });
-        else if (y > swamp + 0.08 && hv < 0.12) tools.trees.push({ kind: s < 0.5 ? 'bush_a' : s < 0.8 ? 'bush_b' : 'birch_a', x, y, z, rot, scale });
+        // (the swamp, the hamlet's ground too since 2026-10-23, but clear of its houses, its boardwalks and what stands
+        // about them: thickets on the hummocks and islands, thin between, ferns under them; drowned trunks and stumps in
+        // the water. The owner's review: "reeds and cattails in clumps ... dead and drowned trees, bushes and grassy
+        // hummocks". The reeds are the grass's own, grown tall: see reedsOf)
+        if (!hamletClear(hamlet, x, z)) continue;
+        const above = y - swamp, thicket = smoothstep(-0.15, 0.45, n3.noise(x * 0.019 + 3, z * 0.019 - 6));
+        if (above < -0.05) {
+          if (hv < 0.035) tools.props.push({ kind: 'dead_tree_trunk', x, y: y - 0.1, z, rot, scale: 0.9 + hz * 0.5 });
+          else if (hv < 0.05) tools.props.push({ kind: 'tree_stump_01', x, y: y - 0.15, z, rot, scale: 0.8 + hz * 0.4 });
+        } else if (above > 0.06) {
+          // (the birches only in the thickets' hearts: one by one across it all they stood in rows from the sky)
+          if (hv < 0.05 + 0.5 * thicket) tools.trees.push({ kind: thicket > 0.55 && s > 0.62 ? (s > 0.82 ? 'birch_b' : 'birch_a') : s < 0.5 ? 'bush_a' : 'bush_b', x, y, z, rot, scale });
+          else if (hv < 0.1 + 0.55 * thicket) tools.props.push({ kind: 'fern_02', x, y, z, rot, scale: 0.8 + hz * 0.5, far: 90 });
+        }
         continue;
       }
       if (x < east) {
@@ -622,13 +664,30 @@ export function toWorld(sq: SquareFields, tools: WestTools): WestFields {
       }
     }
   }
+  // ---- THE TOWNS LAID LATER (their parts, src/sim/town-parts.ts; the dig camp, src/sim/desert.ts): last of everything
+  // the west lays, so that not one building, thing or door laid before them is renumbered for them
+  for (const t of PLACED) if (isLater(t)) layTown(t);
+  // (and a track trodden to each of the open country's places from the nearest road, to the end of its own lane: the
+  // ground as it is, nothing moved; src/sim/outposts.ts)
+  for (const [k, t] of PLACED.filter((p) => isOutpost(p)).entries()) {
+    const lane = townGround(t).lanes[0]?.line[0];
+    if (!lane) continue;
+    const [lx, lz] = townPoint(t, lane[0], lane[1]);
+    let best = Infinity, rx = lx, rz = lz;
+    for (const r of [...ways, ...tools.roads]) for (let i = 0; i < r.points.length; i += 3) {
+      const d = Math.hypot(r.points[i] - lx, r.points[i + 2] - lz);
+      if (d < best) [best, rx, rz] = [d, r.points[i], r.points[i + 2]];
+    }
+    if (best > 8 && best < 450) trail(rx, rz, lx, lz, 40 + k, t.x < DESERT_EAST);
+  }
   return {
-    heights, surface, splat, grass, towns, kalat, slabs, sand: sands,
+    heights, surface, splat, grass, towns, kalat, slabs, sand: sands, reeds,
     water: {
       lakes: [{ name: OZERKI.name, level: lake, outline: L }, { name: 'swamp', level: swamp, outline: S, swamp: true }],
       rivers: [{ name: 'the river', pts: river }],
       // (the hamlet's houses with the swamp's water over their floors: drawn still and dark inside, src/sim/water.ts WaterRoom)
-      rooms: placedRooms(placed(hamlet, padY.get(MOKROYE.name)!), BUILDING_FOOTPRINT),
+      // (and its part's, in the same water)
+      rooms: towns.filter((p) => (p.town.part ?? p.town.name) === MOKROYE.name).flatMap((p) => placedRooms(p, BUILDING_FOOTPRINT)),
     },
   };
 }

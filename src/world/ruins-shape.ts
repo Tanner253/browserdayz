@@ -28,9 +28,10 @@ export interface Shape { drawn: Drawn[]; solids: Solid[] }
  * the colour it is washed with (more than 1 lightens it), how many metres of wall or floor one repeat of it
  * covers, and the colour the picture comes to taken all together (what the town is painted with from far off,
  * where it has no pictures). All Poly Haven, CC0.
- *   stone  – rubble limestone in pale mortar: `medieval_blocks_06`, warm pitted stones in heavy mortar. Laid small
- *            (a stone is a hand to a forearm across, as rubble is) and at two sizes and turns mixed in patches
- *            (src/world/ruins.ts), so that a long wall does not show the picture come round again.
+ *   stone  – rubble laid in rough courses: `castle_wall_slates`, washed to the buff of the town's limestone, at two
+ *            sizes mixed in patches (src/world/ruins.ts), so that a long wall does not show the picture come round
+ *            again. (It was `medieval_blocks_06`, laid at 1.35 m: its heavy mortar net came out a grid of squares on
+ *            every front from the town's top, the owner, 2026-10-23: "it is visually ugly".)
  *   core   – the heart of a wall, on its broken top and ends: earth rammed with stones. `sandy_gravel_02`.
  *   earth  – fallen stone and earth: heaps, falls at a breach. The same gravel, darker.
  *   sand   – blown in and trodden: the floors of courts and cisterns, drifts against a wall. `sand_01`.
@@ -41,7 +42,7 @@ export interface Shape { drawn: Drawn[]; solids: Solid[] }
  * `rocks_ground_02` for all the earth, which read as brown dirt and not as desert.)
  */
 export const PAINTS: Record<Paint, { tex: string; tint: V3; tile: number; mean: V3 }> = {
-  stone: { tex: 'medieval_blocks_06', tint: [1.3, 1.3, 1.26], tile: 1.35, mean: [0.298, 0.19, 0.113] },
+  stone: { tex: 'castle_wall_slates', tint: [1.4, 1.36, 1.38], tile: 2.1, mean: [0.255, 0.209, 0.132] },
   core: { tex: 'sandy_gravel_02', tint: [1.02, 1.42, 1.8], tile: 2.2, mean: [0.329, 0.174, 0.082] },
   earth: { tex: 'sandy_gravel_02', tint: [0.86, 1.14, 1.4], tile: 2.2, mean: [0.329, 0.174, 0.082] },
   sand: { tex: 'sand_01', tint: [1.04, 1.04, 1.04], tile: 2.6, mean: [0.384, 0.309, 0.16] },

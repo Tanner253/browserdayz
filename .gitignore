@@ -17,3 +17,6 @@ tools/trailer/emotes.glb
 # the poster and its film at full size: kept on disk, not in the repository (the 1080p pictures are)
 marketing/*-4k.png
 marketing/*.mp4
+
+# scripts/stash-guard.ts: the base world unpacked while it runs
+.stash-base*

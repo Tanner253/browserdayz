@@ -5,6 +5,7 @@
 
 import { BUILDING_FOOTPRINT, TOWN, heightAt, type World } from '../world/worldgen';
 import { POKROV, townPoint } from './towns';
+import { outpostWell } from './outposts';
 import { POKROV_WELL } from './pokrov';
 
 export const WELL = {
@@ -97,6 +98,13 @@ export function wellSpots(world: World): Well[] {
   for (const p of world.towns ?? []) if (p.town.name === POKROV.name) {
     const [x, z] = townPoint(p.town, POKROV_WELL.x, POKROV_WELL.z);
     out.push({ x, y: heightAt(H, x, z), z, rot: p.town.rot + POKROV_WELL.rot, town: POKROV.name });
+  }
+  // (and the herders' in the desert, 2026-10-23: src/sim/outposts.ts. After the others: the ones before keep their numbers)
+  for (const p of world.towns ?? []) {
+    const w = outpostWell(p.town);
+    if (!w) continue;
+    const [x, z] = townPoint(p.town, w.x, w.z);
+    out.push({ x, y: heightAt(H, x, z), z, rot: p.town.rot + w.rot, town: p.town.name });
   }
   return out;
 }

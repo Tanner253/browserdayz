@@ -90,9 +90,9 @@ export function ridgeAt(z: number): [number, number, number] {
 /** the pass's middle z, about which the ridge's west foot stands out as a spur */
 const PASS_Z = (PLAN.pass.line[0][1] + PLAN.pass.line[PLAN.pass.line.length - 1][1]) / 2;
 /** how high the crest stands about a spot: a rough tableland, higher and lower along it */
-function crestY(x: number, z: number) {
+function crestY(x: number, z: number, smooth = false) {
   const R = PLAN.ridge;
-  return R.top + R.peaks * r2.fbm(z * 0.004, 3.3, 3) + 0.5 * R.peaks * r1.fbm(x * 0.01, z * 0.012, 2) + 4 * r3.fbm(x * 0.02, z * 0.02, 2);
+  return R.top + R.peaks * r2.fbm(z * 0.004, 3.3, 3) + 0.5 * R.peaks * r1.fbm(x * 0.01, z * 0.012, 2) + (smooth ? 0 : 4 * r3.fbm(x * 0.02, z * 0.02, 2));
 }
 /**
  * THE STRATA (the owner: "like the grand canyon"): the rock lies in level beds, the hard ones cliffs and the soft
@@ -130,9 +130,10 @@ function butte(x: number, z: number): number {
     const dx = x - bx, dz = z - bz, d0 = Math.hypot(dx, dz);
     if (d0 > r * 2.6) continue;
     const a = Math.atan2(dz, dx), edge = r * (1 + 0.22 * r1.noise(Math.cos(a) * 1.3 + bx * 0.01, Math.sin(a) * 1.3 + bz * 0.01) + 0.08 * r2.noise(a * 3, bz));
-    // (a flat top to its edge, its sides the beds' cliffs, and the scree it sheds round its foot)
+    // (a flat top to its edge, its sides the beds' cliffs, and the scree it sheds round its foot; its top smooth, the
+    // unevenness on its sides only: see the ridge's top)
     const u = (d0 - edge) / (r * 1.4);
-    best = Math.max(best, h * (u <= 0 ? 1 : Math.max(0, 1 - u) ** 1.4) + 1.2 * r3.noise(x * 0.06, z * 0.06));
+    best = Math.max(best, h * (u <= 0 ? 1 : Math.max(0, 1 - u) ** 1.4) + 1.2 * r3.noise(x * 0.06, z * 0.06) * smoothstep(-0.02, 0.06, u));
   }
   return best;
 }
@@ -368,7 +369,15 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
       if (u <= 0) continue;
       const base = west ? yw : ye, top = crestY(x, z), raw = base + (top - base) * Math.pow(smoothstep(0, 0.62, Math.min(u, 1)), 0.9);
       const i = iz * nx + ix;
-      H[i] = Math.max(H[i], strata(raw, x, z) + 1.6 * r3.fbm(x * 0.07, z * 0.07, 2) * smoothstep(0.02, 0.1, u));
+      // (its faces in their beds, cliffs and benches; past the brink its top as the land would lie, rolling and smooth:
+      // in beds and pocked with bumps, the tableland was rings of little cliffs and pits from end to end. The owner,
+      // 2026-10-23: "i like the smoothness like we have on our ground and hills, AND i like the cliffs aesthetic")
+      const face = strata(raw, x, z) + 1.6 * r3.fbm(x * 0.07, z * 0.07, 2) * smoothstep(0.02, 0.1, u), brink = smoothstep(0.64, 0.8, u);
+      const land = raw + (crestY(x, z, true) - top) * smoothstep(0.7, 0.95, u), v = face + (land - face) * brink;
+      // (where its smooth top meets a butte standing out of it, the two run together over a few metres: the higher of
+      // the two, as its faces take it, drew a dark seam across the butte's foot where they crossed, 2026-10-23)
+      const k = 3 * brink, d = k > 0 ? clamp(0.5 + (0.5 * (v - H[i])) / k, 0, 1) : v > H[i] ? 1 : 0;
+      H[i] = k > 0 ? H[i] + (v - H[i]) * d + k * d * (1 - d) * 0.5 : Math.max(H[i], v);
     }
   }
 
@@ -381,7 +390,10 @@ export function shapeRelief(H: Float32Array, net: Net, seam: number, shores: Flo
   passLine.each(net, reach, (i, x, z, a) => {
     const side = a.s >= 0 ? 1 : -1, y = passFloor(a.along) + passRise(Math.abs(a.s) - passHalf(a.along, side), side, a.along, passKeep(x, z));
     const cut = Math.max(y, overCaves(x, z));
-    if (cut < H[i]) H[i] = cut;
+    // (its lip rounded over a few metres where the cut meets the ground: with the tableland smooth, the knife edge it
+    // left drew a dark line along the far wall's foot, seen from the ridge, 2026-10-23)
+    const k = 3, d = clamp(0.5 + (0.5 * (H[i] - cut)) / k, 0, 1), soft = H[i] + (cut - H[i]) * d - 0.5 * k * d * (1 - d);
+    if (soft < H[i]) H[i] = soft;
   });
   return walls;
 }

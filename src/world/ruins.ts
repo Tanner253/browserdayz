@@ -30,15 +30,37 @@ export interface Stood { piece: Piece; place: Place }
 /** a thing got ready to be drawn before it is put in the world: the game's own way of it (Renderer.ready, then Renderer.send) */
 export type Ready = (o: THREE.Object3D) => Promise<unknown>;
 
-/** the two pictures of stone and of earth laid by one material: which a point has is in the fourth part of its colour */
-const twoPictures = (earth: THREE.Texture, earthN: THREE.Texture) => (shader: { uniforms: Record<string, unknown>; fragmentShader: string }) => {
+/**
+ * The two pictures of stone and of earth laid by one material: which a point has is in the fourth part of its colour.
+ * The stone is laid twice, at two sizes and turned, and the two are mixed by a slow cloud across the world, and its
+ * tone wanders with another: laid once, at a hand to a stone, a whole front came out a grid of squares from the town's
+ * top (the owner, 2026-10-23: "one of our weakest POI's it is visually ugly").
+ */
+const twoPictures = (earth: THREE.Texture, earthN: THREE.Texture) => (shader: { uniforms: Record<string, unknown>; vertexShader: string; fragmentShader: string }) => {
   Object.assign(shader.uniforms, { tEarth: { value: earth }, tEarthN: { value: earthN } });
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vRuinW;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRuinW = ( modelMatrix * vec4( position, 1.0 ) ).xyz;');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nuniform sampler2D tEarth;\nuniform sampler2D tEarthN;')
-    .replace('#include <map_fragment>', '#ifdef USE_MAP\n\tdiffuseColor *= mix( texture2D( map, vMapUv ), texture2D( tEarth, vMapUv ), vColor.a );\n#endif')
-    .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replace('texture2D( normalMap, vNormalMapUv ).xyz', 'mix( texture2D( normalMap, vNormalMapUv ).xyz, texture2D( tEarthN, vNormalMapUv ).xyz, vColor.a )'))
+    .replace('#include <common>', `#include <common>
+uniform sampler2D tEarth;
+uniform sampler2D tEarthN;
+varying vec3 vRuinW;
+float ruinCell( vec2 c ) { vec3 q = fract( vec3( c.xyx ) * 0.1031 ); q += dot( q, q.yzx + 33.33 ); return fract( ( q.x + q.y ) * q.z ); }
+float ruinCloud( vec2 p ) { vec2 i = floor( p ), u = fract( p ); u = u * u * ( 3.0 - 2.0 * u ); return mix( mix( ruinCell( i ), ruinCell( i + vec2( 1.0, 0.0 ) ), u.x ), mix( ruinCell( i + vec2( 0.0, 1.0 ) ), ruinCell( i + vec2( 1.0, 1.0 ) ), u.x ), u.y ); }
+// (the second laying: 1.6 times the size, turned end for end (the stone lies in courses: any other turn tilts them), moved off)
+vec2 ruinTurn( vec2 uv ) { return -uv * 0.63 + vec2( 0.37, 0.71 ); }
+float ruinMix() { vec2 w = vRuinW.xz + vRuinW.y * vec2( 0.6, -0.4 ); return smoothstep( 0.36, 0.64, ruinCloud( w * 0.09 ) * 0.72 + ruinCloud( w * 0.31 + 4.1 ) * 0.28 ); }`)
+    .replace('#include <map_fragment>', `#ifdef USE_MAP
+	vec4 ruinStone = mix( texture2D( map, vMapUv ), texture2D( map, ruinTurn( vMapUv ) ), ruinMix() );
+	diffuseColor *= mix( ruinStone, texture2D( tEarth, vMapUv ), vColor.a );
+	diffuseColor.rgb *= 0.86 + 0.26 * ruinCloud( vRuinW.xz * 0.045 + vRuinW.y * 0.06 + 9.3 );
+#endif`)
+    .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replace('texture2D( normalMap, vNormalMapUv ).xyz', 'mix( mix( texture2D( normalMap, vNormalMapUv ).xyz, ruinUnturn( texture2D( normalMap, ruinTurn( vNormalMapUv ) ).xyz ), ruinMix() ), texture2D( tEarthN, vNormalMapUv ).xyz, vColor.a )'))
     // (earth is dull all over: the stone's own map of where it shines is not laid on it)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n\troughnessFactor = mix( roughnessFactor, 1.0, vColor.a );');
+  // (a turned picture's bumps turned back, so that its light falls as the first's does)
+  shader.fragmentShader = shader.fragmentShader.replace('float ruinMix()', 'vec3 ruinUnturn( vec3 n ) { vec2 d = n.xy * 2.0 - 1.0; d = -d; return vec3( d * 0.5 + 0.5, n.z ); }\nfloat ruinMix()');
 };
 
 export class Ruins {

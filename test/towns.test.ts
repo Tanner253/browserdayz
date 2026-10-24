@@ -107,6 +107,15 @@ for (const t of TOWNS) {
     }
   }
 }
+// (a town's part, 2026-10-23, stands among the town's own: its houses apart from the town's, and neither's things in the other's houses)
+for (const p of TOWNS.filter((t) => t.part)) {
+  const town = TOWNS.find((t) => t.name === p.part)!, mine = townBuildings(p), theirs = townBuildings(town);
+  for (const a of mine) for (const b of theirs) ok(!overlap(box(p, a), box(town, b), 0), `${p.name}: its ${a.type} at ${a.x}, ${a.z} and ${town.name}'s ${b.type} at ${b.x}, ${b.z} stand apart`);
+  for (const [things, houses, of] of [[townThings(p), theirs, town], [townThings(town), mine, p]] as const) for (const th of things) {
+    const [x, z] = townPoint(p, th.x, th.z);
+    for (const s of houses) if (s.up === undefined) ok(!overlap(box(of, s), corners(x, z, 0.02, 0.02, 0), -0.3), `${p.name}: a ${th.kind} at ${th.x.toFixed(1)}, ${th.z.toFixed(1)} is inside a ${s.type} at ${s.x}, ${s.z}`);
+  }
+}
 
 // ---- Zavod's wall: moved with the town, the gate left open on the road
 const slabs = placedSlabs(ZAVOD);
@@ -141,7 +150,10 @@ ok(townBuildings(oz).find((s) => s.type === 'boathouse')!.up === DECK, "the boat
   // (the water stands in the houses whose floors are under it, and nowhere else: not under the stilts, not on the islands)
   const mok = TOWNS.find((t) => t.name === 'Mokroye')!, rooms = placedRooms({ town: mok, padY: 50 }, BUILDING_FOOTPRINT);
   ok(rooms.length === 3 && rooms.every((q) => !q.dry), `the water stands in the two flooded houses and the barn (${rooms.length} rooms)`);
-  ok(TOWNS.filter((t) => t !== mok).every((t) => placedRooms({ town: t, padY: 0 }, BUILDING_FOOTPRINT).length === 0), 'no rooms in the towns on dry land');
+  // (and in its part's, 2026-10-23: its two flooded houses; not the house on stilts nor the boathouse over the water, nor the house on piles and the high seat, open under their floors)
+  const reeds = TOWNS.find((t) => t.part === mok.name)!, wet = placedRooms({ town: reeds, padY: 50 }, BUILDING_FOOTPRINT);
+  ok(wet.length === 2 && wet.every((q) => !q.dry), `the water stands in the reeds' two flooded houses (${wet.length} rooms)`);
+  ok(TOWNS.filter((t) => t !== mok && t !== reeds).every((t) => placedRooms({ town: t, padY: 0 }, BUILDING_FOOTPRINT).length === 0), 'no rooms in the towns on dry land');
 }
 
 // ---- every building of a town of one kind, as test/loot.test.ts has it: no shop, clinic or hospital that is also a
