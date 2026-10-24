@@ -27,7 +27,7 @@ import { RockField } from './world/rock-field';
 import { CANYON_ROCK_TINT } from './world/ground';
 import { outcropPieces } from './world/outcrops';
 import { passPlan } from './world/worldgen';
-import { loadWorld } from './world/load-world';
+import { loadWorld, mapFrom } from './world/load-world';
 import { Atmosphere, SHADOW_FRUSTA } from './world/atmosphere';
 import { installTiny } from './core/tiny';
 import { layBait } from './net/bait';
@@ -93,6 +93,8 @@ function tell(how: 'ok' | 'failed' | 'slow' | 'died' | 'lost', err = '') {
       gl: card,
       screen: `${innerWidth}x${innerHeight}@${devicePixelRatio}`,
       mem: (navigator as { deviceMemory?: number }).deviceMemory ?? 0,
+      map: mapFrom.how,
+      mapS: mapFrom.secs,
     });
     if (!navigator.sendBeacon?.('/api/boot', new Blob([body], { type: 'application/json' }))) void fetch('/api/boot', { method: 'POST', body, keepalive: true }).catch(() => {});
   } catch {

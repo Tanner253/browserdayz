@@ -8,11 +8,12 @@
 //
 // What is in a line: how it went (ok, failed, slow, died: the last start never finished, lost: the picture was
 // shut down), how far it got and in how many seconds, what went wrong in the page's own words, what kind of
-// browser and graphics chip it is, and the size of the screen. Nothing that says who anybody is: no name, no
-// wallet, no address. Only what is named below is kept, and only so much of each.
+// browser and graphics chip it is, the size of the screen, and how the map was had (`map`: the built file, kept in
+// the browser, or made; `mapS`: in how many seconds). Nothing that says who anybody is: no name, no wallet, no
+// address. Only what is named below is kept, and only so much of each.
 
-const WORDS = ['how', 'stage', 'err', 'died', 'ua', 'gl', 'screen'] as const;
-const NUMBERS = ['secs', 'deaths', 'lean', 'touch', 'got', 'mem'] as const;
+const WORDS = ['how', 'stage', 'err', 'died', 'ua', 'gl', 'screen', 'map'] as const;
+const NUMBERS = ['secs', 'deaths', 'lean', 'touch', 'got', 'mem', 'mapS'] as const;
 
 export async function POST(req: Request): Promise<Response> {
   let said: Record<string, unknown>;

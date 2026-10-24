@@ -36,7 +36,16 @@ async function make() {
   try {
     // Vite's content-hashed worker URL changes with the generator and its dependencies. Development never caches.
     const key = import.meta.env.PROD && typeof location !== 'undefined' ? location.href : undefined;
-    const world = (key && (await fetched(key))) || (await cachedWorld(key, () => withCaves(generateWorld())));
+    // (and how it was had, for the start's report: the built file, kept in this browser, or made here)
+    let how = 'file';
+    let world = key ? await fetched(key) : null;
+    if (!world) {
+      how = 'kept';
+      world = await cachedWorld(key, () => {
+        how = 'made';
+        return withCaves(generateWorld());
+      });
+    }
     const buffers = new Set<ArrayBuffer>();
     const seen = new Set<object>();
     const collect = (value: unknown) => {
@@ -46,7 +55,7 @@ async function make() {
       else for (const child of Object.values(value)) collect(child);
     };
     collect(world);
-    endpoint.postMessage({ world }, [...buffers]);
+    endpoint.postMessage({ world, how }, [...buffers]);
   } catch (error) {
     endpoint.postMessage({ error: String(error) });
   }
