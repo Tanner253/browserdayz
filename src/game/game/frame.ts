@@ -11,7 +11,6 @@ import { controls } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
 import { CUT } from '../../../arena/rules';
 import { ITEMS, capacityOf } from '../../sim/items';
-import { SLOT_ORDER } from '../../sim/inventory';
 import { weightFelt } from '../../sim/powers';
 import { MAX_STAMINA } from '../../net/protocol';
 import { greyOf, bleedsOutIn, BLOOD } from '../../sim/blood';
@@ -152,9 +151,9 @@ export const frameMethods = {
     const typing = this.hud.chatOpen;
     // A phone has no row of number keys under the fingers: whatever is picked up to fight with
     // comes into the hands by itself when they are empty, unless they were emptied on purpose.
-    if (this.touch && playing && !uiOpen && !this.use && !this.garage.ride && !this.handsFree && !this.weapons.equippedItem && !this.weapons.busy) {
-      const slot = this.inHand ? null : SLOT_ORDER.find((s) => this.inv.slots[s]);
-      if (slot) this.weapons.equip(slot);
+    if (this.touch && playing && !uiOpen && !this.use && !this.garage.ride && !this.handsFree && !this.inv.held() && !this.weapons.busy) {
+      const first = this.inv.ring()[0];
+      if (first) this.takeUp(first);
     }
 
     // binoculars come down for anything else: a trigger, a sprint, the pockets, a hit
@@ -352,7 +351,7 @@ export const frameMethods = {
     if (this.ready) {
       const r = this.ready;
       r.t += dt;
-      const kept = this.loose === r.item || this.inv.containers.some((c) => c.has(r.item));
+      const kept = this.inv.held() === r.item;
       // (a magazine: the wheel turns over what the button does with it, filling or emptying, and it stays in the hand)
       if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.turnMagWork()) input.wheel = 0;
       // (the wheel goes on to the next thing on the hot bar from this one; with no other, it is put away)
@@ -403,10 +402,7 @@ export const frameMethods = {
         // (what is done a round at a time has begun on the next one: the button is still what keeps it going)
         if (this.use) this.holding = hold;
         else if (this.inHand) this.rest();
-        else {
-          this.weapons.endUse();
-          this.settle();
-        }
+        else this.weapons.endUse();
       }
     }
 

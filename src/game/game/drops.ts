@@ -10,7 +10,6 @@ import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
 import { CUT } from '../../../arena/rules';
 import { newUid, ITEMS, fittedOf, quietOf } from '../../sim/items';
-import { SLOT_ORDER } from '../../sim/inventory';
 import type { WorldLoot } from '../../sim/economy';
 import { WEAPON_RULES } from '../../sim/combat';
 import { shotOf } from '../../sim/gunplay';
@@ -201,7 +200,6 @@ export const dropsMethods = {
       this.use = null;
       this.weapons.endUse();
       this.act('stop');
-      this.settle();
     }
     this.meDirty = true;
   },
@@ -336,13 +334,11 @@ export const dropsMethods = {
 
   /** The next weapon carried, round and round (the mouse wheel, for a thumb: it never stops on empty hands). False: none is carried. */
   nextWeapon(this: Game): boolean {
-    const have = SLOT_ORDER.filter((s) => this.inv.slots[s]);
+    const have = this.inv.ring();
     if (!have.length) return false;
     if (this.use || this.garage.ride) return true;
-    const at = this.inv.active ? have.indexOf(this.inv.active) : -1;
-    this.handsFree = false;
-    this.stow();
-    this.weapons.equip(have[(at + 1) % have.length]);
+    const next = have[(have.indexOf(this.inv.held()!) + 1) % have.length];
+    if (next !== this.inv.held()) this.takeUp(next);
     return true;
   },
 

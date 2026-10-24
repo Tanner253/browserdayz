@@ -109,9 +109,14 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     looseFor: (mag) => inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
     assignHot: (it, i) => inv.bind(i, it),
     hotIndex: (it) => inv.hotOf(it),
-    hold: () => {},
-    release: () => {},
-    inHands: () => null,
+    // (the hands as the game has them: a place of their own, and nothing drawn in them here)
+    hold: (it) => {
+      const ok = inv.hold(it);
+      if (!ok) console.info('no room to put away what is in the hands');
+      screen?.render();
+      return ok;
+    },
+    inHands: () => inv.held(),
     goingIn: () => null,
     lying: () => 'mine',
     changed: () => {

@@ -86,7 +86,7 @@ ok('what is worn has DayZ\'s eleven places, beside the two on the back and the h
   assert.deepEqual(GEAR_SLOTS, ['head', 'face', 'eyes', 'top', 'vest', 'belt', 'legs', 'back', 'hands', 'feet', 'armband']);
   assert.deepEqual(ALL_SLOTS, [...WEAPON_SLOTS, ...GEAR_SLOTS]);
   assert.deepEqual(SLOT_LABEL, {
-    primary: 'On the back', secondary: 'On the back', holster: 'Holster',
+    held: 'In your hands', primary: 'On the back', secondary: 'On the back', holster: 'Holster',
     head: 'Head', face: 'Face', eyes: 'Eyes', top: 'Top', vest: 'Vest', belt: 'Belt', legs: 'Legs', back: 'Back', hands: 'Gloves', feet: 'Feet', armband: 'Armband',
   });
   for (const s of ALL_SLOTS) assert.ok(SLOT_KIND[s] && SLOT_LABEL[s], `${s} has no kind or no name`);
@@ -200,19 +200,23 @@ ok('with nothing on the top or the legs there are no pockets there: hands only',
   assert.equal(jacket.cargo![0].item, tin);
 });
 
-ok('taken off, a jacket keeps what is in its pockets; another is put on in its place; a hot key on a thing in the first finds nothing', () => {
+ok('taken off, a jacket keeps what is in its pockets; another is put on in its place; a hot key on a thing in the first finds nothing; what is in the hands stays there', () => {
   const inv = new PlayerInventory();
-  const mine = inv.slots.top!, tin = makeItem('beans'), dressing = makeItem('bandage');
+  const mine = inv.slots.top!, tin = makeItem('beans'), dressing = makeItem('bandage'), stim = makeItem('stim');
   inv.add(tin);
   inv.add(dressing);
+  inv.add(stim);
   inv.bind(4, dressing);
-  inv.hold(dressing);
-  assert.equal(inv.held(), dressing);
+  inv.bind(5, stim);
+  // (taken out of the pocket into the hands, a place of their own)
+  assert.ok(inv.hold(stim));
+  assert.equal(inv.held(), stim);
   inv.remove(mine);
   assert.equal(inv.slots.top, null);
   assert.deepEqual(mine.cargo!.map((p) => p.item), [tin, dressing], 'the jacket came off without what was in it');
-  assert.equal(inv.held(), null, 'a thing in a jacket on the ground is still in the hands');
+  assert.equal(inv.held(), stim, 'what was in the hands went with the jacket');
   assert.equal(inv.hotItem(4), null);
+  assert.equal(inv.hotItem(5), stim);
   assert.ok(!inv.find((it) => it === tin));
   const other = makeItem('field_jacket');
   other.cargo = [{ item: makeItem('stim'), x: 3, y: 3, rot: false }];
@@ -272,7 +276,7 @@ for (const file of FIXTURES) {
     const before = census(old(file));
     const kept = cleanInventory(old(file), name)!;
     assert.deepEqual(kept.containers.map((c) => c.id), ['tags'], `the server kept grids of the old shape, or leftovers (${SPILL})`);
-    assert.equal(kept.active, null);
+    assert.equal(kept.slots.held ?? null, null);
     assert.equal(kept.slots.top?.id, 'field_jacket');
     assert.equal(kept.slots.legs?.id, 'field_trousers');
     const after = census(kept);
@@ -511,7 +515,7 @@ ok('what is no thing is left out of what the server keeps, and what is said of a
   assert.deepEqual(cleanStored([{ uid: 'a', id: 'bandage', qty: 1, x: 1, y: 2, rot: 1 }, { uid: 'b', id: 'bandage', qty: 1 }, { uid: 'c', id: 'nothing', qty: 1, x: 0, y: 0 }], name), [{ uid: 'a', id: 'bandage', qty: 1, x: 1, y: 2, rot: true }]);
   assert.equal(cleanInventory(null, name), null);
   assert.equal(cleanInventory('inventory', name), null);
-  assert.deepEqual(cleanInventory({ slots: { ['x'.repeat(16)]: makeItem('ak'), top: null, legs: null }, containers: 'none' }, name), { slots: { top: null, legs: null }, active: null, containers: [], hot: Array(HOT_KEYS).fill(null) });
+  assert.deepEqual(cleanInventory({ slots: { ['x'.repeat(16)]: makeItem('ak'), top: null, legs: null }, containers: 'none' }, name), { slots: { top: null, legs: null }, containers: [], hot: Array(HOT_KEYS).fill(null) });
 });
 
 // ------------------------------------------------------------------ a body
@@ -592,14 +596,15 @@ ok('every set of things a person can have on at once, with their own tag and a f
     if (!kinds.length) return then(picked);
     for (const id of shapes(kinds[0])) each(kinds.slice(1), [...picked, id], then);
   };
-  for (const a of long) for (const b of long) {
+  // (and a third long thing in the hands, or nothing: the hands are a place, 2026-10-24, "2 weapons on their back and 1 more in their hand")
+  for (const a of long) for (const b of long) for (const c of [biggest('long'), null]) {
     // every shape of what varies, with everything else on
-    each(varied, [a, b, ...fixed.map(biggest)], lay);
+    each(varied, [a, b, c, ...fixed.map(biggest)], lay);
     // and each of the rest left off in its turn, with the biggest of what varies
-    for (const off of fixed) lay([a, b, ...fixed.map((k) => (k === off ? null : biggest(k))), ...varied.map(biggest)]);
+    for (const off of fixed) lay([a, b, c, ...fixed.map((k) => (k === off ? null : biggest(k))), ...varied.map(biggest)]);
   }
   assert.ok(sets > 3000, `only ${sets} sets were laid out`);
-  assert.equal(most, 132, 'the most a person can have on is not what it was when the grid was sized: see BODY_GRID');
+  assert.equal(most, 162, 'the most a person can have on is not what it was when the grid was sized: see BODY_GRID');
   assert.ok(BODY_GRID[0] * BODY_GRID[1] >= most);
   // (a grid sent is read to as many things as a body has cells: here, and cleanStored in server/players.ts likewise)
   assert.equal(cleanStored(Array.from({ length: 200 }, (_, i) => ({ id: 'bandage', uid: `b${i}`, x: 0, y: 0 })), (v) => String(v)).length, BODY_GRID[0] * BODY_GRID[1], 'the server reads fewer things out of a grid than a body has cells');

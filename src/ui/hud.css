@@ -877,8 +877,6 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 /* the hands: the one place that is not a place on the body */
 .inv-slot.slot-inhands { border-color: rgba(255, 211, 90, 0.35); }
 /* (held, and carried nowhere: there was no room for it) */
-.inv-slot.slot-inhands.loose { border-style: dashed; border-color: var(--accent); }
-.inv-slot.slot-inhands.loose .slot-label::after { content: ' · no room for it'; color: var(--accent); }
 .inv-slot.slot-inhands.empty::after { content: 'Empty: drag a thing here'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; letter-spacing: 0.08em; color: var(--ink-faint); pointer-events: none; }
 /* under a gun, the places on it that take a part: each a slot of its own, dragged onto and dragged off */
 .inv-armed { min-width: 0; }

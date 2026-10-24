@@ -227,10 +227,10 @@ export const enterMethods = {
     // out of the aerial shot and down into the character's eyes (in a wager, straight in: a round starts in the eyes;
     // and back after a dropped line, where the eyes already were)
     this.director.flyIn(wagerQuery() || again ? 0.001 : undefined);
-    if (!this.weapons.equippedItem) {
-      const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
-      if (slot) this.weapons.equip(slot);
-    }
+    // (what was in the hands is in them again; empty, they take up the first gun on the back or in the holster)
+    const first = this.inv.held() ? null : this.inv.ring()[0];
+    if (first) this.takeUp(first);
+    else this.showHands(true);
     if (this.input.locked) this.unpause();
     else this.hud.showStart(true, true, waited && welcome ? 'You are in: click to play' : '');
   },
@@ -331,8 +331,8 @@ export const enterMethods = {
       await this.botCheck.deal(turn, go, need, secs, lay);
       // (straight to the eyes: the range's clock is running)
       this.director.flyIn(0.5);
-      const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
-      if (slot && !this.weapons.equippedItem) this.weapons.equip(slot);
+      const first = this.inv.held() ? null : this.inv.ring()[0];
+      if (first) this.takeUp(first);
       // (the mouse was let go for the check before this one: the next click on the game takes it again. On a phone there
       // is no mouse to take, and a tap is not that click: it waited paused, with no controls on the screen, for good. A
       // player on Android, 2026-10-15: "I can get into the bot test but there is no way of moving/controlling".)
@@ -426,7 +426,6 @@ export const enterMethods = {
       // (whatever the hands were at is dropped: a kit asked for again is the same kit, whole, in place of what is left of the last)
       if (this.use) this.breakOff();
       if (this.invUI.isOpen) this.toggleInventory(false);
-      this.loose = null;
       this.weapons.take(null);
       const me = publicId();
       inv.sortTags((tag) => tag.pid === me);
@@ -476,11 +475,8 @@ export const enterMethods = {
       it.cargo.splice(0, it.cargo.length, ...kept);
       for (const p of it.cargo) strip(p.item);
     };
-    if (this.inHand && gone.has(this.inHand.uid)) this.emptyHands();
-    if (this.loose && gone.has(this.loose.uid)) this.loose = null;
     for (const [slot, it] of Object.entries(inv.slots) as [keyof typeof inv.slots, ItemInstance | null][]) {
       if (it && gone.has(it.uid)) {
-        if (inv.held() === it) this.weapons.take(null);
         inv.slots[slot] = null;
         n++;
       } else strip(it);
@@ -511,7 +507,7 @@ export const enterMethods = {
     // (whatever the hands were at with a magazine or a gun stops there: a change half made is not finished on top of this)
     if (this.use) this.breakOff();
     else this.weapons.abortReload();
-    const r = refill([...this.inv.topLevel(), this.loose]), did = refilledWords(r);
+    const r = refill(this.inv.topLevel()), did = refilledWords(r);
     if (did) this.inventoryChanged();
     if (this.invUI.isOpen) this.invUI.render();
     this.hud.note(did ? `${by ? `${by}, an admin, has filled what you carry: ` : ''}${did}` : `${by ? `${by}, an admin, went to fill what you carry: ` : ''}${r.of ? 'every magazine and gun you carry is full already' : 'you carry no magazine and no gun'}`, did ? 'good' : 'info');

@@ -364,7 +364,9 @@ export class Stage {
     const w = this.g.weapons;
     w.action = null;
     // (the body has no place of its own for a thing to hit with any more: 'melee' is whichever one is carried)
+    // (what was in the hands goes back to its place first: the hands are a place of their own, and a slot is empty while its thing is in them)
     const inv = this.g.inv;
+    inv.putAway();
     inv.hold(slot === 'melee' ? [...inv.carried()].find((i: { id: string }) => !!ITEMS[i.id].melee) ?? null : slot ? inv.slots[slot] ?? null : null);
     w.validate();
     w.boltReady = true;
