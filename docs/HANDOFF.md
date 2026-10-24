@@ -75,6 +75,9 @@ want half baked things making it in but we also dont need to spend extra money a
       The throw and one circular progress ring for every timed action (the owner: "a circular progress bar rather than a
       flat horizontal bar, like dayz") are DONE and merged into battle-royale (0ad14012); throw, tag-custody and
       animals tests pass on the merged tree.
+- Higgsfield: PARKED until the current work ships (the owner, 2026-10-24: "forget it for now will come back to it when all
+  ongoing work is done and we are shipped"). The desktop app never loaded the owner's Custom connector (only the
+  read-only Community one); restart the app or switch it on in + → Connectors, then rerun the pilot brief.
 - The stage (tools/stage.html, 75503d2d): a plain test scene for one-pass pictures, headless on the processor; pictures
   of a model or animation go there, not the world (the owner: "think when you make a new project on unity").
 - Several branches raise PROTOCOL (gameplay-batch 61, more to come): when merging them, give the merged tree one number.
