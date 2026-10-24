@@ -97,6 +97,8 @@ export class EmotesMenu {
     this.el.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
       const slot = (t as Element).closest<SVGGElement>('.em-svg g')?.dataset.slot;
+      // (Cancel's wedge is fixed: nothing is set there)
+      if (slot === 'cancel') return;
       if (slot !== undefined) {
         this.slot = Number(slot);
         this.show(wheelSlots()[this.slot]);

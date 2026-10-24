@@ -29,7 +29,7 @@ import { ClaimView } from './claims';
 import { publicId } from '../../net/client';
 import type { Stash } from '../loot';
 import { ghostGeometry } from './look';
-import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, hammerEntries, outerOf, piecesOf, planEntries } from './wheel';
+import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, hammerEntries, pieceAt, piecesOf, planEntries } from './wheel';
 import { DoorView } from './doors';
 import { BoxView } from './boxes';
 
@@ -64,8 +64,8 @@ export interface BuildHost {
   name: () => string;
 }
 
-/** how far the pointer goes to reach each ring (of the wheel's reach) */
-const RING = { pick: 0.22, outer: 0.66, reach: 260 };
+/** how far the mouse moves for the pointer to cross the wheel, px */
+const RING = { reach: 260 };
 /** a player who lays is told nothing of a refusal they have already been told, for this long */
 const SAID_AGAIN = 1500;
 
@@ -379,7 +379,7 @@ export class Building {
     if (what === 'plan') this.wheelCat = Math.max(0, CATS.findIndex((c) => c.cat === PIECES[this.kind].cat));
     this.fillWheel();
     this.wheel.open();
-    this.wheel.hub(what === 'plan' ? PIECES[this.kind].name : 'Hammer', what === 'plan' ? 'let go on a piece' : 'let go on what to do');
+    this.say(this.hubFor(-1));
   }
 
   private fillWheel() {
@@ -389,72 +389,75 @@ export class Building {
     } else this.wheel.set(planEntries(this.wheelCat, this.kind));
   }
 
+  /** the hub says the name only; what it costs or gives is the line under the wheel */
+  private say([title, foot]: [string, string]) {
+    this.wheel.hub(title, '');
+    const el = this.wheel.el.querySelector('.radial-foot') ?? this.wheel.el.appendChild(Object.assign(document.createElement('div'), { className: 'radial-foot' }));
+    el.textContent = foot;
+  }
+
   private wheelFrame(ok: boolean) {
     const input = this.h.input, at = this.wheelAt;
     at.x += input.mouseDX / RING.reach;
     at.y += input.mouseDY / RING.reach;
     if (at.length() > 1) at.normalize();
-    const per = this.wheelFor === 'plan' ? PER : HAMMER_PER;
-    const far = at.length(), k = ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * per) % per) + per) % per;
-    let pick = -1;
-    if (this.wheelFor === 'plan') {
-      if (far > RING.outer) pick = outerOf(this.wheelCat)[k] ? PER + k : -1;
-      else if (far > RING.pick) pick = k;
-      // (onto another group: its pieces come round the outside)
-      if (pick >= 0 && pick < PER && CATS[pick].cat && pick !== this.wheelCat) {
-        this.wheelCat = pick;
-        this.fillWheel();
-      }
-    } else if (far > RING.pick) pick = HAMMER_WHEEL[k] ? k : -1;
+    const pick = this.wheel.pickAt([at.x, at.y]);
+    // (onto another group: its pieces come round the outside)
+    if (this.wheelFor === 'plan' && pick >= 0 && pick < CATS.length && pick !== this.wheelCat) {
+      this.wheelCat = pick;
+      this.fillWheel();
+    }
     if (pick !== this.wheelPick) {
       this.wheelPick = pick;
-      this.wheel.hub(...this.hubFor(pick));
+      this.say(this.hubFor(pick));
     }
     this.wheel.point(pick, [at.x, at.y]);
     if (ok && input.held('Mouse2')) return;
-    // (let go: what is under the pointer is done, or nothing)
+    // (let go: what is under the pointer is done; on Cancel or the hub, nothing)
     const what = this.wheelFor;
     this.wheelFor = null;
-    const chose = this.choose(what, pick);
-    this.wheel.close(chose ? pick : -1);
+    const chose = pick >= 0 && this.choose(what, pick);
+    this.wheel.close(chose || pick === Radial.CANCEL ? pick : -1);
   }
 
+  /** the hub's word for wedge `pick`, and the line under the wheel */
   private hubFor(pick: number): [string, string] {
+    if (pick === Radial.CANCEL) return ['Cancel', ''];
+    const costs = (c: Record<string, number>) => Object.entries(c).map(([k, n]) => `${amount(k, n)} (${this.h.count(k)})`).join(' · ');
     if (this.wheelFor === 'hammer') {
-      const w = HAMMER_WHEEL[pick];
+      const w = pick >= 0 ? HAMMER_WHEEL[pick] : '';
       const t = this.target(), p = t ? t.base.pieces.get(t.id) : null;
-      if (!w || pick < 0) return ['Hammer', p ? `${PIECES[p.k].name} · ${TIERS[p.t]}` : 'look at a piece'];
-      if (w === 'cancel') return ['Cancel', ''];
-      if (w === 'remove') return ['Take down', p ? `half of it back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => `${amount(k, n)}`).join(', ') || 'nothing'}` : ''];
+      if (!w) return ['Hammer', p ? `${PIECES[p.k].name} · ${TIERS[p.t]}` : 'Look at a piece'];
+      if (w === 'remove') return [PIECES[p?.k ?? '']?.role === 'deploy' && p?.k !== 'claim' ? 'Pick up' : 'Take down', p ? `Back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : ''];
       if (w.startsWith('up') && p) {
         const to = Number(w.slice(2)) as Tier;
-        return [TIERS[to], Object.entries(costOf(p.k, to)).map(([k, n]) => `${amount(k, n)} (${this.h.count(k)})`).join(', ')];
+        return [TIERS[to], costs(costOf(p.k, to))];
       }
-      return [w === 'repair' ? 'Repair' : 'Turn', 'to come'];
+      return [w === 'repair' ? 'Repair' : 'Turn', 'Still to come'];
     }
-    if (pick < 0) return [PIECES[this.kind].name, 'let go on a piece'];
-    if (pick < PER) return CATS[pick].cat ? [CATS[pick].label, 'out to the pieces'] : ['Cancel', ''];
-    const id = outerOf(this.wheelCat)[pick - PER]!;
-    return [PIECES[id].name, Object.entries(costOf(id, laidAt(id))).map(([k, n]) => `${amount(k, n)} (${this.h.count(k)})`).join(', ')];
+    if (pick < 0) return [PIECES[this.kind].name, 'Let go on a piece'];
+    if (pick < CATS.length) return [CATS[pick].cat === 'found' ? 'Foundations' : CATS[pick].label, ''];
+    const id = pieceAt(this.wheelCat, pick);
+    return id ? [PIECES[id].name, costs(costOf(id, laidAt(id)))] : [PIECES[this.kind].name, ''];
   }
 
   /** what the wheel's wedge `pick` does; true when it did something */
   private choose(what: 'plan' | 'hammer' | null, pick: number): boolean {
-    if (pick < 0) return false;
     if (what === 'plan') {
-      if (pick >= PER) {
-        this.kind = outerOf(this.wheelCat)[pick - PER]!;
+      const id = pieceAt(this.wheelCat, pick);
+      if (id) {
+        this.kind = id;
         this.turn = 0;
         return true;
       }
       // (a group let go on: its first piece)
+      if (pick >= CATS.length) return false;
       const cat = CATS[pick].cat;
-      if (!cat) return false;
       this.kind = piecesOf(cat).some((k) => k.id === this.kind) ? this.kind : piecesOf(cat)[0].id;
       return true;
     }
     const w = HAMMER_WHEEL[pick], held = this.h.held(), t = this.target();
-    if (!w || w === 'cancel' || !held || !t) return false;
+    if (!w || !held || !t) return false;
     if (w === 'remove') {
       this.takeDown(held, t.base, t.id);
       return true;

@@ -1,16 +1,18 @@
 // The emote wheel's sixteen slots as this player has set them (Emotes, opened from the wheel: src/ui/emotes-menu.ts), kept in
 // this browser. The owner, 2026-10-14: "we need to allow the user to assign which emote to which radial key".
-import { EMOTE, WHEEL_DEFAULT, WHEEL_RING, WHEEL_SLOTS } from '../sim/emotes';
-import type { RadialEntry } from './radial';
+import { EMOTE, WHEEL_CANCEL_AT, WHEEL_DEFAULT, WHEEL_RING, WHEEL_SLOTS } from '../sim/emotes';
+import { ICONS, radialSvg, type RadialEntry } from './radial';
 
 const KEY = 'zona.wheel';
 const told: ((ids: string[]) => void)[] = [];
 
-/** the sixteen, the inner ring and then the outer, each clockwise from the top: what was set here, or the default
- * (anything no longer in the game is put back to it; a wheel set when there were eight keeps them, the outer ring added) */
+/** the fifteen, the inner ring and then the outer round Cancel, each clockwise from the top: what was set here, or the
+ * default (anything no longer in the game is put back to it; a wheel set when there were eight keeps them, the outer
+ * ring added; one of sixteen lets go of the slot where Cancel is now, and keeps the rest where they were) */
 export function wheelSlots(): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as unknown;
+    let v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as unknown;
+    if (Array.isArray(v) && v.length === WHEEL_SLOTS + 1) v = [...v.slice(0, WHEEL_CANCEL_AT), ...v.slice(WHEEL_CANCEL_AT + 1)];
     if (Array.isArray(v) && v.length > 0 && v.length <= WHEEL_SLOTS) return WHEEL_DEFAULT.map((d, i) => (typeof v[i] === 'string' && EMOTE[v[i] as string] ? (v[i] as string) : d));
   } catch {
     /* a browser that keeps nothing */
@@ -38,25 +40,18 @@ export const RINGS = [
   { r0: 127, r1: 205, text: 166 },
 ];
 
-/** the slots as the wheel on T has them (src/ui/radial.ts): each emote's words, and those kept up until stopped drawn quieter */
-export function wheelEntries(slots: string[]): RadialEntry[] {
-  return slots.map((id) => ({ id, label: EMOTE[id].label, ...(EMOTE[id].hold ? { mark: 'keeps' as const } : {}) }));
+/** an emote's icon (src/ui/radial.ts ICONS): its own, else its kind's */
+export function emoteIcon(id: string): string {
+  const e = EMOTE[id];
+  return ICONS[id] ? id : e.kind === 'dance' || e.kind === 'gesture' ? e.kind : e.hold === 'surrender' ? 'surrender' : e.hold === 'sit' ? 'sit' : 'call';
 }
 
-/** the wheel: two rings of eight wedges round a hub, each ring's first at the top and the rest clockwise (the player's slots: src/ui/wheel-slots.ts) */
+/** the slots as the wheel on T has them (src/ui/radial.ts): each emote's icon and words, those kept up until stopped drawn quieter */
+export function wheelEntries(slots: string[]): RadialEntry[] {
+  return slots.map((id) => ({ id, label: EMOTE[id].label, icon: emoteIcon(id), ...(EMOTE[id].hold ? { mark: 'keeps' as const } : {}) }));
+}
+
+/** the wheel as Emotes sets it: the one held up in the game (radialSvg), each wedge's data-slot its slot, Cancel's 'cancel' */
 export function wheelSvg(slots: string[]) {
-  const pt = (r: number, a: number) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
-  const wedges = slots.map((id, i) => {
-    const e = EMOTE[id];
-    const { r0, r1, text: tr } = RINGS[Math.min(RINGS.length - 1, Math.floor(i / WHEEL_RING))];
-    const a = ((i % WHEEL_RING) / WHEEL_RING) * Math.PI * 2, half = Math.PI / WHEEL_RING - 0.022 * (58 / r0);
-    const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;
-    const [x, y] = pt(tr, a).split(' ');
-    // two words go on two lines
-    const words = e.label.split(' ');
-    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && e.label.length > 9 ? words : [e.label];
-    const text = lines.map((l, k) => `<text x="${x}" y="${(Number(y) + (k - (lines.length - 1) / 2) * 17).toFixed(1)}">${l}</text>`).join('');
-    return `<g class="${e.hold ? 'keeps' : ''}" data-slot="${i}"><path d="${d}"/>${text}</g>`;
-  });
-  return `<svg viewBox="-210 -210 420 420" aria-hidden="true">${wedges.join('')}</svg>`;
+  return radialSvg(wheelEntries(slots), RINGS, WHEEL_RING);
 }

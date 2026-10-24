@@ -775,4 +775,43 @@ ok('what is in the hands is kept as a place: written and read again it is still 
   assert.equal(was.slots.primary?.uid, ak.uid);
 });
 
+ok('keys 1 and 2 are the back\'s whatever moves (the owner: "the 1 and 2 hotkey slots should always be paired to the back slots no matter what"), and a gun put from the back into a bag is on no key ("it should be removed from the hotbar")', () => {
+  const inv = new PlayerInventory();
+  const pack = Object.values(ITEMS).filter((d) => d.slot === 'back' && d.wear?.cargo).sort((a, b) => b.wear!.cargo![0] * b.wear!.cargo![1] - a.wear!.cargo![0] * a.wear!.cargo![1])[0];
+  inv.add(makeItem(pack.id));
+  const [ak, sniper, tin] = [makeItem('ak'), makeItem('mosin'), makeItem('beans')];
+  inv.add(ak);
+  inv.add(sniper);
+  inv.add(tin);
+  inv.autoBind();
+  assert.deepEqual([inv.hotItem(0), inv.hotItem(1), inv.hotOf(ak), inv.hotOf(sniper)], [ak, sniper, 0, 1]);
+  // (nothing else goes on 1 or 2, and what is on the back goes on no other key)
+  inv.bind(0, tin);
+  inv.bind(5, ak);
+  assert.deepEqual([inv.hotItem(0), inv.hotOf(tin), inv.hotOf(ak), inv.hot[5]], [ak, -1, 0, null]);
+  // (taken into the hands it is still on its key, and goes back to its own place)
+  assert.ok(inv.hold(ak));
+  assert.deepEqual([inv.slots.primary, inv.hotItem(0), inv.hotOf(ak)], [null, ak, 0]);
+  assert.ok(inv.putAway());
+  assert.deepEqual([inv.slots.primary, inv.hotItem(0)], [ak, ak]);
+  // (the sniper from the back into the pack, as the screen moves it: off the hot bar)
+  const bag = inv.cargoOf(inv.slots.back!)!;
+  assert.ok(bag.hasRoom(sniper), `the ${pack.name} takes no rifle`);
+  inv.slots.secondary = null;
+  bag.add(sniper);
+  inv.forgetGone();
+  assert.deepEqual([inv.hotItem(1), inv.hotOf(sniper), inv.hot.some((b) => b?.uid === sniper.uid)], [null, -1, false]);
+  // (put on a key of its own in the pack, then slung: the back's key and no other; back into the pack: none)
+  inv.bind(6, sniper);
+  assert.equal(inv.hotOf(sniper), 6);
+  bag.remove(sniper);
+  inv.slots.secondary = sniper;
+  inv.forgetGone();
+  assert.deepEqual([inv.hotOf(sniper), inv.hot[6]], [1, null]);
+  inv.slots.secondary = null;
+  bag.add(sniper);
+  inv.forgetGone();
+  assert.equal(inv.hotOf(sniper), -1);
+});
+
 console.log(`\n${n} checks passed`);

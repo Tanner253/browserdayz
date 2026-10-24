@@ -21,7 +21,7 @@ import { PIECES, TIERS, type Tier } from '../sim/build/pieces';
 import { blocked, nearestSpot, spots, toWorld, worldYaw, type Base } from '../sim/build/snap';
 import { BaseDraw } from '../game/building/draw';
 import { ghostGeometry } from '../game/building/look';
-import { HAMMER_PER, PER, RINGS, hammerEntries, outerOf, planEntries } from '../game/building/wheel';
+import { HAMMER_PER, PER, RINGS, hammerEntries, outerEntry, outerOf, planEntries } from '../game/building/wheel';
 
 interface Stage {
   q: URLSearchParams;
@@ -344,7 +344,7 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     ui.style.cssText = `position:fixed;left:0;top:0;width:${s.cw}px;height:${s.ch}px;display:flex;pointer-events:none`;
     document.body.appendChild(ui);
     const wall = [...[...bs.bases.values()][0].pieces.values()].find((p) => p.k === 'wall' && p.t === 2)!;
-    for (const [entries, lit, hub] of [[planEntries(1, 'doorway'), PER + outerOf(1).indexOf('doorway'), ['Doorway', '4 planks (23)']], [hammerEntries(wall), 2, ['Metal', '4 sheet metal (6), 24 nails (40)']]] as const) {
+    for (const [entries, lit, hub] of [[planEntries(1, 'doorway'), outerEntry(outerOf(1).indexOf('doorway')), ['Doorway', '4 planks (23)']], [hammerEntries(wall), 2, ['Metal', '4 sheet metal (6) · 24 nails (40)']]] as const) {
       const half = document.createElement('div');
       half.id = 'hud';
       half.style.cssText = 'position:relative;flex:1;height:100%';
@@ -353,7 +353,8 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
       r.set([...entries]);
       half.appendChild(r.el);
       r.open();
-      r.hub(hub[0], hub[1]);
+      r.hub(hub[0], '');
+      r.el.appendChild(Object.assign(document.createElement('div'), { className: 'radial-foot', textContent: hub[1] }));
       r.point(lit, [0.3, -0.6]);
     }
     await new Promise((r) => setTimeout(r, 900));

@@ -93,12 +93,15 @@ export const EMOTES: Emote[] = [
 ];
 
 /**
- * The wheel as it is until a player sets their own (Emotes, opened from the wheel): sixteen, an inner eight and an
- * outer eight, each clockwise from the top (the owner, 2026-10-15: "we have so many options to pick from but we need
- * more slots to assign to can we double it?"). The inner eight are the eight there were.
+ * The wheel as it is until a player sets their own (Emotes, opened from the wheel): fifteen, an inner eight and an
+ * outer seven, each clockwise from the top (the owner, 2026-10-15: "we have so many options to pick from but we need
+ * more slots to assign to can we double it?"); the bottom of the outer ring is Cancel (2026-10-24: "the bottom option
+ * for the radial wheel should always be cancel"). The inner eight are the eight there were.
  */
-export const WHEEL_DEFAULT = ['hey', 'dontshoot', 'yes', 'no', 'bhangra', 'surrender', 'follow', 'help', 'here', 'thanks', 'wait', 'enemy', 'medic', 'loot', 'sit', 'shuffle'];
-export const WHEEL_SLOTS = 16;
+export const WHEEL_DEFAULT = ['hey', 'dontshoot', 'yes', 'no', 'bhangra', 'surrender', 'follow', 'help', 'here', 'thanks', 'wait', 'enemy', 'loot', 'sit', 'medic'];
+export const WHEEL_SLOTS = 15;
+/** where Cancel came in: the slot a wheel set before it kept there, which is let go (`wheelSlots`) */
+export const WHEEL_CANCEL_AT = 12;
 /** wedges to a ring */
 export const WHEEL_RING = 8;
 

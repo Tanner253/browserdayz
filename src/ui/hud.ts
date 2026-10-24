@@ -754,7 +754,12 @@ export class HUD {
     r.point(pick, at);
     const e = pick >= 0 ? EMOTE[slots[pick]] : null;
     // (in the middle with nothing picked: a click opens Emotes, where the wheel is set; the owner: "just put the 'click to edit' in the center of the radial wheel")
-    r.hub(e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit', e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
+    if (pick === Radial.CANCEL) r.hub('Cancel', 'let go of T');
+    else r.hub(e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit', e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
+  }
+  /** the wedge of the wheel on T a pointer is on (`Radial.pickAt`): a slot, `Radial.CANCEL`, or -1 */
+  wheelPick(at: [number, number]): number {
+    return this.radial.pickAt(at);
   }
   /** the wheel on T (`wheel`), and the emote it last showed as kept up (undefined: none shown yet) */
   private radial!: Radial;

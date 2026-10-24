@@ -67,10 +67,11 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-// (64, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
+// (64, 2026-10-24: the hands' slot, the fixes path's release.)
+// (65, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock').)
-export const PROTOCOL = 64;
+export const PROTOCOL = 65;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
