@@ -169,11 +169,18 @@ export class Herd {
 
   /** Every herd of every kind the game can draw, on ground of its own. */
   populate(now: number, people: Seen[] = []) {
+    for (const _ of this.populating(now, people));
+  }
+
+  /** The same, a little at a time: a game playing alone stands its herds over many frames, not in one (see Wildlife.alone). */
+  *populating(now: number, people: Seen[] = []): Generator<void> {
     const pick = seeded(7331);
-    HERDS.forEach((h, hi) => {
+    for (let hi = 0; hi < HERDS.length; hi++) {
+      const h = HERDS[hi];
       const kinds = h.of.map(([id]) => KINDS.findIndex((k) => k.id === id));
-      if (kinds.some((k) => k < 0 || !this.live(KINDS[k]))) return;
-      const homes = h.farm ? this.ground.farms.slice(0, h.count).map((f) => ({ x: f.x, z: f.z })) : this.homesFor(h, pick);
+      if (kinds.some((k) => k < 0 || !this.live(KINDS[k]))) continue;
+      const homes: { x: number; z: number }[] = h.farm ? this.ground.farms.slice(0, h.count).map((f) => ({ x: f.x, z: f.z })) : [];
+      if (!h.farm) yield* this.homesFor(h, pick, homes);
       for (const home of homes) {
         const wants: number[] = [];
         h.of.forEach(([, lo, hi2], n) => {
@@ -187,14 +194,16 @@ export class Herd {
         this.groups.push(g);
         this.plan(g, now);
         for (const k of wants) if (this.beasts.size < ANIMALS.max) this.stand(g, k, now, people, true);
+        yield;
       }
-    });
+    }
   }
 
   /** where the herds of a kind live: ground with both what it feeds on and cover to lie up in, apart from each other and out of the towns */
-  private homesFor(h: HerdKind, pick: () => number): { x: number; z: number }[] {
-    const { x0, x1, z0, z1 } = this.ground.bounds, out: { x: number; z: number }[] = [];
+  private *homesFor(h: HerdKind, pick: () => number, out: { x: number; z: number }[]): Generator<void> {
+    const { x0, x1, z0, z1 } = this.ground.bounds;
     for (let tries = 0; tries < 900 && out.length < h.count; tries++) {
+      if (tries % 25 === 24) yield;
       const x = x0 + 60 + pick() * (x1 - x0 - 120), z = z0 + 60 + pick() * (z1 - z0 - 120);
       if (!h.feed.includes(this.ground.biome(x, z)) && !h.rest.includes(this.ground.biome(x, z))) continue;
       if (out.some((o) => Math.hypot(o.x - x, o.z - z) < h.apart)) continue;
@@ -206,7 +215,6 @@ export class Herd {
       }
       if (feed >= 4 && rest >= 3) out.push({ x, z });
     }
-    return out;
   }
 
   /** a spot of its ground for what the herd is about to do (null: none found this time) */

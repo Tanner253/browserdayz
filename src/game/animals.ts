@@ -42,6 +42,13 @@ const DRAWN = 260;
 const MOVED = 120;
 /** how far behind the server's word it is drawn, so that there is always a word on either side of now, ms */
 const BEHIND = 320;
+/**
+ * Measuring what the animals cost (replay.mjs --flip __noAnimals): every half second they are taken out (not drawn,
+ * not thought for) and put back; and meanwhile a kind with no model of its own yet is drawn as the stag is, so that
+ * there is something to measure. Neither is so in play.
+ */
+const MEASURING = typeof location !== 'undefined' && new URLSearchParams(location.search).get('flip') === '__noAnimals';
+const out = () => !!(globalThis as { __noAnimals?: boolean }).__noAnimals;
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 interface Kit {
@@ -55,9 +62,10 @@ function kitOf(kind: Kind): Promise<Kit | null> {
   let k = kits.get(kind.model);
   if (!k) {
     k = (async () => {
-      const entry = assets.manifest.models[kind.model] as { cuts?: Record<string, [number, number]> } | undefined;
-      if (!entry) return null;
-      const gltf = await assets.gltfOf(kind.model);
+      const model = assets.manifest.models[kind.model] ? kind.model : MEASURING ? 'animal_stag' : null;
+      const entry = model ? (assets.manifest.models[model] as { cuts?: Record<string, [number, number]> } | undefined) : undefined;
+      if (!entry || !model) return null;
+      const gltf = await assets.gltfOf(model);
       const clips = new Map<string, THREE.AnimationClip>();
       if (entry.cuts) {
         // (one long take, cut where its movements change: scripts/animals.mjs)
@@ -283,6 +291,8 @@ export class Wildlife {
   readonly beasts = new Map<number, Beast>();
   /** playing alone, the herds are this game's own (as the server keeps them online: src/sim/animal-mind.ts) */
   herd: Herd | null = null;
+  /** the herds being stood, a little at a time */
+  private standing: Herd | null = null;
   private stepT = 0;
 
   constructor(private host: WildHost) {}
@@ -291,24 +301,29 @@ export class Wildlife {
   alone() {
     this.clear();
     const world = this.host.world();
-    window.setTimeout(() => {
-      if (this.herd) return;
-      const herd = new Herd(animalGround(world), (k) => !!assets.manifest.models[k.model], () => this.host.hour());
-      const me = this.host.me();
-      herd.populate(Date.now(), me ? [me] : []);
-      this.herd = herd;
-    }, 1500);
+    // (a few milliseconds a frame, a herd's ground at a time: all at once it was most of a second)
+    const herd = new Herd(animalGround(world), (k) => MEASURING || !!assets.manifest.models[k.model], () => this.host.hour());
+    const me = this.host.me(), steps = herd.populating(Date.now(), me ? [me] : []);
+    this.standing = herd;
+    const more = () => {
+      if (this.standing !== herd) return;
+      const until = performance.now() + 4;
+      while (performance.now() < until) if (steps.next().done) return void ((this.herd = herd), (this.standing = null));
+      window.setTimeout(more, 16);
+    };
+    window.setTimeout(more, 1500);
   }
 
   /** gone online: the server keeps them from here */
   leaveAlone() {
     this.herd = null;
+    this.standing = null;
     this.clear();
   }
 
   /** Playing alone, five times a second: the herds think, their blows land, and this game is told of them as a server would tell it. */
   tickAlone(dt: number) {
-    if (!this.herd || (this.stepT -= dt) > 0) return;
+    if (!this.herd || out() || (this.stepT -= dt) > 0) return;
     this.stepT = ANIMALS.step;
     const me = this.host.me(), now = Date.now();
     if (me) me.sheltered = this.herd.ground.roofed(me.x, me.z);
@@ -375,6 +390,10 @@ export class Wildlife {
   }
 
   update(dt: number, now: number, eye: THREE.Vector3) {
+    if (out()) {
+      for (const b of this.beasts.values()) b.root.visible = false;
+      return;
+    }
     for (const b of this.beasts.values()) b.update(dt, now, eye);
   }
 
