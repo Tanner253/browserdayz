@@ -286,12 +286,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ozerki.ts` | 75 | Ozerki, the fishing village on a lake in the north woods (2026-10-16, new): where its houses, piers and what lies about them stand. |
 | `pass.ts` | 625 | THE PASS through the ridge, and its caves, as a plan (plan v5, the owner, 2026-10-16: |
 | `placement.ts` | 28 | Whether an item can physically lie at a loot point. |
-| `pokrov-towers.ts` | 235 | Inside Pokrov's corner towers (2026-10-19). |
-| `pokrov.ts` | 155 | Pokrov, the white-walled monastery and the town outside its gate (2026-10-16, reworked): where its buildings and what lies about them stand, and the terrace it stands on. |
+| `pokrov-towers.ts` | 254 | Inside Pokrov's corner towers (2026-10-19). |
+| `pokrov.ts` | 159 | Pokrov, the white-walled monastery and the town outside its gate (2026-10-16, reworked): where its buildings and what lies about them stand, and the terrace it stands on. |
 | `posts.ts` | 98 | The army's field posts in the west: a WW2 pillbox (the model "WW2 Field Bunker" by Golden, the one stood over Bunker 17's stair: see src/world/bunker.ts) by four of the western roads, its door to the road, a rack, a... |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
 | `range.ts` | 359 | The bot check (2026-10-12: |
-| `ruins.ts` | 1261 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
+| `ruins.ts` | 1267 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
 | `save.ts` | 58 | Local persistence for the single-player slice. |
 | `slopes.ts` | 236 | Steep ground: what legs can do on it. |
 | `stash.ts` | 36 | Where a stash can be put under the ground (2026-10-12): out in the country, and nowhere else. |
@@ -433,7 +433,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `batch-cull.ts` | 68 |  |
 | `big-buildings.ts` | 999 | The two buildings of several floors (2026-10-11): the district hospital in Kamenka and the police headquarters at the edge of the village. |
 | `bridge.ts` | 679 | The road bridge as it is built (see src/sim/bridge.ts for what a bridge is, in figures, and src/world/worldgen.ts for where one stands): a reinforced-concrete road bridge of the kind the country it stands in built by... |
-| `buildings.ts` | 3668 | Procedural buildings: walls with door/window cut-outs (two material layers), floors, ceilings, gable / shed / flat roofs, window frames + glass, hinged doors, hand-authored interior layouts with Poly Haven furniture,... |
+| `buildings.ts` | 3702 | Procedural buildings: walls with door/window cut-outs (two material layers), floors, ceilings, gable / shed / flat roofs, window frames + glass, hinged doors, hand-authored interior layouts with Poly Haven furniture,... |
 | `bunker.ts` | 966 | The bunker as it is built (see src/sim/bunker.ts for what and where): the pad over the hole, the hut, the stair, the first level with its passage, rooms and benches, the door a keycard opens, the sealed way down, and... |
 | `canyon-beds.ts` | 46 | THE CANYON'S BEDS as a chunk of shader (the terrain's, src/world/terrain.ts, and any other rock of the canyon: the carved rock round the caves' mouths, rock-blend's face), so that where a piece meets the wall its... |
 | `castle-post-shape.ts` | 439 | The signals post on the fort (src/sim/castle-post.ts): the shapes of what is made by hand, as plain numbers. |
@@ -461,14 +461,14 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `caves.ts` | 230 | The pass's walls and its caves, drawn and made solid (the plan is src/sim/pass.ts). |
 | `cells.ts` | 89 |  |
 | `crest.ts` | 53 | What is set down on the crest the fort stands on that is neither ground, rock nor the fort itself (MOUNTAIN.crest in src/world/worldgen.ts). |
-| `domes.ts` | 48 | Onion domes on drums, with a cross, for the new towns' churches (2026-10-16): what tells a church of these lands from a barn at a kilometre. |
+| `domes.ts` | 49 | Onion domes on drums, with a cross, for the new towns' churches (2026-10-16): what tells a church of these lands from a barn at a kilometre. |
 | `facade.ts` | 188 | Facades of the downloaded modular kits laid over the game's own buildings (2026-10-16, the new land's towns). |
 | `foliage.ts` | 179 | Shader patches shared by every instanced foliage / prop material: - wind: whole-plant sway (height-weighted) + leaf flutter - LOD dithering: screen-space dissolve between LOD levels (no popping) - translucency:... |
 | `gatehouse.ts` | 686 | The ruined gatehouse at the end of the mountain road (MOUNTAIN in src/world/worldgen.ts; 2026-10-13: |
 | `grass.ts` | 399 | GPU grass. The field is tiled into 4 m patches; every patch shares one geometry of ~1000 randomly ordered blades. Blades are placed on the exact terrain triangles in the vertex shader (height texture), culled by the... |
 | `ground.ts` | 354 | What the ground is, place by place: the kinds of ground there are, and how much of each lies at every point of the world's net. |
 | `helipad.ts` | 68 | The pads the helicopters stand on (src/sim/heli.ts: on the hospital's roof, and by the fort): a painted circle and an H, as every pad has. |
-| `kit.ts` | 288 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
+| `kit.ts` | 299 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
 | `load-world.ts` | 26 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `macro.ts` | 45 | THE GROUND'S LARGE NOISE: a tileable picture of slow noise (three of its places fbm at three sizes, the fourth a smoother noise that deals out the ground pictures' copies), read by the terrain, the grass and whatever... |
 | `mokroye-plans.ts` | 30 | Mokroye, the flooded hamlet in the swamp (2026-10-16): its houses as the water has them. |
@@ -477,18 +477,19 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `outcrops.ts` | 171 | The canyon country's outcrops (the owner, 2026-10-16: |
 | `outline.ts` | 219 | The edge of the Zona as one line. |
 | `ozerki-plans.ts` | 50 | Ozerki, the fishing village on the lake (2026-10-16): its two buildings of its own. |
+| `pokrov-tents.ts` | 74 | The tented roofs over Pokrov's towers, as drawn (2026-10-23; the plan is src/sim/pokrov-towers.ts, TENT): the tent in painted iron with its seams running down it, boarded under; the board round its eave; the eight... |
 | `pokrov-towers.ts` | 151 | Inside Pokrov's corner towers, as drawn (2026-10-19): the room's wall and ceiling, the doorway's lining, the floor, the stair and its parapet, and the hatch's edges. |
 | `posts.ts` | 61 | The army's field posts by the western roads (src/sim/posts.ts): each the pillbox model ("WW2 Field Bunker"), drawn and made solid triangle for triangle, as the one over Bunker 17's stair is (src/world/bunker.ts), on... |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
 | `rock-blend.ts` | 219 | Rock that meets the ground without a seam (the owner, 2026-10-16: |
 | `rock-field.ts` | 335 | A field of scanned rocks, drawn and made solid: the pass's walls and cave mouths (src/world/caves.ts) and the canyon country's outcrops (src/world/outcrops.ts). |
-| `ruins-shape.ts` | 553 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
-| `ruins.ts` | 245 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
+| `ruins-shape.ts` | 554 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
+| `ruins.ts` | 267 | The ruined town as it is built (see src/sim/ruins.ts for what and where, src/world/ruins-shape.ts for its shape and for which pictures it is painted with): each piece stood in the world at its own place and turn, and... |
 | `seat.ts` | 180 | HOW A THING THAT STANDS ON THE GROUND IS SEATED IN IT. |
 | `snow.ts` | 661 | Where snow lies: by height, OR BY PLACE. |
 | `terrain.ts` | 1470 |  |
-| `town-plans.ts` | 523 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
-| `towns.ts` | 247 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
+| `town-plans.ts` | 528 | The buildings of the new towns (2026-10-16), each drawn up for its place: |
+| `towns.ts` | 265 | The new towns as they are drawn (2026-10-16): the monastery's walls, the fort kit's pieces re-skinned in white limewash, and the onion domes over the churches. |
 | `vegetation.ts` | 1220 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
 | `water.ts` | 464 | Lakes and rivers, drawn (the owner, 2026-10-16: |
 | `ways-out.ts` | 115 | Nothing stands in a building's way out (the owner, 2026-10-19: |
@@ -509,9 +510,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `opening.ts` | 222 | THE SQUARE OPENED TO THE WEST (2026-10-16, plan v2), done to the square when everything of it is made and before it is laid into the world (see `toWorld`, west.ts). |
 | `places.ts` | 479 | The map's measures and its places as numbers: its size and seed, the expansions (the Chemical Works, the bunker, Kamenka), the loop road (LOOP) and the mountain with its fort (MOUNTAIN). |
 | `types.ts` | 129 | What a world is made of (World, Site, Instance, Solid, POI, Way, Worn): the types every part of the game reads it by. |
-| `west-plan.ts` | 342 | THE WEST'S PLAN: where everything of the new ground goes, as numbers, and the questions only those numbers answer. |
-| `west-relief.ts` | 421 | THE WEST'S RELIEF (plan v5 as the owner's client chose it, the desert made twice as big: |
-| `west-towns.ts` | 296 | THE WEST'S TOWNS (2026-10-16): the new towns set down where plan v5 has them, each on level ground of its own, as their own data says (src/sim/towns.ts: the reference is lay() in src/dev/towns.ts, at the town's real... |
+| `west-plan.ts` | 345 | THE WEST'S PLAN: where everything of the new ground goes, as numbers, and the questions only those numbers answer. |
+| `west-relief.ts` | 427 | THE WEST'S RELIEF (plan v5 as the owner's client chose it, the desert made twice as big: |
+| `west-towns.ts` | 315 | THE WEST'S TOWNS (2026-10-16): the new towns set down where plan v5 has them, each on level ground of its own, as their own data says (src/sim/towns.ts: the reference is lay() in src/dev/towns.ts, at the town's real... |
 | `west-water.ts` | 299 | THE WEST'S WATER (2026-10-16): the owner, "i want lakes and rivers as well in natural spots in the map since we now have water". |
 | `west.ts` | 833 | THE WEST (2026-10-16): the square laid into the world's rectangle, and the ground of the two squares west of it. |
 
