@@ -37,6 +37,8 @@ import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
 
 const CELL = 46;
+/** whether what is worn is shown under the guns, kept in this browser (see `gearOpen`) */
+const GEAR_KEPT = 'zona.inv.gear';
 /** the inventory painted once, with what is carried, before it is first opened (`paintAhead`): how long into play, and for how many frames */
 const AHEAD_AFTER = 2000, AHEAD_FRAMES = 6;
 /** the hot key a thing in a place is on, as a key before the place's name (nothing for none) */
@@ -1326,6 +1328,16 @@ export class InventoryUI {
   private dollShown: string | null = null;
   /** each block as it was last built, by its name, with what it was built from */
   private built = new Map<string, { sig: string; nodes: Node[] }>();
+  /** what is worn shown under the guns, as this player last left it (shut unless they opened it: it is room) */
+  private gearOpen = (() => {
+    try {
+      return localStorage.getItem(GEAR_KEPT) === '1';
+    } catch {
+      return false;
+    }
+  })();
+  /** opened by itself for a thing that is worn being dragged, and shut again when it is let go */
+  private gearAuto = false;
   /** the crate or body open when this was last drawn ('' for none): its scroll is kept while it is the same (see render) */
   private scrolledFor = '';
   /** what all that is carried weighed when this was last drawn (see render) */
@@ -1683,7 +1695,11 @@ export class InventoryUI {
     // the hands instead. Two squares under a gun with no parts to show (a shovel, the gun in the hands, an empty
     // place) are taken by what is worn, which fills every square left (the owner, 2026-10-24: "make this take up less
     // height its pushing the players inventory too far down").
-    const strip = this.block('c:strip', ui + ALL_SLOTS.map((s) => (inv.slots[s] ? `${this.look(inv.slots[s]!)}:${this.actions.goingIn(inv.slots[s]!) ?? ''}` : '-')).join('|') + `|${held?.uid ?? ''}`, () => {
+    // What is worn folds away under a bar of its own, the guns always in sight (the owner, 2026-10-24: "can we make all of
+    // this collapsable in the inventory so it can be tabbed and save space for the user, leave the weapons showing but
+    // tab the equipment"); remembered, and opened by itself while a thing that is worn is dragged (see `onMove`).
+    const gearOpen = this.gearOpen || this.gearAuto;
+    const strip = this.block('c:strip', ui + ALL_SLOTS.map((s) => (inv.slots[s] ? `${this.look(inv.slots[s]!)}:${this.actions.goingIn(inv.slots[s]!) ?? ''}` : '-')).join('|') + `|${held?.uid ?? ''}|${gearOpen ? 1 : 0}`, () => {
       const row = document.createElement('div');
       row.className = 'inv-strip';
       WEAPON_SLOTS.forEach((s, k) => {
@@ -1695,8 +1711,27 @@ export class InventoryUI {
         parts.style.gridArea = `2 / ${k * 2 + 1} / 3 / span 2`;
         row.appendChild(parts);
       });
-      for (const s of [...DOLL_SLOTS[0], ...DOLL_SLOTS[1]]) row.appendChild(this.slotEl(s));
-      return [row];
+      const worn = DOLL_SLOTS.flat().filter((s) => inv.slots[s]).length;
+      const bar = document.createElement('button');
+      bar.type = 'button';
+      bar.className = 'inv-gearbar' + (gearOpen ? ' open' : '');
+      bar.innerHTML = `<i></i><b>Equipment</b><small>${worn} worn</small>`;
+      bar.title = gearOpen ? 'Fold away what you wear' : 'Show what you wear';
+      bar.addEventListener('click', () => {
+        this.gearOpen = !gearOpen;
+        this.gearAuto = false;
+        try {
+          localStorage.setItem(GEAR_KEPT, this.gearOpen ? '1' : '0');
+        } catch {
+          /* not kept: it is as it was the next time */
+        }
+        this.render();
+      });
+      if (!gearOpen) return [row, bar];
+      const gear = document.createElement('div');
+      gear.className = 'inv-strip inv-gear-strip';
+      for (const s of DOLL_SLOTS.flat()) gear.appendChild(this.slotEl(s));
+      return [row, bar, gear];
     });
     this.fill(sk.cargo, [...head, ...strip, this.findEl(), sk.scroll, ...inspect, ...(this.vitals && this.status ? [sk.status] : [])]);
 
@@ -2663,6 +2698,12 @@ export class InventoryUI {
     const started = !this.dragStart.moved && Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y) > 4;
     if (started) {
       this.dragStart.moved = true;
+      // (a thing that is worn, not a gun, dragged with what is worn folded away: shown for it to be put on)
+      const slot = ITEMS[d.src.item.id].slot;
+      if (!this.gearOpen && slot && slot !== 'long' && slot !== 'holster' && d.src.kind !== 'slot') {
+        this.gearAuto = true;
+        this.render();
+      }
       this.showTargets(d);
     }
     const z = this.z;
@@ -3064,6 +3105,11 @@ export class InventoryUI {
   private cancelDrag() {
     if (this.drag) this.drag.ghost.remove();
     this.drag = null;
+    // (what is worn, shown only for the drag, folded away again once what was let go has gone where it went)
+    if (this.gearAuto) {
+      this.gearAuto = false;
+      requestAnimationFrame(() => this.isOpen && !this.drag && this.render());
+    }
     this.hoverOutline.style.display = 'none';
     // (and the line by the pointer that said why it would not go where it was held)
     if (this.card.classList.contains('hint')) this.hideCard();
