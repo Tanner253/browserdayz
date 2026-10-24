@@ -382,6 +382,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     flights: [...flights.values()].map(flightNow),
     barrels: [...barrelsGone.keys()],
     racks: racksNow(),
+    built: [...hearths.built].map(([i, b]): [number, number, number, number] => [i, b.x, b.y, b.z]),
     fires: hearths.alight(Date.now() / 1000),
     bunker: bunkerDoor.open,
     // (the map's containers that somebody has open at this moment: a locker among them is seen standing open)

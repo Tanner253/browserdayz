@@ -1,6 +1,7 @@
 // The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off).
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
+import { spawnAnimal } from './animals';
 import { createHash } from 'node:crypto';
 import { heldIn } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
@@ -365,6 +366,13 @@ export async function command(c: Client, line: string) {
         const which = `number ${made.map((v) => v.i).join(', ')}`;
         log(`[admin] ${c.name} stood ${made.length} × ${e.name.toLowerCase()} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which})`);
         return void sys(c, `${made.length > 1 ? `${made.length} × ` : ''}${e.name} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which}). /delcar takes the nearest car away.`);
+      }
+      if (e.kind === 'animal') {
+        // (all of them one herd or pack, wolves stood together hunting together; a bear, which lives alone, each alone)
+        const made = spawnAnimal(e.animal!, x, z, count);
+        if (!made) return void sys(c, `No ${e.name.toLowerCase()} can be stood: the game has no model for it yet.`);
+        log(`[admin] ${c.name} stood ${made} × ${e.name.toLowerCase()} at ${x.toFixed(0)}, ${z.toFixed(0)}`);
+        return void sys(c, `${made > 1 ? `${made} × ` : ''}${e.name} at ${x.toFixed(0)}, ${z.toFixed(0)}.`);
       }
       // (as many as are asked for, however many are on their feet already: the owner, 2026-10-19, "admins when they
       // spawn zombies should bypass the server cap". The map's own are still kept to theirs: see Director.)

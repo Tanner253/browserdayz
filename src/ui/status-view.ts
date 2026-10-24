@@ -47,6 +47,10 @@ const BADGES: Record<BadgeId, string> = {
   leg: `<path class="st-solid" transform="translate(6.6 25.4) rotate(-45)" d="${BONE}"/><path class="st-solid" transform="translate(25.8 7) rotate(156)" d="${BONE}"/>`,
   // a mask, its two eyepieces and the round filter under them; and a stroke through it when there is none on the face
   gas: `<path class="st-solid" fill-rule="evenodd" d="M16 3.6C9.8 3.6 6 7.8 6 13.4C6 16.6 7.4 19.4 9.8 21H22.2C24.6 19.4 26 16.6 26 13.4C26 7.8 22.2 3.6 16 3.6zM14.8 12.4a3.2 3.2 0 1 0-6.4 0a3.2 3.2 0 1 0 6.4 0zM23.6 12.4a3.2 3.2 0 1 0-6.4 0a3.2 3.2 0 1 0 6.4 0z"/><circle class="st-solid" cx="16" cy="23" r="5.4"/><path class="st-cut" d="M13.2 21.6h5.6M12.8 23.8h6.4M13.8 26h4.4"/><path class="st-slash st-under" d="M5 27.5L27 4.5"/><path class="st-slash" d="M5 27.5L27 4.5"/>`,
+  // a stomach, turned over: a bag with a twist in it (food poisoning)
+  ill: `<path class="st-solid" d="M11 3.5h4v5.2c0 1.6 1.4 2.8 3.2 2.8c4.4 0 8.3 3.6 8.3 8.6c0 5-4.2 8.4-9.6 8.4c-5.9 0-11.4-3.6-11.4-9.4c0-3 1.5-5.2 3.4-6.6c1.3-1 2.1-2.3 2.1-4z"/><path class="st-cut" d="M10.4 19.4c1.8-2.4 4.1-2.4 5.6 0s3.8 2.4 5.6 0"/>`,
+  // a capsule of two halves, laid across (vitamins)
+  guard: `<path class="st-solid" transform="rotate(-40 16 16)" d="M9.5 10.5h13a5.5 5.5 0 0 1 0 11h-13a5.5 5.5 0 0 1 0-11z"/><path class="st-cut" transform="rotate(-40 16 16)" d="M16 10.5v11"/>`,
   // a flame of two tongues: solid while it mends, and only its outline while it does no more than warm
   fire: `<path class="st-solid" d="M17 2.5C18 7.5 24 11 24 18.6a8 8 0 0 1-16 0C8 14.6 9.4 11.4 10.6 8.4C11.4 10.6 12.4 12.4 13.9 13.6C13.6 9.6 14.8 5.6 17 2.5z"/><path class="st-cut st-heart" d="M16 24.6c-1.7 0-2.9-1.2-2.9-2.8c0-1.6 1.2-2.6 1.9-4.2c1.9 1.3 3.9 2.7 3.9 4.5c0 1.4-1.2 2.5-2.9 2.5z"/>`,
 };
@@ -151,7 +155,7 @@ class BadgeMark {
   }
 }
 
-const BADGE_ORDER: BadgeId[] = ['fire', 'gas', 'leg', 'bleed'];
+const BADGE_ORDER: BadgeId[] = ['fire', 'gas', 'ill', 'guard', 'leg', 'bleed'];
 const STORE = 'zona.figures';
 
 /** whether the numbers are wanted beside the symbols (Settings: off until somebody asks for them), as this browser has it kept */

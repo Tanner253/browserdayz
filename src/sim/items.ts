@@ -4,6 +4,7 @@ import { PART_ITEMS } from './items/parts';
 import { KIT_ITEMS } from './items/kit';
 import { WEAR_ITEMS } from './items/wear';
 import { TOOL_ITEMS } from './items/tools';
+import { HUNT_ITEMS } from './items/hunt';
 import type { LootRule } from './items/rules';
 import { lookOf } from '../../api/_lib/shop-items';
 // Item database. Pure data; shared by the client UI, world spawning and the server.
@@ -72,7 +73,7 @@ export interface ItemDef {
   /** how many of it a new one is, where that is not six tenths of a full pile: a bandage is found one at a time, and carried five together */
   fresh?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** a bottle: it holds this many drinks (what `water` and `energy` say is one of them), is kept when it is empty, and is filled at a well */ sips?: number; /** and the kilograms of drink in a full one: it weighs that much less empty, and less with every drink */ drink?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** blood given back, ml, and the seconds it takes to run in (a bag of a drip: see src/sim/blood.ts) */ blood?: number; over?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** a bottle: it holds this many drinks (what `water` and `energy` say is one of them), is kept when it is empty, and is filled at a well */ sips?: number; /** and the kilograms of drink in a full one: it weighs that much less empty, and less with every drink */ drink?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** blood given back, ml, and the seconds it takes to run in (a bag of a drip: see src/sim/blood.ts) */ blood?: number; over?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; /** ends food poisoning (charcoal) */ cures?: boolean; /** seconds of a body's guard against illness (vitamins) */ guard?: number; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
   /** used, it calls a supply drop down where its user stands (see CALL in src/sim/drops.ts) */
@@ -143,7 +144,7 @@ export interface ItemDef {
 
 // (the items themselves are in src/sim/items/, by sort, each with its loot rule and its price)
 
-const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS];
+const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));
 
@@ -159,6 +160,10 @@ export interface ItemInstance {
   uid: string;
   id: string;
   qty: number;
+  /** what cooks and goes off (src/sim/cooking.ts, Cooked): seconds of cooking it has had, the moment it is cold again, when it was got (wall-clock seconds) */
+  cook?: number;
+  hot?: number;
+  made?: number;
   /** a gun: the rounds in it, in its magazine or its tube and the one in its chamber */
   loaded?: number;
   /** a gun fed by a magazine: the one in it (an item's id), or null with none in it. (Not said at all: a gun from before magazines were things, which is given the one it was made with: see sanitizeItem.) */
@@ -228,10 +233,15 @@ export function tagClock(it: ItemInstance): string {
   return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
 }
 
-/** what an item is called: a dog tag carries its owner's name */
+/** a word after a thing's name for the stage it is at ("raw", "rotten"): said by src/sim/cooking.ts, which this file cannot import */
+export const NAMING: { stage?: (it: ItemInstance) => string } = {};
+
+/** what an item is called: a dog tag carries its owner's name; meat says whether it is raw, cooked, burned or rotten */
 export function itemName(it: ItemInstance): string {
   const d = ITEMS[it.id];
   if (it.id === 'dogtag' && it.owner) return `${tagOwner(it)}'s Dog Tag`;
+  const stage = NAMING.stage?.(it);
+  if (stage) return `${d.name} (${stage})`;
   const look = lookOf(it.finish);
   return look ? `${look === 'gold' ? 'Gold' : 'Nickel'}-plated ${d.name}` : d.name;
 }

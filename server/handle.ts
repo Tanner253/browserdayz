@@ -15,6 +15,7 @@ import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
+import { FUEL } from '../src/sim/cooking';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
@@ -45,6 +46,8 @@ import { stashBuriedNear } from './stash-sight';
 import { changed, contents, hidden } from './storages';
 import { espAnswer, espRows } from './esp';
 import { aimWatch, looked } from './aimwatch';
+import { animalHit, animalSkin, animalsHear } from './animals';
+import { POISON } from '../src/sim/sickness';
 
 /** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
 function withoutTags<T extends { id: string; cargo?: { item: { id: string } }[] }>(items: T[]): T[] {
@@ -113,6 +116,8 @@ export function handle(c: Client, m: C2S) {
       stayOn(c, 'you fired');
       // (to whoever is within earshot of that gun, and a little more for those on the move: see src/sim/heard.ts)
       broadcastNear({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, m.o[0], m.o[2], shotHeard(m.w, !!m.sup)[1] + 50, c);
+      // (and every animal within earshot hears it)
+      animalsHear(m.o[0], m.o[2], shotHeard(m.w, !!m.sup));
       return;
     }
     case 'swing': {
@@ -166,6 +171,22 @@ export function handle(c: Client, m: C2S) {
       // lit by somebody standing beside it (a couple of metres' grace: where they are is told a moment late)
       if (!c.alive || !hearths.light(m.i, c.pose[0], c.pose[2], Date.now() / 1000, 2.5)) return;
       broadcast({ t: 'fire', i: m.i, left: FIRE.burns });
+      return;
+    }
+    case 'build': {
+      // a fire built from firewood at the feet of whoever built it, on open ground (src/sim/fires.ts FIRE.built)
+      if (!c.alive || !isVec3([m.x, m.y, m.z]) || Math.hypot(m.x - c.pose[0], m.z - c.pose[2]) > FIRE.built.reach || Math.abs(m.y - c.pose[1]) > 2) return;
+      const now = Date.now() / 1000, i = hearths.build(m.x, m.y, m.z, c.id, now);
+      if (i < 0) return void send(c, { t: 'sys', text: 'Too many fires are standing: let one go out first.' });
+      broadcast({ t: 'fire+', i, x: m.x, y: m.y, z: m.z });
+      broadcast({ t: 'fire', i, left: hearths.left(i, now) });
+      return;
+    }
+    case 'feed': {
+      // firewood put on a fire that is alight: it burns that much longer
+      const now = Date.now() / 1000;
+      if (!c.alive || !hearths.feed(m.i, FUEL.firewood, c.pose[0], c.pose[2], now, 2.5)) return;
+      broadcast({ t: 'fire', i: m.i, left: hearths.left(m.i, now) });
       return;
     }
     case 'barrel': {
@@ -327,6 +348,10 @@ export function handle(c: Client, m: C2S) {
       broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir, melee: !!rule.melee && !rule.blast, ...(body ? { body } : {}) });
       return;
     }
+    case 'ahit':
+      return animalHit(c, m);
+    case 'askin':
+      return animalSkin(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
@@ -618,7 +643,7 @@ export function handle(c: Client, m: C2S) {
         // (nor any blood, and no wound of theirs is closed by it)
         const bleeding = held ? held.bleeding || !!v.bleeding : !!v.bleeding;
         const bleed = bleeding ? Math.max(held?.bleeding ? bleedOf(held) : 0, v.bleeding ? bleedOf(v) : 0) : 0;
-        c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding, blood: held ? Math.min(bloodOf(held), bloodOf(v)) : bloodOf(v), bleed, broken: !!v.broken };
+        c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding, blood: held ? Math.min(bloodOf(held), bloodOf(v)) : bloodOf(v), bleed, broken: !!v.broken, ...(num(v.ill) && v.ill > 0 ? { ill: Math.min(POISON.lasts, v.ill) } : {}), ...(num(v.guard) && v.guard > 0 ? { guard: Math.min(1200, v.guard) } : {}) };
       }
       return;
     }

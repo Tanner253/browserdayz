@@ -765,13 +765,22 @@ export const LOCAL_MODELS = {
   // worn faces -z, the way a body does and the K6-3 helmet does; what stands against a wall has its front to +z,
   // as the furniture from Poly Haven has; what goes on a gun looks along +x.
   // (The pouch leans six degrees in its file: it is stood straight. The red cross is on its +z face.)
+  // A box of pills out of the food pack the owner added (food_collection_-_game_ready.zip, unpacked to
+  // assets-src/models/food_collection/): charcoal tablets and multivitamins, told apart by their paint (2026-10-23).
+  // What a body gives (2026-10-23, the animals): the downloads the owner fetched, at the size the game wants them.
+  meat_steak: { dir: 'meat_rib_kimmen', size: 0.24, tex: 2048, tags: ['loot', 'food'], changes: 'Stood on the ground about its own middle and scaled to a rib steak 24 cm long; textures re-encoded as WebP at 2048 a side (they came at 4096); geometry compressed.' },
+  animal_fat: { dir: 'raw_meat_4_plaggy', size: 0.13, tex: 2048, dye: { hue: 12, saturation: 0.3, brightness: 1.45 }, tags: ['loot'], changes: 'Stood on the ground about its own middle and scaled to a piece 13 cm long; its colour turned paler, to fat; textures re-encoded as WebP at 2048 a side (they came at 4096); geometry compressed.' },
+  bone_pile: { dir: 'bone_pile_3dsauce', size: 0.42, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle and scaled to a heap 42 cm across; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (548,000 triangles as it came, drawn whole near and as a light copy further off: never brought down itself)
+  fur_pelt: { dir: 'bear_skin_rug_jepson', size: 2.2, tex: 2048, tags: ['loot'], changes: 'Stood on the ground about its own middle and scaled to a pelt 2.2 m long; a copy of about 7,300 triangles made for seeing it from further off (scripts/lods.mjs), the whole one kept for near; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  pill_box: { dir: 'food_collection', only: /SM_Pills_Box_01/, size: 0.09, tex: 512, tags: ['loot'], changes: 'Only its box of pills is used here: stood on the ground about its own middle and scaled to nine centimetres tall; textures re-encoded as WebP at no more than 512 a side (one picture for the whole pack, of which the box is a corner); geometry compressed.' },
   aid_pouch: { dir: 'tactical_first_aid_kit', rot: [0.1013, -0.0337, -0.0034], size: 0.2, tex: 2048, tags: ['loot'], changes: 'Stood straight on the ground about its own middle and scaled to a pouch twenty centimetres tall; textures re-encoded as WebP at the size they came; geometry compressed.' },
   // (The ACOG: life size, 14.3 cm. Its objective is toward -x as it comes, the end its fibre lies along: turned
   // round. It is one shape with one material, drawn see-through: the picture's alpha is 22 in 255 on the clear lid
   // over the fibre, 224 on the objective's glass and 255 everywhere else. Cut at a half, the lid is gone and the red
   // fibre shows as it does through a clear lid; the glass is solid and dark. Drawn solid whole, the lid hid the fibre.
   // Its pictures at 1024 as the heaviest guns' are: 71,000 triangles, where the other sights are 2,000 to 30,000.)
-  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 1024, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at no more than 1024 a side; geometry compressed.' },
+  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 1024, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at no more than 512 a side (one picture for the whole pack, of which the box is a corner); geometry compressed.' },
   // (The M1: its shell, the band round it and the four cartridges tucked into the band; its chin straps and their
   // buckle hang a hand below the rim and are left off, as nothing holds them to a chin. Its brow is toward +z as it
   // comes: turned round. Its biggest picture is 1024.)
