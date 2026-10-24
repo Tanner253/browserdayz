@@ -1,8 +1,167 @@
-# Where the work stands (handoff, 2026-10-20)
+# ZONA handoff (2026-10-24, for a new navigator)
 
-Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
+Read in this order: `CLAUDE.md` (the rules; it wins over everything but this file), then sections 1 to 6 below, then
+`docs/ARCHITECTURE.md` when you need a file. Section 7 is history: the decisions and their reasons, newest first.
+The memory notes (`MEMORY.md` and its files) are older history; where they disagree with CLAUDE.md or this file, these win.
 
-## THE WORK LIST (the owner, 2026-10-23: "do not lose sight of the work list at hand"; then base building, gathering, crafting, raiding)
+## Contents
+1. [Start here: your first half hour](#1-start-here-your-first-half-hour)
+2. [Where things stand right now](#2-where-things-stand-right-now)
+3. [Open tasks, in order](#3-open-tasks-in-order)
+4. [How the work runs](#4-how-the-work-runs)
+5. [Getting to know the codebase](#5-getting-to-know-the-codebase)
+6. [Must-know nuances](#6-must-know-nuances-beyond-claudemd)
+7. [History](#7-history-newest-first)
+
+## 1. Start here: your first half hour
+You are the navigator: the owner (they/them) talks to you; you do the small things yourself and coordinate the bigger
+ones; you are the quality filter for anything the owner sees; you assemble and run releases on their word.
+1. Read `CLAUDE.md` whole. Then this file's sections 2 to 6.
+2. `git status`, `git log --oneline -5`, `git branch --show-current` in `C:\Users\perci\source\repos\Zona`: you should be on
+   `battle-royale` at or after `e879723c`, with only the owner's untracked marketing files and `.claude/launch.json` changed.
+3. `curl -s https://browserdayz.onrender.com/healthz` (protocol 62, `kept`, `players`) and
+   `curl -s https://www.zonapvp.fun/version.json`. If `players` is not 0, the owner or players are on: keep the Browser
+   pane closed and never start the game's sound in it.
+4. `mcp__ccd_session_mgmt__list_sessions` shows the side sessions (section 4); none is working on anything open now.
+5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
+
+## 2. Where things stand right now
+- **LIVE 2026-10-24 13:29 UTC**: site, game server and `main` all from `613f731d` (PROTOCOL 62, server boot fc91453e;
+  801 characters and 133 stashes kept across the restart; payouts on). `site-live` and `hotfix` point there too.
+- **Working branch: `battle-royale`** (the name is historical: it holds everything, ZONA, Arena and Battle Royale).
+  It is `613f731d` plus handoff commits only, so a site-only deploy from it is free again while it holds no server change.
+- That release held: the DayZ-style inventory (guns two squares wide in the equipment strip, their parts under them; the
+  ten hot keys big under HANDS; Vicinity as pictures), the animals (bear, stag, doe, wolf packs, cow; hunting, gutting,
+  cooking), Mokroye in the swamp and twelve new places, Pokrov, Kalat and the canyon reworked, the phone fixes (phone sky,
+  ready-made map file built on Vercel), the fort's gaps closed, one ring round the crosshair for timed actions, G to
+  drop / hold G to throw, Discord buttons, the Desert Eagle's suppressor and red dot, and ONE holographic sight (the
+  Benelli's) on every gun and as the item. Changelog entries `#sights-fort-discord`, `#world-polish`, `#animals`,
+  `#inventory-dayz`. The full suite (135 files) passed.
+- Nothing is half done in the tree. No side session is working.
+
+## 3. Open tasks, in order
+The owner's rules for all of it: visual quality first; no corners cut, but once up to standard move on (no extra
+polishing or analysis); build cheap by design, and NO performance measuring (the owner optimizes in a pass of their own);
+develop single things on the stage first; never change the ground round buried stashes; never raise WORLD_REV.
+
+1. **Admin panel: a "show animals" toggle** (the owner, 2026-10-24: "admin panel needs a toggle for show animals").
+   Beside "Names of players" and "Loot" in the admin panel's own powers (`src/ui/admin-ui.ts`, the `this.flip(...)` list
+   near line 1085): every animal where it is, through anything, as those two show players and loot. Look at how the
+   loot overlay is drawn and switched (`this.act.*`) and do the same for animals (their positions reach the game in
+   the animal messages: `src/sim/animal-mind.ts` and the game's animal code).
+2. **Every sniper takes a sniper pad** (the owner, 2026-10-24: "all snipers should take a sniper pad attachment"; they
+   said yes to starting it). The pad today is `rifle_wrap` ("Cheek Rest", `src/sim/items/parts.ts`, slot `wrap`), fitting
+   only `mosin` and `mosin9130`, drawn from the Mosin's own model. The snipers: `mosin`, `mosin9130`, `sniper50` (L96 AWP),
+   `barrett`, `vssk`. Add them to its `fits`, and give each a place for it on its stock (as `FIT` in
+   `src/game/weapons.ts` places attachments, measured off each model with `scripts/sight-profile.mjs`), in the hands and on
+   others. Judge in third person and first person; the inventory slot follows from the rules.
+3. **The inventory's key 0 square is not drawn while it is empty** (the ten keys under HANDS show 1 to 9 and a gap).
+4. **One loading, not two** (players: "why does the user need to wait for 2 loadings?"): the deploy wait behind the menu.
+   Not started (the phone pass left it).
+5. **Phones, small**: the desert canyon cliff is drawn green on phones and red on computers (also on live); the dog-tag
+   measuring makes about 500 MB of garbage at spawn. KTX2 textures for phones are planned (card
+   `progress/phones-stay-up/pictures/plan-phones-ktx2.html`, about -450 MB card) and need the owner's yes first.
+6. **Server-run inventory**: the session "Server-run inventory: no client authority over items" (local_cbc26f80) built
+   inventory step 1b and the layout; ask it (or read its last messages) what of "no client authority over items" is left
+   before starting anything there. Tag custody (the payout side) is live.
+7. **Higgsfield AI** (parked "until all ongoing work is done and we are shipped": now shipped). Models made by its 3D
+   generators may replace ours only if equal or better, judged on the stage side by side, licence checked for commercial
+   use. The desktop app never loaded the owner's Custom connector, only the read-only one; the owner must switch it on
+   (+ > Connectors) before a pilot. Ask the owner before spending credits.
+8. **The next big phase** (the owner, 2026-10-23): base building, gathering, crafting and raiding, "combining the best of
+   rust and the best of dayz". A plan picture first, and the owner's yes on the design.
+9. **Later, not to be lost** (the owner's words are in section 7):
+   - a basement under nearly every house, reached from the yard AND by a stair inside, with attics in the same pass;
+   - weather (rain, cold, shelter), crashed aircraft, forests of different trees;
+   - server walls for ZONA (the battle royale's cheap boxes), then server-side sight and aim checks (end of the list);
+   - real recorded audio for every generated sound;
+   - furniture searchable everywhere;
+   - split the next giant files (`src/game/weapons.ts` is about 4,000 lines, then buildings, `generate.ts`, the body,
+     the sound, the inventory screen) with `scripts/split/`;
+   - Arena wagers round 2 (money) waits on the owner's calls;
+   - LAST: the Google Ads media (`progress/google-ads/plan.md`; never mention payouts or play to earn).
+
+## 4. How the work runs
+- **The owner's way**: short TL;DRs, pictures of work as it goes, a plan picture before anything big. Full URLs in chat,
+  one per line, when they must download something; every model link licence-checked first (record, description, the
+  uploader's other uploads). When they say deploy, deploy at once.
+- **Side sessions**: the owner has had several sessions running at once, each on one task, and asked that their
+  questions, approvals and pictures come to the navigator ("i wont have to check 8 different tabs"). Start one only when
+  the owner asks for it or agrees; do small things yourself. No sub-agents and no Workflows (CLAUDE.md), whatever the
+  ultracode setting says. A session works in its own worktree under `.claude/worktrees/`, commits to its own branch,
+  and reports a hash; you review its pictures (judge them yourself: the owner sees only what passes), then merge its
+  branch into `battle-royale` (the owner: merge without asking). Message a session with `SendMessage` and its `local_…`
+  id. Sessions of the last release, all finished: world polish local_c34bf24d, phone pass local_8b56a161, animals
+  local_6551ac13, gameplay batch local_5deed9ae, fort local_e1fb82cc, Kamenka local_ea76b89e, inventory local_cbc26f80,
+  Higgsfield pilots local_3bbe9422 and local_00eaa8e1. They may be archived (ask the owner).
+- **Two runs on one machine**: only one headless game on the card at a time (`scripts/card-lock.mjs` queues them), and
+  only one full test suite (`scripts/test-all.mjs` now queues behind another: two at once took the same ports and hung).
+  A session that needs the dev page or the local server starts its own on its own port; never kill another session's
+  processes (ask it).
+- **A release** (on the owner's word; a site-only deploy needs no asking):
+  1. Merge the branches into `battle-royale`. A conflict in `docs/ARCHITECTURE.md`: take either side, then
+     `node scripts/architecture.mjs`.
+  2. `node scripts/typecheck.mjs; echo $?`, then `node scripts/test-all.mjs` once (about 14 minutes). A test that lists
+     items (gunsound's quieted guns, for one) fails when the rules change on purpose: update its list.
+  3. A changelog entry with pictures (`public/changelog/index.html`, pictures in `public/changelog/media/`; move the
+     `Latest` tag to it), and `server/restart-note.json` (120 characters at most: `deploy.mjs` refuses a longer one, as players see only 120).
+  4. PROTOCOL raised if the wire changed; never WORLD_REV; if the ground changed, `npx tsx scripts/stash-guard.ts --cells`
+     regenerates `server/changed-cells.json` (only those cells are set again; the guard checks no stash is near).
+  5. Deploy from a clean copy of the commit: `git worktree add --detach <tmp> <commit>`; copy `.vercel` and
+     `.env.local-server` into it; `cmd //c "mklink /J <tmp>\node_modules <repo>\node_modules"`; in it
+     `node scripts/deploy.mjs --dry`, then `node scripts/deploy.mjs` (site, then the live server saves, then `main`).
+  6. After: `/healthz` (protocol, `kept`, `stashGuard`), `/version.json`, `/api/cashins?format=status`;
+     `git branch -f main <commit>`, the same for `site-live` and `hotfix`; remove the copy junction first
+     (`cmd //c "rmdir <tmp>\node_modules"`, check it is gone), then `rm -rf <tmp>`, `git worktree prune`. Update this file.
+
+## 5. Getting to know the codebase
+- `docs/ARCHITECTURE.md`: every file, its size and what it is. Start there, then read only the parts you need (grep first).
+- The game in the browser: `src/game/game.ts` (the Game class, with a list of which file in `src/game/game/` holds each
+  of its methods), `src/game/weapons.ts` (guns, attachments and where they sit: `FIT`, `RED_DOT_AT`, `holoParts`),
+  `src/ui/` (HUD, inventory `inventory-ui.ts`, admin panel `admin-ui.ts`, the door `door.ts`, the store).
+- Shared rules: `src/sim/` (items in `src/sim/items/`: guns, parts with what each fits; loot; animals `animal-mind.ts`).
+- The world: `src/world/worldgen.ts` and `src/world/worldgen/generate.ts` (one long function, its stages indexed at its
+  head), buildings, the fort (`castle*`).
+- The server: `server/index.ts` (start-up in order, the loops), `server/handle.ts` (every message a player sends),
+  `server/admin.ts` (every admin command). Payouts: `api/_lib/payouts.ts`.
+- Seeing things: the stage `tools/stage.html` for one model or animation (headless on the processor with
+  `PLAY_NOWAIT=1 PLAY_GL=swiftshader` and `assets-src/_wf/me/stage-shot.js`); the real game headless with
+  `node assets-src/_wf/me/play.mjs <script.js> <out> 1600 900 "http://localhost:5173/zona?server=http://127.0.0.1:9"`
+  (the dev page must be up: launch entry `zona-dev`). The harness in the page is `window.T` (`src/dev/harness.ts`:
+  `T.boot()`, `T.kit()`, `T.give(id)`, `T.lineup({...})`, `T.tp`, `T.aim`) and the game is `window.__game`. Ready
+  scripts to copy: `assets-src/_wf/me/inv-look.js` (inventory), `benelli-look.js` (sights hip and aimed),
+  `deagle-mods-look.js` (a gun with parts, in the hands and on others), `door-shot.js` (the front page).
+- Pictures of work go in `progress/<topic>/` (kept out of git, kept for the story).
+
+## 6. Must-know nuances (beyond CLAUDE.md)
+- **Models ship as copies**: computers draw every model from its lean copy (`public/assets/lean/256-128/`, pictures 256 and
+  128); phones draw the world copy (pictures up to 1024) near; `public/assets/models/hi/` holds each model as it came,
+  which no player loads (`.vercelignore` keeps it off the site; tools like `scripts/sight-profile.mjs` read it).
+- **Fixing a downloaded model**: edit its source in `assets-src/models/<dir>/` (keep the original beside it as
+  `*.orig.*`), then `node scripts/packs.mjs <id> --force`, `node scripts/tier-now.mjs`, `node scripts/lods.mjs <id>`,
+  `node scripts/lean.mjs`, and `npm run icons -- --only <item>` if its picture changes. `tier-now` also makes the copies
+  of any other model that lacks them. Example: `assets-src/_wf/me/benelli-hood-fit.mjs` (the holo sight's hood).
+- **One holographic sight**: the Benelli's `sight` piece, taken off it by `holoParts()` for every gun that has `FIT.dot`;
+  the item `red_dot` is the same piece (`model: 'benelli_m3', nodeRe: '^sight'`); `holo_sight.glb` only lends its lit
+  mark. The AR-15's own sight is never shown (`never: ['foregrip', 'sight']`). A pistol's 1x red dot rides its slide
+  unless `RED_DOT_AT` says `body` (the Desert Eagle's sits on its fixed barrel).
+- **See-through, both sides** (`src/core/one-draw.ts`): such a material is drawn front-only over a doubled shape, so its
+  `side` reads 0 at runtime by design. A see-through slit in a model is its geometry, not this.
+- **Inventory**: the guns' panels are gone; each gun is two squares in the equipment strip with its parts under it.
+- **Stashes**: never change the ground near a buried stash. The owner-only `/stashes` command lists them; the list must
+  never be committed or copied into code or logs. The server's stash guard reports on `/healthz`.
+- **Licences**: `assets-src/_not-licensed/` holds downloads that must never ship (README there). Poly Haven is free to
+  use; any other site needs the owner's yes; nothing ripped.
+- **Remote Control**: the owner may write from their phone, where the end-of-turn box does not show: put any question in
+  your closing message.
+- **Patching files**: the Edit tool for code. A Python patch must read and write with `encoding='utf-8'` and
+  `newline=''` (the files hold non-ASCII; the default code page fails on them).
+
+---
+
+# 7. History (newest first)
+
+## The work list of 2026-10-23/24 (all of it shipped 2026-10-24 as 613f731d; kept for its decisions)
 Visual quality first; build cheap (heli flight replay.mjs owner-run-2.json, 114.8 fps), but a small cost is accepted (the
 owner: "small frame cost is to be expected ... we will have to do optimizations after the fact"). Never change the
 ground around buried stashes or build on them; never raise WORLD_REV. The onboarding session reviews each session's pictures
@@ -376,7 +535,7 @@ The owner, 2026-10-16: "we need a impressive trailer that tells a story". Nothin
 - **Server-side sight and aim checks, at the end of the list** (the owner, 2026-10-20: "draw the plan but we will not work on it for now", then "save it for later and put on the end of the to do list"). Players are sent only the players they could see: hills and solid walls hide, windows, doors and foliage never do. The test looks about 0.3 s ahead, so nobody pops in. Shots through solid walls are refused, and the aim watch grows. Steps: watch only, tune with bots, switch on, aim. Plan card: `marketing/plan-visibility.html` -> `zona-plan-visibility.png` (and `progress/plans/`). It is the real answer to the wallhacks of 2026-10-20: the trap on window.__game (live, c721b3e) stops pasted scripts, but not somebody who edits their own copy of the page.
 - **LAST: Google Ads media** (the owner, 2026-10-18: "put this at the very end of our todo list for now"): 15 stills (5 landscape 1200x628, 5 square 1200x1200, 5 portrait 1080x1920), five trailers each in 16:9, 1:1 and 9:16 on the ABCD plan, and the 15:5:5 copy. The plan, with the owner's brief whole and three questions for them first (the tag holds 15 minutes, not the brief's 10; ZONA has no "extraction"; a landing page without token or payouts): `progress/google-ads/plan.md`. The owner: "do not discuss mention or elude to payouts or play to earn".
 
-# Where the work stood (handoff, 2026-10-14)
+## Where the work stood, 2026-10-14 (older history)
 
 Read `CLAUDE.md` first. This file says what is live, what is waiting, and what is next. Update it at every release.
 

@@ -9,7 +9,7 @@ notes describe other ways to deploy, one lane at a time, or publishing the site 
 ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag taken from a kill and held pays SOL.
 - Site and serverless API: Vercel project `dayz-web-slice`, https://www.zonapvp.fun (`/version.json` gives the protocol; `/changelog/`, `/payouts`).
 - Game server: Render, https://browserdayz.onrender.com (`/healthz`, websocket `/ws`). **A push to `main` redeploys it.**
-- Repo: https://github.com/Tanner253/browserdayz. `main` is what is live; `next` is the working branch; `site-live` and `hotfix` mark what the site and server were last deployed from.
+- Repo: https://github.com/Tanner253/browserdayz. `main` is what is live; `battle-royale` is the working branch (the name is historical: it holds everything; `next` is old); `site-live` and `hotfix` mark what the site and server were last deployed from.
 - Stack: Vite + TypeScript + three.js + Rapier (character controller), a Node `ws` server that shares `src/sim` with the game, Vercel functions in `api/`.
 
 ## Where things are
