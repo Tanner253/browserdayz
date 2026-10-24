@@ -7,6 +7,10 @@ Read `CLAUDE.md` first. The 2026-10-14 notes below are history.
   (assets.ts DESK_UP; the owner: "bump them up by 1 incriment"). 2.5 -> 10.1 MB on the card. Lossless 512 copies
   outweigh the files, so a computer loads those two files whole and cuts them; phones keep their 256/128 lean copies
   (lean.mjs UP_FILES). Pictures and tools: progress/kamenka-textures/ (look.js, pairs.mjs). Changelog `#kamenka-sharper`.
+- NOT DEPLOYED, on the same branch after it: the plank house let down 0.27 m onto the sand at its four desert copies
+  (Peski, Bereg x2, Mys; buildings.ts `seatDrop`, the owner: "the building is floating off the ground"), with its
+  floors and its 48 loot places (each 0.27 lower; nothing else of the 4,243 moved). The server makes those places too:
+  site and server go out together, on the owner's word ("don't deploy the server until I say"). No WORLD_REV.
 
 ## LIVE (2026-10-22 ~08:57 UTC): site, server and `main` from `de02380` (PROTOCOL 60)
 - **Apply a finish** (the owner: "the apply should stick with the weapon on the server ... like rust"): the item's own
