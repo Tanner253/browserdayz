@@ -23,7 +23,8 @@
 
 import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
-import { combinePiles, goesWith, gridWeight, pileGrids, sortGrid } from './inv-piles';
+import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
+import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon } from './act-icons';
 import { lookOf } from '../../api/_lib/shop-items';
@@ -83,6 +84,8 @@ export interface InvActions {
   release(item: ItemInstance): void;
   /** what is in the hands */
   inHands(): ItemInstance | null;
+  /** the magazine on its way into this gun (the gun being taken up for it, or the hands at it), or null */
+  goingIn(gun: ItemInstance): string | null;
   /** a thing lying within reach that holds things: this player's to go through ('mine'), being asked for, somebody else's, or not opened (null). See Game.openLying */
   lying(uid: string): 'wait' | 'mine' | 'busy' | null;
   changed(): void;
@@ -107,6 +110,16 @@ type Source =
   | { kind: 'fitted'; weapon: ItemInstance; mod: string; item: ItemInstance };
 
 /** the places on a gun that take a part, in the order they are shown under it */
+/** a number for each thing a part of the screen acts on, written on it, so that two parts written alike act on the same things (see `place`) */
+const OIDS = new WeakMap<object, number>();
+let nextOid = 0;
+const oid = (o: object) => {
+  let n = OIDS.get(o);
+  if (n === undefined) OIDS.set(o, (n = ++nextOid));
+  return n;
+};
+const srcOid = (s: Source) => `${oid(s.item)}${s.kind === 'container' ? `.${oid(s.c)}` : s.kind === 'ground' ? `.${oid(s.w)}` : s.kind === 'fitted' ? `.${oid(s.weapon)}` : ''}`;
+
 const PARTS: [AttachSlot, string][] = [['magazine', 'Magazine'], ['optic', 'Optic'], ['muzzle', 'Muzzle'], ['grip', 'Grip'], ['light', 'Light'], ['wrap', 'Stock']];
 
 interface Drag {
@@ -486,6 +499,32 @@ export class InventoryUI {
   /** something it shows has changed that it was not told about through `refresh` (the figure of the survivor) */
   redraw() {
     if (this.isOpen && !this.drag && !this.menu) this.render();
+  }
+
+  private drawn = 0;
+  private due = false;
+  /** the grid whose kinds are being offered under its chip (see gridBox), or null */
+  private typing: string | null = null;
+
+  /**
+   * The pockets changed under it (a magazine gone in once the gun was up, a reload done, a tag put on): drawn again
+   * on the next frame, once however many changes come in it, and not at all if it was drawn since. Until 2026-10-23
+   * nothing drew it then, and the change showed at the next 5 s refresh or the next click (the owner: "when i swap my
+   * magaizines out it takes a second for it to show in my inventory").
+   */
+  soon() {
+    if (!this.isOpen || this.due) return;
+    this.due = true;
+    const at = this.drawn;
+    requestAnimationFrame(() => {
+      this.due = false;
+      if (this.drawn === at && this.isOpen && !this.drag && !this.menu) this.render();
+    });
+  }
+
+  /** is this thing lying among what the Vicinity shows? (loot taken elsewhere on the map leaves the screen alone) */
+  shows(uid: string) {
+    return this.vicinity.some((w) => w.loot.uid === uid);
   }
 
   /** a message in place of the open container's grid (waiting for the server), '' to show the grid */
@@ -875,18 +914,23 @@ export class InventoryUI {
     // of this screen has room for when it is opened there, on a body: it is marked, and scrolls sideways by itself
     // wherever it stands in less room than it is wide. Nothing is ever off the edge.)
     box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '') + (c.w >= 9 ? ' wide' : '');
+    box.dataset.o = String(oid(c));
     // (a bag's room taken, "13 / 20", is not said any more: Fettah 2026-10-18, "not much use for it"; the tag pouch and the hold still say theirs)
     // (what a bag's things weigh, idea 6, Fettah 2026-10-18: "so you can see which bag to drop", drawn as their share of all
     // that is carried, a percentage and a weight; nothing on an empty one, nor with the choice by "Carried" off)
     const kg = hold || c === this.inv.tags || !c.items.length || !kindView.weights ? 0 : gridWeight(c);
-    const all = kg && this.inv.weight(), share = all ? Math.min(1, kg / all) : 0;
+    const all = kg && (this.weighed ?? this.inv.weight()), share = all ? Math.min(1, kg / all) : 0;
     const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : '';
     const weighs = kg ? `<span class="inv-bagkg">${Math.round(share * 100)}%${WEIGHT_ICON}</span>` : '';
     const tip = kg ? `What is in it weighs ${kg.toFixed(2)} kg: ${Math.round(share * 100)}% of the ${all.toFixed(1)} kg you carry. ` : hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
     // (a grid of what is carried, open, with two things or more in it and not sorted already, can be sorted: packed tight, kind by kind)
-    const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && this.inv.containers.some((x) => x.id === c.id) && sortGrid(c, false);
+    // (the crate or body open can be sorted too, as well as what is carried)
+    const sorts = !shut && c.items.length > 1 && c !== this.inv.tags && (this.inv.containers.some((x) => x.id === c.id) || c === this.stash?.container) && wouldSort(c);
     const sortBtn = sorts ? `<button type="button" class="inv-sort" title="Sort: pack it tight, kind by kind"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 6H28V10H4ZM4 14H21V18H4ZM4 22H14V26H4Z"/></svg></button>` : '';
-    box.innerHTML = `<h4 title="${tip}${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
+    // (what is worn that has room is set For a kind with the chip by its name, the kinds offered under it: inv-types.ts)
+    const kind = typable(c) ? bagFor(c) : undefined;
+    const forBtn = kind !== undefined ? `<button type="button" class="inv-for${kind ? ' set' : ''}" title="What goes in here first: things of this kind you take, buy or sort go here by themselves">${kind ? BAG_FOR.find((k) => k.id === kind)!.label : 'For…'}</button>` : '';
+    box.innerHTML = `<h4 title="${tip}${close ? 'Close it' : shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''}${forBtn}${sortBtn}${said ? ` <span>${said}</span>` : weighs}</h4>`;
     box.querySelector('h4')!.addEventListener('click', () => {
       if (close) return close();
       if (!this.folded.delete(c.id)) this.folded.add(c.id);
@@ -897,6 +941,29 @@ export class InventoryUI {
       if (sortGrid(c)) this.finish('move');
       else this.actions.note(`The ${c.name.toLowerCase()} is as tidy as it gets`);
     });
+    box.querySelector('.inv-for')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.typing = this.typing === c.id ? null : c.id;
+      this.render();
+    });
+    if (this.typing === c.id) {
+      const pick = document.createElement('div');
+      pick.className = 'inv-for-pick';
+      for (const k of [...BAG_FOR, null]) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = (k?.id ?? null) === kind ? 'on' : '';
+        b.textContent = k ? k.label : 'Anything';
+        b.addEventListener('click', () => {
+          setBagFor(c, k?.id ?? null);
+          this.typing = null;
+          this.actions.note(k ? `${k.label} goes into the ${c.name.toLowerCase()} first` : `Anything goes into the ${c.name.toLowerCase()}`);
+          this.render();
+        });
+        pick.appendChild(b);
+      }
+      box.appendChild(pick);
+    }
     if (!shut) box.appendChild(this.gridEl(c));
     return box;
   }
@@ -937,14 +1004,34 @@ export class InventoryUI {
     for (const [slot, label] of PARTS) {
       if (!takes.has(slot)) continue;
       const mod = slot === 'magazine' ? gun.mag ?? null : gun.mods?.find((m) => ITEMS[m]?.attach?.slot === slot) ?? null;
+      // (a magazine on its way in, the gun being taken up for it or the hands at it, is shown going in: it is in when they are done)
+      const coming = slot === 'magazine' ? this.actions.goingIn(gun) : null;
       const cell = document.createElement('div');
-      cell.className = 'inv-part' + (mod ? '' : ' empty');
+      cell.className = 'inv-part' + (mod || coming ? '' : ' empty') + (coming ? ' coming' : '');
       cell.dataset.part = slot;
       cell.dataset.gun = gun.uid;
+      cell.dataset.o = String(oid(gun));
       const inMag = slot === 'magazine' && mod ? Math.max(0, (gun.loaded ?? 0) - ((gun.loaded ?? 0) > 0 ? 1 : 0)) : 0;
-      cell.innerHTML = `<span>${label}</span>` + (mod ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[mod] ?? ''})"></div>${slot === 'magazine' ? `<em>${inMag}/${ITEMS[mod].mag?.capacity ?? 0}</em>` : ''}` : '');
+      if (coming) {
+        cell.innerHTML = `<span>Mag</span><div class="inv-item-img fit" style="background-image:url(${this.icons[coming] ?? ''})"></div><em>in…</em>`;
+        cell.title = `${ITEMS[coming].name}: going in`;
+        row.appendChild(cell);
+        continue;
+      }
+      // (A magazine is taken out with Out as well as by dragging it off: the owner, 2026-10-23, of players with the gun
+      // in their hands "confused" how to pull the magazine out. Dragging, a double-click and the right button still do.)
+      const out = slot === 'magazine' && mod ? `<button type="button" class="inv-part-out" title="Take the magazine out">Out</button>` : '';
+      // (with a magazine in it and Out on it, the place says what it is without its name)
+      cell.innerHTML = (out ? '' : `<span>${label}</span>`) + (mod ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[mod] ?? ''})"></div>${slot === 'magazine' ? `<em>${inMag}/${ITEMS[mod].mag?.capacity ?? 0}</em>` : ''}${out}` : '');
       cell.title = mod ? `${ITEMS[mod].name}: drag it off to take it off` : `${label}: drag one here`;
       if (mod) {
+        cell.querySelector<HTMLElement>('.inv-part-out')?.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          this.actions.detach(gun, mod);
+          this.finish('move');
+        });
         cell.addEventListener('pointerdown', (e) => {
           if (e.button !== 0) return;
           e.preventDefault();
@@ -1037,22 +1124,68 @@ export class InventoryUI {
     return s;
   }
 
+  /** the three columns and the foot as they stand on the screen, and each as it was written out when placed (see `place`) */
+  private parts: HTMLElement[] = [];
+  private written: string[] = [];
+  /** what all that is carried weighed when this was last drawn (see render) */
+  private weighed: number | null = null;
+
+  /**
+   * What was made put on the screen: the first time (or once anything else has emptied it) all of it; after that each
+   * column only if it came out written differently from the one there, the numbers of the things it acts on included
+   * (`oid`). One the same is left as it is, scrolled where it was, and the browser has nothing of it to lay out again.
+   * One put in its place is scrolled where that was (2026-10-12: "the scroll view resets and scrolls to the top on the
+   * vicinity side when interacting with loot").
+   * @returns whether the whole screen was put up anew
+   */
+  private place(parts: HTMLElement[]): boolean {
+    const r = this.root, scrolls = '.inv-col, .inv-ground, .inv-scroll, .inv-inspect';
+    const within = (e: HTMLElement) => [...(e.matches(scrolls) ? [e] : []), ...e.querySelectorAll<HTMLElement>(scrolls)];
+    const scrolled = (es: HTMLElement[]) => es.map((e) => [e.scrollTop, e.scrollLeft]);
+    // (a part at the top is left at the top without asking: put there, it makes the browser lay the page out at once)
+    const scroll = (es: HTMLElement[], was: number[][]) => es.forEach((e, i) => {
+      if (!was[i] || !(was[i][0] || was[i][1])) return;
+      e.scrollTop = was[i][0];
+      e.scrollLeft = was[i][1];
+    });
+    const words = parts.map((e) => e.outerHTML);
+    const old = this.parts;
+    if (old.length !== parts.length || !old.every((e) => r.contains(e))) {
+      const was = scrolled([...r.querySelectorAll<HTMLElement>(scrolls)]);
+      r.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'inv-wrap';
+      wrap.append(...parts.slice(0, -1));
+      r.append(wrap, parts[parts.length - 1]);
+      scroll([...r.querySelectorAll<HTMLElement>(scrolls)], was);
+      this.parts = parts;
+      this.written = words;
+      return true;
+    }
+    parts.forEach((e, i) => {
+      if (words[i] === this.written[i]) return;
+      const was = scrolled(within(old[i]));
+      old[i].replaceWith(e);
+      scroll(within(e), was);
+      this.parts[i] = e;
+      this.written[i] = words[i];
+    });
+    return false;
+  }
+
+  /**
+   * The columns and the foot made afresh, and only those that came out different put on the screen (`place`): a
+   * whole new screen cost 18 ms a change, 7 of them the browser laying all of it out again (2026-10-23).
+   */
   render() {
     const inv = this.inv;
     const r = this.root;
-    // (Everything here is made afresh each time anything changes, and what is made afresh is scrolled to its top:
-    // the list of what lies about went back to its first thing every time one of them was taken. 2026-10-12:
-    // "the scroll view resets and scrolls to the top on the vicinity side when interacting with loot". How far
-    // each part that scrolls was scrolled is kept, and given back to the part made in its place.)
-    // (`.inv-scroll`: the grids of what is carried, which scroll by themselves over the inspector: see below)
-    const scrolls = '.inv-col, .inv-ground, .inv-scroll, .inv-inspect';
-    const was = [...r.querySelectorAll<HTMLElement>(scrolls)].map((e) => [e.scrollTop, e.scrollLeft]);
-    r.innerHTML = '';
+    this.drawn++;
+    // (all that is carried weighed once a drawing: each bag's share of it is said by its name)
+    this.weighed = inv.weight();
     this.fitting = null;
     this.clocks.clear();
     this.hover = null;
-    const wrap = document.createElement('div');
-    wrap.className = 'inv-wrap';
 
     // ---- vicinity
     const vic = document.createElement('div');
@@ -1153,18 +1286,21 @@ export class InventoryUI {
     gear.insertAdjacentHTML('beforeend', this.neckEl());
     // The hands, and beside them the holster; under those the two places on the back. Under each gun are the
     // places on it that take a part, each a slot of its own: a part is dragged onto one and dragged off it.
+    // (A gun in the hands has its parts under the hands, wherever it is slung: under its slot they were not where a player
+    // looked for its magazine. The owner, 2026-10-23: "when they have the gun in their hand and then want to pull the
+    // magazine out they are confused".)
+    const held = this.actions.inHands();
     const withParts = (slot: Slot) => {
       const box = document.createElement('div');
       box.className = 'inv-armed';
-      box.append(this.slotEl(slot), this.partsEl(inv.slots[slot]));
+      box.append(this.slotEl(slot), this.partsEl(inv.slots[slot] === held ? null : inv.slots[slot]));
       return box;
     };
     const top = document.createElement('div');
     top.className = 'inv-slots';
     const handBox = document.createElement('div');
     handBox.className = 'inv-armed';
-    const held = this.actions.inHands();
-    handBox.append(this.handsEl(), this.partsEl(held && !WEAPON_SLOTS.some((x) => inv.slots[x] === held) ? held : null));
+    handBox.append(this.handsEl(), this.partsEl(held));
     // (which places those are is the rules' to say, WEAPON_SLOTS: the ones there are two of a kind of are the back, and stand together)
     const pair = (s: Slot) => WEAPON_SLOTS.some((x) => x !== s && SLOT_KIND[x] === SLOT_KIND[s]);
     top.append(handBox, ...WEAPON_SLOTS.filter((s) => !pair(s)).map(withParts));
@@ -1182,12 +1318,24 @@ export class InventoryUI {
     cargo.dataset.pockets = '1';
     // (what is carried and, where the game has said a load weighs on anybody, what it leaves of a sprint: the rule is
     // src/sim/load.ts. In red past the weight that slows the feet as well.)
-    const kg = inv.weight(), told = this.carryLimit !== null;
+    const kg = this.weighed ?? inv.weight(), told = this.carryLimit !== null;
     cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${told ? `${Math.round(breathOf(kg) * 100)}%${SPRINT_ICON} · ` : ''}${kg.toFixed(1)}${WEIGHT_ICON}</span></h3>`;
     // (an admin's power: it weighs nothing to them, and the head says that and no weight)
     if (this.weightless) cargo.innerHTML = `<h3><b class="inv-h">Carried${this.viewEl()}${this.ammoLine()}</b><span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
     this.wireView(cargo);
-    cargo.appendChild(this.findEl());
+    // (every bag carried sorted at once, each kind into the bag set for it: inv-piles.ts sortAll)
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'inv-sortall';
+    all.title = 'Sort everything you carry: piles joined, each kind into the bag set for it, every bag packed kind by kind';
+    all.textContent = 'Sort all';
+    all.addEventListener('click', () => {
+      if (sortAll(inv, wants, (c) => !!bagFor(c))) this.finish('move');
+      else this.actions.note('Everything you carry is as tidy as it gets');
+    });
+    cargo.querySelector('.inv-h')?.after(all);
+    // (the search box is one box kept for good, with what is typed in it: its place only, filled once the columns are placed)
+    cargo.appendChild(Object.assign(document.createElement('div'), { className: 'inv-find-at' }));
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';
     const grids = document.createElement('div');
@@ -1222,15 +1370,13 @@ export class InventoryUI {
     // and no key to it beside it. They were four bars, drawn when this was and stale until it was drawn again; this
     // is one element of the HUD's own, which the HUD keeps up to date while this screen is open, and it is put here
     // each time this is drawn.)
+    // (its place only: the row itself, which the HUD keeps changing, is put in once the columns are placed)
     if (this.vitals && this.status) {
       const box = document.createElement('div');
       box.className = 'inv-status';
-      box.appendChild(this.status);
       cargo.appendChild(box);
     }
 
-    wrap.append(vic, gear, cargo);
-    r.appendChild(wrap);
     // The foot of the screen, on the columns' own grid: the clicks under the first two, the hot keys under Carried
     // and as wide as it (Fettah 2026-10-18: "the same width and under the carriage", so the clicks have the room to the
     // left). The clicks are always in sight there and take no room from the grids: each means one thing, wherever
@@ -1266,19 +1412,18 @@ export class InventoryUI {
       ]);
     }
     foot.appendChild(this.hotEl());
-    r.appendChild(foot);
-    [...r.querySelectorAll<HTMLElement>(scrolls)].forEach((e, i) => {
-      if (!was[i]) return;
-      e.scrollTop = was[i][0];
-      e.scrollLeft = was[i][1];
-    });
-    // (the figure's box was made afresh with the rest: where it is, is found again; and its still picture is put away where the live one is to be had)
+    const whole = this.place([vic, gear, cargo, foot]);
+    if (this.vitals && this.status) this.parts[2].querySelector('.inv-status')?.appendChild(this.status);
+    this.parts[2].querySelector('.inv-find-at')?.replaceWith(this.findEl());
+    // (the figure's box may have been made afresh: where it is, is found again; and its still picture is put away where the live one is to be had)
     this.figMoved = true;
     r.classList.toggle('fig-ready', !!this.figure?.alive);
-    r.append(...this.veil);
-    r.appendChild(this.hoverOutline);
-    r.appendChild(this.card);
-    if (this.menu) r.appendChild(this.menu);
+    if (whole) {
+      r.append(...this.veil);
+      r.appendChild(this.hoverOutline);
+      r.appendChild(this.card);
+    }
+    if (this.menu && this.menu.parentElement !== r) r.appendChild(this.menu);
     // (What the pointer is on was made afresh with the rest: it is found again, so that the card stays by it and
     // the keys that act on what is pointed at still do, without the mouse having to be moved first.)
     let under: Element | null = this.isOpen && this.at.mouse && !this.drag ? document.elementFromPoint(this.at.x, this.at.y) : null;
@@ -1842,6 +1987,7 @@ export class InventoryUI {
 
   private bindItem(el: HTMLElement, src: Source) {
     this.bound.set(el, src);
+    el.dataset.o = srcOid(src);
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
@@ -2155,6 +2301,26 @@ export class InventoryUI {
       el.classList.toggle('grid-ok', room);
       el.classList.toggle('grid-full', !room);
     }
+    // A magazine lights up every gun it goes into, and the gun's magazine place, with Load; rounds light up every
+    // magazine they fill with Fill; a part, Fit. (The owner, 2026-10-23: loading "can be confusing ... the users want it
+    // to be easier and more intuitive. I want to maintain all dayz functionality": the drops were always there, unseen.)
+    const word = (j: 'stack' | 'attach' | 'fill' | null) => (j === 'fill' ? 'Fill' : j === 'attach' ? (def.mag ? 'Load' : 'Fit') : '');
+    const held = this.actions.inHands();
+    for (const el of this.root.querySelectorAll<HTMLElement>('.inv-item')) {
+      const onto = this.bound.get(el)?.item;
+      // (a gun in the hands is marked there, not again where it is slung)
+      if (onto && onto === held && !el.closest('.slot-inhands')) continue;
+      const w = onto ? word(this.joins(d, onto)) : '';
+      if (!w) continue;
+      el.classList.add('drop-hint');
+      el.dataset.does = w;
+    }
+    for (const el of this.root.querySelectorAll<HTMLElement>('.inv-part')) {
+      const gun = this.gunByUid(el.dataset.gun ?? '');
+      if (!gun || def.attach?.slot !== el.dataset.part || !this.actions.attachTargets(item).includes(gun)) continue;
+      el.classList.add('drop-hint');
+      el.dataset.does = def.mag ? 'Load' : 'Fit';
+    }
     const act = this.onCharacter(d.src);
     const gear = this.root.querySelector<HTMLElement>('.inv-gear');
     const fig = this.root.querySelector<HTMLElement>('.doll-fig');
@@ -2165,6 +2331,7 @@ export class InventoryUI {
 
   private clearTargets() {
     this.root.classList.remove('dragging');
+    this.root.querySelectorAll<HTMLElement>('[data-does]').forEach((el) => delete el.dataset.does);
     this.root.querySelectorAll('.drop-hint, .drop-ok, .drop-bad, .grid-ok, .grid-full, .char-ok, .char-over, .ground-ok, .ground-over, .pockets-over').forEach((el) => el.classList.remove('drop-hint', 'drop-ok', 'drop-bad', 'grid-ok', 'grid-full', 'char-ok', 'char-over', 'ground-ok', 'ground-over', 'pockets-over'));
   }
 

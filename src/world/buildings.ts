@@ -497,7 +497,11 @@ export interface Blueprint {
    * `floors`: how high each floor is over the ground one (a place for a thing at one of those heights lies on that
    * floor). `doors`: a leaf hung at [x, y, z] (its hinge, on the sill), turned `rot`, `w` wide and `h` high.
    */
-  whole?: { model: string; lift: number; surface: Surface; floors: number[]; doors: { x: number; y: number; z: number; rot: number; w: number; h: number }[] };
+  whole?: {
+    model: string; lift: number; surface: Surface; floors: number[]; doors: { x: number; y: number; z: number; rot: number; w: number; h: number }[];
+    /** rooms that stand off the model's own feet (a house on piles): how high, and each one's plan [x0, x1, z0, z1] (see `seatDrop`) */
+    off?: { y: number; rooms: [number, number, number, number][] };
+  };
   walls: WallDef[];
   furniture: Furn[];
   loot: [number, number, number][];
@@ -683,7 +687,11 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
       // 6.49 m over its own ground; it stands 0.3 m into the pad, so that the feet of its ramps are on the ground.
       return {
         w: 9.82, d: 15.8, h: 2.7, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_iron', roofType: 'flat',
-        whole: { model: 'shanty_mansion', lift: 0.3, surface: 'wood', floors: [0.351, 3.052, 2.962, 6.19, 6.08], doors: [] },
+        whole: {
+          model: 'shanty_mansion', lift: 0.3, surface: 'wood', floors: [0.351, 3.052, 2.962, 6.19, 6.08], doors: [],
+          // (the two rooms' undersides, 0.25 m over the feet of its legs and ramps: progress/kamenka-textures/underside.mjs)
+          off: { y: 0.25, rooms: [[-2.88, 4.76, -7.64, -4.08], [-2.88, 4.75, 1.58, 7.9]] },
+        },
         walls: [],
         furniture: [],
         loot: [
@@ -2234,6 +2242,24 @@ export class Buildings {
     return gasDepth(this.gasField, plot.x, plot.floorY + 1.5, plot.z) > GAS.breathe;
   }
 
+  /**
+   * How far a model whose rooms stand off its own feet is let down onto the ground (the owner, 2026-10-23, of the plank
+   * house in the desert: "the building is floating off the ground"). It is set by its floor, which the old map's towns
+   * lay 8 cm over their ground and the desert's 30: its rooms were 3 cm over the grass there and 25 over the sand here.
+   * Where they are clear of the ground by more than 5 cm they go 2 cm into it, and nothing else of the town moves.
+   */
+  private seatDrop(plot: BuildingPlot, whole: NonNullable<Blueprint['whole']>) {
+    const c = Math.cos(plot.rot), s = Math.sin(plot.rot);
+    let low = Infinity;
+    for (const [x0, x1, z0, z1] of whole.off!.rooms)
+      for (let k = 0; k <= 8; k++) {
+        const lx = x0 + ((x1 - x0) * k) / 8, lz = z0 + ((z1 - z0) * k) / 8;
+        for (const [x, z] of [[lx, z0], [lx, z1], [x0, lz], [x1, lz]]) low = Math.min(low, heightAt(this.world.heights, plot.x + x * c + z * s, plot.z - x * s + z * c));
+      }
+    const clear = plot.floorY - whole.lift + whole.off!.y - low;
+    return clear > 0.05 ? Math.round((clear + 0.02) * 100) / 100 : 0;
+  }
+
   private planBuilding(plot: BuildingPlot) {
     if (plot.type === 'tower') return this.planTower(plot);
     const rng = new RNG(plot.seed);
@@ -2241,8 +2267,9 @@ export class Buildings {
     const bp = reskin(blueprint(plot.type, rng), plot.seed);
     // (a watchtower is the bell tower stood alone, the army's lookout: its store is a soldier's, see src/sim/watchtowers.ts)
     if (plot.id.startsWith('watchtower_')) bp.usage = ['Military', 'Hunting'];
+    // (all of it let down together, model, floors and places for things: see seatDrop)
     const B = new THREE.Matrix4().compose(
-      new THREE.Vector3(plot.x, plot.floorY, plot.z),
+      new THREE.Vector3(plot.x, plot.floorY - (bp.whole?.off ? this.seatDrop(plot, bp.whole) : 0), plot.z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), plot.rot),
       new THREE.Vector3(1, 1, 1),
     );

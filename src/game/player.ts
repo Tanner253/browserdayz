@@ -1192,8 +1192,8 @@ export class Player {
       return;
     }
     const exertion = this.god ? 0 : this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
-    v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
-    v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
+    v.energy = Math.max(0, v.energy - NEED.hunger * exertion * dt);
+    v.water = Math.max(0, v.water - NEED.thirst * exertion * this.thirstMult * dt);
     // An open wound costs blood, and no health: the two are two things (src/sim/blood.ts). Left alone it closes
     // in the end, five minutes on; a dressing closes it there and then.
     if (v.bleeding) {

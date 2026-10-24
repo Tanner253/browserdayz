@@ -64,14 +64,17 @@ export const voided = new Set<string>();
 export const tagSeen = new Map<string, number>();
 export const seenOf = (key: string) => `${hashOf('key', key)}|`;
 
+/** tag uid -> who holds it, as this server saw it change hands: `p:<seenOf(key)>` a player, `g` the ground, `b:<cid>` a body (see custody.ts) */
+export const custody = new Map<string, string>();
+
 /**
  * The three above, kept with the world and taken in again (the owner, 2026-10-18: "when the server restarts, player
  * sshould not lose their dogtags, its bad UX its not their fault"). Held only here, a restart forgot whose every tag
  * had been and when it was picked up, and each was cashed in for nothing. The time a carrier is away, restart and all,
  * is not counted (see `join` in players.ts). The newest few thousand, should it ever come to that.
  */
-export interface TagsKept { looted: [string, Looted][]; seen: [string, number][]; voided: string[] }
-export const keepTags = (): TagsKept => ({ looted: [...lootedTags].slice(-4000), seen: [...tagSeen].slice(-4000), voided: [...voided].slice(-4000) });
+export interface TagsKept { looted: [string, Looted][]; seen: [string, number][]; voided: string[]; with?: [string, string][] }
+export const keepTags = (): TagsKept => ({ looted: [...lootedTags].slice(-4000), seen: [...tagSeen].slice(-4000), voided: [...voided].slice(-4000), with: [...custody].slice(-4000) });
 export function takeTags(k: TagsKept | undefined) {
   if (!k) return;
   const str = (s: unknown): s is string => typeof s === 'string';
@@ -80,6 +83,7 @@ export function takeTags(k: TagsKept | undefined) {
   }
   for (const [s, at] of Array.isArray(k.seen) ? k.seen : []) if (str(s) && Number.isFinite(at) && !tagSeen.has(s)) tagSeen.set(s, at);
   for (const uid of Array.isArray(k.voided) ? k.voided : []) if (str(uid)) voided.add(uid);
+  for (const e of Array.isArray(k.with) ? k.with : []) if (Array.isArray(e) && str(e[0]) && str(e[1]) && !custody.has(e[0])) custody.set(e[0], e[1]);
 }
 
 export const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);

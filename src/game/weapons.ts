@@ -1353,6 +1353,11 @@ export class Weapons {
   /** how many rounds are in the magazine that is on its way into the gun */
   private incomingRounds = 0;
 
+  /** the magazine the hands are putting in now (the inventory marks it on the gun until it is in) */
+  goingIn(): string | null {
+    return this.action?.name === 'magswap' || this.action?.name === 'reload' ? this.incoming : null;
+  }
+
   /**
    * The rounds drawn in the mouth of a magazine: the M9's top two, the row in the AR-15's. They are pieces of
    * their own in the gun's file, and were always there, in a magazine with nothing in it: "when the pistol is out

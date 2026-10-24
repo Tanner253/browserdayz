@@ -192,6 +192,9 @@ const SPLASHES = [
   splash(27, "<ellipse cx='52' cy='40' rx='32' ry='18'/>", "<circle cx='14' cy='30' r='4.5'/><circle cx='90' cy='44' r='3.5'/><circle cx='62' cy='10' r='4'/><circle cx='26' cy='62' r='3'/><circle cx='78' cy='66' r='2.5'/>", "<path d='M58 52 Q60 92 61 122 Q62 128 64 122 Q64 92 66 52 Z'/>"),
 ];
 
+/** a name over a head (a player, a dead one, a vanished one, the admin's own body), or a thing lying about by its sort (in a body, a crate or a stash: 'box') */
+export type EspKind = '' | 'dead' | 'ghost' | 'me' | 'box' | 'gun' | 'ammo' | 'med' | 'gear' | 'food' | 'item';
+
 export class HUD {
   root: HTMLDivElement;
   /** Emotes: the wheel's slots set, each watched first; opened in the game from the wheel (src/ui/emotes-menu.ts) */
@@ -1616,7 +1619,7 @@ export class HUD {
    * of the screen's width and height). An empty list takes them all away.
    */
   /** @param list where each name goes, as parts of the screen across and down (0 to 1) */
-  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: '' | 'dead' | 'ghost' | 'me' }[]) {
+  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: EspKind }[]) {
     let box = this.root.querySelector('.hud-esp') as HTMLElement | null;
     if (!box) {
       if (!list.length) return;

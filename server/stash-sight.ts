@@ -15,6 +15,8 @@ export type Seer = { pose: number[]; ws: { readyState: number } };
 export type Kept = { cid: string; kind: string; buried?: boolean; x: number; y: number; z: number; rot: number; item?: string };
 
 const told = new WeakMap<Seer, Set<string>>();
+/** each stash's burials so far: every burial is news, so one dug up and buried again is told again, near or later */
+const burials = new Map<string, number>();
 
 const infoOf = (b: Kept): StashInfo => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, ...(b.item ? { item: b.item } : {}), buried: true });
 const near = (c: Seer, b: { x: number; z: number }) => (b.x - c.pose[0]) ** 2 + (b.z - c.pose[2]) ** 2 <= SEE_M * SEE_M;
@@ -23,8 +25,9 @@ const near = (c: Seer, b: { x: number; z: number }) => (b.x - c.pose[0]) ** 2 + 
 function tell<C extends Seer>(c: C, b: Kept, send: (c: C, m: S2C) => void) {
   let mine = told.get(c);
   if (!mine) told.set(c, (mine = new Set()));
-  if (mine.has(b.cid)) return;
-  mine.add(b.cid);
+  const key = `${b.cid}#${burials.get(b.cid) ?? 0}`;
+  if (mine.has(key)) return;
+  mine.add(key);
   send(c, { t: 'stash+', s: infoOf(b) });
 }
 
@@ -41,5 +44,6 @@ export function stashesSeen<C extends Seer>(clients: Iterable<C>, boxes: Iterabl
 /** A stash gone into the ground this moment: told to those near enough to see it go (the one burying it among them). */
 export function stashBuriedNear<C extends Seer>(s: StashInfo, clients: Iterable<C>, send: (c: C, m: S2C) => void) {
   const b: Kept = { cid: s.uid, kind: 'stash', buried: true, x: s.x, y: s.y, z: s.z, rot: s.rot, ...(s.item ? { item: s.item } : {}) };
+  burials.set(b.cid, (burials.get(b.cid) ?? 0) + 1);
   for (const c of clients) if (c.ws.readyState === 1 && near(c, b)) tell(c, b, send);
 }

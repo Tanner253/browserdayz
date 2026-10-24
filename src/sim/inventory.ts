@@ -191,18 +191,23 @@ export class Container {
   }
 
   /** Merges into existing stacks first, then finds free space. Returns leftover qty. */
+  /** a pile put onto the piles of its kind already here, as far as they have room: true if none of it is left */
+  topUp(item: ItemInstance): boolean {
+    const cap = ITEMS[item.id].stack;
+    if (!cap || !this.accepts(item)) return false;
+    for (const p of this.items) {
+      if (p.item.id !== item.id || p.item === item || p.item.qty >= cap) continue;
+      const move = Math.min(cap - p.item.qty, item.qty);
+      p.item.qty += move;
+      item.qty -= move;
+      if (item.qty <= 0) return true;
+    }
+    return false;
+  }
+
   add(item: ItemInstance): ItemInstance | null {
     if (!this.accepts(item)) return item;
-    const def = ITEMS[item.id];
-    if (def.stack) {
-      for (const p of this.items) {
-        if (p.item.id !== item.id || p.item.qty >= def.stack) continue;
-        const move = Math.min(def.stack - p.item.qty, item.qty);
-        p.item.qty += move;
-        item.qty -= move;
-        if (item.qty <= 0) return null;
-      }
-    }
+    if (this.topUp(item)) return null;
     const spot = this.findSpace(item);
     if (!spot) return item;
     this.items.push({ item, ...spot });
@@ -653,14 +658,26 @@ export class PlayerInventory {
     }
   }
 
+  /**
+   * Which grids a thing would rather go to (the game's: a bag the player has set for its kind, "assign their containers
+   * as a Type like ammo or food or medical etc so those items automatically go there", the owner, 2026-10-23). Not
+   * set, as on the server, every grid is as good as another.
+   */
+  prefer: ((c: Container, item: ItemInstance) => boolean) | null = null;
+
   add(item: ItemInstance): ItemInstance | null {
     const free = this.freeSlotFor(item);
     if (free) {
       this.slots[free] = item;
       return null;
     }
+    // (A pile joins its own kind first, wherever on the body that is: it went into the first grid with room, a pile
+    // of its own beside nothing, while one of the same lay half full in the pack. Then the grids set for it.)
+    if (ITEMS[item.id].stack) for (const c of this.containers) if (c.topUp(item)) return null;
+    const all = this.containers, want = this.prefer;
+    const order = want ? [...all.filter((c) => want(c, item)), ...all.filter((c) => !want(c, item))] : all;
     let left: ItemInstance | null = item;
-    for (const c of this.containers) {
+    for (const c of order) {
       if (!left) break;
       left = c.add(left);
     }

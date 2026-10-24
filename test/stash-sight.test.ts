@@ -57,6 +57,23 @@ ok('one going into the ground is told to whoever is near, the one burying it amo
   assert.equal(got.get(far), undefined);
 });
 
+ok('one dug up and buried again is told again: to whoever is near, and to one told before who comes near later', () => {
+  const digger = player(200, 200), away = player(200, 400), { got, send } = inbox();
+  const s = { uid: 'again', x: 201, y: 5, z: 200, rot: 0, buried: true };
+  stashBuriedNear(s, [digger, away], send);
+  away.pose = [201, 0, 210, 0];
+  stashesSeen([digger, away], [stash('again', 201, 200)], send);
+  away.pose = [200, 0, 400, 0];
+  stashBuriedNear(s, [digger, away], send);
+  assert.deepEqual(got.get(digger), ['again', 'again']);
+  assert.deepEqual(got.get(away), ['again']);
+  away.pose = [201, 0, 210, 0];
+  stashesSeen([digger, away], [stash('again', 201, 200)], send);
+  stashesSeen([digger, away], [stash('again', 201, 200)], send);
+  assert.deepEqual(got.get(away), ['again', 'again']);
+  assert.deepEqual(got.get(digger), ['again', 'again']);
+});
+
 ok('the server no longer sends buried stashes to everybody', () => {
   const players = readFileSync('server/players.ts', 'utf8'), handle = readFileSync('server/handle.ts', 'utf8');
   const keep = readFileSync('server/keep.ts', 'utf8'), index = readFileSync('server/index.ts', 'utf8');

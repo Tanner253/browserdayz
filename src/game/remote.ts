@@ -699,6 +699,9 @@ export class CorpseBody {
     // (and its bones not gone through again: the two above stop only the root's own sum, and three still walked its
     // sixty-five joints every frame, each put together again, for every body lying about, 2026-10-18)
     root.updateMatrixWorld = () => {};
+    // (and no shadow: lying on the ground there is next to nothing of one to see, and each body was drawn again into
+    // the sun's shadow every frame. The owner, 2026-10-23: "turn off bodies shadows".)
+    root.traverse((o) => void ((o as THREE.Mesh).isMesh && (o.castShadow = false)));
   }
   dispose() {
     this.gone = true;

@@ -57,9 +57,11 @@ import type { AnimalRow, Call } from '../sim/animals';
 // 56's page, counting twenty and ten, is told to load the page again.)
 // (60, 2026-10-22: a store finish is put on one gun ('finish') and goes with it, drawn from the gun's own `finish`;
 // the held gun's look rides on 'ps', its uid on 's'. A page of 59 would plate every gun its owner holds.)
-// (61, 2026-10-23: animals, moved by the server ('an' rows, 'ahit', 'askin'); a blow from one says whether it
-// opened a wound ('dmg' bleed). A page of 60 would see none and could not hunt.)
-export const PROTOCOL = 61;
+// (61, 2026-10-23: what one of the infected had on it lies in its body (`zed` on a body, 'ihp' `body`), not on the
+// ground: a page of 60 would draw a soldier's body over every infected's that had anything. An admin's 'esp'.)
+// (62, 2026-10-24: animals, moved by the server ('an' rows, 'ahit', 'askin'); a blow from one says whether it
+// opened a wound ('dmg' bleed). A page of 61 would see none and could not hunt.)
+export const PROTOCOL = 62;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -169,7 +171,18 @@ export interface CorpseInfo extends StashInfo {
   v?: number;
   /** still sat in a helicopter: which (its `i`) and which seat. It is drawn there until 'corpse@' lays it on the ground. */
   ride?: { i: number; seat: number };
+  /** the body of one of the infected (its `i`): drawn by them, and only searched here */
+  zed?: number;
 }
+
+/**
+ * What an admin's far sight shows of the things about them (`esp`): where, what (an item's id; in a body, a crate, a
+ * stash or a drop, the biggest thing in it), how many (of an item; the things in anything else, those in its bags too),
+ * where it is (ESP_AT), and for a bag lying on the ground, how many things are in it.
+ */
+export type EspRow = [x: number, y: number, z: number, what: string, n: number, at: number, inside?: number];
+/** on the ground, put away in a piece of furniture, a body, a crate, a stash, a buried stash, a supply drop */
+export const ESP_AT = { ground: 0, furniture: 1, body: 2, crate: 3, stash: 4, buried: 5, drop: 6 } as const;
 
 export interface KillInfo {
   id: number;
@@ -254,6 +267,8 @@ export type C2S =
   | { t: 'store'; act: unknown }
   /** somebody with a role has their panel open: the lists it shows are asked for */
   | { t: 'adm' }
+  /** an admin's far sight wants what lies about where their view is, or about them (answered to an admin alone, and no oftener than ESP.every: server/esp.ts) */
+  | { t: 'esp'; x?: number; z?: number }
   /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
   | { t: 'tint'; color: string | null }
   /** a party (server/party.ts): ask the player of that id to join yours, say yes to whoever asked you, or leave yours */
@@ -483,7 +498,7 @@ export type S2C =
   /** where the games that move them say they are */
   | { t: 'is'; s: [number, ...IState][] }
   /** one was hit by this player: what it has left, whether that was the end of it, where on it, which way the blow was going, and whether it was a blow and not a shot */
-  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number]; melee?: boolean }
+  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number]; melee?: boolean; /** it is down, with something on it to be searched */ body?: CorpseInfo }
   /** a blow of one's was stopped by the guard of the player it was thrown at */
   | { t: 'iblk'; i: number; to: number }
   | { t: 'pong'; n: number }
@@ -552,6 +567,7 @@ export type S2C =
   | { t: 'refill'; by?: string }
   /** the lists the panel shows (see AdminLists) */
   | ({ t: 'adm' } & AdminLists)
+  | { t: 'esp'; l: EspRow[] }
   /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
   | { t: 'restart'; why: string; in: number }
   /** (`v`: turned away for being of another version than the server, which is of this one) */

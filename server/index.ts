@@ -49,6 +49,7 @@ import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tel
 import { seen } from './seen';
 import { westDue } from './west-cars';
 import { TAG_PING_MS, nudge, tickDrops } from './drops';
+import { zedUid } from './bodies';
 
 
 /**
@@ -150,6 +151,8 @@ export interface Box {
   v?: number;
   /** a corpse still sat in a helicopter's seat, until it is down (see `riders` in server/acts.ts): not to be searched until then */
   ride?: { i: number; seat: number };
+  /** the body of one of the infected (its number): not kept through a restart, as its body is not (server/bodies.ts) */
+  zed?: number;
 }
 
 export const boxes = new Map<string, Box>();
@@ -394,7 +397,7 @@ function saveWorld() {
       rev: WORLD_REV,
       economy: economy.serialize(),
       // (and the dead lying on the ground, not one riding in a seat: see `bodies` in keep.ts)
-      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && b.ride)),
+      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     };
     writeFileSync(SAVE_FILE, JSON.stringify(data));
@@ -656,7 +659,15 @@ setInterval(() => {
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
   // (the bunker's are not put back while its door stands open; by its own mark, as the caves' homes are no open ground either)
   const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.bunker && bunkerDoor.open);
-  for (const i of turn.gone) broadcast({ t: 'i-', i });
+  for (const i of turn.gone) {
+    broadcast({ t: 'i-', i });
+    // (and what is left in its body goes with it; with somebody in it, when they are done, as a player's body does)
+    const cid = zedUid(i);
+    if (boxes.has(cid) && !locks.has(cid)) {
+      boxes.delete(cid);
+      broadcast({ t: 'corpse-', uid: cid });
+    }
+  }
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
   // the bunker's door: open while anybody is in there or in its doorway (a body left asleep in it too), shut a minute

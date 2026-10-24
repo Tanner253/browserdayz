@@ -89,6 +89,23 @@ class Player {
   say(x: number, z: number, w: string | null = null) {
     this.send({ t: 's', p: [x, ground(x, z), z, 0, 0, 0], w, m: [] });
   }
+  /** a tag taken off a body as a game takes it: the body opened, and set again without it (the server keeps who holds each tag that can pay, server/custody.ts: a game's word that it carries one is not enough) */
+  async takeOff(cid: string, uid: string) {
+    const at = this.got.length;
+    this.send({ t: 'copen', cid });
+    for (let k = 0; k < 60 && !this.got.slice(at).some((m) => m.t === 'cdata' && m.cid === cid); k++) await sleep(50);
+    const d = this.got.slice(at).find((m) => m.t === 'cdata' && m.cid === cid) as Extract<S2C, { t: 'cdata' }> | undefined;
+    assert.ok(d?.items.some((it) => it.uid === uid), `${this.name} found no tag ${uid} on the body`);
+    this.send({ t: 'cset', cid, items: d!.items.filter((it) => it.uid !== uid) });
+    this.send({ t: 'cclose', cid });
+    await sleep(150);
+  }
+  /** the body of the player numbered `id`, as this player was told of their death */
+  bodyOf(id: number): string {
+    const d = this.got.find((m) => m.t === 'death' && m.k.id === id) as Extract<S2C, { t: 'death' }> | undefined;
+    assert.ok(d?.corpse, `${this.name} was told of no body of #${id}`);
+    return d!.corpse!.uid;
+  }
   /** these tags on them, and nothing else */
   carry(tags: { uid: string; owner: string; held?: number }[]) {
     this.send({ t: 'me', inv: { slots: {}, active: null, containers: [{ id: 'tags', items: tags.map((t, i) => ({ ...t, id: 'dogtag', qty: 1, x: i, y: 0, rot: false })) }] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
@@ -153,6 +170,7 @@ async function looted(log: () => string, who: Player, tag: { uid: string; owner:
     await sleep(900);
   }
   assert.ok(log().includes(`${who.name} was killed`) && !log().includes(`${who.name} left no dog tag`), `${who.name} was not shot dead with their tag on them:\n${log().slice(-800)}`);
+  await eli.takeOff(eli.bodyOf(who.id), tag.uid);
   eli.carry([...also, tag]);
   await sleep(HOLD * 1000 + 800);
   const mark = log().length;

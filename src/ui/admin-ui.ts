@@ -57,6 +57,8 @@ export interface AdminActions {
   tint(color: string | null): void;
   /** everybody's name shown where they are, through anything: put on or off */
   names(on: boolean): void;
+  /** every thing lying about shown where it is, through anything: put on or off */
+  loot(on: boolean): void;
   /** what the middle of the game's view is on, behind the window (null: nothing within reach) */
   look(): AdminLook | null;
   /** somebody has been picked on the left (0: nobody): the admin's map rings them too */
@@ -78,6 +80,8 @@ export interface AdminLook {
   what: string;
   /** a car: its number */
   car?: number;
+  /** a body: its number, for /delbody (a player's body's uid, or the number of one of the infected) */
+  body?: string;
 }
 /** one of those online, as the lists have them */
 export type AdminPlayer = AdminLists['players'][number];
@@ -100,6 +104,8 @@ export interface AdminSelf {
   night: boolean;
   /** everybody's name is shown where they are */
   names: boolean;
+  /** every thing lying about is shown where it is */
+  loot?: boolean;
   /** the colour chosen for the word ADMIN in the chat (null: the rainbow) */
   tint: string | null;
   freecam: boolean;
@@ -268,6 +274,8 @@ export class AdminUI {
   /** counted up whenever the heads change, and whenever the server says something: the parts that show them are made again */
   private headsN = 0;
   private saidN = 0;
+  /** the last answer to /stashes, its STASHES lines (server/stash-list.ts): copied in one press, as nothing said here can be selected */
+  private stashLines: string[] = [];
   private held = false;
   /** where the window was left by whoever moved or resized it (null: where it opens), and where it stands now */
   private box: Box | null = null;
@@ -504,6 +512,8 @@ export class AdminUI {
 
   /** a line the server said back: shown along the bottom */
   say(text: string) {
+    if (/^\d+ stashes kept/.test(text)) this.stashLines = [];
+    if (text.startsWith('STASHES ')) this.stashLines.push(text);
     this.said.push({ at: Date.now(), text });
     this.saidN++;
     if (this.said.length > 60) this.said.shift();
@@ -703,7 +713,7 @@ export class AdminUI {
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
-    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.bottomless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.bottomless, s.night, s.names, s.freecam, s.tint].join() : ''}`;
+    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.bottomless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.bottomless, s.night, s.names, s.loot, s.freecam, s.tint].join() : ''}`;
   }
 
   private bodyOf(): HTMLElement[] {
@@ -935,6 +945,27 @@ export class AdminUI {
       row.style.opacity = String(Math.max(0.4, 1 - (lines.length - 1 - k) * 0.1));
       return row;
     }) : [el('div', 'dim', 'What an order did is said here, and in the chat.')]));
+    if (this.stashLines.length) this.log.append(this.copyStashes());
+  }
+
+  /**
+   * The whole of the last answer to /stashes onto the clipboard in one press (2026-10-23: the owner pastes it to be
+   * checked against before the map changes). Where the clipboard cannot be written, the text is laid out selected.
+   */
+  private copyStashes() {
+    const text = this.stashLines.join('\n'), b = el('button', 'adm-copy', `Copy the stash list (${this.stashLines.length} lines)`);
+    b.onclick = () => {
+      const pick = () => {
+        const box = el('textarea', 'adm-copied');
+        box.value = text;
+        box.readOnly = true;
+        b.replaceWith(box);
+        box.select();
+      };
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => void (b.textContent = 'Copied: paste it where it was asked for'), pick);
+      else pick();
+    };
+    return b;
   }
 
   // ---------------------------------------------------------------- somebody else
@@ -1052,6 +1083,7 @@ export class AdminUI {
       }, 'camera', 'K'),
       this.flip('Night vision', 'It is day, for you alone, in the bunker too', s.night, () => this.act.night(!s.night), 'sun'),
       this.flip('Names of players', 'Everybody’s name where they are, however far, through anything', s.names, () => this.act.names(!s.names), 'eye'),
+      this.flip('Loot', 'Every thing lying within 150 m of your view, through anything: on the ground, put away, on bodies, in crates and stashes', s.loot, () => this.act.loot(!s.loot), 'box'),
     );
     grid.append(this.card('Powers', 'bolt', powers,
       el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),
@@ -1396,7 +1428,19 @@ export class AdminUI {
         this.grave('wrecks', `Clear every burned-out car${st?.wrecks ? `  (${st.wrecks})` : ''}`, () => this.send('/wrecks'), 'trash'),
       ),
       this.line('Infected', el('span', '', 'Put down those within'), ...CULL.map((m) => this.grave(`delz${m}`, `${m} m`, () => this.send(`/delz ${m}`), 'infected')), el('span', '', 'of me')),
-      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected.'),
+      // (2026-10-23: "admin needs a way to get rid of corpses ... and a way to delete corpses in bulk like the kill zombies in bulk vicinity control")
+      this.line('Bodies',
+        look?.body !== undefined ? this.grave(`delbody:${look.body}`, `Delete ${look.what}`, () => {
+          this.send(`/delbody ${look.body}`);
+          window.setTimeout(() => {
+            this.looked = this.act.look();
+            if (this.isOpen) this.draw();
+          }, 900);
+        }, 'target') : this.off('The body I am looking at', 'You are not looking at a body. Shut this window, look at one, and open it again', 'target'),
+        this.grave('delbody', 'Delete the body nearest me', () => this.send('/delbody'), 'skull'),
+      ),
+      this.line('', el('span', '', 'Delete the bodies within'), ...CULL.map((m) => this.grave(`delbodies${m}`, `${m} m`, () => this.send(`/delbodies ${m}`), 'skull')), el('span', '', 'of me')),
+      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. A body goes with whatever is on it: a player’s, or one of the infected’s. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected.'),
     );
 
     const counts = el('div', 'adm-tiles');

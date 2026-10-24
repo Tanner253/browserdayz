@@ -34,9 +34,14 @@ export const INFECTED = {
   max: 93,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
-  /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
-  linger: 50,
-  respawn: 210,
+  /**
+   * How long a body lies there with what was in its pockets, and how long after it went down before another turns up
+   * about the same place, seconds. (The body lay 50 s and its things fell on the ground beside it, until the owner,
+   * 2026-10-23: "it should be lootable on the zombies dead body, until they are cleaned up. (5 mins)". The next one
+   * comes as soon as it did, 260 s after.)
+   */
+  linger: 300,
+  respawn: 260,
   /** none turns up within this of somebody living, metres */
   clear: 75,
   /**
@@ -117,7 +122,10 @@ const POCKETS: [string, number, number, number][] = [
   ['apple', 1, 1, 2], ['cigarettes', 1, 1, 2], ['watch', 1, 1, 1], ['compass', 1, 1, 1], ['knife', 1, 1, 1],
 ];
 
-/** What one drops when it goes down, if anything: [item, how many]. */
+/** the grid of a body of theirs, to be searched (see server/zbodies.ts): room for whatever a pocket held, and a little more */
+export const INFECTED_GRID: [number, number] = [5, 4];
+
+/** What one had on it when it went down, if anything: [item, how many]. */
 export function infectedDrop(rnd: () => number = Math.random): [string, number] | null {
   if (rnd() > INFECTED.carries) return null;
   let roll = rnd() * POCKETS.reduce((n, p) => n + p[3], 0);
@@ -456,19 +464,21 @@ export class Director {
     return b;
   }
 
-  /** how many have been stood by an admin (see `place`) */
-  private strays = 0;
-
   /**
    * One stood where it is asked for, by an admin (`/spawn infected`), whoever is watching. It lives nowhere (its
-   * home is -1): where it was put is where it goes back to, and when it is dead and cleared away nothing is owed in
-   * its place (see `tick`).
+   * home is -1): where it was put is where it goes back to, and when it is dead nothing is owed in its place (see `hurt`).
    */
   place(x: number, y: number, z: number, now: number): Body {
     const b: Body = { i: this.next++, s: [x, y, z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, h: [Math.round(x * 10) / 10, Math.round(z * 10) / 10], home: -1, diedAt: 0, heard: now, struck: 0 };
     this.bodies.set(b.i, b);
-    this.strays++;
     return b;
+  }
+
+  /** a body cleared away before its time, by an admin: false if there is no such body lying (one alive is not cleared) */
+  clear(i: number): boolean {
+    if (!this.bodies.get(i)?.diedAt) return false;
+    this.bodies.delete(i);
+    return true;
   }
 
   /**
@@ -484,11 +494,8 @@ export class Director {
       if (b.diedAt && now - b.diedAt > INFECTED.linger * 1000) {
         this.bodies.delete(b.i);
         turn.gone.push(b.i);
-        this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
       }
     }
-    // (one an admin stood somewhere lived nowhere, and no home is owed another for it: see `place`)
-    if (this.strays) this.due = this.due.filter((d) => d.home >= 0);
     // The ones that are owed. (It is the spot that has to be clear of the living, not the
     // whole place: somebody is nearly always somewhere in the village, and it would never
     // fill again.)
@@ -570,12 +577,18 @@ export class Director {
       b.s[4] = I_DEAD;
       b.s[5] = 0;
       b.own = null;
+      // (owed from when it went down, not from when its body is cleared away; one an admin stood lived nowhere, and nothing is owed for it)
+      if (b.home >= 0) this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
     }
     return { hp: b.hp, dead: b.hp <= 0 };
   }
 
   /** everything standing or lying, for somebody who has just arrived */
   list(): InfectedInfo[] {
-    return [...this.bodies.values()].map((b) => ({ i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) }));
+    // (where each is, to the centimetre, and which way it faces to the thousandth: told to the double's last digit, as
+    // the games report it, the list for somebody arriving was twice what it needed to be, and with bodies lying five
+    // minutes it holds six times as many of the dead, 2026-10-23)
+    const c = (v: number) => Math.round(v * 100) / 100;
+    return [...this.bodies.values()].map((b) => ({ i: b.i, s: [c(b.s[0]), c(b.s[1]), c(b.s[2]), Math.round(b.s[3] * 1000) / 1000, b.s[4], b.s[5]] as IState, hp: Math.round(b.hp * 10) / 10, own: b.own, h: b.h, ...(b.w ? { w: b.w } : {}) }));
   }
 }

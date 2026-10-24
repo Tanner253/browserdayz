@@ -33,7 +33,7 @@ import '../sim/barrels';
 import '../sim/emotes';
 import '../sim/save';
 import { Net, playerName, publicId, serverStatus, setPlayerName } from '../net/client';
-import { crateId } from '../net/protocol';
+import { crateId, type EspRow } from '../net/protocol';
 import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
 import '../sim/blood';
@@ -59,6 +59,7 @@ import type { BrMode } from './br/mode';
 import { Modes } from './modes';
 import '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
+import { wants } from '../ui/inv-types';
 import { Minimap } from '../ui/minimap';
 import { BigMap } from '../ui/bigmap';
 import { BURY } from '../sim/stash';
@@ -80,7 +81,7 @@ import { Horde, Infected } from './infected';
 import { Beast, Wildlife } from './animals';
 import { Heli } from './heli';
 import { shotHeard } from '../sim/heard';
-import { INFECTED, guarded } from '../sim/infected';
+import { INFECTED, INFECTED_GRID, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, onPinned } from '../ui/rewards';
@@ -108,7 +109,7 @@ import { CASTLE_SCALE, inCastle } from '../sim/castle';
 import { WreckFire } from './wreck-fire';
 import { helipads } from '../world/helipad';
 import { enterMethods } from './game/enter';
-import { onlineMethods } from './game/online';
+import { onlineMethods, searchedAt } from './game/online';
 import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
@@ -229,7 +230,8 @@ export class Game {
   player: Player;
   avatar = new Avatar();
   director: CameraDirector;
-  inv = new PlayerInventory();
+  /** what is carried; a thing taken goes first into a bag the player has set for its kind (src/ui/inv-types.ts) */
+  inv = Object.assign(new PlayerInventory(), { prefer: wants });
   net = new Net();
   effects!: Effects;
   weapons!: Weapons;
@@ -326,7 +328,14 @@ export class Game {
       return true;
     },
     guarded: () => this.onGuarded(),
-    dropped: (id, qty, at) => this.dropItem(makeItem(id, qty), at.clone().setY(at.y + 0.05), 0.4),
+    bodied: (b, id, qty) => {
+      const uid = `zbody_${b.i}`, stash = new Stash(uid, b.pos.x, b.pos.y, b.pos.z, b.yaw, INFECTED_GRID[0], INFECTED_GRID[1], 'Infected');
+      stash.corpse = true;
+      stash.container.add(makeItem(id, qty));
+      searchedAt(stash, b.variant);
+      this.corpses.set(uid, { stash });
+    },
+    cleared: (i) => this.removeCorpse(`zbody_${i}`),
     killed: (zone, distance) => {
       this.weapons.confirmKill();
       // (counted toward the trader's work of the day, whether or not he has been asked about it)
@@ -343,7 +352,7 @@ export class Game {
   remotes = new Map<number, RemotePlayer>();
   /** item ids on the quick-use keys 5-8 */
   quick: (string | null)[] = [null, null, null, null];
-  corpses = new Map<string, { stash: Stash; body: CorpseBody }>();
+  corpses = new Map<string, { stash: Stash; body?: CorpseBody }>();
   last = performance.now();
   fpsAcc = 0;
   fpsN = 0;
@@ -376,6 +385,7 @@ export class Game {
   vicinityDue: number[] = [];
   vicinityT = 0;
   vicinitySig = '';
+  saveDue: ReturnType<typeof setTimeout> | null = null;
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   awaitClick = false;
   /** the chat is open and the mouse let go for it (see frame) */
@@ -855,6 +865,11 @@ export class Game {
       hotIndex: (item) => this.inv.hotOf(item),
       hold: (item, loose) => this.takeUp(item, loose),
       inHands: () => this.inv.held() ?? this.inHand,
+      goingIn: (gun) => {
+        const f = this.fitting;
+        if (f?.gun === gun && f.part) return f.part;
+        return this.inv.held() === gun ? this.weapons.goingIn() : null;
+      },
       lying: (uid) => this.lying.get(uid) ?? null,
       release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
@@ -1146,6 +1161,16 @@ export class Game {
           this.namesWanted = on && this.role === 'admin';
           try {
             localStorage.setItem('zona.admin.names', this.namesWanted ? '1' : '0');
+          } catch {
+            /* not kept: it is as it was the next time */
+          }
+          this.adminUI.setSelf(this.adminSelf());
+        },
+        loot: (on) => {
+          this.lootWanted = on && this.role === 'admin';
+          if (!this.lootWanted) this.espLoot = [];
+          try {
+            localStorage.setItem('zona.admin.loot', this.lootWanted ? '1' : '0');
           } catch {
             /* not kept: it is as it was the next time */
           }
@@ -1461,6 +1486,17 @@ export class Game {
     }
   })();
   namesOn = false;
+  /** an admin wants every thing lying about shown where it is (the panel's switch; remembered): see `drawNames` */
+  lootWanted = (() => {
+    try {
+      return localStorage.getItem('zona.admin.loot') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  lootAsked = 0;
+  /** what the server last said lies about the view (server/esp.ts) */
+  espLoot: EspRow[] = [];
   freeView = (cam: THREE.PerspectiveCamera) => {
     const f = this.freecam;
     if (!f) return;
@@ -1536,7 +1572,7 @@ export class Game {
   drumsBack: { i: number; t: number }[] = [];
 
   /** a change to a gun's parts that is waiting on the gun coming up into the hands */
-  fitting: { gun: ItemInstance; run: () => void; t: number } | null = null;
+  fitting: { gun: ItemInstance; run: () => void; t: number; part?: string } | null = null;
 
   // ------------------------------------------------------------ magazines
 
@@ -1597,6 +1633,7 @@ export interface Game {
   tickTags: Methods<typeof enterMethods>['tickTags'];
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];
+  saveSoon: Methods<typeof enterMethods>['saveSoon'];
   enterOnline: Methods<typeof onlineMethods>['enterOnline'];
   leaveOnline: Methods<typeof onlineMethods>['leaveOnline'];
   rejoin: Methods<typeof onlineMethods>['rejoin'];
