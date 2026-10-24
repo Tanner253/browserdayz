@@ -1156,41 +1156,6 @@ export class InventoryUI {
    * (Pointing at a thing and pressing the number does the same. A right-click on a key clears it.)
    */
   /**
-   * Each gun slung or holstered (not the one in the hands: its parts are under the hands) as a panel of its own, with its
-   * parts: its name, its rounds and where it is carried; folded by its bar, as a grid is.
-   */
-  private gunPanels(ui: string, held: ItemInstance | null): Node[] {
-    const out: Node[] = [];
-    for (const slot of WEAPON_SLOTS) {
-      const gun = this.inv.slots[slot];
-      if (!gun || gun === held) continue;
-      const key = `gun:${slot}`, shut = this.folded.has(key);
-      out.push(...this.block(`c:${key}`, `${ui}|${this.look(gun)}:${this.actions.goingIn(gun) ?? ''}|${shut ? 1 : 0}`, () => {
-        const box = document.createElement('div');
-        box.className = 'inv-gridbox inv-gunbox' + (shut ? ' shut' : '');
-        const d = ITEMS[gun.id];
-        const rounds = d.weapon ? `${gun.loaded ?? 0}/${d.weapon.mag ? (gun.mag ? magRoom(gun) : '–') : capacityOf(gun)}` : '';
-        box.innerHTML = `<h4 title="${shut ? 'Open it' : 'Fold it away'}" data-tail="${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${itemName(gun)}<small>${SLOT_LABEL[slot]}</small> <span>${rounds}</span></h4>`;
-        box.querySelector('h4')!.addEventListener('click', () => {
-          if (!this.folded.delete(key)) this.folded.add(key);
-          this.render();
-        });
-        if (!shut) {
-          // (the gun itself at its own size, a long one on its side: dragged from here as from its place; the owner,
-          // 2026-10-24: "the guns and their attachments are too small in the inventory")
-          const rot = d.h > d.w, [w, h] = Container.size(gun, rot);
-          const pic = this.itemEl(gun, w, h, rot);
-          pic.classList.add('gun-pic');
-          this.bindItem(pic, { kind: 'slot', slot, item: gun });
-          box.append(pic, this.partsEl(gun));
-        }
-        return [box];
-      }));
-    }
-    return out;
-  }
-
-  /**
    * A body as your own side is drawn: a strip of what it wears and carries slung, then each thing it wears that has
    * room as a panel (`openBags`), then whatever else lies on it, loose (the owner, 2026-10-23, the plan: "looting a
    * body mirrors your own side"). Every thing is the body's own, dragged out as from its grid; what is let go on the
@@ -1658,7 +1623,7 @@ export class InventoryUI {
     // (an admin's hold stands last, under everything that is worn: it is where what those cannot take goes)
     const rank = (c: Container, slot: Slot | null) => (c === inv.theHold ? places.length + 2 : slot ? (places.indexOf(slot) + 1 || places.length + 1) : 0);
     carried.sort((a, b) => rank(a.c, a.slot) - rank(b.c, b.slot) || a.i - b.i);
-    const grids: Node[] = [...this.gunPanels(ui, held)];
+    const grids: Node[] = [];
     for (const { c, slot } of carried) {
       const where = slot ? SLOT_LABEL[slot] : c === inv.theHold ? 'admin' : '';
       grids.push(...this.block(`c:grid:${c.id}`, `${ui}|${where}|${this.gridSig(c)}`, () => this.boxNodes(c, where)));
@@ -1678,11 +1643,22 @@ export class InventoryUI {
     // (The body's state is the row of symbols the game has in its corner, which this screen covers: the same row,
     // and no key to it beside it, the HUD's own element, which the HUD keeps up to date while this screen is open.)
     if (this.vitals && this.status && this.status.parentElement !== sk.status) sk.status.appendChild(this.status);
-    // (what is worn, every place a body has, as a strip of squares at the top: guns, then head to feet, as DayZ has it)
-    const strip = this.block('c:strip', ui + ALL_SLOTS.map((s) => (inv.slots[s] ? this.look(inv.slots[s]!) : '-')).join('|') + `|${held?.uid ?? ''}`, () => {
+    // What is worn, every place a body has, as a strip of squares at the top, as DayZ has it. Each gun's place is two
+    // squares wide with the gun drawn across both, and the two squares under it hold its parts (the owner, 2026-10-24:
+    // "move the weapons ui like so, make it take 2 squares and then make room for the attachments and remove from the
+    // right panel its too big and annoying"); head to feet fill in after. The gun in the hands has its parts under
+    // the hands instead.
+    const strip = this.block('c:strip', ui + ALL_SLOTS.map((s) => (inv.slots[s] ? `${this.look(inv.slots[s]!)}:${this.actions.goingIn(inv.slots[s]!) ?? ''}` : '-')).join('|') + `|${held?.uid ?? ''}`, () => {
       const row = document.createElement('div');
       row.className = 'inv-strip';
-      for (const s of [...WEAPON_SLOTS, ...DOLL_SLOTS[0], ...DOLL_SLOTS[1]]) row.appendChild(this.slotEl(s));
+      for (const s of WEAPON_SLOTS) {
+        const gun = document.createElement('div');
+        gun.className = 'strip-gun';
+        const it = inv.slots[s];
+        gun.append(this.slotEl(s), this.partsEl(it && it !== held ? it : null));
+        row.appendChild(gun);
+      }
+      for (const s of [...DOLL_SLOTS[0], ...DOLL_SLOTS[1]]) row.appendChild(this.slotEl(s));
       return [row];
     });
     this.fill(sk.cargo, [...head, ...strip, this.findEl(), sk.scroll, ...inspect, ...(this.vitals && this.status ? [sk.status] : [])]);
