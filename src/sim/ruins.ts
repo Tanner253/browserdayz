@@ -618,10 +618,10 @@ function curtain(): Part[] {
     const a = x0 + 0.75, b = x1 - 0.75, d = z1 - 0.75;
     add(t, floor(rect(a, 0.9, b, d), SILL, 'paving', { name: `${name} floor` }), apron([(x0 + x1) / 2 - 0.6, -0.9], [(x0 + x1) / 2 + 0.6, -0.9], [0, -1], SILL));
     if (whole) {
-      // a platform of boards level with the walk, and one stair to it along the outer wall, the length of the room: at a
-      // pace clear of the corner it rose 43 degrees, and nobody got up it (2026-10-23: "lots of visual glitches and bugs")
-      const xf = a + 0.2, run = b - xf - 0.05, xh = xf + run;
-      // (its hole from a third of the way up: from half way, a climber's head met the boards' edge)
+      // a platform of boards level with the walk, and one stair to it along the outer wall: its foot a pace clear of the corner, so that it is come onto from behind
+      const xf = a + 0.75, run = Math.min(b - xf - 0.15, (W - SILL) / 0.95), xh = xf + run;
+      // (its hole from a third of the way up: from half way, a climber's head met the boards' edge and nobody got up it,
+      // 2026-10-23: "lots of visual glitches and bugs")
       add(floor(rect(a, 0.9, b, d), W, 'timber', { holes: [rect(xf + run * 0.3, d - 1.05, xh, d)], under: 0.12, name: `${name} platform` }));
       add(flight([xf, SILL, d - 0.52], [xh, W, d - 0.52], 0.9, 'timber'));
     } else {
@@ -790,10 +790,9 @@ function spur(): Part[] {
     opening(w, E.x0 + 0.5, 0, 1.6, T, 99);
     for (const [x, z] of [[E.x1 - 0.5, -1], [E.x0 + 3, -E.half + 0.5], [E.x0 + 3, E.half - 0.5]] as V2[]) opening(w, x, z, 0.8, T + 0.95, 99);
     add(w, floor(rect(E.x0 + 1, -E.half + 1, E.x1 - 1, E.half - 1), P.plain + SILL, 'paving', { name: 'end tower floor' }));
-    // (the stair the length of the room, and the hole over its top end: at 46 degrees, under boards over its foot and
-    // none over its head, a climber's head met the platform a metre short of it)
-    add(floor(rect(E.x0 + 1, -E.half + 1, E.x1 - 1, E.half - 1), T, 'timber', { holes: [rect(E.x0 + 1, -E.half + 1, E.x0 + 3.9, -E.half + 2.05)], under: 0.12, name: 'end tower platform' }));
-    add(flight([E.x1 - 1.05, P.plain + SILL, -E.half + 1.52], [E.x0 + 1.1, T, -E.half + 1.52], 0.9, 'timber'));
+    // (the hole over the stair's head: it was over its foot, and a climber's head met the boards a metre short of the top)
+    add(floor(rect(E.x0 + 1, -E.half + 1, E.x1 - 1, E.half - 1), T, 'timber', { holes: [rect(E.x0 + 1, -E.half + 1, E.x0 + 3.6, -E.half + 2.05)], under: 0.12, name: 'end tower platform' }));
+    add(flight([E.x1 - 1.55, P.plain + SILL, -E.half + 1.52], [E.x0 + 1.4, T, -E.half + 1.52], 0.9, 'timber'));
     add(apron([E.x1, 0.35], [E.x1, 1.45], [1, 0], P.plain + SILL));
   }
   return out;
