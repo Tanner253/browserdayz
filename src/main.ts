@@ -239,7 +239,7 @@ async function boot() {
   void westTowns?.build();
   const kalat = world.kalat ? ruinsPlan(world.kalat) : [];
   const kalatRuins = kalat.length ? new Ruins(atmo, r.scene, kalat, ready) : null;
-  for (const { piece, place } of kalat) buildings.lootPoints.push(...ruinLoot(piece, place, ground));
+  for (const { piece, place } of kalat) if (piece !== 'keep') buildings.lootPoints.push(...ruinLoot(piece, place, ground));
   // (the pass's caves, carved where the world was made (World.caves), dressed with the coast kit's rock; their places
   // for things after Kalat's, as the server lays them)
   const caves = new PassCaves(r.scene, atmo, passPlan, ground);
@@ -257,8 +257,10 @@ async function boot() {
   outcrops.camera = r.camera;
   void outcrops.build().then(() => ready(outcrops.group));
   buildings.lootPoints.push(...caveLootPoints());
-  // (and the towns' parts', last: src/sim/town-parts.ts)
+  // (and the towns' parts': src/sim/town-parts.ts)
   buildings.lootPoints.push(...buildings.laterLoot);
+  // (and the keep's in Kalat's middle, built since, after every other one so that nothing is renumbered: as the server lays them)
+  for (const { piece, place } of kalat) if (piece === 'keep') buildings.lootPoints.push(...ruinLoot(piece, place, ground));
   // (the sea's, the lakes' and the river's water and the swamp's mist got ready as they are made: hidden at the start
   // (the mist by day) they were a shader made in the frame they were first shown. Only these few: everything the west
   // made, got ready at once, held the loot's own getting ready past its six seconds, and each new thing of loot was
