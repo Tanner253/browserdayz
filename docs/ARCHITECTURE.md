@@ -115,7 +115,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
-| `stage.ts` | 202 | The stage: a plain place to look at one thing at a time, the same way every time (2026-10-24, the owner: |
+| `stage-sim.ts` | 167 | The stage's behaviour checks (2026-10-24, the owner: |
+| `stage.ts` | 234 | The stage: a plain place to look at one thing at a time, the same way every time (2026-10-24, the owner: |
 | `stance.ts` | 553 | Development-only measure of how a gun is held by a body seen from outside (window.ST), beside the harness that drives the game (window.T). |
 | `sweep.ts` | 313 | Development-only numbers for every animation (window.S), beside the harness that drives the game (window.T) and the tools that photograph it (window.D). |
 | `towns.ts` | 130 | `?towns` on a development build: a new town (src/sim/towns.ts) stood on level ground of its own in the north-west corner of today's map, in the game as it is, to be walked and looked at before it has its place in the... |
@@ -126,7 +127,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
-| `animals.ts` | 526 | The animals as the game draws them (2026-10-23). |
+| `animals.ts` | 567 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
 | `avatar.ts` | 2777 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 | `blast.ts` | 1420 | A blast: a grenade, a drum of fuel, a car going up. |

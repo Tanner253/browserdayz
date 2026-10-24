@@ -124,16 +124,33 @@ export const MODES: Record<string, number> = {
  * (or what stands in for it), lifted to that movement's floor. Its root stands on the ground, as a Beast's does.
  */
 export async function stageAnimal(kindId: string, mode: number): Promise<{ root: THREE.Group; mixer: THREE.AnimationMixer; action: THREE.AnimationAction | null; clip: string } | null> {
+  const p = await stagePoser(kindId);
+  if (!p) return null;
+  const { clip, action } = p.pose(mode, 0);
+  return { root: p.root, mixer: p.mixer, action, clip };
+}
+
+/** the same, posed again and again: doing `mode`, `seconds` into its movement (one played once is held at its end) */
+export async function stagePoser(kindId: string) {
   const kind = KINDS.find((k) => k.id === kindId);
   const kit = kind ? await kitOf(kind) : null;
   if (!kit) return null;
-  const root = new THREE.Group(), model = SkeletonUtils.clone(kit.scene);
+  const root = new THREE.Group(), model = SkeletonUtils.clone(kit.scene), mixer = new THREE.AnimationMixer(model);
   root.add(model);
-  const clip = (CLIPS[mode] ?? ['idle']).find((n) => kit.clips.has(n)) ?? '';
-  const mixer = new THREE.AnimationMixer(model), action = clip ? mixer.clipAction(kit.clips.get(clip)!) : null;
-  action?.play();
-  model.position.y = -(kit.floors[clip] ?? 0);
-  return { root, mixer, action, clip };
+  let action: THREE.AnimationAction | null = null;
+  const pose = (mode: number, seconds: number) => {
+    const clip = (CLIPS[mode] ?? ['idle']).find((n) => kit.clips.has(n)) ?? '';
+    action?.stop();
+    action = clip ? mixer.clipAction(kit.clips.get(clip)!) : null;
+    if (action) {
+      action.reset().play();
+      const d = action.getClip().duration;
+      mixer.setTime(ONCE.has(clip) ? Math.min(seconds, d - 1e-3) : seconds % d);
+    }
+    model.position.y = -(kit.floors[clip] ?? 0);
+    return { clip, action };
+  };
+  return { root, mixer, pose };
 }
 
 export class Beast implements Damageable {
