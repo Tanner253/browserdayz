@@ -22,7 +22,7 @@
 
 import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, isBagKind, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
 
-const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(ALL_SLOTS.map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
+const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(['held', ...ALL_SLOTS].map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
 /** the places whose things are looked into for room, in the order they are filled: jacket and trousers first, as ever, then the rest of what is worn */
 const POCKET_ORDER: Slot[] = [...new Set<Slot>([...CLOTHES.map(([slot]) => slot), ...GEAR_SLOTS])];
 /** the body's own places for weapons, in the order of the keys they are first put on: the two on the back, and the holster */
@@ -411,7 +411,7 @@ export function bagGrid(item: ItemInstance, depth = 1): Container | null {
  * 2026-10-13 it held `jacket` and `pants` as well: see `upgradeInventory`. And `spill`, when the server found no
  * room for something while making an old one new: whoever it is for is given those at their feet.)
  */
-export type SerializedInventory = { slots: Record<string, ItemInstance | null>; active: Slot | null; containers: ReturnType<Container['serialize']>[]; hot?: (HotBind | null)[] };
+export type SerializedInventory = { slots: Record<string, ItemInstance | null>; containers: ReturnType<Container['serialize']>[]; hot?: (HotBind | null)[] };
 
 /**
  * Two things change places: `item`, out of `from` (null: it lies on the ground, or is in the hands and carried
@@ -533,10 +533,6 @@ export class PlayerInventory {
    * until theyve been alive long enough"). Nought: not waiting.
    */
   neckDue = 0;
-  /** which of the body's own places has its thing in the hands (null: none of them) */
-  active: Slot | null = null;
-  /** a thing carried in a pocket or a pack that is in the hands: it stays where it is carried, and is held (see `hold`) */
-  hand: ItemInstance | null = null;
   /** what each hot key is bound to */
   hot: (HotBind | null)[] = Array.from({ length: HOT_KEYS }, () => null);
   /** each bound thing as last seen on this body, to follow it into the pile it was poured into (`forgetGone`) */
@@ -544,21 +540,71 @@ export class PlayerInventory {
   /** the kinds a key has been given by itself in this life (`Game.autoHot`), each once: a kind whose thing left is not put back on a key when more of it comes */
   autoGiven = new Set<string>();
 
-  /** What is in the hands: something off the back or out of the holster, or a thing out of a pocket. */
+  /** What is in the hands. */
   held(): ItemInstance | null {
-    if (this.active) return this.slots[this.active];
-    return this.hand && this.containerOf(this.hand) ? this.hand : null;
+    return this.slots.held;
   }
 
-  /** A thing carried is taken into the hands (null: the hands are emptied). It stays where it is carried. */
-  hold(item: ItemInstance | null) {
-    const slot = item ? WEAPON_SLOTS.find((s) => this.slots[s] === item) ?? null : null;
-    this.active = slot;
-    this.hand = item && !slot && this.containerOf(item) ? item : null;
+  /**
+   * A thing is taken into the hands (null: they are emptied), out of wherever it was carried, which is room again,
+   * or from outside (the ground, a crate: the caller's to have taken it from there). What was in them is put away
+   * first (`putAway`), into the place the new thing leaves if that is its own: a third long gun in the hands and two
+   * on the back change places, as in DayZ. With no room for it the hands are not changed (the owner, 2026-10-24:
+   * "must put one on the ground to free up hands if no room").
+   * @param dry only asked: would it be so? Nothing is moved.
+   * @returns whether the hands now hold `item`
+   */
+  hold(item: ItemInstance | null, dry = false): boolean {
+    const was = this.slots.held;
+    if (item === was) return true;
+    if (!item) return dry ? this.canPutAway() : this.putAway();
+    // (where it lies, to be laid back there, just where it was, if what is in the hands finds no room)
+    const slot = ALL_SLOTS.find((s) => this.slots[s] === item), c = slot ? null : this.containerOf(item), i = c ? c.items.findIndex((p) => p.item === item) : -1, at = c?.items[i];
+    this.remove(item);
+    const room = !was || this.hasRoom(was);
+    if (!room || dry) {
+      if (slot) this.slots[slot] = item;
+      else if (c && at) c.items.splice(i, 0, at);
+      return room;
+    }
+    if (was) this.putAway();
+    this.slots.held = item;
+    return true;
   }
 
-  /** every thing carried that a hand could take up: on the back and in the holster, in the pockets, and in what is worn */
+  /** What is in the hands goes into its own free place (the back, the holster), onto its own kind, or into any room (`add`): false, and it stays there, if there is none. */
+  putAway(): boolean {
+    const it = this.slots.held;
+    if (!it) return true;
+    if (!this.hasRoom(it)) return false;
+    this.slots.held = null;
+    // (room said, but a pile that was poured in part: what is left of it stays in the hands)
+    const left = this.add(it);
+    this.slots.held = left;
+    return !left;
+  }
+
+  /**
+   * What the wheel and a thumb go round, one after another, whichever of them is held: what is on the back and in the
+   * holster and a gun or a thing to hit with in the hands, in the order of their hot keys (which go with the things:
+   * 1 and 2 the back, 3 the holster, as `autoBind` gives them), and any on no key after those, the hands' last.
+   */
+  ring(): ItemInstance[] {
+    const h = this.slots.held, armed = h && (ITEMS[h.id].weapon || ITEMS[h.id].melee) ? h : null;
+    const all = [...WEAPON_SLOTS.map((s) => this.slots[s]), armed].filter((it): it is ItemInstance => !!it);
+    const rank = (it: ItemInstance) => (this.hotOf(it) >= 0 ? this.hotOf(it) : HOT_KEYS + all.indexOf(it));
+    return all.sort((a, b) => rank(a) - rank(b));
+  }
+
+  /** could what is in the hands be put away now? */
+  canPutAway(): boolean {
+    const it = this.slots.held;
+    return !it || this.hasRoom(it);
+  }
+
+  /** every thing carried that a hand could take up: what is in them, on the back and in the holster, in the pockets, and in what is worn */
   *carried(): Generator<ItemInstance> {
+    if (this.slots.held) yield this.slots.held;
     for (const s of WEAPON_SLOTS) if (this.slots[s]) yield this.slots[s]!;
     for (const c of this.containers) if (c !== this.tags) for (const p of c.items) yield p.item;
   }
@@ -653,8 +699,6 @@ export class PlayerInventory {
    */
   clear() {
     this.slots = EMPTY_SLOTS();
-    this.active = null;
-    this.hand = null;
     this.hot = Array.from({ length: HOT_KEYS }, () => null);
     this.boundSeen.clear();
     this.autoGiven.clear();
@@ -731,13 +775,8 @@ export class PlayerInventory {
   }
 
   remove(item: ItemInstance) {
-    for (const s of ALL_SLOTS) {
-      if (this.slots[s] === item) {
-        this.slots[s] = null;
-        if (this.active === s) this.active = null;
-      }
-    }
-    if (this.hand === item) this.hand = null;
+    for (const s of ALL_SLOTS) if (this.slots[s] === item) this.slots[s] = null;
+    if (this.slots.held === item) this.slots.held = null;
     for (const c of this.containers) c.remove(item);
   }
 
@@ -752,6 +791,7 @@ export class PlayerInventory {
   }
 
   find(pred: (i: ItemInstance) => boolean): ItemInstance | null {
+    if (this.slots.held && pred(this.slots.held)) return this.slots.held;
     for (const s of ALL_SLOTS) {
       const it = this.slots[s];
       if (it && pred(it)) return it;
@@ -772,7 +812,7 @@ export class PlayerInventory {
    * an admin has in the hold: it is carried, and weighs what it weighs.)
    */
   topLevel(): ItemInstance[] {
-    const out: ItemInstance[] = [];
+    const out: ItemInstance[] = this.slots.held ? [this.slots.held] : [];
     for (const s of ALL_SLOTS) {
       const it = this.slots[s];
       if (it) out.push(it);
@@ -803,7 +843,7 @@ export class PlayerInventory {
     // (the tag round the neck goes with the slots: to the server it is one more thing worn, and so it is on the body)
     // (the pockets are in the jacket and the trousers, which are among the slots: the pouch is the one grid left that is no thing's)
     // (but for an admin's hold, said only when there is something in it: nobody else's inventory is a byte longer for it)
-    return { slots: { ...this.slots, neck: this.neck }, active: this.active, containers: [this.tags.serialize(), ...(this.theHold.items.length ? [this.theHold.serialize()] : [])], hot: this.hot.map((b) => (b ? { ...b } : null)) };
+    return { slots: { ...this.slots, neck: this.neck }, containers: [this.tags.serialize(), ...(this.theHold.items.length ? [this.theHold.serialize()] : [])], hot: this.hot.map((b) => (b ? { ...b } : null)) };
   }
 
   /**
@@ -829,8 +869,8 @@ export class PlayerInventory {
       if (ITEMS[it.id].slot === SLOT_KIND[s]) this.slots[s] = it;
       else overflow.push(it);
     }
-    this.active = null;
-    this.hand = null;
+    // (what was in the hands is in them again: it is carried nowhere else. A save from before the hands were a place says `active`, which is let be: that gun is still on the back.)
+    this.slots.held = raw.held ? sanitizeItem(raw.held) : null;
     const neck = raw.neck ? sanitizeItem(raw.neck) : null;
     this.neck = neck?.id === 'dogtag' ? neck : null;
     this.tags.items = [];
@@ -1047,12 +1087,12 @@ export function cleanStored(list: unknown, name: (v: unknown) => string, most = 
 /**
  * A whole inventory as somebody's game says it is, or as it was kept, made safe and made new: every thing through
  * `cleanItem`, the hot keys through `cleanHot` (they were let fall here until 2026-10-13, and every key was bare
- * again after every rejoin), nothing in the hands (that is the game's to say when it is back), and the shape of
+ * again after every rejoin), what is in the hands as a place like any other, and the shape of
  * today (`upgradeInventory`). Whatever found no room on the way is kept in a grid named `spill`, which the game it
  * is for empties at its player's feet: the server has no feet to put it at, and loses nothing by holding it.
  */
-/** the places a kept inventory may name: every one a body has, the tag round the neck, and the two an old save may still have */
-const KEPT_SLOTS = new Set<string>([...ALL_SLOTS, 'neck', 'shoulder', 'melee']);
+/** the places a kept inventory may name: every one a body has, the hands, the tag round the neck, and the two an old save may still have */
+const KEPT_SLOTS = new Set<string>([...ALL_SLOTS, 'held', 'neck', 'shoulder', 'melee']);
 
 export function cleanInventory(raw: unknown, name: (v: unknown) => string): SerializedInventory | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -1066,7 +1106,7 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
   // read to all a hold takes. That makes nobody a present of the room: whose hold it is, and whether anything may be
   // put in it, is the server's to say of what comes out of here: `holdOnlyEmpties`. And one hold, not two.)
   const containers = (Array.isArray(r.containers) ? r.containers : []).slice(0, 4).map((c) => ({ id: String(c?.id).slice(0, 16), items: cleanStored(c?.items, name, c?.id === HOLD ? HOLD_MOST : 120) })).filter((c, i, all) => c.id !== HOLD || all.findIndex((o) => o.id === HOLD) === i);
-  const { inv, left } = upgradeInventory({ slots, active: null, containers, hot: cleanHot(r.hot) });
+  const { inv, left } = upgradeInventory({ slots, containers, hot: cleanHot(r.hot) });
   if (left.length) {
     let spill = inv.containers.find((c) => c.id === SPILL);
     if (!spill) inv.containers.push((spill = { id: SPILL, items: [] }));
@@ -1084,15 +1124,16 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
 
 /**
  * A body's grid: everything a person can have on and slung at once, with their own tag and a full pouch of tags
- * taken, lies in it. The worst there is, two .50 rifles and the biggest thing for every place, is 132 cells, and this
- * is 136 (it was 8x15 until the .50s came): laid biggest first (`layOnBody`) every set of things that can be worn
+ * taken, lies in it. The worst there is, three .50 rifles (two slung, one in the hands: 2026-10-24) and the biggest
+ * thing for every place, is 162 cells, and this is 170, ten wide so that a long gun lies flat (it was 8x17 for two,
+ * 8x15 until the .50s came): laid biggest first (`layOnBody`) every set of things that can be worn
  * goes in with none left over (test/clothes.test.ts lays them out). It was 8x10: a geared body is 83 to 88 cells of
  * worn things before a single thing out of a pocket, and what found no room was thrown on the ground round it.
  *
  * (No bigger than it need be: the server reads no more things out of any grid it is sent than this has cells. When
  * something bigger is made this has to grow a row: the test will say so.)
  */
-export const BODY_GRID: [number, number] = [8, 17];
+export const BODY_GRID: [number, number] = [10, 17];
 
 /**
  * Things laid in a body's grid, the biggest first so that the small ones fill what is left.

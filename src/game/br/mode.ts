@@ -301,8 +301,26 @@ export class BrMode {
     // (what is in hand follows the slot it was taken from: swapped out, the new one comes up in its place)
     const s = m.slots[this.held], want = s ? this.mirror.get(s.uid) ?? null : null;
     if (m.knocked || !this.game.player.pos) return;
-    if (want && g.weapons.equippedItem !== want) g.weapons.take(want);
-    else if (!want && g.weapons.equippedItem && ![...this.mirror.values()].includes(g.weapons.equippedItem)) g.weapons.take(null);
+    if (want && g.inv.held() !== want) this.hold(want);
+    else if (!want && g.inv.held() && ![...this.mirror.values()].includes(g.inv.held()!)) this.hold(null);
+  }
+
+  /**
+   * A thing into the hands by this mode's own slots, out of wherever the game carries it, and what was in them put
+   * back (null: only that). Nothing is refused for want of room here: the server's slots are what is carried, and
+   * what the game finds no room for is laid in it again by their next word.
+   */
+  private hold(it: ItemInstance | null) {
+    const g = this.game, was = g.inv.held();
+    if (was !== it) {
+      g.inv.slots.held = null;
+      if (was) g.inv.add(was);
+      if (it) {
+        g.inv.remove(it);
+        g.inv.slots.held = it;
+      }
+    }
+    g.showHands(true);
   }
 
   private select(k: number) {
@@ -312,7 +330,7 @@ export class BrMode {
     this.held = k;
     const it = this.mirror.get(s.uid);
     // (a grenade is taken up the game's own way, its pin and its throw as in the open world)
-    if (it) kindOf(s.id) === 'nade' ? this.game.takeUp(it) : this.game.weapons.take(it);
+    if (it) this.hold(it);
   }
 
   private vote() {
@@ -371,11 +389,11 @@ export class BrMode {
     this.look.ground(this.ground, p.pos, dt);
     this.fly(dt, now);
     // knocked: down on the ground, nothing in hand; and nothing in hand in the air either
-    if (this.air && g.weapons.equippedItem) g.weapons.take(null);
+    if (this.air && g.inv.held()) this.hold(null);
     g.hud.root.classList.toggle('br-air', !!this.air);
     if (me?.knocked && p.pos) {
       p.prone = true;
-      if (g.weapons.equippedItem) g.weapons.take(null);
+      if (g.inv.held()) this.hold(null);
     }
     this.aim(cam);
     // rounds walked over are picked up (Fortnite's way), while there is room for them
@@ -476,7 +494,7 @@ export class BrMode {
       this.look.chute(null, 0, others);
       // (and what was in hand before the plane comes back up)
       const s = this.me?.slots[this.held], it = s ? this.mirror.get(s.uid) : null;
-      if (it) g.weapons.take(it);
+      if (it) this.hold(it);
     }
   }
 }

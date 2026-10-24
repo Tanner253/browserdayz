@@ -15,8 +15,11 @@ export type Category = 'weapon' | 'ammo' | 'magazine' | 'food' | 'drink' | 'medi
  * Physical equipment slots on the character: weapons and worn gear. Two things are carried slung on the back
  * (`primary`, `secondary`: a long gun, or something long to hit with), a sidearm in a holster, and that is all the
  * body has places for (2026-10-10, as DayZ has it: there was a place for a melee weapon, and there is not). A
- * knife or a hatchet goes in a pocket like anything else. What is in the hands is whatever was taken into them:
- * see `hold` on the inventory, and the hot keys, which are bound to things and not to places.
+ * knife or a hatchet goes in a pocket like anything else. The hands are a place of their own (`held`): what is
+ * taken into them leaves where it was carried, and is put away again into its own place or any room (2026-10-24,
+ * the owner: "when i drag something out of my backpack to my hands it should leave my backpack making those slots
+ * available"; "2 weapons on their back and 1 more in their hand"). See `hold` on the inventory. `held` is in none
+ * of the lists below: nothing is worn there, and nothing goes there by itself.
  *
  * What is worn has the places DayZ has (2026-10-13: "look up how dayz handles their equip slots, they have more than
  * we do ... we will need to make our player character equip more robust. like dayz, once again"): head, face, eyes,
@@ -25,18 +28,18 @@ export type Category = 'weapon' | 'ammo' | 'magazine' | 'food' | 'drink' | 'medi
  * their pockets are those things' own. (`hands` is the place for gloves, and keeps its name: every save says it.)
  * Nothing is made yet for `eyes`, `belt` or `armband`: the places are there, and empty.
  */
-export type Slot = 'primary' | 'secondary' | 'holster' | 'head' | 'face' | 'eyes' | 'top' | 'vest' | 'belt' | 'legs' | 'back' | 'hands' | 'feet' | 'armband';
+export type Slot = 'held' | 'primary' | 'secondary' | 'holster' | 'head' | 'face' | 'eyes' | 'top' | 'vest' | 'belt' | 'legs' | 'back' | 'hands' | 'feet' | 'armband';
 /** what kind of slot an item fits: long things fit either place on the back, gear fits its own slot */
-export type SlotKind = 'long' | 'holster' | 'head' | 'face' | 'eyes' | 'top' | 'vest' | 'belt' | 'legs' | 'back' | 'hands' | 'feet' | 'armband';
+export type SlotKind = 'held' | 'long' | 'holster' | 'head' | 'face' | 'eyes' | 'top' | 'vest' | 'belt' | 'legs' | 'back' | 'hands' | 'feet' | 'armband';
 export const SLOT_KIND: Record<Slot, SlotKind> = {
-  primary: 'long', secondary: 'long', holster: 'holster',
+  held: 'held', primary: 'long', secondary: 'long', holster: 'holster',
   head: 'head', face: 'face', eyes: 'eyes', top: 'top', vest: 'vest', belt: 'belt', legs: 'legs', back: 'back', hands: 'hands', feet: 'feet', armband: 'armband',
 };
 export const WEAPON_SLOTS: Slot[] = ['primary', 'secondary', 'holster'];
 export const GEAR_SLOTS: Slot[] = ['head', 'face', 'eyes', 'top', 'vest', 'belt', 'legs', 'back', 'hands', 'feet', 'armband'];
 export const ALL_SLOTS: Slot[] = [...WEAPON_SLOTS, ...GEAR_SLOTS];
 export const SLOT_LABEL: Record<Slot, string> = {
-  primary: 'On the back', secondary: 'On the back', holster: 'Holster',
+  held: 'In your hands', primary: 'On the back', secondary: 'On the back', holster: 'Holster',
   head: 'Head', face: 'Face', eyes: 'Eyes', top: 'Top', vest: 'Vest', belt: 'Belt', legs: 'Legs', back: 'Back', hands: 'Gloves', feet: 'Feet', armband: 'Armband',
 };
 /** the places for what is worn as the inventory stands them either side of the survivor, each column from the top down */

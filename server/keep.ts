@@ -568,7 +568,7 @@ export async function loadKept() {
     for (const l of snap.loose ?? []) {
       const item = cleanItem(l?.item);
       if (!item || ITEMS[item.id]?.category !== 'stash' || economy.loot.has(item.uid) || boxes.has(item.uid) || ![l.x, l.y, l.z, l.rot].every(num)) continue;
-      for (const it of things({ slots: { it: item }, active: null, containers: [] })) issue(it);
+      for (const it of things({ slots: { it: item }, containers: [] })) issue(it);
       economy.drop(item, l.x, moved ? world.groundAt(l.x, l.z) : l.y, l.z, l.rot).keptAt = num(l.at) ? l.at : now;
       stashes++;
     }

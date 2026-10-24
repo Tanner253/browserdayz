@@ -539,7 +539,7 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     // (a jacket's pockets are what the smallest pack is, as they were, and well under the others)
     assert.ok(cells('field_jacket') <= cells('sack_pack') && cells('field_jacket') * 1.5 < cells('camping_pack') && cells('field_trousers') < cells('field_jacket'));
     // what is not worn is as it was: the cases but the stash crate, a body
-    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[10, 15], [6, 5], [5, 4], [8, 17]]);
+    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[10, 15], [6, 5], [5, 4], [10, 17]]);
   });
 
   ok('a stash crate holds five Barretts (the owner, 2026-10-18: "large enough to hold 5 barretts")', () => {
@@ -670,5 +670,109 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     console.log(`      (the fullest load is ${things} things and ${(said.length / 1024).toFixed(0)} KB to say; with an admin's full hold, ${(both.length / 1024).toFixed(0)} KB)`);
   });
 }
+
+// ------------------------------------------------------------------ the hands, a place of their own (2026-10-24)
+
+ok('a thing taken into the hands leaves its pocket, which is room again; put away, it goes back into room (the owner: "it should leave my backpack making those slots available for storage")', () => {
+  const inv = new PlayerInventory();
+  const tin = makeItem('beans');
+  assert.equal(inv.add(tin), null);
+  const pocket = inv.containerOf(tin)!;
+  assert.ok(inv.hold(tin));
+  assert.equal(inv.held(), tin);
+  assert.equal(inv.containerOf(tin), null, 'still in the pocket while in the hands');
+  assert.ok(!pocket.has(tin));
+  // (carried all the same: it weighs, a key finds it, it is among what is on the body)
+  assert.ok(inv.topLevel().includes(tin) && inv.find((it) => it === tin) === tin && inv.everything().has(tin.uid));
+  inv.bind(4, tin);
+  assert.equal(inv.hotItem(4), tin);
+  assert.ok(inv.putAway());
+  assert.equal(inv.held(), null);
+  assert.ok(inv.containerOf(tin));
+  // (and one dragged out of the hands, as the screen does it, leaves them empty)
+  inv.hold(tin);
+  inv.remove(tin);
+  assert.equal(inv.held(), null);
+});
+
+ok('put away, a long gun goes to a free place on the back, a pistol to the holster, a pile onto its own kind, anything else into any room', () => {
+  const inv = new PlayerInventory();
+  const ak = makeItem('ak'), colt = makeItem('colt');
+  inv.add(ak);
+  inv.add(colt);
+  assert.equal(inv.slots.primary, ak);
+  assert.equal(inv.slots.holster, colt);
+  assert.ok(inv.hold(ak));
+  assert.equal(inv.slots.primary, null, 'the back keeps the gun that is in the hands');
+  // (the pistol taken up: the rifle goes back on the back, the holster is empty)
+  assert.ok(inv.hold(colt));
+  assert.deepEqual([inv.slots.primary, inv.slots.holster, inv.held()], [ak, null, colt]);
+  assert.ok(inv.putAway());
+  assert.equal(inv.slots.holster, colt);
+  // (a pile of the same kind is joined)
+  const a = makeItem('bandage', 2), b = makeItem('bandage', 1);
+  inv.add(a);
+  inv.slots.held = b;
+  assert.ok(inv.putAway());
+  assert.equal(a.qty, 3);
+  assert.equal(inv.held(), null);
+});
+
+ok('two long guns on the back and a third in the hands; they change places by a key, and the hands are not emptied with no room for the third (the owner: "must put one on the ground to free up hands if no room")', () => {
+  const inv = new PlayerInventory();
+  const [a, b, c] = [makeItem('ak'), makeItem('mosin'), makeItem('ar15')];
+  inv.add(a);
+  inv.add(b);
+  assert.deepEqual([inv.slots.primary, inv.slots.secondary], [a, b]);
+  assert.ok(!inv.hasRoom(c), 'the third has nowhere to go but the hands');
+  assert.ok(inv.hold(c));
+  assert.equal(inv.held(), c);
+  // (no room for the third: it stays in the hands, and nothing else moves)
+  assert.ok(!inv.canPutAway());
+  assert.ok(!inv.putAway());
+  assert.deepEqual([inv.held(), inv.slots.primary, inv.slots.secondary], [c, a, b]);
+  // (a gun off the back is taken: the one in the hands goes into the place it leaves)
+  assert.ok(inv.hold(a));
+  assert.deepEqual([inv.held(), inv.slots.primary, inv.slots.secondary], [a, c, b]);
+  // (a thing with no place of its own cannot change places with it: refused, and nothing moved)
+  const tin = makeItem('beans');
+  inv.add(tin);
+  const pocket = inv.containerOf(tin)!, at = pocket.items.find((p) => p.item === tin)!;
+  // (the pockets cannot take a rifle: so the tin cannot come into the hands, and is where it lay; only asked, the same)
+  assert.ok(!inv.hold(tin, true));
+  assert.ok(!inv.hold(tin));
+  assert.equal(inv.held(), a);
+  assert.equal(pocket.items.indexOf(at), pocket.items.findIndex((p) => p.item === tin), 'the tin left its place when the hands refused it');
+  // (the wheel goes round all three in the order of their keys, whichever is held: here the third is on none, and comes last)
+  inv.autoBind();
+  assert.deepEqual(inv.ring(), [c, b, a].filter((it) => inv.hotOf(it) >= 0).concat([c, b, a].filter((it) => inv.hotOf(it) < 0)).sort((x, y) => (inv.hotOf(x) < 0 ? 99 : inv.hotOf(x)) - (inv.hotOf(y) < 0 ? 99 : inv.hotOf(y))));
+  assert.equal(inv.ring().length, 3);
+});
+
+ok('what is in the hands is kept as a place: written and read again it is still in them, the server keeps it, and a body takes it', () => {
+  const inv = new PlayerInventory();
+  const ak = makeItem('ak');
+  inv.add(ak);
+  inv.hold(ak);
+  const said = JSON.parse(JSON.stringify(inv.serialize())) as SerializedInventory;
+  assert.equal(said.slots.held?.uid, ak.uid);
+  const back = new PlayerInventory();
+  assert.deepEqual(back.load(said), []);
+  assert.equal(back.held()?.uid, ak.uid);
+  assert.equal(back.slots.primary, null);
+  const kept = cleanInventory(said, (v) => String(v))!;
+  assert.equal(kept.slots.held?.uid, ak.uid);
+  const box = new Container('corpse', 'Body', ...BODY_GRID, [], true);
+  assert.deepEqual(layOnBody(box, Object.values(kept.slots).filter((it): it is ItemInstance => !!it)), []);
+  assert.ok(box.items.some((p) => p.item.uid === ak.uid));
+  // (a save from before the hands were a place says `active`: that gun is on the back still, and nothing is in the hands)
+  const old = JSON.parse(JSON.stringify({ ...inv.serialize(), active: 'primary' }));
+  old.slots.primary = old.slots.held;
+  old.slots.held = null;
+  const was = new PlayerInventory();
+  was.load(old);
+  assert.equal(was.held(), null);
+  assert.equal(was.slots.primary?.uid, ak.uid);
+});
 
 console.log(`\n${n} checks passed`);
