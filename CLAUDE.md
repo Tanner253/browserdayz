@@ -67,6 +67,7 @@ The owner, 2026-10-18, with this machine's card and processor holding up their l
 ## How the owner works (use they/them)
 - Short TL;DRs, not documents. Pictures of work as it goes (send them), and a plan picture before anything big is built: wait for their yes on a design, not on every step.
 - Do not over-test. When they say deploy, deploy.
+- No performance measuring in feature work (the owner, 2026-10-24: "just focus on getting the build done and we will optimize ourselves ... taking too many tests and running comparison heads etc its nonsense"): build things cheap by design (instancing, shared materials, LODs), but run no heli flights, A/B pairs or frame-cost runs. Performance gets its own pass when the owner asks.
 - Do not use Workflows unless they ask for one in that same message.
 - NO sub-agents or lanes: do the work yourself, one thing at a time. The owner, 2026-10-14, watching the weekly token limit: "i would prefer that you do not run multiple lanes or agents at once and do everything yourself." Spend tokens with care: read only the parts of a file you need (grep first), do not re-read what you have, no long polling. The one exception: a cloud session for a code-only piece when the owner asks for one (see Cloud sessions).
 - Keep what they loved: change only what was asked, and prove nothing else was lost.

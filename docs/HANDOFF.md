@@ -65,6 +65,8 @@ want half baked things making it in but we also dont need to spend extra money a
       support them in the admin panel entities for spawning", "yes to animals icons and sounds". Building all six.
 - [ ] Server-run inventory + inventory lag + container QOL (session local_cbc26f80, branch claude/kind-lewin-2891bd):
       building; the payout custody holes (client-claimed inventory before 'cash', tagSeen kept after a tag leaves) with tests.
+      1b DONE (1d44d603 + ce776a88): a move 3.3 ms (was 19), unchanged redraw 0.9-2 ms (was 28.7), first Tab 190-200 ms
+      (was 320-390), no "Opening...", shared boxes, bag kinds on the server, the hotbar forgets items that leave.
       Next after 1b: a DayZ-style layout (progress/plans/dayz-inventory-ref.webp, the owner: "dayz ui is much better than
       ours for looting"): equipment slot icons on top, worn containers listed in fixed panels with X to fold, the body
       looted on the left mirroring your side. Plan (progress/plans/zona-plan-inv-layout.jpg) taken as yes with the owner's
