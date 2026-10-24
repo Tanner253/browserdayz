@@ -15,6 +15,14 @@ want half baked things making it in but we also dont need to spend extra money a
   seating (3633a957), inventory step 1 (5aeea24e), fort gaps round one (3156d4f0), changelog #infected-bodies.
   battle-royale merged it (3a44ec3c). Earlier the same night: /stashes + the stash re-burial fix (7616a121).
   The NEXT release waits for everything else below to be finished and reviewed.
+- RELEASE 2026-10-24 being assembled on battle-royale (the owner: "i wanna get this build out"): phone pass 9f308a12,
+  world polish b673bc15, inventory DayZ layout f1f5b045 merged (8d2151e2); Discord buttons b47f9837; models/hi left out
+  of the site deploy (.vercelignore, a802b1cf); test-all queues behind another suite (57041c7a); Deagle can + red dot
+  and ONE holographic sight, the Benelli's, everywhere incl. the item, its hood slit closed in the source (78d3ebde);
+  changelog #sights-fort-discord + restart note (4957a686). Waiting on: the inventory session's gun strip (guns two
+  squares wide in the strip with their parts under them, the big gun panels gone), then the full suite, then deploy.
+- After it: every sniper takes a sniper (cheek) pad (the owner, 2026-10-24: "all snipers should take a sniper pad
+  attachment"); the inventory's key 0 square is not drawn while empty.
 - battle-royale now holds the fort (9111ac65), the stage (75503d2d) and the ANIMALS (cfd41aaa: PROTOCOL 62, changelog
   #animals, restart note in the branch). It is AHEAD of live (61): NO site-only deploy from battle-royale until the full
   release goes out with the server. The live stash list is in the
