@@ -14,9 +14,6 @@
 .inv-sortall { flex: none; margin-left: 10px; padding: 2px 9px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); color: var(--ink-dim); font: 600 10px/16px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
 .inv-sortall:hover { color: var(--accent); border-color: var(--accent); }
 
-/* a magazine taken out with one click */
-.inv-part-out { position: absolute; right: 2px; top: 2px; z-index: 2; padding: 0 4px; border: 1px solid var(--line); background: rgba(10, 12, 11, 0.85); color: var(--ink); font: 700 9px/13px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
-.inv-part-out:hover { color: #11130f; background: var(--accent); border-color: var(--accent); }
 
 /* a magazine on its way in: shown in its place, faint, until the hands are done */
 .inv-part.coming { border-style: dashed; border-color: var(--accent); }
@@ -39,6 +36,7 @@
    of five (InventoryUI.hotEl): the number, the picture, what there is of it; dragged off to clear, onto another to move. */
 .inv-doll { grid-template-columns: 1fr; }
 .inv-hands-box { margin-top: 8px; }
+.inv-hands-box > .inv-slot.slot-inhands { height: 104px; }
 .inv-hot.big { position: static; transform: none; display: grid; grid-template-columns: repeat(5, 64px); justify-content: center; gap: 6px; margin: 10px 0 4px; padding: 6px; }
 .inv-hot.big .inv-hotkey { width: 64px; height: 64px; }
 .inv-hot.big .inv-hotkey:nth-child(3) { margin-right: 0; }
@@ -53,7 +51,16 @@
 .inv-strip .slot-label { font-size: 8px; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* (a square with something in it shows the thing and its key, and no word: the word names an empty place) */
 .inv-strip .inv-slot:has(.inv-item) .slot-label { font-size: 0; }
-.inv-gunbox .inv-parts { padding: 4px 6px 6px; }
+.inv-gunbox { min-width: 0; }
+.inv-gunbox > .inv-item.gun-pic { position: relative; margin: 6px 6px 0; }
+.inv-gunbox .inv-parts { padding: 0 6px 6px; }
+
+/* a gun's parts, wherever they stand (under the hands, on a gun's panel): squares big enough to see what is on it */
+.inv-parts { height: 60px; gap: 5px; }
+.inv-part { flex: none; width: 60px; max-width: none; }
+.inv-part span { font-size: 9px; top: 2px; }
+.inv-part .inv-item-img.fit { inset: 13px 5px 12px; }
+.inv-part em { font-size: 10px; }
 
 /* a body, as your side is: its strip, its panels, and what is loose on it */
 .inv-body-strip { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -64,3 +71,8 @@
 /* Vicinity: each thing lying about its own picture at its own size, as in a grid, packed in rows */
 .inv-ground-tiles { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; padding: 2px; }
 .inv-ground-tiles > .inv-item.g-tile { position: relative; flex: none; }
+
+/* The scroll bars of the inventory's columns and panels a few pixels wider (the owner, 2026-10-24: "its hard to scroll
+   sometimes"): the browser's own width, not its thin one. (Where a browser still draws them by the older rules, 13 px.) */
+.inv-col, .inv-ground, .inv-cargo > .inv-scroll, .inv-cargo > .inv-inspect, .inv-gridbox.wide { scrollbar-width: auto; }
+.inv-col::-webkit-scrollbar, .inv-ground::-webkit-scrollbar, .inv-scroll::-webkit-scrollbar, .inv-inspect::-webkit-scrollbar { width: 13px; height: 13px; }

@@ -1116,20 +1116,11 @@ export class InventoryUI {
         row.appendChild(cell);
         continue;
       }
-      // (A magazine is taken out with Out as well as by dragging it off: the owner, 2026-10-23, of players with the gun
-      // in their hands "confused" how to pull the magazine out. Dragging, a double-click and the right button still do.)
-      const out = slot === 'magazine' && mod ? `<button type="button" class="inv-part-out" title="Take the magazine out">Out</button>` : '';
-      // (with a magazine in it and Out on it, the place says what it is without its name)
-      cell.innerHTML = (out ? '' : `<span>${label}</span>`) + (mod ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[mod] ?? ''})"></div>${slot === 'magazine' ? `<em>${inMag}/${ITEMS[mod].mag?.capacity ?? 0}</em>` : ''}${out}` : '');
-      cell.title = mod ? `${ITEMS[mod].name}: drag it off to take it off` : `${label}: drag one here`;
+      // (A magazine comes out as every part does: dragged off, double-clicked or right-clicked. The Out on it was taken
+      // off again, the owner, 2026-10-24: "the out tags on the mags on the guns make no sense".)
+      cell.innerHTML = `<span>${label}</span>` + (mod ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[mod] ?? ''})"></div>${slot === 'magazine' ? `<em>${inMag}/${ITEMS[mod].mag?.capacity ?? 0}</em>` : ''}` : '');
+      cell.title = mod ? `${ITEMS[mod].name}: double-click or drag it off to take it out` : `${label}: drag one here`;
       if (mod) {
-        cell.querySelector<HTMLElement>('.inv-part-out')?.addEventListener('pointerdown', (e) => {
-          if (e.button !== 0) return;
-          e.preventDefault();
-          e.stopPropagation();
-          this.actions.detach(gun, mod);
-          this.finish('move');
-        });
         cell.addEventListener('pointerdown', (e) => {
           if (e.button !== 0) return;
           e.preventDefault();
@@ -1184,7 +1175,15 @@ export class InventoryUI {
           if (!this.folded.delete(key)) this.folded.add(key);
           this.render();
         });
-        if (!shut) box.appendChild(this.partsEl(gun));
+        if (!shut) {
+          // (the gun itself at its own size, a long one on its side: dragged from here as from its place; the owner,
+          // 2026-10-24: "the guns and their attachments are too small in the inventory")
+          const rot = d.h > d.w, [w, h] = Container.size(gun, rot);
+          const pic = this.itemEl(gun, w, h, rot);
+          pic.classList.add('gun-pic');
+          this.bindItem(pic, { kind: 'slot', slot, item: gun });
+          box.append(pic, this.partsEl(gun));
+        }
         return [box];
       }));
     }
