@@ -1,11 +1,13 @@
-// The Zona: everything east of a line across the map, where tags are earned (the owner, 2026-10-19: "i think we should
-// make it so people cannot earn tags west of the wall. we should add the zona back so dogtags are void along the coast
-// ... the whole map to the east of the ruins can be hotzone", and of where: "x -2000 i think makes the most sense, enough
-// room on the east side of the canyon to take the road out south without being camped. but we keep pokrov in the zone").
-// The line is at x -1950: Pokrov's furthest place for a thing lies at -1920, and the monastery is inside. West of it,
-// the coast, the desert, Kalat, Zavod, Blokpost, Zastava and Mokroye, nobody has a tag, and one carried there is void
-// (ZONA_VOID in src/sim/items.ts); and nothing of the fourth step or above is found there (src/sim/economy.ts).
-// (It was the rounds the owner drew on 2026-10-18 round the valley and each town, and before that PLAY_AREAS.)
+// The Zona, where tags are earned: a round about each town, site and settlement east of a line across the map, joined by
+// corridors, the middle of the valley filled in whole; and everywhere else is wilderness, for bases and raiding (the
+// owner, 2026-10-24: "rein in the zona zones ... to be around town (but connected) so that the wilderness is focused on
+// bases and raiding while the interior of the map rewards pvp based earning ... otherwise people can earn tags while
+// camping their base roof"; "only east of the line we have currently"; "even smaller on the east ... more wilderness
+// around the edges of the map"; "leave zastava out its right at the mouth of the canyon"; "connect the cirlces in the
+// east in the middle"). Drawn as marketing/plan-zona-smaller.html, from the world's places (progress/zona-plan).
+// The line is at x -1950 (2026-10-19, "people cannot earn tags west of the wall"): west of it nobody has a tag, and
+// one carried outside the Zona is void (ZONA_VOID in src/sim/items.ts). The loot still goes by the line alone
+// (`eastOfLine`: nothing of the fourth step or above west of it, src/sim/economy.ts), so no loot changed.
 //
 // Sums only: nothing of the page or of the renderer is known here.
 
@@ -26,9 +28,62 @@ export function westAt(z: number): number {
   return ZONA_WEST + (x - ZONA_WEST) * Math.max(0, Math.min(1, t));
 }
 
-/** how far inside the Zona a place is, metres (less than none: how far outside it), measured along x */
-export function zonaDepth(x: number, z: number): number {
+/** how far east of the line a place is, metres (less than none: how far west of it), measured along x */
+export function eastDepth(x: number, z: number): number {
   return x - westAt(z);
+}
+
+/** is this place east of the line, by `margin` metres at least: what the loot goes by */
+export function eastOfLine(x: number, z: number, margin = 0): boolean {
+  return eastDepth(x, z) > margin;
+}
+
+/** each place's round: where, and how far out (its own size and 35 to 45 m more; the fort and the bunker more) */
+const ROUNDS: [string, number, number, number][] = [
+  ['Zelenaya Dolina', 30, 10, 150], ['Military Checkpoint', -175, 175, 80], ["Hunter's Cabin", 235, -195, 65],
+  ["Forester's Lodge", 326, 98, 75], ['Kamenka Farm', 150, 290, 75], ['South Ranger Post', -77, 264, 75],
+  ['Old Sawmill', -279, 144, 75], ["Trapper's Camp", -270, -130, 75], ['Berezovo Dacha', -106, -286, 75],
+  ['North Ranger Post', 128, -268, 75], ['Lugovoe Farm', 326, -89, 75], ['Kolkhoz Yard', 68, 203, 75],
+  ['Field Depot', -44, -155, 75], ['Quarry Dacha', 111, -159, 75], ['Sosnovka', -158, -169, 75],
+  ['Motor Pool', 179, 174, 75], ['Trading Post', -1507, 8, 75], ['Army Camp', -240, 5, 75],
+  ['Chemical Works', -368, 368, 119], ['Bunker 17', -1450, -320, 110], ['Kamenka', 625, 365, 135],
+  ['Orlinoye', 537, -371, 130], ['Pokrov', -1850, -30, 202], ['Lipki', -1180, 350, 157],
+  ['Ozerki', -1250, -120, 132], ['Mokroye', -1855, 585, 146], ["Mel'nitsa", -1760, -505, 79],
+  ['Khutor', -1560, -575, 79], ['Kordon', -1300, -480, 72],
+];
+/** the corridors that join them, 22 m either side of the line between two places: the shortest set that joins all */
+const BANDS: [number, number, number, number][] = [
+  [179, 174, 326, 98], [-279, 144, -368, 368], [326, -89, 537, -371], [326, 98, 625, 365], [-368, 368, -1180, 350],
+  [-1180, 350, -1250, -120], [-1250, -120, -1450, -320], [-1450, -320, -1300, -480], [-1250, -120, -1507, 8],
+  [-1507, 8, -1850, -30], [-1450, -320, -1560, -575], [-1560, -575, -1760, -505], [-1850, -30, -1855, 585],
+];
+const BAND = 22;
+/** and the middle of the valley, round the settlements about Zelenaya Dolina, filled in whole */
+const MIDDLE: [number, number][] = [[-106, -286], [128, -268], [235, -195], [326, -89], [326, 98], [150, 290], [-77, 264], [-175, 175], [-279, 144], [-240, 5], [-270, -130]];
+
+/** how far a point is from a segment */
+function segDist(x: number, z: number, ax: number, az: number, bx: number, bz: number) {
+  const dx = bx - ax, dz = bz - az, l = dx * dx + dz * dz, t = l > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l)) : 0;
+  return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+}
+
+/** how far inside the middle a point is (less than none: how far outside it) */
+function middleDepth(x: number, z: number): number {
+  let inside = false, d = Infinity;
+  for (let i = 0, j = MIDDLE.length - 1; i < MIDDLE.length; j = i++) {
+    const [xi, zi] = MIDDLE[i], [xj, zj] = MIDDLE[j];
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    d = Math.min(d, segDist(x, z, xi, zi, xj, zj));
+  }
+  return inside ? d : -d;
+}
+
+/** how far inside the Zona a place is, metres (less than none: how far outside it): the deepest it is in any of its shapes, and never west of the line */
+export function zonaDepth(x: number, z: number): number {
+  let d = middleDepth(x, z);
+  for (const [, cx, cz, r] of ROUNDS) d = Math.max(d, r - Math.hypot(x - cx, z - cz));
+  for (const [ax, az, bx, bz] of BANDS) d = Math.max(d, BAND - segDist(x, z, ax, az, bx, bz));
+  return Math.min(d, eastDepth(x, z));
 }
 
 /** is this place inside the Zona, by `margin` metres at least (less than none: or within that much outside it) */

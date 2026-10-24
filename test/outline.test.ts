@@ -10,7 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { playEdge, playRing, type Ring, type Round } from '../src/world/outline';
-import { zonaDepth, zonaRings } from '../src/world/zona';
+import { eastOfLine, zonaDepth, zonaRings } from '../src/world/zona';
 import { PLAY_AREAS, inPlay, playOutline } from '../src/world/worldgen';
 
 let n = 0;
@@ -140,11 +140,13 @@ ok('the Zona as the owner drew it (src/world/zona.ts): one closed line, every po
   // (since 2026-10-19 the Zona runs to the world's own edges east of its line: there the line is the world's edge, not the rule's)
   const edge = (p: { x: number; z: number }) => p.x >= 760 || Math.abs(p.z) >= 760 || p.x <= -3832;
   for (const p of rings[0]) if (!edge(p)) assert.ok(Math.abs(zonaDepth(p.x, p.z)) <= 4, `the line is ${zonaDepth(p.x, p.z).toFixed(1)} m off the edge of the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
-  // (Lipki, Kamenka, the swamp and Pokrov in it; the desert and Kalat out, since 2026-10-19: everything east of x -1950)
-  assert.ok(inPlay(-1180, 350) && inPlay(625, 365) && inPlay(-1855, 585) && inPlay(-1915, 0) && !inPlay(-2200, 0) && !inPlay(-3200, 200), 'Lipki, Kamenka, the swamp or Pokrov is out of it, or the desert or Kalat is in it');
-  // (and round Zastava: its five buildings in, the paved road out of the canyon beside it out)
-  for (const [x, z] of [[-1973, -460], [-1943, -467], [-1951, -436], [-1932, -437], [-1999, -425]]) assert.ok(inPlay(x, z), `Zastava's building at ${x}, ${z} is out of the Zona`);
-  for (const [x, z] of [[-2027, -425], [-2023, -454], [-2027, -375], [-2040, -450]]) assert.ok(!inPlay(x, z), `the road by Zastava at ${x}, ${z} is in the Zona`);
+  // (Lipki, Kamenka, the swamp, Pokrov and the middle of the valley in it; the desert and Kalat out: nothing west of x -1950)
+  assert.ok(inPlay(-1180, 350) && inPlay(625, 365) && inPlay(-1855, 585) && inPlay(-1915, 0) && inPlay(100, 50) && !inPlay(-2200, 0) && !inPlay(-3200, 200), 'Lipki, Kamenka, the swamp, Pokrov or the valley is out of it, or the desert or Kalat is in it');
+  // (drawn smaller, 2026-10-24: Zastava at the canyon's mouth out, and the wilderness round the edges and between the
+  // towns out, the two lone places with it; the loot keeps the line)
+  for (const [x, z] of [[-1973, -460], [-1943, -467], [-1999, -425], [-2027, -425]]) assert.ok(!inPlay(x, z), `Zastava at ${x}, ${z} is in the Zona`);
+  for (const [x, z] of [[700, 0], [0, 700], [-600, -600], [-800, 100], [-100, 640], [300, -640]]) assert.ok(!inPlay(x, z), `the wilderness at ${x}, ${z} is in the Zona`);
+  assert.ok(eastOfLine(-1973, -460) && !eastOfLine(-2027, -425), 'the line itself moved');
   // (the maps are handed the same line, worked out once)
   assert.equal(playEdge(), playEdge());
   assert.deepEqual(playEdge(), rings);
