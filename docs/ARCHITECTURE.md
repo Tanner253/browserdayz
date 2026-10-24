@@ -158,7 +158,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 152 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1846 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1844 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -168,7 +168,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `enter.ts` | 758 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 751 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 534 | The game: attachments and magazines. |
-| `hands.ts` | 750 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
+| `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 394 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 737 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
@@ -234,9 +234,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `airdrop.ts` | 484 | The supply drop comes by helicopter (2026-10-13: |
 | `animal-calls.ts` | 26 | The animals' calls (2026-10-23): when a herd is heard, and which of it. |
-| `animal-fight.ts` | 356 | The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt of whoever comes too near, and, hungry, of deer (src/sim/animal-mind.ts calls these for its own). |
+| `animal-fight.ts` | 390 | The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt of whoever comes too near, and, hungry, of deer (src/sim/animal-mind.ts calls these for its own). |
 | `animal-ground.ts` | 288 | The ground as the animals know it (2026-10-23): what kind of country a place is (field, forest, rock, snow, desert, water, a town), whether an animal can stand there, and whether it can see from one place to another. |
-| `animal-mind.ts` | 819 | The animals' minds (2026-10-23): the herds, their ground and their day, what frightens them, the bear's charge and the wolves' hunt. |
+| `animal-mind.ts` | 822 | The animals' minds (2026-10-23): the herds, their ground and their day, what frightens them, the bear's charge and the wolves' hunt. |
 | `animal-places.ts` | 144 | Where the animals are (2026-10-23): the herds' ground, each one's place in its herd and room from the rest, and whether a place will do for one (src/sim/animal-mind.ts calls these for its own). |
 | `animals.ts` | 340 | Animals (2026-10-23). The owner: "We also need animals ... it may be time to implement hunting as a food source", and of how: "regarding animal logic just ask what does dayz or rust do and copy/revamp their... |
 | `apart.ts` | 90 | The places stocked apart from the rest of the map, on top of it: the fort, the hamlet on its track, the wreck under the bridge, every cellar, Kalat and the new towns, the canyon pass. |
@@ -271,7 +271,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `desert.ts` | 160 | The desert's places for whoever starts on the coast (2026-10-18), the owner: |
 | `drops.ts` | 256 | Supply drops. Every few minutes, while anybody is playing, a crate of the best things on the map is set down somewhere in the open and everyone is told where. It is there for a few minutes, or until somebody has... |
 | `economy.ts` | 887 | Central Economy, modelled on DayZ's types.xml: every item type has a world-wide nominal (target) count, a minimum that triggers restocking, a lifetime after which untouched loot despawns, and usage tags that decide... |
-| `emotes.ts` | 126 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
+| `emotes.ts` | 129 | The wheel (hold T): things to call out without a microphone, and things to do with the body. |
 | `fires.ts` | 140 | Campfires. The rings of stones at the lodges, the cabins and the hamlet can be lit. A fire is somewhere to mend: resting beside one puts health back far faster than it comes back on its own, and what is eaten beside... |
 | `gas.ts` | 154 | The gas. One place on the map is sunk in it (the Chemical Works, in the cirque behind the checkpoint: the map's first expansion). A low dome of it lies over the place, thickest at the middle and thinning to nothing... |
 | `grenades.ts` | 282 | Grenades: what is thrown, how its fuse runs, and what the server believes of one. |
@@ -281,7 +281,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hitclock.ts` | 24 | How often a shooter's hits on one body are believed (server/tags.ts, mayHit): no oftener than the gun fires, over a run of them, with one allowed a gap early when the one before came late. |
 | `infected.ts` | 595 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
-| `inventory.ts` | 1153 | Grid inventory (DayZ / Tarkov style). |
+| `inventory.ts` | 1204 | Grid inventory (DayZ / Tarkov style). |
 | `items.ts` | 538 |  |
 
 ## src/sim/items/
@@ -316,7 +316,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `posts.ts` | 98 | The army's field posts in the west: a WW2 pillbox (the model "WW2 Field Bunker" by Golden, the one stood over Bunker 17's stair: see src/world/bunker.ts) by four of the western roads, its door to the road, a rack, a... |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
 | `range.ts` | 359 | The bot check (2026-10-12: |
-| `ruins.ts` | 1275 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
+| `ruins.ts` | 1277 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
 | `save.ts` | 58 | Local persistence for the single-player slice. |
 | `sickness.ts` | 47 | Food poisoning (2026-10-23, with the animals; DayZ's). |
 | `slopes.ts` | 236 | Steep ground: what legs can do on it. |
@@ -414,9 +414,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `dogtag.ts` | 166 | The dog tag on the menu: two steel tags on a ball chain, the player's name stamped into the front one as it is typed. |
 | `door.ts` | 170 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
 | `elite-crown.ts` | 37 | The Elite's crown by a name in chat, and a word about them with the pointer on it (the owner, 2026-10-15: |
-| `emotes-menu.ts` | 239 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
+| `emotes-menu.ts` | 241 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
 | `howto-more.ts` | 87 | The How to Play card's second half (the owner, 2026-10-19: |
-| `hud.ts` | 2166 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
+| `hud.ts` | 2171 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 481 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inv-card.ts` | 107 | What a thing is, and what to do with it (idea 15 of Fettah, a contributor, 2026-10-18). |
 | `inv-piles.ts` | 166 | The inventory's tidying (Fettah's inventory pull request, a contributor's, 2026-10-18): a grid sorted kind by kind, piles of one thing joined, a bag's weight, and which things feed one another. |
@@ -432,7 +432,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `minimap.ts` | 592 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
 | `person.ts` | 104 | The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a program came by the dozen, and stood in the world as players). |
 | `platform.ts` | 33 | ZONA PvP, the platform both games stand under (2026-10-14). |
-| `radial.ts` | 176 | One radial menu for every wheel of the game (2026-10-24, the owner: |
+| `radial.ts` | 263 | One radial menu for every wheel of the game (2026-10-24, the owner: |
 | `rewards.ts` | 424 | Dog tags and creator rewards: the illustrated explanation a player sees on entering the site, and the wallet address they give. |
 | `rotate.ts` | 34 | The screen a phone shows while it is held upright. |
 | `shop.ts` | 188 | The trader's counter: what you have that he will take, and what he has to sell. |
@@ -453,7 +453,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `touch.ts` | 271 | On-screen controls for phones and tablets. |
 | `updates.ts` | 153 | The game's news in a corner of its main menu: the last few posts of its X account, each with what it says, its picture or film, and a way to it on X. |
-| `wheel-slots.ts` | 63 | The emote wheel's sixteen slots as this player has set them (Emotes, opened from the wheel: src/ui/emotes-menu.ts), kept in this browser. |
+| `wheel-slots.ts` | 58 | The emote wheel's sixteen slots as this player has set them (Emotes, opened from the wheel: src/ui/emotes-menu.ts), kept in this browser. |
 
 ## src/world/
 

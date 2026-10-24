@@ -12,7 +12,8 @@ import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
 import { BARREL } from '../../sim/barrels';
-import { EMOTE, EMOTE_GAP, WHEEL_RING, voiceOf, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
+import { EMOTE, EMOTE_GAP, voiceOf, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
+import { Radial } from '../../ui/radial';
 import { wheelSlots } from '../../ui/wheel-slots';
 import { playerName } from '../../net/client';
 import { type Act, MAX_STAMINA } from '../../net/protocol';
@@ -26,7 +27,7 @@ import { FIRE } from '../../sim/fires';
 import { heightAt } from '../../world/worldgen';
 import { COOKS, COOK_KINDS, FUEL, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
 import { POISON, fallsIll } from '../../sim/sickness';
-import { WHEEL_OUTER, WHEEL_PICK, WHEEL_REACH, type TimedAction, type Game } from '../game';
+import { WHEEL_REACH, type TimedAction, type Game } from '../game';
 
 export const itemsMethods = {
   // ------------------------------------------------------------ item actions
@@ -501,11 +502,9 @@ export const itemsMethods = {
     at.x += input.mouseDX / WHEEL_REACH;
     at.y += input.mouseDY / WHEEL_REACH;
     if (at.length() > 1) at.normalize();
-    // the first entry is at the top, the rest follow clockwise (as the player has set them in Emotes)
-    // (two rings of eight: the way the mouse has gone says the wedge, how far it has gone says the ring)
-    const slots = wheelSlots(), per = WHEEL_RING, far = at.length();
-    const k = ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * per) % per) + per) % per;
-    const pick = far > WHEEL_PICK ? Math.min(slots.length - 1, (far > WHEEL_OUTER ? per : 0) + k) : -1;
+    // the first entry is at the top, the rest follow clockwise (as the player has set them in Emotes), round Cancel at
+    // the bottom of the outer ring: the way the mouse has gone says the wedge, how far it has gone says the ring
+    const slots = wheelSlots(), pick = this.hud.wheelPick([at.x, at.y]);
     // a click while it is up: Emotes, where its slots are set (the owner: "edit button on the T wheel"; the gun is quiet while the wheel is up)
     if (ok && input.pressed('Mouse0')) {
       this.wheelOn = false;
@@ -519,8 +518,9 @@ export const itemsMethods = {
       this.wheelOn = false;
       // (a tap, the mouse left alone, is the last call again)
       if (ok) {
-        chose = pick >= 0;
-        if (chose) this.emote(slots[pick]);
+        // (Cancel, let go on: the wheel goes and nothing is done)
+        chose = pick >= 0 || pick === Radial.CANCEL;
+        if (pick >= 0) this.emote(slots[pick]);
         else if (now - this.wheelSince < 220) this.emote(this.lastCall);
       }
     }
