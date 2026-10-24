@@ -120,7 +120,7 @@ export const frameMethods = {
     }
     if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
     if (this.hud.emotes.isOpen && (!playing || this.player.dead)) this.toggleEmotes(false);
-    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen;
+    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen || this.build.locks.padOpen;
     // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
     const uiOpen = panels || !!this.freecam;
     // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
@@ -164,6 +164,7 @@ export const frameMethods = {
     this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
     // (the building plan and the hammer: before the hands, so that the hammer at a piece is not a swing: src/game/building)
     this.build.update(dt, playing && !uiOpen && !typing && !p.dead && !this.wheelOn && !this.garage.ride);
+    this.build.beds.frame(dt, this.started && p.dead);
     // a dance, or hands that are up, ends with the first step, shot or anything else done
     // (one of the pack's movements played once, at its end)
     if (this.hold === 'dance' && this.danced && this.avatar.emoteOver) this.setHold(null);
@@ -682,7 +683,7 @@ export const frameMethods = {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? (this.ready && this.ready.item.id !== 'building_plan' ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
+      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? (this.ready && this.ready.item.id !== 'building_plan' ? { label: `${ITEMS[this.ready.item.id].name}: ${this.ready.item.id === 'torch' ? (this.build.torches.lit ? 'L puts it out' : 'L lights it') : ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

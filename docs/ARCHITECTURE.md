@@ -42,24 +42,26 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `admin.ts` | 977 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
 | `animals.ts` | 206 | The server: the animals (2026-10-23). |
+| `beds.ts` | 47 | Beds and sleeping bags as the server keeps them (2026-10-24, base building's fourth step). |
 | `bodies.ts` | 87 | The bodies of the infected, searched as a player's is, and bodies cleared away by an admin. |
 | `bodywatch.ts` | 201 | How a body moves, watched for a program walking it: standing on nothing, or to and fro on one spot doing nothing. |
 | `botrules.ts` | 51 | The server: the numbers the bot rules go by, kept off the public code (the owner, 2026-10-18: |
 | `boxes.ts` | 51 | A base's boxes as the server keeps them (2026-10-24, base building's fourth step). |
-| `build.ts` | 257 | The server: base building (2026-10-24, the second step; the rules are src/sim/build/). |
+| `build.ts` | 289 | The server: base building (2026-10-24, the second step; the rules are src/sim/build/). |
 | `checks.ts` | 453 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
-| `claims.ts` | 140 | The server: claims, upkeep and rot (2026-10-24, base building's third step; the rules are src/sim/build/upkeep.ts). |
+| `claims.ts` | 144 | The server: claims, upkeep and rot (2026-10-24, base building's third step; the rules are src/sim/build/upkeep.ts). |
 | `custody.ts` | 72 | Who holds each dog tag that can pay (one in `lootedTags`), as this server saw it change hands (2026-10-23, the owner: |
 | `device.ts` | 91 | The server: the devices games run on (2026-10-16). |
-| `doors.ts` | 53 | A base's doors as the server keeps them (2026-10-24, base building's fourth step; how a leaf swings, and what it may not swing through, is src/sim/build/doors.ts). |
+| `doors.ts` | 55 | A base's doors as the server keeps them (2026-10-24, base building's fourth step; how a leaf swings, and what it may not swing through, is src/sim/build/doors.ts). |
 | `drops.ts` | 130 | The server: supply drops and the helicopter that brings them. |
 | `elite.ts` | 32 | The Elite: players whose last payout was at the top rate, each held by their key's hash (nobody's anything), with a crown by their name in chat (the owner, 2026-10-15: |
 | `esp.ts` | 69 | An admin's far sight of the things about them (the owner, 2026-10-23: |
 | `gate.ts` | 743 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 142 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 942 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 963 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1356 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 777 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
+| `locks.ts` | 140 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
 | `party.ts` | 145 | Parties (2026-10-19), the lite first one: the owner, "players want to be able to team up with eachother, can we do a simple party system, with a very LITE indicator on friendlies ... |
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
@@ -122,7 +124,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `overlap.ts` | 131 | Where two faces lie in one plane, facing the same way, over the same ground: the two are drawn turn and turn about and the wall flickers there ("z-fighting"). |
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
-| `sandbox-build.ts` | 406 | The sandbox's base-building scenes (2026-10-24): each step of base building looked at on the plain floor before the world (the owner: |
+| `sandbox-build.ts` | 541 | The sandbox's base-building scenes (2026-10-24): each step of base building looked at on the plain floor before the world (the owner: |
 | `sandbox-inventory.ts` | 178 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
 | `sandbox.ts` | 249 | The sandbox (the stage until 2026-10-24, the owner: |
@@ -156,14 +158,19 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `boxes.ts` | 47 | A base's boxes in the game (2026-10-24, base building's fourth step; the server's side server/boxes.ts): each a store opened with F and filled as a crate is. |
-| `claims.ts` | 201 | A base's claim as the game has it (2026-10-24, base building's third step; the server's side server/claims.ts). |
-| `doors.ts` | 66 | A base's doors in the game (2026-10-24, base building's fourth step): |
-| `draw.ts` | 282 | The bases as they are drawn and stood on (2026-10-24). |
-| `icons.ts` | 78 | The wheel's pictures (2026-10-24, the owner: |
-| `index.ts` | 565 | Base building as the game has it (2026-10-24, the second step; the rules are src/sim/build/, the server's side server/build.ts). |
-| `look.ts` | 230 | How a piece of a base looks (2026-10-24): its solids (src/sim/build/solids.ts) made into one shape for each kind and tier, and one paint for each tier, from Poly Haven's pictures (the owner's yes, plan v2: |
-| `wheel.ts` | 86 | The building's two wheels (2026-10-24), on the game's one radial menu (src/ui/radial.ts): the plan's, its groups of pieces round the inside and the pieces of the group pointed at round the outside; and the hammer's,... |
+| `beds.ts` | 115 | Beds and sleeping bags on the death screen (2026-10-24, base building's fourth step; the server's side server/beds.ts). |
+| `boxes.ts` | 53 | A base's boxes in the game (2026-10-24, base building's fourth step; the server's side server/boxes.ts): each a store opened with F and filled as a crate is. |
+| `claims.ts` | 208 | A base's claim as the game has it (2026-10-24, base building's third step; the server's side server/claims.ts). |
+| `doors.ts` | 67 | A base's doors in the game (2026-10-24, base building's fourth step): |
+| `draw.ts` | 293 | The bases as they are drawn and stood on (2026-10-24). |
+| `icons.ts` | 102 | The wheel's pictures (2026-10-24, the owner: |
+| `index.ts` | 643 | Base building as the game has it (2026-10-24, the second step; the rules are src/sim/build/, the server's side server/build.ts). |
+| `ladders.ts` | 95 | Ladders in the game (2026-10-24, base building's fourth step): a ladder leant on a wall, and the ladder under a hatch. |
+| `locks.ts` | 244 | Locks in the game (2026-10-24, base building's fourth step; the rules src/sim/build/locks.ts, the server's side server/locks.ts). |
+| `look.ts` | 245 | How a piece of a base looks (2026-10-24): its solids (src/sim/build/solids.ts) made into one shape for each kind and tier, and one paint for each tier, from Poly Haven's pictures (the owner's yes, plan v2: |
+| `prints.ts` | 152 | Blueprints in the game (2026-10-24, base building's fourth step; the rules src/sim/build/blueprints.ts). |
+| `torches.ts` | 105 | Torches (2026-10-24, base building's fourth step). |
+| `wheel.ts` | 91 | The building's two wheels (2026-10-24), on the game's one radial menu (src/ui/radial.ts): the plan's, its groups of pieces round the inside and the pieces of the group pointed at round the outside; and the hammer's,... |
 
 ## src/game/
 
@@ -177,21 +184,21 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 152 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1898 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1915 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
 | file | lines | what it is |
 |---|---:|---|
-| `drops.ts` | 589 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
+| `drops.ts` | 593 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 758 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 756 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 757 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 534 | The game: attachments and magazines. |
 | `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 397 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 737 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 1001 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 1003 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
 ## src/game/
 
@@ -202,7 +209,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gathering.ts` | 210 | Gathering as the game has it (2026-10-24, base building's first step; the rules are src/sim/gather.ts, the server's side server/gather.ts). |
 | `grenades.ts` | 130 | Thrown grenades. A grenade is a point flying under gravity that bounces off the world and goes off when its fuse runs out. Everyone is told where it left the hand and how fast (see the 'nade' message), and every game... |
 | `hands-on.ts` | 285 | Our own arms on a pack drawn round another maker's arms (2026-10-17). |
-| `held-size.ts` | 14 | How big a building material is in the hands (2026-10-24). |
+| `held-size.ts` | 15 | How big a building material is in the hands (2026-10-24). |
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
 | `infected.ts` | 1251 | The infected, as this game draws and (for the ones near its own player) moves them. |
@@ -210,7 +217,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
 | `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
-| `loot.ts` | 1167 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
+| `loot.ts` | 1169 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
 | `menu-order.ts` | 90 | Which of the menu's scenes are shown first, which are said to be new, and what a browser remembers of having been shown. |
 | `menu-scenes.ts` | 1698 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
 | `modes.ts` | 144 | The three games of one page (the owner, 2026-10-21: |
@@ -218,8 +225,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `my-perks.ts` | 26 | What this player has from the store, as their server says it (S2C 'perks', server/perks.ts): the finishes they may put on their guns (Apply in the inventory: server/plates.ts), VIP (a gold dog tag round their neck),... |
 | `near.ts` | 160 | What is near is drawn with its pictures at the size they came; what is far, with the world's copies. |
 | `party.ts` | 108 | Your party (2026-10-19, the lite first one: see server/party.ts). |
-| `player.ts` | 1403 | First-person survivor: kinematic character controller (Rapier), movement model, stamina / vitals, camera feel (bob, lean, landing dip) and footsteps. |
-| `procedural.ts` | 345 | The few meshes that have no scanned model: small machined parts built from a lathe profile, with a parkerised-steel material, and the stamped dog tag. |
+| `player.ts` | 1448 | First-person survivor: kinematic character controller (Rapier), movement model, stamina / vitals, camera feel (bob, lean, landing dip) and footsteps. |
+| `procedural.ts` | 396 | The few meshes that have no scanned model: small machined parts built from a lathe profile, with a parkerised-steel material, and the stamped dog tag. |
 | `racks.ts` | 201 | Gun racks that show what stands in them (the owner, 2026-10-17: |
 | `remote.ts` | 711 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
 | `riders.ts` | 67 | The dead who ride on (2026-10-14). |
@@ -228,7 +235,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
 | `vehicle.ts` | 623 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5113 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5128 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
@@ -246,7 +253,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `client.ts` | 483 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `orders.ts` | 234 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 677 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 691 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -271,13 +278,15 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `bases.ts` | 323 | Every base on the map, as the server keeps them (server/build.ts) and as a game played alone keeps its own (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. |
+| `bases.ts` | 332 | Every base on the map, as the server keeps them (server/build.ts) and as a game played alone keeps its own (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. |
+| `blueprints.ts` | 113 | Blueprints (2026-10-24, base building's fourth step). |
 | `doors.ts` | 85 | Doors, hatches, shutters and gates as they swing (2026-10-24, base building's fourth step). |
 | `land.ts` | 68 | Where a base may stand (2026-10-24): out in the country, as a stash is buried (src/sim/stash.ts), and not on a tree or a rock. |
-| `pieces.ts` | 147 | What a base is built of (2026-10-24, base building's second step; plan v2, approved by the owner with "think like rust how does rust do it"): |
-| `snap.ts` | 456 | Where a piece can go (2026-10-24, base building's second step): |
-| `solids.ts` | 256 | What each piece is made of, as solids in its own frame (2026-10-24): boxes, upright prisms and a few hulls, the same list drawn by the game (src/game/building/draw.ts) and made into what stops a body and a bullet. |
-| `upkeep.ts` | 92 | Upkeep and rot (2026-10-24, base building's third step). |
+| `locks.ts` | 70 | Locks on a base (2026-10-24, base building's fourth step). |
+| `pieces.ts` | 162 | What a base is built of (2026-10-24, base building's second step; plan v2, approved by the owner with "think like rust how does rust do it"): |
+| `snap.ts` | 505 | Where a piece can go (2026-10-24, base building's second step): |
+| `solids.ts` | 290 | What each piece is made of, as solids in its own frame (2026-10-24): boxes, upright prisms and a few hulls, the same list drawn by the game (src/game/building/draw.ts) and made into what stops a body and a bullet. |
+| `upkeep.ts` | 93 | Upkeep and rot (2026-10-24, base building's third step). |
 
 ## src/sim/
 
@@ -320,14 +329,14 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hitclock.ts` | 24 | How often a shooter's hits on one body are believed (server/tags.ts, mayHit): no oftener than the gun fires, over a run of them, with one allowed a gap early when the one before came late. |
 | `infected.ts` | 595 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
-| `inventory.ts` | 1206 | Grid inventory (DayZ / Tarkov style). |
-| `items.ts` | 547 |  |
+| `inventory.ts` | 1215 | Grid inventory (DayZ / Tarkov style). |
+| `items.ts` | 550 |  |
 
 ## src/sim/items/
 
 | file | lines | what it is |
 |---|---:|---|
-| `build.ts` | 60 | What a base is built from, and the tools that get it (2026-10-24, base building's first step; the rules of gathering are src/sim/gather.ts). |
+| `build.ts` | 88 | What a base is built from, and the tools that get it (2026-10-24, base building's first step; the rules of gathering are src/sim/gather.ts). |
 | `guns.ts` | 352 | The guns, what they fire and the boxes it comes in. |
 | `hunt.ts` | 83 | What a hunt gives, and what keeps a hunter well (2026-10-23, with the animals: src/sim/animals.ts). |
 | `kit.ts` | 190 | What you hit with, eat, drink and mend with. |
@@ -464,6 +473,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `inv-take.ts` | 20 | The buttons over a crate or a body (idea 10, 2026-10-18): |
 | `inv-types.ts` | 59 | A bag set for a kind of thing (2026-10-23, the owner: |
 | `inventory-ui.ts` | 3118 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
+| `keypad.ts` | 106 | A lock's panel (2026-10-24, base building's fourth step, the owner: |
 | `keys-view.ts` | 42 | The keys that do something now, drawn in the corner under the hands' mouse (what they are is src/game/key-hints.ts). |
 | `kind-icons.ts` | 85 | What kind of thing an item is, as a small symbol in the top right of it in the inventory and on its hot keys, in the colour of its kind: so that a gun, its rounds, a bandage or a tin is told at a glance without the card. |
 | `loading-fx.ts` | 382 | The loading screen's blood and the part of its motion that answers the player. |

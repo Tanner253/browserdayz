@@ -5,7 +5,7 @@
 // The models are stand-ins until real ones are downloaded (the owner: "make due with placeholders if needed").
 
 import type { ItemDef } from '../items';
-import { SHEDS, IN_SHEDS } from './rules';
+import { HOMES, SHEDS, IN_SHEDS } from './rules';
 
 export const BUILD_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- materials
@@ -51,6 +51,34 @@ export const BUILD_ITEMS: ItemDef[] = [
   { id: 'hammer', name: 'Building Hammer', model: 'hatchet', scale: 0.85, tint: 0x8c9299, w: 1, h: 3, weight: 0.7, category: 'melee', desc: 'Nails a frame up to wood, stone or metal, mends what is broken and takes down what is yours. Hold the left button on a piece.', melee: { damage: 30, range: 1.7, rate: 0.6 },
     loot: { pair: 'Hammer', at: [1, 4, 7, 0, 0], restock: 180, usage: SHEDS, favour: { Industrial: 2, Farm: 2 }, on: IN_SHEDS, rack: { any: 1.2 } },
     worth: 4,
+  },
+  // (base building's fourth step, the owner: "keycode keylocks". Plan v2: a code lock in the police's, the works' and the
+  // army's places, rare; the key lock in sheds and houses)
+  { id: 'code_lock', name: 'Code Lock', model: '@codelock', w: 1, h: 1, weight: 0.4, category: 'tool',
+    desc: 'A keypad lock. In your hands, the left button fits it to a door, a gate, a hatch, a box or a claim you may build at, on a four-figure code you choose. Whoever enters the code may open it; a wrong code shocks.',
+    loot: { pair: 'CodeLock', at: [0, 1, 3, 0, 0], restock: 600, usage: ['Police', 'Industrial', 'Military'], favour: { Police: 2 } },
+    worth: 8,
+  },
+  { id: 'key_lock', name: 'Key Lock', model: '@keylock', w: 1, h: 1, weight: 0.3, category: 'tool',
+    desc: 'A lock and its key. In your hands, the left button fits it to a door, a gate, a hatch, a box or a claim you may build at, and gives you its key. Whoever carries a key to it may open it; more keys are cut at it from a plank.',
+    loot: { pair: 'CombinationLock', at: [1, 3, 3, 0, 0], restock: 480, usage: [...SHEDS, ...HOMES], favour: { Farm: 1.5 } },
+    worth: 4,
+  },
+  // (found where people camped and hunted: the owner's "bedroll", set down in a base whose claim you are on)
+  { id: 'sleeping_bag', name: 'Sleeping Bag', model: '@bag', w: 3, h: 2, weight: 1.8, category: 'misc',
+    desc: 'A rolled sleeping bag. Set down with the building plan in a base whose claim you are on, you wake at it after a death, every ten minutes at most; on a bed of planks, every five.',
+    loot: { pair: 'SleepingBag', at: [2, 3, 2, 0, 0], restock: 600, usage: ['Hunting', 'Village'], favour: { Hunting: 3 } },
+    worth: 3,
+  },
+  // (the owner, 2026-10-24: "found around, (tier 1 flashlight reuse the fire from campfire and cars put it on a stick boom
+  // you have a torch)": lit with L in the hands, or set on a wall with the building plan)
+  { id: 'torch', name: 'Torch', model: '@torch', w: 1, h: 4, weight: 0.5, category: 'tool',
+    desc: 'A stick with a rag-wrapped head soaked in fuel. In your hands, L lights it: a flame and a warm light all round, as far as a campfire throws one. Set on a wall with the building plan, it burns there.',
+    loot: { pair: 'LongTorch', at: [3, 4, 2, 0, 0], restock: 420, usage: [...HOMES, ...SHEDS], favour: { Hunting: 2, Farm: 1.5 } },
+    worth: 2,
+  },
+  { id: 'key', name: 'Key', model: '@key', w: 1, h: 1, weight: 0.02, category: 'misc',
+    desc: 'A key to one key lock. Carried, it opens that lock: lose it, and so does whoever finds it.',
   },
   { id: 'pickaxe', name: 'Pickaxe', model: 'crowbar_01', scale: 1.6, tint: 0xc9a77a, w: 2, h: 6, weight: 2.8, category: 'melee', slot: 'long', desc: 'Breaks stone off a boulder. Swung in both hands: slow, and heavy where it lands.', melee: { damage: 50, range: 2.0, rate: 1.05 },
     loot: { pair: 'Pickaxe', at: [0, 2, 5, 0, 0], restock: 240, usage: SHEDS, favour: { Industrial: 3, Farm: 1 }, on: IN_SHEDS },

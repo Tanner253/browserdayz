@@ -21,6 +21,7 @@ import { PIECES, TIERS, type Tier } from '../sim/build/pieces';
 import { blocked, nearestSpot, spots, toWorld, worldYaw, type Base } from '../sim/build/snap';
 import { BaseDraw } from '../game/building/draw';
 import { ghostGeometry } from '../game/building/look';
+import { layPrint } from '../sim/build/blueprints';
 import { HAMMER_PER, PER, RINGS, hammerEntries, outerEntry, outerOf, planEntries } from '../game/building/wheel';
 
 interface Stage {
@@ -36,9 +37,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6 };
+export const BUILD_CELLS: Record<string, number> = { items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { fell: 4, doors: 3 };
+export const BUILD_COLS: Record<string, number> = { fell: 4, doors: 3, slope: 3, part2: 3 };
 
 /** a small base built by the rules on flat ground: two storeys, triangles, a doorway, a window, stairs, roofs, every tier */
 function sampleBase() {
@@ -400,6 +401,140 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
       shoot(s, camera, i, v);
     });
     return { pieces: [...bs.bases.values()].map((b) => [...b.pieces.values()].map((p) => `${p.k}${p.open ? '(open)' : ''}`)) };
+  }
+  if (name === 'slope') {
+    // (a slope of about 17 degrees, rising to +x: a row of three foundations down it from the highest ground, walled,
+    // each one's skirt reaching into the ground on its low side; the navigator, 2026-10-24: "no foundation ever shows
+    // a gap under it on a slope")
+    const ground = (x: number) => 3 + 0.3 * x;
+    const slope = new THREE.PlaneGeometry(40, 30, 80, 60).rotateX(-Math.PI / 2);
+    const pos = slope.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) pos.setY(i, ground(pos.getX(i)));
+    slope.computeVertexNormals();
+    const earth = new THREE.Mesh(slope, new THREE.MeshStandardMaterial({ color: 0x8a8460, roughness: 1 }));
+    earth.receiveShadow = true;
+    s.scene.add(earth);
+    const bs = new Bases({ ground: (x) => ground(x), why: () => null });
+    const first = bs.lay({ k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+    if (typeof first === 'string') throw new Error(first);
+    const b = first.base;
+    for (const x of [-3, -6]) {
+      const sp = nearestSpot(spots(b, 'foundation'), 'foundation', { x, y: 0, z: 0 }, 1);
+      const why = sp && blocked(b, 'foundation', sp, bs.groundIn(b));
+      if (!sp || why) throw new Error(`foundation at ${x}: ${why ?? 'no spot'}`);
+      bs.lay({ b: b.id, k: 'foundation', ...sp }, 'me', 0);
+    }
+    for (const p of [...b.pieces.values()]) bs.upgrade(b.id, p.id, 2);
+    for (const [k, x, z] of [['wall', -7.5, 0], ['wall', 0, 1.5], ['doorway', -3, 1.5], ['window', -6, 1.5], ['wall', 0, -1.5], ['wall', -3, -1.5], ['wall', -6, -1.5], ['wall', 1.5, 0]] as const) {
+      const sp = nearestSpot(spots(b, k), k, { x, y: 1.5, z }, 2);
+      if (sp) bs.lay({ b: b.id, k, ...sp }, 'me', 0);
+    }
+    for (const p of [...b.pieces.values()]) if (p.t === 0) bs.upgrade(b.id, p.id, 1);
+    const draw = new BaseDraw(s.scene, null);
+    draw.setBase(b);
+    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    await settle();
+    s.sun.position.set(-14, 24, 16);
+    s.sun.target.position.set(-3, 2, 0);
+    s.sun.shadow.camera.left = s.sun.shadow.camera.bottom = -18;
+    s.sun.shadow.camera.right = s.sun.shadow.camera.top = 18;
+    s.sun.shadow.camera.updateProjectionMatrix();
+    camera.fov = 40;
+    camera.updateProjectionMatrix();
+    const views: [string, [number, number, number], [number, number, number]][] = [
+      ['from the low side: the skirt into the ground', [-17, 3, 6], [-4, 2.4, 0]],
+      ['side on: the slope under the row', [-3, 4.5, 16], [-3, 2.5, 0]],
+      ['the low corner, close', [-10.5, 1.6, 4], [-7.5, 1.2, 1.5]],
+    ];
+    views.forEach(([v, p, l], i) => {
+      camera.position.set(...p);
+      camera.lookAt(...l);
+      shoot(s, camera, i, v);
+    });
+    return { top: +b.oy.toFixed(2), lowest: +ground(-7.5).toFixed(2), drop: +(b.oy - ground(-7.5)).toFixed(2) };
+  }
+  if (name === 'part2') {
+    // (step four, part two: blueprints laid whole, a code lock on the hut's door, the watchtower's ladder, a room with a
+    // bed, a sleeping bag, a box with a key lock and a torch on its wall, a hatch with the ladder under it)
+    const bs = new Bases({ ground: () => 0, why: () => null });
+    const print = (id: string, x: number, z: number) => {
+      const r = layPrint(bs, id, { x, z, yaw: 0 }, 'me', 0, 'Me', () => true);
+      if (!r.base) throw new Error(`${id}: ${r.why}`);
+      return r.base;
+    };
+    const hut = print('bp:hut', 0, 0), tower = print('bp:tower', 12, 0), air = print('bp:airlock', -14, 0);
+    const hutDoor = [...hut.pieces.values()].find((p) => p.k === 'door_wood')!;
+    hutDoor.lock = { k: 'code', on: true, who: ['me'], code: '1234' };
+    void tower;
+    void air;
+    // the room: four cells, walled at the back, a torch on the back wall, a bench, a bed, a bag, a locked box
+    const r0 = bs.lay({ k: 'foundation', x: 26, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+    if (typeof r0 === 'string') throw new Error(r0);
+    const C = r0.base;
+    const at = (k: string, x: number, y: number, z: number, turn = 0) => {
+      const sp = nearestSpot(spots(C, k, turn), k, { x, y, z }, 2);
+      const why = sp ? blocked(C, k, sp) : 'no spot';
+      const r = !why && bs.lay({ b: C.id, k, ...sp! }, 'me', 0);
+      if (!r || typeof r === 'string') throw new Error(`${k} at ${x} ${z}: ${why ?? r}`);
+      return r.piece;
+    };
+    for (const x of [3, 6, 9]) at('foundation', x, 0, 0);
+    for (const x of [0, 3, 6, 9]) bs.upgrade(C.id, at('wall', x, 1.5, -1.5).id, 1);
+    for (const p of [...C.pieces.values()]) if (p.k === 'foundation') bs.upgrade(C.id, p.id, 2);
+    at('torch_wall', 6, 1.5, -1.3, 1);
+    const set = (k: string, x: number, z: number, r = 0) => {
+      const q = bs.lay({ b: C.id, k, x, y: 0, z, r }, 'me', 0);
+      if (typeof q === 'string') throw new Error(`${k}: ${q}`);
+      return q.piece;
+    };
+    bs.lay({ b: C.id, k: 'claim', x: 0, y: 0, z: 0.5, r: 0 }, 'me', 0, 'Me');
+    set('bed', 3, 0, 3);
+    set('bedroll', 6, 0, 3);
+    const box = set('box_small', 9, -0.5);
+    box.lock = { k: 'key', on: true, who: ['me'], key: 7 };
+    // a room with a floor frame over it, its hatch open, the ladder under it; a bench near for the hatch
+    const r1 = bs.lay({ k: 'foundation', x: 46, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+    if (typeof r1 === 'string') throw new Error(r1);
+    const D = r1.base;
+    const atD = (k: string, x: number, y: number, z: number) => {
+      const sp = nearestSpot(spots(D, k), k, { x, y, z }, 2);
+      const r = sp && bs.lay({ b: D.id, k, ...sp }, 'me', 0);
+      if (!r || typeof r === 'string') throw new Error(`${k}: ${r ?? 'no spot'}`);
+      return r.piece;
+    };
+    for (const [x, z] of [[0, -1.5], [-1.5, 0], [1.5, 0]]) bs.upgrade(D.id, atD('wall', x, 1.5, z).id, 2);
+    bs.upgrade(D.id, atD('floor_frame', 0, 3, 0).id, 2);
+    const wb = bs.lay({ b: D.id, k: 'workbench', x: 0, y: 0, z: -0.5, r: 0 }, 'me', 0);
+    if (typeof wb === 'string') throw new Error(`workbench: ${wb}`);
+    atD('hatch', 0, 3, 0).open = true;
+    const draw = new BaseDraw(s.scene, null);
+    for (const b of bs.bases.values()) draw.setBase(b);
+    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    await settle();
+    const body = await survivor();
+    body.position.set(-3.2, 0, 4);
+    s.scene.add(body);
+    s.sun.position.set(10, 26, 20);
+    s.sun.target.position.set(12, 0, 0);
+    s.sun.shadow.camera.left = s.sun.shadow.camera.bottom = -36;
+    s.sun.shadow.camera.right = s.sun.shadow.camera.top = 36;
+    s.sun.shadow.camera.updateProjectionMatrix();
+    camera.fov = 40;
+    camera.updateProjectionMatrix();
+    const views: [string, [number, number, number], [number, number, number]][] = [
+      ['the Hut blueprint laid, a code lock on its door', [2.4, 2.4, 6.5], [0.2, 1.3, 1.5]],
+      ['the Watchtower and the Airlock blueprints, frames', [-1, 9, 22], [0, 2.5, 0]],
+      ["the Watchtower's ladder up its back", [15, 3.5, -9], [12, 3, -1.8]],
+      ['a room: a bed, a sleeping bag, a box with a key lock, a torch on the wall', [30.5, 6, 6.5], [30, 0.6, -0.5]],
+      ['a hatch open over the room, the ladder under it', [46.6, 1.6, 1.3], [46, 2.6, 0.4]],
+      ['close: the code lock on the door, the key lock on the box', [1.05, 1.3, 2.3], [0.34, 1.15, 1.55]],
+    ];
+    views.forEach(([v, p, l], i) => {
+      camera.position.set(...p);
+      camera.lookAt(...l);
+      shoot(s, camera, i, v);
+    });
+    return { bases: [...bs.bases.values()].map((b) => b.pieces.size) };
   }
   throw new Error(`no such base-building scene: ${name}`);
 }

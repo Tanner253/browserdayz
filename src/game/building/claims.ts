@@ -119,7 +119,14 @@ export class ClaimView {
     return `<span class="bc"><kbd>F</kbd><b>Claim</b> ${on ? 'yours' : `${who || 'nobody'}'s`}<i>${holding ? (on ? 'leaving…' : 'joining…') : `F opens its store · hold F to ${on ? 'leave it' : 'join it'}`}</i></span>`;
   }
 
-  private toggle(b: Base) {
+  /** a base's claim's store opened */
+  openStore(b: Base) {
+    const s = this.stores.get(b.id);
+    if (s) this.h.open(s);
+  }
+
+  /** the player joins a claim, or leaves it */
+  toggle(b: Base) {
     if (this.h.online()) return void this.h.send({ t: 'bjoin', b: b.id });
     const on = this.store().join(b, this.h.who(), this.h.name());
     this.h.note(on ? 'You are on this claim: you may build here' : 'You have left this claim', on ? 'good' : 'info');

@@ -339,6 +339,7 @@ export const onlineMethods = {
     net.on('bkeep', (m) => this.build.onKeep(m));
     net.on('bhp', (m) => this.build.onHp(m));
     net.on('bdoor', (m) => this.build.doors.onDoor(m));
+    net.on('beds', (m) => this.build.beds.onBeds(m));
     net.on('knock', (m) => this.build.doors.onKnock(m));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => {
@@ -514,7 +515,8 @@ export const onlineMethods = {
     });
     net.on('spawn', (m) => {
       const p = this.player;
-      p.spawn(m.x, heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      // (at a bed, on it: its height is the server's word)
+      p.spawn(m.x, m.y ?? heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
       this.freshKit();
       this.deathSent = false;
       this.deathInfo = '';

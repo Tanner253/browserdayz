@@ -156,8 +156,9 @@ export const dropsMethods = {
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
     // the jeep they are in ran into something: no wound, and nobody to look round for
-    if (m.w === 'crash') {
-      p.damage(m.amount, 'a crash');
+    // (or a code lock shocked the hand that got its code wrong)
+    if (m.w === 'crash' || m.w === 'shock') {
+      p.damage(m.amount, m.w === 'shock' ? 'a code lock' : 'a crash');
       this.weapons.flinch(1);
       this.meDirty = true;
       return;
@@ -387,7 +388,8 @@ export const dropsMethods = {
     this.input.unlock();
   },
 
-  respawn(this: Game) {
+  /** back after a death: at the map's edge, or alone at `at` (a bed: src/game/building/beds.ts) */
+  respawn(this: Game, at?: { x: number; y: number; z: number; yaw: number }) {
     this.handsFree = false;
     if (this.online) {
       // the server picks the spawn and answers with 'spawn'
@@ -399,7 +401,8 @@ export const dropsMethods = {
     for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
     // (and the trader writes off half of what he owed a dead man: credit is not a way to carry nothing and lose nothing)
     if (this.credit > 0) this.setCredit(Math.floor(this.credit * KEPT_ON_DEATH));
-    this.spawnAtEdge();
+    if (at) this.player.spawn(at.x, at.y, at.z, at.yaw);
+    else this.spawnAtEdge();
     this.freshKit();
     this.deathInfo = '';
     this.hitsOn.clear();
@@ -439,7 +442,8 @@ export const dropsMethods = {
   lightStep(this: Game, dt: number, free: boolean) {
     const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
     const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
-    if (free && this.input.pressed('KeyL')) {
+    // (a torch in the hands is lit with L itself: src/game/building/torches.ts)
+    if (free && this.input.pressed('KeyL') && this.inv.held()?.id !== 'torch') {
       if (this.garage.ride) this.hud.note('It lights its own lamps while somebody drives', 'warn');
       else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');
       else {

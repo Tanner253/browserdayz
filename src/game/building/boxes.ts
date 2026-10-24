@@ -36,6 +36,12 @@ export class BoxView {
     return this.stores.get(cid);
   }
 
+  /** a box's store opened, by its base and piece */
+  openFor(b: number, p: number) {
+    const s = this.stores.get(`bbox:${b}:${p}`);
+    if (s) this.open(s);
+  }
+
   /** a box looked at (`t`): what the corner says, and F opens it */
   frame(ok: boolean, t: { base: Base; id: number } | null): string | null {
     const p = t?.base.pieces.get(t.id), s = t && this.stores.get(`bbox:${t.base.id}:${t.id}`);

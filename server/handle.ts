@@ -48,8 +48,10 @@ import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
 import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
-import { hammer, lay, owing, takeDown } from './build';
+import { hammer, lay, owing, print, takeDown } from './build';
 import { knock, swing } from './doors';
+import { tellBeds, wakeAt } from './beds';
+import { code as lockCode, cutKey, fit as fitLock, lockLets, onOff as lockOnOff, unfit as unfitLock } from './locks';
 import { join as joinClaim } from './claims';
 import { POISON } from '../src/sim/sickness';
 
@@ -362,12 +364,26 @@ export function handle(c: Client, m: C2S) {
       return hammer(c, m);
     case 'bdel':
       return takeDown(c, m);
+    case 'bprint':
+      return print(c, m);
     case 'bjoin':
       return joinClaim(c, m);
+    case 'mybeds':
+      return tellBeds(c);
     case 'bdoor':
       return swing(c, m);
     case 'bknock':
       return knock(c, m);
+    case 'block':
+      return fitLock(c, m);
+    case 'bcode':
+      return lockCode(c, m);
+    case 'blockon':
+      return lockOnOff(c, m);
+    case 'bkey':
+      return cutKey(c, m);
+    case 'bunlock':
+      return unfitLock(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
@@ -489,6 +505,8 @@ export function handle(c: Client, m: C2S) {
       // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat; nor a body still in the air in one)
       if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
+      // (a base's box or claim with a lock on it opens only for whoever the lock lets in: server/locks.ts)
+      if (!lockLets(c, m.cid)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is locked' });
       // (open by as many as like at once: searched.ts. Another crate they had open is shut first.)
       if (c.openCid && c.openCid !== m.cid) shutIt(c, c.openCid);
       if (!hasOpen(c, m.cid)) openIt(c, m.cid);
@@ -617,18 +635,21 @@ export function handle(c: Client, m: C2S) {
         log(`${c.name} asks to come back while alive here and dead by their own game: taken as a death`);
         kill(c, 'injuries');
       }
-      const sp = pickSpawn({ x: c.pose[0], z: c.pose[2] });
+      // (at a bed of their own, if they asked and may: server/beds.ts; else at the map's edge as ever)
+      const bed = m.bed ? wakeAt(c, m.bed) : null;
+      if (m.bed && !bed) return;
+      const sp = bed ?? pickSpawn({ x: c.pose[0], z: c.pose[2] });
       c.alive = true;
       c.lifeAt = Date.now();
       c.zonaMs = 0;
       c.inv = null;
       c.vitals = null;
-      c.pose = [sp.x, world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
+      c.pose = [sp.x, bed ? bed.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
       c.check.free = Date.now() + CHECK.free;
       c.check.hp = 100;
       c.check.hpAt = Date.now();
       c.check.downAt = 0;
-      send(c, { t: 'spawn', ...sp });
+      send(c, { t: 'spawn', x: sp.x, z: sp.z, yaw: sp.yaw, ...(bed ? { y: bed.y } : {}) });
       broadcast({ t: 'alive', id: c.id }, c);
       return;
     }

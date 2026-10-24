@@ -29,9 +29,15 @@ import { ClaimView } from './claims';
 import { publicId } from '../../net/client';
 import type { Stash } from '../loot';
 import { ghostGeometry } from './look';
-import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, hammerEntries, pieceAt, piecesOf, planEntries } from './wheel';
+import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, hammerEntries, itemsOf, nameOf, pieceAt, planEntries } from './wheel';
 import { DoorView } from './doors';
 import { BoxView } from './boxes';
+import { LockView } from './locks';
+import { BedsView } from './beds';
+import { LadderView, type Climber } from './ladders';
+import { PrintView } from './prints';
+import { TorchView, type TorchHost } from './torches';
+import { printCost, printOf } from '../../sim/build/blueprints';
 
 export interface BuildHost {
   scene: THREE.Scene;
@@ -62,6 +68,20 @@ export interface BuildHost {
   open: (s: Stash) => void;
   /** the player's name, as their claim's members are listed */
   name: () => string;
+  /** the numbers of the keys carried (src/sim/build/locks.ts) */
+  keys: () => number[];
+  /** a panel of the building's up (the mouse freed) or put away */
+  panel: (open: boolean) => void;
+  /** played alone: hurt (a code lock's shock) */
+  hurt: (n: number) => void;
+  /** played alone: back after a death, woken at a bed */
+  wake: (x: number, y: number, z: number, yaw: number) => void;
+  /** the player's body, as a ladder is climbed by it */
+  climber: () => Climber;
+  /** a torch's flames and light, and where the head of what is held is */
+  flames: TorchHost['flames'];
+  glow: TorchHost['glow'];
+  tip: TorchHost['tip'];
 }
 
 /** how far the mouse moves for the pointer to cross the wheel, px */
@@ -123,6 +143,31 @@ export class Building {
     this.wheel = this.wheels.plan;
     this.boxes = new BoxView(h.input, h.open);
     this.doors = new DoorView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, camera: h.camera }, () => this.store, this.draw);
+    this.locks = new LockView({
+      input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, who: () => this.me, keys: h.keys, count: h.count, take: h.take, give: h.give,
+      begin: h.begin, panel: h.panel, hurt: h.hurt, looked: () => this.target(),
+      changed: (b) => {
+        for (const p of b.pieces.values()) this.draw.put(b, p);
+        this.synced(b);
+        this.bump(b.id);
+        h.changed();
+      },
+      openClaim: (b) => this.claims.openStore(b),
+      joinClaim: (b) => this.claims.toggle(b),
+    }, () => this.store, this.doors, this.boxes);
+    this.ladders = new LadderView(h.input, () => this.store, h.climber);
+    this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me }, () => this.store);
+    this.prints = new PrintView({
+      scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, yaw: h.yaw, who: () => this.me, name: h.name, count: h.count, take: h.take,
+      changed: (b) => {
+        this.draw.setBase(b);
+        this.synced(b);
+        this.bump(b.id);
+        h.changed();
+      },
+      costHtml: (c) => this.costHtml(c),
+    }, () => this.store);
+    this.beds = new BedsView({ online: h.online, send: h.send, me: h.me, who: () => this.me, hud: h.hud, wake: h.wake }, () => this.store);
   }
 
   private get store() {
@@ -143,6 +188,16 @@ export class Building {
   readonly doors: DoorView;
   /** boxes: F opens their stores (src/game/building/boxes.ts) */
   readonly boxes: BoxView;
+  /** locks: fitted from the hands, worked with F (src/game/building/locks.ts) */
+  readonly locks: LockView;
+  /** beds on the death screen (src/game/building/beds.ts) */
+  readonly beds: BedsView;
+  /** ladders: walked into, climbed (src/game/building/ladders.ts) */
+  readonly ladders: LadderView;
+  /** blueprints: laid as one ghost (src/game/building/prints.ts) */
+  readonly prints: PrintView;
+  /** torches: in the hands, and on walls (src/game/building/torches.ts) */
+  readonly torches: TorchView;
 
   /** a base's stores (its claim's, its boxes') as it now stands */
   private synced(b: Base) {
@@ -160,15 +215,23 @@ export class Building {
     if (this.wheel.isOpen) this.wheelFrame(ok && (plan || hammer));
     else if (ok && (plan || hammer) && this.h.input.pressed('Mouse2') && !this.h.busy()) this.openWheel(plan ? 'plan' : 'hammer');
     if (plan && !this.wheel.isOpen) this.planFrame(held!);
-    else this.hideGhost();
+    else {
+      this.hideGhost();
+      this.prints.hide();
+    }
     if (hammer && !this.wheel.isOpen) this.hammerFrame(held!);
     // (a claim looked at: F opens its store, held it joins; a door: F swings it. Whatever is in the hands, though the
     // plan's and the hammer's cards say more of what is looked at than that)
     const free = ok && !this.wheel.isOpen && !this.h.busy(), t = ok ? this.target() : null;
-    const claim = this.claims.frame(dt, free, t);
+    // (a lock in the hands, or a lock on what is looked at: F is the lock's)
+    const lock = this.locks.frame(dt, free, t);
+    const claim = this.claims.frame(dt, free, lock ? null : t);
     if (claim) this.prompt = claim;
-    const door = this.doors.frame(free, t) ?? this.boxes.frame(free, t);
+    const door = lock ?? this.doors.frame(free, t) ?? this.boxes.frame(free, t);
     if (door && !plan && !hammer) this.prompt = door;
+    this.torches.update(dt, ok && !this.wheel.isOpen);
+    const ladder = this.ladders.frame(dt, ok && !this.wheel.isOpen);
+    if (ladder && !this.prompt) this.prompt = ladder;
     // (while the hands are at it, the ring round the crosshair says what they are doing: the card stands aside)
     if (this.h.busy()) this.prompt = null;
   }
@@ -182,6 +245,13 @@ export class Building {
     const from = cam.getWorldPosition(new THREE.Vector3());
     const hit = physics.raycast(from, _dir, 9, SOLID_GROUPS, this.h.player()) ?? this.ontoGround(from);
     const at = hit ? new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z) : from.clone().addScaledVector(_dir, 6);
+    // (a blueprint: its own ghost, whole)
+    if (printOf(this.kind)) {
+      this.hideGhost();
+      this.prompt = this.prints.frame(plan, this.kind, hit ? at : null);
+      return;
+    }
+    this.prints.hide();
     const K = PIECES[this.kind];
     // (the base aimed at: the nearest with a piece near the aim)
     const near = this.store.near(at.x, at.z, 14);
@@ -376,7 +446,7 @@ export class Building {
     this.wheelFor = what;
     this.wheelAt.set(0, 0);
     this.wheelPick = -1;
-    if (what === 'plan') this.wheelCat = Math.max(0, CATS.findIndex((c) => c.cat === PIECES[this.kind].cat));
+    if (what === 'plan') this.wheelCat = Math.max(0, CATS.findIndex((c) => c.cat === (printOf(this.kind) ? 'found' : PIECES[this.kind].cat)));
     this.fillWheel();
     this.wheel.open();
     this.say(this.hubFor(-1));
@@ -433,12 +503,13 @@ export class Building {
         const to = Number(w.slice(2)) as Tier;
         return [TIERS[to], costs(costOf(p.k, to))];
       }
+      if (w === 'unlock') return ['Take the lock off', p?.lock ? `The ${p.lock.k === 'code' ? 'code' : 'key'} lock back in your pockets` : 'There is no lock on it'];
       return [w === 'repair' ? 'Repair' : 'Turn', 'Still to come'];
     }
-    if (pick < 0) return [PIECES[this.kind].name, 'Let go on a piece'];
+    if (pick < 0) return [nameOf(this.kind), 'Let go on a piece'];
     if (pick < CATS.length) return [CATS[pick].cat === 'found' ? 'Foundations' : CATS[pick].label, ''];
     const id = pieceAt(this.wheelCat, pick);
-    return id ? [PIECES[id].name, costs(costOf(id, laidAt(id)))] : [PIECES[this.kind].name, ''];
+    return id ? [nameOf(id), costs(printOf(id) ? printCost(id) : costOf(id, laidAt(id)))] : [nameOf(this.kind), ''];
   }
 
   /** what the wheel's wedge `pick` does; true when it did something */
@@ -453,13 +524,19 @@ export class Building {
       // (a group let go on: its first piece)
       if (pick >= CATS.length) return false;
       const cat = CATS[pick].cat;
-      this.kind = piecesOf(cat).some((k) => k.id === this.kind) ? this.kind : piecesOf(cat)[0].id;
+      this.kind = itemsOf(cat).includes(this.kind) ? this.kind : itemsOf(cat)[0];
       return true;
     }
     const w = HAMMER_WHEEL[pick], held = this.h.held(), t = this.target();
     if (!w || !held || !t) return false;
     if (w === 'remove') {
       this.takeDown(held, t.base, t.id);
+      return true;
+    }
+    if (w === 'unlock') {
+      const p = t.base.pieces.get(t.id);
+      if (!p?.lock) return false;
+      this.locks.unfit(t.base, p, held);
       return true;
     }
     if (w.startsWith('up')) {
@@ -547,6 +624,7 @@ export class Building {
     this.draw.clear();
     this.claims.clear();
     this.boxes.clear();
+    this.torches.clear();
     if (!this.h.online()) for (const b of this.local.bases.values()) {
       this.draw.setBase(b);
       this.synced(b);

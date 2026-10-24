@@ -15,7 +15,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
-import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { F_DEAD, PROTOCOL, type S2C } from '../src/net/protocol';
 import type { ItemInstance } from '../src/sim/items';
 import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
@@ -24,6 +24,8 @@ import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 import { inTheWay, swept } from '../src/sim/build/doors';
+import { lockable, mayPass } from '../src/sim/build/locks';
+import { PRINTS, asksOf, layPrint, printCost } from '../src/sim/build/blueprints';
 
 let n = 0;
 const failed: string[] = [];
@@ -64,7 +66,7 @@ ok('costs and health by tier, as the plan says; half pieces half; a foundation\'
   assert.deepEqual([0, 1, 2, 3].map((t) => hpOf('wall', t as Tier)), [60, 500, 1000, 2000]);
   // (plan v2: 22 pieces, less the ladder that is set down, and 12 fittings: the doors, the windows' and the gates)
   const fitting = (k: string) => PIECES[k].role === 'fit' || k.startsWith('gate_');
-  assert.equal(Object.keys(PIECES).filter((k) => PIECES[k].role !== 'deploy' && !fitting(k)).length, 21);
+  assert.equal(Object.keys(PIECES).filter((k) => PIECES[k].role !== 'deploy' && PIECES[k].role !== 'lean' && !fitting(k)).length, 21);
   assert.equal(Object.keys(PIECES).filter(fitting).length, 12);
 });
 
@@ -400,6 +402,50 @@ ok('a box picked up gives back all it cost; kept with what was in its store and 
   assert.equal(again.pieces.get(box.piece.id)?.on.length, 1, 'it rests on its foundation again');
   // (and what a game is told has no store in it)
   assert.ok(!JSON.stringify(said(b)).includes('"s"'));
+});
+
+console.log('Building: locks');
+ok('a lock fits what swings shut, a box and the claim; it lets in whoever knows its code or carries its key', () => {
+  assert.deepEqual(['door_wood', 'garage_door', 'hatch', 'gate_stone', 'box_small', 'claim', 'shutters', 'wall', 'workbench'].map(lockable), [true, true, true, true, true, true, false, false, false]);
+  const code = { k: 'code' as const, on: true, who: ['me'], code: '1234' };
+  assert.ok(mayPass(code, 'me') && !mayPass(code, 'you') && mayPass({ ...code, on: false }, 'you'));
+  const key = { k: 'key' as const, on: true, who: ['me'], key: 77 };
+  assert.ok(!mayPass(key, 'you') && mayPass(key, 'you', [77]) && !mayPass(key, 'you', [78]));
+});
+
+ok("a lock's code and its keys' number are kept in the save and never told to a game", () => {
+  const { bs, b } = hut();
+  const d = at(bs, b, 'door_wood', 0, 1.2, 1.5);
+  d.lock = { k: 'code', on: true, who: ['me', 'you'], code: '0420' };
+  const told = JSON.stringify(said(b));
+  assert.ok(told.includes('"you"') && !told.includes('0420'), told);
+  const again = heard(JSON.parse(JSON.stringify(bs.keep()))[0])!;
+  assert.deepEqual(again.pieces.get(d.id)?.lock, { k: 'code', on: true, who: ['me', 'you'], code: '0420' });
+  d.lock = { k: 'key', on: false, who: ['me'], key: 991 };
+  assert.ok(!JSON.stringify(said(b)).includes('991'));
+  assert.equal(heard(JSON.parse(JSON.stringify(bs.keep()))[0])!.pieces.get(d.id)?.lock?.key, 991);
+});
+
+console.log('Building: blueprints');
+ok('every blueprint is laid whole by the rules; short of planks one lays what it can in order, and laid again finishes', () => {
+  for (const p of PRINTS) {
+    const bs = new Bases(flat), r = layPrint(bs, p.id, { x: 0, z: 0, yaw: 0.4 }, ME, 0, 'Me', () => true);
+    assert.equal(r.laid.length, asksOf(p.id).length, `${p.id}: ${r.why}`);
+    console.log(`      ${p.name}: ${r.laid.length} pieces, ${Object.entries(printCost(p.id)).map(([k, n]) => `${n} ${k}`).join(', ')}`);
+  }
+  const bs = new Bases(flat);
+  let planks = 20;
+  const pay = (c: Record<string, number>) => {
+    if ((c.planks ?? 0) > planks) return false;
+    planks -= c.planks ?? 0;
+    return true;
+  };
+  const first = layPrint(bs, 'bp:hut', { x: 0, z: 0, yaw: 0 }, ME, 0, 'Me', pay);
+  assert.ok(first.base && first.laid.length === 5 && /Short/.test(first.why ?? ''), `${first.laid.length}: ${first.why}`);
+  planks = 100;
+  const again = layPrint(bs, 'bp:hut', { b: first.base!.id, x: 0, z: 0, yaw: 0 }, ME, 0, 'Me', pay);
+  assert.deepEqual(again.laid.map((p) => p.k), ['door_wood', 'roof']);
+  assert.equal(first.base!.pieces.size, asksOf('bp:hut').length);
 });
 
 if (process.argv.includes('--server')) await serverTest();
@@ -738,6 +784,116 @@ async function serverTest() {
     them.send({ t: 'bknock', b: D.id, p: P });
     assert.ok(await me.until('knock', () => true, 3000, sinceD), 'the knock was not heard');
     console.log('  ok  a door opens and shuts for everybody near, will not shut on somebody in its swing, and a knock on it is heard');
+
+    // ---- locks: a code lock on the door; a stranger is shut out and shocked by a wrong code, let in by the right one
+    const lockIt = await me.give('code_lock');
+    const sinceL = me.got.length;
+    me.send({ t: 'block', b: D.id, p: P, u: lockIt.uid, code: '0420' });
+    const locked = await me.until('bpc', (m) => m.b === D.id && m.p[0] === P && !!(m.p[9] as { l?: unknown } | undefined)?.l, 3000, sinceL);
+    assert.ok(locked, `no lock: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    assert.ok(!JSON.stringify(locked).includes('0420'), 'the code was told');
+    await stand(them, 2.2, 3.4);
+    // (a door swung a moment ago is not swung again at once: DOOR.again)
+    await sleep(500);
+    const sinceT = them.got.length;
+    them.send({ t: 'bdoor', b: D.id, p: P, open: true });
+    assert.ok(await them.until('tell', (m) => /locked/.test(m.text), 3000, sinceT), `a stranger opened a locked door: ${JSON.stringify(them.got.slice(sinceT).filter((m) => m.t === 'tell' || m.t === 'bdoor'))}`);
+    them.send({ t: 'bcode', b: D.id, p: P, code: '1111' });
+    assert.ok(await them.until('dmg', (m) => m.w === 'shock' && m.amount === 10, 3000, sinceT), 'a wrong code did not shock');
+    them.send({ t: 'bcode', b: D.id, p: P, code: '0420' });
+    assert.ok(await them.until('tell', (m) => /code is right/.test(m.text), 3000, sinceT), 'the right code was not taken');
+    await sleep(500);
+    them.send({ t: 'bdoor', b: D.id, p: P, open: true });
+    assert.ok(await them.until('bdoor', (m) => m.b === D.id && m.p === P && m.o === 1, 3000, sinceT), 'the right code did not let them in');
+    // (three wrong codes from somebody else again: shut out a minute)
+    me.send({ t: 'bcode', b: D.id, p: P, code: '0420', set: true });
+    await sleep(400);
+    for (const c of ['1', '2', '3']) them.send({ t: 'bcode', b: D.id, p: P, code: c.repeat(4) });
+    assert.ok(await them.until('tell', (m) => /take none for 60 s/.test(m.text), 3000, sinceT), 'three wrong codes did not shut them out');
+    console.log('  ok  a code lock: a stranger is shut out, shocked by a wrong code, let in by the right one; three wrong shut them out a minute');
+    // a key lock on a box: its key given to whoever fitted it; the box opens for them and not for the stranger
+    await me.give('planks', 12);
+    await me.give('nails', 8);
+    const bx = deployAt(D, 'box_small', { x: -0.5, y: 0, z: -0.5 })!;
+    me.send({ t: 'blay', k: 'box_small', b: D.id, x: bx.x, y: bx.y, z: bx.z, r: 0, u: plan3.uid });
+    const boxPc = await me.until('bpc', (m) => m.b === D.id && PIECES[PIECE_IDS[m.p[1]]]?.store !== undefined, 3000, sinceL);
+    assert.ok(boxPc, `no box: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    await stand(me, -0.5, 1.2);
+    await stand(them, 0.5, 0.8);
+    const keyLock = await me.give('key_lock');
+    const sinceK = me.got.length;
+    me.send({ t: 'block', b: D.id, p: boxPc!.p[0], u: keyLock.uid });
+    const keyKit = await me.until('kit', (m) => m.items.some((i) => i.id === 'key'), 3000, sinceK);
+    assert.ok(keyKit && keyKit.items[0].key! > 0, `no key: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    me.pockets.push(...keyKit!.items);
+    me.me();
+    const boxCid = `bbox:${D.id}:${boxPc!.p[0]}`;
+    them.send({ t: 'copen', cid: boxCid });
+    assert.ok(await them.until('tell', (m) => /locked/.test(m.text), 3000, sinceT), 'the stranger opened a locked box');
+    me.send({ t: 'copen', cid: boxCid });
+    assert.ok(await me.until('cdata', (m) => m.cid === boxCid, 3000, sinceK), 'the box did not open for its owner');
+    console.log('  ok  a key lock on a box: its key given to whoever fitted it; the box opens for them and not for a stranger');
+
+    // ---- a sleeping bag: laid only in a base whose claim one is on; woken at after a death, and not again so soon
+    const bag = await me.give('sleeping_bag');
+    // (a foundation of its own beside the hut: the hut's floor has its box and its door's swing)
+    await me.give('planks', 4);
+    await me.give('log', 2);
+    const sinceB = me.got.length;
+    const gIn = new Bases(land).groundIn(D);
+    const fs = [[-3, 0], [0, -3], [3, 0], [0, 3]].map(([x, z]) => nearestSpot(spots(D, 'foundation'), 'foundation', { x, y: 0, z }, 1)).find((sp) => sp && !blocked(D, 'foundation', sp, gIn))!;
+    me.send({ t: 'blay', k: 'foundation', b: D.id, ...fs, u: plan3.uid });
+    const f2 = await me.until('bpc', (m) => m.b === D.id && PIECE_IDS[m.p[1]] === 'foundation', 3000, sinceB);
+    assert.ok(f2, `no second foundation: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const f2p = heardPiece(f2!.p)!;
+    D.pieces.set(f2p.id, f2p);
+    const bs1 = deployAt(D, 'bedroll', { x: fs.x, y: 0, z: fs.z })!;
+    me.send({ t: 'blay', k: 'bedroll', b: D.id, x: bs1.x, y: bs1.y, z: bs1.z, r: 0, u: plan3.uid });
+    assert.ok(await me.until('tell', (m) => /claim you are on/.test(m.text), 3000, sinceB), 'a bed laid with no claim');
+    await me.give('log', 1);
+    await me.give('planks', 10);
+    await me.give('nails', 10);
+    const cl2 = deployAt(D, 'claim', { x: 0.5, y: 0, z: 0.5 })!;
+    me.send({ t: 'blay', k: 'claim', b: D.id, x: cl2.x, y: cl2.y, z: cl2.z, r: 0, u: plan3.uid });
+    assert.ok(await me.until('bclaim', (m) => m.b === D.id && !!m.c, 3000, sinceB), `no claim for the bed: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    const bs2 = bs1;
+    me.send({ t: 'blay', k: 'bedroll', b: D.id, x: bs2.x, y: bs2.y, z: bs2.z, r: 0, u: plan3.uid });
+    const bagPc = await me.until('bpc', (m) => m.b === D.id && PIECE_IDS[m.p[1]] === 'bedroll', 3000, sinceB);
+    assert.ok(bagPc, `no sleeping bag: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    assert.ok(me.of('spent').some((m) => m.items.some(([id]) => id === 'sleeping_bag')), 'the bag was not spent');
+    void bag;
+    me.send({ t: 'mybeds' });
+    const beds = await me.until('beds', (m) => m.list.length > 0, 3000, sinceB);
+    assert.ok(beds && beds.list[0][2] === 'bedroll' && beds.list[0][5] === 0, `beds: ${JSON.stringify(beds)}`);
+    // (dead by its own game's word, and back at the bag, on it)
+    me.send({ t: 's', p: [me.pos[0], me.pos[1], me.pos[2], 0, 0, F_DEAD], w: null, m: [] });
+    await sleep(200);
+    me.send({ t: 'respawn', bed: { b: D.id, p: bagPc!.p[0] } });
+    const woke = await me.until('spawn', () => true, 3000, sinceB);
+    assert.ok(woke && Math.hypot(woke.x - (D.ox + bagPc!.p[3] / 100), woke.z - (D.oz + bagPc!.p[5] / 100)) < 0.5 && Math.abs((woke.y ?? 0) - (D.oy + 0.15)) < 0.05, `woke at ${JSON.stringify(woke)}`);
+    me.send({ t: 's', p: [woke!.x, woke!.y!, woke!.z, 0, 0, F_DEAD], w: null, m: [] });
+    await sleep(200);
+    me.send({ t: 'respawn', bed: { b: D.id, p: bagPc!.p[0] } });
+    assert.ok(await me.until('tell', (m) => /not ready/.test(m.text), 3000, sinceB), 'woken at the bag again at once');
+    me.send({ t: 'respawn' });
+    assert.ok(await me.until('spawn', (m) => m !== woke, 3000, sinceB), 'not back at the edge');
+    console.log('  ok  a sleeping bag goes only in a base whose claim one is on; its owner wakes on it after a death, and not again for ten minutes');
+
+    // ---- a blueprint: the hut laid whole by one word, out of the pockets
+    for (const [id, n] of [['planks', 20], ['planks', 20], ['log', 2], ['nails', 10]] as const) await me.give(id, n);
+    let hutAt: [number, number] | null = null;
+    for (let r = 0; r < 600 && !hutAt; r += 23) for (let q = 0; q < 6.28 && !hutAt; q += 0.7) {
+      const x = sx - 150 + Math.cos(q) * r, z = sz + Math.sin(q) * r;
+      if (typeof new Bases(land).lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, ME, 0) !== 'string') hutAt = [x, z];
+    }
+    assert.ok(hutAt, 'no place for the hut');
+    await me.go(hutAt![0], hutAt![1] + 6);
+    const sinceP = me.got.length;
+    me.send({ t: 'bprint', id: 'bp:hut', x: hutAt![0], z: hutAt![1], yaw: 0, u: plan3.uid });
+    const hutBase = await me.until('base', (m) => Math.hypot(m.b[1] - hutAt![0], m.b[3] - hutAt![1]) < 1, 5000, sinceP);
+    assert.ok(hutBase && hutBase.b[7].length === 7, `the hut: ${JSON.stringify(hutBase?.b[7].length)} ${JSON.stringify(me.of('tell').slice(-2))}`);
+    assert.ok(me.of('spent').slice(-12).some((m) => m.items.some(([id]) => id === 'log')), 'the hut was not paid for');
+    console.log('  ok  a blueprint: the 1x1 hut laid whole, frames and its door, paid for out of the pockets');
   } catch (e) {
     fail = e;
   } finally {

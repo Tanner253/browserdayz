@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
 import { shutOf, type Solid } from '../../sim/build/solids';
+import { FOUND, PIECES } from '../../sim/build/pieces';
 
 const YAW = 0.55, PITCH = 0.5;
 const V = new THREE.Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
@@ -38,9 +39,31 @@ function facesOf(s: Solid): Face[] {
 
 const shade = (hex: string, k: number) => `rgb(${[1, 3, 5].map((i) => Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16) * k))).join(',')})`;
 
+/** a piece's solids as it is pictured: a foundation as its slab (what reaches into the ground is not what it is to a player choosing it) */
+const pictured = (kind: string) => (PIECES[kind]?.ground ? shutOf(kind).map((q) => ('box' in q ? { ...q, box: [q.box[0], -FOUND.deep / 2, q.box[2], q.box[3], FOUND.deep, q.box[5]] as typeof q.box } : 'prism' in q ? { ...q, y0: -FOUND.deep } : q)) : shutOf(kind));
+
 /** a piece drawn as an SVG picture (a data URL), in the colour of a tier */
-export function pieceIcon(kind: string, ink = TIER_INK[1]): string {
-  const solids = shutOf(kind);
+export const pieceIcon = (kind: string, ink = TIER_INK[1]) => drawn(pictured(kind), ink);
+
+/** a blueprint drawn whole: each of its pieces where it goes, turned as it goes (src/sim/build/blueprints.ts) */
+export function printIcon(asks: { k: string; x: number; y: number; z: number; r: number }[], ink = TIER_INK[0]): string {
+  const corners = (q: Solid): [number, number, number][] => {
+    if ('box' in q) {
+      const [cx, cy, cz, sx, sy, sz] = q.box, out: [number, number, number][] = [];
+      for (const a of [-0.5, 0.5]) for (const b of [-0.5, 0.5]) for (const c of [-0.5, 0.5]) out.push([cx + a * sx, cy + b * sy, cz + c * sz]);
+      return out;
+    }
+    if ('prism' in q) return q.prism.flatMap(([x, z]) => [[x, q.y0, z], [x, q.y1, z]] as [number, number, number][]);
+    return q.hull;
+  };
+  const solids: Solid[] = asks.flatMap((a) => {
+    const t = (a.r * Math.PI) / 6, c = Math.cos(t), s = Math.sin(t);
+    return pictured(a.k).map((q) => ({ hull: corners(q).map(([x, y, z]) => [a.x + x * c + z * s, a.y + y, a.z - x * s + z * c] as [number, number, number]) }));
+  });
+  return drawn(solids, ink);
+}
+
+function drawn(solids: Solid[], ink: string): string {
   const cy = Math.cos(YAW), sy = Math.sin(YAW), cp = Math.cos(PITCH), sp = Math.sin(PITCH);
   const P = (p: THREE.Vector3) => [(p.x * cy - p.z * sy) * 20, ((p.x * sy + p.z * cy) * sp - p.y * cp) * 20];
   const drawn: { d: number; pts: number[][]; k: number }[] = [];
@@ -65,8 +88,9 @@ export function pieceIcon(kind: string, ink = TIER_INK[1]): string {
 }
 
 /** what the hammer's wheel shows for each thing it does */
-export function actionIcon(what: 'up' | 'remove' | 'rotate' | 'repair' | 'cancel', ink = '#e9e4d8'): string {
+export function actionIcon(what: 'up' | 'remove' | 'rotate' | 'repair' | 'cancel' | 'lock', ink = '#e9e4d8'): string {
   const path = {
+    lock: `<rect x="8" y="14" width="16" height="13" rx="2" fill="${ink}"/><path d="M11 14 V10 A5 5 0 0 1 21 10 V14" fill="none" stroke="${ink}" stroke-width="3"/>`,
     up: `<path d="M16 4 L28 18 L20 18 L20 28 L12 28 L12 18 L4 18 Z" fill="${ink}" stroke="#0b0d0b" stroke-width="1.2"/>`,
     remove: `<path d="M7 7 L25 25 M25 7 L7 25" stroke="${ink}" stroke-width="5" stroke-linecap="round"/>`,
     rotate: `<path d="M24 16 A8 8 0 1 1 16 8" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/><path d="M14 2 L21 8 L14 13 Z" fill="${ink}"/>`,

@@ -26,7 +26,8 @@ export const bracket = (n: number) => (n < 15 ? 0.1 : n < 50 ? 0.15 : n < 100 ? 
 /** what a base costs a day to keep (its claim is free, and so are a foundation's logs) */
 export function perDay(base: Base): Record<string, number> {
   const out: Record<string, number> = {};
-  const list = [...base.pieces.values()].filter((p) => PIECES[p.k].role !== 'deploy').sort((a, b) => a.id - b.id);
+  // (nor what is set down, nor a ladder, which may be anybody's leant on it)
+  const list = [...base.pieces.values()].filter((p) => PIECES[p.k].role !== 'deploy' && PIECES[p.k].role !== 'lean').sort((a, b) => a.id - b.id);
   list.forEach((p, i) => {
     for (const [id, n] of Object.entries(costOf(p.k, p.t))) {
       if (!UPKEEP.has(id)) continue;

@@ -351,6 +351,8 @@ export class ItemModels {
       const mesh = new THREE.Mesh(p.geometry, p.material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      // (its part's name kept: a torch's head is where its flame burns, src/game/weapons.ts heldTip)
+      if (p.name === 'head') mesh.name = p.name;
       this.atmo.register(p.material);
       group.add(mesh);
     }

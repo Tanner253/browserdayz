@@ -70,7 +70,7 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (64, 2026-10-24: the hands' slot, the fixes path's release.)
 // (65, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
-// 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock').)
+// 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint').)
 export const PROTOCOL = 65;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -275,7 +275,10 @@ export type C2S =
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'me'; inv: SerializedInventory; vitals: Vitals; /** the last 'spent' this game has taken out of its pockets */ sp?: number }
   | { t: 'died'; cause: string; v?: number }
-  | { t: 'respawn' }
+  /** back after a death: at the map's edge, or at a bed of one's own (server/beds.ts) */
+  | { t: 'respawn'; bed?: { b: number; p: number } }
+  /** one's beds, asked for on the death screen */
+  | { t: 'mybeds' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
   | { t: 'admin'; pw: string }
@@ -344,6 +347,15 @@ export type C2S =
   /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
   | { t: 'bdoor'; b: number; p: number; open: boolean }
   | { t: 'bknock'; b: number; p: number }
+  /** a lock (item `u`) fitted to a piece, on a code for a code lock; a code entered at one (`set`: a new code, by one who may);
+   * a lock locked or unlocked; a key cut at a key lock; a lock taken off with the hammer `u` */
+  | { t: 'block'; b: number; p: number; u: string; code?: string }
+  | { t: 'bcode'; b: number; p: number; code: string; set?: boolean }
+  | { t: 'blockon'; b: number; p: number; on: boolean }
+  | { t: 'bkey'; b: number; p: number }
+  | { t: 'bunlock'; b: number; p: number; u: string }
+  /** a blueprint laid with the plan `u` (src/sim/build/blueprints.ts): begun on the ground, or carried on with on base `b` */
+  | { t: 'bprint'; id: string; b?: number; x: number; z: number; yaw: number; u: string }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -499,7 +511,9 @@ export type S2C =
   /** a body that rode down in a helicopter, laid on the ground beside it now that it is down: there to be searched */
   | { t: 'corpse@'; corpse: CorpseInfo }
   | { t: 'door'; i: number; open: boolean; swing: number }
-  | { t: 'spawn'; x: number; z: number; yaw: number }
+  | { t: 'spawn'; x: number; z: number; yaw: number; /** at a bed: how high (none: on the ground) */ y?: number }
+  /** one's beds: [base, piece, kind, x, z, seconds until it may be woken at] */
+  | { t: 'beds'; list: [number, number, string, number, number, number][] }
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }

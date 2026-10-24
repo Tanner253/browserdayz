@@ -5,6 +5,7 @@
 import { BENCH_NEAR, FOUND, PIECES, PIECE_IDS, costOf, hpOf, laidAt, type Tier } from './pieces';
 import { blocked, cornersOf, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
 import { ROT } from './upkeep';
+import { heardLock, saidLock, type KeptLock } from './locks';
 
 export const LIMITS = {
   /** pieces a base holds (the owner's yes to "150 pieces a claim"), and the server holds in all */
@@ -114,8 +115,9 @@ export class Bases {
     if (no) return no;
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
-    if (theirs && !theirs.claim!.members.some((m) => m.pid === by)) return "Building blocked: someone else's claim";
+    if (theirs && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";
     if (K.bench && !this.benchNear(wx, wz)) return `It needs a workbench within ${BENCH_NEAR} m`;
+    if (K.sleep && !base.claim?.members.some((m) => m.pid === by)) return 'A bed goes only in a base whose claim you are on';
     if (ask.k === 'claim') {
       if (base.claim) return 'This base has its claim already';
       if ([...this.bases.values()].filter((b) => b.claim?.members[0]?.pid === by).length >= LIMITS.claims) return 'You hold a claim already: one a player';
@@ -244,7 +246,7 @@ export class Bases {
 
   /** every base, as short as it can be said, with what is in each claim's store (`stock`) and each box's (`held`): what the save keeps */
   keep(stock?: (b: Base) => unknown[], held?: (b: Base, p: Piece) => unknown[] | undefined): KeptBase[] {
-    return [...this.bases.values()].map((b) => said(b, stock?.(b), held));
+    return [...this.bases.values()].map((b) => said(b, stock?.(b), held, true));
   }
 
   /** read back (the save's, or what the server says): every piece's rests worked out again from where it stands */
@@ -264,15 +266,18 @@ export type KeptBase = [number, number, number, number, number, string, number, 
 export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, unknown[]?];
 /** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s), and what more there is of it] */
 export type KeptPiece = [number, number, number, number, number, number, number, number, number, KeptMore?];
-/** what more there is of a piece: `o` it stands open; `s` what is in its store (the save's only, never a game's) */
+/** what more there is of a piece: `o` it stands open; `s` what is in its store (the save's only, never a game's); `l` its lock; `w` whose bed it is */
 export interface KeptMore {
   o?: 1;
   s?: unknown[];
+  l?: KeptLock;
+  w?: string;
 }
 
 const cm = (v: number) => Math.round(v * 100);
-export function said(b: Base, stock?: unknown[], held?: (b: Base, p: Piece) => unknown[] | undefined): KeptBase {
-  const k: KeptBase = [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map((p) => saidPiece(p, held?.(b, p)))];
+/** a base said short: for a game, or with `secret` for the save (its locks' codes and keys) */
+export function said(b: Base, stock?: unknown[], held?: (b: Base, p: Piece) => unknown[] | undefined, secret = false): KeptBase {
+  const k: KeptBase = [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map((p) => saidPiece(p, held?.(b, p), secret))];
   if (b.claim) k.push(saidClaim(b.claim, stock));
   return k;
 }
@@ -284,9 +289,10 @@ export function heardClaim(k: unknown): Claim | undefined {
   for (const [id, n] of Object.entries((k[2] ?? {}) as Record<string, unknown>)) if (Number.isFinite(n)) due[id] = Number(n);
   return { p: k[0] as number, members, due, dry: !!k[3], ...(Array.isArray(k[4]) ? { kept: k[4] as unknown[] } : {}) };
 }
-export function saidPiece(p: Piece, store?: unknown[]): KeptPiece {
+export function saidPiece(p: Piece, store?: unknown[], secret = false): KeptPiece {
   const k: KeptPiece = [p.id, PIECE_IDS.indexOf(p.k), p.t, cm(p.x), cm(p.y), cm(p.z), p.r, Math.round(p.hp), Math.round(p.at / 1000)];
-  if (p.open || store?.length) k.push({ ...(p.open ? { o: 1 as const } : {}), ...(store?.length ? { s: store } : {}) });
+  const bed = !!PIECES[p.k].sleep;
+  if (p.open || store?.length || p.lock || bed) k.push({ ...(p.open ? { o: 1 as const } : {}), ...(store?.length ? { s: store } : {}), ...(p.lock ? { l: saidLock(p.lock, secret) } : {}), ...(bed ? { w: p.by } : {}) });
   return k;
 }
 
@@ -317,6 +323,9 @@ export function heardPiece(q: KeptPiece, by = ''): Piece | null {
   if (more && typeof more === 'object') {
     if (more.o === 1) p.open = true;
     if (Array.isArray(more.s)) p.kept = more.s;
+    const l = heardLock(more.l);
+    if (l) p.lock = l;
+    if (typeof more.w === 'string') p.by = more.w;
   }
   return p;
 }

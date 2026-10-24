@@ -713,6 +713,23 @@ export class Game {
         this.toggleInventory(true);
       },
       name: () => playerName(),
+      keys: () => [...this.inv.everything().values()].filter((it) => it.id === 'key' && it.key).map((it) => it.key!),
+      panel: (open) => {
+        // (as the shop's: the mouse let go while it is up, taken again when it is put away)
+        this.input.releaseAll();
+        this.input.uiMode = open;
+        if (open) this.input.unlock();
+        else if (this.started && !this.paused) this.input.lock();
+      },
+      hurt: (n) => {
+        this.player.damage(n, 'a code lock');
+        this.weapons.flinch(1);
+      },
+      wake: (x, y, z, yaw) => this.respawn({ x, y, z, yaw }),
+      climber: () => this.player,
+      flames: () => this.effects.fire,
+      glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
+      tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
     });
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);

@@ -318,7 +318,58 @@ function sheetGeometry() {
   return g;
 }
 
+let brass: THREE.MeshStandardMaterial | null = null, keypadBody: THREE.MeshStandardMaterial | null = null, keypadFace: THREE.MeshStandardMaterial | null = null;
+/** the locks and the key (2026-10-24, base building): stand-ins until models of them are downloaded, lying flat */
+function lockParts(model: string): MeshPart[] {
+  brass ??= new THREE.MeshStandardMaterial({ color: 0xb8913f, metalness: 0.85, roughness: 0.35, name: 'brass' });
+  if (model === '@codelock') {
+    keypadBody ??= new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: 0.6, name: 'keypad-body' });
+    keypadFace ??= new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.45, metalness: 0.3, name: 'keypad-face' });
+    // (a body, a keypad of twelve keys on top, and the lamp over them)
+    const keys = mergeGeometries(Array.from({ length: 12 }, (_, i) => new THREE.BoxGeometry(0.014, 0.004, 0.012).translate(-0.018 + (i % 3) * 0.018, 0.037, -0.022 + Math.floor(i / 3) * 0.016)), false)!;
+    return [
+      { name: 'lock', geometry: new THREE.BoxGeometry(0.08, 0.035, 0.12).translate(0, 0.0175, 0), material: keypadBody },
+      { name: 'keys', geometry: keys, material: keypadFace },
+      { name: 'lamp', geometry: new THREE.BoxGeometry(0.01, 0.004, 0.006).translate(0, 0.037, -0.045), material: brass },
+    ];
+  }
+  if (model === '@keylock') {
+    // (a padlock: its body, and its shackle lying out from it)
+    const shackle = new THREE.TorusGeometry(0.022, 0.005, 6, 14, Math.PI).rotateX(-Math.PI / 2).translate(0, 0.0125, -0.035);
+    return [{ name: 'lock', geometry: mergeGeometries([new THREE.BoxGeometry(0.06, 0.025, 0.07).translate(0, 0.0125, 0), shackle], false)!, material: brass }];
+  }
+  // (a key: its bow and its blade, with its bits)
+  const bow = new THREE.TorusGeometry(0.012, 0.0035, 6, 14).rotateX(-Math.PI / 2).translate(-0.03, 0.0035, 0);
+  const blade = new THREE.BoxGeometry(0.045, 0.003, 0.008).translate(0.004, 0.0035, 0);
+  const bits = new THREE.BoxGeometry(0.014, 0.003, 0.007).translate(0.018, 0.0035, 0.007);
+  return [{ name: 'key', geometry: mergeGeometries([bow, blade, bits], false)!, material: brass }];
+}
+
+let bagCloth: THREE.MeshStandardMaterial | null = null;
+/** a rolled sleeping bag tied with two straps: a stand-in until a model of one is downloaded */
+function bagParts(): MeshPart[] {
+  bagCloth ??= new THREE.MeshStandardMaterial({ color: 0x5a6440, roughness: 0.95, name: 'sleeping-bag' });
+  brass ??= new THREE.MeshStandardMaterial({ color: 0xb8913f, metalness: 0.85, roughness: 0.35, name: 'brass' });
+  const roll = new THREE.CylinderGeometry(0.13, 0.13, 0.55, 16).rotateZ(Math.PI / 2).translate(0.275, 0.13, 0);
+  const straps = mergeGeometries([-0.15, 0.15].map((x) => new THREE.TorusGeometry(0.133, 0.008, 4, 18).rotateY(Math.PI / 2).translate(0.275 + x, 0.13, 0)), false)!;
+  return [{ name: 'bag', geometry: roll, material: bagCloth }, { name: 'straps', geometry: straps, material: brass }];
+}
+
+let torchStick: THREE.MeshStandardMaterial | null = null, torchHead: THREE.MeshStandardMaterial | null = null;
+/** a torch: a stick, and its head wrapped in a dark rag (a stand-in until a model of one is downloaded) */
+function torchParts(): MeshPart[] {
+  torchStick ??= new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.9, name: 'torch-stick' });
+  torchHead ??= new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 1, name: 'torch-head' });
+  return [
+    { name: 'stick', geometry: new THREE.CylinderGeometry(0.016, 0.02, 0.5, 8).rotateZ(Math.PI / 2).translate(0.25, 0.02, 0), material: torchStick },
+    { name: 'head', geometry: new THREE.CylinderGeometry(0.035, 0.03, 0.14, 10).rotateZ(Math.PI / 2).translate(0.47, 0.035, 0), material: torchHead },
+  ];
+}
+
 export function proceduralParts(model: string): MeshPart[] {
+  if (model === '@torch') return torchParts();
+  if (model === '@bag') return bagParts();
+  if (model === '@codelock' || model === '@keylock' || model === '@key') return lockParts(model);
   if (model === '@log') return logParts();
   if (model === '@plan') {
     // (a roll of blueprint paper, tied: a stand-in until a model of one is downloaded)

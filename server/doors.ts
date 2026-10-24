@@ -9,6 +9,7 @@ import { PIECES } from '../src/sim/build/pieces';
 import type { C2S } from '../src/net/protocol';
 import { broadcastNear, clients, send, type Client } from './players';
 import { bases, known, tellBase } from './build';
+import { passes } from './locks';
 
 /** when each door last swung, ms (`${base}:${piece}`) */
 const swung = new Map<string, number>();
@@ -30,6 +31,7 @@ export function swing(c: Client, m: Extract<C2S, { t: 'bdoor' }>) {
   if (!d || !!m.open === !!d.piece.open) return;
   const key = `${m.b}:${m.p}`, now = Date.now();
   if (now - (swung.get(key) ?? 0) < DOOR.again) return;
+  if (!passes(c, d.piece)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is locked' });
   // (nobody in its way: whoever stands where it swings, the one opening it too)
   const feet = [...clients.values()].filter((o) => o.alive && Math.hypot(o.pose[0] - d.x, o.pose[2] - d.z) < 8).map((o) => {
     const [x, y, z] = toLocal(d.base, o.pose[0], o.pose[1], o.pose[2]);

@@ -14,7 +14,7 @@ import { shapeOf, shutOf, type Paint, type Solid } from '../../sim/build/solids'
 import { leafPoint } from '../../sim/build/doors';
 
 /** metres of a piece to one picture of each paint */
-const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1 };
+const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1 };
 
 /** a box with its pictures laid on in metres (each face by its own two ways) */
 function boxGeo(c: [number, number, number, number, number, number], tile: number): THREE.BufferGeometry {
@@ -155,6 +155,20 @@ export function ghostGeometry(kind: string): THREE.BufferGeometry {
 }
 
 
+/** a lock as it is seen fitted (src/sim/build/locks.ts), facing +z: a code lock's keypad, a key lock's brass padlock */
+export function lockGeometry(k: string): THREE.BufferGeometry {
+  const key = `lock:${k}`;
+  let g = geos.get(key);
+  if (!g) {
+    const b = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, c: number): Solid => ({ box: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, x1 - x0, y1 - y0, z1 - z0], c });
+    const parts = k === 'code'
+      ? [b(-0.04, -0.06, 0, 0.04, 0.06, 0.035, 0x2a2d31), b(-0.03, -0.045, 0.035, 0.03, 0.03, 0.041, 0x9aa0a6), b(-0.008, 0.038, 0.035, 0.008, 0.048, 0.041, 0xd04030)]
+      : [b(-0.03, -0.035, 0, 0.03, 0.025, 0.026, 0xb8913f), b(-0.024, 0.025, 0.008, -0.016, 0.06, 0.018, 0xa8a8a0), b(0.016, 0.025, 0.008, 0.024, 0.06, 0.018, 0xa8a8a0), b(-0.024, 0.052, 0.008, 0.024, 0.06, 0.018, 0xa8a8a0)];
+    geos.set(key, (g = merged(parts, 1)));
+  }
+  return g;
+}
+
 /** a frame's lattice: timber round the edge of every 3 m and across it corner to corner, open between */
 function lattice(): THREE.Texture {
   const c = document.createElement('canvas');
@@ -215,6 +229,7 @@ export function paintFor(p: Paint, atmo: Atmosphere | null): THREE.MeshStandardM
       : p === 'steel' ? new THREE.MeshStandardMaterial({ color: 0x56605a, metalness: 0.6, roughness: 0.5, vertexColors: true, name: 'build-steel' })
       : p === 'galv' ? pbr('corrugated_iron', { metalnessMap: assets.pbr('corrugated_iron').armMap, metalness: 1, vertexColors: true, name: 'build-galv' })
       : p === 'trim' ? pbr('wood_floor_worn', { color: 0x76695e, vertexColors: true, name: 'build-trim' })
+      : p === 'bag' ? new THREE.MeshStandardMaterial({ color: 0x5a6440, roughness: 0.95, vertexColors: true, name: 'build-bag' })
       : new THREE.MeshStandardMaterial({ color: 0xa8322a, roughness: 0.95, side: THREE.DoubleSide, name: 'build-flag' });
     if (atmo) atmo.register(m);
     own.set(p, m);

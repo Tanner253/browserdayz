@@ -10,8 +10,10 @@
 //
 // Directions: an angle a is the way (sin a, cos a) on the ground (x, z), as three.js's rotation.y turns +z.
 
-import { CELL, FOUND, PIECES, STOREY, type Hole, type PieceKind, type Shape, type Tier } from './pieces';
+import { CELL, FOUND, PIECES, STOREY, WALL_T, type Hole, type PieceKind, type Shape, type Tier } from './pieces';
 import { swept, swings } from './doors';
+import { shapeOf } from './solids';
+import type { Lock } from './locks';
 
 export interface Piece {
   id: number;
@@ -34,6 +36,8 @@ export interface Piece {
   open?: boolean;
   /** a box: what was in its store when it was kept (read back by whoever keeps the store: the server's boxes) */
   kept?: unknown[];
+  /** a lock fitted to it (src/sim/build/locks.ts) */
+  lock?: Lock;
 }
 
 export interface Base {
@@ -221,6 +225,18 @@ export function spots(base: Base, kind: string, turn = 0): Spot[] {
       if (W.hole !== K.fits || (K.fits === 'hatch' && W.shape !== 'sq')) continue;
       add({ x: w.x, y: w.y, z: w.z, r: K.fits === 'hatch' ? mod12(w.r + 3 * (turn % 4)) : mod12(w.r + (turn % 2) * 6), on: [] });
     }
+  } else if (K.role === 'lean') {
+    // against either face of a wall a storey high, or a high wall (two to its height); on top of another ladder
+    for (const w of all) {
+      const W = kindOf(w);
+      if (!(bears(w) || (W.role === 'free' && !W.id.startsWith('gate_')))) continue;
+      const half = W.role === 'free' ? (W.id === 'high_wall_stone' ? 0.4 : 0.25) : WALL_T / 2;
+      for (const side of [0, 6]) {
+        const n = mod12(w.r + side), d = half + 0.12;
+        add({ x: r3(w.x + sin(n) * d), y: w.y, z: r3(w.z + cos(n) * d), r: n, on: [] });
+      }
+    }
+    if (kind === 'ladder') for (const l of all) if (l.k === 'ladder') add({ x: l.x, y: r3(l.y + STOREY), z: l.z, r: l.r, on: [] });
   } else if (K.role === 'free') {
     // end to end with another high wall or gate, along its line (either way)
     for (const w of all) {
@@ -246,13 +262,40 @@ function within(poly: [number, number][], x: number, z: number) {
   return true;
 }
 
-/** the floor a thing set down at a place would stand on: a foundation's or a floor's top, its foot wholly on it */
-function floorUnder(base: Base, kind: string, x: number, y: number, z: number): Piece | null {
-  const foot = PIECES[kind].foot ?? 0.5;
+/** a thing set down: half its size across and deep, from its own solids (the oblong it stands on) */
+const feet = new Map<string, [number, number]>();
+function halfOf(kind: string): [number, number] {
+  let h = feet.get(kind);
+  if (!h) {
+    const s = shapeOf(kind);
+    let hx = 0.1, hz = 0.1;
+    // (what stands on the floor: not what is held up over it, as the claim's flag is)
+    const low = (q: (typeof s.solid)[number]) => ('box' in q ? q.box[1] - q.box[4] / 2 : 'prism' in q ? q.y0 : Math.min(...q.hull.map((h) => h[1]))) < 0.9;
+    for (const q of [...s.solid, ...(s.dress ?? []), ...(s.cloth?.solid ?? [])].filter(low)) {
+      const pts: [number, number][] = 'box' in q ? [[Math.abs(q.box[0]) + q.box[3] / 2, Math.abs(q.box[2]) + q.box[5] / 2]] : 'prism' in q ? q.prism.map(([x, z]) => [Math.abs(x), Math.abs(z)]) : q.hull.map(([x, , z]) => [Math.abs(x), Math.abs(z)]);
+      for (const [x, z] of pts) {
+        hx = Math.max(hx, x);
+        hz = Math.max(hz, z);
+      }
+    }
+    feet.set(kind, (h = [hx, hz]));
+  }
+  return h;
+}
+/** the oblong a thing set down stands on, at (x, z) turned `r`, grown by `grow` */
+export function footOf(kind: string, x: number, z: number, r: number, grow = 0): [number, number][] {
+  const [hx, hz] = halfOf(kind), c = cos(r), s = sin(r);
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + a * (hx + grow) * c + b * (hz + grow) * s, z - a * (hx + grow) * s + b * (hz + grow) * c]);
+}
+
+/** the floor a thing set down at a place would stand on: a foundation's or a floor's top, the whole of its oblong on it */
+function floorUnder(base: Base, kind: string, x: number, y: number, z: number, r: number): Piece | null {
+  const foot = footOf(kind, x, z, r);
   for (const p of base.pieces.values()) {
     const P = kindOf(p);
     if (!isFloor(p) || P.roof || Math.abs(p.y - y) > 0.7) continue;
-    if (within(cornersOf(P.shape!, p.x, p.z, p.r, foot), x, z)) return p;
+    const under = cornersOf(P.shape!, p.x, p.z, p.r, 0.03);
+    if (foot.every(([fx, fz]) => within(under, fx, fz))) return p;
   }
   return null;
 }
@@ -262,9 +305,9 @@ function floorUnder(base: Base, kind: string, x: number, y: number, z: number): 
  * to a quarter of a metre, turned as the player turns it. Null: no floor there for it.
  */
 export function deployAt(base: Base, kind: string, aim: { x: number; y: number; z: number }, turn = 0): Spot | null {
-  const x = Math.round(aim.x * 4) / 4, z = Math.round(aim.z * 4) / 4;
-  const f = floorUnder(base, kind, x, aim.y, z);
-  return f ? { x, y: f.y, z, r: mod12(turn), on: [f.id] } : null;
+  const x = Math.round(aim.x * 4) / 4, z = Math.round(aim.z * 4) / 4, r = mod12(turn);
+  const f = floorUnder(base, kind, x, aim.y, z, r);
+  return f ? { x, y: f.y, z, r, on: [f.id] } : null;
 }
 
 /** what a piece of `kind` at `s` would rest on (an empty list: nothing, unless it is a foundation or free) */
@@ -286,8 +329,13 @@ export function restsOn(base: Base, kind: string, s: { x: number; y: number; z: 
       if (isFloor(p) && !P.roof && near(p, s)) on.push(p.id);
     } else if (K.role === 'fit') {
       if (P.hole === K.fits && near(p, s)) on.push(p.id);
+    } else if (K.role === 'lean') {
+      // (the wall behind it, or the ladder under it)
+      const bx = s.x - sin(s.r) * 0.6, bz = s.z - cos(s.r) * 0.6;
+      if ((bears(p) || P.role === 'free') && Math.abs(p.y - s.y) < SAME && Math.hypot(p.x - (s.x + bx) / 2, p.z - (s.z + bz) / 2) < 0.45 && mod12(p.r - s.r) % 6 === 0) on.push(p.id);
+      if (p.k === 'ladder' && Math.abs(p.x - s.x) < SAME && Math.abs(p.z - s.z) < SAME && Math.abs(p.y + STOREY - s.y) < SAME) on.push(p.id);
     } else if (K.role === 'deploy') {
-      if (isFloor(p) && !P.roof && Math.abs(p.y - s.y) < SAME && within(cornersOf(P.shape!, p.x, p.z, p.r, K.foot ?? 0.5), s.x, s.z)) on.push(p.id);
+      if (isFloor(p) && !P.roof && Math.abs(p.y - s.y) < SAME && footOf(kind, s.x, s.z, s.r).every(([fx, fz]) => within(cornersOf(P.shape!, p.x, p.z, p.r, 0.03), fx, fz))) on.push(p.id);
     } else if (K.role === 'steps') {
       const back = K.half ? CELL / 4 : CELL / 2;
       if (P.ground && edgesOf(P.shape!, p.x, p.y, p.z, p.r).some((e) => near(e, { x: s.x - sin(s.r) * back, y: s.y, z: s.z - cos(s.r) * back }))) on.push(p.id);
@@ -311,12 +359,13 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     if (P.role === 'stairs' && K.role === 'stairs' && near(p, s)) return 'Stairs stand there already';
     if (P.role === 'steps' && K.role === 'steps' && near(p, s)) return 'Something stands there already';
     if (P.role === 'free' && K.role === 'free' && Math.hypot(p.x - s.x, p.z - s.z) < 1 && Math.abs(p.y - s.y) < 2) return 'A wall stands there already';
-    if (K.role === 'deploy' && P.role === 'deploy' && Math.abs(p.y - s.y) < 1 && Math.hypot(p.x - s.x, p.z - s.z) < (P.foot ?? 0.5) + (K.foot ?? 0.5)) return `The ${P.name.toLowerCase()} is in the way`;
-    if (K.role === 'deploy' && P.role === 'stairs' && Math.abs(p.y - s.y) < 0.3 && within(cornersOf(P.shape!, p.x, p.z, p.r), s.x, s.z)) return 'The stairs are in the way';
+    if (K.role === 'deploy' && P.role === 'deploy' && Math.abs(p.y - s.y) < 1 && overlaps(footOf(kind, s.x, s.z, s.r), footOf(p.k, p.x, p.z, p.r))) return `The ${P.name.toLowerCase()} is in the way`;
+    if (K.role === 'deploy' && P.role === 'stairs' && Math.abs(p.y - s.y) < 0.3 && overlaps(footOf(kind, s.x, s.z, s.r), cornersOf(P.shape!, p.x, p.z, p.r))) return 'The stairs are in the way';
     if (K.role === 'fit' && P.role === 'fit' && near(p, s)) return 'Something is hung there already';
+    if (K.role === 'lean' && P.role === 'lean' && near(p, s)) return `The ${P.name.toLowerCase()} is there already`;
     // (nothing is set down where a door swings, nor a door hung to swing through what is set down: it would never move)
-    if (K.role === 'deploy' && swings(p.k) && clash(p, s, K)) return 'A door swings there';
-    if (P.role === 'deploy' && swings(kind) && clash({ ...s, k: kind }, p, P)) return `The ${P.name.toLowerCase()} is where it swings`;
+    if (K.role === 'deploy' && swings(p.k) && clash(p, { ...s, k: kind })) return 'A door swings there';
+    if (P.role === 'deploy' && swings(kind) && clash({ ...s, k: kind }, p)) return `The ${P.name.toLowerCase()} is where it swings`;
   }
   if (K.role === 'floor') {
     const mine = cornersOf(K.shape!, s.x, s.z, s.r, 0.06);
@@ -335,7 +384,7 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
   const lowest = Math.min(0, ...all.filter((p) => kindOf(p).ground).map(level));
   if (s.y - lowest > STOREYS * STOREY + (K.role === 'floor' ? 0.1 : -0.1)) return `Too high: ${STOREYS} storeys at most`;
   if (K.role !== 'floor' || !K.ground) {
-    if (K.role !== 'free' && !s.on.length) return K.role === 'wall' ? 'It needs a foundation or a floor under it' : K.role === 'floor' ? 'It needs walls to rest on' : K.role === 'deploy' ? 'It is set down on a foundation or a floor' : K.role === 'fit' ? `It is hung in ${HOLE[K.fits!]}` : 'It needs a foundation under it';
+    if (K.role !== 'free' && !s.on.length) return K.role === 'wall' ? 'It needs a foundation or a floor under it' : K.role === 'floor' ? 'It needs walls to rest on' : K.role === 'deploy' ? 'It is set down on a foundation or a floor' : K.role === 'fit' ? `It is hung in ${HOLE[K.fits!]}` : K.role === 'lean' ? 'It leans on a wall' : 'It needs a foundation under it';
     // (a floor holds on walls on two sides, or beside a floor that does: one cell past its walls, no more)
     if (K.role === 'floor' && !K.ground && !held(base, s.on)) return s.on.some((id) => isFloor(base.pieces.get(id)!)) ? 'Too far out: a floor reaches one cell past its walls' : 'It needs walls on two sides, or a floor beside it';
   }
@@ -343,7 +392,7 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     const pts = K.ground ? [...cornersOf(K.shape!, s.x, s.z, s.r), [s.x, s.z] as [number, number]] : [[s.x, s.z] as [number, number]];
     const hs = pts.map(([x, z]) => ground(x, z));
     if (K.ground && Math.max(...hs) > s.y + 0.05) return 'The ground is in the way';
-    if (K.ground && Math.min(...hs) < s.y - FOUND.posts - FOUND.deep) return 'Too high off the ground';
+    if (K.ground && Math.min(...hs) < s.y - FOUND.skirt - FOUND.deep) return 'Too high off the ground';
   }
   return null;
 }
@@ -351,11 +400,11 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
 /** what each opening is called, as a player is told where a fitting goes */
 const HOLE: Record<Hole, string> = { door: 'a doorway', wide: 'a wall frame', window: 'a window', hatch: 'a square floor frame' };
 
-/** whether a door's swing (`d`) and a thing set down (`t`, its foot round it) meet, at one level */
-function clash(d: { x: number; y: number; z: number; r: number; k: string }, t: { x: number; y: number; z: number }, T: PieceKind) {
+/** whether a door's swing (`d`) and a thing set down (`t`, the oblong it stands on) meet, at one level */
+function clash(d: { x: number; y: number; z: number; r: number; k: string }, t: { x: number; y: number; z: number; r: number; k: string }) {
   if (Math.abs(d.y - t.y) > 2.5) return false;
-  const pts = swept({ ...d, id: 0, t: 0, hp: 0, at: 0, by: '', on: [] }, 4);
-  return pts.some(([x, y, z]) => y < t.y + 1.2 && Math.hypot(x - t.x, z - t.z) < (T.foot ?? 0.5));
+  const pts = swept({ ...d, id: 0, t: 0, hp: 0, at: 0, by: '', on: [] }, 4), foot = footOf(t.k, t.x, t.z, t.r, 0.06);
+  return pts.some(([x, y, z]) => y < t.y + 1.2 && within(foot, x, z));
 }
 
 /** whether a floor resting on these is held: on two walls or more, or beside a floor that is on two walls or more */
@@ -365,7 +414,7 @@ function held(base: Base, on: number[]) {
 }
 
 /** how far over its spot a piece's middle is (what the aim is measured to) */
-const liftOf = (K: PieceKind) => (K.role === 'wall' ? (K.h ?? STOREY) / 2 : K.role === 'stairs' ? STOREY / 2 : K.role === 'floor' ? -0.1 : K.role === 'fit' ? (K.fits === 'hatch' ? 0 : K.fits === 'window' ? 1.6 : 1.2) : 0.5);
+const liftOf = (K: PieceKind) => (K.role === 'wall' || K.role === 'lean' ? (K.h ?? STOREY) / 2 : K.role === 'stairs' ? STOREY / 2 : K.role === 'floor' ? -0.1 : K.role === 'fit' ? (K.fits === 'hatch' ? 0 : K.fits === 'window' ? 1.6 : 1.2) : 0.5);
 
 /** the nearest of `list` to where the player aims (in the base's frame), within `reach` metres; null: none near enough */
 export function nearestSpot(list: Spot[], kind: string, aim: { x: number; y: number; z: number }, reach = 3.2): Spot | null {

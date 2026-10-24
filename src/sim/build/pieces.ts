@@ -9,8 +9,12 @@
 
 export const CELL = 3;
 export const STOREY = 3;
-/** a foundation's slab: how far it stands above its highest ground, and how deep the slab is */
-export const FOUND = { lift: 0.25, deep: 0.6, posts: 2.5 };
+/**
+ * A foundation: how far it stands above its highest ground, how deep its slab is, and how far its skirt reaches below
+ * the slab into the ground (as Rust's does: the navigator, 2026-10-24, of one standing over a slope, "no foundation
+ * ever shows a gap under it"). It may be laid no higher over its lowest ground than slab and skirt reach.
+ */
+export const FOUND = { lift: 0.25, deep: 0.6, skirt: 2.5 };
 /** a floor's thickness, under the level it makes */
 export const FLOOR_T = 0.2;
 export const WALL_T = 0.2;
@@ -31,9 +35,10 @@ const TIER_COST: Record<string, number>[] = [{ planks: 4 }, { planks: 10, nails:
  *   steps  against a foundation's edge, on the outside
  *   free   laid anywhere on the ground, end to end with another (the high walls and their gates)
  *   fit    hung in an opening of its sort (a door in a doorway, bars in a window, a hatch in a floor frame)
+ *   lean   leant on either face of a full wall or a high wall, or on top of another (a ladder)
  *   deploy set down anywhere on a foundation or a floor, turned as the player likes (the claim, boxes, the bench)
  */
-export type Role = 'floor' | 'wall' | 'stairs' | 'steps' | 'free' | 'fit' | 'deploy';
+export type Role = 'floor' | 'wall' | 'stairs' | 'steps' | 'free' | 'fit' | 'lean' | 'deploy';
 export type Shape = 'sq' | 'tri';
 export type Hole = 'door' | 'window' | 'wide' | 'hatch';
 export type Cat = 'found' | 'walls' | 'floors' | 'stairs' | 'roofs' | 'doors' | 'windows' | 'outside' | 'deploy';
@@ -65,10 +70,12 @@ export interface PieceKind {
   bench?: boolean;
   /** the length of a free piece along its line, m */
   long?: number;
-  /** a thing set down: how far round it its foot takes, m */
-  foot?: number;
   /** a box: its store, squares across and down */
   store?: [number, number];
+  /** a bed or a sleeping bag: its owner wakes at it after a death, no sooner than this many seconds after the last time */
+  sleep?: number;
+  /** laid on anybody's base, a claim's or not (a raider's ladder, Rust's) */
+  anywhere?: boolean;
 }
 
 /** how near a workbench has to be for what needs one, m */
@@ -99,7 +106,7 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'high_wall_wood', name: 'High Wood Wall', cat: 'outside', role: 'free', only: 1, long: 3, h: 6, cost: { log: 4, nails: 10 }, hp: 800 },
     { id: 'high_wall_stone', name: 'High Stone Wall', cat: 'outside', role: 'free', only: 2, long: 3, h: 6, cost: { stone: 60, planks: 4 }, hp: 1500 },
     // (the third step: DayZ's flag over Rust's tool cupboard, plan v2: "Building rights 20 m round every piece; its members build, repair and remove")
-    { id: 'claim', name: 'Claim', cat: 'deploy', role: 'deploy', only: 1, foot: 0.55, cost: { log: 1, planks: 10, nails: 10 }, hp: 300 },
+    { id: 'claim', name: 'Claim', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 1, planks: 10, nails: 10 }, hp: 300 },
     // (the fourth step's fittings, plan v2: "Doors: wood 250, metal 500, garage 1,000: the way in is always weaker than
     // the wall"; "wood door 12 planks, 8 nails · metal door 4 sheet metal, 20 nails · garage door 8 sheet metal, 40
     // nails (the metal ones need a bench); double doors twice a single". The owner: "airlock mechanics like rust has
@@ -115,12 +122,20 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'bars_metal', name: 'Metal Bars', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 2, nails: 10 }, hp: 500, bench: true },
     { id: 'embrasure', name: 'Embrasure', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 3, nails: 12 }, hp: 500, bench: true },
     { id: 'gate_wood', name: 'High Wood Gate', cat: 'outside', role: 'free', only: 1, long: 3, h: 6, cost: { log: 6, nails: 20 }, hp: 800 },
+    // (plan v2: "Ladder: 8 planks, 10 nails. Leans on any wall. Raiders' ladders work anywhere too")
+    { id: 'ladder', name: 'Ladder', cat: 'outside', role: 'lean', only: 1, cost: { planks: 8, nails: 10 }, hp: 150, anywhere: true },
     { id: 'gate_stone', name: 'High Stone Gate', cat: 'outside', role: 'free', only: 2, long: 3, h: 6, cost: { stone: 40, sheet_metal: 6, nails: 20 }, hp: 1500, bench: true },
     // (what is set down, plan v2: "Small box · Large box: 12 planks, 8 nails · 25 planks, 20 nails; 6×5 and 10×8
     // squares; health 150 and 300"; "Workbench: 2 logs, 20 planks, 20 nails. Lets metal fittings be made in its claim")
-    { id: 'box_small', name: 'Small Box', cat: 'deploy', role: 'deploy', only: 1, foot: 0.55, cost: { planks: 12, nails: 8 }, hp: 150, store: [6, 5] },
-    { id: 'box_large', name: 'Large Box', cat: 'deploy', role: 'deploy', only: 1, foot: 0.85, cost: { planks: 25, nails: 20 }, hp: 300, store: [10, 8] },
-    { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, foot: 0.95, cost: { log: 2, planks: 20, nails: 20 }, hp: 500 },
+    { id: 'box_small', name: 'Small Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 12, nails: 8 }, hp: 150, store: [6, 5] },
+    { id: 'box_large', name: 'Large Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 25, nails: 20 }, hp: 300, store: [10, 8] },
+    { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 2, planks: 20, nails: 20 }, hp: 500 },
+    // (the owner, 2026-10-24: "players can place a bed or bedroll in their base when they have a TC down like rust". Plan
+    // v2: "Sleeping bag: found ... Wake here after a death, with nothing, at most every 10 min"; a bed, Rust's, sooner)
+    { id: 'bedroll', name: 'Sleeping Bag', cat: 'deploy', role: 'deploy', only: 1, cost: { sleeping_bag: 1 }, hp: 100, sleep: 600 },
+    // (the owner, 2026-10-24: torches "hung on walls"; the torch itself, set in an iron bracket)
+    { id: 'torch_wall', name: 'Wall Torch', cat: 'deploy', role: 'lean', only: 1, cost: { torch: 1 }, hp: 50 },
+    { id: 'bed', name: 'Bed', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, nails: 12, sleeping_bag: 1 }, hp: 250, sleep: 300 },
   ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
 

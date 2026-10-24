@@ -7,7 +7,8 @@
 import type { RadialEntry, RadialRing } from '../../ui/radial';
 import { PIECES, TIERS, type Cat, type Tier } from '../../sim/build/pieces';
 import type { Piece } from '../../sim/build/snap';
-import { TIER_INK, actionIcon, pieceIcon } from './icons';
+import { TIER_INK, actionIcon, pieceIcon, printIcon } from './icons';
+import { PRINTS, asksOf, printOf } from '../../sim/build/blueprints';
 
 /** the plan's wheel: nine wedges to a ring (an odd count turns it half a wedge, so one sits at the bottom for Cancel) */
 export const PER = 9;
@@ -28,13 +29,17 @@ export const CATS: { cat: Cat; label: string; icon: string }[] = [
 ];
 /** the hammer's wheel: eight wedges (the radial's Cancel at the bottom), and what each of the others does */
 export const HAMMER_PER = 8;
-export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'repair', 'remove', 'rotate', ''] as const;
+export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'repair', 'remove', 'rotate', 'unlock'] as const;
 
 export const piecesOf = (cat: Cat) => Object.values(PIECES).filter((k) => k.cat === cat);
+/** what a group offers round the outside: its pieces, and with the foundations the blueprints (starting spots for a base) */
+export const itemsOf = (cat: Cat) => [...piecesOf(cat).map((k) => k.id), ...(cat === 'found' ? PRINTS.map((p) => p.id) : [])];
+/** a piece's or a blueprint's name */
+export const nameOf = (id: string) => printOf(id)?.name ?? PIECES[id].name;
 
 /** the outer ring by its wedges (k from the top, clockwise): a group's pieces laid round from beside its own wedge outward both ways, never on Cancel's */
 export function outerOf(cat: number): (string | null)[] {
-  const list = piecesOf(CATS[cat].cat).map((k) => k.id), out: (string | null)[] = Array(PER).fill(null);
+  const list = itemsOf(CATS[cat].cat), out: (string | null)[] = Array(PER).fill(null);
   let n = 0;
   for (let s = 0; s < PER * 2 && n < list.length; s++) {
     const k = (cat + (s % 2 ? -1 : 1) * Math.ceil(s / 2) + PER * 2) % PER;
@@ -56,7 +61,7 @@ export function pieceAt(cat: number, pick: number): string | null {
 const icons = new Map<string, string>();
 const iconOf = (id: string) => {
   let u = icons.get(id);
-  if (!u) icons.set(id, (u = pieceIcon(id)));
+  if (!u) icons.set(id, (u = printOf(id) ? printIcon(asksOf(id)) : pieceIcon(id)));
   return u;
 };
 
@@ -67,7 +72,7 @@ export function planEntries(cat: number, kind: string): RadialEntry[] {
   for (let k = 0; k < PER; k++) {
     if (k === CANCEL_K) continue;
     const id = slots[k];
-    outer[outerEntry(k) - CATS.length] = id ? { id, label: PIECES[id].name.replace(/ (Foundation|Floor|Stairs)$/, '').replace(/^(Wooden|High) /, ''), icon: iconOf(id), mark: id === kind ? 'held' : undefined } : { id: 'none', label: '', mark: 'gap' };
+    outer[outerEntry(k) - CATS.length] = id ? { id, label: nameOf(id).replace(/ (Foundation|Floor|Stairs)$/, '').replace(/^(Wooden|High) /, ''), icon: iconOf(id), mark: id === kind ? 'held' : undefined } : { id: 'none', label: '', mark: 'gap' };
   }
   return [...inner, ...outer];
 }
@@ -75,7 +80,7 @@ export function planEntries(cat: number, kind: string): RadialEntry[] {
 /** the hammer's wheel at piece `p` (none looked at: all dim) */
 export function hammerEntries(p: Piece | null): RadialEntry[] {
   return HAMMER_WHEEL.map((w): RadialEntry => {
-    if (w === '') return { id: 'none', label: '', mark: 'gap' };
+    if (w === 'unlock') return { id: w, label: 'Lock off', icon: actionIcon('lock'), mark: p?.lock ? undefined : 'dim' };
     if (w === 'remove') return { id: w, label: p && PIECES[p.k].role === 'deploy' && p.k !== 'claim' ? 'Pick up' : 'Take down', icon: actionIcon('remove', '#ee7a6e'), mark: p ? undefined : 'dim' };
     if (w === 'repair') return { id: w, label: 'Repair', icon: actionIcon('repair'), mark: 'dim' };
     if (w === 'rotate') return { id: w, label: 'Turn', icon: actionIcon('rotate'), mark: 'dim' };

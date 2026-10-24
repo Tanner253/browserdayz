@@ -13,7 +13,7 @@ import { PIECES } from '../../sim/build/pieces';
 import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
 import { DOOR } from '../../sim/build/doors';
-import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
+import { clothGeometry, drawnAt, geometryOf, leafGeometry, lockGeometry, paintFor, surfaceOf } from './look';
 
 /** what a blow or a bullet that lands on a piece struck */
 export class PieceRef {
@@ -38,6 +38,8 @@ interface Part {
 
 interface Drawn {
   parts: Part[];
+  /** a lock fitted to it, as it is seen (kept where it is by `pose`, on its leaf if it has one) */
+  lock: Part | null;
   /** where it stands in the world (its frame's matrix), for the colliders' nearness */
   frame: THREE.Matrix4;
   at: THREE.Vector3;
@@ -82,9 +84,12 @@ export class BaseDraw {
     const s = shapeOf(piece.k), t = drawnAt(piece.k, piece.t), parts: Part[] = [];
     if (s.solid.length || s.dress?.length) parts.push({ key: `${piece.k}:${s.paint ?? t}`, matrix: frame, slot: 0 });
     if (s.cloth) parts.push({ key: `${piece.k}:${s.cloth.paint}:C`, matrix: frame, slot: 0 });
+    // (its lock, if one is fitted: before the leaves, which are always the last of its parts)
+    const lock: Part | null = piece.lock && s.lockAt ? { key: `__lock:steel:${piece.lock.k}`, matrix: new THREE.Matrix4(), slot: 0 } : null;
+    if (lock) parts.push(lock);
     (s.leaves ?? []).forEach((l, i) => parts.push({ key: `${piece.k}:${l.paint ?? t}:L${i}`, matrix: new THREE.Matrix4(), slot: 0 }));
     // (a door already drawn keeps how far it stood open, and swings on from there)
-    const d: Drawn = { parts, frame, at: new THREE.Vector3(x, y, z), colliders: null, a: was ? was.a : piece.open ? 1 : 0, leafCols: null, base, piece };
+    const d: Drawn = { parts, lock, frame, at: new THREE.Vector3(x, y, z), colliders: null, a: was ? was.a : piece.open ? 1 : 0, leafCols: null, base, piece };
     this.pose(d);
     if (d.a !== (piece.open ? 1 : 0)) this.moving.add(d);
     this.drawn.set(id, d);
@@ -152,12 +157,18 @@ export class BaseDraw {
 
   /** where each of a door's leaves is at `d.a`, drawn and solid */
   private pose(d: Drawn) {
-    const leaves = shapeOf(d.piece.k).leaves ?? [];
+    const s = shapeOf(d.piece.k), leaves = s.leaves ?? [];
     const first = d.parts.length - leaves.length;
     leaves.forEach((l, i) => {
       _h.makeTranslation(l.hinge[0], l.hinge[1], l.hinge[2]).multiply(_m.makeRotationAxis(l.axis === 'y' ? _up : _x, angleAt(l, d.a)));
       d.parts[first + i].matrix.multiplyMatrices(d.frame, _h);
     });
+    if (d.lock && s.lockAt) {
+      const on = s.lockAt.leaf !== undefined ? d.parts[first + s.lockAt.leaf].matrix : d.frame, [x, y, z] = s.lockAt.at;
+      _h.makeTranslation(x, y, z);
+      if (s.lockAt.up) _h.multiply(_m.makeRotationX(-Math.PI / 2));
+      d.lock.matrix.multiplyMatrices(on, _h);
+    }
   }
 
   /** a door's leaves on toward where it is going, unless the player's own body is where they would be */
@@ -221,7 +232,7 @@ export class BaseDraw {
         m.dispose();
       }
       const [kind, name, more] = key.split(':'), paint = (/^\d$/.test(name) ? Number(name) : name) as Paint;
-      const geo = more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
+      const geo = kind === '__lock' ? lockGeometry(more) : more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
       m = new THREE.InstancedMesh(geo, paintFor(paint, this.atmo), Math.max(16, Math.ceil(list.length * 1.5)));
       m.castShadow = m.receiveShadow = true;
       m.name = `base:${key}`;

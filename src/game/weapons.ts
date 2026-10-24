@@ -3804,6 +3804,21 @@ export class Weapons {
 
   mainCam: THREE.PerspectiveCamera | null = null;
 
+  /** the far end of what is held in the hands (a torch's head), as a place in the world; null with nothing shown in them */
+  heldTip(cam: THREE.PerspectiveCamera, out: THREE.Vector3): THREE.Vector3 | null {
+    const h = this.held;
+    if (!h || !h.root.visible) return null;
+    h.root.updateWorldMatrix(true, true);
+    // (a part named its head, a torch's, if it has one: the top of that; else the far top of the whole of it)
+    let head: THREE.Object3D | undefined;
+    h.root.traverse((o) => {
+      if (!head && o.name === 'head') head = o;
+    });
+    const box = new THREE.Box3().setFromObject(head ?? h.root).applyMatrix4(this.vmCamera.matrixWorldInverse);
+    box.getCenter(out);
+    return out.copy(this.toWorld(head ? out.setY(box.max.y) : out.set(out.x, box.max.y, box.min.z), cam));
+  }
+
   /**
    * A place in the hands' own picture, said as a place in the world (for smoke, which is in
    * the world). The hands are drawn through a narrower lens than the world is: what is at the

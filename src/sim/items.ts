@@ -192,6 +192,8 @@ export interface ItemInstance {
   left?: number;
   /** a tool's condition, 1 new and 0 ruined (DayZ's health of an item; src/sim/gather.ts `condition`): not said, new */
   cond?: number;
+  /** a key: the number of the key lock it opens (src/sim/build/locks.ts), never shown */
+  key?: number;
   /**
    * a gun with a store finish put on it (the shop's item id, 'deagle_gold'): it goes with the gun until the gun is
    * gone, Rust's way. Only ever the server's word (server/plates.ts); a game's own is not read.
@@ -538,6 +540,7 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
     if (Number.isFinite(c) && c < 1) it.cond = Math.max(0, c);
     else delete it.cond;
   }
+  if (it.key !== undefined && !(it.id === 'key' && Number.isInteger(it.key) && it.key > 0)) delete it.key;
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));
     if (!holds(it.id)) delete it.cargo;

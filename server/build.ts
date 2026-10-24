@@ -20,6 +20,7 @@ import { tool, use, woods } from './gather';
 import { pidOf } from './acts';
 import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
 import { boxStore, boxesBack, emptyBox, heldIn, spillBoxes } from './boxes';
+import { asksOf, layPrint, printOf } from '../src/sim/build/blueprints';
 
 /** how far off a base is told to a game, and how far off it is forgotten again */
 export const SIGHT = { tell: 450, forget: 650 };
@@ -89,13 +90,21 @@ export function takeFrom(inv: SerializedInventory | null, id: string, n: number)
     for (const p of it.cargo) inCargo(p.item);
   };
   for (const c of inv.containers) fromList(c.items as unknown as { qty: number; id: string }[]);
+  // (what is in the hands, after the pockets: as the game takes it, src/sim/inventory.ts)
+  const held = (inv.slots as Record<string, ItemInstance | null | undefined>).held;
+  if (left > 0 && held?.id === id) {
+    const k = Math.min(left, held.qty);
+    held.qty -= k;
+    left -= k;
+    if (held.qty <= 0) (inv.slots as Record<string, ItemInstance | null>).held = null;
+  }
   for (const it of Object.values(inv.slots)) inCargo(it);
   for (const c of inv.containers) for (const it of c.items) inCargo(it);
   return n - left;
 }
 
 /** a cost taken out of a player's pockets (the server's copy), and their game told to take it out of theirs */
-function pay(c: Client, cost: Record<string, number>) {
+export function pay(c: Client, cost: Record<string, number>) {
   const d = of(c), items = Object.entries(cost).filter(([, n]) => n > 0) as [string, number][];
   if (!items.length) return;
   for (const [id, n] of items) takeFrom(c.inv, id, n);
@@ -185,6 +194,29 @@ export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
 }
 
 /** the hammer at a piece: whose it is to work, near enough, and the hammer fit to work with */
+/** a blueprint laid: each piece in order while what they carry pays, the rest passed over (src/sim/build/blueprints.ts) */
+export function print(c: Client, m: Extract<C2S, { t: 'bprint' }>) {
+  if (!c.alive || !printOf(m.id) || ![m.x, m.z, m.yaw].every(Number.isFinite)) return;
+  const plan = [...things(c.inv)].find((it) => it.uid === m.u && it.id === 'building_plan');
+  if (!plan) return void send(c, { t: 'tell', kind: 'warn', text: 'You need a building plan' });
+  const all = bases(), b = m.b !== undefined ? all.bases.get(m.b) : undefined;
+  if (m.b !== undefined && !b) return;
+  const [x, , z] = b ? toWorld(b, 0, 0, 0) : [m.x, 0, m.z];
+  if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.lay + 6) return;
+  const r = layPrint(all, m.id, { b: m.b, x: m.x, z: m.z, yaw: m.yaw }, own(c), Date.now(), c.name, (cost) => {
+    if (short(c.inv, cost)) return false;
+    pay(c, cost);
+    return true;
+  });
+  if (!r.base || !r.laid.length) return void send(c, { t: 'tell', kind: 'warn', text: (r.need && short(c.inv, r.need)) || r.why || 'Nothing more of it to lay' });
+  if (r.fresh) sighting();
+  else for (const p of r.laid) tellBase(r.base.id, { t: 'bpc', b: r.base.id, p: saidPiece(p) });
+  const left = asksOf(m.id).length - r.base.pieces.size;
+  const why = (r.need && short(c.inv, r.need)) || r.why;
+  send(c, { t: 'tell', kind: left > 0 ? 'info' : 'good', text: `${printOf(m.id)!.name}: ${r.laid.length} laid${left > 0 && why ? `; ${why.toLowerCase()}` : ''}` });
+  log(`[build] ${c.name} laid ${r.laid.length} pieces of a ${m.id} in base ${r.base.id}`);
+}
+
 function atPiece(c: Client, b: number, p: number, u: unknown): { it: ItemInstance; why: string | null } | null {
   const it = tool(c, u, HAMMERS);
   if (!it || !c.alive) return null;

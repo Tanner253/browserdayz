@@ -2645,3 +2645,27 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .soc-row a { display: inline-flex; align-items: center; padding: 9px 16px; font: 700 13px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; border: 1px solid rgba(233, 228, 216, 0.3); color: #e9e4d8; background: rgba(5, 7, 6, 0.6); }
 .soc-row a:hover { border-color: currentColor; }
 .soc-row .soc-discord { color: #fff; background: #5865f2; border-color: #5865f2; }
+
+/* a lock's panel (src/ui/keypad.ts): what it is, who it lets in, its keypad, what may be done with it */
+.keypad { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(6, 8, 6, 0.55); font-family: 'Barlow Condensed', system-ui, sans-serif; color: var(--ink); }
+.keypad.on { display: flex; }
+.kp-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 260px; padding: 18px 22px 14px; background: var(--panel-solid); border: 1px solid var(--line); border-top: 2px solid var(--accent); box-shadow: 0 24px 70px #000; }
+.kp-card > b { font-size: 26px; letter-spacing: 0.08em; text-transform: uppercase; }
+.kp-card > span { font-size: 16px; color: rgba(233, 228, 216, 0.7); }
+.kp-card > small { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(233, 228, 216, 0.4); }
+.kp-x { position: absolute; top: 6px; right: 8px; font-size: 20px; background: none; border: 0; color: rgba(233, 228, 216, 0.5); cursor: pointer; }
+.kp-for { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+.kp-cells { display: flex; gap: 8px; }
+.kp-cells i { display: flex; align-items: center; justify-content: center; width: 34px; height: 42px; font-style: normal; font-size: 26px; background: rgba(233, 228, 216, 0.05); border: 1px solid var(--line); }
+.kp-cells i.set { border-color: var(--accent); color: var(--accent); }
+.kp-keys { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; }
+.kp-keys button, .kp-acts button { height: 44px; font: inherit; font-size: 22px; color: var(--ink); background: rgba(233, 228, 216, 0.06); border: 1px solid var(--line); cursor: pointer; }
+.kp-keys button:hover, .kp-acts button:hover { background: rgba(201, 178, 124, 0.18); border-color: var(--accent); }
+.kp-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 320px; }
+.kp-acts button { height: 36px; padding: 0 14px; font-size: 17px; letter-spacing: 0.04em; }
+
+/* the death screen's beds (src/game/building/beds.ts): under Respawn, each bed of the player's, ready or not yet */
+.dead-beds { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: -14px 0 18px; }
+.dead-bed { padding: 7px 22px; font-family: var(--font); font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); background: rgba(18, 20, 19, 0.7); border: 1px solid var(--accent); cursor: pointer; }
+.dead-bed small { margin-left: 8px; letter-spacing: 0.04em; text-transform: none; color: rgba(233, 228, 216, 0.6); }
+.dead-bed:disabled { opacity: 0.5; cursor: default; border-color: var(--line); }

@@ -41,7 +41,8 @@ export class DoorView {
     return `<kbd>F</kbd>${p.open ? 'Close' : 'Open'} ${doorWord(p.k)}`;
   }
 
-  private toggle(base: Base, p: Piece) {
+  /** a door swung, by whoever may (the server judges online; alone, nobody may be in its way) */
+  toggle(base: Base, p: Piece) {
     if (this.h.online()) return void this.h.send({ t: 'bdoor', b: base.id, p: p.id, open: !p.open });
     // (alone: the server's own rule, against the one body there is)
     const me = this.h.me(), [x, y, z] = toLocal(base, me.x, me.y, me.z);

@@ -14,6 +14,7 @@ import { tellOpeners } from './searched';
 import { bases, known, tellBase } from './build';
 import { pidOf } from './acts';
 import { spillBoxes } from './boxes';
+import { passes } from './locks';
 
 /** a claim's store: so many places across and down */
 export const STORE = { w: 6, h: 4 };
@@ -58,6 +59,9 @@ export function tellClaim(b: Base) {
 export function join(c: Client, m: { b: number }) {
   const b = bases().bases.get(m.b), at = b && claimAt(b);
   if (!c.alive || !b || !at || Math.hypot(at[0] - c.pose[0], at[2] - c.pose[2]) > AT || !known(c, b.id)) return;
+  // (a locked claim is joined only by whoever its lock lets in: Rust's locked cupboard)
+  const cp = b.claim && b.pieces.get(b.claim.p);
+  if (cp && !passes(c, cp)) return void send(c, { t: 'tell', kind: 'warn', text: 'The claim is locked' });
   const on = bases().join(b, pidOf(c.key), c.name);
   if (on) keepTold(b);
   send(c, { t: 'tell', kind: on ? 'good' : 'info', text: on ? 'You are on this claim: you may build here' : 'You have left this claim' });
