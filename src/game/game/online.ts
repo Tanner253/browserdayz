@@ -250,6 +250,7 @@ export const onlineMethods = {
     net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
     // the animals near this player, a hit on one, and gutting one (src/game/animals.ts, server/animals.ts)
     net.on('an', (m) => this.wild.rows(m.r, !!m.all, performance.now()));
+    net.on('acall', (m) => this.wild.call(m.c, m.x, m.z));
     net.on('ahp', (m) => {
       const b = this.wild.beasts.get(m.i);
       this.wild.hp(m.i, m.dead);

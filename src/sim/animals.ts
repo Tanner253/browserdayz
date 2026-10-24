@@ -90,6 +90,8 @@ export interface Kind {
   /** how long its body lies, seconds */
   lies: number;
   fight?: Fight;
+  /** it has no gait to be drawn walking with: it stands where it was stood, grazing and looking up (a farm's cows) */
+  still?: boolean;
   /** what it gives when gutted and skinned with the best blade (see BLADES): meat (the item, how many), fat, the hide, bones */
   gives: { meat: string; n: number; fat: number; hide: string | null; bones: number; feathers?: number };
 }
@@ -144,7 +146,7 @@ export const KINDS: Kind[] = [
   },
   {
     id: 'cow', name: 'Cow', model: 'animal_cow', len: 2.3, tall: 1.4, hp: 220, tough: 1, walk: 0.9, trot: 2.6, run: 5, wind: 6, steep: 0.6,
-    temper: 'tame', sight: 20, hear: 0.8, smell: 10, view: 160 * F, flee: 18, lies: 900,
+    temper: 'tame', sight: 20, hear: 0.8, smell: 10, view: 160 * F, flee: 18, lies: 900, still: true,
     gives: { meat: 'meat_beef', n: 10, fat: 5, hide: 'hide', bones: 8 },
   },
 ];
@@ -184,6 +186,25 @@ export const HERDS: HerdKind[] = [
   { id: 'hare', of: [['hare', 1, 1]], count: 16, range: 110, apart: 160, feed: ['field'], rest: ['field'], hours: [[0, 0.15], [0.62, 0.9]], drinks: false, respawn: 300 },
   { id: 'cows', of: [['cow', 2, 3]], count: 3, range: 38, apart: 0, feed: ['field', 'town'], rest: ['field', 'town'], hours: [[0.04, 0.74]], drinks: false, respawn: 1200, farm: true },
 ];
+
+/**
+ * What the animals are heard to say, and how seldom (onboarding, for the owner, 2026-10-23: "we want to make sure
+ * animals dont call too often so that its not annoying, as the plaeyr is surrounded by animals naturally"). Of each
+ * call: the herd it is a call of, the seconds between two of one herd's (at random between the two), the shares of
+ * the day it is said in (src/sim/daynight.ts: dusk 0.71, night 0.75), and how far it carries, metres. A deer's bark is
+ * only ever its alarm, as the herd bolts, once a minute at most. Nobody hears two calls within `apart` seconds of
+ * each other. A bear's roar, swipe and bite, a wolf's snarl and the hooves are its movements' own (src/game/animals.ts).
+ */
+export type Call = 'roar' | 'howl' | 'moo' | 'bark';
+export const CALLS = {
+  /** a stag at the rut: at dusk and first light */
+  roar: { herd: 'deer', every: [360, 600] as [number, number], hours: [[0.66, 0.8], [0, 0.08]] as [number, number][], heard: 600 },
+  /** a pack: by night */
+  howl: { herd: 'wolves', every: [240, 420] as [number, number], hours: [[0.75, 1], [0, 0.02]] as [number, number][], heard: 900 },
+  moo: { herd: 'cows', every: [120, 240] as [number, number], hours: [[0, 1]] as [number, number][], heard: 150 },
+  bark: { every: 60, heard: 250 },
+  apart: 45,
+};
 
 /** How the animals live together, over the whole map. */
 export const ANIMALS = {

@@ -12,10 +12,11 @@
 //     and only comes home once things have been quiet for two of the Zone's days. Nobody can camp a herd.
 //   - With nobody near, a herd sleeps; when somebody comes it is where its day would have taken it by now.
 
-import { ANIMALS, A_ALERT, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_RUN, A_TROT, A_WALK, HERDS, KIND, KINDS, ROW_BLEEDS, SKIN, fwd, smellReach, yawTo, type AnimalRow, type HerdKind, type Kind, type Move } from './animals';
+import { ANIMALS, A_ALERT, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_RUN, A_TROT, A_WALK, HERDS, KIND, KINDS, ROW_BLEEDS, SKIN, fwd, smellReach, yawTo, type AnimalRow, type Call, type HerdKind, type Kind, type Move } from './animals';
 import type { Ground } from './animal-ground';
 import { heardShare } from './heard';
 import { fighter, pack } from './animal-fight';
+import { alarm, herdCall } from './animal-calls';
 
 /** A person as the animals know of them. */
 export interface Seen {
@@ -117,6 +118,9 @@ export interface Group {
   /** the kinds it is made of, as it should be */
   wants: number[];
   awake: boolean;
+  /** when it may next call, and a deer herd next bark its alarm (src/sim/animal-calls.ts) */
+  callAt: number;
+  barkAt: number;
   sleptAt: number;
   pressure: number;
   pressedAt: number;
@@ -136,6 +140,8 @@ export interface Turn {
   strikes: Strike[];
   /** those that died this turn of their own (bled out, killed by wolves) */
   died: number[];
+  /** what was heard of them (src/sim/animal-calls.ts) */
+  calls: { i: number; call: Call; x: number; z: number }[];
 }
 
 const PI2 = Math.PI * 2;
@@ -192,7 +198,7 @@ export class Herd {
         });
         const g: Group = {
           i: this.groups.length, herd: hi, home, mid: { ...home }, at: { ...home }, spot: 'rest', nextSpot: 0, feeding: false, drank: false,
-          members: [], wants, awake: false, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1,
+          members: [], wants, awake: false, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1, callAt: 0, barkAt: 0,
         };
         this.groups.push(g);
         this.plan(g, now);
@@ -272,10 +278,12 @@ export class Herd {
     const kind = KINDS[k];
     for (let n = 0; n < 12; n++) {
       const a = this.rnd() * PI2, d = 4 + this.rnd() * (start ? 30 : 60);
-      const x = g.at.x + Math.cos(a) * d, z = g.at.z + Math.sin(a) * d, farm = !!HERDS[g.herd].farm;
+      // (one that never walks is stood at its own place in the herd, which no other has)
+      const farm = !!HERDS[g.herd].farm, at = kind.still ? this.slotFor(g, k, (x, z) => this.fit(x, z, kind.steep, ANIMALS.keepOff.walk, farm)) : null;
+      const x = at ? g.at.x + at[0] : g.at.x + Math.cos(a) * d, z = at ? g.at.z + at[1] : g.at.z + Math.sin(a) * d;
       if (!this.fit(x, z, kind.steep, ANIMALS.keepOff.walk, farm)) continue;
       if (people.some((p) => Math.hypot(p.x - x, p.z - z) < ANIMALS.clear)) return null;
-      const slot = this.slotFor(g, k);
+      const slot = at ?? this.slotFor(g, k);
       const b: Beast = {
         i: this.next++, k, g: g.i, x, z, yaw: this.rnd() * PI2, mode: A_IDLE, hp: kind.hp, diedAt: 0, skinned: false, bleeds: false, speed: 0,
         aware: 0, fearX: x, fearZ: z, ranFor: 0, slot, act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0, detourYaw: 0, detourT: 0,
@@ -303,14 +311,14 @@ export class Herd {
    * Its place in the herd, off the herd's spot: the first free one along a sunflower spiral, so that no two places
    * ever fall within room of each other (they were thrown at random, and two herd mates stood in one another).
    */
-  private slotFor(g: Group, k: number): [number, number] {
+  private slotFor(g: Group, k: number, ok?: (x: number, z: number) => boolean): [number, number] {
     const taken = g.members.map((i) => this.beasts.get(i)!).filter((o) => !o.diedAt);
     if (!taken.length && g.wants.length <= 1) return [0, 0];
     const turn = (g.i * 2.39996) % PI2;
     for (let n = 0; n < 64; n++) {
       const r = KINDS[k].len * 1.05 * Math.sqrt(n + 0.5), a = turn + n * 2.39996;
       const s: [number, number] = [Math.cos(a) * r, Math.sin(a) * r];
-      if (taken.every((o) => Math.hypot(o.slot[0] - s[0], o.slot[1] - s[1]) >= this.room(o.k, k, true))) return s;
+      if (taken.every((o) => Math.hypot(o.slot[0] - s[0], o.slot[1] - s[1]) >= this.room(o.k, k, true)) && (!ok || ok(g.at.x + s[0], g.at.z + s[1]))) return s;
     }
     return [0, 0];
   }
@@ -340,7 +348,7 @@ export class Herd {
     if (k < 0 || hi < 0 || n < 1) return [];
     const g: Group = {
       i: this.groups.length, herd: hi, home: { x, z }, mid: { x, z }, at: { x, z }, spot: 'feed', nextSpot: now + 120_000, feeding: true, drank: true,
-      members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1,
+      members: [], wants: [], awake: true, sleptAt: now, pressure: 0, pressedAt: now, movedAt: 0, flee: null, owed: [], hunt: null, nextDash: 0, dasher: 0, huntedDay: -1, callAt: 0, barkAt: 0,
     };
     this.groups.push(g);
     const others = HERDS[hi].of.map(([id]) => KINDS.findIndex((kk) => kk.id === id)).filter((o) => o !== k);
@@ -360,7 +368,7 @@ export class Herd {
 
   /** Five times a second or so. `people` is everybody alive, as the animals know of them. */
   tick(now: number, people: Seen[]): Turn {
-    const turn: Turn = { strikes: [], died: [] };
+    const turn: Turn = { strikes: [], died: [], calls: [] };
     const dt = Math.max(0, Math.min(0.5, this.lastTick ? (now - this.lastTick) / 1000 : ANIMALS.step));
     this.lastTick = now;
     const p = this.phase(now), noticed = people.filter((q) => !q.unseen);
@@ -416,6 +424,7 @@ export class Herd {
       // (only those near enough to be sensed: every animal sensing everybody on the map was most of the cost)
       const close = noticed.filter((q) => Math.hypot(q.x - lead.x, q.z - lead.z) < ANIMALS.wake + 100);
       for (const b of living) this.think(b, g, now, dt, close, turn, p);
+      herdCall(this, g, living, now, p, turn);
     }
     return turn;
   }
@@ -516,7 +525,7 @@ export class Herd {
         if (pack(this, b, g, k, now, dt, people, turn, from, phase)) return;
         break;
     }
-    this.prey(b, g, k, now, dt, !!from && from.ride !== '');
+    this.prey(b, g, k, now, dt, turn, !!from && from.ride !== '');
   }
 
   /** How much a person frightens it this moment, 0 to 1 (and over: something it cannot mistake). */
@@ -541,8 +550,18 @@ export class Herd {
   }
 
   /** What anything does that is not fighting: keeps with its herd, feeds, lies up, looks up, bolts. */
-  private prey(b: Beast, g: Group, k: Kind, now: number, dt: number, rideFear = false) {
+  private prey(b: Beast, g: Group, k: Kind, now: number, dt: number, turn: Turn, rideFear = false) {
     const h = HERDS[g.herd];
+    if (k.still) {
+      // (no gait: it would slide. It grazes and looks up where it stands; a fright only brings its head up)
+      if (now > b.next) {
+        b.act = this.rnd() < 0.6 ? A_GRAZE : A_IDLE;
+        b.next = now + 6000 + this.rnd() * 9000;
+      }
+      b.speed = 0;
+      b.mode = b.aware >= ANIMALS.alert ? A_ALERT : b.act;
+      return;
+    }
     // (a bear or a wolf whole and unhurt does not run from a person: it stands and watches. A car, a helicopter, a
     // shot from further off than it will charge, or being hurt past bearing, and it runs like anything else.)
     const stands = !!k.fight && b.hp >= k.hp * k.fight.breakAt && !rideFear && !(b.hurtBy && now - b.hurtAt < 8000);
@@ -550,6 +569,7 @@ export class Herd {
       // (the whole herd goes at once: DayZ's deer)
       const run = k.flee / k.run;
       g.flee = { x: b.fearX, z: b.fearZ, until: now + (run + 2) * 1000 };
+      alarm(g, b, now, turn);
       this.press(g, ANIMALS.pressure.fled, now);
       for (const i of g.members) {
         const o = this.beasts.get(i)!;

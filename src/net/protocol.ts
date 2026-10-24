@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
-import type { AnimalRow } from '../sim/animals';
+import type { AnimalRow, Call } from '../sim/animals';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
@@ -374,6 +374,8 @@ export type S2C =
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number]; /** an animal's: whether it opened a wound (the server's roll, not the game's) */ bleed?: boolean }
   /** the animals near this player (src/sim/animals.ts AnimalRow), five times a second; once a second all within its reach (`all`: any it knows of that is not in it has gone) */
   | { t: 'an'; r: AnimalRow[]; all?: boolean }
+  /** an animal is heard (src/sim/animal-calls.ts): which, what it said, where it was */
+  | { t: 'acall'; i: number; c: Call; x: number; z: number }
   /** an animal was hit: what it has left, and who hit it */
   | { t: 'ahp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone }
   /** gutting and skinning: begun (ok), refused (why), or done (got: what fell by the body) */

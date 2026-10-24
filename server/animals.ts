@@ -5,7 +5,7 @@
 
 import { Herd, type Seen } from '../src/sim/animal-mind';
 import type { Ground } from '../src/sim/animal-ground';
-import { ANIMALS, BLADES, KINDS, KIND, yieldOf } from '../src/sim/animals';
+import { ANIMALS, BLADES, CALLS, KINDS, KIND, yieldOf } from '../src/sim/animals';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
 import { makeItem } from '../src/sim/items';
@@ -33,6 +33,8 @@ export function startAnimals() {
 
 /** where each player was a moment ago, for how fast they are going */
 const was = new Map<number, { x: number; z: number; t: number; v: number }>();
+/** when each player last heard one of the herds' calls */
+const heardAt = new Map<number, number>();
 let beat = 0;
 
 /** a player as the animals know of them (null: nobody they can know of, dead or under the ground; a vanished admin is there and never noticed) */
@@ -71,6 +73,18 @@ export function animalsTick(now: number) {
     dealt(target, s.damage, 'torso', kind.id);
     send(target, { t: 'dmg', from: 0, amount: s.damage, zone: 'torso', w: kind.id, dir: [(target.pose[0] - s.from[0]) / len, 0, (target.pose[2] - s.from[1]) / len], bleed: s.bleed });
   }
+  // what is heard of them: by whoever is within its carry, and nobody two of the herds' calls within CALLS.apart
+  // seconds (an alarm is not held back: it says something)
+  for (const k of turn.calls) {
+    const reach = k.call === 'bark' ? CALLS.bark.heard : CALLS[k.call].heard;
+    for (const c of clients.values()) {
+      if (c.ws.readyState !== 1 || Math.hypot(c.pose[0] - k.x, c.pose[2] - k.z) > reach) continue;
+      if (k.call !== 'bark' && now - (heardAt.get(c.id) ?? 0) < CALLS.apart * 1000) continue;
+      if (k.call !== 'bark') heardAt.set(c.id, now);
+      send(c, { t: 'acall', i: k.i, c: k.call, x: Math.round(k.x * 10) / 10, z: Math.round(k.z * 10) / 10 });
+    }
+  }
+  for (const id of heardAt.keys()) if (!clients.has(id)) heardAt.delete(id);
   // (near ones every time; all within reach once a second, so that whatever has gone from it is dropped)
   const all = beat++ % 5 === 0;
   for (const c of clients.values()) {

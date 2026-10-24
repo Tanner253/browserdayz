@@ -39,22 +39,23 @@ export const HUNT_ITEMS: ItemDef[] = [
     worth: 1,
   },
   {
-    id: 'hide', name: 'Animal Hide', model: 'animal_hide', w: 2, h: 2, weight: 1.2, category: 'misc',
+    // (no model of its own: a pelt, tanned in colour and the size of a deer's)
+    id: 'hide', name: 'Animal Hide', model: 'fur_pelt', tint: 0x9a7a5a, scale: 0.8, w: 2, h: 2, weight: 1.2, category: 'misc',
     desc: 'A raw hide off a deer or a cow. Leather is made of it one day: clothes, bags, armour. The trader takes it.',
     worth: 4,
   },
   {
-    id: 'pelt_wolf', name: 'Wolf Pelt', model: 'fur_pelt', tint: 0x8a8a86, w: 2, h: 2, weight: 1.0, category: 'misc',
+    id: 'pelt_wolf', name: 'Wolf Pelt', model: 'fur_pelt', tint: 0x8a8a86, scale: 0.65, w: 2, h: 2, weight: 1.0, category: 'misc',
     desc: 'A grey wolf\'s pelt. Warm, and worth something to the trader.',
     worth: 7,
   },
   {
-    id: 'pelt_bear', name: 'Bear Pelt', model: 'fur_pelt', tint: 0x5a4030, scale: 1.5, w: 3, h: 3, weight: 4.0, category: 'misc',
+    id: 'pelt_bear', name: 'Bear Pelt', model: 'fur_pelt', tint: 0x5a4030, w: 3, h: 3, weight: 4.0, category: 'misc',
     desc: 'A brown bear\'s pelt, heavy and thick. The best thing the trader buys off a hunter.',
     worth: 16,
   },
   {
-    id: 'pelt_small', name: 'Small Pelt', model: 'fur_pelt', tint: 0xa0704a, scale: 0.6, w: 1, h: 2, weight: 0.3, category: 'misc',
+    id: 'pelt_small', name: 'Small Pelt', model: 'fur_pelt', tint: 0xa0704a, scale: 0.25, w: 1, h: 2, weight: 0.3, category: 'misc',
     desc: 'A hare\'s pelt.',
     worth: 2,
   },

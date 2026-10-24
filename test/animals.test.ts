@@ -4,7 +4,7 @@
 //   npx tsx test/animals.test.ts
 
 import assert from 'node:assert/strict';
-import { ANIMALS, A_DEAD, A_REST, A_ROAR, BLADES, KIND, KINDS, SKIN, yieldOf, type Biome } from '../src/sim/animals';
+import { ANIMALS, A_DEAD, A_REST, A_ROAR, BLADES, CALLS, HERDS, KIND, KINDS, SKIN, yieldOf, type Biome } from '../src/sim/animals';
 import { Herd, seeded, type Seen } from '../src/sim/animal-mind';
 import type { Ground } from '../src/sim/animal-ground';
 import { ENTITIES, entityBy } from '../src/net/orders';
@@ -335,6 +335,33 @@ ok('herd and pack mates never stand inside each other: stood, grazing, bolting, 
   }
   assert.ok(worst >= 0.5, `never touching, bolting included (closest ${worst.toFixed(2)} of their lengths)`);
   assert.ok(settled >= 0.55, `grazing, room between them (closest ${settled.toFixed(2)})`);
+});
+
+ok('calls are rare and kept to their hours: a stag roars at dusk and first light, wolves howl by night, deer bark only as they bolt', () => {
+  // (onboarding, for the owner: "make sure animals dont call too often so that its not annoying")
+  const DAY = 1920_000, h = new Herd(ground, (k) => ['stag', 'doe', 'wolf'].includes(k.id), (now) => (now % DAY) / DAY, seeded(3));
+  h.populate(0);
+  const deer = h.groups.find((g) => HERDS[g.herd].id === 'deer')!, wolves = h.groups.find((g) => HERDS[g.herd].id === 'wolves')!;
+  const near = (g: typeof deer) => h.beasts.get(g.members[0])!;
+  const calls: { t: number; call: string; g: number; p: number; bolting: boolean }[] = [];
+  // (two hours of the Zone's days, a still watcher 250 m from each, out of sight and smell)
+  for (let t = 0; t <= 2 * 3_600_000; t += 200) {
+    const people = [deer, wolves].map((g, i) => person(i + 1, near(g).x + 250, near(g).z, { crouch: true }));
+    for (const c of h.tick(t + 1, people).calls) calls.push({ t, call: c.call, g: h.beasts.get(c.i)!.g, p: ((t + 1) % DAY) / DAY, bolting: !!h.groups[h.beasts.get(c.i)!.g].flee });
+  }
+  const roars = calls.filter((c) => c.call === 'roar' && c.g === deer.i), howls = calls.filter((c) => c.call === 'howl' && c.g === wolves.i);
+  assert.ok(roars.length >= 1 && roars.length <= 12, `${roars.length} roars in two hours`);
+  assert.ok(roars.every((c) => CALLS.roar.hours.some(([a, b]) => c.p >= a && c.p < b)), 'a roar only at dusk and first light');
+  assert.ok(howls.length >= 1 && howls.every((c) => CALLS.howl.hours.some(([a, b]) => c.p >= a && c.p < b)), `${howls.length} howls, by night only`);
+  for (const list of [roars, howls]) for (let n = 1; n < list.length; n++) assert.ok(list[n].t - list[n - 1].t >= CALLS.roar.every[0] * 1000 * (list === roars ? 1 : CALLS.howl.every[0] / CALLS.roar.every[0]) - 1, 'never sooner than its wait');
+  // (a bark only ever as its herd bolts, from whatever it was: a wolf, a bear, a person; and once a minute at most)
+  const bk = calls.filter((c) => c.call === 'bark');
+  assert.ok(bk.every((c) => c.bolting), 'a bark only as the herd bolts');
+  for (let n = 1; n < bk.length; n++) if (bk[n].g === bk[n - 1].g) assert.ok(bk[n].t - bk[n - 1].t >= CALLS.bark.every * 1000, 'a bark a minute at most');
+  // a fright: the herd bolts with one bark, and not another within the minute
+  const t0 = 2 * 3_600_000 + 1000, b = near(deer), sprinter = person(9, b.x + 20, b.z, { speed: 6 }), barks: number[] = [];
+  for (let t = 0; t <= 60_000; t += 200) for (const c of h.tick(t0 + t, [sprinter]).calls) if (c.call === 'bark') barks.push(t);
+  assert.equal(barks.length, 1, `${barks.length} barks in a minute of fright`);
 });
 
 ok('a game is told only of the animals within its reach', () => {

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T01:13:54.986Z",
+ "generated": "2026-10-24T05:39:57.388Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -12529,47 +12529,34 @@
    "tags": [
     "animal"
    ],
-   "bytes": 505468,
-   "tris": 1058,
+   "bytes": 1074752,
+   "tris": 7886,
    "min": [
-    -0.7899,
+    -0.2647,
     0,
     -1.05
    ],
    "max": [
-    0.7899,
-    1.8633,
+    0.2647,
+    1.5828,
     1.05
    ],
    "lods": [],
    "clips": [
-    "take"
+    "graze",
+    "alert",
+    "rest",
+    "walk",
+    "trot",
+    "run",
+    "hit",
+    "death",
+    "idle"
    ],
-   "cuts": {
-    "run": [
-     11.6,
-     12.6
-    ],
-    "graze": [
-     1.4,
-     2.2
-    ],
-    "idle": [
-     2.6,
-     3.9
-    ],
-    "alert": [
-     6.8,
-     8.6
-    ],
-    "walk": [
-     9,
-     10.6
-    ],
-    "trot": [
-     10.8,
-     11.4
-    ]
+   "paces": {
+    "walk": 1.55,
+    "trot": 7.23,
+    "run": 11.62
    }
   },
   "pill_box": {
@@ -12591,6 +12578,207 @@
     0.0097
    ],
    "lods": []
+  },
+  "animal_doe": {
+   "url": "assets/models/animal_doe.glb",
+   "tags": [
+    "animal"
+   ],
+   "bytes": 860736,
+   "tris": 5216,
+   "min": [
+    -0.185,
+    0,
+    -0.9
+   ],
+   "max": [
+    0.185,
+    1.2805,
+    0.9
+   ],
+   "lods": [],
+   "clips": [
+    "graze",
+    "rest",
+    "walk",
+    "trot",
+    "run",
+    "hit",
+    "death",
+    "alert",
+    "idle"
+   ],
+   "paces": {
+    "walk": 1.27,
+    "trot": 5.92,
+    "run": 9.51
+   }
+  },
+  "animal_bear": {
+   "url": "assets/models/animal_bear.glb",
+   "tags": [
+    "animal"
+   ],
+   "bytes": 1239144,
+   "tris": 7508,
+   "min": [
+    -0.3929,
+    0,
+    -1.15
+   ],
+   "max": [
+    0.3929,
+    1.5084,
+    1.15
+   ],
+   "lods": [],
+   "clips": [
+    "graze",
+    "idle",
+    "swipe",
+    "bite",
+    "roar",
+    "death",
+    "run",
+    "hit",
+    "trot",
+    "walk",
+    "rest",
+    "alert"
+   ],
+   "paces": {
+    "run": 7.32,
+    "trot": 4.39,
+    "walk": 0.94
+   }
+  },
+  "animal_cow": {
+   "url": "assets/models/animal_cow.glb",
+   "tags": [
+    "animal"
+   ],
+   "bytes": 317852,
+   "tris": 9546,
+   "min": [
+    -0.2962,
+    0,
+    -1.15
+   ],
+   "max": [
+    0.2962,
+    1.2801,
+    1.15
+   ],
+   "lods": [],
+   "clips": [
+    "idle",
+    "graze",
+    "death"
+   ]
+  },
+  "meat_steak": {
+   "url": "assets/models/meat_steak.glb",
+   "tags": [
+    "loot",
+    "food"
+   ],
+   "bytes": 381224,
+   "srcTris": 2700,
+   "tris": 2700,
+   "min": [
+    -0.12,
+    0,
+    -0.0693
+   ],
+   "max": [
+    0.12,
+    0.1598,
+    0.0693
+   ],
+   "lods": [
+    {
+     "url": "assets/models/meat_steak_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "2591380:1792820383209"
+    }
+   ],
+   "hi": "assets/models/hi/meat_steak.glb",
+   "hiBytes": 2591380,
+   "hiCard": 64
+  },
+  "animal_fat": {
+   "url": "assets/models/animal_fat.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 286976,
+   "srcTris": 2252,
+   "tris": 2252,
+   "min": [
+    -0.065,
+    0,
+    -0.0264
+   ],
+   "max": [
+    0.065,
+    0.0717,
+    0.0264
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/animal_fat.glb",
+   "hiBytes": 1384520,
+   "hiCard": 64
+  },
+  "bone_pile": {
+   "url": "assets/models/bone_pile.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 24484,
+   "srcTris": 560,
+   "tris": 560,
+   "min": [
+    -0.21,
+    0,
+    -0.1843
+   ],
+   "max": [
+    0.21,
+    0.2003,
+    0.1843
+   ],
+   "lods": []
+  },
+  "fur_pelt": {
+   "url": "assets/models/fur_pelt.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 5932152,
+   "srcTris": 548660,
+   "tris": 548660,
+   "min": [
+    -0.8454,
+    0,
+    -1.1
+   ],
+   "max": [
+    0.8454,
+    0.2691,
+    1.1
+   ],
+   "lods": [
+    {
+     "url": "assets/models/fur_pelt_lod1.glb",
+     "tris": 7300,
+     "far": 2,
+     "of": "6345500:1792820389991"
+    }
+   ],
+   "hi": "assets/models/hi/fur_pelt.glb",
+   "hiBytes": 6345500,
+   "hiCard": 64
   }
  }
 }

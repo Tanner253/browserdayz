@@ -1315,6 +1315,29 @@ export class AudioEngine {
   // ------------------------------------------------------------ world
 
   /** latch click + hinge creak (opening) or a soft thud (closing) */
+  /**
+   * An animal heard (src/sim/animal-calls.ts, and its own movements: src/game/animals.ts): its recording,
+   * assets/sounds/animal_<name>.wav, fetched when one is first heard, from where it was, as late as sound takes to come
+   * and dulled with the distance as a shot is. Silent where there is no recording.
+   */
+  animalCall(name: string, pos: V3, distance: number, gain = 1, waited = false) {
+    if (!this.ready) return;
+    const buf = bank.get(`animal_${name}`)?.[0];
+    if (!buf) {
+      // (the first is heard once it is here, if that is soon)
+      if (!waited) {
+        const asked = performance.now();
+        void lateRecording(`animal_${name}`).then(() => performance.now() - asked < 1500 && this.animalCall(name, pos, distance, gain, true));
+      }
+      return;
+    }
+    const src = this.ctx.createBufferSource(), level = this.ctx.createGain();
+    src.buffer = buf;
+    level.gain.value = gain;
+    src.connect(level).connect(this.out(pos, 10, 1, distance, this.bus.ambience));
+    src.start(this.ctx.currentTime + distance / 343);
+  }
+
   door(opening: boolean, pos: V3, distance = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;

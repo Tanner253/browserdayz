@@ -11,7 +11,7 @@ import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import type { Atmosphere } from '../world/atmosphere';
 import { heightAt, type World } from '../world/worldgen';
-import { ANIMALS, A_ALERT, A_BITE, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_ROAR, A_RUN, A_SWIPE, A_TROT, A_WALK, KINDS, ROW_BLEEDS, type AnimalRow, type Kind } from '../sim/animals';
+import { ANIMALS, CALLS, type Call, A_ALERT, A_BITE, A_DEAD, A_DRINK, A_GRAZE, A_HIT, A_IDLE, A_REST, A_ROAR, A_RUN, A_SWIPE, A_TROT, A_WALK, KINDS, ROW_BLEEDS, type AnimalRow, type Kind } from '../sim/animals';
 import { Herd, type Seen, type Strike } from '../sim/animal-mind';
 import { animalGround } from '../sim/animal-ground';
 import type { RockPiece } from '../sim/pass';
@@ -29,6 +29,8 @@ export interface WildHost {
   hour(): number;
   /** playing alone: one of them has struck this player */
   struck(s: Strike, kind: Kind): void;
+  /** something of them is heard: a call (src/sim/animal-calls.ts) or a movement's own sound, from where it was */
+  heard(name: string, at: THREE.Vector3): void;
 }
 
 /** the clip each mode plays, and what stands in for it in a model without it */
@@ -39,6 +41,19 @@ const CLIPS: Record<number, string[]> = {
 };
 /** the movements played once and held at their end, not looped */
 const ONCE = new Set(['death', 'swipe', 'bite', 'roar', 'hit']);
+/**
+ * What is heard as a movement begins, by kind and movement, and how near it has to be, metres: a bear's roar as it
+ * charges, its growl and bite, a wolf's snarl as it goes in; hooves when deer or cattle break into a run.
+ */
+const SOUNDS: Record<string, Record<string, [name: string, reach: number]>> = {
+  bear: { roar: ['bear_roar', 300], swipe: ['bear_growl', 90], bite: ['bear_bite', 90] },
+  wolf: { bite: ['wolf_snarl', 60] },
+  stag: { run: ['hooves', 60] },
+  doe: { run: ['hooves', 60] },
+};
+/** hooves at most this often, milliseconds: a whole herd breaking into a run is one sound of running, not five */
+const HOOVES = 2000;
+let hoovesAt = 0;
 const DRAWN = 260;
 const MOVED = 120;
 /** how far behind the server's word it is drawn, so that there is always a word on either side of now, ms */
@@ -55,6 +70,10 @@ const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b
 interface Kit {
   scene: THREE.Object3D;
   clips: Map<string, THREE.AnimationClip>;
+  /** each gait's own pace over the ground, metres a second (scripts/animals.mjs measures it) */
+  paces: Record<string, number>;
+  /** the moment each blow lands in its movement, seconds in (the same) */
+  strikes: Record<string, number>;
 }
 const kits = new Map<string, Promise<Kit | null>>();
 
@@ -64,7 +83,7 @@ function kitOf(kind: Kind): Promise<Kit | null> {
   if (!k) {
     k = (async () => {
       const model = assets.manifest.models[kind.model] ? kind.model : MEASURING ? 'animal_stag' : null;
-      const entry = model ? (assets.manifest.models[model] as { cuts?: Record<string, [number, number]> } | undefined) : undefined;
+      const entry = model ? (assets.manifest.models[model] as { cuts?: Record<string, [number, number]>; paces?: Record<string, number>; strikes?: Record<string, number> } | undefined) : undefined;
       if (!entry || !model) return null;
       const gltf = await assets.gltfOf(model);
       const clips = new Map<string, THREE.AnimationClip>();
@@ -73,7 +92,7 @@ function kitOf(kind: Kind): Promise<Kit | null> {
         const take = gltf.animations[0];
         for (const [name, [a, b]] of Object.entries(entry.cuts)) clips.set(name, THREE.AnimationUtils.subclip(take, name, Math.round(a * 30), Math.round(b * 30), 30));
       } else for (const c of gltf.animations) clips.set(c.name, c);
-      return { scene: gltf.scene, clips };
+      return { scene: gltf.scene, clips, paces: entry.paces ?? {}, strikes: entry.strikes ?? {} };
     })().catch((e) => {
       console.warn(`animal ${kind.id}:`, e);
       return null;
@@ -98,6 +117,8 @@ export class Beast implements Damageable {
   private snaps: { t: number; x: number; z: number; yaw: number; mode: number }[] = [];
   private model: THREE.Object3D | null = null;
   private mixer: THREE.AnimationMixer | null = null;
+  private paces: Record<string, number> = {};
+  private strikes: Record<string, number> = {};
   private actions = new Map<string, THREE.AnimationAction>();
   private playing: THREE.AnimationAction | null = null;
   private playingName = '';
@@ -131,6 +152,8 @@ export class Beast implements Damageable {
       mats.forEach((mat) => this.host.atmo().register(mat));
     });
     this.model = model;
+    this.paces = kit.paces;
+    this.strikes = kit.strikes;
     this.root.add(model);
     this.root.rotation.order = 'YXZ';
     this.mixer = new THREE.AnimationMixer(model);
@@ -190,6 +213,9 @@ export class Beast implements Damageable {
     if (already) this.fall = 1;
   }
 
+  /** how far it is from the eye, metres (as of its last frame) */
+  private away = 0;
+
   update(dt: number, now: number, eye: THREE.Vector3) {
     // where it was BEHIND ago, between the two words either side of then
     const t = now - BEHIND, s = this.snaps;
@@ -211,6 +237,7 @@ export class Beast implements Damageable {
       if (!this.dead) this.mode = k < 1 ? a.mode : b.mode;
     }
     const d = Math.hypot(this.x - eye.x, this.z - eye.z);
+    this.away = d;
     this.root.visible = !!this.model && d < DRAWN;
     if (!this.model) return;
     // sat on the ground it stands on, nose up a slope and down one
@@ -280,14 +307,23 @@ export class Beast implements Damageable {
     }
     if (act && name !== this.playingName) {
       act.reset().play();
+      // (a blow begun where its paw or jaws are as far from landing as the wind-up is long: it lands with the damage)
+      const move = this.kind.fight?.moves.find((m) => m.mode === this.mode), hit = this.strikes[name];
+      if (move && hit !== undefined) act.time = Math.max(0, hit - move.windup);
+      const sound = SOUNDS[this.kind.id]?.[name], at = performance.now();
+      if (sound && this.away < sound[1] && (sound[0] !== 'hooves' || at - hoovesAt > HOOVES)) {
+        if (sound[0] === 'hooves') hoovesAt = at;
+        this.host.heard(sound[0], this.root.position);
+      }
       if (this.playing) act.crossFadeFrom(this.playing, ONCE.has(name) ? 0.12 : 0.3, false);
       this.playing = act;
       this.playingName = name;
     }
-    // (a gait played as fast as the animal is going, beside the pace it was drawn for)
+    // (a gait played as fast as the animal is going, beside the pace its feet go over the ground at in the clip: so
+    // they stay where they are put down)
     if (act && (name === 'walk' || name === 'trot' || name === 'run')) {
-      const pace = name === 'walk' ? this.kind.walk : name === 'trot' ? this.kind.trot : this.kind.run;
-      act.timeScale = THREE.MathUtils.clamp(this.speed / pace, 0.6, 1.6);
+      const pace = this.paces[name] ?? (name === 'walk' ? this.kind.walk : name === 'trot' ? this.kind.trot : this.kind.run);
+      act.timeScale = THREE.MathUtils.clamp(this.speed / pace, 0.4, 2);
     } else if (act) act.timeScale = 1;
   }
 
@@ -308,6 +344,8 @@ export class Wildlife {
   /** the herds being stood, a little at a time */
   private standing: Herd | null = null;
   private stepT = 0;
+  /** playing alone: when the last of the herds' calls was heard */
+  private calledAt = 0;
   /** the canyon's rock the game has stood (main.ts hands it over): solid to the herds played alone, as to the server's */
   rocks: RockPiece[] = [];
 
@@ -349,8 +387,22 @@ export class Wildlife {
       const b = this.herd.beasts.get(s.i);
       if (b) this.host.struck(s, KINDS[b.k]);
     }
+    // (what the server would tell this player of them: within its carry, and no two of the herds' calls close together)
+    for (const k of turn.calls) {
+      const reach = k.call === 'bark' ? CALLS.bark.heard : CALLS[k.call].heard;
+      if (!me || Math.hypot(me.x - k.x, me.z - k.z) > reach) continue;
+      if (k.call !== 'bark' && now - this.calledAt < CALLS.apart * 1000) continue;
+      if (k.call !== 'bark') this.calledAt = now;
+      this.call(k.call, k.x, k.z);
+    }
     const at = me ?? { x: 0, z: 0 };
     this.rows(this.herd.rows(at.x, at.z, ANIMALS.told), true, performance.now());
+  }
+
+  /** a call heard (online, the server's 'acall'): from where it was, at the height of the ground there */
+  call(name: Call, x: number, z: number) {
+    const w = this.host.world();
+    this.host.heard(name, new THREE.Vector3(x, heightAt(w.heights, x, z) + 1.2, z));
   }
 
   /** playing alone: a shot heard by everything within earshot */

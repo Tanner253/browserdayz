@@ -299,6 +299,7 @@ export class Game {
       audio.blow(true, { x: p.x, y: p.y + 1.1, z: p.z }, 1);
       this.takeHit({ t: 'dmg', from: 0, amount: s.damage, zone: 'torso', w: kind.id, dir: [(p.x - s.from[0]) / len, 0, (p.z - s.from[1]) / len], bleed: s.bleed });
     },
+    heard: (name, at) => audio.animalCall(name, at, Math.hypot(at.x - this.player.pos.x, at.z - this.player.pos.z)),
   });
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
