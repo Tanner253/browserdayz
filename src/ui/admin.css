@@ -290,6 +290,8 @@ button.adm-p:hover { background: rgba(233, 228, 216, 0.07); }
 .adm-log time { margin-right: 9px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
 .adm-log > .adm-ic { position: absolute; left: 12px; top: 8px; color: var(--ink-faint); }
 .adm-log .last { color: var(--ink); }
+.adm-log .adm-copy { align-self: flex-start; margin-top: 5px; padding: 4px 10px; font-size: 13px; background: rgba(233, 228, 216, 0.1); border: 1px solid var(--accent); }
+.adm-log .adm-copied { margin-top: 5px; height: 72px; font: 11px var(--mono); color: var(--ink); background: rgba(0, 0, 0, 0.4); border: 1px solid var(--rim); user-select: text; }
 
 /* which powers are on, said at the top of the screen for as long as they are */
 .hud-powers { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: none; padding: 3px 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: #c8a8ff; background: rgba(10, 12, 11, 0.6); border: 1px solid rgba(200, 168, 255, 0.4); pointer-events: none; }

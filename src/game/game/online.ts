@@ -478,6 +478,8 @@ export const onlineMethods = {
     net.on('sys', (m) => {
       this.hud.chatLine('system', '', m.text);
       this.adminUI.say(m.text);
+      // (what is said in the chat cannot be selected: the answer to /stashes is copied from the admin panel, in one press)
+      if (/^\d+ stashes kept/.test(m.text)) this.hud.note('The stash list is ready: open the admin panel (`) and press "Copy the stash list"', 'info');
     });
     net.on('adm', (m) => {
       this.admPlayers = new Map(m.players.map((q) => [q.id, q]));
