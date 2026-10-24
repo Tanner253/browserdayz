@@ -66,6 +66,7 @@ export const handsMethods = {
     this.slowT = 1; // refresh carried weight on the next frame
     this.weapons.validate();
     this.syncGear();
+    this.inv.forgetGone();
     this.autoHot();
     this.meDirty = true;
     this.syncOpenBox();
@@ -87,14 +88,17 @@ export const handsMethods = {
    * What goes on the back or in the holster takes the key of its place, and a new kind of thing to eat, drink or
    * dress a wound with takes the first free key after those, by itself: nobody has to open their pack under fire
    * to find out which key the bandage they have just picked up is on. Everything else is put on a key by hand.
+   * Each kind once a life: a key taken off it, or whose thing left, stays bare (the owner, 2026-10-23: "when i drop
+   * an item my hotbar should forget about it"; it bounced back on the next pick-up before).
    */
   autoHot(this: Game) {
     this.inv.autoBind();
     for (const it of this.inv.carried()) {
-      if (!ITEMS[it.id].use || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
+      if (!ITEMS[it.id].use || this.inv.autoGiven.has(it.id) || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
       for (let i = HOT_FREE; i < this.inv.hot.length; i++) {
-        if (this.inv.hot[i] && this.inv.hotItem(i)) continue;
+        if (this.inv.hot[i]) continue;
         this.inv.bind(i, it);
+        this.inv.autoGiven.add(it.id);
         break;
       }
     }

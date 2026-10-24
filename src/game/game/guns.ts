@@ -501,8 +501,9 @@ export const gunsMethods = {
       // (offline, a piece of furniture is given what the economy has put in it since it was last opened)
       if (!this.online && this.openStash && economyCargo(this.openStash.kind)) this.fillCrate(this.openStash);
       if (this.online && this.openStash) {
-        // the server holds what is inside; show it once it answers
-        this.invUI.setStashState('Opening…');
+        // (the server holds what is inside: asked for on the way to it (peekNear), it is shown at once and brought up
+        // to date by the answer; never asked for, it is shown once the server answers)
+        if (!this.openStash.known) this.invUI.setStashState('Opening…');
         this.net.send({ t: 'copen', cid: this.openStash.uid });
       }
       // (going through something is heard by whoever is near, as the lockers' doors are seen, but of an admin vanished: see SEARCHED)

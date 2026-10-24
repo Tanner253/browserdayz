@@ -148,27 +148,29 @@ try {
   for (const p of [ann, bob, cat]) assert.deepEqual(p.doors(one.cid), [true], `${p.name} was not told the locker stands open`);
   ok('one player opens a locker: they are shown what is in it, and they, the player beside them and one across the map are told its doors are open');
 
-  // ---- while it is being searched nobody else has it, and nothing more is said of its doors; asked for again by
-  // whoever has it, nothing more is said either
+  // ---- searched by two at once (2026-10-23, the owner's players "locked out" of what somebody else had open:
+  // server/searched.ts): the second is shown what is in it too, and nothing more is said of its doors; asked for
+  // again by whoever has it, nothing more is said either
   bob.say(one.x + 1, one.z + 0.5);
   await sleep(150);
   bob.send({ t: 'copen', cid: one.cid });
   ann.send({ t: 'copen', cid: one.cid });
   await sleep(300);
-  assert.equal(bob.last('cbusy')?.cid, one.cid, 'two players are searching one locker');
+  assert.equal(bob.last('cdata')?.cid, one.cid, 'a second player was kept out of a locker somebody has open');
+  assert.equal(bob.last('cbusy'), undefined, 'a second player was told the locker is busy');
   assert.equal(ann.got.filter((m) => m.t === 'cdata').length, 2, 'whoever has it open was not told again what is in it');
   for (const p of [ann, bob, cat]) assert.deepEqual(p.doors(one.cid), [true], `${p.name} was told of the doors again`);
   // and somebody who comes in now finds it standing open
   const dee = new Player('Dee');
   assert.ok(await dee.join());
   assert.deepEqual(dee.last('welcome')!.ajar, [one.cid], 'somebody who came in while it was being searched is not shown it open');
-  ok('while it is searched nobody else has it and nothing more is said of its doors; somebody who comes in meanwhile is told it stands open');
+  ok('two players search one locker at once, and nothing more is said of its doors; somebody who comes in meanwhile is told it stands open');
 
-  // ---- on to the locker beside it without shutting the first: the first shuts, the second opens
+  // ---- on to the locker beside it without shutting the first: the first stays open while Bob still has it, the second opens
   ann.send({ t: 'copen', cid: two.cid });
   await sleep(300);
   for (const p of [ann, bob, cat, dee]) {
-    assert.deepEqual(p.doors(one.cid).slice(-1), [false], `${p.name} was not told the first locker is shut`);
+    assert.deepEqual(p.doors(one.cid), p === dee ? [] : [true], `${p.name} was told the first locker shut while Bob still searches it`);
     assert.deepEqual(p.doors(two.cid), [true], `${p.name} was not told the second locker stands open`);
   }
   // ---- done with it: it shuts, for everybody
@@ -177,21 +179,21 @@ try {
   for (const p of [ann, bob, cat, dee]) assert.deepEqual(p.doors(two.cid), [true, false], `${p.name} was not told the locker is shut`);
   const eve = new Player('Eve');
   assert.ok(await eve.join());
-  assert.deepEqual(eve.last('welcome')!.ajar, [], 'somebody who came in after it was shut is shown it open');
+  assert.deepEqual(eve.last('welcome')!.ajar, [one.cid], 'somebody who came in after the second was shut is not shown the first, still searched, open');
   eve.ws.close();
-  ok('moving on to the next locker shuts the first and opens the second; done with it, it shuts; and everybody is told each time');
+  ok('moving on to the next locker leaves the first open to whoever still searches it and opens the second; done with it, it shuts; and everybody is told each time');
 
-  // ---- whoever is searching one and leaves the game leaves it shut behind them
+  // ---- the last who is searching one and leaves the game leaves it shut behind them
   bob.send({ t: 'copen', cid: one.cid });
   await sleep(300);
-  assert.equal(bob.last('cdata')?.cid, one.cid, 'the locker cannot be opened once the first to search it is done');
-  assert.deepEqual(cat.doors(one.cid), [true, false, true]);
+  assert.equal(bob.last('cdata')?.cid, one.cid, 'the locker cannot be opened again by whoever has it');
+  assert.deepEqual(cat.doors(one.cid), [true]);
   bob.ws.close();
   await sleep(600);
-  for (const p of [ann, cat]) assert.deepEqual(p.doors(one.cid), [true, false, true, false], `${p.name} was not told the locker shut when the player searching it left`);
-  // (Dee came in while it stood open the first time: that much she had from her welcome)
-  assert.deepEqual(dee.doors(one.cid), [false, true, false], 'Dee was not told the locker shut when the player searching it left');
-  ok('a player who leaves the game with a locker open leaves it shut: everybody is told');
+  for (const p of [ann, cat]) assert.deepEqual(p.doors(one.cid), [true, false], `${p.name} was not told the locker shut when the last player searching it left`);
+  // (Dee came in while it stood open: that much she had from her welcome)
+  assert.deepEqual(dee.doors(one.cid), [false], 'Dee was not told the locker shut when the player searching it left');
+  ok('the last player searching a locker who leaves the game leaves it shut: everybody is told');
 
   // ---- from too far off nothing is opened, and nothing is said
   cat.send({ t: 'copen', cid: two.cid });

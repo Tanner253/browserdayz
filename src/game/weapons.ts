@@ -2857,6 +2857,7 @@ export class Weapons {
       } else {
         this.action = null;
       }
+      this.slungKey = JSON.stringify(this.slung());
       this.onSlungChange(this.slungModel());
     };
     if (this.current) this.start('unequip', 0.28, swap, { away: next ? 0 : 1 });
@@ -2874,8 +2875,15 @@ export class Weapons {
       if (this.current) this.vmRoot.add(this.current.root);
       this.action = null;
     }
+    // (what is slung on the back built again only when that has changed: every change of the pockets cloned the guns
+    // on the back afresh, 2026-10-23)
+    const key = JSON.stringify(this.slung());
+    if (key === this.slungKey) return;
+    this.slungKey = key;
     this.onSlungChange(this.slungModel());
   }
+  /** what was last slung on the back, as a word (see `validate`) */
+  private slungKey = '';
 
   /** mouse wheel: next / previous occupied slot (wraps through empty hands) */
   cycle(dir: 1 | -1) {

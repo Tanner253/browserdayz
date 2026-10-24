@@ -26,6 +26,7 @@ import { pinned } from './pinned';
 import { perks } from './perks';
 import { plating } from './plates';
 import { SHOP, type ItemId } from '../api/_lib/shop-items';
+import { forget } from './searched';
 
 export interface Client {
   ws: WebSocket;
@@ -433,6 +434,7 @@ export function drop(c: Client) {
   ADMIN.tints.delete(c.id);
   if (ADMIN.gone.length > 60) ADMIN.gone.shift();
   releaseLock(c);
+  forget(c);
   leaveSeat(c, true);
   // (left when they went: a body left sleeping after a connection was lost is not its owner on the server, and the
   // clock on a tag they took does not run for it, the owner, 2026-10-17: "the cash-in clock on a taken tag only counts

@@ -105,4 +105,20 @@ const sound = (c: Container) => {
   for (const c of inv.containers) sound(c);
 }
 
-console.log('sort-all: 5 checks pass');
+
+// a bag's kind is the bag's own: the server's cleaning of what a game says it carries keeps it, and only a kind there is
+{
+  const { cleanInventory } = await import('../src/sim/inventory');
+  const name = (v: unknown) => String(v ?? '');
+  const raw = { slots: { back: { uid: 'pack-1', id: 'suitcase', qty: 1, for: 'ammo', cargo: [] }, vest: { uid: 'vest-1', id: 'life_vest', qty: 1, for: 'gold bars', cargo: [] } }, active: null, containers: [] };
+  const inv = cleanInventory(raw, name)!;
+  assert.equal(inv.slots.back?.for, 'ammo', 'what a pack is set for was lost in the server\'s cleaning');
+  assert.equal(inv.slots.vest?.for, undefined, 'a kind there is not was kept');
+  // (and it is what the game's own grid of that pack goes by)
+  const back = new PlayerInventory();
+  back.load(inv);
+  const sack = back.containers.find((c) => c.of === 'suitcase')!;
+  assert.equal(sack.bag?.for, 'ammo', 'the pack\'s grid does not know what the pack is set for');
+}
+
+console.log('sort-all: 6 checks pass');

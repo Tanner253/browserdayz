@@ -186,7 +186,18 @@ export interface ItemInstance {
    * gone, Rust's way. Only ever the server's word (server/plates.ts); a game's own is not read.
    */
   finish?: string;
+  /** a bag, a vest or the pockets of something worn, set for a kind of thing: that kind goes into it first (BAG_KINDS) */
+  for?: BagKind;
 }
+
+/**
+ * The kinds a bag can be set for, and the item categories each takes (the owner, 2026-10-23: "people want to be able
+ * to assign their containers as a "Type" like ammo or food or medical etc so those items automatically go there").
+ * Kept on the bag itself, so it is the same after a restart, on another device, and dropped and picked up again.
+ */
+export const BAG_KINDS = { ammo: ['ammo', 'magazine'], food: ['food', 'drink'], medical: ['medical'], parts: ['attachment'], tools: ['tool', 'misc'] } as const;
+export type BagKind = keyof typeof BAG_KINDS;
+export const isBagKind = (v: unknown): v is BagKind => typeof v === 'string' && Object.prototype.hasOwnProperty.call(BAG_KINDS, v);
 
 /**
  * seconds somebody else's dog tag has to be carried before it is cashed in

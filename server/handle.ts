@@ -1,7 +1,7 @@
 // The server: handle, every message a player sends, checked and acted on.
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
-import { bagGrid, holdOnlyEmpties } from '../src/sim/inventory';
+import { holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, makeItem, TAG_HOLD, type ItemInstance } from '../src/sim/items';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
@@ -15,7 +15,7 @@ import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
 import { type C2S, F_DEAD, F_SEAT, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
-import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
+import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
@@ -30,25 +30,17 @@ import { roleRows } from './roles';
 
 /** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
 const LYING_REACH = 4;
-/** what is in a thing, as it is sent: each with its place in it */
-const storedOf = (item: ItemInstance): StoredItem[] => (item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
 import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { shotHeard } from '../src/sim/heard';
-import { ajar, findCarried, hurtJeep, kill, leaveSeat, rackChanged, releaseLock, seatOf } from './acts';
-import { cameTo, holdsTag, keepToTheirs, payingTags, stripTags, wentFrom } from './custody';
+import { findCarried, hurtJeep, kill, leaveSeat, releaseLock, seatOf } from './acts';
+import { cameTo, holdsTag, keepToTheirs, payingTags, wentFrom } from './custody';
+import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, refusedNow, shutIt } from './searched';
 import { scores } from './queue';
 import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
 import { pinned } from './pinned';
-import { changed, contents } from './storages';
 import { aimWatch, looked } from './aimwatch';
-
-/** what is put in something that holds things, without any dog tag in it or in anything in it (Container.refusal) */
-function withoutTags<T extends { id: string; cargo?: { item: { id: string } }[] }>(items: T[]): T[] {
-  for (const it of items) if (it.cargo) it.cargo = it.cargo.filter((p) => p.item.id !== 'dogtag');
-  return items.filter((it) => it.id !== 'dogtag');
-}
 
 export function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
@@ -383,79 +375,38 @@ export function handle(c: Client, m: C2S) {
         send(c, { t: 'denied', uid: m.uid });
         return;
       }
-      // (not a pack somebody else is going through where it lies: what they took out of it would be in it still)
-      const holder = locks.get(`l:${m.uid}`);
-      if (holder !== undefined && holder !== c.id && clients.has(holder)) {
-        send(c, { t: 'denied', uid: m.uid });
-        return;
-      }
       if (c.seatAt || !economy.take(m.uid)) return void send(c, { t: 'denied', uid: m.uid });
       // (a tag in what was picked up is theirs from now on, its clock started now: custody.ts)
       if (lying) for (const t of payingTags(lying.item)) cameTo(c.key, t.uid);
-      if (holder !== undefined) {
-        locks.delete(`l:${m.uid}`);
-        clients.get(holder)?.openLying.delete(m.uid);
-      }
+      // (a pack picked up that others were going through where it lay: gone from under them, told by 'loot-')
+      goneFrom(`l:${m.uid}`);
       return;
     }
     case 'lopen': {
-      // What lies within reach that holds things, gone through where it lies as a crate is: each is this player's to
-      // set while nobody else has it open (see 'lset'). Nothing from a seat, or from under the ground.
+      // What lies within reach that holds things, gone through where it lies as a crate is, by as many as like at
+      // once (searched.ts). Nothing from a seat, or from under the ground.
       if (!Array.isArray(m.uids) || !c.alive || c.seatAt || buried(c)) return;
       for (const uid of m.uids.slice(0, 16)) {
         if (typeof uid !== 'string' || c.openLying.has(uid)) continue;
         const l = economy.loot.get(uid);
         if (!l || !holds(l.item.id) || Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > LYING_REACH) continue;
-        const holder = locks.get(`l:${uid}`);
-        if (holder !== undefined && holder !== c.id && clients.has(holder)) {
-          send(c, { t: 'lbusy', uid });
-          continue;
-        }
-        locks.set(`l:${uid}`, c.id);
+        openIt(c, `l:${uid}`);
         c.openLying.add(uid);
-        send(c, { t: 'ldata', uid, items: storedOf(l.item) });
+        send(c, { t: 'ldata', uid, items: laidIn(l.item) });
       }
       return;
     }
+    case 'lops':
     case 'lset': {
-      if (typeof m.uid !== 'string' || locks.get(`l:${m.uid}`) !== c.id || c.seatAt || !c.alive) return;
+      if (typeof m.uid !== 'string' || !hasOpen(c, `l:${m.uid}`) || c.seatAt || !c.alive) return;
       const l = economy.loot.get(m.uid);
       if (!l || !holds(l.item.id) || Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > LYING_REACH + 2) return;
-      let items = withoutTags(cleanStored(m.items));
-      if (CHECKS !== 'off') {
-        const made = items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
-        if (made.length && flag(c, `put ${ITEMS[made[0].id].name} in a ${ITEMS[l.item.id].name.toLowerCase()} lying there, which the server never put in the world`)) items = items.filter((it) => !made.includes(it));
-      }
-      // (laid as the thing's own grid lays them, by its own rules of what goes into it: what does not go, or has no
-      // room, is refused, and they are told what is in it after all)
-      const grid = bagGrid({ ...l.item, cargo: [] }, 1);
-      if (!grid) return;
-      let refused = false;
-      for (const s of items) {
-        const { x, y, rot, ...it } = s;
-        if (!grid.accepts(it) || !grid.place(it, x, y, rot)) refused = true;
-      }
-      if (refused) {
-        send(c, { t: 'ldata', uid: m.uid, items: storedOf(l.item) });
-        return;
-      }
-      // (a tag that was in it, dropped in a bag, and is not now came to this player, as off a body: custody.ts. None goes
-      // back into it: a tag is not stashed.)
-      const had = payingTags(l.item).map((t) => t.uid);
-      l.item.cargo = grid.items;
-      const left = new Set(payingTags(l.item).map((t) => t.uid));
-      for (const uid of had) if (!left.has(uid)) cameTo(c.key, uid);
-      for (const p of grid.items) issue(p.item);
-      // (gone through is used: a case kept between restarts starts its time again, see Economy's containerLife)
-      if (l.keptAt !== undefined) {
-        l.keptAt = Date.now();
-        KEPT.dirty = true;
-      }
-      broadcast({ t: 'lcargo', uid: m.uid, items: storedOf(l.item) });
+      if (m.t === 'lops') lyingOps(c, l, Array.isArray(m.ops) ? m.ops : []);
+      else lyingSet(c, l, m.items);
       return;
     }
     case 'lclose': {
-      for (const uid of c.openLying) if (locks.get(`l:${uid}`) === c.id) locks.delete(`l:${uid}`);
+      for (const uid of c.openLying) shutIt(c, `l:${uid}`);
       c.openLying.clear();
       return;
     }
@@ -463,6 +414,8 @@ export function handle(c: Client, m: C2S) {
       const l = m.l;
       const item = cleanItem(l?.item);
       if (!item || !num(l.x) || !num(l.y) || !num(l.z) || !num(l.rot) || economy.loot.has(item.uid)) return;
+      // (nor what somebody else took out of a crate first, which their game has yet to hear: searched.ts)
+      if (refusedNow(c).has(item.uid)) return;
       if (Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > 12) return;
       if (CHECKS !== 'off' && [...things({ slots: { it: item }, active: null, containers: [] })].some(invented) && flag(c, `put down ${ITEMS[item.id].name}, which the server never put in the world`)) return;
       // (a tag is put down only by whoever holds it, and is then on the ground and theirs no more: custody.ts)
@@ -478,68 +431,33 @@ export function handle(c: Client, m: C2S) {
       // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat; nor a body still in the air in one)
       if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
-      const holder = locks.get(m.cid);
-      if (holder !== undefined && holder !== c.id && clients.has(holder)) {
-        send(c, { t: 'cbusy', cid: m.cid });
-        return;
-      }
-      // (asked again for what they already have open, they are told what is in it and nothing is said of its doors)
-      const again = c.openCid === m.cid && holder === c.id;
-      if (!again) releaseLock(c, false);
-      locks.set(m.cid, c.id);
+      // (open by as many as like at once: searched.ts. Another crate they had open is shut first.)
+      if (c.openCid && c.openCid !== m.cid) shutIt(c, c.openCid);
+      if (!hasOpen(c, m.cid)) openIt(c, m.cid);
       c.openCid = m.cid;
-      if (!again) ajar(m.cid, true, c);
       touched(b);
-      send(c, { t: 'cdata', cid: m.cid, items: b.kind === 'furniture' ? contents(b) : b.items });
+      send(c, { t: 'cdata', cid: m.cid, items: boxItems(b) });
       return;
     }
+    case 'cpeek': {
+      // What is in it, asked for on the way to it: told, and nothing else (no doors, nobody holds it). See box-ops.ts.
+      const b = typeof m.cid === 'string' ? boxes.get(m.cid) : undefined;
+      if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
+      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6 || !mayPeek(c, m.cid)) return;
+      send(c, { t: 'cdata', cid: m.cid, items: boxItems(b) });
+      return;
+    }
+    case 'cops':
     case 'cset': {
       const b = boxes.get(m.cid);
-      if (!b || locks.get(m.cid) !== c.id || c.seatAt) return;
-      // (a piece of furniture: the economy's things in it are told apart from what they leave there, server/storages.ts)
-      if (b.kind === 'furniture') {
-        const items = withoutTags(cleanStored(m.items));
-        changed(b, items);
-        if (CHECKS !== 'off') {
-          const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
-          if (made.length && flag(c, `stored ${ITEMS[made[0].id].name}, which the server never put in the world`)) b.items = b.items.filter((it) => !made.includes(it));
-          for (const it of b.items) issue(it);
-        }
-        touched(b);
-        return;
-      }
-      // (a dog tag lies on a body and nowhere else that holds things: the owner, "dogtags should not be stashed")
-      const before = b.kind === 'corpse' ? b.items.flatMap((it) => payingTags(it)).map((t) => t.uid) : [];
-      b.items = b.kind === 'corpse' ? cleanStored(m.items) : withoutTags(cleanStored(m.items));
-      if (b.kind === 'corpse') {
-        // (A tag that left the body came to this player; one that came onto it left them. One put on it that they
-        // do not hold is not put on it: what a game says is on a body is not taken for a tag. custody.ts)
-        const now = b.items.flatMap((it) => payingTags(it)).map((t) => t.uid);
-        const foreign = new Set(now.filter((uid) => !before.includes(uid) && !holdsTag(c.key, uid)));
-        if (foreign.size) {
-          log(`${c.name} put ${foreign.size} dog tag${foreign.size === 1 ? '' : 's'} they do not hold on a body: not let through`);
-          b.items = b.items.filter((it) => !foreign.has(it.uid));
-          for (const it of b.items) stripTags(it, foreign);
-        }
-        for (const uid of before) if (!now.includes(uid)) cameTo(c.key, uid);
-        const onto = now.filter((uid) => !before.includes(uid) && !foreign.has(uid));
-        for (const uid of onto) wentFrom(c.key, uid, `b:${b.cid}`);
-        if (onto.length) takeOut(c.inv, new Set(onto));
-      }
-      if (CHECKS !== 'off') {
-        const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
-        if (made.length && flag(c, `stored ${ITEMS[made[0].id].name}, which the server never put in the world`)) b.items = b.items.filter((it) => !made.includes(it));
-        // (let through, it is in the world from now on: it is whoever brought it that was asked)
-        for (const it of b.items) issue(it);
-      }
-      if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
-      if (b.kind === 'crate') b.pickedAt = economy.time;
-      rackChanged(b);
-      touched(b);
+      if (!b || !hasOpen(c, m.cid) || c.seatAt) return;
+      if (m.t === 'cops') boxOps(c, b, Array.isArray(m.ops) ? m.ops : []);
+      else boxSet(c, b, m.items);
       return;
     }
     case 'cclose': {
-      if (c.openCid === m.cid) releaseLock(c, false);
+      shutIt(c, m.cid);
+      if (c.openCid === m.cid) c.openCid = null;
       return;
     }
     case 'bury': {
@@ -567,7 +485,7 @@ export function handle(c: Client, m: C2S) {
       const b = boxes.get(m.uid);
       if (!b || b.kind !== 'stash' || !b.buried) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > BURY.reach) return;
-      locks.delete(m.uid);
+      goneFrom(m.uid);
       boxes.delete(m.uid);
       KEPT.dirty = true;
       log(`${c.name} dug up a ${(ITEMS[b.item ?? 'stash_kit']?.name ?? 'stash').toLowerCase()} at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`);
@@ -589,7 +507,9 @@ export function handle(c: Client, m: C2S) {
       // (of the tags that can pay, only those the server has seen this player take: one they dropped, put on a body,
       // or had trashed, said to be in their pockets still, is not: custody.ts)
       const notTheirs = keepToTheirs(c.key, c.inv);
-      if (notTheirs.length) takeOut(c.inv, new Set(notTheirs));
+      // (nor anything they took out of a crate that somebody else had taken first: their game is being told, searched.ts)
+      const refused = refusedNow(c);
+      if (notTheirs.length || refused.size) takeOut(c.inv, new Set([...notTheirs, ...refused]));
       // (no tag of their own round the neck of somebody alive less than TAG_FRESH: their game puts it on then, and an
       // admin looking in their pockets before that sees none)
       if (c.inv?.slots?.neck && tagTime(c) < TAG_FRESH_MS) c.inv.slots.neck = null;

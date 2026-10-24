@@ -35,6 +35,7 @@ import { CRESSET } from '../../world/castle';
 import { castleDark } from '../../sim/castle';
 import { HELI } from '../../sim/heli';
 import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEARCHLIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
+import { diffOps, type Laid } from '../../sim/box-ops';
 
 /** how far off a lit street lamp is seen, metres: within the camera's reach (1800) */
 const LAMP_SEEN = 1600;
@@ -239,10 +240,15 @@ export const dropsMethods = {
     this.net.send({ t: 'drop', l });
   },
 
+  /** what was done in the crate open told to the server, move by move, from what it last said is in it: any number may have it open at once (server/searched.ts) */
   syncOpenBox(this: Game) {
     const st = this.openStash;
     if (!this.online || !st || !st.known) return;
-    this.net.send({ t: 'cset', cid: st.uid, items: st.container.serialize().items });
+    const now = st.container.serialize().items as Laid[];
+    const ops = diffOps((st.sent ?? []) as Laid[], now);
+    if (!ops.length) return;
+    st.sent = JSON.parse(JSON.stringify(now));
+    this.net.send({ t: 'cops', cid: st.uid, ops });
   },
 
   // ------------------------------------------------------------ targets (offline)

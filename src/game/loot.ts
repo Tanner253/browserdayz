@@ -18,6 +18,7 @@ import { Container } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import { SHADOW_FRUSTA, type Atmosphere } from '../world/atmosphere';
 import type { LootPoint } from '../world/buildings';
+import type { StoredItem } from '../net/protocol';
 
 export interface ItemTemplate {
   group: THREE.Group;
@@ -682,6 +683,8 @@ export class Stash {
   fixed = false;
   /** multiplayer: contents were fetched from the server at least once */
   known = false;
+  /** multiplayer: what the server last said is in it, or what this game last told it: its moves are reckoned from this (src/sim/box-ops.ts) */
+  sent: StoredItem[] | null = null;
   /** a dead player's body: searched like a crate, gone once it despawns */
   corpse = false;
   /** prop kind of a map crate (selects its loot table) */

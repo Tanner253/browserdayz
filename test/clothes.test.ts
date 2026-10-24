@@ -497,7 +497,8 @@ ok('the hot keys are kept by the server (they were let fall, and were bare after
   assert.equal(clean.length, HOT_KEYS);
   assert.deepEqual(clean, [{ uid: 'a', id: 'bandage' }, null, null, null, null, { uid: 'x'.repeat(64), id: 'stim' }, null, null, { uid: 'd', id: 'ak' }, { uid: 'e', id: 'm9' }]);
   for (const none of [undefined, null, 'keys', 5, {}]) assert.deepEqual(cleanHot(none), Array(HOT_KEYS).fill(null));
-  assert.deepEqual(cleanInventory({ slots: {}, containers: [], hot: junk }, name)!.hot, clean);
+  // (and the server keeps no key whose thing is not carried: here, none is. test/hot-forget.test.ts)
+  assert.deepEqual(cleanInventory({ slots: {}, containers: [], hot: junk }, name)!.hot, Array(HOT_KEYS).fill(null));
 });
 
 ok('what is no thing is left out of what the server keeps, and what is said of a thing is held to what can be', () => {

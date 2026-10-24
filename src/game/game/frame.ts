@@ -69,6 +69,11 @@ export const frameMethods = {
     // The inventory open: what lies near comes into the list and goes out of it as they walk, and a crate refilled
     // while open (alone, the economy's) is shown. Nothing else redraws it on a clock: it was redrawn whole every 5 s
     // as well, changed or not, until 2026-10-23.
+    // (what is in the crates within a few steps, asked for on the way to them: see peekNear)
+    if (!this.invUI.isOpen && (this.peekT += dt) > 0.3) {
+      this.peekT = 0;
+      this.peekNear();
+    }
     if (this.invUI.isOpen && (this.vicinityT += dt) > 0.25) {
       this.vicinityT = 0;
       const near = this.around();

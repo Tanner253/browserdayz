@@ -20,7 +20,7 @@
 // other people go in a pouch of ten, so they do not fill the pockets; an eleventh goes
 // wherever there is room.
 
-import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
+import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, isBagKind, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
 
 const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(ALL_SLOTS.map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
 /** the places whose things are looked into for room, in the order they are filled: jacket and trousers first, as ever, then the rest of what is worn */
@@ -42,6 +42,9 @@ export interface HotBind {
 
 export type { Placed };
 
+/** A pile gone into another of its kind (topped up into it, combined, let go on it): its hot key goes with it (`forgetGone`). */
+export const poured = new WeakMap<ItemInstance, ItemInstance>();
+
 export class Container {
   /**
    * @param items backing array (a bag's own `cargo`), so the container is a live view of the item
@@ -61,6 +64,8 @@ export class Container {
 
   /** the thing this grid is the inside of, by its item (a pack, a vest, a jacket, a stash case); null for a grid that is no thing's: the tag pouch, a crate, a body, a stash on the ground */
   of: string | null = null;
+  /** that thing itself, where the grid is the inside of something worn (what it is set for is on it: `for`) */
+  bag: ItemInstance | null = null;
 
   static size(item: ItemInstance, rot: boolean): [number, number] {
     const d = ITEMS[item.id];
@@ -190,7 +195,6 @@ export class Container {
     return true;
   }
 
-  /** Merges into existing stacks first, then finds free space. Returns leftover qty. */
   /** a pile put onto the piles of its kind already here, as far as they have room: true if none of it is left */
   topUp(item: ItemInstance): boolean {
     const cap = ITEMS[item.id].stack;
@@ -200,11 +204,15 @@ export class Container {
       const move = Math.min(cap - p.item.qty, item.qty);
       p.item.qty += move;
       item.qty -= move;
-      if (item.qty <= 0) return true;
+      if (item.qty <= 0) {
+        poured.set(item, p.item);
+        return true;
+      }
     }
     return false;
   }
 
+  /** Merges into existing stacks first, then finds free space. Returns what is left of it, or null. */
   add(item: ItemInstance): ItemInstance | null {
     if (!this.accepts(item)) return item;
     if (this.topUp(item)) return null;
@@ -531,6 +539,10 @@ export class PlayerInventory {
   hand: ItemInstance | null = null;
   /** what each hot key is bound to */
   hot: (HotBind | null)[] = Array.from({ length: HOT_KEYS }, () => null);
+  /** each bound thing as last seen on this body, to follow it into the pile it was poured into (`forgetGone`) */
+  private boundSeen = new Map<string, ItemInstance>();
+  /** the kinds a key has been given by itself in this life (`Game.autoHot`), each once: a kind whose thing left is not put back on a key when more of it comes */
+  autoGiven = new Set<string>();
 
   /** What is in the hands: something off the back or out of the holster, or a thing out of a pocket. */
   held(): ItemInstance | null {
@@ -551,16 +563,12 @@ export class PlayerInventory {
     for (const c of this.containers) if (c !== this.tags) for (const p of c.items) yield p.item;
   }
 
-  /** The thing a hot key brings up: the one it was given, or failing that another of its kind (null: nothing of the sort is carried). */
+  /** The thing a hot key brings up: the very one it was given (null: it is not carried where it can be taken up). */
   hotItem(i: number): ItemInstance | null {
     const b = this.hot[i];
     if (!b) return null;
-    let other: ItemInstance | null = null;
-    for (const it of this.carried()) {
-      if (it.uid === b.uid) return it;
-      if (!other && it.id === b.id) other = it;
-    }
-    return other;
+    for (const it of this.carried()) if (it.uid === b.uid) return it;
+    return null;
   }
 
   /** Put a thing on a hot key (it comes off any other it was on), or clear the key. */
@@ -568,12 +576,36 @@ export class PlayerInventory {
     if (i < 0 || i >= HOT_KEYS) return;
     if (item) this.hot = this.hot.map((b) => (b && b.uid === item.uid ? null : b));
     this.hot[i] = item ? { uid: item.uid, id: item.id } : null;
+    if (item) this.boundSeen.set(item.uid, item);
   }
 
-  /** the hot key this thing is on, or one of its kind is (-1: none) */
+  /** the hot key this thing is on (-1: none) */
   hotOf(item: ItemInstance): number {
-    const own = this.hot.findIndex((b) => b?.uid === item.uid);
-    return own >= 0 ? own : this.hot.findIndex((b, i) => b?.id === item.id && this.hotItem(i) === item);
+    return this.hot.findIndex((b) => b?.uid === item.uid);
+  }
+
+  /**
+   * Every hot key whose thing has left this body is made bare (the owner, 2026-10-23: "when i drop an item my hotbar
+   * should forget about it"): dropped, thrown, put in a crate, a stash or on a body, traded, used up, loaded into a
+   * gun, taken by an admin. A key holds the thing, not its kind (DayZ's way), so no other of the kind takes its
+   * place. Only a pile poured into another pile still carried takes its key on with it.
+   */
+  forgetGone() {
+    const on = this.everything(), taken = new Set<string>();
+    this.hot = this.hot.map((b) => {
+      if (!b || on.has(b.uid)) return b;
+      let o = this.boundSeen.get(b.uid);
+      while (o && !on.has(o.uid)) o = poured.get(o);
+      if (!o || on.get(o.uid) !== o || this.hotOf(o) >= 0 || taken.has(o.uid)) return null;
+      taken.add(o.uid);
+      return { uid: o.uid, id: o.id };
+    });
+    this.boundSeen = new Map(this.hot.flatMap((b) => (b && on.has(b.uid) ? [[b.uid, on.get(b.uid)!] as const] : [])));
+  }
+
+  /** everything on this body by its number: what is worn, slung and round the neck, and what is in every grid and bag */
+  everything(): Map<string, ItemInstance> {
+    return allIn([...Object.values(this.slots), this.neck, ...this.containers.flatMap((c) => c.items.map((p) => p.item))]);
   }
 
   /**
@@ -596,7 +628,7 @@ export class PlayerInventory {
     let c = this.gearCargo.get(item.uid);
     if (!c || c.items !== item.cargo) {
       // (what is worn on the back takes a stash case with things in it, as it did; nothing worn takes a pack, a vest or a jacket that has: see `accepts`)
-      c = Object.assign(new Container(`gear:${item.uid}`, d.name, d.wear.cargo[0], d.wear.cargo[1], item.cargo, d.slot === 'back'), { depth: 1, of: item.id });
+      c = Object.assign(new Container(`gear:${item.uid}`, d.name, d.wear.cargo[0], d.wear.cargo[1], item.cargo, d.slot === 'back'), { depth: 1, of: item.id, bag: item });
       this.gearCargo.set(item.uid, c);
     }
     return c;
@@ -624,6 +656,8 @@ export class PlayerInventory {
     this.active = null;
     this.hand = null;
     this.hot = Array.from({ length: HOT_KEYS }, () => null);
+    this.boundSeen.clear();
+    this.autoGiven.clear();
     this.tags.items = [];
     // (and what an admin had in the hold: everything carried goes. Whether it is open is the power's, and stays as it is.)
     this.theHold.items = [];
@@ -816,9 +850,29 @@ export class PlayerInventory {
     const left = overflow.map((it) => this.add(it)).filter((it): it is ItemInstance => !!it);
     // the hot keys as they were left; a save from before there were any gets the back and the holster on 1, 2 and 3
     this.hot = cleanHot(d.hot);
+    this.forgetGone();
     this.autoBind();
+    // (what came back with them has been seen: a kind they took off its key, or whose thing left them, is not put back)
+    this.autoGiven = new Set([...this.everything().values()].map((it) => it.id));
     return left;
   }
+}
+
+/** every thing among these by its number, and down into every bag (what is on a body: `forgetGone`, `keepHotHeld`) */
+function allIn(items: Iterable<ItemInstance | null | undefined>, on = new Map<string, ItemInstance>()): Map<string, ItemInstance> {
+  for (const it of items) {
+    if (!it || on.has(it.uid)) continue;
+    on.set(it.uid, it);
+    if (it.cargo) allIn(it.cargo.map((p) => p.item), on);
+  }
+  return on;
+}
+
+/** The server's side of `PlayerInventory.forgetGone`: a key whose thing is not in this inventory is bare. */
+export function keepHotHeld(inv: SerializedInventory | null) {
+  if (!inv?.hot) return;
+  const on = allIn([...Object.values(inv.slots), ...inv.containers.flatMap((c) => c.items as ItemInstance[])]);
+  inv.hot = inv.hot.map((b) => (b && on.has(b.uid) ? b : null));
 }
 
 /** The hot keys as something kept or sent says they were: ten of them, each a thing's number and its kind, or nothing. */
@@ -954,6 +1008,8 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
     it.held = Math.max(0, Math.min(TAG_HOLD, Number(r.held) || 0));
   }
   const room = holds(def.id);
+  // (what it is set for, one of the kinds there are, or nothing)
+  if (room && isBagKind(r.for)) it.for = r.for;
   if (room && Array.isArray(r.cargo)) {
     it.cargo = [];
     // (As many things as it has cells, and no fewer. It was forty whatever the thing: a full rucksack was forty-two
@@ -1011,6 +1067,7 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
     if (!spill) inv.containers.push((spill = { id: SPILL, items: [] }));
     spill.items.push(...left.map((it) => ({ ...it, x: 0, y: 0, rot: false })));
   }
+  keepHotHeld(inv);
   return inv;
 }
 
