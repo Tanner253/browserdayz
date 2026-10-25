@@ -37,11 +37,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `acts.ts` | 528 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
+| `acts.ts` | 532 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
 | `admin-bodies.ts` | 75 | Bodies cleared away by an admin, with whatever is on them: one (the one looked at, by its number, or the nearest), or every one within so many metres, as /delz puts down the infected (the owner, 2026-10-23: |
 | `admin.ts` | 977 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
-| `animals.ts` | 206 | The server: the animals (2026-10-23). |
+| `animals.ts` | 217 | The server: the animals (2026-10-23). |
 | `bodies.ts` | 87 | The bodies of the infected, searched as a player's is, and bodies cleared away by an admin. |
 | `bodywatch.ts` | 201 | How a body moves, watched for a program walking it: standing on nothing, or to and fro on one spot doing nothing. |
 | `botrules.ts` | 51 | The server: the numbers the bot rules go by, kept off the public code (the owner, 2026-10-18: |
@@ -52,14 +52,14 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `elite.ts` | 32 | The Elite: players whose last payout was at the top rate, each held by their key's hash (nobody's anything), with a crown by their name in chat (the owner, 2026-10-15: |
 | `esp.ts` | 69 | An admin's far sight of the things about them (the owner, 2026-10-23: |
 | `gate.ts` | 743 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
-| `handle.ts` | 917 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 922 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1337 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 771 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `party.ts` | 145 | Parties (2026-10-19), the lite first one: the owner, "players want to be able to team up with eachother, can we do a simple party system, with a very LITE indicator on friendlies ... |
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
 | `plates.ts` | 91 | A store finish put on one gun (2026-10-22), Rust's way. |
-| `players.ts` | 451 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
+| `players.ts` | 453 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `queue.ts` | 149 | The server: the line to get in when it is full, and the leaderboard. |
 | `roles.ts` | 72 | The server: the roles as the panel's Roles shows them, and whether an admin leaves a dog tag, set by an admin above them. |
 | `searched.ts` | 179 | Crates, bodies, stashes, drops, furniture and bags lying about, gone through by several at once (2026-10-23, the owner's list: the "Opening…" wait and "Someone else is searching that"; "We should not have cut any... |
@@ -119,7 +119,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
 | `sandbox-inventory.ts` | 178 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
-| `sandbox.ts` | 271 | The sandbox (the stage until 2026-10-24, the owner: |
+| `sandbox.ts` | 280 | The sandbox (the stage until 2026-10-24, the owner: |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
 | `stance.ts` | 553 | Development-only measure of how a gun is held by a body seen from outside (window.ST), beside the harness that drives the game (window.T). |
 | `sweep.ts` | 313 | Development-only numbers for every animation (window.S), beside the harness that drives the game (window.T) and the tools that photograph it (window.D). |
@@ -131,9 +131,28 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
-| `animals.ts` | 572 | The animals as the game draws them (2026-10-23). |
+| `animals.ts` | 584 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 2798 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 620 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+
+## src/game/avatar/
+
+| file | lines | what it is |
+|---|---:|---|
+| `acts.ts` | 186 | What the body is told to do: blows, flinches, deaths, gestures, emotes and the wheel's calls, lying, sitting, leaning; and a clip laid over the rest. |
+| `dress.ts` | 131 | What the body wears and carries: slung guns, worn gear, the dog tag, and what is on the face that a stock goes round. |
+| `gear.ts` | 203 | What is worn, and where it sits on the body: hats, masks and vests on their bones, and what a mask hides of the head under it. |
+| `hands.ts` | 240 | The hands: what is held (taken up, put away), the two-bone arms reaching for grips, fingers curled and thumbs laid. |
+| `make.ts` | 399 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
+| `pose.ts` | 232 | The body's clips and the numbers they are played by: which clips there are, lying, sitting, the live-tunable POSE table and the stances a gun is held in. |
+| `sick.ts` | 124 | The infected's own way of going: feet kept on the ground, the sick gait. |
+| `update.ts` | 818 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
+| `wounds.ts` | 67 | Wounds on the body, and the infected's shared paints while they are unhurt. |
+
+## src/game/
+
+| file | lines | what it is |
+|---|---:|---|
 | `blast.ts` | 1420 | A blast: a grenade, a drum of fuel, a car going up. |
 | `botcheck-strip.ts` | 368 | The bot check as it was until 2026-10-15, kept for the ninth film (src/trailer/shots9.ts), which shows it: the game's own is the round course now (./botcheck.ts). |
 | `botcheck.ts` | 452 | The bot check, as the player meets it: a round yard high over the middle of the map, walls and a hut and a catwalk in it, and six figures about it that the server walks and the server shows (src/sim/course.ts: read... |
@@ -158,7 +177,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 152 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1844 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1867 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -166,13 +185,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `drops.ts` | 589 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 758 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 751 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 759 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 534 | The game: attachments and magazines. |
 | `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 394 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 737 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 980 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 982 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
 ## src/game/
 
@@ -226,7 +245,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `client.ts` | 483 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `orders.ts` | 234 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 630 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 632 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -235,11 +254,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `airdrop.ts` | 484 | The supply drop comes by helicopter (2026-10-13: |
 | `animal-calls.ts` | 26 | The animals' calls (2026-10-23): when a herd is heard, and which of it. |
-| `animal-fight.ts` | 390 | The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt of whoever comes too near, and, hungry, of deer (src/sim/animal-mind.ts calls these for its own). |
+| `animal-fight.ts` | 391 | The animals that fight (2026-10-23): a bear's warning, rush and chase, and a wolf pack's hunt of whoever comes too near, and, hungry, of deer (src/sim/animal-mind.ts calls these for its own). |
 | `animal-ground.ts` | 288 | The ground as the animals know it (2026-10-23): what kind of country a place is (field, forest, rock, snow, desert, water, a town), whether an animal can stand there, and whether it can see from one place to another. |
-| `animal-mind.ts` | 822 | The animals' minds (2026-10-23): the herds, their ground and their day, what frightens them, the bear's charge and the wolves' hunt. |
+| `animal-mind.ts` | 850 | The animals' minds (2026-10-23): the herds, their ground and their day, what frightens them, the bear's charge and the wolves' hunt. |
 | `animal-places.ts` | 144 | Where the animals are (2026-10-23): the herds' ground, each one's place in its herd and room from the rest, and whether a place will do for one (src/sim/animal-mind.ts calls these for its own). |
-| `animals.ts` | 340 | Animals (2026-10-23). The owner: "We also need animals ... it may be time to implement hunting as a food source", and of how: "regarding animal logic just ask what does dayz or rust do and copy/revamp their... |
+| `animals.ts` | 345 | Animals (2026-10-23). The owner: "We also need animals ... it may be time to implement hunting as a food source", and of how: "regarding animal logic just ask what does dayz or rust do and copy/revamp their... |
 | `apart.ts` | 90 | The places stocked apart from the rest of the map, on top of it: the fort, the hamlet on its track, the wreck under the bridge, every cellar, Kalat and the new towns, the canyon pass. |
 | `barrels.ts` | 31 | Fuel drums. The red barrels standing about the yards and sheds go up when a bullet finds them, and take whoever is standing near with them: a thing to shoot at instead of the man behind it, and a reason to look at... |
 | `basements.ts` | 553 | Basements (2026-10-14). |
@@ -392,13 +411,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `act-icons.ts` | 47 | What an entry of the inventory's menu does, as a small solid symbol before its words (the right button on a thing): so that a long menu is read at a glance. |
 | `admin-store.ts` | 466 | The admin panel's STORE tab (2026-10-22). |
-| `admin-ui.ts` | 1724 | The panel of somebody with a role (2026-10-11; laid out again 2026-10-12). |
+| `admin-ui.ts` | 1751 | The panel of somebody with a role (2026-10-11; laid out again 2026-10-12). |
 | `ads.ts` | 52 | Google Ads: its tag on the site, and its conversion sent once a page as the page is loaded (the owner, 2026-10-18, giving Google's own event snippet for the account's "Page view" conversion: |
 | `adsense.ts` | 60 | Ads in the game's page (2026-10-22), through public/ads.js, on the live site only and never for a VIP or a no-ads buyer (what this browser has bought, asked of the site afresh, at most an hour old). |
 | `arena-hud.ts` | 174 | The arena's own screen (2026-10-14). |
 | `arena-menu.ts` | 233 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
 | `bigmap-names.ts` | 158 | Where the big map's names go, so that none lies on another (the owner, 2026-10-19, of the whole map: |
-| `bigmap.ts` | 1612 | The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: |
+| `bigmap.ts` | 1634 | The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: |
 | `bookmark.ts` | 83 | A place the player marks on the map for themself (double-click or double-tap the sheet opened large, M): a pin there, and the same pin on the corner map, on its rim when the place is out of its view, with how far it is. |
 
 ## src/ui/br/
@@ -555,4 +574,4 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `zavod-plans.ts` | 193 | Zavod, the brick works by the river (2026-10-16): its buildings. |
-| `zona.ts` | 99 | The Zona: everything east of a line across the map, where tags are earned (the owner, 2026-10-19: |
+| `zona.ts` | 154 | The Zona, where tags are earned: a round about each town, site and settlement east of a line across the map, joined by corridors, the middle of the valley filled in whole; and everywhere else is wilderness, for bases... |
