@@ -124,6 +124,12 @@ for (const kind of KINDS) {
   let hands;
   try {
     hands = giveFingers(suit, ours);
+    // (and a finding that cannot be a hand is not taken: the Villager's thumb "parted" 2.9 cm from the wrist and a
+    // finger was 4 cm long, the rags of its torn sleeve taken for them, and they curled into a lump at the elbow. On
+    // the hands that were found right, every thumb parts 8 cm or more out and no finger is under 6.)
+    const parts = [...hands.matchAll(/parting at ([\d.]+)/g)].map((m) => +m[1]);
+    const lengths = [...hands.matchAll(/fingers ([\d. ]+) cm/g)].flatMap((m) => m[1].trim().split(/\s+/).map(Number));
+    if (parts.some((x) => x < 6) || lengths.some((x) => x < 6)) throw new Error(`not a hand: ${hands}`);
   } catch (e) {
     // (Fingers drawn held together are not told apart: the survivors were drawn with theirs spread, these mostly
     // were not. Such a hand is kept whole on the hand's bone, in the curl it was modelled with, as the hazmat's

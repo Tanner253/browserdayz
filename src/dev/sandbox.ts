@@ -16,6 +16,7 @@
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
 //                                               picture (src/dev/sandbox-sim.ts)
+//   &moves=assets/characters/moves-infected.glb  the movements of that file, for g= files with none of their own (the infected)
 //   &hide=body_far                              the parts of a g= file by those names not drawn (an infected's far body)
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
@@ -165,8 +166,11 @@ if (sim) {
     info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), ...extra });
   };
   for (const id of ids) place(await assets.model(id), id);
+  // (a body with no movements of its own, one of the infected, played in another file's: &moves=)
+  const borrowed = q.get('moves') ? (await assets.loadGLTF(q.get('moves')!)).animations : null;
   for (const [k, f] of files.entries()) {
-    const gltf = await assets.loadGLTF(f);
+    const own = await assets.loadGLTF(f);
+    const gltf = borrowed && !own.animations.length ? { ...own, animations: borrowed } : own;
     const o = gltf.animations.length ? cloneSkinned(gltf.scene) : gltf.scene;
     o.traverse((n) => void (list('hide').includes(n.name) && (n.visible = false)));
     const clips = gltf.animations.map((c) => `${c.name} (${c.duration.toFixed(2)} s)`);
