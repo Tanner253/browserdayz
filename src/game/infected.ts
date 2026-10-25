@@ -66,6 +66,14 @@ const INTERP_DELAY = 210;
 const DRAWN = 150;
 /** seconds of posing after which a body has done falling (the longest fall, the backwards one, takes 2.1) */
 const SETTLED = 4;
+/**
+ * Bodies are made for the ones within this of the eye, nearest first, so many at a time. (Coming into a server, every
+ * one on the map had its body made at once, one after another, and the ones beside the player waited behind ones a
+ * kilometre off: 152 of them, 2026-10-25, and the twelve kinds' files are fetched as they are wanted. Further off than
+ * this no game moves one for its player (INFECTED.own) nor draws one (DRAWN).)
+ */
+const MAKE_WITHIN = 200;
+const MAKING = 3;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
 /** as near as two of them stand to each other, metres */
@@ -93,6 +101,10 @@ export class Infected implements Damageable {
   /** this game moves it */
   mine = false;
   ready = false;
+  /** what it is, until its body is made (see MAKE_WITHIN) */
+  waiting: InfectedInfo | null = null;
+  /** whose game the server last said moves it (its body may be made after) */
+  owner: number | null = null;
   private gone = false;
   private body!: RAPIER.RigidBody;
   private zones: RAPIER.Collider[] = [];
@@ -230,6 +242,8 @@ export class Infected implements Damageable {
 
   /** where its owner says it is */
   push(s: IState, now: number) {
+    // (where it is, for when its body is to be made)
+    if (!this.ready) this.pos.set(s[0], s[1], s[2]);
     this.snaps.push({ t: now, s });
     if (this.snaps.length > 12) this.snaps.shift();
   }
@@ -1080,9 +1094,31 @@ export class Horde {
     if (this.all.has(info.i)) return;
     const b = new Infected(info.i, this.host, this);
     this.all.set(info.i, b);
-    void b.load(info).then(() => {
-      if (info.own !== null && info.own === this.host.me().id) b.setMine(true);
-    });
+    b.waiting = info;
+    b.owner = info.own;
+    b.pos.set(info.s[0], info.s[1], info.s[2]);
+  }
+
+  /** bodies being made just now (see MAKE_WITHIN) */
+  private making = 0;
+  /** the nearest one still to be made, if any is near enough, has its body made */
+  private makeNext() {
+    let next: Infected | null = null, best = MAKE_WITHIN * MAKE_WITHIN;
+    for (const b of this.all.values()) {
+      if (!b.waiting) continue;
+      const d = b.pos.distanceToSquared(this.eye);
+      if (d < best) (best = d), (next = b);
+    }
+    if (!next) return;
+    const b = next, info = next.waiting!;
+    b.waiting = null;
+    this.making++;
+    void b
+      .load(info)
+      .then(() => {
+        if (b.owner !== null && b.owner === this.host.me().id) b.setMine(true);
+      })
+      .finally(() => this.making--);
   }
 
   remove(i: number) {
@@ -1108,7 +1144,10 @@ export class Horde {
   }
 
   own(i: number, to: number | null) {
-    this.all.get(i)?.setMine(to !== null && to === this.host.me().id);
+    const b = this.all.get(i);
+    if (!b) return;
+    b.owner = to;
+    b.setMine(to !== null && to === this.host.me().id);
   }
 
   /** where the games that move the others say they are */
@@ -1270,6 +1309,7 @@ export class Horde {
   update(dt: number, now: number, eye: THREE.Vector3) {
     this.eye.copy(eye);
     this.now = now;
+    if (this.making < MAKING) this.makeNext();
     const me = this.host.me();
     this.people.clear();
     this.people.set(me.id, me);
