@@ -187,8 +187,13 @@ export async function stageBodies(o: Stage) {
       if (!s.isSkinnedMesh || !s.visible || !s.geometry.attributes.position) return;
       for (let k = 0; k < s.geometry.attributes.position.count; k += 3) low = Math.min(low, s.localToWorld(s.getVertexPosition(k, v)).y);
     });
-    const ball = a.root.getObjectByName('ball_l')?.getWorldPosition(new THREE.Vector3()).y ?? NaN;
-    return [+low.toFixed(3), +ball.toFixed(3)];
+    // (and the left leg's joints as posed, cm, against the hip: forward, then up)
+    const hip = a.root.getObjectByName('thigh_l')?.getWorldPosition(new THREE.Vector3());
+    const leg = ['calf_l', 'foot_l', 'ball_l'].map((n) => {
+      const p = a.root.getObjectByName(n)?.getWorldPosition(new THREE.Vector3());
+      return p && hip ? `${n} ${(-(p.z - hip.z) * 100).toFixed(1)},${((p.y - hip.y) * 100).toFixed(1)} at ${(p.y * 100).toFixed(1)}` : n;
+    });
+    return [+low.toFixed(3), leg.join(' ')];
   });
   return { bodies: specs.map((s, i) => ({ words: s.words, speed: +s.speed.toFixed(2), head: heads[i].map((v) => +v.toFixed(3)), sole: sole[i] })), frames, fps, across, block: [per * cw, blockRows * ch] };
 }

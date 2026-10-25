@@ -601,6 +601,149 @@ export function suitWeights(node, suit, keep = [9]) {
   return `weighted as the suit: ${got.filter(Boolean).length} points of ${n}, ${far} of them over 10 cm from it`;
 }
 
+/**
+ * Where a carried body's legs bend: its knees and ankles in the middle of its own legs at their heights, its toes'
+ * joint across the ball of its own foot (seven tenths of the way from the heel), the toe's end at its tip. Its bones were
+ * made as long as its own but along the old suit's ways (fitProportions), and so stood a hand's breadth in front of the
+ * legs they bend: the knees seen pushed back and the feet folding as they turned (the owner, 2026-10-25: "these player
+ * models do not look right or natural ... weird body positions"). Reads the body's skin at rest and its regions
+ * (markRegions); the bones' heights are kept.
+ * @returns the joints' places, to be given to the body and to everything made on it alike (moveJoints)
+ */
+export function legJoints(node) {
+  const joints = new Map(node.getSkin().listJoints().map((j) => [j.getName(), at(M4(j.getWorldMatrix()))]));
+  const P = restPoints(node), region = node.getMesh().listPrimitives()[0].getAttribute('_REGION');
+  const out = new Map();
+  for (const side of ['l', 'r']) {
+    const hip = joints.get(`thigh_${side}`), knee = joints.get(`calf_${side}`), ankle = joints.get(`foot_${side}`), ball = joints.get(`ball_${side}`);
+    const mine = P.filter((p, i) => Math.sign(p.x - 0) === Math.sign(hip.x) && Math.abs(p.x) > 0.02 && [10, 11, 12, 13].includes(region.getScalar(i)));
+    const middle = (y, of) => {
+      const band = of.filter((p) => Math.abs(p.y - y) < 0.015);
+      if (band.length < 8) return null;
+      const b = new THREE.Box3().setFromPoints(band);
+      return new THREE.Vector3((b.min.x + b.max.x) / 2, y, (b.min.z + b.max.z) / 2);
+    };
+    const k = middle(knee.y, mine);
+    // (the ankle's line from the shin just over the foot: at the joint's own height the foot is in the middle)
+    const a = middle(ankle.y + 0.06, mine);
+    if (k) out.set(`calf_${side}`, k);
+    if (a) out.set(`foot_${side}`, new THREE.Vector3(a.x, ankle.y, a.z));
+    const foot = mine.filter((p) => p.y < ankle.y);
+    if (foot.length > 20) {
+      const b = new THREE.Box3().setFromPoints(foot), z = b.min.z + 0.7 * (b.max.z - b.min.z);
+      const across = foot.filter((p) => Math.abs(p.z - z) < 0.015), x = across.length ? across.reduce((s, p) => s + p.x, 0) / across.length : ball.x;
+      out.set(`ball_${side}`, new THREE.Vector3(x, ball.y, z));
+      const leaf = joints.get(`ball_leaf_${side}`);
+      if (leaf) out.set(`ball_leaf_${side}`, new THREE.Vector3(x, leaf.y, b.max.z));
+      // (and the sole: the lowest of the heel's fifth and of the toes' quarter)
+      const len = b.max.z - b.min.z, low = (of) => of.reduce((m, p) => (p.y < m.y ? p : m), of[0]);
+      const heel = foot.filter((p) => p.z < b.min.z + len * 0.2), toes = foot.filter((p) => p.z > b.max.z - len * 0.25);
+      if (heel.length && toes.length) out.set(`heel_${side}`, low(heel).clone()).set(`toes_${side}`, low(toes).clone());
+    }
+  }
+  return out;
+}
+
+/**
+ * A carried body's legs stood as the game's skeleton stands them (the owner, 2026-10-25: "these player models do not look
+ * right or natural ... weird body positions"): carried on Meshy's rig, each leg came out slanted back, its knee a hand's
+ * breadth behind the hip and its ankle further, and every pose the game gave it kept the slant, knees locked back and
+ * feet folding. Each thigh is turned about its hip until its own knee (legJoints) is where the skeleton's is, each shin
+ * about the knee until its own ankle is, and each foot carried along as it lies, its sole still flat; the skin moves by
+ * its weights, so the bends are smooth. The skeleton is not touched.
+ * @param mine the body's own joints (legJoints of the body); the same turns are given to everything made on the body
+ * @returns what was done, for the build's line
+ */
+/** the old suit's sole (survivor.glb, at rest): it rises 1.4 cm from the heel to the toes over 26, its heel 12.5 cm under the ankle joint (progress/survivors/soles.mjs) */
+const SOLE = { rise: 0.054, heel: 0.125 };
+
+export function straightenLegs(node, mine) {
+  const joints = node.getSkin().listJoints(), ibm = node.getSkin().getInverseBindMatrices();
+  const J = new Map(joints.map((j) => [j.getName(), at(M4(j.getWorldMatrix()))]));
+  const C = M4(joints[0].getWorldMatrix()).multiply(M4(ibm.getElement(0, []))), Ci = C.clone().invert();
+  /** each leg joint's move of the skin it carries, as a matrix in the world at rest */
+  const move = new Map(), said = [];
+  const turn = (about, from, to) => {
+    const q = new THREE.Quaternion().setFromUnitVectors(from.clone().sub(about).normalize(), to.clone().sub(about).normalize());
+    return new THREE.Matrix4().makeTranslation(about.x, about.y, about.z).multiply(new THREE.Matrix4().makeRotationFromQuaternion(q)).multiply(new THREE.Matrix4().makeTranslation(-about.x, -about.y, -about.z));
+  };
+  for (const side of ['l', 'r']) {
+    const hip = J.get(`thigh_${side}`), knee = J.get(`calf_${side}`), ankle = J.get(`foot_${side}`);
+    const k = mine.get(`calf_${side}`), a = mine.get(`foot_${side}`);
+    if (!k || !a) continue;
+    const thigh = turn(hip, k, knee);
+    const a1 = a.clone().applyMatrix4(thigh);
+    const shin = turn(knee, a1, ankle).multiply(thigh);
+    // (the foot carried from where its ankle was to where the skeleton's is, and turned about the ankle to the old suit's
+    // sole: the bodies' came pitched a dozen degrees heel down, the heel in the floor and the toes off it in every pose)
+    const foot = new THREE.Matrix4().makeTranslation(ankle.x - a.x, ankle.y - a.y, ankle.z - a.z);
+    const heel = mine.get(`heel_${side}`), toes = mine.get(`toes_${side}`);
+    if (heel && toes) {
+      const run = Math.max(0.05, toes.z - heel.z), from = new THREE.Vector3(0, toes.y - heel.y, run).normalize(), to = new THREE.Vector3(0, SOLE.rise * run, run).normalize();
+      const pitch = turn(a, a.clone().add(from), a.clone().add(to));
+      // (and the heel as deep under the ankle as the suit's)
+      const h = heel.clone().applyMatrix4(pitch);
+      foot.multiply(new THREE.Matrix4().makeTranslation(0, a.y - SOLE.heel - h.y, 0)).multiply(pitch);
+      said.push(`${side} sole ${((Math.atan2(toes.y - heel.y, run) * 180) / Math.PI).toFixed(0)} deg`);
+    }
+    move.set(`thigh_${side}`, thigh).set(`calf_${side}`, shin);
+    for (const n of ['foot', 'ball', 'ball_leaf']) move.set(`${n}_${side}`, foot);
+    said.push(`${side} knee ${(k.distanceTo(knee) * 100).toFixed(1)} ankle ${(a.distanceTo(ankle) * 100).toFixed(1)} cm`);
+  }
+  const names = joints.map((j) => j.getName());
+  const prim = node.getMesh().listPrimitives()[0], pos = prim.getAttribute('POSITION'), nor = prim.getAttribute('NORMAL');
+  const ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0');
+  // (only what a leg joint carries is moved, by as much as the joint moves it at rest: nothing else is touched)
+  const P = restPoints(node), out = new Float32Array(pos.getCount() * 3), N = nor ? new Float32Array(nor.getCount() * 3) : null;
+  const lin = new THREE.Matrix3().setFromMatrix4(Ci);
+  const v = new THREE.Vector3(), n = new THREE.Vector3(), d = new THREE.Vector3(), nsum = new THREE.Vector3(), a = [], w = [], e = [];
+  for (let i = 0; i < pos.getCount(); i++) {
+    ji.getElement(i, a), jw.getElement(i, w);
+    out.set(pos.getElement(i, e), i * 3);
+    if (N) N.set(nor.getElement(i, e), i * 3);
+    if (![0, 1, 2, 3].some((c) => w[c] > 0 && move.has(names[a[c]]))) continue;
+    d.set(0, 0, 0);
+    nsum.set(0, 0, 0);
+    if (nor) n.fromArray(nor.getElement(i, e));
+    for (let c = 0; c < 4; c++) {
+      if (!(w[c] > 0)) continue;
+      const m = move.get(names[a[c]]);
+      if (m) d.addScaledVector(v.copy(P[i]).applyMatrix4(m).sub(P[i]), w[c]);
+      if (nor) nsum.addScaledVector(m ? v.copy(n).transformDirection(m) : n, w[c]);
+    }
+    d.applyMatrix3(lin);
+    out[i * 3] += d.x;
+    out[i * 3 + 1] += d.y;
+    out[i * 3 + 2] += d.z;
+    if (N && nsum.lengthSq() > 0) N.set(nsum.normalize().toArray(), i * 3);
+  }
+  // (new accessors, as floats: the old ones may be packed)
+  prim.setAttribute('POSITION', pos.clone().setNormalized(false).setArray(out));
+  if (nor && N) prim.setAttribute('NORMAL', nor.clone().setNormalized(false).setArray(N));
+  return `legs stood straight: ${said.join('; ')}`;
+}
+
+/**
+ * Joints put where they are said to be (world, at rest), turned as they were, each one's binding made again so that
+ * the skin stays where it is: the shape at rest is as it was, and bends about the joints' new places.
+ * @param places from legJoints, parents before children
+ */
+export function moveJoints(node, places) {
+  const skin = node.getSkin(), joints = skin.listJoints(), ibm = skin.getInverseBindMatrices();
+  // (what each joint's binding makes of the skin at rest: the same for all of them, kept)
+  const kept = joints.map((j, k) => M4(j.getWorldMatrix()).multiply(M4(ibm.getElement(k, []))));
+  for (const [name, want] of places) {
+    const j = joints.find((x) => x.getName() === name);
+    if (!j) continue;
+    const parent = j.getParentNode();
+    const local = want.clone().applyMatrix4(parent ? M4(parent.getWorldMatrix()).invert() : new THREE.Matrix4());
+    j.setTranslation(local.toArray());
+  }
+  const arr = ibm.getArray().slice();
+  joints.forEach((j, k) => arr.set(M4(j.getWorldMatrix()).invert().multiply(kept[k]).toArray(), k * 16));
+  ibm.setArray(arr);
+}
+
 export async function carry({ io, template, src, fingers, fit = src }) {
   const doc = await io.read(template);
   const root = doc.getRoot();

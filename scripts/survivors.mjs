@@ -31,7 +31,7 @@ import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-trans
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import * as THREE from 'three';
-import { carry, markRegions, padTexture, restPoints, suitWeights } from './meshy.mjs';
+import { carry, legJoints, markRegions, padTexture, restPoints, straightenLegs, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -172,6 +172,8 @@ for (const [n, file] of BODIES.entries()) {
   const { doc, node, hands, worn, proportions } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
   const root = doc.getRoot();
   const regions = markRegions(doc, node);
+  // (its legs stood as the skeleton stands them: see straightenLegs)
+  const moved = straightenLegs(node, legJoints(node));
   // (weighted as the old suit is, not as Meshy rigged it: see suitWeights)
   const weighted = suitWeights(node, SUIT);
   // (the picture between its islands filled from them first: what lay there came in at every island's edge; then the
@@ -226,5 +228,6 @@ for (const [n, file] of BODIES.entries()) {
   const st = await fs.stat(dest);
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
   console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}
+  ${moved}
   ${weighted}\n  ${cloth}\n  ${worn}`);
 }

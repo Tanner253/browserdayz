@@ -32,7 +32,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { M4, carry, markRegions, padTexture, suitWeights } from './meshy.mjs';
+import { M4, carry, legJoints, markRegions, padTexture, straightenLegs, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -169,10 +169,14 @@ for (const [id, piece] of Object.entries(PIECES)) {
   if (ONLY.length && !ONLY.includes(id)) continue;
   const body = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, BODIES[piece.body])), fingers: true });
   markRegions(body.doc, body.node);
+  // (the body's legs stood as the skeleton stands them, and the piece's alike: see straightenLegs)
+  const legs = legJoints(body.node);
+  straightenLegs(body.node, legs);
   // (weighted as the built body is, the old suit's, so the piece takes the same: see suitWeights)
   suitWeights(body.node, SUIT);
   // (on the skeleton made the shape of the body it was made on, as that body is: see fitProportions in scripts/meshy.mjs)
   const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: !!piece.fingers, fit: await io.read(path.join(SRC, BODIES[piece.body])) });
+  straightenLegs(dressed.node, legs);
   const B = await laid(body.node), D = await laid(dressed.node);
   const region = body.node.getMesh().listPrimitives()[0].getAttribute('_REGION');
 
