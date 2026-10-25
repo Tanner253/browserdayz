@@ -466,6 +466,8 @@ export type S2C =
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
   | { t: 'void'; uids: string[] }
+  /** how long the server counts you as having held this tag, seconds: it starts again each time the tag comes back to you (server/custody.ts), and the game's countdown follows it */
+  | { t: 'tagclock'; uid: string; held: number }
   /** to an admin who asked: what somebody carries, as the server last had it from their game */
   | { t: 'inv'; id: number; name: string; inv: SerializedInventory | null }
   /** an admin has taken these things out of what this player carries: they are gone */

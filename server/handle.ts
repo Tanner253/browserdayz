@@ -404,7 +404,10 @@ export function handle(c: Client, m: C2S) {
       }
       if (c.seatAt || !economy.take(m.uid)) return void send(c, { t: 'denied', uid: m.uid });
       // (a tag in what was picked up is theirs from now on, its clock started now: custody.ts)
-      if (lying) for (const t of payingTags(lying.item)) cameTo(c.key, t.uid);
+      if (lying) for (const t of payingTags(lying.item)) {
+        cameTo(c.key, t.uid);
+        send(c, { t: 'tagclock', uid: t.uid, held: 0 });
+      }
       // (a pack picked up that others were going through where it lay: gone from under them, told by 'loot-')
       goneFrom(`l:${m.uid}`);
       return;
@@ -879,6 +882,19 @@ export function handle(c: Client, m: C2S) {
       if (c.power.god || c.power.hidden || c.power.clip) return void sys(c, 'No tag is cashed in with god mode, vanish or noclip on: put them off first.');
       // (nor once the last word is written: one cashed after it would be in the pockets, and on the list, of the server that comes next)
       if (stoppingNow()) return void send(c, { t: 'tell', kind: 'warn', text: 'The server is restarting: cash the tag in when it is back. It is kept.' });
+      // (one that can pay waits for the server's own clock, which starts again each time the tag comes back to them,
+      // custody.ts. Their game's went on counting, let them cash in early, and the tag was eaten for nothing (a
+      // player, 2026-10-25: "No reward for capnascimento's tag: it was not held for the full time"). Kept now, and
+      // their countdown set to the server's.)
+      const owed = lootedTags.get(tag.uid);
+      if (owed && !theirOwn(owed, c.key) && !voided.has(tag.uid) && (seenAt === undefined || Date.now() - seenAt < CASH_HOLD_MS)) {
+        const at = seenAt ?? Date.now();
+        if (seenAt === undefined) tagSeen.set(seenOf(c.key) + tag.uid, at);
+        tag.held = Math.floor((Date.now() - at) / 1000);
+        send(c, { t: 'tagclock', uid: tag.uid, held: tag.held });
+        const left = Math.max(1, Math.ceil((CASH_HOLD_MS - (Date.now() - at)) / 60000));
+        return void send(c, { t: 'tell', kind: 'warn', text: `Not yet: hold ${tag.owner ?? 'Survivor'}'s tag ${left} more minute${left === 1 ? '' : 's'}. Its clock starts again each time it comes back to you.` });
+      }
       tag.held = 0;
       const owner = tag.owner ?? 'Survivor';
       const from = lootedTags.get(tag.uid);
