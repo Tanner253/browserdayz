@@ -191,7 +191,8 @@ export interface TimedAction {
 // (26, 2026-10-18: the gun racks, see WORLD_REV 29 in server/index.ts)
 // (27, 2026-10-18: the desert's places, see WORLD_REV 30)
 // (28, 2026-10-19: the cellars' places stand elsewhere, see PROTOCOL 51)
-export const LOOT_REV = 28;
+// (29, 2026-10-25: Kalat's keep, the trader camp, the recyclers and wrecks: 4739 places, from 4726)
+export const LOOT_REV = 29;
 /** how far over the ridge's crest its invisible wall stands, metres: past it a helicopter flies over */
 const RIDGE_OVER = 18;
 /** the new places of the map three times over, as the map and the menu say them: what is there, the kind of mark, and its step where PLAN.tiers has none */

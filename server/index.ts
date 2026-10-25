@@ -105,7 +105,8 @@ export const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character
 // in the desert is set down afresh, nobody else, see REMADE in keep.ts)
 // (31, 2026-10-19: watchtowers and hunting towers on ground levelled for them, the cellars' and the desert's places
 // for things moved; whoever stood on a tower's ground is set down afresh, nobody else)
-export const WORLD_REV = 31;
+// (32, 2026-10-25: Kalat's keep stands in the town's flat middle; whoever was kept on its ground is set down afresh, nobody else)
+export const WORLD_REV = 32;
 
 export const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 

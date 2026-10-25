@@ -108,7 +108,18 @@ const REMADE: Record<number, (x: number, z: number) => boolean> = {
   // (30 -> 31: the ground each watchtower and hunting tower was levelled on, 2026-10-19, and nowhere else it moved;
   // and Pokrov's court, where the church grew half as big again and the belfry moved: whoever was kept there could be in a wall)
   30: (x, z) => [...WATCHTOWERS, ...HUNTING_TOWERS].some((t) => Math.hypot(t.x - x, t.z - z) < 16) || inPokrovCourt(x, z),
+  // (31 -> 32: Kalat's keep, 2026-10-25, on ground nobody stood in a wall of before)
+  31: (x, z) => keepNear(x, z),
 };
+/** within the keep's walls or a step off them (it reaches 24 m from its middle, found as the middle of its places for loot) */
+let keepMid: [number, number] | null | undefined;
+function keepNear(x: number, z: number) {
+  if (keepMid === undefined) {
+    const at = world.lootPoints.filter((p) => p.building === 'ruins_keep');
+    keepMid = at.length ? [at.reduce((s, p) => s + p.x, 0) / at.length, at.reduce((s, p) => s + p.z, 0) / at.length] : null;
+  }
+  return !!keepMid && Math.hypot(keepMid[0] - x, keepMid[1] - z) < 30;
+}
 /** is somebody kept from a world of this number, standing here, set down afresh at a start */
 export function remadeUnder(rev: number, x: number, z: number): boolean {
   for (let v = rev; v < WORLD_REV; v++) if (!REMADE[v] || REMADE[v](x, z)) return true;
