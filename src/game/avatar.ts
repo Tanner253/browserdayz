@@ -139,6 +139,14 @@ export const RAISE = {
   palm: [0.1, 0.12, -1] as [number, number, number],
 };
 
+/**
+ * A thing to strike with in one hand, only carried: the way it hangs from the fist beside the leg (forward, up, right of
+ * the body), its head down and a little forward and out, clear of the thigh. The hand on motion capture hangs turned
+ * another way than production's idle had it, and the survivors' thighs are wider: a hatchet's head went into the thigh,
+ * a hammer hung across the hips pointing in (the navigator's sweep, 2026-10-25). The grip on it is production's.
+ */
+export const HANG = [0.32, -0.92, 0.22] as [number, number, number];
+
 export interface ArmRig {
   arm: THREE.Bone;
   fore: THREE.Bone;
@@ -462,11 +470,13 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean; head?: THREE.Vector3 } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** how far a torch is held up (0 at the side, 1 up: RAISE) */
   raiseT = 0;
+  /** how far what is in one fist is hung beside the leg (HANG), 0..1 */
+  hangT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are

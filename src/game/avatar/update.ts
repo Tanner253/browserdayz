@@ -9,9 +9,11 @@ import { slashAt } from '../held-mocap';
 import { MOCAP_HANDS } from '../mocap-switch';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
-import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, RAISE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+import { CLAW, CLAW_HIT, CUT, FP_BACK, HANG, HOLD_GONE, RAISE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
 const _way = new THREE.Vector3();
+
+const _hangNow = new THREE.Vector3(), _hangAt = new THREE.Vector3(), _hangWant = new THREE.Vector3();
 
 export const updateMethods = {
   /**
@@ -710,6 +712,21 @@ export const updateMethods = {
         const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r).normalize();
         const to = new THREE.Vector3().copy(head).addScaledVector(fwd, RAISE.at[0]).addScaledVector(UP, RAISE.at[1]).addScaledVector(_right, RAISE.at[2]);
         this.reach(this.armR, to, dirOf(...RAISE.fingers), dirOf(...RAISE.palm), this.inHand.curl, aimQ, this.raiseT);
+      }
+    }
+
+    // --- a thing to strike with in one hand, only carried: hung beside the leg (HANG), the hand turned at the wrist
+    {
+      const h = this.inHand;
+      const hang = !!h?.head && !h.shoulder && !h.raise && !dead && !using && !ges && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02 && pr < 0.5;
+      this.hangT += ((hang ? 1 : 0) - this.hangT) * ease(hang ? 6 : 14);
+      if (this.hangT > 0.02 && h?.head && this.armR) {
+        const hand = this.armR.hand;
+        hand.updateWorldMatrix(true, false);
+        const now = _hangNow.copy(h.head).applyMatrix4(hand.matrixWorld).sub(hand.getWorldPosition(_hangAt)).normalize();
+        const want = _hangWant.set(HANG[2], HANG[1], -HANG[0]).applyQuaternion(_aimQ.setFromAxisAngle(UP, this.yaw)).normalize();
+        _q1.setFromUnitVectors(now, want);
+        this.setWorldQuat(hand, _q2.identity().slerp(_q1, this.hangT).multiply(hand.getWorldQuaternion(_qa)));
       }
     }
 
