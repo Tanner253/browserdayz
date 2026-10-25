@@ -183,6 +183,9 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 .hud-prompt .bc .ok { color: #8fe0b8; }
 .hud-prompt .bc .no { color: #f08a7e; }
 .hud-prompt .bc small { margin-left: 2px; }
+/* a piece's health, a moment after a blow lands on it (src/game/building/raid.ts) */
+.hud-prompt .bc .bhp { display: inline-block; width: 92px; height: 6px; margin: 0 6px 2px; vertical-align: middle; background: rgba(233, 228, 216, 0.14); border-radius: 3px; overflow: hidden; }
+.hud-prompt .bc .bhp span { display: block; height: 100%; background: linear-gradient(90deg, #c98f3a, #e8cf7a); transition: width 0.15s ease-out; }
 /* inside a claim's reach (src/game/building/claims.ts): whose, and how long it is kept */
 .hud-claim { position: absolute; left: 50%; top: 58px; transform: translate(-50%, -6px); padding: 4px 12px; border-radius: 13px; font-size: 13px; letter-spacing: 0.05em; background: rgba(8, 10, 9, 0.62); border: 1px solid rgba(233, 228, 216, 0.2); color: var(--ink); opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap; }
 .hud-claim.show { opacity: 1; transform: translate(-50%, 0); }

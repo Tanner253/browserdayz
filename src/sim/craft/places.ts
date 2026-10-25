@@ -3,6 +3,7 @@
 
 import type { Bases } from '../build/bases';
 import { toWorld, type Piece } from '../build/snap';
+import { benchLevel } from '../build/pieces';
 import { NEAR, type Level, type Place } from './recipes';
 
 export type Spot = Exclude<Place, 'hand'> | 'research';
@@ -10,10 +11,10 @@ export type Spot = Exclude<Place, 'hand'> | 'research';
 export const PLACE_PIECE: Record<Spot, string> = { bench: 'workbench', forge: 'forge', research: 'research_table' };
 const REACH: Record<Spot, number> = { ...NEAR, research: 3 };
 
-/** a workbench's level (progression v3: "three bench levels"), as base building keeps it on the piece; one when unsaid */
+/** a workbench's level (progression v3: "three bench levels"), as base building keeps it: its piece's tier (src/sim/build/pieces.ts benchLevel) */
 export const levelOf = (p: Piece): Level => {
-  const lv = (p as Piece & { lv?: number }).lv;
-  return lv === 2 || lv === 3 ? lv : 1;
+  const lv = benchLevel(p);
+  return lv >= 3 ? 3 : lv === 2 ? 2 : 1;
 };
 
 export interface Near {

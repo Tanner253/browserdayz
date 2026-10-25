@@ -103,7 +103,7 @@ export const RECIPES: Recipe[] = [
   bench(2, 'red_dot', 'red_dot', 1, [{ id: BAR, n: 2 }, { id: F, n: 50 }], 20, 'weapons'),
   gun(2, 'colt', 4, 1, 1, 'pistol', 30),
   gun(2, 'm9', 5, 1, 1, 'pistol', 30),
-  // ---------------------------------------------------------------- Bench III: rifles, submachine guns, scopes, suppressors, rifle rounds
+  // ---------------------------------------------------------------- Bench III: rifles, submachine guns, scopes, suppressors, rifle rounds, C4
   bench(3, 'ammo_762', 'ammo_762', 10, [{ id: 'gunpowder', n: 4 }, { id: F, n: 20 }], 10, 'weapons'),
   bench(3, 'ammo_739', 'ammo_739', 10, [{ id: 'gunpowder', n: 4 }, { id: F, n: 20 }], 10, 'weapons'),
   bench(3, 'suppressor_9', 'suppressor_9', 1, [{ id: BAR, n: 2 }, { id: 'metal_pipe', n: 1 }, { id: F, n: 50 }], 25, 'weapons'),
@@ -113,6 +113,8 @@ export const RECIPES: Recipe[] = [
   gun(3, 'mpa', 8, 2, 1, 'rifle', 45),
   gun(3, 'scorpion', 9, 2, 1, 'rifle', 45),
   gun(3, 'ak', 12, 2, 1, 'rifle', 60),
+  // (C4, plan v3's Bench III: four satchels' powder for what four or five do, src/sim/build/raid.ts; found too, where the army was)
+  bench(3, 'c4', 'c4', 1, [{ id: 'gunpowder', n: 40 }, { id: F, n: 60 }, { id: 'rags', n: 5 }, { id: 'spring', n: 1 }], 45, 'raid'),
   // ---------------------------------------------------------------- at a forge (ours): ten fragments and half a minute of its fire make a bar
   { id: 'iron_bar', makes: BAR, qty: 1, needs: [{ id: F, n: FORGE.frags }], at: 'forge', time: FORGE.smelt, cat: 'build' },
 ];

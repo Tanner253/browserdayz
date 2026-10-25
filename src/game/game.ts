@@ -130,6 +130,7 @@ import { WreckView } from './craft-wrecks';
 import { RockRef, TreeRef } from '../world/felling';
 import { pocketsOf } from '../sim/craft/plan';
 import { Building } from './building';
+import { PieceRef } from './building/draw';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -779,6 +780,8 @@ export class Game {
       flames: () => this.effects.fire,
       glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
       tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
+      explode: (at, mine, w) => this.explode(at, mine, w === 'c4' || w === 'satchel' ? w : 'grenade'),
+      impact: (surface, at, normal) => this.effects.impact(surface, at, normal, false),
     });
     this.forges = new ForgeView({
       scene: r.scene,
@@ -925,6 +928,8 @@ export class Game {
     // (a swing that lands on a tree or a rock: src/game/gathering.ts)
     this.weapons.onWhack = (owner, at, w) => {
       this.gather.whack(owner, w);
+      // (or on a piece of a base: a raid, src/game/building/raid.ts)
+      if (owner instanceof PieceRef) return this.build.raid.whack(owner, at, w);
       // (or on a wreck, a drum, a heap of junk: src/game/craft-salvage.ts)
       if (!(owner instanceof TreeRef || owner instanceof RockRef)) this.salvage.whack(at, w);
     };
@@ -1555,6 +1560,8 @@ export class Game {
   outFor = 0;
   /** the tags they carry that they took off somebody (as of the last look, a second ago at most) */
   takenTags: string[] = [];
+  /** tags asked of the server to be cashed, by uid, with when: they stay in the pockets until it answers (tickTags) */
+  cashing = new Map<string, number>();
 
   maxPlayers = 0;
   /** the server said it was about to restart: why, and when it said so (by this game's clock) */
@@ -1864,6 +1871,8 @@ export interface Game {
   tagWhenDue: Methods<typeof enterMethods>['tagWhenDue'];
   tickZone: Methods<typeof enterMethods>['tickZone'];
   voidTags: Methods<typeof enterMethods>['voidTags'];
+  tagClock: Methods<typeof enterMethods>['tagClock'];
+  tagCashed: Methods<typeof enterMethods>['tagCashed'];
   tickTags: Methods<typeof enterMethods>['tickTags'];
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];

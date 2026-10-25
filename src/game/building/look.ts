@@ -204,6 +204,8 @@ export function paintsOf(atmo: Atmosphere | null): THREE.MeshStandardMaterial[] 
     pbr('weathered_planks', { name: 'build-wood' }),
     pbr('castle_wall_slates', { name: 'build-stone' }),
     pbr('rusty_corrugated_iron', { metalnessMap: assets.pbr('rusty_corrugated_iron').armMap, metalness: 1, name: 'build-metal' }),
+    // (the armoured tier: welded plates of dark steel, the progression plan's fifth)
+    pbr('metal_plate_02', { metalnessMap: assets.pbr('metal_plate_02').armMap, metalness: 1, name: 'build-armour' }),
   ];
   if (atmo) for (const m of paints) atmo.register(m);
   return paints;
@@ -234,7 +236,7 @@ export function paintFor(p: Paint, atmo: Atmosphere | null): THREE.MeshStandardM
 }
 
 /** what a piece in each paint sounds and is struck as */
-export const surfaceOf = (p: Paint) => (p === 'steel' || p === 'galv' || p === 3 ? 'metal' : p === 2 ? 'rock' : 'wood');
+export const surfaceOf = (p: Paint) => (p === 'steel' || p === 'galv' || p === 3 || p === 4 ? 'metal' : p === 2 ? 'rock' : 'wood');
 
 /** the tier a kind is drawn in when it comes in one only */
 export const drawnAt = (kind: string, t: Tier): Tier => PIECES[kind].only ?? t;

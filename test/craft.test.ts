@@ -163,8 +163,8 @@ ok('a workbench is near when one stands within 4 m on the same floor, not on the
   assert.equal(placeNear(bs, 'forge', wx, wy, wz), null, 'a bench was a forge');
   // (its level: one unsaid, the best of those within reach)
   assert.equal(placeNear(bs, 'bench', wx + 1, wy, wz)?.lv, 1);
-  const p = [...b.pieces.values()].find((q) => q.k === 'workbench')! as { lv?: number };
-  p.lv = 3;
+  const p = [...b.pieces.values()].find((q) => q.k === 'workbench')!;
+  p.t = 3;
   assert.equal(placeNear(bs, 'bench', wx + 1, wy, wz)?.lv, 3, 'a Bench III was not three');
 });
 

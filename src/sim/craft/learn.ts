@@ -19,7 +19,7 @@ export const KNOWN_AT_START: ReadonlySet<string> = new Set([
 export const TREE: Record<Level, readonly (readonly [string, number])[]> = {
   1: [['pickaxe', 20], ['hand_saw', 30], ['key_lock', 40], ['ammo_9mm', 50], ['ammo_45', 60]],
   2: [['gun_light', 75], ['sheet_metal', 90], ['sledgehammer', 110], ['red_dot', 140], ['colt', 175], ['m9', 225], ['satchel', 300]],
-  3: [['ammo_762', 200], ['ammo_739', 225], ['suppressor_9', 260], ['pu_scope', 300], ['mosin9130', 350], ['mpa', 400], ['scorpion', 450], ['suppressor_739', 500], ['ak', 650]],
+  3: [['ammo_762', 200], ['ammo_739', 225], ['suppressor_9', 260], ['pu_scope', 300], ['mosin9130', 350], ['mpa', 400], ['scorpion', 450], ['suppressor_739', 500], ['ak', 650], ['c4', 750]],
 };
 
 /** how a recipe not yet known may be learned: its tree's place (and why not now), and researching it (and why not now) */

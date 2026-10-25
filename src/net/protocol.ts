@@ -73,6 +73,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
 // who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; metal salvaged, 'salvage');
+// raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
+// a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels;
 // progression v3 ('known' and 'learn': blueprints; 'recy': recyclers; 'trade', 'tday' and 'book': the trader camp, paid in scrap).)
 export const PROTOCOL = 66;
 
@@ -372,6 +374,8 @@ export type C2S =
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
   | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
   | { t: 'bdel'; b: number; p: number; u: string }
+  /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
+  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean }
   /** joining a base's claim, or leaving it (stood at it) */
   | { t: 'bjoin'; b: number }
   /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
@@ -386,6 +390,11 @@ export type C2S =
   | { t: 'bunlock'; b: number; p: number; u: string }
   /** a blueprint laid with the plan `u` (src/sim/build/blueprints.ts): begun on the ground, or carried on with on base `b` */
   | { t: 'bprint'; id: string; b?: number; x: number; z: number; yaw: number; u: string }
+  /** raiding (src/sim/build/raid.ts): a blow of the tool in the hands `u` landed on piece `p` of base `b` at `at`; a charge
+   * (item `u`, `w` 'c4' or 'satchel') stuck at `at` on a face turned to `n`; a charge that did not go off, lit again */
+  | { t: 'bhit'; b: number; p: number; u: string; at: [number, number, number] }
+  | { t: 'bplant'; w: string; u: string; at: [number, number, number]; n: [number, number, number] }
+  | { t: 'blight'; i: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -498,6 +507,10 @@ export type S2C =
   /** a base's claim as it is now (null: gone), with no store; the health of its pieces rotting */
   | { t: 'bclaim'; b: number; c: KeptClaim | null }
   | { t: 'bhp'; b: number; hp: [number, number][] }
+  /** a charge stuck to a base, burning with `f` seconds left (-1: it did not go off), by player `by`; gone off; gone out */
+  | { t: 'bcharge'; i: number; w: string; o: [number, number, number]; n: [number, number, number]; f: number; by: number }
+  | { t: 'bboom'; i: number; w: string; o: [number, number, number]; by: number }
+  | { t: 'bfizz'; i: number }
   /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */
   | { t: 'bkeep'; b: number; s: number; dry: boolean; day: [string, number][] }
   /** the server's word on the hammer begun at a piece */
@@ -577,6 +590,8 @@ export type S2C =
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
   | { t: 'void'; uids: string[] }
+  /** how long the server counts you as having held this tag, seconds: it starts again each time the tag comes back to you (server/custody.ts), and the game's countdown follows it */
+  | { t: 'tagclock'; uid: string; held: number }
   /** to an admin who asked: what somebody carries, as the server last had it from their game */
   | { t: 'inv'; id: number; name: string; inv: SerializedInventory | null }
   /** an admin has taken these things out of what this player carries: they are gone */

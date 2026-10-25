@@ -5,7 +5,8 @@
 // six o'clock itself: no wheel here has one of its own).
 
 import type { RadialEntry, RadialRing } from '../../ui/radial';
-import { PIECES, TIERS, type Cat, type Tier } from '../../sim/build/pieces';
+import { PIECES, TIERS, hpOf, type Cat, type Tier } from '../../sim/build/pieces';
+import { MEND } from '../../sim/build/bases';
 import type { Piece } from '../../sim/build/snap';
 import { TIER_INK, actionIcon, pieceIcon, printIcon } from './icons';
 import { PRINTS, asksOf, printOf } from '../../sim/build/blueprints';
@@ -27,9 +28,11 @@ export const CATS: { cat: Cat; label: string; icon: string }[] = [
   { cat: 'outside', label: 'Outside', icon: 'high_wall_wood' },
   { cat: 'deploy', label: 'Set down', icon: 'claim' },
 ];
-/** the hammer's wheel: eight wedges (the radial's Cancel at the bottom), and what each of the others does */
-export const HAMMER_PER = 8;
-export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'repair', 'remove', 'rotate', 'unlock'] as const;
+/** the hammer's wheel: nine wedges (the radial's Cancel at the bottom), and what each of the others does (up4: the armoured tier) */
+export const HAMMER_PER = 9;
+export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'up4', 'repair', 'remove', 'rotate', 'unlock'] as const;
+/** a workbench's level, as it is said */
+export const ROMAN = ['', 'I', 'II', 'III'];
 
 export const piecesOf = (cat: Cat) => Object.values(PIECES).filter((k) => k.cat === cat);
 /** what a group offers round the outside: its pieces, and with the foundations the blueprints (starting spots for a base) */
@@ -82,9 +85,12 @@ export function hammerEntries(p: Piece | null): RadialEntry[] {
   return HAMMER_WHEEL.map((w): RadialEntry => {
     if (w === 'unlock') return { id: w, label: 'Lock off', icon: actionIcon('lock'), mark: p?.lock ? undefined : 'dim' };
     if (w === 'remove') return { id: w, label: p && PIECES[p.k].role === 'deploy' && p.k !== 'claim' ? 'Pick up' : 'Take down', icon: actionIcon('remove', '#ee7a6e'), mark: p ? undefined : 'dim' };
-    if (w === 'repair') return { id: w, label: 'Repair', icon: actionIcon('repair'), mark: 'dim' };
-    if (w === 'rotate') return { id: w, label: 'Turn', icon: actionIcon('rotate'), mark: 'dim' };
+    // (mended when it has lost health; turned about within ten minutes of being laid: src/sim/build/bases.ts MEND)
+    if (w === 'repair') return { id: w, label: 'Repair', icon: actionIcon('repair'), mark: p && p.hp < hpOf(p.k, p.t) - 0.5 ? undefined : 'dim' };
+    if (w === 'rotate') return { id: w, label: 'Turn', icon: actionIcon('rotate'), mark: p && ['wall', 'fit', 'stairs', 'deploy'].includes(PIECES[p.k].role) && Date.now() - p.at <= MEND.turn ? undefined : 'dim' };
     const to = Number(w.slice(2)) as Tier;
+    // (a workbench is brought up in levels, II and III: the progression plan)
+    if (p && PIECES[p.k].levels) return { id: w, label: ROMAN[to] ? `Level ${ROMAN[to]}` : '', icon: actionIcon('up', TIER_INK[Math.min(4, to + 1)]), mark: to !== p.t + 1 || to > 3 ? 'dim' : undefined };
     return { id: w, label: TIERS[to], icon: actionIcon('up', TIER_INK[to]), mark: !p || p.t >= to || PIECES[p.k].only !== undefined ? 'dim' : undefined };
   });
 }

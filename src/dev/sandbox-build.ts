@@ -17,8 +17,8 @@ import '../ui/style.css';
 import '../ui/hud.css';
 import { Radial } from '../ui/radial';
 import { Bases } from '../sim/build/bases';
-import { PIECES, TIERS, type Tier } from '../sim/build/pieces';
-import { blocked, nearestSpot, spots, toWorld, worldYaw, type Base } from '../sim/build/snap';
+import { PIECES, TIERS, hpOf, type Tier } from '../sim/build/pieces';
+import { blocked, deployAt, nearestSpot, spots, toWorld, worldYaw, type Base } from '../sim/build/snap';
 import { BaseDraw } from '../game/building/draw';
 import { ghostGeometry } from '../game/building/look';
 import { layPrint } from '../sim/build/blueprints';
@@ -37,9 +37,17 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6 };
+export const BUILD_CELLS: Record<string, number> = { items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { fell: 4, doors: 3, slope: 3, part2: 3 };
+export const BUILD_COLS: Record<string, number> = { fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+
+/** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
+async function drawnAll(draw: BaseDraw) {
+  const far = new THREE.Vector3(1e6, 0, 1e6);
+  draw.update(0, far);
+  await draw.models.all();
+  draw.update(0, far);
+}
 
 /** a small base built by the rules on flat ground: two storeys, triangles, a doorway, a window, stairs, roofs, every tier */
 function sampleBase() {
@@ -110,6 +118,9 @@ function doorBase() {
   // (the bench first: the metal fittings need it near)
   const bench = bs.lay({ b: b.id, k: 'workbench', x: 3, y: 0, z: 0, r: 0 }, 'me', 0);
   if (typeof bench === 'string') throw new Error(`workbench: ${bench}`);
+  // (brought up to level III: the metal fittings need a II, the high stone gate a III)
+  bs.upgrade(b.id, bench.piece.id, 2);
+  bs.upgrade(b.id, bench.piece.id, 3);
   for (const [k, x, z] of [['wall', -1.5, 0], ['wall', 7.5, 0], ['doorway', 0, 1.5], ['window', 3, 1.5], ['wall_frame', 6, 1.5], ['window', 0, -1.5], ['window', 3, -1.5], ['window', 6, -1.5], ['doorway', 1.5, 0], ['wall_frame', 4.5, 0], ['wall', -1.5, 3], ['wall', 1.5, 3], ['doorway', 0, 4.5]] as const) at(k, x, 1.5, z, 0, 2);
   // the airlock: the porch's outer door shut, the front room's door open, the inner metal one shut
   at('door_wood', 0, 1.2, 1.5, 0, undefined, true);
@@ -311,7 +322,7 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     const bs = sampleBase();
     const draw = new BaseDraw(s.scene, null);
     for (const b of bs.bases.values()) draw.setBase(b);
-    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    await drawnAll(draw);
     await settle();
     const body = await survivor();
     body.position.set(0.6, 0.25, 3.6);
@@ -371,7 +382,7 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     if (typeof way === 'string') throw new Error(way);
     bs.upgrade(g.base.id, way.piece.id, 1);
     for (const b of bs.bases.values()) draw.setBase(b);
-    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    await drawnAll(draw);
     const ghost = new THREE.Mesh(ghostGeometry('door_wood'), new THREE.MeshBasicMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide }));
     ghost.position.set(...toWorld(g.base, way.piece.x, way.piece.y, way.piece.z));
     ghost.rotation.y = worldYaw(g.base, way.piece.r);
@@ -401,6 +412,71 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
       shoot(s, camera, i, v);
     });
     return { pieces: [...bs.bases.values()].map((b) => [...b.pieces.values()].map((p) => `${p.k}${p.open ? '(open)' : ''}`)) };
+  }
+  if (name === 'models') {
+    // (the pieces drawn from models, close to: src/game/building/models.ts. A stone house with its things set down in
+    // it, and the high walls and their gates outside)
+    const bs = new Bases({ ground: () => 0, why: () => null });
+    const house = layPrint(bs, 'bp:house', { x: 0, z: 0, yaw: 0 }, 'me', 0, 'Me', () => true).base!;
+    for (const p of house.pieces.values()) if (PIECES[p.k].only === undefined) {
+      p.t = 2;
+      p.hp = hpOf(p.k, 2);
+    }
+    const said: string[] = [];
+    const put = (k: string, x: number, z: number, b = house) => {
+      const at = deployAt(b, k, { x, y: 0, z });
+      const r = at ? bs.lay({ b: b.id, k, ...at }, 'me', 0, 'Me') : 'no spot';
+      if (typeof r === 'string') said.push(`${k}: ${r}`);
+      return typeof r === 'string' ? null : r.piece;
+    };
+    put('claim', -0.7, -0.5);
+    const box = put('box_small', 0.6, -0.9);
+    if (box) box.lock = { k: 'key', on: true, who: ['me'], key: 1 };
+    put('box_large', 3.4, -0.9);
+    put('bed', -0.5, 3.3);
+    const bench = put('workbench', 0.1, 0.9);
+    if (bench) bench.t = 3;
+    const torch = nearestSpot(spots(house, 'torch_wall'), 'torch_wall', { x: 1.5, y: 0.2, z: -1.4 }, 3);
+    const lit = torch ? bs.lay({ b: house.id, k: 'torch_wall', ...torch }, 'me', 0) : 'no spot';
+    if (typeof lit === 'string') said.push(`torch_wall: ${lit}`);
+    const tw = typeof lit === 'string' ? [2, 1.8, -1.3] : toWorld(house, lit.piece.x, lit.piece.y + 1.9, lit.piece.z);
+    for (const [k, x] of [['high_wall_wood', 16], ['gate_stone', 26], ['gate_wood', 36], ['high_wall_stone', 46]] as const) {
+      const r = bs.lay({ k, x, y: 0, z: -2, r: 0, yaw: 0 }, 'me', 0);
+      if (typeof r === 'string') said.push(`${k}: ${r}`);
+    }
+    const draw = new BaseDraw(s.scene, null);
+    for (const b of bs.bases.values()) draw.setBase(b);
+    await drawnAll(draw);
+    await settle();
+    const body = await survivor();
+    body.position.set(3.8, 0.25, 0.4);
+    s.scene.add(body);
+    s.sun.position.set(14, 22, 16);
+    s.sun.target.position.set(8, 0, 1);
+    s.sun.shadow.camera.left = s.sun.shadow.camera.bottom = -24;
+    s.sun.shadow.camera.right = s.sun.shadow.camera.top = 24;
+    s.sun.shadow.camera.updateProjectionMatrix();
+    camera.fov = 40;
+    camera.updateProjectionMatrix();
+    // (the house's roof and upper floor out of the way: looked into from above its walls)
+    const views: [string, [number, number, number], [number, number, number]][] = [
+      ['the claim and a small box with a key lock', [0.4, 2.0, 1.6], [-0.1, 0.5, -0.8]],
+      ['the large box and a torch on the wall', [tw[0] + 0.9, tw[1] - 0.2, 1.4], [tw[0], tw[1] - 0.3, tw[2]]],
+      ['the workbench at level III, and the bed', [1.4, 2.4, 2.6], [-0.2, 0.6, 1.8]],
+      ['a palisade, and the stone gate shut', [21, 4, 13], [21, 3, -2]],
+      ['the wooden gate shut, and a high stone wall', [41, 4, 13], [41, 3, -2]],
+      ['the whole house from outside', [9, 8, 13], [1.5, 2, 1.5]],
+    ];
+    house.pieces.forEach((p) => {
+      if (p.y >= 2.5) draw.remove(house.id, [p.id]);
+    });
+    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    views.forEach(([v, p, l], i) => {
+      camera.position.set(...p);
+      camera.lookAt(...l);
+      shoot(s, camera, i, v);
+    });
+    return { said };
   }
   if (name === 'slope') {
     // (a slope of about 17 degrees, rising to +x: a row of three foundations down it from the highest ground, walled,
@@ -432,7 +508,7 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     for (const p of [...b.pieces.values()]) if (p.t === 0) bs.upgrade(b.id, p.id, 1);
     const draw = new BaseDraw(s.scene, null);
     draw.setBase(b);
-    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    await drawnAll(draw);
     await settle();
     s.sun.position.set(-14, 24, 16);
     s.sun.target.position.set(-3, 2, 0);
@@ -506,10 +582,11 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     bs.upgrade(D.id, atD('floor_frame', 0, 3, 0).id, 2);
     const wb = bs.lay({ b: D.id, k: 'workbench', x: 0, y: 0, z: -0.5, r: 0 }, 'me', 0);
     if (typeof wb === 'string') throw new Error(`workbench: ${wb}`);
+    bs.upgrade(D.id, wb.piece.id, 2);
     atD('hatch', 0, 3, 0).open = true;
     const draw = new BaseDraw(s.scene, null);
     for (const b of bs.bases.values()) draw.setBase(b);
-    draw.update(0, new THREE.Vector3(1e6, 0, 1e6));
+    await drawnAll(draw);
     await settle();
     const body = await survivor();
     body.position.set(-3.2, 0, 4);

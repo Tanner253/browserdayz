@@ -357,6 +357,9 @@ export const onlineMethods = {
     net.on('bclaim', (m) => this.build.onClaim(m));
     net.on('bkeep', (m) => this.build.onKeep(m));
     net.on('bhp', (m) => this.build.onHp(m));
+    net.on('bcharge', (m) => this.build.raid.onCharge(m));
+    net.on('bboom', (m) => this.build.raid.onBoom(m));
+    net.on('bfizz', (m) => this.build.raid.onFizz(m));
     net.on('bdoor', (m) => this.build.doors.onDoor(m));
     net.on('beds', (m) => this.build.beds.onBeds(m));
     net.on('knock', (m) => this.build.doors.onKnock(m));
@@ -680,7 +683,10 @@ export const onlineMethods = {
     net.on('score', (m) => this.arenaHud?.score(m));
     net.on('kill', (m) => this.arenaHud?.kill(m));
     net.on('void', (m) => this.voidTags(m.uids));
+    net.on('tagclock', (m) => this.tagClock(m.uid, m.held));
     net.on('cashed', (m) => {
+      // (one of ours: it leaves the pockets only now, on the server's word: see tickTags)
+      if (m.id === net.id) this.tagCashed(m.owner);
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);
       this.hud.feed(text, m.id === net.id);

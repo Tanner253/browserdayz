@@ -19,13 +19,22 @@ export const FOUND = { lift: 0.25, deep: 0.6, skirt: 2.5 };
 export const FLOOR_T = 0.2;
 export const WALL_T = 0.2;
 
-export type Tier = 0 | 1 | 2 | 3;
-export const TIERS = ['Frame', 'Wood', 'Stone', 'Metal'] as const;
+// (the armoured tier, a fifth after metal: the owner's yes to the progression plan, 2026-10-25, "the highest tier
+// upgrades to base should be quite grindy and also shoudl require th euser to loot")
+export type Tier = 0 | 1 | 2 | 3 | 4;
+export const TIERS = ['Frame', 'Wood', 'Stone', 'Metal', 'Armoured'] as const;
 /** health by tier, and the seconds the hammer takes to bring a piece up to it (a frame is laid with the plan) */
-export const TIER_HP = [60, 500, 1000, 2000];
-export const TIER_S = [1, 5, 8, 12];
-/** what a full piece costs at each tier, of the materials (src/sim/items/build.ts) */
-const TIER_COST: Record<string, number>[] = [{ planks: 4 }, { planks: 10, nails: 12 }, { stone: 30 }, { sheet_metal: 4, nails: 24 }];
+export const TIER_HP = [60, 500, 1000, 2000, 4000];
+export const TIER_S = [1, 5, 8, 12, 16];
+/** what a full piece costs at each tier, of the materials (src/sim/items/build.ts; steel plate and iron bars are looted and forged) */
+const TIER_COST: Record<string, number>[] = [{ planks: 4 }, { planks: 10, nails: 12 }, { stone: 30, nails: 6 }, { sheet_metal: 4, nails: 24 }, { steel_plate: 2, iron_bar: 6, nails: 30 }];
+/** the level of workbench a piece is nailed up to each tier near (0: none): metal at a bench II, armoured at a bench III */
+export const TIER_BENCH = [0, 0, 0, 2, 3];
+/**
+ * The workbench's levels, I to III, brought up in place with the hammer as a tier is (the progression plan, approved):
+ * what each level beyond the first costs. Its level is its piece's `t` (`benchLevel`): crafting reads it for its recipes.
+ */
+export const BENCH_LEVELS: Record<string, number>[] = [{}, {}, { iron_bar: 10, nails: 40, hardware: 2 }, { iron_bar: 25, nails: 60, steel_plate: 3 }];
 
 /**
  * What a piece is to the snapping (src/sim/build/snap.ts):
@@ -66,8 +75,10 @@ export interface PieceKind {
   /** what one made in one tier costs, and its health */
   cost?: Record<string, number>;
   hp?: number;
-  /** laid only with a workbench near (plan v2: "metal ones need a workbench in the claim") */
-  bench?: boolean;
+  /** laid only with a workbench of this level or better near (plan v2: "metal ones need a workbench in the claim") */
+  bench?: 1 | 2 | 3;
+  /** brought up in levels with the hammer, not tiers (the workbench: BENCH_LEVELS) */
+  levels?: boolean;
   /** the length of a free piece along its line, m */
   long?: number;
   /** a box: its store, squares across and down */
@@ -112,45 +123,50 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     // nails (the metal ones need a bench); double doors twice a single". The owner: "airlock mechanics like rust has
     // doors that swing open 1 way with collision".)
     { id: 'door_wood', name: 'Wooden Door', cat: 'doors', role: 'fit', fits: 'door', only: 1, cost: { planks: 12, nails: 8 }, hp: 250 },
-    { id: 'door_metal', name: 'Metal Door', cat: 'doors', role: 'fit', fits: 'door', only: 3, cost: { sheet_metal: 4, nails: 20 }, hp: 500, bench: true },
+    // (and a tin of hinges and bolts in every metal door, hatch and gate: the progression plan's `hardware`, looted)
+    { id: 'door_metal', name: 'Metal Door', cat: 'doors', role: 'fit', fits: 'door', only: 3, cost: { sheet_metal: 4, nails: 20, hardware: 1 }, hp: 500, bench: 2 },
     { id: 'double_door_wood', name: 'Wooden Double Door', cat: 'doors', role: 'fit', fits: 'wide', only: 1, cost: { planks: 24, nails: 16 }, hp: 250 },
-    { id: 'double_door_metal', name: 'Metal Double Door', cat: 'doors', role: 'fit', fits: 'wide', only: 3, cost: { sheet_metal: 8, nails: 40 }, hp: 500, bench: true },
-    { id: 'garage_door', name: 'Garage Door', cat: 'doors', role: 'fit', fits: 'wide', only: 3, cost: { sheet_metal: 8, nails: 40 }, hp: 1000, bench: true },
-    { id: 'hatch', name: 'Ladder Hatch', cat: 'doors', role: 'fit', fits: 'hatch', only: 3, cost: { sheet_metal: 3, nails: 16 }, hp: 500, bench: true },
+    { id: 'double_door_metal', name: 'Metal Double Door', cat: 'doors', role: 'fit', fits: 'wide', only: 3, cost: { sheet_metal: 8, nails: 40, hardware: 1 }, hp: 500, bench: 2 },
+    { id: 'garage_door', name: 'Garage Door', cat: 'doors', role: 'fit', fits: 'wide', only: 3, cost: { sheet_metal: 8, nails: 40, hardware: 1 }, hp: 1000, bench: 2 },
+    { id: 'hatch', name: 'Ladder Hatch', cat: 'doors', role: 'fit', fits: 'hatch', only: 3, cost: { sheet_metal: 3, nails: 16, hardware: 1 }, hp: 500, bench: 2 },
     { id: 'shutters', name: 'Wooden Shutters', cat: 'windows', role: 'fit', fits: 'window', only: 1, cost: { planks: 8, nails: 6 }, hp: 250 },
     { id: 'bars_wood', name: 'Wooden Bars', cat: 'windows', role: 'fit', fits: 'window', only: 1, cost: { planks: 6, nails: 6 }, hp: 250 },
-    { id: 'bars_metal', name: 'Metal Bars', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 2, nails: 10 }, hp: 500, bench: true },
-    { id: 'embrasure', name: 'Embrasure', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 3, nails: 12 }, hp: 500, bench: true },
-    { id: 'gate_wood', name: 'High Wood Gate', cat: 'outside', role: 'free', only: 1, long: 3, h: 6, cost: { log: 6, nails: 20 }, hp: 800 },
+    { id: 'bars_metal', name: 'Metal Bars', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 2, nails: 10 }, hp: 500, bench: 2 },
+    { id: 'embrasure', name: 'Embrasure', cat: 'windows', role: 'fit', fits: 'window', only: 3, cost: { sheet_metal: 3, nails: 12 }, hp: 500, bench: 2 },
+    { id: 'gate_wood', name: 'High Wood Gate', cat: 'outside', role: 'free', only: 1, long: 3, h: 6, cost: { log: 6, nails: 20, hardware: 1 }, hp: 800 },
     // (plan v2: "Ladder: 8 planks, 10 nails. Leans on any wall. Raiders' ladders work anywhere too")
     { id: 'ladder', name: 'Ladder', cat: 'outside', role: 'lean', only: 1, cost: { planks: 8, nails: 10 }, hp: 150, anywhere: true },
-    { id: 'gate_stone', name: 'High Stone Gate', cat: 'outside', role: 'free', only: 2, long: 3, h: 6, cost: { stone: 40, sheet_metal: 6, nails: 20 }, hp: 1500, bench: true },
+    { id: 'gate_stone', name: 'High Stone Gate', cat: 'outside', role: 'free', only: 2, long: 3, h: 6, cost: { stone: 40, sheet_metal: 6, nails: 20, hardware: 1 }, hp: 1500, bench: 3 },
     // (what is set down, plan v2: "Small box · Large box: 12 planks, 8 nails · 25 planks, 20 nails; 6×5 and 10×8
     // squares; health 150 and 300"; "Workbench: 2 logs, 20 planks, 20 nails. Lets metal fittings be made in its claim")
     { id: 'box_small', name: 'Small Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 12, nails: 8 }, hp: 150, store: [6, 5] },
     { id: 'box_large', name: 'Large Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 25, nails: 20 }, hp: 300, store: [10, 8] },
-    { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 2, planks: 20, nails: 20 }, hp: 500 },
+    { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 2, planks: 20, nails: 20 }, hp: 500, levels: true },
+    // (crafting's forge, plan-crafting: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts while it
+    // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the fragments and what comes out, src/sim/craft/forge.ts)
+    { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
     // (the owner, 2026-10-24: "players can place a bed or bedroll in their base when they have a TC down like rust". Plan
     // v2: "Sleeping bag: found ... Wake here after a death, with nothing, at most every 10 min"; a bed, Rust's, sooner)
     { id: 'bedroll', name: 'Sleeping Bag', cat: 'deploy', role: 'deploy', only: 1, cost: { sleeping_bag: 1 }, hp: 100, sleep: 600 },
     // (the owner, 2026-10-24: torches "hung on walls"; the torch itself, set in an iron bracket)
     { id: 'torch_wall', name: 'Wall Torch', cat: 'deploy', role: 'lean', only: 1, cost: { torch: 1 }, hp: 50 },
     { id: 'bed', name: 'Bed', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, nails: 12, sleeping_bag: 1 }, hp: 250, sleep: 300 },
-    // (crafting's, on the end as every new piece goes)
-    // (crafting's forge, plan-crafting: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts while it
-    // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the fragments and what comes out, src/sim/craft/forge.ts)
-    { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
-    // (crafting's research table, progression v3: "put a found item in with scrap, and the item is used up; you know it for good"; laid by a bench, as Bench I makes it)
-    { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 25 }, hp: 300, bench: true },
+    // (the armoured tier's doors, the progression plan: "cost in steel plates, iron bars, hardware and nails; raid cost
+    // about twice metal's": two C4 for the door, four for the garage door, src/sim/build/raid.ts)
+    { id: 'door_armoured', name: 'Armoured Door', cat: 'doors', role: 'fit', fits: 'door', only: 4, cost: { steel_plate: 2, iron_bar: 4, hardware: 2, nails: 20 }, hp: 1000, bench: 3 },
+    { id: 'garage_door_armoured', name: 'Armoured Garage Door', cat: 'doors', role: 'fit', fits: 'wide', only: 4, cost: { steel_plate: 4, iron_bar: 8, hardware: 3, nails: 40 }, hp: 2000, bench: 3 },
+    // (crafting's research table, progression v3: "put a found item in with scrap, and the item is used up; you know it for good"; laid by a bench, as Bench I makes it; on the end, as every new piece goes)
+    { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 25 }, hp: 300, bench: 1 },
   ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
 
 /** the pieces' numbers on the wire and in the save (never reordered: a new piece goes on the end) */
 export const PIECE_IDS = Object.keys(PIECES);
 
-/** what bringing a piece to tier `t` takes (a frame: what laying it takes) */
+/** what bringing a piece to tier `t` takes (a frame: what laying it takes; the workbench: its level `t`) */
 export function costOf(kind: string, t: Tier): Record<string, number> {
   const k = PIECES[kind];
+  if (k.levels && t > (k.only ?? 0)) return { ...BENCH_LEVELS[t] };
   // (one made in one tier is laid whole, at its own cost)
   if (k.cost) return { ...k.cost };
   const of = TIER_COST[t], out: Record<string, number> = {};
@@ -165,3 +181,8 @@ export const hpOf = (kind: string, t: Tier) => PIECES[kind].hp ?? TIER_HP[t];
 
 /** the first tier a piece is laid at: a frame, or the one tier it comes in */
 export const laidAt = (kind: string): Tier => PIECES[kind].only ?? 0;
+
+/** a workbench's level, I to III (anything else: none) */
+export const benchLevel = (p: { k: string; t: number }) => (PIECES[p.k].levels ? p.t : 0);
+/** the highest a piece is brought up to: the armoured tier; the workbench, level III */
+export const topOf = (kind: string): Tier => (PIECES[kind].levels ? 3 : PIECES[kind].only ?? 4);

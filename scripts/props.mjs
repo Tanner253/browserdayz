@@ -395,6 +395,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const [rx, ry, rz] = cfg.rot ?? [0, 0, 0];
     const R = mul(about.z(rz), mul(about.y(ry), about.x(rx)));
     for (const mesh of meshes) transformMesh(mesh, R);
+    // (and pressed along its axes as it then stands: a plate that came four times as thick as steel plate is)
+    if (cfg.squash) for (const mesh of meshes) transformMesh(mesh, [cfg.squash[0], 0, 0, 0, 0, cfg.squash[1], 0, 0, 0, 0, cfg.squash[2], 0, 0, 0, 0, 1]);
     if (pivot) pivot = [0, 1, 2].map((r) => R[r] * pivot[0] + R[4 + r] * pivot[1] + R[8 + r] * pivot[2]);
     const b = getBounds(scene);
     const s = cfg.scale ?? cfg.size / Math.max(...b.max.map((v, k) => v - b.min[k]));

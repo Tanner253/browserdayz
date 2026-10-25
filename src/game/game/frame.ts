@@ -30,6 +30,7 @@ import { bunkerDark } from '../../sim/bunker';
 import { rackShows } from '../../sim/crates';
 import { ANIMALS } from '../../sim/animals';
 import { keyHints } from '../key-hints';
+import { LEFT_HELD } from '../building';
 import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../game';
 
 /** the server unheard this long (ms), the line is said to have stalled */
@@ -377,8 +378,8 @@ export const frameMethods = {
       // (the wheel goes on to the next thing on the hot bar from this one; with no other, it is put away)
       if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.wheelStep(input.wheel > 0 ? 1 : -1)) input.wheel = 0;
       if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
-      // (the building plan's left button is the building's: it lays a piece)
-      else if (playing && !uiOpen && !typing && r.t > 0.3 && r.item.id !== 'building_plan' && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
+      // (the building plan's left button is the building's: it lays a piece; a lock's fits it, a charge's sticks it)
+      else if (playing && !uiOpen && !typing && r.t > 0.3 && !LEFT_HELD.has(r.item.id) && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }
 
     // a grenade: its pin coming out, and then live in the hand until the button is let go (see `cook`)
@@ -701,7 +702,7 @@ export const frameMethods = {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? this.salvage.shown() ?? (this.ready && this.ready.item.id !== 'building_plan' ? { label: `${ITEMS[this.ready.item.id].name}: ${this.ready.item.id === 'torch' ? (this.build.torches.lit ? 'L puts it out' : 'L lights it') : ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
+      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? this.salvage.shown() ?? (this.ready && !LEFT_HELD.has(this.ready.item.id) ? { label: `${ITEMS[this.ready.item.id].name}: ${this.ready.item.id === 'torch' ? (this.build.torches.lit ? 'L puts it out' : 'L lights it') : ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

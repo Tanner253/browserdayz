@@ -17,8 +17,8 @@ import type { Input } from '../../core/input';
 import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
-import { Bases, heard, heardClaim, heardPiece, said, type KeptBase } from '../../sim/build/bases';
-import { PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, type Tier } from '../../sim/build/pieces';
+import { Bases, heard, heardClaim, heardPiece, repairOf, said, type KeptBase } from '../../sim/build/bases';
+import { PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
 import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
@@ -29,7 +29,7 @@ import { ClaimView } from './claims';
 import { publicId } from '../../net/client';
 import type { Stash } from '../loot';
 import { ghostGeometry } from './look';
-import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, hammerEntries, itemsOf, nameOf, pieceAt, planEntries } from './wheel';
+import { CATS, HAMMER_PER, HAMMER_WHEEL, PER, RINGS, ROMAN, hammerEntries, itemsOf, nameOf, pieceAt, planEntries } from './wheel';
 import { DoorView } from './doors';
 import { BoxView } from './boxes';
 import { LockView } from './locks';
@@ -37,6 +37,7 @@ import { BedsView } from './beds';
 import { LadderView, type Climber } from './ladders';
 import { PrintView } from './prints';
 import { TorchView, type TorchHost } from './torches';
+import { RaidView } from './raid';
 import { printCost, printOf } from '../../sim/build/blueprints';
 import { BaseSolids } from '../../sim/build/solid';
 import { inRoom, shutRoom, type Room } from '../../sim/build/rooms';
@@ -86,7 +87,14 @@ export interface BuildHost {
   flames: TorchHost['flames'];
   glow: TorchHost['glow'];
   tip: TorchHost['tip'];
+  /** a blast gone off: its fire and sound, and alone what it does to this game's bodies (Game.explode) */
+  explode: (at: THREE.Vector3, mine: boolean, w: string) => void;
+  /** chips and dust off a surface struck (Effects.impact, no mark) */
+  impact: (surface: import('../../core/physics').Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
 }
+
+/** what in the hands has its left button here, not the hands' (the plan lays, a lock is fitted, a charge stuck) */
+export const LEFT_HELD = new Set(['building_plan', 'code_lock', 'key_lock', 'c4', 'satchel']);
 
 /** how far the mouse moves for the pointer to cross the wheel, px */
 const RING = { reach: 260 };
@@ -173,6 +181,10 @@ export class Building {
     }, () => this.store, this.doors, this.boxes);
     this.ladders = new LadderView(h.input, () => this.store, h.climber);
     this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me, shut: (at) => this.lightShut(at) }, () => this.store);
+    this.raid = new RaidView({
+      scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, camera: h.camera, player: h.player, me: h.me, take: h.take,
+      changed: h.changed, flames: h.flames, glow: h.glow, explode: h.explode, broken: (b, ids) => this.brokeAlone(b, ids), impact: h.impact,
+    }, () => this.store, this.solids);
     this.prints = new PrintView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, yaw: h.yaw, who: () => this.me, name: h.name, count: h.count, take: h.take,
       changed: (b) => {
@@ -251,6 +263,8 @@ export class Building {
   readonly prints: PrintView;
   /** torches: in the hands, and on walls (src/game/building/torches.ts) */
   readonly torches: TorchView;
+  /** raiding: blows at pieces, charges stuck and going off (src/game/building/raid.ts) */
+  readonly raid: RaidView;
 
   /** a base's stores (its claim's, its boxes') as it now stands */
   private synced(b: Base) {
@@ -289,6 +303,11 @@ export class Building {
     this.torches.update(dt, ok && !this.wheel.isOpen);
     const ladder = this.ladders.frame(dt, ok && !this.wheel.isOpen);
     if (ladder && !this.prompt) this.prompt = ladder;
+    // (a charge in the hands, or one that did not go off; the health of a piece just struck)
+    this.raid.update(dt);
+    const raid = this.raid.frame(free);
+    if (raid && !plan && !hammer) this.prompt = raid;
+    if (!this.prompt) this.prompt = this.raid.shown();
     // (while the hands are at it, the ring round the crosshair says what they are doing: the card stands aside)
     if (this.h.busy()) this.prompt = null;
   }
@@ -550,14 +569,15 @@ export class Building {
     const t = this.target();
     if (!t) return;
     const p = t.base.pieces.get(t.id)!, K = PIECES[p.k];
-    const next = (Math.min(3, p.t + 1)) as Tier;
-    const head = `${K.name} · ${K.only !== undefined ? '' : `${TIERS[p.t]} · `}${Math.round(p.hp)}/${hpOf(p.k, p.t)}`;
-    if (K.only !== undefined || p.t >= 3) {
+    // (a workbench goes up in levels, the rest in tiers to armoured: the progression plan)
+    const top = topOf(p.k), next = Math.min(top, p.t + 1) as Tier, said = (n: number) => (K.levels ? `level ${ROMAN[n]}` : TIERS[n]);
+    const head = `${K.name} · ${K.levels ? `Level ${ROMAN[p.t]} · ` : K.only !== undefined ? '' : `${TIERS[p.t]} · `}${Math.round(p.hp)}/${hpOf(p.k, p.t)}`;
+    if ((K.only !== undefined && !K.levels) || p.t >= top) {
       this.prompt = card(head, '', 'hold the right button to take it down');
       return;
     }
-    const cost = costOf(p.k, next), why = this.short(cost);
-    this.prompt = card(head, `${why ? `<span class="no">${why}</span> · ` : ''}up to ${TIERS[next]}: ${this.costHtml(cost)}`, 'hold the right button for more', why ? undefined : 'LMB');
+    const cost = costOf(p.k, next), why = this.store.canUpgrade(t.base.id, p.id, next) ?? this.short(cost);
+    this.prompt = card(head, `${why ? `<span class="no">${why}</span> · ` : ''}up to ${said(next)}: ${this.costHtml(cost)}`, 'hold the right button for more', why ? undefined : 'LMB');
     if (this.h.input.pressed('Mouse0') && !this.h.busy() && !why) this.upgrade(hammer, t.base, t.id, next);
   }
 
@@ -568,7 +588,7 @@ export class Building {
     if (!p) return;
     const still = () => this.h.held()?.uid === hammer.uid && this.target()?.id === id && this.target()?.base === base;
     if (this.h.online()) this.h.send({ t: 'bup', b: base.id, p: id, to, go: 1, u: hammer.uid });
-    this.h.begin(`Nailing the ${PIECES[p.k].name.toLowerCase()} up to ${TIERS[to].toLowerCase()}`, TIER_S[to], still, () => {
+    this.h.begin(PIECES[p.k].levels ? `Bringing the ${PIECES[p.k].name.toLowerCase()} up to level ${ROMAN[to]}` : `Nailing the ${PIECES[p.k].name.toLowerCase()} up to ${TIERS[to].toLowerCase()}`, TIER_S[to], still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bup', b: base.id, p: id, to, go: 2, u: hammer.uid });
       const cost = costOf(p.k, to), why = this.short(cost);
@@ -580,6 +600,16 @@ export class Building {
       this.bump(base.id);
       this.h.changed();
     }, 'You stopped: it is as it was');
+  }
+
+  /** pieces of a base broken in this game's own copy of it (alone: a raid, src/game/building/raid.ts), with what stood only on them */
+  private brokeAlone(base: Base, ids: number[]) {
+    for (const id of ids) {
+      if (!base.pieces.has(id)) continue;
+      this.draw.remove(base.id, this.local.remove(base.id, id));
+    }
+    this.synced(base);
+    this.bump(base.id);
   }
 
   private takeDown(hammer: ItemInstance, base: Base, id: number) {
@@ -661,14 +691,16 @@ export class Building {
     if (this.wheelFor === 'hammer') {
       const w = pick >= 0 ? HAMMER_WHEEL[pick] : '';
       const t = this.target(), p = t ? t.base.pieces.get(t.id) : null;
-      if (!w) return ['Hammer', p ? `${PIECES[p.k].name} · ${TIERS[p.t]}` : 'Look at a piece'];
+      if (!w) return ['Hammer', p ? `${PIECES[p.k].name} · ${PIECES[p.k].levels ? `Level ${ROMAN[p.t]}` : TIERS[p.t]}` : 'Look at a piece'];
       if (w === 'remove') return [PIECES[p?.k ?? '']?.role === 'deploy' && p?.k !== 'claim' ? 'Pick up' : 'Take down', p ? `Back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : ''];
       if (w.startsWith('up') && p) {
-        const to = Number(w.slice(2)) as Tier;
-        return [TIERS[to], costs(costOf(p.k, to))];
+        const to = Number(w.slice(2)) as Tier, why = this.store.canUpgrade(t!.base.id, t!.id, to);
+        return [PIECES[p.k].levels ? `Level ${ROMAN[to] ?? ''}` : TIERS[to], why && !why.startsWith('It is') ? why : costs(costOf(p.k, to))];
       }
       if (w === 'unlock') return ['Take the lock off', p?.lock ? `The ${p.lock.k === 'code' ? 'code' : 'key'} lock back in your pockets` : 'There is no lock on it'];
-      return [w === 'repair' ? 'Repair' : 'Turn', 'Still to come'];
+      if (!p || !t) return [w === 'repair' ? 'Repair' : 'Turn', 'Look at a piece'];
+      if (w === 'repair') return ['Repair', this.store.canRepair(t.base.id, t.id, this.raid.struckAt(t.base.id, t.id), Date.now()) ?? costs(repairOf(p))];
+      return ['Turn', this.store.canTurn(t.base.id, t.id, Date.now()) ?? (PIECES[p.k].role === 'deploy' ? 'a quarter round' : 'the other way about')];
     }
     if (pick < 0) return [nameOf(this.kind), 'Let go on a piece'];
     if (pick < CATS.length) return [CATS[pick].cat === 'found' ? 'Foundations' : CATS[pick].label, ''];
@@ -713,8 +745,35 @@ export class Building {
       this.upgrade(held, t.base, t.id, to);
       return true;
     }
-    this.h.note('That is still to come', 'info');
-    return false;
+    return this.mend(held, t.base, t.id, w === 'rotate');
+  }
+
+  /** the hammer at a piece: mended whole for a share of its cost, or turned about (the server says whether, online) */
+  private mend(hammer: ItemInstance, base: Base, id: number, turn: boolean): boolean {
+    const p = base.pieces.get(id);
+    if (!p) return false;
+    const now = Date.now(), why = turn ? this.store.canTurn(base.id, id, now) : this.store.canRepair(base.id, id, this.raid.struckAt(base.id, id), now) ?? this.short(repairOf(p));
+    if (why) {
+      this.h.note(why, 'warn');
+      return false;
+    }
+    const name = PIECES[p.k].name.toLowerCase(), still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
+    this.h.begin(turn ? `Turning the ${name} about` : `Mending the ${name}`, turn ? 1.5 : 3, still, () => {
+      if (!still()) return;
+      if (this.h.online()) return void this.h.send({ t: 'bfix', b: base.id, p: id, u: hammer.uid, ...(turn ? { turn: true } : {}) });
+      if (turn) this.local.turn(base.id, id);
+      else {
+        const cost = repairOf(p), no = this.short(cost);
+        if (no) return void this.h.note(no, 'warn');
+        for (const [k, n] of Object.entries(cost)) this.h.take(k, n);
+        this.local.repair(base.id, id);
+      }
+      hammer.cond = worn(hammer.id, hammer.cond);
+      this.draw.put(base, p);
+      this.bump(base.id);
+      this.h.changed();
+    }, 'You stopped: it is as it was');
+    return true;
   }
 
   // ---- what the server says
@@ -748,6 +807,7 @@ export class Building {
   onOut(m: Extract<S2C, { t: 'bout' }>) {
     const b = this.seen.bases.get(m.b);
     if (!b) return;
+    this.raid.broke(b, m.ids);
     for (const id of m.ids) b.pieces.delete(id);
     for (const p of b.pieces.values()) p.on = p.on.filter((q) => !m.ids.includes(q));
     this.draw.remove(m.b, m.ids);
@@ -768,7 +828,10 @@ export class Building {
     if (!b) return;
     for (const [id, hp] of m.hp) {
       const p = b.pieces.get(id);
-      if (p) p.hp = hp;
+      if (!p) continue;
+      // (struck, if it was not rot: rot is told an hour's worth at a time, and only to a base with no claim or a dry one)
+      if (hp < p.hp - 1) this.raid.mark(m.b, id);
+      p.hp = hp;
     }
   }
   onSpent(m: Extract<S2C, { t: 'spent' }>) {

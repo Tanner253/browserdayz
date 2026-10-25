@@ -320,6 +320,11 @@
    "diff": "assets/tex/distressed_painted_planks_diff.webp",
    "nor": "assets/tex/distressed_painted_planks_nor.webp",
    "arm": "assets/tex/distressed_painted_planks_arm.webp"
+  },
+  "metal_plate_02": {
+   "diff": "assets/tex/metal_plate_02_diff.webp",
+   "nor": "assets/tex/metal_plate_02_nor.webp",
+   "arm": "assets/tex/metal_plate_02_arm.webp"
   }
  },
  "models": {
@@ -13448,18 +13453,18 @@
    "tags": [
     "loot"
    ],
-   "bytes": 470680,
-   "srcTris": 2438,
-   "tris": 2438,
+   "bytes": 423324,
+   "srcTris": 7316,
+   "tris": 7316,
    "min": [
-    -0.0621,
+    -0.0298,
     0,
-    -0.3
+    -0.31
    ],
    "max": [
-    0.0621,
-    0.4311,
-    0.3
+    0.0298,
+    0.1877,
+    0.31
    ],
    "lods": []
   },
@@ -13739,6 +13744,346 @@
    "hi": "assets/models/hi/market_stall.glb",
    "hiBytes": 760000,
    "hiCard": 64
+  },
+  "c4": {
+   "url": "assets/models/c4.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 523136,
+   "srcTris": 4589,
+   "tris": 4589,
+   "min": [
+    -0.034,
+    0,
+    -0.0639
+   ],
+   "max": [
+    0.034,
+    0.2,
+    0.0639
+   ],
+   "lods": []
+  },
+  "hardware": {
+   "url": "assets/models/hardware.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 330660,
+   "srcTris": 5577,
+   "tris": 5577,
+   "min": [
+    -0.0648,
+    0,
+    -0.065
+   ],
+   "max": [
+    0.0648,
+    0.088,
+    0.065
+   ],
+   "lods": []
+  },
+  "steel_plate": {
+   "url": "assets/models/steel_plate.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 216060,
+   "srcTris": 2585,
+   "tris": 2585,
+   "min": [
+    -0.25,
+    0,
+    -0.2487
+   ],
+   "max": [
+    0.25,
+    0.0309,
+    0.2487
+   ],
+   "lods": []
+  },
+  "bb_door_wood": {
+   "url": "assets/models/bb_door_wood.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 603976,
+   "srcTris": 3696,
+   "tris": 3696,
+   "min": [
+    -0.025,
+    0,
+    -0.5
+   ],
+   "max": [
+    0.025,
+    2.2,
+    0.5
+   ],
+   "lods": []
+  },
+  "bb_door_metal": {
+   "url": "assets/models/bb_door_metal.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 448000,
+   "srcTris": 3061,
+   "tris": 3061,
+   "min": [
+    -0.03,
+    0,
+    -0.5
+   ],
+   "max": [
+    0.03,
+    2.2,
+    0.5
+   ],
+   "lods": []
+  },
+  "bb_hatch": {
+   "url": "assets/models/bb_hatch.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 446568,
+   "srcTris": 2726,
+   "tris": 2726,
+   "min": [
+    -0.03,
+    0,
+    -0.5
+   ],
+   "max": [
+    0.03,
+    1,
+    0.5
+   ],
+   "lods": []
+  },
+  "bb_garage": {
+   "url": "assets/models/bb_garage.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 756248,
+   "srcTris": 12,
+   "tris": 12,
+   "min": [
+    -1.2,
+    0,
+    -0.04
+   ],
+   "max": [
+    1.2,
+    2.6,
+    0.04
+   ],
+   "lods": []
+  },
+  "bb_small_box": {
+   "url": "assets/models/bb_small_box.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 345524,
+   "srcTris": 2231,
+   "tris": 2231,
+   "min": [
+    -0.3184,
+    0,
+    -0.4
+   ],
+   "max": [
+    0.3184,
+    0.4744,
+    0.4
+   ],
+   "lods": []
+  },
+  "bb_large_box": {
+   "url": "assets/models/bb_large_box.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 487264,
+   "srcTris": 2565,
+   "tris": 2565,
+   "min": [
+    -0.7,
+    0,
+    -0.4196
+   ],
+   "max": [
+    0.7,
+    0.8844,
+    0.4196
+   ],
+   "lods": []
+  },
+  "bb_workbench": {
+   "url": "assets/models/bb_workbench.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 472748,
+   "srcTris": 4708,
+   "tris": 4708,
+   "min": [
+    -0.3221,
+    0,
+    -0.8
+   ],
+   "max": [
+    0.3221,
+    1.1266,
+    0.8
+   ],
+   "lods": []
+  },
+  "bb_bed": {
+   "url": "assets/models/bb_bed.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 361188,
+   "srcTris": 3197,
+   "tris": 3197,
+   "min": [
+    -1,
+    0,
+    -0.5844
+   ],
+   "max": [
+    1,
+    0.5942,
+    0.5844
+   ],
+   "lods": []
+  },
+  "bb_wall_torch": {
+   "url": "assets/models/bb_wall_torch.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 336828,
+   "srcTris": 1870,
+   "tris": 1870,
+   "min": [
+    -0.077,
+    0,
+    -0.1783
+   ],
+   "max": [
+    0.077,
+    0.45,
+    0.1783
+   ],
+   "lods": []
+  },
+  "bb_ladder": {
+   "url": "assets/models/bb_ladder.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 653632,
+   "srcTris": 1916,
+   "tris": 1916,
+   "min": [
+    -0.9934,
+    0,
+    -1.75
+   ],
+   "max": [
+    0.9934,
+    3.2051,
+    1.75
+   ],
+   "lods": []
+  },
+  "bb_palisade_log": {
+   "url": "assets/models/bb_palisade_log.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 530964,
+   "srcTris": 950,
+   "tris": 950,
+   "min": [
+    -0.4472,
+    0,
+    -0.3836
+   ],
+   "max": [
+    0.4472,
+    6,
+    0.3836
+   ],
+   "lods": []
+  },
+  "bb_gate_wood": {
+   "url": "assets/models/bb_gate_wood.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 494628,
+   "srcTris": 2860,
+   "tris": 2860,
+   "min": [
+    -0.5583,
+    0,
+    -1.8006
+   ],
+   "max": [
+    0.5583,
+    5.1,
+    1.8006
+   ],
+   "lods": []
+  },
+  "bb_gate_steel": {
+   "url": "assets/models/bb_gate_steel.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 549096,
+   "srcTris": 2539,
+   "tris": 2539,
+   "min": [
+    -0.075,
+    0,
+    -0.6
+   ],
+   "max": [
+    0.075,
+    5.1,
+    0.6
+   ],
+   "lods": []
+  },
+  "bb_claim": {
+   "url": "assets/models/bb_claim.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 817648,
+   "srcTris": 15527,
+   "tris": 15527,
+   "min": [
+    -0.8288,
+    0,
+    -0.3392
+   ],
+   "max": [
+    0.8288,
+    2.1,
+    0.3392
+   ],
+   "lods": []
   }
  }
 }

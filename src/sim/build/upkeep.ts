@@ -8,12 +8,12 @@
 import { PIECES, costOf, hpOf, type Tier } from './pieces';
 import type { Base, Piece } from './snap';
 
-/** what a claim's store takes: the materials a base is built of */
-export const UPKEEP = new Set(['planks', 'nails', 'stone', 'sheet_metal']);
+/** what a claim's store takes: the materials a base is built of (the armoured tier's paid in iron bars: its steel plate is not asked again) */
+export const UPKEEP = new Set(['planks', 'nails', 'stone', 'sheet_metal', 'iron_bar']);
 
 export const ROT = {
-  /** hours from whole to nothing, by tier, once upkeep is out (the owner's yes: "frame 2 h, wood 12 h, stone 24 h, metal 36 h") */
-  hours: [2, 12, 24, 36],
+  /** hours from whole to nothing, by tier, once upkeep is out (the owner's yes: "frame 2 h, wood 12 h, stone 24 h, metal 36 h"; armoured 48 h, the progression plan) */
+  hours: [2, 12, 24, 36, 48],
   /** a piece laid with no claim over it rots after this long (ms) */
   grace: 10 * 60_000,
   /** a claim's building rights reach this far round every piece of its base, m */

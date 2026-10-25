@@ -31,6 +31,19 @@ export const BUILD_ITEMS: ItemDef[] = [
     desc: 'Corrugated sheet steel. A metal wall or a metal door is made of it, nailed up.',
     loot: { pair: 'MetalPlate', at: [0, 5, 8, 0, 0], restock: 360, usage: ['Industrial', 'Farm', 'Military'], favour: { Industrial: 3 }, qty: [0.2, 0.6] },
   },
+  // (the progression plan, the owner's yes 2026-10-25: two parts only ever looted, "the highest tier upgrades to base should
+  // be quite grindy and also shoudl require th euser to loot". Hardware goes into every metal door, hatch and gate and a
+  // level II workbench; steel plate into the armoured tier, its doors and a level III workbench.)
+  { id: 'hardware', name: 'Hardware', model: 'hardware', w: 1, h: 1, weight: 0.6, stack: 5, category: 'misc',
+    desc: 'A tin of hinges, bolts and screws. Every metal door, hatch and gate takes one; a workbench is brought up to level II with two.',
+    loot: { pair: 'Hinges', at: [0, 2, 3, 1, 0], restock: 600, usage: [...SHEDS, 'Industrial'], favour: { Industrial: 3, Farm: 1.5 } },
+    worth: 6,
+  },
+  { id: 'steel_plate', name: 'Steel Plate', model: 'steel_plate', w: 2, h: 3, weight: 4, stack: 2, category: 'misc',
+    desc: 'A plate of armour steel, cut square. The armoured tier is made of it, and its doors, and a level III workbench.',
+    loot: { pair: 'MetalPlate', at: [0, 0, 1, 3, 4], restock: 1800, usage: ['Military'] },
+    worth: 25,
+  },
   // ---------------------------------------------------------------- tools (each wears out: see TOOL_LIFE in src/sim/gather.ts)
   { id: 'hand_saw', name: 'Hand Saw', model: 'hand_saw', w: 1, h: 4, weight: 0.6, category: 'melee', desc: 'Saws a log lying on the ground into planks.', melee: { damage: 18, range: 1.6, rate: 0.7 },
     loot: { pair: 'HandSaw', at: [1, 3, 6, 0, 0], restock: 180, usage: SHEDS, favour: { Farm: 2, Industrial: 2 }, on: IN_SHEDS, rack: { any: 1.4 } },
@@ -76,6 +89,13 @@ export const BUILD_ITEMS: ItemDef[] = [
     desc: 'A stick with a rag-wrapped head soaked in fuel. In your hands, L lights it: a flame and a warm light all round, as far as a campfire throws one. Set on a wall with the building plan, it burns there.',
     loot: { pair: 'LongTorch', at: [3, 4, 2, 0, 0], restock: 420, usage: [...HOMES, ...SHEDS], favour: { Hunting: 2, Farm: 1.5 } },
     worth: 2,
+  },
+  // (raiding, base building's fifth step: the navigator, "C4 as loot". Plan v2: "explosive loot rare; crafted later". Found
+  // only where the army was, and seldom; crafting's satchel charge is the cheaper way through a door: src/sim/build/raid.ts)
+  { id: 'c4', name: 'C4 Charge', model: 'c4', w: 1, h: 2, weight: 1.2, category: 'tool',
+    desc: 'Three blocks of plastic explosive taped to a timer. In your hands, the left button sticks it to a wall, a door or a floor within reach: ten seconds later it goes off. One takes a wooden wall, two a stone one, four a metal one.',
+    loot: { pair: 'PlasticExplosive', at: [0, 0, 0, 1, 2], restock: 3600, usage: ['Military'] },
+    worth: 40,
   },
   { id: 'key', name: 'Key', model: 'key', w: 1, h: 1, weight: 0.02, category: 'misc',
     desc: 'A key to one key lock. Carried, it opens that lock: lose it, and so does whoever finds it.',

@@ -7,7 +7,7 @@
 // it lays a body its colliders do not reach.
 
 import { PIECES, type Role } from './pieces';
-import { angleOf, toLocal, type Base, type Piece } from './snap';
+import { angleOf, toLocal, toWorld, type Base, type Piece } from './snap';
 import { shapeOf, type Solid } from './solids';
 
 type V3 = [number, number, number];
@@ -27,6 +27,8 @@ interface Kind {
   /** its box in its own frame, leaves at every angle and a hand over */
   lo: V3;
   hi: V3;
+  /** the middle of its solids as it stands shut, in its own frame (where a blast is looked for it from) */
+  mid: V3;
   role: Role;
 }
 
@@ -134,12 +136,23 @@ function kindOf(k: string): Kind {
       hi[i] = Math.max(hi[i], p[i] + 0.15);
     }
   };
-  for (const q of s.solid) cornersOf(q).forEach(grow);
+  const mid: V3 = [0, 0, 0];
+  let n = 0;
+  const into = (c: V3) => {
+    for (let i = 0; i < 3; i++) mid[i] += c[i];
+    n++;
+  };
+  for (const q of s.solid) for (const c of cornersOf(q)) {
+    grow(c);
+    into(c);
+  }
+  for (const l of s.leaves ?? []) for (const q of l.solid) for (const c of cornersOf(q)) into(sum(c, l.hinge));
+  if (n) for (let i = 0; i < 3; i++) mid[i] /= n;
   const leaves = (s.leaves ?? []).map((l): Leafed => {
     for (const q of l.solid) for (const c of cornersOf(q)) for (let i = 0; i <= 4; i++) grow(sum(turn(l.axis, (l.open * i) / 4, c), l.hinge));
     return { hinge: l.hinge, axis: l.axis, open: l.open, parts: l.solid.map(planesOf) };
   });
-  kinds.set(k, (K = { body: s.solid.map(planesOf), leaves, lo, hi, role: PIECES[k].role }));
+  kinds.set(k, (K = { body: s.solid.map(planesOf), leaves, lo, hi, mid, role: PIECES[k].role }));
   return K;
 }
 const sum = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -254,6 +267,40 @@ export class BaseSolids {
       return best === 0;
     });
     return best;
+  }
+
+  /** the piece a line from `a` to `b` first goes into, how far along it (0 to 1), and its base (null: none) */
+  first(a: V3, b: V3, use: Use = 'shot'): { t: number; p: Piece; base: Base } | null {
+    const best: { t: number; p: Piece | null; base: Base | null } = { t: Infinity, p: null, base: null };
+    this.each(a, b, use, (tt, p, base) => {
+      if (tt[0] < best.t) Object.assign(best, { t: tt[0], p, base });
+      return best.t === 0;
+    });
+    return best.p && best.base ? { t: best.t, p: best.p, base: best.base } : null;
+  }
+
+  /**
+   * The pieces a blast at `at` reaches, and how far each is from it: each looked for along a line from the blast to its
+   * middle, and reached where that line goes into it first. One that another piece stands in front of along that line
+   * is not reached: the wall a charge is stuck to takes it, and what is behind that wall does not.
+   */
+  reached(at: V3, within: number): { p: Piece; base: Base; d: number }[] {
+    const out: { p: Piece; base: Base; d: number }[] = [];
+    for (const base of this.around(at[0], at[2], within)) {
+      for (const p of base.pieces.values()) {
+        const K = kindOf(p.k);
+        if (!ROLES.shot.has(K.role)) continue;
+        // (its middle, out of its own frame into the base's, then the world's)
+        const q = angleOf(p.r), c = Math.cos(q), s = Math.sin(q), [mx, my, mz] = K.mid;
+        const mid = toWorld(base, p.x + mx * c + mz * s, p.y + my, p.z - mx * s + mz * c) as V3;
+        const far = Math.hypot(mid[0] - at[0], mid[1] - at[1], mid[2] - at[2]);
+        if (far > within + 4.5) continue;
+        const f = this.first(at, mid, 'shot');
+        if (!f || f.p !== p || f.base !== base || f.t * far > within) continue;
+        out.push({ p, base, d: f.t * far });
+      }
+    }
+    return out;
   }
 
   /** whether nothing of a base stands on the line between two places: what a round and a blast are asked */
