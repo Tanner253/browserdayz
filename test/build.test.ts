@@ -331,8 +331,8 @@ ok('kept and read back with its claim: its members, what is owed, and what was i
   assert.deepEqual(again.claim?.members.map((m) => m.pid), [ME, 'you']);
   assert.equal(again.claim?.due.planks, 0.4);
   assert.deepEqual(again.claim?.kept, [{ id: 'planks', qty: 9 }]);
-  // (and what a game is told has no store in it)
-  assert.equal((said(b)[8] as unknown[]).length, 4);
+  // (and what a game is told has no store in it: only how long it is kept)
+  assert.equal((said(b)[8] as unknown[])[4], null);
 });
 
 console.log('Building: doors, fittings, boxes');
