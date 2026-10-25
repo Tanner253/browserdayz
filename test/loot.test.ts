@@ -26,6 +26,7 @@ import { RNG } from '../src/core/noise';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { APART_KIND, Economy, TYPES, apartOf } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
+import { MADE_ONLY } from '../src/sim/items/craft';
 import { KINDS, yieldOf } from '../src/sim/animals';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
@@ -81,8 +82,9 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // (nor the launcher and its grenades: the owner, "the grenade launcher and its ammo is an admin only weapon")
   // (nor what only comes off an animal: its meat, fat, bones, hide and pelt, as in DayZ)
   // (nor what is only got by work: a log off a tree, stone off a boulder, src/sim/gather.ts; a key, cut at its lock)
+  // (nor what is only made, smelted or salvaged: src/sim/items/craft.ts)
   const hunted = new Set(KINDS.flatMap((k) => yieldOf(k, 1).map(([id]) => id)));
-  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm', 'log', 'stone', 'key'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
+  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm', 'log', 'stone', 'key', ...MADE_ONLY].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
   const { ruled: on, e } = worlds[0];
   // (how full each step is: a thing short where there is room, two or a fifth where a step is nearly full (the police

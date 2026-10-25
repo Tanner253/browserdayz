@@ -117,6 +117,9 @@ import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
 import { huntMethods } from './game/hunt';
 import { Gathering } from './gathering';
+import { Crafting } from './crafting';
+import { CraftCard } from '../ui/craft-card';
+import { pocketsOf } from '../sim/craft/plan';
 import { Building } from './building';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
@@ -246,6 +249,9 @@ export class Game {
   garage!: Garage;
   /** trees felled, stone broken, logs sawn (src/game/gathering.ts) */
   gather!: Gathering;
+  /** things made by hand, and a recipe's card (src/game/crafting.ts, src/ui/craft-card.ts) */
+  craft!: Crafting;
+  craftCard!: CraftCard;
   /** bases: the plan, the hammer, the pieces (src/game/building/index.ts) */
   build!: Building;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
@@ -686,6 +692,24 @@ export class Game {
       begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
       breakOff: () => this.breakOff(),
     });
+    this.craft = new Crafting({
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      pockets: () => pocketsOf(this.inv.serialize()),
+      find: (uid) => this.inv.everything().get(uid) ?? null,
+      me: () => this.player.pos,
+      begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
+      busy: () => !!this.use || this.weapons.working,
+      breakOff: () => this.breakOff(),
+      remove: (uid) => {
+        const it = this.inv.everything().get(uid);
+        if (it) this.inv.remove(it);
+      },
+      take: (id, n) => void this.inv.take(id, n),
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      changed: () => this.inventoryChanged(),
+    });
     this.build = new Building({
       scene: r.scene,
       atmo,
@@ -985,7 +1009,11 @@ export class Game {
       finishFor: (item) => this.finishFor(item),
       applyFinish: (item) => this.applyFinish(item),
       plateIcon: (id, f) => this.plateIcon(id, f),
+      craftWith: (a, b) => this.craft.recipesFor(a, b).length > 0,
+      craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
+      craftOpen: () => this.craftCard.open,
     });
+    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u) });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
     this.gas.under = (x, y, z) => bunkerUnder(this.bunker.place, x, y, z);

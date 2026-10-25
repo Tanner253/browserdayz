@@ -333,6 +333,7 @@ export const onlineMethods = {
     net.on('work', (m) => this.gather.onWork(m));
     net.on('wear', (m) => this.gather.onWear(m));
     net.on('saw', (m) => this.gather.onSaw(m));
+    net.on('craft', (m) => this.craft.onCraft(m));
     net.on('base', (m) => this.build.onBase(m));
     net.on('bgone', (m) => this.build.onGone(m));
     net.on('bpc', (m) => this.build.onPiece(m));

@@ -102,6 +102,12 @@ export interface InvActions {
   applyFinish(item: ItemInstance): void;
   /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
   plateIcon(id: string, f: 'gold' | 'nickel'): void;
+  /** whether two carried things dragged onto each other go into a hand recipe (src/game/crafting.ts) */
+  craftWith?(a: ItemInstance, b: ItemInstance): boolean;
+  /** the card of the recipes they go into, where they were let go */
+  craftOnto?(a: ItemInstance, b: ItemInstance, at: { x: number; y: number }): void;
+  /** whether that card is up (the card by the pointer keeps out of its way) */
+  craftOpen?(): boolean;
 }
 
 type Source =
@@ -647,7 +653,7 @@ export class InventoryUI {
   }
 
   private showCard(src: Source) {
-    if (this.drag || this.menu || !this.at.mouse || src.kind === 'fitted') return;
+    if (this.drag || this.menu || !this.at.mouse || src.kind === 'fitted' || this.actions.craftOpen?.()) return;
     this.cardSrc = src;
     this.card.className = 'inv-card';
     this.card.innerHTML = this.cardHtml(src);
@@ -2609,7 +2615,7 @@ export class InventoryUI {
   }
 
   /** dropped on that item, the dragged one goes into it: more of the same stack, or a part the weapon takes */
-  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | 'fill' | null {
+  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | 'fill' | 'craft' | null {
     const item = d.src.item;
     const def = ITEMS[item.id];
     if (onto === item) return null;
@@ -2619,6 +2625,8 @@ export class InventoryUI {
     if (into && into.ammo === item.id && (onto.rounds ?? 0) < into.capacity) return 'fill';
     // (a part is fitted from wherever it lies: off the ground as well as out of a pocket)
     if (def.attach && this.actions.attachTargets(item).includes(onto)) return 'attach';
+    // (two carried things that make something together: the recipe's card, DayZ's way)
+    if (d.src.kind !== 'ground' && this.actions.craftWith?.(item, onto)) return 'craft';
     return null;
   }
 
@@ -2665,7 +2673,7 @@ export class InventoryUI {
     // A magazine lights up every gun it goes into, and the gun's magazine place, with Load; rounds light up every
     // magazine they fill with Fill; a part, Fit. (The owner, 2026-10-23: loading "can be confusing ... the users want it
     // to be easier and more intuitive. I want to maintain all dayz functionality": the drops were always there, unseen.)
-    const word = (j: 'stack' | 'attach' | 'fill' | null) => (j === 'fill' ? 'Fill' : j === 'attach' ? (def.mag ? 'Load' : 'Fit') : '');
+    const word = (j: 'stack' | 'attach' | 'fill' | 'craft' | null) => (j === 'fill' ? 'Fill' : j === 'attach' ? (def.mag ? 'Load' : 'Fit') : j === 'craft' ? 'Craft' : '');
     const held = this.actions.inHands();
     for (const el of this.root.querySelectorAll<HTMLElement>('.inv-item')) {
       const onto = this.bound.get(el)?.item;
@@ -2749,7 +2757,7 @@ export class InventoryUI {
       const how = onto && c.joinable(d.src.item, d.src.kind === 'container' ? d.src.c : null) ? this.joins(d, onto.item) : null;
       if (onto && how) {
         const [w, h] = Container.size(onto.item, onto.rot);
-        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : how === 'fill' ? 'Fill' : 'Fit');
+        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : how === 'fill' ? 'Fill' : how === 'craft' ? 'Craft' : 'Fit');
         return;
       }
       // (Held over another thing, the two change places when it is let go, where each has room where the other lay:
@@ -2916,6 +2924,12 @@ export class InventoryUI {
           if (left) this.spill(left);
         }
         this.actions.fillMag(onto.item);
+        return this.render();
+      }
+      // two things that make something together: nothing moves, and the recipe's card opens where they met
+      if (onto && how === 'craft') {
+        this.actions.craftOnto?.(item, onto.item, { x: e.clientX, y: e.clientY });
+        this.hideCard();
         return this.render();
       }
       // Let go on another thing: the two change places, where each has room where the other lay (as in DayZ). Off
