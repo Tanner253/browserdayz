@@ -6,7 +6,7 @@
 //   &roused=1                               after somebody: arms out at them, the run's head down
 //   &act=claw|eat|scream|hit|hithead        a blow thrown, a body torn at, a scream, a shot taken, from the strip's start
 //   &act=fall0|fall1|fall2                  shot dead from in front (falls back), from behind (forward), from the side
-//   &far=1                                  their far copies
+//   &far=1 (or 0,1,0,1: one each)           their far copies
 // With &strip=N the strip runs over `&secs` seconds (2 by default).
 
 import * as THREE from 'three';
@@ -32,7 +32,7 @@ export interface StagedInfected {
 export async function stageInfected(q: URLSearchParams): Promise<StagedInfected[]> {
   const list = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean);
   const kinds = list('infected') as InfectedKind[], nums = list('n').map(Number);
-  const speed = +(q.get('speed') ?? 0), roused = +(q.get('roused') ?? 0), act = q.get('act'), far = q.get('far') === '1';
+  const speed = +(q.get('speed') ?? 0), roused = +(q.get('roused') ?? 0), act = q.get('act'), fars = list('far');
   const out: StagedInfected[] = [];
   for (const [k, kind] of kinds.entries()) {
     const i = nums[k] ?? k + 1, body = new Avatar();
@@ -42,7 +42,7 @@ export async function stageInfected(q: URLSearchParams): Promise<StagedInfected[
     body.sick = { roused, claw: -1, seed: (i * 7.31) % 20 };
     const [across, up] = sizeOf(kind, i);
     body.root.scale.set(across, up, across);
-    drawFar(body.root, far);
+    drawFar(body.root, (fars[k] ?? fars[0]) === '1');
     // (facing the camera that looks at the line of them from in front: the game's bodies face -z)
     const yaw = Math.PI, pos = new THREE.Vector3(), vel = new THREE.Vector3(0, 0, speed);
     let t = 0;

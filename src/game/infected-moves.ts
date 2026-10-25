@@ -68,7 +68,7 @@ export async function infectedMoves(kind: InfectedKind, i: number): Promise<Infe
   // (what an infected never does, crouch, jump, dance, sit or hold a gun, stands in as standing: its weight is always none)
   const clips: Record<string, THREE.AnimationClip> = {
     idle, walk: z(walk), run: z(run), strike: z(blow),
-    hit: s('hitBody'), hitHead: s('hitHead'), death: s('deathB'), deathFront: fall, deathSide: s('deathS'),
+    hit: s('hitBody'), hitHead: s('hitHead'), death: z('zFallBack'), deathFront: fall, deathSide: s('deathS'),
     proneDown: as('proneDown', fall), crawl: as('crawl', fall),
   };
   for (const n of ['crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'dance', 'sit', 'armed']) clips[n] = as(n, idle);

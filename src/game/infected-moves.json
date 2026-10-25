@@ -97,5 +97,8 @@
  },
  "zBlown": {
   "dur": 2.7
+ },
+ "zFallBack": {
+  "dur": 1.667
  }
 }

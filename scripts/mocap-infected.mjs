@@ -48,6 +48,9 @@ export const INFECTED_MOVES = {
   zScream: { from: 'Zombie_Scream', dir: ZOMBIES },
   zPain: { from: 'Head_Hold_in_Pain', dir: ZOMBIES, square: 0.3 },
   zBlown: { from: 'Shot_and_Blown_Back', dir: ZOMBIES },
+  // (shot from in front: the survivors' fall backwards, from where it is already going over. Their cut starts with the
+  // arms flung out level for half a second, standing: on one of the infected it read as a T-pose)
+  zFallBack: { from: 'Shot_and_Fall_Backward', dir: MOCAP, cut: [1.85, 3.53] },
 };
 
 /** where the game's lunge has a blow's arm (src/game/avatar.ts strikeAt): drawn back by then, through by then, home by then */
