@@ -97,7 +97,7 @@ export function boxOps(c: Client, b: Box, ops: BoxOp[]) {
   const was = JSON.stringify(before);
   const r = applyOps(before, b.w, b.h, ops, mayPut, clean, true);
   if (body) {
-    for (const it of r.took) for (const t of payingTags(it)) cameTo(c.key, t.uid);
+    for (const it of r.took) for (const t of payingTags(it)) came(c, t.uid);
     const onto = r.put.flatMap((it) => payingTags(it)).map((t) => t.uid);
     for (const uid of onto) wentFrom(c.key, uid, `b:${b.cid}`);
     if (onto.length) takeOut(c.inv, new Set(onto));
@@ -118,6 +118,12 @@ export function boxOps(c: Client, b: Box, ops: BoxOp[]) {
   else if (ops.length) send(c, now);
 }
 
+/** a tag came to this player: theirs, its clock started now (custody.ts), and their game's countdown started again with it */
+function came(c: Client, uid: string) {
+  cameTo(c.key, uid);
+  send(c, { t: 'tagclock', uid, held: 0 });
+}
+
 /** What an old game says is in the whole crate now, made into the moves from what is in it (one that has it alone open loses nothing by it). */
 export function boxSet(c: Client, b: Box, items: unknown) {
   const now = (b.kind === 'furniture' ? contents(b) : b.items) as Laid[];
@@ -133,7 +139,7 @@ export function lyingOps(c: Client, l: WorldLoot, ops: BoxOp[]) {
   const before = laidIn(l.item), was = JSON.stringify(before);
   const r = applyOps(before, grid.w, grid.h, ops, (it) => !hasTag(it) && !madeUp(c, it, `a ${ITEMS[l.item.id].name.toLowerCase()} lying there`), clean, false, grid);
   // (a tag that was in it, dropped in it, and was taken out came to this player, as off a body: custody.ts)
-  for (const it of r.took) for (const t of payingTags(it)) cameTo(c.key, t.uid);
+  for (const it of r.took) for (const t of payingTags(it)) came(c, t.uid);
   refuse(c, r.refused.took.map((t) => t.uid));
   l.item.cargo = r.items.map(({ x, y, rot, ...it }) => ({ item: it, x, y, rot }));
   for (const it of r.put) issue(it);
