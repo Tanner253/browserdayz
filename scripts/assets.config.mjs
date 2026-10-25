@@ -887,6 +887,35 @@ export const LOCAL_MODELS = {
     changes: 'Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.',
     credit: { name: 'Satchel charge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
   },
+  // (base building's pieces drawn from models, 2026-10-25, src/game/building/models.ts: made for them in Higgsfield on the
+  // owner's account. Each is fitted into its piece's solids as the game draws it, so it comes at the size it was made.)
+  ...Object.fromEntries([
+    ['bb_door_wood', 'Wooden door leaf', 'doors/door_wood_leaf.glb'], ['bb_door_metal', 'Metal door leaf', 'doors/door_metal_leaf.glb'],
+    ['bb_hatch', 'Hatch lid', 'doors/hatch_leaf.glb'], ['bb_garage', 'Garage door', 'doors/garage_door_slab.glb'],
+    ['bb_small_box', 'Small box', 'base/small_box_sized.glb'], ['bb_large_box', 'Large box', 'base/large_box_sized.glb'],
+    ['bb_workbench', 'Workbench', 'base/workbench_sized.glb'], ['bb_bed', 'Bed', 'base/bed_sized.glb'],
+    ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'base/ladder2_sized.glb'],
+    ['bb_palisade_log', 'Palisade log', 'base/palisade_log_sized.glb'], ['bb_gate_wood', 'Wooden gate', 'base/gate_wood_sized.glb'],
+    ['bb_gate_steel', 'Steel gate leaf', 'base/gate_steel_leaf.glb'],
+  ].map(([id, name, file]) => [id, {
+    dir: '../incoming/higgsfield', file, scale: 1, tex: 1024, tags: ['base'],
+    changes: 'Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+  }])),
+  // (the claim: a post on a rusted strongbox, made in Higgsfield, with the owner's pirate flag nailed to it: "i prefer the
+  // look of the pirate flag i porovided". The flag is SusanKing's, waved by the game: src/game/building/models.ts)
+  bb_claim: {
+    dir: '../incoming/higgsfield', file: 'claim_pirate.glb', scale: 1, tex: 1024, tags: ['base'],
+    changes: 'The post and strongbox made for ZONA in Higgsfield, the flag set on the post; kept at its size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Pirate Flag animated', author: 'SusanKing', url: 'https://sketchfab.com/3d-models/pirate-flag-animated-e6b2c8a5be864ad6afba3bdfdde1aff2', line: 'This work is based on "Pirate Flag animated" (https://sketchfab.com/3d-models/pirate-flag-animated-e6b2c8a5be864ad6afba3bdfdde1aff2) by SusanKing (https://sketchfab.com/krolzuzannapl) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/); its post and strongbox made for ZONA with Higgsfield (text-to-3D) on the owner’s account' },
+  },
+  // (the progression plan's two looted parts, made for it in Higgsfield, 2026-10-25: a tin of hinges and bolts, and a
+  // plate of armour steel, laid flat and pressed to three centimetres thick)
+  ...Object.fromEntries([['hardware', 'Hardware tin', { size: 0.13 }], ['steel_plate', 'Steel plate', { rot: [0, 0, Math.PI / 2], squash: [1, 0.3, 1], size: 0.5 }]].map(([id, name, more]) => [id, {
+    dir: '../incoming/higgsfield/parts', file: `${id}.glb`, tex: 1024, tags: ['loot'], ...more,
+    changes: 'Made its real size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+  }])),
   // (C4, base building's raiding: of the two the owner downloaded, the one of three blocks taped to a timer, picked in
   // the sandbox over a cartoon one)
   c4: { dir: '../incoming/simple_old_c4', file: 'scene.gltf', size: 0.2, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle and made 20 cm tall; textures re-encoded as WebP at 1024; geometry compressed.' },

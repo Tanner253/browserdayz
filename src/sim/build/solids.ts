@@ -133,7 +133,8 @@ const SHAPES: Record<string, () => Shape> = {
   }),
   high_wall_stone: () => ({ solid: [box(-H, 0, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
   // (the claim: its upkeep box, and over it a pole with the flag of whoever holds it)
-  claim: () => ({ lockAt: { at: [0, 0.5, 0.35] }, solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], cloth: { paint: 'flag', solid: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] } }),
+  // (as its model stands, src/game/building/models.ts: a rusted strongbox, the post on it, the flag off the post to +x)
+  claim: () => ({ lockAt: { at: [0, 0.24, 0.34] }, solid: [box(-0.49, 0, -0.34, 0.49, 0.45, 0.34), box(0.01, 0.45, -0.11, 0.13, 2.1, 0.01)], cloth: { paint: 'flag', solid: [box(0.17, 1.42, -0.065, 1.17, 2.04, -0.035)] } }),
   // ---- fittings: each swings out to its piece's +z, which R turns about
   // (a leaf a metre wide in the doorway, hung on its -x jamb; braced on the inside, its handle both sides)
   door_wood: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, true)], lockAt: { leaf: 0, at: [0.82, 1.16, 0] } }),
@@ -182,11 +183,12 @@ const SHAPES: Record<string, () => Shape> = {
   // ---- set down
   box_small: () => ({ lockAt: { at: [0, 0.38, 0.28] }, solid: [box(-0.4, 0, -0.28, 0.4, 0.5, 0.28)], dress: [box(-0.42, 0.5, -0.3, 0.42, 0.56, 0.3)] }),
   box_large: () => ({ lockAt: { at: [0, 0.56, 0.42] }, solid: [box(-0.7, 0, -0.42, 0.7, 0.75, 0.42)], dress: [box(-0.72, 0.75, -0.44, 0.72, 0.82, 0.44), box(-0.74, 0.1, -0.44, -0.7, 0.65, 0.44), box(0.7, 0.1, -0.44, 0.74, 0.65, 0.44)] }),
-  // (a sleeping bag rolled out flat, its hood at the head; a bed of planks on four legs with a headboard, a bag on it)
+  // (a sleeping bag rolled out flat, its hood at the head; a bed of pallets with its bedding, as its model is,
+  // src/game/building/models.ts)
   bedroll: () => ({ solid: [box(-0.4, 0, -1, 0.4, 0.1, 1)], paint: 'bag', dress: [box(-0.36, 0.1, 0.6, 0.36, 0.17, 0.95), tinted(box(-0.41, 0, -1.02, 0.41, 0.11, -0.86), 0x8a8a70)] }),
   bed: () => ({
-    solid: [box(-0.5, 0.28, -1.05, 0.5, 0.4, 1.05), box(-0.5, 0.4, 0.98, 0.5, 0.95, 1.05), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.44 - 0.05, 0, sz * 1 - 0.05, sx * 0.44 + 0.05, 0.28, sz * 1 + 0.05)))],
-    cloth: { paint: 'bag', solid: [box(-0.44, 0.4, -1, 0.44, 0.52, 0.96), box(-0.36, 0.52, 0.6, 0.36, 0.6, 0.92)] },
+    solid: [box(-0.55, 0, -1.05, 0.55, 0.3, 1.05)],
+    cloth: { paint: 'bag', solid: [box(-0.5, 0.3, -1, 0.5, 0.45, 0.96), box(-0.36, 0.45, 0.6, 0.36, 0.6, 0.92)] },
   }),
   // (crafting's forge: the drum, as high as its rim of stones; the chimney stops nothing)
   forge: () => ({ solid: [box(-0.4, 0, -0.4, 0.4, 0.95, 0.4)], unseen: true }),

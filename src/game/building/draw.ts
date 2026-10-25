@@ -16,6 +16,7 @@ import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
 import { DOOR } from '../../sim/build/doors';
 import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
+import { PieceModels } from './models';
 
 /** what a blow or a bullet that lands on a piece struck */
 export class PieceRef {
@@ -68,7 +69,23 @@ export class BaseDraw {
   /** each kind of lock as it is fitted, out of its item's own model (null while that loads) */
   private locks = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material | THREE.Material[] } | null>();
 
-  constructor(private scene: THREE.Scene, private atmo: Atmosphere | null) {}
+  /** the pieces drawn from models (src/game/building/models.ts) */
+  readonly models: PieceModels;
+
+  constructor(private scene: THREE.Scene, private atmo: Atmosphere | null) {
+    this.models = new PieceModels(atmo, (kind) => this.remodel(kind));
+  }
+
+  /** a kind's model come: what of it was drawn as its solids, drawn again */
+  private remodel(kind: string) {
+    for (const [key, m] of [...this.meshes]) {
+      if (!key.startsWith(`${kind}:`)) continue;
+      this.scene.remove(m);
+      m.dispose();
+      this.meshes.delete(key);
+      this.dirty.add(key);
+    }
+  }
 
   /**
    * A key lock's or a code lock's model (`key_lock`, `code_lock`), fitted as the lock is at a piece's `lockAt`: its
@@ -176,6 +193,7 @@ export class BaseDraw {
   update(dt: number, eye: THREE.Vector3) {
     for (const key of this.dirty) this.rebuild(key);
     this.dirty.clear();
+    this.models.tick(dt);
     for (const d of this.moving) this.step(d, dt);
     // (the colliders, twice a second: made for what has come near, taken away from what is far)
     this.solidT -= dt;
@@ -273,9 +291,12 @@ export class BaseDraw {
       // (a lock is drawn once its model is in: lockModel marks it to be drawn again then)
       const lock = kind === '__lock' ? this.lockModel(more) : null;
       if (kind === '__lock' && !lock) return;
-      const geo = lock ? lock.geo : more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
+      // (a piece drawn from its model, src/game/building/models.ts: as its solids until the model has come)
+      const look = lock ? null : this.models.get(kind, more ?? '');
+      if (look === 'hide') return;
+      const geo = lock ? lock.geo : look ? look.geo : more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
       // (a leaf with ironwork is two groups, its paint and its iron: see leafGeometry)
-      const mat = lock ? lock.mat : geo.groups.length > 1 ? [paintFor(paint, this.atmo), paintFor('iron', this.atmo)] : paintFor(paint, this.atmo);
+      const mat = lock ? lock.mat : look ? look.mat : geo.groups.length > 1 ? [paintFor(paint, this.atmo), paintFor('iron', this.atmo)] : paintFor(paint, this.atmo);
       m = new THREE.InstancedMesh(geo, mat, Math.max(16, Math.ceil(list.length * 1.5)));
       m.castShadow = m.receiveShadow = true;
       m.name = `base:${key}`;
