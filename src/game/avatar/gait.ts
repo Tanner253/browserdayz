@@ -28,7 +28,11 @@ const GAITS = {
   walk: [['F', 'walkF'], ['B', 'walkB']],
   aim: [['F', 'aimF'], ['B', 'aimB']],
   jog: [['F', 'jogF'], ['FL', 'jogFL'], ['FR', 'jogFR'], ['BL', 'jogBL'], ['BR', 'jogBR']],
-  crouch: [['F', 'crouchF'], ['B', 'crouchB']],
+  // (empty handed, the crouch and the walk's arms, hung from a chest stooped as the crouch's is (scripts/mocap.mjs
+  // walkLow): the cautious crouch holds both arms out wide at the chest, which squared to the front stood out to the
+  // sides; behind a gun the arms are the gun's)
+  crouch: [['F', 'crouchF.body', 'walkLow.arms'], ['B', 'crouchB.body', 'walkLowB.arms']],
+  crouchGun: [['F', 'crouchF'], ['B', 'crouchB']],
   sprint: [['F', 'sprint']],
   sprintGun: [['F', 'sprintGun']],
   limp: [['F', 'limpF'], ['B', 'limpB']],
@@ -36,18 +40,20 @@ const GAITS = {
 type GaitName = keyof typeof GAITS;
 /** the gaits drawn only ahead (and back): they are turned at the hips to go to a side, by as much as this at most
  * (the walks and the crouch as far as the old clips' hips went, POSE.maxTwist; flat out and limping, as far as a waist goes) */
-const TURNED = new Map<GaitName, number>([['walk', 1.35], ['aim', 1.35], ['crouch', 1.35], ['sprint', 1.1], ['sprintGun', 1.1], ['limp', 1.1]]);
+const TURNED = new Map<GaitName, number>([['walk', 1.35], ['aim', 1.35], ['crouch', 1.35], ['crouchGun', 1.35], ['sprint', 1.1], ['sprintGun', 1.1], ['limp', 1.1]]);
 /** the gaits run the nearest way and turned the rest */
 const NEAREST = new Set<GaitName>(['jog']);
 
-/** where the legs leave off and the body above them begins, by bone */
-const LEGS = /^(pelvis|thigh|calf|foot|ball)_?/;
+/** where the legs leave off and the body above them begins, and the arms, by bone */
+const LEGS = /^(pelvis|thigh|calf|foot|ball)_?/, ARMS = /^(clavicle|upperarm|lowerarm|hand|thumb|index|middle|ring|pinky)_/;
+type Part = 'legs' | 'upper' | 'body' | 'arms';
+const IN: Record<Part, (t: string) => boolean> = { legs: (t) => LEGS.test(t), upper: (t) => !LEGS.test(t), body: (t) => !ARMS.test(t), arms: (t) => ARMS.test(t) };
 const parts = new Map<string, THREE.AnimationClip>();
-/** a movement's legs alone, or what is above them alone (made once, and shared by every body) */
-function part(clip: THREE.AnimationClip, legs: boolean) {
-  const name = `${clip.name}.${legs ? 'legs' : 'upper'}`;
+/** part of a movement: its legs, all above them, all but the arms, the arms (made once, and shared by every body) */
+function part(clip: THREE.AnimationClip, which: Part) {
+  const name = `${clip.name}.${which}`;
   let p = parts.get(name);
-  if (!p) parts.set(name, (p = new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => LEGS.test(t.name) === legs))));
+  if (!p) parts.set(name, (p = new THREE.AnimationClip(name, clip.duration, clip.tracks.filter((t) => IN[which](t.name)))));
   return p;
 }
 
@@ -90,7 +96,7 @@ export class Gait {
           const [base, half] = n.split('.');
           const clip = byName.get(base);
           if (!clip) throw new Error(`moves.glb has no "${base}"`);
-          const a = mixer.clipAction(half ? part(clip, half === 'legs') : clip);
+          const a = mixer.clipAction(half ? part(clip, half as Part) : clip);
           // (scrubbed by hand, as every clip of the body is)
           a.timeScale = 0;
           a.setEffectiveWeight(0);
@@ -187,13 +193,14 @@ export class Gait {
     this.ways('jog', at, stand * jog * (1 - flat), dt);
     this.ways('sprint', at, stand * jog * flat * (1 - gun), dt);
     this.ways('sprintGun', at, stand * jog * flat * gun, dt);
-    this.ways('crouch', at, crouch, dt);
+    this.ways('crouch', at, crouch * (1 - gun), dt);
+    this.ways('crouchGun', at, crouch * gun, dt);
     // the hips turned, by each gait that turns them, for as much of the body as it has
     this.twist = this.turnW > 1e-3 ? this.turns / this.turnW : 0;
     // the pace and the length of a stride, as captured, over all of it (by the legs)
     let w = 0, pace = 0, len = 0;
     for (const [n, k] of this.w) {
-      if (n.endsWith('.upper')) continue;
+      if (n.endsWith('.upper') || n.endsWith('.arms')) continue;
       const p = PACE[n.split('.')[0]];
       w += k;
       pace += k * (p.pace ?? 1);

@@ -13,11 +13,14 @@ import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
-import { Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, roundHouse, suited, type IState, type InfectedInfo } from '../sim/infected';
+import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, roundSpot, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
-import { ZOMBIES, lookFor } from './look';
+import { lookFor } from './look';
+import { FAR_FROM, bodyOf, drawFar, kindOf, roll } from './infected-kinds';
+import { infectedLook, sizeOf } from './infected-look';
+import { infectedMoves } from './infected-moves';
 import { REST_STEP, inSight } from './remote';
 import type { Damageable, HitZone } from './weapons';
 
@@ -64,10 +67,16 @@ const INTERP_DELAY = 210;
 const DRAWN = 150;
 /** seconds of posing after which a body has done falling (the longest fall, the backwards one, takes 2.1) */
 const SETTLED = 4;
+/**
+ * Bodies are made for the ones within this of the eye, nearest first, so many at a time. (Coming into a server, every
+ * one on the map had its body made at once, one after another, and the ones beside the player waited behind ones a
+ * kilometre off: 152 of them, 2026-10-25, and the twelve kinds' files are fetched as they are wanted. Further off than
+ * this no game moves one for its player (INFECTED.own) nor draws one (DRAWN).)
+ */
+const MAKE_WITHIN = 200;
+const MAKING = 3;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
-/** as near as two of them stand to each other, metres */
-const APART = 0.62;
 /** a way through a wall: the middle of a doorway, which way it faces (level), the door in it, and the building it belongs to */
 interface Doorway {
   plot: string;
@@ -91,6 +100,12 @@ export class Infected implements Damageable {
   /** this game moves it */
   mine = false;
   ready = false;
+  /** drawn as its far copy (see FAR_FROM) */
+  private drawnFar = true;
+  /** what it is, until its body is made (see MAKE_WITHIN) */
+  waiting: InfectedInfo | null = null;
+  /** whose game the server last said moves it (its body may be made after) */
+  owner: number | null = null;
   private gone = false;
   private body!: RAPIER.RigidBody;
   private zones: RAPIER.Collider[] = [];
@@ -132,6 +147,12 @@ export class Infected implements Damageable {
   private sideT = 0;
   private stuckT = 0;
   private groanT = 4 + Math.random() * 14;
+  /** its movements besides walking, running and striking (see `acting`), and the one it is at */
+  private extras: Record<string, THREE.AnimationAction> | null = null;
+  private doing: { name: string; t: number; from: number; to: number; legs: number; loop: boolean } | null = null;
+  private wasMode = I_IDLE;
+  private painT = 10 + Math.random() * 30;
+  private lookT = 0;
   /** the doorway it is making for, which side of it it started on, how far through it has got, and how long it has been at it */
   private way: Doorway | null = null;
   private waySide = 1;
@@ -174,9 +195,27 @@ export class Infected implements Damageable {
     this.still = info.w === 1;
     // (the still ones live on the bunker's floor, whatever height they were found at)
     if (this.still) this.home.y = this.horde.floorY ?? y;
-    // (which of the three bodies it is goes by its number: every game draws the same one. The ones of the gas and of the bunker wear the orange suit.)
-    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), suited(this.host.world(), this.home.x, this.home.z) ? 'zombie_hazmat' : ZOMBIES[this.i % ZOMBIES.length]);
+    // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
+    const kind = kindOf(this.host.world(), this.i, this.home.x, this.home.z);
+    this.avatar.zombieMoves = await infectedMoves(kind, this.i);
+    this.avatar.zombieLook = infectedLook(kind, this.i);
+    if (this.gone) return;
+    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), `zombie_${bodyOf(kind, this.i).body}`);
     if (this.gone) return this.avatar.dispose();
+    // (its own size: a little broader or narrower, taller or shorter than its kind)
+    const [across, up] = sizeOf(kind, this.i);
+    this.avatar.root.scale.set(across, up, across);
+    drawFar(this.avatar.root, true);
+    // (and its run at its own moment: the walk's is the body's own, at random)
+    this.avatar.sickRun = roll(this.i, 14) * 10;
+    this.extras = {};
+    for (const [n, c] of Object.entries(this.avatar.zombieMoves.extras)) {
+      const a = this.avatar.mixer.clipAction(c);
+      a.timeScale = 0;
+      a.setEffectiveWeight(0);
+      a.play();
+      this.extras[n] = a;
+    }
     this.avatar.sick = { roused: 0, claw: -1, seed: (this.i * 7.31) % 20 };
     this.host.scene().add(this.avatar.root);
     const R = physics.R;
@@ -207,6 +246,8 @@ export class Infected implements Damageable {
 
   /** where its owner says it is */
   push(s: IState, now: number) {
+    // (where it is, for when its body is to be made)
+    if (!this.ready) this.pos.set(s[0], s[1], s[2]);
     this.snaps.push({ t: now, s });
     if (this.snaps.length > 12) this.snaps.shift();
   }
@@ -679,6 +720,9 @@ export class Infected implements Damageable {
       case I_CHASE: {
         const at = quarry?.alive && now - this.seenAt < 900 ? quarry.pos : this.lastSeen;
         const d = Math.hypot(at.x - this.pos.x, at.z - this.pos.z);
+        // (upon them, and seeing them, it goes round them to a place of its own at arm's length: `roundSpot`)
+        const spot = quarry?.alive && now - this.seenAt < 500 && d < 2.5 && Math.abs(quarry.pos.y - this.pos.y) < 1.4 ? this.horde.roundOf(this, quarry.pos) : null;
+        const off = spot ? Math.hypot(spot[0] - this.pos.x, spot[1] - this.pos.z) : 0;
         // (it strikes what it can see: not through a wall it happens to be standing against)
         if (quarry?.alive && now - this.seenAt < 500 && !(quarry.seated && quarry.speed > 2.5) && d < I.reach * 0.82 && Math.abs(quarry.pos.y - this.pos.y) < 1.4) {
           if (now >= this.strikeAt) {
@@ -693,11 +737,14 @@ export class Infected implements Damageable {
             break;
           }
           // between one blow and the next it does not stand like a post: it keeps its face to them, and keeps at them
+          if (spot && off > 0.15) this.walk(spot[0], spot[1], I.wander, dt);
+          else if (!spot && d > 1.0) this.walk(quarry.pos.x, quarry.pos.z, I.wander, dt);
           this.yaw = turnTo(this.yaw, Math.atan2(-(quarry.pos.x - this.pos.x), -(quarry.pos.z - this.pos.z)), dt * 5);
-          if (d > 1.0) this.walk(quarry.pos.x, quarry.pos.z, I.wander, dt);
           break;
         }
-        if (d > 0.4) this.goTo(at, I.chase, dt);
+        if (spot) {
+          if (off > 0.15) this.walk(spot[0], spot[1], I.chase, dt);
+        } else if (d > 0.4) this.goTo(at, I.chase, dt);
         break;
       }
       case I_ATTACK: {
@@ -770,6 +817,9 @@ export class Infected implements Damageable {
     const off = this.pos.distanceToSquared(eye);
     const far = off > DRAWN * DRAWN;
     this.avatar.root.visible = !far;
+    // (a band of four metres between the two, so that one standing at the line is not drawn now near and now far)
+    const lens = this.horde.lens, farNow = off > ((FAR_FROM + (this.drawnFar ? -2 : 2)) * lens) ** 2;
+    if (farNow !== this.drawnFar) drawFar(this.avatar.root, (this.drawnFar = farNow));
     if (dt > 0) {
       const k = 1 - Math.exp(-14 * dt);
       this.vel.x += ((this.pos.x - px) / dt - this.vel.x) * k;
@@ -818,6 +868,7 @@ export class Infected implements Damageable {
     const sick = this.avatar.sick!;
     const roused = this.dead ? 0 : this.mode >= I_CHASE ? 1 : this.mode === I_ALERT ? 0.45 : 0;
     sick.roused += (roused - sick.roused) * (1 - Math.exp(-5 * dt));
+    this.acting(dt);
     this.avatar.update(dt, this.pos, this.vel, this.yaw, false, this.dead, false, 0, true, false);
     if (!this.dead) {
       // the head and the chest that count are where the bent body has them
@@ -842,6 +893,51 @@ export class Infected implements Damageable {
       }
     }
     if (resting) this.avatar.root.visible = false;
+  }
+
+  /**
+   * What it does over its walking and running, by the movements of its own (src/game/infected-moves.ts EXTRAS): it
+   * screams as it goes after somebody, holds its head now and then while it stands about, and tears at a body it is
+   * standing over. All of it is drawn by every game from what it is told of the infected: nothing of it is sent.
+   */
+  private acting(dt: number) {
+    const x = this.extras;
+    if (!x) return;
+    const was = this.wasMode;
+    this.wasMode = this.mode;
+    const still = Math.hypot(this.vel.x, this.vel.z) < 0.25;
+    const go = (name: string, from: number, to: number, legs: number, loop = false) => (this.doing = { name, t: 0, from, to, legs, loop });
+    if (this.dead) this.doing = null;
+    // (the scream: from its first breath to its last, about a second and a half of it, over the first strides after them)
+    else if (this.mode === I_CHASE && was < I_CHASE) go('zScream', 0.35, 1.9, 0);
+    else if (!this.doing && this.mode <= I_WANDER) {
+      // a body lying within reach: it goes down on it (looked for twice a second)
+      if ((this.lookT -= dt) <= 0) {
+        this.lookT = 0.5;
+        if (still && this.besideBody()) go('zEat', 0, x.zEat.getClip().duration, 1, true);
+      }
+      if (!this.doing && still && (this.painT -= dt) <= 0) {
+        this.painT = 15 + Math.random() * 35;
+        go('zPain', 0.3, 2.6, 0.4);
+      }
+    }
+    const d = this.doing;
+    if (d && ((d.loop && (this.mode > I_WANDER || !still)) || (!d.loop && d.t > d.to - d.from))) this.doing = null;
+    if (!this.doing) {
+      this.avatar.zombieAct = null;
+      return;
+    }
+    d!.t += dt;
+    const len = d!.to - d!.from;
+    const k = d!.loop ? THREE.MathUtils.smoothstep(d!.t, 0, 0.5) : THREE.MathUtils.smoothstep(d!.t, 0, 0.25) * (1 - THREE.MathUtils.smoothstep(d!.t, len - 0.35, len));
+    this.avatar.zombieAct = { a: x[d!.name], t: d!.from + (d!.loop ? d!.t % len : d!.t), k, legs: d!.legs };
+  }
+
+  /** whether a body lies within reach of it: one of its own kind, or a player's */
+  private besideBody() {
+    for (const b of this.horde.all.values()) if (b !== this && b.dead && b.pos.distanceToSquared(this.pos) < 1.6 * 1.6) return true;
+    for (const p of this.host.others()) if (!p.alive && p.pos.distanceToSquared(this.pos) < 1.6 * 1.6) return true;
+    return false;
   }
 
   /** a head or a chest moved on the body (in its own frame): put where it is, with the body where the physics was last told it is */
@@ -969,6 +1065,8 @@ export class Horde {
   }
   /** where this game's player is listening and looking from */
   readonly eye = new THREE.Vector3();
+  /** how much nearer the lens brings things than the eye alone (set each frame by the game): what is far is drawn far by it */
+  lens = 1;
   /** playing alone: this game is the director too */
   private director: Director | null = null;
   private dirT = 0;
@@ -1008,9 +1106,31 @@ export class Horde {
     if (this.all.has(info.i)) return;
     const b = new Infected(info.i, this.host, this);
     this.all.set(info.i, b);
-    void b.load(info).then(() => {
-      if (info.own !== null && info.own === this.host.me().id) b.setMine(true);
-    });
+    b.waiting = info;
+    b.owner = info.own;
+    b.pos.set(info.s[0], info.s[1], info.s[2]);
+  }
+
+  /** bodies being made just now (see MAKE_WITHIN) */
+  private making = 0;
+  /** the nearest one still to be made, if any is near enough, has its body made */
+  private makeNext() {
+    let next: Infected | null = null, best = MAKE_WITHIN * MAKE_WITHIN;
+    for (const b of this.all.values()) {
+      if (!b.waiting) continue;
+      const d = b.pos.distanceToSquared(this.eye);
+      if (d < best) (best = d), (next = b);
+    }
+    if (!next) return;
+    const b = next, info = next.waiting!;
+    b.waiting = null;
+    this.making++;
+    void b
+      .load(info)
+      .then(() => {
+        if (b.owner !== null && b.owner === this.host.me().id) b.setMine(true);
+      })
+      .finally(() => this.making--);
   }
 
   remove(i: number) {
@@ -1036,7 +1156,10 @@ export class Horde {
   }
 
   own(i: number, to: number | null) {
-    this.all.get(i)?.setMine(to !== null && to === this.host.me().id);
+    const b = this.all.get(i);
+    if (!b) return;
+    b.owner = to;
+    b.setMine(to !== null && to === this.host.me().id);
   }
 
   /** where the games that move the others say they are */
@@ -1139,6 +1262,16 @@ export class Horde {
     return false;
   }
 
+  /** where this one, upon whoever it is after at `q`, goes to stand round them among the others upon them (src/sim/infected.ts `roundSpot`) */
+  roundOf(b: Infected, q: THREE.Vector3): [number, number] {
+    const upon: { x: number; z: number; i: number }[] = [];
+    for (const o of this.all.values()) {
+      if (o === b || o.dead || !o.ready || o.after !== b.after || o.mode < I_CHASE) continue;
+      if (Math.abs(o.pos.x - q.x) < 2.5 && Math.abs(o.pos.z - q.z) < 2.5) upon.push({ x: o.pos.x, z: o.pos.z, i: o.i });
+    }
+    return roundSpot(q.x, q.z, b.pos.x, b.pos.z, b.i, upon);
+  }
+
   /** the director (playing alone) or the server says a blow of one's was stopped by somebody's guard */
   blocked(i: number, to: number) {
     const b = this.all.get(i);
@@ -1198,6 +1331,7 @@ export class Horde {
   update(dt: number, now: number, eye: THREE.Vector3) {
     this.eye.copy(eye);
     this.now = now;
+    if (this.making < MAKING) this.makeNext();
     const me = this.host.me();
     this.people.clear();
     this.people.set(me.id, me);
@@ -1215,20 +1349,23 @@ export class Horde {
         for (const [i, to] of turn.owned) this.own(i, to);
       }
     }
-    // the ones this game moves keep out of each other
-    const mine: Infected[] = [];
+    // The ones this game moves keep out of each other, and out of those another game moves, which that game moves off
+    // these by the same rule (`parting`). (Only this game's own were kept apart: two at one player, each moved by
+    // another game, stood one inside the other.)
+    const mine: Infected[] = [], standing: Infected[] = [];
     for (const b of this.all.values()) {
       b.update(dt, now, eye);
-      if (b.mine && !b.dead && b.ready) mine.push(b);
+      if (b.dead || !b.ready) continue;
+      standing.push(b);
+      if (b.mine) mine.push(b);
     }
-    for (let a = 0; a < mine.length; a++) {
-      for (let c = a + 1; c < mine.length; c++) {
-        const dx = mine[c].pos.x - mine[a].pos.x, dz = mine[c].pos.z - mine[a].pos.z;
-        const d = Math.hypot(dx, dz);
-        if (d > APART || d < 1e-3 || Math.abs(mine[c].pos.y - mine[a].pos.y) > 1.2) continue;
-        const push = (APART - d) / 2 / d;
-        mine[a].nudge(-dx * push, -dz * push);
-        mine[c].nudge(dx * push, dz * push);
+    for (const a of mine) {
+      for (const o of standing) {
+        if (o === a || (o.mine && o.i < a.i) || Math.abs(o.pos.y - a.pos.y) > 1.2) continue;
+        const p = parting(a.pos.x, a.pos.z, a.i, o.pos.x, o.pos.z, o.i);
+        if (!p) continue;
+        a.nudge(p[0], p[1]);
+        if (o.mine) o.nudge(-p[0], -p[1]);
       }
     }
     // say where they are: eight times a second what has moved, all of them once a second

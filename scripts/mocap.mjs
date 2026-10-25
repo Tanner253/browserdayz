@@ -3,14 +3,16 @@
 // tarkov quality military animations realism"): how each is carried is scripts/mocap-carry.mjs, what is done to each
 // once on our body (squared, stood up, its heel first, cut) scripts/mocap-pose.mjs.
 //   node scripts/mocap.mjs              public/assets/characters/moves.glb and moves-late.glb, their table src/game/avatar/moves.json
+//   and the infected's, moves-infected.glb and src/game/infected-moves.json (scripts/mocap-infected.mjs)
 //   node scripts/mocap.mjs --cands      every movement harvested, on the whole body, for the sandbox (progress/anim-tools/cands.glb)
 import { prune, cloneDocument, resample } from '@gltf-transform/functions';
 import * as THREE from 'three';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes } from './mocap-pose.mjs';
+import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop } from './mocap-pose.mjs';
 import { ROOT, SRC, io, loadBody, carry as carryOnto } from './mocap-carry.mjs';
 export { meshyBone } from './mocap-carry.mjs';
+import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
 
 /**
  * The movements kept, by the game's name. `from` the library's; `way` which way a step goes (F B L R and the corners:
@@ -49,6 +51,12 @@ export const MOVES = {
   // (0.92 m as the file stands, under the crouched eye: the library's carries it a third of a metre higher)
   crouchF: { from: 'Cautious_Crouch_Walk_Forward', way: 'F', gait: 'crouch', square: 0.4, head: 0.92 },
   crouchB: { from: 'Cautious_Crouch_Walk_Backward', way: 'B', gait: 'crouch', square: 0.4, head: 0.92 },
+  // (and the crouch's arms with nothing in the hands: the walk's, hung from a chest stooped as far as the crouch's
+  // leans. The cautious crouch holds both arms out wide, which squared to the front stood out to the sides. Stepped by
+  // the crouch's legs, so without a gait of their own: in step with them as every loop is, left heel first; only the
+  // arms are kept)
+  walkLow: { from: 'walking_2', way: 'F', stoop: 0.5, arms: true },
+  walkLowB: { from: 'Walk_Backward', way: 'B', stoop: 0.5, arms: true },
   // on a broken leg
   limpF: { from: 'Limping_Walk_1', way: 'F', gait: 'limp', square: 0.5 },
   limpB: { from: 'Injured_Walk_Backward', way: 'B', gait: 'limp', square: 0.5 },
@@ -78,39 +86,49 @@ export const MOVES = {
   jabR: { from: 'Right_Jab_from_Guard', cut: [0, 1.0], late: true },
   jabL: { from: 'Left_Jab_from_Guard', cut: [0, 1.0], late: true },
 };
-// (and melee's, kept in a table of their own: scripts/mocap-melee.json)
-const MELEE = JSON.parse(readFileSync(path.join(ROOT, 'scripts', 'mocap-melee.json'), 'utf8'));
-Object.assign(MOVES, MELEE.moves);
 
 const cands = process.argv.includes('--cands');
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
 const body = await loadBody(), { doc, sk } = body;
 const report = {};
-const carry = async (file, clip, o) => (report[clip] = await carryOnto(body, file, clip, o));
+const carry = async (file, clip, { dir = SRC, ...o } = {}) => (report[clip] = await carryOnto(body, file, clip, { ...o, src: dir }));
 
 if (!cands) {
-  const left = leftOf(sk), table = {};
+  const left = leftOf(sk), table = {}, ztable = {};
+  // (the infected's with the survivors': scripts/mocap-infected.mjs. Which file each goes to: see `setOf`)
+  const ALL = { ...MOVES, ...INFECTED_MOVES };
+  const setOf = (name) => (INFECTED_MOVES[name] ? 'infected' : MOVES[name]?.late ? 'late' : MOVES[name] ? 'moves' : null);
   // (in an order that has each one a crouch is stood up to already made)
-  const names = Object.keys(MOVES).sort((a, b) => !!MOVES[a].stand - !!MOVES[b].stand);
+  const names = Object.keys(ALL).sort((a, b) => !!ALL[a].stand - !!ALL[b].stand);
   for (const name of names) {
-    const m = MOVES[name];
-    await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way });
+    const m = ALL[name];
+    await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way, dir: m.dir ?? SRC });
     const said = {};
     said.was = facing(doc, sk, name);
     if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
+    if (m.stoop) stoop(doc, sk, name, m.stoop);
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
+    if (m.blow) warp(doc, sk, name, m.blow);
+    if (m.arms) {
+      const anim = doc.getRoot().listAnimations().find((a) => a.getName() === name);
+      for (const c of anim.listChannels()) {
+        if (/^(clavicle|upperarm|lowerarm|hand|thumb|index|middle|ring|pinky)_/.test(c.getTargetNode().getName())) continue;
+        c.getSampler().dispose();
+        c.dispose();
+      }
+    }
     const r = report[name], got = readClip(doc, sk, name);
     // (its pace: by the hips where it travels, by the feet where it was drawn on the spot; and a loop that goes another
     // way than it is said to stops the build: the library's 'Walk_Left_with_Gun' steps to the right, and was laid in
     // as a step to the left, its feet sliding along with the body)
-    if (m.way) {
+    if (m.way && !m.arms) {
       const went = goes(doc, sk, name), want = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 }[m.way];
       if (Math.abs(((went.deg - want + 540) % 360) - 180) > 40) throw new Error(`${name} goes ${went.deg} degrees to the left of its front, not ${m.way}`);
     }
-    table[name] = { ...(m.way ? { way: m.way, gait: m.gait, pace: m.pace ?? (r.hips > 0.3 ? r.hips : r.pace) } : {}), dur: +got.dur.toFixed(3), ...(m.late ? { late: true } : {}) };
+    (setOf(name) === 'infected' ? ztable : table)[name] = { ...(m.way ? { way: m.way, gait: m.gait, pace: m.pace ?? (r.hips > 0.3 ? r.hips : r.pace) } : {}), dur: +got.dur.toFixed(3), ...(m.late ? { late: true } : {}) };
     // (a fall: where the hips end up lying from where it stood, metres ahead and to the left)
-    if (/^death/.test(name)) {
+    if (/^death/.test(name) && table[name]) {
       const P = sk.index('pelvis'), a = sk.pose(got.qAt(0), got.tAt(0))[P], b = sk.pose(got.qAt(got.frames), got.tAt(got.frames))[P];
       const d = new THREE.Vector3().setFromMatrixPosition(b).sub(new THREE.Vector3().setFromMatrixPosition(a));
       table[name].rest = [+d.z.toFixed(2), +(d.x * left).toFixed(2)];
@@ -122,11 +140,11 @@ if (!cands) {
   // (and as they are on the body, beside its old clips: for the sandbox)
   await io.write(path.join(ROOT, 'progress', 'anim-tools', 'moves-body.glb'), doc);
   // the body's own file of them, and the late one: the skeleton and the movements, nothing of the body
-  for (const late of [false, true]) {
+  for (const set of ['moves', 'late', 'infected']) {
     const out = cloneDocument(doc), r = out.getRoot();
     // (an animation let go of takes its channels and samplers with it, or what they hold is written all the same)
     for (const a of r.listAnimations()) {
-      if (MOVES[a.getName()] && !!MOVES[a.getName()].late === late) continue;
+      if (setOf(a.getName()) === set) continue;
       for (const c of a.listChannels()) c.dispose();
       for (const x of a.listSamplers()) x.dispose();
       a.dispose();
@@ -159,21 +177,20 @@ if (!cands) {
     // (no meshopt: it packs meshes, and laid over movements it gave back their 32 bits)
     await out.transform(prune({ keepLeaves: true }));
     for (const e of r.listExtensionsUsed()) e.dispose();
-    const file = path.join(ROOT, 'public', 'assets', 'characters', late ? 'moves-late.glb' : 'moves.glb');
+    const file = path.join(ROOT, 'public', 'assets', 'characters', { moves: 'moves.glb', late: 'moves-late.glb', infected: 'moves-infected.glb' }[set]);
     await io.write(file, out);
     console.log('wrote', path.relative(ROOT, file));
   }
   writeFileSync(path.join(ROOT, 'src', 'game', 'avatar', 'moves.json'), JSON.stringify(table, null, 1) + '\n');
+  writeFileSync(path.join(ROOT, 'src', 'game', 'infected-moves.json'), JSON.stringify(ztable, null, 1) + '\n');
   // Where the hands go in the movements the first-person arms are moved by (src/game/held-mocap.ts): each hand's
   // place and turn from the head, frame by frame, in the eye's own measure (x to the right, y up, z back), and for a
   // drink how near the right hand is to the mouth. What is seen from the eye is then what everybody else sees.
   const hands = {}, H = sk.index('Head'), HR = sk.index('hand_r'), HL = sk.index('hand_l');
   const eye = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), left > 0 ? Math.PI : 0);
   const round = (x) => +x.toFixed(4);
-  // (melee's blows the elbow and shoulder as well, by place alone: the first-person arm is swung as the captured one was)
-  const ER = sk.index('lowerarm_r'), SR = sk.index('upperarm_r');
-  for (const name of new Set(['drink', 'throw', 'jabR', 'jabL', 'slash', 'chop', 'hammer', 'pickUp', 'ladder', 'swim', ...MELEE.arms])) {
-    const c = readClip(doc, sk, name), r = [], l = [], mouth = [], arm = MELEE.arms.includes(name), e = [], s = [];
+  for (const name of ['drink', 'throw', 'jabR', 'jabL', 'slash', 'chop', 'hammer', 'pickUp', 'ladder', 'swim']) {
+    const c = readClip(doc, sk, name), r = [], l = [], mouth = [];
     for (let f = 0; f <= c.frames; f++) {
       const W = sk.pose(c.qAt(f), c.tAt(f)), head = new THREE.Vector3().setFromMatrixPosition(W[H]);
       const of = (i, to) => {
@@ -186,12 +203,11 @@ if (!cands) {
       };
       const pr = of(HR, r);
       of(HL, l);
-      if (arm) for (const [i, to] of [[ER, e], [SR, s]]) to.push(of(i, []).toArray().map(round));
       // (the mouth: a hand's breadth down from the head joint and a little ahead of it)
       mouth.push(round(pr.distanceTo(new THREE.Vector3(0, -0.06, -0.1))));
     }
     const near = Math.min(...mouth), far = Math.max(...mouth);
-    hands[name] = { dur: +c.dur.toFixed(3), r, l, ...(arm ? { e, s } : {}), ...(name === 'drink' ? { mouth: mouth.map((d) => round(1 - (d - near) / Math.max(1e-3, far - near))) } : {}) };
+    hands[name] = { dur: +c.dur.toFixed(3), r, l, ...(name === 'drink' ? { mouth: mouth.map((d) => round(1 - (d - near) / Math.max(1e-3, far - near))) } : {}) };
   }
   writeFileSync(path.join(ROOT, 'src', 'game', 'avatar', 'hands.json'), JSON.stringify(hands) + '\n');
   console.log('wrote src/game/avatar/hands.json', (JSON.stringify(hands).length / 1024).toFixed(0), 'KB');

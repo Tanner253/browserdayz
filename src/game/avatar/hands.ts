@@ -16,12 +16,6 @@ export const handsMethods = {
     else if (this.held && this.placed && this.root.visible && this.holdT > HOLD_GONE) {
       this.nextHeld = { obj, grips, kind };
       return;
-    } else if (this.inHand?.long && this.placed && this.root.visible && obj !== this.inHand.obj.children[0]) {
-      // something long in the fist is put away over the shoulder first (melee/cuts.ts DRAW), then the next taken up
-      if (this.deed?.way === 'stow' || this.carry('stow')) {
-        this.nextHeld = { obj, grips, kind };
-        return;
-      }
     }
     this.nextHeld = null;
     this.takeUp(obj, grips, kind);
@@ -39,8 +33,6 @@ export const handsMethods = {
       if (m.isMesh) m.castShadow = true;
     });
     if (kind === 'melee') {
-      // (its movements: the guard's and the draw's are the first wanted)
-      this.deeds?.get('drawBack');
       // A hatchet, a bat: carried in the right fist, so it swings with the arm as the body
       // walks. The grip (wrist position, finger and palm directions in the weapon's own
       // space) is laid onto the hand's own frame.
@@ -65,10 +57,7 @@ export const handsMethods = {
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
-      // (carried on the back, not in a pocket: as long as a slung thing is, and drawn from there)
-      const long = new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length() > 0.5;
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long, spin: obj.getObjectByName('spin') ?? null, raise: !!g.raise };
-      if (long && this.placed && this.root.visible) this.carry('draw');
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, raise: !!g.raise };
       Avatar.onDressed([obj]);
       return;
     }

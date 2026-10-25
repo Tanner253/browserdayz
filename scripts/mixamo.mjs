@@ -1,7 +1,7 @@
 // A movement read off a body on a Mixamo skeleton (as Sketchfab hands them over) and carried onto this game's
 // skeleton, bone by bone: each bone turned from how it stands at rest by what the other's is turned by from how
-// that stands at rest. Made for the infected (scripts/zombies.mjs, where these were first written), and used too
-// for the player's own lying down and crawling (scripts/build-character.mjs).
+// that stands at rest. Made for the infected (scripts/zombies.mjs, since gone), and used now by the motion capture
+// (scripts/mocap.mjs) and the player's own lying down and crawling (scripts/build-character.mjs).
 import * as THREE from 'three';
 import { ours } from './suit.mjs';
 

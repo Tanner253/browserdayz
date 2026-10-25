@@ -30,7 +30,8 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { carry, markRegions, padTexture } from './meshy.mjs';
+import * as THREE from 'three';
+import { carry, markRegions, padTexture, restPoints, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -55,6 +56,8 @@ const ONLY = process.argv.slice(2).map(Number);
 await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
+/** the old suit, whose weights each body takes (suitWeights in scripts/meshy.mjs) */
+const SUIT = await io.read(path.join(OUT, 'survivor.glb'));
 
 /**
  * The base layer's cloth made clean (the navigator, 2026-10-25: the shorts "carry orange-red streaks that read as texture
@@ -169,6 +172,8 @@ for (const [n, file] of BODIES.entries()) {
   const { doc, node, hands, worn, proportions } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
   const root = doc.getRoot();
   const regions = markRegions(doc, node);
+  // (weighted as the old suit is, not as Meshy rigged it: see suitWeights)
+  const weighted = suitWeights(node, SUIT);
   // (the picture between its islands filled from them first: what lay there came in at every island's edge; then the
   // cloth mended, as its strips are narrower than what the filling shaves off an island's edge)
   {
@@ -185,7 +190,27 @@ for (const [n, file] of BODIES.entries()) {
       lo = Math.min(lo, v);
       hi = Math.max(hi, v);
     }
-    node.setExtras({ ...node.getExtras(), height: +(hi - lo).toFixed(4), stands: STANDS[n] });
+    // (and its head and chest against the joints that carry what is worn there, at rest, metres, facing +z: the game
+    // hangs hats, vests and packs by these, against the old suit's (SUIT_FIT in src/game/avatar/gear.ts), Avatar.gearFit)
+    const P = restPoints(node), region = node.getMesh().listPrimitives()[0].getAttribute('_REGION');
+    const joint = (name) => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(node.getSkin().listJoints().find((j) => j.getName() === name).getWorldMatrix()));
+    const head = joint('Head'), sp = joint('spine_03');
+    // (the hair that stands off the skull behind, Anya's bun, a part of its own (hair in REGION, src/sim/survivor.ts):
+    // not drawn under what closes round the head (bareWorn in src/game/survivors.ts). The men's skulls reach 9 cm
+    // behind the joint, her bun 13)
+    let hair = 0;
+    P.forEach((p, i) => {
+      if (region.getScalar(i) <= 1 && p.z - head.z < -0.1) {
+        region.setScalar(i, 14);
+        hair++;
+      }
+    });
+    if (hair) console.log(`body ${n}: ${hair} points of hair off the skull`);
+    const skull = new THREE.Box3().setFromPoints(P.filter((p, i) => region.getScalar(i) <= 1));
+    const chest = new THREE.Box3().setFromPoints(P.filter((p, i) => region.getScalar(i) === 3 && Math.abs(p.y - sp.y) < 0.04 && Math.abs(p.x) < 0.21));
+    const r = (v) => +v.toFixed(4);
+    const fit = { crown: r(skull.max.y - head.y), headZ: r((skull.min.z + skull.max.z) / 2 - head.z), headDepth: r(skull.max.z - skull.min.z), chestMin: r(chest.min.z - sp.z), chestMax: r(chest.max.z - sp.z), chestWidth: r(chest.max.x - chest.min.x) };
+    node.setExtras({ ...node.getExtras(), height: +(hi - lo).toFixed(4), stands: STANDS[n], fit });
   }
   for (const m of root.listMaterials()) m.setName(`survivor_${n}`);
   await doc.transform(
@@ -200,5 +225,6 @@ for (const [n, file] of BODIES.entries()) {
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
-  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}\n  ${cloth}\n  ${worn}`);
+  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}
+  ${weighted}\n  ${cloth}\n  ${worn}`);
 }

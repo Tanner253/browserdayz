@@ -119,6 +119,7 @@ import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
 import { huntMethods } from './game/hunt';
+import { reclaimMethods } from './game/reclaim';
 import { Gathering } from './gathering';
 import { Crafting } from './crafting';
 import { CraftCard } from '../ui/craft-card';
@@ -137,7 +138,6 @@ import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
 import { MyPerks } from './my-perks';
 import { finishLighting, wearFinish, type Finish } from './finish';
-import { cutFor } from './melee/cuts';
 import type { StoredItem } from '../net/protocol';
 
 export const _gasHead = new THREE.Vector3();
@@ -470,6 +470,8 @@ export class Game {
   sendT = 0;
   meT = 0;
   meDirty = false;
+  /** a press of 'Reclaim gear' waits for the server's word until then (performance.now()): see src/game/game/reclaim.ts */
+  reclaimUntil = 0;
   pendingTakes = new Map<string, { item: ItemInstance; id: string; qty: number }>();
   localDrops = new Set<string>();
 
@@ -944,9 +946,9 @@ export class Game {
       // (or on a wreck, a drum, a heap of junk: src/game/craft-salvage.ts)
       if (!(owner instanceof TreeRef || owner instanceof RockRef)) this.salvage.whack(at, w);
     };
-    this.weapons.onSwing = (seconds, stroke, heavy) => {
-      this.avatar.swing(false, seconds, stroke === undefined ? null : cutFor(this.weapons.equippedItem?.id, stroke, heavy));
-      this.net.send({ t: 'swing', ...(heavy ? { hv: true } : {}) });
+    this.weapons.onSwing = (seconds) => {
+      this.avatar.swing(false, seconds);
+      this.net.send({ t: 'swing' });
     };
     progress('compiling shaders');
     // (A loot model's materials are made ready when the model comes, off the frame: see ItemModels.onMade. They
@@ -1095,6 +1097,7 @@ export class Game {
       finishFor: (item) => this.finishFor(item),
       applyFinish: (item, f) => this.applyFinish(item, f),
       plateIcon: (id, f) => this.plateIcon(id, f),
+      reclaim: () => this.reclaimGear(),
       craftWith: (a, b) => this.craft.recipesFor(a, b).length > 0,
       craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
       craftOpen: () => this.craftCard.open,
@@ -2005,6 +2008,8 @@ export interface Game {
   burnWood: Methods<typeof itemsMethods>['burnWood'];
   skinPrompt: Methods<typeof huntMethods>['skinPrompt'];
   onSkin: Methods<typeof huntMethods>['onSkin'];
+  reclaimGear: Methods<typeof reclaimMethods>['reclaimGear'];
+  reclaimed: Methods<typeof reclaimMethods>['reclaimed'];
   grill: Methods<typeof itemsMethods>['grill'];
   cookShown: Methods<typeof itemsMethods>['cookShown'];
   emptyOfGrenade: Methods<typeof itemsMethods>['emptyOfGrenade'];
@@ -2062,6 +2067,6 @@ export interface Game {
   finished: Methods<typeof interactMethods>['finished'];
   frame: Methods<typeof frameMethods>['frame'];
 }
-for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods, huntMethods]) {
+for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods, huntMethods, reclaimMethods]) {
   for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Game.prototype, name, { ...d, enumerable: false });
 }

@@ -1207,9 +1207,9 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
  * worn things before a single thing out of a pocket, and what found no room was thrown on the ground round it.
  *
  * (No bigger than it need be: the server reads no more things out of any grid it is sent than this has cells. When
- * something bigger is made this has to grow a row: the test will say so.)
+ * something bigger is made this has to grow a row: the test will say so. It did, 2026-10-25, for the belt's hip pack: 10x18.)
  */
-export const BODY_GRID: [number, number] = [10, 17];
+export const BODY_GRID: [number, number] = [10, 18];
 
 /**
  * Things laid in a body's grid, the biggest first so that the small ones fill what is left.

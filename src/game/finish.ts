@@ -41,7 +41,8 @@ const PATTERN: Partial<Record<Finish, number>> = { emerald: 2.2, ruby: 2.2, dama
  */
 const MASK: Record<string, { smooth: number } | undefined> = { m9: { smooth: 0.43 } };
 /** the gun's own materials, by name: the hands and sights drawn with it are left as they are */
-const PARTS: Record<string, RegExp> = { deagle: /^(Slide|MainBody|Magazine)$/, m9: /^beretta$/, colt: /^Scene_-_Root$/, knife: /knife/i, karambit: /./ };
+// (the knives are each one piece, made in Higgsfield with one material: the finish is the whole knife's)
+const PARTS: Record<string, RegExp> = { deagle: /^(Slide|MainBody|Magazine)$/, m9: /^beretta$/, colt: /^Scene_-_Root$/, knife: /./, hunting_knife: /./, bayonet: /./, karambit: /./ };
 
 type Register = (m: THREE.Material, patch: (s: THREE.WebGLProgramParametersWithUniforms) => void, key: string) => void;
 let world: { register: Register; daylight: { value: number } } | null = null;

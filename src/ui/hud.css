@@ -820,6 +820,8 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .inv-takes button span { color: var(--accent); }
 .inv-takes button:hover { color: var(--ink); border-color: var(--accent); }
 .inv-takes .inv-fits { margin-left: auto; }
+/* (their own body: the one button that puts it all back on, src/sim/reclaim.ts) */
+.inv-takes .inv-reclaim { color: var(--ink); border-color: var(--accent); background: rgba(201, 178, 124, 0.16); }
 .inv-takes .inv-fits[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); background: rgba(201, 178, 124, 0.16); }
 .inv-sort { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
 .inv-sort svg { width: 11px; height: 11px; fill: currentColor; }

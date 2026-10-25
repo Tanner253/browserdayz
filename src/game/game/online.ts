@@ -307,7 +307,7 @@ export const onlineMethods = {
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);
     });
-    net.on('swing', (m) => this.remotes.get(m.id)?.swing(!!m.hv));
+    net.on('swing', (m) => this.remotes.get(m.id)?.swing());
     net.on('nade', (m) => {
       // (which grenade, and what is left of its fuse, are the server's word: it heard the pin go, and counts from that)
       const id = THROWN[m.w] ? m.w : 'grenade';
@@ -445,6 +445,11 @@ export const onlineMethods = {
     net.on('cdata', (m) => {
       const st = this.findBox(m.cid);
       if (!st) return;
+      // (their own body: the button that puts it all back on is shown, src/game/game/reclaim.ts)
+      if (m.own && !st.own) {
+        st.own = true;
+        if (this.openStash === st && this.invUI.isOpen) this.invUI.render();
+      }
       // (What the server says is in it: what this game's moves are reckoned from. Its answer to this game's own moves
       // is what this game has already, and nothing is laid out again for it.)
       const same = st.known && JSON.stringify(st.container.serialize().items) === JSON.stringify(m.items);
@@ -642,6 +647,7 @@ export const onlineMethods = {
       this.meDirty = true;
     });
     net.on('kit', (m) => this.kitUp(m));
+    net.on('reclaimed', (m) => this.reclaimed(m));
     net.on('trash', (m) => this.trashed(m.uids, m.by));
     net.on('refill', (m) => this.refilled(m.by));
     net.on('inv', (m) => this.adminUI.setPockets(m));

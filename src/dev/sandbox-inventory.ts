@@ -164,6 +164,7 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     finishFor: () => [],
     applyFinish: () => {},
     plateIcon: () => {},
+    reclaim: () => {},
     craftWith: (a, b) => recipesFor(a, b).length > 0,
     craftOnto: (a, b, at) => card.float(recipesFor(a, b), at, [a.uid, b.uid]),
     craftOpen: () => card.open,

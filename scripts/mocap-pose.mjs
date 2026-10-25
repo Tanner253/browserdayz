@@ -121,6 +121,27 @@ export function heelFirst(doc, sk, name, way) {
   return best / n;
 }
 
+/**
+ * A movement stooped: the chest bent forward from the hips by `angle` (radians, a third at each joint of the spine), the
+ * head and the upper arms turned back by as much, so that the eyes are where they looked and the arms hang and swing
+ * as they did. The walk's upper body laid over the crouch's legs (src/game/avatar/gait.ts), as a body crouched carries
+ * its chest.
+ */
+export function stoop(doc, sk, name, angle) {
+  const clip = readClip(doc, sk, name), { Q, T } = frameOf(clip), n = clip.frames + 1;
+  const S = ['spine_01', 'spine_02', 'spine_03'].map(sk.index), back = ['neck_01', 'upperarm_l', 'upperarm_r'].map(sk.index);
+  const side = new THREE.Vector3(1, 0, 0);
+  const turnWorld = (f, i, q) => {
+    const W = sk.pose(Q[f], T[f]);
+    Q[f][i] = rotOf(W[sk.parent[i]]).invert().multiply(q.clone().multiply(rotOf(W[i]))).normalize();
+  };
+  for (let f = 0; f < n; f++) {
+    for (const i of S) turnWorld(f, i, new THREE.Quaternion().setFromAxisAngle(side, angle / S.length));
+    for (const i of back) turnWorld(f, i, new THREE.Quaternion().setFromAxisAngle(side, -angle));
+  }
+  writeClip(doc, clip, Q, T, clip.dur);
+}
+
 /** part of a movement done once: from `a` to `b` seconds */
 export function trim(doc, sk, name, a, b) {
   const clip = readClip(doc, sk, name);

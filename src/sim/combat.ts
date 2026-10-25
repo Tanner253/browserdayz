@@ -154,11 +154,3 @@ export function hitDamage(weapon: string, zone: HitZone, distance: number, suppr
   const n = r.pellets ? Math.max(1, Math.min(r.pellets, Math.floor(pellets) || 1)) : 1;
   return base * k * zoneMultiplier(zone, r.melee) * n;
 }
-
-/**
- * A heavy blow with something to hit with (the owner's brief, 2026-10-25: the left button held, as DayZ's heavy attack):
- * held `hold` seconds it is drawn back and kept there (`drawn` of the way through it, just short of coming through: a
- * blow lands at 0.35) until let go or for `keep` seconds, then lands `damage` times as hard, takes `rate` times as long
- * and `stamina` of the breath. The server believes one no sooner than `every` seconds after the last.
- */
-export const HEAVY = { hold: 0.3, drawn: 0.28, keep: 2, damage: 1.6, rate: 1.5, stamina: 18, every: 1.0 };

@@ -82,7 +82,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (67, 2026-10-25: which survivor each player is and the voice they call out in (`bd`, `vo` on hello and on a player;
 // 'who' when it is changed: src/sim/survivor.ts), and what they wear by its colour ('gear' as id~colour). A page of 66
 // would draw everybody in the old suit. (66 is base building's; the navigator sets the last number at release.)
-export const PROTOCOL = 67;
+// (68, 2026-10-25: a survivor's own body gives back their gear at one press ('reclaim', 'reclaimed'; `own` on the
+// 'cdata' that answers 'copen': src/sim/reclaim.ts). A page of 67 shows no button and is never told it can.)
+export const PROTOCOL = 68;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -245,7 +247,7 @@ export type C2S =
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
-  | { t: 'swing'; /** a heavy blow (HEAVY) */ hv?: boolean }
+  | { t: 'swing' }
   /**
    * The pin of a grenade is out (which grenade: its item), and its fuse runs from when the server hears this. And
    * it has left the hand: from where, and how fast (not moving, at the end of its fuse: it went off in the hand).
@@ -273,7 +275,7 @@ export type C2S =
   /** another body or voice picked (src/sim/survivor.ts) */
   | { t: 'who'; bd: number; vo: number }
   | { t: 'back'; b: Slung[] }
-  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number; /** a heavy blow (HEAVY) */ hv?: boolean }
+  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number }
   | { t: 'take'; uid: string }
   /** a field radio keyed: a supply drop is asked for where the sender stands */
   | { t: 'radio' }
@@ -286,6 +288,8 @@ export type C2S =
   | { t: 'cops'; cid: string; ops: BoxOp[] }
   /** what is in a crate within reach, asked for on the way to it (no doors open, nothing is held): it is shown at once when it is opened */
   | { t: 'cpeek'; cid: string }
+  /** everything on this player's own body, open, back onto them as it was worn and carried (src/sim/reclaim.ts) */
+  | { t: 'reclaim'; cid: string }
   | { t: 'cclose'; cid: string }
   /**
    * What lies within reach that holds things (a pack, a vest, a jacket, a case), opened with the pockets: each is the
@@ -356,7 +360,7 @@ export type C2S =
   /** where the infected this game is moving have got to (see src/sim/infected.ts): [which, ...where and what it is doing] */
   | { t: 'is'; s: [number, ...IState][] }
   /** a round or a blow of ours landed on one of them */
-  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number; hv?: boolean }
+  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
   /** a shot or a blow on an animal (server/animals.ts judges it as it does one on the infected) */
@@ -474,7 +478,7 @@ export type S2C =
   /** each: who, where, what is in their hands and on it, and when their game said so by its own clock (ms) */
   | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ string?][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
-  | { t: 'swing'; id: number; hv?: boolean }
+  | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number]; w: string; f: number }
   /** somebody near has thrown something (an item's id): every game flies it the same way, and it is told where it lies when it does ('loot+') */
@@ -557,7 +561,10 @@ export type S2C =
   | { t: 'loot+'; l: WorldLoot }
   | { t: 'loot-'; uid: string }
   | { t: 'denied'; uid: string }
-  | { t: 'cdata'; cid: string; items: StoredItem[] }
+  /** what is in a crate or a body; `own`: the body is this player's own, whose gear they may take back at one press ('reclaim'), said only in answer to 'copen' */
+  | { t: 'cdata'; cid: string; items: StoredItem[]; own?: true }
+  /** their own body gone through ('reclaim'): what they carry now, how many things came off it, and how many found no room and lie on it still */
+  | { t: 'reclaimed'; cid: string; inv: SerializedInventory; took: number; left: number }
   | { t: 'cbusy'; cid: string }
   /** what of this player's moves in a crate (`cid`) or a bag lying about (`l`) could not be done: taken by somebody else first (out of their pockets again), or no room (back into them) */
   | ({ t: 'cno'; cid?: string; l?: string } & Refused)

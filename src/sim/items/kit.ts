@@ -34,7 +34,7 @@ export const KIT_ITEMS: ItemDef[] = [
   },
   // (2026-10-13: the Fish Knife is gone and this is in its place, under the same id: an army bayonet-knife out of a
   // pack with hands and movements of its own, see `knife` in WEAPON_PACKS. What it does is as it was.)
-  { id: 'pitchfork', name: 'Pitchfork', model: 'melee_pitchfork', w: 2, h: 7, weight: 2.0, category: 'melee', slot: 'long', desc: 'A farm pitchfork, four long tines. Held in both hands: the longest reach of anything you can swing, and slow.', melee: { damage: 40, range: 2.4, rate: 0.85 },
+  { id: 'pitchfork', name: 'Pitchfork', model: 'pitchfork', w: 2, h: 7, weight: 2.0, category: 'melee', slot: 'long', desc: 'A farm pitchfork, four long tines. Held in both hands: the longest reach of anything you can swing, and slow.', melee: { damage: 40, range: 2.4, rate: 0.85 },
     loot: { pair: 'Pitchfork', at: [6, 1, 12, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 3 }, on: IN_SHEDS },
     worth: 3,
   },

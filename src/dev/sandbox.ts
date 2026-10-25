@@ -10,24 +10,25 @@
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length; with
 //                                               several files, one each (clip=walk,mc_walk: the old beside the new)
-//   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
-//                                               one of its clips; today's survivor beside them plays it too
+//   &survivor=-1,0,1,2,3&clip=jogF&t=0.3       the survivors' bodies (-1: the old suit) (src/game/survivors.ts) on the game's skeleton, playing
+//                                               one of the game's movements (moves.glb) or the file's own; the one beside too
 //   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
 //   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
 //   &shrink=hips,thigh                           the parts only partly under them drawn a little in)
+//   &gear=beanie,assault_pack                   (and things worn as things of their own, where the game hangs them: GEAR)
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
 //                                               picture (src/dev/sandbox-sim.ts)
+//   &infected=nurse,nurse&n=3,17&speed=0.6   the infected as the game draws them, each by its number (src/dev/sandbox-infected.ts)
+//   &moves=assets/characters/moves-infected.glb  the movements of that file, for g= files with none of their own (the infected)
+//   &hide=body_far                              the parts of a g= file by those names not drawn (an infected's far body)
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
+//   &near=1.2,0.8                                or at that height over the middle of what is shown, from that far
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
-//   &gap=0.05                                   metres between things laid side by side (0.5)
-//   &roll=90                                    the thing laid over on its side, degrees (a long thing across a wide picture)
-//   &melee=hatchet&n=0&strip=8                  a survivor at moments of one of its blows (src/dev/sandbox-melee.ts)
-//   &finish=emerald,ruby&as=knife               the store finish each model wears in turn (as: the gun it is plated as)
 //   &bg=20231f&floor=0                          a plain backdrop of that colour and no floor (pictures for the page)
 //   &person=0                                   no survivor beside it; &body=2 which survivor (src/game/survivors.ts BODIES)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
@@ -42,7 +43,6 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assets } from '../core/assets';
-import { wearFinish, type Finish } from '../game/finish';
 
 const q = new URLSearchParams(location.search);
 const list = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean);
@@ -53,15 +53,17 @@ const views = list('views').length ? list('views') : ['side', 'front', 'q', 'top
 const strip = Math.max(0, Math.floor(+(q.get('strip') ?? 0)));
 // (an animal faces -z, as the game has them: turned a quarter by default, so that 'side' sees its side)
 const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
-const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0', gap = +(q.get('gap') ?? 0.5), roll = (+(q.get('roll') ?? 0) * Math.PI) / 180;
+const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
-const sim = q.get('sim'), melee = q.get('melee'), bb = q.get('bb');
+const sim = q.get('sim'), bb = q.get('bb');
 const { BUILD_CELLS, BUILD_COLS } = bb ? await import('./sandbox-build') : { BUILD_CELLS: {} as Record<string, number>, BUILD_COLS: {} as Record<string, number> };
-// (bodies: a block of them for each moment drawn)
+// (bodies: a block of them for each moment drawn, `across` blocks to a row: a picture is drawn no more than 8192 a side)
 const bodies = list('bodies').length, bodyCols = Math.min(bodies, Math.max(1, +(q.get('cols') ?? 4)));
-const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : bodies ? Math.ceil(bodies / bodyCols) * bodyCols * Math.max(1, Math.floor(+(q.get('frames') ?? 1))) : strip > 0 ? strip : views.length;
-const cols = bodies ? bodyCols : Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
+const blocks = Math.max(1, Math.floor(+(q.get('frames') ?? 1))), across = Math.min(blocks, Math.max(1, Math.floor(+(q.get('across') ?? 1))));
+const blockRows = Math.ceil(bodies / bodyCols);
+const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : bodies ? blockRows * bodyCols * blocks : strip > 0 ? strip : views.length;
+const cols = bodies ? bodyCols * across : Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = bodies ? blockRows * Math.ceil(blocks / across) : Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);
@@ -145,12 +147,6 @@ if (bb) {
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   out.stageInfo = await stageSim(sim, { q, scene, renderer, sun, floor, cw, ch, cols, rows, say, body });
   out.staged = true;
-} else if (melee) {
-  // (a survivor holding something to hit with, at moments of one of its blows: src/dev/sandbox-melee.ts)
-  const { stageMelee } = await import('./sandbox-melee');
-  const out = window as unknown as { staged: boolean; stageInfo: unknown };
-  out.stageInfo = await stageMelee(melee, { q, scene, renderer, sun, cw, ch, cols, rows, cells, say });
-  out.staged = true;
 } else if (bodies) {
   const { stageBodies } = await import('./sandbox-body');
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
@@ -192,9 +188,6 @@ if (bb) {
   let x = 0;
   const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> = {}, asIs = false) => {
     o.rotation.y = yaw;
-    // (laid over about the line of sight, after it is turned)
-    o.rotation.z = roll;
-    if (roll) o.rotation.order = 'ZYX';
     shadowed(o);
     o.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(o);
@@ -206,22 +199,18 @@ if (bb) {
     // (an animal stands where the game stands it, its root on the ground, and is not set down by its box)
     if (!asIs) o.position.y -= box.min.y;
     o.position.z -= (box.min.z + box.max.z) / 2;
-    x += size.x + gap;
+    x += size.x + 0.5;
     thing.add(o);
     info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), picture: picture(o), ...extra });
   };
-  // (&finish=emerald,ruby: the store finish each model wears, in turn; its picture's light, as the inventory's)
-  const finishes = list('finish');
-  for (const [i, id] of ids.entries()) {
-    const f = finishes.length ? finishes[i % finishes.length] : '';
-    // (a copy each, as one id may be laid out in several finishes)
-    const o = f ? (await assets.model(id)).clone() : await assets.model(id);
-    if (f && f !== 'none') wearFinish(o, q.get('as') ?? id, f as Finish, true);
-    place(o, f ? `${id} ${f}` : id);
-  }
+  for (const id of ids) place(await assets.model(id), id);
+  // (a body with no movements of its own, one of the infected, played in another file's: &moves=)
+  const borrowed = q.get('moves') ? (await assets.loadGLTF(q.get('moves')!)).animations : null;
   for (const [k, f] of files.entries()) {
-    const gltf = await assets.loadGLTF(f);
+    const own = await assets.loadGLTF(f);
+    const gltf = borrowed && !own.animations.length ? { ...own, animations: borrowed } : own;
     const o = gltf.animations.length ? cloneSkinned(gltf.scene) : gltf.scene;
+    o.traverse((n) => void (list('hide').includes(n.name) && (n.visible = false)));
     const clips = gltf.animations.map((c) => `${c.name} (${c.duration.toFixed(2)} s)`);
     // (placed and framed as it rests, before any clip moves it: the cameras then hold still across a strip)
     const want = list('clip')[k] ?? list('clip')[0] ?? null;
@@ -236,9 +225,11 @@ if (bb) {
       played.push(a);
     }
   }
-  // (every survivor, and today's beside them, in one clip at one moment: see `played`)
-  const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
-    const want = q.get('clip');
+  // (every survivor, and today's beside them, in one clip at one moment: see `played`. The game's own movements first,
+  // the motion capture (moves.glb, moves-late.glb: src/game/avatar/gait.ts), then the character file's old ones)
+  const mocap = survivors.length || person ? (await Promise.all(['moves', 'moves-late'].map((f) => assets.loadGLTF(`assets/characters/${f}.glb`)))).flatMap((g) => g.animations) : [];
+  const playOn = (o: THREE.Object3D, own: THREE.AnimationClip[]) => {
+    const want = q.get('clip'), clips = [...mocap, ...own];
     const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
     if (!clip) return null;
     const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
@@ -248,28 +239,71 @@ if (bb) {
     return clip.name;
   };
   if (survivors.length) {
-    const { wearBody, wearOn, BODIES } = await import('../game/survivors');
+    const { wearBody, wearOn, bareWorn, BODIES } = await import('../game/survivors');
+    type Worn = import('../game/survivors').Worn;
     const { hides } = await import('../sim/survivor');
     const { ITEMS } = await import('../sim/items');
     const hide = hides(list('hide') as Parameters<typeof hides>[0]);
     // (what a piece hides and draws in is its item's, src/sim/items/wear.ts, unless &hide or &shrink says)
     const dressOf = (model: string) => Object.values(ITEMS).find((d) => d.dress?.model === model)?.dress;
     const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
+    const { GEAR, placeWorn, hangFit } = await import('../game/avatar/gear');
+    const { BODY_SCALE } = await import('../game/avatar');
+    // (the game says where gear goes on the body as the game turns it and draws it: half round, at BODY_SCALE)
+    const turned = new THREE.Matrix4().makeRotationY(Math.PI).multiply(new THREE.Matrix4().makeScale(BODY_SCALE, BODY_SCALE, BODY_SCALE));
     for (const n of survivors) {
       const o = cloneSkinned(gltf.scene) as THREE.Group;
       o.traverse((m) => { if (m.name.startsWith('gear_')) m.visible = false; });
+      // (where the bones that carry gear stand as the skeleton is made, before the body's own lengths: as Avatar.make measures them)
+      o.updateMatrixWorld(true);
+      const rest = new Map(['Head', 'spine_03', 'pelvis'].map((b) => [b, o.getObjectByName(b)?.matrixWorld.clone().invert()] as const));
+      // (-1: the old suit as it was, to judge a body against: the owner, 2026-10-25, "our previous player model was better")
+      if (n < 0) {
+        const playing = playOn(o, gltf.animations);
+        place(o, 'suit', { playing });
+        continue;
+      }
       const body = await wearBody(o, n, list('wear').length ? 0 : hide);
       // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
-      const worn = list('wear').map((w) => {
+      const worn: Worn[] = list('wear').map((w) => {
         const [model, c] = w.split('~');
         const own = dressOf(model);
         return { model, hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
       });
+      const gearIds = list('gear');
+      for (const id of gearIds) {
+        const bare = bareWorn(id);
+        if (bare) worn.push(bare);
+      }
       if (worn.length) await wearOn(o, body, worn);
+      for (const id of gearIds) {
+        const g = GEAR[id], bone = g && o.getObjectByName(g.bone), inv = g && rest.get(g.bone);
+        if (!g || !bone || !inv) continue;
+        const item = (await assets.model(id)).clone();
+        const holder = new THREE.Group(), m = new THREE.Matrix4();
+        placeWorn(id, item, gearIds, m);
+        // (as the game hangs it: by the body's own head and chest, Avatar.gearFit)
+        const gearInv = inv.clone().multiply(turned.clone().invert()), fit = body[0]?.userData.fit ?? null;
+        holder.matrixAutoUpdate = false;
+        holder.matrix.copy(gearInv).multiply(hangFit(fit, g, gearInv)).multiply(m);
+        holder.add(item);
+        bone.add(holder);
+      }
       const playing = playOn(o, gltf.animations);
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }
   }
+  // (the infected as the game makes and poses them, each by its number: src/dev/sandbox-infected.ts)
+  const infected = q.get('infected') ? await (await import('./sandbox-infected')).stageInfected(q) : [];
+  const secs = +(q.get('secs') ?? 2);
+  for (const s of infected) {
+    place(s.root, s.name, {}, true);
+    s.pos.copy(s.root.position);
+  }
+  // (gathered round the survivor, who stands in the middle: &round=1)
+  const round = infected.length > 0 && q.get('round') === '1';
+  if (round) (await import('./sandbox-infected')).gatherRound(infected);
+  for (const s of infected) s.at(strip > 0 ? 0 : +(q.get('t') ?? 0.5) * secs);
   if (animal) {
     const { MODES, stageAnimal } = await import('../game/animals');
     const mode = q.get('mode') ?? 'idle', a = await stageAnimal(animal, MODES[mode] ?? +mode);
@@ -302,11 +336,11 @@ if (bb) {
     const idle = gltf.animations.find((c) => /^idle/i.test(c.name));
     if (!(survivors.length && playOn(body, gltf.animations)) && idle) new THREE.AnimationMixer(body).clipAction(idle).play().getMixer().setTime(0);
     shadowed(body);
-    body.position.set(subject.max.x + 0.9, 0, 0);
+    body.position.set(round ? 0 : subject.max.x + 0.9, 0, 0);
     scene.add(body);
   }
   const all = new THREE.Box3().setFromObject(thing);
-  if (person) all.expandByPoint(new THREE.Vector3(subject.max.x + 1.3, 1.85, 0));
+  if (person) all.expandByPoint(new THREE.Vector3(round ? 0 : subject.max.x + 1.3, 1.85, 0));
   const mid = all.getCenter(new THREE.Vector3()), span = all.getSize(new THREE.Vector3());
   sun.target.position.copy(mid);
   const reach = Math.max(span.x, span.y, span.z) * 0.75 + 0.5;
@@ -325,8 +359,9 @@ if (bb) {
     const fit = Math.max(span.x / camera.aspect, span.y, span.z * (view === 'top' ? 1 / camera.aspect : 0.6));
     const d = (fit * 0.62) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) + Math.max(span.x, span.z) * 0.5;
     const near = q.get('near')?.split(',').map(Number);
-    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : mid;
-    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : d);
+    // (or, of two, at that height over the middle of what is shown, from that far: a body in a strip, wherever its clip puts it)
+    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : near?.length === 2 ? new THREE.Vector3(mid.x, near[0], mid.z) : mid;
+    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : near?.length === 2 ? near[1] : d);
     camera.lookAt(at);
   };
 
@@ -336,6 +371,7 @@ if (bb) {
     const view = strip > 0 ? views[0] : views[i];
     if (strip > 0 && mixer && action) mixer.setTime(action.getClip().duration * (i / strip));
     if (strip > 0) for (const a of played) if (a !== action) a.getMixer().setTime(a.getClip().duration * (i / strip));
+    if (strip > 0) for (const s of infected) s.at(secs * (i / strip));
     thing.updateMatrixWorld(true);
     frame(view);
     const vx = (i % cols) * cw, vy = (rows - 1 - Math.floor(i / cols)) * ch;

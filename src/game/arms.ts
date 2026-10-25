@@ -17,15 +17,6 @@ import { liftPack } from './rig';
 
 /** the weapon pack whose arms these are */
 const ARMS_PACK = 'sniper_fp';
-/**
- * The pack whose own right hand closes on a handle as its animator drew it (the knife's, its idle's first frame): a thing
- * to hit with is held in that hand (HandGrip.pose), every finger and the thumb where they were drawn, not curled by
- * figures. (Curled by figures, the thumb tucked over a fist hard shut, the hand on a hatchet read as a mitten: the
- * owner's navigator, 2026-10-25.) The two packs' arms are one pair under two paints: the same bones.
- */
-const GRIP_PACK = 'knife_fp';
-/** a bone of the packs' hands by its part, whichever pack: R_point1_032 -> point1 */
-const partOf = (name: string) => name.replace(/^[RL]_/, '').replace(/_\d+$/, '');
 
 /** A hand placement in weapon (model) space: wrist position, finger direction, palm normal. */
 /** how far a finger is closed: all of it by one figure, or each of its three joints by its own, knuckle first */
@@ -50,8 +41,6 @@ export interface HandGrip {
   thumb: number;
   /** 0..1: fold the thumb across the curled fingers (a closed fist) */
   tuck?: number;
-  /** the hand closed on it as the knife pack's own right hand closes on its knife (GRIP_PACK; the left as its twin): the curl, thumb and tuck are not used */
-  pose?: 'knife';
   /** how far out from the first finger the thumb stands, 1 as it comes (less for a hand at rest, its thumb in beside the finger) */
   spread?: number;
   /** how the curl is shared between a finger's three joints, knuckle first (0.8, 1.1, 0.8 when not given) */
@@ -165,8 +154,6 @@ export class FPArms {
   /** the upper arms: drawn for bare hands only, where a thrown punch shows the whole arm */
   private upper: THREE.SkinnedMesh[] = [];
   private uniforms = lookUniforms();
-  /** the knife pack's hand on its handle: each finger joint's and the thumb's own turn, by part (see GRIP_PACK) */
-  private grasp = new Map<string, THREE.Quaternion>();
 
   async load() {
     if (assets.manifest.models[ARMS_PACK]?.rig) return this.loadPack();
@@ -345,16 +332,6 @@ export class FPArms {
     this.right = this.makeArm(of('R'), 'r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
     this.left = this.makeArm(of('L'), 'l', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
     this.root.visible = false;
-    const grip = assets.manifest.models[GRIP_PACK]?.rig;
-    if (grip) {
-      const at = grip.clips.idle[0] / grip.fps;
-      for (const t of (await assets.gltfOf(GRIP_PACK)).animations.flatMap((c) => c.tracks)) {
-        const m = t.name.match(/^R_((?:thumb|point|middle|ring|pink)\d)(?:_\d+)?\.quaternion$/);
-        if (!m) continue;
-        const v = new THREE.QuaternionLinearInterpolant(t.times, t.values, 4, new Float32Array(4)).evaluate(at);
-        this.grasp.set(m[1], new THREE.Quaternion(v[0], v[1], v[2], v[3]));
-      }
-    }
   }
 
   /** Sleeves and skin of this player (see look.ts). */
@@ -445,17 +422,6 @@ export class FPArms {
     _m2.makeBasis(F, N, new THREE.Vector3().crossVectors(F, N));
     const handWorld = new THREE.Quaternion().setFromRotationMatrix(_m2.multiply(_m1.transpose()));
     this.setWorldQuat(a.hand, handWorld);
-    if (grip.pose && this.grasp.size) {
-      // (the left hand the right's twin: these hands' bones are turned as in a mirror, the turn's y and z the other way)
-      const twin = a === this.left;
-      for (const chain of [...a.fingers, a.thumb])
-        for (const b of chain) {
-          const q = this.grasp.get(partOf(b.name));
-          if (q) b.quaternion.set(q.x, twin ? -q.y : q.y, twin ? -q.z : q.z, q.w);
-        }
-      a.hand.updateMatrixWorld(true);
-      return;
-    }
 
     // finger curl toward the palm
     // rotating the finger direction about (fingers x palm) swings fingertips toward the palm side

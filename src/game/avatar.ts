@@ -14,7 +14,7 @@ import 'three/addons/utils/SkeletonUtils.js';
 import '../world/atmosphere';
 import type { Atmosphere } from '../world/atmosphere';
 import './arms';
-import type { Grips, Curl, HandGrip } from './arms';
+import type { Grips, Curl } from './arms';
 import './look';
 import type { LookUniforms } from './look';
 import { assets } from '../core/assets';
@@ -22,6 +22,8 @@ import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
 import { Wardrobe } from './survivors';
+import type { InfectedMoves } from './infected-moves';
+import type { InfectedLook } from './infected-look';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -81,15 +83,11 @@ export const THUMB_SEEN = 16;
 export const CLAW = INFECTED.lunge;
 
 /**
- * How the infected get about. Their walk is the game's own, at whatever pace they are going;
- * their run is another body's, drawn to another length with several strides in it, so it is
- * not stepped in time with the walk (which played it at better than twice its pace): above
- * `from` metres a second it is faded in over the walk, all of it by `to`, and it keeps its
- * own time, at the pace it was drawn for (`pace`, metres a second) or as near as `give` lets it be.
+ * How the infected get about (src/game/infected-moves.ts): their run is drawn to another length than their walk, so it
+ * is not stepped in time with it: above `from` metres a second it is faded in over the walk, all of it by `to`, and it
+ * keeps its own time, at the pace it was captured at or as near as `give` lets it be.
  */
-// (Measured on the body: a foot on the ground goes back under it at about 2.3 m/s as the clip
-// was drawn. Played at that pace under a body going 3.3, the feet slid a metre a second.)
-export const SICK_GAIT = { from: 1.9, to: 2.7, pace: 2.3, give: [0.8, 1.5] };
+export const SICK_GAIT = { from: 1.9, to: 2.7, give: [0.8, 1.5] };
 
 /** how far through it the blow lands */
 export const CLAW_HIT = INFECTED.windup / CLAW;
@@ -404,6 +402,10 @@ export class Avatar {
   handsT = 0;
   gearRest = new Map<string, { bone: THREE.Object3D; inv: THREE.Matrix4 }>();
   gearObjs: THREE.Object3D[] = [];
+  /** each hung thing's holder, its bone at rest and its place there, to be hung again when the body changes (see gearFit) */
+  gearPlaced: { holder: THREE.Object3D; rest: { inv: THREE.Matrix4 }; m: THREE.Matrix4; g: { bone: string; pack?: boolean } }[] = [];
+  /** this survivor's head and chest, which what is hung there is fitted to (null: the old suit's) */
+  bodyFit: import('./survivors').BodyFit | null = null;
   /** a pack is worn: a slung weapon rides outside it */
   packOut = 0;
   /** seconds since the feet came back down after being in the air (-1 = long ago) */
@@ -460,7 +462,7 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; /** what the left hand closes on, for a thing held in both (in its own space) */ left: HandGrip | null; /** carried slung on the back, and drawn from there */ long: boolean; /** what of it is spun round a ring when it is looked over (a karambit's) */ spin: THREE.Object3D | null; /** carried held up before the chest (a torch: RAISE) */ raise: boolean } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** how far a torch is held up (0 at the side, 1 up: RAISE) */
@@ -483,15 +485,7 @@ export class Avatar {
   legs: Leg[] = [];
   /** the rest of a survivor's motion capture (src/game/avatar/deeds.ts); a performance done once (seconds into it), and one kept up */
   deeds?: Deeds;
-  /**
-   * what is being done once on the motion capture: from and to as shares of its movement, played evenly, or (a blow:
-   * `hit`) reaching `hit` at `at` of the time; `way` a long thing being drawn off the back or put away there
-   */
-  deed: { name: Deed; t: number; dur: number; legs: number; k: number; from: number; to: number; hit?: number; at?: number; way?: 'draw' | 'stow' } | null = null;
-  /** how far up the guard with something in the fist is, 0..1 (see melee/cuts.ts GUARD) */
-  guardK = 0;
-  /** how much of the body the deed being done has this frame, 0..1 */
-  deedK = 0;
+  deed: { name: Deed; t: number; dur: number; legs: number; k: number; from: number; to: number } | null = null;
   stay: { name: Stay; t: number; rate: number } | null = null;
   stayT = 0;
   stayWas: Stay | null = null;
@@ -557,6 +551,15 @@ export class Avatar {
    * into it, -1 none); `seed` keeps one from swaying in time with the next.
    */
   sick: { roused: number; claw: number; seed: number } | null = null;
+  /**
+   * One of the infected's own movements (src/game/infected-moves.ts), set before the body is made: every clip it
+   * plays, and the paces its walk and run were captured at. And one done over whatever it is doing (eating, a scream),
+   * `t` seconds into it, `k` of the body given to it, `legs` of the legs.
+   */
+  zombieMoves: InfectedMoves | null = null;
+  /** and the look it is given among its kind (src/game/infected-look.ts), also set before it is made */
+  zombieLook: InfectedLook | null = null;
+  zombieAct: { a: THREE.AnimationAction; t: number; k: number; legs: number } | null = null;
 
   /**
    * Where the middle of the head as a body draws it is, on its Head bone: the middle of every point of its mesh that
@@ -614,6 +617,7 @@ export interface Avatar {
   setLook: Methods<typeof makeMethods>['setLook'];
   makeArm: Methods<typeof makeMethods>['makeArm'];
   proportion: Methods<typeof dressMethods>['proportion'];
+  gearFit: Methods<typeof dressMethods>['gearFit'];
   setSlung: Methods<typeof dressMethods>['setSlung'];
   setGear: Methods<typeof dressMethods>['setGear'];
   wearTag: Methods<typeof dressMethods>['wearTag'];
@@ -650,7 +654,6 @@ export interface Avatar {
   setLean: Methods<typeof actsMethods>['setLean'];
   layer: Methods<typeof actsMethods>['layer'];
   perform: Methods<typeof actsMethods>['perform'];
-  carry: Methods<typeof actsMethods>['carry'];
   pickUp: Methods<typeof actsMethods>['pickUp'];
   setStay: Methods<typeof actsMethods>['setStay'];
   debugPose: Methods<typeof actsMethods>['debugPose'];

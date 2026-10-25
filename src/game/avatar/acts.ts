@@ -5,8 +5,6 @@
 import * as THREE from 'three';
 import { POSE, DEATHS, type Gesture, type Move, type Hold, type SeatPose, type Clip, CLIPS } from './pose';
 import { CUT, _a, _q1, _q2, _q3, emoteClips, type Avatar } from '../avatar';
-import { DRAW } from '../melee/cuts';
-import type { Cut } from '../held-mocap';
 import { MOVES, type Deed, type Stay } from './deeds';
 
 export const actsMethods = {
@@ -14,22 +12,14 @@ export const actsMethods = {
    * A blow. With something in the right hand it is swung, overhand; with nothing a punch is
    * thrown from a guard, left and right in turn.
    * @param overhand swing the empty arm all the same (a throw)
-   * @param cut the captured blow it throws, where it has one (src/game/melee/cuts.ts)
    */
-  swing(this: Avatar, overhand = false, seconds = 0.62, cut: Cut | null = null) {
+  swing(this: Avatar, overhand = false, seconds = 0.62) {
     // (a survivor throws on the motion capture: from the arm drawn back, so the hand comes through as it lets go, a
     // sixth of a second on, which is when the game throws it)
     // (the arms and the chest: the captured throw goes down into a crouch that a body throwing standing does not)
     if (overhand && this.deeds && !this.held) return this.perform('throw', { from: 0.12, to: 0.5, dur: 0.8, legs: 0.25 });
     if (this.inHand && !overhand) {
-      // something in the fist to strike with: its captured blow (melee/cuts.ts), done as any deed is, the hips with it
-      // standing; or (none, or its movement not here yet) the library's
-      const len = cut && this.deeds?.get(cut.clip) ? MOVES[cut.clip]?.dur : 0;
-      if (cut && len) {
-        this.perform(cut.clip as Deed, { from: cut.from / len, hit: cut.hit / len, to: cut.to / len, at: 0.35, dur: seconds, legs: 0.6 });
-        this.strikeT = -1;
-        return;
-      }
+      // something in the fist to strike with: the blow the library draws
       this.strikeT = 0;
       this.strikeDur = seconds;
       return;
@@ -48,19 +38,11 @@ export const actsMethods = {
    * infected and a body without it do nothing). `dur` stretches it to the time the game gives it; `legs` how much of
    * the lower body goes with it standing (none while walking: the legs go on walking).
    */
-  perform(this: Avatar, name: Deed, o: { dur?: number; legs?: number; k?: number; from?: number; to?: number; hit?: number; at?: number; way?: 'draw' | 'stow' } = {}) {
+  perform(this: Avatar, name: Deed, o: { dur?: number; legs?: number; k?: number; from?: number; to?: number } = {}) {
     if (!this.deeds) return;
     this.deeds.get(name);
     const from = o.from ?? 0, to = o.to ?? 1;
-    this.deed = { name, t: 0, dur: o.dur ?? (MOVES[name]?.dur ?? 1) * Math.abs(to - from), legs: o.legs ?? (name === 'drink' ? 0 : 1), k: o.k ?? 1, from, to, hit: o.hit, at: o.at, way: o.way };
-  },
-
-  /** Something long drawn off the back, or put away there (melee/cuts.ts DRAW). Whether it could be (its movement is here). */
-  carry(this: Avatar, way: 'draw' | 'stow') {
-    const d = DRAW[way], len = this.deeds?.get(d.clip) ? MOVES[d.clip]?.dur : 0;
-    if (!len) return false;
-    this.perform(d.clip as Deed, { from: d.from / len, hit: d.hit / len, to: d.to / len, at: DRAW.at, dur: DRAW.dur, legs: 0, way });
-    return true;
+    this.deed = { name, t: 0, dur: o.dur ?? (MOVES[name]?.dur ?? 1) * (to - from), legs: o.legs ?? (name === 'drink' ? 0 : 1), k: o.k ?? 1, from, to };
   },
 
   /**

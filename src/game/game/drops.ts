@@ -238,7 +238,8 @@ export const dropsMethods = {
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;
-    if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
+    // (nothing said of the pockets while the server is putting their own body's gear on them: it says what they carry then)
+    if (!p.dead && performance.now() > this.reclaimUntil && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
       this.meT = 0;
       this.meDirty = false;
       this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals }, sp: this.build.sp });
@@ -322,7 +323,7 @@ export const dropsMethods = {
       // (stopped where it stands for a moment: at once if it is this game's to move, when the server says so if not)
       h.victim.stagger(h.melee ? INFECTED.stopStruck : INFECTED.stopShot);
       // (alone, this game has already decided what it did; on a server the server does)
-      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0, ...(h.pierced ? { p: h.pierced } : {}), ...(h.heavy ? { hv: true } : {}) });
+      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0, ...(h.pierced ? { p: h.pierced } : {}) });
       else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
       return;
     }
@@ -334,7 +335,7 @@ export const dropsMethods = {
     if (h.victim instanceof RemotePlayer) {
       const it = this.weapons.equippedItem;
       const bonus = this.inv.wear('fist').reduce((a, b) => a + b, 0);
-      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(it), n, bonus: h.weapon === 'fists' ? bonus : 0, ...(h.pierced ? { p: h.pierced } : {}), ...(h.heavy ? { hv: true } : {}) });
+      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(it), n, bonus: h.weapon === 'fists' ? bonus : 0, ...(h.pierced ? { p: h.pierced } : {}) });
       return;
     }
     if (!h.killed) return;

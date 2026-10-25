@@ -115,9 +115,8 @@ export function keyHints(g: Game): KeyHints | null {
     }
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
   } else if (it && def?.melee) {
-    click(own, 'Swing (hold: heavy)', 'l', P.r2);
+    click(own, 'Swing', 'l', P.r2);
     click(own, 'Block', 'r', P.l2);
-    put(own, 'Look it over', [k('KeyI')], ['→']);
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
   } else if (g.inHand?.id === 'building_plan') {
     // (the plan's own: laid in one click, or a thing set down in two, turned between them: src/game/building/index.ts)
