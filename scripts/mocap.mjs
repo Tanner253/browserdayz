@@ -28,6 +28,8 @@ import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
  * they ride 4 to 10 cm up, a shrug (the owner, 2026-10-25: "their shoulders are all bunched up")
  */
 const SHOULDERS = { drop: 0.01, inward: 0.09 };
+/** the runs' chests brought up, radians (a stoop backward) */
+const UPRIGHT = -0.17;
 
 export const MOVES = {
   // standing still, breathing, the weight shifting a little, its soles laid flat (it stood rocked back on its heels) (the library's 'Idle' turns round to look behind it: a
@@ -44,15 +46,18 @@ export const MOVES = {
   // (no side steps: the library's one standing is a crouched one, and stood up it was a bow-legged cross-step. The walks
   // and the crouch go to a side as the old clips did, ahead with the hips turned: see src/game/avatar/gait.ts GAITS)
   // a jog, eight ways (left and right are the corners between)
-  jogF: { from: 'Run_02', way: 'F', gait: 'jog' },
-  jogFL: { from: 'ForwardLeft_Run_Fight', way: 'FL', gait: 'jog', square: 0.5 },
+  // (the chest brought up toward production's run, which leans 9 degrees off rest: as captured these lean 20 to 24, a
+  // charge more than a jog (the owner, 2026-10-25, of the run: "also probably third person"); the head and hanging
+  // arms kept on their line, see mocap-pose.mjs stoop)
+  jogF: { from: 'Run_02', way: 'F', gait: 'jog', stoop: UPRIGHT },
+  jogFL: { from: 'ForwardLeft_Run_Fight', way: 'FL', gait: 'jog', square: 0.5, stoop: UPRIGHT },
   // (its feet are not read: it is the other's twin, at the other's pace)
-  jogFR: { from: 'ForwardRight_Run_Fight', way: 'FR', gait: 'jog', pace: 5.321, square: 0.5 },
+  jogFR: { from: 'ForwardRight_Run_Fight', way: 'FR', gait: 'jog', pace: 5.321, square: 0.5, stoop: UPRIGHT },
   jogBL: { from: 'BackLeft_run', way: 'BL', gait: 'jog', square: 0.5 },
   jogBR: { from: 'BackRight_Run', way: 'BR', gait: 'jog', square: 0.5 },
   // flat out: empty handed, and with a gun (the arms are the gun's)
-  sprint: { from: 'run_fast_2', way: 'F', gait: 'sprint' },
-  sprintGun: { from: 'Rifle_Charge', way: 'F', gait: 'sprint' },
+  sprint: { from: 'run_fast_2', way: 'F', gait: 'sprint', stoop: UPRIGHT / 2 },
+  sprintGun: { from: 'Rifle_Charge', way: 'F', gait: 'sprint', stoop: UPRIGHT },
   // the cautious crouch, ahead and back (to a side it is turned, as the walks are), let down to the old crouch's head
   // (0.92 m as the file stands, under the crouched eye: the library's carries it a third of a metre higher)
   crouchF: { from: 'Cautious_Crouch_Walk_Forward', way: 'F', gait: 'crouch', square: 0.4, head: 0.92 },

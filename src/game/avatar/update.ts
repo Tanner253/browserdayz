@@ -188,10 +188,12 @@ export const updateMethods = {
     }
     // (a survivor's steps are the motion capture's: its gait takes the walk's, the run's and the crouched walk's share)
     const gait = this.gait;
-    if (gait) {
-      gait.step(dt, speed, wrap(velYaw - this.yaw), w.walk + w.run, w.crouchWalk, hold, this.limpT);
-      w.walk = w.run = w.crouchWalk = 0;
-    }
+    if (gait) gait.step(dt, speed, wrap(velYaw - this.yaw), w.walk + w.run, w.crouchWalk, hold, this.limpT);
+    // (the player's own: the eye's bob, the gun's walk and run in first person and the steps heard are kept on the old
+    // clips' clock, as production has them. On the motion capture's a sprint is two strides a second against
+    // production's one, and the gun's own run, drawn a stride to a turn, pumped twice as fast: the owner, 2026-10-25,
+    // "when in first person the run animations looks terrible")
+    this.ownClock = firstPerson;
     // (the crawl keeps time with the ground: a pull of the arms for so much of it, backwards when going backwards)
     const pulled = this.crawlAt;
     this.crawlAt = (((this.crawlAt + (dt * speedNow * dirSign) / POSE.crawlStride) % 1) + 1) % 1;
@@ -233,8 +235,11 @@ export const updateMethods = {
     this.sinceStep += dt;
     this.footfall = footfall && stepping > 0.35 && speedNow > 0.5 && this.sinceStep > 0.25;
     if (gait) {
-      this.phase = gait.phase;
-      this.footfall = gait.footfall && this.sinceStep > 0.25;
+      w.walk = w.run = w.crouchWalk = 0;
+      if (!firstPerson) {
+        this.phase = gait.phase;
+        this.footfall = gait.footfall && this.sinceStep > 0.25;
+      }
     }
     if (this.footfall) this.sinceStep = 0;
     this.clock += dt;

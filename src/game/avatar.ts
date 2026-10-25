@@ -477,6 +477,8 @@ export class Avatar {
   raiseT = 0;
   /** how far what is in one fist is hung beside the leg (HANG), 0..1 */
   hangT = 0;
+  /** the player's own body: its stride clock is the old clips' (see update.ts) */
+  ownClock = false;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are
@@ -602,8 +604,8 @@ export class Avatar {
   }
 
   get plantAt() {
-    // (on motion capture every loop starts on the left heel)
-    if (this.gait) return 0;
+    // (on motion capture every loop starts on the left heel; the player's own clock is the old clips', see update.ts)
+    if (this.gait && !this.ownClock) return 0;
     const k = THREE.MathUtils.clamp((this.speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
     const [walk, jog, low] = this.backing ? POSE.plant.back : POSE.plant.fwd;
     // backwards nobody gets beyond a slow jog, and the feet are already landing as at one well before that
