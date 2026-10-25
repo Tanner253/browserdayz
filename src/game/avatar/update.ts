@@ -7,7 +7,8 @@ import { stretch } from './gait';
 import { MOCAP, MOVES } from './deeds';
 import { slashAt } from '../held-mocap';
 import type { HandGrip } from '../arms';
-import { BodyBlow, holdLeft, lookOverBody } from '../melee/body';
+import { holdLeft, lookOverBody } from '../melee/body';
+import { DRAW, GUARD } from '../melee/cuts';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
@@ -56,7 +57,7 @@ export const updateMethods = {
     const wantHold = !!this.held && !busy && !dead && !this.nextHeld;
     if (!this.placed) this.holdT = wantHold ? 1 : 0;
     else this.holdT += ((wantHold ? 1 : 0) - this.holdT) * ease(wantHold ? 11 : dead ? 26 : 16);
-    if (this.nextHeld && this.holdT <= HOLD_GONE && !this.blow?.stowing) {
+    if (this.nextHeld && this.holdT <= HOLD_GONE && this.deed?.way !== 'stow') {
       const n = this.nextHeld;
       this.nextHeld = null;
       this.takeUp(n.obj, n.grips, n.kind);
@@ -312,11 +313,14 @@ export const updateMethods = {
       else if (slash) this.layer(slash, slashAt(u), strikeShare(u));
       else this.layer('strike', strikeAt(u), strikeShare(u));
     }
-    if (this.blow?.busy) {
-      if (dead || !this.inHand) this.blow.stop();
-      else this.blow.update(dt);
+    // (the guard with something in the fist: a moment of a movement held, laid as a blow is, and a blow thrown from it
+    // goes over it; the fists' guard is the body's own, above)
+    const guard = this.guarding && !!this.inHand && !dead && !using;
+    this.guardK += ((guard ? 1 : 0) - this.guardK) * ease(guard ? 14 : 8);
+    if (deeds && this.inHand && this.guardK > 0.01) {
+      const g = GUARD[this.inHand.left ? 'two' : 'one'], a = deeds.get(g.clip);
+      if (a) this.layer(a, g.at, this.guardK);
     }
-    if (this.inHand && !dead && !using && (this.guarding || this.blow)) (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).guard(this.guarding, !!this.inHand.left, dt);
     if (this.sick && this.sick.claw >= 0 && !dead) {
       // (it throws its whole body after its arm: the lunge is the clip's own)
       const u = this.sick.claw / CLAW;
@@ -340,7 +344,10 @@ export const updateMethods = {
         if (d.t >= d.dur || dead) this.deed = null;
         else if (act) {
           const k = d.k * THREE.MathUtils.smoothstep(d.t, 0, Math.min(0.2, d.dur * 0.25)) * (1 - THREE.MathUtils.smoothstep(d.t, d.dur - Math.min(0.3, d.dur * 0.35), d.dur));
-          this.layer(act, (d.from + ((d.to - d.from) * d.t) / d.dur) * act.getClip().duration, k, d.legs * (1 - this.moveT));
+          // (evenly through it, or a blow: to the moment it lands in `at` of the time, the rest after)
+          const s = d.t / d.dur, at = d.at ?? 0;
+          const share = d.hit === undefined ? d.from + (d.to - d.from) * s : s < at ? d.from + ((d.hit - d.from) * s) / at : d.hit + ((d.to - d.hit) * (s - at)) / (1 - at);
+          this.layer(act, share * act.getClip().duration, k, d.legs * (1 - this.moveT));
         }
       }
     }
@@ -379,7 +386,9 @@ export const updateMethods = {
     }
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
-    if (this.inHand) this.inHand.obj.visible = !using && !this.blow?.hides;
+    // (a long thing being drawn is out of sight till the hand closes on it behind the shoulder, and put away from when it lets go)
+    const way = this.deed?.way, wayU = way ? this.deed!.t / this.deed!.dur : 0;
+    if (this.inHand) this.inHand.obj.visible = !using && !(way && (way === 'draw' ? wayU < DRAW.at : wayU >= DRAW.at));
     this.heldPivot.rotation.set(pitch, -this.twist, 0);
     this.aimT += ((aiming && !dead ? 1 : 0) - this.aimT) * ease(12);
     this.carryT += (THREE.MathUtils.smoothstep(speed, 2.6, 3.6) * (1 - this.aimT) - this.carryT) * ease(7);
@@ -678,7 +687,7 @@ export const updateMethods = {
 
     // --- a bat, carried: laid back over the right shoulder, the fist on it in front of the chest
     {
-      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && !this.blow?.busy && !this.guarding && ges?.kind !== 'check' && this.swingT < 0 && this.fistsT < 0.02;
+      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && !this.deed && !this.guarding && ges?.kind !== 'check' && this.swingT < 0 && this.fistsT < 0.02;
       this.shoulderT += ((laid ? 1 : 0) - this.shoulderT) * ease(laid ? 6 : 14);
       if (this.shoulderT > 0.02 && this.inHand && this.armR && this.neck.length) {
         settle(this.root);
@@ -697,7 +706,7 @@ export const updateMethods = {
     // --- something held in both hands: the left closes on it where its grip says, but while it lies on the shoulder
     if (this.inHand && ges?.kind === 'check' && !dead) lookOverBody(this, ges.t / ges.dur, left(ges));
     else this.inHand?.spin?.rotation.set(0, 0, 0);
-    if (this.inHand?.left && !dead && !using && !this.blow?.carrying) holdLeft(this, 1 - this.shoulderT);
+    if (this.inHand?.left && !dead && !using && !this.deed?.way) holdLeft(this, 1 - this.shoulderT);
 
     // --- the arms at their own business: a guard and a punch, hands at work, the wheel's calls (gestures.ts)
     this.gestures(dt, dead, using, ges, mv, pitch);

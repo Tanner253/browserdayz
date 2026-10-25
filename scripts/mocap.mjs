@@ -15,7 +15,7 @@ import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extension
 import { prune, meshopt, cloneDocument, resample } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import * as THREE from 'three';
-import { existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runOf, giveRun } from './mixamo.mjs';
@@ -119,6 +119,9 @@ export const MOVES = {
   jabR: { from: 'Right_Jab_from_Guard', cut: [0, 1.0], late: true },
   jabL: { from: 'Left_Jab_from_Guard', cut: [0, 1.0], late: true },
 };
+// (and melee's, kept in a table of their own: scripts/mocap-melee.json)
+const MELEE = JSON.parse(readFileSync(path.join(ROOT, 'scripts', 'mocap-melee.json'), 'utf8'));
+Object.assign(MOVES, MELEE.moves);
 
 await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready]);
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
@@ -249,8 +252,10 @@ if (!cands) {
   const hands = {}, H = sk.index('Head'), HR = sk.index('hand_r'), HL = sk.index('hand_l');
   const eye = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), left > 0 ? Math.PI : 0);
   const round = (x) => +x.toFixed(4);
-  for (const name of ['drink', 'throw', 'jabR', 'jabL', 'slash', 'chop', 'hammer', 'pickUp', 'ladder', 'swim']) {
-    const c = readClip(doc, sk, name), r = [], l = [], mouth = [];
+  // (melee's blows the elbow and shoulder as well, by place alone: the first-person arm is swung as the captured one was)
+  const ER = sk.index('lowerarm_r'), SR = sk.index('upperarm_r');
+  for (const name of new Set(['drink', 'throw', 'jabR', 'jabL', 'slash', 'chop', 'hammer', 'pickUp', 'ladder', 'swim', ...MELEE.arms])) {
+    const c = readClip(doc, sk, name), r = [], l = [], mouth = [], arm = MELEE.arms.includes(name), e = [], s = [];
     for (let f = 0; f <= c.frames; f++) {
       const W = sk.pose(c.qAt(f), c.tAt(f)), head = new THREE.Vector3().setFromMatrixPosition(W[H]);
       const of = (i, to) => {
@@ -263,11 +268,12 @@ if (!cands) {
       };
       const pr = of(HR, r);
       of(HL, l);
+      if (arm) for (const [i, to] of [[ER, e], [SR, s]]) to.push(of(i, []).toArray().map(round));
       // (the mouth: a hand's breadth down from the head joint and a little ahead of it)
       mouth.push(round(pr.distanceTo(new THREE.Vector3(0, -0.06, -0.1))));
     }
     const near = Math.min(...mouth), far = Math.max(...mouth);
-    hands[name] = { dur: +c.dur.toFixed(3), r, l, ...(name === 'drink' ? { mouth: mouth.map((d) => round(1 - (d - near) / Math.max(1e-3, far - near))) } : {}) };
+    hands[name] = { dur: +c.dur.toFixed(3), r, l, ...(arm ? { e, s } : {}), ...(name === 'drink' ? { mouth: mouth.map((d) => round(1 - (d - near) / Math.max(1e-3, far - near))) } : {}) };
   }
   writeFileSync(path.join(ROOT, 'src', 'game', 'avatar', 'hands.json'), JSON.stringify(hands) + '\n');
   console.log('wrote src/game/avatar/hands.json', (JSON.stringify(hands).length / 1024).toFixed(0), 'KB');

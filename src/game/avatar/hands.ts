@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { type Grips, type HandGrip, type Curl, bent } from '../arms';
 import { POSE } from './pose';
-import { BodyBlow, meleeClips } from '../melee/body';
+import { meleeSoon } from '../held-mocap';
 import { BODY_SCALE, EAGER, GUN_ELBOW, HOLD_GONE, THUMB_BESIDE, UP, _a, _b, _ca, _ch, _cq, _cq2, _k1, _k2, _k3, _k4, _k5, _kq, _m1, _m2, _q1, _q2, _q3, _qa, _qb, buttOf, settle, Avatar, type ArmRig } from '../avatar';
 
 export const handsMethods = {
@@ -18,8 +18,8 @@ export const handsMethods = {
       this.nextHeld = { obj, grips, kind };
       return;
     } else if (this.inHand?.long && this.placed && this.root.visible && obj !== this.inHand.obj.children[0]) {
-      // something long in the fist is put away over the shoulder first (src/game/melee/body.ts), then the next taken up
-      if (this.blow?.stowing || (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).carry('stow')) {
+      // something long in the fist is put away over the shoulder first (melee/cuts.ts DRAW), then the next taken up
+      if (this.deed?.way === 'stow' || this.carry('stow')) {
         this.nextHeld = { obj, grips, kind };
         return;
       }
@@ -40,7 +40,9 @@ export const handsMethods = {
       if (m.isMesh) m.castShadow = true;
     });
     if (kind === 'melee') {
-      void meleeClips();
+      // (its blows' paths, and its movements: the guard's and the draw's are the first wanted)
+      meleeSoon();
+      this.deeds?.get('drawBack');
       // A hatchet, a bat: carried in the right fist, so it swings with the arm as the body
       // walks. The grip (wrist position, finger and palm directions in the weapon's own
       // space) is laid onto the hand's own frame.
@@ -68,7 +70,7 @@ export const handsMethods = {
       // (carried on the back, not in a pocket: as long as a slung thing is, and drawn from there)
       const long = new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length() > 0.5;
       this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long, spin: obj.getObjectByName('spin') ?? null };
-      if (long && this.placed && this.root.visible) (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).carry('draw');
+      if (long && this.placed && this.root.visible) this.carry('draw');
       Avatar.onDressed([obj]);
       return;
     }

@@ -26,9 +26,8 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
-import { LOOK, fpPose, layOn, lookOver, stanceQuat as stanceOf, type Cut, type FpPose } from './melee/fp';
 import { cutFor } from './melee/cuts';
-import { handMove, jabAt, lengthOf, mouthAt, slashAt } from './held-mocap';
+import { LOOK, fpPose, handMove, hasCut, jabAt, layOn, lengthOf, lookOver, mouthAt, slashAt, stanceQuat as stanceOf, type Cut, type FpPose } from './held-mocap';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -1502,7 +1501,7 @@ export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { 
     grips: {
       // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
       // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
-      right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
+      right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, pose: 'knife', shoulder: !!style.rest },
       left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
     },
     // high enough that the fist on the handle is in the picture, not only the head
@@ -1513,8 +1512,8 @@ export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { 
 }
 /**
  * Where something held to strike with is in the picture (the eye's space): `k` of the way through the `n`th blow of a
- * run, or at rest (k < 0). From its stance and the blow: a captured one (src/game/melee/fp.ts) where it has one, or
- * one of its style's strokes, made to be seen from the eye. The walk, the guard and a bat laid on the shoulder are
+ * run, or at rest (k < 0). From its stance and the blow: a captured one (held-mocap.ts layOn) where it has one and
+ * its paths have come, or one of its style's strokes, made to be seen from the eye. The walk, the guard and a bat laid on the shoulder are
  * the view's own (animateMelee); the sandbox shows this alone (src/dev/sandbox-melee.ts).
  */
 export function meleeAt(st: MeleeStyle, k: number, n: number, cut: Cut | null, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3, cutAt: FpPose) {
@@ -1522,7 +1521,8 @@ export function meleeAt(st: MeleeStyle, k: number, n: number, cut: Cut | null, p
   stanceQuat(st.idle, quat);
   elbow.set(...st.elbow);
   let pitch = 0, yaw = 0;
-  if (k >= 0 && !cut) {
+  const captured = k >= 0 && hasCut(cut);
+  if (k >= 0 && !captured) {
     const stroke = st.strokes[n % st.strokes.length];
     let i = 0;
     while (i < stroke.length && k >= stroke[i].at) i++;
@@ -1549,9 +1549,7 @@ export function meleeAt(st: MeleeStyle, k: number, n: number, cut: Cut | null, p
     pos.copy(fore.applyQuaternion(swing)).add(elbow);
     quat.premultiply(swing);
   }
-  if (cut && k >= 0) {
-    layOn(cut, k, 0.35, pos, quat, elbow, cutAt, st.two);
-  }
+  if (captured) layOn(cut!, k, 0.35, pos, quat, elbow, cutAt, st.two);
 }
 export class Weapons {
   private vmRoot = new THREE.Group();

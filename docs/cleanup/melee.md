@@ -1,9 +1,11 @@
 # Melee (`claude/nifty-kowalevski-c635f1`, 2026-10-25)
 
-Melee weapons remodelled, new knives and their store finishes, and every melee weapon animated in both views. Each line becomes dead once its replacement is judged better on this branch.
+Melee weapons remodelled, new knives and their store finishes, and every melee weapon animated in both views, on movement's systems: first person on `src/game/held-mocap.ts`, third person on the body's deeds (`src/game/avatar/deeds.ts`), the movements carried by `scripts/mocap.mjs` from melee's table `scripts/mocap-melee.json`. Each line becomes dead once its replacement is judged better on this branch.
 
 - [ ] today's melee models (`hatchet`, `machete`, `crowbar_01`, `baseball_bat`, `shovel`, `pitchfork`, `pitchfork_fp`, `knife`, `fish_knife`) | replaced by the Higgsfield remodels and new knives | - | no item or pack points at them; their manifest entries, LODs, lean copies and `public/assets/models/hi/` files go
-- [ ] `MELEE_STYLE` strokes `CUT` and `BACK`, `MELEE` wrist and curl, `animateMelee` in `src/game/weapons.ts` | replaced by the captured swings fitted into the view | - | grep `MELEE_STYLE`
-- [ ] the body's `strike` clip (Sword_Attack) for every melee blow, `strikeAt`/`strikeShare` in `src/game/avatar.ts` | replaced by the captured melee clips | - | grep `strikeT`; the infected's claw still uses `strike` until zombies replace it
-- [x] `scripts/melee-paths.mjs` writes every frame of every movement (paths.json ~230 KB in the game's bundle) | replaced by the frames of the cuts used (cuts.ts), three decimals | - | paths.json under 60 KB
-- [ ] `_mocaptmp/` (a copy of movement's mocap.mjs, mixamo.mjs, mocap-pose.mjs to build melee.glb meanwhile; not committed) | replaced by movement's committed mocap.mjs with a melee table | - | the folder is gone; melee.glb rebuilt by `node scripts/mocap.mjs` and committed
+- [ ] `MELEE_STYLE` strokes (`CUT`, `BACK`) and the stroke half of `meleeAt` in `src/game/weapons.ts` | replaced by the captured blows (`held-mocap.ts` layOn); the strokes only stand in until `hands.json` has come (fetched when something to hit with is taken up) | - | grep `strokes`; preload hands.json with the melee item, then delete
+- [ ] the body's `strike` clip (Sword_Attack) for every melee blow, `strikeAt`/`strikeShare` in `src/game/avatar.ts` | replaced by the captured blows as deeds; `strike` stays only until the late movements have come | - | grep `strikeT`; the infected's claw still uses `strike` until zombies replace it
+- [x] `scripts/melee-paths.mjs`, `src/game/melee/paths.json` (melee's own paths file) | replaced by movement's `hands.json`, its `arms` rows written by `scripts/mocap.mjs` | - | deleted
+- [x] `src/game/melee/fp.ts` (melee's own first-person mapping) | moved into `src/game/held-mocap.ts` (cutPose, layOn, lookOver) | - | deleted
+- [x] `BodyBlow` in `src/game/melee/body.ts`, `public/assets/characters/melee.glb` (a second animation driver and its own movements file, 950 KB) | replaced by the body's deeds and `moves-late.glb` (+60 KB) | - | deleted; body.ts keeps the left hand on a two-handed thing and the look-over
+- [x] `_mocaptmp/`, `public/assets/_melee-proto/` (copies made to build melee.glb meanwhile; never committed) | replaced by movement's committed `mocap.mjs` | - | deleted

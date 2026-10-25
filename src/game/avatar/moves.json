@@ -169,6 +169,22 @@
   "dur": 1,
   "late": true
  },
+ "combo": {
+  "dur": 0.733,
+  "late": true
+ },
+ "level": {
+  "dur": 2.233,
+  "late": true
+ },
+ "parry": {
+  "dur": 0.2,
+  "late": true
+ },
+ "drawBack": {
+  "dur": 1.7,
+  "late": true
+ },
  "aimF": {
   "way": "F",
   "gait": "aim",

@@ -18,12 +18,14 @@ export const MOCAP: Record<string, string> = { death: 'deathB', deathFront: 'dea
 export const MOCAP_REST = (['deathB', 'deathF', 'deathS'] as const).map((n) => (MOVES[n].rest ?? [0, 0]) as [number, number]);
 
 /** a performance done once (the name of its movement) or kept up until told otherwise (`stay`) */
-export type Deed = 'pickUp' | 'drink' | 'chop' | 'hammer' | 'throw' | 'vault' | 'jabR' | 'jabL';
+export type Deed = 'pickUp' | 'drink' | 'chop' | 'hammer' | 'throw' | 'vault' | 'jabR' | 'jabL' | 'slash' | 'combo' | 'level' | 'parry' | 'drawBack';
 export type Stay = 'ladder' | 'swim' | 'tread' | 'sleep';
 
 let late: Promise<THREE.AnimationClip[]> | null = null;
 const lateClips = () => (late ??= assets.loadGLTF('assets/characters/moves-late.glb').then((g) => g.animations));
 let soon = false;
+/** the late ones, when they have come (the sandbox waits for them) */
+export const lateReady = () => lateClips().then(() => undefined);
 /** the late ones fetched a while after the first body is made, off the way in: the first grenade thrown is seen thrown */
 export function lateSoon() {
   if (soon) return;

@@ -21,7 +21,6 @@ import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
-import type { BodyBlow } from './melee/body';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -332,8 +331,6 @@ export class Avatar {
   /** a blow with something in the fist: seconds into it (-1 none), and how long it takes */
   strikeT = -1;
   strikeDur = 0.6;
-  /** a captured blow being thrown with what is in the fist (src/game/melee/body.ts), made the first time one is */
-  blow: BodyBlow | null = null;
   fpBones: [THREE.Object3D, THREE.Object3D, boolean][] = [];
   yaw = 0;
   /** false until the first update: a body that appears is already facing its way, not turning to it */
@@ -469,7 +466,13 @@ export class Avatar {
   legs: Leg[] = [];
   /** the rest of a survivor's motion capture (src/game/avatar/deeds.ts); a performance done once (seconds into it), and one kept up */
   deeds?: Deeds;
-  deed: { name: Deed; t: number; dur: number; legs: number; k: number; from: number; to: number } | null = null;
+  /**
+   * what is being done once on the motion capture: from and to as shares of its movement, played evenly, or (a blow:
+   * `hit`) reaching `hit` at `at` of the time; `way` a long thing being drawn off the back or put away there
+   */
+  deed: { name: Deed; t: number; dur: number; legs: number; k: number; from: number; to: number; hit?: number; at?: number; way?: 'draw' | 'stow' } | null = null;
+  /** how far up the guard with something in the fist is, 0..1 (see melee/cuts.ts GUARD) */
+  guardK = 0;
   stay: { name: Stay; t: number; rate: number } | null = null;
   stayT = 0;
   stayWas: Stay | null = null;
@@ -623,6 +626,7 @@ export interface Avatar {
   setLean: Methods<typeof actsMethods>['setLean'];
   layer: Methods<typeof actsMethods>['layer'];
   perform: Methods<typeof actsMethods>['perform'];
+  carry: Methods<typeof actsMethods>['carry'];
   pickUp: Methods<typeof actsMethods>['pickUp'];
   setStay: Methods<typeof actsMethods>['setStay'];
   debugPose: Methods<typeof actsMethods>['debugPose'];

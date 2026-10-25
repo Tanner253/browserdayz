@@ -1,0 +1,10 @@
+{
+  "_": "Melee's movements, carried by scripts/mocap.mjs as its own are (MOVES): src/game/melee/cuts.ts says which blow is cut from which. `arms`: the ones the first-person blows follow, written with the elbow and shoulder too (src/game/held-mocap.ts).",
+  "moves": {
+    "combo": { "from": "Triple_Combo_Attack", "cut": [1.1, 1.85], "late": true },
+    "level": { "from": "Charged_Slash", "late": true },
+    "parry": { "from": "Two_Handed_Parry", "cut": [0.5, 0.7], "late": true },
+    "drawBack": { "from": "Draw_and_Shoot_from_Back", "cut": [0.25, 1.95], "late": true }
+  },
+  "arms": ["slash", "hammer", "chop", "combo", "level"]
+}
