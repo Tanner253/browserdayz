@@ -1,7 +1,9 @@
 // Torches (2026-10-24, base building's fourth step). The owner: "found around, (tier 1 flashlight reuse the fire from
 // campfire and cars put it on a stick boom you have a torch)", "held and hung on walls". In the hands, L lights it: the
 // campfire's own flames, a small fire's worth, at its head (src/game/flames.ts), and a warm light all round it from the
-// lamps' pool (src/game/lamps.ts). On a wall (the Wall Torch, set down with the plan) it burns for whoever is near.
+// lamps' pool (src/game/lamps.ts). On a wall (the Wall Torch, set down with the plan) it burns for whoever is near; and
+// one lit in somebody else's hands burns at its head for everybody near (the navigator: "at night it's the biggest
+// tell there is").
 
 import * as THREE from 'three';
 import { audio } from '../../core/audio';
@@ -20,12 +22,14 @@ export interface TorchHost {
   held: () => string | null;
   tip: (out: THREE.Vector3) => THREE.Vector3 | null;
   me: () => THREE.Vector3;
+  /** a light there is shut in a stone room the eye is not in, and is not seen (src/sim/build/rooms.ts) */
+  shut: (at: THREE.Vector3) => boolean;
 }
 
 /** how far off a wall torch burns for the player (its flames and its light), m */
 const SEEN = 70;
-/** a torch's flame (of a campfire's 1: in the hands, at arm's length from the eye, smaller) and its light (of a street lamp's 1, and how far it reaches) */
-const TORCH = { size: 0.075, hand: 0.045, power: 0.55, reach: 11 };
+/** a torch's flame (of a campfire's 1, as big as a real torch's: in the hands, at arm's length from the eye, smaller) and its light (of a street lamp's 1, and how far it reaches) */
+const TORCH = { size: 0.15, hand: 0.045, power: 0.55, reach: 11 };
 const WARM = new THREE.Color(1, 0.62, 0.3);
 
 export class TorchView {
@@ -33,6 +37,9 @@ export class TorchView {
   lit = false;
   private hand: Fire | null = null;
   private walls = new Map<string, { at: THREE.Vector3; fire: Fire | null }>();
+  /** the torches lit in other players' hands, by who */
+  private theirs = new Map<number, Fire>();
+  private their = new THREE.Vector3();
   private t = 0;
   private tip = new THREE.Vector3();
 
@@ -51,7 +58,7 @@ export class TorchView {
       this.hand ??= this.h.flames().add(tip, { size: TORCH.hand, smoke: 0.15 });
       this.hand.at.copy(tip);
       this.hand.strength = 1;
-      this.h.glow(tip, WARM, TORCH.power, TORCH.reach);
+      if (!this.h.shut(tip)) this.h.glow(tip, WARM, TORCH.power, TORCH.reach);
     } else if (this.hand) {
       this.h.flames().remove(this.hand);
       this.hand = null;
@@ -92,7 +99,27 @@ export class TorchView {
         this.h.flames().remove(w.fire);
         w.fire = null;
       }
-      if (close) this.h.glow(w.at, WARM, TORCH.power, TORCH.reach);
+      if (close && !this.h.shut(w.at)) this.h.glow(w.at, WARM, TORCH.power, TORCH.reach);
+    }
+  }
+
+  /** each frame: the torches lit in other players' hands (the head of each, as their body is drawn), their flames and light */
+  others(players: Iterable<{ id: number; torchTip: (out: THREE.Vector3) => THREE.Vector3 | null }>) {
+    const lit = new Set<number>();
+    for (const r of players) {
+      const tip = r.torchTip(this.their);
+      if (!tip) continue;
+      lit.add(r.id);
+      let f = this.theirs.get(r.id);
+      if (!f) this.theirs.set(r.id, (f = this.h.flames().add(tip, { size: TORCH.size, smoke: 0.15 })));
+      f.at.copy(tip);
+      f.strength = 1;
+      if (!this.h.shut(tip)) this.h.glow(tip, WARM, TORCH.power, TORCH.reach);
+    }
+    for (const [id, f] of this.theirs) {
+      if (lit.has(id)) continue;
+      this.h.flames().remove(f);
+      this.theirs.delete(id);
     }
   }
 
@@ -100,5 +127,7 @@ export class TorchView {
   clear() {
     for (const w of this.walls.values()) if (w.fire) this.h.flames().remove(w.fire);
     this.walls.clear();
+    for (const f of this.theirs.values()) this.h.flames().remove(f);
+    this.theirs.clear();
   }
 }

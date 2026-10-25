@@ -21,12 +21,13 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
 import { inPlay } from '../src/world/worldgen/layout';
-import { Bases, heard, heardPiece, said, type Land } from '../src/sim/build/bases';
+import { Bases, heard, heardPiece, said, saidPiece, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 import { inBase, inTheWay, swept } from '../src/sim/build/doors';
 import { BaseSolids } from '../src/sim/build/solid';
+import { inRoom, shutRoom } from '../src/sim/build/rooms';
 import { lockable, mayPass } from '../src/sim/build/locks';
 import { PRINTS, asksOf, layPrint, printCost } from '../src/sim/build/blueprints';
 
@@ -521,6 +522,41 @@ ok('somebody in its rooms is shut in it; on its roof or outside, not; in a wall 
   assert.equal(solid.roomOf(...w(0, -0.3, -5)), null, 'outside');
   assert.ok(solid.within(...w(-1.5, 1, 0)) && !solid.within(...w(0, 1, 0)), 'in a wall, and not in the room');
   assert.ok(solid.within2(b, ...([w(1.5, 0, 1.5)[0], w(1.5, 0, 1.5)[2]] as [number, number])) && !solid.within2(b, w(0, 0, -6)[0], w(0, 0, -6)[2]), 'its outline');
+});
+
+ok('a room shut all round in stone keeps its light in: its door open, a wall of wood or a window unshuttered, and it does not', () => {
+  const stone = () => {
+    const h = house();
+    for (const p of h.b.pieces.values()) p.t = Math.max(p.t, 2) as Tier;
+    for (const s of spots(h.b, 'shutters')) assert.ok(typeof h.bs.lay({ b: h.b.id, k: 'shutters', ...s }, ME, 0) !== 'string', 'no shutters');
+    return h;
+  };
+  const { b, w, piece } = stone(), inside = w(0, 0.1, 0);
+  const room = shutRoom(b, ...inside);
+  assert.ok(room && room.cells.size === 8, `the whole house, both storeys up its stairs: ${room?.cells.size}`);
+  assert.ok(inRoom(room!, b, ...w(3, 3.1, 0)) && !inRoom(room!, b, ...w(0, 0.1, -4)), 'upstairs is in it, outside is not');
+  piece('door_wood', 0, 4.5).open = true;
+  assert.equal(shutRoom(b, ...inside), null, 'its door open');
+  const h2 = stone();
+  h2.piece('wall', -1.5, 0, 0).t = 1;
+  assert.equal(shutRoom(h2.b, ...h2.w(0, 0.1, 0)), null, 'a wall of wood');
+  const h3 = stone();
+  [...h3.b.pieces.values()].find((p) => p.k === 'shutters')!.open = true;
+  assert.equal(shutRoom(h3.b, ...h3.w(0, 0.1, 0)), null, 'a window open');
+});
+
+ok('a thing set down is turned any way, to a degree, and kept so; a box in quarter turns, squared to its base', () => {
+  const bs = new Bases(flat), b = start(bs);
+  const at = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 }, 1.37)!;
+  assert.ok(Math.abs(at.r - 41 / 30) < 1e-9, `a workbench turned 41.1 degrees is turned 41: ${at.r * 30}`);
+  const r = bs.lay({ b: b.id, k: 'workbench', ...at }, ME, 0);
+  assert.ok(typeof r !== 'string', `not laid: ${r}`);
+  assert.equal(heardPiece(saidPiece(r.piece))!.r, r.piece.r, 'its turn told and kept to the degree');
+  assert.equal(deployAt(b, 'box_small', { x: 1, y: 0, z: 1 }, 1.4)!.r, 0, 'a box a little turned: square');
+  assert.equal(deployAt(b, 'box_small', { x: 1, y: 0, z: 1 }, 4.6)!.r, 6, 'a box near half round: half round');
+  // (a piece of a building keeps whole steps)
+  const wall = at && spots(b, 'wall')[0];
+  assert.ok(Number.isInteger(wall.r), 'a wall in whole steps');
 });
 
 if (process.argv.includes('--server')) await serverTest();

@@ -14,7 +14,7 @@ import { shapeOf, shutOf, type Paint, type Solid } from '../../sim/build/solids'
 import { leafPoint } from '../../sim/build/doors';
 
 /** metres of a piece to one picture of each paint */
-const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1 };
+const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1, iron: 1 };
 
 /** a box with its pictures laid on in metres (each face by its own two ways) */
 function boxGeo(c: [number, number, number, number, number, number], tile: number): THREE.BufferGeometry {
@@ -112,13 +112,18 @@ export function clothGeometry(kind: string): THREE.BufferGeometry {
   return g;
 }
 
-/** a leaf of a kind (its `i`th), in its hinge's own frame, its pictures laid on for a paint */
+/**
+ * A leaf of a kind (its `i`th), in its hinge's own frame, its pictures laid on for a paint: and its ironwork, if it has
+ * any, as a second group of the one geometry, which is drawn in iron (`paintFor('iron')`: see BaseDraw.rebuild).
+ */
 export function leafGeometry(kind: string, i: number, p: Paint): THREE.BufferGeometry {
   const key = `${kind}:L${i}:${p}`;
   let g = geos.get(key);
   if (!g) {
-    const l = shapeOf(kind).leaves![i];
-    geos.set(key, (g = merged([...l.solid, ...(l.dress ?? [])], TILE[p])));
+    const l = shapeOf(kind).leaves![i], body = merged([...l.solid, ...(l.dress ?? [])], TILE[p]);
+    g = l.iron?.length ? mergeGeometries([body, merged(l.iron, TILE.iron)], true)! : body;
+    g.computeBoundingSphere();
+    geos.set(key, g);
   }
   return g;
 }
@@ -230,6 +235,8 @@ export function paintFor(p: Paint, atmo: Atmosphere | null): THREE.MeshStandardM
       : p === 'galv' ? pbr('corrugated_iron', { metalnessMap: assets.pbr('corrugated_iron').armMap, metalness: 1, vertexColors: true, name: 'build-galv' })
       : p === 'trim' ? pbr('wood_floor_worn', { color: 0x76695e, vertexColors: true, name: 'build-trim' })
       : p === 'bag' ? new THREE.MeshStandardMaterial({ color: 0x5a6440, roughness: 0.95, vertexColors: true, name: 'build-bag' })
+      // (forged iron: dark grey, a little sheen off it)
+      : p === 'iron' ? new THREE.MeshStandardMaterial({ color: 0x6a6d71, metalness: 0.5, roughness: 0.4, vertexColors: true, name: 'build-iron' })
       : new THREE.MeshStandardMaterial({ color: 0xa8322a, roughness: 0.95, side: THREE.DoubleSide, name: 'build-flag' });
     if (atmo) atmo.register(m);
     own.set(p, m);

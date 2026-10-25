@@ -213,8 +213,9 @@ export const dropsMethods = {
       // (what is over is kept: thrown away, sixty frames a second made thirteen reports of fifteen, and whoever
       // was watching saw a runner stop for a tick now and then)
       this.sendT = this.sendT > 2 / SEND_HZ ? 0 : this.sendT - 1 / SEND_HZ;
-      const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0) | (this.hold === 'dance' && this.danced ? (EMOTE[this.danced]?.n ?? 0) << EMOTE_SHIFT : 0);
+      // (what is in the hands, as everybody else is shown it: a gun, a thing to hit with, or a torch, lit or not)
+      const torch = this.inv.held()?.id === 'torch' ? this.inv.held() : null, it = this.weapons.equippedItem ?? torch;
+      const flags =(p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | ((this.lit || this.build.torches.lit) && !this.garage.ride ? F_LIGHT : 0) | (this.hold === 'dance' && this.danced ? (EMOTE[this.danced]?.n ?? 0) << EMOTE_SHIFT : 0);
       // With the pockets open (or the map, or a panel) the mouse is free and the head is not steered: it was told
       // to the server turned exactly as it had been, report after report. The server takes a body that goes to
       // and fro with its head held like a statue's for one walked by a program (`gaitCheck`), and put a player
@@ -459,8 +460,11 @@ export const dropsMethods = {
     }
     for (const r of this.remotes.values()) {
       const l = r.lamp(_lampPos, _lampDir);
-      if (l) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide, 0);
+      // (nor a lamp shut in a stone room the eye is not in: src/sim/build/rooms.ts)
+      if (l && !this.build.lightShut(_lampPos)) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide, 0);
     }
+    // (and a torch lit in anybody's hands, its flames and its light at its head: src/game/building/torches.ts)
+    this.build.torches.others(this.remotes.values());
     const dark = atmo.night > 0.3;
     // headlights: a jeep's lamps are on while it is driven, and after dark they light the road
     if (dark) {

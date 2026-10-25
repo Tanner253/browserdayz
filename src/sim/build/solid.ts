@@ -312,6 +312,17 @@ export class BaseSolids {
     return true;
   }
 
+  /** the bases with a piece within about `within` metres of a place, across the ground (by their reach: cheap) */
+  around(x: number, z: number, within: number): Base[] {
+    const out: Base[] = [];
+    for (const b of this.all()) {
+      if (!b.pieces.size) continue;
+      const R = this.reachOf(b);
+      if (Math.hypot(R.x - x, R.z - z) < R.r + within) out.push(b);
+    }
+    return out;
+  }
+
   /** whether any base has a piece within `within` metres of a place, across the ground */
   near(x: number, z: number, within: number) {
     for (const b of this.all()) {

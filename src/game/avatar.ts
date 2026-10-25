@@ -501,6 +501,17 @@ const THUMB_BESIDE = 0.02;
  * to its right, metres), and which way the fingers and the palm of that hand are turned (the
  * same three: ahead, up, right).
  */
+/**
+ * A torch, carried: the fist before the chest and out to the right, the forearm up, the torch standing in it and leaning a
+ * little out, so its flame is at the shoulder's height and clear of the body (the navigator, of one held at the hip: "he
+ * looks like his jacket is on fire ... Hold it as DayZ and Rust do"). From the head, as SHOULDER: forward, up, right.
+ */
+const RAISE = {
+  at: [0.4, -0.44, 0.32] as [number, number, number],
+  fingers: [0.92, -0.18, -0.34] as [number, number, number],
+  palm: [0.1, 0.12, -1] as [number, number, number],
+};
+
 const SHOULDER = {
   at: [0.2, -0.42, 0.21] as [number, number, number],
   fingers: [0.93, 0.36, 0] as [number, number, number],
@@ -794,9 +805,11 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   private nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  private inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean } | null = null;
+  private inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   private shoulderT = 0;
+  /** how far a torch is held up (0 at the side, 1 up: RAISE) */
+  private raiseT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   private swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are
@@ -1310,7 +1323,7 @@ export class Avatar {
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder };
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, raise: !!g.raise };
       Avatar.onDressed([obj]);
       return;
     }
@@ -2544,6 +2557,22 @@ export class Avatar {
         // stands out of the thumb's side of it, up and back, and comes down on the shoulder)
         const to = new THREE.Vector3().copy(head).addScaledVector(fwd, SHOULDER.at[0]).addScaledVector(UP, SHOULDER.at[1]).addScaledVector(_right, SHOULDER.at[2]);
         this.reach(this.armR, to, dirOf(...SHOULDER.fingers), dirOf(...SHOULDER.palm), this.inHand.curl, aimQ, this.shoulderT);
+      }
+    }
+
+    // --- a torch, carried: held up before the chest (RAISE)
+    {
+      const up = !!this.inHand?.raise && !dead && !using && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02;
+      this.raiseT += ((up ? 1 : 0) - this.raiseT) * ease(up ? 6 : 14);
+      if (this.raiseT > 0.02 && this.inHand && this.armR && this.neck.length) {
+        settle(this.root);
+        const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+        const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+        _right.set(1, 0, 0).applyQuaternion(aimQ);
+        const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+        const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r).normalize();
+        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, RAISE.at[0]).addScaledVector(UP, RAISE.at[1]).addScaledVector(_right, RAISE.at[2]);
+        this.reach(this.armR, to, dirOf(...RAISE.fingers), dirOf(...RAISE.palm), this.inHand.curl, aimQ, this.raiseT);
       }
     }
 
