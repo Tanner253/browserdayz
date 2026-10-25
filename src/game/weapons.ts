@@ -657,6 +657,9 @@ function cigarette() {
 
 /** melee weapons whose model is drawn with its edge toward whoever holds it */
 const EDGE_IN = new Set(['machete', 'hand_saw']);
+/** and those whose striking face leads, not the side of the head furthest off the handle: a claw hammer's claw stands
+ * further off than its face, and it was held claw first (the owner, 2026-10-25: "building hammer is backwards in hand") */
+const FACE_LEADS = new Set(['hammer']);
 /**
  * A tool in the fist: where the wrist is from the point of the handle that is held (to its
  * right, up it, toward the eye), how far the fingers close, and where the fist is held from
@@ -1816,7 +1819,8 @@ export class Weapons {
         // toward +z is toward the eye: turn it about the handle so it faces out
         // (a machete's blade stands off its handle no more one way than the other, and this
         // one is drawn edge to the eye: it is turned because it is known to be)
-        if ((far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id)) {
+        const out = (far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id);
+        if (FACE_LEADS.has(id) ? !out : out) {
           const turn = new THREE.Group();
           turn.position.set(hx, 0, hz);
           turn.rotation.y = Math.PI;
@@ -1877,9 +1881,12 @@ export class Weapons {
         root, kind: 'melee', flash, body, melee: style,
         grips: {
           // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
-          // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
-          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
-          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
+          // (a fist round the handle: the thumb comes over the fingers, not out along the handle; and the fingers square
+          // across it, along the forearm, so the wrist is straight. They ran a third of the way down the handle and away
+          // from the forearm, and the wrist folded down to make them: "the wris tholding the tool is all bent downwards
+          // it doesnt look natural at all", the owner, 2026-10-25)
+          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.16, 0, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
+          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.16, 0, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
         hip: new THREE.Vector3(...MELEE.hip),

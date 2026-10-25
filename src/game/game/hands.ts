@@ -115,14 +115,17 @@ export const handsMethods = {
   /**
    * What goes on the back or in the holster takes the key of its place, and a new kind of thing to eat, drink or
    * dress a wound with takes the first free key after those, by itself: nobody has to open their pack under fire
-   * to find out which key the bandage they have just picked up is on. Everything else is put on a key by hand.
-   * Each kind once a life: a key taken off it, or whose thing left, stays bare (the owner, 2026-10-23: "when i drop
-   * an item my hotbar should forget about it"; it bounced back on the next pick-up before).
+   * to find out which key the bandage they have just picked up is on. So does a tool or a thing to swing, a key, a lock
+   * and a charge (the owner, 2026-10-25: "i should be able to hotkey equip and attack with the new tools we added as
+   * well as hotkey them ... ALL the new items like building plan etc."). Each kind once a life: a key taken off it, or
+   * whose thing left, stays bare (the owner, 2026-10-23: "when i drop an item my hotbar should forget about it"; it
+   * bounced back on the next pick-up before).
    */
   autoHot(this: Game) {
     this.inv.autoBind();
     for (const it of this.inv.carried()) {
-      if (!ITEMS[it.id].use || this.inv.autoGiven.has(it.id) || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
+      const d = ITEMS[it.id], handy = d.use || d.melee || d.category === 'tool' || ['key', 'satchel'].includes(d.id);
+      if (!handy || this.inv.autoGiven.has(it.id) || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
       for (let i = HOT_FREE; i < this.inv.hot.length; i++) {
         if (this.inv.hot[i]) continue;
         this.inv.bind(i, it);
