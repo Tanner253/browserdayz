@@ -224,8 +224,8 @@ export function infectedPatch(shader: Shader, u: InfectedUniforms, rest = new TH
   float hair = (1.0 - smoothstep(0.14, 0.3, lum)) * smoothstep(uHairFrom - 0.03, uHairFrom + 0.03, vRest.y) * uHair.w;
   skin = mix(skin, uHair.rgb * (0.45 + lum * 3.5), hair);
   diffuseColor.rgb = upper * vTone.r + lower * vTone.g + skin * vTone.b + was * (1.0 - min(1.0, vTone.r + vTone.g + vTone.b));
-  // (blotches a hand or two across, thickest in their middles, mud or soot)
-  float grime = smoothstep(0.45, 0.9, woundNoise(vRest * 6.0 + uGrime.xyz) * 0.7 + woundNoise(vRest * 17.0 + uGrime.zxy) * 0.3) * uGrime.w;
+  // (blotches a hand or two across, thickest in their middles, mud or soot; thicker on the face and hands, which nothing covered)
+  float grime = min(1.0, smoothstep(0.42, 0.9, woundNoise(vRest * 6.0 + uGrime.xyz) * 0.7 + woundNoise(vRest * 17.0 + uGrime.zxy) * 0.3) * uGrime.w * (1.0 + vTone.b * 0.6));
   diffuseColor.rgb *= mix(vec3(1.0), uGrimeTint, grime);`);
 }
 
