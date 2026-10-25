@@ -143,8 +143,8 @@ export interface Camp {
   recycler: { x: number; y: number; z: number; rot: number } | null;
 }
 
-/** a market stall's model is drawn at this size (as made it stood a little low over a survivor); how deep it is from its counter back (its x) and how wide (its z); its trader behind its counter */
-export const STALL = { model: 'market_stall', scale: 1.1, l: 1.97 * 1.1, w: 2.6 * 1.1, behind: 0.15 };
+/** a stall's model (made again from three pictures, the owner: "the trader stand looks very low quality") at the size it was made; how deep it is from its counter back, roof and all (its x), and how wide (its z); its trader behind its counter */
+export const STALL = { model: 'trader_stall', scale: 1, l: 2.42, w: 2.8, behind: 0.15 };
 /** what a model whose front is its +x (the stall, the recycler: the sandbox's front camera looks from +x) is turned by, past the way it faces */
 export const FACE_TURN = -Math.PI / 2;
 /** the shop's trader, behind its counter facing the door (src/game/trader.ts had him so) */

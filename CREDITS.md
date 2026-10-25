@@ -268,8 +268,6 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle, 1.2 m long as made; textures re-encoded as WebP at 2048; geometry compressed.
 - "Recycler" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood on the ground about its own middle, 2 m wide as made; textures re-encoded as WebP at 2048; geometry compressed.
-- "Market stall" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
-  Changes made: Stood on the ground about its own middle, 2.6 m deep as made; textures re-encoded as WebP at 2048; geometry compressed.
 - This work is based on "Simple Old C4" (https://sketchfab.com/3d-models/simple-old-c4-43d3b6a933b04aea8006d790627f9555) by Blender3D (https://sketchfab.com/Blender3D) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Stood on the ground about its own middle and made 20 cm tall; textures re-encoded as WebP at 1024; geometry compressed.
 - "Hardware tin" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
@@ -324,6 +322,9 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Its worn piece let go of the body and laid flat; scaled to 60 cm at its longest and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Crowbar" made for ZONA with Higgsfield (gpt_image_2_5 views and Meshy multi-image to 3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Trader stall" made for ZONA with Higgsfield (Meshy multi-image-to-3D, from three pictures made for it), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 2.8 m across as made, turned so its counter faces +x; textures re-encoded as WebP at 2048; geometry compressed.
+  Also: Stood on the ground about its own middle, 2.8 m across as made, turned so its counter faces +x; the holes in its texture atlas filled from their neighbours; textures re-encoded as WebP at 2048; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -1068,7 +1068,7 @@ export const LOCAL_MODELS = {
   },
   // Progression v3's things (crafting, 2026-10-25), made in Higgsfield on the owner's account (Tripo text-to-3D) and sized
   // at intake (progress/tools/intake.mjs): the metal fragments, the spring, the pipe, the rifle body, the research table,
-  // the recycler and the trader camp's stall (the pistol body is the Colt's own frame: src/sim/items/craft.ts). What is carried at 1024, what stands at 2048 (the navigator: "textures 2048, 1024 for hand items").
+  // and the recycler (the pistol body is the Colt's own frame: src/sim/items/craft.ts; the stall made again below). What is carried at 1024, what stands at 2048 (the navigator: "textures 2048, 1024 for hand items").
   ...Object.fromEntries(
     [
       ['metal_frags', 'Metal fragments', '22 cm across', 1024, ['loot']],
@@ -1077,13 +1077,21 @@ export const LOCAL_MODELS = {
       ['gun_body_rifle', 'Rifle body', '45 cm long', 1024, ['loot']],
       ['research_table', 'Research table', '1.2 m long', 2048, ['prop']],
       ['recycler', 'Recycler', '2 m wide', 2048, ['prop']],
-      ['market_stall', 'Market stall', '2.6 m deep', 2048, ['prop']],
     ].map(([id, name, size, tex, tags]) => [id, {
       dir: '../incoming/higgsfield', file: `${id}_sized.glb`, scale: 1, tex, tags,
       changes: `Stood on the ground about its own middle, ${size} as made; textures re-encoded as WebP at ${tex}; geometry compressed.`,
       credit: { name, author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
     }]),
   ),
+  // (the trader camp's stall made again, the owner: "the trader stand looks very low quality": a front, a side and a back
+  // picture first, then Meshy's model of all three, on the owner's Higgsfield account; its counter turned to +x, as the
+  // camp lays a stall: src/sim/camp.ts FACE_TURN; the black holes Meshy left in its atlas filled from their neighbours by
+  // progress/crafting/stall/pad.mjs, as they showed as dark blotches on the canvas)
+  trader_stall: {
+    dir: '../incoming/higgsfield', file: 'trader_stall_padded.glb', scale: 1, tex: 2048, tags: ['prop'], rot: [0, Math.PI / 2, 0],
+    changes: 'Stood on the ground about its own middle, 2.8 m across as made, turned so its counter faces +x; the holes in its texture atlas filled from their neighbours; textures re-encoded as WebP at 2048; geometry compressed.',
+    credit: { name: 'Trader stall', author: 'ZONA (Higgsfield, Meshy multi-image-to-3D)', url: 'https://higgsfield.ai', line: '"Trader stall" made for ZONA with Higgsfield (Meshy multi-image-to-3D, from three pictures made for it), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // Base building's things (2026-10-25), made in Higgsfield in place of the stand-ins (the owner: "all of thes eitems
   // look terrible and need models done in higgsfield ... they all look extremely low quality"). Each came at its real
   // size, foot on the ground, centred (the navigator's *_sized.glb), 1.6 to 3.3 thousand triangles: put in
