@@ -4,7 +4,7 @@
 // crowd never moves as one: the same walk at another pace, in another moment of its stride, or another walk. What they
 // share with a survivor (standing, a flinch, a fall) is the survivors' own (moves.glb). Every game picks the same.
 
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { moveClips } from './avatar/gait';
 import { roll, type InfectedKind } from './infected-kinds';
@@ -45,6 +45,19 @@ export interface InfectedMoves {
   extras: Record<(typeof EXTRAS)[number], THREE.AnimationClip>;
 }
 
+/**
+ * A clip of its own for a name that stands in for another: a body's mixer makes one action for one clip, so the eight
+ * names standing in as standing were one action, and the last of them (its weight always none) put standing out. (The
+ * tracks are the same ones: nothing is copied.) Made once a name and clip, for every body.
+ */
+const standIns = new Map<string, THREE.AnimationClip>();
+const as = (name: string, c: THREE.AnimationClip) => {
+  const k = `${name}|${c.uuid}`;
+  let got = standIns.get(k);
+  if (!got) standIns.set(k, (got = new THREE.AnimationClip(name, c.duration, c.tracks)));
+  return got;
+};
+
 /** the `i`th one's movements, of its kind */
 export async function infectedMoves(kind: InfectedKind, i: number): Promise<InfectedMoves> {
   const [own, shared] = await Promise.all([infectedClips(), moveClips()]);
@@ -56,9 +69,9 @@ export async function infectedMoves(kind: InfectedKind, i: number): Promise<Infe
   const clips: Record<string, THREE.AnimationClip> = {
     idle, walk: z(walk), run: z(run), strike: z(blow),
     hit: s('hitBody'), hitHead: s('hitHead'), death: s('deathB'), deathFront: fall, deathSide: s('deathS'),
-    proneDown: fall, crawl: fall,
-    crouchIdle: idle, crouchWalk: idle, jumpStart: idle, jumpLoop: idle, jumpLand: idle, dance: idle, sit: idle, armed: idle,
+    proneDown: as('proneDown', fall), crawl: as('crawl', fall),
   };
+  for (const n of ['crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'dance', 'sit', 'armed']) clips[n] = as(n, idle);
   const pace = (n: Name) => (TABLE as Record<string, { pace?: number }>)[n].pace ?? 1;
   return { clips, paces: { walk: pace(walk), run: pace(run) }, extras: { zEat: z('zEat'), zScream: z('zScream'), zPain: z('zPain') } };
 }

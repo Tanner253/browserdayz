@@ -22,7 +22,7 @@ export const KIND_HEIGHT: Record<InfectedKind, number> = {
 
 /** each of the rare ones turns up about this often wherever it may */
 const RARE = 0.05;
-/** what an infected lived among: the nearest building within this of where it lives, metres */
+/** what an infected lived among: the nearest place of work within this of where it lives, metres */
 const AMONG = 40;
 
 /** a number in 0..1 that is the same in every game for the same one (and another for each `salt`) */
@@ -64,10 +64,12 @@ export function kindOf(world: World, i: number, x: number, z: number): InfectedK
   const r = roll(i, 2);
   if (r < RARE) return 'bloated';
   if (r < RARE * 2) return 'starved';
+  // (the nearest of the places people worked, if one is within reach: among thirty houses the village's one police
+  // station was the nearest to hardly anybody, and its militia were not to be found)
   let near = '', best = AMONG * AMONG;
   for (const b of world.buildings) {
     const d = (b.x - x) ** 2 + (b.z - z) ** 2;
-    if (d < best) (best = d), (near = b.type);
+    if (d < best && AMONG_KIND[b.type]) (best = d), (near = b.type);
   }
   // (or, with no building near, the place it is at: the army's own, a depot or a yard)
   if (!near) {
