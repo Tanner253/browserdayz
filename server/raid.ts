@@ -127,7 +127,7 @@ export function charges(now: number) {
     lit.delete(ch.i);
     broadcast({ t: 'bboom', i: ch.i, w: ch.w, o: ch.at, by: ch.by.id });
     const by = new Map<Base, [number, number][]>();
-    for (const { base, p, hp } of blastOn(solid, ch.at, ch.w)) {
+    for (const { base, p, hp } of blastOn(solid, ch.at, ch.w, ch.n)) {
       if (!by.has(base)) by.set(base, []);
       by.get(base)!.push([p.id, hp]);
     }

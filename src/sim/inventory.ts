@@ -20,7 +20,7 @@
 // other people go in a pouch of ten, so they do not fill the pockets; an eleventh goes
 // wherever there is room.
 
-import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, isBagKind, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
+import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ruined, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, isBagKind, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
 
 const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(['held', ...ALL_SLOTS].map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
 /** the places whose things are looked into for room, in the order they are filled: jacket and trousers first, as ever, then the rest of what is worn */
@@ -742,8 +742,8 @@ export class PlayerInventory {
   }
 
   /**
-   * Everything carried goes, and the survivor stands in a new jacket and new trousers with nothing in them: what a
-   * body had by itself when its pockets were its own, and what every new life starts in (2026-10-13). Whoever is
+   * Everything carried goes, and the survivor stands in the clothes every new life starts in (CLOTHES), with nothing
+   * in them (2026-10-13). Whoever is
    * given a kit by an admin, which "replaces everything", is left the same.
    */
   clear() {
@@ -760,9 +760,17 @@ export class PlayerInventory {
     this.dress();
   }
 
-  /** A jacket and trousers put on, wherever nothing is worn in their place. */
+  /** The clothes every survivor begins in put on (CLOTHES), wherever nothing is worn in their place. */
   dress() {
     for (const [slot, id] of CLOTHES) this.slots[slot] ??= makeItem(id);
+  }
+
+  /** Those clothes, while nothing is in them, taken off where one of these is to be worn instead: a kit's boots go on the feet, not into a pocket. */
+  makeWay(items: ItemInstance[]) {
+    for (const [slot, id] of CLOTHES) {
+      const on = this.slots[slot];
+      if (on?.id === id && !on.cargo?.length && items.some((it) => ITEMS[it.id]?.slot === slot)) this.slots[slot] = null;
+    }
   }
 
   /**
@@ -886,7 +894,8 @@ export class PlayerInventory {
     for (const s of GEAR_SLOTS) {
       const it = this.slots[s];
       const v = it ? ITEMS[it.id].wear?.[key] : undefined;
-      if (v !== undefined) out.push(v);
+      // (a ruined piece does nothing it did: src/sim/condition.ts)
+      if (v !== undefined && !ruined(it!)) out.push(v);
     }
     return out;
   }
@@ -995,6 +1004,8 @@ const isItem = (id: unknown): id is string => typeof id === 'string' && Object.h
 
 /** the grids that were the body's own, and the place the thing that has each one's pockets is worn in now */
 const OLD_POCKETS = new Map<unknown, Slot>([['jacket', 'top'], ['pants', 'legs']]);
+/** what was made of those grids: the clothes everybody began in then (CLOTHES has been the basics since 2026-10-25) */
+const OLD_CLOTHES: [Slot, string][] = [['top', 'field_jacket'], ['legs', 'field_trousers']];
 /** the grid the server keeps things in that found no room while an old inventory was made new (see `cleanInventory`) */
 export const SPILL = 'spill';
 
@@ -1026,7 +1037,7 @@ export function upgradeInventory(d: SerializedInventory): { inv: SerializedInven
   };
   /** what has no place yet: each thing, where it lay, and the place on the body whose grid it lay in */
   const stray: { st: Stored; slot: Slot }[] = [];
-  for (const [slot, id] of CLOTHES) {
+  for (const [slot, id] of OLD_CLOTHES) {
     const grids = kept.filter((c) => OLD_POCKETS.get(c?.id) === slot);
     if (!grids.length) continue;
     const old = grids.flatMap((c) => (Array.isArray(c.items) ? c.items : []));
@@ -1106,6 +1117,9 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   // (a tool's condition, worn by work: src/sim/gather.ts; the server holds it to no newer than it wore it, server/gather.ts)
   if (num(r.cond) && r.cond < 1) it.cond = Math.max(0, r.cond);
   if (r.id === 'key' && Number.isInteger(r.key) && (r.key as number) > 0) it.key = r.key;
+  // (a piece of clothing's colour, one of its own, and how worn it is: src/sim/items/wear.ts)
+  if (Number.isInteger(r.c) && r.c! > 0 && r.c! < (def.colours?.length ?? 0)) it.c = r.c;
+  if (num(r.hp) && r.hp >= 0 && r.hp < 1) it.hp = r.hp;
   if (r.id === 'dogtag') {
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
     it.owner = name(r.owner);
@@ -1193,9 +1207,9 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
  * worn things before a single thing out of a pocket, and what found no room was thrown on the ground round it.
  *
  * (No bigger than it need be: the server reads no more things out of any grid it is sent than this has cells. When
- * something bigger is made this has to grow a row: the test will say so.)
+ * something bigger is made this has to grow a row: the test will say so. It did, 2026-10-25, for the belt's hip pack: 10x18.)
  */
-export const BODY_GRID: [number, number] = [10, 17];
+export const BODY_GRID: [number, number] = [10, 18];
 
 /**
  * Things laid in a body's grid, the biggest first so that the small ones fill what is left.

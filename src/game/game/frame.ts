@@ -490,6 +490,7 @@ export const frameMethods = {
     Avatar.ground ??= (x, z) => heightAt(this.s.world.heights, x, z);
     // (what the eye takes in, for the infected as for everybody else: see inSight)
     RemotePlayer.look(cam);
+    this.horde.lens = Math.tan((62 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360);
     this.horde.update(dt, now, cam.position);
     if (!this.online) this.wild.tickAlone(dt);
     this.wild.update(dt, now, cam.position, cam);

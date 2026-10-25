@@ -10,7 +10,7 @@
 //
 // Directions: an angle a is the way (sin a, cos a) on the ground (x, z), as three.js's rotation.y turns +z.
 
-import { CELL, FOUND, PIECES, STOREY, WALL_T, type Hole, type PieceKind, type Shape, type Tier } from './pieces';
+import { CELL, FOUND, FREE, PIECES, STOREY, WALL_T, type Hole, type PieceKind, type Shape, type Tier } from './pieces';
 import { swept, swings } from './doors';
 import { shapeOf } from './solids';
 import type { Lock } from './locks';
@@ -63,6 +63,8 @@ export interface Claim {
   due: Record<string, number>;
   /** its store ran dry: the base is rotting */
   dry: boolean;
+  /** until when its store keeps it (ms since 1970; -1 for ever), told to all who see it: its flag flies as high (src/game/building/flags.ts) */
+  until?: number;
   /** what was in its store when it was kept (read back by whoever keeps the store: the server's boxes) */
   kept?: unknown[];
 }
@@ -88,8 +90,8 @@ const INR: Record<Shape, number> = { sq: CELL / 2, tri: CELL / (2 * Math.sqrt(3)
 const EDGE_R: Record<Shape, number[]> = { sq: [0, 3, 6, 9], tri: [0, 4, 8] };
 /** an outline looks the same turned this many steps */
 const SYM: Record<Shape, number> = { sq: 3, tri: 4 };
-/** the most storeys over the foundations */
-export const STOREYS = 4;
+/** the most storeys over the foundations (the owner, 2026-10-25: "max stories player can build a base is 5 stories for now") */
+export const STOREYS = 5;
 
 const kindOf = (p: { k: string }) => PIECES[p.k];
 const isFloor = (p: Piece) => kindOf(p).role === 'floor';
@@ -392,7 +394,7 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     const mine = cornersOf(K.shape!, s.x, s.z, s.r, 0.06);
     if (all.some((p) => isFloor(p) && Math.abs(p.y - (s.y + STOREY)) < 0.3 && overlaps(mine, cornersOf(kindOf(p).shape!, p.x, p.z, p.r, 0.06)))) return 'No room over it: the floor above is in the way';
   }
-  // (no more storeys than four: a floor may be the fourth's ceiling, nothing may stand on it)
+  // (no more storeys than STOREYS: a floor may be the last one's ceiling, nothing may stand on it)
   const lowest = Math.min(0, ...all.filter((p) => kindOf(p).ground).map(level));
   if (s.y - lowest > STOREYS * STOREY + (K.role === 'floor' ? 0.1 : -0.1)) return `Too high: ${STOREYS} storeys at most`;
   if (K.role !== 'floor' || !K.ground) {
@@ -405,6 +407,12 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     const hs = pts.map(([x, z]) => ground(x, z));
     if (K.ground && Math.max(...hs) > s.y + 0.05) return 'The ground is in the way';
     if (K.ground && Math.min(...hs) < s.y - FOUND.skirt - FOUND.deep) return 'Too high off the ground';
+    // (a high wall or a gate: the ground at both its ends within its footing, below, and not over its foot)
+    if (K.role === 'free') {
+      const half = (K.long ?? CELL) / 2, ends = [-1, 1].map((e) => ground(s.x + e * half * cos(s.r), s.z - e * half * sin(s.r)));
+      if (Math.max(...ends) > s.y + FREE.rise) return 'The ground is in the way';
+      if (Math.min(...ends) < s.y - FREE.skirt + 0.1) return 'Too high off the ground';
+    }
   }
   return null;
 }

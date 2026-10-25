@@ -50,6 +50,18 @@ const HOLD = 0.6;
 
 const card = (head: string, line: string, keys: string, kbd?: string) => `<span class="bc">${kbd ? `<kbd>${kbd}</kbd>` : ''}<b>${head}</b>${line ? ` ${line}` : ''}<i>${keys}</i></span>`;
 
+/** a knock on a door: three raps on wood; on steel, its own ring three times */
+export function knock(at: [number, number, number], metal: boolean, distance = 0) {
+  const [x, y, z] = at;
+  if (!metal && audio.built('knock', { x, y, z }, 1.1)) return;
+  for (let i = 0; i < 3; i++) setTimeout(() => audio.impact(metal ? 'metal' : 'wood', { x, y, z }, distance), i * 170);
+}
+/** a wrong code: the keypad's refusal, and the shock it gives the hand on it */
+export function shocked() {
+  audio.built('code_wrong', undefined, 0.8);
+  audio.built('shock', undefined, 0.7);
+}
+
 export class LockView {
   readonly pad = new Keypad();
   private fT = -1;
@@ -115,10 +127,7 @@ export class LockView {
     if (!pass) {
       if (swings(p.k)) {
         if (this.h.online()) this.h.send({ t: 'bknock', b: base.id, p: p.id });
-        else {
-          const [x, y, z] = toWorld(base, p.x, p.y + 1.2, p.z);
-          for (let i = 0; i < 3; i++) setTimeout(() => audio.impact(PIECES[p.k].only === 3 ? 'metal' : 'wood', { x, y, z }, 1), i * 170);
-        }
+        else knock(toWorld(base, p.x, p.y + 1.2, p.z), (PIECES[p.k].only ?? 1) >= 3);
       }
       return this.h.note('It is locked', 'warn');
     }
@@ -164,6 +173,8 @@ export class LockView {
       const still = () => this.h.held()?.uid === held.uid && this.h.looked()?.id === p.id && this.h.looked()?.base === base;
       this.h.begin(`Fitting the ${held.id === 'code_lock' ? 'code lock' : 'key lock'}`, LOCK.fit, still, () => {
         if (!still()) return;
+        const [x, y, z] = toWorld(base, p.x, p.y + 1.2, p.z);
+        audio.built('lock_click', { x, y, z }, 0.9);
         if (this.h.online()) return void this.h.send({ t: 'block', b: base.id, p: p.id, u: held.uid, ...(code ? { code } : {}) });
         const k = LOCK_ITEMS[held.id];
         this.h.take(held.id, 1);
@@ -186,6 +197,7 @@ export class LockView {
       this.tries.delete(key);
       if (!l.who.includes(this.h.who())) l.who.push(this.h.who());
       this.h.changed(base);
+      audio.built('code_ok', undefined, 0.7);
       return this.h.note('The code is right: it lets you in', 'good');
     }
     if (++t.n >= LOCK.tries) {
@@ -193,6 +205,7 @@ export class LockView {
       t.out = now + LOCK.out;
     }
     this.tries.set(key, t);
+    shocked();
     this.h.hurt(LOCK.shock);
     this.h.note(t.out > now ? `Wrong code: it will take none for ${LOCK.out / 1000} s` : 'Wrong code', 'warn');
   }
@@ -207,6 +220,10 @@ export class LockView {
   }
 
   private onOff(base: Base, p: Piece, on: boolean) {
+    // (a key lock's bolt thrown, a code lock's keypad answering)
+    const [x, y, z] = toWorld(base, p.x, p.y + 1.2, p.z);
+    if (p.lock!.k === 'key') audio.built('lock_click', { x, y, z }, 0.9);
+    else audio.built('code_ok', { x, y, z }, 0.5);
     if (this.h.online()) return void this.h.send({ t: 'blockon', b: base.id, p: p.id, on });
     p.lock!.on = on;
     this.h.changed(base);

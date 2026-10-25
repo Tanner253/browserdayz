@@ -14,7 +14,7 @@ import { shapeOf, shutOf, type Paint, type Solid } from '../../sim/build/solids'
 import { leafPoint } from '../../sim/build/doors';
 
 /** metres of a piece to one picture of each paint */
-const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1, iron: 1 };
+const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, 4: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1, iron: 1 };
 
 /** a box with its pictures laid on in metres (each face by its own two ways) */
 function boxGeo(c: [number, number, number, number, number, number], tile: number): THREE.BufferGeometry {
@@ -72,9 +72,58 @@ function planar(g: THREE.BufferGeometry, tile: number) {
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
 
-/** a solid as drawn: its pictures laid on in metres, and its shade (white: none) in every corner */
-function solidGeo(s: Solid, tile: number) {
-  const g = 'box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile);
+/**
+ * A frame's solid as one sheet down its middle, its lattice seen from either side: drawn as a box, the far face's poles
+ * showed through the near one's gaps and boxes meeting at a corner fought for the same place (the owner, 2026-10-25:
+ * "the frames for walls and buildings are a bit bugy with overlapping textures, no overlapping textures"). A solid
+ * thick every way (a foundation's) stays a box.
+ */
+const SHEET = 0.35;
+function sheetGeo(s: Solid, tile: number): THREE.BufferGeometry | null {
+  if ('box' in s) {
+    const [x, y, z, w, h, d] = s.box, thin = Math.min(w, h, d);
+    if (thin >= SHEET) return null;
+    const g = new THREE.PlaneGeometry(thin === d ? w : thin === w ? d : w, thin === h ? d : h).toNonIndexed();
+    if (thin === w) g.rotateY(Math.PI / 2);
+    else if (thin === h) g.rotateX(-Math.PI / 2);
+    g.translate(x, y, z);
+    planar(g, tile);
+    return g;
+  }
+  if ('prism' in s && s.y1 - s.y0 < SHEET) {
+    // (a thin prism, a triangle of floor: its top, at its middle height)
+    const g = prismGeo(s.prism, s.y0, s.y1, tile), P = g.getAttribute('position'), keep: number[] = [];
+    for (let i = 0; i < P.count; i += 3) if ([0, 1, 2].every((k) => Math.abs(P.getY(i + k) - s.y1) < 1e-4)) for (let k = 0; k < 3; k++) keep.push(P.getX(i + k), (s.y0 + s.y1) / 2, P.getZ(i + k));
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(keep, 3));
+    out.computeVertexNormals();
+    planar(out, tile);
+    return out;
+  }
+  if ('hull' in s) {
+    // (a roof's wedge: its slope alone, the rafters; not its underside, its back or the triangles at its ends)
+    const g = hullGeo(s.hull, tile), P = g.getAttribute('position'), keep: number[] = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let i = 0; i < P.count; i += 3) {
+      a.fromBufferAttribute(P, i);
+      b.fromBufferAttribute(P, i + 1);
+      c.fromBufferAttribute(P, i + 2);
+      const n = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      if (n.y > 0.2 && n.y < 0.98) keep.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    }
+    if (!keep.length) return null;
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(keep, 3));
+    out.computeVertexNormals();
+    planar(out, tile);
+    return out;
+  }
+  return null;
+}
+
+/** a solid as drawn: its pictures laid on in metres, and its shade (white: none) in every corner; `sheet`: a frame's (sheetGeo) */
+function solidGeo(s: Solid, tile: number, sheet = false) {
+  const g = (sheet && sheetGeo(s, tile)) || ('box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile));
   // (one set of attributes for all: what a box, a prism and a hull each carry, and the shade)
   for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
   const c = new THREE.Color(s.c ?? 0xffffff), n = g.getAttribute('position').count;
@@ -83,8 +132,8 @@ function solidGeo(s: Solid, tile: number) {
 }
 
 /** a merge of solids, as one shape drawn with one paint */
-function merged(list: Solid[], tile: number): THREE.BufferGeometry {
-  const g = mergeGeometries(list.map((q) => solidGeo(q, tile)), false)!;
+function merged(list: Solid[], tile: number, sheet = false): THREE.BufferGeometry {
+  const g = mergeGeometries(list.map((q) => solidGeo(q, tile, sheet)), false)!;
   g.computeBoundingSphere();
   return g;
 }
@@ -98,7 +147,8 @@ export function geometryOf(kind: string, p: Paint, dress = true): THREE.BufferGe
     const s = shapeOf(kind);
     // (a piece drawn by a model of its own elsewhere: nothing here)
     if (s.unseen) (g = new THREE.BufferGeometry()).setAttribute('position', new THREE.Float32BufferAttribute([], 3));
-    else g = merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
+    // (a frame: sheets, and none of the trim the tiers above have)
+    else g = p === 0 ? merged(s.solid, TILE[p], true) : merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
     geos.set(key, g);
   }
   return g;
@@ -163,30 +213,58 @@ export function ghostGeometry(kind: string): THREE.BufferGeometry {
 }
 
 
-/** a frame's lattice: timber round the edge of every 3 m and across it corner to corner, open between */
+/** a frame's poles in a 512 square (one to every 3 m, drawn at four times that): round the edge, corner to corner, and across the middle; and where they are tied */
+const POLES: [number, number, number, number, number][] = [[0, 18, 512, 18, 34], [0, 494, 512, 494, 34], [18, 0, 18, 512, 34], [494, 0, 494, 512, 34], [26, 486, 486, 26, 28], [26, 256, 486, 256, 22]];
+const TIED: [number, number, number][] = [[18, 18, 0.785], [494, 494, 0.785], [494, 18, -0.785], [18, 494, -0.785], [18, 256, 0], [494, 256, 0], [256, 256, 0.785]];
+/**
+ * A frame's lattice: poles lashed round the edge of every 3 m and across it, open between (the navigator's tier plan:
+ * "lashed poles for twig"). Painted from the bark of a real tree (Poly Haven's bark_brown_02), each pole shaded round
+ * and tied with rope where it crosses another; drawn plain until the bark has come, and again then. At 2048 a side,
+ * the castle's sharpness (the owner, 2026-10-25: "can be the same quality as the castle is"; it was 512).
+ */
 function lattice(): THREE.Texture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
+  const N = 2048, c = document.createElement('canvas');
+  c.width = c.height = N;
   const g = c.getContext('2d')!;
-  g.clearRect(0, 0, 256, 256);
-  const beam = (x0: number, y0: number, x1: number, y1: number, w: number) => {
-    g.strokeStyle = '#b8935f';
+  const t = new THREE.CanvasTexture(c);
+  const line = (x0: number, y0: number, x1: number, y1: number, w: number, style: string | CanvasPattern) => {
+    g.strokeStyle = style;
     g.lineWidth = w;
     g.beginPath();
     g.moveTo(x0, y0);
     g.lineTo(x1, y1);
     g.stroke();
-    g.strokeStyle = 'rgba(70,45,22,0.55)';
-    g.lineWidth = 2;
-    g.stroke();
   };
-  for (const [x0, y0, x1, y1] of [[0, 9, 256, 9], [0, 247, 256, 247], [9, 0, 9, 256], [247, 0, 247, 256]]) beam(x0, y0, x1, y1, 18);
-  beam(14, 242, 242, 14, 14);
-  beam(14, 128, 242, 128, 10);
-  const t = new THREE.CanvasTexture(c);
+  const paint = (bark: ImageBitmap | null) => {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, N, N);
+    g.scale(N / 512, N / 512);
+    g.lineCap = 'round';
+    for (const [x0, y0, x1, y1, w] of POLES) {
+      // (its edges in shadow, its bark along it, a little light down its middle: a pole, not a plank)
+      line(x0, y0, x1, y1, w, 'rgba(28,18,10,0.9)');
+      const pat = bark && g.createPattern(bark, 'repeat');
+      if (pat) pat.setTransform(new DOMMatrix().rotate((Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI + 90).scale(0.22));
+      line(x0, y0, x1, y1, w * 0.8, pat ?? '#7d5d3c');
+      line(x0, y0, x1, y1, w * 0.28, 'rgba(255,236,205,0.13)');
+    }
+    // (rope wound round where they cross)
+    for (const [x, y, a] of TIED) {
+      g.save();
+      g.translate(x, y);
+      g.rotate(a);
+      for (let k = -3; k <= 3; k++) line(k * 4.5, -22, k * 4.5 + 3, 22, 3.2, k % 2 ? '#6e5a3c' : '#86704c');
+      g.restore();
+    }
+    t.needsUpdate = true;
+  };
+  paint(null);
+  // (its own copy of the bark's picture: the world's is let go of once the card has it)
+  const rel = assets.manifest.textures.bark_brown_02?.diff;
+  if (rel) void fetch(assets.url(rel)).then((r) => r.blob()).then((b) => createImageBitmap(b)).then(paint, () => {});
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
@@ -204,8 +282,9 @@ export function paintsOf(atmo: Atmosphere | null): THREE.MeshStandardMaterial[] 
     pbr('weathered_planks', { name: 'build-wood' }),
     pbr('castle_wall_slates', { name: 'build-stone' }),
     pbr('rusty_corrugated_iron', { metalnessMap: assets.pbr('rusty_corrugated_iron').armMap, metalness: 1, name: 'build-metal' }),
-    // (the armoured tier: welded plates of dark steel, the progression plan's fifth)
-    pbr('metal_plate_02', { metalnessMap: assets.pbr('metal_plate_02').armMap, metalness: 1, name: 'build-armour' }),
+    // (the armoured tier: welded plates of dark steel, the progression plan's fifth. Its picture's steel is all metal:
+    // drawn so it mirrored the sky and went black under a dull one, so a little under half as much)
+    pbr('metal_plate_02', { metalnessMap: assets.pbr('metal_plate_02').armMap, metalness: 0.45, name: 'build-armour' }),
   ];
   if (atmo) for (const m of paints) atmo.register(m);
   return paints;

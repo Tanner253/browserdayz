@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { PlayerInventory } from '../src/sim/inventory';
-import { ITEMS, makeItem } from '../src/sim/items';
+import { CLOTHES, ITEMS, makeItem } from '../src/sim/items';
 import { KITS } from '../src/sim/kits';
 
 for (const kit of KITS) {
@@ -52,9 +52,11 @@ for (const kit of [...KITS, { id: 'nothing', name: '', does: 'what /clear sends:
     inv.clear();
     for (const t of pouch) inv.tags.add(t);
   }
-  const over = kit.things.filter((th) => inv.add(makeItem(th.id, th.qty)));
-  assert.equal(inv.slots.top?.id, 'field_jacket', `${kit.id}: left them with no jacket`);
-  assert.equal(inv.slots.legs?.id, 'field_trousers', `${kit.id}: left them with no trousers`);
+  const given = kit.things.map((th) => makeItem(th.id, th.qty));
+  if (!('adds' in kit && kit.adds)) inv.makeWay(given);
+  const over = given.filter((it) => inv.add(it));
+  // (the basics every life begins in, but where the kit has its own: its boots on the feet)
+  for (const [slot, id] of CLOTHES) assert.equal(inv.slots[slot]?.id, kit.things.find((th) => ITEMS[th.id].slot === slot)?.id ?? id, `${kit.id}: left them without what is worn on the ${slot}`);
   assert.deepEqual(inv.tags.items.map((q) => q.item), [tag], `${kit.id}: the tags they had taken are gone`);
   if ('adds' in kit && kit.adds) {
     // (a bag of supplies: nothing is taken away, and what does not fit is theirs to pick up)

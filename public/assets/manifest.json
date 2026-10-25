@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T06:58:56.535Z",
+ "generated": "2026-10-25T10:57:18.885Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12850,6 +12850,242 @@
    "hiBytes": 805220,
    "hiCard": 21
   },
+  "karambit": {
+   "url": "assets/models/karambit.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 271700,
+   "srcTris": 3740,
+   "tris": 3740,
+   "min": [
+    -0.0103,
+    0,
+    -0.0374
+   ],
+   "max": [
+    0.0103,
+    0.2,
+    0.0374
+   ],
+   "lods": [
+    {
+     "url": "assets/models/karambit_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "271700:1792903843795"
+    }
+   ]
+  },
+  "combat_knife": {
+   "url": "assets/models/combat_knife.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 499824,
+   "srcTris": 10852,
+   "tris": 10852,
+   "min": [
+    -0.0305,
+    0,
+    -0.0312
+   ],
+   "max": [
+    0.0305,
+    0.3,
+    0.0312
+   ],
+   "lods": [
+    {
+     "url": "assets/models/combat_knife_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "499824:1792907542852"
+    }
+   ]
+  },
+  "hunting_knife": {
+   "url": "assets/models/hunting_knife.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 366216,
+   "srcTris": 11150,
+   "tris": 11150,
+   "min": [
+    -0.0129,
+    0,
+    -0.0254
+   ],
+   "max": [
+    0.0129,
+    0.25,
+    0.0254
+   ],
+   "lods": [
+    {
+     "url": "assets/models/hunting_knife_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "366216:1792907543320"
+    }
+   ]
+  },
+  "bayonet": {
+   "url": "assets/models/bayonet.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 500992,
+   "srcTris": 11276,
+   "tris": 11276,
+   "min": [
+    -0.0213,
+    0,
+    -0.0323
+   ],
+   "max": [
+    0.0213,
+    0.28,
+    0.0323
+   ],
+   "lods": [
+    {
+     "url": "assets/models/bayonet_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "500992:1792907543796"
+    }
+   ]
+  },
+  "melee_hatchet": {
+   "url": "assets/models/melee_hatchet.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 462436,
+   "srcTris": 13476,
+   "tris": 13476,
+   "min": [
+    -0.0234,
+    0,
+    -0.0704
+   ],
+   "max": [
+    0.0234,
+    0.36,
+    0.0704
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_hatchet_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "462436:1792907544274"
+    }
+   ]
+  },
+  "melee_machete": {
+   "url": "assets/models/melee_machete.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 454708,
+   "srcTris": 13288,
+   "tris": 13288,
+   "min": [
+    -0.041,
+    0,
+    -0.0469
+   ],
+   "max": [
+    0.041,
+    0.6,
+    0.0469
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_machete_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "454708:1792907544839"
+    }
+   ]
+  },
+  "melee_crowbar": {
+   "url": "assets/models/melee_crowbar.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 683912,
+   "srcTris": 16376,
+   "tris": 16376,
+   "min": [
+    -0.0445,
+    0,
+    -0.1088
+   ],
+   "max": [
+    0.0445,
+    0.6,
+    0.1088
+   ],
+   "lods": []
+  },
+  "melee_bat": {
+   "url": "assets/models/melee_bat.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 604328,
+   "srcTris": 11524,
+   "tris": 11524,
+   "min": [
+    -0.0781,
+    0,
+    -0.0543
+   ],
+   "max": [
+    0.0781,
+    0.84,
+    0.0543
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_bat_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "604328:1792909129965"
+    }
+   ]
+  },
+  "melee_shovel": {
+   "url": "assets/models/melee_shovel.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 556928,
+   "srcTris": 15004,
+   "tris": 15004,
+   "min": [
+    -0.091,
+    0,
+    -0.0746
+   ],
+   "max": [
+    0.091,
+    0.95,
+    0.0746
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_shovel_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "556928:1792907546371"
+    }
+   ]
+  },
   "alcohol_bottle": {
    "url": "assets/models/alcohol_bottle.glb",
    "tags": [
@@ -13783,18 +14019,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 603976,
-   "srcTris": 3696,
-   "tris": 3696,
+   "bytes": 1084104,
+   "srcTris": 14032,
+   "tris": 14032,
    "min": [
-    -0.025,
+    -0.4938,
     0,
-    -0.5
+    -0.0971
    ],
    "max": [
-    0.025,
-    2.2,
-    0.5
+    0.4938,
+    1.8993,
+    0.0971
    ],
    "lods": []
   },
@@ -13803,18 +14039,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 448000,
-   "srcTris": 3061,
-   "tris": 3061,
+   "bytes": 786564,
+   "srcTris": 13075,
+   "tris": 13075,
    "min": [
-    -0.03,
+    -0.4714,
     0,
-    -0.5
+    -0.2892
    ],
    "max": [
-    0.03,
-    2.2,
-    0.5
+    0.4714,
+    1.8966,
+    0.2892
    ],
    "lods": []
   },
@@ -13823,18 +14059,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 446568,
-   "srcTris": 2726,
-   "tris": 2726,
+   "bytes": 804780,
+   "srcTris": 14636,
+   "tris": 14636,
    "min": [
-    -0.03,
+    -0.9409,
     0,
-    -0.5
+    -0.2096
    ],
    "max": [
-    0.03,
-    1,
-    0.5
+    0.9409,
+    1.8993,
+    0.2096
    ],
    "lods": []
   },
@@ -13843,18 +14079,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 756248,
-   "srcTris": 12,
-   "tris": 12,
+   "bytes": 992528,
+   "srcTris": 11680,
+   "tris": 11680,
    "min": [
-    -1.2,
+    -0.8364,
     0,
-    -0.04
+    -0.1457
    ],
    "max": [
-    1.2,
-    2.6,
-    0.04
+    0.8364,
+    1.8912,
+    0.1457
    ],
    "lods": []
   },
@@ -13863,18 +14099,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 345524,
-   "srcTris": 2231,
-   "tris": 2231,
+   "bytes": 900700,
+   "srcTris": 13921,
+   "tris": 13921,
    "min": [
-    -0.3184,
+    -0.9495,
     0,
-    -0.4
+    -0.7326
    ],
    "max": [
-    0.3184,
-    0.4744,
-    0.4
+    0.9495,
+    1.506,
+    0.7326
    ],
    "lods": []
   },
@@ -13963,18 +14199,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 653632,
-   "srcTris": 1916,
-   "tris": 1916,
+   "bytes": 1031820,
+   "srcTris": 15598,
+   "tris": 15598,
    "min": [
-    -0.9934,
+    -0.1776,
     0,
-    -1.75
+    -0.0658
    ],
    "max": [
-    0.9934,
-    3.2051,
-    1.75
+    0.1776,
+    1.8985,
+    0.0658
    ],
    "lods": []
   },
@@ -14023,18 +14259,18 @@
    "tags": [
     "base"
    ],
-   "bytes": 549096,
-   "srcTris": 2539,
-   "tris": 2539,
+   "bytes": 1045784,
+   "srcTris": 13970,
+   "tris": 13970,
    "min": [
-    -0.075,
+    -0.3046,
     0,
-    -0.6
+    -0.0756
    ],
    "max": [
-    0.075,
-    5.1,
-    0.6
+    0.3046,
+    1.8993,
+    0.0756
    ],
    "lods": []
   },
@@ -14055,6 +14291,306 @@
     0.8288,
     2.1,
     0.3392
+   ],
+   "lods": []
+  },
+  "bb_bedroll": {
+   "url": "assets/models/bb_bedroll.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 399100,
+   "srcTris": 4900,
+   "tris": 4900,
+   "min": [
+    -0.5,
+    0,
+    -0.1688
+   ],
+   "max": [
+    0.5,
+    0.1759,
+    0.1688
+   ],
+   "lods": []
+  },
+  "beanie": {
+   "url": "assets/models/beanie.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 544332,
+   "srcTris": 3818,
+   "tris": 3818,
+   "min": [
+    -0.1066,
+    0,
+    -0.0972
+   ],
+   "max": [
+    0.1066,
+    0.24,
+    0.0972
+   ],
+   "lods": []
+  },
+  "ushanka": {
+   "url": "assets/models/ushanka.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 553064,
+   "srcTris": 5553,
+   "tris": 5553,
+   "min": [
+    -0.1431,
+    0,
+    -0.1487
+   ],
+   "max": [
+    0.1431,
+    0.3,
+    0.1487
+   ],
+   "lods": []
+  },
+  "beret": {
+   "url": "assets/models/beret.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 172800,
+   "srcTris": 3918,
+   "tris": 3918,
+   "min": [
+    -0.1337,
+    0,
+    -0.145
+   ],
+   "max": [
+    0.1337,
+    0.2063,
+    0.145
+   ],
+   "lods": []
+  },
+  "balaclava": {
+   "url": "assets/models/balaclava.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 160376,
+   "srcTris": 3894,
+   "tris": 3894,
+   "min": [
+    -0.1126,
+    0,
+    -0.0893
+   ],
+   "max": [
+    0.1126,
+    0.3,
+    0.0893
+   ],
+   "lods": []
+  },
+  "ghillie_hood": {
+   "url": "assets/models/ghillie_hood.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 477056,
+   "srcTris": 7451,
+   "tris": 7451,
+   "min": [
+    -0.2255,
+    0,
+    -0.1593
+   ],
+   "max": [
+    0.2255,
+    0.5,
+    0.1593
+   ],
+   "lods": []
+  },
+  "hip_pack": {
+   "url": "assets/models/hip_pack.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 285936,
+   "srcTris": 4604,
+   "tris": 4604,
+   "min": [
+    -0.17,
+    0,
+    -0.19
+   ],
+   "max": [
+    0.17,
+    0.1617,
+    0.19
+   ],
+   "lods": []
+  },
+  "field_bag": {
+   "url": "assets/models/field_bag.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 352140,
+   "srcTris": 5795,
+   "tris": 5795,
+   "min": [
+    -0.1249,
+    0,
+    -0.19
+   ],
+   "max": [
+    0.1249,
+    0.2662,
+    0.19
+   ],
+   "lods": []
+  },
+  "military_belt": {
+   "url": "assets/models/military_belt.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 355936,
+   "srcTris": 5502,
+   "tris": 5502,
+   "min": [
+    -0.1839,
+    0,
+    -0.2
+   ],
+   "max": [
+    0.1839,
+    0.1762,
+    0.2
+   ],
+   "lods": []
+  },
+  "assault_pack": {
+   "url": "assets/models/assault_pack.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 354932,
+   "srcTris": 7565,
+   "tris": 7565,
+   "min": [
+    -0.2,
+    0,
+    -0.1554
+   ],
+   "max": [
+    0.2,
+    0.52,
+    0.1554
+   ],
+   "lods": []
+  },
+  "ground_jacket": {
+   "url": "assets/models/ground_jacket.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 151128,
+   "srcTris": 2830,
+   "tris": 2830,
+   "min": [
+    -0.3015,
+    0,
+    -0.31
+   ],
+   "max": [
+    0.3015,
+    0.2033,
+    0.31
+   ],
+   "lods": []
+  },
+  "ground_trousers": {
+   "url": "assets/models/ground_trousers.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 177156,
+   "srcTris": 2874,
+   "tris": 2874,
+   "min": [
+    -0.31,
+    0,
+    -0.2743
+   ],
+   "max": [
+    0.31,
+    0.1636,
+    0.2743
+   ],
+   "lods": []
+  },
+  "ground_shirt": {
+   "url": "assets/models/ground_shirt.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 125308,
+   "srcTris": 2424,
+   "tris": 2424,
+   "min": [
+    -0.2215,
+    0,
+    -0.25
+   ],
+   "max": [
+    0.2215,
+    0.095,
+    0.25
+   ],
+   "lods": []
+  },
+  "ground_trainers": {
+   "url": "assets/models/ground_trainers.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 355552,
+   "srcTris": 3712,
+   "tris": 3712,
+   "min": [
+    -0.0674,
+    0,
+    -0.15
+   ],
+   "max": [
+    0.0674,
+    0.1216,
+    0.15
+   ],
+   "lods": []
+  },
+  "ground_stab_vest": {
+   "url": "assets/models/ground_stab_vest.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 124632,
+   "srcTris": 9087,
+   "tris": 9087,
+   "min": [
+    -0.3,
+    0,
+    -0.2577
+   ],
+   "max": [
+    0.3,
+    0.3381,
+    0.2577
    ],
    "lods": []
   }

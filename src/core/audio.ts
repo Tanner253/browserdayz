@@ -4,6 +4,7 @@
 
 import type { Surface } from './physics';
 import { EMOTE } from '../sim/emotes';
+import { VOICES } from '../sim/survivor';
 import { alarmShare, alarmTop } from '../sim/heard';
 import { ITEMS } from '../sim/items';
 
@@ -327,6 +328,26 @@ export const rotorRecording = () => lateRecording('rotor');
 /** a raid's (src/game/building/raid.ts): fetched when a charge is first stuck or a piece first struck */
 const RAID_SOUNDS = ['c4_beep', 'fuse', 'break_wood', 'break_stone', 'break_metal', 'sledge'];
 export const raidRecordings = () => Promise.all(RAID_SOUNDS.map(lateRecording));
+/** building's own (scripts/sounds.mjs): fetched when a base is first near, or the plan or the hammer first in the hands */
+const BUILD_SOUNDS = ['nail', 'lock_click', 'crate_latch', 'crate_open', 'crate_shut', 'creak', 'cloth', 'keypad', 'code_ok', 'code_wrong', 'shock', 'knock', 'garage', 'saw'] as const;
+export type BuildSound = (typeof BUILD_SOUNDS)[number];
+export const buildRecordings = () => Promise.all(BUILD_SOUNDS.map(lateRecording));
+
+/** the calls in each voice, fetched the first time each is heard: the recording, null where there is none, or the fetch under way */
+const called = new Map<string, AudioBuffer | null | Promise<AudioBuffer | null>>();
+function voiceLine(name: string): Promise<AudioBuffer | null> {
+  const p = (async () => {
+    try {
+      const res = await fetch(`assets/sounds/voices/${name}.mp3`);
+      if (!res.ok) return null;
+      return await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  })().then((buf) => (called.set(name, buf), buf));
+  called.set(name, p);
+  return p;
+}
 export const sirenRecording = () => lateRecording('siren');
 
 /** how loud the siren's recording is played: as loud as the made-up wail it replaced */
@@ -2040,14 +2061,30 @@ export class AudioEngine {
   }
 
   /**
-   * Somebody calls out (src/sim/emotes.ts): the words, said by the browser's speaking voice. (There was a voice
-   * made up out of a buzz and three resonances under them, and before them: it is gone.)
+   * Somebody calls out (src/sim/emotes.ts), in the voice they picked (src/sim/survivor.ts VOICES): its recording,
+   * fetched the first time that call in that voice is heard (the owner, 2026-10-24: "we can offer multiple voice
+   * options for the oplayer to pick from in the settings"). A call not recorded in it is said by the browser's
+   * speaking voice, as every call was before.
    * @param pos where they stand; none for the player's own voice
-   * @param voice whose voice, 0..1: the same caller has the same one every time
+   * @param voice which of VOICES
+   * @param pitch the browser's voice for them, 0..1: the same caller has the same one every time
    */
-  shout(id: string, _pos?: V3, distance = 0, voice = 0.5) {
+  shout(id: string, pos?: V3, distance = 0, voice = 0, pitch = 0.5) {
     if (!this.ready) return;
-    this.speak(EMOTE[id]?.say ?? '', distance, voice);
+    const name = `${VOICES[voice]?.id ?? VOICES[0].id}/${id}`, had = called.get(name);
+    const say = (buf: AudioBuffer | null) => {
+      if (!buf) return void this.speak(EMOTE[id]?.say ?? '', distance, pitch);
+      const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
+      src.buffer = buf;
+      // (as loud as a shout is: a voice raised to carry across a field, and quieter for every metre past the first eight)
+      g.gain.value = 0.9;
+      src.connect(g).connect(this.out(pos, 8, 1, distance, this.bus.voice));
+      src.start(this.ctx.currentTime + distance / 343);
+    };
+    if (had instanceof AudioBuffer || had === null) return say(had);
+    // (fetched now, and said when it comes if that is soon: a call heard a second late is a call out of its moment)
+    const asked = performance.now();
+    void (had ?? voiceLine(name)).then((buf) => performance.now() - asked < 1500 && say(buf));
   }
 
   // ------------------------------------------------------------ ambience
@@ -2397,6 +2434,16 @@ export class AudioEngine {
     this.rec('hit_wood', out, t + 0.04, 1.6, 0.55, false, true);
   }
 
+  /**
+   * One of building's sounds (a nail driven, a lock's click, a box's lid, a ladder's creak, a keypad...): at a place, or
+   * in the ear with none. False when its recording has not come yet (it is asked for: the next one is heard).
+   */
+  built(name: BuildSound, pos?: V3, gain = 1, rate = 1): boolean {
+    if (!this.ready) return false;
+    void buildRecordings();
+    return this.rec(name, pos ? this.out(pos, 3, 1.3) : this.sfx, this.ctx.currentTime, gain, rate, false, true);
+  }
+
   /** A C4's timer beeping where it is stuck (made up, a short tone, until the recording has come). */
   beep(pos: V3) {
     if (!this.ready) return;
@@ -2428,6 +2475,26 @@ export class AudioEngine {
       stop: () => {
         g.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
         src.stop(ctx.currentTime + 0.2);
+      },
+    };
+  }
+
+  /** A saw at a log, over and over until it is told to stop (src/game/gathering.ts). */
+  sawing(pos: V3): { stop: () => void } {
+    const ctx = this.ctx;
+    void buildRecordings();
+    const buf = this.ready ? bank.get('saw')?.[0] : undefined;
+    if (!buf) return { stop: () => {} };
+    const out = this.out(pos, 2, 1.5), src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    g.gain.value = 0.7;
+    src.connect(g).connect(out);
+    src.start();
+    return {
+      stop: () => {
+        g.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        src.stop(ctx.currentTime + 0.25);
       },
     };
   }

@@ -9,6 +9,7 @@ import { BUILD_ITEMS } from './items/build';
 import { CRAFT_ITEMS } from './items/craft';
 import type { LootRule } from './items/rules';
 import { lookOf } from '../../api/_lib/shop-items';
+import type { Region } from './survivor';
 // Item database. Pure data; shared by the client UI, world spawning and the server.
 // Grid sizes follow DayZ conventions (1 cell ~ 10 cm).
 
@@ -46,8 +47,13 @@ export const SLOT_LABEL: Record<Slot, string> = {
 };
 /** the places for what is worn as the inventory stands them either side of the survivor, each column from the top down */
 export const DOLL_SLOTS: [Slot[], Slot[]] = [['head', 'face', 'eyes', 'top', 'vest', 'belt'], ['back', 'armband', 'hands', 'legs', 'feet']];
-/** what every survivor stands in to begin with: its place on them, and the thing */
-export const CLOTHES: [Slot, string][] = [['top', 'field_jacket'], ['legs', 'field_trousers']];
+/**
+ * what every survivor stands in to begin with: its place on them, and the thing. A T-shirt, jeans and trainers, with
+ * very little room in them (the owner, 2026-10-25: "we should reduce them to jeans and a t-shirt with very little
+ * storage to be replaced with better gear"); the field jacket and trousers everybody wore until then are found now
+ * (src/sim/items/wear.ts), and whoever has them on keeps them.
+ */
+export const CLOTHES: [Slot, string][] = [['top', 'tshirt'], ['legs', 'jeans'], ['feet', 'trainers']];
 
 export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap' | 'light' | 'grip';
 
@@ -131,6 +137,16 @@ export interface ItemDef {
   wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number; /** over the face, it keeps the gas out (see src/sim/gas.ts) */ gas?: number };
   /** weapon attachment: which weapons take it and where it mounts; what it does to the gun's handling score, and to its kick (a multiplier) */
   attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number; /** on the muzzle: it quiets the shot and hides the flash */ quiet?: boolean };
+  /**
+   * Worn, it is drawn on the body as the clothes are (scripts/wear.mjs, src/game/survivors.ts): its model, the parts of
+   * the body it covers (the skin there is hidden) and those it is only partly over (drawn a little in from the skin).
+   */
+  dress?: { model: string; hides: Region[]; shrinks?: Region[] };
+  /**
+   * The colours it is found in, each one model of it made that colour: as it was drawn (neither said), a colour laid
+   * on its cloth, or a camouflage's tile (assets/tex/camo/). Which one a thing is is its own (`c` on it).
+   */
+  colours?: Colour[];
   /** its model's colours are multiplied by this (0xrrggbb): one model, told apart from another thing made of it */
   tint?: number;
   /** what is white on its model is painted this colour (0xrrggbb) and the rest keeps its own: see whiteTo in src/game/loot.ts */
@@ -152,6 +168,15 @@ export interface ItemDef {
 const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS, ...BUILD_ITEMS, ...CRAFT_ITEMS];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));
+
+/** one of the colours a thing is found in (see `colours`) */
+export interface Colour {
+  name: string;
+  tint?: number;
+  camo?: string;
+}
+/** the colour a thing is: its own, or the first of its kind's */
+export const colourOf = (it: { id: string; c?: number }): Colour | undefined => ITEMS[it.id]?.colours?.[it.c ?? 0];
 
 /** an item sitting at a grid position inside a container */
 export interface Placed {
@@ -202,6 +227,10 @@ export interface ItemInstance {
   finish?: string;
   /** a bag, a vest or the pockets of something worn, set for a kind of thing: that kind goes into it first (BAG_KINDS) */
   for?: BagKind;
+  /** which of its kind's colours it is (`colours`): not said, the first */
+  c?: number;
+  /** what shape it is in, 1 new to 0 ruined (src/sim/condition.ts): not said, new */
+  hp?: number;
 }
 
 /**
@@ -256,12 +285,28 @@ export function tagClock(it: ItemInstance): string {
 /** a word after a thing's name for the stage it is at ("raw", "rotten"): said by src/sim/cooking.ts, which this file cannot import */
 export const NAMING: { stage?: (it: ItemInstance) => string } = {};
 
-/** what an item is called: a dog tag carries its owner's name; meat says whether it is raw, cooked, burned or rotten */
+/** how worn a thing is, DayZ's five states from the best down, each from this much of its health (src/sim/condition.ts) */
+export const STATES: { name: string; from: number }[] = [
+  { name: 'Pristine', from: 0.7 },
+  { name: 'Worn', from: 0.5 },
+  { name: 'Damaged', from: 0.3 },
+  { name: 'Badly damaged', from: 1e-6 },
+  { name: 'Ruined', from: 0 },
+];
+export const healthOf = (it: ItemInstance) => it.hp ?? 1;
+export const ruined = (it: ItemInstance) => healthOf(it) <= 0;
+export const stateOf = (it: ItemInstance) => STATES.find((s) => healthOf(it) >= s.from)!.name;
+
+/** what an item is called: a dog tag carries its owner's name; meat says whether it is raw, cooked, burned or rotten; clothes say their colour, and how worn they are when they are */
 export function itemName(it: ItemInstance): string {
   const d = ITEMS[it.id];
   if (it.id === 'dogtag' && it.owner) return `${tagOwner(it)}'s Dog Tag`;
   const stage = NAMING.stage?.(it);
   if (stage) return `${d.name} (${stage})`;
+  if (d.category === 'clothing') {
+    const said = [d.colours && d.colours.length > 1 ? colourOf(it)?.name ?? d.colours[0].name : '', it.hp !== undefined && it.hp < STATES[0].from ? stateOf(it).toLowerCase() : ''].filter(Boolean);
+    if (said.length) return `${d.name} (${said.join(', ')})`;
+  }
   const look = lookOf(it.finish);
   return look ? `${look === 'gold' ? 'Gold' : 'Nickel'}-plated ${d.name}` : d.name;
 }
@@ -286,6 +331,11 @@ export function makeItem(id: string, qty?: number): ItemInstance {
   }
   if (def.mag) it.rounds = 0;
   if (def.use?.sips) it.left = def.use.sips;
+  // (a thing that comes in colours comes in any of them)
+  if (def.colours && def.colours.length > 1) {
+    const c = Math.floor(Math.random() * def.colours.length);
+    if (c) it.c = c;
+  }
   return it;
 }
 
@@ -545,6 +595,13 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));
     if (!holds(it.id)) delete it.cargo;
+  }
+  // (a colour it has, and a shape between new and ruined)
+  if (it.c !== undefined && !(Number.isInteger(it.c) && it.c > 0 && it.c < (d.colours?.length ?? 0))) delete it.c;
+  if (it.hp !== undefined) {
+    const hp = Number(it.hp);
+    if (Number.isFinite(hp) && hp < 1) it.hp = Math.max(0, hp);
+    else delete it.hp;
   }
   return it;
 }

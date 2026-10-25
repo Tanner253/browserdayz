@@ -152,12 +152,16 @@ export interface Box {
   filled?: string[];
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
+  /** a player's body: the public mark of their key (pidOf in server/acts.ts), whose alone it is to take back at one press ('reclaim') */
+  pid?: string;
   expires?: number;
   v?: number;
   /** a corpse still sat in a helicopter's seat, until it is down (see `riders` in server/acts.ts): not to be searched until then */
   ride?: { i: number; seat: number };
   /** the body of one of the infected (its number): not kept through a restart, as its body is not (server/bodies.ts) */
   zed?: number;
+  /** a player's body: which of the survivors' bodies it was (not kept through a restart: then it is the one their name gives) */
+  bd?: number;
 }
 
 export const boxes = new Map<string, Box>();

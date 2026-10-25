@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { POSE, DEATHS, type Gesture, type Move, type Hold, type SeatPose, type Clip, CLIPS } from './pose';
 import { CUT, _a, _q1, _q2, _q3, emoteClips, type Avatar } from '../avatar';
+import { MOVES, type Deed, type Stay } from './deeds';
 
 export const actsMethods = {
   /**
@@ -13,6 +14,10 @@ export const actsMethods = {
    * @param overhand swing the empty arm all the same (a throw)
    */
   swing(this: Avatar, overhand = false, seconds = 0.62) {
+    // (a survivor throws on the motion capture: from the arm drawn back, so the hand comes through as it lets go, a
+    // sixth of a second on, which is when the game throws it)
+    // (the arms and the chest: the captured throw goes down into a crouch that a body throwing standing does not)
+    if (overhand && this.deeds && !this.held) return this.perform('throw', { from: 0.12, to: 0.5, dur: 0.8, legs: 0.25 });
     if (this.inHand && !overhand) {
       // something in the fist to strike with: the blow the library draws
       this.strikeT = 0;
@@ -26,6 +31,40 @@ export const actsMethods = {
     this.punchSide = -this.punchSide;
     this.punchT = 0;
     this.fistsHold = POSE.punch[1];
+  },
+
+  /**
+   * Something done once on the motion capture, over whatever else the body is doing (a survivor's body only; the
+   * infected and a body without it do nothing). `dur` stretches it to the time the game gives it; `legs` how much of
+   * the lower body goes with it standing (none while walking: the legs go on walking).
+   */
+  perform(this: Avatar, name: Deed, o: { dur?: number; legs?: number; k?: number; from?: number; to?: number } = {}) {
+    if (!this.deeds) return;
+    this.deeds.get(name);
+    const from = o.from ?? 0, to = o.to ?? 1;
+    this.deed = { name, t: 0, dur: o.dur ?? (MOVES[name]?.dur ?? 1) * (to - from), legs: o.legs ?? (name === 'drink' ? 0 : 1), k: o.k ?? 1, from, to };
+  },
+
+  /**
+   * Something taken up (the act 'take', seen by everybody): bent right down for it, or a little toward somewhere
+   * higher. Which is said by how long it takes, the one number an act carries: a short one is not off the ground.
+   */
+  pickUp(this: Avatar, dur = 1.4) {
+    this.perform('pickUp', { dur, k: dur < 1.2 ? 0.45 : 1 });
+  },
+
+  /**
+   * Kept up until told otherwise, the whole body: on a ladder, swimming, treading water, asleep in a bedroll. `rate`
+   * how fast its movement plays (a ladder climbed faster or down: negative); null stops it.
+   */
+  setStay(this: Avatar, name: Stay | null, rate = 1) {
+    if (!this.deeds) return;
+    if (!name) this.stay = null;
+    else if (this.stay?.name === name) this.stay.rate = rate;
+    else {
+      this.deeds.get(name);
+      this.stay = { name, t: 0, rate };
+    }
   },
 
   /** A shot or a blow landed: the body jolts (the head snaps back if that is where it landed). */
@@ -138,10 +177,18 @@ export const actsMethods = {
    * arms and the head take it (see LAID), and the legs go on with what they were doing.
    * @param legs 0..1: how far the hips and legs are given over to it as well (the whole body lunges)
    */
-  layer(this: Avatar, clip: Clip, time: number, weight: number, legs = 0) {
+  layer(this: Avatar, clip: Clip | THREE.AnimationAction, time: number, weight: number, legs = 0) {
     if (weight <= 0.001) return;
+    // (the clip alone on the skeleton the clips play on: the body's own, or a movement of the motion capture's)
+    const own = typeof clip === 'string';
     for (const n of CLIPS) this.actions[n].setEffectiveWeight(n === clip ? 1 : 0);
-    this.actions[clip].time = THREE.MathUtils.clamp(time, 0, this.dur[clip] - 1e-3);
+    this.gait?.mute();
+    this.deeds?.mute();
+    if (own) this.actions[clip].time = THREE.MathUtils.clamp(time, 0, this.dur[clip] - 1e-3);
+    else {
+      clip.setEffectiveWeight(1);
+      clip.time = THREE.MathUtils.clamp(time, 0, clip.getClip().duration - 1e-3);
+    }
     this.mixer.update(0);
     // The clip turns its hips as it pleases (a blow is thrown side-on). When the hips are not
     // given over to it, the lowest bone that is has to end up facing the way the CLIP has it

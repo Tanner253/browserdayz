@@ -4,10 +4,40 @@
 
 import * as THREE from 'three';
 import { POSE } from './pose';
-import { WORN, GEAR, placeWorn } from './gear';
+import { WORN, GEAR, hangFit, placeWorn } from './gear';
 import { _k6, _m1, _m2, Avatar } from '../avatar';
+import { proportion, type BodyFit, type Lengths } from '../survivors';
+import { BODY_SCALE } from '../avatar';
 
 export const dressMethods = {
+  /** where a thing hung on this body goes on it, by its own head and chest (see hangFit in ./gear) */
+  gearFit(this: Avatar, g: { bone: string; pack?: boolean }, inv: THREE.Matrix4): THREE.Matrix4 {
+    return hangFit(this.bodyFit, g, inv);
+  },
+
+  /**
+   * A survivor's own bone lengths (src/game/survivors.ts, proportion): on the skeleton the clips play on and the one
+   * drawn, which takes its places from it; and the arms' reach, which their hold on a weapon is worked out by.
+   */
+  proportion(this: Avatar, lengths: Lengths | null, scale: number | null, fit: BodyFit | null = null) {
+    proportion(this.drive.flatMap(([from, to]) => [from, to]), lengths);
+    // (and what is hung on the head and the chest hung by this body's own: see gearFit)
+    this.bodyFit = fit;
+    for (const p of this.gearPlaced) p.holder.matrix.copy(p.rest.inv).multiply(this.gearFit(p.g, p.rest.inv)).multiply(p.m);
+    // (and as tall as that survivor stands: the whole body drawn bigger or smaller, so that the clips' hips still stand
+    // its feet on the ground; what is in its hands keeps its own size, see Avatar.hold)
+    this.stature = (scale ?? BODY_SCALE) / BODY_SCALE;
+    this.modelRoot?.parent?.scale.setScalar(BODY_SCALE * this.stature);
+    for (const r of [this.armR, this.armL]) {
+      if (!r) continue;
+      const own = (b: THREE.Object3D) => (b.userData.ownPlace as THREE.Vector3 | undefined)?.length() ?? b.position.length();
+      r.la0 ??= r.la;
+      r.lb0 ??= r.lb;
+      r.la = ((r.la0 * r.fore.position.length()) / own(r.fore)) * this.stature;
+      r.lb = ((r.lb0 * r.hand.position.length()) / own(r.hand)) * this.stature;
+    }
+  },
+
   /**
    * Puts copies of what is slung on the back there: the first with its muzzle up over the left shoulder, flat
    * against the back, and a second crossing it, up over the right.
@@ -30,6 +60,7 @@ export const dressMethods = {
   setGear(this: Avatar, items: { id: string; obj: THREE.Object3D }[]) {
     for (const o of this.gearObjs) o.removeFromParent();
     this.gearObjs = [];
+    this.gearPlaced = [];
     this.packOut = 0;
     for (const p of this.pieces.values()) p.visible = false;
     const ids = items.map(({ id }) => id);
@@ -53,7 +84,8 @@ export const dressMethods = {
       // (a helmet over a mask: the mask goes under it, cut where the helmet covers it, and the helmet may sit a
       // little otherwise for it: see OVER_MASK)
       placeWorn(id, obj, ids, _m1);
-      holder.matrix.copy(rest.inv).multiply(_m1);
+      holder.matrix.copy(rest.inv).multiply(this.gearFit(g, rest.inv)).multiply(_m1);
+      this.gearPlaced.push({ holder, rest, m: _m1.clone(), g });
       holder.add(obj);
       if (g.bone === 'spine_03' && !g.pack) chest.push({ obj, rest: _m1.clone() });
       rest.bone.add(holder);

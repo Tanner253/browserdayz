@@ -78,8 +78,9 @@ const PHONE_FAR = { colour: 256, other: 128 };
  * On a computer every model is drawn at one size, near or far, with no copy as it came for what is close (2026-10-21:
  * six minutes online had put 1.3 GB of models' pictures on an 8 GB card). 256 until 2026-10-25, when the owner found
  * it too soft: "1024 should be used on the player model zombies and hand held models we brought in then 512 should be
- * used for things that arent righht in the users face all the time or in their hands ... want good UX". Which files
- * are which: src/core/near-models.ts.
+ * used for things that arent righht in the users face all the time or in their hands ... want good UX". 1024 always
+ * was up to 2.7 GB of the card ("we need to be more performant ... this is an insane jump"): so everything is drawn at
+ * DESK_CAP, and bodies and what is held or worn (src/core/near-models.ts) at DESK_NEAR only while close (`sharpen`).
  */
 const DESK = !TOUCH;
 const DESK_CAP = { colour: 512, other: 256 };
@@ -90,7 +91,6 @@ const DESK_NEAR = { colour: 1024, other: 512 };
  * ones the game would have cut (Chrome's own cut, stored lossless). A copy is named by the version of the file it was
  * made from: a file changed since is loaded whole. A phone loads the ones at PHONE_FAR for what it draws far: unpacked
  * whole first, each file's pictures were up to 16 MB apiece in the page before they were cut (2026-10-23, iPhones).
- * What a computer draws at DESK_NEAR has no copy: lossless at 1024 outweighs the files' own pictures, which are cut here.
  */
 const leanDir = (cap: Cap) => `assets/lean/${cap.colour}-${cap.other}/`;
 /** somebody's body, on a phone: it is not one of the things made sharper when near, and is never far when it matters */
@@ -355,9 +355,8 @@ export class Assets {
   }
   /** the files of the things that are made sharper when they are near (see PHONE_FAR) */
   private far = new Set<string>();
-  /** the manifest's files a computer draws at DESK_NEAR (with every body's: see drawnNear) */
+  /** the manifest's files a computer draws at DESK_NEAR when close (with every body's: see drawnNear) */
   private near = new Set<string>();
-  private deskCap = (url: string): Cap => (drawnNear(url, this.near) ? DESK_NEAR : DESK_CAP);
 
   private idleWaiters: (() => void)[] = [];
 
@@ -505,8 +504,9 @@ export class Assets {
           const g = await this.gltf.parseAsync(data, '');
           // (on a phone its pictures are made small before anything is drawn with them: see PHONE_FAR)
           if (TOUCH) return shrinkModel(g, this.far.has(url) ? PHONE_FAR : PHONE_BODY);
-          // (and on a computer to DESK_CAP or DESK_NEAR: kept small in the page, so that a picture taken off the card can be put back)
-          if (DESK && !this.allSharp) return shrinkModel(g, this.deskCap(url));
+          // (and on a computer to DESK_CAP: kept small in the page, so that a picture taken off the card can be put back; a
+          // body is marked for its sharper pictures as the manifest's models are in `model`)
+          if (DESK && !this.allSharp) return shrinkModel(g, DESK_CAP).then((s) => (url.startsWith('assets/characters/') ? this.mark(url, s) : s));
           // (its pictures are let go of here once they are on the card: see `thin`)
           if (!this.kept.has(url)) g.scene.traverse((o) => paints(o).forEach((mat) => MAPS.forEach((slot) => mat[slot] && thin(mat[slot]!))));
           return g;
@@ -524,7 +524,7 @@ export class Assets {
   /** a computer's copy of a model's file, where there is one made from the file as it is now (see leanDir); a phone's, for what it draws at PHONE_FAR */
   private leanOf(url: string) {
     const v = this.versions[url];
-    if ((!DESK && !this.far.has(url)) || (DESK && drawnNear(url, this.near)) || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
+    if ((!DESK && !this.far.has(url)) || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
     const lean = `${leanDir(DESK ? DESK_CAP : PHONE_FAR)}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
     return this.versions[lean] ? lean : url;
   }
@@ -552,10 +552,13 @@ export class Assets {
   /** development: every model is loaded as it came, whatever it is for (the inventory's pictures are made so: see scripts/icons.mjs) */
   allSharp = false;
 
-  /** every material of a model that has a copy as it came says which model that is, and which of its materials it is */
+  /**
+   * Every material of a model that has a sharper copy says which model that is (its manifest id, or a body's file),
+   * and which of its materials it is. On a phone every model has one: its own file, whose pictures were made small as
+   * it was read. On a computer, bodies and what is held or worn: their own files at DESK_NEAR.
+   */
   private mark(id: string, g: GLTF): GLTF {
-    // (on a phone every model has a sharper copy of itself: its own file, whose pictures were made small as it was read)
-    if (this.marked.has(g) || !(TOUCH || this.manifest.models[id]?.hi) || this.allSharp || DESK) return g;
+    if (this.marked.has(g) || this.allSharp || (DESK && !drawnNear(this.manifest.models[id]?.url ?? id, this.near))) return g;
     this.marked.add(g);
     g.scene.traverse((o) => {
       for (const mat of paints(o)) {
@@ -574,13 +577,14 @@ export class Assets {
    * every copy of it in the world is sharp while this one is, at no cost.
    *
    * On a phone the same is done a size down: what is far is drawn with very small pictures (PHONE_FAR), and what
-   * is close with the world's own (PHONE_CAP), read again out of the file the browser already has.
+   * is close with the world's own (PHONE_CAP), read again out of the file the browser already has. On a computer,
+   * only for what `mark` marks there, at DESK_NEAR.
    * @param first it is in the hands or being looked at: its pictures go on before those of what is walked past
    * @returns the letting go
    */
   sharpen(root: THREE.Object3D | THREE.Material[], first = false): () => void {
     // (a phone the game has already failed to start on is asked for nothing more than the small pictures: see LEAN)
-    if (this.allSharp || LEAN || DESK) return () => {};
+    if (this.allSharp || LEAN) return () => {};
     const want = new Map<string, Painted[]>();
     // (or the materials themselves, where whoever asks knows them: see src/game/near.ts)
     if (Array.isArray(root)) {
@@ -736,10 +740,11 @@ export class Assets {
     }
   }
 
-  /** what a model's own pictures weigh on the graphics card, megabytes */
+  /** what a model's sharper pictures weigh on the graphics card, megabytes: as measured once they have been fetched, and till then what its own file's weigh */
   sharpCost(id: string) {
-    return this.manifest.models[id]?.hiCard ?? 64;
+    return this.sharpWeighs.get(id) ?? this.manifest.models[id]?.hiCard ?? 16;
   }
+  private sharpWeighs = new Map<string, number>();
 
   /** megabytes of the card that everything sharp now has, is about to have, or has not yet given back */
   get sharpMB() {
@@ -752,18 +757,23 @@ export class Assets {
     let s = this.sharp.get(id);
     if (!s) {
       const pictures = new Set<THREE.Texture>();
-      const entry = this.manifest.models[id];
-      const mats = this.bytes(TOUCH ? entry.url : entry.hi!).then((data) =>
+      // (its own file, a body's being its id)
+      const mats = this.bytes(this.manifest.models[id]?.url ?? id).then((data) =>
         this.sharpTurn(first, () => this.turn(async () => {
           // (only what it is painted with is unpacked: its shapes are in the world already)
           const g = await this.paint.parseAsync(data, '');
           const list = (await g.parser.getDependencies('material')) as unknown as Painted[];
-          if (TOUCH) await shrinkPaints(list, PHONE_CAP);
+          await shrinkPaints(list, TOUCH ? PHONE_CAP : DESK_NEAR);
+          let mb = 0;
           for (const m of list) for (const slot of MAPS) if (m[slot]) {
+            const img = m[slot]!.image as { width?: number; height?: number } | undefined;
+            // (four bytes a pixel, and a third again for its smaller copies)
+            if (!pictures.has(m[slot]!) && img?.width) mb += (img.width * (img.height ?? img.width) * 16) / 3 / 1e6;
             pictures.add(m[slot]!);
             // (these are never taken off the card and put back, only thrown away: the page's copy of each goes as soon as the card has it, whatever its size)
             thin(m[slot]!, 0);
           }
+          this.sharpWeighs.set(id, mb);
           return list;
         })),
       );

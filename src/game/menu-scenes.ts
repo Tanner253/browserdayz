@@ -55,7 +55,10 @@ import { SNOW, bunkerPlace, heightAt, idx, sampleOf, type BuildingPlot, type Bui
 import { Avatar } from './avatar';
 import type { Effects } from './effects';
 import type { Grips } from './arms';
-import { ZOMBIES, lookFor } from './look';
+import { lookFor } from './look';
+import { bodyOf, drawFar } from './infected-kinds';
+import { infectedMoves } from './infected-moves';
+import { infectedLook } from './infected-look';
 import type { Stash } from './loot';
 import { menuOrder, recall, remember, visit, type SceneRow } from './menu-order';
 
@@ -242,8 +245,13 @@ export class MenuScenes {
     }
     for (let k = 0; k < (TOUCH ? 3 : 5); k++) {
       const body = new Avatar();
-      await body.load(atmo, 0, false, lookFor(''), ZOMBIES[k % ZOMBIES.length]);
+      // (the townsfolk and a worker: the menu's scenes are of the open country)
+      const kind = (['villager', 'babushka', 'worker', 'oldman', 'conscript'] as const)[k];
+      body.zombieMoves = await infectedMoves(kind, k);
+      body.zombieLook = infectedLook(kind, k);
+      await body.load(atmo, 0, false, lookFor(''), `zombie_${bodyOf(kind, k).body}`);
       if (this.gone) return body.dispose();
+      drawFar(body.root, false);
       body.sick = { roused: 1, claw: -1, seed: (k * 7.31) % 20 };
       body.root.visible = false;
       scene.add(body.root);
@@ -252,8 +260,11 @@ export class MenuScenes {
     // (and three of those the bunker keeps, in their suits: not on a phone, which is not shown the bunker)
     for (let k = 0; k < (TOUCH ? 0 : 3); k++) {
       const body = new Avatar();
+      body.zombieMoves = await infectedMoves('hazmat', k + 5);
+      body.zombieLook = infectedLook('hazmat', k + 5);
       await body.load(atmo, 0, false, lookFor(''), 'zombie_hazmat');
       if (this.gone) return body.dispose();
+      drawFar(body.root, false);
       body.sick = { roused: 1, claw: -1, seed: (k * 5.17 + 3) % 20 };
       body.root.visible = false;
       scene.add(body.root);

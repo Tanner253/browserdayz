@@ -350,6 +350,8 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   const spill: ItemInstance[] = [];
   /** what is to lie in the grid: laid all at once, the biggest first, so that the small things fill what is left */
   const laid: ItemInstance[] = [];
+  /** what was in the hands: it falls on the ground beside the body (the owner, 2026-10-25: "Item in hand when a player dies should drop on the ground like rust") */
+  const fell: ItemInstance[] = [];
   // Their own tag (one, however many they claim to carry): on the body to be taken and cashed in, unless they had
   // only just arrived. Somebody alive less than TAG_FRESH leaves no tag of their own at all: not the one round
   // their neck, and not an older one of theirs that they took back off their last body. (That one was left on
@@ -388,16 +390,16 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
     it.cargo = it.cargo.filter((p) => !theirs(p.item));
     for (const p of it.cargo) shed(p.item);
   };
-  const put = (it: ItemInstance | null) => {
+  const put = (it: ItemInstance | null, to = laid) => {
     if (!it || (noTag && theirs(it))) return;
     // (an admin who leaves nothing leaves the tags all the same, out of whatever they were carried in: the pockets were gone through thing by thing when they were the body's own)
-    if (bare && it.id !== 'dogtag') return void (it.cargo ?? []).forEach((p) => put(p.item));
+    if (bare && it.id !== 'dogtag') return void (it.cargo ?? []).forEach((p) => put(p.item, to));
     if (noTag) shed(it);
     stopTagClocks(it);
-    laid.push(it);
+    to.push(it);
   };
   if (inv) {
-    for (const it of Object.values(inv.slots)) put(it);
+    for (const [slot, it] of Object.entries(inv.slots)) put(it, slot === 'held' ? fell : laid);
     for (const cont of inv.containers) if (cont.id !== HOLD) for (const s of cont.items) put(cleanItem(s));
     spill.push(...layOnBody(box, laid));
     // An admin's hold is nobody's on a body: a body has a body's room and no more. What was in it is laid after
@@ -425,11 +427,14 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
     const ix = x + Math.cos(a) * 0.9, iz = z + Math.sin(a) * 0.9, under = world.standAt(ix, y + 0.3, iz);
     economy.drop(it, ix, Math.abs(under - y) < 0.6 ? under + 0.03 : y, iz, Math.random() * 6.28);
   }
-  lieAt(spill, 'g');
+  // (at arm's length on their right, a gun with its magazine and whatever is fitted to it: every game lays it clear of
+  // walls on whatever is under it, as anything let go of, see LootManager.settleOnGround)
+  for (const it of fell) economy.drop(it, x + Math.cos(yaw) * 0.55, y, z - Math.sin(yaw) * 0.55, yaw + 1.3);
+  lieAt([...spill, ...fell], 'g');
   if (!box.items.length) return null;
   // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
   for (const p of box.items) issue(p.item);
-  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + (inPlay(x, z) ? CORPSE_LIFETIME : CORPSE_WEST), v, ...(ride ? { ride } : {}) });
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, pid: mine, expires: economy.time + (inPlay(x, z) ? CORPSE_LIFETIME : CORPSE_WEST), v, ...(c.bd !== null ? { bd: c.bd } : {}), ...(ride ? { ride } : {}) });
   // (the tags on it are on this body now: custody.ts)
   lieAt(box.items.map((p) => p.item), `b:${uid}`);
   if (ride) riders.add(uid);

@@ -856,6 +856,60 @@ export const LOCAL_MODELS = {
   // 28 m over all, rotor included: some 27 m nose to tail, 1.7 times a real Apache (at 1.4 times it read as any
   // helicopter would in the sky at ninety metres). Stood with its origin under the main rotor's hub, nose toward -z.
   apache: { dir: 'low_poly_apache_gunship', only: /Gunship_material/, pivot: /^Rotor$/, hung: { rotor: /^Rotor_/, tail: /^Back_Rotor_/ }, rot: [0, Math.PI, 0], size: 28, tex: 1024, tags: ['prop'], changes: 'Its loose missile left out; its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; scaled to 28 m over all; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // The karambit (2026-10-25, the owner: "karambit is not a finish type its a knife type, the circular claw one like from
+  // cs:go"): made in Higgsfield on the owner's account, a picture first (gpt_image_2_5) then Tripo H3.1 image to 3D,
+  // brought in at 20 cm long (progress/tools/intake.mjs). Stood with its point up and its ring at the foot, as the other
+  // things to hit with stand.
+  karambit: {
+    dir: '../incoming/higgsfield/melee', file: 'karambit_sized.glb', size: 0.2, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.',
+    credit: { name: 'Karambit', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // The melee remodels and the knives (2026-10-25, the owner: "we should remodel our melee weapons and I want high
+  // quality knives"): made as the karambit was, a picture first (with no stamped words) then Tripo H3.1 image to 3D,
+  // brought in at their real lengths (progress/tools/intake.mjs). Stood with the head or point up, as every thing to hit
+  // with stands. The old models they replace in the hand stay where the world uses them (the shovel as a prop).
+  combat_knife: {
+    dir: '../incoming/higgsfield/melee', file: 'combat_knife_sized.glb', size: 0.3, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 30 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Combat knife', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Combat knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  hunting_knife: {
+    dir: '../incoming/higgsfield/melee', file: 'hunting_knife_sized.glb', size: 0.25, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 25 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Hunting knife', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Hunting knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  bayonet: {
+    dir: '../incoming/higgsfield/melee', file: 'bayonet_sized.glb', size: 0.28, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 28 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'AK bayonet', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"AK bayonet" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_hatchet: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_hatchet_sized.glb', size: 0.36, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 36 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Hatchet', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Hatchet" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_machete: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_machete_sized.glb', size: 0.6, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Machete', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Machete" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_crowbar: {
+    // (made again from four views, Meshy multi-image to 3D: the one-picture Tripo copy's claw was melted, close up)
+    dir: '../incoming/higgsfield/melee', file: 'melee_crowbar_mv_sized.glb', size: 0.6, rot: [0, 0, -Math.PI / 2], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Crowbar', author: 'ZONA (Higgsfield, Meshy multi-image to 3D)', url: 'https://higgsfield.ai', line: '"Crowbar" made for ZONA with Higgsfield (gpt_image_2_5 views and Meshy multi-image to 3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_bat: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_bat_sized.glb', size: 0.84, rot: [Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 84 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Baseball bat', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Baseball bat" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_shovel: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_shovel_sized.glb', size: 0.95, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 95 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Shovel', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Shovel" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // The helicopter a player flies (2026-10-14: "a new helicopter for users to use"). Unpack
   // assets-src/md-500_defender_helicopter.zip into assets-src/models/md-500_defender_helicopter/. Its rotors are
   // pieces of their own (`md500_rotor`, `md500_tail`), each with its origin on its hub, so the game turns them. It
@@ -870,6 +924,40 @@ export const LOCAL_MODELS = {
   // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
   // pictures at the size they came.
   frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // What survivors wear as things of their own (2026-10-25, the owner's yes to the clothing card: hats, a balaclava, the
+  // ghillie hood, packs and a belt), made as the melee remodels were: a picture with no stamped words, then Tripo H3.1
+  // image to 3D, at their real sizes; worn where GEAR in src/game/avatar/gear.ts puts them, and lying as they are.
+  // The clothes' own ground models are the shared folded ones below, coloured as each piece is.
+  ...Object.fromEntries(
+    [
+      ['beanie', 0.24, 'Beanie'],
+      ['ushanka', 0.3, 'Ushanka'],
+      ['beret', 0.29, 'Beret'],
+      ['balaclava', 0.3, 'Balaclava'],
+      ['ghillie_hood', 0.5, 'Ghillie hood'],
+      ['hip_pack', 0.38, 'Hip pack'],
+      ['field_bag', 0.38, 'Field bag'],
+      ['assault_pack', 0.52, 'Assault pack'],
+      ['military_belt', 0.4, 'Military belt'],
+      ['ground_jacket', 0.62, 'Folded jacket'],
+      ['ground_trousers', 0.62, 'Folded trousers'],
+      ['ground_shirt', 0.5, 'Folded shirt'],
+      ['ground_trainers', 0.3, 'Trainers'],
+    ].map(([id, size, name, rot]) => [
+      id,
+      {
+        dir: '../incoming/higgsfield/survivors/gear', file: id.startsWith('ground_') && id !== 'ground_trainers' ? `${id}_flat.glb` : `${id}.glb`, size, ...(rot ? { rot } : {}), tex: 1024, tags: ['loot'],
+        changes: `Scaled to life size (${Math.round(size * 100)} cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.`,
+        credit: { name, author: 'ZONA (Higgsfield, Tripo H3.1)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+      },
+    ]),
+  ),
+  // (the stab vest lying down: its worn piece let go of the body and laid flat, scripts/unskin.mjs and lay-flat.mjs)
+  ground_stab_vest: {
+    dir: '../incoming/higgsfield/survivors/gear', file: 'ground_stab_vest_flat.glb', size: 0.6, tex: 1024, tags: ['loot'],
+    changes: 'Its worn piece let go of the body and laid flat; scaled to 60 cm at its longest and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Stab vest', author: 'ZONA (Higgsfield, Meshy)', url: 'https://higgsfield.ai', line: '"Stab vest" made for ZONA with Higgsfield (gpt_image_2_5 and Meshy multi-image-to-3D, front and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // ---------------------------------------------------------------- crafting (2026-10-25): the owner's downloads for its
   // items (progress/base-models/incoming-map.md), each judged in the sandbox beside the stand-in it replaced. Their folders
   // are the downloads as they came, in assets-src/incoming/; textures at 1024 for what is carried in the hand (the navigator).
@@ -890,17 +978,18 @@ export const LOCAL_MODELS = {
   // (base building's pieces drawn from models, 2026-10-25, src/game/building/models.ts: made for them in Higgsfield on the
   // owner's account. Each is fitted into its piece's solids as the game draws it, so it comes at the size it was made.)
   ...Object.fromEntries([
-    ['bb_door_wood', 'Wooden door leaf', 'doors/door_wood_leaf.glb'], ['bb_door_metal', 'Metal door leaf', 'doors/door_metal_leaf.glb'],
-    ['bb_hatch', 'Hatch lid', 'doors/hatch_leaf.glb'], ['bb_garage', 'Garage door', 'doors/garage_door_slab.glb'],
-    ['bb_small_box', 'Small box', 'base/small_box_sized.glb'], ['bb_large_box', 'Large box', 'base/large_box_sized.glb'],
+    ['bb_door_wood', 'Wooden door leaf', 'remade/door_wood.glb'], ['bb_door_metal', 'Metal door leaf', 'remade/door_metal.glb'],
+    ['bb_hatch', 'Hatch lid', 'remade/hatch.glb'], ['bb_garage', 'Garage door', 'remade/garage.glb'],
+    ['bb_small_box', 'Small box', 'remade/small_box.glb'], ['bb_large_box', 'Large box', 'base/large_box_sized.glb'],
     ['bb_workbench', 'Workbench', 'base/workbench_sized.glb'], ['bb_bed', 'Bed', 'base/bed_sized.glb'],
-    ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'base/ladder2_sized.glb'],
+    ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'remade/ladder.glb'],
     ['bb_palisade_log', 'Palisade log', 'base/palisade_log_sized.glb'], ['bb_gate_wood', 'Wooden gate', 'base/gate_wood_sized.glb'],
-    ['bb_gate_steel', 'Steel gate leaf', 'base/gate_steel_leaf.glb'],
+    ['bb_gate_steel', 'Steel gate leaf', 'remade/gate_steel.glb'],
+    ['bb_bedroll', 'Sleeping bag', 'base/bedroll.glb'],
   ].map(([id, name, file]) => [id, {
     dir: '../incoming/higgsfield', file, scale: 1, tex: 1024, tags: ['base'],
     changes: 'Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
-    credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+    credit: { name, author: 'ZONA (Higgsfield)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (${file.startsWith('remade/') ? 'Meshy multi-image-to-3D from front, side and back views' : 'text-to-3D'}), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
   }])),
   // (the claim: a post on a rusted strongbox, made in Higgsfield, with the owner's pirate flag nailed to it: "i prefer the
   // look of the pirate flag i porovided". The flag is SusanKing's, waved by the game: src/game/building/models.ts)

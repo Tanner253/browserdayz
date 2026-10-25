@@ -150,6 +150,50 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle and scaled to a pelt 2.2 m long; a copy of about 7,300 triangles made for seeing it from further off (scripts/lods.mjs), the whole one kept for near; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "wolf animated" (https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c) by victory_mirosya (https://sketchfab.com/victory_mirosya) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Kept whole with its skeleton and the movements the game plays (graze, idle, alert, rest), the others left out; turned nose to -z, scaled to 1.6 m nose to tail and stood on the ground; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.
+- "Beanie" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (24 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Ushanka" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (30 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Beret" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (29 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Balaclava" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (30 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Ghillie hood" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (50 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Hip pack" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (38 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Field bag" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (38 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Military belt" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (40 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Assault pack" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (52 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Folded jacket" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (62 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Folded trousers" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (62 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Folded shirt" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (50 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Trainers" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Scaled to life size (30 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.
+- "Combat knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 30 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Hunting knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 25 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "AK bayonet" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 28 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Hatchet" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 36 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Machete" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Crowbar" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Baseball bat" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 84 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- "Shovel" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 95 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
 - This work is based on "Isopropyl Rubbing Alcohol Bottle Game Ready" (https://sketchfab.com/3d-models/isopropyl-rubbing-alcohol-bottle-game-ready-a323700f7c93400aba8000f2f2a7e8e0) by KQ92 (https://sketchfab.com/KQ92) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
 - This work is based on "Blacksmith Ingots (game ready asset)" (https://sketchfab.com/3d-models/blacksmith-ingots-game-ready-asset-6ea0ab1141de40d68db5bcdccdb91d68) by Pixel Life (https://sketchfab.com/pixellife) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -258,8 +302,28 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Steel gate leaf" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Sleeping bag" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - This work is based on "Pirate Flag animated" (https://sketchfab.com/3d-models/pirate-flag-animated-e6b2c8a5be864ad6afba3bdfdde1aff2) by SusanKing (https://sketchfab.com/krolzuzannapl) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/); its post and strongbox made for ZONA with Higgsfield (text-to-3D) on the owner’s account
   Changes made: The post and strongbox made for ZONA in Higgsfield, the flag set on the post; kept at its size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Wooden door leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal door leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Hatch lid" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Garage door" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Small box" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Ladder" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Steel gate leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Stab vest" made for ZONA with Higgsfield (gpt_image_2_5 and Meshy multi-image-to-3D, front and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Its worn piece let go of the body and laid flat; scaled to 60 cm at its longest and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Crowbar" made for ZONA with Higgsfield (gpt_image_2_5 views and Meshy multi-image to 3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -351,6 +415,7 @@ The doors, a heavy blow and steel struck are out of the same two. A fist landing
 artisticdude (CC0). The police car's siren is [Police Siren](https://freesound.org/s/746302/) by TitanKaempfer (CC0).
 The animals' sounds are recordings cut by the same `npm run sounds` (the two credited above aside): a bear, [R19-13-Bear Roaring](https://freesound.org/s/479825/) by craigsmith; hooves, [Horse Running](https://freesound.org/s/792860/) by ebenvie; wolves, [Wolf howl](https://freesound.org/s/398430/) by NaturesTemper and [Howling wolves](https://freesound.org/s/378334/) by Kingcornz, and a snarl out of [Dog Growling Snarling Grumbling](https://freesound.org/s/122183/) by qubodup; a cow, [Cow moos](https://freesound.org/s/177253/) by JosephSardin; and a sick player throwing up, [Vomit, puking spilling water onto grass](https://freesound.org/s/338116/) by SpliceSound (all CC0).
 A raid's sounds are cut the same way, all CC0: a C4's timer, twoTone1 out of [Digital Audio](https://kenney.nl/assets/digital-audio) by Kenney; a satchel's fuse, [Fuse burning](https://freesound.org/s/45650/) by elonen; a wooden piece splintering, [R29-30-Breaking Wooden Poles](https://freesound.org/s/481936/) by craigsmith; a stone one crumbling, [Stone crumble 2](https://freesound.org/s/521956/) by kastenfrosch; a steel one coming down, [Big falling debris crash](https://freesound.org/s/703247/) by xkeril; and a sledgehammer on a wall, [sledgehammer hitting drywall stonewall](https://freesound.org/s/827432/) by jerryberumen.
+Building's own sounds are cut the same way, all CC0: a nail driven, out of [100 CC0 metal and wood SFX](https://opengameart.org/content/100-cc0-metal-and-wood-sfx) by rubberduck; a key lock's click, a latch, a box's lid, a ladder's creaks and a sleeping bag's rustle out of [RPG Audio](https://kenney.nl/assets/rpg-audio), a keypad's key and a code taken and refused out of [Interface Sounds](https://kenney.nl/assets/interface-sounds), and a wrong code's shock out of [Digital Audio](https://kenney.nl/assets/digital-audio), by Kenney; a knock, [knocking on wood door](https://freesound.org/s/629987/) by flem0527; a garage door, [roller shutter](https://freesound.org/s/335364/) by nicola_ariutti; a hand saw at a log, [Hand Saw Sawing Wood](https://freesound.org/s/383725/) by deleted_user_7146007.
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).

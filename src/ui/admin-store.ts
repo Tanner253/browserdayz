@@ -180,7 +180,7 @@ export class StoreTab {
   /** a finish: its picture, its name and number; clicked, it opens */
   private finishChip(o: Owned) {
     const { el } = this.h;
-    const c = el('button', `st-chip finish ${SHOP[o.item].skin?.finish ?? ''}${this.chip === o.id ? ' open' : ''}`);
+    const c = el('button', `st-chip finish ${SHOP[o.item].skin?.finish ?? SHOP[o.item].skin?.form ?? ''}${this.chip === o.id ? ' open' : ''}`);
     c.type = 'button';
     c.dataset.k = `chip:${o.id}`;
     const img = el('img');
@@ -360,7 +360,7 @@ export class StoreTab {
     const grid = el('div', 'adm-store-grid');
     for (let n = 1; n <= limit; n++) {
       const has = held.has(n), p = held.get(n);
-      const c = el('button', `${has ? `held ${SHOP[item].skin!.finish}` : 'free'}${ring === n ? ' ring' : ''}`, String(n));
+      const c = el('button', `${has ? `held ${SHOP[item].skin!.finish ?? SHOP[item].skin!.form}` : 'free'}${ring === n ? ' ring' : ''}`, String(n));
       c.type = 'button';
       c.title = has ? `No. ${n}: ${p ? p.name || p.acct : 'a payment waiting for a look'}` : `No. ${n}: free`;
       c.onclick = () => pick(n, has ? p : undefined);

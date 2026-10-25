@@ -8,6 +8,7 @@ import { RECIPE, RECIPES, type Level, type Recipe } from './recipes';
 import { ITEMS, type ItemInstance } from '../items';
 import { count } from './plan';
 import { MAT } from './materials';
+import { HELD_BACK } from '../build/raid';
 
 /** known from the start: everything made by hand, the forge's bar, and a bench's first tools, bed and plan */
 export const KNOWN_AT_START: ReadonlySet<string> = new Set([
@@ -15,12 +16,13 @@ export const KNOWN_AT_START: ReadonlySet<string> = new Set([
   'hammer', 'hatchet', 'building_plan', 'sleeping_bag',
 ]);
 
-/** each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there */
-export const TREE: Record<Level, readonly (readonly [string, number])[]> = {
+/** each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there (less what is held back: src/sim/build/raid.ts) */
+const TREE_ALL: Record<Level, readonly (readonly [string, number])[]> = {
   1: [['pickaxe', 20], ['hand_saw', 30], ['key_lock', 40], ['ammo_9mm', 50], ['ammo_45', 60]],
   2: [['gun_light', 75], ['sheet_metal', 90], ['sledgehammer', 110], ['red_dot', 140], ['colt', 175], ['m9', 225], ['satchel', 300]],
   3: [['ammo_762', 200], ['ammo_739', 225], ['suppressor_9', 260], ['pu_scope', 300], ['mosin9130', 350], ['mpa', 400], ['scorpion', 450], ['suppressor_739', 500], ['ak', 650], ['c4', 750]],
 };
+export const TREE = Object.fromEntries(Object.entries(TREE_ALL).map(([lv, list]) => [lv, list.filter(([id]) => !HELD_BACK.has(id))])) as unknown as Record<Level, readonly (readonly [string, number])[]>;
 
 /** how a recipe not yet known may be learned: its tree's place (and why not now), and researching it (and why not now) */
 export interface LearnWays {
@@ -40,7 +42,7 @@ const treeOf = (id: string): { lv: Level; i: number; cost: number } | null => {
 };
 
 /** what is still to learn: a bench's recipe not known from the start */
-export const learnable = (r: Recipe | undefined): r is Recipe => !!r && r.at === 'bench' && !KNOWN_AT_START.has(r.id);
+export const learnable = (r: Recipe | undefined): r is Recipe => !!r && r.at === 'bench' && !KNOWN_AT_START.has(r.id) && !HELD_BACK.has(r.makes);
 
 /** whether a recipe may be made by somebody who knows these */
 export const knows = (known: ReadonlySet<string>, id: string) => KNOWN_AT_START.has(id) || known.has(id);

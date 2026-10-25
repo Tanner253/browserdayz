@@ -8,7 +8,7 @@ import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { shown } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
-import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
+import { ITEMS, GEAR_SLOTS, holds, type ItemInstance } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
@@ -16,6 +16,7 @@ import { playerName, remoteServer, serverSays } from '../../net/client';
 import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
 import { bloodOf, bleedOf } from '../../sim/blood';
 import { type Avatar, GEAR_SHOWN, facepiece, DEATH_REST } from '../avatar';
+import { MOCAP_REST } from '../avatar/deeds';
 import { lookFor } from '../look';
 import { RemotePlayer, CorpseBody } from '../remote';
 import { Stash } from '../loot';
@@ -28,6 +29,8 @@ import { cashedTags, setPinned } from '../../ui/rewards';
 import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
 import { diffOps, laidIn, type Laid } from '../../sim/box-ops';
+import { bodyFor, voiceFor } from '../../sim/survivor';
+import { chosen, wornKey, sortWorn } from '../survivors';
 
 /** how near a crate is asked what is in it, and how often again while near (peekNear) */
 const PEEK_AT = 3.5, PEEK_AGAIN = 8000;
@@ -46,8 +49,8 @@ function searched(g: Game, at: THREE.Vector3): 'hard' | 'soft' | null {
  * The box to search on a body is where the body lies: behind where they stood if they went over backwards, ahead if
  * they went down on their face, beside it if they folded up. @returns how far ahead and to the left that is
  */
-export function searchedAt(stash: Stash, v: number): [number, number] {
-  const [ahead, left] = DEATH_REST[v] ?? DEATH_REST[0];
+export function searchedAt(stash: Stash, v: number, rest: [number, number][] = DEATH_REST): [number, number] {
+  const [ahead, left] = rest[v] ?? rest[0];
   if (v === 2) stash.trigger(0.6, 0.25, 0.6, -ahead, left);
   else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
   return [ahead, left];
@@ -252,7 +255,7 @@ export const onlineMethods = {
       r.wearTag();
     });
     net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setVip(!!m.vip)));
-    net.on('finish', (m) => this.finished(m.uid, m.f));
+    net.on('finish', (m) => this.finished(m.uid, m.f, m.id));
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
@@ -369,6 +372,12 @@ export const onlineMethods = {
       if (this.remotes.get(m.id)) void this.wear(this.remotes.get(m.id)!.avatar, m.g);
     });
     net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
+    net.on('who', (m) => {
+      const r = this.remotes.get(m.id);
+      if (!r) return;
+      r.avatar.wardrobe.setBody(m.bd);
+      r.voice = m.vo;
+    });
     net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
     net.on('hitok', (m) => {
@@ -436,6 +445,11 @@ export const onlineMethods = {
     net.on('cdata', (m) => {
       const st = this.findBox(m.cid);
       if (!st) return;
+      // (their own body: the button that puts it all back on is shown, src/game/game/reclaim.ts)
+      if (m.own && !st.own) {
+        st.own = true;
+        if (this.openStash === st && this.invUI.isOpen) this.invUI.render();
+      }
       // (What the server says is in it: what this game's moves are reckoned from. Its answer to this game's own moves
       // is what this game has already, and nothing is laid out again for it.)
       const same = st.known && JSON.stringify(st.container.serialize().items) === JSON.stringify(m.items);
@@ -633,6 +647,7 @@ export const onlineMethods = {
       this.meDirty = true;
     });
     net.on('kit', (m) => this.kitUp(m));
+    net.on('reclaimed', (m) => this.reclaimed(m));
     net.on('trash', (m) => this.trashed(m.uids, m.by));
     net.on('refill', (m) => this.refilled(m.by));
     net.on('inv', (m) => this.adminUI.setPockets(m));
@@ -859,6 +874,12 @@ export const onlineMethods = {
     if (p.id === this.net.id || this.remotes.has(p.id)) return;
     const r = new RemotePlayer(p.id, p.name, this.makeHeld);
     this.remotes.set(p.id, r);
+    // (who they are and what they wear, as they were when they came: what is said of either while their body is being
+    // made is put on when it is, and not undone by this; a game from before there were survivors to pick is given the
+    // one its name gives)
+    this.gearOf.set(p.id, p.g ?? []);
+    r.avatar.wardrobe.setBody(p.bd ?? bodyFor(p.name));
+    r.voice = p.vo ?? voiceFor(p.bd ?? bodyFor(p.name));
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
@@ -866,8 +887,7 @@ export const onlineMethods = {
     r.tagged = !!p.tag;
     r.wearTag();
     r.setWeapon(p.w, p.m, p.f);
-    void this.wear(r.avatar, p.g ?? []);
-    this.gearOf.set(p.id, p.g ?? []);
+    void this.wear(r.avatar, this.gearOf.get(p.id) ?? []);
     r.setGhost(!!p.hidden);
     r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);
@@ -877,7 +897,8 @@ export const onlineMethods = {
 
   /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
   act(this: Game, a: Act, d = 1) {
-    if (a === 'stop') this.avatar.act(null);
+    if (a === 'take') this.avatar.pickUp(d);
+    else if (a === 'stop') this.avatar.act(null);
     else this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, d);
     this.net.send({ t: 'act', a, d });
   },
@@ -885,7 +906,10 @@ export const onlineMethods = {
   /** hat, vest and pack as they sit on a body */
   async wear(this: Game, body: Avatar, ids: string[]) {
     const out: { id: string; obj: THREE.Object3D }[] = [];
-    for (const id of ids) {
+    // (the clothes as they are worn, and the rest hung on the body)
+    const { worn, gear } = sortWorn(ids);
+    body.wardrobe.setWorn(worn);
+    for (const id of gear) {
       if (!GEAR_SHOWN.has(id)) continue;
       const model = (await this.loot.models.get(id)).group.clone();
       out.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
@@ -903,11 +927,14 @@ export const onlineMethods = {
     this.net.send({ t: 'back', b });
   },
 
+  /** what this player wears that a body shows: the clothes by their colours (src/game/survivors.ts), and the hats, vests and packs (GEAR) */
+  wornKeys(this: Game): string[] {
+    return GEAR_SLOTS.map((s) => this.inv.slots[s]).filter((x): x is ItemInstance => !!x && (GEAR_SHOWN.has(x.id) || !!ITEMS[x.id]?.dress)).map(wornKey);
+  },
+
   /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
   syncGear(this: Game) {
-    // (every place a thing is worn in, and of what is worn there whatever has a model for the body: head, face, vest
-    // and back today, as it was when those four were named here; a thing made for any other place is sent the day it is)
-    const ids = GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x));
+    const ids = this.wornKeys();
     const key = ids.join(',');
     if (key === this.gearKey) return;
     this.gearKey = key;
@@ -933,7 +960,8 @@ export const onlineMethods = {
         const name = mine ? playerName() : q.name, key = `${name}|${worn.join(',')}`;
         if (!this.heads.has(key) && fresh < 3) {
           fresh++;
-          this.heads.set(key, await renderDoll(r.renderer, atmo.envMap, lookFor(name), worn, this.loot.models, true).catch(() => ''));
+          const body = mine ? chosen(name).body : this.remotes.get(q.id)?.avatar.wardrobe.body ?? bodyFor(name);
+          this.heads.set(key, await renderDoll(r.renderer, atmo.envMap, lookFor(name), worn, this.loot.models, true, body).catch(() => ''));
         }
         const url = this.heads.get(key);
         if (url) out[q.id] = url;
@@ -951,7 +979,7 @@ export const onlineMethods = {
     const { r, atmo } = this.s;
     const worn = this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : [];
     const mine = ++this.portraitN;
-    void renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), worn, this.loot.models).then((doll) => {
+    void renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), worn, this.loot.models, false, chosen(playerName()).body).then((doll) => {
       // (a later one may have been asked for while this was drawn)
       if (mine !== this.portraitN || !this.invUI) return;
       this.invUI.doll = doll;
@@ -1006,12 +1034,13 @@ export const onlineMethods = {
     // (dog tags lie on a body, and are taken off it: see Container.refusal)
     stash.container.tagsHere = true;
     const v = c.v ?? 0;
-    const [ahead, left] = searchedAt(stash, v);
+    // (a survivor falls on the motion capture, and lies where that leaves them)
+    const [ahead, left] = searchedAt(stash, v, MOCAP_REST);
     const body = new CorpseBody();
     this.corpses.set(c.uid, { stash, body });
     if (wait) await new Promise((r) => setTimeout(r, wait));
     if (!this.corpses.has(c.uid)) return;
-    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope);
+    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope, c.bd ?? bodyFor(c.name));
     // and what has run out of it by then
     this.effects.pool(c.x - Math.sin(c.rot) * ahead * 0.75 - Math.cos(c.rot) * left, c.y, c.z - Math.cos(c.rot) * ahead * 0.75 + Math.sin(c.rot) * left);
   },

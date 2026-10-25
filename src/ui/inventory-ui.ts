@@ -23,12 +23,16 @@
 
 import { ALL_SLOTS, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { TOOL_LIFE, condition } from '../sim/gather';
+import { bandagesFrom, cuttable } from '../sim/condition';
 import { Container, bagGrid, poured, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon } from './act-icons';
-import { lookOf } from '../../api/_lib/shop-items';
+import { lookOf, type ItemId, type Look } from '../../api/_lib/shop-items';
+
+/** a finish's name, as the menu says it */
+const LOOK_NAME: Partial<Record<Look, string>> = { carbon: 'carbon fibre', nightcamo: 'night camo' };
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
 import { TAKE_GROUPS, fitsGuns, inTakeGroup, type TakeGroup } from './inv-take';
@@ -62,6 +66,9 @@ export interface InvActions {
   onGround(w: WorldItem, how: 'use' | 'open'): void;
   /** take the rounds out of a weapon */
   unload(item: ItemInstance): void;
+  /** cut a piece of clothing into bandages, and whether a blade is carried to (src/sim/condition.ts) */
+  cut(item: ItemInstance): void;
+  canCut(): boolean;
   /** carried weapons this attachment can be fitted to right now */
   attachTargets(att: ItemInstance): ItemInstance[];
   /** @param loose picked up off the ground to be fitted: held by nothing */
@@ -97,11 +104,13 @@ export interface InvActions {
   /** a line said to the player */
   note(text: string): void;
   /** the store finish of theirs this gun can be given ('gold', 'nickel'), where it does not wear it already; else null */
-  finishFor(item: ItemInstance): 'gold' | 'nickel' | null;
+  finishFor(item: ItemInstance): { id: ItemId; look: Look | null; form: string | null }[];
   /** that finish put on it for good, by the server (server/plates.ts) */
-  applyFinish(item: ItemInstance): void;
+  applyFinish(item: ItemInstance, f: ItemId): void;
   /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
-  plateIcon(id: string, f: 'gold' | 'nickel'): void;
+  plateIcon(id: string, f: Look): void;
+  /** everything on this player's own body, open, back onto them as it was worn and carried (src/game/game/reclaim.ts) */
+  reclaim(): void;
   /** whether two carried things dragged onto each other go into a hand recipe (src/game/crafting.ts) */
   craftWith?(a: ItemInstance, b: ItemInstance): boolean;
   /** the card of the recipes they go into, where they were let go */
@@ -1642,7 +1651,7 @@ export class InventoryUI {
     const st = this.stash, bar = st ? (this.actions.stashBar?.(st) ?? null) : null;
     const stashPart = !st
       ? []
-      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}|${bar?.sig ?? ''}`, () => {
+      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${st.own}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}|${bar?.sig ?? ''}`, () => {
           const out: Node[] = [];
           const head = document.createElement('h3');
           head.innerHTML = `${st.label} <span>${st.container.w}×${st.container.h}</span>`;
@@ -2139,6 +2148,11 @@ export class InventoryUI {
       const room = this.inv.containers.some((c) => c.hasRoom(it));
       if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', id: 'off', run: () => this.takeOff(loc) });
     }
+    // (clothes taken off and empty are cut into bandages with a blade carried, as DayZ cuts them into rags)
+    if (this.carried(loc) && loc.kind !== 'slot' && cuttable(it) && this.actions.canCut()) {
+      const n = bandagesFrom(it);
+      out.push({ label: `Cut into ${n} bandage${n === 1 ? '' : 's'}`, icon: { kind: 'bandage' }, id: 'cut', run: () => this.actions.cut(it) });
+    }
     if (d.mag) {
       // (filled from the loose rounds carried, as letting them go on it does: Fettah 2026-10-18, "instead of dragging rounds in by hand")
       const room = d.mag.capacity - (it.rounds ?? 0), loose = this.actions.looseFor(it);
@@ -2177,8 +2191,8 @@ export class InventoryUI {
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, icon: 'detach', run: () => this.actions.detach(it, m) });
     // (a finish from the store, put on this one gun and kept with it, Rust's way: the owner, 2026-10-22, "maybe open a
     // menu when we have options, but for now an apply")
-    const look = this.carried(loc) ? this.actions.finishFor(it) : null;
-    if (look) out.push({ label: `Apply ${look} finish`, icon: 'shine', id: 'finish', run: () => this.actions.applyFinish(it) });
+    // (one for each finish of theirs it can take: a knife may take any of several)
+    if (this.carried(loc)) for (const f of this.actions.finishFor(it)) out.push({ label: f.form ? `Make it a ${ITEMS[f.form]?.name.toLowerCase() ?? f.form}` : `Apply ${LOOK_NAME[f.look!] ?? f.look} finish`, icon: 'shine', id: `finish-${f.id}`, run: () => this.actions.applyFinish(it, f.id) });
     if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, icon: inStash ? 'take' : 'move', id: 'across', run: () => this.transfer(loc), primary: inStash });
     out.push({
       label: 'Drop',
@@ -2281,6 +2295,16 @@ export class InventoryUI {
       b.addEventListener('click', () => this.takeAll(group));
       bar.appendChild(b);
     };
+    // (their own body: one press puts back on everything that was worn and carried, src/sim/reclaim.ts)
+    if (this.stash?.own && this.stash.container.items.length) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'inv-reclaim';
+      b.textContent = 'Reclaim gear';
+      b.title = 'Your own body: puts back on everything you wore and carried, where there is room';
+      b.addEventListener('click', () => this.actions.reclaim());
+      bar.appendChild(b);
+    }
     add('Take all', null, this.takeList(null).length);
     // (with only what fits shown, every kind's button would take the same as "Take all")
     if (!this.fitting) for (const g of TAKE_GROUPS) add(g.label, g.id, this.takeList(g.id).length);

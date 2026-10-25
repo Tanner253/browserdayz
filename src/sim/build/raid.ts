@@ -10,11 +10,23 @@ import type { BaseSolids } from './solid';
 
 type V3 = [number, number, number];
 
+/**
+ * The charges held back for now: neither found nor learned at a bench, given only by an admin, to be tried (the owner,
+ * 2026-10-25: "right now c4 shouldnt be craftable or lootable from players but it should be accsisble to admins sam ewith
+ * satchel charges ... players will ened time to make bases before theyll be raiding eachother anyways"). Their recipes
+ * and their numbers here stay as they are, for when raiding opens.
+ */
+export const HELD_BACK: ReadonlySet<string> = new Set(['c4', 'satchel']);
+
 export interface Charge {
   /** what it takes off a piece it reaches at a hand's breadth, by tier (Frame, Wood, Stone, Metal, Armoured) */
   dmg: number[];
   /** and it falls to nothing this far off, metres */
   reach: number;
+  /** the share of it that reaches anything but what it is stuck to (Rust's sharp falloff: one charge in the corner of
+   * two walls brings down one, not both, the owner, 2026-10-25: "as to not destroy multiple walls easily with 1 satch
+   * placement in the intersection of walls") */
+  splash: number;
   /** its fuse, seconds: from the first figure to the second */
   fuse: [number, number];
   /** the share of them that do not go off when the fuse ends (lit again with a hand on it) */
@@ -38,11 +50,11 @@ export const RAID = {
   other: [10, 1, 0, 0, 0],
   charge: {
     // (one C4 takes a wooden wall, two a stone one, four a metal one, eight an armoured one, as Rust's)
-    c4: { dmg: [5000, 520, 520, 520, 520], reach: 2.5, fuse: [10, 10], dud: 0 },
+    c4: { dmg: [5000, 520, 520, 520, 520], reach: 2.5, splash: 0.1, fuse: [10, 10], dud: 0 },
     // (crafting's satchel: "a hundred rounds of powder to blow one door". A wooden door is 250: one; a wooden wall two,
     // a stone wall ten, a metal wall twenty-three, as Rust's; its fuse runs from six to twelve seconds, and one in five
     // does not go off)
-    satchel: { dmg: [5000, 260, 105, 90, 90], reach: 2, fuse: [6, 12], dud: 0.2 },
+    satchel: { dmg: [5000, 260, 105, 90, 90], reach: 2, splash: 0.1, fuse: [6, 12], dud: 0.2 },
   } as Record<string, Charge>,
   /** how far from the eye a blow is believed to land on a piece, and a charge to be stuck, metres */
   reach: { blow: 3.4, plant: 2.8 },
@@ -72,10 +84,15 @@ export const fuseOf = (w: string, r: number) => {
 
 /**
  * What a charge gone off at `at` does to every base about it: each piece it reaches and what it then has left
- * (`hp` at 0 or under: broken). The pieces themselves are not changed: whoever owns them does that.
+ * (`hp` at 0 or under: broken). The piece it is stuck to (behind it along `n`, its face's outward line; or, not said,
+ * the nearest within a hand's breadth) takes all of it; anything else only its splash. The pieces themselves are not
+ * changed: whoever owns them does that.
  */
-export function blastOn(solids: BaseSolids, at: V3, w: string): { base: Base; p: Piece; hp: number }[] {
+export function blastOn(solids: BaseSolids, at: V3, w: string, n?: V3): { base: Base; p: Piece; hp: number }[] {
   const c = RAID.charge[w];
   if (!c) return [];
-  return solids.reached(at, c.reach).map(({ base, p, d }) => ({ base, p, hp: p.hp - chargeOf(w, p, d) }));
+  const all = solids.reached(at, c.reach);
+  const near = all.reduce<(typeof all)[number] | null>((m, r) => (r.d <= 0.15 && (!m || r.d < m.d) ? r : m), null);
+  const on = n ? solids.first(at, [at[0] - n[0] * 0.2, at[1] - n[1] * 0.2, at[2] - n[2] * 0.2], 'shot')?.p ?? near?.p : near?.p;
+  return all.map(({ base, p, d }) => ({ base, p, hp: p.hp - (p === on ? chargeOf(w, p, 0) : chargeOf(w, p, d) * c.splash) }));
 }

@@ -45,10 +45,10 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // or plates; and a gas mask if you are lucky: the masks are the police's, "bar what one of the army's cases or a
   // supply drop turns up". 2026-10-13: "ammo should be more abundant in polive stations and armories ... i should find
   // all ammo there": a handful of every calibre the army kept.)
-  wooden_military_crate: { label: 'Military Crate', w: 8, h: 4, count: [2, 4], usage: ['Military'], tier: 2, lean: { weapon: 0.18, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
-  old_military_crate: { label: 'Ammunition Crate', w: 8, h: 4, count: [2, 4], usage: ['Military'], tier: 2, lean: { weapon: 0.15, ammo: 0.6, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
+  wooden_military_crate: { label: 'Military Crate', w: 8, h: 4, count: [2, 4], usage: ['Military'], tier: 2, lean: { melee: 0, weapon: 0.18, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
+  old_military_crate: { label: 'Ammunition Crate', w: 8, h: 4, count: [2, 4], usage: ['Military'], tier: 2, lean: { melee: 0, weapon: 0.15, ammo: 0.6, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
   // (the hard case that stands wherever a military crate or an ammunition crate stood, and a little better filled)
-  weapons_case: { label: 'Weapons Case', w: 8, h: 4, count: [2, 5], usage: ['Military'], tier: 2, lean: { weapon: 0.2, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
+  weapons_case: { label: 'Weapons Case', w: 8, h: 4, count: [2, 5], usage: ['Military'], tier: 2, lean: { melee: 0, weapon: 0.2, ammo: 0.35, magazine: 0.5, food: 4, drink: 3, medical: 1.5 }, up: 0.08, also: [['gasmask', 0.05]] },
   // (a wooden crate is of the outskirts, of their farms, yards and sheds: food, tools, something to hit with, and no gun)
   wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, count: [1, 3], usage: ['Farm', 'Industrial', 'Hunting', 'Village'], tier: 1, lean: { food: 3, drink: 2.5, misc: 2, melee: 0.5, tool: 0.7, weapon: 0 } },
   // The steel cabinets of the hospital, of a clinic and of the police (2026-10-12: "the metal lockers found in the police
@@ -58,14 +58,15 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // and what every gun fires.
   med_cabinet: { label: 'Locker', w: 4, h: 6, count: [2, 4], usage: ['Medic'], tier: 3 },
   hospital_cabinet: { label: 'Locker', w: 4, h: 6, count: [2, 4], usage: ['Hospital'], tier: 3 },
-  police_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Police'], tier: 3, lean: { weapon: 0.2 } },
+  police_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Police'], tier: 3, lean: { weapon: 0.2, clothing: 4 } },
   // The steel locker with two doors (see HUNG): a soldier's, in a barracks or a long hut (2026-10-13), where a man kept
   // his clothes, something to eat and to smoke, a dressing, a torch and a handful of what his pistol fired; a pistol
   // itself seldom, those are in the cases. In a police building it is a constable's, in the hospital a clinic's cabinet.
   steel_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Military'], tier: 2, lean: { clothing: 4, food: 8, drink: 5, misc: 1, medical: 2, tool: 3, melee: 2, ammo: 0.12, weapon: 0.05, magazine: 0.2, attachment: 0.2 } },
   // What is searched down the bunker ("abundant supplies in the T5": a rack is never bare, and a locker seldom), and on
   // its racks the long things.
-  locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5 },
+  // (and clothes, as a soldier's steel locker leans: the owner, 2026-10-25, the gas's and the bunker's pieces in their lockers)
+  locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5, lean: { clothing: 4 } },
   // (in the bunker its own, the best; anywhere else, the military's of the step it stands on: see fillCrate's `at`)
   // (as full as its step is rich: a thing or two in a village's, three to five down the bunker, the owner: "loot density
   // depends on tier it spawns in"; ten across, as a .50 is long)

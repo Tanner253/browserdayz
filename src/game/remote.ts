@@ -96,6 +96,8 @@ export const SEARCHED = { hands: 1.4, heard: 18 };
 
 export class RemotePlayer implements Damageable {
   alive = true;
+  /** the voice they call out in (src/sim/survivor.ts VOICES) */
+  voice = 0;
   pos = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
@@ -437,6 +439,7 @@ export class RemotePlayer implements Damageable {
   act(a: Act, dur: number, listener: THREE.Vector3, searched: 'hard' | 'soft' | null = null) {
     if (!this.ready || !this.alive) return;
     if (a === 'stop') return this.avatar.act(null);
+    if (a === 'take') return this.avatar.pickUp(dur);
     // (rounds going into a magazine and a box being torn open are hands at work in front of the body, as opening anything is)
     this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, dur);
     if (searched) {
@@ -461,7 +464,7 @@ export class RemotePlayer implements Damageable {
     if (e.move) this.avatar.emote(e.move, e.dur);
     const head = this.head(new THREE.Vector3());
     const d = head.distanceTo(listener);
-    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, voiceOf(this.name));
+    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, this.voice, voiceOf(this.name));
   }
 
   /** your shot or blow landed on them: the server decides what it did, this is the flinch and the grunt */
@@ -690,8 +693,10 @@ export class CorpseBody {
   private gone = false;
   /** @param name whose body it is: it is dressed the way they were */
   /** @param slope which way is up out of what it lies on (on a hillside it lies along the hill, not level in the air over it) */
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3) {
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3, bd: number | null = null) {
+    this.avatar.wardrobe.setBody(bd);
     await this.avatar.load(atmo, 0, false, lookFor(name));
+    await this.avatar.wardrobe.ready();
     if (this.gone) return void this.avatar.dispose();
     scene.add(this.avatar.root);
     this.avatar.layDown(variant);

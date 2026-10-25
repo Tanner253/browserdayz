@@ -1,0 +1,16 @@
+/* Which survivor you are (src/ui/who.ts): a card at the right of the menu, as the name field is drawn, clear of the updates tab below it */
+.sm-who { position: absolute; right: 40px; bottom: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 214px; padding: 10px 10px 12px; background: rgba(10, 12, 11, 0.74); border: 1px solid rgba(232, 228, 214, 0.3); border-radius: 4px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
+.sw-label { font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
+.sw-stage { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; }
+.sw-stage img { display: block; width: 150px; height: 291px; object-fit: contain; }
+.sw-go { position: absolute; top: 50%; width: 30px; height: 54px; margin-top: -27px; padding: 0; font-size: 34px; line-height: 50px; color: var(--ink); background: rgba(232, 228, 214, 0.06); border: 1px solid rgba(232, 228, 214, 0.25); border-radius: 3px; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; }
+.sw-go:hover { color: var(--brand); border-color: var(--brand); background: rgba(255, 211, 90, 0.08); }
+.sw-go[data-by='-1'] { left: 0; }
+.sw-go[data-by='1'] { right: 0; }
+.sw-name { font-family: var(--mono); font-size: 19px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+.sw-dots { display: flex; gap: 6px; }
+.sw-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(232, 228, 214, 0.25); }
+.sw-dots i.on { background: var(--brand); }
+/* (not while a sheet of the menu is open, nor in the pause menu, nor while the way in is being taken) */
+.hud-start.sheet .sm-who, .hud-start.paused .sm-who, .hud-start.busy .sm-who { display: none; }
+@media (max-width: 900px), (max-height: 620px) { .sm-who { transform: scale(0.72); transform-origin: right bottom; right: 12px; bottom: 12px; } }

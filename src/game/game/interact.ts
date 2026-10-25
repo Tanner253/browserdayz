@@ -8,6 +8,7 @@ import { physics, USE_GROUPS, SIGHT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { Door } from '../../world/buildings';
 import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf, ZONA_VOID } from '../../sim/items';
+import { LOOT_BAG } from '../../sim/items/build';
 import { inPlay } from '../../world/worldgen';
 import { CRATE_RESTOCK } from '../../sim/crates';
 import { POLICE_CAR } from '../../sim/vehicles';
@@ -21,11 +22,17 @@ import { waterName } from '../../sim/water';
 import { STALLS } from '../../sim/camp';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 import { finishDay, finishOn, type Finish } from '../finish';
-import { lookOf } from '../../../api/_lib/shop-items';
+import { formOf, lookOf, type ItemId } from '../../../api/_lib/shop-items';
 import { renderIcons } from '../../ui/icons';
 
 export const interactMethods = {
   // ------------------------------------------------------------ interaction
+
+  /** the body bends to take something up, right down for what lies at the feet (see Avatar.pickUp), and everybody sees it */
+  bendFor(this: Game, w: WorldItem) {
+    if (this.player.prone || this.garage.ride) return;
+    this.act('take', w.loot.y - this.player.pos.y < 0.5 ? 1.4 : 1.0);
+  },
 
   updateInteraction(this: Game, cam: THREE.PerspectiveCamera) {
     this.prompt = null;
@@ -96,7 +103,16 @@ export const interactMethods = {
       const wet = well ? null : this.waterHere();
       if (wet) c.set(wet.under ? this.player.pos.x + dir.x * 1.2 : wet.x, wet.surface, wet.under ? this.player.pos.z + dir.z * 1.2 : wet.z);
       else if (well) c.set(well.x, well.y + 0.8, well.z);
-      if ((well || wet) && c.sub(cam.position).normalize().dot(dir) > 0.55) {
+      // (water only when it is looked down into, the aim meeting its surface within reach: wading through the swamp
+      // looking ahead it said drink the whole way, the owner, 2026-10-25: "i should not see 'hold f to drink' unless im
+      // looking down into the water")
+      let into = false;
+      if (wet && dir.y < -0.3) {
+        const t = (wet.surface - cam.position.y) / dir.y, hx = cam.position.x + dir.x * t, hz = cam.position.z + dir.z * t;
+        const w = this.player.water(hx, hz);
+        into = t > 0 && Math.hypot(hx - this.player.pos.x, hz - this.player.pos.z) < 2.4 && !!w && Math.abs(w.surface - wet.surface) < 0.3;
+      }
+      if ((well && c.sub(cam.position).normalize().dot(dir) > 0.55) || into) {
         const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
         const dry = this.player.vitals.water < 99;
         const held = this.inHand && ITEMS[this.inHand.id].use?.sips ? this.inHand : null;
@@ -161,6 +177,11 @@ export const interactMethods = {
       const spade = d.category === 'stash' && this.weapons.equippedItem?.id === 'shovel';
       // (a log, and a saw in the hands: the left button saws it into planks where it lies, src/game/gathering.ts)
       const saw = item.id === 'log' && this.gather.canSaw();
+      // (a broken box's bag is gone through where it lies, never taken: see LOOT_BAG)
+      if (item.id === LOOT_BAG.id) {
+        this.prompt = `<kbd>Tab</kbd>Go through the ${d.name}${qty}`;
+        return;
+      }
       this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : saw ? ' <small>the left button saws it into planks</small>' : ''}`;
       if (spade && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
       if (saw && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.gather.saw(owner.loot);
@@ -179,12 +200,14 @@ export const interactMethods = {
             return;
           }
           if (!this.takeWorldItem(owner)) return;
+          this.bendFor(owner);
           if (!this.takeUp(item, true)) return;
           audio.ui('pickup', undefined, item.id);
           this.hud.note(`${d.name}: in your hands, there is no room to put it away`, 'info');
           return;
         }
         if (!this.takeWorldItem(owner)) return;
+        this.bendFor(owner);
         const left = this.inv.add(item);
         if (left) this.dropItem(left);
         audio.ui('pickup', undefined, item.id);
@@ -366,10 +389,13 @@ export const interactMethods = {
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   },
 
-  /** the store finish of theirs this gun can be given, where it does not wear it already (server/plates.ts) */
-  finishFor(this: Game, it: ItemInstance): Finish | null {
-    const f = this.online ? this.perks.skin(it.id) : null;
-    return f && it.finish !== f ? lookOf(f) : null;
+  /** the store finishes of theirs this gun can be given, but the one it wears; and the kinds a knife can be made (server/plates.ts) */
+  finishFor(this: Game, it: ItemInstance): { id: ItemId; look: Finish | null; form: string | null }[] {
+    if (!this.online) return [];
+    return this.perks
+      .skinsFor(it.id)
+      .map((f) => ({ id: f, look: lookOf(f), form: formOf(f) }))
+      .filter((o) => (o.form ? it.id !== o.form : it.finish !== o.id));
   },
 
   /** a plated gun's picture, drawn once from its model with the finish on (src/ui/icons.ts) and shared by the inventory and the hot keys */
@@ -387,17 +413,25 @@ export const interactMethods = {
   },
 
   /** Apply: asked of the server, which keeps it on the gun; what it carries is told first, so that it finds the gun */
-  applyFinish(this: Game, it: ItemInstance) {
-    if (!this.finishFor(it)) return;
+  applyFinish(this: Game, it: ItemInstance, f: ItemId) {
+    if (!this.finishFor(it).some((o) => o.id === f)) return;
     this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
-    this.net.send({ t: 'finish', uid: it.uid });
+    this.net.send({ t: 'finish', uid: it.uid, f });
   },
 
   /** the server has put a finish on one of our guns: on it from now, wherever it goes */
-  finished(this: Game, uid: string, f: string) {
+  finished(this: Game, uid: string, f: string, id?: string) {
     const it = this.inv.find((t) => t.uid === uid) ?? (this.inHand?.uid === uid ? this.inHand : null);
     if (!it) return;
-    it.finish = f;
+    // (a knife made another kind: taken up again in the hands if it is there, as what it is now)
+    const form = formOf(f);
+    if (form) {
+      it.id = id ?? form;
+      if (this.weapons.equippedItem === it) {
+        this.weapons.take(null);
+        this.weapons.take(it);
+      }
+    } else it.finish = f;
     this.weapons.refinish();
     this.syncHeld();
     this.inventoryChanged();

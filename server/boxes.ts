@@ -5,7 +5,9 @@
 import { PIECES } from '../src/sim/build/pieces';
 import { toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import type { StoredItem } from '../src/net/protocol';
-import { boxes, economy, world } from './index';
+import { LOOT_BAG } from '../src/sim/items/build';
+import { newUid } from '../src/sim/items';
+import { boxes, economy, stashItem, world, type Box } from './index';
 import { bases } from './build';
 
 const cidOf = (b: number, p: number) => `bbox:${b}:${p}`;
@@ -30,14 +32,15 @@ export function spillBoxes(b: number, ids: number[]) {
     const box = boxes.get(cidOf(b, p));
     if (!box) continue;
     boxes.delete(box.cid);
-    box.items.forEach((it, i) => {
-      const { x: _x, y: _y, rot: _r, ...item } = it as StoredItem & { rot?: boolean };
-      const a = (i / Math.max(1, box.items.length)) * Math.PI * 2;
-      // (on the floor it stood on, or whatever is under: server/solid.ts)
-      const x = box.x + Math.cos(a) * 0.7, z = box.z + Math.sin(a) * 0.7;
-      economy.drop(item, x, world.standAt(x, box.y + 0.3, z) + 0.03, z, a);
-    });
+    bagged(box);
   }
+}
+
+/** a broken store's things in one bag where it stood, on the floor it stood on or whatever is under (Rust's loot bag: LOOT_BAG) */
+export function bagged(box: Box) {
+  if (!box.items.length) return;
+  const bag = stashItem({ ...box, cid: newUid(), item: LOOT_BAG.id });
+  economy.drop(bag, box.x, world.standAt(box.x, box.y + 0.3, box.z) + 0.03, box.z, box.rot);
 }
 
 /** after the bases are read back: each box's store made again with what was kept in it */

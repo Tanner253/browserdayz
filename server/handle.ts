@@ -3,6 +3,8 @@
 
 import { holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/sim/items';
+import { LOOT_BAG } from '../src/sim/items/build';
+import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { ANIMALS } from '../src/sim/animals';
@@ -34,9 +36,9 @@ import { roleRows } from './roles';
 const LYING_REACH = 4;
 import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { shotHeard } from '../src/sim/heard';
-import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, releaseLock, seatOf } from './acts';
+import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, pidOf, releaseLock, seatOf } from './acts';
 import { cameTo, holdsTag, keepToTheirs, payingTags, wentFrom } from './custody';
-import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, refusedNow, shutIt } from './searched';
+import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, reclaimBody, refusedNow, shutIt } from './searched';
 import { scores } from './queue';
 import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
@@ -233,8 +235,23 @@ export function handle(c: Client, m: C2S) {
     case 'gear': {
       // only things that are worn, and only as many as there are places to wear them (there were six places, and
       // the list was cut to six: there are eleven now, and whatever is drawn of any of them has room in it)
-      c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, GEAR_SLOTS.length);
+      // (a piece of clothing comes as id~colour, its colour one of those it has)
+      c.g = (Array.isArray(m.g) ? m.g : []).filter((x): x is string => {
+        if (typeof x !== 'string') return false;
+        const [id, k, more] = x.split('~'), def = ITEMS[id];
+        if (!def?.wear || more !== undefined) return false;
+        return k === undefined || (/^[1-9]d?$/.test(k) && +k < (def.colours?.length ?? 0));
+      }).slice(0, GEAR_SLOTS.length);
       broadcast({ t: 'gear', id: c.id, g: c.g }, c);
+      return;
+    }
+    case 'who': {
+      // another body or voice picked: anything but one there is, and nothing is changed
+      const bd = pickOf(m.bd, BODY_NAMES.length), vo = pickOf(m.vo, VOICES.length);
+      if (bd === null || vo === null || (bd === c.bd && vo === c.vo)) return;
+      c.bd = bd;
+      c.vo = vo;
+      broadcast({ t: 'who', id: c.id, bd, vo }, c);
       return;
     }
     case 'back': {
@@ -480,6 +497,8 @@ export function handle(c: Client, m: C2S) {
       // first request wins; the economy's despawn event tells everyone it is gone
       // (and nobody reaches the ground from a jeep's seat)
       const lying = economy.loot.get(m.uid);
+      // (a broken box's bag is gone through where it lies, never carried off: see LOOT_BAG)
+      if (lying?.item.id === LOOT_BAG.id) return void send(c, { t: 'denied', uid: m.uid });
       const far = lying && CHECKS !== 'off' ? Math.hypot(lying.x - c.pose[0], lying.z - c.pose[2]) : 0;
       if (lying && far > CHECK.reach && flag(c, `took ${ITEMS[lying.item.id]?.name ?? lying.item.id} from ${Math.round(far)} m away`)) {
         send(c, { t: 'denied', uid: m.uid });
@@ -560,7 +579,15 @@ export function handle(c: Client, m: C2S) {
       if (!hasOpen(c, m.cid)) openIt(c, m.cid);
       c.openCid = m.cid;
       touched(b);
-      send(c, { t: 'cdata', cid: m.cid, items: boxItems(b) });
+      // (their own body: its gear theirs to take back at one press, 'reclaim')
+      send(c, { t: 'cdata', cid: m.cid, items: boxItems(b), ...(b.pid && b.pid === pidOf(c.key) ? { own: true as const } : {}) });
+      return;
+    }
+    case 'reclaim': {
+      const b = typeof m.cid === 'string' ? boxes.get(m.cid) : undefined;
+      if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
+      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
+      reclaimBody(c, b);
       return;
     }
     case 'cpeek': {
@@ -752,9 +779,9 @@ export function handle(c: Client, m: C2S) {
       return void storeOrder(c, m.act);
     // (their finish put on a gun they carry, for good: plates.ts)
     case 'finish': {
-      const it = c.alive ? plating.apply(c.inv, m.uid, (gun) => perks.skin(c.key, gun)) : 'Not now';
-      if (typeof it === 'string') return send(c, { t: 'tell', kind: 'warn', text: it });
-      return send(c, { t: 'finish', uid: it.uid, f: it.finish! });
+      const done = c.alive ? plating.apply(c.inv, m.uid, (gun) => perks.skin(c.key, gun, m.f)) : 'Not now';
+      if (typeof done === 'string') return send(c, { t: 'tell', kind: 'warn', text: done });
+      return send(c, { t: 'finish', uid: done.it.uid, f: done.f, id: done.it.id });
     }
     case 'tint': {
       if (roleOf(c) !== 'admin') return;

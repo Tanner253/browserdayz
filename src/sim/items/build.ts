@@ -7,6 +7,14 @@
 import type { ItemDef } from '../items';
 import { HOMES, SHEDS, IN_SHEDS } from './rules';
 
+/**
+ * A broken box's things, in one bag where it stood, gone through where it lies and never picked up: gone itself once it
+ * is emptied, or this long after (ms), near anybody or not (the owner, 2026-10-25: "if it has loot and is a container
+ * then it drops as a bag on the ground but it despawns like loot dropped on the ground within 10 mins ... defer to
+ * rust"). As big inside as the biggest store, the large box's, so each thing keeps its place.
+ */
+export const LOOT_BAG = { id: 'loot_bag', life: 10 * 60_000 };
+
 export const BUILD_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- materials
   // (a log is long and heavy: a big pack takes one, otherwise it is carried in the hands, as in DayZ)
@@ -83,6 +91,8 @@ export const BUILD_ITEMS: ItemDef[] = [
     loot: { pair: 'SleepingBag', at: [2, 3, 2, 0, 0], restock: 600, usage: ['Hunting', 'Village'], favour: { Hunting: 3 } },
     worth: 3,
   },
+  { id: 'loot_bag', name: 'Loot Bag', model: 'trashbag', w: 2, h: 3, weight: 0.3, category: 'stash', scale: 0.7, stash: [10, 8],
+    desc: 'What was in a box when it was broken. Go through it where it lies: it is gone once emptied, or ten minutes on.' },
   // (the owner, 2026-10-24: "found around, (tier 1 flashlight reuse the fire from campfire and cars put it on a stick boom
   // you have a torch)": lit with L in the hands, or set on a wall with the building plan)
   { id: 'torch', name: 'Torch', model: 'torch', w: 1, h: 4, weight: 0.5, category: 'tool',
@@ -94,7 +104,8 @@ export const BUILD_ITEMS: ItemDef[] = [
   // only where the army was, and seldom; crafting's satchel charge is the cheaper way through a door: src/sim/build/raid.ts)
   { id: 'c4', name: 'C4 Charge', model: 'c4', w: 1, h: 2, weight: 1.2, category: 'tool',
     desc: 'Three blocks of plastic explosive taped to a timer. In your hands, the left button sticks it to a wall, a door or a floor within reach: ten seconds later it goes off. One takes a wooden wall, two a stone one, four a metal one.',
-    loot: { pair: 'PlasticExplosive', at: [0, 0, 0, 1, 2], restock: 3600, usage: ['Military'] },
+    // (held back for now, src/sim/build/raid.ts HELD_BACK: none found. When raiding opens, at [0, 0, 0, 1, 2])
+    loot: { pair: 'PlasticExplosive', at: [0, 0, 0, 0, 0], restock: 3600, usage: ['Military'] },
     worth: 40,
   },
   { id: 'key', name: 'Key', model: 'key', w: 1, h: 1, weight: 0.02, category: 'misc',

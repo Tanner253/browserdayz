@@ -12,7 +12,7 @@
 
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS } from '../../core/physics';
-import { audio } from '../../core/audio';
+import { audio, buildRecordings } from '../../core/audio';
 import type { Input } from '../../core/input';
 import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
@@ -60,6 +60,8 @@ export interface BuildHost {
   give: (items: ItemInstance[], gift: string) => void;
   begin: (label: string, dur: number, valid: () => boolean, done: () => void, lost: string) => void;
   busy: () => boolean;
+  /** a blow of what is in the hands at the work, hitting nobody (false: the hands are at something else) */
+  work: (dur: number) => boolean;
   breakOff: () => void;
   changed: () => void;
   /** the felled trees (a stump is no trunk) */
@@ -98,6 +100,10 @@ export const LEFT_HELD = new Set(['building_plan', 'code_lock', 'key_lock', 'c4'
 
 /** how far the mouse moves for the pointer to cross the wheel, px */
 const RING = { reach: 260 };
+/** a hammer's blow at a nail, seconds, and how far through it the nail is struck */
+const NAIL = { blow: 0.55, lands: 0.45 };
+/** how far from the eye, along the ground, a foundation begun on its own is laid at most (see `alone`) */
+const PLACE = { reach: 6 };
 /** a player who lays is told nothing of a refusal they have already been told, for this long */
 const SAID_AGAIN = 1500;
 
@@ -278,6 +284,22 @@ export class Building {
     const held = this.h.held();
     const plan = ok && held?.id === 'building_plan', hammer = ok && !!held && !!HAMMERS[held.id];
     this.prompt = null;
+    // (building's sounds asked for once a building tool is first in the hands)
+    if (plan || hammer) void buildRecordings();
+    // (the hammer driving nails while it works at a piece)
+    // (the hammer's blows seen, its own and everybody's: each nail rings as its blow lands. The plan alone, nails only)
+    if (this.nailing && this.h.busy()) {
+      const now = performance.now(), n = this.nailing;
+      if (now >= n.next) {
+        const blow = hammer && this.h.work(NAIL.blow);
+        n.next = now + (blow ? NAIL.blow * 1000 + 60 + Math.random() * 120 : 360 + Math.random() * 280);
+        n.ring = now + (blow ? NAIL.lands * NAIL.blow * 1000 : 0);
+      }
+      if (n.ring && now >= n.ring) {
+        n.ring = 0;
+        audio.built('nail', n.at, 0.9, 0.94 + Math.random() * 0.12);
+      }
+    } else this.nailing = null;
     this.draw.update(dt, this.h.me());
     // (the plan put away, another piece chosen, or the mouse let go of (Esc): a thing being turned goes back to its first click)
     if (this.placing && (!plan || this.placing.k !== this.kind || (this.placing.locked && !this.h.input.locked))) this.placing = null;
@@ -359,7 +381,10 @@ export class Building {
     // triangle a sixth)
     const turned = K.shape === 'tri' ? (this.turn % 6) * (Math.PI / 3) : (this.turn % 4) * (Math.PI / 2);
     if (best) ask = { b: best.base.id, k: this.kind, x: best.s.x, y: best.s.y, z: best.s.z, r: best.s.r };
-    else if ((K.ground || K.role === 'free') && hit) ask = { k: this.kind, x: at.x, y: 0, z: at.z, r: 0, yaw: this.h.yaw() + Math.PI + turned };
+    else if (K.ground || K.role === 'free') {
+      const own = this.alone(from, hit);
+      if (own) ask = { k: this.kind, x: own.x, y: K.ground ? own.y : 0, z: own.z, r: 0, yaw: this.h.yaw() + Math.PI + turned };
+    }
     if (!ask) {
       this.hideGhost();
       this.prompt = card(K.name, near.length ? 'aim at where it goes on your base' : K.ground ? 'aim at open ground' : 'lay a foundation first', 'hold the right button for the pieces');
@@ -373,7 +398,7 @@ export class Building {
     const base = typeof c === 'string' ? (ask.b !== undefined ? this.store.bases.get(ask.b)! : null) : c.base;
     const spot = typeof c === 'string' ? (ask.b !== undefined ? { x: ask.x, y: ask.y, z: ask.z, r: ask.r } : null) : c.spot;
     if (base && spot) this.showGhost(base, spot, !why);
-    else this.showGhostAt(at, ask.yaw ?? 0, false);
+    else this.showGhostAt(ask.b === undefined ? new THREE.Vector3(ask.x, Math.max(ask.y, heightAt(this.h.world.heights, ask.x, ask.z)), ask.z) : at, ask.yaw ?? 0, false);
     if (K.role === 'deploy') {
       // (the first click holds it where it is, to be turned: `turnFrame`)
       this.prompt = why ? card(K.name, `<span class="no">${why}</span>`, this.costHtml(cost)) : card(`Place ${K.name}`, this.costHtml(cost), 'then turn it with the aim · R turns it · hold the right button for the pieces', 'LMB');
@@ -479,6 +504,21 @@ export class Building {
   }
 
   /** where the aim meets the ground, walked along it a quarter metre at a time (the ground's own height, which the rules go by) */
+  /**
+   * Where a foundation begun on its own goes, Rust's way: where the aim meets the ground within PLACE.reach of the eye
+   * (along the ground), its top over the ground there; past that, held at that distance along the aim, its top as high
+   * as the aim is there, so that looking up raises it on its footing (the owner, 2026-10-25: "as the player looks
+   * further away we cap the distance ... then as the player continues looking up the height of the foundation is
+   * adjusted"). A height under the ground's least is the least (src/sim/build/bases.ts).
+   */
+  private alone(from: THREE.Vector3, hit: { point: { x: number; y: number; z: number } } | null): { x: number; y: number; z: number } | null {
+    if (hit && Math.hypot(hit.point.x - from.x, hit.point.z - from.z) <= PLACE.reach) return { x: hit.point.x, y: 0, z: hit.point.z };
+    const flat = Math.hypot(_dir.x, _dir.z);
+    if (flat < 0.05) return null;
+    const t = PLACE.reach / flat;
+    return { x: from.x + _dir.x * t, y: from.y + _dir.y * t, z: from.z + _dir.z * t };
+  }
+
   private ontoGround(from: THREE.Vector3): { point: { x: number; y: number; z: number } } | null {
     for (let d = 0.5; d <= 9; d += 0.25) {
       const x = from.x + _dir.x * d, y = from.y + _dir.y * d, z = from.z + _dir.z * d;
@@ -507,6 +547,8 @@ export class Building {
     }
     const [x, y, z] = this.ghost ? [this.ghost.position.x, this.ghost.position.y, this.ghost.position.z] : [ask.x, 0, ask.z];
     audio.impact('wood', { x, y, z }, 1);
+    // (a frame nailed together; a sleeping bag or a bed's bedding laid out)
+    audio.built(PIECES[ask.k].sleep ? 'cloth' : 'nail', { x, y: y + 0.5, z }, 0.9);
     if (this.h.online()) return void this.h.send({ t: 'blay', ...ask, u: plan.uid });
     const r = this.local.lay(ask, this.me, Date.now(), this.h.name());
     if (typeof r === 'string') return void this.h.note(r, 'warn');
@@ -588,6 +630,7 @@ export class Building {
     if (!p) return;
     const still = () => this.h.held()?.uid === hammer.uid && this.target()?.id === id && this.target()?.base === base;
     if (this.h.online()) this.h.send({ t: 'bup', b: base.id, p: id, to, go: 1, u: hammer.uid });
+    this.nail(base, p);
     this.h.begin(PIECES[p.k].levels ? `Bringing the ${PIECES[p.k].name.toLowerCase()} up to level ${ROMAN[to]}` : `Nailing the ${PIECES[p.k].name.toLowerCase()} up to ${TIERS[to].toLowerCase()}`, TIER_S[to], still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bup', b: base.id, p: id, to, go: 2, u: hammer.uid });
@@ -600,6 +643,13 @@ export class Building {
       this.bump(base.id);
       this.h.changed();
     }, 'You stopped: it is as it was');
+  }
+
+  /** the hammer heard at a piece while it works at it (the nails go in until the work is done or stopped) */
+  private nailing: { at: { x: number; y: number; z: number }; next: number; ring: number } | null = null;
+  private nail(base: Base, p: { x: number; y: number; z: number; k: string }) {
+    const [x, y, z] = toWorld(base, p.x, p.y + (PIECES[p.k].role === 'floor' ? 0 : 1.2), p.z);
+    this.nailing = { at: { x, y, z }, next: 0, ring: 0 };
   }
 
   /** pieces of a base broken in this game's own copy of it (alone: a raid, src/game/building/raid.ts), with what stood only on them */
@@ -758,6 +808,7 @@ export class Building {
       return false;
     }
     const name = PIECES[p.k].name.toLowerCase(), still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
+    this.nail(base, p);
     this.h.begin(turn ? `Turning the ${name} about` : `Mending the ${name}`, turn ? 1.5 : 3, still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bfix', b: base.id, p: id, u: hammer.uid, ...(turn ? { turn: true } : {}) });

@@ -67,12 +67,13 @@
 .hud-hit i:nth-child(3) { left: 0; bottom: 4px; transform: rotate(-45deg); }
 .hud-hit i:nth-child(4) { right: 0; bottom: 4px; transform: rotate(45deg); }
 
+/* (beside the crosshair, small, out of the middle of the picture, as DayZ's: the owner, 2026-10-25, "im not a big fan of
+   the text showing in the middle of screen for interactions". It sat centred under it, at 16px) */
 .hud-prompt {
   position: absolute;
-  left: 50%;
-  top: calc(50% + 34px);
-  transform: translateX(-50%);
-  font-size: 16px;
+  left: calc(50% + 40px);
+  top: calc(50% + 14px);
+  font-size: 13px;
   letter-spacing: 0.04em;
   color: var(--ink);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
@@ -165,20 +166,20 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 .hud-mark.show { opacity: 0.95; }
 .hud-prompt kbd {
   display: inline-block;
-  min-width: 22px;
-  padding: 1px 6px;
-  margin-right: 8px;
+  min-width: 18px;
+  padding: 0 5px;
+  margin-right: 6px;
   border: 1px solid var(--accent);
   border-radius: 3px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--accent);
   text-align: center;
   background: rgba(0, 0, 0, 0.35);
 }
 .hud-prompt small { color: var(--ink-dim); margin-left: 6px; }
 /* base building's card (src/game/building): the piece, what it takes against what is carried, the keys under */
-.hud-prompt .bc { display: inline-block; text-align: left; padding: 7px 11px 6px; background: rgba(8, 10, 9, 0.6); border: 1px solid rgba(233, 228, 216, 0.16); border-radius: 4px; font-size: 15px; }
+.hud-prompt .bc { display: inline-block; max-width: min(460px, calc(50vw - 60px)); white-space: normal; text-align: left; padding: 5px 9px 4px; background: rgba(8, 10, 9, 0.45); border: 1px solid rgba(233, 228, 216, 0.12); border-radius: 3px; font-size: 12.5px; line-height: 1.35; }
 .hud-prompt .bc b { color: var(--accent); letter-spacing: 0.05em; margin-right: 4px; }
 .hud-prompt .bc .ok { color: #8fe0b8; }
 .hud-prompt .bc .no { color: #f08a7e; }
@@ -193,7 +194,7 @@ body.touch .hud-acts { position: absolute; right: auto; left: 46%; bottom: 196px
 .hud-claim.low { border-color: rgba(255, 211, 90, 0.75); color: #ffe49a; }
 .hud-claim.dry { border-color: rgba(238, 122, 110, 0.8); color: #f6a69c; }
 .hud-claim.theirs { border-color: rgba(255, 211, 90, 0.5); color: #f0d99a; }
-.hud-prompt .bc i { display: block; font-style: normal; font-size: 12px; letter-spacing: 0.06em; color: var(--ink-dim); margin-top: 3px; }
+.hud-prompt .bc i { display: block; font-style: normal; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-dim); margin-top: 2px; }
 
 /* Every timed thing (eating, a dressing, a throw winding up, a fuse running down, digging, drinking): one thin ring
    round the crosshair, filling clockwise from the top on a faint dark track, its name under it on a dark pill (the
@@ -819,6 +820,8 @@ body.touch .hud-progress.idle .hud-progress-label { top: 70px; }
 .inv-takes button span { color: var(--accent); }
 .inv-takes button:hover { color: var(--ink); border-color: var(--accent); }
 .inv-takes .inv-fits { margin-left: auto; }
+/* (their own body: the one button that puts it all back on, src/sim/reclaim.ts) */
+.inv-takes .inv-reclaim { color: var(--ink); border-color: var(--accent); background: rgba(201, 178, 124, 0.16); }
 .inv-takes .inv-fits[aria-pressed="true"] { color: var(--ink); border-color: var(--accent); background: rgba(201, 178, 124, 0.16); }
 .inv-sort { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; padding: 0; border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; }
 .inv-sort svg { width: 11px; height: 11px; fill: currentColor; }

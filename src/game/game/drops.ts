@@ -10,6 +10,7 @@ import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
 import { CUT } from '../../../arena/rules';
 import { newUid, ITEMS, fittedOf, quietOf } from '../../sim/items';
+import { wearOut } from '../../sim/condition';
 import type { WorldLoot } from '../../sim/economy';
 import { WEAPON_RULES } from '../../sim/combat';
 import { shotOf } from '../../sim/gunplay';
@@ -36,6 +37,7 @@ import { castleDark } from '../../sim/castle';
 import { HELI } from '../../sim/heli';
 import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEARCHLIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
 import { diffOps, type Laid } from '../../sim/box-ops';
+import { shocked } from '../building/locks';
 
 /** how far off a lit street lamp is seen, metres: within the camera's reach (1800) */
 const LAMP_SEEN = 1600;
@@ -154,8 +156,15 @@ export const dropsMethods = {
     let amount = m.amount;
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
+    // (and what covers where it landed is worn by it, as in DayZ: src/sim/condition.ts)
+    if (m.w !== 'crash') {
+      for (const it of wearOut(this.inv.slots, m.zone, m.amount)) this.hud.note(`Your ${ITEMS[it.id].name} is ruined`, 'warn');
+      this.saveSoon();
+      this.invUI.soon();
+    }
     // the jeep they are in ran into something: no wound, and nobody to look round for
-    // (or a code lock shocked the hand that got its code wrong)
+    // (or a code lock shocked the hand that got its code wrong: its refusal and its shock heard, src/game/building/locks.ts)
+    if (m.w === 'shock') shocked();
     if (m.w === 'crash' || m.w === 'shock') {
       p.damage(m.amount, m.w === 'shock' ? 'a code lock' : 'a crash');
       this.weapons.flinch(1);
@@ -229,7 +238,8 @@ export const dropsMethods = {
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;
-    if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
+    // (nothing said of the pockets while the server is putting their own body's gear on them: it says what they carry then)
+    if (!p.dead && performance.now() > this.reclaimUntil && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
       this.meT = 0;
       this.meDirty = false;
       this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals }, sp: this.build.sp });

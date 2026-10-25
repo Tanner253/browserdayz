@@ -5,6 +5,7 @@ import { Stash } from '../loot';
 import { PIECES } from '../../sim/build/pieces';
 import { toWorld, type Base } from '../../sim/build/snap';
 import type { Input } from '../../core/input';
+import { audio } from '../../core/audio';
 
 export class BoxView {
   /** each box's store, by its server name (`bbox:<base>:<piece>`) */
@@ -39,14 +40,21 @@ export class BoxView {
   /** a box's store opened, by its base and piece */
   openFor(b: number, p: number) {
     const s = this.stores.get(`bbox:${b}:${p}`);
-    if (s) this.open(s);
+    if (s) this.lift(s);
+  }
+
+  /** its lid up, its latch first (the box's own sounds), and its store opened */
+  private lift(s: Stash) {
+    audio.built('crate_latch', { x: s.x, y: s.y, z: s.z }, 0.7);
+    setTimeout(() => audio.built('crate_open', { x: s.x, y: s.y, z: s.z }, 0.9), 90);
+    this.open(s);
   }
 
   /** a box looked at (`t`): what the corner says, and F opens it */
   frame(ok: boolean, t: { base: Base; id: number } | null): string | null {
     const p = t?.base.pieces.get(t.id), s = t && this.stores.get(`bbox:${t.base.id}:${t.id}`);
     if (!p || !s) return null;
-    if (ok && this.input.pressed('KeyF')) this.open(s);
+    if (ok && this.input.pressed('KeyF')) this.lift(s);
     return `<kbd>F</kbd>Open ${PIECES[p.k].name.toLowerCase()}`;
   }
 }
