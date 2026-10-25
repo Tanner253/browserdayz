@@ -32,7 +32,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { M4, carry, markRegions, padTexture } from './meshy.mjs';
+import { M4, carry, markRegions, padTexture, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -46,7 +46,8 @@ const REGION = { scalp: 0, face: 1, neck: 2, chest: 3, belly: 4, hips: 5, should
  * Each piece: its Meshy file, the body it was made on, the parts of the body it can be over (`parts`) and those it
  * surely covers (`core`: its own colour is learnt there; `covers`: all of it there is the piece, as the item's own
  * `hides` in src/sim/items/wear.ts), and its picture's size. Gloves have fingers (`fingers`: bound to the finger bones
- * as the body is, scripts/meshy.mjs fitHand).
+ * as the body is, scripts/meshy.mjs fitHand). A piece of one colour (`plain`) has its picture made that colour all
+ * over at its own lightness, Meshy's leftovers painted out (see plainCloth).
  */
 const TOP = ['neck', 'face', 'chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm', 'hand', 'thigh'];
 const LEGS = ['belly', 'hips', 'thigh', 'aboveKnee', 'shin', 'foot'];
@@ -56,15 +57,16 @@ const JACKET = { parts: TOP, core: ['chest', 'upperArm'], covers: ['chest', 'bel
 const TROUSERS = { parts: LEGS, core: ['thigh', 'shin'], covers: ['hips', 'thigh', 'aboveKnee', 'shin'], peeks: ['hips'] };
 const BOOTS = { parts: FEET, core: ['foot'], covers: ['foot'] };
 const PIECES = {
-  m65: { src: 'wear_m65.glb', body: 0, ...JACKET, tex: 2048 },
-  telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, tex: 2048 },
-  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, tex: 2048 },
+  m65: { src: 'wear_m65.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
+  telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, plain: true, tex: 2048 },
+  // (down over the hips, as the parka: all of it there is the hoodie but what is plainly the body's)
+  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, covers: [...JACKET.covers, 'hips'], peeks: [...JACKET.peeks, 'hips'], plain: true, tex: 2048 },
   flannel: { src: 'wear_flannel.glb', body: 3, ...JACKET, tex: 2048 },
-  leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, tex: 2048 },
-  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips'], tex: 2048 },
-  field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, tex: 2048 },
+  leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, plain: true, tex: 2048 },
+  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], plain: true, tex: 2048 },
+  field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
   jeans: { src: 'wear_jeans.glb', body: 1, ...TROUSERS, tex: 2048 },
-  cargo_pants: { src: 'wear_cargo_pants.glb', body: 2, ...TROUSERS, tex: 2048 },
+  cargo_pants: { src: 'wear_cargo_pants.glb', body: 2, ...TROUSERS, plain: true, tex: 2048 },
   work_pants: { src: 'wear_work_pants.glb', body: 3, ...TROUSERS, tex: 2048 },
   combat_boots: { src: 'wear_combat_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   work_boots: { src: 'wear_work_boots.glb', body: 1, ...BOOTS, tex: 1024 },
@@ -72,11 +74,21 @@ const PIECES = {
   leather_gloves: { src: 'wear_leather_gloves.glb', body: 2, parts: HANDS, core: ['hand'], covers: ['hand'], tex: 1024, fingers: true },
   fingerless: { src: 'wear_fingerless.glb', body: 0, parts: HANDS, core: ['hand'], covers: [], tex: 1024, fingers: true },
   // (the basics every life begins in: src/sim/items.ts, CLOTHES)
-  tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], peeks: ['chest', 'belly', 'shoulder'], tex: 2048 },
+  // (all of it over the chest, the belly and the shoulders is the shirt: white over the body's own grey shirt, it was
+  // taken for the body there by its colour, and had holes)
+  tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], plain: true, tex: 2048 },
   tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, tex: 2048 },
   trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, tex: 1024 },
-  smock: { src: 'wear_smock.glb', body: 0, ...JACKET, tex: 2048 },
-  smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, tex: 2048 },
+  smock: { src: 'wear_smock.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
+  smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
+  // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)
+  tactical_jacket: { src: 'wear_tactical_jacket.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
+  combat_shirt: { src: 'wear_combat_shirt.glb', body: 1, ...JACKET, tex: 2048 },
+  tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048 },
+  winter_boots: { src: 'wear_winter_boots.glb', body: 0, ...BOOTS, tex: 1024 },
+  // (the stab vest that takes the all-black one's place, the owner: "the stab vest I think needs a new model"; its
+  // straps over the shoulders)
+  stab_vest: { src: 'wear_stab_vest.glb', body: 0, parts: ['neck', 'chest', 'belly', 'hips', 'shoulder'], core: ['chest', 'belly'], covers: ['chest', 'belly'], peeks: ['chest', 'belly'], tex: 2048 },
   // (neck to ankle, over everything: there is no base layer to show through it)
   ghillie_suit: { src: 'wear_ghillie_suit.glb', body: 0, parts: [...new Set([...TOP, ...LEGS])], core: ['chest', 'thigh'], covers: [...JACKET.covers, ...TROUSERS.covers], tex: 2048 },
 };
@@ -87,6 +99,7 @@ const ONLY = process.argv.slice(2);
 await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
+const SUIT = await io.read(path.join(ROOT, 'public', 'assets', 'characters', 'survivor.glb'));
 
 /** a carried shape's points as its skeleton stands at rest, each with its colour off its picture (0..1) */
 async function laid(node) {
@@ -111,10 +124,51 @@ async function laid(node) {
   return { P, C, prim };
 }
 
+/**
+ * A plain piece's picture made its own colour (the owner, 2026-10-25: "polish high quality consistency"): Meshy left
+ * skin in a crease and blocks of shadow on the cloth (a grey patch stood on a T-shirt's back). What is far from the
+ * piece's own colour, in hue or in lightness, is painted from the cloth about it; then every texel takes the piece's
+ * own hue at its own lightness, so the folds and seams stay and nothing else does.
+ * @param own the piece's colour, 0..1
+ */
+async function plainCloth(prim, own) {
+  const tex = prim.getMaterial().getBaseColorTexture();
+  const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, N = W * H, luma = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+  const lo = Math.max(0.04, luma(...own)), hue = own.map((c) => c / lo);
+  const good = Buffer.alloc(N), held = Buffer.alloc(N * 3);
+  let bad = 0;
+  for (let i = 0; i < N; i++) {
+    const r = data[i * 3] / 255, g = data[i * 3 + 1] / 255, b = data[i * 3 + 2] / 255, L = Math.max(0.02, luma(r, g, b));
+    // (how far it is from the piece's colour at its own lightness, in the picture's own units: a dark cloth's hue is
+    // too unsteady to judge it by)
+    const k = L / lo, off = Math.hypot(r - own[0] * k, g - own[1] * k, b - own[2] * k);
+    // (a fold's shadow is half as light as the cloth, its top lit half again: kept)
+    const ok = k > 0.45 && k < 1.6 && off < 0.12;
+    if (!ok) bad++;
+    good[i] = ok ? 255 : 0;
+    if (ok) data.copy(held, i * 3, i * 3, i * 3 + 3);
+  }
+  // (what is around each texel, of the cloth only: the cloth blurred over the blurred share of it that is cloth)
+  const raw = (buf, channels) => sharp(buf, { raw: { width: W, height: H, channels } }).blur(12).raw().toBuffer();
+  const [sum, share] = await Promise.all([raw(held, 3), raw(good, 1)]);
+  const out = Buffer.alloc(N * 3);
+  for (let i = 0; i < N; i++) {
+    let r = data[i * 3], g = data[i * 3 + 1], b = data[i * 3 + 2];
+    if (!good[i] && share[i] > 2) [r, g, b] = [0, 1, 2].map((c) => (sum[i * 3 + c] * 255) / share[i]);
+    const k = Math.min(1.6, Math.max(0.45, luma(r, g, b) / 255 / lo));
+    for (let c = 0; c < 3; c++) out[i * 3 + c] = Math.max(0, Math.min(255, Math.round(own[c] * k * 255)));
+  }
+  tex.setImage(new Uint8Array(await sharp(out, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer())).setMimeType('image/png');
+  return `plain: ${((bad / N) * 100).toFixed(1)}% of its picture painted from the cloth`;
+}
+
 for (const [id, piece] of Object.entries(PIECES)) {
   if (ONLY.length && !ONLY.includes(id)) continue;
   const body = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, BODIES[piece.body])), fingers: true });
   markRegions(body.doc, body.node);
+  // (weighted as the built body is, the old suit's, so the piece takes the same: see suitWeights)
+  suitWeights(body.node, SUIT);
   // (on the skeleton made the shape of the body it was made on, as that body is: see fitProportions in scripts/meshy.mjs)
   const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: !!piece.fingers, fit: await io.read(path.join(SRC, BODIES[piece.body])) });
   const B = await laid(body.node), D = await laid(dressed.node);
@@ -198,6 +252,22 @@ for (const [id, piece] of Object.entries(PIECES)) {
     }
     keep = keep.map((k, i) => k || shut[i]);
   }
+  // (and a hole in it filled, however wide: a patch of fewer than four hundred places left out with the piece all round
+  // it, where Meshy shaded the cloth as dark as the body under it. A T-shirt's back had one a hand across, 2026-10-25.
+  // Over the trunk and the limbs only: the lips, the nails and the eyes are shells of their own, and were filled too.)
+  {
+    const seen = new Uint8Array(D.P.length), skin = new Set([REGION.scalp, REGION.face, REGION.neck, REGION.hand, REGION.foot]);
+    const trunk = (i) => near[i] >= 0 && parts.has(region.getScalar(near[i])) && !skin.has(region.getScalar(near[i]));
+    for (let s = 0; s < D.P.length; s++) {
+      if (seen[s] || keep[s] || one[s] !== s || !trunk(s)) continue;
+      const lot = [s];
+      seen[s] = 1;
+      let open = false;
+      for (let h = 0; h < lot.length && lot.length < 400; h++) for (const j of next[lot[h]]) if (!seen[j] && !keep[j]) (trunk(j) ? ((seen[j] = 1), lot.push(j)) : (open = true));
+      if (lot.length < 400 && !open) for (const p of lot) keep[p] = true;
+    }
+    keep = keep.map((k, i) => keep[one[i]]);
+  }
   let tris = T.filter((t) => t.every((i) => keep[i]));
   // (the skin Meshy made between a sleeve and the side: how much longer a triangle's longest edge is at rest, arms out,
   // than as it was made, arms down, against how much longer they are on the whole; four times is no cloth's)
@@ -247,6 +317,28 @@ for (const [id, piece] of Object.entries(PIECES)) {
     const was = count(T), edges = count(tris);
     let front = [];
     for (const [k, n] of edges) if (n === 1 && was.get(k) > 1) for (const p of k.split(',').map(Number)) if (!ring.has(p)) (ring.set(p, 0), front.push(p));
+    // (the cut runs along the triangles, a saw's edge: each of its points is drawn halfway to the middle of its two
+    // neighbours along it, three times, as it is made and as it rests alike)
+    {
+      const along = new Map();
+      for (const [k, n] of edges) {
+        if (n !== 1 || !(was.get(k) > 1)) continue;
+        const [a, b] = k.split(',').map(Number);
+        (along.get(a) ?? along.set(a, []).get(a)).push(b);
+        (along.get(b) ?? along.set(b, []).get(b)).push(a);
+      }
+      const pos = D.prim.getAttribute('POSITION'), same = new Map();
+      one.forEach((o, i) => (same.get(o) ?? same.set(o, []).get(o)).push(i));
+      for (let r = 0; r < 3; r++) {
+        const move = [];
+        for (const [p, ns] of along) {
+          if (ns.length !== 2) continue;
+          const [a, b] = ns, made = pos.getElement(p, []), ma = pos.getElement(a, []), mb = pos.getElement(b, []);
+          move.push([p, made.map((v, c) => v * 0.5 + (ma[c] + mb[c]) * 0.25), D.P[p].clone().multiplyScalar(0.5).addScaledVector(D.P[a], 0.25).addScaledVector(D.P[b], 0.25)]);
+        }
+        for (const [p, m, rest] of move) for (const i of same.get(p)) (pos.setElement(i, m), D.P[i].copy(rest));
+      }
+    }
     const near = new Map();
     for (const t of tris) for (const i of t) for (const j of t) if (one[i] !== one[j]) (near.get(one[i]) ?? near.set(one[i], new Set()).get(one[i])).add(one[j]);
     for (let d = 1; d <= HEM; d++) {
@@ -273,17 +365,93 @@ for (const [id, piece] of Object.entries(PIECES)) {
         uv.setElement(i, m);
       }
     }
-    const shade = [0.62, 0.84], col = new Float32Array(uv.getCount() * 3).fill(1);
+    const shade = process.env.NOHEM ? [1, 1] : [0.8, 0.92], col = new Float32Array(uv.getCount() * 3).fill(1);
     for (let i = 0; i < uv.getCount(); i++) {
       const d = depth(i);
       if (d < shade.length) col.fill(shade[d], i * 3, i * 3 + 3);
     }
     D.prim.setAttribute('COLOR_0', dressed.doc.createAccessor().setType('VEC3').setArray(col));
   }
+  // ---- which part of the body each of its points lies over (REGION): what is worn over it draws it in there (a
+  // jacket's chest under a vest: Worn.under in src/game/survivors.ts)
+  D.prim.setAttribute('_REGION', dressed.doc.createAccessor().setType('SCALAR').setArray(new Uint8Array(near.map((n) => (n >= 0 ? region.getScalar(n) : 0)))));
   // ---- the picture padded from the piece's own cloth: what lies between its islands on the picture was the body's
   // (skin, the shirt), and came in at every island's edge as pink and light slivers, nearer at a distance as the
   // picture is drawn smaller. Everything of the picture the piece does not cover takes the colour of the nearest cloth.
   await padTexture(D.prim, tris);
+  const plain = piece.plain ? await plainCloth(D.prim, own) : '';
+
+  // ---- weighted as the skin under it is (the owner, 2026-10-25: "the player models are super buggy especially during
+  // animations ... our previous player model was better with no stretching textures or distortions"). Meshy rigged the
+  // dressed figure on its own: a sleeve weighted to the chest hung off a raised arm like a wing, and a shirt's back
+  // stood off a bent spine. Each point takes the weights of the body's points nearest it (the body it was made on, by
+  // distance), evened out over the cloth twice, so the cloth goes wherever the skin under it goes.
+  {
+    const bp = body.node.getMesh().listPrimitives()[0], bj = bp.getAttribute('JOINTS_0'), bw = bp.getAttribute('WEIGHTS_0');
+    const names = dressed.node.getSkin().listJoints().map((j) => j.getName());
+    const to = body.node.getSkin().listJoints().map((j) => names.indexOf(j.getName()));
+    if (to.some((k) => k < 0)) throw new Error(`${id}: the body has a joint the piece has not`);
+    const K = 6, ja = [], wa = [];
+    /** the body's points nearest p, K of them, nearest first */
+    const nearK = (p) => {
+      const cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL), cz = Math.floor(p.z / CELL), got = [];
+      for (let r = 1; r <= 5 && got.length < K; r++) {
+        got.length = 0;
+        for (let x = cx - r; x <= cx + r; x++) for (let y = cy - r; y <= cy + r; y++) for (let z = cz - r; z <= cz + r; z++) for (const i of grid.get(`${x},${y},${z}`) ?? []) got.push([i, B.P[i].distanceTo(p)]);
+      }
+      return got.sort((a, b) => a[1] - b[1]).slice(0, K);
+    };
+    const mine = [...new Set(tris.flat().map((i) => one[i]))], W = new Map();
+    for (const i of mine) {
+      const w = new Map();
+      for (const [n, d] of nearK(D.P[i])) {
+        const k = 1 / (d + 0.005) ** 2;
+        bj.getElement(n, ja), bw.getElement(n, wa);
+        for (let c = 0; c < 4; c++) if (wa[c] > 0) w.set(to[ja[c]], (w.get(to[ja[c]]) ?? 0) + wa[c] * k);
+      }
+      W.set(i, w);
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      const was = new Map(W);
+      for (const i of mine) {
+        const ns = [...next[i]].filter((j) => was.has(j));
+        if (!ns.length) continue;
+        const w = new Map();
+        const put = (m, f) => {
+          const sum = [...m.values()].reduce((a, b) => a + b, 0) || 1;
+          for (const [j, v] of m) w.set(j, (w.get(j) ?? 0) + (v / sum) * f);
+        };
+        put(was.get(i), 0.5);
+        for (const j of ns) put(was.get(j), 0.5 / ns.length);
+        W.set(i, w);
+      }
+    }
+    const n = D.P.length, J = new Uint16Array(n * 4), V = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) {
+      const w = W.get(one[i]);
+      if (!w) continue;
+      const top = [...w].sort((a, b) => b[1] - a[1]).slice(0, 4), sum = top.reduce((a, [, v]) => a + v, 0) || 1;
+      top.forEach(([j, v], c) => ((J[i * 4 + c] = j), (V[i * 4 + c] = v / sum)));
+    }
+    D.prim.setAttribute('JOINTS_0', dressed.doc.createAccessor().setType('VEC4').setArray(J));
+    D.prim.setAttribute('WEIGHTS_0', dressed.doc.createAccessor().setType('VEC4').setArray(V));
+  }
+
+  // ---- every triangle wound as its points face (Meshy turned a few dozen of them inside out: drawn from both sides, the
+  // cloth lit them as its own inside, a grey patch on a T-shirt's back and grey teeth at its sleeves)
+  {
+    const pos = D.prim.getAttribute('POSITION'), nor = D.prim.getAttribute('NORMAL'), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), m = new THREE.Vector3(), e = [];
+    let turned = 0;
+    tris = tris.map((t) => {
+      a.fromArray(pos.getElement(t[0], e));
+      b.fromArray(pos.getElement(t[1], e)).sub(a);
+      c.fromArray(pos.getElement(t[2], e)).sub(a);
+      m.set(0, 0, 0);
+      for (const i of t) m.x += nor.getElement(i, e)[0], m.y += e[1], m.z += e[2];
+      return b.cross(c).dot(m) < 0 ? (turned++, [t[0], t[2], t[1]]) : t;
+    });
+    why.turned = turned;
+  }
 
   // ---- the piece: only its own points, in the order they are first used
   const prim = D.prim, used = new Map();
@@ -319,5 +487,5 @@ for (const [id, piece] of Object.entries(PIECES)) {
   const dest = path.join(OUT, `${id}.glb`);
   await io.write(dest, dressed.doc);
   const st = await fs.stat(dest);
-  console.log(`${id}.glb  ${(st.size / 1048576).toFixed(2)} MB  ${tris.length} triangles of ${T.length}, ${used.size} points, light ${mat.getExtras().light}`);
+  console.log(`${id}.glb  ${(st.size / 1048576).toFixed(2)} MB  ${tris.length} triangles of ${T.length}, ${used.size} points, light ${mat.getExtras().light}${plain ? `, ${plain}` : ''}`);
 }

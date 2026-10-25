@@ -10,11 +10,12 @@
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length; with
 //                                               several files, one each (clip=walk,mc_walk: the old beside the new)
-//   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
-//                                               one of its clips; today's survivor beside them plays it too
+//   &survivor=-1,0,1,2,3&clip=jogF&t=0.3       the survivors' bodies (-1: the old suit) (src/game/survivors.ts) on the game's skeleton, playing
+//                                               one of the game's movements (moves.glb) or the file's own; the one beside too
 //   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
 //   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
 //   &shrink=hips,thigh                           the parts only partly under them drawn a little in)
+//   &gear=beanie,assault_pack                   (and things worn as things of their own, where the game hangs them: GEAR)
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
@@ -25,6 +26,7 @@
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
+//   &near=1.2,0.8                                or at that height over the middle of what is shown, from that far
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
 //   &bg=20231f&floor=0                          a plain backdrop of that colour and no floor (pictures for the page)
@@ -223,9 +225,11 @@ if (bb) {
       played.push(a);
     }
   }
-  // (every survivor, and today's beside them, in one clip at one moment: see `played`)
-  const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
-    const want = q.get('clip');
+  // (every survivor, and today's beside them, in one clip at one moment: see `played`. The game's own movements first,
+  // the motion capture (moves.glb, moves-late.glb: src/game/avatar/gait.ts), then the character file's old ones)
+  const mocap = survivors.length || person ? (await Promise.all(['moves', 'moves-late'].map((f) => assets.loadGLTF(`assets/characters/${f}.glb`)))).flatMap((g) => g.animations) : [];
+  const playOn = (o: THREE.Object3D, own: THREE.AnimationClip[]) => {
+    const want = q.get('clip'), clips = [...mocap, ...own];
     const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
     if (!clip) return null;
     const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
@@ -235,24 +239,56 @@ if (bb) {
     return clip.name;
   };
   if (survivors.length) {
-    const { wearBody, wearOn, BODIES } = await import('../game/survivors');
+    const { wearBody, wearOn, bareWorn, BODIES } = await import('../game/survivors');
+    type Worn = import('../game/survivors').Worn;
     const { hides } = await import('../sim/survivor');
     const { ITEMS } = await import('../sim/items');
     const hide = hides(list('hide') as Parameters<typeof hides>[0]);
     // (what a piece hides and draws in is its item's, src/sim/items/wear.ts, unless &hide or &shrink says)
     const dressOf = (model: string) => Object.values(ITEMS).find((d) => d.dress?.model === model)?.dress;
     const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
+    const { GEAR, placeWorn, hangFit } = await import('../game/avatar/gear');
+    const { BODY_SCALE } = await import('../game/avatar');
+    // (the game says where gear goes on the body as the game turns it and draws it: half round, at BODY_SCALE)
+    const turned = new THREE.Matrix4().makeRotationY(Math.PI).multiply(new THREE.Matrix4().makeScale(BODY_SCALE, BODY_SCALE, BODY_SCALE));
     for (const n of survivors) {
       const o = cloneSkinned(gltf.scene) as THREE.Group;
       o.traverse((m) => { if (m.name.startsWith('gear_')) m.visible = false; });
+      // (where the bones that carry gear stand as the skeleton is made, before the body's own lengths: as Avatar.make measures them)
+      o.updateMatrixWorld(true);
+      const rest = new Map(['Head', 'spine_03', 'pelvis'].map((b) => [b, o.getObjectByName(b)?.matrixWorld.clone().invert()] as const));
+      // (-1: the old suit as it was, to judge a body against: the owner, 2026-10-25, "our previous player model was better")
+      if (n < 0) {
+        const playing = playOn(o, gltf.animations);
+        place(o, 'suit', { playing });
+        continue;
+      }
       const body = await wearBody(o, n, list('wear').length ? 0 : hide);
       // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
-      const worn = list('wear').map((w) => {
+      const worn: Worn[] = list('wear').map((w) => {
         const [model, c] = w.split('~');
         const own = dressOf(model);
         return { model, hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
       });
+      const gearIds = list('gear');
+      for (const id of gearIds) {
+        const bare = bareWorn(id);
+        if (bare) worn.push(bare);
+      }
       if (worn.length) await wearOn(o, body, worn);
+      for (const id of gearIds) {
+        const g = GEAR[id], bone = g && o.getObjectByName(g.bone), inv = g && rest.get(g.bone);
+        if (!g || !bone || !inv) continue;
+        const item = (await assets.model(id)).clone();
+        const holder = new THREE.Group(), m = new THREE.Matrix4();
+        placeWorn(id, item, gearIds, m);
+        // (as the game hangs it: by the body's own head and chest, Avatar.gearFit)
+        const gearInv = inv.clone().multiply(turned.clone().invert()), fit = body[0]?.userData.fit ?? null;
+        holder.matrixAutoUpdate = false;
+        holder.matrix.copy(gearInv).multiply(hangFit(fit, g, gearInv)).multiply(m);
+        holder.add(item);
+        bone.add(holder);
+      }
       const playing = playOn(o, gltf.animations);
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }
@@ -323,8 +359,9 @@ if (bb) {
     const fit = Math.max(span.x / camera.aspect, span.y, span.z * (view === 'top' ? 1 / camera.aspect : 0.6));
     const d = (fit * 0.62) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) + Math.max(span.x, span.z) * 0.5;
     const near = q.get('near')?.split(',').map(Number);
-    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : mid;
-    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : d);
+    // (or, of two, at that height over the middle of what is shown, from that far: a body in a strip, wherever its clip puts it)
+    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : near?.length === 2 ? new THREE.Vector3(mid.x, near[0], mid.z) : mid;
+    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : near?.length === 2 ? near[1] : d);
     camera.lookAt(at);
   };
 

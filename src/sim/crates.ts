@@ -58,14 +58,15 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // and what every gun fires.
   med_cabinet: { label: 'Locker', w: 4, h: 6, count: [2, 4], usage: ['Medic'], tier: 3 },
   hospital_cabinet: { label: 'Locker', w: 4, h: 6, count: [2, 4], usage: ['Hospital'], tier: 3 },
-  police_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Police'], tier: 3, lean: { weapon: 0.2 } },
+  police_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Police'], tier: 3, lean: { weapon: 0.2, clothing: 4 } },
   // The steel locker with two doors (see HUNG): a soldier's, in a barracks or a long hut (2026-10-13), where a man kept
   // his clothes, something to eat and to smoke, a dressing, a torch and a handful of what his pistol fired; a pistol
   // itself seldom, those are in the cases. In a police building it is a constable's, in the hospital a clinic's cabinet.
   steel_locker: { label: 'Locker', w: 4, h: 6, count: [1, 3], usage: ['Military'], tier: 2, lean: { clothing: 4, food: 8, drink: 5, misc: 1, medical: 2, tool: 3, melee: 2, ammo: 0.12, weapon: 0.05, magazine: 0.2, attachment: 0.2 } },
   // What is searched down the bunker ("abundant supplies in the T5": a rack is never bare, and a locker seldom), and on
   // its racks the long things.
-  locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5 },
+  // (and clothes, as a soldier's steel locker leans: the owner, 2026-10-25, the gas's and the bunker's pieces in their lockers)
+  locker: { label: 'Locker', w: 4, h: 6, count: [0, 3], usage: ['Bunker'], tier: 5, lean: { clothing: 4 } },
   // (in the bunker its own, the best; anywhere else, the military's of the step it stands on: see fillCrate's `at`)
   // (as full as its step is rich: a thing or two in a village's, three to five down the bunker, the owner: "loot density
   // depends on tier it spawns in"; ten across, as a .50 is long)

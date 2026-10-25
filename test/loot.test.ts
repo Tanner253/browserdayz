@@ -157,7 +157,9 @@ ok('pistols from the second step on, most of them where guns were kept; a submac
     assert.ok(all.filter(({ id, p }) => id === 'mpa' && p.tier === 3 && /^police/.test(p.building)).length >= 5, 'the submachine guns are not at the police');
     assert.equal(on('mosin', 1) + on('mosin', 2), 0, 'a sniper rifle below Kamenka');
     assert.ok(on('mosin', 3) >= 1 && on('mosin', 3) <= 3, `${on('mosin', 3)} sniper rifles in Kamenka`);
-    assert.ok(on('mosin', 4) >= 5 && on('mosin', 4) >= on('mosin', 3) * 2, `${on('mosin', 4)} sniper rifles under the gas, ${on('mosin', 3)} in Kamenka`);
+    // (four since 2026-10-25, five before: the gas's clothes joined its pool, and a full step cuts every sort a little, the
+    // owner's word: "adding clothing just means each thing there comes up a little less often")
+    assert.ok(on('mosin', 4) >= 4 && on('mosin', 4) >= on('mosin', 3) * 2, `${on('mosin', 4)} sniper rifles under the gas, ${on('mosin', 3)} in Kamenka`);
     // (under the gas every place is spoken for, some forty things more wanted than there are places: a scope or two short)
     assert.ok(on('pu_scope', 4) >= 3 && on('pu_scope', 1) + on('pu_scope', 2) === 0, `${[1, 2, 3, 4, 5].map((t) => on('pu_scope', t as Tier))} scopes`);
   }
@@ -390,11 +392,32 @@ ok('one of the army\'s cases holds pistols and kit, now and then a mask or somet
     assert.ok((seen.get('colt') ?? 0) + (seen.get('m9') ?? 0) > 60, 'hardly a pistol in the army\'s cases');
     const mask = (seen.get('gasmask') ?? 0) / 600;
     assert.ok(mask > 0.01 && mask < 0.12, `a gas mask in ${(mask * 100).toFixed(0)} cases of a hundred`);
-    assert.ok((seen.get('armor_vest') ?? 0) + (seen.get('boonie_hat') ?? 0) > 0 && ((seen.get('armor_vest') ?? 0) + (seen.get('boonie_hat') ?? 0)) / 600 < 0.15, 'the third step\'s things are not rare in them');
+    // (the third step's armour: the stab vest and the steel pot since 2026-10-25, when the armoured vest and the combat
+    // helmet went to the fourth, each piece of clothing on one step only)
+    const third = (seen.get('soft_vest') ?? 0) + (seen.get('helmet_m1') ?? 0);
+    assert.ok(third > 0 && third / 600 < 0.15, `the third step's things in ${third} of 600 cases`);
   }
   const wood = open('wooden_crate_01', 600);
   for (const id of guns) assert.ok(!wood.has(id), `a ${id} in a wooden crate`);
   assert.ok(melee.some((id) => wood.has(id)));
+});
+
+ok('the bunker\'s lockers hold its clothes, a crate under the gas now and then the gas\'s, a constable\'s and a soldier\'s locker theirs: each only its own step\'s', () => {
+  // (the owner, 2026-10-25: clothing "should also fill the containers that already stand at every loot place")
+  let s = 11;
+  const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
+  const clothes = (kind: string, rich: boolean) => {
+    const seen = new Map<string, number>();
+    for (let k = 0; k < 400; k++) fillCrate({ add: (it: { id: string }) => (ITEMS[it.id].category === 'clothing' && seen.set(it.id, (seen.get(it.id) ?? 0) + 1), it) } as never, kind, rnd, rich);
+    return seen;
+  };
+  const stepOf = (id: string) => (ITEMS[id].loot?.at ?? [0, 0, 0, 0, 0]).findIndex((n) => n > 0) + 1;
+  // (a locker is filled from its own step wherever it stands; anything else under the gas from the gas's, where its clothes are few)
+  for (const [kind, rich, step, least] of [['locker', false, 5, 20], ['wooden_military_crate', true, 4, 1], ['police_locker', false, 3, 20], ['steel_locker', false, 2, 20]] as [string, boolean, number, number][]) {
+    const seen = clothes(kind, rich), n = [...seen.values()].reduce((a, b) => a + b, 0);
+    assert.ok(n >= least, `${kind} of step ${step}: ${n} pieces of clothing in 400`);
+    assert.deepEqual([...seen.keys()].filter((id) => stepOf(id) !== step), [], `${kind} of step ${step} held another step's clothes`);
+  }
 });
 
 ok('a looted spot, and the ground about it, is left alone for three minutes; and what lay there does not come straight back to it', () => {

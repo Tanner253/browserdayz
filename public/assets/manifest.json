@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T09:00:32.666Z",
+ "generated": "2026-10-25T10:13:04.597Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14075,6 +14075,286 @@
     0.5,
     0.1759,
     0.1688
+   ],
+   "lods": []
+  },
+  "beanie": {
+   "url": "assets/models/beanie.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 544332,
+   "srcTris": 3818,
+   "tris": 3818,
+   "min": [
+    -0.1066,
+    0,
+    -0.0972
+   ],
+   "max": [
+    0.1066,
+    0.24,
+    0.0972
+   ],
+   "lods": []
+  },
+  "ushanka": {
+   "url": "assets/models/ushanka.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 553064,
+   "srcTris": 5553,
+   "tris": 5553,
+   "min": [
+    -0.1431,
+    0,
+    -0.1487
+   ],
+   "max": [
+    0.1431,
+    0.3,
+    0.1487
+   ],
+   "lods": []
+  },
+  "beret": {
+   "url": "assets/models/beret.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 172800,
+   "srcTris": 3918,
+   "tris": 3918,
+   "min": [
+    -0.1337,
+    0,
+    -0.145
+   ],
+   "max": [
+    0.1337,
+    0.2063,
+    0.145
+   ],
+   "lods": []
+  },
+  "balaclava": {
+   "url": "assets/models/balaclava.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 160376,
+   "srcTris": 3894,
+   "tris": 3894,
+   "min": [
+    -0.1126,
+    0,
+    -0.0893
+   ],
+   "max": [
+    0.1126,
+    0.3,
+    0.0893
+   ],
+   "lods": []
+  },
+  "ghillie_hood": {
+   "url": "assets/models/ghillie_hood.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 477056,
+   "srcTris": 7451,
+   "tris": 7451,
+   "min": [
+    -0.2255,
+    0,
+    -0.1593
+   ],
+   "max": [
+    0.2255,
+    0.5,
+    0.1593
+   ],
+   "lods": []
+  },
+  "hip_pack": {
+   "url": "assets/models/hip_pack.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 285936,
+   "srcTris": 4604,
+   "tris": 4604,
+   "min": [
+    -0.17,
+    0,
+    -0.19
+   ],
+   "max": [
+    0.17,
+    0.1617,
+    0.19
+   ],
+   "lods": []
+  },
+  "field_bag": {
+   "url": "assets/models/field_bag.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 352140,
+   "srcTris": 5795,
+   "tris": 5795,
+   "min": [
+    -0.1249,
+    0,
+    -0.19
+   ],
+   "max": [
+    0.1249,
+    0.2662,
+    0.19
+   ],
+   "lods": []
+  },
+  "military_belt": {
+   "url": "assets/models/military_belt.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 355936,
+   "srcTris": 5502,
+   "tris": 5502,
+   "min": [
+    -0.1839,
+    0,
+    -0.2
+   ],
+   "max": [
+    0.1839,
+    0.1762,
+    0.2
+   ],
+   "lods": []
+  },
+  "assault_pack": {
+   "url": "assets/models/assault_pack.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 354932,
+   "srcTris": 7565,
+   "tris": 7565,
+   "min": [
+    -0.2,
+    0,
+    -0.1554
+   ],
+   "max": [
+    0.2,
+    0.52,
+    0.1554
+   ],
+   "lods": []
+  },
+  "ground_jacket": {
+   "url": "assets/models/ground_jacket.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 151128,
+   "srcTris": 2830,
+   "tris": 2830,
+   "min": [
+    -0.3015,
+    0,
+    -0.31
+   ],
+   "max": [
+    0.3015,
+    0.2033,
+    0.31
+   ],
+   "lods": []
+  },
+  "ground_trousers": {
+   "url": "assets/models/ground_trousers.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 177156,
+   "srcTris": 2874,
+   "tris": 2874,
+   "min": [
+    -0.31,
+    0,
+    -0.2743
+   ],
+   "max": [
+    0.31,
+    0.1636,
+    0.2743
+   ],
+   "lods": []
+  },
+  "ground_shirt": {
+   "url": "assets/models/ground_shirt.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 125308,
+   "srcTris": 2424,
+   "tris": 2424,
+   "min": [
+    -0.2215,
+    0,
+    -0.25
+   ],
+   "max": [
+    0.2215,
+    0.095,
+    0.25
+   ],
+   "lods": []
+  },
+  "ground_trainers": {
+   "url": "assets/models/ground_trainers.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 355552,
+   "srcTris": 3712,
+   "tris": 3712,
+   "min": [
+    -0.0674,
+    0,
+    -0.15
+   ],
+   "max": [
+    0.0674,
+    0.1216,
+    0.15
+   ],
+   "lods": []
+  },
+  "ground_stab_vest": {
+   "url": "assets/models/ground_stab_vest.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 124632,
+   "srcTris": 9087,
+   "tris": 9087,
+   "min": [
+    -0.3,
+    0,
+    -0.2577
+   ],
+   "max": [
+    0.3,
+    0.3381,
+    0.2577
    ],
    "lods": []
   }
