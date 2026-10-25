@@ -32,7 +32,7 @@ function cornersOf(s: Solid): V3[] {
   return s.prism.flatMap(([x, z]): V3[] => [[x, s.y0, z], [x, s.y1, z]]);
 }
 /** the box a list of solids fills */
-function boxOf(list: Solid[]): [V3, V3] {
+export function boxOf(list: Solid[]): [V3, V3] {
   const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
   for (const s of list) for (const c of cornersOf(s)) for (let i = 0; i < 3; i++) {
     lo[i] = Math.min(lo[i], c[i]);
@@ -213,28 +213,38 @@ async function palisade(atmo: Atmosphere | null): Promise<Built> {
   return built(out);
 }
 
-/** the claim: its strongbox and post, and its flag waving (a shader of its own, shared by every claim) */
+/**
+ * The claim: its strongbox, the post it came with cut off at the lid; and its flag apart, waving (a shader of its own,
+ * shared by every claim), flown on each claim's own pole (src/game/building/flags.ts).
+ */
 const FLAG = { time: { value: 0 }, at: { value: new THREE.Vector2(0, 1) } };
-async function claim(atmo: Atmosphere | null): Promise<Built> {
-  const parts = await partsOf('bb_claim', atmo);
-  const flag = parts.find((p) => p.mat.name === 'pirate_flag' || p.mat.side === THREE.DoubleSide);
-  // (its strongbox's middle where the claim stands: the model came stood about the middle of all of it, flag and all)
-  const body = parts.find((p) => p !== flag);
-  if (body) {
-    const P = body.geo.getAttribute('position');
+/** the flag's size flown, metres: a yard and a half by one, as a flag on a house's pole is */
+export const FLAG_SIZE: readonly [number, number] = [1.1, 0.75];
+/** how high the strongbox's lid is, as its solids have it: whatever of the model stands over it was its post */
+const LID = 0.47;
+let claimMade: Promise<{ box: Built; flag: Built | null }> | null = null;
+function claimParts(atmo: Atmosphere | null) {
+  return (claimMade ??= (async () => {
+    const parts = await partsOf('bb_claim', atmo);
+    const flag = parts.find((p) => p.mat.name === 'pirate_flag' || p.mat.side === THREE.DoubleSide);
+    // (its strongbox's middle where the claim stands: the model came stood about the middle of all of it, flag and all)
+    const body = parts.filter((p) => p !== flag);
     let x0 = Infinity, x1 = -Infinity;
-    for (let i = 0; i < P.count; i++) if (P.getY(i) < 0.4) {
-      x0 = Math.min(x0, P.getX(i));
-      x1 = Math.max(x1, P.getX(i));
+    for (const b of body) {
+      const P = b.geo.getAttribute('position');
+      for (let i = 0; i < P.count; i++) if (P.getY(i) < 0.4) {
+        x0 = Math.min(x0, P.getX(i));
+        x1 = Math.max(x1, P.getX(i));
+      }
     }
-    if (Number.isFinite(x0)) moved(parts, new THREE.Matrix4().makeTranslation(-(x0 + x1) / 2, 0, 0));
-  }
-  if (flag) {
+    if (Number.isFinite(x0)) moved(body, new THREE.Matrix4().makeTranslation(-(x0 + x1) / 2, 0, 0));
+    const box = built(body.map((b) => ({ geo: under(b.geo, LID + 0.01), mat: b.mat })));
+    if (!flag) return { box, flag: null };
+    // (its hoist at x 0 and its middle at y 0, made FLAG_SIZE long, its folds kept as they are)
     flag.geo.computeBoundingBox();
-    const fb = flag.geo.boundingBox!;
-    FLAG.at.value.set(fb.min.x, Math.max(0.1, fb.max.x - fb.min.x));
-    const m = flag.mat as THREE.MeshStandardMaterial;
-    m.side = THREE.DoubleSide;
+    const fb = flag.geo.boundingBox!, k = FLAG_SIZE[0] / Math.max(0.01, fb.max.x - fb.min.x);
+    flag.geo.applyMatrix4(new THREE.Matrix4().makeScale(k, (FLAG_SIZE[1] / Math.max(0.01, fb.max.y - fb.min.y)), k).multiply(new THREE.Matrix4().makeTranslation(-fb.min.x, -(fb.min.y + fb.max.y) / 2, -(fb.min.z + fb.max.z) / 2)));
+    FLAG.at.value.set(0, FLAG_SIZE[0]);
     // (cloth hangs from its hoist: nothing moves there, more the further out; two waves and a slower roll through it,
     // each claim a little out of step with the next by where it stands)
     const wave = (shader: THREE.WebGLProgramParametersWithUniforms) => {
@@ -244,21 +254,33 @@ async function claim(atmo: Atmosphere | null): Promise<Built> {
         '#include <begin_vertex>',
         `#include <begin_vertex>
         float fk = clamp((transformed.x - uFlagAt.x) / uFlagAt.y, 0.0, 1.0);
-        float fph = 0.0;
-        #ifdef USE_INSTANCING
-          fph = instanceMatrix[3].x * 0.37 + instanceMatrix[3].z * 0.21;
-        #endif
-        transformed.z += fk * (sin(uFlagTime * 3.1 - transformed.x * 6.0 + fph) * 0.06 + sin(uFlagTime * 1.7 - transformed.x * 2.5 + transformed.y * 3.0 + fph) * 0.035);
-        transformed.y += fk * fk * sin(uFlagTime * 2.3 - transformed.x * 4.0 + fph) * 0.015;`,
+        float fph = modelMatrix[3].x * 0.37 + modelMatrix[3].z * 0.21;
+        transformed.z += fk * (sin(uFlagTime * 3.1 - transformed.x * 6.0 + fph) * 0.07 + sin(uFlagTime * 1.7 - transformed.x * 2.5 + transformed.y * 3.0 + fph) * 0.04);
+        transformed.y += fk * fk * (sin(uFlagTime * 2.3 - transformed.x * 4.0 + fph) * 0.015 - 0.05);`,
       );
     };
-    const fresh = m.clone();
-    fresh.side = THREE.DoubleSide;
-    if (atmo) atmo.register(fresh, wave, 'flag-wave');
-    else fresh.onBeforeCompile = wave;
-    flag.mat = fresh;
+    const m = (flag.mat as THREE.MeshStandardMaterial).clone();
+    m.side = THREE.DoubleSide;
+    if (atmo) atmo.register(m, wave, 'flag-wave');
+    else m.onBeforeCompile = wave;
+    return { box, flag: { geo: flag.geo, mat: m } };
+  })());
+}
+const claim = async (atmo: Atmosphere | null) => (await claimParts(atmo)).box;
+/** the claim's flag, made once: flown by src/game/building/flags.ts */
+export const flagOf = async (atmo: Atmosphere | null) => (await claimParts(atmo)).flag;
+
+/** a geometry's triangles that lie wholly under a height (non-indexed: partsOf makes them so) */
+function under(g: THREE.BufferGeometry, y: number): THREE.BufferGeometry {
+  const P = g.getAttribute('position'), keep: number[] = [];
+  for (let t = 0; t < P.count; t += 3) if (Math.max(P.getY(t), P.getY(t + 1), P.getY(t + 2)) < y) keep.push(t);
+  const out = new THREE.BufferGeometry();
+  for (const [name, a] of Object.entries(g.attributes) as [string, THREE.BufferAttribute][]) {
+    const arr = new Float32Array(keep.length * 3 * a.itemSize);
+    keep.forEach((t, j) => arr.set((a.array as Float32Array).subarray(t * a.itemSize, (t + 3) * a.itemSize), j * 3 * a.itemSize));
+    out.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize));
   }
-  return built(parts);
+  return out;
 }
 
 /** each kind drawn from a model: its body, and its leaves */

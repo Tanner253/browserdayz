@@ -111,12 +111,13 @@ export class Bases {
       const yaw = Number.isFinite(ask.yaw) ? ask.yaw! : 0;
       base = { id: 0, ox: ask.x, oy: 0, oz: ask.z, yaw, owner: by, pieces: new Map(), next: 1 };
       if (K.ground) {
-        // (its top a hand over the highest ground under it)
+        // (its top a hand over the highest ground under it, or as high as it is asked: the aim raises it, Rust's way,
+        // and the ground's check below says when it would stand off its footing)
         const hs = cornersOf(K.shape!, 0, 0, 0).map(([x, z]) => {
           const [wx, , wz] = toWorld(base, x, 0, z);
           return this.land.ground(wx, wz);
         });
-        base.oy = Math.max(this.land.ground(ask.x, ask.z), ...hs) + FOUND.lift;
+        base.oy = Math.max(Math.max(this.land.ground(ask.x, ask.z), ...hs) + FOUND.lift, Number.isFinite(ask.y) ? ask.y : -Infinity);
       } else base.oy = this.land.ground(ask.x, ask.z);
       spot = { x: 0, y: 0, z: 0, r: 0, on: [] };
       fresh = true;
@@ -331,7 +332,7 @@ export class Bases {
 /** a base said short: [id, x, y, z, yaw, owner, next piece's number, pieces, and its claim] */
 export type KeptBase = [number, number, number, number, number, string, number, KeptPiece[], KeptClaim?];
 /** a claim: [its piece, its members [public id, name], what is owed over, dry, what is in its store (the save's only, never a game's)] */
-export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, unknown[]?];
+export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, (unknown[] | null)?, number?];
 /** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s), and what more there is of it] */
 export type KeptPiece = [number, number, number, number, number, number, number, number, number, KeptMore?];
 /** what more there is of a piece: `o` it stands open; `s` what is in its store (the save's only, never a game's); `l` its lock; `w` whose bed it is */
@@ -349,13 +350,13 @@ export function said(b: Base, stock?: unknown[], held?: (b: Base, p: Piece) => u
   if (b.claim) k.push(saidClaim(b.claim, stock));
   return k;
 }
-export const saidClaim = (c: Claim, stock?: unknown[]): KeptClaim => [c.p, c.members.map((m) => [m.pid, m.name]), Object.fromEntries(Object.entries(c.due).map(([k, n]) => [k, Math.round(n * 1000) / 1000])), c.dry, ...(stock ? [stock] : [])] as KeptClaim;
+export const saidClaim = (c: Claim, stock?: unknown[]): KeptClaim => [c.p, c.members.map((m) => [m.pid, m.name]), Object.fromEntries(Object.entries(c.due).map(([k, n]) => [k, Math.round(n * 1000) / 1000])), c.dry, stock ?? null, c.until ?? -1] as KeptClaim;
 export function heardClaim(k: unknown): Claim | undefined {
   if (!Array.isArray(k) || !Number.isFinite(k[0]) || !Array.isArray(k[1])) return undefined;
   const members = (k[1] as unknown[]).filter((m): m is [string, string] => Array.isArray(m) && typeof m[0] === 'string' && typeof m[1] === 'string').map(([pid, name]) => ({ pid, name }));
   const due: Record<string, number> = {};
   for (const [id, n] of Object.entries((k[2] ?? {}) as Record<string, unknown>)) if (Number.isFinite(n)) due[id] = Number(n);
-  return { p: k[0] as number, members, due, dry: !!k[3], ...(Array.isArray(k[4]) ? { kept: k[4] as unknown[] } : {}) };
+  return { p: k[0] as number, members, due, dry: !!k[3], ...(Array.isArray(k[4]) ? { kept: k[4] as unknown[] } : {}), ...(Number.isFinite(k[5]) ? { until: k[5] as number } : {}) };
 }
 export function saidPiece(p: Piece, store?: unknown[], secret = false): KeptPiece {
   const k: KeptPiece = [p.id, PIECE_IDS.indexOf(p.k), p.t, cm(p.x), cm(p.y), cm(p.z), p.r, Math.round(p.hp), Math.round(p.at / 1000)];

@@ -131,6 +131,12 @@ export function broke(b: Base, id: number) {
 export function keepTold(b: Base, have = counts(boxes.get(cidOf(b.id))?.items ?? [])) {
   if (!b.claim) return;
   const day = perDay(b), s = protectedFor(have, day), on = new Set(b.claim.members.map((m) => m.pid));
+  // (and everybody who sees it, how long it is kept, when that has moved by more than a minute: its flag flies as high)
+  const until = Number.isFinite(s) ? Math.round(Date.now() + s * 1000) : -1, was = b.claim.until;
+  if (was === undefined || (until < 0) !== (was < 0) || Math.abs(until - was) > 60_000) {
+    b.claim.until = until;
+    tellClaim(b);
+  }
   const m = { t: 'bkeep', b: b.id, s: Number.isFinite(s) ? Math.round(s) : -1, dry: b.claim.dry, day: Object.entries(day).map(([id, n]) => [id, Math.round(n * 10) / 10] as [string, number]) } as const;
   for (const c of clients.values()) if (known(c, b.id) && on.has(pidOf(c.key))) send(c, m);
 }

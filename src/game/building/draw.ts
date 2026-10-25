@@ -17,6 +17,7 @@ import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
 import { DOOR } from '../../sim/build/doors';
 import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
 import { PieceModels } from './models';
+import { ClaimFlags } from './flags';
 
 /** what a blow or a bullet that lands on a piece struck */
 export class PieceRef {
@@ -71,9 +72,13 @@ export class BaseDraw {
 
   /** the pieces drawn from models (src/game/building/models.ts) */
   readonly models: PieceModels;
+  /** each claim's pole and flag (src/game/building/flags.ts), stood again each second */
+  readonly flags: ClaimFlags;
+  private flagT = 0;
 
   constructor(private scene: THREE.Scene, private atmo: Atmosphere | null) {
     this.models = new PieceModels(atmo, (kind) => this.remodel(kind));
+    this.flags = new ClaimFlags(scene, atmo);
   }
 
   /** a kind's model come: what of it was drawn as its solids, drawn again */
@@ -179,6 +184,7 @@ export class BaseDraw {
   }
 
   clear() {
+    this.flags.clear();
     for (const d of this.drawn.values()) this.unsolid(d);
     for (const d of this.drawn.values()) for (const q of d.parts) this.dirty.add(q.key);
     this.drawn.clear();
@@ -194,6 +200,11 @@ export class BaseDraw {
     for (const key of this.dirty) this.rebuild(key);
     this.dirty.clear();
     this.models.tick(dt);
+    if ((this.flagT -= dt) <= 0) {
+      this.flagT = 1;
+      this.flags.sync(new Set([...this.drawn.values()].filter((d) => d.piece.k === 'claim').map((d) => d.base)));
+    }
+    this.flags.update(dt);
     for (const d of this.moving) this.step(d, dt);
     // (the colliders, twice a second: made for what has come near, taken away from what is far)
     this.solidT -= dt;

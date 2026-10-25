@@ -432,6 +432,9 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
       return typeof r === 'string' ? null : r.piece;
     };
     put('claim', -0.7, -0.5);
+    // (`&keep=` the share of two days its store keeps it, 0 dry: how high its flag flies, src/game/building/flags.ts)
+    const keep = new URLSearchParams(location.search).get('keep');
+    if (keep !== null && house.claim) Object.assign(house.claim, Number(keep) > 0 ? { until: Date.now() + Number(keep) * 48 * 3600_000 } : { dry: true });
     const box = put('box_small', 0.6, -0.9);
     if (box) box.lock = { k: 'key', on: true, who: ['me'], key: 1 };
     put('box_large', 3.4, -0.9);
@@ -467,7 +470,7 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
       ['the workbench at level III, and the bed', [1.4, 2.4, 2.6], [-0.2, 0.6, 1.8]],
       ['a palisade, and the stone gate shut', [21, 4, 13], [21, 3, -2]],
       ['the wooden gate shut, and a high stone wall', [41, 4, 13], [41, 3, -2]],
-      ['the whole house from outside', [9, 8, 13], [1.5, 2, 1.5]],
+      ["the whole house from outside, the claim's pole and flag", [17, 7, 26], [1.5, 6.5, 1.5]],
     ];
     house.pieces.forEach((p) => {
       if (p.y >= 2.5) draw.remove(house.id, [p.id]);

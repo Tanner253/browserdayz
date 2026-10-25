@@ -5,7 +5,7 @@
 // players to make their own dynamic bases?"; "think like rust how does rust do it". So, on flat ground and on a slope:
 // foundations go edge to edge, squares and triangles together, at one level; walls stand on edges, one to an edge,
 // their hard side out unless turned; floors go over walls and out one cell past them, no further; stairs need room
-// over them; nothing is built over four storeys; a piece taken away takes what stood only on it; a foundation stands
+// over them; nothing is built over five storeys; a piece taken away takes what stood only on it; a foundation stands
 // on posts no longer than they are, and never in the ground; the save keeps every piece and works out again what each
 // rests on.
 
@@ -151,16 +151,16 @@ ok('stairs on a foundation need room over them; a floor over them is refused', (
   assert.match(blocked(b2, 'stairs_l', st) ?? '', /No room over it/);
 });
 
-ok(`nothing over four storeys; a wall with nothing under it has no spot at all`, () => {
+ok(`nothing over five storeys; a wall with nothing under it has no spot at all`, () => {
   const bs = new Bases(flat), b = start(bs);
-  for (let s = 0; s < 5; s++) {
+  for (let s = 0; s < 6; s++) {
     const wall = nearestSpot(spots(b, 'wall'), 'wall', { x: 0, y: s * STOREY + 1.5, z: 1.5 });
     if (!wall) break;
     const why = blocked(b, 'wall', wall);
-    if (s < 4) {
+    if (s < 5) {
       assert.equal(why, null, `storey ${s + 1}: ${why}`);
       bs.lay({ b: b.id, k: 'wall', ...wall }, ME, 0);
-    } else assert.match(why ?? '', /4 storeys/);
+    } else assert.match(why ?? '', /5 storeys/);
   }
   assert.equal(spots(b, 'wall').filter((s) => Math.hypot(s.x - 30, s.z) < 1).length, 0);
 });
