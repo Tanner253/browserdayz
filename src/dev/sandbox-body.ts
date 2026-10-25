@@ -5,8 +5,9 @@
 // a cell of the picture; `&frames=` draws them again at successive moments, a block of cells each, for a moving
 // picture (progress/anim-tools/sheet-gif.mjs cuts the blocks apart).
 //
-//   &bodies=free.walk,ak.aim.crouch.walk.L,m9.aim,hatchet.jog.FL,ak.prone.walk,free.turn
-//     each body's words, by dots: what is held (free, or an item: ak, m9, hatchet...), aim, crouch or prone, idle /
+//   &bodies=free.walk,ak.aim.crouch.walk.L,m9.aim,hatchet.jog.FL,ak.prone.walk,free.turn,bat.b2
+//     each body's words, by dots: what is held (free, or an item: ak, m9, hatchet...), b0..b3 (a survivor's body, as
+//     the game puts it on: none, the old suit), aim, crouch or prone, idle /
 //     walk / jog / sprint / run (the hurried crouch) or a pace (v2.5, m/s), a way (F B L R FL FR BL BR), turn (on the
 //     spot), up / down (the aim pitched), limp
 //   &frames=12&fps=15&settle=1.2    moments drawn (after so many seconds of going), how many a second
@@ -17,7 +18,8 @@ import * as THREE from 'three';
 import { Avatar } from '../game/avatar';
 import { lookFor } from '../game/look';
 import { Weapons } from '../game/weapons';
-import { ITEMS } from '../sim/items';
+import { CLOTHES, ITEMS } from '../sim/items';
+import { sortWorn } from '../game/survivors';
 import { CRAWL, CROUCH_RUN, HANDS_FREE, AIM_SLOW } from '../game/player';
 import type { Atmosphere } from '../world/atmosphere';
 
@@ -36,7 +38,7 @@ interface Stage {
 /** the ways, radians to the body's left of ahead */
 const WAYS: Record<string, number> = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 };
 
-export interface BodySpec { words: string; held: string | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean }
+export interface BodySpec { words: string; held: string | null; body: number | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean }
 
 /** what a cell's words ask for, at the pace the game would go at (src/game/player.ts: 1.7 walking, 4.0 at a jog, 6.2 flat out, 1.9 crouched) */
 export function specOf(words: string): BodySpec {
@@ -56,7 +58,9 @@ export function specOf(words: string): BodySpec {
       if (way && Math.abs(WAYS[way]) > 90) speed *= 0.75;
     }
   }
-  return { words, held, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp') };
+  // (b0..b3: one of the survivors' bodies, as the game puts it on, in what a new life wears; none: the old suit)
+  const body = w.find((k) => /^b\d$/.test(k));
+  return { words, held, body: body ? +body.slice(1) : null, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp') };
 }
 
 /** a stand-in for the game's sky and sun: what a body and a gun ask of it */
@@ -99,6 +103,12 @@ export async function stageBodies(o: Stage) {
   const bodies = await Promise.all(specs.map(async (s, i) => {
     const a = new Avatar();
     await a.load(atmo, 0, false, lookFor('Sable'));
+    if (s.body !== null) {
+      a.wardrobe.setBody(s.body);
+      await a.wardrobe.ready();
+      a.wardrobe.setWorn(sortWorn(CLOTHES.map(([, id]) => id)).worn);
+      await a.wardrobe.dressed();
+    }
     scene.add(a.root);
     a.root.traverse((m) => { if ((m as THREE.Mesh).isMesh) { m.castShadow = true; m.frustumCulled = false; } });
     if (s.held) {

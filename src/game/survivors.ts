@@ -273,7 +273,10 @@ export const SUIT = ['body', 'head', 'pads'];
 
 /**
  * A copy of the character file shown as one of the bodies, with the body's own paint (the sandbox, and the figure a
- * player picks theirs by on the menu): the suit hidden and the body put on its bones.
+ * player picks theirs by on the menu): the suit hidden and the body put on its bones. Not for an Avatar: its driving
+ * skeleton's lengths are copied onto these bones every frame, the suit's, and the body's fingers and wrists stood
+ * where the suit's were (melee's sandbox, 2026-10-25: open fists on a handle). An Avatar is given a body as the game
+ * gives it, `avatar.wardrobe.setBody(n)` and `await avatar.wardrobe.ready()` (src/dev/sandbox-body.ts, `.b0`).
  */
 export async function wearBody(model: THREE.Object3D, n: number, hide = 0): Promise<THREE.SkinnedMesh[]> {
   const gltf = await loadBody(n);
@@ -373,8 +376,14 @@ export class Wardrobe {
   setWorn(worn: Worn[]) {
     this.worn = worn;
     this.wornKey = JSON.stringify(worn);
-    void this.dress();
+    this.dressing = this.dress();
   }
+
+  /** once what was last asked to be worn is drawn (for the tools: the game does not wait for it) */
+  dressed() {
+    return this.dressing;
+  }
+  private dressing: Promise<void> = Promise.resolve();
 
   private async dress() {
     const f = this.frame, key = this.wornKey, worn = this.worn, on = this.shown !== null;

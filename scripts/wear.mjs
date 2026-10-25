@@ -65,9 +65,9 @@ const PIECES = {
   leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, plain: true, tex: 2048 },
   parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], plain: true, tex: 2048 },
   field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
-  jeans: { src: 'wear_jeans.glb', body: 1, ...TROUSERS, plain: true, tex: 2048 },
+  jeans: { src: 'wear_jeans.glb', body: 1, ...TROUSERS, tex: 2048 },
   cargo_pants: { src: 'wear_cargo_pants.glb', body: 2, ...TROUSERS, plain: true, tex: 2048 },
-  work_pants: { src: 'wear_work_pants.glb', body: 3, ...TROUSERS, plain: true, tex: 2048 },
+  work_pants: { src: 'wear_work_pants.glb', body: 3, ...TROUSERS, tex: 2048 },
   combat_boots: { src: 'wear_combat_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   work_boots: { src: 'wear_work_boots.glb', body: 1, ...BOOTS, tex: 1024 },
   hiking_boots: { src: 'wear_hiking_boots.glb', body: 2, ...BOOTS, tex: 1024 },
@@ -77,14 +77,14 @@ const PIECES = {
   // (all of it over the chest, the belly and the shoulders is the shirt: white over the body's own grey shirt, it was
   // taken for the body there by its colour, and had holes)
   tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], plain: true, tex: 2048 },
-  tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, plain: true, tex: 2048 },
+  tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, tex: 2048 },
   trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, tex: 1024 },
   smock: { src: 'wear_smock.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
   smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
   // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)
   tactical_jacket: { src: 'wear_tactical_jacket.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
   combat_shirt: { src: 'wear_combat_shirt.glb', body: 1, ...JACKET, tex: 2048 },
-  tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, plain: true, tex: 2048 },
+  tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048 },
   winter_boots: { src: 'wear_winter_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   // (the stab vest that takes the all-black one's place, the owner: "the stab vest I think needs a new model"; its
   // straps over the shoulders)
@@ -140,8 +140,11 @@ async function plainCloth(prim, own) {
   let bad = 0;
   for (let i = 0; i < N; i++) {
     const r = data[i * 3] / 255, g = data[i * 3 + 1] / 255, b = data[i * 3 + 2] / 255, L = Math.max(0.02, luma(r, g, b));
-    const off = Math.hypot(r / L - hue[0], g / L - hue[1], b / L - hue[2]), k = L / lo;
-    const ok = k > 0.62 && k < 1.25 && off < 0.25;
+    // (how far it is from the piece's colour at its own lightness, in the picture's own units: a dark cloth's hue is
+    // too unsteady to judge it by)
+    const k = L / lo, off = Math.hypot(r - own[0] * k, g - own[1] * k, b - own[2] * k);
+    // (a fold's shadow is half as light as the cloth, its top lit half again: kept)
+    const ok = k > 0.45 && k < 1.6 && off < 0.12;
     if (!ok) bad++;
     good[i] = ok ? 255 : 0;
     if (ok) data.copy(held, i * 3, i * 3, i * 3 + 3);
@@ -153,7 +156,7 @@ async function plainCloth(prim, own) {
   for (let i = 0; i < N; i++) {
     let r = data[i * 3], g = data[i * 3 + 1], b = data[i * 3 + 2];
     if (!good[i] && share[i] > 2) [r, g, b] = [0, 1, 2].map((c) => (sum[i * 3 + c] * 255) / share[i]);
-    const k = Math.min(1.25, Math.max(0.62, luma(r, g, b) / 255 / lo));
+    const k = Math.min(1.6, Math.max(0.45, luma(r, g, b) / 255 / lo));
     for (let c = 0; c < 3; c++) out[i * 3 + c] = Math.max(0, Math.min(255, Math.round(own[c] * k * 255)));
   }
   tex.setImage(new Uint8Array(await sharp(out, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer())).setMimeType('image/png');
