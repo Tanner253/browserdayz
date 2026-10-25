@@ -291,7 +291,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const gltfPath = path.join(dir, cfg.file ?? 'scene.gltf');
   if (!(await exists(gltfPath))) throw new Error(`${id}: put its glTF download in assets-src/models/${cfg.dir ?? id}/ (${cfg.file ?? 'scene.gltf'} is not there)`);
   // (a licence that asks for no credit line, Sketchfab's own: the model's settings give the one it is credited with)
-  const credit = { id, ...(await creditOf(dir)), changes: cfg.changes, ...(cfg.credit ?? {}) };
+  // (a credit written out in full needs no licence beside the download: a model made for us, as the Higgsfield ones)
+  const credit = { id, ...(cfg.credit?.line ? {} : await creditOf(dir)), changes: cfg.changes, ...(cfg.credit ?? {}) };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
   const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, hung: cfg.hung && Object.entries(cfg.hung).map(([name, re]) => `${name}: ${re.source}`).join(), cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, isles: cfg.isles ? JSON.stringify(cfg.isles, (_k, v) => (typeof v === 'function' ? String(v) : v)) : undefined, v: 6 });
@@ -394,6 +395,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const [rx, ry, rz] = cfg.rot ?? [0, 0, 0];
     const R = mul(about.z(rz), mul(about.y(ry), about.x(rx)));
     for (const mesh of meshes) transformMesh(mesh, R);
+    // (and pressed along its axes as it then stands: a plate that came four times as thick as steel plate is)
+    if (cfg.squash) for (const mesh of meshes) transformMesh(mesh, [cfg.squash[0], 0, 0, 0, 0, cfg.squash[1], 0, 0, 0, 0, cfg.squash[2], 0, 0, 0, 0, 1]);
     if (pivot) pivot = [0, 1, 2].map((r) => R[r] * pivot[0] + R[4 + r] * pivot[1] + R[8 + r] * pivot[2]);
     const b = getBounds(scene);
     const s = cfg.scale ?? cfg.size / Math.max(...b.max.map((v, k) => v - b.min[k]));
@@ -451,6 +454,9 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
       }
       // (a model that came as bare colour, lighter than the thing is: its colour darkened by this much)
       if (cfg.shade !== undefined) m.setBaseColorFactor(m.getBaseColorFactor().map((v, k) => (k < 3 ? v * cfg.shade : v)));
+      // (a model that came polished as a mirror where it is metal: its metal map toned down by this much, the factor
+      // scaling the map, so what of it is no metal stays none)
+      if (cfg.metalBy !== undefined) m.setMetallicFactor(m.getMetallicFactor() * cfg.metalBy);
       if (m.getMetallicRoughnessTexture()) continue;
       if (cfg.metal !== undefined) m.setMetallicFactor(cfg.metal);
       if (cfg.rough !== undefined) m.setRoughnessFactor(cfg.rough);

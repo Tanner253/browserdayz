@@ -1,3 +1,3 @@
 {
- "why": "Hotfix: a dog tag cashed in too early is now kept, not lost; its countdown matches the server. Places kept."
+ "why": "Hotfix: a dog tag now stays yours until the server cashes it; the countdown follows the server. Places kept."
 }

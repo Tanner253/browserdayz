@@ -105,7 +105,8 @@ try {
   ann.send({ t: 'respawn' });
   assert.ok(await ann.next('spawn'), 'she did not come back');
   const now = new PlayerInventory();
-  const fresh = { top: now.slots.top!.uid, legs: now.slots.legs!.uid };
+  // (whatever a new life begins dressed in: src/sim/items.ts CLOTHES)
+  const fresh = Object.values(now.slots).flatMap((it) => (it ? [it.uid] : []));
   ann.carry(now);
 
   // ---- somebody else's press does nothing, and they are not told the body is theirs
@@ -132,7 +133,7 @@ try {
   assert.equal(back.inv.slots.held ?? null, null, 'something was put in her hands');
   await sleep(200);
   const left = vic.got.filter((m): m is Extract<S2C, { t: 'cdata' }> => m.t === 'cdata' && m.cid === body.uid).at(-1);
-  assert.deepEqual(new Set(left?.items.map((p) => p.uid)), new Set([fresh.top, fresh.legs]), 'what lies on the body is not the clothes she came back in');
+  assert.deepEqual(new Set(left?.items.map((p) => p.uid)), new Set(fresh), 'what lies on the body is not the clothes she came back in');
   console.log(`reclaim: ok (the gun in the hands wore ${optic?.id ?? 'nothing fitted'})`);
 } catch (e) {
   failed = e;

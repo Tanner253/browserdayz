@@ -341,8 +341,10 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   // Near anything that could be stood on, a house's upper floor, a roof, a rock, it stays at their height: the server
   // knows the ground and not every floor, and each game lays the body on whatever is under it (Game.addCorpse).
   // It was put on the ground under the building: 2026-10-24, "when i kill someone on the 3rd floor their body falls
-  // to the ground rather than staying on the floor of where they were killed at".)
-  const at = c.pose[1], under = world.standAt(x, at, z), y = !ride && at - under > 1.5 && !world.supportNear(x, z) ? under : at;
+  // to the ground rather than staying on the floor of where they were killed at". A floor the server does know, a
+  // base's or a bridge's deck, it falls to: server/solid.ts.)
+  const at = c.pose[1], under = world.standAt(x, at, z), known = under > world.coverAt(x, z) + 0.05;
+  const y = !ride && at - under > 1.5 && (known || !world.supportNear(x, z)) ? under : at;
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
   const box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
   const spill: ItemInstance[] = [];
@@ -421,7 +423,9 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;
-    economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
+    // (at the body's height, or on what is under each about there: a base's floor, which the body may be a hair off)
+    const ix = x + Math.cos(a) * 0.9, iz = z + Math.sin(a) * 0.9, under = world.standAt(ix, y + 0.3, iz);
+    economy.drop(it, ix, Math.abs(under - y) < 0.6 ? under + 0.03 : y, iz, Math.random() * 6.28);
   }
   // (at arm's length on their right, a gun with its magazine and whatever is fitted to it: every game lays it clear of
   // walls on whatever is under it, as anything let go of, see LootManager.settleOnGround)
@@ -430,7 +434,7 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   if (!box.items.length) return null;
   // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
   for (const p of box.items) issue(p.item);
-  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, pid: mine, expires: economy.time + (inPlay(x, z) ? CORPSE_LIFETIME : CORPSE_WEST), v, ...(ride ? { ride } : {}) });
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, pid: mine, expires: economy.time + (inPlay(x, z) ? CORPSE_LIFETIME : CORPSE_WEST), v, ...(c.bd !== null ? { bd: c.bd } : {}), ...(ride ? { ride } : {}) });
   // (the tags on it are on this body now: custody.ts)
   lieAt(box.items.map((p) => p.item), `b:${uid}`);
   if (ride) riders.add(uid);

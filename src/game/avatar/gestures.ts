@@ -69,6 +69,12 @@ export const gesturesMethods = {
           // on the motion capture: the arms and the chest of somebody drinking, a sip after a sip (only survivors eat)
           const sip = this.deeds?.get('drink');
           if (sip) this.layer(sip, ges.t % sip.getClip().duration, wgt, 0);
+        } else if (ges.kind === 'saw') {
+          // a log sawn at the feet: the left hand braced on it, the right and its saw drawn forward and back (the owner,
+          // 2026-10-25: "sawing animation is moving the hand and arm forweward and backward with the saw attached")
+          this.reach(this.armL, near(at(0.42, -0.95, -0.18), this.armL), dirOf(1, -0.3, 0.2), dirOf(0, -1, 0), [0.5, 0.55, 0.6, 0.65], aimQ, wgt);
+          const r = at(0.5 + Math.sin((ges.t * Math.PI * 2) / 0.7) * 0.14, -0.85, 0.16);
+          this.reach(this.armR, near(r, this.armR), dirOf(1, -0.4, 0), dirOf(-0.2, 0, -1), [1.4, 1.45, 1.5, 1.5], aimQ, wgt);
         } else {
           // both hands in front of the belly: the left held still, the right working round it
           const l = near(at(0.28, -0.4, -0.07), this.armL);

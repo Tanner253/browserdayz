@@ -18,6 +18,7 @@ import { DEVICE, cameWith, deviceName, isFarm, shortDevice } from './device';
 import { broadcast, clients, drop, send, type Client } from './players';
 import { hurtJeep, infectedBody, kill, leaveSeat, releaseLock } from './acts';
 import { animalsBlast } from './animals';
+import { blastWalled } from './solid';
 
 // ------------------------------------------------------------------ a life kept by the server
 //
@@ -379,21 +380,23 @@ export function inHands(now: number) {
  * the ground would"). Nobody's game is asked anything of it: where it lay and when it went off are the server's
  * own, and so is whom it reached, by how far each stands from it, as a car that burns is reckoned. Whoever is in
  * reach is hurt by it through what they wear, and it is the dead holder's doing; the infected in reach and a car
- * in reach take it too. (There are no walls in the server's world: none stops it, as none stops a burning car's.)
+ * in reach take it too. (A base's walls stop it, server/solid.ts; the world's buildings do not, nor a burning car's.)
  */
 export function fellBlast(by: Client, w: string, at: Vec3) {
   const rule = WEAPON_RULES[w], now = Date.now();
   for (const o of clients.values()) {
     if (!o.alive || o.power.god) continue;
-    const amount = lyingBlast(w, at, [o.pose[0], o.pose[1] + 1.1, o.pose[2]]);
-    if (amount <= 0) continue;
+    const chest: Vec3 = [o.pose[0], o.pose[1] + 1.1, o.pose[2]];
+    const amount = lyingBlast(w, at, chest);
+    if (amount <= 0 || blastWalled(at, chest)) continue;
     const len = Math.max(0.001, Math.hypot(o.pose[0] - at[0], o.pose[2] - at[2]));
     o.lastHitBy = { id: by.id, name: by.name, w, zone: 'torso', dist: Math.hypot(o.pose[0] - at[0], o.pose[1] - at[1], o.pose[2] - at[2]), at: now };
     dealt(o, amount, 'torso', w);
     send(o, { t: 'dmg', from: by.id, amount, zone: 'torso', w, dir: [(o.pose[0] - at[0]) / len, 0, (o.pose[2] - at[2]) / len] });
   }
   for (const [i, b] of horde.bodies) {
-    const r = b.diedAt ? null : horde.hurt(i, lyingBlast(w, at, [b.s[0], b.s[1] + 1.2, b.s[2]]), now);
+    const chest: Vec3 = [b.s[0], b.s[1] + 1.2, b.s[2]];
+    const r = b.diedAt || blastWalled(at, chest) ? null : horde.hurt(i, lyingBlast(w, at, chest), now);
     if (!r) continue;
     const len = Math.max(0.001, Math.hypot(b.s[0] - at[0], b.s[2] - at[2]));
     const dir: [number, number] = [(b.s[0] - at[0]) / len, (b.s[2] - at[2]) / len];

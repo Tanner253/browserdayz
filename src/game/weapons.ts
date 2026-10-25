@@ -26,6 +26,7 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
+import { HELD_FIT } from './held-size';
 import { handMove, jabAt, lengthOf, mouthAt, slashAt } from './held-mocap';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
@@ -379,6 +380,9 @@ const SMG_CARRY = {
 };
 /** a stroke of the spade when something is being buried or dug up, seconds */
 const DIG_STROKE = 1.15;
+/** a saw's stroke at a log, there and back, seconds; and how far it goes along its blade, metres */
+const SAW_STROKE = { time: 0.7, reach: 0.12 };
+const _sawQ = new THREE.Quaternion(), _sawX = new THREE.Vector3(1, 0, 0);
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
 /**
@@ -497,6 +501,18 @@ export const LIVE = {
 };
 
 /**
+ * A torch in the hands, in the eye's space: up on the right in the fist, its head uppermost and leaning a little out
+ * and forward, the flame clear at the top right of the picture (the navigator, 2026-10-24: "the forearm raised, the
+ * torch up and a little out, the flame about shoulder height and clear of the body"). `turn` stands it up off the line
+ * it lies along when held (as it lies on the ground: its head toward the eye), its head uppermost and leaning a little
+ * away and out.
+ */
+export const TORCH_UP = {
+  at: [0.23, -0.13, -0.48] as [number, number, number],
+  turn: [-1.84, 0.12, -0.2] as [number, number, number],
+};
+
+/**
  * A roll of dressing (the bandage, the splint tape), in the eye's space. It lies in the hollow of the left palm,
  * held up left of the middle and tipped to the eye; the right hand takes the end of it, draws a length off, goes
  * down out of the picture to where the wound is, and comes back for more.
@@ -513,6 +529,7 @@ export const LIVE = {
  * bandage item needs to be larger its too small in the hand"): the roll of dressing is a 4.5 cm reel of tape.
  */
 // (firewood: a bundle half a metre long, held in front of the eye, filled the view)
+// (and base building's, 2026-10-24: a roll of plan held as a roll is, a log, a bundle of boards, a sheet of steel, at a size a hand can show)
 const IN_HAND: Record<string, number> = { bandage: 1.8, firewood: 0.45 };
 
 /**
@@ -642,7 +659,10 @@ function cigarette() {
 }
 
 /** melee weapons whose model is drawn with its edge toward whoever holds it */
-const EDGE_IN = new Set(['machete']);
+const EDGE_IN = new Set(['machete', 'hand_saw']);
+/** and those whose striking face leads, not the side of the head furthest off the handle: a claw hammer's claw stands
+ * further off than its face, and it was held claw first (the owner, 2026-10-25: "building hammer is backwards in hand") */
+const FACE_LEADS = new Set(['hammer']);
 /**
  * A tool in the fist: where the wrist is from the point of the handle that is held (to its
  * right, up it, toward the eye), how far the fingers close, and where the fist is held from
@@ -706,7 +726,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.16, -0.125, -0.42], tip: [-0.3, 0.84, -0.45], edge: [-0.25, -0.45, -0.86] },
     guard: { p: [0.1, -0.04, -0.4], tip: [-0.88, 0.46, -0.12], edge: [0.1, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.33, -0.34, -0.2],
+    elbow: [0.3, -0.24, -0.16],
     two: false,
     // (its rubber grip is the lower twelve centimetres, under the collar)
     grip: 0.062,
@@ -715,7 +735,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.16, -0.135, -0.42], tip: [-0.34, 0.8, -0.5], edge: [-0.25, -0.5, -0.83] },
     guard: { p: [0.13, -0.05, -0.4], tip: [-0.93, 0.36, -0.1], edge: [0.1, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.33, -0.35, -0.2],
+    elbow: [0.3, -0.25, -0.16],
     two: false,
     // (a long handle, twenty-eight centimetres of it: held at its middle)
     grip: 0.13,
@@ -724,7 +744,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.4, 0.85, -0.34], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.2, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.34, -0.36, -0.18],
+    elbow: [0.31, -0.26, -0.15],
     two: true,
     grip: 0.175,
   },
@@ -734,7 +754,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     rest: { p: [0.12, -0.13, -0.42], tip: [0.2, 0.86, 0.42], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.34, -0.36, -0.18],
+    elbow: [0.31, -0.26, -0.15],
     two: true,
     // (the left hand above the knob, the right a hand's width up the tape)
     grip: 0.175,
@@ -744,7 +764,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.42, 0.84, -0.34], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.34, -0.36, -0.18],
+    elbow: [0.31, -0.26, -0.15],
     two: true,
     grip: 0.3,
   },
@@ -773,6 +793,22 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // The shovel is held and swung as the bat is: in both hands, the left on the grip at its foot and the right a
   // hand's width up the shaft, carried back over the right shoulder, the same two strokes.
   styles.shovel = { ...styles.bat, grip: 0.2 };
+  // (the tools of gathering, src/sim/gather.ts: the saw held as the machete is, the long axe and the pickaxe as the
+  // bat, in both hands)
+  // (the saw pointed away, its teeth in and its flat turned partly to the eye: held as the machete was, upright by
+  // the eye, its broad blade filled a third of the picture. The owner, 2026-10-25: "this does not look good". Gripped
+  // at the middle of its handle, which is the bottom 14 cm of it.)
+  // (the saw held as the hammer is, its wooden handle in the fist where the hammer's is: the owner, 2026-10-25, "the hand
+  // positionc an be the sam eas the hammer, the wooden handle goes in the hand where the base of the hammer would go")
+  styles.hand_saw = { ...styles.hatchet, grip: 0.07 };
+  styles.hammer = styles.hatchet;
+  styles.felling_axe = { ...styles.bat, grip: 0.22 };
+  styles.pickaxe = { ...styles.bat, grip: 0.22 };
+  // (crafting's: the stone hatchet in one hand as the hatchet is; the bone knife as the combat knife, at its bound grip; the
+  // sledgehammer in both hands as the bat)
+  styles.stone_hatchet = styles.hatchet;
+  styles.bone_knife = { ...styles.knife, grip: 0.045 };
+  styles.sledgehammer = { ...styles.bat, grip: 0.22 };
   return styles;
 })();
 /**
@@ -1496,6 +1532,8 @@ export class Weapons {
   onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
   /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
   onStruck: (owner: unknown, weapon: string) => void = () => {};
+  /** a swing landed on the world, not on a body: a tree, a rock (src/game/game/gather.ts); what was struck, and with what */
+  onWhack: (owner: unknown, point: THREE.Vector3, weapon: string) => void = () => {};
   /** a punch or a melee swing has started */
   /** a punch has been thrown, or what is held swung (which takes this many seconds) */
   onSwing: (seconds?: number) => void = () => {};
@@ -1541,7 +1579,7 @@ export class Weapons {
    * `wait`: taken into the hand and not yet used (an injector: see `ready` in game.ts). `age` is how long it has
    * been in the hand, `t` how far into its use it is; `from` is where it was held when the use began.
    */
-  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** seconds since it was thrown: the empty hand goes on through the throw, and what is to follow */ thrown?: number; then?: () => void } | null = null;
+  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** seconds since it was thrown: the empty hand goes on through the throw, and what is to follow */ thrown?: number; then?: () => void; /** the middle of its top end, in its own frame (`heldTip`) */ top?: THREE.Vector3 } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3; round?: THREE.Object3D }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
   private lowerT = 0;
@@ -1729,7 +1767,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe', 'hammer', 'stone_hatchet', 'bone_knife', 'sledgehammer']) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();
@@ -1786,7 +1824,8 @@ export class Weapons {
         // toward +z is toward the eye: turn it about the handle so it faces out
         // (a machete's blade stands off its handle no more one way than the other, and this
         // one is drawn edge to the eye: it is turned because it is known to be)
-        if ((far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id)) {
+        const out = (far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id);
+        if (FACE_LEADS.has(id) ? !out : out) {
           const turn = new THREE.Group();
           turn.position.set(hx, 0, hz);
           turn.rotation.y = Math.PI;
@@ -1847,9 +1886,13 @@ export class Weapons {
         root, kind: 'melee', flash, body, melee: style,
         grips: {
           // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
-          // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
-          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
-          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
+          // (a fist round the handle: the thumb comes over the fingers, not out along the handle; and the fingers across
+          // it and a little up it, toward the forearm, the elbow raised to match (the styles' `elbow`): the wrist bent 48
+          // degrees where it was 96. They ran a third of the way down the handle and away
+          // from the forearm, and the wrist folded down to make them: "the wris tholding the tool is all bent downwards
+          // it doesnt look natural at all", the owner, 2026-10-25)
+          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.16, 0.25, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
+          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.16, 0.25, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
         hip: new THREE.Vector3(...MELEE.hip),
@@ -3644,7 +3687,8 @@ export class Weapons {
           }
         });
         const size = tpl.size.clone();
-        const big = IN_HAND[id] ?? 1;
+        // (a building material at a tin's size: src/game/held-size.ts)
+        const big = HELD_FIT[id] ? HELD_FIT[id] / Math.max(size.x, size.y, size.z) : (IN_HAND[id] ?? 1);
         if (big !== 1) {
           obj.scale.multiplyScalar(big);
           size.multiplyScalar(big);
@@ -3700,8 +3744,9 @@ export class Weapons {
             obj.rotation.y = Math.PI / 2;
             size.set(size.z, size.y, size.x);
           }
-          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it)
-          if (isBag(id)) obj.rotation.y += Math.PI;
+          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it, and
+          // the building plan's clipboard with its sketch so, its clip away from them)
+          if (isBag(id) || id === 'building_plan') obj.rotation.y += Math.PI;
           obj.position.y = -size.y / 2;
           root.add(obj);
         }
@@ -3754,6 +3799,21 @@ export class Weapons {
     if (this.action?.name === 'swing' && this.action.data?.dig) this.action = null;
   }
 
+  /**
+   * Work with what is in the hands, a blow at a time for as long as this is called: the hammer driving nails while a
+   * piece is put up, mended or turned (the owner, 2026-10-25: "We need sawing and hammering animations"). A swing's
+   * blow, seen by everybody as one is, that hits nobody. @returns true when a new blow has just begun
+   */
+  work(dur = 0.6): boolean {
+    if (this.action) return false;
+    this.start('swing', dur, undefined, { hit: 1, dmg: 0, range: 0, stroke: 0 });
+    this.onSwing(dur);
+    return true;
+  }
+  /** a saw drawn to and fro over a log, for as long as this is true (`animateMelee`) */
+  sawing = false;
+  private sawT = 0;
+
   private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera) {
     this.fireCooldown = melee.rate;
     this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
@@ -3801,8 +3861,10 @@ export class Weapons {
           audio.blow(a.name === 'punch', pt, 1);
         } else {
           const s = (hit.tag?.surface ?? 'dirt') as Surface;
-          this.fx.impact(s, pt, n, false);
+          // (a blow throws a few chips, not a bullet's cloud)
+          this.fx.knock(s, pt, n);
           audio.impact(s, pt, 1);
+          if (a.name === 'swing') this.onWhack(hit.tag?.owner, pt, this.currentItem?.id ?? 'fists');
         }
         // the blow lands: the view jolts
         this.kickRot.v.x -= 6;
@@ -3813,6 +3875,47 @@ export class Weapons {
   }
 
   mainCam: THREE.PerspectiveCamera | null = null;
+
+  /** the far end of what is held in the hands (a torch's head), as a place in the world; null with nothing shown in them */
+  heldTip(cam: THREE.PerspectiveCamera, out: THREE.Vector3): THREE.Vector3 | null {
+    const h = this.held;
+    if (!h || !h.root.visible) return null;
+    h.root.updateWorldMatrix(true, true);
+    // (a part named its head, a torch's, if it has one: the top of that; else the far top of the whole of it)
+    let head: THREE.Object3D | undefined;
+    h.root.traverse((o) => {
+      if (!head && o.name === 'head') head = o;
+    });
+    if (!head) {
+      // (no part named so, a model of one piece: the middle of its points within four centimetres of its top, found
+      // once as it is first held up and kept in its own frame. The top of its box was the box's middle, off to one side
+      // of a torch that leans, and its flame burned in the air beside it.)
+      if (!h.top) {
+        const inv = this.vmCamera.matrixWorldInverse, v = new THREE.Vector3(), pts: THREE.Vector3[] = [];
+        let top = -Infinity;
+        h.root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          const P = m.geometry.getAttribute('position');
+          for (let i = 0; i < P.count; i++) {
+            v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+            pts.push(v.clone());
+            top = Math.max(top, v.y);
+          }
+        });
+        const near = pts.filter((q) => q.y > top - 0.04);
+        if (!near.length) return null;
+        const mid = near.reduce((acc, q) => acc.add(q), new THREE.Vector3()).multiplyScalar(1 / near.length).setY(top);
+        h.top = h.root.worldToLocal(mid.applyMatrix4(this.vmCamera.matrixWorld));
+      }
+      out.copy(h.top);
+      h.root.localToWorld(out).applyMatrix4(this.vmCamera.matrixWorldInverse);
+      return out.copy(this.toWorld(out, cam));
+    }
+    const box = new THREE.Box3().setFromObject(head).applyMatrix4(this.vmCamera.matrixWorldInverse);
+    box.getCenter(out);
+    return out.copy(this.toWorld(out.setY(box.max.y), cam));
+  }
 
   /**
    * A place in the hands' own picture, said as a place in the world (for smoke, which is in
@@ -4623,6 +4726,16 @@ export class Weapons {
     elbow.add(_mv);
     // (what the arms have just taken: a blow landed, or one stopped)
     quat.premultiply(_mq2.setFromEuler(_me.set(-0.35 * sp + Math.cos(ph) * 0.02 * amp + kr.x * 0.012 - down * 0.9, 0.25 * sp, 0.3 * sp + Math.cos(ph) * 0.025 * amp + kr.z * 0.01, 'XYZ')));
+    // (a saw at a log: tipped down at it, and drawn to and fro along its blade)
+    if (this.sawing && !a) {
+      this.sawT += dt;
+      const s = Math.sin((this.sawT * Math.PI * 2) / SAW_STROKE.time);
+      // (the hand and the arm with it drawn forward and back, the saw in the fist: "sawing animation is moving the hand
+      // and arm forweward and backward with the saw attached", the owner, 2026-10-25)
+      quat.premultiply(_sawQ.setFromAxisAngle(_sawX, -0.6));
+      pos.z -= s * SAW_STROKE.reach;
+      elbow.z -= s * SAW_STROKE.reach;
+    } else this.sawT = 0;
     m.root.position.copy(pos);
     m.root.quaternion.copy(quat);
     m.root.visible = true;
@@ -4819,7 +4932,11 @@ export class Weapons {
     let drawn = -1;
     // an injection: where the left hand is held out to take it (in the eye's space), and how far the shot has gone in
     let offered: { pos: THREE.Vector3; elbow: THREE.Vector3; fingers: THREE.Vector3; palm: THREE.Vector3; clench: number } | null = null;
-    if (h.kind === 'eat' || h.kind === 'drink') {
+    if (h.id === 'torch') {
+      const T = TORCH_UP;
+      pos.set(T.at[0] + Math.sin(h.age * 1.3) * 0.002, T.at[1] + Math.sin(h.age * 1.9) * 0.003, T.at[2]);
+      rot.set(T.turn[0], T.turn[1], T.turn[2]);
+    } else if (h.kind === 'eat' || h.kind === 'drink') {
       // up to the mouth and back, on the motion capture: at the moments the body everybody sees is drinking
       const len = lengthOf('drink'), m = mouthAt((t % len) / len);
       pos.lerp(new THREE.Vector3(H.mouth[0], H.mouth[1] + sy * H.mouthBy[0], H.mouth[2] + sy * H.mouthBy[1]), m * 0.92);

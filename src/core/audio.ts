@@ -4,6 +4,7 @@
 
 import type { Surface } from './physics';
 import { EMOTE } from '../sim/emotes';
+import { VOICES } from '../sim/survivor';
 import { alarmShare, alarmTop } from '../sim/heard';
 import { ITEMS } from '../sim/items';
 
@@ -324,6 +325,29 @@ function lateRecording(name: string): Promise<void> {
   return asked;
 }
 export const rotorRecording = () => lateRecording('rotor');
+/** a raid's (src/game/building/raid.ts): fetched when a charge is first stuck or a piece first struck */
+const RAID_SOUNDS = ['c4_beep', 'fuse', 'break_wood', 'break_stone', 'break_metal', 'sledge'];
+export const raidRecordings = () => Promise.all(RAID_SOUNDS.map(lateRecording));
+/** building's own (scripts/sounds.mjs): fetched when a base is first near, or the plan or the hammer first in the hands */
+const BUILD_SOUNDS = ['nail', 'lock_click', 'crate_latch', 'crate_open', 'crate_shut', 'creak', 'cloth', 'keypad', 'code_ok', 'code_wrong', 'shock', 'knock', 'garage', 'saw'] as const;
+export type BuildSound = (typeof BUILD_SOUNDS)[number];
+export const buildRecordings = () => Promise.all(BUILD_SOUNDS.map(lateRecording));
+
+/** the calls in each voice, fetched the first time each is heard: the recording, null where there is none, or the fetch under way */
+const called = new Map<string, AudioBuffer | null | Promise<AudioBuffer | null>>();
+function voiceLine(name: string): Promise<AudioBuffer | null> {
+  const p = (async () => {
+    try {
+      const res = await fetch(`assets/sounds/voices/${name}.mp3`);
+      if (!res.ok) return null;
+      return await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  })().then((buf) => (called.set(name, buf), buf));
+  called.set(name, p);
+  return p;
+}
 export const sirenRecording = () => lateRecording('siren');
 
 /** how loud the siren's recording is played: as loud as the made-up wail it replaced */
@@ -370,6 +394,8 @@ export class AudioEngine {
   private maskIn = true;
   private fireT = 0;
   private crackT = 0;
+  private machineT = 0;
+  private crunchT = 0;
   private heartT = 0;
   private stepSide = 1;
   ready = false;
@@ -1853,6 +1879,45 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * A recycler running near by (crafting, progression v3: "A run takes a minute and is loud"): a motor's rumble, and the
+   * crunch of metal in its teeth, heard a long way off. Made up until recordings come, but for the clank of metal.
+   * @param distance metres to the nearest one running (-1 = none near enough to hear)
+   */
+  machine(dt: number, distance: number) {
+    if (!this.ready || distance < 0 || distance > 90) {
+      this.machineT = 0.1;
+      this.crunchT = 0.4;
+      return;
+    }
+    const ctx = this.ctx, t = ctx.currentTime;
+    const near = 1 / (1 + (distance * distance) / 260);
+    this.machineT -= dt;
+    if (this.machineT <= 0) {
+      // the motor: a low growl of noise, one length laid over the end of the last
+      this.machineT = 0.6;
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuf;
+      src.loop = true;
+      src.start(t, Math.random());
+      src.stop(t + 1);
+      const lo = this.filter('lowpass', 150, 1.4), g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16 * near, t + 0.3);
+      g.gain.linearRampToValueAtTime(0.0001, t + 0.95);
+      src.connect(lo).connect(g).connect(this.sfx);
+    }
+    this.crunchT -= dt;
+    if (this.crunchT <= 0) {
+      // the teeth on metal: never at an even pace
+      this.crunchT = 0.25 + Math.random() * 0.6;
+      if (this.rec('hit_metal', this.sfx, t, 0.55 * near, 0.55 + Math.random() * 0.35, false, true)) return;
+      const src = this.noise(t, 0.08), bp = this.filter('bandpass', 900 + Math.random() * 900, 1.2), g = ctx.createGain();
+      this.env(g, t, 0.12 * near, 0.004, 0.07);
+      src.connect(bp).connect(g).connect(this.sfx);
+    }
+  }
+
   /** a cough: your own, the gas coming back up */
   cough(hard = 1) {
     if (!this.ready) return;
@@ -1996,14 +2061,30 @@ export class AudioEngine {
   }
 
   /**
-   * Somebody calls out (src/sim/emotes.ts): the words, said by the browser's speaking voice. (There was a voice
-   * made up out of a buzz and three resonances under them, and before them: it is gone.)
+   * Somebody calls out (src/sim/emotes.ts), in the voice they picked (src/sim/survivor.ts VOICES): its recording,
+   * fetched the first time that call in that voice is heard (the owner, 2026-10-24: "we can offer multiple voice
+   * options for the oplayer to pick from in the settings"). A call not recorded in it is said by the browser's
+   * speaking voice, as every call was before.
    * @param pos where they stand; none for the player's own voice
-   * @param voice whose voice, 0..1: the same caller has the same one every time
+   * @param voice which of VOICES
+   * @param pitch the browser's voice for them, 0..1: the same caller has the same one every time
    */
-  shout(id: string, _pos?: V3, distance = 0, voice = 0.5) {
+  shout(id: string, pos?: V3, distance = 0, voice = 0, pitch = 0.5) {
     if (!this.ready) return;
-    this.speak(EMOTE[id]?.say ?? '', distance, voice);
+    const name = `${VOICES[voice]?.id ?? VOICES[0].id}/${id}`, had = called.get(name);
+    const say = (buf: AudioBuffer | null) => {
+      if (!buf) return void this.speak(EMOTE[id]?.say ?? '', distance, pitch);
+      const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
+      src.buffer = buf;
+      // (as loud as a shout is: a voice raised to carry across a field, and quieter for every metre past the first eight)
+      g.gain.value = 0.9;
+      src.connect(g).connect(this.out(pos, 8, 1, distance, this.bus.voice));
+      src.start(this.ctx.currentTime + distance / 343);
+    };
+    if (had instanceof AudioBuffer || had === null) return say(had);
+    // (fetched now, and said when it comes if that is soon: a call heard a second late is a call out of its moment)
+    const asked = performance.now();
+    void (had ?? voiceLine(name)).then((buf) => performance.now() - asked < 1500 && say(buf));
   }
 
   // ------------------------------------------------------------ ambience
@@ -2342,6 +2423,96 @@ export class AudioEngine {
         setTimeout(() => pan.disconnect(), 1800);
       },
     };
+  }
+
+  /** A tree coming down (src/world/felling.ts): the trunk giving as it begins to go, and the weight of it landing. */
+  timber(pos: V3, land: boolean) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, out = this.out(pos, 10, 1, 0);
+    if (!land) return void this.rec('hit_wood', out, t, 1.3, 0.42, false, true);
+    this.rec('thud', out, t, 2.4, 0.5, false, true);
+    this.rec('hit_wood', out, t + 0.04, 1.6, 0.55, false, true);
+  }
+
+  /**
+   * One of building's sounds (a nail driven, a lock's click, a box's lid, a ladder's creak, a keypad...): at a place, or
+   * in the ear with none. False when its recording has not come yet (it is asked for: the next one is heard).
+   */
+  built(name: BuildSound, pos?: V3, gain = 1, rate = 1): boolean {
+    if (!this.ready) return false;
+    void buildRecordings();
+    return this.rec(name, pos ? this.out(pos, 3, 1.3) : this.sfx, this.ctx.currentTime, gain, rate, false, true);
+  }
+
+  /** A C4's timer beeping where it is stuck (made up, a short tone, until the recording has come). */
+  beep(pos: V3) {
+    if (!this.ready) return;
+    void raidRecordings();
+    const t = this.ctx.currentTime, out = this.out(pos, 2, 1.4);
+    if (this.rec('c4_beep', out, t, 0.45, 1)) return;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.frequency.value = 3100;
+    g.gain.setValueAtTime(0.06, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    o.connect(g).connect(out);
+    o.start(t);
+    o.stop(t + 0.08);
+  }
+
+  /** A satchel charge's fuse burning where it is stuck: kept up while it burns, ended by what this gives back. */
+  fuse(pos: V3): { stop: () => void } {
+    const ctx = this.ctx;
+    void raidRecordings();
+    const buf = this.ready ? bank.get('fuse')?.[0] : undefined;
+    if (!buf) return { stop: () => {} };
+    const out = this.out(pos, 2, 1.5), src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    g.gain.value = 0.55;
+    src.connect(g).connect(out);
+    src.start();
+    return {
+      stop: () => {
+        g.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+        src.stop(ctx.currentTime + 0.2);
+      },
+    };
+  }
+
+  /** A saw at a log, over and over until it is told to stop (src/game/gathering.ts). */
+  sawing(pos: V3): { stop: () => void } {
+    const ctx = this.ctx;
+    void buildRecordings();
+    const buf = this.ready ? bank.get('saw')?.[0] : undefined;
+    if (!buf) return { stop: () => {} };
+    const out = this.out(pos, 2, 1.5), src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    g.gain.value = 0.7;
+    src.connect(g).connect(out);
+    src.start();
+    return {
+      stop: () => {
+        g.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        src.stop(ctx.currentTime + 0.25);
+      },
+    };
+  }
+
+  /** A piece of a base coming down, by what it is made of: wood splintering, stone crumbling, steel crashing down. */
+  breakPiece(tier: number, pos: V3) {
+    if (!this.ready) return;
+    void raidRecordings();
+    const t = this.ctx.currentTime, out = this.out(pos, 7, 1);
+    const name = tier >= 3 ? 'break_metal' : tier === 2 ? 'break_stone' : 'break_wood';
+    if (!this.rec(name, out, t, tier >= 3 ? 1.1 : 1.3, 1, false, true)) this.impact(tier >= 3 ? 'metal' : 'wood', pos, 0);
+  }
+
+  /** A sledgehammer's (or a pickaxe's) blow landing on a stone or metal piece of a base: the weight of it, over the hit. */
+  sledge(pos: V3) {
+    if (!this.ready) return;
+    void raidRecordings();
+    this.rec('sledge', this.out(pos, 4, 1.2), this.ctx.currentTime, 0.9, 1, false, true);
   }
 
   /** A jeep running into something: tin, and the weight behind it. @param k how hard, 0..1 */
