@@ -82,8 +82,9 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // (nor what only comes off an animal: its meat, fat, bones, hide and pelt, as in DayZ)
   // (nor what is only got by work: a log off a tree, stone off a boulder, src/sim/gather.ts; a key, cut at its lock)
   // (nor what is only made, smelted or salvaged: src/sim/items/craft.ts)
+  // (nor the karambit: bought at the store, a knife of one's own made one, never found)
   const hunted = new Set(KINDS.flatMap((k) => yieldOf(k, 1).map(([id]) => id)));
-  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'm32', 'ammo_40mm', 'log', 'stone', 'key', 'loot_bag', ...MADE_ONLY].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
+  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'm32', 'ammo_40mm', 'log', 'stone', 'key', 'loot_bag', 'karambit', ...MADE_ONLY].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
   const { ruled: on, e } = worlds[0];
   // (new things join the pools and the rest are a little rarer for it, the owner, 2026-10-25: "every item has a

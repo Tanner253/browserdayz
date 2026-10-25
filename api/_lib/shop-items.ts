@@ -3,7 +3,13 @@
 // optional (sol) ... and a gold plated desert eagle for 4.99 (sol)", and yes to no-ads alone, the three other finishes
 // and the gold dog tag in VIP. Cosmetic and convenience only: a finish only ever makes a gun easier to see, never harder.
 
-export type ItemId = 'vip' | 'noads' | 'deagle_gold' | 'm9_nickel' | 'colt_nickel' | 'knife_gold' | 'coffee';
+export type ItemId = 'vip' | 'noads' | 'deagle_gold' | 'm9_nickel' | 'colt_nickel' | 'knife_gold' | 'knife_emerald' | 'knife_ruby' | 'knife_damascus' | 'knife_carbon' | 'knife_nightcamo' | 'karambit' | 'coffee';
+
+/** how a finish looks (src/game/finish.ts paints each) */
+export type Look = 'gold' | 'nickel' | 'emerald' | 'ruby' | 'damascus' | 'carbon' | 'nightcamo';
+
+/** every knife a knife's finish goes on (the owner, 2026-10-25: "high quality knives ... in the store as cosmetics") */
+export const KNIVES: readonly string[] = ['knife', 'hunting_knife', 'bayonet', 'karambit'];
 
 export interface ShopItem {
   name: string;
@@ -11,8 +17,12 @@ export interface ShopItem {
   usd: number;
   /** a perk that runs out: each payment adds this many days to what is left */
   days?: number;
-  /** a finish on one of the game's own models, by its item id (src/sim/items.ts): numbered, each one sold its own */
-  skin?: { gun: string; finish: 'gold' | 'nickel' };
+  /**
+   * A finish on one of the game's own models, by its item id (src/sim/items.ts), or on any knife ('knife'): numbered,
+   * each one sold its own. Or a `form`: the thing it is put on made another of its kind (a knife made a karambit), its
+   * finish kept.
+   */
+  skin?: { gun: string; finish?: Look; form?: string };
   /** how many will ever be sold (the owner, 2026-10-22: "we will make these items nft's in the future so each cosmetic sold should be reserved. we will only sell 100 gold deagles and 100 gold knives") */
   limit?: number;
   say: string;
@@ -24,6 +34,16 @@ export const SHOP: Record<ItemId, ShopItem> = {
   m9_nickel: { name: 'Nickel-plated M9', usd: 2.99, skin: { gun: 'm9', finish: 'nickel' }, say: 'Apply it to any M9 you carry: that gun is nickel-plated for good.' },
   colt_nickel: { name: 'Nickel-plated Colt', usd: 2.99, skin: { gun: 'colt', finish: 'nickel' }, say: 'Apply it to any Colt you carry: that gun is nickel-plated for good.' },
   knife_gold: { name: 'Gold knife', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'gold' }, say: 'Apply it to any knife you carry: its blade is gold for good.' },
+  // (the knives' finishes, 2026-10-25, the owner: "emerald blades and ruby etc.. cool stuff": on any knife, whoever holds it
+  // next. Priced by them: "the cooler ones reflective liekemerald and ruby be like 9.99 and the cheasper ones like the gray
+  // ones just 2.99"; night camo 4.99, gold as it was)
+  knife_emerald: { name: 'Emerald blade', usd: 9.99, limit: 50, skin: { gun: 'knife', finish: 'emerald' }, say: 'Apply it to any knife you carry: a deep green blade, polished, for good.' },
+  knife_ruby: { name: 'Ruby blade', usd: 9.99, limit: 50, skin: { gun: 'knife', finish: 'ruby' }, say: 'Apply it to any knife you carry: a deep red blade, polished, for good.' },
+  knife_damascus: { name: 'Damascus blade', usd: 2.99, skin: { gun: 'knife', finish: 'damascus' }, say: 'Apply it to any knife you carry: folded steel, its layers waving down the blade.' },
+  knife_carbon: { name: 'Carbon fibre blade', usd: 2.99, skin: { gun: 'knife', finish: 'carbon' }, say: 'Apply it to any knife you carry: a black woven blade.' },
+  knife_nightcamo: { name: 'Night camo blade', usd: 4.99, limit: 200, skin: { gun: 'knife', finish: 'nightcamo' }, say: 'Apply it to any knife you carry: dark greens, matte, for the night.' },
+  // (the owner, 2026-10-25: "karambit is not a finish type its a knife type, the circular claw one like from cs:go")
+  karambit: { name: 'Karambit', usd: 4.99, skin: { gun: 'knife', form: 'karambit' }, say: 'The curved claw, a finger through its ring. Apply it to any knife you carry: that knife is a karambit for good, its finish kept. It hits as every knife does.' },
   noads: { name: 'No ads', usd: 1.99, days: 30, say: 'The site and the game with no ads (VIP has this too).' },
   coffee: { name: 'Buy the dev a coffee', usd: 0, say: 'Any amount, with a note if you like. A cup by your name in chat for a week.' },
 };
@@ -62,11 +82,24 @@ export const isAcct = (v: unknown): v is string => typeof v === 'string' && /^[0
 /** whether ads are kept from this account now: VIP or no-ads running */
 export const adFree = (p: Perks, now = Date.now()) => p.vip > now || p.noads > now;
 
-/** the finish of theirs that can be put on a gun of this id, if they own one */
-export function skinFor(skins: readonly string[], gun: string): ItemId | null {
-  for (const id of skins) if ((SHOP as Record<string, ShopItem>)[id]?.skin?.gun === gun) return id as ItemId;
-  return null;
+/** whether a finish made for `skin` (a gun's id, or 'knife' for every knife) goes on a gun of this id */
+export const skinFits = (skin: string, gun: string) => skin === gun || (skin === 'knife' && KNIVES.includes(gun));
+
+/** the finishes of theirs that can be put on a gun of this id */
+export const skinsFor = (skins: readonly string[], gun: string): ItemId[] =>
+  skins.filter((id): id is ItemId => {
+    const s = (SHOP as Record<string, ShopItem>)[id]?.skin;
+    return !!s && skinFits(s.gun, gun);
+  });
+
+/** the finish of theirs that can be put on a gun of this id: the one asked for, if they own it, or else the first */
+export function skinFor(skins: readonly string[], gun: string, want?: unknown): ItemId | null {
+  const all = skinsFor(skins, gun);
+  return all.find((id) => id === want) ?? all[0] ?? null;
 }
 
+/** what a knife this is put on becomes (the karambit's), or null for a finish */
+export const formOf = (id: string | undefined): string | null => (id && (SHOP as Record<string, ShopItem>)[id]?.skin?.form) || null;
+
 /** how a gun wearing this finish (a shop item id, as on the gun: ItemInstance.finish) looks, or null for none */
-export const lookOf = (id: string | undefined): 'gold' | 'nickel' | null => (id && (SHOP as Record<string, ShopItem>)[id]?.skin?.finish) || null;
+export const lookOf = (id: string | undefined): Look | null => (id && (SHOP as Record<string, ShopItem>)[id]?.skin?.finish) || null;

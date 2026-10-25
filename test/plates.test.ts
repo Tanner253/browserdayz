@@ -33,7 +33,7 @@ const ok = (what: string) => (checks++, console.log(`  ok  ${what}`));
   assert.equal(plating.apply(inv, 'u-9', owns), 'Carry it first');
   assert.equal(inv.slots.holster.finish, undefined);
   const done = plating.apply(inv, 'u-1', owns);
-  assert.ok(typeof done !== 'string' && done.finish === 'deagle_gold', `not plated: ${JSON.stringify(done)}`);
+  assert.ok(typeof done !== 'string' && done.it.finish === 'deagle_gold' && done.f === 'deagle_gold', `not plated: ${JSON.stringify(done)}`);
   assert.equal(itemName(inv.slots.holster), 'Gold-plated Desert Eagle');
   assert.equal(plating.held(inv, 'deagle', 'u-1'), 'gold');
   assert.equal(plating.held(inv, 'deagle', 'u-2'), undefined);
@@ -56,6 +56,32 @@ const ok = (what: string) => (checks++, console.log(`  ok  ${what}`));
   const kept = JSON.parse(JSON.stringify(plating.keep())) as ReturnType<typeof plating.keep>;
   assert.equal(kept.length, 2);
   ok("a game's own word on a finish is stripped; the record's is written on the gun however it is read in, a pack's cargo too");
+}
+
+// ---- knives: any knife takes a knife's finish; one made a karambit stays one, its finish kept; a claimed one is not believed
+{
+  const knife = (uid: string, id = 'knife'): ItemInstance => ({ uid, id, qty: 1 });
+  const inv = { slots: {}, active: null, containers: [{ id: 'pockets', items: [{ ...knife('k-1'), x: 0, y: 0, rot: false }, { ...knife('k-2', 'hunting_knife'), x: 1, y: 0, rot: false }] }] } as unknown as Parameters<typeof plating.apply>[0];
+  const items = () => (inv as unknown as { containers: { items: ItemInstance[] }[] }).containers[0].items;
+  const ruby = plating.apply(inv, 'k-2', () => 'knife_ruby');
+  assert.ok(typeof ruby !== 'string' && ruby.it.finish === 'knife_ruby', 'a hunting knife did not take a knife finish');
+  const made = plating.apply(inv, 'k-1', () => 'karambit');
+  assert.ok(typeof made !== 'string' && made.it.id === 'karambit' && made.f === 'karambit', `not made a karambit: ${JSON.stringify(made)}`);
+  assert.equal(plating.apply(inv, 'k-1', () => 'karambit'), 'It is one already');
+  assert.ok(typeof plating.apply(inv, 'k-1', () => 'knife_emerald') !== 'string');
+  assert.equal(items()[0].id, 'karambit');
+  assert.equal(items()[0].finish, 'knife_emerald');
+  // (read in again as the plain knife its game says it is, it is the karambit it was made, still emerald)
+  const again = plating.stamp(knife('k-1'));
+  assert.equal(again.id, 'karambit');
+  assert.equal(again.finish, 'knife_emerald');
+  // (a game that says it has a karambit it was never made has the knife)
+  assert.equal(plating.stamp(knife('k-9', 'karambit')).id, 'knife');
+  // (and both are kept over a restart)
+  const kept = JSON.parse(JSON.stringify(plating.keep())) as ReturnType<typeof plating.keep>;
+  const k1 = kept.find(([uid]) => uid === 'k-1')?.[1];
+  assert.ok(k1?.form === 'karambit' && k1?.f === 'knife_emerald', `kept as ${JSON.stringify(k1)}`);
+  ok('a knife takes any knife finish; one made a karambit is one wherever it is read in, its finish kept; a claimed one is the knife');
 }
 
 // ---- the real server

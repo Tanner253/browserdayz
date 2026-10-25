@@ -1095,7 +1095,7 @@ export class Game {
       sound: (k) => audio.ui(k),
       note: (text) => this.hud.note(text, 'info'),
       finishFor: (item) => this.finishFor(item),
-      applyFinish: (item) => this.applyFinish(item),
+      applyFinish: (item, f) => this.applyFinish(item, f),
       plateIcon: (id, f) => this.plateIcon(id, f),
       reclaim: () => this.reclaimGear(),
       craftWith: (a, b) => this.craft.recipesFor(a, b).length > 0,

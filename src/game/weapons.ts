@@ -26,6 +26,7 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
+import { KNIVES } from '../../api/_lib/shop-items';
 import { HELD_FIT } from './held-size';
 import { handMove, jabAt, lengthOf, mouthAt, slashAt } from './held-mocap';
 import { MOCAP_HANDS } from './mocap-switch';
@@ -232,6 +233,8 @@ interface VmModel {
   body?: THREE.Object3D;
   /** something held to strike with: how it stands in the picture and how it is swung */
   melee?: MeleeStyle;
+  /** what a finish is worn on, where that is not the whole of what is drawn (a knife in the pack's hands: not the hands) */
+  worn?: THREE.Object3D;
   grips?: Grips;
   /** a long gun with sights of its own to aim along when it has no optic (the shotgun): no cross is drawn over them */
   ownSights?: boolean;
@@ -810,6 +813,11 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.stone_hatchet = styles.hatchet;
   styles.bone_knife = { ...styles.knife, grip: 0.045 };
   styles.sledgehammer = { ...styles.bat, grip: 0.22 };
+  // (the knives, 2026-10-25, the owner: "high quality knives": each as the combat knife, the fist on the middle of its
+  // own grip; the karambit's between its ring and its blade)
+  styles.hunting_knife = { ...styles.knife, grip: 0.06 };
+  styles.bayonet = { ...styles.knife, grip: 0.06 };
+  styles.karambit = { ...styles.knife, grip: 0.075 };
   return styles;
 })();
 /**
@@ -1381,6 +1389,24 @@ async function holoParts(): Promise<MeshPart[]> {
   return parts;
 }
 
+/**
+ * A knife of ours in the knife pack's hand, where the pack's own was: the middle of the pack's knife node is the middle
+ * of its handle, its +y toward the point and its flat across x, as a thing to hit with stands (its root the middle of
+ * its handle: see the melee models), at the pack's scale. @returns what it hangs by (what a finish is worn on)
+ */
+function hangKnife(rig: WeaponRig, thing: THREE.Object3D) {
+  const node = rig.node('knife')!;
+  rig.strip(['knife']);
+  rig.root.updateMatrixWorld(true);
+  const held = new THREE.Group();
+  held.scale.setScalar(rig.root.getWorldScale(new THREE.Vector3()).x / node.getWorldScale(new THREE.Vector3()).x);
+  // (the pack's knife has its edge on the node's +z: a thing to hit with stands edge to -z)
+  held.rotation.y = Math.PI;
+  held.add(thing);
+  node.add(held);
+  return held;
+}
+
 export class Weapons {
   private vmRoot = new THREE.Group();
   private models = new Map<string, VmModel>();
@@ -1768,7 +1794,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe', 'hammer', 'stone_hatchet', 'bone_knife', 'sledgehammer']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe', 'hammer', 'stone_hatchet', 'bone_knife', 'sledgehammer', ...KNIVES]) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();
@@ -1899,18 +1925,22 @@ export class Weapons {
         muzzle: new THREE.Vector3(),
       });
     }
-    // ---- the knife, for whoever holds it: its own pack, hands and all, moved by its own animation (see BLADE).
-    // What was made of it just above is still what everybody else sees in its holder's fist. Its arms are the
-    // sniper's arms under another paint: they are drawn in the one pair of sleeves and gloves every gun of that
-    // maker's is drawn in, which are the ones on a hatchet too.
-    const blade = this.models.get('knife'), bladeFp = assets.manifest.models.knife_fp;
-    if (blade && bladeFp?.rig) {
+    // ---- the knives, for whoever holds them: the knife's own pack, hands and all, moved by its own animation (see
+    // BLADE), its own knife taken out and ours hung where it held it (each of the four knives, the karambit too: the
+    // owner, 2026-10-25, "high quality knives"). What was made of each just above is still what everybody else sees in
+    // its holder's fist. The pack's arms are the sniper's arms under another paint: they are drawn in the one pair of
+    // sleeves and gloves every gun of that maker's is drawn in, which are the ones on a hatchet too.
+    const bladeFp = assets.manifest.models.knife_fp;
+    for (const id of KNIVES) {
+      const m = this.models.get(id);
+      if (!m || !bladeFp?.rig) continue;
       const rig = new WeaponRig(await assets.gltfOf('knife_fp'), bladeFp.rig, packMaterial);
       if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
-      blade.root = new THREE.Group();
-      blade.root.add(rig.root);
-      blade.rig = rig;
-      blade.hip = HELD.knife;
+      m.worn = hangKnife(rig, m.root);
+      m.root = new THREE.Group();
+      m.root.add(rig.root);
+      m.rig = rig;
+      m.hip = HELD.knife;
     }
     // ---- the pitchfork, for whoever holds it: its pack's movements in our own arms, the fork hung on its node
     const fork = this.models.get('pitchfork');
@@ -2706,7 +2736,7 @@ export class Weapons {
   /** a gun's model as it is held in the hands (what must stay on the card while it is carried: see CardKeep.wanted) */
   /** a finish has been put on a gun (src/game/finish.ts): the one in the hands plated afresh */
   refinish() {
-    if (this.current && this.currentItem) wearFinish(this.current.root, this.currentItem.id, finishOn(this.currentItem));
+    if (this.current && this.currentItem) wearFinish(this.current.worn ?? this.current.root, this.currentItem.id, finishOn(this.currentItem));
   }
 
   heldModel(id: string): THREE.Object3D | null {
@@ -2899,7 +2929,7 @@ export class Weapons {
       this.going = undefined;
       this.current = next ? this.models.get(next.id) ?? null : null;
       if (this.current) {
-        wearFinish(this.current.root, next!.id, finishOn(next));
+        wearFinish(this.current.worn ?? this.current.root, next!.id, finishOn(next));
         this.vmRoot.add(this.current.root);
         this.boltReady = true;
         audio.equip(ITEMS[next!.id].weapon ? 'gun' : 'melee');

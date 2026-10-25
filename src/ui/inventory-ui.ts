@@ -29,7 +29,10 @@ import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, would
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon } from './act-icons';
-import { lookOf } from '../../api/_lib/shop-items';
+import { lookOf, type ItemId, type Look } from '../../api/_lib/shop-items';
+
+/** a finish's name, as the menu says it */
+const LOOK_NAME: Partial<Record<Look, string>> = { carbon: 'carbon fibre', nightcamo: 'night camo' };
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
 import { TAKE_GROUPS, fitsGuns, inTakeGroup, type TakeGroup } from './inv-take';
@@ -101,11 +104,11 @@ export interface InvActions {
   /** a line said to the player */
   note(text: string): void;
   /** the store finish of theirs this gun can be given ('gold', 'nickel'), where it does not wear it already; else null */
-  finishFor(item: ItemInstance): 'gold' | 'nickel' | null;
+  finishFor(item: ItemInstance): { id: ItemId; look: Look | null; form: string | null }[];
   /** that finish put on it for good, by the server (server/plates.ts) */
-  applyFinish(item: ItemInstance): void;
+  applyFinish(item: ItemInstance, f: ItemId): void;
   /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
-  plateIcon(id: string, f: 'gold' | 'nickel'): void;
+  plateIcon(id: string, f: Look): void;
   /** everything on this player's own body, open, back onto them as it was worn and carried (src/game/game/reclaim.ts) */
   reclaim(): void;
   /** whether two carried things dragged onto each other go into a hand recipe (src/game/crafting.ts) */
@@ -2188,8 +2191,8 @@ export class InventoryUI {
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, icon: 'detach', run: () => this.actions.detach(it, m) });
     // (a finish from the store, put on this one gun and kept with it, Rust's way: the owner, 2026-10-22, "maybe open a
     // menu when we have options, but for now an apply")
-    const look = this.carried(loc) ? this.actions.finishFor(it) : null;
-    if (look) out.push({ label: `Apply ${look} finish`, icon: 'shine', id: 'finish', run: () => this.actions.applyFinish(it) });
+    // (one for each finish of theirs it can take: a knife may take any of several)
+    if (this.carried(loc)) for (const f of this.actions.finishFor(it)) out.push({ label: f.form ? `Make it a ${ITEMS[f.form]?.name.toLowerCase() ?? f.form}` : `Apply ${LOOK_NAME[f.look!] ?? f.look} finish`, icon: 'shine', id: `finish-${f.id}`, run: () => this.actions.applyFinish(it, f.id) });
     if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, icon: inStash ? 'take' : 'move', id: 'across', run: () => this.transfer(loc), primary: inStash });
     out.push({
       label: 'Drop',
