@@ -57,7 +57,10 @@ export const handsMethods = {
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, raise: !!g.raise };
+      // (and where the middle of it is from the hand, in the hand's own frame: which way it hangs, see HANG)
+      r.hand.updateWorldMatrix(true, true);
+      const mid = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, raise: !!g.raise, head: r.hand.worldToLocal(mid) };
       Avatar.onDressed([obj]);
       return;
     }
