@@ -62,6 +62,8 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (a new connection knows nothing of how far this game draws animals: told again, by the next frame)
+    this.animalsAsked = 0;
     // (whether this player's name and wallet are fixed is the server's to say: server/pinned.ts)
     setPinned(w.pinned ?? null);
     // (bought at the store in the last ten minutes: the server is asked to look again, as the store itself asks it
@@ -644,7 +646,10 @@ export const onlineMethods = {
     net.on('score', (m) => this.arenaHud?.score(m));
     net.on('kill', (m) => this.arenaHud?.kill(m));
     net.on('void', (m) => this.voidTags(m.uids));
+    net.on('tagclock', (m) => this.tagClock(m.uid, m.held));
     net.on('cashed', (m) => {
+      // (one of ours: it leaves the pockets only now, on the server's word: see tickTags)
+      if (m.id === net.id) this.tagCashed(m.owner);
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);
       this.hud.feed(text, m.id === net.id);

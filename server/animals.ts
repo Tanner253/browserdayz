@@ -5,7 +5,7 @@
 
 import { Herd, type Seen } from '../src/sim/animal-mind';
 import type { Ground } from '../src/sim/animal-ground';
-import { ANIMALS, BLADES, CALLS, KINDS, KIND, yieldOf } from '../src/sim/animals';
+import { ANIMALS, BLADES, CALLS, KINDS, KIND, yieldOf, type AnimalRow } from '../src/sim/animals';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, piercedBy, type HitZone } from '../src/sim/combat';
 import { makeItem } from '../src/sim/items';
@@ -37,6 +37,9 @@ export function startAnimals() {
 const was = new Map<number, { x: number; z: number; t: number; v: number }>();
 /** when each player last heard one of the herds' calls */
 const heardAt = new Map<number, number>();
+/** what each player was last told of each animal near them, so that one standing still is not told of again */
+const toldOf = new Map<number, Map<number, string>>();
+const rowKey = (row: AnimalRow) => row.slice(2).join(',');
 let beat = 0;
 
 /** a player as the animals know of them (null: nobody they can know of, dead or under the ground; a vanished admin is there and never noticed) */
@@ -88,14 +91,22 @@ export function animalsTick(now: number) {
     }
   }
   for (const id of heardAt.keys()) if (!clients.has(id)) heardAt.delete(id);
-  // (near ones every time; all within reach once a second, so that whatever has gone from it is dropped)
+  // (every one within their reach that has changed since they were last told of it, five times a second, however far:
+  // once a second it was beyond 140 m, and those were seen stop and jump; and all within reach once a second, so that
+  // whatever has gone from it is dropped)
   const all = beat++ % 5 === 0;
   for (const c of clients.values()) {
     if (c.ws.readyState !== 1) continue;
-    const r = herd.rows(c.pose[0], c.pose[2], all ? ANIMALS.told : ANIMALS.near);
+    const rows = herd.rows(c.pose[0], c.pose[2], c.animalsFar ?? ANIMALS.told);
+    let was = toldOf.get(c.id);
+    if (!was) toldOf.set(c.id, (was = new Map()));
+    const r = all ? rows : rows.filter((row) => was.get(row[0]) !== rowKey(row));
+    if (all) was.clear();
+    for (const row of r) was.set(row[0], rowKey(row));
     if (!r.length && !all) continue;
     send(c, { t: 'an', r, ...(all ? { all: true } : {}) });
   }
+  for (const id of toldOf.keys()) if (!clients.has(id)) toldOf.delete(id);
 }
 
 /** a shot fired: everything within earshot of it hears it */

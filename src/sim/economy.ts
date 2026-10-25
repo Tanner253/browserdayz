@@ -17,7 +17,7 @@ import { APART_FILL, APART_KIND, APART_LEAN, APART_LEAST, APART_RICH, OWN, apart
 
 export { APART, APART_KIND, apartOf } from './apart';
 import { eastOnly, typeRule, type TypeRule } from './items/rules';
-import { inZona } from '../world/zona';
+import { eastOfLine } from '../world/zona';
 
 export type { TypeRule };
 
@@ -407,7 +407,7 @@ export class Economy {
   private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
     const p = this.points[i];
     // (nothing of the fourth step and up west of the Zona's line: see eastOnly; and on a step it is kept only in places apart, nothing on the step's own: see TypeRule.away)
-    if (eastOnly(ITEMS[id], where) && !inZona(p.x, p.z)) return false;
+    if (eastOnly(ITEMS[id], where) && !eastOfLine(p.x, p.z)) return false;
     if (rule.away?.includes(where) && this.apart[i] === null) return false;
     // (A place apart is sorted on every step: its spots were each said to be of a kind on purpose, an armoury's and
     // a dressing station's, where under the gas and down the bunker anything lies anywhere. A sort with no kind of
@@ -651,7 +651,7 @@ export class Economy {
       // (Each sort is tried once at most, by its weight. Thrown for afresh every time, the one sort that would not
       // lie there could come up six times running, and the place was left bare: one rack in fifty.)
       // (and west of the Zona's line nothing of the fourth step and up, whatever the post: see eastOnly)
-      const west = !inZona(p.x, p.z);
+      const west = !eastOfLine(p.x, p.z);
       const left = table.filter(([id]) => !west || !eastOnly(ITEMS[id]));
       while (left.length) {
         const total = left.reduce((s, [, w]) => s + w, 0);

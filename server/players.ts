@@ -59,6 +59,8 @@ export interface Client {
   inv: SerializedInventory | null;
   vitals: Vitals | null;
   lastHit: number;
+  /** how far off they are told of animals, metres, as their game asked ('adist'; ANIMALS.told until it does) */
+  animalsFar?: number;
   /** when a round of theirs last hit a jeep, and when they got into the seat they are in (0: on foot) */
   lastVHit: number;
   seatAt: number;

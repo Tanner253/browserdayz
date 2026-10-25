@@ -381,6 +381,11 @@ button.adm-p:hover { background: rgba(233, 228, 216, 0.07); }
 .adm-esp-head .adm-sw-text { flex: 1; }
 .adm-esp-arrow { width: 9px; height: 9px; border-right: 2px solid var(--ink-dim); border-bottom: 2px solid var(--ink-dim); transform: rotate(45deg); margin: 0 6px 4px 0; transition: transform 0.15s; }
 .adm-esp.open .adm-esp-arrow { transform: rotate(-135deg); margin-bottom: -4px; }
+/* (the Animal distance: a row the width of the card, as the ESP list is, its choice at the right) */
+.adm-reach { grid-column: 1 / -1; border: 1px solid var(--rim); background: rgba(233, 228, 216, 0.04); cursor: default; }
+.adm-reach:hover { background: rgba(233, 228, 216, 0.04); }
+.adm-reach .adm-sw-text { min-width: 0; }
+.adm-reach .adm-pick { flex: none; align-self: center; width: auto; max-width: 110px; font-size: 16px; padding: 4px 6px; }
 .adm-esp-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 2px 10px; padding: 4px 12px 10px; border-top: 1px solid var(--rim); }
 .adm-esp-row { display: flex; align-items: center; gap: 10px; padding: 7px 4px; cursor: pointer; }
 .adm-esp-row:hover { background: rgba(233, 228, 216, 0.05); }

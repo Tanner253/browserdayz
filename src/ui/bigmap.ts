@@ -527,6 +527,8 @@ export class BigMap {
   /** a place on the sheet right-clicked (an admin goes there): null, and a right-click is nothing */
   onPick: ((x: number, z: number) => void) | null = null;
   private sheet: Sheet[] | null = null;
+  /** the Zona's line round the towns, in world metres, made once (it never changes) */
+  private zonaPath: Path2D | null = null;
   /** pixels of the sheet to a metre: finer on a computer, which has the memory for it and looks closer */
   private S = TOUCH ? 1 : 2;
   private view: HTMLCanvasElement;
@@ -1293,6 +1295,29 @@ export class BigMap {
     // The Zona's west line, drawn here at one width at any distance: on the sheet it is a metre or two wide, a hair
     // at the whole map's distance, and dark red down the red canyon it runs by (the owner, 2026-10-19: "the map does
     // not show the zona boundaries?"). Its words are put with the names, below.
+    // (and the Zona's own line round the towns, drawn smaller on 2026-10-24, the same red but whole, at one width at any
+    // distance as the owner drew it: on the sheet alone it was a hair at the whole map's distance)
+    if (ZONA_VOID) {
+      this.zonaPath ??= (() => {
+        const p = new Path2D();
+        for (const ring of playEdge()) {
+          p.moveTo(ring[0].x, ring[0].z);
+          for (let i = 1; i < ring.length - 1; i++) p.lineTo(ring[i].x, ring[i].z);
+          p.closePath();
+        }
+        return p;
+      })();
+      g.save();
+      g.setTransform(k, 0, 0, k, sx(0), sy(0));
+      g.lineJoin = 'round';
+      g.lineWidth = (5 * u) / k;
+      g.strokeStyle = 'rgba(20, 8, 6, 0.5)';
+      g.stroke(this.zonaPath);
+      g.lineWidth = (2.6 * u) / k;
+      g.strokeStyle = 'rgba(255, 64, 44, 0.95)';
+      g.stroke(this.zonaPath);
+      g.restore();
+    }
     const zx = ZONA_VOID ? sx(westAt(220)) : NaN;
     const zonaOn = ZONA_VOID && sx(-2013) < W + 60 * u && sx(-1950) > -60 * u;
     if (zonaOn) {
@@ -1342,8 +1367,8 @@ export class BigMap {
     taken.push([W - 22 * u - bar - 14 * u, Hh - 56 * u, W, Hh]);
     const zly = Math.min(Hh - 30 * u, Math.max(34 * u, sy(220)));
     if (zonaOn) {
-      const a = measure('THE ZONA ▸', 15, 700, 0.08), b = measure('◂ NO TAGS', 15, 700, 0.08);
-      taken.push([zx - 9 * u - b - 4 * u, zly - 16 * u, zx + 9 * u + a + 4 * u, zly + 6 * u]);
+      const b = measure('◂ NO TAGS', 15, 700, 0.08);
+      taken.push([zx - 9 * u - b - 4 * u, zly - 16 * u, zx + 4 * u, zly + 6 * u]);
     }
     const laid = layNames({ spots: this.spots, regions: REGIONS, gases: this.gases, sx, sy, W, H: Hh, u, k, zoom: this.zoom, touch: TOUCH, names: this.shown.names, taken, measure });
     this.laid = laid.marks;
@@ -1575,13 +1600,10 @@ export class BigMap {
         drawLabel(g, distanceText(Math.hypot(pin.x - x, pin.z - z)), qx, qz + 15 * u, 14 * u);
       }
     }
-    // (which side of the Zona's line is which: the Zona to the east, no tags to the west)
+    // (no tags west of the line, ever; east of it, only inside the Zona's own line, drawn on the sheet: 2026-10-24)
     if (zonaOn) {
-      const ly = zly;
-      g.textAlign = 'left';
-      text('THE ZONA ▸', zx + 9 * u, ly, 15, '#ff7a62');
       g.textAlign = 'right';
-      text('◂ NO TAGS', zx - 9 * u, ly, 15, '#ff7a62');
+      text('◂ NO TAGS', zx - 9 * u, zly, 15, '#ff7a62');
       g.textAlign = 'left';
     }
 

@@ -34,6 +34,7 @@ import { ENTITIES, type Entity, type Role } from '../net/orders';
 import { ITEMS, TAG_HOLD_MIN, tagClock, tagOwner } from '../sim/items';
 import { KITS } from '../sim/kits';
 import { CARRY_POWERS, type CarryPower } from '../sim/powers';
+import { ANIMALS } from '../sim/animals';
 import type { S2C } from '../net/protocol';
 import type { ItemInstance } from '../sim/items';
 import { controls, keyOf, shown } from '../core/keys';
@@ -57,6 +58,8 @@ export interface AdminActions {
   tint(color: string | null): void;
   /** one of the far sight's switches (the ESP list) put on or off: everybody's name, every thing lying about, every animal, every one of the infected */
   esp(which: EspSwitch, on: boolean): void;
+  /** how far off animals are drawn for this admin, metres (never past the draw distance, whatever is chosen) */
+  animalsFar(m: number): void;
   /** what the middle of the game's view is on, behind the window (null: nothing within reach) */
   look(): AdminLook | null;
   /** somebody has been picked on the left (0: nobody): the admin's map rings them too */
@@ -75,6 +78,9 @@ const ESP_LIST: { k: EspSwitch; label: string; does: string; ic: string }[] = [
   { k: 'animals', label: 'Animals', does: 'Every animal on the map, however far: down or bleeding too', ic: 'animal' },
   { k: 'infected', label: 'Infected', does: 'Every one of the infected on the map, however far, and those down', ic: 'infected' },
 ];
+
+/** the Animal distance's choices, metres (ANIMALS.admin at most: the server holds it to that) */
+const ANIMAL_REACH = [300, 500, 600, 800, 1000, 1500].filter((m) => m <= ANIMALS.admin);
 
 /** what the middle of the view is on: where, how far off, and what it is */
 export interface AdminLook {
@@ -120,6 +126,9 @@ export interface AdminSelf {
   animals?: boolean;
   /** and every one of the infected */
   infected?: boolean;
+  /** how far off animals are drawn for them, metres, and their draw distance, which it never passes */
+  animalsFar?: number;
+  draw?: number;
   /** the colour chosen for the word ADMIN in the chat (null: the rainbow) */
   tint: string | null;
   freecam: boolean;
@@ -674,6 +683,23 @@ export class AdminUI {
     return box;
   }
 
+  /**
+   * How far off animals are drawn, for this admin alone (2026-10-24: "make it a setting in the admin panel so it is
+   * controlled indepeneently like the render distance is"): never past the draw distance in Settings.
+   */
+  private animalReach() {
+    const s = this.self, draw = s.draw ?? ANIMAL_REACH[ANIMAL_REACH.length - 1], now = s.animalsFar ?? ANIMALS.told;
+    const row = el('label', 'adm-esp-head adm-reach');
+    const text = el('span', 'adm-sw-text');
+    text.append(el('b', '', 'Animal distance'), el('small', '', `How far off animals are drawn and move, for you; never past your draw distance (${draw} m), so further is greyed out.`));
+    const pick = el('select', 'adm-pick');
+    pick.dataset.k = 'animalsFar';
+    for (const m of ANIMAL_REACH) pick.append(Object.assign(document.createElement('option'), { value: String(m), textContent: `${m} m`, disabled: m > draw, selected: m === Math.min(now, draw) || (m === draw && now > draw) }));
+    pick.onchange = () => this.act.animalsFar(Number(pick.value));
+    row.append(icon('animal'), text, pick);
+    return row;
+  }
+
   /** @param k the name it goes by, when what it says in its box changes with who is picked */
   private input(value: string, hint: string, set: (v: string) => void, cls = '', enter?: () => void, k = hint) {
     const i = el('input', `adm-i ${cls}`.trim());
@@ -1139,6 +1165,7 @@ export class AdminUI {
       }, 'camera', 'K'),
       this.flip('Night vision', 'It is day, for you alone, in the bunker too', s.night, () => this.act.night(!s.night), 'sun'),
       this.espList(),
+      this.animalReach(),
     );
     grid.append(this.card('Powers', 'bolt', powers,
       el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),

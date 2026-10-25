@@ -77,9 +77,10 @@ ok('the town as it stood: the palace at the east point, the best wall on the sou
 ok('the highest masonry is eleven and a half metres over the town, the keep sixteen tall from its foot in the ditch, the great arch four and a half wide', () => {
   const keep = walls('alcazar').find((w) => w.name === 'keep')!;
   assert.equal(keep.top, ALCAZAR.keep);
-  // (each piece stands at its own level in the town: the palace three metres under the top, so its keep comes to the same height over it)
+  // (each piece stands at its own level in the town: the palace three metres under the top, so its keep comes to the same height over it.
+  // Of the town as it stood: the keep in the flat middle, built since, has a tower of its own that stands higher, to see over it all.)
   let highest = -99;
-  for (const st of ruinsLayout()) for (const w of walls(st.piece)) for (const l of wallLengths(w)) for (const s of l.solids) highest = Math.max(highest, s[2] + st.y);
+  for (const st of ruinsLayout()) if (st.piece !== 'keep') for (const w of walls(st.piece)) for (const l of wallLengths(w)) for (const s of l.solids) highest = Math.max(highest, s[2] + st.y);
   want(highest <= 11.61 && highest > 11, `highest ${highest}`);
   want(ALCAZAR.keep - ruinGround('alcazar', 3, -6.5).y > 15, 'the keep is not tall from the ditch on its north side');
   const arch = walls('alcazar').find((w) => w.name === 'the great arch')!.openings![0];
@@ -354,8 +355,9 @@ ok('what is drawn of it: under a hundred and twenty thousand triangles for every
       }
     }
   }
-  want(tris < 120000, `${tris} triangles`);
-  want(solids < 1500, `${solids} things that stop a body`);
+  // (the town as it stood was under 110,000 and 1,400; the keep in the flat middle, built since, is some 18,000 and 250 of its own)
+  want(tris < 128000, `${tris} triangles`);
+  want(solids < 1650, `${solids} things that stop a body`);
 });
 
 ok('the faces of a wall look outward: from a pace outside either face of a length, that face is seen from its front', () => {
