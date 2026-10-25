@@ -152,8 +152,11 @@ function yawOf(W, rest, a, b) {
  * With `ref`, a crouched movement stood up too: the hips raised to the height `ref` carries them at, and the chest
  * brought up to lean as that one's does. What comes of it is the same steps, taken standing and facing ahead: the
  * library steps sideways only crouched, and a gun held up is walked sideways standing, facing the aim.
+ * With `head`, the body let down (or raised) until its head is that high on the whole, the chest leaning as it did:
+ * a crouch as low as the game's own, whose eye is a crouched body's eye (see EYE_CROUCH in src/game/player.ts). What
+ * is shot at on a body is where its head is drawn: a crouch drawn higher than the eye stood up out of cover.
  */
-export function reshape(doc, sk, name, { keep = 0, ref = null } = {}) {
+export function reshape(doc, sk, name, { keep = 0, ref = null, head = null } = {}) {
   const clip = readClip(doc, sk, name), other = readClip(doc, sk, ref ?? name);
   const { Q, T } = frameOf(clip);
   const n = clip.frames + 1;
@@ -203,6 +206,12 @@ export function reshape(doc, sk, name, { keep = 0, ref = null } = {}) {
   }
   // (no higher than leaves every leg a bend: a straight one locks and pops)
   let up = ref ? oh - hy : 0;
+  if (head !== null) {
+    const HEAD = sk.index('Head');
+    let hh = 0;
+    for (let f = 0; f < n; f++) hh += posOf(sk.pose(Q[f], T[f])[HEAD]).y / n;
+    up = head - hh;
+  }
   for (let f = 0; f < n; f++) {
     const W = sk.pose(Q[f], T[f]);
     legs.forEach(([a], k) => {

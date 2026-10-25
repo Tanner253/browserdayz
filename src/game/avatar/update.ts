@@ -4,7 +4,8 @@
 
 import * as THREE from 'three';
 import { stretch } from './gait';
-import { MOCAP } from './deeds';
+import { MOCAP, MOVES } from './deeds';
+import { jabAt, slashAt } from '../held-mocap';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
@@ -268,6 +269,9 @@ export const updateMethods = {
       const fall = MOCAP[this.deathClip], flinch = MOCAP[this.hitClip];
       if (w[this.deathClip] > 0) deeds.set(fall, w[this.deathClip], this.downT);
       if (w[this.hitClip] > 0) deeds.set(flinch, w[this.hitClip], this.hitT);
+      // (and stands on it: see MOVES.idle)
+      if (w.idle > 0) deeds.set('idle', w.idle, this.clock % MOVES.idle.dur);
+      this.actions.idle.setEffectiveWeight(0);
       this.actions[this.deathClip].setEffectiveWeight(0);
       this.actions.hit.setEffectiveWeight(0);
       this.actions.hitHead.setEffectiveWeight(0);
@@ -300,7 +304,10 @@ export const updateMethods = {
     if (this.strikeT >= 0) {
       this.strikeT += dt;
       const u = this.strikeT / this.strikeDur;
+      // (a survivor's on the motion capture: the slash, as the eye sees its own: see held-mocap.ts)
+      const slash = deeds?.get('slash');
       if (u >= 1 || dead) this.strikeT = -1;
+      else if (slash) this.layer(slash, slashAt(u), strikeShare(u));
       else this.layer('strike', strikeAt(u), strikeShare(u));
     }
     if (this.sick && this.sick.claw >= 0 && !dead) {
@@ -692,6 +699,9 @@ export const updateMethods = {
           wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
           const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
           out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
+          // (a survivor's on the motion capture's jab, as the eye sees its own: see held-mocap.ts)
+          const jab = this.deeds ? jabAt(this.punchSide > 0 ? 1 : -1, k) : null;
+          if (jab) ({ out, wind } = jab);
         }
       }
       const side = this.punchT >= 0 ? this.punchSide : 0;

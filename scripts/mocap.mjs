@@ -54,13 +54,16 @@ function mirrored(run) {
  * The movements kept, by the game's name. `from` the library's; `way` which way a step goes (F B L R and the corners:
  * a loop, stepped by the game in time with the ground); `gait` which set of steps it is one of; `mirror` the library's
  * done the other way about; `square` turned to face ahead, its hips kept turned by that share (see reshape); `stand`
- * a crouched one stood up (to the hips of `stand`, and squared); `cut` the seconds of it kept;
+ * a crouched one stood up (to the hips of `stand`, and squared); `head` let down until its head is that high on the
+ * whole (metres, as the file stands); `cut` the seconds of it kept;
  * `late` loaded the first time it is wanted, not with the body. The owner, 2026-10-25: "we want tarkov quality military
  * animations realism".
  */
 export const MOVES = {
+  // standing still, breathing, the weight shifting a little (the library's 'Idle' turns round to look behind it: a
+  // body that is seen to look elsewhere than it aims tells lies in a shooter)
+  idle: { from: 'Idle_02', square: 0.5 },
   // standing, nothing held up: an easy walk
-  idle: { from: 'Idle' },
   walkF: { from: 'walking_2', way: 'F', gait: 'walk' },
   walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk' },
   // a gun up: the knees soft, the chest still over them (the bow's walk: the arms are the gun's)
@@ -78,11 +81,12 @@ export const MOVES = {
   // flat out: empty handed, and with a gun (the arms are the gun's)
   sprint: { from: 'run_fast_2', way: 'F', gait: 'sprint' },
   sprintGun: { from: 'Rifle_Charge', way: 'F', gait: 'sprint' },
-  // the cautious crouch, four ways
-  crouchF: { from: 'Cautious_Crouch_Walk_Forward', way: 'F', gait: 'crouch', square: 0.4 },
-  crouchB: { from: 'Cautious_Crouch_Walk_Backward', way: 'B', gait: 'crouch', square: 0.4 },
-  crouchL: { from: 'Cautious_Crouch_Walk_Left', way: 'L', gait: 'crouch', square: 0.4 },
-  crouchR: { from: 'Cautious_Crouch_Walk_Right', way: 'R', gait: 'crouch', square: 0.4 },
+  // the cautious crouch, four ways, let down to the old crouch's head (0.92 m as the file stands, under the crouched
+  // eye: the library's carries it a third of a metre higher)
+  crouchF: { from: 'Cautious_Crouch_Walk_Forward', way: 'F', gait: 'crouch', square: 0.4, head: 0.92 },
+  crouchB: { from: 'Cautious_Crouch_Walk_Backward', way: 'B', gait: 'crouch', square: 0.4, head: 0.92 },
+  crouchL: { from: 'Cautious_Crouch_Walk_Left', way: 'L', gait: 'crouch', square: 0.4, head: 0.92 },
+  crouchR: { from: 'Cautious_Crouch_Walk_Right', way: 'R', gait: 'crouch', square: 0.4, head: 0.92 },
   // on a broken leg
   limpF: { from: 'Limping_Walk_1', way: 'F', gait: 'limp', square: 0.5 },
   limpB: { from: 'Injured_Walk_Backward', way: 'B', gait: 'limp', square: 0.5 },
@@ -96,7 +100,9 @@ export const MOVES = {
   hitHead: { from: 'Gunshot_Reaction', cut: [0, 0.9] },
   // the everyday things the hands do: something taken up off the ground, a drink
   pickUp: { from: 'Male_Bend_Over_Pick_Up', cut: [0.7, 2.5] },
-  drink: { from: 'Stand_and_Drink', cut: [1.8, 6.0] },
+  // a blow with what is in the right fist (a hatchet, a knife, a bat): drawn up and back, and brought down across
+  slash: { from: 'Right_Hand_Sword_Slash' },
+  drink: { from: 'Stand_and_Drink', cut: [1.8, 6.0], mirror: true },
   // and the rarer, fetched the first time any is wanted: a ladder, the water, a bedroll, a hatchet, a sledgehammer, a
   // grenade, a wall to go over, fists
   ladder: { from: 'Ladder_Climb_Loop', still: true, late: true },
@@ -173,7 +179,7 @@ if (!cands) {
     await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way });
     const said = {};
     said.was = facing(doc, sk, name);
-    if (m.square !== undefined || m.stand) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null }));
+    if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
     const r = report[name], got = readClip(doc, sk, name);
@@ -234,6 +240,34 @@ if (!cands) {
     console.log('wrote', path.relative(ROOT, file));
   }
   writeFileSync(path.join(ROOT, 'src', 'game', 'avatar', 'moves.json'), JSON.stringify(table, null, 1) + '\n');
+  // Where the hands go in the movements the first-person arms are moved by (src/game/held-mocap.ts): each hand's
+  // place and turn from the head, frame by frame, in the eye's own measure (x to the right, y up, z back), and for a
+  // drink how near the right hand is to the mouth. What is seen from the eye is then what everybody else sees.
+  const hands = {}, H = sk.index('Head'), HR = sk.index('hand_r'), HL = sk.index('hand_l');
+  const eye = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), left > 0 ? Math.PI : 0);
+  const round = (x) => +x.toFixed(4);
+  for (const name of ['drink', 'throw', 'jabR', 'jabL', 'slash', 'chop', 'hammer', 'pickUp', 'ladder', 'swim']) {
+    const c = readClip(doc, sk, name), r = [], l = [], mouth = [];
+    for (let f = 0; f <= c.frames; f++) {
+      const W = sk.pose(c.qAt(f), c.tAt(f)), head = new THREE.Vector3().setFromMatrixPosition(W[H]);
+      const of = (i, to) => {
+        const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+        W[i].decompose(p, q, s);
+        p.sub(head).applyQuaternion(eye);
+        q.premultiply(eye);
+        to.push([p.x, p.y, p.z, q.x, q.y, q.z, q.w].map(round));
+        return p;
+      };
+      const pr = of(HR, r);
+      of(HL, l);
+      // (the mouth: a hand's breadth down from the head joint and a little ahead of it)
+      mouth.push(round(pr.distanceTo(new THREE.Vector3(0, -0.06, -0.1))));
+    }
+    const near = Math.min(...mouth), far = Math.max(...mouth);
+    hands[name] = { dur: +c.dur.toFixed(3), r, l, ...(name === 'drink' ? { mouth: mouth.map((d) => round(1 - (d - near) / Math.max(1e-3, far - near))) } : {}) };
+  }
+  writeFileSync(path.join(ROOT, 'src', 'game', 'avatar', 'hands.json'), JSON.stringify(hands) + '\n');
+  console.log('wrote src/game/avatar/hands.json', (JSON.stringify(hands).length / 1024).toFixed(0), 'KB');
 }
 
 if (cands) {
