@@ -11,11 +11,11 @@ import { hasCut, type Cut } from '../held-mocap';
 /** one hand: a cut right to left at the height of the face, the arm thrown out from the shoulder */
 const SLASH: Cut = { clip: 'slash', from: 0.28, hit: 0.57, to: 0.95, lands: { tip: [-0.35, 0.85, -0.4], edge: [-1, -0.1, -0.1] }, reach: [0.38, 0.45] };
 /** one hand: drawn up over the shoulder and brought down across the body, right to left */
-const CHOP: Cut = { clip: 'combo', from: 0.1, hit: 0.47, to: 0.65, lands: { tip: [-0.25, 0.2, -0.95], edge: [-0.2, -1, 0] }, reach: [0.4, 0.4] };
+const CHOP: Cut = { clip: 'combo', from: 0.1, hit: 0.47, to: 0.65, lands: { tip: [-0.5, 0.45, -0.74], edge: [-0.2, -0.8, -0.55] }, reach: [0.4, 0.4], turn: 0.2 };
 /** one hand, heavy: raised high over the right shoulder and brought straight down, as a log is split */
-const SPLIT: Cut = { clip: 'chop', from: 1.1, hit: 1.86, to: 2.3, lands: { tip: [-0.2, 0.1, -0.97], edge: [0, -1, 0.1] }, reach: [0.3, 0.35] };
+const SPLIT: Cut = { clip: 'chop', from: 1.1, hit: 1.86, to: 2.3, lands: { tip: [-0.35, 0.5, -0.8], edge: [0, -0.85, -0.5] }, reach: [0.3, 0.35], turn: 0.15, at: [0.2, 0.05] };
 /** both hands, heavy: up over the head and down in front, the body bent over it */
-const OVERHEAD: Cut = { clip: 'hammer', from: 0.75, hit: 1.5, to: 1.75, lands: { tip: [-0.35, 0.1, -0.93], edge: [0, -1, 0.1] }, reach: [0.35, 0.25] };
+const OVERHEAD: Cut = { clip: 'hammer', from: 0.75, hit: 1.5, to: 1.75, lands: { tip: [-0.55, 0.4, -0.73], edge: [0, -0.88, -0.48] }, reach: [0.35, 0.25], turn: 0.15 };
 /**
  * Both hands, level, as a bat is swung (the owner's word, 2026-10-25: a baseball swing, both hands on the handle, turned
  * from the hips): from back over the right shoulder round through the middle at the height of the chest, and the

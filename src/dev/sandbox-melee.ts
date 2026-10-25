@@ -8,6 +8,7 @@
 //   &guard=1                          on guard (the right button), held
 //   &inspect=1                        looked over, through its length
 //   &rest=1                           (first person) held, nothing done with it
+//   &heavy=1                          its heavy blow
 //   &carry=draw|stow                  something long drawn off the back, or put away there
 //   &close=1                          close on the right hand (its fingers on the handle)
 //   &finish=emerald                   wearing a store finish
@@ -25,6 +26,7 @@ import { LOOK, fpPose, handsReady, lookOver, type Cut } from '../game/held-mocap
 import { lateReady } from '../game/avatar/deeds';
 import type { Atmosphere } from '../world/atmosphere';
 import { ITEMS } from '../sim/items';
+import { HEAVY } from '../sim/combat';
 
 /** the world's lighting, as much of it as a body asks for: its own patches, and the hour (always day here) */
 const atmo = {
@@ -47,10 +49,12 @@ export async function stageMelee(id: string, s: {
   const def = ITEMS[id];
   if (!def?.melee) throw new Error(`not something to hit with: ${id}`);
   await handsReady();
+  // (&heavy=1: its heavy blow, as long as the game gives one: see HEAVY)
+  const heavy = s.q.get('heavy') === '1';
   const by = s.q.get('blow')?.split(',');
-  const cut: Cut | null = by ? { clip: by[0], from: +by[1], hit: +by[2], to: +by[3], ...(by.length >= 10 ? { lands: { tip: [+by[4], +by[5], +by[6]] as [number, number, number], edge: [+by[7], +by[8], +by[9]] as [number, number, number] } } : {}) } : cutFor(id, +(s.q.get('n') ?? 0));
+  const cut: Cut | null = by ? { clip: by[0], from: +by[1], hit: +by[2], to: +by[3], ...(by.length >= 10 ? { lands: { tip: [+by[4], +by[5], +by[6]] as [number, number, number], edge: [+by[7], +by[8], +by[9]] as [number, number, number] } } : {}) } : cutFor(id, +(s.q.get('n') ?? 0), heavy);
   if (!cut) throw new Error(`no captured blow for ${id}`);
-  const dur = def.melee.rate * 0.9;
+  const dur = def.melee.rate * 0.9 * (heavy ? HEAVY.rate : 1);
   if (s.q.get('fp') === '1') return firstPerson(id, cut, dur, s);
   const body = new Avatar();
   await body.load(atmo, 0, false, lookFor('sandbox'));
