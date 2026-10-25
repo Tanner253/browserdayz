@@ -1,27 +1,31 @@
-// The trader's counter: what you have that he will take, and what he has to sell.
-// One click sells a thing or buys one. Everything it does it asks of the game (`ShopHost`):
-// it holds nothing itself but what is on the screen.
+// A stall's counter at the trader camp (progression v3: "a trader camp with four stalls ... Paid in scrap"): what you
+// carry that it will take, and what it has to sell, for scrap, so many a day; at the shop, the day's work. One click
+// sells a thing or buys one. Everything it does it asks of the camp (`ShopHost`, src/game/camp.ts), whose answer may
+// come from the server: the screen waits for it, and holds nothing itself but what is on it.
 
 import { ITEMS, itemName, type ItemInstance } from '../sim/items';
-import { sold } from '../sim/trade';
+
+type Answer = string | null | Promise<string | null>;
 
 export interface ShopHost {
-  /** what is written against your name in his book */
-  credit(): number;
-  /** what you carry that he will take, and what he pays for each */
+  /** the stall whose counter this is */
+  stall(): { id: string; name: string; hello: string };
+  /** the scrap carried */
+  scrap(): number;
+  /** what you carry that this stall takes, and what it pays for each */
   wares(): { item: ItemInstance; pays: number }[];
-  /** what he sells, and what he asks */
-  /** (`left`: how many more of it he will sell this player today) */
-  stock(): { id: string; asks: number; left: number }[];
-  /** the day's work: each job, how much of it is done, and whether it has been paid */
+  /** how much more scrap it will pay out today, over every stall */
+  soldLeft(): number;
+  /** what it sells: how many a sale hands over, the price, and how many more sales of it today */
+  stock(): { id: string; n: number; price: number; left: number }[];
+  /** the day's work (the shop's): each job, how much of it is done, and whether it has been paid */
   jobs(): { id: string; text: string; n: number; have: number; pays: number; paid: boolean }[];
-  /** null if it was paid; else why not */
-  handIn(id: string): string | null;
   /** picture of a thing, if there is one yet */
   icon(id: string): string | undefined;
-  sell(item: ItemInstance): void;
-  /** false if it could not be bought (no credit, or nowhere to put it) */
-  buy(id: string): string | null;
+  /** each: null if it was done (or what the trader says), else why not */
+  buy(id: string): Answer;
+  sell(item: ItemInstance): Answer;
+  handIn(id: string): Answer;
   closed(): void;
 }
 
@@ -32,8 +36,11 @@ const CSS = `
 .shop-top { display: flex; align-items: baseline; gap: 18px; padding: 16px 22px 12px; border-bottom: 1px solid rgba(233, 228, 216, 0.14); }
 .shop-top h2 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .shop-top p { margin: 0; font-size: 17px; color: rgba(233, 228, 216, 0.6); }
-.shop-credit { margin-left: auto; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(233, 228, 216, 0.6); }
-.shop-credit b { margin-left: 8px; font-size: 22px; letter-spacing: 0.04em; color: #ffd35a; }
+.shop-credit { margin-left: auto; display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(233, 228, 216, 0.6); }
+.shop-credit b { margin-left: 2px; font-size: 22px; letter-spacing: 0.04em; color: #ffd35a; }
+.shop-credit i, .shop-row b i { display: inline-block; width: 18px; height: 18px; vertical-align: -3px; margin-right: 3px; background: center / contain no-repeat; }
+.shop-row b i { width: 15px; height: 15px; }
+.shop.busy .shop-row, .shop.busy .shop-job button { pointer-events: none; opacity: 0.6; }
 .shop-cols { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 .shop-col { min-height: 0; overflow-y: auto; padding: 12px 16px 16px; }
 .shop-col + .shop-col { border-left: 1px solid rgba(233, 228, 216, 0.14); }
@@ -56,11 +63,6 @@ const CSS = `
 .shop-job em b { color: #ffd35a; font-weight: 500; }
 .shop-job button { grid-column: 2; grid-row: 1 / 3; padding: 5px 12px 6px; font: inherit; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: #14160f; background: #ffd35a; border: 0; cursor: pointer; }
 .shop-job button[disabled] { color: rgba(233, 228, 216, 0.5); background: rgba(233, 228, 216, 0.1); cursor: default; }
-.shop-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 10px; }
-.shop-tabs button { padding: 4px 10px 5px; font: inherit; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(233, 228, 216, 0.7); background: rgba(233, 228, 216, 0.05); border: 1px solid transparent; cursor: pointer; }
-.shop-tabs button:hover { border-color: rgba(233, 228, 216, 0.4); }
-.shop-tabs button.on { color: #14160f; background: #ffd35a; }
-.shop-tabs button small { margin-left: 5px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; opacity: 0.7; }
 .shop-none { padding: 18px 6px; font-size: 18px; color: rgba(233, 228, 216, 0.5); }
 .shop-foot { display: flex; gap: 18px; align-items: center; padding: 10px 22px 12px; font-size: 16px; color: rgba(233, 228, 216, 0.55); border-top: 1px solid rgba(233, 228, 216, 0.14); }
 .shop-say { color: #e9e4d8; }
@@ -69,22 +71,13 @@ const CSS = `
 @media (max-width: 760px) { .shop-jobs { grid-template-columns: 1fr; } .shop-cols { grid-template-columns: 1fr; overflow-y: auto; } .shop-col { overflow: visible; } .shop-col + .shop-col { border-left: 0; border-top: 1px solid rgba(233, 228, 216, 0.14); } .shop-top p { display: none; } }
 `;
 
-/** the sorts his stock is shown under, and the kinds of thing each takes in */
-const TABS: { key: string; name: string; has: string[] }[] = [
-  { key: 'ammo', name: 'Ammo', has: ['ammo', 'magazine'] },
-  { key: 'medical', name: 'Medical', has: ['medical'] },
-  { key: 'food', name: 'Food & drink', has: ['food', 'drink'] },
-  { key: 'gear', name: 'Gear', has: ['clothing', 'tool', 'attachment'] },
-  { key: 'other', name: 'Other', has: ['misc', 'stash', 'weapon', 'melee'] },
-];
-
 export class ShopUI {
   isOpen = false;
   private el: HTMLElement;
   private said = '';
   private openedAt = 0;
-  /** which sort of his stock is shown */
-  private tab = 'all';
+  /** waiting for the server's answer to a trade */
+  private busy = false;
 
   constructor(private host: ShopHost) {
     const style = document.createElement('style');
@@ -110,7 +103,7 @@ export class ShopUI {
     if (this.isOpen) return;
     this.isOpen = true;
     this.openedAt = performance.now();
-    this.said = 'Put it on the counter. I pay what it is worth here, not what it cost you to get.';
+    this.said = this.host.stall().hello;
     this.el.classList.add('on');
     this.render();
   }
@@ -122,64 +115,67 @@ export class ShopUI {
     this.host.closed();
   }
 
+  /** drawn again (the day told, the pockets changed) */
+  refresh() {
+    if (this.isOpen) this.render();
+  }
+
+  /** a trade asked: the screen waits for the answer, says it, and is drawn again */
+  private act(answer: Answer, done: (no: string | null) => string) {
+    if (this.busy) return;
+    if (!(answer instanceof Promise)) {
+      this.said = done(answer);
+      return this.render();
+    }
+    this.busy = true;
+    this.el.classList.add('busy');
+    void answer.then((no) => {
+      this.busy = false;
+      this.el.classList.remove('busy');
+      this.said = done(no);
+      this.render();
+    });
+  }
+
   private render() {
-    const h = this.host, credit = h.credit();
-    // (what is worth most to him first: it is what somebody came to sell)
-    const wares = h.wares().sort((a, b) => b.pays - a.pays), stock = h.stock();
+    const h = this.host, scrap = h.scrap(), st = h.stall(), coin = `<i style="background-image:url(${h.icon('scrap') ?? ''})"></i>`;
+    // (what is worth most to it first: it is what somebody came to sell)
+    const wares = h.wares().sort((a, b) => b.pays - a.pays), stock = h.stock(), left = h.soldLeft();
     const row = (kind: string, key: string, id: string, title: string, sub: string, price: string, off = false) =>
       `<button class="shop-row" data-${kind}="${key}"${off ? ' disabled' : ''}><i style="${h.icon(id) ? `background-image:url(${h.icon(id)})` : ''}"></i><span>${title}<small>${sub}</small></span><b>${price}</b></button>`;
     const mine = wares.length
-      ? wares.map((w, i) => row('sell', String(i), w.item.id, itemName(w.item) + (ITEMS[w.item.id].stack ? ` ×${w.item.qty ?? 1}` : ''), ITEMS[w.item.id].category, `+${w.pays}`)).join('')
-      : '<div class="shop-none">Nothing on you that he deals in.</div>';
-    // his stock by sort: what somebody came for is one click away
-    const sortOf = (id: string) => TABS.find((t) => t.has.includes(ITEMS[id].category))?.key ?? 'other';
-    const tabs = [{ key: 'all', name: 'All', n: stock.length }, ...TABS.map((t) => ({ key: t.key, name: t.name, n: stock.filter((x) => sortOf(x.id) === t.key).length }))].filter((t) => t.n);
-    if (!tabs.some((t) => t.key === this.tab)) this.tab = 'all';
-    const tabRow = `<div class="shop-tabs">${tabs.map((t) => `<button data-sort="${t.key}"${t.key === this.tab ? ' class="on"' : ''}>${t.name}<small>${t.n}</small></button>`).join('')}</div>`;
-    const his = tabRow + stock.filter((x) => this.tab === 'all' || sortOf(x.id) === this.tab).map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + (sold(s.id) > 1 ? ` ×${sold(s.id)}` : ''), s.left > 0 ? `${s.left} left today · ${ITEMS[s.id].desc ?? ''}` : 'None left today: he sells so many a day', String(s.asks), s.asks > credit || s.left <= 0)).join('');
+      ? wares.map((w, i) => row('sell', String(i), w.item.id, itemName(w.item) + (ITEMS[w.item.id].stack ? ` ×${w.item.qty ?? 1}` : ''), ITEMS[w.item.id].category, `+${coin}${Math.min(w.pays, left)}`, left <= 0)).join('')
+      : '<div class="shop-none">Nothing on you that this stall deals in.</div>';
+    const his = stock.map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + (s.n > 1 ? ` ×${s.n}` : ''), s.left > 0 ? `${s.left} left today · ${ITEMS[s.id].desc ?? ''}` : 'None left today: so many a day', `${coin}${s.price}`, s.price > scrap || s.left <= 0)).join('');
     const jobs = h.jobs();
     const work = jobs
       .map((j) => {
         const ready = !j.paid && j.have >= j.n;
-        return `<div class="shop-job${j.paid ? ' paid' : ready ? ' ready' : ''}"><span>${j.text}</span><em>${j.paid ? 'Paid' : `${j.have} of ${j.n}`} · pays <b>${j.pays}</b></em><button data-job="${j.id}"${ready ? '' : ' disabled'}>${j.paid ? 'Done' : 'Hand in'}</button></div>`;
+        return `<div class="shop-job${j.paid ? ' paid' : ready ? ' ready' : ''}"><span>${j.text}</span><em>${j.paid ? 'Paid' : `${j.have} of ${j.n}`} · pays <b>${j.pays}</b> scrap</em><button data-job="${j.id}"${ready ? '' : ' disabled'}>${j.paid ? 'Done' : 'Hand in'}</button></div>`;
       })
       .join('');
     this.el.innerHTML = `<div class="shop-box">
-      <div class="shop-top"><h2>The trader</h2><p>He buys what you bring and sells what keeps you alive. No tags, no keycards.</p><div class="shop-credit">Your credit<b>${credit}</b></div></div>
-      <div class="shop-jobs"><h3>Work he has today · the same for everybody, new at midnight UTC</h3>${work}</div>
-      <div class="shop-cols"><div class="shop-col"><h3>You sell · click a thing to sell it</h3>${mine}</div><div class="shop-col"><h3>He sells · click to buy</h3>${his}</div></div>
+      <div class="shop-top"><h2>${st.name}</h2><p>The trader camp · no shooting here</p><div class="shop-credit">Your scrap ${coin}<b>${scrap}</b></div></div>
+      ${jobs.length ? `<div class="shop-jobs"><h3>Work today · the same for everybody, new at midnight UTC · paid in scrap</h3>${work}</div>` : ''}
+      <div class="shop-cols"><div class="shop-col"><h3>You sell · ${left > 0 ? `he pays out ${left} more scrap today` : 'he pays out no more today'}</h3>${mine}</div><div class="shop-col"><h3>He sells · for scrap, so many a day</h3>${his}</div></div>
       <div class="shop-foot"><span class="shop-say">“${this.said}”</span><span><kbd>F</kbd> or <kbd>Esc</kbd> to leave</span><button data-close>Done</button></div>
     </div>`;
     this.el.querySelectorAll<HTMLElement>('[data-sell]').forEach((b) => {
       b.onclick = () => {
         const w = wares[Number(b.dataset.sell)];
-        if (!w) return;
-        h.sell(w.item);
-        this.said = `${w.pays} for the ${itemName(w.item).toLowerCase()}. It is in the book.`;
-        this.render();
+        if (w) this.act(h.sell(w.item), (no) => no ?? `${Math.min(w.pays, left)} for the ${itemName(w.item).toLowerCase()}.`);
       };
     });
     this.el.querySelectorAll<HTMLElement>('[data-buy]').forEach((b) => {
       b.onclick = () => {
         const id = b.dataset.buy!;
-        const no = h.buy(id);
-        this.said = no ?? `One ${ITEMS[id].name.toLowerCase()}. Mind how you go.`;
-        this.render();
+        this.act(h.buy(id), (no) => no ?? `${ITEMS[id].name}. Mind how you go.`);
       };
     });
     this.el.querySelectorAll<HTMLElement>('[data-job]').forEach((b) => {
       b.onclick = () => {
         const job = jobs.find((j) => j.id === b.dataset.job);
-        if (!job) return;
-        const no = h.handIn(job.id);
-        this.said = no ?? `That is the job done. ${job.pays} in the book.`;
-        this.render();
-      };
-    });
-    this.el.querySelectorAll<HTMLElement>('[data-sort]').forEach((b) => {
-      b.onclick = () => {
-        this.tab = b.dataset.sort!;
-        this.render();
+        if (job) this.act(h.handIn(job.id), (no) => no ?? `That is the job done. ${job.pays} scrap.`);
       };
     });
     this.el.querySelector<HTMLElement>('[data-close]')!.onclick = () => this.close();

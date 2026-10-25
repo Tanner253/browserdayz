@@ -25,8 +25,10 @@ const ICONS_REV = 3;
 // and the stick grenade, drawn handle up: "the stick grenade in this image is upside down in the icon", 2026-10-19;
 // and, every picture looked at on 2026-10-19 ("you should check all the icons for proper orientations"), two boxes of
 // rounds whose printing read upside down and the tin of tomatoes standing on its lid)
-// (and the Mosin's clip, its rounds tip down as it came: 2026-10-19)
-const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin']);
+// (and the Mosin's clip, its rounds tip down as it came: 2026-10-19; and the long tools, which lie head down: 2026-10-25,
+// "make sure the model photos are upright"; and crafting's, the same day: the stone hatchet and the sledgehammer head up,
+// the bone knife grip up as the combat knife)
+const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin', 'felling_axe', 'hammer', 'pickaxe', 'stone_hatchet', 'sledgehammer', 'bone_knife']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
  * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip
@@ -57,6 +59,20 @@ const gunView = (id: string): [boolean, boolean] => (globalThis as { __GUN_VIEW?
  * eyepiece and the valve, and read as a flask.)
  */
 const FACE_UP = new Set(['gasmask']);
+/**
+ * A thing whose picture the rules above leave on its side or edge on, posed by hand (2026-10-24, the owner: "make sure
+ * the model photos are upright and look proper in the icon images for items not upside down or backwards"): `pivot`
+ * how the model is stood (in place of the rules' turn), `frame` how the whole is then turned to the eye. The rules
+ * turned the key lock's back plate to the eye, looked at the saw along its length, and laid the clipboard across its
+ * tall place: each is turned face to the eye, the saw's handle and the clipboard's clip at the ends they are held by.
+ */
+const POSED: Record<string, { pivot?: [number, number, number]; frame?: [number, number, number] }> = {
+  key_lock: { pivot: [0.15, -Math.PI / 2 + 0.35, 0] },
+  // (its keypad and timer to the eye: the model has them to +x)
+  c4: { pivot: [0.15, -Math.PI / 2 + 0.35, 0] },
+  hand_saw: { pivot: [Math.PI / 2 - 0.2, 0, 0], frame: [0, 0, Math.PI] },
+  building_plan: { pivot: [Math.PI / 2 - 0.25, 0, 0], frame: [0, 0, -Math.PI / 2] },
+};
 
 /** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */
 const LIT = (d: (typeof ITEMS)[string]) => !!(d.weapon || d.mag || d.attach);
@@ -260,10 +276,13 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       pivot.rotation.x += upright ? 0.15 : flat ? 1.15 : 0.55;
     }
     if (FACE_UP.has(id)) pivot.rotation.set(Math.PI / 2 - 0.15, 0, 0);
+    const posed = POSED[id];
+    if (posed?.pivot) pivot.rotation.set(...posed.pivot);
     // (in a frame of its own, which is what is turned if the turns above left it across the picture)
     const frame = new THREE.Group();
     frame.add(pivot);
     if (FACE_UP.has(id)) frame.rotation.y = 0.4;
+    if (posed?.frame) frame.rotation.set(...posed.frame);
     // (a magazine is looked at a little from one side and a little from above, as a thing stood on a table is)
     if (def.mag) frame.rotation.set(0.12, 0.45, 0);
     scene.add(frame);

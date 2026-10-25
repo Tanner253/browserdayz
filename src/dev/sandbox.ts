@@ -12,6 +12,9 @@
 //                                               several files, one each (clip=walk,mc_walk: the old beside the new)
 //   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
 //                                               one of its clips; today's survivor beside them plays it too
+//   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
+//   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
+//   &shrink=hips,thigh                           the parts only partly under them drawn a little in)
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
@@ -24,9 +27,11 @@
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
-//   &person=0                                   no survivor beside it
+//   &bg=20231f&floor=0                          a plain backdrop of that colour and no floor (pictures for the page)
+//   &person=0                                   no survivor beside it; &body=2 which survivor (src/game/survivors.ts BODIES)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
+//   &bb=items | fell                            base building's scenes (src/dev/sandbox-build.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
 // Headless, in one pass and off the graphics card's queue:
 //   PLAY_NOWAIT=1 PLAY_GL=swiftshader node assets-src/_wf/me/play.mjs assets-src/_wf/me/stage-shot.js <out> 1280 720 "http://localhost:5173/tools/sandbox.html?..."
@@ -47,9 +52,10 @@ const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
 const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
-const sim = q.get('sim');
-const cells = sim ? 8 : strip > 0 ? strip : views.length;
-const cols = Math.min(cells, strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
+const sim = q.get('sim'), bb = q.get('bb');
+const { BUILD_CELLS, BUILD_COLS } = bb ? await import('./sandbox-build') : { BUILD_CELLS: {} as Record<string, number>, BUILD_COLS: {} as Record<string, number> };
+const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : strip > 0 ? strip : views.length;
+const cols = Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);
@@ -62,7 +68,7 @@ document.body.appendChild(renderer.domElement);
 
 await assets.init();
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(dusk ? 0x4a4f63 : 0xb9c7d6);
+scene.background = new THREE.Color(q.get('bg') ? Number(`0x${q.get('bg')}`) : dusk ? 0x4a4f63 : 0xb9c7d6);
 // (the game's own sky for light, so a material that is wrong in the game is wrong here too: the wolf's pale coat was)
 const env = await assets.hdri(assets.manifest.hdri.env);
 env.mapping = THREE.EquirectangularReflectionMapping;
@@ -97,6 +103,7 @@ floorTex.anisotropy = 8;
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
+floor.visible = q.get('floor') !== '0';
 scene.add(floor);
 
 // (the words on each view: which camera, and the moment of the clip)
@@ -115,7 +122,13 @@ const say = (i: number, text: string) => {
   w2.fillText(text, cx + 6, cy + 16);
 };
 
-if (sim) {
+if (bb) {
+  // (base building's scenes: src/dev/sandbox-build.ts)
+  const { stageBuild } = await import('./sandbox-build');
+  const out = window as unknown as { staged: boolean; stageInfo: unknown };
+  out.stageInfo = await stageBuild(bb, { q, scene, renderer, sun, cw, ch, cols, rows, say });
+  out.staged = true;
+} else if (sim) {
   // (the animals' own minds on the floor, their moments in one picture: src/dev/sandbox-sim.ts)
   const { stageSim } = await import('./sandbox-sim');
   const body = async () => {
@@ -148,6 +161,17 @@ if (sim) {
     });
     return n;
   };
+  /** the biggest colour picture it is drawn with, as the game cut it (see DESK_NEAR in src/core/assets.ts) */
+  const picture = (o: THREE.Object3D) => {
+    let n = 0;
+    o.traverse((m) => {
+      for (const mat of ([] as THREE.Material[]).concat((m as THREE.Mesh).material ?? [])) {
+        const img = (mat as THREE.MeshStandardMaterial).map?.image as { width?: number; height?: number } | undefined;
+        if (img?.width) n = Math.max(n, img.width, img.height ?? 0);
+      }
+    });
+    return n;
+  };
   let x = 0;
   const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> = {}, asIs = false) => {
     o.rotation.y = yaw;
@@ -164,7 +188,7 @@ if (sim) {
     o.position.z -= (box.min.z + box.max.z) / 2;
     x += size.x + 0.5;
     thing.add(o);
-    info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), ...extra });
+    info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), picture: picture(o), ...extra });
   };
   for (const id of ids) place(await assets.model(id), id);
   // (a body with no movements of its own, one of the infected, played in another file's: &moves=)
@@ -190,9 +214,8 @@ if (sim) {
   }
   // (every survivor, and today's beside them, in one clip at one moment: see `played`)
   const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
-    // (set upon by the infected, &round=1, the survivor stands as one does, not in the file's T)
-    const want = q.get('clip'), idle = want === null && q.get('round') === '1';
-    const clip = idle ? clips.find((c) => /idle/i.test(c.name)) ?? null : want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
+    const want = q.get('clip');
+    const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
     if (!clip) return null;
     const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
     a.play();
@@ -201,12 +224,24 @@ if (sim) {
     return clip.name;
   };
   if (survivors.length) {
-    const { wearBody, BODIES } = await import('../game/survivors');
+    const { wearBody, wearOn, BODIES } = await import('../game/survivors');
+    const { hides } = await import('../sim/survivor');
+    const { ITEMS } = await import('../sim/items');
+    const hide = hides(list('hide') as Parameters<typeof hides>[0]);
+    // (what a piece hides and draws in is its item's, src/sim/items/wear.ts, unless &hide or &shrink says)
+    const dressOf = (model: string) => Object.values(ITEMS).find((d) => d.dress?.model === model)?.dress;
     const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
     for (const n of survivors) {
       const o = cloneSkinned(gltf.scene) as THREE.Group;
       o.traverse((m) => { if (m.name.startsWith('gear_')) m.visible = false; });
-      await wearBody(o, n);
+      const body = await wearBody(o, n, list('wear').length ? 0 : hide);
+      // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
+      const worn = list('wear').map((w) => {
+        const [model, c] = w.split('~');
+        const own = dressOf(model);
+        return { model, hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
+      });
+      if (worn.length) await wearOn(o, body, worn);
       const playing = playOn(o, gltf.animations);
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }
@@ -235,13 +270,24 @@ if (sim) {
   }
   if (!thing.children.length) throw new Error('nothing to stage: give m=, g= or animal=');
 
-  // (the survivor for size: the player's body as its file has it, no gear, standing to one side, facing the camera)
+  // (the survivor for size: a new life's body in what it begins in, T-shirt, jeans and trainers, standing to one side,
+  // facing the camera. The owner, 2026-10-25, of the old suit beside every path's work: "why are our sub agents not
+  // using our new player models?")
   const subject = new THREE.Box3().setFromObject(thing);
   if (person) {
     // (a copy: the file's own is the one the game's pictures of the survivor are made from, and it is moved aside here)
-    const body = cloneSkinned((await assets.loadGLTF('assets/characters/survivor.glb')).scene) as THREE.Group;
+    const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
+    const body = cloneSkinned(gltf.scene) as THREE.Group;
     body.traverse((o) => { if (o.name.startsWith('gear_')) o.visible = false; });
-    if (survivors.length || round) playOn(body, (await assets.loadGLTF('assets/characters/survivor.glb')).animations);
+    const { wearBody, wearOn } = await import('../game/survivors');
+    const { hides } = await import('../sim/survivor');
+    const { ITEMS, CLOTHES } = await import('../sim/items');
+    const skin = await wearBody(body, +(q.get('body') ?? 0));
+    const dress = CLOTHES.flatMap(([, id]) => (ITEMS[id]?.dress ? [ITEMS[id].dress!] : []));
+    await wearOn(body, skin, dress.map((d) => ({ model: d.model, hides: hides(d.hides), shrinks: hides(d.shrinks ?? []) })));
+    // (at rest when no clip is asked of it, not in the pose its file was made in: a T-shirt flares under arms held out)
+    const idle = gltf.animations.find((c) => /^idle/i.test(c.name));
+    if (!(survivors.length && playOn(body, gltf.animations)) && idle) new THREE.AnimationMixer(body).clipAction(idle).play().getMixer().setTime(0);
     shadowed(body);
     body.position.set(round ? 0 : subject.max.x + 0.9, 0, 0);
     scene.add(body);

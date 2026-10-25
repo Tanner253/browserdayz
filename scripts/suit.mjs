@@ -201,7 +201,7 @@ export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:', toes =
  *                 which shape of the body, as PIECES), `moved` (as MOVED) and `prefix` (see ours)
  * @returns what was done, for the build's last line
  */
-export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, pieces = PIECES, moved: MOVED_ = MOVED, prefix = 'mixamorig:', toes = true }) {
+export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, pieces = PIECES, moved: MOVED_ = MOVED, prefix = 'mixamorig:', toes = true, scale: sized }) {
   const suit = given ?? (await io.read(path.join(dir, 'scene.gltf')));
   const sRoot = suit.getRoot();
   const sSkin = sRoot.listSkins()[0];
@@ -237,8 +237,9 @@ export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, 
   });
   const S = (n) => suitOf.get(byName.get(n));
   if (p[S('ball_l')].z < p[S('foot_l')].z || p[S('upperarm_l')].x < p[S('upperarm_r')].x || p[S('Head')].y < p[S('pelvis')].y) throw new Error('suit: it does not stand the way this skeleton does (y up, facing +z, its left at +x)');
-  // its size: head to ankle, against the game's
-  const scale = (r[byName.get('Head')].y - r[byName.get('foot_l')].y) / (p[S('Head')].y - p[S('foot_l')].y);
+  // its size: head to ankle, against the game's (or as said, by a skeleton already made the suit's own shape: see
+  // fitProportions in scripts/meshy.mjs, where it goes by the legs)
+  const scale = sized ?? (r[byName.get('Head')].y - r[byName.get('foot_l')].y) / (p[S('Head')].y - p[S('foot_l')].y);
 
   // ---- the trunk: where the hips, the shoulders and the head are on each, and how much wider this skeleton is there
   const O = (n) => r[byName.get(n)];

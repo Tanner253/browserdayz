@@ -265,6 +265,8 @@ export class Net {
   unreached: '' | 'blocked' | 'asleep' | 'socket' = '';
   /** this game's print of its places for things, said with hello (src/sim/economy.ts, lootPrint): set by the game */
   lootPrint: () => string = () => '';
+  /** which survivor this player is and their voice, said in the hello (src/sim/survivor.ts; the game sets it) */
+  who: () => { bd: number; vo: number } | null = () => null;
   private proofKey = '';
   /** turned away for want of the check that this is a person: the key the server said to ask for it with (see src/ui/person.ts) */
   get wantsProof() {
@@ -388,7 +390,7 @@ export class Net {
       this.ws = ws;
       ws.onopen = () => {
         const lp = this.lootPrint();
-        this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName(), ...(lp ? { lp } : {}) });
+        this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}), ...(fp ? { fp } : {}), gl: glName(), ...(lp ? { lp } : {}), ...(this.who() ?? {}) });
       };
       ws.onerror = () => done(null);
       ws.onclose = () => {

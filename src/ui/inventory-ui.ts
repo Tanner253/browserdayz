@@ -22,6 +22,8 @@
 // which is the nearest free spot to the pointer, not only the cell under it.
 
 import { ALL_SLOTS, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
+import { TOOL_LIFE, condition } from '../sim/gather';
+import { bandagesFrom, cuttable } from '../sim/condition';
 import { Container, bagGrid, poured, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
@@ -61,6 +63,9 @@ export interface InvActions {
   onGround(w: WorldItem, how: 'use' | 'open'): void;
   /** take the rounds out of a weapon */
   unload(item: ItemInstance): void;
+  /** cut a piece of clothing into bandages, and whether a blade is carried to (src/sim/condition.ts) */
+  cut(item: ItemInstance): void;
+  canCut(): boolean;
   /** carried weapons this attachment can be fitted to right now */
   attachTargets(att: ItemInstance): ItemInstance[];
   /** @param loose picked up off the ground to be fitted: held by nothing */
@@ -101,6 +106,14 @@ export interface InvActions {
   applyFinish(item: ItemInstance): void;
   /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
   plateIcon(id: string, f: 'gold' | 'nickel'): void;
+  /** whether two carried things dragged onto each other go into a hand recipe (src/game/crafting.ts) */
+  craftWith?(a: ItemInstance, b: ItemInstance): boolean;
+  /** the card of the recipes they go into, where they were let go */
+  craftOnto?(a: ItemInstance, b: ItemInstance, at: { x: number; y: number }): void;
+  /** whether that card is up (the card by the pointer keeps out of its way) */
+  craftOpen?(): boolean;
+  /** a bar over a store that is a machine (a recycler's switch, a forge's fire): what it is drawn of, and the bar (crafting's) */
+  stashBar?(st: Stash): { sig: string; el: () => HTMLElement } | null;
 }
 
 type Source =
@@ -168,6 +181,12 @@ const holdable = (d: Def) => d.category !== 'clothing';
 export class InventoryUI {
   root: HTMLDivElement;
   isOpen = false;
+  /** which tab is open: the inventory, or Crafting (src/ui/crafting-ui.ts), which takes the left and middle columns */
+  mode: 'inv' | 'craft' = 'inv';
+  /** the Crafting tab, given by the game: no tabs are shown without it */
+  craftPane: { el: HTMLElement; render(): void; shown(on: boolean): void } | null = null;
+  /** what the chosen recipe takes, lit among what is carried */
+  private need: Set<string> | null = null;
   /** `paintAhead`: the frames it has still to stand, when it may begin, and whether it has been done in this page */
   private aheadLeft = 0;
   private aheadFrom = 0;
@@ -623,7 +642,38 @@ export class InventoryUI {
     this.cancelDrag();
     this.hideCard();
     this.figureLetGo();
+    // (opened again, by Tab or by a crate, it is the inventory: J is what opens Crafting)
+    if (this.mode === 'craft') this.setMode('inv', false);
     this.root.classList.remove('show');
+  }
+
+  /** the inventory or Crafting shown (drawn again unless `draw` is false) */
+  setMode(m: 'inv' | 'craft', draw = true) {
+    if (m === 'craft' && !this.craftPane) return;
+    this.mode = m;
+    this.root.classList.toggle('crafting', m === 'craft');
+    for (const b of this.root.querySelectorAll<HTMLElement>('.inv-tabs [data-tab]')) b.classList.toggle('on', b.dataset.tab === m);
+    const pane = this.craftPane;
+    if (pane) {
+      if (m === 'craft') this.sk?.vic.parentElement?.prepend(pane.el);
+      else pane.el.remove();
+      pane.shown(m === 'craft');
+    }
+    if (m === 'inv') this.lightUp(null);
+    if (draw && this.isOpen) this.render();
+  }
+
+  /** these kinds lit among what is carried (null: none) */
+  lightUp(ids: Set<string> | null) {
+    this.need = ids;
+    this.lit();
+  }
+
+  private lit() {
+    for (const el of this.root.querySelectorAll<HTMLElement>('.inv-item')) {
+      const src = this.bound.get(el), on = !!this.need && !!src && src.kind !== 'ground' && this.need.has(src.item.id);
+      el.classList.toggle('craft-need', on);
+    }
   }
 
   // ------------------------------------------------------------ the card by the pointer
@@ -646,7 +696,7 @@ export class InventoryUI {
   }
 
   private showCard(src: Source) {
-    if (this.drag || this.menu || !this.at.mouse || src.kind === 'fitted') return;
+    if (this.drag || this.menu || !this.at.mouse || src.kind === 'fitted' || this.actions.craftOpen?.()) return;
     this.cardSrc = src;
     this.card.className = 'inv-card';
     this.card.innerHTML = this.cardHtml(src);
@@ -690,6 +740,11 @@ export class InventoryUI {
     }
     if (d.mag) s.push({ k: 'Rounds', v: `${it.rounds ?? 0} of ${d.mag.capacity}` });
     if (d.melee) s.push({ k: 'Damage', v: String(d.melee.damage) });
+    // (a tool wears as it works, DayZ's way: src/sim/gather.ts)
+    if (TOOL_LIFE[it.id]) {
+      const c = condition(it.cond);
+      s.push({ k: 'Condition', v: `<span style="color:${c.colour}">${c.name}</span> · ${Math.round((it.cond ?? 1) * 100)}%` });
+    }
     if (holds(it.id)) s.push({ k: 'Inside', v: it.cargo?.length ? things(it.cargo.length) : 'Nothing' });
     const vs = this.against(src);
     if (vs) s.push({ k: vs.label, v: vs.change });
@@ -1402,7 +1457,20 @@ export class InventoryUI {
           ['Point + 1–0', 'put it on that key', 'Point at a thing and press 1 to 0: it is put on that key'],
           ['Point + G', 'drop it', 'Point at a thing and press G: it is dropped'],
         ]);
-    r.append(wrap, foot, ...this.veil, this.hoverOutline, this.card);
+    // (the tabs, Inventory and Crafting, where the game has given the Crafting tab)
+    const tabs: HTMLElement[] = [];
+    if (this.craftPane) {
+      const t = div('inv-tabs');
+      t.innerHTML = `<button data-tab="inv" class="${this.mode === 'inv' ? 'on' : ''}">Inventory<kbd>Tab</kbd></button><button data-tab="craft" class="${this.mode === 'craft' ? 'on' : ''}">Crafting<kbd>J</kbd></button>`;
+      t.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]');
+        if (b) this.setMode(b.dataset.tab as 'inv' | 'craft');
+      });
+      tabs.push(t);
+      if (this.mode === 'craft') wrap.prepend(this.craftPane.el);
+    }
+    r.classList.toggle('tabbed', tabs.length > 0);
+    r.append(...tabs, wrap, foot, ...this.veil, this.hoverOutline, this.card);
     this.sk = { vic, gear, cargo, grids, scroll, status, foot, vicHead, gearHead, help: foot.firstElementChild as HTMLElement, doll, dollFig };
     return this.sk;
   }
@@ -1575,14 +1643,15 @@ export class InventoryUI {
       }
       return [g];
     });
-    const st = this.stash;
+    const st = this.stash, bar = st ? (this.actions.stashBar?.(st) ?? null) : null;
     const stashPart = !st
       ? []
-      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}`, () => {
+      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}|${bar?.sig ?? ''}`, () => {
           const out: Node[] = [];
           const head = document.createElement('h3');
           head.innerHTML = `${st.label} <span>${st.container.w}×${st.container.h}</span>`;
           out.push(head);
+          if (bar) out.push(bar.el());
           if (this.stashState) {
             out.push(Object.assign(document.createElement('div'), { className: 'inv-empty', textContent: this.stashState }));
             return out;
@@ -1745,6 +1814,8 @@ export class InventoryUI {
     requestAnimationFrame(back);
     this.marks();
     this.shares();
+    if (this.mode === 'craft') this.craftPane?.render();
+    this.lit();
     for (const [k, v] of this.gridEls) if (!v.g.isConnected) this.gridEls.delete(k);
     for (const [k, v] of this.gboxes) if (!v.box.isConnected) this.gboxes.delete(k);
 
@@ -2071,6 +2142,11 @@ export class InventoryUI {
       // ground, and the entry says so before it is chosen. A gun with no room for it is put down with Drop.)
       const room = this.inv.containers.some((c) => c.hasRoom(it));
       if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', id: 'off', run: () => this.takeOff(loc) });
+    }
+    // (clothes taken off and empty are cut into bandages with a blade carried, as DayZ cuts them into rags)
+    if (this.carried(loc) && loc.kind !== 'slot' && cuttable(it) && this.actions.canCut()) {
+      const n = bandagesFrom(it);
+      out.push({ label: `Cut into ${n} bandage${n === 1 ? '' : 's'}`, icon: { kind: 'bandage' }, id: 'cut', run: () => this.actions.cut(it) });
     }
     if (d.mag) {
       // (filled from the loose rounds carried, as letting them go on it does: Fettah 2026-10-18, "instead of dragging rounds in by hand")
@@ -2603,7 +2679,7 @@ export class InventoryUI {
   }
 
   /** dropped on that item, the dragged one goes into it: more of the same stack, or a part the weapon takes */
-  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | 'fill' | null {
+  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | 'fill' | 'craft' | null {
     const item = d.src.item;
     const def = ITEMS[item.id];
     if (onto === item) return null;
@@ -2613,6 +2689,8 @@ export class InventoryUI {
     if (into && into.ammo === item.id && (onto.rounds ?? 0) < into.capacity) return 'fill';
     // (a part is fitted from wherever it lies: off the ground as well as out of a pocket)
     if (def.attach && this.actions.attachTargets(item).includes(onto)) return 'attach';
+    // (two carried things that make something together: the recipe's card, DayZ's way)
+    if (d.src.kind !== 'ground' && this.actions.craftWith?.(item, onto)) return 'craft';
     return null;
   }
 
@@ -2659,7 +2737,7 @@ export class InventoryUI {
     // A magazine lights up every gun it goes into, and the gun's magazine place, with Load; rounds light up every
     // magazine they fill with Fill; a part, Fit. (The owner, 2026-10-23: loading "can be confusing ... the users want it
     // to be easier and more intuitive. I want to maintain all dayz functionality": the drops were always there, unseen.)
-    const word = (j: 'stack' | 'attach' | 'fill' | null) => (j === 'fill' ? 'Fill' : j === 'attach' ? (def.mag ? 'Load' : 'Fit') : '');
+    const word = (j: 'stack' | 'attach' | 'fill' | 'craft' | null) => (j === 'fill' ? 'Fill' : j === 'attach' ? (def.mag ? 'Load' : 'Fit') : j === 'craft' ? 'Craft' : '');
     const held = this.actions.inHands();
     for (const el of this.root.querySelectorAll<HTMLElement>('.inv-item')) {
       const onto = this.bound.get(el)?.item;
@@ -2743,7 +2821,7 @@ export class InventoryUI {
       const how = onto && c.joinable(d.src.item, d.src.kind === 'container' ? d.src.c : null) ? this.joins(d, onto.item) : null;
       if (onto && how) {
         const [w, h] = Container.size(onto.item, onto.rot);
-        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : how === 'fill' ? 'Fill' : 'Fit');
+        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : how === 'fill' ? 'Fill' : how === 'craft' ? 'Craft' : 'Fit');
         return;
       }
       // (Held over another thing, the two change places when it is let go, where each has room where the other lay:
@@ -2910,6 +2988,12 @@ export class InventoryUI {
           if (left) this.spill(left);
         }
         this.actions.fillMag(onto.item);
+        return this.render();
+      }
+      // two things that make something together: nothing moves, and the recipe's card opens where they met
+      if (onto && how === 'craft') {
+        this.actions.craftOnto?.(item, onto.item, { x: e.clientX, y: e.clientY });
+        this.hideCard();
         return this.render();
       }
       // Let go on another thing: the two change places, where each has room where the other lay (as in DayZ). Off

@@ -29,7 +29,7 @@ import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-trans
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { wearSuit, fitSkeleton } from './suit.mjs';
-import { MIXAMO, evenOut, giveFingers } from './survivors.mjs';
+import { evenOut, giveFingers, padTexture, plainBones } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -167,9 +167,7 @@ for (const kind of KINDS) {
     // always was. Its bones named as giveFingers names them, on a fresh copy: the one it gave up on is half done.)
     suit = await io.read(file);
     evenOut(suit);
-    for (const j of suit.getRoot().listSkins()[0].listJoints()) j.setName(`${MIXAMO[j.getName()] ?? j.getName()}_0`);
-    suit.getRoot().listNodes().find((n) => n.getMesh() && n.getSkin()).getMesh().setName('survivor');
-    for (const a of suit.getRoot().listAnimations()) a.dispose();
+    plainBones(suit);
     hands = `kept whole (${e.message})`;
   }
   const old = ['eyes', 'eyebrows', 'hair_buzzed', 'hair_parted', 'hair_long', 'hair_beard'].map((x) => nodes.get(x)).filter(Boolean);
