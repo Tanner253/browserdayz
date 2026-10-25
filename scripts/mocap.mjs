@@ -9,7 +9,7 @@ import { prune, cloneDocument, resample } from '@gltf-transform/functions';
 import * as THREE from 'three';
 import { readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop } from './mocap-pose.mjs';
+import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop, flat } from './mocap-pose.mjs';
 import { ROOT, SRC, io, loadBody, carry as carryOnto } from './mocap-carry.mjs';
 export { meshyBone } from './mocap-carry.mjs';
 import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
@@ -24,9 +24,9 @@ import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
  * animations realism".
  */
 export const MOVES = {
-  // standing still, breathing, the weight shifting a little (the library's 'Idle' turns round to look behind it: a
+  // standing still, breathing, the weight shifting a little, its soles laid flat (it stood rocked back on its heels) (the library's 'Idle' turns round to look behind it: a
   // body that is seen to look elsewhere than it aims tells lies in a shooter)
-  idle: { from: 'Idle_3' },
+  idle: { from: 'Idle_3', flat: true },
   // standing, nothing held up: an easy walk
   walkF: { from: 'walking_2', way: 'F', gait: 'walk' },
   walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk' },
@@ -107,6 +107,7 @@ if (!cands) {
     said.was = facing(doc, sk, name);
     if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
     if (m.stoop) stoop(doc, sk, name, m.stoop);
+    if (m.flat) flat(doc, sk, name);
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
     if (m.blow) warp(doc, sk, name, m.blow);
@@ -124,7 +125,12 @@ if (!cands) {
     // as a step to the left, its feet sliding along with the body)
     if (m.way && !m.arms) {
       const went = goes(doc, sk, name), want = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 }[m.way];
-      if (Math.abs(((went.deg - want + 540) % 360) - 180) > 40) throw new Error(`${name} goes ${went.deg} degrees to the left of its front, not ${m.way}`);
+      // (the infected's own table is theirs: said, not stopped on)
+      if (Math.abs(((went.deg - want + 540) % 360) - 180) > 40) {
+        const said = `${name} goes ${went.deg} degrees to the left of its front, not ${m.way}`;
+        if (MOVES[name]) throw new Error(said);
+        console.warn('  !', said);
+      }
     }
     (setOf(name) === 'infected' ? ztable : table)[name] = { ...(m.way ? { way: m.way, gait: m.gait, pace: m.pace ?? (r.hips > 0.3 ? r.hips : r.pace) } : {}), dur: +got.dur.toFixed(3), ...(m.late ? { late: true } : {}) };
     // (a fall: where the hips end up lying from where it stood, metres ahead and to the left)
