@@ -55,7 +55,7 @@ const M4 = (a) => new THREE.Matrix4().fromArray(a);
 const at = (m) => new THREE.Vector3().setFromMatrixPosition(m);
 
 /** Meshy's bones by Mixamo's names, where they are not the same (its spine is numbered the other way up) */
-const MIXAMO = { Spine02: 'Spine', Spine01: 'Spine1', Spine: 'Spine2', neck: 'Neck', head_end: 'HeadTop_End', headfront: 'HeadFront' };
+export const MIXAMO = { Spine02: 'Spine', Spine01: 'Spine1', Spine: 'Spine2', neck: 'Neck', head_end: 'HeadTop_End', headfront: 'HeadFront' };
 const DIGITS = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
 
 /** how far from the wrist each finger's knuckle is, as a share of the hand's length to the longest fingertip */
@@ -263,7 +263,7 @@ function fitHand({ P, I, W, mine, u, wrist, elbow, sg, J, ours }) {
  * of shards. So the roughness is one for all of it, the normals are made one across the seams of the picture (the
  * normal map, baked against the old ones, goes with them), and the glow map (black, under a full glow) and any metal go.
  */
-function evenOut(doc) {
+export function evenOut(doc) {
   for (const m of doc.getRoot().listMaterials()) {
     m.setMetallicRoughnessTexture(null).setEmissiveTexture(null).setNormalTexture(null).setOcclusionTexture(null);
     m.setEmissiveFactor([0, 0, 0]).setMetallicFactor(0).setRoughnessFactor(0.75);
@@ -303,7 +303,7 @@ function evenOut(doc) {
  * joints added under each hand where fitHand finds them, and every point of each hand hung on them.
  * @returns what was found, for the build's line
  */
-function giveFingers(doc, ours) {
+export function giveFingers(doc, ours) {
   const root = doc.getRoot();
   const skin = root.listSkins()[0];
   const joints = skin.listJoints();
@@ -387,7 +387,8 @@ function giveFingers(doc, ours) {
 await fs.access(TEMPLATE).catch(() => {
   throw new Error('survivors: run "node scripts/build-character.mjs --infected" first (it makes assets-src/characters/plain.glb)');
 });
-for (const [n, file] of BODIES.entries()) {
+// (only when run: the infected's build, scripts/infected.mjs, takes evenOut and giveFingers from here)
+for (const [n, file] of (process.argv[1]?.endsWith('survivors.mjs') ? BODIES : []).entries()) {
   if (ONLY.length && !ONLY.includes(n)) continue;
   const suit = await io.read(path.join(SRC, file));
   const doc = await io.read(TEMPLATE);

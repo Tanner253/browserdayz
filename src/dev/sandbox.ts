@@ -15,6 +15,7 @@
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
 //                                               picture (src/dev/sandbox-sim.ts)
+//   &hide=body_far                              the parts of a g= file by those names not drawn (an infected's far body)
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
@@ -161,15 +162,23 @@ if (sim) {
     info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), ...extra });
   };
   for (const id of ids) place(await assets.model(id), id);
+  // (every file after the first plays the same clip too, so that a line of bodies is seen in one pose: the infected)
+  const alongside: [THREE.AnimationMixer, THREE.AnimationAction][] = [];
   for (const f of files) {
     const gltf = await assets.loadGLTF(f);
     const o = gltf.animations.length ? cloneSkinned(gltf.scene) : gltf.scene;
+    o.traverse((n) => void (list('hide').includes(n.name) && (n.visible = false)));
     const clips = gltf.animations.map((c) => `${c.name} (${c.duration.toFixed(2)} s)`);
     // (placed and framed as it rests, before any clip moves it: the cameras then hold still across a strip)
     const want = q.get('clip');
-    const clip = !gltf.animations.length || mixer ? null : want === null ? gltf.animations[0] : gltf.animations.find((c) => c.name === want) ?? gltf.animations[+want] ?? gltf.animations[0];
+    const clip = !gltf.animations.length ? null : want === null ? gltf.animations[0] : gltf.animations.find((c) => c.name === want) ?? gltf.animations[+want] ?? gltf.animations[0];
     place(o, f, { clips, playing: clip?.name ?? null });
-    if (clip) {
+    if (clip && mixer) {
+      const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
+      a.play();
+      m.setTime(clip.duration * +(q.get('t') ?? 0));
+      alongside.push([m, a]);
+    } else if (clip) {
       mixer = new THREE.AnimationMixer(o);
       action = mixer.clipAction(clip);
       action.play();
@@ -177,7 +186,7 @@ if (sim) {
     }
   }
   // (every survivor, and today's beside them, in one clip at one moment: see `played`)
-  const played: [THREE.AnimationMixer, THREE.AnimationAction][] = [];
+  const played: [THREE.AnimationMixer, THREE.AnimationAction][] = [...alongside];
   const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
     const want = q.get('clip');
     const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
