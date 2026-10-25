@@ -117,6 +117,7 @@ export function keyHints(g: Game): KeyHints | null {
   } else if (it && def?.melee) {
     click(own, 'Swing', 'l', P.r2);
     click(own, 'Block', 'r', P.l2);
+    put(own, 'Look it over', [k('KeyI')], ['→']);
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
   } else if (g.inHand) {
     // (the mouse for what is held is drawn above, by handActs)

@@ -150,3 +150,23 @@ export function layOn(c: Cut, u: number, hitU: number, pos: THREE.Vector3, quat:
   else _l.copy(quat);
   quat.slerp(_r.copy(at.turn).multiply(_l), at.w);
 }
+
+/**
+ * Something to hit with, looked over (I, as a gun is: the owner, 2026-10-25, of the knives' finishes, "cool stuff"): brought
+ * in toward the middle of the picture and a little nearer, turned to show one face, then over to show the other, and
+ * home. A finish is what it shows off.
+ */
+export const LOOK = { dur: 2.4, at: [0.05, -0.105, -0.36] as const, turn: 1.25, tilt: -0.35 };
+const _lq = new THREE.Quaternion(), _le = new THREE.Euler(), _la = new THREE.Vector3();
+/** `k` of the way through being looked over, laid on where the fist, the thing and the elbow are */
+export function lookOver(k: number, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3) {
+  const s = THREE.MathUtils.smoothstep, w = s(k, 0, 0.15) * (1 - s(k, 0.86, 1));
+  if (w <= 0) return;
+  // (its one face, its other face, and back: round the eye's up, the head tipped toward the eye)
+  const yaw = LOOK.turn * (s(k, 0.1, 0.32) - 2 * s(k, 0.45, 0.68) + s(k, 0.78, 0.95));
+  _lq.setFromEuler(_le.set(LOOK.tilt * w, yaw, 0.25 * yaw, 'YXZ'));
+  _la.set(LOOK.at[0], LOOK.at[1], LOOK.at[2]);
+  elbow.add(_v.copy(_la).sub(pos).multiplyScalar(w * 0.8));
+  pos.lerp(_la, w);
+  quat.premultiply(_lq);
+}

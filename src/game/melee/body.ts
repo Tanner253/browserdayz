@@ -161,3 +161,30 @@ export function holdLeft(a: Avatar, w: number) {
   a.reach(r, _t, _F, _N, g.curl, _aq.setFromAxisAngle(_up, a.yaw), w);
   a.curl(r, g.curl, r.hand.getWorldQuaternion(_aq));
 }
+
+const _hd = new THREE.Vector3(), _fw = new THREE.Vector3(), _rt = new THREE.Vector3(), _to = new THREE.Vector3(), _fi = new THREE.Vector3(), _pa = new THREE.Vector3(), _tq = new THREE.Quaternion();
+/**
+ * Something to hit with, looked over, as others see it (the `check` act a gun is looked over by): the fist brought up in
+ * front of the face, its knuckles across, and the wrist turned to show one face of the thing and then the other, and
+ * let back down. `k` how far through, `live` how much of it is left if it was broken off. As the first person's
+ * (fp.ts, lookOver).
+ */
+export function lookOverBody(a: Avatar, k: number, live: number) {
+  const r = a.armR, held = a.inHand, s = THREE.MathUtils.smoothstep;
+  const up = s(k, 0, 0.14) * (1 - s(k, 0.86, 1)) * live;
+  if (!r || !held || up < 0.01 || !a.neck.length) return;
+  const over = s(k, 0.14, 0.32) - 2 * s(k, 0.42, 0.66) + s(k, 0.74, 0.88);
+  a.root.updateWorldMatrix(true, false);
+  _aq.setFromAxisAngle(_up, a.yaw);
+  _fw.set(0, 0, -1).applyQuaternion(_aq);
+  _rt.set(1, 0, 0).applyQuaternion(_aq);
+  a.neck[a.neck.length - 1].getWorldPosition(_hd);
+  _to.copy(_hd).addScaledVector(_fw, 0.4).addScaledVector(_up, -0.2).addScaledVector(_rt, 0.06);
+  // (the knuckles across to the left, the palm in toward the face: turned about the forearm, one way and the other)
+  _tq.setFromAxisAngle(_fw, 1.1 * over);
+  _fi.copy(_rt).negate().addScaledVector(_up, 0.3).applyQuaternion(_tq);
+  _pa.copy(_fw).negate().applyQuaternion(_tq);
+  a.reach(r, _to, _fi, _pa, held.curl, _aq, up);
+  r.hand.updateWorldMatrix(true, false);
+  a.curl(r, held.curl, r.hand.getWorldQuaternion(_tq));
+}

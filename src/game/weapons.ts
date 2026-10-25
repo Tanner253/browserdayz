@@ -26,7 +26,7 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
-import { fpPose, layOn, stanceQuat as stanceOf, type Cut, type FpPose } from './melee/fp';
+import { LOOK, fpPose, layOn, lookOver, stanceQuat as stanceOf, type Cut, type FpPose } from './melee/fp';
 import { cutFor } from './melee/cuts';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
@@ -3206,6 +3206,15 @@ export class Weapons {
         this.guardHeld = input.held('Mouse2') && !this.action;
         if (this.guardHeld) this.guardHold = 0.12;
         if (input.pressed('Mouse0') && !this.action && this.fireCooldown <= 0) this.swing(def.melee, camera);
+        // looked over (I, as a gun is: see lookOver); a blow, the guard or a run ends it
+        if (input.pressed('KeyI') && !this.action && this.sprintT < 0.2) {
+          this.start('check', LOOK.dur);
+          this.onAct('check', LOOK.dur);
+        }
+        if (this.action?.name === 'check' && (input.pressed('Mouse0') || input.held('Mouse2') || this.sprintT > 0.5)) {
+          this.action = null;
+          this.onAct('stop', 0);
+        }
       }
     } else if (enabled && !m && !p.dead && !this.held) {
       // bare hands
@@ -4587,6 +4596,7 @@ export class Weapons {
       this.readyT = 0;
       this.cockT = 1;
     }
+    if (a?.name === 'check') lookOver(Math.min(1, a.t / a.dur), pos, quat, elbow);
     // on guard it is put across in front, whatever the arm was doing
     if (g > 0.001) {
       pos.lerp(_mv.set(...st.guard.p), g);

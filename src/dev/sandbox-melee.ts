@@ -6,6 +6,7 @@
 //                                     hit, to (seconds), and how the thing is held as it lands (see Cut)
 //   &strip=8&views=q                  eight moments, from three-quarters (side, front, q, back)
 //   &guard=1                          on guard (the right button), held
+//   &inspect=1                        looked over, through its length
 //   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
 //                                     places them (meleeAt), through the hands' own lens (48 degrees)
 
@@ -16,7 +17,7 @@ import { meleeAt, meleeHeld } from '../game/weapons';
 import { FPArms } from '../game/arms';
 import { meleeClips } from '../game/melee/body';
 import { cutFor } from '../game/melee/cuts';
-import { fpPose, type Cut } from '../game/melee/fp';
+import { LOOK, fpPose, lookOver, type Cut } from '../game/melee/fp';
 import type { Atmosphere } from '../world/atmosphere';
 import { ITEMS } from '../sim/items';
 
@@ -60,7 +61,7 @@ export async function stageMelee(id: string, s: {
     }
   });
   // (&guard=1: on guard, held, from each of the views asked for)
-  const guard = s.q.get('guard') === '1';
+  const guard = s.q.get('guard') === '1', inspect = s.q.get('inspect') === '1';
   if (guard) {
     body.guarding = true;
     for (let k = 0; k < 20; k++) body.update(0.05, at, still, face, false, false, false, 0, true, false);
@@ -77,8 +78,11 @@ export async function stageMelee(id: string, s: {
   for (let i = 0; i < s.cells; i++) {
     const u = s.cells === 1 ? 0.35 : i / (s.cells - 1);
     moments.push(u);
-    // (the blow begun again and stood at its moment: the body's own update lays it over the rest)
-    if (!guard) body.swing(false, dur, cut);
+    // (the blow begun again and stood at its moment: the body's own update lays it over the rest; or looked over)
+    if (inspect) {
+      body.act('check', LOOK.dur);
+      (body.gesture as { t: number }).t = u * LOOK.dur;
+    } else if (!guard) body.swing(false, dur, cut);
     const now = (body.blow as unknown as { now: { t: number } | null } | null)?.now;
     if (now) now.t = Math.min(u, 0.999) * dur;
     // (off the shoulder at once: in the game it is let down over the first tenth of a second)
@@ -110,13 +114,17 @@ async function firstPerson(id: string, cut: Cut, dur: number, s: Stage) {
   s.scene.add(camera);
   const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), elbow = new THREE.Vector3();
   const at = fpPose();
-  const n = +(s.q.get('n') ?? 0);
+  const n = +(s.q.get('n') ?? 0), look = s.q.get('inspect') === '1';
   s.renderer.setScissorTest(true);
   const moments: number[] = [];
   for (let i = 0; i < s.cells; i++) {
     const u = s.cells === 1 ? 0.35 : i / (s.cells - 1);
     moments.push(u);
-    meleeAt(st, u, n, cut, pos, quat, elbow, at);
+    // (&inspect=1: looked over instead of a blow)
+    if (look) {
+      meleeAt(st, -1, 0, null, pos, quat, elbow, at);
+      lookOver(u, pos, quat, elbow);
+    } else meleeAt(st, u, n, cut, pos, quat, elbow, at);
     held.root.position.copy(pos);
     held.root.quaternion.copy(quat);
     camera.updateMatrixWorld(true);

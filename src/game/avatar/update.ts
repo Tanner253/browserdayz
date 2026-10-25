@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type { HandGrip } from '../arms';
-import { BodyBlow, holdLeft } from '../melee/body';
+import { BodyBlow, holdLeft, lookOverBody } from '../melee/body';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
@@ -616,7 +616,7 @@ export const updateMethods = {
 
     // --- a bat, carried: laid back over the right shoulder, the fist on it in front of the chest
     {
-      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && !this.blow?.busy && !this.guarding && this.swingT < 0 && this.fistsT < 0.02;
+      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && !this.blow?.busy && !this.guarding && ges?.kind !== 'check' && this.swingT < 0 && this.fistsT < 0.02;
       this.shoulderT += ((laid ? 1 : 0) - this.shoulderT) * ease(laid ? 6 : 14);
       if (this.shoulderT > 0.02 && this.inHand && this.armR && this.neck.length) {
         settle(this.root);
@@ -633,6 +633,7 @@ export const updateMethods = {
     }
 
     // --- something held in both hands: the left closes on it where its grip says, but while it lies on the shoulder
+    if (this.inHand && ges?.kind === 'check' && !dead) lookOverBody(this, ges.t / ges.dur, left(ges));
     if (this.inHand?.left && !dead && !using) holdLeft(this, 1 - this.shoulderT);
 
     // --- bare hands: a guard, the left leading, and a punch thrown from it
