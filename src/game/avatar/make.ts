@@ -264,8 +264,8 @@ export const makeMethods = {
     for (const r of [driver, model]) r.traverse((o) => void ((o as THREE.Bone).isBone && (o.quaternion as unknown as { _onChange(f: () => void): void })._onChange(unread)));
     this.mixer = new THREE.AnimationMixer(driver);
     for (const name of CLIPS) {
-      // (the infected's files have no lying down or crawling, and they never do either: a copy of the fall stands in)
-      const own = gltf.animations.find((c) => c.name === name);
+      // (the infected's are their own, of their kind: src/game/infected-moves.ts)
+      const own = this.zombieMoves?.clips[name] ?? gltf.animations.find((c) => c.name === name);
       const clip = own ?? (name === 'proneDown' || name === 'crawl' ? gltf.animations.find((c) => c.name === 'deathFront')?.clone() : undefined);
       if (!clip) throw new Error(`character has no "${name}" clip`);
       await breathe();

@@ -22,6 +22,7 @@ import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
 import { Wardrobe } from './survivors';
+import type { InfectedMoves } from './infected-moves';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -530,6 +531,13 @@ export class Avatar {
    * into it, -1 none); `seed` keeps one from swaying in time with the next.
    */
   sick: { roused: number; claw: number; seed: number } | null = null;
+  /**
+   * One of the infected's own movements (src/game/infected-moves.ts), set before the body is made: every clip it
+   * plays, and the paces its walk and run were captured at. And one done over whatever it is doing (eating, a scream),
+   * `t` seconds into it, `k` of the body given to it, `legs` of the legs.
+   */
+  zombieMoves: InfectedMoves | null = null;
+  zombieAct: { a: THREE.AnimationAction; t: number; k: number; legs: number } | null = null;
 
   /**
    * Where the middle of the head as a body draws it is, on its Head bone: the middle of every point of its mesh that

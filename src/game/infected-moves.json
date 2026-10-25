@@ -1,0 +1,101 @@
+{
+ "zUnsteady": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.749,
+  "dur": 3
+ },
+ "zStumble": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.999,
+  "dur": 2.6
+ },
+ "zShaky": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.189,
+  "dur": 2.867
+ },
+ "zDrag": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.366,
+  "dur": 5.533
+ },
+ "zMummy": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.353,
+  "dur": 4.867
+ },
+ "zMonster": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.739,
+  "dur": 4.133
+ },
+ "zInjured": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.407,
+  "dur": 8.7
+ },
+ "zLimp": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.682,
+  "dur": 3.533
+ },
+ "zLimp2": {
+  "way": "F",
+  "gait": "walk",
+  "pace": 0.612,
+  "dur": 2.467
+ },
+ "zCharge": {
+  "way": "F",
+  "gait": "run",
+  "pace": 4.204,
+  "dur": 0.533
+ },
+ "zChargeF": {
+  "way": "F",
+  "gait": "run",
+  "pace": 4.222,
+  "dur": 0.533
+ },
+ "zSprint": {
+  "way": "F",
+  "gait": "run",
+  "pace": 3.529,
+  "dur": 0.6
+ },
+ "zRun": {
+  "way": "F",
+  "gait": "run",
+  "pace": 4.312,
+  "dur": 0.833
+ },
+ "zLunge": {
+  "dur": 1.1
+ },
+ "zGrab": {
+  "dur": 1.1
+ },
+ "zSlam": {
+  "dur": 1.1
+ },
+ "zEat": {
+  "dur": 4.733
+ },
+ "zScream": {
+  "dur": 2.833
+ },
+ "zPain": {
+  "dur": 3.733
+ },
+ "zBlown": {
+  "dur": 2.7
+ }
+}

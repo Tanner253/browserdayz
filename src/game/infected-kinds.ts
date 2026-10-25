@@ -26,7 +26,7 @@ const RARE = 0.05;
 const AMONG = 40;
 
 /** a number in 0..1 that is the same in every game for the same one (and another for each `salt`) */
-function roll(i: number, salt: number) {
+export function roll(i: number, salt: number) {
   let h = Math.imul(i + 1, 0x9e3779b1) ^ Math.imul(salt + 7, 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
   h = Math.imul(h ^ (h >>> 12), 0x297a2d39);

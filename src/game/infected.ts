@@ -18,7 +18,8 @@ import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
-import { FAR_FROM, KIND_HEIGHT, drawFar, kindOf } from './infected-kinds';
+import { FAR_FROM, KIND_HEIGHT, drawFar, kindOf, roll } from './infected-kinds';
+import { infectedMoves } from './infected-moves';
 import { REST_STEP, inSight } from './remote';
 import type { Damageable, HitZone } from './weapons';
 
@@ -133,6 +134,12 @@ export class Infected implements Damageable {
   private sideT = 0;
   private stuckT = 0;
   private groanT = 4 + Math.random() * 14;
+  /** its movements besides walking, running and striking (see `acting`), and the one it is at */
+  private extras: Record<string, THREE.AnimationAction> | null = null;
+  private doing: { name: string; t: number; from: number; to: number; legs: number; loop: boolean } | null = null;
+  private wasMode = I_IDLE;
+  private painT = 10 + Math.random() * 30;
+  private lookT = 0;
   /** the doorway it is making for, which side of it it started on, how far through it has got, and how long it has been at it */
   private way: Doorway | null = null;
   private waySide = 1;
@@ -177,10 +184,22 @@ export class Infected implements Damageable {
     if (this.still) this.home.y = this.horde.floorY ?? y;
     // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
     const kind = kindOf(this.host.world(), this.i, this.home.x, this.home.z);
+    this.avatar.zombieMoves = await infectedMoves(kind, this.i);
+    if (this.gone) return;
     await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), `zombie_${kind}`);
     if (this.gone) return this.avatar.dispose();
     this.avatar.root.scale.setScalar(KIND_HEIGHT[kind]);
     drawFar(this.avatar.root, true);
+    // (and its run at its own moment: the walk's is the body's own, at random)
+    this.avatar.sickRun = roll(this.i, 14) * 10;
+    this.extras = {};
+    for (const [n, c] of Object.entries(this.avatar.zombieMoves.extras)) {
+      const a = this.avatar.mixer.clipAction(c);
+      a.timeScale = 0;
+      a.setEffectiveWeight(0);
+      a.play();
+      this.extras[n] = a;
+    }
     this.avatar.sick = { roused: 0, claw: -1, seed: (this.i * 7.31) % 20 };
     this.host.scene().add(this.avatar.root);
     const R = physics.R;
@@ -823,6 +842,7 @@ export class Infected implements Damageable {
     const sick = this.avatar.sick!;
     const roused = this.dead ? 0 : this.mode >= I_CHASE ? 1 : this.mode === I_ALERT ? 0.45 : 0;
     sick.roused += (roused - sick.roused) * (1 - Math.exp(-5 * dt));
+    this.acting(dt);
     this.avatar.update(dt, this.pos, this.vel, this.yaw, false, this.dead, false, 0, true, false);
     if (!this.dead) {
       // the head and the chest that count are where the bent body has them
@@ -847,6 +867,51 @@ export class Infected implements Damageable {
       }
     }
     if (resting) this.avatar.root.visible = false;
+  }
+
+  /**
+   * What it does over its walking and running, by the movements of its own (src/game/infected-moves.ts EXTRAS): it
+   * screams as it goes after somebody, holds its head now and then while it stands about, and tears at a body it is
+   * standing over. All of it is drawn by every game from what it is told of the infected: nothing of it is sent.
+   */
+  private acting(dt: number) {
+    const x = this.extras;
+    if (!x) return;
+    const was = this.wasMode;
+    this.wasMode = this.mode;
+    const still = Math.hypot(this.vel.x, this.vel.z) < 0.25;
+    const go = (name: string, from: number, to: number, legs: number, loop = false) => (this.doing = { name, t: 0, from, to, legs, loop });
+    if (this.dead) this.doing = null;
+    // (the scream: from its first breath to its last, about a second and a half of it, over the first strides after them)
+    else if (this.mode === I_CHASE && was < I_CHASE) go('zScream', 0.35, 1.9, 0);
+    else if (!this.doing && this.mode <= I_WANDER) {
+      // a body lying within reach: it goes down on it (looked for twice a second)
+      if ((this.lookT -= dt) <= 0) {
+        this.lookT = 0.5;
+        if (still && this.besideBody()) go('zEat', 0, x.zEat.getClip().duration, 1, true);
+      }
+      if (!this.doing && still && (this.painT -= dt) <= 0) {
+        this.painT = 15 + Math.random() * 35;
+        go('zPain', 0.3, 2.6, 0.4);
+      }
+    }
+    const d = this.doing;
+    if (d && ((d.loop && (this.mode > I_WANDER || !still)) || (!d.loop && d.t > d.to - d.from))) this.doing = null;
+    if (!this.doing) {
+      this.avatar.zombieAct = null;
+      return;
+    }
+    d!.t += dt;
+    const len = d!.to - d!.from;
+    const k = d!.loop ? THREE.MathUtils.smoothstep(d!.t, 0, 0.5) : THREE.MathUtils.smoothstep(d!.t, 0, 0.25) * (1 - THREE.MathUtils.smoothstep(d!.t, len - 0.35, len));
+    this.avatar.zombieAct = { a: x[d!.name], t: d!.from + (d!.loop ? d!.t % len : d!.t), k, legs: d!.legs };
+  }
+
+  /** whether a body lies within reach of it: one of its own kind, or a player's */
+  private besideBody() {
+    for (const b of this.horde.all.values()) if (b !== this && b.dead && b.pos.distanceToSquared(this.pos) < 1.6 * 1.6) return true;
+    for (const p of this.host.others()) if (!p.alive && p.pos.distanceToSquared(this.pos) < 1.6 * 1.6) return true;
+    return false;
   }
 
   /** a head or a chest moved on the body (in its own frame): put where it is, with the body where the physics was last told it is */

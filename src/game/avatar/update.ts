@@ -136,7 +136,7 @@ export const updateMethods = {
     const push = this.jumpT >= 0 ? 1 - THREE.MathUtils.smoothstep(this.jumpT, POSE.jump[1] * 0.4, POSE.jump[1]) : 0;
     const move = this.moveT;
     const runK = this.sick ? THREE.MathUtils.smoothstep(speed, SICK_GAIT.from, SICK_GAIT.to) : THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
-    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / SICK_GAIT.pace, SICK_GAIT.give[0], SICK_GAIT.give[1]);
+    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / (this.zombieMoves?.paces.run ?? SICK_GAIT.pace), SICK_GAIT.give[0], SICK_GAIT.give[1]);
     let hit = 0;
     const hitLen = this.dur[this.hitClip];
     if (this.hitT >= 0) {
@@ -196,7 +196,7 @@ export const updateMethods = {
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
     const rate: Record<Stride, number> = {
-      walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / POSE.pace.walk, 0.6, 2.1),
+      walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / (this.zombieMoves?.paces.walk ?? POSE.pace.walk), 0.6, 2.1),
       run: THREE.MathUtils.clamp(speed / POSE.pace.run, 1, 1.2),
       // (to 4.8: the hurried crouch is 3.3 m/s, and at 2.8 the legs crept at 1.9 under a body going nearly twice that)
       crouchWalk: THREE.MathUtils.clamp(speed / POSE.pace.crouchWalk, 0.6, 4.8),
@@ -307,6 +307,12 @@ export const updateMethods = {
       // (it throws its whole body after its arm: the lunge is the clip's own)
       const u = this.sick.claw / CLAW;
       this.layer('strike', strikeAt(u, CLAW_HIT), strikeShare(u), 1);
+    }
+    // (and what else one of them is doing: see Avatar.zombieAct)
+    const act = this.zombieAct;
+    if (act && !dead && act.k > 0.002) {
+      this.layer(act.a, act.t, act.k, act.legs);
+      act.a.setEffectiveWeight(0);
     }
     // --- on the motion capture: what is kept up (a ladder, the water, a bedroll), the whole body; and what is done once
     // over it, the legs too while standing (a pick-up, a swing, a throw), the arms alone for a drink

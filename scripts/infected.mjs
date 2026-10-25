@@ -139,6 +139,12 @@ for (const kind of KINDS) {
   // (the skeleton to the body, not the body to the skeleton; the toes lie as the foot lies: Meshy's toe bone has no end to lie along)
   const fitted = fitSkeleton({ doc, bodyNode: nodes.get('body'), suit, prefix: '', toes: false });
   const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit, pieces: { body: [[/^survivor$/, null]] }, moved: {}, prefix: '', toes: false });
+  // the body alone: its movements are every kind's, in one file (scripts/mocap-infected.mjs, src/game/infected-moves.ts)
+  for (const a of root.listAnimations()) {
+    for (const c of a.listChannels()) c.dispose();
+    for (const x of a.listSamplers()) x.dispose();
+    a.dispose();
+  }
   for (const m of root.listMaterials()) m.setMetallicFactor(0).setName(`zombie_${kind}`);
   const far = await giveFar(doc, root.listNodes().find((n) => n.getName() === 'body'));
   await doc.transform(

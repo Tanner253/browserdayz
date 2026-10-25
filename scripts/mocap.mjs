@@ -8,7 +8,8 @@
 // movement at the pace it was captured at. Meshy's hands have no fingers: ours are given the old idle's relaxed hand
 // for the length of the movement (a pose of their own: our hand at rest is flat), and what is held curls them in the
 // game, as before (memory note hand-animation-lessons).
-//   node scripts/mocap.mjs              public/assets/characters/moves.glb and moves-late.glb, their table src/game/avatar/moves.json
+//   node scripts/mocap.mjs              public/assets/characters/moves.glb and moves-late.glb, their table src/game/avatar/moves.json;
+//                                       and the infected's, moves-infected.glb and src/game/infected-moves.json (scripts/mocap-infected.mjs)
 //   node scripts/mocap.mjs --cands      every movement harvested, on the whole body, for the sandbox (progress/anim-tools/cands.glb)
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
@@ -20,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runOf, giveRun } from './mixamo.mjs';
 import { skeleton, heelFirst, leftOf, reshape, trim, wayOf, facing, readClip } from './mocap-pose.mjs';
+import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAIN = process.env.ZONA_MAIN ?? ROOT;
@@ -135,8 +137,8 @@ const relax = (clip, dur) => {
 };
 const scale = root.listNodes().find((n) => n.getName() === 'pelvis').getWorldMatrix()[13];
 const report = {};
-const carry = async (file, clip, { mirror = false, still = true } = {}) => {
-  const src = await io.read(path.join(SRC, file + '.glb'));
+const carry = async (file, clip, { mirror = false, still = true, dir = SRC } = {}) => {
+  const src = await io.read(path.join(dir, file + '.glb'));
   let run = runOf(src, meshyBone, still);
   if (mirror) run = mirrored(run);
   if (!still) {
@@ -165,22 +167,26 @@ const carry = async (file, clip, { mirror = false, still = true } = {}) => {
 
 const sk = skeleton(doc);
 if (!cands) {
-  const left = leftOf(sk), table = {};
+  const left = leftOf(sk), table = {}, ztable = {};
+  // (the infected's with the survivors': scripts/mocap-infected.mjs. Which file each goes to: see `setOf`)
+  const ALL = { ...MOVES, ...INFECTED_MOVES };
+  const setOf = (name) => (INFECTED_MOVES[name] ? 'infected' : MOVES[name]?.late ? 'late' : MOVES[name] ? 'moves' : null);
   // (in an order that has each one a crouch is stood up to already made)
-  const names = Object.keys(MOVES).sort((a, b) => !!MOVES[a].stand - !!MOVES[b].stand);
+  const names = Object.keys(ALL).sort((a, b) => !!ALL[a].stand - !!ALL[b].stand);
   for (const name of names) {
-    const m = MOVES[name];
-    await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way });
+    const m = ALL[name];
+    await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way, dir: m.dir ?? SRC });
     const said = {};
     said.was = facing(doc, sk, name);
     if (m.square !== undefined || m.stand) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null }));
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
+    if (m.blow) warp(doc, sk, name, m.blow);
     const r = report[name], got = readClip(doc, sk, name);
     // (its pace: by the hips where it travels, by the feet where it was drawn on the spot)
-    table[name] = { ...(m.way ? { way: m.way, gait: m.gait, pace: m.pace ?? (r.hips > 0.3 ? r.hips : r.pace) } : {}), dur: +got.dur.toFixed(3), ...(m.late ? { late: true } : {}) };
+    (setOf(name) === 'infected' ? ztable : table)[name] = { ...(m.way ? { way: m.way, gait: m.gait, pace: m.pace ?? (r.hips > 0.3 ? r.hips : r.pace) } : {}), dur: +got.dur.toFixed(3), ...(m.late ? { late: true } : {}) };
     // (a fall: where the hips end up lying from where it stood, metres ahead and to the left)
-    if (/^death/.test(name)) {
+    if (/^death/.test(name) && table[name]) {
       const P = sk.index('pelvis'), a = sk.pose(got.qAt(0), got.tAt(0))[P], b = sk.pose(got.qAt(got.frames), got.tAt(got.frames))[P];
       const d = new THREE.Vector3().setFromMatrixPosition(b).sub(new THREE.Vector3().setFromMatrixPosition(a));
       table[name].rest = [+d.z.toFixed(2), +(d.x * left).toFixed(2)];
@@ -192,11 +198,11 @@ if (!cands) {
   // (and as they are on the body, beside its old clips: for the sandbox)
   await io.write(path.join(ROOT, 'progress', 'anim-tools', 'moves-body.glb'), doc);
   // the body's own file of them, and the late one: the skeleton and the movements, nothing of the body
-  for (const late of [false, true]) {
+  for (const set of ['moves', 'late', 'infected']) {
     const out = cloneDocument(doc), r = out.getRoot();
     // (an animation let go of takes its channels and samplers with it, or what they hold is written all the same)
     for (const a of r.listAnimations()) {
-      if (MOVES[a.getName()] && !!MOVES[a.getName()].late === late) continue;
+      if (setOf(a.getName()) === set) continue;
       for (const c of a.listChannels()) c.dispose();
       for (const x of a.listSamplers()) x.dispose();
       a.dispose();
@@ -229,11 +235,12 @@ if (!cands) {
     // (no meshopt: it packs meshes, and laid over movements it gave back their 32 bits)
     await out.transform(prune({ keepLeaves: true }));
     for (const e of r.listExtensionsUsed()) e.dispose();
-    const file = path.join(ROOT, 'public', 'assets', 'characters', late ? 'moves-late.glb' : 'moves.glb');
+    const file = path.join(ROOT, 'public', 'assets', 'characters', { moves: 'moves.glb', late: 'moves-late.glb', infected: 'moves-infected.glb' }[set]);
     await io.write(file, out);
     console.log('wrote', path.relative(ROOT, file));
   }
   writeFileSync(path.join(ROOT, 'src', 'game', 'avatar', 'moves.json'), JSON.stringify(table, null, 1) + '\n');
+  writeFileSync(path.join(ROOT, 'src', 'game', 'infected-moves.json'), JSON.stringify(ztable, null, 1) + '\n');
 }
 
 if (cands) {

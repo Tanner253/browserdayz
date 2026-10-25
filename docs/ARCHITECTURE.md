@@ -133,7 +133,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
 | `animals.ts` | 584 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 636 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 644 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 
 ## src/game/avatar/
 
@@ -147,8 +147,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hands.ts` | 240 | The hands: what is held (taken up, put away), the two-bone arms reaching for grips, fingers curled and thumbs laid. |
 | `make.ts` | 414 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
 | `pose.ts` | 232 | The body's clips and the numbers they are played by: which clips there are, lying, sitting, the live-tunable POSE table and the stances a gun is held in. |
-| `sick.ts` | 124 | The infected's own way of going: feet kept on the ground, the sick gait. |
-| `update.ts` | 877 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
+| `sick.ts` | 127 | The infected's own way of going: feet kept on the ground, the sick gait. |
+| `update.ts` | 883 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
 | `wounds.ts` | 67 | Wounds on the body, and the infected's shared paints while they are unhurt. |
 
 ## src/game/
@@ -206,14 +206,15 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
 | `infected-kinds.ts` | 104 | The twelve kinds of the infected, and which one each is (the owner, 2026-10-25: |
-| `infected.ts` | 1258 | The infected, as this game draws and (for the ones near its own player) moves them. |
+| `infected-moves.ts` | 65 | How the infected move: motion capture from Higgsfield's library (the owner, 2026-10-25: |
+| `infected.ts` | 1323 | The infected, as this game draws and (for the ones near its own player) moves them. |
 | `key-hints.ts` | 153 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
 | `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
 | `loot.ts` | 1167 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
 | `menu-order.ts` | 90 | Which of the menu's scenes are shown first, which are said to be new, and what a browser remembers of having been shown. |
-| `menu-scenes.ts` | 1702 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
+| `menu-scenes.ts` | 1706 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
 | `modes.ts` | 144 | The three games of one page (the owner, 2026-10-21: |
 | `muzzle.ts` | 131 | The flash at a muzzle: burning gas, seen for two or three frames. |
 | `my-perks.ts` | 26 | What this player has from the store, as their server says it (S2C 'perks', server/perks.ts): the finishes they may put on their guns (Apply in the inventory: server/plates.ts), VIP (a gold dog tag round their neck),... |
