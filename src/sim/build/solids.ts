@@ -188,10 +188,25 @@ const SHAPES: Record<string, () => Shape> = {
     solid: [box(-0.5, 0.28, -1.05, 0.5, 0.4, 1.05), box(-0.5, 0.4, 0.98, 0.5, 0.95, 1.05), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.44 - 0.05, 0, sz * 1 - 0.05, sx * 0.44 + 0.05, 0.28, sz * 1 + 0.05)))],
     cloth: { paint: 'bag', solid: [box(-0.44, 0.4, -1, 0.44, 0.52, 0.96), box(-0.36, 0.52, 0.6, 0.36, 0.6, 0.92)] },
   }),
-  // (crafting's forge: the drum, as high as its rim of stones; the chimney stops nothing)
-  forge: () => ({ solid: [box(-0.4, 0, -0.4, 0.4, 0.95, 0.4)], unseen: true }),
+  // (crafting's forge: the drum, round, as high as its rim of stones, and its chimney; drawn by its model, these are what
+  // stops a body and what the wheel's picture is drawn from)
+  forge: () => ({
+    solid: [
+      { prism: Array.from({ length: 10 }, (_, i) => [Math.cos((i / 10) * Math.PI * 2) * 0.4, Math.sin((i / 10) * Math.PI * 2) * 0.4] as [number, number]), y0: 0, y1: 0.95 },
+      box(-0.07, 0.95, -0.07, 0.07, 1.6, 0.07),
+    ],
+    unseen: true,
+  }),
   // (crafting's research table: its top and what stands on it; drawn by its own model, src/game/craft-forge.ts)
-  research_table: () => ({ solid: [box(-0.6, 0, -0.3, 0.6, 0.92, 0.3)], unseen: true }),
+  research_table: () => ({
+    solid: [
+      box(-0.6, 0.86, -0.3, 0.6, 0.92, 0.3),
+      box(0.05, 0.12, -0.27, 0.55, 0.86, 0.27),
+      ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.56 - 0.03, 0, sz * 0.26 - 0.03, sx * 0.56 + 0.03, 0.86, sz * 0.26 + 0.03))),
+      box(-0.52, 0.92, -0.22, -0.48, 1.3, -0.18),
+    ],
+    unseen: true,
+  }),
   // (a heavy table: its top, its four legs and a shelf between them)
   workbench: () => ({
     solid: [box(-0.85, 0.82, -0.45, 0.85, 0.94, 0.45), box(-0.8, 0.15, -0.4, 0.8, 0.22, 0.4), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.78 - 0.05, 0, sz * 0.38 - 0.05, sx * 0.78 + 0.05, 0.82, sz * 0.38 + 0.05)))],
