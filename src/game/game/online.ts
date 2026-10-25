@@ -638,6 +638,7 @@ export const onlineMethods = {
     net.on('score', (m) => this.arenaHud?.score(m));
     net.on('kill', (m) => this.arenaHud?.kill(m));
     net.on('void', (m) => this.voidTags(m.uids));
+    net.on('tagclock', (m) => this.tagClock(m.uid, m.held));
     net.on('cashed', (m) => {
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);

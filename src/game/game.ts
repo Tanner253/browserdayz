@@ -1701,6 +1701,7 @@ export interface Game {
   tagWhenDue: Methods<typeof enterMethods>['tagWhenDue'];
   tickZone: Methods<typeof enterMethods>['tickZone'];
   voidTags: Methods<typeof enterMethods>['voidTags'];
+  tagClock: Methods<typeof enterMethods>['tagClock'];
   tickTags: Methods<typeof enterMethods>['tickTags'];
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];
