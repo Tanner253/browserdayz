@@ -6,7 +6,7 @@ import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/si
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { ANIMALS } from '../src/sim/animals';
-import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
+import { HEAVY, WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
 import { THROWN, LAUNCHED, pullPin, letGo, judge, launch } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
@@ -116,7 +116,7 @@ export function handle(c: Client, m: C2S) {
       return;
     }
     case 'swing': {
-      if (c.alive) broadcast({ t: 'swing', id: c.id }, c);
+      if (c.alive) broadcast({ t: 'swing', id: c.id, ...(m.hv ? { hv: true } : {}) }, c);
       return;
     }
     case 'pin': {
@@ -286,7 +286,7 @@ export function handle(c: Client, m: C2S) {
         if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
         c.lastHit = now;
         // (what the round left in the bodies it went through first: see PIERCE)
-        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p) * heavyOf(c, m.hv, rule, now);
       }
       if (amount <= 0) return;
       const len = Math.max(0.001, Math.hypot(target.pose[0] - from[0], target.pose[2] - from[1]));
@@ -332,7 +332,7 @@ export function handle(c: Client, m: C2S) {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (!mayHit(c, `i${m.i}`, now, rule.interval * 700)) return;
         c.lastHit = now;
-        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p);
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p) * heavyOf(c, m.hv, rule, now);
       }
       const r = horde.hurt(m.i, amount, now);
       if (!r) return;
@@ -935,3 +935,13 @@ export function handle(c: Client, m: C2S) {
 let lastCall = -1e9;
 /** when each driver last pressed or let go of their horn (see 'vhorn') */
 const hornAt = new WeakMap<Client, number>();
+
+/**
+ * How much harder a blow lands for being a heavy one (HEAVY): only something to hit with, and no sooner after the last
+ * heavy one than one can be drawn back and thrown. Said heavy sooner, it lands as a light one.
+ */
+function heavyOf(c: Client, hv: unknown, rule: { melee?: boolean }, now: number) {
+  if (hv !== true || !rule.melee || now - c.lastHeavy < HEAVY.every * 1000 - 100) return 1;
+  c.lastHeavy = now;
+  return HEAVY.damage;
+}

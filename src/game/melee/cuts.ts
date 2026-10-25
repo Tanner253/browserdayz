@@ -22,10 +22,15 @@ const OVERHEAD: Cut = { clip: 'hammer', from: 0.75, hit: 1.5, to: 1.75, lands: {
  * backhand home the other way.
  */
 const LEVEL: Cut = { clip: 'level', from: 0.2, hit: 0.53, to: 0.85, lands: { tip: [-0.8, 0.2, -0.55], edge: [-0.55, 0, 0.8] }, reach: [0.4, 0.3] };
-const BACKHAND: Cut = { clip: 'level', from: 1.0, hit: 1.2, to: 1.42, lands: { tip: [0.8, 0.2, -0.55], edge: [0.55, 0, 0.8] }, reach: [0.4, 0.3] };
+const BACKHAND: Cut = { clip: 'level', from: 1.0, hit: 1.2, to: 1.3, lands: { tip: [0.8, 0.2, -0.55], edge: [0.55, 0, 0.8] }, reach: [0.4, 0.3], turn: 0.15, keep: [0.5, 0.45, 0.3, 0.25] };
+/**
+ * In first person the first blow with both hands stays the game's own (the owner, 2026-10-25, of the old two-handed
+ * block and first swing: "first person was good"); the body throws the level swing for it.
+ */
+const LEVEL_BODY: Cut = { ...LEVEL, fp: false };
 
 /** the families: one hand, a knife (its first person is its own pack's), both hands; the light blows of a run, and the heavy */
-const ONE = { light: [SLASH, CHOP], heavy: SPLIT }, KNIFE = { light: [SLASH, CHOP], heavy: CHOP }, TWO = { light: [LEVEL, BACKHAND], heavy: OVERHEAD };
+const ONE = { light: [SLASH, CHOP], heavy: SPLIT }, KNIFE = { light: [SLASH, CHOP], heavy: CHOP }, TWO = { light: [LEVEL_BODY, BACKHAND], heavy: OVERHEAD };
 
 export const CUTS: Record<string, { light: Cut[]; heavy: Cut }> = {
   hatchet: ONE,

@@ -115,7 +115,7 @@ export function keyHints(g: Game): KeyHints | null {
     }
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
   } else if (it && def?.melee) {
-    click(own, 'Swing', 'l', P.r2);
+    click(own, 'Swing (hold: heavy)', 'l', P.r2);
     click(own, 'Block', 'r', P.l2);
     put(own, 'Look it over', [k('KeyI')], ['→']);
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);

@@ -34,12 +34,14 @@ export const SHOP: Record<ItemId, ShopItem> = {
   m9_nickel: { name: 'Nickel-plated M9', usd: 2.99, skin: { gun: 'm9', finish: 'nickel' }, say: 'Apply it to any M9 you carry: that gun is nickel-plated for good.' },
   colt_nickel: { name: 'Nickel-plated Colt', usd: 2.99, skin: { gun: 'colt', finish: 'nickel' }, say: 'Apply it to any Colt you carry: that gun is nickel-plated for good.' },
   knife_gold: { name: 'Gold knife', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'gold' }, say: 'Apply it to any knife you carry: its blade is gold for good.' },
-  // (the knives' finishes, 2026-10-25, the owner: "emerald blades and ruby etc.. cool stuff": on any knife, whoever holds it next)
-  knife_emerald: { name: 'Emerald blade', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'emerald' }, say: 'Apply it to any knife you carry: a deep green blade, polished, for good.' },
-  knife_ruby: { name: 'Ruby blade', usd: 4.99, limit: 100, skin: { gun: 'knife', finish: 'ruby' }, say: 'Apply it to any knife you carry: a deep red blade, polished, for good.' },
+  // (the knives' finishes, 2026-10-25, the owner: "emerald blades and ruby etc.. cool stuff": on any knife, whoever holds it
+  // next. Priced by them: "the cooler ones reflective liekemerald and ruby be like 9.99 and the cheasper ones like the gray
+  // ones just 2.99"; night camo 4.99, gold as it was)
+  knife_emerald: { name: 'Emerald blade', usd: 9.99, limit: 50, skin: { gun: 'knife', finish: 'emerald' }, say: 'Apply it to any knife you carry: a deep green blade, polished, for good.' },
+  knife_ruby: { name: 'Ruby blade', usd: 9.99, limit: 50, skin: { gun: 'knife', finish: 'ruby' }, say: 'Apply it to any knife you carry: a deep red blade, polished, for good.' },
   knife_damascus: { name: 'Damascus blade', usd: 2.99, skin: { gun: 'knife', finish: 'damascus' }, say: 'Apply it to any knife you carry: folded steel, its layers waving down the blade.' },
   knife_carbon: { name: 'Carbon fibre blade', usd: 2.99, skin: { gun: 'knife', finish: 'carbon' }, say: 'Apply it to any knife you carry: a black woven blade.' },
-  knife_nightcamo: { name: 'Night camo blade', usd: 2.99, skin: { gun: 'knife', finish: 'nightcamo' }, say: 'Apply it to any knife you carry: dark greens, matte, for the night.' },
+  knife_nightcamo: { name: 'Night camo blade', usd: 4.99, limit: 200, skin: { gun: 'knife', finish: 'nightcamo' }, say: 'Apply it to any knife you carry: dark greens, matte, for the night.' },
   // (the owner, 2026-10-25: "karambit is not a finish type its a knife type, the circular claw one like from cs:go")
   karambit: { name: 'Karambit', usd: 4.99, skin: { gun: 'knife', form: 'karambit' }, say: 'The curved claw, a finger through its ring. Apply it to any knife you carry: that knife is a karambit for good, its finish kept. It hits as every knife does.' },
   noads: { name: 'No ads', usd: 1.99, days: 30, say: 'The site and the game with no ads (VIP has this too).' },

@@ -8,38 +8,49 @@ export const KIT_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- melee
   // (The long ones are carried slung on the back, in either of its two places, or in a pack that is tall enough;
   // the hatchet and the knife go in a pocket. Any of them is put on a hot key and taken into the hands with it.)
-  { id: 'hatchet', name: 'Hatchet', model: 'hatchet', w: 1, h: 3, weight: 0.8, category: 'melee', desc: 'Chops wood and anything else.', melee: { damage: 45, range: 1.7, rate: 0.75 },
+  { id: 'hatchet', name: 'Hatchet', model: 'melee_hatchet', w: 1, h: 3, weight: 0.8, category: 'melee', desc: 'Chops wood and anything else.', melee: { damage: 45, range: 1.7, rate: 0.75 },
     // ("t1 melee heavy". Past the outskirts the tools of a shed are still in sheds, a few: a shed with nothing in
     // it is a shed nobody opens twice. Nothing to hit with lies in a house, a shop or a barracks past the outskirts.)
     loot: { pair: 'Hatchet', at: [14, 1, 7, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2, Hunting: 2 }, on: IN_SHEDS, rack: { any: 1.6 } },
     worth: 5,
   },
-  { id: 'machete', name: 'Machete', model: 'machete', w: 1, h: 5, weight: 0.6, category: 'melee', slot: 'long', desc: 'Long blade. Fast swings.', melee: { damage: 38, range: 1.9, rate: 0.55 },
+  { id: 'machete', name: 'Machete', model: 'melee_machete', w: 1, h: 5, weight: 0.6, category: 'melee', slot: 'long', desc: 'Long blade. Fast swings.', melee: { damage: 38, range: 1.9, rate: 0.55 },
     loot: { pair: 'Machete', at: [12, 0, 0, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2 }, rack: { any: 1.4 } },
     worth: 5,
   },
-  { id: 'crowbar', name: 'Crowbar', model: 'crowbar_01', w: 1, h: 4, weight: 1.6, category: 'melee', slot: 'long', desc: 'Heavy steel. Opens things, closes arguments.', melee: { damage: 42, range: 1.8, rate: 0.85 },
+  { id: 'crowbar', name: 'Crowbar', model: 'melee_crowbar', w: 1, h: 4, weight: 1.6, category: 'melee', slot: 'long', desc: 'Heavy steel. Opens things, closes arguments.', melee: { damage: 42, range: 1.8, rate: 0.85 },
     loot: { pair: 'Crowbar', at: [14, 1, 7, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Industrial: 2 }, on: IN_SHEDS, rack: { any: 1.4 } },
     worth: 4,
   },
-  { id: 'bat', name: 'Baseball Bat', model: 'baseball_bat', w: 1, h: 6, weight: 0.9, category: 'melee', slot: 'long', desc: 'Wooden bat.', melee: { damage: 30, range: 2.0, rate: 0.7 },
+  { id: 'bat', name: 'Baseball Bat', model: 'melee_bat', w: 1, h: 6, weight: 0.9, category: 'melee', slot: 'long', desc: 'Wooden bat.', melee: { damage: 30, range: 2.0, rate: 0.7 },
     loot: { pair: 'BaseballBat', at: [13, 0, 0, 0, 0], restock: 180, usage: [...HOMES, 'Farm'], rack: { any: 1.6 } },
     worth: 3,
   },
   // (2026-10-10: swung as the bat is, in both hands; heavier, a little slower, and its edge bites)
-  { id: 'shovel', name: 'Shovel', model: 'shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'long', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 },
+  { id: 'shovel', name: 'Shovel', model: 'melee_shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'long', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 },
     // (a tool of yards and sheds: it lies on a floor, being as long as a rifle is)
     loot: { pair: 'Shovel', at: [11, 1, 7, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2, Industrial: 2 }, on: IN_SHEDS, rack: { any: 1.4 } },
     worth: 4,
   },
   // (2026-10-13: the Fish Knife is gone and this is in its place, under the same id: an army bayonet-knife out of a
   // pack with hands and movements of its own, see `knife` in WEAPON_PACKS. What it does is as it was.)
-  { id: 'pitchfork', name: 'Pitchfork', model: 'pitchfork', w: 2, h: 7, weight: 2.0, category: 'melee', slot: 'long', desc: 'A farm pitchfork, four long tines. Held in both hands: the longest reach of anything you can swing, and slow.', melee: { damage: 40, range: 2.4, rate: 0.85 },
+  { id: 'pitchfork', name: 'Pitchfork', model: 'melee_pitchfork', w: 2, h: 7, weight: 2.0, category: 'melee', slot: 'long', desc: 'A farm pitchfork, four long tines. Held in both hands: the longest reach of anything you can swing, and slow.', melee: { damage: 40, range: 2.4, rate: 0.85 },
     loot: { pair: 'Pitchfork', at: [6, 1, 12, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 3 }, on: IN_SHEDS },
     worth: 3,
   },
-  { id: 'knife', name: 'Combat Knife', model: 'knife', w: 1, h: 2, weight: 0.4, category: 'melee', desc: 'An army bayonet-knife with a saw-back: clip point, steel cross guard, ribbed grip. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 },
+  { id: 'knife', name: 'Combat Knife', model: 'combat_knife', w: 1, h: 2, weight: 0.4, category: 'melee', desc: 'A clip-point fighting knife: a steel guard, a grip of stacked leather. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 },
     loot: { pair: 'CombatKnife', at: [18, 1, 10, 0, 0], restock: 180, usage: [...HOMES, ...SHEDS], on: IN_SHEDS, rack: { any: 1 } },
+    worth: 3,
+  },
+  // (the owner, 2026-10-25: "high quality knives". Found as DayZ has them: the hunting knife where hunters keep things,
+  // the AK's bayonet at the army's places of the second step, as no police station keeps a thing to hit with. Every
+  // knife hits as every other: what one finds is a look, not an edge.)
+  { id: 'hunting_knife', name: 'Hunting Knife', model: 'hunting_knife', w: 1, h: 2, weight: 0.3, category: 'melee', desc: 'A drop-point hunting knife: a brass guard, a wooden grip. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 },
+    loot: { pair: 'HuntingKnife', at: [12, 1, 4, 0, 0], restock: 180, usage: [...SHEDS, 'Village'], favour: { Hunting: 3 }, on: IN_SHEDS, rack: { any: 1 } },
+    worth: 3,
+  },
+  { id: 'bayonet', name: 'AK Bayonet', model: 'bayonet', w: 1, h: 2, weight: 0.35, category: 'melee', desc: 'The AK\'s bayonet (6Kh4): a saw-backed blade, a ring at its guard. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 },
+    loot: { pair: 'AK_Bayonet', at: [0, 4, 0, 0, 0], restock: 240, usage: ['Military'], rack: { any: 1 } },
     worth: 3,
   },
   // (the owner, 2026-10-25: "karambit is not a finish type its a knife type, the circular claw one like from cs:go". Bought

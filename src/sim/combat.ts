@@ -81,6 +81,8 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   pitchfork: { damage: 40, melee: true, range: 4.4, interval: 0.6, falloff: 1 },
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   karambit: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
+  hunting_knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
+  bayonet: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   // (What they do to a car, 2026-10-13: "2 stick grenades or 1 frag grenade blows up a car".)
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9, car: 0.5 },
   frag: FRAG_RULE,
@@ -148,3 +150,11 @@ export function hitDamage(weapon: string, zone: HitZone, distance: number, suppr
   const n = r.pellets ? Math.max(1, Math.min(r.pellets, Math.floor(pellets) || 1)) : 1;
   return base * k * zoneMultiplier(zone, r.melee) * n;
 }
+
+/**
+ * A heavy blow with something to hit with (the owner's brief, 2026-10-25: the left button held, as DayZ's heavy attack):
+ * held `hold` seconds it is drawn back and kept there (`drawn` of the way through it, just short of coming through: a
+ * blow lands at 0.35) until let go or for `keep` seconds, then lands `damage` times as hard, takes `rate` times as long
+ * and `stamina` of the breath. The server believes one no sooner than `every` seconds after the last.
+ */
+export const HEAVY = { hold: 0.3, drawn: 0.28, keep: 2, damage: 1.6, rate: 1.5, stamina: 18, every: 1.0 };

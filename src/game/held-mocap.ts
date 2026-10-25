@@ -117,6 +117,7 @@ const NEAREST = -0.32;
  *           stance says it: see stanceQuat); as it rests, where none is said
  *   turn  – the share of the captured hand's turning about that
  *   keep  – how far round and up the arm may be shown going, if not as far as KEEP lets it
+ *   fp    – false: thrown so by the body only, the first person keeping its own hand-made blow (see cuts.ts)
  */
 export interface Cut {
   clip: string;
@@ -128,6 +129,7 @@ export interface Cut {
   lands?: { tip: [number, number, number]; edge: [number, number, number] };
   turn?: number;
   keep?: [number, number, number, number];
+  fp?: false;
 }
 
 export interface FpPose {

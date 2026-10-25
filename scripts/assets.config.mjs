@@ -863,6 +863,55 @@ export const LOCAL_MODELS = {
     changes: 'Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.',
     credit: { name: 'Karambit', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
   },
+  // The melee remodels and the knives (2026-10-25, the owner: "we should remodel our melee weapons and I want high
+  // quality knives"): made as the karambit was, a picture first (with no stamped words) then Tripo H3.1 image to 3D,
+  // brought in at their real lengths (progress/tools/intake.mjs). Stood with the head or point up, as every thing to hit
+  // with stands. The old models they replace in the hand stay where the world uses them (the shovel as a prop).
+  combat_knife: {
+    dir: '../incoming/higgsfield/melee', file: 'combat_knife_sized.glb', size: 0.3, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 30 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Combat knife', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Combat knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  hunting_knife: {
+    dir: '../incoming/higgsfield/melee', file: 'hunting_knife_sized.glb', size: 0.25, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 25 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Hunting knife', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Hunting knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  bayonet: {
+    dir: '../incoming/higgsfield/melee', file: 'bayonet_sized.glb', size: 0.28, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 28 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'AK bayonet', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"AK bayonet" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_hatchet: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_hatchet_sized.glb', size: 0.36, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 36 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Hatchet', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Hatchet" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_machete: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_machete_sized.glb', size: 0.6, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Machete', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Machete" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_crowbar: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_crowbar_sized.glb', size: 0.6, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 60 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Crowbar', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Crowbar" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_bat: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_bat_sized.glb', size: 0.84, rot: [Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 84 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Baseball bat', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Baseball bat" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_shovel: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_shovel_sized.glb', size: 0.95, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 95 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Shovel', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Shovel" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  melee_pitchfork: {
+    dir: '../incoming/higgsfield/melee', file: 'melee_pitchfork_sized.glb', size: 1.3, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood head up, 130 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.',
+    credit: { name: 'Pitchfork', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Pitchfork" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // The helicopter a player flies (2026-10-14: "a new helicopter for users to use"). Unpack
   // assets-src/md-500_defender_helicopter.zip into assets-src/models/md-500_defender_helicopter/. Its rotors are
   // pieces of their own (`md500_rotor`, `md500_tail`), each with its origin on its hub, so the game turns them. It

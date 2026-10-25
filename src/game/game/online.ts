@@ -292,7 +292,7 @@ export const onlineMethods = {
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);
     });
-    net.on('swing', (m) => this.remotes.get(m.id)?.swing());
+    net.on('swing', (m) => this.remotes.get(m.id)?.swing(!!m.hv));
     net.on('nade', (m) => {
       // (which grenade, and what is left of its fuse, are the server's word: it heard the pin go, and counts from that)
       const id = THROWN[m.w] ? m.w : 'grenade';

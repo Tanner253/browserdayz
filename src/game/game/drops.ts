@@ -312,7 +312,7 @@ export const dropsMethods = {
       // (stopped where it stands for a moment: at once if it is this game's to move, when the server says so if not)
       h.victim.stagger(h.melee ? INFECTED.stopStruck : INFECTED.stopShot);
       // (alone, this game has already decided what it did; on a server the server does)
-      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0, ...(h.pierced ? { p: h.pierced } : {}) });
+      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0, ...(h.pierced ? { p: h.pierced } : {}), ...(h.heavy ? { hv: true } : {}) });
       else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
       return;
     }
@@ -324,7 +324,7 @@ export const dropsMethods = {
     if (h.victim instanceof RemotePlayer) {
       const it = this.weapons.equippedItem;
       const bonus = this.inv.wear('fist').reduce((a, b) => a + b, 0);
-      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(it), n, bonus: h.weapon === 'fists' ? bonus : 0, ...(h.pierced ? { p: h.pierced } : {}) });
+      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(it), n, bonus: h.weapon === 'fists' ? bonus : 0, ...(h.pierced ? { p: h.pierced } : {}), ...(h.heavy ? { hv: true } : {}) });
       return;
     }
     if (!h.killed) return;

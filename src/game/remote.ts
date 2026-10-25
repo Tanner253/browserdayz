@@ -19,6 +19,7 @@ import type { Grips } from './arms';
 import type { Jeep } from './vehicle';
 import { Timeline, between, caughtUp } from '../net/timeline';
 import { cutFor } from './melee/cuts';
+import { HEAVY } from '../sim/combat';
 
 
 interface Snap {
@@ -414,13 +415,13 @@ export class RemotePlayer implements Damageable {
   /** which blow of a run they threw last, and when (performance.now, ms): the same run as their own game counts */
   private strokeN = 0;
   private strokeAt = -1e9;
-  /** they threw a punch or swung what they are holding */
-  swing() {
+  /** they threw a punch or swung what they are holding (`heavy`: a heavy blow, let go now: see HEAVY) */
+  swing(heavy = false) {
     if (!this.ready || !this.alive) return;
     const melee = this.weapon ? ITEMS[this.weapon]?.melee : undefined, now = performance.now();
     this.strokeN = melee && now - this.strokeAt < (melee.rate + 0.7) * 1000 ? this.strokeN + 1 : 0;
     this.strokeAt = now;
-    this.avatar.swing(false, melee ? melee.rate * 0.9 : undefined, melee ? cutFor(this.weapon!, this.strokeN) : null);
+    this.avatar.swing(false, melee ? melee.rate * 0.9 * (heavy ? HEAVY.rate * (1 - HEAVY.drawn) : 1) : undefined, melee ? cutFor(this.weapon!, this.strokeN, heavy) : null);
     if (this.pos.distanceToSquared(this.heard) < 30 * 30) audio.whoosh(this.weapon ? 0.6 : 0, this.pos);
   }
 

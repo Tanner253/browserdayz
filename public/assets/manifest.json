@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T04:50:43.802Z",
+ "generated": "2026-10-25T06:18:49.969Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12869,6 +12869,249 @@
      "tris": 1600,
      "far": 2,
      "of": "271700:1792903843795"
+    }
+   ]
+  },
+  "combat_knife": {
+   "url": "assets/models/combat_knife.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 499824,
+   "srcTris": 10852,
+   "tris": 10852,
+   "min": [
+    -0.0305,
+    0,
+    -0.0312
+   ],
+   "max": [
+    0.0305,
+    0.3,
+    0.0312
+   ],
+   "lods": [
+    {
+     "url": "assets/models/combat_knife_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "499824:1792907542852"
+    }
+   ]
+  },
+  "hunting_knife": {
+   "url": "assets/models/hunting_knife.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 366216,
+   "srcTris": 11150,
+   "tris": 11150,
+   "min": [
+    -0.0129,
+    0,
+    -0.0254
+   ],
+   "max": [
+    0.0129,
+    0.25,
+    0.0254
+   ],
+   "lods": [
+    {
+     "url": "assets/models/hunting_knife_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "366216:1792907543320"
+    }
+   ]
+  },
+  "bayonet": {
+   "url": "assets/models/bayonet.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 500992,
+   "srcTris": 11276,
+   "tris": 11276,
+   "min": [
+    -0.0213,
+    0,
+    -0.0323
+   ],
+   "max": [
+    0.0213,
+    0.28,
+    0.0323
+   ],
+   "lods": [
+    {
+     "url": "assets/models/bayonet_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "500992:1792907543796"
+    }
+   ]
+  },
+  "melee_hatchet": {
+   "url": "assets/models/melee_hatchet.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 462436,
+   "srcTris": 13476,
+   "tris": 13476,
+   "min": [
+    -0.0234,
+    0,
+    -0.0704
+   ],
+   "max": [
+    0.0234,
+    0.36,
+    0.0704
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_hatchet_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "462436:1792907544274"
+    }
+   ]
+  },
+  "melee_machete": {
+   "url": "assets/models/melee_machete.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 454708,
+   "srcTris": 13288,
+   "tris": 13288,
+   "min": [
+    -0.041,
+    0,
+    -0.0469
+   ],
+   "max": [
+    0.041,
+    0.6,
+    0.0469
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_machete_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "454708:1792907544839"
+    }
+   ]
+  },
+  "melee_crowbar": {
+   "url": "assets/models/melee_crowbar.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 659584,
+   "srcTris": 13806,
+   "tris": 13806,
+   "min": [
+    -0.066,
+    0,
+    -0.0681
+   ],
+   "max": [
+    0.066,
+    0.6,
+    0.0681
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_crowbar_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "659584:1792907545367"
+    }
+   ]
+  },
+  "melee_bat": {
+   "url": "assets/models/melee_bat.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 604328,
+   "srcTris": 11524,
+   "tris": 11524,
+   "min": [
+    -0.0781,
+    0,
+    -0.0543
+   ],
+   "max": [
+    0.0781,
+    0.84,
+    0.0543
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_bat_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "604328:1792909129965"
+    }
+   ]
+  },
+  "melee_shovel": {
+   "url": "assets/models/melee_shovel.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 556928,
+   "srcTris": 15004,
+   "tris": 15004,
+   "min": [
+    -0.091,
+    0,
+    -0.0746
+   ],
+   "max": [
+    0.091,
+    0.95,
+    0.0746
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_shovel_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "556928:1792907546371"
+    }
+   ]
+  },
+  "melee_pitchfork": {
+   "url": "assets/models/melee_pitchfork.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 520344,
+   "srcTris": 15040,
+   "tris": 15040,
+   "min": [
+    -0.1098,
+    0,
+    -0.1264
+   ],
+   "max": [
+    0.1098,
+    1.3,
+    0.1264
+   ],
+   "lods": [
+    {
+     "url": "assets/models/melee_pitchfork_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "520344:1792907546864"
     }
    ]
   }

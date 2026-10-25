@@ -781,9 +781,9 @@ export class Game {
       this.hud.note(`No room for the ${ITEMS[item.id].name.toLowerCase()}: it is at your feet`, 'warn');
     };
     // a punch or a swing: your own body throws it, and everyone near you sees it
-    this.weapons.onSwing = (seconds, stroke) => {
-      this.avatar.swing(false, seconds, stroke === undefined ? null : cutFor(this.weapons.equippedItem?.id, stroke));
-      this.net.send({ t: 'swing' });
+    this.weapons.onSwing = (seconds, stroke, heavy) => {
+      this.avatar.swing(false, seconds, stroke === undefined ? null : cutFor(this.weapons.equippedItem?.id, stroke, heavy));
+      this.net.send({ t: 'swing', ...(heavy ? { hv: true } : {}) });
     };
     progress('compiling shaders');
     // (A loot model's materials are made ready when the model comes, off the frame: see ItemModels.onMade. They

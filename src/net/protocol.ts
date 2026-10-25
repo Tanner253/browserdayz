@@ -214,7 +214,7 @@ export type C2S =
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
-  | { t: 'swing' }
+  | { t: 'swing'; /** a heavy blow (HEAVY) */ hv?: boolean }
   /**
    * The pin of a grenade is out (which grenade: its item), and its fuse runs from when the server hears this. And
    * it has left the hand: from where, and how fast (not moving, at the end of its fuse: it went off in the hand).
@@ -240,7 +240,7 @@ export type C2S =
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
   | { t: 'back'; b: Slung[] }
-  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number }
+  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number; /** a heavy blow (HEAVY) */ hv?: boolean }
   | { t: 'take'; uid: string }
   /** a field radio keyed: a supply drop is asked for where the sender stands */
   | { t: 'radio' }
@@ -320,7 +320,7 @@ export type C2S =
   /** where the infected this game is moving have got to (see src/sim/infected.ts): [which, ...where and what it is doing] */
   | { t: 'is'; s: [number, ...IState][] }
   /** a round or a blow of ours landed on one of them */
-  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number }
+  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number; p?: number; hv?: boolean }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
   /** a shot or a blow on an animal (server/animals.ts judges it as it does one on the infected) */
@@ -388,7 +388,7 @@ export type S2C =
   /** each: who, where, what is in their hands and on it, and when their game said so by its own clock (ms) */
   | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ string?][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
-  | { t: 'swing'; id: number }
+  | { t: 'swing'; id: number; hv?: boolean }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number]; w: string; f: number }
   /** somebody near has thrown something (an item's id): every game flies it the same way, and it is told where it lies when it does ('loot+') */

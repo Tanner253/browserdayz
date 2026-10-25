@@ -23,7 +23,7 @@ import { MAX_STAMINA } from '../net/protocol';
 import { BULLET_STEP, GRAVITY, GUNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, intervalOf, kickOf, scatterOf, shotOf, zeroOf } from '../sim/gunplay';
 import type { ItemModels } from './loot';
 
-import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
+import { HEAVY, ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
 import { KNIVES } from '../../api/_lib/shop-items';
@@ -65,6 +65,8 @@ export interface HitInfo {
   melee: boolean;
   /** how many bodies the round went through first (see PIERCE) */
   pierced?: number;
+  /** a heavy blow (HEAVY) */
+  heavy?: boolean;
 }
 
 /** Is its bolt worked by hand after every shot? (a rifle's is, unless the gun says it loads itself) */
@@ -346,7 +348,6 @@ const HELD = {
   m32: new THREE.Vector3(0.14, -0.22, -0.36),
   // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
   knife: new THREE.Vector3(0, -0.16, -0.34),
-  pitchfork: new THREE.Vector3(0.05, -0.02, -0.05),
 };
 
 /**
@@ -783,6 +784,9 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.shovel = { ...styles.bat, grip: 0.2 };
   // (the karambit, point down: stood on its head, the fist round its grip under the ring, the blade curving out under it)
   // (held higher than a knife and tipped forward: the claw is under the fist, and in the picture)
+  // (the hunting knife and the bayonet as the combat knife: each fist on the middle of its own grip)
+  styles.hunting_knife = { ...styles.knife, grip: 0.06 };
+  styles.bayonet = { ...styles.knife, grip: 0.06 };
   styles.karambit = { ...styles.knife, grip: 0.14, flip: true, idle: { p: [0.14, -0.035, -0.38], tip: [0.3, 0.75, -0.55], edge: [-0.5, -0.3, -0.8] } };
   return styles;
 })();
@@ -816,8 +820,6 @@ const BLADE = {
   every: 3.6,
   guard: { p: [-0.03, 0.09, 0.04] as [number, number, number], r: [0.05, 0.12, -0.4] as [number, number, number] },
   run: { p: [0.03, -0.09, 0.02] as [number, number, number], r: [-0.35, 0.25, 0.3] as [number, number, number] },
-  /** a thing in its own pack whose guard is not the knife's: the pitchfork's shaft, turned as the knife is, swung across the whole picture */
-  own: { pitchfork: { guard: { p: [0, 0.05, 0.03] as [number, number, number], r: [0.04, 0, -0.08] as [number, number, number] } } } as Record<string, { guard: { p: [number, number, number]; r: [number, number, number] } }>,
 };
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
 const _bh = new THREE.Vector3();
@@ -1542,7 +1544,7 @@ export function meleeAt(st: MeleeStyle, k: number, n: number, cut: Cut | null, p
   stanceQuat(st.idle, quat);
   elbow.set(...st.elbow);
   let pitch = 0, yaw = 0;
-  const captured = k >= 0 && hasCut(cut);
+  const captured = k >= 0 && hasCut(cut) && cut.fp !== false;
   if (k >= 0 && !captured) {
     const stroke = st.strokes[n % st.strokes.length];
     let i = 0;
@@ -1725,7 +1727,9 @@ export class Weapons {
   /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
   onStruck: (owner: unknown, weapon: string) => void = () => {};
   /** a punch or a swing has started: how long it takes, and which blow of a run it is (a swing of something to hit with) */
-  onSwing: (seconds?: number, stroke?: number) => void = () => {};
+  onSwing: (seconds?: number, stroke?: number, heavy?: boolean) => void = () => {};
+  /** when the left button went down on something to hit with, held to see whether it is a heavy blow (-1: it is not down) */
+  private chargeAt = -1;
   /** loot models, so consumables can be shown in the hands while they are used */
   itemModels: ItemModels | null = null;
   // bare hands: fists come up to punch (LMB) or guard (RMB) and drop again after a moment
@@ -1956,28 +1960,19 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand (see meleeHeld)
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'karambit']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'pitchfork', ...KNIVES]) {
       this.models.set(id, { ...(await meleeHeld(id)), flash: mkFlash() });
     }
-    // ---- the knife, for whoever holds it: its own pack, hands and all, moved by its own animation (see BLADE).
-    // What was made of it just above is still what everybody else sees in its holder's fist. Its arms are the
-    // sniper's arms under another paint: they are drawn in the one pair of sleeves and gloves every gun of that
-    // maker's is drawn in, which are the ones on a hatchet too.
-    const blade = this.models.get('knife'), bladeFp = assets.manifest.models.knife_fp;
-    if (blade && bladeFp?.rig) {
-      const rig = new WeaponRig(await assets.gltfOf('knife_fp'), bladeFp.rig, packMaterial);
-      if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
-      blade.root = new THREE.Group();
-      blade.root.add(rig.root);
-      blade.rig = rig;
-      blade.hip = HELD.knife;
-    }
-    // ---- every other knife in the same hands and movements (the owner, 2026-10-25: "high quality knives"): the pack's
-    // own knife taken out, and this one hung where it was held. (Not the karambit: held point down, its blade is under
-    // the pack's fist and out of sight. It is held in our own arms, closed as the pack's hand closes: see GRIP_PACK.)
+    // ---- the knives, for whoever holds them: the knife pack, hands and all, moved by its own animation (see BLADE),
+    // its own knife taken out and ours hung where it was held (the owner, 2026-10-25: "high quality knives"). What was
+    // made of each just above is still what everybody else sees in its holder's fist. The pack's arms are the sniper's
+    // arms under another paint: the one pair of sleeves and gloves every gun of that maker's is drawn in. (Not the
+    // karambit: held point down, its blade is under the pack's fist and out of sight. It is held in our own arms,
+    // closed as the pack's hand closes: see GRIP_PACK.)
+    const bladeFp = assets.manifest.models.knife_fp;
     for (const id of KNIVES) {
       const m = this.models.get(id);
-      if (id === 'knife' || MELEE_STYLE[id]?.flip || !m || !bladeFp?.rig) continue;
+      if (MELEE_STYLE[id]?.flip || !m || !bladeFp?.rig) continue;
       const rig = new WeaponRig(await assets.gltfOf('knife_fp'), bladeFp.rig, packMaterial);
       if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
       m.worn = hangKnife(rig, m.root);
@@ -1985,14 +1980,6 @@ export class Weapons {
       m.root.add(rig.root);
       m.rig = rig;
       m.hip = HELD.knife;
-    }
-    // ---- the pitchfork, for whoever holds it: its pack's movements in our own arms, the fork hung on its node
-    const fork = this.models.get('pitchfork');
-    if (fork && assets.manifest.models.pitchfork_fp?.rig) {
-      const m = await this.packGun({ pack: 'pitchfork', item: 'pitchfork', gun: 'pitchfork', kind: 'rifle', hands: true, hip: HELD.pitchfork, flashSize: 0.01, flash: mkFlash(), strip: [], ride: { base: 'pitchfork' } });
-      fork.root = m.root;
-      fork.rig = m.rig;
-      fork.hip = HELD.pitchfork;
     }
   }
 
@@ -3288,7 +3275,23 @@ export class Weapons {
         // put up across the body to stop a blow (the other button), or swung
         this.guardHeld = input.held('Mouse2') && !this.action;
         if (this.guardHeld) this.guardHold = 0.12;
-        if (input.pressed('Mouse0') && !this.action && this.fireCooldown <= 0) this.swing(def.melee, camera);
+        // A click is a blow; held, a heavy one (HEAVY), drawn back and kept there until the button is let go.
+        if (input.pressed('Mouse0') && !this.action && this.fireCooldown <= 0) this.chargeAt = this.time;
+        if (this.chargeAt >= 0) {
+          const held = input.held('Mouse0');
+          if (!held || this.time - this.chargeAt >= HEAVY.hold) {
+            this.swing(def.melee, camera, held);
+            this.chargeAt = -1;
+          }
+        }
+        const drawn = this.action;
+        if (drawn?.name === 'swing' && drawn.data?.held) {
+          if (input.held('Mouse0') && drawn.t < HEAVY.keep + drawn.dur * HEAVY.drawn) drawn.t = Math.min(drawn.t, drawn.dur * HEAVY.drawn);
+          else {
+            drawn.data.held = 0;
+            this.onSwing(drawn.dur - drawn.t, drawn.data.stroke, true);
+          }
+        }
         // looked over (I, as a gun is: see lookOver); a blow, the guard or a run ends it
         if (input.pressed('KeyI') && !this.action && this.sprintT < 0.2) {
           this.start('check', LOOK.dur);
@@ -3879,15 +3882,17 @@ export class Weapons {
     if (this.action?.name === 'swing' && this.action.data?.dig) this.action = null;
   }
 
-  private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera) {
-    this.fireCooldown = melee.rate;
-    this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
+  /** @param heavy a heavy blow (HEAVY): drawn back and held there while the button is (see `held`), others told as it is let go */
+  private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera, heavy = false) {
+    const k = heavy ? HEAVY.rate : 1;
+    this.fireCooldown = melee.rate * k;
+    this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - (heavy ? HEAVY.stamina : 6));
     // the heavier the thing, the lower and longer it cuts the air
-    audio.whoosh(THREE.MathUtils.clamp((melee.rate - 0.4) / 0.45, 0, 1));
+    audio.whoosh(THREE.MathUtils.clamp((melee.rate - 0.4) / 0.45 + (heavy ? 0.3 : 0), 0, 1));
     this.strokeN = this.time - this.strokeAt < melee.rate + 0.7 ? this.strokeN + 1 : 0;
     this.strokeAt = this.time;
-    this.start('swing', melee.rate * 0.9, undefined, { hit: 0, dmg: melee.damage, range: melee.range, stroke: this.strokeN });
-    this.onSwing(melee.rate * 0.9, this.strokeN);
+    this.start('swing', melee.rate * 0.9 * k, undefined, { hit: 0, dmg: melee.damage * (heavy ? HEAVY.damage : 1), range: melee.range, stroke: this.strokeN, ...(heavy ? { heavy: 1, held: 1 } : {}) });
+    if (!heavy) this.onSwing(melee.rate * 0.9, this.strokeN);
     void camera;
   }
 
@@ -3919,7 +3924,7 @@ export class Weapons {
           const dmg = a.data.dmg * ZONE_MULT[zone][1];
           const killed = target.damage(dmg, pt, dir, zone);
           this.markHit(killed);
-          this.onHit({ victim: target, weapon: a.name === 'punch' ? 'fists' : this.currentItem?.id ?? 'fists', target: target.name, zone, damage: dmg, killed, distance: hit.toi, melee: true });
+          this.onHit({ victim: target, weapon: a.name === 'punch' ? 'fists' : this.currentItem?.id ?? 'fists', target: target.name, zone, damage: dmg, killed, distance: hit.toi, melee: true, heavy: !!a.data.heavy });
           const power = a.name === 'punch' ? 0.2 : 0.55;
           this.fx.bleed(pt, dir, power);
           this.onFlesh(hit.tag?.owner, pt, dir, power);
@@ -4687,7 +4692,7 @@ export class Weapons {
     // (A captured blow, where the thing has one: see src/game/melee/fp.ts. Otherwise one made to be seen from the eye.)
     const swung = a && a.name === 'swing' ? Math.min(1, a.t / a.dur) : -1, n = a?.data?.stroke ?? 0;
     const pos = _mp, quat = _mq, elbow = _mel;
-    meleeAt(st, swung, n, swung >= 0 && !a?.data?.dig ? cutFor(this.currentItem?.id, n) : null, pos, quat, elbow, this.cutAt);
+    meleeAt(st, swung, n, swung >= 0 && !a?.data?.dig ? cutFor(this.currentItem?.id, n, !!a?.data?.heavy) : null, pos, quat, elbow, this.cutAt);
     // Carried, it lies where its style rests it. For a blow the fists go at once to where it is
     // struck from; what is in them stays laid back while the arms are drawn up, and comes over
     // the top as they start down (the first blow of a run: one that comes back the other way
@@ -4762,10 +4767,11 @@ export class Weapons {
     this.guardT += (want - this.guardT) * (1 - Math.exp(-(want ? 16 : 9) * dt));
     const g = this.guardT;
     // a blow begun: the next of the run, from its first frame
-    m.shotT = (m.shotT ?? 9) + dt;
+    // (held still while a heavy blow is kept drawn back)
+    m.shotT = (m.shotT ?? 9) + (a?.data?.held ? 0 : dt);
     if (a && a.name === 'swing' && a !== this.bladeOf) {
       this.bladeOf = a;
-      m.shotClip = BLADE.blows[(a.data?.stroke ?? 0) % BLADE.blows.length];
+      m.shotClip = a.data?.heavy && rig.has('stab') ? 'stab' : BLADE.blows[(a.data?.stroke ?? 0) % BLADE.blows.length];
       // (as far into it as the swing is, less what of its drawing back is left out)
       m.shotT = a.t + (BLADE.skip[m.shotClip] ?? 0);
       this.bladeFrom = { ...this.bladeNow, t: 0 };
@@ -4810,7 +4816,7 @@ export class Weapons {
     const sp = busy ? 0 : this.sprintT * (1 - g);
     const kick = this.kick.step(dt);
     const kr = this.kickRot.step(dt);
-    const G = (this.currentItem && BLADE.own[this.currentItem.id]?.guard) || BLADE.guard, R = BLADE.run;
+    const G = BLADE.guard, R = BLADE.run;
     m.root.position.set(
       m.hip.x + Math.cos(ph) * 0.012 * amp + R.p[0] * sp + G.p[0] * g - p.strafe * 0.006,
       m.hip.y - Math.abs(Math.sin(ph)) * 0.016 * amp + R.p[1] * sp + G.p[1] * g + kick.y * 0.02 - this.lowerT * 0.4,
