@@ -1541,7 +1541,7 @@ export class Weapons {
    * `wait`: taken into the hand and not yet used (an injector: see `ready` in game.ts). `age` is how long it has
    * been in the hand, `t` how far into its use it is; `from` is where it was held when the use began.
    */
-  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** seconds since it was thrown: the empty hand goes on through the throw */ thrown?: number } | null = null;
+  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** seconds since it was thrown: the empty hand goes on through the throw, and what is to follow */ thrown?: number; then?: () => void } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3; round?: THREE.Object3D }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
   private lowerT = 0;
@@ -3724,12 +3724,13 @@ export class Weapons {
    * A grenade thrown: it has left the hand, and the hand goes on through the throw as the body everybody else sees
    * throws (the motion capture's, see held-mocap.ts), then is let down. Without the paths yet, it is put away as before.
    */
-  throwOut() {
+  throwOut(then?: () => void): boolean {
     const h = this.held;
-    if (!h || h.ending || h.thrown !== undefined) return;
-    if (!lengthOf('throw')) return this.endUse();
+    if (!h || h.ending || h.thrown !== undefined || !lengthOf('throw')) return false;
     h.thrown = 0;
+    h.then = then;
     for (const c of h.root.children) c.visible = false;
+    return true;
   }
 
   /**
@@ -4808,6 +4809,7 @@ export class Weapons {
       this.vmRoot.remove(h.root);
       this.held = null;
       this.arms.update(null, null, this.vmCamera.quaternion, false);
+      h.then?.();
       return;
     }
     const t = h.t;

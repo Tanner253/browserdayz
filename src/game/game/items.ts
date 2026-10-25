@@ -426,11 +426,11 @@ export const itemsMethods = {
   },
 
   /** the grenade is out of the hands, thrown or gone off or gone with them: they are empty */
-  /** @param thrown it left the hand thrown: the hand goes on through the throw (see Weapons.throwOut) */
+  /** @param thrown it left the hand thrown: the hand goes on through the throw (see Weapons.throwOut), and only then do the hands take up what is in them */
   emptyOfGrenade(this: Game, thrown = false) {
     this.cook = null;
+    if (thrown && this.weapons.throwOut(this.inHand ? () => this.rest() : undefined)) return;
     if (this.inHand) this.rest();
-    else if (thrown) this.weapons.throwOut();
     else this.weapons.endUse();
   },
 
