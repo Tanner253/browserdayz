@@ -10,6 +10,7 @@ import { physics } from '../core/physics';
 import { RECYCLE, recycleStep, recyclable, type Recycler, type Run } from '../sim/craft/recyclers';
 import type { C2S, S2C, StoredItem } from '../net/protocol';
 import { Stash } from './loot';
+import { FACE_TURN } from '../sim/camp';
 import type { Input } from '../core/input';
 
 export interface RecyclerHost {
@@ -47,7 +48,7 @@ export class RecyclerView {
     const e = assets.manifest.models[RECYCLE.model];
     for (const r of spots) {
       const hx = e?.min && e.max ? (e.max[0] - e.min[0]) / 2 : RECYCLE.w / 2, hy = e?.min && e.max ? (e.max[1] - e.min[1]) / 2 : 0.9, hz = e?.min && e.max ? (e.max[2] - e.min[2]) / 2 : RECYCLE.l / 2;
-      physics.addStatic(physics.R.ColliderDesc.cuboid(hx * 0.9, hy, hz * 0.9), 'metal', { x: r.x, y: r.y + hy, z: r.z }, r.rot);
+      physics.addStatic(physics.R.ColliderDesc.cuboid(hx * 0.9, hy, hz * 0.9), 'metal', { x: r.x, y: r.y + hy, z: r.z }, r.rot + FACE_TURN);
     }
   }
 
@@ -108,7 +109,7 @@ export class RecyclerView {
         if (near && !this.roots[i]) {
           const m = this.model!.clone();
           m.position.set(r.x, r.y, r.z);
-          m.rotation.y = r.rot;
+          m.rotation.y = r.rot + FACE_TURN;
           this.h.scene.add(m);
           this.roots[i] = m;
         } else if (!near && this.roots[i]) {

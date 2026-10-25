@@ -22,12 +22,12 @@ export const RECYCLE = {
   /** seconds a thing takes (a store of ten, a minute and a half) */
   each: 6,
   /** its store */
-  store: [6, 5] as [number, number],
+  store: [10, 6] as [number, number],
   /** how far off one running is heard, m */
   heard: 90,
-  /** its size, m: across its front and from front to back (its model's x and z) */
-  w: 2.0,
-  l: 1.6,
+  /** its size, m: across its front and from front to back (its model's z and x: its front is its +x) */
+  w: 1.6,
+  l: 2.0,
   model: 'recycler',
 };
 
@@ -153,7 +153,7 @@ export interface Recycler {
   x: number;
   y: number;
   z: number;
-  /** which way its front faces (its model's +z) */
+  /** which way its front faces (its model's +x: drawn turned by FACE_TURN, src/sim/camp.ts) */
   rot: number;
 }
 
@@ -161,7 +161,7 @@ const SEED = 0x2ec7c1;
 
 /** the recyclers' layer: Zavod, the army camp, the fort, the chemical works, the trader camp; the same for the game and the server */
 export function recyclerLayer(world: LayerWorld & Pick<World, 'sites' | 'towns' | 'castle'>, camp: Camp | null): Recycler[] {
-  const room = roomOn(world), rng = new RNG(SEED), out: Recycler[] = [];
+  const room = roomOn(world, true), rng = new RNG(SEED), out: Recycler[] = [];
   // (keep clear of the camp's stalls and its own recycler: laid before these)
   for (const s of camp?.stalls ?? []) room.stand(s.x, s.z, 2.5);
   const near = (at: string, cx: number, cz: number, from = 8) => {

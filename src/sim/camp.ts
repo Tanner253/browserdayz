@@ -127,7 +127,7 @@ export interface StallSpot {
   x: number;
   y: number;
   z: number;
-  /** which way its counter faces (its model's +z) */
+  /** which way its counter faces (its model's +x: drawn turned by FACE_TURN) */
   rot: number;
   /** where its trader stands, and faces */
   at: [number, number, number];
@@ -143,8 +143,10 @@ export interface Camp {
   recycler: { x: number; y: number; z: number; rot: number } | null;
 }
 
-/** a market stall's model is drawn at this size (as made it stood a little low over a survivor), and its trader behind its counter */
-export const STALL = { model: 'market_stall', scale: 1.1, w: 1.97 * 1.1, l: 2.6 * 1.1, behind: 0.15 };
+/** a market stall's model is drawn at this size (as made it stood a little low over a survivor); how deep it is from its counter back (its x) and how wide (its z); its trader behind its counter */
+export const STALL = { model: 'market_stall', scale: 1.1, l: 1.97 * 1.1, w: 2.6 * 1.1, behind: 0.15 };
+/** what a model whose front is its +x (the stall, the recycler: the sandbox's front camera looks from +x) is turned by, past the way it faces */
+export const FACE_TURN = -Math.PI / 2;
 /** the shop's trader, behind its counter facing the door (src/game/trader.ts had him so) */
 const SHOP_BEHIND = { x: -0.9, z: -0.45 };
 const SEED = 0x7c4a11;
@@ -154,7 +156,7 @@ export function campLayer(world: LayerWorld & Pick<World, 'sites'>): Camp | null
   const post = world.sites.find((st) => st.kind === 'market');
   const shop = post && world.buildings.find((b) => b.type === 'store' && Math.hypot(post.x - b.x, post.z - b.z) < 40);
   if (!post || !shop) return null;
-  const room = roomOn(world), rng = new RNG(SEED);
+  const room = roomOn(world, true), rng = new RNG(SEED);
   const c = Math.cos(shop.rot), s = Math.sin(shop.rot), [, fd] = BUILDING_FOOTPRINT[shop.type] ?? [10, 10];
   // (the shop's own frame to the world's: its door faces its +z)
   const at = (lx: number, lz: number): [number, number] => [shop.x + lx * c + lz * s, shop.z - lx * s + lz * c];

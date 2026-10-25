@@ -30,7 +30,14 @@ export interface Room {
   ground(x: number, z: number): number;
 }
 
-export function roomOn(world: LayerWorld): Room {
+/** how far round a big thing of the map's own stands, m (a container, a car, a wreck: the rest are taken as a metre or so) */
+const BIG: Record<string, number> = {
+  'container_shell@0': 4.2, 'container_shell@1': 4.2, container_shell: 4.2, covered_car: 2.6, uaz_469: 2.6, heli_wreck: 6, portable_generator: 1.2,
+  Barrel_01: 0.8, barrel_03: 0.8, propane_tank: 0.8, metal_trash_can: 0.8, 'metal_trash_can@0': 0.8, pallet: 1.2, crate: 1,
+};
+
+/** room on a world for a layer (`sized`: the map's big things by their size, as the recyclers and the camp keep clear of them; the wrecks' layer, laid first, takes every thing as a metre or so, and is kept as it was) */
+export function roomOn(world: LayerWorld, sized = false): Room {
   const ground = (x: number, z: number) => heightAt(world.heights, x, z), wet = wetAt(world.water, ground);
   // (what stands already, in cells of 8 m)
   const CELL = 8, cells = new Map<string, { x: number; z: number; r: number }[]>();
@@ -40,7 +47,7 @@ export function roomOn(world: LayerWorld): Room {
     if (!l) cells.set(k, (l = []));
     l.push({ x, z, r });
   };
-  for (const list of [world.props, world.trees, world.rocks]) for (const t of list) stand(t.x, t.z, 0.6 + 0.6 * (t.scale ?? 1));
+  for (const list of [world.props, world.trees, world.rocks]) for (const t of list) stand(t.x, t.z, (sized && list === world.props ? BIG[t.kind] : undefined) ?? 0.6 + 0.6 * (t.scale ?? 1));
   const clear = (x: number, z: number, r: number) => {
     for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
       for (const s of cells.get(`${Math.floor(x / CELL) + dx},${Math.floor(z / CELL) + dz}`) ?? []) if (Math.hypot(s.x - x, s.z - z) < r + s.r) return false;

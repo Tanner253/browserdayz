@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
-import { CAMP, STALL, STALLS, bookScrap, campLayer, dayFor, inSafe, leftToday, maySell, mayBuy, pays, type Camp, type StallId } from '../sim/camp';
+import { CAMP, FACE_TURN, STALL, STALLS, bookScrap, campLayer, dayFor, inSafe, leftToday, maySell, mayBuy, pays, type Camp, type StallId } from '../sim/camp';
 import { dayOf, jobsFor, mayHandIn, progress } from '../sim/jobs';
 import { madeItems } from '../sim/craft/plan';
 import { MAT } from '../sim/craft/materials';
@@ -69,13 +69,13 @@ export class TraderCamp {
     for (const s of spots) {
       const m = model.clone();
       m.position.set(s.x, s.y, s.z);
-      m.rotation.y = s.rot;
+      m.rotation.y = s.rot + FACE_TURN;
       m.scale.setScalar(STALL.scale);
       this.h.scene.add(m);
       // (its back and sides stop a body; its counter is a body's height and stops it too)
       if (e?.min && e.max) {
         const k = STALL.scale, hx = ((e.max[0] - e.min[0]) / 2) * k, hy = ((e.max[1] - e.min[1]) / 2) * k, hz = ((e.max[2] - e.min[2]) / 2) * k * 0.9;
-        physics.addStatic(physics.R.ColliderDesc.cuboid(hx * 0.92, Math.min(hy, 0.55), hz), 'wood', { x: s.x, y: s.y + 0.55, z: s.z }, s.rot);
+        physics.addStatic(physics.R.ColliderDesc.cuboid(hx * 0.9, Math.min(hy, 0.55), hz), 'wood', { x: s.x, y: s.y + 0.55, z: s.z }, s.rot + FACE_TURN);
       }
     }
   }
