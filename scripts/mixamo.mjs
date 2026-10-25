@@ -133,8 +133,11 @@ export function runOf(cop, prefix = '', onTheSpot = true) {
 }
 
 const ID = new THREE.Quaternion();
-/** one of the character's movements (`run`, unless another is named) made the one that was read */
-export function giveRun(doc, run, clip = 'run') {
+/**
+ * one of the character's movements (`run`, unless another is named) made the one that was read. `lay`: which limb
+ * bones are first laid along the other body's (see below; all of NEXT unless said)
+ */
+export function giveRun(doc, run, clip = 'run', { lay = null } = {}) {
   const root = doc.getRoot();
   const nodes = new Map(root.listNodes().map((n) => [n.getName(), n]));
   const parentOf = new Map();
@@ -164,7 +167,7 @@ export function giveRun(doc, run, clip = 'run') {
   const laid = new Map();
   for (const [, node] of mine) {
     const m = node.getName().match(/^(.+?)(_[lr])$/);
-    const next = m && NEXT[m[1]] && m[1] + m[2] && NEXT[m[1]] + m[2];
+    const next = m && NEXT[m[1]] && (!lay || lay.includes(m[1])) && NEXT[m[1]] + m[2];
     const to = next && nodes.get(next);
     if (!to || !run.rig.name.includes(next)) continue;
     const here = at(to).sub(at(node)).normalize(), there = run.rig.at(next).sub(run.rig.at(node.getName())).normalize();

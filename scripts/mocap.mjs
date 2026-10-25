@@ -24,7 +24,7 @@ export { meshyBone } from './mocap-carry.mjs';
 export const MOVES = {
   // standing still, breathing, the weight shifting a little (the library's 'Idle' turns round to look behind it: a
   // body that is seen to look elsewhere than it aims tells lies in a shooter)
-  idle: { from: 'Idle_02', square: 0.5 },
+  idle: { from: 'Idle_3' },
   // standing, nothing held up: an easy walk
   walkF: { from: 'walking_2', way: 'F', gait: 'walk' },
   walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk' },

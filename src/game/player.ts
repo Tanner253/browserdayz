@@ -21,7 +21,7 @@ const CROUCH_HALF = 0.26;
 /** lying down: as low as the body's own thickness lets it be */
 const PRONE_HALF = 0.03;
 /** and at a crawl, metres a second */
-const CRAWL = 1.05;
+export const CRAWL = 1.05;
 /**
  * Kilograms that were carried for nothing when every one more slowed the legs. No rule of the legs reads it now:
  * on the level and on steep ground alike a load takes breath, and pace only when it is past all running with
@@ -96,11 +96,11 @@ export interface Vitals {
 export const freshVitals = (): Vitals => ({ health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 });
 
 /** metres a second hurrying in a crouch: creeping is 1.9, a jog upright 4, a sprint 6.2 */
-const CROUCH_RUN = 3.3;
+export const CROUCH_RUN = 3.3;
 /** how much faster somebody moves with their hands empty: at a walk, in a crouch and at a run alike */
-const HANDS_FREE = 1.2;
+export const HANDS_FREE = 1.2;
 /** and how much slower with a gun held at the eye */
-const AIM_SLOW = 0.8;
+export const AIM_SLOW = 0.8;
 
 export class Player {
   body!: RAPIER.RigidBody;

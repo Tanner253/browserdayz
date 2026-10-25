@@ -90,7 +90,10 @@ export async function carry(body, file, clip, { mirror = false, still = true, sr
     const o = run.moved[0].clone();
     for (const m of run.moved) { m.x -= o.x; m.z -= o.z; }
   }
-  const said = giveRun(body.doc, run, clip);
+  // (the clavicles are not laid: Meshy rigged our own body standing as it is bound, so a line apart is only where the
+  // two riggers put the joints, and the collarbone is short: laid 39 degrees along Meshy's, it carried every shoulder a
+  // hand's breadth forward and up, the owner's "walk empty handed looks weird shoulders")
+  const said = giveRun(body.doc, run, clip, { lay: ['upperarm', 'lowerarm', 'thigh', 'calf'] });
   relax(body, clip, run.dur);
   // Its pace on our body, metres a second along the ground. Many of the library's movements are drawn on the spot
   // whatever their name says, so it is read from the feet: whichever foot is down travels back under the body at the
