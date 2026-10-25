@@ -334,6 +334,7 @@ export const makeMethods = {
         into: this.skin.parent ?? model, fpInto: fpModel?.getObjectByName('body')?.parent ?? null,
         atmo, uniforms: this.uniforms, ref: this.skin, layers: () => this.layerMask, fpLayer: FP_BODY_LAYER, inSight, dressed: (parts) => Avatar.onDressed(parts),
         lengths: (l, scale, fit) => this.proportion(l, scale, fit),
+        bulk: (b) => this.setBulk(b),
       });
     }
     restBones(this.root);

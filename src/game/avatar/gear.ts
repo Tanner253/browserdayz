@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { BODY_SCALE, _a, _b, _euler, _m2, _q1 } from '../avatar';
+import type { Bulk } from '../survivors';
 
 /** where a thing that is worn sits on the body (see GEAR) */
 type Worn = { bone: 'Head' | 'spine_03' | 'pelvis'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean };
@@ -21,6 +22,8 @@ const MASK: Worn = { bone: 'Head', p: [0.0007, 1.5772, 0.1298], r: [-Math.PI / 2
  * was fitted to it, and is hung on a survivor's body moved and sized by the difference (Avatar.gearFit).
  */
 export const SUIT_FIT = { crown: 0.212, headZ: 0.017, headDepth: 0.268, chestMin: -0.19, chestMax: 0.143, chestWidth: 0.407 };
+/** and its waist, against the pelvis joint (progress/survivors/waist.mjs): what is worn round it was fitted there */
+export const SUIT_WAIST = { waistMin: -0.154, waistMax: 0.1541, waistWidth: 0.4549 };
 
 /**
  * Where a thing fitted to the old suit (GEAR) goes on a survivor's own body: on the head, moved to its crown and sized
@@ -29,18 +32,25 @@ export const SUIT_FIT = { crown: 0.212, headZ: 0.017, headDepth: 0.268, chestMin
  * in, the body at rest as the game turns it (facing -z) and draws it (BODY_SCALE); none for the suit (fit null).
  * @param inv the inverse of the carrying bone's place at rest (Avatar.gearRest)
  */
-export function hangFit(f: typeof SUIT_FIT | null, g: { bone: string; pack?: boolean }, inv: THREE.Matrix4): THREE.Matrix4 {
+export function hangFit(f: (typeof SUIT_FIT & Partial<typeof SUIT_WAIST>) | null, g: { bone: string; pack?: boolean }, inv: THREE.Matrix4, bulk: Bulk | null = null): THREE.Matrix4 {
   const out = new THREE.Matrix4();
   if (!f) return out;
+  // (over what is worn there, not the skin: in front, behind, to each side; see Bulk)
+  const [cf, cb, cs] = bulk?.chest ?? [0, 0, 0], [wf, wb, ws] = bulk?.waist ?? [0, 0, 0];
   const J = new THREE.Vector3().setFromMatrixPosition(inv.clone().invert()), S = SUIT_FIT, u = BODY_SCALE;
   const about = (dy: number, dz: number, sx: number, sy: number, sz: number) =>
     out.makeTranslation(J.x, J.y + dy, J.z + dz).multiply(new THREE.Matrix4().makeScale(sx, sy, sz)).multiply(new THREE.Matrix4().makeTranslation(-J.x, -J.y, -J.z));
   // (the head moved, not sized: a head's depth is no measure of it, the woman's bun made hers the biggest)
   if (g.bone === 'Head') return about((f.crown - S.crown) * u, -(f.headZ - S.headZ) * u, 1, 1, 1);
-  if (g.bone === 'spine_03' && g.pack) return about(0, -(f.chestMin - S.chestMin) * u, 1, 1, 1);
+  if (g.bone === 'spine_03' && g.pack) return about(0, -(f.chestMin - cb - S.chestMin) * u, 1, 1, 1);
   if (g.bone === 'spine_03') {
-    const kz = (f.chestMax - f.chestMin) / (S.chestMax - S.chestMin), kx = f.chestWidth / S.chestWidth;
-    return about(0, -((f.chestMin + f.chestMax) / 2 - ((S.chestMin + S.chestMax) / 2) * kz) * u, kx, 1, kz);
+    const min = f.chestMin - cb, max = f.chestMax + cf, kz = (max - min) / (S.chestMax - S.chestMin), kx = (f.chestWidth + 2 * cs) / S.chestWidth;
+    return about(0, -((min + max) / 2 - ((S.chestMin + S.chestMax) / 2) * kz) * u, kx, 1, kz);
+  }
+  // (round the waist, a belt and what hangs from it: by the body's own waist and what is worn over it)
+  if (g.bone === 'pelvis' && f.waistMin !== undefined && f.waistMax !== undefined && f.waistWidth !== undefined) {
+    const W = SUIT_WAIST, min = f.waistMin - wb, max = f.waistMax + wf, kz = (max - min) / (W.waistMax - W.waistMin), kx = (f.waistWidth + 2 * ws) / W.waistWidth;
+    return about(0, -((min + max) / 2 - ((W.waistMin + W.waistMax) / 2) * kz) * u, kx, 1, kz);
   }
   return out;
 }

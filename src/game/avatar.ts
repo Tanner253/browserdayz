@@ -414,6 +414,8 @@ export class Avatar {
   gearPlaced: { holder: THREE.Object3D; rest: { inv: THREE.Matrix4 }; m: THREE.Matrix4; g: { bone: string; pack?: boolean } }[] = [];
   /** this survivor's head and chest, which what is hung there is fitted to (null: the old suit's) */
   bodyFit: import('./survivors').BodyFit | null = null;
+  /** how far what is worn stands off the body, which what is hung there goes over (see setBulk) */
+  wornBulk: import('./survivors').Bulk | null = null;
   /** a pack is worn: a slung weapon rides outside it */
   packOut = 0;
   /** seconds since the feet came back down after being in the air (-1 = long ago) */
@@ -627,6 +629,7 @@ export interface Avatar {
   setLook: Methods<typeof makeMethods>['setLook'];
   makeArm: Methods<typeof makeMethods>['makeArm'];
   proportion: Methods<typeof dressMethods>['proportion'];
+  setBulk: Methods<typeof dressMethods>['setBulk'];
   gearFit: Methods<typeof dressMethods>['gearFit'];
   setSlung: Methods<typeof dressMethods>['setSlung'];
   setGear: Methods<typeof dressMethods>['setGear'];

@@ -89,8 +89,9 @@ const PIECES = {
   tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048 },
   winter_boots: { src: 'wear_winter_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   // (the stab vest that takes the all-black one's place, the owner: "the stab vest I think needs a new model"; its
-  // straps over the shoulders)
-  stab_vest: { src: 'wear_stab_vest.glb', body: 0, parts: ['neck', 'chest', 'belly', 'hips', 'shoulder'], core: ['chest', 'belly'], covers: ['chest', 'belly'], peeks: ['chest', 'belly'], tex: 2048 },
+  // straps over the shoulders. All of it over the chest and the belly is the vest, painted its own colour: Meshy drew a
+  // T-shirt at its sides, and cut away by its colour it left a hole from each armhole to the waist)
+  stab_vest: { src: 'wear_stab_vest.glb', body: 0, parts: ['neck', 'chest', 'belly', 'hips', 'shoulder', 'upperArm'], core: ['chest', 'belly'], covers: ['chest', 'belly'], plain: true, grey: true, tex: 2048 },
   // (neck to ankle, over everything: there is no base layer to show through it)
   ghillie_suit: { src: 'wear_ghillie_suit.glb', body: 0, parts: [...new Set([...TOP, ...LEGS])], core: ['chest', 'thigh'], covers: [...JACKET.covers, ...TROUSERS.covers], tex: 2048 },
 };
@@ -518,6 +519,27 @@ for (const [id, piece] of Object.entries(PIECES)) {
     D.prim.setAttribute('TANGENT', null);
   }
 
+  // ---- how far it stands off the body over the chest and over the waist, front, back and each side, metres (at rest,
+  // the body facing +z): what is hung over it is hung that much further out (hangFit in src/game/avatar/gear.ts). A
+  // flannel shirt swallowed a chest rig hung at the skin, 2026-10-25 (the owner: "my body equipment and armor is
+  // clipping through my body").
+  let bulk = null;
+  {
+    const sk = body.node.getSkin().listJoints(), y = (n) => new THREE.Vector3().setFromMatrixPosition(M4(sk.find((j) => j.getName() === n).getWorldMatrix())).y;
+    const mine = [...new Set(tris.flat())].map((i) => D.P[i]);
+    const band = (h, pts) => pts.filter((p) => Math.abs(p.y - h) < 0.04 && Math.abs(p.x) < 0.21);
+    const measure = (h, under) => {
+      const g = band(h, mine), b = band(h, B.P.filter((p, n) => under(region.getScalar(n))));
+      if (g.length < 20 || b.length < 20) return null;
+      const G = new THREE.Box3().setFromPoints(g), S = new THREE.Box3().setFromPoints(b);
+      return [G.max.z - S.max.z, S.min.z - G.min.z, (G.max.x - G.min.x - (S.max.x - S.min.x)) / 2].map((v) => +Math.max(0, v).toFixed(4));
+    };
+    // (the chest's skin at the chest; at the waist, all but the arms that hang there)
+    const arms = [REGION.shoulder, REGION.upperArm, REGION.forearm, REGION.hand];
+    const chest = measure(y('spine_03'), (r) => r === REGION.chest), waist = measure(y('pelvis'), (r) => !arms.includes(r));
+    if (chest || waist) bulk = { ...(chest ? { chest } : {}), ...(waist ? { waist } : {}) };
+  }
+
   // ---- the piece: only its own points, in the order they are first used
   const prim = D.prim, used = new Map();
   for (const t of tris) for (const i of t) if (!used.has(i)) used.set(i, used.size);
@@ -539,7 +561,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
       const [s, t] = uv.getElement(i, e), o = (Math.round(t * (info.height - 1)) * info.width + Math.round(s * (info.width - 1))) * info.channels;
       sum += 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
     }
-    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4) });
+    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(bulk ? { bulk } : {}) });
   }
   await dressed.doc.transform(
     unpartition(),
@@ -552,5 +574,5 @@ for (const [id, piece] of Object.entries(PIECES)) {
   const dest = path.join(OUT, `${id}.glb`);
   await io.write(dest, dressed.doc);
   const st = await fs.stat(dest);
-  console.log(`${id}.glb  ${(st.size / 1048576).toFixed(2)} MB  ${tris.length} triangles of ${T.length}, ${used.size} points, light ${mat.getExtras().light}${plain ? `, ${plain}` : ''}`);
+  console.log(`${id}.glb  ${(st.size / 1048576).toFixed(2)} MB  ${tris.length} triangles of ${T.length}, ${used.size} points, light ${mat.getExtras().light}${bulk ? `, off the body ${JSON.stringify(bulk)}` : ''}${plain ? `, ${plain}` : ''}`);
 }

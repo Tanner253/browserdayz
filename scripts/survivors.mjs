@@ -31,7 +31,7 @@ import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-trans
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import * as THREE from 'three';
-import { carry, legJoints, markRegions, padTexture, restPoints, straightenLegs, suitWeights } from './meshy.mjs';
+import { carry, legJoints, markRegions, padTexture, restPoints, straightenLegs, suitWeights, waistOf } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -211,7 +211,7 @@ for (const [n, file] of BODIES.entries()) {
     const skull = new THREE.Box3().setFromPoints(P.filter((p, i) => region.getScalar(i) <= 1));
     const chest = new THREE.Box3().setFromPoints(P.filter((p, i) => region.getScalar(i) === 3 && Math.abs(p.y - sp.y) < 0.04 && Math.abs(p.x) < 0.21));
     const r = (v) => +v.toFixed(4);
-    const fit = { crown: r(skull.max.y - head.y), headZ: r((skull.min.z + skull.max.z) / 2 - head.z), headDepth: r(skull.max.z - skull.min.z), chestMin: r(chest.min.z - sp.z), chestMax: r(chest.max.z - sp.z), chestWidth: r(chest.max.x - chest.min.x) };
+    const fit = { crown: r(skull.max.y - head.y), headZ: r((skull.min.z + skull.max.z) / 2 - head.z), headDepth: r(skull.max.z - skull.min.z), chestMin: r(chest.min.z - sp.z), chestMax: r(chest.max.z - sp.z), chestWidth: r(chest.max.x - chest.min.x), ...waistOf(node) };
     node.setExtras({ ...node.getExtras(), height: +(hi - lo).toFixed(4), stands: STANDS[n], fit });
   }
   for (const m of root.listMaterials()) m.setName(`survivor_${n}`);

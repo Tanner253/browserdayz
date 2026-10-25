@@ -80,7 +80,9 @@ export interface Worn {
  * What is worn over the clothes as a thing of its own (GEAR in src/game/avatar/gear.ts), and what of a body it lies on:
  * what is worn under it is drawn in there, or a puffy jacket stood out through a vest.
  */
-const OVER: Record<string, Region[]> = { chest_rig: ['chest'], armor_vest: ['chest', 'belly'], heavy_armor: ['chest', 'belly', 'shoulder'], life_vest: ['chest', 'belly'] };
+const OVER: Record<string, Region[]> = { chest_rig: ['chest'], armor_vest: ['chest', 'belly'], heavy_armor: ['chest', 'belly', 'shoulder'], life_vest: ['chest', 'belly'], military_belt: ['hips'], hip_pack: ['hips'] };
+/** the most that what is hung on a body is moved out over what is worn, metres (see Bulk) */
+const BULK = 0.05;
 /**
  * Things hung as they are (GEAR) that close round the head: the hair that stands off the skull is not drawn under them
  * (Anya's bun stood out through a balaclava). As a Worn of no model, which only hides.
@@ -198,6 +200,8 @@ export interface Frame {
    * how big it is drawn, as it stands (`stands` metres, against the `height` it was built: scripts/survivors.mjs)
    */
   lengths: (l: Lengths | null, scale: number | null, fit: BodyFit | null) => void;
+  /** how far what is worn stands off the body, the most of it (see Bulk): what is hung over it goes further out */
+  bulk?: (b: Bulk) => void;
 }
 
 /** a body's own bone lengths: each bone's place on the one above it, by name (the build fits them: scripts/meshy.mjs, fitProportions) */
@@ -214,12 +218,26 @@ export function lengthsOf(scene: THREE.Object3D): Lengths {
  * +z as the file stands (scripts/survivors.mjs): hats, vests and packs are hung by it (Avatar.gearFit).
  */
 export interface BodyFit {
+  /** and its waist against the pelvis joint (waistOf in scripts/meshy.mjs); none in a body built before it */
+  waistMin?: number;
+  waistMax?: number;
+  waistWidth?: number;
   crown: number;
   headZ: number;
   headDepth: number;
   chestMin: number;
   chestMax: number;
   chestWidth: number;
+}
+
+/**
+ * How far a piece of clothing stands off its body over the chest and over the waist, metres: in front, behind, and to
+ * each side (scripts/wear.mjs, in its material's extras). Vests, packs and belts are hung that much further out
+ * (hangFit in src/game/avatar/gear.ts): hung at the skin, a flannel shirt swallowed a chest rig.
+ */
+export interface Bulk {
+  chest?: [number, number, number];
+  waist?: [number, number, number];
 }
 
 /** how big a body is drawn so that it stands as tall as it is said to (null: as it is built) */
@@ -424,7 +442,7 @@ export class Wardrobe {
     this.wornShapes = [];
     this.wornShown = now;
     this.hide.hide.value = this.hide.shrink.value = 0;
-    const skin = this.skin;
+    const skin = this.skin, bulk: Bulk = {};
     got.forEach((gltf, k) => {
       const w = worn[k];
       // (a piece that did not come leaves the skin under it drawn)
@@ -437,6 +455,13 @@ export class Wardrobe {
         if (!s.isSkinnedMesh) return;
         const mat = (s.material as THREE.MeshStandardMaterial).clone();
         const light = (mat.userData.light as number | undefined) ?? 0.4;
+        // (the most any piece stands off the body, each way)
+        const own = mat.userData.bulk as Bulk | undefined;
+        for (const band of ['chest', 'waist'] as const) {
+          const b = own?.[band];
+          // (no more than BULK: a flannel's hem flares a hand's breadth off the waist, and is drawn in under a belt instead, OVER)
+          if (b) bulk[band] = (bulk[band] ?? [0, 0, 0]).map((v, i) => Math.max(v, Math.min(BULK, b[i]))) as [number, number, number];
+        }
         // (stained where the body under it is: its points brought into the body's own space, as the suit's pieces are in Avatar.make)
         const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
@@ -471,6 +496,7 @@ export class Wardrobe {
       });
     });
     if (this.wornShapes.length) f.dressed(this.wornShapes);
+    f.bulk?.(bulk);
   }
 
   private async apply() {
