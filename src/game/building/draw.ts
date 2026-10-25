@@ -238,7 +238,9 @@ export class BaseDraw {
       }
       const [kind, name, more] = key.split(':'), paint = (/^\d$/.test(name) ? Number(name) : name) as Paint;
       const geo = kind === '__lock' ? lockGeometry(more) : more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
-      m = new THREE.InstancedMesh(geo, paintFor(paint, this.atmo), Math.max(16, Math.ceil(list.length * 1.5)));
+      // (a leaf with ironwork is two groups, its paint and its iron: see leafGeometry)
+      const mat = geo.groups.length > 1 ? [paintFor(paint, this.atmo), paintFor('iron', this.atmo)] : paintFor(paint, this.atmo);
+      m = new THREE.InstancedMesh(geo, mat, Math.max(16, Math.ceil(list.length * 1.5)));
       m.castShadow = m.receiveShadow = true;
       m.name = `base:${key}`;
       this.scene.add(m);

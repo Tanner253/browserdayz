@@ -23,7 +23,7 @@ export type Solid = (
  * plate and rivets". A wooden door is painted boards, a metal one a plate of painted steel, a garage door galvanised
  * sheet; an opening's frame is dark timber; the claim's flag is cloth.
  */
-export type Paint = 0 | 1 | 2 | 3 | 'door' | 'steel' | 'galv' | 'trim' | 'flag' | 'bag';
+export type Paint = 0 | 1 | 2 | 3 | 'door' | 'steel' | 'galv' | 'trim' | 'flag' | 'bag' | 'iron';
 
 export interface Shape {
   /** what stops a body and a bullet, and is drawn */
@@ -56,6 +56,8 @@ export interface Leaf {
   solid: Solid[];
   dress?: Solid[];
   paint?: Paint;
+  /** its ironwork (straps, hinges, handles), drawn in iron of its own: made from what of its dress is shaded IRON (`ironOf`) */
+  iron?: Solid[];
 }
 
 const H = CELL / 2;
@@ -274,14 +276,42 @@ export function moved(s: Solid, [dx, dy, dz]: [number, number, number]): Solid {
 /** everything of a piece as it stands shut, in its own frame: what it is, what dresses it, and its leaves hung shut */
 export function shutOf(kind: string, dress = true): Solid[] {
   const s = shapeOf(kind);
-  return [...s.solid, ...(dress ? [...(s.dress ?? []), ...(s.cloth?.solid ?? [])] : []), ...(s.leaves ?? []).flatMap((l) => [...l.solid, ...(dress ? (l.dress ?? []) : [])].map((q) => moved(q, l.hinge)))];
+  return [...s.solid, ...(dress ? [...(s.dress ?? []), ...(s.cloth?.solid ?? [])] : []), ...(s.leaves ?? []).flatMap((l) => [...l.solid, ...(dress ? [...(l.dress ?? []), ...(l.iron ?? [])] : [])].map((q) => moved(q, l.hinge)))];
+}
+
+/**
+ * A leaf's ironwork drawn in iron of its own, with a raised edge: what of its dress was shaded IRON on its paint, and
+ * read as black holes through the leaf (the navigator, 2026-10-24, of the locked door's straps: "Give them an iron look:
+ * dark grey with a little sheen, and a raised edge"). Each strap, hinge and handle a box, and a plate a little in from
+ * its edges on each of its broad faces: the step catches the light as a forged edge does.
+ */
+function ironOf(l: Leaf): Leaf {
+  const iron: Solid[] = [], dress: Solid[] = [];
+  for (const q of l.dress ?? []) {
+    if (q.c !== IRON || !('box' in q)) {
+      dress.push(q);
+      continue;
+    }
+    const [cx, cy, cz, ...size] = q.box, thin = size.indexOf(Math.min(...size)), step = 0.007, lift = 0.006;
+    iron.push({ box: q.box });
+    for (const side of [-1, 1]) {
+      const b = [cx, cy, cz, ...size.map((v, i) => (i === thin ? lift : Math.max(0.004, v - 2 * step)))] as [number, number, number, number, number, number];
+      b[thin] += side * (size[thin] / 2 + lift / 2);
+      iron.push({ box: b });
+    }
+  }
+  return iron.length ? { ...l, dress, iron } : l;
 }
 
 const made = new Map<string, Shape>();
 /** a piece's solids */
 export function shapeOf(kind: string): Shape {
   let s = made.get(kind);
-  if (!s) made.set(kind, (s = SHAPES[kind]()));
+  if (!s) {
+    s = SHAPES[kind]();
+    if (s.leaves) s = { ...s, leaves: s.leaves.map(ironOf) };
+    made.set(kind, s);
+  }
   return s;
 }
 
