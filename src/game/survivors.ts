@@ -87,7 +87,7 @@ const BULK = 0.05;
  * Things hung as they are (GEAR) that close round the head: the hair that stands off the skull is not drawn under them
  * (Anya's bun stood out through a balaclava). As a Worn of no model, which only hides.
  */
-const BARE: Record<string, Region[]> = { balaclava: ['hair'], ghillie_hood: ['hair'] };
+const BARE: Record<string, Region[]> = { balaclava: ['hair'], ghillie_hood: ['hair'], gasmask: ['hair'] };
 export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id]) } : null);
 /** the parts of the trousers that a top long enough lies over */
 const WAIST = hides(['belly', 'hips', 'thigh']);
@@ -218,6 +218,9 @@ export function lengthsOf(scene: THREE.Object3D): Lengths {
  * +z as the file stands (scripts/survivors.mjs): hats, vests and packs are hung by it (Avatar.gearFit).
  */
 export interface BodyFit {
+  /** and the middle of its skull's top against the Head joint (headOf in scripts/meshy.mjs) */
+  topX?: number;
+  topZ?: number;
   /** and its waist against the pelvis joint (waistOf in scripts/meshy.mjs); none in a body built before it */
   waistMin?: number;
   waistMax?: number;

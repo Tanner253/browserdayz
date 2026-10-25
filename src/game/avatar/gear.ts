@@ -22,6 +22,8 @@ const MASK: Worn = { bone: 'Head', p: [0.0007, 1.5772, 0.1298], r: [-Math.PI / 2
  * was fitted to it, and is hung on a survivor's body moved and sized by the difference (Avatar.gearFit).
  */
 export const SUIT_FIT = { crown: 0.212, headZ: 0.017, headDepth: 0.268, chestMin: -0.19, chestMax: 0.143, chestWidth: 0.407 };
+/** and its skull's top, against the Head joint (headOf in scripts/meshy.mjs): hats and masks were fitted there */
+export const SUIT_HEAD = { topX: -0.0028, topZ: 0.0025 };
 /** and its waist, against the pelvis joint (progress/survivors/waist.mjs): what is worn round it was fitted there */
 export const SUIT_WAIST = { waistMin: -0.154, waistMax: 0.1541, waistWidth: 0.4549 };
 
@@ -32,7 +34,7 @@ export const SUIT_WAIST = { waistMin: -0.154, waistMax: 0.1541, waistWidth: 0.45
  * in, the body at rest as the game turns it (facing -z) and draws it (BODY_SCALE); none for the suit (fit null).
  * @param inv the inverse of the carrying bone's place at rest (Avatar.gearRest)
  */
-export function hangFit(f: (typeof SUIT_FIT & Partial<typeof SUIT_WAIST>) | null, g: { bone: string; pack?: boolean }, inv: THREE.Matrix4, bulk: Bulk | null = null): THREE.Matrix4 {
+export function hangFit(f: (typeof SUIT_FIT & Partial<typeof SUIT_WAIST> & Partial<typeof SUIT_HEAD>) | null, g: { bone: string; pack?: boolean }, inv: THREE.Matrix4, bulk: Bulk | null = null): THREE.Matrix4 {
   const out = new THREE.Matrix4();
   if (!f) return out;
   // (over what is worn there, not the skin: in front, behind, to each side; see Bulk)
@@ -40,8 +42,14 @@ export function hangFit(f: (typeof SUIT_FIT & Partial<typeof SUIT_WAIST>) | null
   const J = new THREE.Vector3().setFromMatrixPosition(inv.clone().invert()), S = SUIT_FIT, u = BODY_SCALE;
   const about = (dy: number, dz: number, sx: number, sy: number, sz: number) =>
     out.makeTranslation(J.x, J.y + dy, J.z + dz).multiply(new THREE.Matrix4().makeScale(sx, sy, sz)).multiply(new THREE.Matrix4().makeTranslation(-J.x, -J.y, -J.z));
-  // (the head moved, not sized: a head's depth is no measure of it, the woman's bun made hers the biggest)
-  if (g.bone === 'Head') return about((f.crown - S.crown) * u, -(f.headZ - S.headZ) * u, 1, 1, 1);
+  // (the head moved, not sized: a head's depth is no measure of it, the woman's bun made hers the biggest. By the middle
+  // of the top of the skull, where a hat and a hood sit, not the head's as a whole, which a beard draws forward: see
+  // headOf in scripts/meshy.mjs. The game turns the body half round, so across and forward both change sign.)
+  if (g.bone === 'Head') {
+    if (f.topZ === undefined) return about((f.crown - S.crown) * u, -(f.headZ - S.headZ) * u, 1, 1, 1);
+    const H = SUIT_HEAD, dx = (f.topX ?? H.topX) - H.topX, dz = f.topZ - H.topZ;
+    return out.makeTranslation(-dx * u, (f.crown - S.crown) * u, -dz * u);
+  }
   if (g.bone === 'spine_03' && g.pack) return about(0, -(f.chestMin - cb - S.chestMin) * u, 1, 1, 1);
   if (g.bone === 'spine_03') {
     const min = f.chestMin - cb, max = f.chestMax + cf, kz = (max - min) / (S.chestMax - S.chestMin), kx = (f.chestWidth + 2 * cs) / S.chestWidth;
@@ -83,18 +91,19 @@ export const GEAR: Record<string, Worn> = {
   armor_vest: { bone: 'spine_03', p: [0, 1.0, -0.014], r: [0.15, 0, 0], s: [1.0, 0.88, 1.1] },
   heavy_armor: { bone: 'spine_03', p: [0, 0.95, 0.07], r: [-0.18, Math.PI, 0], s: [1.2, 1.02, 1.15] },
   // (the cap and the soft hat: their bands at the brow. The cap's peak is toward +z as its model lies, so it is turned round.)
-  patrol_cap: { bone: 'Head', p: [0, 1.64, 0.01], r: [0, Math.PI, 0], s: [1, 1, 1] },
-  fishermans_hat: { bone: 'Head', p: [0, 1.66, 0.0], r: [0, 0, 0], s: [1, 1, 1] },
+  patrol_cap: { bone: 'Head', p: [0, 1.62, 0.01], r: [-0.12, Math.PI, 0], s: [1, 1, 1] },
+  fishermans_hat: { bone: 'Head', p: [0, 1.64, 0.0], r: [0, 0, 0], s: [1, 1, 1] },
   // (the steel pot: its brow is toward -z, as the K6-3's is. It is a smaller helmet than the other two, as it was made.)
   helmet_m1: { bone: 'Head', p: [0, 1.62, 0.012], r: [0, 0, 0], s: [1, 1, 1] },
   // (the gas mask: see MASK)
   gasmask: MASK,
   // (what the survivors' card added, 2026-10-25: made in Higgsfield, their fronts toward +z as they came, so turned
-  // round to face the way the body does; fitted on the four bodies in the sandbox, `&gear=`)
+  // round to face the way the body does; fitted on the four bodies in the sandbox, `&gear=`. The soft ones press into
+  // the hair as the suit's hood did not: the cap and the boonie set lower than on the suit, the cap tipped forward.)
   // (said against the suit's head, its crown at 1.749 and some 26 cm across both ways, its middle 1.6 cm before the joint)
-  beanie: { bone: 'Head', p: [0, 1.59, -0.016], r: [0, Math.PI, 0], s: [1.08, 0.72, 1.35] },
-  ushanka: { bone: 'Head', p: [0, 1.605, -0.016], r: [0, Math.PI, 0], s: [0.92, 0.82, 0.92] },
-  beret: { bone: 'Head', p: [0, 1.643, -0.016], r: [0, Math.PI, 0], s: [1.0, 0.6, 1.0] },
+  beanie: { bone: 'Head', p: [0, 1.61, -0.016], r: [0, Math.PI, 0], s: [1.08, 0.72, 1.35] },
+  ushanka: { bone: 'Head', p: [0, 1.595, -0.016], r: [0, Math.PI, 0], s: [0.88, 0.8, 0.88] },
+  beret: { bone: 'Head', p: [0, 1.633, -0.016], r: [0, Math.PI, 0], s: [1.0, 0.6, 1.0] },
   // (its front is toward +x as it came, and it is the shell of one: drawn out round a head 26 cm deep)
   balaclava: { bone: 'Head', p: [0, 1.412, -0.022], r: [0, Math.PI / 2, 0], s: [1.24, 1.15, 1.28] },
   ghillie_hood: { bone: 'Head', p: [0, 1.48, 0.01], r: [0, Math.PI, 0], s: [1.0, 1.0, 1.0] },
@@ -239,7 +248,9 @@ export function placeWorn(id: string, obj: THREE.Object3D, ids: string[], into =
   if (!g) return null;
   const helmet = ids.some((other) => GEAR[other] === MASK) ? ids.map((other) => OVER_MASK[other]).find((h) => !!h) : undefined;
   const nudge = helmet && helmet === OVER_MASK[id] ? helmet.nudge : undefined;
-  into.compose(_a.set(g.p[0] + (nudge?.[0] ?? 0), g.p[1] + (nudge?.[1] ?? 0), g.p[2] + (nudge?.[2] ?? 0)), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s));
+  // (a hat or a helmet over a balaclava sits on its knit, a little higher and wider: a beret sank into one, 2026-10-25)
+  const knit = id !== 'balaclava' && g.bone === 'Head' && g !== MASK && ids.includes('balaclava') ? 1 : 0;
+  into.compose(_a.set(g.p[0] + (nudge?.[0] ?? 0), g.p[1] + (nudge?.[1] ?? 0) + knit * 0.012, g.p[2] + (nudge?.[2] ?? 0)), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s).multiplyScalar(1 + knit * 0.05));
   if (helmet && g === MASK && helmet.keep.length) under(obj, into, helmet.keep);
   return into;
 }
