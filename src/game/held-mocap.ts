@@ -6,11 +6,13 @@
 // it is held.
 
 import * as THREE from 'three';
-import HANDS from './avatar/hands.json';
+import { MOCAP_HANDS } from './mocap-switch';
 
 type Frame = [number, number, number, number, number, number, number];
 type Track = { dur: number; r: Frame[]; l: Frame[]; mouth?: number[] };
-const lib = HANDS as unknown as Record<string, Track>;
+// (fetched only with the hands on the motion capture, src/game/mocap-switch.ts: until it has come nothing moves on it)
+let lib: Record<string, Track> = {};
+if (MOCAP_HANDS) void import('./avatar/hands.json').then((m) => (lib = m.default as unknown as Record<string, Track>));
 
 const _q = new THREE.Quaternion();
 /** where along a track `u` (0..1 of it) falls: the frame before, and how far on to the next */
@@ -24,7 +26,9 @@ function at(n: number, u: number): [number, number, number] {
  * (`pos`, metres in the eye's measure) and how it has turned (`quat`, in the eye's measure).
  */
 export function handMove(name: string, side: 'r' | 'l', u: number, from: number, pos: THREE.Vector3, quat: THREE.Quaternion) {
-  const k = lib[name][side], [a, b, w] = at(k.length, u), [a0, b0, w0] = at(k.length, from);
+  const k = lib[name]?.[side];
+  if (!k) return void (pos.set(0, 0, 0), quat.identity());
+  const [a, b, w] = at(k.length, u), [a0, b0, w0] = at(k.length, from);
   const p = (i: number, j: number, s: number, o: THREE.Vector3) => o.set(k[i][0] + (k[j][0] - k[i][0]) * s, k[i][1] + (k[j][1] - k[i][1]) * s, k[i][2] + (k[j][2] - k[i][2]) * s);
   const q = (i: number, j: number, s: number, o: THREE.Quaternion) => o.set(k[i][3], k[i][4], k[i][5], k[i][6]).slerp(_q.set(k[j][3], k[j][4], k[j][5], k[j][6]), s);
   p(a, b, w, pos).sub(p(a0, b0, w0, new THREE.Vector3()));
@@ -33,12 +37,14 @@ export function handMove(name: string, side: 'r' | 'l', u: number, from: number,
 
 /** how near the right hand is to the mouth at a share `u` of the drink, 0..1 */
 export function mouthAt(u: number): number {
-  const m = lib.drink.mouth!, [a, b, w] = at(m.length, u);
+  const m = lib.drink?.mouth;
+  if (!m) return 0;
+  const [a, b, w] = at(m.length, u);
   return m[a] + (m[b] - m[a]) * w;
 }
 
 /** how long a movement takes as captured, seconds */
-export const lengthOf = (name: string) => lib[name].dur;
+export const lengthOf = (name: string) => lib[name]?.dur ?? 0;
 
 /**
  * How far out a jab is at a share `u` of the game's punch (0 at the guard, 1 the arm out) and how far it is drawn back
@@ -46,7 +52,9 @@ export const lengthOf = (name: string) => lib[name].dur;
  * jab's own moment of reaching out is put there, the drawing back before it and the coming home after as captured.
  */
 export function jabAt(side: 1 | -1, u: number): { out: number; wind: number } {
-  const t = lib[side > 0 ? 'jabR' : 'jabL'], k = side > 0 ? t.r : t.l, z0 = k[0][2];
+  const t = lib[side > 0 ? 'jabR' : 'jabL'];
+  if (!t) return { out: 0, wind: 0 };
+  const k = side > 0 ? t.r : t.l, z0 = k[0][2];
   let far = 0;
   for (let i = 1; i < k.length; i++) if (k[i][2] < k[far][2]) far = i;
   const reach = Math.max(1e-3, z0 - k[far][2]), hit = far / (k.length - 1);

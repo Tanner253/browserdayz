@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { stretch } from './gait';
 import { MOCAP, MOVES } from './deeds';
 import { slashAt } from '../held-mocap';
+import { MOCAP_HANDS } from '../mocap-switch';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, RAISE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
@@ -304,7 +305,7 @@ export const updateMethods = {
       this.strikeT += dt;
       const u = this.strikeT / this.strikeDur;
       // (a survivor's on the motion capture: the slash, as the eye sees its own: see held-mocap.ts)
-      const slash = deeds?.get('slash');
+      const slash = MOCAP_HANDS ? deeds?.get('slash') : undefined;
       if (u >= 1 || dead) this.strikeT = -1;
       else if (slash) this.layer(slash, slashAt(u), strikeShare(u));
       else this.layer('strike', strikeAt(u), strikeShare(u));
@@ -509,7 +510,7 @@ export const updateMethods = {
           const level = (1 - pr) * THREE.MathUtils.clamp(1 + Math.min(0, pitch) / 0.8, 0, 1);
           // (a pistol, lying, out ahead and level a hand under the aim: at the ready as it is stood with, low and dipped,
           // it was pointed into the ground under the chest)
-          const p = set.ready.p, a = set.aim.p, lie = held.long ? 0 : pr;
+          const p = set.ready.p, a = set.aim.p, lie = held.long || !MOCAP_HANDS ? 0 : pr;
           const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] }
             : lie > 0.001 ? { p: [p[0] + (a[0] - p[0]) * lie, p[1] + (a[1] - 0.06 - p[1]) * lie, p[2] + (a[2] - p[2]) * lie], r: [set.ready.r[0] * (1 - lie), set.ready.r[1] * (1 - lie), set.ready.r[2]] } : set.ready;
           if (butt && chest) {

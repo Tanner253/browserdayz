@@ -28,6 +28,7 @@ import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
 import { HELD_FIT } from './held-size';
 import { handMove, jabAt, lengthOf, mouthAt, slashAt } from './held-mocap';
+import { MOCAP_HANDS } from './mocap-switch';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -726,7 +727,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.16, -0.125, -0.42], tip: [-0.3, 0.84, -0.45], edge: [-0.25, -0.45, -0.86] },
     guard: { p: [0.1, -0.04, -0.4], tip: [-0.88, 0.46, -0.12], edge: [0.1, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.3, -0.24, -0.16],
+    elbow: [0.33, -0.34, -0.2],
     two: false,
     // (its rubber grip is the lower twelve centimetres, under the collar)
     grip: 0.062,
@@ -735,7 +736,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.16, -0.135, -0.42], tip: [-0.34, 0.8, -0.5], edge: [-0.25, -0.5, -0.83] },
     guard: { p: [0.13, -0.05, -0.4], tip: [-0.93, 0.36, -0.1], edge: [0.1, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.3, -0.25, -0.16],
+    elbow: [0.33, -0.35, -0.2],
     two: false,
     // (a long handle, twenty-eight centimetres of it: held at its middle)
     grip: 0.13,
@@ -744,7 +745,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.4, 0.85, -0.34], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.2, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.31, -0.26, -0.15],
+    elbow: [0.34, -0.36, -0.18],
     two: true,
     grip: 0.175,
   },
@@ -754,7 +755,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     rest: { p: [0.12, -0.13, -0.42], tip: [0.2, 0.86, 0.42], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.31, -0.26, -0.15],
+    elbow: [0.34, -0.36, -0.18],
     two: true,
     // (the left hand above the knob, the right a hand's width up the tape)
     grip: 0.175,
@@ -764,7 +765,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.42, 0.84, -0.34], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.31, -0.26, -0.15],
+    elbow: [0.34, -0.36, -0.18],
     two: true,
     grip: 0.3,
   },
@@ -1886,13 +1887,11 @@ export class Weapons {
         root, kind: 'melee', flash, body, melee: style,
         grips: {
           // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
-          // (a fist round the handle: the thumb comes over the fingers, not out along the handle; and the fingers across
-          // it and a little up it, toward the forearm, the elbow raised to match (the styles' `elbow`): the wrist bent 48
-          // degrees where it was 96. They ran a third of the way down the handle and away
-          // from the forearm, and the wrist folded down to make them: "the wris tholding the tool is all bent downwards
-          // it doesnt look natural at all", the owner, 2026-10-25)
-          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.16, 0.25, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
-          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.16, 0.25, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
+          // (a fist round the handle: the thumb comes over the fingers, not out along the handle. As production holds it,
+          // in both persons, the fingers and the elbows: the owner, 2026-10-25, "the hands and fingers and tool positioning
+          // is bad and our prod is better")
+          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
+          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
         hip: new THREE.Vector3(...MELEE.hip),
@@ -3771,7 +3770,7 @@ export class Weapons {
    */
   throwOut(then?: () => void): boolean {
     const h = this.held;
-    if (!h || h.ending || h.thrown !== undefined) return false;
+    if (!MOCAP_HANDS || !h || h.ending || h.thrown !== undefined) return false;
     h.thrown = 0;
     h.then = then;
     for (const c of h.root.children) c.visible = false;
@@ -4434,16 +4433,25 @@ export class Weapons {
         rot.y += (drive * 0.12 - lever * 0.3) * (1 - up);
         pos.add(new THREE.Vector3(0.02 * drive - 0.05 * lever, 0.07 * lift - 0.2 * drive + 0.11 * lever, -0.1 * drive + 0.05 * lever).multiplyScalar(1 - up));
       } else if (a.name === 'swing') {
-        // On the motion capture, the blow everybody else sees the body strike (see held-mocap.ts slashAt): what is in
-        // the fist goes where the right hand went, drawn up beside the head and brought down across, by a share of the
-        // way (the eye is on the end of that arm), and home again over the end.
-        const len = lengthOf('slash'), home = 1 - THREE.MathUtils.smoothstep(k, 0.72, 1);
-        handMove('slash', 'r', slashAt(k) / len, slashAt(0) / len, _swungP, _swungQ);
-        pos.addScaledVector(_swungP.multiply(SWUNG.by), home);
-        _swungE.setFromQuaternion(_swungQ.slerp(_swungI, 1 - SWUNG.turn * home), 'XYZ');
-        rot.x += _swungE.x;
-        rot.y += _swungE.y;
-        rot.z += _swungE.z;
+        if (MOCAP_HANDS) {
+          // On the motion capture (src/game/mocap-switch.ts), the blow everybody else sees the body strike (see
+          // held-mocap.ts slashAt): what is in the fist goes where the right hand went, drawn up beside the head and
+          // brought down across, by a share of the way (the eye is on the end of that arm), and home again over the end.
+          const len = lengthOf('slash'), home = 1 - THREE.MathUtils.smoothstep(k, 0.72, 1);
+          handMove('slash', 'r', slashAt(k) / len, slashAt(0) / len, _swungP, _swungQ);
+          pos.addScaledVector(_swungP.multiply(SWUNG.by), home);
+          _swungE.setFromQuaternion(_swungQ.slerp(_swungI, 1 - SWUNG.turn * home), 'XYZ');
+          rot.x += _swungE.x;
+          rot.y += _swungE.y;
+          rot.z += _swungE.z;
+        } else {
+          const wind = THREE.MathUtils.smoothstep(k, 0, 0.3);
+          const strike = THREE.MathUtils.smoothstep(k, 0.3, 0.5);
+          const recover = THREE.MathUtils.smoothstep(k, 0.55, 1);
+          rot.x += (wind * 0.9 - strike * 2.0) * (1 - recover);
+          rot.y += (wind * 0.4 - strike * 0.6) * (1 - recover);
+          pos.add(new THREE.Vector3(-0.08 * strike, 0.08 * wind, -0.12 * strike).multiplyScalar(1 - recover));
+        }
       }
     } else {
       if (m.bolt) m.bolt.rotation.x = 0;
@@ -4856,9 +4864,13 @@ export class Weapons {
     if (a && a.name === 'punch' && a.data) {
       const k = Math.min(1, a.t / a.dur);
       thrown = a.data.hand ? 1 : -1;
-      // On the motion capture: a jab's own drawing back, reach and coming home, as the body is seen to throw it (it
-      // lands at 0.28 of the way through, see the action timeline).
-      ({ out, wind } = jabAt(thrown as 1 | -1, k));
+      // Drawn back a touch, thrown fast (it lands at 0.28 of the way through, see the action
+      // timeline), held a moment on the end of the arm and brought home slower than it went.
+      wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
+      const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
+      out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
+      // (or a jab's own drawing back, reach and coming home on the motion capture: see src/game/mocap-switch.ts)
+      if (MOCAP_HANDS) ({ out, wind } = jabAt(thrown as 1 | -1, k));
     }
     const hand = (side: 1 | -1): HandGrip => {
       const strike = side === thrown ? out : 0;
@@ -4937,8 +4949,11 @@ export class Weapons {
       pos.set(T.at[0] + Math.sin(h.age * 1.3) * 0.002, T.at[1] + Math.sin(h.age * 1.9) * 0.003, T.at[2]);
       rot.set(T.turn[0], T.turn[1], T.turn[2]);
     } else if (h.kind === 'eat' || h.kind === 'drink') {
-      // up to the mouth and back, on the motion capture: at the moments the body everybody sees is drinking
-      const len = lengthOf('drink'), m = mouthAt((t % len) / len);
+      // up to the mouth and back, once per bite / gulp (or at the moments the body everybody sees is drinking, on the
+      // motion capture: see src/game/mocap-switch.ts)
+      const period = h.kind === 'eat' ? 0.95 : 1.25;
+      const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, t - 0.3) / period) * Math.PI * 2);
+      const len = lengthOf('drink'), m = MOCAP_HANDS ? mouthAt((t % len) / len) : h.kind === 'drink' ? Math.pow(cyc, 0.6) : cyc;
       pos.lerp(new THREE.Vector3(H.mouth[0], H.mouth[1] + sy * H.mouthBy[0], H.mouth[2] + sy * H.mouthBy[1]), m * 0.92);
       rot.x = (h.kind === 'drink' ? H.tilt.drink : H.tilt.eat) * m;
       rot.z = -0.15 * m;

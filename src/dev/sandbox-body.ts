@@ -8,7 +8,7 @@
 //   &bodies=free.walk,ak.aim.crouch.walk.L,m9.aim,hatchet.jog.FL,ak.prone.walk,free.turn
 //     each body's words, by dots: what is held (free, or an item: ak, m9, hatchet...), aim, crouch or prone, idle /
 //     walk / jog / sprint / run (the hurried crouch) or a pace (v2.5, m/s), a way (F B L R FL FR BL BR), turn (on the
-//     spot), up / down (the aim pitched), limp
+//     spot), up / down (the aim pitched), limp, swing (a blow with what is in the fist, the moments drawn across it)
 //   &frames=12&fps=15&settle=1.2    moments drawn (after so many seconds of going), how many a second
 //   &across=4                       moments to a row of blocks (a picture is drawn no more than 8192 a side)
 //   &cols=4&view=q                  bodies across a block; the camera (q, side, front, back, top), framed on each body
@@ -36,7 +36,7 @@ interface Stage {
 /** the ways, radians to the body's left of ahead */
 const WAYS: Record<string, number> = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 };
 
-export interface BodySpec { words: string; held: string | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean }
+export interface BodySpec { words: string; held: string | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean }
 
 /** what a cell's words ask for, at the pace the game would go at (src/game/player.ts: 1.7 walking, 4.0 at a jog, 6.2 flat out, 1.9 crouched) */
 export function specOf(words: string): BodySpec {
@@ -56,7 +56,7 @@ export function specOf(words: string): BodySpec {
       if (way && Math.abs(WAYS[way]) > 90) speed *= 0.75;
     }
   }
-  return { words, held, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp') };
+  return { words, held, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing') };
 }
 
 /** a stand-in for the game's sky and sun: what a body and a gun ask of it */
@@ -107,6 +107,9 @@ export async function stageBodies(o: Stage) {
     }
     a.prone = s.prone;
     a.limping = s.limp;
+    // (every body from the same moment of its stride, so that two builds drawn side by side step together)
+    (a as unknown as { phase: number }).phase = 0;
+    if ((a as { gait?: { phase: number } }).gait) (a as unknown as { gait: { phase: number } }).gait.phase = 0;
     return { a, s, pos: new THREE.Vector3((i % 8) * 12, 0, Math.floor(i / 8) * 12), face: 0 };
   }));
   const vel = new THREE.Vector3();
@@ -122,6 +125,8 @@ export async function stageBodies(o: Stage) {
   // (gone on a while first, so what is shown is the going and not the start of it, at most a sixtieth at a step)
   const sub = (t: number) => { for (let k = Math.ceil(t * 60); k > 0; k--) step(t / Math.ceil(t * 60)); };
   sub(settle);
+  // (a blow begun as the first moment is drawn: the moments are across it)
+  for (const b of bodies) if (b.s.swing) b.a.swing();
   const camera = new THREE.PerspectiveCamera(30, cw / ch, 0.05, 200);
   // (each moment a block of `per` bodies across: the blocks `across` to a row)
   const across = Math.min(frames, Math.max(1, Math.floor(+(q.get('across') ?? 1)))), per = cols / across, blockRows = Math.ceil(bodies.length / per);
