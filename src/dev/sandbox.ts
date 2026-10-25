@@ -10,7 +10,7 @@
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length; with
 //                                               several files, one each (clip=walk,mc_walk: the old beside the new)
-//   &survivor=0,1,2,3&clip=jogF&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
+//   &survivor=-1,0,1,2,3&clip=jogF&t=0.3       the survivors' bodies (-1: the old suit) (src/game/survivors.ts) on the game's skeleton, playing
 //                                               one of the game's movements (moves.glb) or the file's own; the one beside too
 //   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
 //   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
@@ -239,6 +239,12 @@ if (bb) {
       // (where the bones that carry gear stand as the skeleton is made, before the body's own lengths: as Avatar.make measures them)
       o.updateMatrixWorld(true);
       const rest = new Map(['Head', 'spine_03', 'pelvis'].map((b) => [b, o.getObjectByName(b)?.matrixWorld.clone().invert()] as const));
+      // (-1: the old suit as it was, to judge a body against: the owner, 2026-10-25, "our previous player model was better")
+      if (n < 0) {
+        const playing = playOn(o, gltf.animations);
+        place(o, 'suit', { playing });
+        continue;
+      }
       const body = await wearBody(o, n, list('wear').length ? 0 : hide);
       // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
       const worn: Worn[] = list('wear').map((w) => {

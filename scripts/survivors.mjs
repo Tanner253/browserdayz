@@ -31,7 +31,7 @@ import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-trans
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import * as THREE from 'three';
-import { carry, markRegions, padTexture, restPoints } from './meshy.mjs';
+import { carry, markRegions, padTexture, restPoints, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -56,6 +56,8 @@ const ONLY = process.argv.slice(2).map(Number);
 await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
+/** the old suit, whose weights each body takes (suitWeights in scripts/meshy.mjs) */
+const SUIT = await io.read(path.join(OUT, 'survivor.glb'));
 
 /**
  * The base layer's cloth made clean (the navigator, 2026-10-25: the shorts "carry orange-red streaks that read as texture
@@ -170,6 +172,8 @@ for (const [n, file] of BODIES.entries()) {
   const { doc, node, hands, worn, proportions } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
   const root = doc.getRoot();
   const regions = markRegions(doc, node);
+  // (weighted as the old suit is, not as Meshy rigged it: see suitWeights)
+  const weighted = suitWeights(node, SUIT);
   // (the picture between its islands filled from them first: what lay there came in at every island's edge; then the
   // cloth mended, as its strips are narrower than what the filling shaves off an island's edge)
   {
@@ -221,5 +225,6 @@ for (const [n, file] of BODIES.entries()) {
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
-  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}\n  ${cloth}\n  ${worn}`);
+  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}
+  ${weighted}\n  ${cloth}\n  ${worn}`);
 }

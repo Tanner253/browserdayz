@@ -257,8 +257,12 @@ interface Hidden {
   shrink: { value: number };
   by: { value: number };
 }
-/** how far in a part only partly under something worn is drawn, metres */
-const SHRINK = 0.022;
+/**
+ * how far in a part only partly under something worn is drawn, metres: 2.2 cm until the clothes were weighted as the
+ * skin under them is (scripts/wear.mjs), when a hem no longer stood off the arm in motion and the arm drawn in so far
+ * read as a thin, flattened one (the owner, 2026-10-25: "stretching ... and distortions during animations")
+ */
+const SHRINK = 0.006;
 /** and a piece of clothing under a vest (a vest sits close on the body it was fitted to: the cloth goes in under it) */
 const UNDER = 0.018;
 /** a shape's own unit, in metres: its points are packed (quantized), and unpacked by its first bone's binding */

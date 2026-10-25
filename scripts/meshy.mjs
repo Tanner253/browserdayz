@@ -480,6 +480,127 @@ export function restPoints(node) {
   return out;
 }
 
+/**
+ * A carried body weighted as the old suit was (the owner, 2026-10-25: "our previous player model was better with no
+ * stretching textures or distortions during animations and actions"). Meshy's own rig hung the chest off the
+ * collarbones and the arms, a collar off the head and a hem off the thighs, and every bend pulled the skin with it.
+ * The suit's body and head (public/assets/characters/survivor.glb), weighted by hand on this same skeleton, are laid
+ * on this body's bones at rest (each point moved as its own bones moved, from the suit's rest to this one's); each
+ * point of this body then takes the weights at the nearest place on the suit's surface (its head's for the scalp and
+ * the face, its body's for the rest), between the corners of the triangle there, and those are evened over the skin twice. The hands keep their own, hung finger by finger (fitHand).
+ * @param suit the suit's document; @param keep the regions (_REGION, markRegions) whose own weights stay
+ * @returns a line for the build
+ */
+export function suitWeights(node, suit, keep = [9]) {
+  const names = node.getSkin().listJoints().map((j) => j.getName());
+  const here = new Map(node.getSkin().listJoints().map((j) => [j.getName(), M4(j.getWorldMatrix())]));
+  // ---- the suit's skin, on this body's bones
+  const T = [], W = [];
+  for (const sn of suit.getRoot().listNodes().filter((n) => n.getSkin() && ['body', 'head'].includes(n.getName()))) {
+    const sj = sn.getSkin().listJoints(), ibm = sn.getSkin().getInverseBindMatrices();
+    const M = sj.map((j, k) => (here.get(j.getName()) ?? M4(j.getWorldMatrix())).clone().multiply(M4(ibm.getElement(k, []))));
+    const to = sj.map((j) => names.indexOf(j.getName()));
+    for (const prim of sn.getMesh().listPrimitives()) {
+      const pos = prim.getAttribute('POSITION'), ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0'), idx = prim.getIndices();
+      const base = W.length, v = new THREE.Vector3(), a = [], w = [];
+      const P = [];
+      for (let i = 0; i < pos.getCount(); i++) {
+        v.fromArray(pos.getElement(i, []));
+        ji.getElement(i, a), jw.getElement(i, w);
+        const o = new THREE.Vector3(), m = new Map();
+        for (let c = 0; c < 4; c++) if (w[c] > 0) (o.addScaledVector(v.clone().applyMatrix4(M[a[c]]), w[c]), to[a[c]] >= 0 && m.set(to[a[c]], (m.get(to[a[c]]) ?? 0) + w[c]));
+        P.push(o);
+        W.push(m);
+      }
+      for (let t = 0; t < idx.getCount(); t += 3) {
+        const k = [idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2)];
+        T.push({ p: k.map((i) => P[i]), w: k.map((i) => base + i), head: sn.getName() === 'head' });
+      }
+    }
+  }
+  // ---- its triangles by where they lie, for the nearest of them to each of this body's points
+  // (the head's for the scalp and the face, the body's for the rest: the suit's head is hung on Head down to its neck,
+  // and a collar near it followed the head round)
+  const CELL = 0.06, grids = [new Map(), new Map()], box = new THREE.Box3();
+  T.forEach((t, k) => {
+    const grid = grids[t.head ? 1 : 0];
+    box.setFromPoints(t.p);
+    for (let x = Math.floor(box.min.x / CELL); x <= Math.floor(box.max.x / CELL); x++) for (let y = Math.floor(box.min.y / CELL); y <= Math.floor(box.max.y / CELL); y++) for (let z = Math.floor(box.min.z / CELL); z <= Math.floor(box.max.z / CELL); z++) {
+      const key = `${x},${y},${z}`;
+      (grid.get(key) ?? grid.set(key, []).get(key)).push(k);
+    }
+  });
+  const tri = new THREE.Triangle(), at = new THREE.Vector3(), bary = new THREE.Vector3();
+  const prim = node.getMesh().listPrimitives()[0], region = prim.getAttribute('_REGION'), idx = prim.getIndices();
+  const ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0'), n = ji.getCount();
+  // (and only above the Head joint: Meshy's rig hung the front of the neck on the head too)
+  const P = restPoints(node), got = new Array(n).fill(null), chin = new THREE.Vector3().setFromMatrixPosition(here.get('Head')).y;
+  let far = 0;
+  for (let i = 0; i < n; i++) {
+    if (keep.includes(region.getScalar(i))) continue;
+    const p = P[i], cx = Math.floor(p.x / CELL), cy = Math.floor(p.y / CELL), cz = Math.floor(p.z / CELL);
+    const grid = grids[region.getScalar(i) <= 1 && p.y > chin ? 1 : 0];
+    let best = null, bd = Infinity;
+    for (let r = 0; r <= 4 && (!best || bd > (r * CELL) ** 2); r++) {
+      for (let x = cx - r; x <= cx + r; x++) for (let y = cy - r; y <= cy + r; y++) for (let z = cz - r; z <= cz + r; z++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy), Math.abs(z - cz)) !== r) continue;
+        for (const k of grid.get(`${x},${y},${z}`) ?? []) {
+          tri.set(...T[k].p).closestPointToPoint(p, at);
+          const d = at.distanceToSquared(p);
+          if (d < bd) (bd = d), (best = { k, at: at.clone() });
+        }
+      }
+    }
+    if (!best) continue;
+    if (bd > 0.1 ** 2) far++;
+    tri.set(...T[best.k].p).getBarycoord(best.at, bary);
+    const m = new Map();
+    T[best.k].w.forEach((wi, c) => {
+      for (const [j, v] of W[wi]) m.set(j, (m.get(j) ?? 0) + v * bary.getComponent(c));
+    });
+    got[i] = m;
+  }
+  // ---- evened over the skin twice (each point half its own, half its neighbours'), the hands as they are
+  const one = new Int32Array(n), first = new Map(), pos = prim.getAttribute('POSITION');
+  for (let i = 0; i < n; i++) {
+    const k = pos.getElement(i, []).map((x) => Math.round(x * 20000)).join(',');
+    if (!first.has(k)) first.set(k, i);
+    one[i] = first.get(k);
+  }
+  const next = Array.from({ length: n }, () => new Set());
+  for (let t = 0; t < idx.getCount(); t += 3) {
+    const v = [idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2)].map((i) => one[i]);
+    for (const a of v) for (const b of v) if (a !== b) next[a].add(b);
+  }
+  const a = [], w = [];
+  const own = (i) => {
+    ji.getElement(i, a), jw.getElement(i, w);
+    const m = new Map();
+    for (let c = 0; c < 4; c++) if (w[c] > 0) m.set(a[c], (m.get(a[c]) ?? 0) + w[c]);
+    return m;
+  };
+  let cur = got.map((m, i) => (i === one[i] ? m ?? own(i) : null));
+  for (let pass = 0; pass < 2; pass++) {
+    const was = cur;
+    cur = was.map((m, i) => {
+      if (!m || !got[i]) return m;
+      const out = new Map();
+      for (const [j, v] of m) out.set(j, v * 0.5);
+      const ns = [...next[i]];
+      for (const q of ns) for (const [j, v] of was[q] ?? []) out.set(j, (out.get(j) ?? 0) + (v * 0.5) / ns.length);
+      return out;
+    });
+  }
+  const J = new Uint16Array(n * 4), V = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    const m = (got[i] && cur[one[i]]) || own(i);
+    const top = [...m].sort((x, y) => y[1] - x[1]).slice(0, 4), sum = top.reduce((s, [, v]) => s + v, 0) || 1;
+    top.forEach(([j, v], c) => ((J[i * 4 + c] = j), (V[i * 4 + c] = v / sum)));
+  }
+  prim.setAttribute('JOINTS_0', ji.clone().setArray(J)).setAttribute('WEIGHTS_0', jw.clone().setType('VEC4').setNormalized(false).setArray(V));
+  return `weighted as the suit: ${got.filter(Boolean).length} points of ${n}, ${far} of them over 10 cm from it`;
+}
+
 export async function carry({ io, template, src, fingers, fit = src }) {
   const doc = await io.read(template);
   const root = doc.getRoot();
