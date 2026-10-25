@@ -548,7 +548,6 @@ export async function loadKept() {
     restoreBases(snap.bases);
     restoreLearned(snap.learned);
     restoreCamp(snap.camp);
-  restoreCamp(snap.camp);
     let bad = 0;
     for (const [k, r] of snap.chars ?? []) {
       try {
