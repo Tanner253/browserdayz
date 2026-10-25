@@ -142,6 +142,46 @@ export function stoop(doc, sk, name, angle) {
   writeClip(doc, clip, Q, T, clip.dur);
 }
 
+/**
+ * A movement stood still with its soles flat on the ground: each foot laid as it lies at rest, turned only about the up
+ * as the movement turns it, its ankle as high as it stands at rest (the heel on the ground, the ball too), and the leg
+ * worked out again to reach it, the knee bent the way it was. The library's calm idle stood rocked back 21 degrees on
+ * its heels, the ball of the foot 3.5 cm off the ground and the heel 2 cm into it: the owner, 2026-10-25, "The feet".
+ */
+export function flat(doc, sk, name) {
+  const clip = readClip(doc, sk, name), { Q, T } = frameOf(clip), n = clip.frames + 1;
+  const rest = sk.pose([], null), UP = new THREE.Vector3(0, 1, 0);
+  const parentQ = (W, i) => rotOf(W[sk.parent[i]]);
+  const aim = (f, i, from, toward, kid) => {
+    const W = sk.pose(Q[f], T[f]);
+    const now = posOf(W[kid]).sub(posOf(W[i])).normalize(), want = toward.clone().sub(from).normalize();
+    Q[f][i] = parentQ(W, i).invert().multiply(new THREE.Quaternion().setFromUnitVectors(now, want).multiply(rotOf(W[i]))).normalize();
+  };
+  for (const s of ['l', 'r']) {
+    const [a, b, c, ball] = ['thigh', 'calf', 'foot', 'ball'].map((x) => sk.index(`${x}_${s}`));
+    const la = posOf(rest[b]).distanceTo(posOf(rest[a])), lb = posOf(rest[c]).distanceTo(posOf(rest[b]));
+    const restToe = posOf(rest[ball]).sub(posOf(rest[c])).setY(0).normalize(), restTurn = rotOf(rest[c]), high = posOf(rest[c]).y;
+    for (let f = 0; f < n; f++) {
+      let W = sk.pose(Q[f], T[f]);
+      // (which way the foot points now, about the up: the toe's way along the ground)
+      const toe = posOf(W[ball]).sub(posOf(W[c])).setY(0).normalize();
+      const yaw = Math.atan2(new THREE.Vector3().crossVectors(restToe, toe).y, restToe.dot(toe));
+      const hip = posOf(W[a]), to = posOf(W[c]).setY(high);
+      const d = Math.min(hip.distanceTo(to), (la + lb) * 0.999), along = to.clone().sub(hip).normalize();
+      const bend = posOf(W[b]).sub(hip.clone().add(to).multiplyScalar(0.5));
+      const side = bend.addScaledVector(along, -bend.dot(along)).normalize();
+      const x = (la * la - lb * lb + d * d) / (2 * d), h = Math.sqrt(Math.max(0, la * la - x * x));
+      const knee = hip.clone().addScaledVector(along, x).addScaledVector(side, h);
+      aim(f, a, hip, knee, b);
+      W = sk.pose(Q[f], T[f]);
+      aim(f, b, posOf(W[b]), to, c);
+      W = sk.pose(Q[f], T[f]);
+      Q[f][c] = parentQ(W, c).invert().multiply(new THREE.Quaternion().setFromAxisAngle(UP, yaw).multiply(restTurn)).normalize();
+    }
+  }
+  writeClip(doc, clip, Q, T, clip.dur);
+}
+
 /** part of a movement done once: from `a` to `b` seconds */
 export function trim(doc, sk, name, a, b) {
   const clip = readClip(doc, sk, name);
