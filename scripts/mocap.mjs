@@ -26,7 +26,7 @@ import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
 export const MOVES = {
   // standing still, breathing, the weight shifting a little, its soles laid flat (it stood rocked back on its heels) (the library's 'Idle' turns round to look behind it: a
   // body that is seen to look elsewhere than it aims tells lies in a shooter)
-  idle: { from: 'Idle_3', flat: true },
+  idle: { from: 'Idle_3', flat: true, soft: 0.21 },
   // standing, nothing held up: an easy walk
   walkF: { from: 'walking_2', way: 'F', gait: 'walk' },
   walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk' },
@@ -107,7 +107,7 @@ if (!cands) {
     said.was = facing(doc, sk, name);
     if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
     if (m.stoop) stoop(doc, sk, name, m.stoop);
-    if (m.flat) flat(doc, sk, name);
+    if (m.flat) flat(doc, sk, name, { soft: m.soft ?? null });
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
     if (m.blow) warp(doc, sk, name, m.blow);
