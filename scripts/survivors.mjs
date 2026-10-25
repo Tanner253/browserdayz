@@ -50,6 +50,72 @@ await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
 
+/**
+ * The base layer's cloth made clean (the navigator, 2026-10-25: the shorts "carry orange-red streaks that read as texture
+ * faults up close"). Meshy's picture has slivers of skin in the shorts and the T-shirt: in every triangle of the body
+ * that is cloth (grey at two of its corners, over the trunk, the upper arms and the thighs), what of the picture is
+ * skin-coloured is painted over from the cloth around it, a ring at a time.
+ */
+async function cleanCloth(doc, node) {
+  const prim = node.getMesh().listPrimitives()[0], tex = prim.getMaterial().getBaseColorTexture();
+  const uv = prim.getAttribute('TEXCOORD_0'), region = prim.getAttribute('_REGION'), idx = prim.getIndices();
+  const { data, info } = await sharp(Buffer.from(tex.getImage())).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = 4;
+  const px = (s, t) => [Math.min(W - 1, Math.max(0, Math.round(s * (W - 1)))), Math.min(H - 1, Math.max(0, Math.round(t * (H - 1))))];
+  const grey = (o) => Math.max(data[o], data[o + 1], data[o + 2]) - Math.min(data[o], data[o + 1], data[o + 2]) < 26;
+  const skin = (o) => data[o] >= data[o + 1] && data[o] >= data[o + 2] && data[o] - Math.min(data[o + 1], data[o + 2]) > 28;
+  const CLOTH = new Set([3, 4, 5, 6, 7, 10, 11]);
+  const mask = new Uint8Array(W * H);
+  let tris = 0;
+  for (let t = 0; t < idx.getCount(); t += 3) {
+    const v = [idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2)];
+    if (!v.every((i) => CLOTH.has(region.getScalar(i)))) continue;
+    const P = v.map((i) => px(...uv.getElement(i, [])));
+    if (P.filter(([x, y]) => grey((y * W + x) * C)).length < 2) continue;
+    tris++;
+    // (every texel the triangle covers on the picture, and one more round it)
+    const [x0, x1] = [Math.min(...P.map((p) => p[0])) - 1, Math.max(...P.map((p) => p[0])) + 1], [y0, y1] = [Math.min(...P.map((p) => p[1])) - 1, Math.max(...P.map((p) => p[1])) + 1];
+    const [[ax, ay], [bx, by], [cx, cy]] = P, den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    if (!den) continue;
+    for (let y = Math.max(0, y0); y <= Math.min(H - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) {
+      const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / den, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / den;
+      const e = 1.5 / Math.max(1, Math.abs(den) ** 0.5);
+      if (l1 >= -e && l2 >= -e && 1 - l1 - l2 >= -e) mask[y * W + x] = 1;
+    }
+  }
+  // (the shirt's neckline is the shirt, whatever bone it hangs on: hidden under a top with the chest, or its collar
+  // showed through a flannel's at the nape, 2026-10-25)
+  for (let i = 0; i < uv.getCount(); i++) {
+    if (region.getScalar(i) !== 2) continue;
+    const [x, y] = px(...uv.getElement(i, [])), o = (y * W + x) * C;
+    if (grey(o) && data[o] > 70) region.setScalar(i, 3);
+  }
+  // (painted over from the cloth beside it: each pass, a skin texel with cloth next to it takes their mean)
+  let bad = [];
+  for (let k = 0; k < W * H; k++) if (mask[k] && skin(k * C)) bad.push(k);
+  const fixed = bad.length;
+  for (let pass = 0; pass < 40 && bad.length; pass++) {
+    const left = [], took = [];
+    for (const k of bad) {
+      const x = k % W, y = (k / W) | 0, m = [0, 0, 0];
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const q = (y + dy) * W + x + dx;
+        if ((dx || dy) && x + dx >= 0 && x + dx < W && y + dy >= 0 && y + dy < H && mask[q] === 1 && !skin(q * C)) {
+          for (let c = 0; c < 3; c++) m[c] += data[q * C + c];
+          n++;
+        }
+      }
+      if (n) took.push([k, m.map((c) => c / n)]);
+      else left.push(k);
+    }
+    for (const [k, m] of took) for (let c = 0; c < 3; c++) data[k * C + c] = Math.round(m[c]);
+    bad = left;
+  }
+  tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer())).setMimeType('image/png');
+  return `cloth ${tris} triangles, ${fixed} skin texels painted over${bad.length ? `, ${bad.length} left` : ''}`;
+}
+
 await fs.access(TEMPLATE).catch(() => {
   throw new Error('survivors: run "node scripts/build-character.mjs --infected" first (it makes assets-src/characters/plain.glb)');
 });
@@ -58,6 +124,7 @@ for (const [n, file] of BODIES.entries()) {
   const { doc, node, hands, worn } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
   const root = doc.getRoot();
   const regions = markRegions(doc, node);
+  const cloth = await cleanCloth(doc, node);
   for (const m of root.listMaterials()) m.setName(`survivor_${n}`);
   await doc.transform(
     unpartition(),
@@ -71,5 +138,5 @@ for (const [n, file] of BODIES.entries()) {
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
-  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  hands: ${hands}\n  ${regions}\n  ${worn}`);
+  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  hands: ${hands}\n  ${regions}\n  ${cloth}\n  ${worn}`);
 }

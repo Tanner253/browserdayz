@@ -111,6 +111,76 @@ async function laid(node) {
   return { P, C, prim };
 }
 
+/** a primitive's colour picture filled out from the triangles it is drawn with: each texel they do not cover takes the colour of the nearest one they do */
+async function padTexture(prim, tris) {
+  const tex = prim.getMaterial().getBaseColorTexture(), uv = prim.getAttribute('TEXCOORD_0');
+  const { data, info } = await sharp(Buffer.from(tex.getImage())).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = 4, N = W * H;
+  const done = new Uint8Array(N);
+  const P = (i) => {
+    const [s, t] = uv.getElement(i, []);
+    return [s * W - 0.5, t * H - 0.5];
+  };
+  for (const tri of tris) {
+    const [[ax, ay], [bx, by], [cx, cy]] = tri.map(P), den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx)) - 1), x1 = Math.min(W - 1, Math.ceil(Math.max(ax, bx, cx)) + 1);
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy)) - 1), y1 = Math.min(H - 1, Math.ceil(Math.max(ay, by, cy)) + 1);
+    if (!den) continue;
+    const e = 0.75 / Math.max(1, Math.sqrt(Math.abs(den)));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / den, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / den;
+      if (l1 >= -e && l2 >= -e && 1 - l1 - l2 >= -e) done[y * W + x] = 1;
+    }
+  }
+  // (less the two outermost texels of every island: Meshy darkens an island's rim, and drawn smaller it showed as
+  // dark cracks along every seam)
+  for (let r = 0; r < 2; r++) {
+    const rim = [];
+    for (let k = 0; k < N; k++) {
+      if (!done[k]) continue;
+      const x = k % W, y = (k / W) | 0;
+      if (x === 0 || y === 0 || x === W - 1 || y === H - 1 || !done[k - 1] || !done[k + 1] || !done[k - W] || !done[k + W]) rim.push(k);
+    }
+    for (const k of rim) done[k] = 0;
+  }
+  // (out from them a ring at a time, each texel the mean of those beside it already done: typed rings, as a 4096
+  // picture is sixteen million texels)
+  let front = new Int32Array(N), nf = 0;
+  for (let k = 0; k < N; k++) if (!done[k]) {
+    const x = k % W, y = (k / W) | 0;
+    if ((x > 0 && done[k - 1] === 1) || (x < W - 1 && done[k + 1] === 1) || (y > 0 && done[k - W] === 1) || (y < H - 1 && done[k + W] === 1)) (front[nf++] = k), (done[k] = 2);
+  }
+  let next = new Int32Array(N);
+  const at = [0, 0, 0, 0];
+  while (nf) {
+    let nn = 0;
+    // (first what each takes, from those done before this ring; then all of the ring is done at once)
+    const took = new Uint8Array(nf * 3);
+    for (let f2 = 0; f2 < nf; f2++) {
+      const k = front[f2], x = k % W, y = (k / W) | 0;
+      at[0] = x > 0 ? k - 1 : -1; at[1] = x < W - 1 ? k + 1 : -1; at[2] = y > 0 ? k - W : -1; at[3] = y < H - 1 ? k + W : -1;
+      let r = 0, g = 0, bl = 0, n = 0;
+      for (let e = 0; e < 4; e++) {
+        const q = at[e];
+        if (q < 0) continue;
+        if (done[q] === 1) (r += data[q * C]), (g += data[q * C + 1]), (bl += data[q * C + 2]), n++;
+        else if (!done[q]) (done[q] = 2), (next[nn++] = q);
+      }
+      if (n) (took[f2 * 3] = Math.round(r / n)), (took[f2 * 3 + 1] = Math.round(g / n)), (took[f2 * 3 + 2] = Math.round(bl / n));
+    }
+    for (let f2 = 0; f2 < nf; f2++) {
+      const k = front[f2];
+      data[k * C] = took[f2 * 3];
+      data[k * C + 1] = took[f2 * 3 + 1];
+      data[k * C + 2] = took[f2 * 3 + 2];
+      done[k] = 1;
+    }
+    [front, next] = [next, front];
+    nf = nn;
+  }
+  tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer())).setMimeType('image/png');
+}
+
 for (const [id, piece] of Object.entries(PIECES)) {
   if (ONLY.length && !ONLY.includes(id)) continue;
   const body = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, BODIES[piece.body])), fingers: true });
@@ -182,6 +252,21 @@ for (const [id, piece] of Object.entries(PIECES)) {
       return n.size ? [...n].filter((j) => was[j]).length * 2 > n.size : k;
     });
   }
+  // (and closed, three rings out and three back: a notch or a hole in it, where the cloth was in shadow as dark as the
+  // shorts under it, is filled, and its edge stays where it was. The M65's hem was torn so, 2026-10-25.)
+  {
+    const CLOSE = 3, inPart = near.map((n) => n >= 0 && parts.has(region.getScalar(n)));
+    let shut = keep.slice();
+    for (let r = 0; r < CLOSE; r++) {
+      const was = shut;
+      shut = shut.map((k, i) => k || (inPart[i] && [...next[one[i]]].some((j) => was[j])));
+    }
+    for (let r = 0; r < CLOSE; r++) {
+      const was = shut;
+      shut = shut.map((k, i) => k && [...next[one[i]]].every((j) => was[j]));
+    }
+    keep = keep.map((k, i) => k || shut[i]);
+  }
   let tris = T.filter((t) => t.every((i) => keep[i]));
   // (the skin Meshy made between a sleeve and the side: how much longer a triangle's longest edge is at rest, arms out,
   // than as it was made, arms down, against how much longer they are on the whole; four times is no cloth's)
@@ -210,6 +295,64 @@ for (const [id, piece] of Object.entries(PIECES)) {
     }
     tris = lots.filter((l) => l.length >= 50).flat().map((k) => tris[k]);
   }
+
+  // ---- a clean hem (the navigator, 2026-10-25: the M65's hem and the flannel's collar showed "a ragged, light,
+  // torn-looking rim"): Meshy painted skin and shirt on the piece's edges, and the cut kept a sliver of it. The two
+  // rings of points nearest the cut take their place on the picture from the ring inside them (the rim is drawn with the
+  // cloth beside it), and are shaded a little darker, as a turned hem is.
+  const HEM = 2;
+  const ring = new Map();
+  {
+    // (an edge of the cut is one that is open now and was not in the whole model: Meshy's model is open along many of
+    // its picture's seams, a hair apart, and those are not the cut)
+    const count = (list) => {
+      const edges = new Map();
+      for (const t of list) for (let e = 0; e < 3; e++) {
+        const a = one[t[e]], b = one[t[(e + 1) % 3]], k = a < b ? `${a},${b}` : `${b},${a}`;
+        edges.set(k, (edges.get(k) ?? 0) + 1);
+      }
+      return edges;
+    };
+    const was = count(T), edges = count(tris);
+    let front = [];
+    for (const [k, n] of edges) if (n === 1 && was.get(k) > 1) for (const p of k.split(',').map(Number)) if (!ring.has(p)) (ring.set(p, 0), front.push(p));
+    const near = new Map();
+    for (const t of tris) for (const i of t) for (const j of t) if (one[i] !== one[j]) (near.get(one[i]) ?? near.set(one[i], new Set()).get(one[i])).add(one[j]);
+    for (let d = 1; d <= HEM; d++) {
+      const next = [];
+      for (const p of front) for (const q of near.get(p) ?? []) if (!ring.has(q)) (ring.set(q, d), next.push(q));
+      front = next;
+    }
+  }
+  {
+    const uv = D.prim.getAttribute('TEXCOORD_0'), by = new Map();
+    for (const t of tris) for (const i of t) for (const j of t) if (i !== j) (by.get(i) ?? by.set(i, new Set()).get(i)).add(j);
+    const depth = (i) => ring.get(one[i]) ?? HEM + 1;
+    for (let d = HEM - 1; d >= 0; d--) {
+      for (const [i, js] of by) {
+        if (depth(i) !== d) continue;
+        const inner = [...js].filter((j) => depth(j) > d);
+        if (!inner.length) continue;
+        const m = [0, 0];
+        for (const j of inner) {
+          const [s, t] = uv.getElement(j, []);
+          m[0] += s / inner.length;
+          m[1] += t / inner.length;
+        }
+        uv.setElement(i, m);
+      }
+    }
+    const shade = [0.62, 0.84], col = new Float32Array(uv.getCount() * 3).fill(1);
+    for (let i = 0; i < uv.getCount(); i++) {
+      const d = depth(i);
+      if (d < shade.length) col.fill(shade[d], i * 3, i * 3 + 3);
+    }
+    D.prim.setAttribute('COLOR_0', dressed.doc.createAccessor().setType('VEC3').setArray(col));
+  }
+  // ---- the picture padded from the piece's own cloth: what lies between its islands on the picture was the body's
+  // (skin, the shirt), and came in at every island's edge as pink and light slivers, nearer at a distance as the
+  // picture is drawn smaller. Everything of the picture the piece does not cover takes the colour of the nearest cloth.
+  await padTexture(D.prim, tris);
 
   // ---- the piece: only its own points, in the order they are first used
   const prim = D.prim, used = new Map();
