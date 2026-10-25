@@ -72,9 +72,40 @@ function planar(g: THREE.BufferGeometry, tile: number) {
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
 
-/** a solid as drawn: its pictures laid on in metres, and its shade (white: none) in every corner */
-function solidGeo(s: Solid, tile: number) {
-  const g = 'box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile);
+/**
+ * A frame's solid as one sheet down its middle, its lattice seen from either side: drawn as a box, the far face's poles
+ * showed through the near one's gaps and boxes meeting at a corner fought for the same place (the owner, 2026-10-25:
+ * "the frames for walls and buildings are a bit bugy with overlapping textures, no overlapping textures"). A solid
+ * thick every way (a foundation's) stays a box.
+ */
+const SHEET = 0.35;
+function sheetGeo(s: Solid, tile: number): THREE.BufferGeometry | null {
+  if ('box' in s) {
+    const [x, y, z, w, h, d] = s.box, thin = Math.min(w, h, d);
+    if (thin >= SHEET) return null;
+    const g = new THREE.PlaneGeometry(thin === d ? w : thin === w ? d : w, thin === h ? d : h).toNonIndexed();
+    if (thin === w) g.rotateY(Math.PI / 2);
+    else if (thin === h) g.rotateX(-Math.PI / 2);
+    g.translate(x, y, z);
+    planar(g, tile);
+    return g;
+  }
+  if ('prism' in s && s.y1 - s.y0 < SHEET) {
+    // (a thin prism, a triangle of floor: its top, at its middle height)
+    const g = prismGeo(s.prism, s.y0, s.y1, tile), P = g.getAttribute('position'), keep: number[] = [];
+    for (let i = 0; i < P.count; i += 3) if ([0, 1, 2].every((k) => Math.abs(P.getY(i + k) - s.y1) < 1e-4)) for (let k = 0; k < 3; k++) keep.push(P.getX(i + k), (s.y0 + s.y1) / 2, P.getZ(i + k));
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(keep, 3));
+    out.computeVertexNormals();
+    planar(out, tile);
+    return out;
+  }
+  return null;
+}
+
+/** a solid as drawn: its pictures laid on in metres, and its shade (white: none) in every corner; `sheet`: a frame's (sheetGeo) */
+function solidGeo(s: Solid, tile: number, sheet = false) {
+  const g = (sheet && sheetGeo(s, tile)) || ('box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile));
   // (one set of attributes for all: what a box, a prism and a hull each carry, and the shade)
   for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
   const c = new THREE.Color(s.c ?? 0xffffff), n = g.getAttribute('position').count;
@@ -83,8 +114,8 @@ function solidGeo(s: Solid, tile: number) {
 }
 
 /** a merge of solids, as one shape drawn with one paint */
-function merged(list: Solid[], tile: number): THREE.BufferGeometry {
-  const g = mergeGeometries(list.map((q) => solidGeo(q, tile)), false)!;
+function merged(list: Solid[], tile: number, sheet = false): THREE.BufferGeometry {
+  const g = mergeGeometries(list.map((q) => solidGeo(q, tile, sheet)), false)!;
   g.computeBoundingSphere();
   return g;
 }
@@ -98,7 +129,8 @@ export function geometryOf(kind: string, p: Paint, dress = true): THREE.BufferGe
     const s = shapeOf(kind);
     // (a piece drawn by a model of its own elsewhere: nothing here)
     if (s.unseen) (g = new THREE.BufferGeometry()).setAttribute('position', new THREE.Float32BufferAttribute([], 3));
-    else g = merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
+    // (a frame: sheets, and none of the trim the tiers above have)
+    else g = p === 0 ? merged(s.solid, TILE[p], true) : merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
     geos.set(key, g);
   }
   return g;
