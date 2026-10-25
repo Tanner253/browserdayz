@@ -71,6 +71,14 @@ const PIECES = {
   hiking_boots: { src: 'wear_hiking_boots.glb', body: 2, ...BOOTS, tex: 1024 },
   leather_gloves: { src: 'wear_leather_gloves.glb', body: 2, parts: HANDS, core: ['hand'], covers: ['hand'], tex: 1024, fingers: true },
   fingerless: { src: 'wear_fingerless.glb', body: 0, parts: HANDS, core: ['hand'], covers: [], tex: 1024, fingers: true },
+  // (the basics every life begins in: src/sim/items.ts, CLOTHES)
+  tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], peeks: ['chest', 'belly', 'shoulder'], tex: 2048 },
+  tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, tex: 2048 },
+  trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, tex: 1024 },
+  smock: { src: 'wear_smock.glb', body: 0, ...JACKET, tex: 2048 },
+  smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, tex: 2048 },
+  // (neck to ankle, over everything: there is no base layer to show through it)
+  ghillie_suit: { src: 'wear_ghillie_suit.glb', body: 0, parts: [...new Set([...TOP, ...LEGS])], core: ['chest', 'thigh'], covers: [...JACKET.covers, ...TROUSERS.covers], tex: 2048 },
 };
 /** the bodies as Meshy made them (scripts/survivors.mjs) */
 const BODIES = ['body0_rigged.glb', 'body1_rigged.glb', 'body2_rigged.glb', 'body3_rigged.glb'];
