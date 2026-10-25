@@ -57,6 +57,17 @@ export async function stageMelee(id: string, s: {
   if (s.q.get('fp') === '1') return firstPerson(id, cut, dur, s);
   const body = new Avatar();
   await body.load(atmo, 0, false, lookFor('sandbox'));
+  // (&body=0..3: one of the survivors' new bodies in its T-shirt and jeans, as the sandbox's own survivor is dressed:
+  // every swing and hold is judged on what ships, the navigator, 2026-10-25)
+  const which = s.q.get('body');
+  if (which !== null) {
+    const { wearBody, wearOn } = await import('../game/survivors');
+    const { hides } = await import('../sim/survivor');
+    const { CLOTHES } = await import('../sim/items');
+    const skin = await wearBody(body.modelRoot, +which);
+    const dress = CLOTHES.flatMap(([, id]) => (ITEMS[id]?.dress ? [ITEMS[id].dress!] : []));
+    await wearOn(body.modelRoot, skin, dress.map((d) => ({ model: d.model, hides: hides(d.hides), shrinks: hides(d.shrinks ?? []) })));
+  }
   // (the body's late movements: the blows, the guard and the draw are among them)
   await lateReady();
   for (const n of [cut.clip, 'jabR', 'parry', 'drawBack']) body.deeds?.get(n);
@@ -86,7 +97,12 @@ export async function stageMelee(id: string, s: {
   const dir = ({ side: new THREE.Vector3(1, 0.12, 0), front: new THREE.Vector3(0, 0.12, -1), back: new THREE.Vector3(0, 0.25, 1), q: new THREE.Vector3(0.75, 0.3, -0.9) }[view] ?? new THREE.Vector3(0.75, 0.3, -0.9)).normalize();
   // (&close=1: close on the right hand, to see the fingers on the handle)
   const close = s.q.get('close') === '1';
-  const mid = close ? body.armR!.hand.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1.15, 0);
+  // (the hand where the blow puts it, not where the body was bound: a new body is fitted after it is made)
+  if (close) {
+    body.shoulderT = 0;
+    body.update(0, at, still, face, false, false, false, 0, true, false);
+  }
+  const mid = close ? (body.modelRoot.getObjectByName('hand_r') ?? body.armR!.hand).getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1.15, 0);
   camera.position.copy(mid).addScaledVector(dir, close ? 0.45 : 4.2);
   camera.lookAt(mid);
   s.sun.target.position.copy(mid);

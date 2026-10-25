@@ -73,6 +73,11 @@ export function guardOne(a: Avatar, w: number) {
   a.reach(r, _to, _fi, _pa, held.curl, _aq, w);
   r.hand.updateWorldMatrix(true, false);
   a.curl(r, held.curl, r.hand.getWorldQuaternion(_tq));
+  // (and the other fist up by the chin closed, as a boxer's is: the captured guard's hand was left open, fingers spread)
+  const l = a.armL;
+  if (l) a.curl(l, GUARD_FIST.map((c) => c * w) as [number, number, number, number], l.hand.getWorldQuaternion(_tq));
 }
 /** where that fist is from the head (metres ahead, up, to the right), and how far the thing in it leans over */
 const GUARD_ONE = { ahead: 0.32, up: -0.16, right: 0.12, lean: 2.5 };
+/** how far the empty hand's fingers close in that guard, first to little (radians) */
+const GUARD_FIST: [number, number, number, number] = [1.35, 1.45, 1.5, 1.55];

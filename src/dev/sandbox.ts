@@ -150,6 +150,7 @@ if (bb) {
   const { stageMelee } = await import('./sandbox-melee');
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   out.stageInfo = await stageMelee(melee, { q, scene, renderer, sun, cw, ch, cols, rows, cells, say });
+  out.staged = true;
 } else if (bodies) {
   const { stageBodies } = await import('./sandbox-body');
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
