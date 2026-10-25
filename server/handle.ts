@@ -651,7 +651,7 @@ export function handle(c: Client, m: C2S) {
       return void storeOrder(c, m.act);
     // (their finish put on a gun they carry, for good: plates.ts)
     case 'finish': {
-      const it = c.alive ? plating.apply(c.inv, m.uid, (gun) => perks.skin(c.key, gun)) : 'Not now';
+      const it = c.alive ? plating.apply(c.inv, m.uid, (gun) => perks.skin(c.key, gun, m.f)) : 'Not now';
       if (typeof it === 'string') return send(c, { t: 'tell', kind: 'warn', text: it });
       return send(c, { t: 'finish', uid: it.uid, f: it.finish! });
     }

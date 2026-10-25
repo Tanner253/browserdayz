@@ -84,9 +84,9 @@ export const perks = {
   skins(key: string): ItemId[] {
     return list.who[acct(key)]?.[3] ?? [];
   },
-  /** their finish for a gun of this id, if they own one */
-  skin(key: string, gun: string): ItemId | null {
-    return skinFor(this.skins(key), gun);
+  /** their finish for a gun of this id, if they own one: the one asked for, or the first */
+  skin(key: string, gun: string, want?: unknown): ItemId | null {
+    return skinFor(this.skins(key), gun, want);
   },
   /** for a test: the list as given */
   set(next: PerkList) {

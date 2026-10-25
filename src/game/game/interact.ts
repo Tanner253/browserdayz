@@ -21,7 +21,7 @@ import { waterName } from '../../sim/water';
 import { jobsFor, progress as jobDone } from '../../sim/jobs';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 import { finishDay, finishOn, type Finish } from '../finish';
-import { lookOf } from '../../../api/_lib/shop-items';
+import { lookOf, type ItemId } from '../../../api/_lib/shop-items';
 import { renderIcons } from '../../ui/icons';
 
 export const interactMethods = {
@@ -352,10 +352,10 @@ export const interactMethods = {
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   },
 
-  /** the store finish of theirs this gun can be given, where it does not wear it already (server/plates.ts) */
-  finishFor(this: Game, it: ItemInstance): Finish | null {
-    const f = this.online ? this.perks.skin(it.id) : null;
-    return f && it.finish !== f ? lookOf(f) : null;
+  /** the store finishes of theirs this gun can be given, but the one it wears (server/plates.ts) */
+  finishFor(this: Game, it: ItemInstance): { id: ItemId; look: Finish }[] {
+    if (!this.online) return [];
+    return this.perks.skinsFor(it.id).filter((f) => it.finish !== f).map((f) => ({ id: f, look: lookOf(f)! }));
   },
 
   /** a plated gun's picture, drawn once from its model with the finish on (src/ui/icons.ts) and shared by the inventory and the hot keys */
@@ -373,10 +373,10 @@ export const interactMethods = {
   },
 
   /** Apply: asked of the server, which keeps it on the gun; what it carries is told first, so that it finds the gun */
-  applyFinish(this: Game, it: ItemInstance) {
-    if (!this.finishFor(it)) return;
+  applyFinish(this: Game, it: ItemInstance, f: ItemId) {
+    if (!this.finishFor(it).some((o) => o.id === f)) return;
     this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
-    this.net.send({ t: 'finish', uid: it.uid });
+    this.net.send({ t: 'finish', uid: it.uid, f });
   },
 
   /** the server has put a finish on one of our guns: on it from now, wherever it goes */

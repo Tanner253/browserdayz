@@ -913,7 +913,7 @@ export class Game {
       sound: (k) => audio.ui(k),
       note: (text) => this.hud.note(text, 'info'),
       finishFor: (item) => this.finishFor(item),
-      applyFinish: (item) => this.applyFinish(item),
+      applyFinish: (item, f) => this.applyFinish(item, f),
       plateIcon: (id, f) => this.plateIcon(id, f),
     });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and

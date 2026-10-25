@@ -277,7 +277,7 @@ export type C2S =
   /** this player has just bought at the store: the server asks the site again (server/perks.ts) */
   | { t: 'perks' }
   /** a store finish this player owns put on this gun of theirs, for good: the server checks and keeps it (server/plates.ts) */
-  | { t: 'finish'; uid: string }
+  | { t: 'finish'; uid: string; /** which of their finishes (a knife may take any of several): the first that fits, if not said */ f?: string }
   /** an admin's order to the store's book (api/_lib/shop.ts, AdminAct), passed to the site */
   | { t: 'store'; act: unknown }
   /** somebody with a role has their panel open: the lists it shows are asked for */

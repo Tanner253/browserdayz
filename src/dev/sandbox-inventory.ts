@@ -139,7 +139,7 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     },
     sound: () => {},
     note: (text) => console.info(text),
-    finishFor: () => null,
+    finishFor: () => [],
     applyFinish: () => {},
     plateIcon: () => {},
   };
