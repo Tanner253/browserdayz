@@ -20,13 +20,8 @@ export const gesturesMethods = {
           const k = this.punchT / POSE.punch[0];
           if (k >= 1) this.punchT = -1;
           else {
-            // the same shape as the first-person arms throw: drawn back, out fast, held, home slower
-            wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
-            const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
-            out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
-            // (a survivor's on the motion capture's jab, as the eye sees its own: see held-mocap.ts)
-            const jab = this.deeds ? jabAt(this.punchSide > 0 ? 1 : -1, k) : null;
-            if (jab) ({ out, wind } = jab);
+            // the motion capture's jab, as the first-person arms throw it: drawn back, out fast, held, home slower
+            ({ out, wind } = jabAt(this.punchSide > 0 ? 1 : -1, k));
           }
         }
         const side = this.punchT >= 0 ? this.punchSide : 0;
@@ -70,16 +65,10 @@ export const gesturesMethods = {
           const from = r.arm.getWorldPosition(_v2), d = to.distanceTo(from), most = (r.la + r.lb) * 0.93;
           return d > most ? to.sub(from).multiplyScalar(most / d).add(from) : to;
         };
-        const sip = (ges.kind === 'eat' || ges.kind === 'drink') && this.deeds?.get('drink');
-        if (sip) {
-          // (a survivor's on the motion capture: the arms and the chest of somebody drinking, a sip after a sip)
-          this.layer(sip, ges.t % sip.getClip().duration, wgt, 0);
-        } else if (ges.kind === 'eat' || ges.kind === 'drink') {
-          // up to the mouth and back down, once a bite or a gulp
-          const period = ges.kind === 'eat' ? 0.95 : 1.25;
-          const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, ges.t - 0.3) / period) * Math.PI * 2);
-          const m = ges.kind === 'drink' ? Math.pow(cyc, 0.6) : cyc;
-          this.reach(this.armR, near(at(0.3, -0.36, 0.12).lerp(at(0.17, -0.06, 0.05), m), this.armR), dirOf(-0.2 * m, 0.8, -0.5), dirOf(-1, 0, -0.4), [1.0, 1.05, 1.1, 1.15], aimQ, wgt);
+        if (ges.kind === 'eat' || ges.kind === 'drink') {
+          // on the motion capture: the arms and the chest of somebody drinking, a sip after a sip (only survivors eat)
+          const sip = this.deeds?.get('drink');
+          if (sip) this.layer(sip, ges.t % sip.getClip().duration, wgt, 0);
         } else {
           // both hands in front of the belly: the left held still, the right working round it
           const l = near(at(0.28, -0.4, -0.07), this.armL);
