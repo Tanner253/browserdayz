@@ -10,6 +10,7 @@
 //     walk / jog / sprint / run (the hurried crouch) or a pace (v2.5, m/s), a way (F B L R FL FR BL BR), turn (on the
 //     spot), up / down (the aim pitched), limp
 //   &frames=12&fps=15&settle=1.2    moments drawn (after so many seconds of going), how many a second
+//   &across=4                       moments to a row of blocks (a picture is drawn no more than 8192 a side)
 //   &cols=4&view=q                  bodies across a block; the camera (q, side, front, back, top), framed on each body
 
 import * as THREE from 'three';
@@ -122,17 +123,25 @@ export async function stageBodies(o: Stage) {
   const sub = (t: number) => { for (let k = Math.ceil(t * 60); k > 0; k--) step(t / Math.ceil(t * 60)); };
   sub(settle);
   const camera = new THREE.PerspectiveCamera(30, cw / ch, 0.05, 200);
-  const perFrame = Math.ceil(bodies.length / cols) * cols;
+  // (each moment a block of `per` bodies across: the blocks `across` to a row)
+  const across = Math.min(frames, Math.max(1, Math.floor(+(q.get('across') ?? 1)))), per = cols / across, blockRows = Math.ceil(bodies.length / per);
+  const cellOf = (f: number, i: number) => (Math.floor(f / across) * blockRows + Math.floor(i / per)) * cols + (f % across) * per + (i % per);
   const at = new THREE.Vector3(), ahead = new THREE.Vector3(), left = new THREE.Vector3();
   sun.shadow.camera.left = sun.shadow.camera.bottom = -60;
   sun.shadow.camera.right = sun.shadow.camera.top = 60;
   sun.shadow.camera.far = 200;
   sun.shadow.camera.updateProjectionMatrix();
   renderer.setScissorTest(true);
+  // (how high each head is drawn, over the moments: what is shot at, against the eye the game sees from)
+  const heads = bodies.map(() => [Infinity, -Infinity, 0]);
   for (let f = 0; f < frames; f++) {
     if (f) sub(1 / fps);
+    bodies.forEach((b, i) => {
+      const y = b.a.joints.head?.getWorldPosition(at).y ?? 0, h = heads[i];
+      h[0] = Math.min(h[0], y); h[1] = Math.max(h[1], y); h[2] += y / frames;
+    });
     for (const [i, b] of bodies.entries()) {
-      const cell = f * perFrame + i;
+      const cell = cellOf(f, i);
       // framed on the body as it goes: the grid under it shows a foot that slides
       const low = b.s.prone ? 0.35 : b.s.crouch ? 0.65 : 0.95, d = b.s.prone ? 4.2 : 4.6;
       ahead.set(-Math.sin(b.face), 0, -Math.cos(b.face));
@@ -151,5 +160,5 @@ export async function stageBodies(o: Stage) {
       say(cell, frames > 1 ? `${b.s.words} ${(f / fps).toFixed(2)} s` : b.s.words);
     }
   }
-  return { bodies: specs.map((s) => ({ words: s.words, speed: +s.speed.toFixed(2) })), frames, fps, perFrame, cols };
+  return { bodies: specs.map((s, i) => ({ words: s.words, speed: +s.speed.toFixed(2), head: heads[i].map((v) => +v.toFixed(3)) })), frames, fps, across, block: [per * cw, blockRows * ch] };
 }

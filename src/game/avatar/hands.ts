@@ -57,7 +57,7 @@ export const handsMethods = {
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder };
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, plumb: obj.userData.plumb as THREE.Object3D | undefined };
       Avatar.onDressed([obj]);
       return;
     }

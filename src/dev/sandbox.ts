@@ -44,10 +44,12 @@ const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
 const sim = q.get('sim');
-// (bodies: a block of them for each moment drawn)
+// (bodies: a block of them for each moment drawn, `across` blocks to a row: a picture is drawn no more than 8192 a side)
 const bodies = list('bodies').length, bodyCols = Math.min(bodies, Math.max(1, +(q.get('cols') ?? 4)));
-const cells = sim ? 8 : bodies ? Math.ceil(bodies / bodyCols) * bodyCols * Math.max(1, Math.floor(+(q.get('frames') ?? 1))) : strip > 0 ? strip : views.length;
-const cols = bodies ? bodyCols : Math.min(cells, strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
+const blocks = Math.max(1, Math.floor(+(q.get('frames') ?? 1))), across = Math.min(blocks, Math.max(1, Math.floor(+(q.get('across') ?? 1))));
+const blockRows = Math.ceil(bodies / bodyCols);
+const cells = sim ? 8 : bodies ? blockRows * bodyCols * blocks : strip > 0 ? strip : views.length;
+const cols = bodies ? bodyCols * across : Math.min(cells, strip > 0 || sim ? 4 : 2), rows = bodies ? blockRows * Math.ceil(blocks / across) : Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);

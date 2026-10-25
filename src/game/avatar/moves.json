@@ -1,6 +1,6 @@
 {
  "idle": {
-  "dur": 1.9
+  "dur": 10
  },
  "walkF": {
   "way": "F",
@@ -67,6 +67,16 @@
   "gait": "crouch",
   "pace": 0.867,
   "dur": 1.3
+ },
+ "walkLow": {
+  "way": "F",
+  "pace": 0.876,
+  "dur": 1.2
+ },
+ "walkLowB": {
+  "way": "B",
+  "pace": 0.975,
+  "dur": 0.9
  },
  "limpF": {
   "way": "F",

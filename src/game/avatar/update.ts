@@ -501,7 +501,11 @@ export const updateMethods = {
           // already are, and not at all lying down (it would be in the ground).
           const butt = held.butt, chest = butt && this.gearRest.get('spine_03');
           const level = (1 - pr) * THREE.MathUtils.clamp(1 + Math.min(0, pitch) / 0.8, 0, 1);
-          const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] } : set.ready;
+          // (a pistol, lying, out ahead and level a hand under the aim: at the ready as it is stood with, low and dipped,
+          // it was pointed into the ground under the chest)
+          const p = set.ready.p, a = set.aim.p, lie = held.long ? 0 : pr;
+          const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] }
+            : lie > 0.001 ? { p: [p[0] + (a[0] - p[0]) * lie, p[1] + (a[1] - 0.06 - p[1]) * lie, p[2] + (a[2] - p[2]) * lie], r: [set.ready.r[0] * (1 - lie), set.ready.r[1] * (1 - lie), set.ready.r[2]] } : set.ready;
           if (butt && chest) {
             this.heldPivot.updateWorldMatrix(false, false);
             chest.bone.updateWorldMatrix(true, false);
@@ -688,6 +692,9 @@ export const updateMethods = {
 
     // --- the arms at their own business: a guard and a punch, hands at work, the wheel's calls (gestures.ts)
     this.gestures(dt, dead, using, ges, mv, pitch);
+    // (what hangs from the hand hangs straight down, turned as the body is, whichever way the hand has turned)
+    const hung = this.inHand?.plumb;
+    if (hung?.parent) hung.quaternion.copy(hung.parent.getWorldQuaternion(_qa).invert().multiply(this.root.getWorldQuaternion(_qb)));
 
     if (this.sick && !dead && this.downT <= 0) {
       this.sicken(dt);

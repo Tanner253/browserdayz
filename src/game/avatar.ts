@@ -444,8 +444,8 @@ export class Avatar {
   holdT = 0;
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
-  /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean } | null = null;
+  /** a one-handed weapon in the right fist, or a thing (`plumb`: the part of it that hangs from the hand, see ./avatar/fist.ts) */
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; plumb?: THREE.Object3D } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */

@@ -8,7 +8,7 @@ import { prune, cloneDocument, resample } from '@gltf-transform/functions';
 import * as THREE from 'three';
 import { readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes } from './mocap-pose.mjs';
+import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop } from './mocap-pose.mjs';
 import { ROOT, SRC, io, loadBody, carry as carryOnto } from './mocap-carry.mjs';
 export { meshyBone } from './mocap-carry.mjs';
 
@@ -49,6 +49,12 @@ export const MOVES = {
   // (0.92 m as the file stands, under the crouched eye: the library's carries it a third of a metre higher)
   crouchF: { from: 'Cautious_Crouch_Walk_Forward', way: 'F', gait: 'crouch', square: 0.4, head: 0.92 },
   crouchB: { from: 'Cautious_Crouch_Walk_Backward', way: 'B', gait: 'crouch', square: 0.4, head: 0.92 },
+  // (and the crouch's arms with nothing in the hands: the walk's, hung from a chest stooped as far as the crouch's
+  // leans. The cautious crouch holds both arms out wide, which squared to the front stood out to the sides. Stepped by
+  // the crouch's legs, so without a gait of their own: in step with them as every loop is, left heel first; only the
+  // arms are kept)
+  walkLow: { from: 'walking_2', way: 'F', stoop: 0.5, arms: true },
+  walkLowB: { from: 'Walk_Backward', way: 'B', stoop: 0.5, arms: true },
   // on a broken leg
   limpF: { from: 'Limping_Walk_1', way: 'F', gait: 'limp', square: 0.5 },
   limpB: { from: 'Injured_Walk_Backward', way: 'B', gait: 'limp', square: 0.5 },
@@ -95,13 +101,22 @@ if (!cands) {
     const said = {};
     said.was = facing(doc, sk, name);
     if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
+    if (m.stoop) stoop(doc, sk, name, m.stoop);
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
+    if (m.arms) {
+      const anim = doc.getRoot().listAnimations().find((a) => a.getName() === name);
+      for (const c of anim.listChannels()) {
+        if (/^(clavicle|upperarm|lowerarm|hand|thumb|index|middle|ring|pinky)_/.test(c.getTargetNode().getName())) continue;
+        c.getSampler().dispose();
+        c.dispose();
+      }
+    }
     const r = report[name], got = readClip(doc, sk, name);
     // (its pace: by the hips where it travels, by the feet where it was drawn on the spot; and a loop that goes another
     // way than it is said to stops the build: the library's 'Walk_Left_with_Gun' steps to the right, and was laid in
     // as a step to the left, its feet sliding along with the body)
-    if (m.way) {
+    if (m.way && !m.arms) {
       const went = goes(doc, sk, name), want = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 }[m.way];
       if (Math.abs(((went.deg - want + 540) % 360) - 180) > 40) throw new Error(`${name} goes ${went.deg} degrees to the left of its front, not ${m.way}`);
     }
