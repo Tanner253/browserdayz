@@ -142,6 +142,7 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     finishFor: () => null,
     applyFinish: () => {},
     plateIcon: () => {},
+    reclaim: () => {},
   };
   screen = new InventoryUI(inv, actions);
   screen.icons = icons;

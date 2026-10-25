@@ -138,7 +138,7 @@ interface Snapshot {
 }
 
 /** a body as it is kept: where it lies, whose it was, how it fell, what is on it, and the seconds it has left */
-interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; name: string; v: number; left: number; items: Box['items'] }
+interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; name: string; v: number; left: number; items: Box['items']; pid?: string }
 
 /**
  * The dead lying on the ground, kept through a restart and a deploy with the time each had left (2026-10-17: a player
@@ -148,7 +148,7 @@ interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; 
 function bodies(): KeptBody[] {
   return [...boxes.values()]
     .filter((b) => b.kind === 'corpse' && !b.ride && b.zed === undefined && (b.expires ?? 0) > economy.time)
-    .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items }));
+    .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items, ...(b.pid ? { pid: b.pid } : {}) }));
 }
 
 /** the kept bodies laid out again, each with the time it had left, and everybody on told of each @returns how many */
@@ -162,7 +162,7 @@ function layBodies(list: KeptBody[] | undefined, moved: boolean): number {
     });
     for (const it of items) issue(it);
     const y = moved ? world.groundAt(b.x, b.z) : b.y, name = String(b.name ?? 'Survivor').slice(0, 24), v = num(b.v) ? b.v : 0;
-    boxes.set(b.cid, { cid: b.cid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items, x: b.x, y, z: b.z, rot: b.rot, emptiedAt: -1, name, v, expires: economy.time + Math.min(CORPSE_LIFETIME, b.left) });
+    boxes.set(b.cid, { cid: b.cid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items, x: b.x, y, z: b.z, rot: b.rot, emptiedAt: -1, name, v, expires: economy.time + Math.min(CORPSE_LIFETIME, b.left), ...(typeof b.pid === 'string' ? { pid: b.pid.slice(0, 32) } : {}) });
     broadcast({ t: 'corpse@', corpse: { uid: b.cid, x: b.x, y, z: b.z, rot: b.rot, name, v } });
     n++;
   }

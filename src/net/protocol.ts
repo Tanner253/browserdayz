@@ -66,7 +66,9 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-export const PROTOCOL = 65;
+// (68, 2026-10-25: a survivor's own body gives back their gear at one press ('reclaim', 'reclaimed'; `own` on the
+// 'cdata' that answers 'copen': src/sim/reclaim.ts). A page of 65 shows no button and is never told it can.)
+export const PROTOCOL = 68;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -253,6 +255,8 @@ export type C2S =
   | { t: 'cops'; cid: string; ops: BoxOp[] }
   /** what is in a crate within reach, asked for on the way to it (no doors open, nothing is held): it is shown at once when it is opened */
   | { t: 'cpeek'; cid: string }
+  /** everything on this player's own body, open, back onto them as it was worn and carried (src/sim/reclaim.ts) */
+  | { t: 'reclaim'; cid: string }
   | { t: 'cclose'; cid: string }
   /**
    * What lies within reach that holds things (a pack, a vest, a jacket, a case), opened with the pockets: each is the
@@ -423,7 +427,10 @@ export type S2C =
   | { t: 'loot+'; l: WorldLoot }
   | { t: 'loot-'; uid: string }
   | { t: 'denied'; uid: string }
-  | { t: 'cdata'; cid: string; items: StoredItem[] }
+  /** what is in a crate or a body; `own`: the body is this player's own, whose gear they may take back at one press ('reclaim'), said only in answer to 'copen' */
+  | { t: 'cdata'; cid: string; items: StoredItem[]; own?: true }
+  /** their own body gone through ('reclaim'): what they carry now, how many things came off it, and how many found no room and lie on it still */
+  | { t: 'reclaimed'; cid: string; inv: SerializedInventory; took: number; left: number }
   | { t: 'cbusy'; cid: string }
   /** what of this player's moves in a crate (`cid`) or a bag lying about (`l`) could not be done: taken by somebody else first (out of their pockets again), or no room (back into them) */
   | ({ t: 'cno'; cid?: string; l?: string } & Refused)

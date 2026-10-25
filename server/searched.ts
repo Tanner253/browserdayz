@@ -7,7 +7,8 @@
 
 import { applyOps, diffOps, laidIn, type BoxOp, type Laid } from '../src/sim/box-ops';
 export { laidIn };
-import { bagGrid } from '../src/sim/inventory';
+import { Container, PlayerInventory, bagGrid } from '../src/sim/inventory';
+import { reclaim } from '../src/sim/reclaim';
 import { ITEMS, type ItemInstance } from '../src/sim/items';
 import type { S2C, StoredItem } from '../src/net/protocol';
 import type { WorldLoot } from '../src/sim/economy';
@@ -15,7 +16,7 @@ import { economy, invented, issue, locks, takeOut, things, type Box } from './in
 import { cleanItem, cleanStored, clients, send, broadcast, type Client } from './players';
 import { CHECKS, flag, touched } from './checks';
 import { KEPT } from './keep';
-import { ajar, rackChanged } from './acts';
+import { ajar, pidOf, rackChanged } from './acts';
 import { changed, contents } from './storages';
 import { cameTo, holdsTag, payingTags, wentFrom } from './custody';
 
@@ -122,6 +123,32 @@ export function boxOps(c: Client, b: Box, ops: BoxOp[]) {
 function came(c: Client, uid: string) {
   cameTo(c.key, uid);
   send(c, { t: 'tagclock', uid, held: 0 });
+}
+
+/**
+ * Their own body, open within reach, gone through at one press: everything on it back onto them as it was worn and
+ * carried (src/sim/reclaim.ts), all at once. Their game is told what it carries now, and whoever else has the body
+ * open what is left on it. A tag off it is theirs, its clock started, as off a body thing by thing.
+ * @returns false if it is not theirs to do (their game is not told: it only shows the button on their own body)
+ */
+export function reclaimBody(c: Client, b: Box): boolean {
+  if (b.kind !== 'corpse' || !b.pid || b.pid !== pidOf(c.key) || !c.inv || !hasOpen(c, b.cid)) return false;
+  const inv = new PlayerInventory();
+  // (what they carry as their game last said, which says it again just before asking: nothing of it is let fall here)
+  if (inv.load(JSON.parse(JSON.stringify(c.inv))).length) return false;
+  const body = new Container(b.cid, 'Body', b.w, b.h, [], true);
+  if (body.load({ items: b.items }).length) return false;
+  const { took, put } = reclaim(inv, body);
+  for (const it of took) for (const t of payingTags(it)) came(c, t.uid);
+  const onto = put.flatMap((it) => payingTags(it)).map((t) => t.uid);
+  for (const uid of onto) wentFrom(c.key, uid, `b:${b.cid}`);
+  for (const it of put) issue(it);
+  b.items = body.serialize().items;
+  c.inv = inv.serialize();
+  touched(b);
+  send(c, { t: 'reclaimed', cid: b.cid, inv: c.inv, took: took.length, left: b.items.length });
+  tell(b.cid, { t: 'cdata', cid: b.cid, items: b.items });
+  return true;
 }
 
 /** What an old game says is in the whole crate now, made into the moves from what is in it (one that has it alone open loses nothing by it). */

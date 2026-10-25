@@ -101,6 +101,8 @@ export interface InvActions {
   applyFinish(item: ItemInstance): void;
   /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
   plateIcon(id: string, f: 'gold' | 'nickel'): void;
+  /** everything on this player's own body, open, back onto them as it was worn and carried (src/game/game/reclaim.ts) */
+  reclaim(): void;
 }
 
 type Source =
@@ -1578,7 +1580,7 @@ export class InventoryUI {
     const st = this.stash;
     const stashPart = !st
       ? []
-      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}`, () => {
+      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${st.own}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}`, () => {
           const out: Node[] = [];
           const head = document.createElement('h3');
           head.innerHTML = `${st.label} <span>${st.container.w}×${st.container.h}</span>`;
@@ -2214,6 +2216,16 @@ export class InventoryUI {
       b.addEventListener('click', () => this.takeAll(group));
       bar.appendChild(b);
     };
+    // (their own body: one press puts back on everything that was worn and carried, src/sim/reclaim.ts)
+    if (this.stash?.own && this.stash.container.items.length) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'inv-reclaim';
+      b.textContent = 'Reclaim gear';
+      b.title = 'Your own body: puts back on everything you wore and carried, where there is room';
+      b.addEventListener('click', () => this.actions.reclaim());
+      bar.appendChild(b);
+    }
     add('Take all', null, this.takeList(null).length);
     // (with only what fits shown, every kind's button would take the same as "Take all")
     if (!this.fitting) for (const g of TAKE_GROUPS) add(g.label, g.id, this.takeList(g.id).length);

@@ -395,6 +395,7 @@ export const onlineMethods = {
     net.on('cdata', (m) => {
       const st = this.findBox(m.cid);
       if (!st) return;
+      if (m.own) st.own = true;
       // (What the server says is in it: what this game's moves are reckoned from. Its answer to this game's own moves
       // is what this game has already, and nothing is laid out again for it.)
       const same = st.known && JSON.stringify(st.container.serialize().items) === JSON.stringify(m.items);
@@ -590,6 +591,7 @@ export const onlineMethods = {
       this.meDirty = true;
     });
     net.on('kit', (m) => this.kitUp(m));
+    net.on('reclaimed', (m) => this.reclaimed(m));
     net.on('trash', (m) => this.trashed(m.uids, m.by));
     net.on('refill', (m) => this.refilled(m.by));
     net.on('inv', (m) => this.adminUI.setPockets(m));

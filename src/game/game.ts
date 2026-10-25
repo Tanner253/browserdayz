@@ -116,6 +116,7 @@ import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
 import { huntMethods } from './game/hunt';
+import { reclaimMethods } from './game/reclaim';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -443,6 +444,8 @@ export class Game {
   sendT = 0;
   meT = 0;
   meDirty = false;
+  /** a press of 'Reclaim gear' waits for the server's word until then (performance.now()): see src/game/game/reclaim.ts */
+  reclaimUntil = 0;
   pendingTakes = new Map<string, { item: ItemInstance; id: string; qty: number }>();
   localDrops = new Set<string>();
 
@@ -914,6 +917,7 @@ export class Game {
       finishFor: (item) => this.finishFor(item),
       applyFinish: (item) => this.applyFinish(item),
       plateIcon: (id, f) => this.plateIcon(id, f),
+      reclaim: () => this.reclaimGear(),
     });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
@@ -1808,6 +1812,8 @@ export interface Game {
   burnWood: Methods<typeof itemsMethods>['burnWood'];
   skinPrompt: Methods<typeof huntMethods>['skinPrompt'];
   onSkin: Methods<typeof huntMethods>['onSkin'];
+  reclaimGear: Methods<typeof reclaimMethods>['reclaimGear'];
+  reclaimed: Methods<typeof reclaimMethods>['reclaimed'];
   grill: Methods<typeof itemsMethods>['grill'];
   cookShown: Methods<typeof itemsMethods>['cookShown'];
   emptyOfGrenade: Methods<typeof itemsMethods>['emptyOfGrenade'];
@@ -1866,6 +1872,6 @@ export interface Game {
   finished: Methods<typeof interactMethods>['finished'];
   frame: Methods<typeof frameMethods>['frame'];
 }
-for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods, huntMethods]) {
+for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods, huntMethods, reclaimMethods]) {
   for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Game.prototype, name, { ...d, enumerable: false });
 }
