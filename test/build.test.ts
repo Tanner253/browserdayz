@@ -21,7 +21,7 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
 import { inPlay } from '../src/world/worldgen/layout';
-import { Bases, heard, heardPiece, said, type Land } from '../src/sim/build/bases';
+import { Bases, heard, heardPiece, said, saidPiece, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
@@ -543,6 +543,20 @@ ok('a room shut all round in stone keeps its light in: its door open, a wall of 
   const h3 = stone();
   [...h3.b.pieces.values()].find((p) => p.k === 'shutters')!.open = true;
   assert.equal(shutRoom(h3.b, ...h3.w(0, 0.1, 0)), null, 'a window open');
+});
+
+ok('a thing set down is turned any way, to a degree, and kept so; a box in quarter turns, squared to its base', () => {
+  const bs = new Bases(flat), b = start(bs);
+  const at = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 }, 1.37)!;
+  assert.ok(Math.abs(at.r - 41 / 30) < 1e-9, `a workbench turned 41.1 degrees is turned 41: ${at.r * 30}`);
+  const r = bs.lay({ b: b.id, k: 'workbench', ...at }, ME, 0);
+  assert.ok(typeof r !== 'string', `not laid: ${r}`);
+  assert.equal(heardPiece(saidPiece(r.piece))!.r, r.piece.r, 'its turn told and kept to the degree');
+  assert.equal(deployAt(b, 'box_small', { x: 1, y: 0, z: 1 }, 1.4)!.r, 0, 'a box a little turned: square');
+  assert.equal(deployAt(b, 'box_small', { x: 1, y: 0, z: 1 }, 4.6)!.r, 6, 'a box near half round: half round');
+  // (a piece of a building keeps whole steps)
+  const wall = at && spots(b, 'wall')[0];
+  assert.ok(Number.isInteger(wall.r), 'a wall in whole steps');
 });
 
 if (process.argv.includes('--server')) await serverTest();

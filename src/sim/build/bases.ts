@@ -3,7 +3,7 @@
 // of where a piece goes are src/sim/build/snap.ts; what it is and costs, src/sim/build/pieces.ts.
 
 import { BENCH_NEAR, FOUND, PIECES, PIECE_IDS, costOf, hpOf, laidAt, type Tier } from './pieces';
-import { blocked, cornersOf, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
+import { blocked, cornersOf, deployTurn, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
 import { ROT } from './upkeep';
 import { heardLock, saidLock, type KeptLock } from './locks';
 
@@ -318,7 +318,8 @@ export function heardPiece(q: KeptPiece, by = ''): Piece | null {
   const k = PIECE_IDS[q[1] as number];
   if (!k) return null;
   const t = Math.max(0, Math.min(3, Math.round(q[2]))) as Tier;
-  const p: Piece = { id: q[0], k, t, x: q[3] / 100, y: q[4] / 100, z: q[5] / 100, r: ((Math.round(q[6]) % 12) + 12) % 12, hp: Math.max(1, Math.min(hpOf(k, t), q[7])), at: q[8] * 1000, by, on: [] };
+  // (a thing set down keeps its turn to a degree: src/sim/build/snap.ts deployTurn; a piece of a building, a whole step)
+  const p: Piece = { id: q[0], k, t, x: q[3] / 100, y: q[4] / 100, z: q[5] / 100, r: PIECES[k].role === 'deploy' ? deployTurn(k, q[6]) : ((Math.round(q[6]) % 12) + 12) % 12, hp: Math.max(1, Math.min(hpOf(k, t), q[7])), at: q[8] * 1000, by, on: [] };
   const more = q[9];
   if (more && typeof more === 'object') {
     if (more.o === 1) p.open = true;

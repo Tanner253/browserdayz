@@ -19,7 +19,7 @@ import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
 import { Bases, heard, heardClaim, heardPiece, said, type KeptBase } from '../../sim/build/bases';
 import { PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, type Tier } from '../../sim/build/pieces';
-import { deployAt, nearestSpot, nearestToRay, restsOn, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
+import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../../sim/items';
@@ -107,6 +107,18 @@ export class Building {
   /** the chosen piece, and the turn asked for (R) */
   kind = 'foundation';
   private turn = 0;
+  /**
+   * A thing being set down, Rust's way (the owner, 2026-10-24: "a click once to place then move mouse to rotate click
+   * again to confirm ... rigid when using crates"): its spot, held since the first click, in its base's frame; how it is
+   * turned now; and for a box, the quarter turns R has given it since. Null: the first click is still to come.
+   */
+  private placing: { k: string; b: number; x: number; y: number; z: number; r: number; quarters: number; locked: boolean } | null = null;
+  /** the arrow on the floor under a thing being turned, the way its front faces */
+  private arrow: THREE.Mesh | null = null;
+  /** a thing is held at its spot and being turned (the keys say so: src/game/key-hints.ts) */
+  get turning() {
+    return !!this.placing;
+  }
   /** the ghost: one for each kind, its paint pale blue or red */
   private ghost: THREE.Mesh | null = null;
   private ghostKind = '';
@@ -247,13 +259,17 @@ export class Building {
     const plan = ok && held?.id === 'building_plan', hammer = ok && !!held && !!HAMMERS[held.id];
     this.prompt = null;
     this.draw.update(dt, this.h.me());
+    // (the plan put away, another piece chosen, or the mouse let go of (Esc): a thing being turned goes back to its first click)
+    if (this.placing && (!plan || this.placing.k !== this.kind || (this.placing.locked && !this.h.input.locked))) this.placing = null;
     if (this.wheel.isOpen) this.wheelFrame(ok && (plan || hammer));
-    else if (ok && (plan || hammer) && this.h.input.pressed('Mouse2') && !this.h.busy()) this.openWheel(plan ? 'plan' : 'hammer');
+    // (the right button, while a thing is being turned, takes it back to its first click instead: `turnFrame`)
+    else if (ok && (plan || hammer) && !this.placing && this.h.input.pressed('Mouse2') && !this.h.busy()) this.openWheel(plan ? 'plan' : 'hammer');
     if (plan && !this.wheel.isOpen) this.planFrame(held!);
     else {
       this.hideGhost();
       this.prints.hide();
     }
+    if (!this.placing && this.arrow) this.arrow.visible = false;
     if (hammer && !this.wheel.isOpen) this.hammerFrame(held!);
     // (a claim looked at: F opens its store, held it joins; a door: F swings it. Whatever is in the hands, though the
     // plan's and the hammer's cards say more of what is looked at than that)
@@ -275,6 +291,7 @@ export class Building {
 
   private planFrame(plan: ItemInstance) {
     const input = this.h.input, cam = this.h.camera();
+    if (this.placing) return this.turnFrame(plan);
     if (input.pressed('KeyR')) this.turn = (this.turn + 1) % 12;
     cam.getWorldDirection(_dir);
     const from = cam.getWorldPosition(new THREE.Vector3());
@@ -302,16 +319,22 @@ export class Building {
       if (!best || d < best.d) best = { base: b, s, d };
     }
     let ask: { b?: number; k: string; x: number; y: number; z: number; r: number; yaw?: number } | null = null;
-    // (a thing set down goes where the aim meets a floor, turned as R turns it)
+    // (a thing set down goes where the aim meets a floor: its front to whoever sets it down, a box's back to the wall
+    // behind it if there is one; R turns it on from there, a step, or a box a quarter)
     if (K.role === 'deploy') {
       best = null;
       for (const b of near) {
-        const [lx, ly, lz] = toLocal(b, at.x, at.y, at.z), s = deployAt(b, this.kind, { x: lx, y: ly, z: lz }, this.turn);
+        const [lx, ly, lz] = toLocal(b, at.x, at.y, at.z), first = deployAt(b, this.kind, { x: lx, y: ly, z: lz });
+        if (!first) continue;
+        const s = deployAt(b, this.kind, first, this.facing(b, first, from) + (rigid(this.kind) ? 3 : 1) * this.turn);
         if (s) best = { base: b, s, d: 0 };
       }
     }
+    // (a foundation or a high wall begun on its own: square to the way the player looks, and R turns it a quarter, a
+    // triangle a sixth)
+    const turned = K.shape === 'tri' ? (this.turn % 6) * (Math.PI / 3) : (this.turn % 4) * (Math.PI / 2);
     if (best) ask = { b: best.base.id, k: this.kind, x: best.s.x, y: best.s.y, z: best.s.z, r: best.s.r };
-    else if ((K.ground || K.role === 'free') && hit) ask = { k: this.kind, x: at.x, y: 0, z: at.z, r: 0, yaw: this.h.yaw() + Math.PI };
+    else if ((K.ground || K.role === 'free') && hit) ask = { k: this.kind, x: at.x, y: 0, z: at.z, r: 0, yaw: this.h.yaw() + Math.PI + turned };
     if (!ask) {
       this.hideGhost();
       this.prompt = card(K.name, near.length ? 'aim at where it goes on your base' : K.ground ? 'aim at open ground' : 'lay a foundation first', 'hold the right button for the pieces');
@@ -326,8 +349,108 @@ export class Building {
     const spot = typeof c === 'string' ? (ask.b !== undefined ? { x: ask.x, y: ask.y, z: ask.z, r: ask.r } : null) : c.spot;
     if (base && spot) this.showGhost(base, spot, !why);
     else this.showGhostAt(at, ask.yaw ?? 0, false);
+    if (K.role === 'deploy') {
+      // (the first click holds it where it is, to be turned: `turnFrame`)
+      this.prompt = why ? card(K.name, `<span class="no">${why}</span>`, this.costHtml(cost)) : card(`Place ${K.name}`, this.costHtml(cost), 'then turn it with the aim · R turns it · hold the right button for the pieces', 'LMB');
+      if (input.pressed('Mouse0') && !this.h.busy()) {
+        if (why || ask.b === undefined) return void this.lay(plan, ask, why);
+        this.placing = { k: this.kind, b: ask.b, x: ask.x, y: ask.y, z: ask.z, r: ask.r, quarters: 0, locked: input.locked };
+        audio.click(900, 0.12, 0.015);
+      }
+      return;
+    }
     this.prompt = why ? card(K.name, `<span class="no">${why}</span>`, this.costHtml(cost)) : card(`Lay ${K.name}`, this.costHtml(cost), 'R turns it · hold the right button for the pieces', 'LMB');
     if (input.pressed('Mouse0') && !this.h.busy()) this.lay(plan, ask, why);
+  }
+
+  /**
+   * How a thing about to be set down at `s` (in base `b`'s frame) is first turned, in steps: a box's back to the
+   * nearest wall within a metre and a half of it, squared; anything else, and a box with no wall by it, its front to
+   * the eye (`from`).
+   */
+  private facing(b: Base, s: { x: number; y: number; z: number }, from: THREE.Vector3): number {
+    const STEP = Math.PI / 6;
+    if (rigid(this.kind)) {
+      let wall: { x: number; z: number; d: number } | null = null;
+      for (const p of b.pieces.values()) {
+        if (PIECES[p.k].role !== 'wall' || Math.abs(p.y - s.y) > 0.5) continue;
+        const d = Math.hypot(p.x - s.x, p.z - s.z);
+        if (d < 1.5 && (!wall || d < wall.d)) wall = { x: p.x, z: p.z, d };
+      }
+      if (wall) return Math.round(Math.atan2(s.x - wall.x, s.z - wall.z) / STEP / 3) * 3;
+    }
+    const [ex, , ez] = toLocal(b, from.x, from.y, from.z);
+    return Math.atan2(ex - s.x, ez - s.z) / STEP;
+  }
+
+  /**
+   * The second step of setting a thing down: held at its spot, its front turned to where the aim meets the floor about
+   * it (a box in quarter turns, squared to its base; R turns a box a quarter more), an arrow under it the way it faces,
+   * and a click to set it there. The right button takes it back to the first click; so does letting go of the mouse (Esc).
+   */
+  private turnFrame(plan: ItemInstance) {
+    const input = this.h.input, cam = this.h.camera(), pl = this.placing!, b = this.store.bases.get(pl.b), K = PIECES[pl.k];
+    if (!b || input.pressed('Mouse2')) {
+      this.placing = null;
+      audio.click(500, 0.1, 0.015);
+      return;
+    }
+    if (input.pressed('KeyR') && rigid(pl.k)) pl.quarters = (pl.quarters + 1) % 4;
+    cam.getWorldDirection(_dir);
+    const from = cam.getWorldPosition(new THREE.Vector3());
+    const hit = physics.raycast(from, _dir, 12, SOLID_GROUPS, this.h.player()) ?? this.ontoGround(from);
+    if (hit) {
+      const [lx, , lz] = toLocal(b, hit.point.x, hit.point.y, hit.point.z), dx = lx - pl.x, dz = lz - pl.z;
+      // (near its own spot the way is no way at all: it keeps the last)
+      if (Math.hypot(dx, dz) > 0.35) {
+        const steps = Math.atan2(dx, dz) / (Math.PI / 6);
+        pl.r = rigid(pl.k) ? deployTurn(pl.k, Math.round(steps / 3) * 3 + 3 * pl.quarters) : deployTurn(pl.k, steps);
+      }
+    }
+    const ask = { b: pl.b, k: pl.k, x: pl.x, y: pl.y, z: pl.z, r: pl.r };
+    const c = this.store.check(ask, this.me);
+    let why = typeof c === 'string' ? c : null;
+    const cost = costOf(pl.k, laidAt(pl.k));
+    if (!why) why = this.short(cost);
+    this.showGhost(b, ask, !why);
+    // (the arrow: from its middle out past its front, flat on what it stands on)
+    const [wx, wy, wz] = toWorld(b, pl.x, pl.y, pl.z), yaw = worldYaw(b, ask.r);
+    this.placeArrow(pl.k, wx, wy + 0.03, wz, yaw, !why);
+    const deg = Math.round((ask.r * 30) % 360);
+    this.prompt = why
+      ? card(K.name, `<span class="no">${why}</span>`, 'the right button: back')
+      : card(`Set ${K.name} down`, `facing ${deg}° · ${this.costHtml(cost)}`, rigid(pl.k) ? 'the aim turns it a quarter at a time · R a quarter more · the right button: back' : 'the aim turns it · the right button: back', 'LMB');
+    if (input.pressed('Mouse0') && !this.h.busy()) {
+      this.lay(plan, ask, why);
+      if (!why) this.placing = null;
+    }
+  }
+
+  private arrowOk = new THREE.MeshBasicMaterial({ color: 0xeafcff, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  private arrowBad = new THREE.MeshBasicMaterial({ color: 0xffb3a8, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+  /** the arrow under a thing being turned: flat, from its middle out half a metre past its front, the way the front faces */
+  private placeArrow(kind: string, x: number, y: number, z: number, yaw: number, good: boolean) {
+    if (!this.arrow) {
+      // (a metre long, pointing +z: stretched to each thing's own depth)
+      const s = new THREE.Shape();
+      s.moveTo(-0.07, 0);
+      s.lineTo(0.07, 0);
+      s.lineTo(0.07, 0.68);
+      s.lineTo(0.24, 0.68);
+      s.lineTo(0, 1);
+      s.lineTo(-0.24, 0.68);
+      s.lineTo(-0.07, 0.68);
+      s.closePath();
+      this.arrow = new THREE.Mesh(new THREE.ShapeGeometry(s).rotateX(Math.PI / 2), this.arrowOk);
+      this.arrow.renderOrder = 6;
+      this.h.scene.add(this.arrow);
+    }
+    const front = Math.max(...footOf(kind, 0, 0, 0).map(([, fz]) => Math.abs(fz)));
+    this.arrow.scale.set(1, 1, front + 0.5);
+    this.arrow.material = good ? this.arrowOk : this.arrowBad;
+    this.arrow.position.set(x, y, z);
+    this.arrow.rotation.set(0, yaw, 0);
+    this.arrow.visible = true;
   }
 
   /** where the aim meets the ground, walked along it a quarter metre at a time (the ground's own height, which the rules go by) */

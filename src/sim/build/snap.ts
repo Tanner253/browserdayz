@@ -305,9 +305,21 @@ function floorUnder(base: Base, kind: string, x: number, y: number, z: number, r
  * to a quarter of a metre, turned as the player turns it. Null: no floor there for it.
  */
 export function deployAt(base: Base, kind: string, aim: { x: number; y: number; z: number }, turn = 0): Spot | null {
-  const x = Math.round(aim.x * 4) / 4, z = Math.round(aim.z * 4) / 4, r = mod12(turn);
+  const x = Math.round(aim.x * 4) / 4, z = Math.round(aim.z * 4) / 4, r = deployTurn(kind, turn);
   const f = floorUnder(base, kind, x, aim.y, z, r);
   return f ? { x, y: f.y, z, r, on: [f.id] } : null;
+}
+
+/**
+ * How a thing set down may be turned (the owner, 2026-10-24: "rust does a click once to place then move mouse to rotate
+ * click again to confirm when placing forges, rigid when using crates"): a box squared to its base, in quarter turns;
+ * anything else any way at all, to a degree (a thirtieth of a step).
+ */
+export const rigid = (kind: string) => !!PIECES[kind].store;
+export function deployTurn(kind: string, turn: number): number {
+  if (rigid(kind)) return mod12(Math.round(turn / 3) * 3);
+  const r = Math.round(turn * 30) / 30;
+  return ((r % 12) + 12) % 12;
 }
 
 /** what a piece of `kind` at `s` would rest on (an empty list: nothing, unless it is a foundation or free) */
