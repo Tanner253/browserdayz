@@ -3850,11 +3850,11 @@ export class Weapons {
 
   /**
    * A grenade thrown: it has left the hand, and the hand goes on through the throw as the body everybody else sees
-   * throws (the motion capture's, see held-mocap.ts), then is let down. Without the paths yet, it is put away as before.
+   * throws (the motion capture's, see held-mocap.ts), then is let down. @returns false when there was nothing to throw from
    */
   throwOut(then?: () => void): boolean {
     const h = this.held;
-    if (!h || h.ending || h.thrown !== undefined || !lengthOf('throw')) return false;
+    if (!h || h.ending || h.thrown !== undefined) return false;
     h.thrown = 0;
     h.then = then;
     for (const c of h.root.children) c.visible = false;
@@ -4463,22 +4463,14 @@ export class Weapons {
       } else if (a.name === 'swing') {
         // On the motion capture, the blow everybody else sees the body strike (see held-mocap.ts slashAt): what is in
         // the fist goes where the right hand went, drawn up beside the head and brought down across, by a share of the
-        // way (the eye is on the end of that arm), and home again over the end. The hand-made swing till it has come.
+        // way (the eye is on the end of that arm), and home again over the end.
         const len = lengthOf('slash'), home = 1 - THREE.MathUtils.smoothstep(k, 0.72, 1);
-        if (len && handMove('slash', 'r', slashAt(k) / len, slashAt(0) / len, _swungP, _swungQ)) {
-          pos.addScaledVector(_swungP.multiply(SWUNG.by), home);
-          _swungE.setFromQuaternion(_swungQ.slerp(_swungI, 1 - SWUNG.turn * home), 'XYZ');
-          rot.x += _swungE.x;
-          rot.y += _swungE.y;
-          rot.z += _swungE.z;
-        } else {
-          const wind = THREE.MathUtils.smoothstep(k, 0, 0.3);
-          const strike = THREE.MathUtils.smoothstep(k, 0.3, 0.5);
-          const recover = THREE.MathUtils.smoothstep(k, 0.55, 1);
-          rot.x += (wind * 0.9 - strike * 2.0) * (1 - recover);
-          rot.y += (wind * 0.4 - strike * 0.6) * (1 - recover);
-          pos.add(new THREE.Vector3(-0.08 * strike, 0.08 * wind, -0.12 * strike).multiplyScalar(1 - recover));
-        }
+        handMove('slash', 'r', slashAt(k) / len, slashAt(0) / len, _swungP, _swungQ);
+        pos.addScaledVector(_swungP.multiply(SWUNG.by), home);
+        _swungE.setFromQuaternion(_swungQ.slerp(_swungI, 1 - SWUNG.turn * home), 'XYZ');
+        rot.x += _swungE.x;
+        rot.y += _swungE.y;
+        rot.z += _swungE.z;
       }
     } else {
       if (m.bolt) m.bolt.rotation.x = 0;
@@ -4875,14 +4867,9 @@ export class Weapons {
     if (a && a.name === 'punch' && a.data) {
       const k = Math.min(1, a.t / a.dur);
       thrown = a.data.hand ? 1 : -1;
-      // Drawn back a touch, thrown fast (it lands at 0.28 of the way through, see the action
-      // timeline), held a moment on the end of the arm and brought home slower than it went.
-      wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
-      const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
-      out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
-      // (on the motion capture: a jab's own drawing back, reach and coming home, as the body is seen to throw it)
-      const jab = jabAt(thrown as 1 | -1, k);
-      if (jab) ({ out, wind } = jab);
+      // On the motion capture: a jab's own drawing back, reach and coming home, as the body is seen to throw it (it
+      // lands at 0.28 of the way through, see the action timeline).
+      ({ out, wind } = jabAt(thrown as 1 | -1, k));
     }
     const hand = (side: 1 | -1): HandGrip => {
       const strike = side === thrown ? out : 0;
@@ -4957,12 +4944,8 @@ export class Weapons {
     // an injection: where the left hand is held out to take it (in the eye's space), and how far the shot has gone in
     let offered: { pos: THREE.Vector3; elbow: THREE.Vector3; fingers: THREE.Vector3; palm: THREE.Vector3; clench: number } | null = null;
     if (h.kind === 'eat' || h.kind === 'drink') {
-      // up to the mouth and back, once per bite / gulp
-      const period = h.kind === 'eat' ? 0.95 : 1.25;
-      const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, t - 0.3) / period) * Math.PI * 2);
-      // (on the motion capture: up to the mouth at the moments the body everybody sees is drinking; the curve till it has come)
-      const len = lengthOf('drink'), sip = len ? mouthAt((t % len) / len) : null;
-      const m = sip ?? (h.kind === 'drink' ? Math.pow(cyc, 0.6) : cyc);
+      // up to the mouth and back, on the motion capture: at the moments the body everybody sees is drinking
+      const len = lengthOf('drink'), m = mouthAt((t % len) / len);
       pos.lerp(new THREE.Vector3(H.mouth[0], H.mouth[1] + sy * H.mouthBy[0], H.mouth[2] + sy * H.mouthBy[1]), m * 0.92);
       rot.x = (h.kind === 'drink' ? H.tilt.drink : H.tilt.eat) * m;
       rot.z = -0.15 * m;

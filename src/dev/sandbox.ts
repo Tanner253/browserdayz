@@ -25,6 +25,8 @@
 //   &finish=emerald,ruby&as=knife               the store finish each model wears in turn (as: the gun it is plated as)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
+//   &bodies=ak.aim.crouch.walk.L,free.jog        the game's own bodies, stood, crouched or lying, holding and going as
+//                                               told, at successive moments with &frames= (src/dev/sandbox-body.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
 // Headless, in one pass and off the graphics card's queue:
 //   PLAY_NOWAIT=1 PLAY_GL=swiftshader node assets-src/_wf/me/play.mjs assets-src/_wf/me/stage-shot.js <out> 1280 720 "http://localhost:5173/tools/sandbox.html?..."
@@ -47,8 +49,10 @@ const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0', gap = +(
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
 const sim = q.get('sim'), melee = q.get('melee');
-const cells = sim ? 8 : strip > 0 ? strip : views.length;
-const cols = Math.min(cells, strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
+// (bodies: a block of them for each moment drawn)
+const bodies = list('bodies').length, bodyCols = Math.min(bodies, Math.max(1, +(q.get('cols') ?? 4)));
+const cells = sim ? 8 : bodies ? Math.ceil(bodies / bodyCols) * bodyCols * Math.max(1, Math.floor(+(q.get('frames') ?? 1))) : strip > 0 ? strip : views.length;
+const cols = bodies ? bodyCols : Math.min(cells, strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);
@@ -130,6 +134,10 @@ if (sim) {
   const { stageMelee } = await import('./sandbox-melee');
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   out.stageInfo = await stageMelee(melee, { q, scene, renderer, sun, cw, ch, cols, rows, cells, say });
+} else if (bodies) {
+  const { stageBodies } = await import('./sandbox-body');
+  const out = window as unknown as { staged: boolean; stageInfo: unknown };
+  out.stageInfo = await stageBodies({ q, scene, renderer, sun, cw, ch, cols, rows, say });
   out.staged = true;
 } else {
   // ---- the thing(s): side by side along x, each standing on the floor

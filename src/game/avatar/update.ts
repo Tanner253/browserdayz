@@ -72,9 +72,8 @@ export const updateMethods = {
     const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0 && !this.inHand)) && !dead && !armed && !using;
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
-    // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
-    // (a survivor on motion capture steps sideways and back facing the aim: only flat out does the body turn to the way it runs)
-    const free = !firstPerson && !armed && !fists && (!this.gait || speedNow > 5.2);
+    // face the movement direction when going unarmed, else the look direction (a punch goes where the eyes do)
+    const free = !firstPerson && !armed && !fists;
     const velYaw = Math.atan2(-velocity.x, -velocity.z);
     const targetYaw = free && speedNow > 0.6 ? velYaw : facingYaw;
     if (this.placed) this.yaw += wrap(targetYaw - this.yaw) * ease(firstPerson ? 40 : armed ? 18 : 10);
@@ -384,7 +383,7 @@ export const updateMethods = {
     // (the steps stretched to the pace the body goes at: see Gait's warp. Not past 60 m: a foot that slides is not seen there)
     if (gait && gait.share > 0.02 && Math.abs(gait.warp - 1) > 0.03 && !dead && pr < 0.01 && speedNow > 0.3 && this.joints.pelvis && pos.distanceToSquared(Avatar.eye) < 3600) {
       settle(this.root);
-      stretch(this.legs, this.joints.pelvis, _way.set(velocity.x, 0, velocity.z).normalize(), 1 + (gait.warp - 1) * Math.min(1, gait.share) * (1 - this.airT));
+      stretch(this.legs, _way.set(velocity.x, 0, velocity.z).normalize(), 1 + (gait.warp - 1) * Math.min(1, gait.share) * (1 - this.airT));
     }
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)

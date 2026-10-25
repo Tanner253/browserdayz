@@ -19,7 +19,8 @@ export const actsMethods = {
   swing(this: Avatar, overhand = false, seconds = 0.62, cut: Cut | null = null) {
     // (a survivor throws on the motion capture: from the arm drawn back, so the hand comes through as it lets go, a
     // sixth of a second on, which is when the game throws it)
-    if (overhand && this.deeds && !this.held) return this.perform('throw', { from: 0.12, to: 0.5, dur: 0.8 });
+    // (the arms and the chest: the captured throw goes down into a crouch that a body throwing standing does not)
+    if (overhand && this.deeds && !this.held) return this.perform('throw', { from: 0.12, to: 0.5, dur: 0.8, legs: 0.25 });
     if (this.inHand && !overhand) {
       // something in the fist to strike with: its captured blow (melee/cuts.ts), done as any deed is, the hips with it
       // standing; or (none, or its movement not here yet) the library's

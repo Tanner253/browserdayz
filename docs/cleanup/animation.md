@@ -1,37 +1,13 @@
-# Cleanup catalog: the animation path (motion capture), branch claude/gracious-merkle-a668ca
+# Cleanup: the animation path (motion capture, branch claude/gracious-merkle-a668ca)
 
-What the motion capture replaced, and what is now dead or only a stand-in. The owner, 2026-10-25: "keep a catalog of
-what is being replaced and what needs to be cleaned and scrubbed from the codebase so we dont have speghetti code bloat".
-
-## Replaced for survivors, still used by the infected (keep while the infected use them)
-- The old stride clock in src/game/avatar/update.ts (STRIDES, `phase`/`halves`/`plantWas`, POSE.pace/offset/plant,
-  the hip `twist` toward the way of travel and `backing`): survivors step on Gait (gait.ts). The infected's files have
-  their own walk and run and still go this way.
-- `strike` (the Quaternius blow): survivors strike with the mocap `slash`; the infected's claw lays `strike`.
-- DEATH_REST (pose.ts): survivors' bodies are searched where MOCAP_REST says (deeds.ts); the infected keep DEATH_REST.
-
-## Dead for survivors and for everybody: to delete
-(Done already: the procedural limp's hip drop, deleted from update.ts with this path; only survivors limp.)
-- In survivor.glb (scripts/build-character.mjs, the survivors path's): the clips `walk`, `run`, `crouchWalk`, `idle`,
-  `death`, `deathFront`, `deathSide`, `hit`, `hitHead`, `strike` are no longer played on a survivor (their weights go to
-  the motion capture). make.ts still requires every name in CLIPS; to drop them from the file, make the requirement
-  the infected's only (`file.startsWith('zombie')`) and keep `crouchIdle`, the jumps, `sit`, `dance`, `armed`,
-  `proneDown`, `crawl`, which survivors still play.
-- `deathFront` and `deathSide` built from poses in build-character.mjs, for the survivor only (the infected have their own).
-
-## Stand-ins until a file has come (keep, or delete by loading the file up front)
-- update.ts: the procedural eat/drink reach (used when `deeds.get('drink')` is null) and the old idle/death/hit clips
-  (used when `deeds` is missing, a body made before moves.glb could load: not expected).
-- weapons.ts: the hand-made swing (`wind`/`strike`/`recover`), the punch's `wind`/`out` curves and the eat/drink cosine,
-  used until src/game/avatar/hands.json has come (held-mocap.ts), and in development with `globalThis.__oldHands`.
-  If hands.json is imported statically instead (73 KB in the game's own bundle), these three go.
-- gestures.ts / update.ts: a punch's shape before the jab paths have come (same as above).
-
-## Development only (not in the build, keep or drop at will)
-- src/dev/sandbox.ts `&clip=a,b` one clip per file; src/dev/harness.ts lineup `limp` and the gait phase.
-- progress/anim-tools/* (git-excluded): candidates, sheets, game shots, the online walker.
-- The mocap sources not used by moves.glb (assets-src, git-ignored): Casual_Walk, Run_03, run_fast_3,
-  Lean_Forward_Sprint, Walk_Backward_with_Gun(_1), Walk_Forward/Backward_While_Shooting, Walk_Fight_*,
-  Standard_Forward_Charge, Combat_Stance, Idle, Idle_03, Idle_3, Idle_4, Dead, dying_backwards, Knock_Down,
-  Shot_in_the_Back_and_Fall, Limping_Walk, Limping_Walk_2, Injured_Walk, Crouch_Walk_Left_with_Gun,
-  Over_Shoulder_Throw, Attack, Quick_Walk. Kept as sources; nothing in the game reads them.
+- [ ] survivor.glb's `walk`, `run`, `crouchWalk`, `idle`, `death`, `deathFront`, `deathSide`, `hit`, `hitHead`, `strike` clips (scripts/build-character.mjs, the survivors path's) | replaced by moves.glb's gaits, idle, falls, flinches and slash (src/game/avatar/gait.ts, deeds.ts) | 7ad2ad14, bddcea9e | a survivor sets their weights to 0 (update.ts: `w.walk = w.run = w.crouchWalk = 0`, `this.actions.idle/death*/hit*.setEffectiveWeight(0)`); make.ts requires every CLIPS name, so drop the requirement for non-`zombie_` files first and keep `crouchIdle`, the jumps, `sit`, `dance`, `armed`, `proneDown`, `crawl`
+- [ ] `deathFront` and `deathSide` built from poses in scripts/build-character.mjs, for the survivor | replaced by mocap deathF, deathS | 7ad2ad14 | the infected's own files carry their own falls; nothing but survivor.glb has these
+- [ ] update.ts's `else this.layer('strike', ...)` in the blow with something in the fist | replaced by the mocap slash | bddcea9e | only a body without `deeds` reaches it (none: the infected never hold anything in the fist); `strike` itself stays for the infected's claw
+- [ ] acts.ts `swing()`'s procedural overhand arm (`swingT`) when it is a survivor's throw | replaced by perform('throw') | 7ad2ad14 | `overhand && this.deeds && !this.held` returns first; `swingT` still swings for a gun held (`this.held`), keep that
+- [x] the procedural limp's hip drop and lean (update.ts) | replaced by limpF/limpB | 4cadbdf8 | deleted
+- [x] first-person hand-made curves for the melee swing, the punch and eat/drink, kept until the hand paths came | replaced by src/game/held-mocap.ts on hands.json (now in the bundle) | abadaecd | deleted
+- [x] third-person procedural eat/drink reach (gestures.ts) | replaced by the mocap drink layer | abadaecd | deleted
+- [ ] the old stride clock in update.ts (STRIDES, `phase`/`halves`/`plantWas`, POSE.pace/offset/plant, the hip `twist` toward travel and `backing`) | replaced by Gait for survivors | 7ad2ad14 | keep while the infected's files walk and run on it; dead once the infected move on capture too
+- [ ] DEATH_REST for survivor corpses | replaced by MOCAP_REST (deeds.ts) | bddcea9e | the infected still use DEATH_REST through searchedAt's default; dead with the infected's falls
+- [ ] the unused mocap sources in assets-src/incoming/higgsfield/anim/mocap (Walk_Left_with_Gun, Cautious_Crouch_Walk_Left/Right: the side steps are the walks and the crouch turned now; Casual_Walk, Run_03, run_fast_3, Lean_Forward_Sprint, Walk_Backward_with_Gun(_1), Walk_Forward/Backward_While_Shooting, Walk_Fight_*, Standard_Forward_Charge, Combat_Stance, Idle, Idle_03, Idle_3, Idle_4, Dead, dying_backwards, Knock_Down, Shot_in_the_Back_and_Fall, Limping_Walk, Limping_Walk_2, Injured_Walk, Crouch_Walk_Left_with_Gun, Over_Shoulder_Throw, Attack, Quick_Walk) | not used by moves.glb | - | git-ignored sources only; scripts/mocap.mjs MOVES names what is used
+- [ ] Idle_02 as the survivors' idle (a fighting stance, feet 53 cm apart, knees out) | replaced by Idle_3 (a relaxed stand, 10 s) | this commit | scripts/mocap.mjs MOVES.idle; the source stays in assets-src only

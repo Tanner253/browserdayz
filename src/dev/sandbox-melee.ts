@@ -22,7 +22,7 @@ import { wearFinish, type Finish } from '../game/finish';
 import { meleeAt, meleeHeld } from '../game/weapons';
 import { FPArms } from '../game/arms';
 import { cutFor } from '../game/melee/cuts';
-import { LOOK, fpPose, handsReady, lookOver, type Cut } from '../game/held-mocap';
+import { LOOK, fpPose, lookOver, type Cut } from '../game/held-mocap';
 import { lateReady } from '../game/avatar/deeds';
 import type { Atmosphere } from '../world/atmosphere';
 import { ITEMS } from '../sim/items';
@@ -48,7 +48,6 @@ export async function stageMelee(id: string, s: {
 }) {
   const def = ITEMS[id];
   if (!def?.melee) throw new Error(`not something to hit with: ${id}`);
-  await handsReady();
   // (&heavy=1: its heavy blow, as long as the game gives one: see HEAVY)
   const heavy = s.q.get('heavy') === '1';
   const by = s.q.get('blow')?.split(',');
