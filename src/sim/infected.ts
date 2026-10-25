@@ -165,6 +165,31 @@ export function parting(ax: number, az: number, a: number, bx: number, bz: numbe
   return [dx * push, dz * push];
 }
 
+/** how far from whoever they are upon those at one survivor stand, centre to centre: within reach, round them */
+export const ROUND = 0.85;
+/** the least angle between two of them round one survivor: a body's width at ROUND */
+const ROUND_APART = 2 * Math.asin(APART / 2 / ROUND);
+
+/**
+ * Where one of them at x, z, upon a survivor at qx, qz, goes to stand: on a ring round them at arm's length, at the angle
+ * it came at them from, turned off the angles of the others upon them until each is a body's width from the next. Every
+ * game turns its own so a little each frame, and those at one survivor go round them, left, front, right and at last
+ * behind, each in reach (the navigator, 2026-10-25: three nurses queued in a column at one survivor, the back two inside
+ * the first, and only she could reach).
+ * @param others the others upon the same survivor (two at one angle part by their numbers, the same way in every game)
+ */
+export function roundSpot(qx: number, qz: number, x: number, z: number, i: number, others: Iterable<{ x: number; z: number; i: number }>): [number, number] {
+  let a = Math.atan2(z - qz, x - qx), turn = 0;
+  for (const o of others) {
+    if (o.i === i) continue;
+    const at = Math.atan2(o.z - qz, o.x - qx) - a, d = Math.atan2(Math.sin(at), Math.cos(at));
+    if (Math.abs(d) >= ROUND_APART) continue;
+    turn += (d > 0 || (d === 0 && i < o.i) ? -1 : 1) * ((ROUND_APART - Math.abs(d)) / 2);
+  }
+  a += turn;
+  return [qx + Math.cos(a) * ROUND, qz + Math.sin(a) * ROUND];
+}
+
 export interface InfectedInfo {
   i: number;
   s: IState;

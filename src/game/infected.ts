@@ -13,7 +13,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
-import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, type IState, type InfectedInfo } from '../sim/infected';
+import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, roundSpot, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
@@ -720,6 +720,9 @@ export class Infected implements Damageable {
       case I_CHASE: {
         const at = quarry?.alive && now - this.seenAt < 900 ? quarry.pos : this.lastSeen;
         const d = Math.hypot(at.x - this.pos.x, at.z - this.pos.z);
+        // (upon them, and seeing them, it goes round them to a place of its own at arm's length: `roundSpot`)
+        const spot = quarry?.alive && now - this.seenAt < 500 && d < 2.5 && Math.abs(quarry.pos.y - this.pos.y) < 1.4 ? this.horde.roundOf(this, quarry.pos) : null;
+        const off = spot ? Math.hypot(spot[0] - this.pos.x, spot[1] - this.pos.z) : 0;
         // (it strikes what it can see: not through a wall it happens to be standing against)
         if (quarry?.alive && now - this.seenAt < 500 && !(quarry.seated && quarry.speed > 2.5) && d < I.reach * 0.82 && Math.abs(quarry.pos.y - this.pos.y) < 1.4) {
           if (now >= this.strikeAt) {
@@ -734,11 +737,14 @@ export class Infected implements Damageable {
             break;
           }
           // between one blow and the next it does not stand like a post: it keeps its face to them, and keeps at them
+          if (spot && off > 0.15) this.walk(spot[0], spot[1], I.wander, dt);
+          else if (!spot && d > 1.0) this.walk(quarry.pos.x, quarry.pos.z, I.wander, dt);
           this.yaw = turnTo(this.yaw, Math.atan2(-(quarry.pos.x - this.pos.x), -(quarry.pos.z - this.pos.z)), dt * 5);
-          if (d > 1.0) this.walk(quarry.pos.x, quarry.pos.z, I.wander, dt);
           break;
         }
-        if (d > 0.4) this.goTo(at, I.chase, dt);
+        if (spot) {
+          if (off > 0.15) this.walk(spot[0], spot[1], I.chase, dt);
+        } else if (d > 0.4) this.goTo(at, I.chase, dt);
         break;
       }
       case I_ATTACK: {
@@ -1254,6 +1260,16 @@ export class Horde {
       if (d2 < APART * APART && d2 < (o.pos.x - b.pos.x) ** 2 + (o.pos.z - b.pos.z) ** 2 - 1e-5) return true;
     }
     return false;
+  }
+
+  /** where this one, upon whoever it is after at `q`, goes to stand round them among the others upon them (src/sim/infected.ts `roundSpot`) */
+  roundOf(b: Infected, q: THREE.Vector3): [number, number] {
+    const upon: { x: number; z: number; i: number }[] = [];
+    for (const o of this.all.values()) {
+      if (o === b || o.dead || !o.ready || o.after !== b.after || o.mode < I_CHASE) continue;
+      if (Math.abs(o.pos.x - q.x) < 2.5 && Math.abs(o.pos.z - q.z) < 2.5) upon.push({ x: o.pos.x, z: o.pos.z, i: o.i });
+    }
+    return roundSpot(q.x, q.z, b.pos.x, b.pos.z, b.i, upon);
   }
 
   /** the director (playing alone) or the server says a blow of one's was stopped by somebody's guard */

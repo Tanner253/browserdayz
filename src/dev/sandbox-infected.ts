@@ -17,7 +17,7 @@ import { lookFor } from '../game/look';
 import { bodyOf, drawFar, type InfectedKind } from '../game/infected-kinds';
 import { infectedMoves } from '../game/infected-moves';
 import { infectedLook, sizeOf } from '../game/infected-look';
-import { parting } from '../sim/infected';
+import { parting, roundSpot } from '../sim/infected';
 
 /** what a body needs of the world's light: only that its patch is laid on (the sandbox has no fog, no hour) */
 const bare = { register: (mat: THREE.Material, patch?: (s: never) => void) => (patch && (mat.onBeforeCompile = (s) => patch(s as never)), mat) } as unknown as Atmosphere;
@@ -88,15 +88,15 @@ export async function stageInfected(q: URLSearchParams): Promise<StagedInfected[
 
 /**
  * &round=1: they come at the survivor (at the middle of the floor) from its left, a little behind, all from nearly one
- * spot, as the game moves them: each in to arm's length (where its chase stops walking), and every two kept a body's
- * width apart by the game's own rule (`parting`, src/sim/infected.ts). Then each faces the survivor.
+ * spot, as the game moves them: each to a place of its own round the survivor at arm's length (`roundSpot`), every two
+ * kept a body's width apart (`parting`, both src/sim/infected.ts). Then each faces the survivor.
  */
 export function gatherRound(staged: StagedInfected[]) {
-  const at = staged.map((_, k) => ({ x: -2.2 - k * 0.05, z: -0.9 + (k - (staged.length - 1) / 2) * 0.1 }));
-  for (let f = 0; f < 360; f++) {
+  const at = staged.map((_, k) => ({ x: -2.2 - k * 0.05, z: -0.9 + (k - (staged.length - 1) / 2) * 0.1, i: k }));
+  for (let f = 0; f < 600; f++) {
     for (const p of at) {
-      const d = Math.hypot(p.x, p.z);
-      if (d > 1.0) (p.x -= (p.x / d) * 0.02), (p.z -= (p.z / d) * 0.02);
+      const [sx, sz] = roundSpot(0, 0, p.x, p.z, p.i, at), dx = sx - p.x, dz = sz - p.z, d = Math.hypot(dx, dz);
+      if (d > 0.02) (p.x += (dx / d) * 0.02), (p.z += (dz / d) * 0.02);
     }
     for (let a = 0; a < at.length; a++)
       for (let b = a + 1; b < at.length; b++) {
