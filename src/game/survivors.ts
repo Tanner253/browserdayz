@@ -72,6 +72,8 @@ export interface Worn {
   underBy?: number;
   /** the parts of it not drawn at all under what is over it (a high waist under a jacket) */
   underHide?: number;
+  /** the parts of it tucked in deep under something (TUCK: a trouser hem under a shoe) */
+  tuck?: number;
 }
 
 /**
@@ -95,7 +97,7 @@ export const wornKey = (it: { id: string; c?: number }) => (it.c ? `${it.id}~${i
 
 /** What is said of a body's things worn, sorted: those drawn as they are worn (`dress`: Worn), and the rest by their ids (GEAR in avatar.ts). */
 export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
-  const worn: Worn[] = [], gear: string[] = [], inner: Worn[] = [], legs: Worn[] = [];
+  const worn: Worn[] = [], gear: string[] = [], inner: Worn[] = [], legs: Worn[] = [], feet: Worn[] = [];
   let over = 0, coat = 0;
   for (const k of keys) {
     const [id, c] = k.split('~'), d = ITEMS[id];
@@ -113,11 +115,16 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
     else inner.push(w);
     if (d.slot === 'top') coat |= (w.hides | (w.shrinks ?? 0)) & WAIST;
     if (d.slot === 'legs') legs.push(w);
+    if (d.slot === 'feet') feet.push(w);
   }
   for (const w of inner) if (over) w.under = over;
   // (and trousers in under a top over the hips, a little: a parka's hem stood behind the white of snow trousers' waist)
   // (and their waist above the hips not drawn at all: a gorka's high waist stood out through a parka's front)
   for (const w of legs) if (coat) (w.under = (w.under ?? 0) | coat), (w.underBy = coat & hides(['thigh']) ? UNDER : 0.008), (w.underHide = hides(['belly']));
+  // (and with shoes on, the trousers' hem over the foot tucked in under the shoe: it lay over the trainers to the floor,
+  // and they read as flat white wedges; it breaks at the ankle now (cut away there instead, its edge was torn). And a boot's shaft drawn in under the trouser leg: it stood out behind it.)
+  if (feet.length) for (const w of legs) w.tuck = hides(['foot']);
+  if (legs.length) for (const w of feet) (w.under = (w.under ?? 0) | hides(['shin'])), (w.underBy = 0.012);
   return { worn, gear };
 }
 
@@ -249,10 +256,10 @@ type Shader = { uniforms: Record<string, THREE.IUniform>; vertexShader: string; 
  * `hides`): those are not drawn, so that no skin pokes through cloth however a limb bends.
  */
 function regionPatch(shader: Shader, hide: Hidden) {
-  Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by });
+  Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 } });
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute float _region;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;');
+    .replace('#include <common>', '#include <common>\nattribute float _region;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (((uTuck >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uTuckBy;');
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', '#include <common>\nuniform int uHide;\nflat varying float vRegion;')
     .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (((uHide >> int(vRegion + 0.5)) & 1) != 0) discard;');
@@ -267,7 +274,12 @@ interface Hidden {
   hide: { value: number };
   shrink: { value: number };
   by: { value: number };
+  /** and the parts tucked in deep, out of sight under something (a trouser hem into a shoe), by `tuckBy` */
+  tuck?: { value: number };
+  tuckBy?: { value: number };
 }
+/** how deep a trouser hem is tucked in under a shoe, metres */
+const TUCK = 0.04;
 /**
  * how far in a part only partly under something worn is drawn, metres: 2.2 cm until the clothes were weighted as the
  * skin under them is (scripts/wear.mjs), when a hem no longer stood off the arm in motion and the arm drawn in so far
@@ -429,7 +441,7 @@ export class Wardrobe {
         const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
         // (its parts under a vest drawn in: see Worn.under, and the regions each of its points lies over, scripts/wear.mjs)
-        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 } };
+        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 }, tuck: { value: w.tuck ?? 0 }, tuckBy: { value: 0 } };
         f.atmo.register(
           mat,
           (shader) => {
@@ -441,6 +453,7 @@ export class Wardrobe {
         );
         const m = onto(s, f.bones, mat);
         under.by.value = (w.underBy ?? UNDER) / unitOf(m);
+        under.tuckBy!.value = TUCK / unitOf(m);
         m.castShadow = m.receiveShadow = true;
         m.intersectsFrustum = f.inSight;
         m.layers.mask = f.layers();

@@ -79,7 +79,8 @@ const PIECES = {
   // taken for the body there by its colour, and had holes)
   tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], plain: 0.85, tex: 2048 },
   tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, tex: 2048 },
-  trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, tex: 1024 },
+  // (and the skin Meshy left in its collar cut away: a pink sliver at the heel showed under a jeans hem)
+  trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, peeks: ['foot'], tex: 1024 },
   smock: { src: 'wear_smock.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
   smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
   // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)
@@ -219,7 +220,8 @@ for (const [id, piece] of Object.entries(PIECES)) {
     const v = B.C.flatMap((c, n) => (region.getScalar(n) === REGION.chest ? [c[ch]] : [])).sort((x, y) => x - y);
     return v[Math.floor(v.length / 2)];
   });
-  const notShirt = piece.grey || off(own, shirt) < 0.25;
+  // (only for what reaches the waist, where the undershirt was: a shoe's shadowed white is as grey as it)
+  const notShirt = piece.grey || off(own, shirt) < 0.25 || !(parts.has(REGION.belly) || parts.has(REGION.hips));
   let keep = D.P.map((p, i) => {
     const n = near[i];
     if (n < 0 || !parts.has(region.getScalar(n))) return (why.part[n < 0 ? 0 : region.getScalar(n)]++, false);
