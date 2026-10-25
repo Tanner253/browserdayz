@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T12:59:43.267Z",
+ "generated": "2026-10-25T04:50:43.802Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12844,6 +12844,33 @@
    "hi": "assets/models/hi/animal_wolf.glb",
    "hiBytes": 805220,
    "hiCard": 21
+  },
+  "karambit": {
+   "url": "assets/models/karambit.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 271700,
+   "srcTris": 3740,
+   "tris": 3740,
+   "min": [
+    -0.0103,
+    0,
+    -0.0374
+   ],
+   "max": [
+    0.0103,
+    0.2,
+    0.0374
+   ],
+   "lods": [
+    {
+     "url": "assets/models/karambit_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "271700:1792903843795"
+    }
+   ]
   }
  }
 }

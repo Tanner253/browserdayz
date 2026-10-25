@@ -42,6 +42,11 @@ export const KIT_ITEMS: ItemDef[] = [
     loot: { pair: 'CombatKnife', at: [18, 1, 10, 0, 0], restock: 180, usage: [...HOMES, ...SHEDS], on: IN_SHEDS, rack: { any: 1 } },
     worth: 3,
   },
+  // (the owner, 2026-10-25: "karambit is not a finish type its a knife type, the circular claw one like from cs:go". Bought
+  // at the store, not found: a knife of theirs is made one. It hits as every knife does: nothing bought hits harder.)
+  { id: 'karambit', name: 'Karambit', model: 'karambit', w: 1, h: 2, weight: 0.25, category: 'melee', desc: 'A curved claw blade, held point down, the first finger through its ring. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 },
+    worth: 3,
+  },
   // ---------------------------------------------------------------- food & drink
   // (food that keeps and needs no cooking under half as common, a little of it in the villages and the army's places,
   // and slower to come back: "since we have animals in the game we can reduce the spawn rate of food items ... we

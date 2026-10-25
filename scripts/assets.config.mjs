@@ -854,6 +854,15 @@ export const LOCAL_MODELS = {
   // 28 m over all, rotor included: some 27 m nose to tail, 1.7 times a real Apache (at 1.4 times it read as any
   // helicopter would in the sky at ninety metres). Stood with its origin under the main rotor's hub, nose toward -z.
   apache: { dir: 'low_poly_apache_gunship', only: /Gunship_material/, pivot: /^Rotor$/, hung: { rotor: /^Rotor_/, tail: /^Back_Rotor_/ }, rot: [0, Math.PI, 0], size: 28, tex: 1024, tags: ['prop'], changes: 'Its loose missile left out; its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; scaled to 28 m over all; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // The karambit (2026-10-25, the owner: "karambit is not a finish type its a knife type, the circular claw one like from
+  // cs:go"): made in Higgsfield on the owner's account, a picture first (gpt_image_2_5) then Tripo H3.1 image to 3D,
+  // brought in at 20 cm long (progress/tools/intake.mjs). Stood with its point up and its ring at the foot, as the other
+  // things to hit with stand.
+  karambit: {
+    dir: '../incoming/higgsfield/melee', file: 'karambit_sized.glb', size: 0.2, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
+    changes: 'Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.',
+    credit: { name: 'Karambit', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // The helicopter a player flies (2026-10-14: "a new helicopter for users to use"). Unpack
   // assets-src/md-500_defender_helicopter.zip into assets-src/models/md-500_defender_helicopter/. Its rotors are
   // pieces of their own (`md500_rotor`, `md500_tail`), each with its origin on its hub, so the game turns them. It

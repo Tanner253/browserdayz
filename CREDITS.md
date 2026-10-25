@@ -150,6 +150,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle and scaled to a pelt 2.2 m long; a copy of about 7,300 triangles made for seeing it from further off (scripts/lods.mjs), the whole one kept for near; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "wolf animated" (https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c) by victory_mirosya (https://sketchfab.com/victory_mirosya) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Kept whole with its skeleton and the movements the game plays (graze, idle, alert, rest), the others left out; turned nose to -z, scaled to 1.6 m nose to tail and stood on the ground; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.
+- "Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

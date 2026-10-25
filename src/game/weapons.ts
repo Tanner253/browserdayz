@@ -231,6 +231,8 @@ interface VmModel {
   body?: THREE.Object3D;
   /** something held to strike with: how it stands in the picture and how it is swung */
   melee?: MeleeStyle;
+  /** a pack's own right wrist (the knife's: see BLADE.wrist) */
+  wrist?: THREE.Object3D | null;
   grips?: Grips;
   /** a long gun with sights of its own to aim along when it has no optic (the shotgun): no cross is drawn over them */
   ownSights?: boolean;
@@ -672,6 +674,8 @@ interface MeleeStyle {
   two: boolean;
   /** how far up from its butt the (right) hand closes round it, metres: the middle of the part that is made to be held */
   grip: number;
+  /** held point down (a karambit): stood on its head before it is measured and held */
+  flip?: boolean;
 }
 /**
  * A blow lands 0.35 of the way through it (see actionTick): by then the arm is thrown out in
@@ -765,6 +769,9 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // The shovel is held and swung as the bat is: in both hands, the left on the grip at its foot and the right a
   // hand's width up the shaft, carried back over the right shoulder, the same two strokes.
   styles.shovel = { ...styles.bat, grip: 0.2 };
+  // (the karambit, point down: stood on its head, the fist round its grip under the ring, the blade curving out under it)
+  // (held higher than a knife and tipped forward: the claw is under the fist, and in the picture)
+  styles.karambit = { ...styles.knife, grip: 0.14, flip: true, idle: { p: [0.14, -0.035, -0.38], tip: [0.3, 0.75, -0.55], edge: [-0.5, -0.3, -0.8] } };
   return styles;
 })();
 /**
@@ -789,6 +796,8 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
  */
 const BLADE = {
   blows: ['cutA', 'cutB', 'thrust'],
+  /** the pack's right wrist, what it is turned about when looked over */
+  wrist: 'R_wrist_027',
   skip: { thrust: 1 / 30 } as Record<string, number>,
   join: 0.06,
   breath: 0.7,
@@ -1405,6 +1414,14 @@ export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { 
   }
   if (longAxis === 'x') body.rotation.z = Math.PI / 2;
   if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
+  // (held point down: turned end over end about its flat, still standing from the floor up)
+  if (MELEE_STYLE[id]?.flip) {
+    const over = new THREE.Group();
+    over.rotation.x = Math.PI;
+    over.position.y = size.y;
+    for (const mesh of [...body.children]) over.add(mesh);
+    body.add(over);
+  }
   // Where along it the fist closes: a hand's width up from the butt of a long handle, the
   // middle of a short one. That point is what is held out in front: the fist is in the
   // picture whatever the length of the thing.
@@ -1887,7 +1904,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand (see meleeHeld)
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'karambit']) {
       this.models.set(id, { ...(await meleeHeld(id)), flash: mkFlash() });
     }
     // ---- the knife, for whoever holds it: its own pack, hands and all, moved by its own animation (see BLADE).
@@ -4713,14 +4730,20 @@ export class Weapons {
       R.r[2] * sp + G.r[2] * g + Math.cos(ph) * 0.025 * amp + kr.z * 0.01 - p.strafe * 0.03,
     );
     // looked over (see lookOver): the hands, knife and all, brought in toward the middle and turned one way and the other
+    // (turned about the wrist: about the pack's own origin, a hand's length behind it, the arm swept across the picture)
     if (a?.name === 'check') {
       const k = Math.min(1, a.t / a.dur), S = THREE.MathUtils.smoothstep, w = S(k, 0, 0.15) * (1 - S(k, 0.86, 1));
       const yaw = LOOK.turn * (S(k, 0.1, 0.32) - 2 * S(k, 0.45, 0.68) + S(k, 0.78, 0.95));
-      m.root.position.x -= 0.07 * w;
-      m.root.position.y += 0.035 * w;
-      m.root.rotation.x += LOOK.tilt * 0.5 * w;
-      m.root.rotation.y += 0.55 * yaw;
-      m.root.rotation.z += 0.5 * yaw;
+      m.root.position.x -= 0.05 * w;
+      m.root.position.y += 0.03 * w;
+      m.wrist ??= m.root.getObjectByName(BLADE.wrist) ?? null;
+      if (m.wrist && m.root.parent) {
+        m.root.updateMatrixWorld(true);
+        const piv = m.root.parent.worldToLocal(m.wrist.getWorldPosition(_bh));
+        _mq2.setFromEuler(_me.set(LOOK.tilt * 0.6 * w, 0.4 * yaw, 0.6 * yaw, 'YXZ'));
+        m.root.quaternion.premultiply(_mq2);
+        m.root.position.sub(piv).applyQuaternion(_mq2).add(piv);
+      }
     }
     m.root.visible = true;
     // (a pack brings its own arms)
