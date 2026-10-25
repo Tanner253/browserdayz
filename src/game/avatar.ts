@@ -445,7 +445,7 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; /** what the left hand closes on, for a thing held in both (in its own space) */ left: HandGrip | null; /** carried slung on the back, and drawn from there */ long: boolean } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; /** what the left hand closes on, for a thing held in both (in its own space) */ left: HandGrip | null; /** carried slung on the back, and drawn from there */ long: boolean; /** what of it is spun round a ring when it is looked over (a karambit's) */ spin: THREE.Object3D | null } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */

@@ -1343,6 +1343,22 @@ async function holoParts(): Promise<MeshPart[]> {
  * the fist, its grips said in its own space. The view in the hands and the copy in everybody else's are made from
  * it (and the sandbox, src/dev/sandbox-melee.ts).
  */
+/** the middle of what is at the top of a thing stood on its head (a karambit's ring): its points in the top fifth, in the space of what holds it */
+function ringOf(o: THREE.Object3D, tall: number) {
+  o.updateMatrixWorld(true);
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  o.traverse((m) => {
+    const mesh = m as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const P = mesh.geometry.getAttribute('position');
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
+      if (v.y > tall * 0.8) box.expandByPoint(v);
+    }
+  });
+  return box.isEmpty() ? new THREE.Vector3(0, tall, 0) : box.getCenter(v.clone());
+}
+
 export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { body: THREE.Group; grips: Grips; melee: MeleeStyle }> {
   const def = ITEMS[id];
   const sc = await assets.model(def.model);
@@ -1414,13 +1430,20 @@ export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { 
   }
   if (longAxis === 'x') body.rotation.z = Math.PI / 2;
   if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
-  // (held point down: turned end over end about its flat, still standing from the floor up)
+  // (held point down: turned end over end about its flat, still standing from the floor up; and hung from the middle of
+  // its ring, named `spin`, which it is spun round when looked over: see fp.ts lookOver)
   if (MELEE_STYLE[id]?.flip) {
     const over = new THREE.Group();
     over.rotation.x = Math.PI;
     over.position.y = size.y;
     for (const mesh of [...body.children]) over.add(mesh);
-    body.add(over);
+    const ring = ringOf(over, size.y);
+    const spin = new THREE.Group();
+    spin.name = 'spin';
+    spin.position.copy(ring);
+    over.position.sub(ring);
+    spin.add(over);
+    body.add(spin);
   }
   // Where along it the fist closes: a hand's width up from the butt of a long handle, the
   // middle of a short one. That point is what is held out in front: the fist is in the
@@ -4613,7 +4636,8 @@ export class Weapons {
       this.readyT = 0;
       this.cockT = 1;
     }
-    if (a?.name === 'check') lookOver(Math.min(1, a.t / a.dur), pos, quat, elbow);
+    if (a?.name === 'check') lookOver(Math.min(1, a.t / a.dur), pos, quat, elbow, m.body?.getObjectByName('spin'));
+    else m.body?.getObjectByName('spin')?.rotation.set(0, 0, 0);
     // on guard it is put across in front, whatever the arm was doing
     if (g > 0.001) {
       pos.lerp(_mv.set(...st.guard.p), g);

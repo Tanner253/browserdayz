@@ -634,6 +634,7 @@ export const updateMethods = {
 
     // --- something held in both hands: the left closes on it where its grip says, but while it lies on the shoulder
     if (this.inHand && ges?.kind === 'check' && !dead) lookOverBody(this, ges.t / ges.dur, left(ges));
+    else this.inHand?.spin?.rotation.set(0, 0, 0);
     if (this.inHand?.left && !dead && !using && !this.blow?.carrying) holdLeft(this, 1 - this.shoulderT);
 
     // --- bare hands: a guard, the left leading, and a punch thrown from it

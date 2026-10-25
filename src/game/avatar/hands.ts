@@ -67,7 +67,7 @@ export const handsMethods = {
       r.hand.add(fist);
       // (carried on the back, not in a pocket: as long as a slung thing is, and drawn from there)
       const long = new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length() > 0.5;
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long };
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long, spin: obj.getObjectByName('spin') ?? null };
       if (long && this.placed && this.root.visible) (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).carry('draw');
       Avatar.onDressed([obj]);
       return;

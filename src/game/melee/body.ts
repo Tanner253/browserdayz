@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { assets } from '../../core/assets';
-import type { Cut } from './fp';
+import { spinOf, type Cut } from './fp';
 import type { Avatar } from '../avatar';
 
 /** the captured blows, as one file of movements on our skeleton */
@@ -206,7 +206,9 @@ export function lookOverBody(a: Avatar, k: number, live: number) {
   const r = a.armR, held = a.inHand, s = THREE.MathUtils.smoothstep;
   const up = s(k, 0, 0.14) * (1 - s(k, 0.86, 1)) * live;
   if (!r || !held || up < 0.01 || !a.neck.length) return;
-  const over = s(k, 0.14, 0.32) - 2 * s(k, 0.42, 0.66) + s(k, 0.74, 0.88);
+  // (a karambit is spun round the finger in its ring instead of turned over: fp.ts spinOf)
+  const over = held.spin ? 0 : s(k, 0.14, 0.32) - 2 * s(k, 0.42, 0.66) + s(k, 0.74, 0.88);
+  if (held.spin) held.spin.rotation.x = spinOf(k);
   a.root.updateWorldMatrix(true, false);
   _aq.setFromAxisAngle(_up, a.yaw);
   _fw.set(0, 0, -1).applyQuaternion(_aq);

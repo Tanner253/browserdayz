@@ -135,7 +135,7 @@ async function firstPerson(id: string, cut: Cut, dur: number, s: Stage) {
     // (&inspect=1: looked over instead of a blow)
     if (look) {
       meleeAt(st, -1, 0, null, pos, quat, elbow, at);
-      lookOver(u, pos, quat, elbow);
+      lookOver(u, pos, quat, elbow, held.body.getObjectByName('spin'));
     } else meleeAt(st, u, n, cut, pos, quat, elbow, at);
     held.root.position.copy(pos);
     held.root.quaternion.copy(quat);

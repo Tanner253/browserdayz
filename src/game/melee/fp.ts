@@ -161,13 +161,20 @@ export function layOn(c: Cut, u: number, hitU: number, pos: THREE.Vector3, quat:
  * home. A finish is what it shows off.
  */
 export const LOOK = { dur: 2.4, at: [0.05, -0.105, -0.36] as const, turn: 1.25, tilt: -0.35 };
+/** how far round its ring a thing hung by one is spun, `k` of the way through being looked over: two turns, eased in and out */
+export const spinOf = (k: number) => -Math.PI * 4 * THREE.MathUtils.smootherstep(k, 0.22, 0.78);
 const _lq = new THREE.Quaternion(), _le = new THREE.Euler(), _la = new THREE.Vector3();
-/** `k` of the way through being looked over, laid on where the fist, the thing and the elbow are */
-export function lookOver(k: number, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3) {
+/**
+ * `k` of the way through being looked over, laid on where the fist, the thing and the elbow are. A thing hung by a ring
+ * (`spin`: a karambit's, see meleeHeld) is not turned over in the fist but spun twice round the finger in it, as a
+ * karambit is shown off (the owner's reference, CS:GO's), and caught.
+ */
+export function lookOver(k: number, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3, spin?: THREE.Object3D | null) {
   const s = THREE.MathUtils.smoothstep, w = s(k, 0, 0.15) * (1 - s(k, 0.86, 1));
+  if (spin) spin.rotation.x = spinOf(k);
   if (w <= 0) return;
-  // (its one face, its other face, and back: round the eye's up, the head tipped toward the eye)
-  const yaw = LOOK.turn * (s(k, 0.1, 0.32) - 2 * s(k, 0.45, 0.68) + s(k, 0.78, 0.95));
+  // (its one face, its other face, and back: round the eye's up, the head tipped toward the eye; a spun thing is held still)
+  const yaw = spin ? 0 : LOOK.turn * (s(k, 0.1, 0.32) - 2 * s(k, 0.45, 0.68) + s(k, 0.78, 0.95));
   _lq.setFromEuler(_le.set(LOOK.tilt * w, yaw, 0.25 * yaw, 'YXZ'));
   _la.set(LOOK.at[0], LOOK.at[1], LOOK.at[2]);
   elbow.add(_v.copy(_la).sub(pos).multiplyScalar(w * 0.8));
