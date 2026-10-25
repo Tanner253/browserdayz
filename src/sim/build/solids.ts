@@ -133,21 +133,21 @@ const SHAPES: Record<string, () => Shape> = {
   }),
   high_wall_stone: () => ({ solid: [box(-H, 0, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
   // (the claim: its upkeep box, and over it a pole with the flag of whoever holds it)
-  claim: () => ({ lockAt: { at: [0, 0.5, 0.36] }, solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], cloth: { paint: 'flag', solid: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] } }),
+  claim: () => ({ lockAt: { at: [0, 0.5, 0.35] }, solid: [box(-0.5, 0, -0.35, 0.5, 0.75, 0.35), box(-0.05, 0.75, -0.05, 0.05, 4.2, 0.05)], cloth: { paint: 'flag', solid: [box(0.05, 3.35, -0.015, 1.25, 4.1, 0.015)] } }),
   // ---- fittings: each swings out to its piece's +z, which R turns about
   // (a leaf a metre wide in the doorway, hung on its -x jamb; braced on the inside, its handle both sides)
-  door_wood: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, true)], lockAt: { leaf: 0, at: [0.84, 1.16, 0.02] } }),
-  door_metal: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, false)], lockAt: { leaf: 0, at: [0.84, 1.16, 0.02] } }),
-  double_door_wood: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, true), door(1.2, 1.2, 2.6, true)], lockAt: { leaf: 0, at: [1.04, 1.32, 0.02] } }),
-  double_door_metal: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, false), door(1.2, 1.2, 2.6, false)], lockAt: { leaf: 0, at: [1.04, 1.32, 0.02] } }),
+  door_wood: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, true)], lockAt: { leaf: 0, at: [0.82, 1.16, 0] } }),
+  door_metal: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, false)], lockAt: { leaf: 0, at: [0.82, 1.16, 0] } }),
+  double_door_wood: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, true), door(1.2, 1.2, 2.6, true)], lockAt: { leaf: 0, at: [1.02, 1.32, 0] } }),
+  double_door_metal: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, false), door(1.2, 1.2, 2.6, false)], lockAt: { leaf: 0, at: [1.02, 1.32, 0] } }),
   // (one panel hung from the opening's head, that tips up and in to lie under the ceiling: an up-and-over door)
   garage_door: () => ({
     solid: [],
-    lockAt: { leaf: 0, at: [0.7, -2.2, 0.07] },
+    lockAt: { leaf: 0, at: [0.7, -2.2, 0.05] },
     leaves: [{ hinge: [0, 2.6, 0], axis: 'x', open: Math.PI / 2, paint: 'galv', solid: [box(-1.18, -2.58, -0.05, 1.18, -0.02, 0.05)], dress: [...[0, 1, 2, 3, 4].map((i) => box(-1.15, -2.45 + i * 0.5, -0.09, 1.15, -2.37 + i * 0.5, -0.05)), tinted(box(-0.25, -2.48, 0.05, 0.25, -2.42, 0.09), IRON)] }],
   }),
   // (a lid in the floor frame's hole, hinged at its -z side, that lifts to stand up past upright)
-  hatch: () => ({ ...ladderUnder(), paint: 'steel', lockAt: { leaf: 0, at: [0.35, 0.02, 1.15], up: true }, leaves: [{ hinge: [0, 0, -0.7], axis: 'x', open: -1.75, paint: 'steel', solid: [box(-0.68, -0.08, 0.02, 0.68, 0, 1.38)], dress: [tinted(box(-0.08, 0, 1.12, 0.08, 0.04, 1.3), IRON), ...[-0.5, 0.5].map((x) => tinted(box(x - 0.06, -0.02, 0, x + 0.06, 0.02, 0.14), IRON)), ...rivets([-0.6, 0.6], [0.1, 1.3], 0, 'y')] }] }),
+  hatch: () => ({ ...ladderUnder(), paint: 'steel', lockAt: { leaf: 0, at: [0.35, 0, 1.15], up: true }, leaves: [{ hinge: [0, 0, -0.7], axis: 'x', open: -1.75, paint: 'steel', solid: [box(-0.68, -0.08, 0.02, 0.68, 0, 1.38)], dress: [tinted(box(-0.08, 0, 1.12, 0.08, 0.04, 1.3), IRON), ...[-0.5, 0.5].map((x) => tinted(box(x - 0.06, -0.02, 0, x + 0.06, 0.02, 0.14), IRON)), ...rivets([-0.6, 0.6], [0.1, 1.3], 0, 'y')] }] }),
   // (two leaves on the wall's outside face, folded back flat against it when open)
   shutters: () => ({
     solid: [],
@@ -160,14 +160,14 @@ const SHAPES: Record<string, () => Shape> = {
   embrasure: () => ({ solid: [box(-0.6, 1.1, -0.04, 0.6, 1.5, 0.04), box(-0.6, 1.65, -0.04, 0.6, 2.1, 0.04), box(-0.6, 1.5, -0.04, -0.3, 1.65, 0.04), box(0.3, 1.5, -0.04, 0.6, 1.65, 0.04)], paint: 'steel', dress: [...rivets([-0.54, 0.54], [1.16, 2.04], 0.04, 'z'), ...rivets([-0.54, 0.54], [1.16, 2.04], -0.04, 'z')] }),
   // (a gate the length of a high wall: its posts and head, and two leaves 1.2 m wide and 5.1 high)
   gate_wood: () => ({
-    lockAt: { leaf: 0, at: [1.02, 1.4, 0.02] },
+    lockAt: { leaf: 0, at: [1.02, 1.4, 0] },
     solid: [box(-1.5, 0, -0.3, -1.2, 6, 0.3), box(1.2, 0, -0.3, 1.5, 6, 0.3), box(-1.2, 5.25, -0.25, 1.2, 6, 0.25)],
     dress: [-1.35, 1.35].map((x) => ({ hull: [[x - 0.15, 6, -0.3], [x + 0.15, 6, -0.3], [x - 0.15, 6, 0.3], [x + 0.15, 6, 0.3], [x, 6.6, 0]] as [number, number, number][] })),
     // (hung at their outside faces, as the doors are, and opening square: clear of the posts)
     leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.2, 0, 0.1], axis: 'y', open: (s * Math.PI) / 2, solid: [box(Math.min(0, -s * 1.19), 0.08, -0.2, Math.max(0, -s * 1.19), 5.2, 0)], dress: [0.7, 4.4].map((y) => tinted(box(Math.min(-s * 0.14, -s * 0.9), y, 0, Math.max(-s * 0.14, -s * 0.9), y + 0.12, 0.04), IRON)) })),
   }),
   gate_stone: () => ({
-    lockAt: { leaf: 0, at: [0.98, 1.4, 0.02] },
+    lockAt: { leaf: 0, at: [0.98, 1.4, 0] },
     solid: [box(-1.5, 0, -0.45, -1.15, 6, 0.45), box(1.15, 0, -0.45, 1.5, 6, 0.45), box(-1.15, 5.25, -0.4, 1.15, 6.25, 0.4)],
     leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.15, 0, 0.06], axis: 'y', open: (s * Math.PI) / 2, paint: 'steel', solid: [box(Math.min(0, -s * 1.14), 0.08, -0.12, Math.max(0, -s * 1.14), 5.2, 0)], dress: [0.6, 2.6, 4.6].flatMap((y) => [tinted(box(Math.min(-s * 0.12, -s * 1.1), y, 0, Math.max(-s * 0.12, -s * 1.1), y + 0.14, 0.03), IRON), tinted(box(Math.min(0, -s * 1.1), y, -0.15, Math.max(0, -s * 1.1), y + 0.14, -0.12), IRON)]) })),
   }),
@@ -180,8 +180,8 @@ const SHAPES: Record<string, () => Shape> = {
     flame: [0, 2.26, 0.1],
   }),
   // ---- set down
-  box_small: () => ({ lockAt: { at: [0, 0.38, 0.29] }, solid: [box(-0.4, 0, -0.28, 0.4, 0.5, 0.28)], dress: [box(-0.42, 0.5, -0.3, 0.42, 0.56, 0.3)] }),
-  box_large: () => ({ lockAt: { at: [0, 0.56, 0.43] }, solid: [box(-0.7, 0, -0.42, 0.7, 0.75, 0.42)], dress: [box(-0.72, 0.75, -0.44, 0.72, 0.82, 0.44), box(-0.74, 0.1, -0.44, -0.7, 0.65, 0.44), box(0.7, 0.1, -0.44, 0.74, 0.65, 0.44)] }),
+  box_small: () => ({ lockAt: { at: [0, 0.38, 0.28] }, solid: [box(-0.4, 0, -0.28, 0.4, 0.5, 0.28)], dress: [box(-0.42, 0.5, -0.3, 0.42, 0.56, 0.3)] }),
+  box_large: () => ({ lockAt: { at: [0, 0.56, 0.42] }, solid: [box(-0.7, 0, -0.42, 0.7, 0.75, 0.42)], dress: [box(-0.72, 0.75, -0.44, 0.72, 0.82, 0.44), box(-0.74, 0.1, -0.44, -0.7, 0.65, 0.44), box(0.7, 0.1, -0.44, 0.74, 0.65, 0.44)] }),
   // (a sleeping bag rolled out flat, its hood at the head; a bed of planks on four legs with a headboard, a bag on it)
   bedroll: () => ({ solid: [box(-0.4, 0, -1, 0.4, 0.1, 1)], paint: 'bag', dress: [box(-0.36, 0.1, 0.6, 0.36, 0.17, 0.95), tinted(box(-0.41, 0, -1.02, 0.41, 0.11, -0.86), 0x8a8a70)] }),
   bed: () => ({

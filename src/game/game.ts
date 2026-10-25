@@ -40,7 +40,7 @@ import '../sim/blood';
 import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
 import { Doll } from './doll';
-import { torchInFist } from './in-fist';
+import { inFist } from './in-fist';
 import { GunRacks, RACK_PLAN } from './racks';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
@@ -48,7 +48,7 @@ import { CorpseBody, RemotePlayer } from './remote';
 import { CameraDirector } from './camera';
 import { Effects } from './effects';
 import { Weapons, type HitInfo } from './weapons';
-import { LootManager, Stash, WorldItem } from './loot';
+import { LootManager, Stash, WorldItem, type ItemTemplate } from './loot';
 import { Grenades } from './grenades';
 import { Throwing } from './throwing';
 import { Garage } from './garage';
@@ -562,6 +562,8 @@ export class Game {
     for (const pad of this.pads) r.scene.add(pad);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
+    // (the torch's model at hand for everybody else's fist, which is made at once when one is held: makeHeld)
+    void this.loot.models.get('torch').then((t) => (this.torchModel = t), () => {});
     this.party = new Party(r.scene);
     this.airdrops = new Airdrops(r.scene, {
       // (the crate that comes down is the crate that stands there after: the same model, as big)
@@ -1594,10 +1596,12 @@ export class Game {
   /** the jeep the view was last behind (so going in and out of one is a move of the view, not a cut) */
   rode: Jeep | null = null;
 
+  /** the torch's model, for everybody else's fist (its loot model, asked for as the game starts: see makeHeld) */
+  torchModel: ItemTemplate | null = null;
   makeHeld = (id: string | null, mods: string[], finish?: Finish | null) => {
     if (!id) return null;
-    // (a torch in the fist, as everybody else is shown it, lit or not: src/game/in-fist.ts)
-    if (id === 'torch') return torchInFist();
+    // (a torch in the fist, as everybody else is shown it, lit or not: its own model, fetched as the game starts)
+    if (id === 'torch') return this.torchModel ? inFist(this.torchModel.group.clone(), 'torch') : null;
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
     const grips = this.weapons.gripsOf(id, mods);

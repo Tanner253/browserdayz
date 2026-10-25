@@ -452,6 +452,9 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
       }
       // (a model that came as bare colour, lighter than the thing is: its colour darkened by this much)
       if (cfg.shade !== undefined) m.setBaseColorFactor(m.getBaseColorFactor().map((v, k) => (k < 3 ? v * cfg.shade : v)));
+      // (a model that came polished as a mirror where it is metal: its metal map toned down by this much, the factor
+      // scaling the map, so what of it is no metal stays none)
+      if (cfg.metalBy !== undefined) m.setMetallicFactor(m.getMetallicFactor() * cfg.metalBy);
       if (m.getMetallicRoughnessTexture()) continue;
       if (cfg.metal !== undefined) m.setMetallicFactor(cfg.metal);
       if (cfg.rough !== undefined) m.setRoughnessFactor(cfg.rough);

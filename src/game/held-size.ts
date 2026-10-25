@@ -10,5 +10,5 @@ export const HELD_FIT: Record<string, number> = {
   nails: 0.11,
   stone: 0.12,
   building_plan: 0.28,
-  torch: 0.42,
+  torch: 0.52,
 };

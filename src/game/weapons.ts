@@ -490,12 +490,13 @@ export const LIVE = {
 /**
  * A torch in the hands, in the eye's space: up on the right in the fist, its head uppermost and leaning a little out
  * and forward, the flame clear at the top right of the picture (the navigator, 2026-10-24: "the forearm raised, the
- * torch up and a little out, the flame about shoulder height and clear of the body"). `turn` stands it up off the
- * line it lies along when held (its head away from the eye).
+ * torch up and a little out, the flame about shoulder height and clear of the body"). `turn` stands it up off the line
+ * it lies along when held (as it lies on the ground: its head toward the eye), its head uppermost and leaning a little
+ * away and out.
  */
 export const TORCH_UP = {
-  at: [0.23, -0.14, -0.48] as [number, number, number],
-  turn: [1.3, 0.12, -0.2] as [number, number, number],
+  at: [0.23, -0.13, -0.48] as [number, number, number],
+  turn: [-1.84, 0.12, -0.2] as [number, number, number],
 };
 
 /**
@@ -778,7 +779,10 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.shovel = { ...styles.bat, grip: 0.2 };
   // (the tools of gathering, src/sim/gather.ts: the saw held as the machete is, the long axe and the pickaxe as the
   // bat, in both hands)
-  styles.hand_saw = styles.machete;
+  // (the saw held lower and pointed away, its teeth down and its flat turned partly to the eye: held as the machete
+  // was, upright by the eye, its broad blade filled a third of the picture. The owner, 2026-10-25: "this does not look
+  // good". Gripped at the middle of its handle, which is the bottom 14 cm of it.)
+  styles.hand_saw = { ...styles.machete, idle: { p: [0.2, -0.2, -0.46], tip: [-0.4, 0.55, -0.73], edge: [0.35, 0.85, 0.35] }, grip: 0.07 };
   styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };
@@ -1557,7 +1561,7 @@ export class Weapons {
    * `wait`: taken into the hand and not yet used (an injector: see `ready` in game.ts). `age` is how long it has
    * been in the hand, `t` how far into its use it is; `from` is where it was held when the use began.
    */
-  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number } | null = null;
+  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** the middle of its top end, in its own frame (`heldTip`) */ top?: THREE.Vector3 } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3; round?: THREE.Object3D }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
   private lowerT = 0;
@@ -3717,8 +3721,9 @@ export class Weapons {
             obj.rotation.y = Math.PI / 2;
             size.set(size.z, size.y, size.x);
           }
-          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it)
-          if (isBag(id)) obj.rotation.y += Math.PI;
+          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it, and
+          // the building plan's clipboard with its sketch so, its clip away from them)
+          if (isBag(id) || id === 'building_plan') obj.rotation.y += Math.PI;
           obj.position.y = -size.y / 2;
           root.add(obj);
         }
@@ -3830,9 +3835,35 @@ export class Weapons {
     h.root.traverse((o) => {
       if (!head && o.name === 'head') head = o;
     });
-    const box = new THREE.Box3().setFromObject(head ?? h.root).applyMatrix4(this.vmCamera.matrixWorldInverse);
+    if (!head) {
+      // (no part named so, a model of one piece: the middle of its points within four centimetres of its top, found
+      // once as it is first held up and kept in its own frame. The top of its box was the box's middle, off to one side
+      // of a torch that leans, and its flame burned in the air beside it.)
+      if (!h.top) {
+        const inv = this.vmCamera.matrixWorldInverse, v = new THREE.Vector3(), pts: THREE.Vector3[] = [];
+        let top = -Infinity;
+        h.root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          const P = m.geometry.getAttribute('position');
+          for (let i = 0; i < P.count; i++) {
+            v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+            pts.push(v.clone());
+            top = Math.max(top, v.y);
+          }
+        });
+        const near = pts.filter((q) => q.y > top - 0.04);
+        if (!near.length) return null;
+        const mid = near.reduce((acc, q) => acc.add(q), new THREE.Vector3()).multiplyScalar(1 / near.length).setY(top);
+        h.top = h.root.worldToLocal(mid.applyMatrix4(this.vmCamera.matrixWorld));
+      }
+      out.copy(h.top);
+      h.root.localToWorld(out).applyMatrix4(this.vmCamera.matrixWorldInverse);
+      return out.copy(this.toWorld(out, cam));
+    }
+    const box = new THREE.Box3().setFromObject(head).applyMatrix4(this.vmCamera.matrixWorldInverse);
     box.getCenter(out);
-    return out.copy(this.toWorld(head ? out.setY(box.max.y) : out.set(out.x, box.max.y, box.min.z), cam));
+    return out.copy(this.toWorld(out.setY(box.max.y), cam));
   }
 
   /**

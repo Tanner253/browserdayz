@@ -25,11 +25,10 @@ const ICONS_REV = 3;
 // and the stick grenade, drawn handle up: "the stick grenade in this image is upside down in the icon", 2026-10-19;
 // and, every picture looked at on 2026-10-19 ("you should check all the icons for proper orientations"), two boxes of
 // rounds whose printing read upside down and the tin of tomatoes standing on its lid)
-// (and the Mosin's clip, its rounds tip down as it came: 2026-10-19; and the building's axe and hammer, which are the
-// hatchet's model, its head down as it came: 2026-10-24, "make sure the model photos are upright")
-// (and crafting's, 2026-10-25, the owner: "make sure the model photos are upright and look proper in the icon images for items
-// not upside down or backwards": the stone hatchet and the sledgehammer head up, the bone knife grip up as the combat knife)
-const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin', 'felling_axe', 'hammer', 'stone_hatchet', 'sledgehammer', 'bone_knife']);
+// (and the Mosin's clip, its rounds tip down as it came: 2026-10-19; and the long tools, which lie head down: 2026-10-25,
+// "make sure the model photos are upright"; and crafting's, the same day: the stone hatchet and the sledgehammer head up,
+// the bone knife grip up as the combat knife)
+const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin', 'felling_axe', 'hammer', 'pickaxe', 'stone_hatchet', 'sledgehammer', 'bone_knife']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
  * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip
@@ -63,12 +62,14 @@ const FACE_UP = new Set(['gasmask']);
 /**
  * A thing whose picture the rules above leave on its side or edge on, posed by hand (2026-10-24, the owner: "make sure
  * the model photos are upright and look proper in the icon images for items not upside down or backwards"): `pivot`
- * how the model is stood (in place of the rules' turn), `frame` how the whole is then turned to the eye. The key lock
- * lay flat, its shackle out sideways: stood on its foot, shackle up, its face to the eye. (The hand saw is a sliver
- * whichever way it is turned: it is the machete's model until its own comes.)
+ * how the model is stood (in place of the rules' turn), `frame` how the whole is then turned to the eye. The rules
+ * turned the key lock's back plate to the eye, looked at the saw along its length, and laid the clipboard across its
+ * tall place: each is turned face to the eye, the saw's handle and the clipboard's clip at the ends they are held by.
  */
 const POSED: Record<string, { pivot?: [number, number, number]; frame?: [number, number, number] }> = {
-  key_lock: { pivot: [Math.PI / 2, 0, 0], frame: [0.15, 0.4, 0] },
+  key_lock: { pivot: [0.15, -Math.PI / 2 + 0.35, 0] },
+  hand_saw: { pivot: [Math.PI / 2 - 0.2, 0, 0] },
+  building_plan: { pivot: [Math.PI / 2 - 0.25, 0, 0], frame: [0, 0, -Math.PI / 2] },
 };
 
 /** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */

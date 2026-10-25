@@ -13242,6 +13242,306 @@
    "hi": "assets/models/hi/pirozhok_wreck.glb",
    "hiBytes": 1378776,
    "hiCard": 43
+  },
+  "log": {
+   "url": "assets/models/log.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 512848,
+   "srcTris": 3318,
+   "tris": 3318,
+   "min": [
+    -0.8,
+    0,
+    -0.2126
+   ],
+   "max": [
+    0.8,
+    0.5846,
+    0.2126
+   ],
+   "lods": []
+  },
+  "stone": {
+   "url": "assets/models/stone.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 575764,
+   "srcTris": 2456,
+   "tris": 2456,
+   "min": [
+    -0.1638,
+    0,
+    -0.175
+   ],
+   "max": [
+    0.1638,
+    0.2257,
+    0.175
+   ],
+   "lods": []
+  },
+  "nails": {
+   "url": "assets/models/nails.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 298680,
+   "srcTris": 2376,
+   "tris": 2376,
+   "min": [
+    -0.0601,
+    0,
+    -0.075
+   ],
+   "max": [
+    0.0601,
+    0.058,
+    0.075
+   ],
+   "lods": []
+  },
+  "sheet_metal": {
+   "url": "assets/models/sheet_metal.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 392312,
+   "srcTris": 2175,
+   "tris": 2175,
+   "min": [
+    -0.5,
+    0,
+    -0.4578
+   ],
+   "max": [
+    0.5,
+    0.25,
+    0.4578
+   ],
+   "lods": []
+  },
+  "felling_axe": {
+   "url": "assets/models/felling_axe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 431316,
+   "srcTris": 2950,
+   "tris": 2950,
+   "min": [
+    -0.0645,
+    0,
+    -0.1966
+   ],
+   "max": [
+    0.0645,
+    0.9,
+    0.1966
+   ],
+   "lods": []
+  },
+  "hammer": {
+   "url": "assets/models/hammer.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 391248,
+   "srcTris": 2478,
+   "tris": 2478,
+   "min": [
+    -0.0276,
+    0,
+    -0.0892
+   ],
+   "max": [
+    0.0276,
+    0.33,
+    0.0892
+   ],
+   "lods": []
+  },
+  "pickaxe": {
+   "url": "assets/models/pickaxe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 397860,
+   "srcTris": 2986,
+   "tris": 2986,
+   "min": [
+    -0.1159,
+    0,
+    -0.2257
+   ],
+   "max": [
+    0.1159,
+    0.9,
+    0.2257
+   ],
+   "lods": []
+  },
+  "torch": {
+   "url": "assets/models/torch.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 527948,
+   "srcTris": 2394,
+   "tris": 2394,
+   "min": [
+    -0.062,
+    0,
+    -0.0665
+   ],
+   "max": [
+    0.062,
+    0.6,
+    0.0665
+   ],
+   "lods": []
+  },
+  "code_lock": {
+   "url": "assets/models/code_lock.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 186764,
+   "srcTris": 1658,
+   "tris": 1658,
+   "min": [
+    -0.0209,
+    0,
+    -0.0486
+   ],
+   "max": [
+    0.0209,
+    0.15,
+    0.0486
+   ],
+   "lods": []
+  },
+  "sleeping_bag": {
+   "url": "assets/models/sleeping_bag.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 348680,
+   "srcTris": 2901,
+   "tris": 2901,
+   "min": [
+    -0.3,
+    0,
+    -0.1076
+   ],
+   "max": [
+    0.3,
+    0.1625,
+    0.1076
+   ],
+   "lods": []
+  },
+  "hand_saw": {
+   "url": "assets/models/hand_saw.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 470680,
+   "srcTris": 2438,
+   "tris": 2438,
+   "min": [
+    -0.0621,
+    0,
+    -0.3
+   ],
+   "max": [
+    0.0621,
+    0.4311,
+    0.3
+   ],
+   "lods": []
+  },
+  "key_lock": {
+   "url": "assets/models/key_lock.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 182500,
+   "srcTris": 1428,
+   "tris": 1428,
+   "min": [
+    -0.0294,
+    0,
+    -0.06
+   ],
+   "max": [
+    0.0294,
+    0.1195,
+    0.06
+   ],
+   "lods": []
+  },
+  "key": {
+   "url": "assets/models/key.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 377948,
+   "srcTris": 970,
+   "tris": 970,
+   "min": [
+    -0.0139,
+    0,
+    -0.035
+   ],
+   "max": [
+    0.0139,
+    0.0084,
+    0.035
+   ],
+   "lods": []
+  },
+  "building_plan": {
+   "url": "assets/models/building_plan.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 291044,
+   "srcTris": 1203,
+   "tris": 1203,
+   "min": [
+    -0.175,
+    0,
+    -0.1064
+   ],
+   "max": [
+    0.175,
+    0.0935,
+    0.1064
+   ],
+   "lods": []
+  },
+  "planks": {
+   "url": "assets/models/planks.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 643104,
+   "srcTris": 2145,
+   "tris": 2145,
+   "min": [
+    -0.6,
+    0,
+    -0.0888
+   ],
+   "max": [
+    0.6,
+    0.1695,
+    0.0888
+   ],
+   "lods": []
   }
  }
 }

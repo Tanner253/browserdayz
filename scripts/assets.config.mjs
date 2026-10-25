@@ -943,6 +943,29 @@ export const LOCAL_MODELS = {
     changes: 'Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.',
     credit: { name: 'Junk heap', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
   },
+  // Base building's things (2026-10-25), made in Higgsfield in place of the stand-ins (the owner: "all of thes eitems
+  // look terrible and need models done in higgsfield ... they all look extremely low quality"). Each came at its real
+  // size, foot on the ground, centred (the navigator's *_sized.glb), 1.6 to 3.3 thousand triangles: put in
+  // assets-src/models/higgsfield_items/ (a worktree's own assets-src: `node scripts/packs.mjs <id>` reads it).
+  ...Object.fromEntries(
+    [
+      ['log', 'Birch log'], ['stone', 'Stones'], ['nails', 'Box of nails'], ['sheet_metal', 'Sheet metal'], ['felling_axe', 'Felling axe'],
+      ['hammer', 'Claw hammer'], ['pickaxe', 'Pickaxe'], ['torch', 'Torch'], ['code_lock', 'Code lock'], ['sleeping_bag', 'Sleeping bag'],
+      // (and those made again: the saw's handle, a padlock made a lock box as Rust's, the key, the plan a clipboard, the planks a bundle)
+      ['hand_saw', 'Panel saw', 'hand_saw2'], ['key_lock', 'Key lock', 'key_lock2'], ['key', 'Key', 'key2'], ['building_plan', 'Building plan', 'building_plan2'], ['planks', 'Planks', 'planks3'],
+    ].map(([id, name, file = id]) => [id, {
+      dir: 'higgsfield_items', file: `${file}_sized.glb`, scale: 1, tex: 1024, tags: ['loot'],
+      // (the tools came leaning, their handles 41 to 50 degrees off upright: stood up, head uppermost, as the
+      // hatchet's is, which the hands' hold of a thing to hit with goes by; and made their true length along it. The
+      // clipboard came stood on its edge, its sketch to +x: laid face up. The saw's blade came all metal and polished,
+      // a mirror that drew near black with no bright sky in it (the owner, 2026-10-25: "this does not look good"):
+      // a third as much metal, so its grey steel shows)
+      ...({ felling_axe: { rot: [0.714, 0, 0], size: 0.9 }, hammer: { rot: [-0.577, 0, -0.148], size: 0.33 }, pickaxe: { rot: [0.834, 0, -0.298], size: 0.9 }, building_plan: { rot: [0, 0, Math.PI / 2] }, hand_saw: { metalBy: 0.35 } }[id] ?? {}),
+      ...(id === 'felling_axe' || id === 'hammer' || id === 'pickaxe' ? { scale: undefined } : {}),
+      changes: 'Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+      credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+    }]),
+  ),
 };
 
 /**
