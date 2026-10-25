@@ -23,6 +23,7 @@ import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
 import { Wardrobe } from './survivors';
 import type { InfectedMoves } from './infected-moves';
+import type { InfectedLook } from './infected-look';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -534,6 +535,8 @@ export class Avatar {
    * `t` seconds into it, `k` of the body given to it, `legs` of the legs.
    */
   zombieMoves: InfectedMoves | null = null;
+  /** and the look it is given among its kind (src/game/infected-look.ts), also set before it is made */
+  zombieLook: InfectedLook | null = null;
   zombieAct: { a: THREE.AnimationAction; t: number; k: number; legs: number } | null = null;
 
   /**

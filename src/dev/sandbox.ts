@@ -16,6 +16,7 @@
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
 //                                               picture (src/dev/sandbox-sim.ts)
+//   &infected=nurse,nurse&n=3,17&speed=0.6   the infected as the game draws them, each by its number (src/dev/sandbox-infected.ts)
 //   &moves=assets/characters/moves-infected.glb  the movements of that file, for g= files with none of their own (the infected)
 //   &hide=body_far                              the parts of a g= file by those names not drawn (an infected's far body)
 //   &strip=8                                    eight moments across the clip instead, from the first view
@@ -209,6 +210,14 @@ if (sim) {
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }
   }
+  // (the infected as the game makes and poses them, each by its number: src/dev/sandbox-infected.ts)
+  const infected = q.get('infected') ? await (await import('./sandbox-infected')).stageInfected(q) : [];
+  const secs = +(q.get('secs') ?? 2);
+  for (const s of infected) {
+    place(s.root, s.name, {}, true);
+    s.pos.copy(s.root.position);
+    s.at(strip > 0 ? 0 : +(q.get('t') ?? 0.5) * secs);
+  }
   if (animal) {
     const { MODES, stageAnimal } = await import('../game/animals');
     const mode = q.get('mode') ?? 'idle', a = await stageAnimal(animal, MODES[mode] ?? +mode);
@@ -264,6 +273,7 @@ if (sim) {
     const view = strip > 0 ? views[0] : views[i];
     if (strip > 0 && mixer && action) mixer.setTime(action.getClip().duration * (i / strip));
     if (strip > 0) for (const a of played) if (a !== action) a.getMixer().setTime(a.getClip().duration * (i / strip));
+    if (strip > 0) for (const s of infected) s.at(secs * (i / strip));
     thing.updateMatrixWorld(true);
     frame(view);
     const vx = (i % cols) * cw, vy = (rows - 1 - Math.floor(i / cols)) * ch;

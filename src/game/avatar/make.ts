@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { breathe } from '../../core/breathe';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { type Atmosphere, castsInto } from '../../world/atmosphere';
-import { type Look, type LookUniforms, lookFor, type BodyFile, loadCharacter, HAIR_STYLES, BEARD, lookUniforms, stainPatch, suitPatch, lookPatch, setLookUniforms } from '../look';
+import { type Look, type InfectedUniforms, lookFor, type BodyFile, loadCharacter, HAIR_STYLES, BEARD, lookUniforms, infectedPatch, infectedUniforms, suitPatch, lookPatch, setLookUniforms } from '../look';
+import { bleed } from '../infected-look';
 import { restBones } from '../../core/bones';
 import { WornTag } from '../worn-tag';
 import { CLIPS } from './pose';
@@ -15,7 +16,7 @@ import { Deeds, MOCAP, MOVES } from './deeds';
 import { AVATAR_LAYER, BODY_REACH, BODY_SCALE, CLEAN, FP_BODY_LAYER, FP_HIDDEN, LAID, SOLE_UNDER, WOUND_BONES, _m1, _q1, _v1, _v2, _v3, shareSkeleton, unread, Avatar, type ArmRig } from '../avatar';
 
 /** (the wounds those paints show: none; see CLEAN) */
-let CLEAN_U: LookUniforms | null = null;
+let CLEAN_U: InfectedUniforms | null = null;
 
 export const makeMethods = {
   load(this: Avatar, atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
@@ -91,12 +92,14 @@ export const makeMethods = {
           // shares one paint a piece until it is first hit, and has its own from then (see own()): a paint each was a
           // hundred-odd paints in sight, each made ready again for every draw of it, and every one kept for good by the
           // sun's maps (2026-10-18, the research session's fifth round)
-          const at = rest(m), key = `${file}|${m.name}`;
+          // (and every one of a kind's VARIANTS looks shares its own: src/game/infected-look.ts)
+          const look = this.zombieLook, at = rest(m), key = `${file}|${look?.key ?? ''}|${m.name}`;
           let mat = CLEAN.get(key);
           if (!mat) {
-            const u = (CLEAN_U ??= lookUniforms());
+            const u = look?.u ?? (CLEAN_U ??= infectedUniforms());
+            if (look && m.name === 'body') bleed(look, m.geometry);
             mat = src.clone();
-            atmo.register(mat, (shader) => stainPatch(shader, u, at), 'zombie');
+            atmo.register(mat, (shader) => infectedPatch(shader, u, at), 'zombie');
             CLEAN.set(key, mat);
           }
           m.material = mat;

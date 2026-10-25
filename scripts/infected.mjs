@@ -16,6 +16,8 @@
 // Many are about at once, so each file holds the body twice on the one skeleton: `body` as it was made, and
 // `body_far`, the same points drawn with a fifth of the triangles and a small picture, for whoever is past FAR_FROM
 // (src/game/avatar). The far one shares the near one's points: it costs its triangles and its picture, nothing else.
+// Each point also says what it is, by the bones it hangs on (`_TONE`: red the clothes of the upper body, green of the
+// legs, blue skin), so that no two of a kind need be dressed alike (src/game/infected-look.ts).
 
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -41,7 +43,8 @@ const TEX_FAR = 512;
 /** the far body's share of the near one's triangles */
 const FAR_SHARE = 0.22;
 
-const KINDS = ['villager', 'babushka', 'oldman', 'worker', 'conscript', 'militia', 'patient', 'nurse', 'hazmat', 'bloated', 'starved', 'burned'];
+// (every kind's bodies: BODIES in src/game/infected-kinds.ts; the commonest kinds have two)
+const KINDS = ['villager', 'villager2', 'babushka', 'oldman', 'worker', 'conscript', 'conscript2', 'militia', 'patient', 'nurse', 'hazmat', 'bloated', 'starved', 'burned'];
 const ONLY = process.argv.slice(2);
 
 await MeshoptDecoder.ready;
@@ -103,6 +106,34 @@ async function giveFar(doc, body) {
   return `far ${out.length / 3} of ${I.length / 3} triangles`;
 }
 
+/** the bones whose points are skin (the head and the hands) and the legs' (the trousers, and what is on the feet) */
+const SKIN = /^(Head|neck_01|hand_[lr]|(thumb|index|middle|ring|pinky)_\d+(_leaf)?_[lr])$/, LEGS = /^(pelvis|thigh_[lr]|calf_[lr]|foot_[lr]|ball(_leaf)?_[lr])$/;
+
+/** What each point of the body is, by the bones it hangs on: the share of the upper body's, the legs' and the skin's. */
+function giveTone(doc, body) {
+  const joints = body.getSkin().listJoints().map((j) => j.getName());
+  const prim = body.getMesh().listPrimitives()[0], ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0'), n = ji.getCount();
+  const tone = new Uint8Array(n * 4), j = [], w = [];
+  let skin = 0, legs = 0;
+  for (let i = 0; i < n; i++) {
+    ji.getElement(i, j);
+    jw.getElement(i, w);
+    let s = 0, l = 0, all = 0;
+    for (let c = 0; c < 4; c++) {
+      all += w[c];
+      if (SKIN.test(joints[j[c]])) s += w[c];
+      else if (LEGS.test(joints[j[c]])) l += w[c];
+    }
+    s /= all || 1;
+    l /= all || 1;
+    tone.set([Math.round((1 - s - l) * 255), Math.round(l * 255), Math.round(s * 255), 255], i * 4);
+    skin += s > 0.5 ? 1 : 0;
+    legs += l > 0.5 ? 1 : 0;
+  }
+  prim.setAttribute('_TONE', doc.createAccessor().setType('VEC4').setArray(tone).setNormalized(true));
+  return `tones: ${((skin / n) * 100).toFixed(0)}% skin, ${((legs / n) * 100).toFixed(0)}% legs`;
+}
+
 await fs.access(TEMPLATE).catch(() => {
   throw new Error('infected: run "node scripts/build-character.mjs --infected" first (it makes assets-src/characters/plain.glb)');
 });
@@ -152,6 +183,7 @@ for (const kind of KINDS) {
     a.dispose();
   }
   for (const m of root.listMaterials()) m.setMetallicFactor(0).setName(`zombie_${kind}`);
+  const tones = giveTone(doc, root.listNodes().find((n) => n.getName() === 'body'));
   const far = await giveFar(doc, root.listNodes().find((n) => n.getName() === 'body'));
   await doc.transform(
     unpartition(),
@@ -164,5 +196,5 @@ for (const kind of KINDS) {
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const triangles = (name) => root.listNodes().find((n) => n.getName() === name)?.getMesh()?.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0) ?? 0;
-  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles('body'))} triangles, ${far}\n  hands: ${hands}\n  ${fitted}\n  ${worn}`);
+  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles('body'))} triangles, ${far}, ${tones}\n  hands: ${hands}\n  ${fitted}\n  ${worn}`);
 }

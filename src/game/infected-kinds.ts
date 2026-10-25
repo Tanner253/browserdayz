@@ -13,12 +13,21 @@ export const KINDS = ['villager', 'babushka', 'oldman', 'worker', 'conscript', '
 export type InfectedKind = (typeof KINDS)[number];
 
 /**
- * How tall each stands against the skeleton every body is fitted to (a survivor's height): the babushka and the
- * nurse are smaller, the old man stooped and shrunk, the Starved long.
+ * Each kind's bodies (public/assets/characters/zombie_<body>.glb, scripts/infected.mjs), and how tall each stands against
+ * the skeleton every body is fitted to (a survivor's height): the babushka and the nurse smaller, the old man stooped and
+ * shrunk, the Starved long. The commonest have two: the villages a woman as well as a man, the army a second soldier.
  */
-export const KIND_HEIGHT: Record<InfectedKind, number> = {
-  villager: 1, babushka: 0.9, oldman: 0.95, worker: 1.01, conscript: 1.01, militia: 1.02, patient: 0.99, nurse: 0.94, hazmat: 1.01, bloated: 1, starved: 1.05, burned: 1,
+export const BODIES: Record<InfectedKind, [body: string, height: number][]> = {
+  villager: [['villager', 1], ['villager2', 0.93]], babushka: [['babushka', 0.9]], oldman: [['oldman', 0.95]], worker: [['worker', 1.01]],
+  conscript: [['conscript', 1.01], ['conscript2', 1]], militia: [['militia', 1.02]], patient: [['patient', 0.99]], nurse: [['nurse', 0.94]],
+  hazmat: [['hazmat', 1.01]], bloated: [['bloated', 1]], starved: [['starved', 1.05]], burned: [['burned', 1]],
 };
+
+/** which of its kind's bodies the `i`th one has, and how tall that body stands */
+export function bodyOf(kind: InfectedKind, i: number): { body: string; height: number } {
+  const of = BODIES[kind], [body, height] = of[Math.floor(roll(i, 24) * of.length)];
+  return { body, height };
+}
 
 /** each of the rare ones turns up about this often wherever it may */
 const RARE = 0.05;

@@ -18,7 +18,8 @@ import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
-import { FAR_FROM, KIND_HEIGHT, drawFar, kindOf, roll } from './infected-kinds';
+import { FAR_FROM, bodyOf, drawFar, kindOf, roll } from './infected-kinds';
+import { infectedLook, sizeOf } from './infected-look';
 import { infectedMoves } from './infected-moves';
 import { REST_STEP, inSight } from './remote';
 import type { Damageable, HitZone } from './weapons';
@@ -101,6 +102,8 @@ export class Infected implements Damageable {
   /** this game moves it */
   mine = false;
   ready = false;
+  /** drawn as its far copy (see FAR_FROM) */
+  private drawnFar = true;
   /** what it is, until its body is made (see MAKE_WITHIN) */
   waiting: InfectedInfo | null = null;
   /** whose game the server last said moves it (its body may be made after) */
@@ -197,10 +200,13 @@ export class Infected implements Damageable {
     // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
     const kind = kindOf(this.host.world(), this.i, this.home.x, this.home.z);
     this.avatar.zombieMoves = await infectedMoves(kind, this.i);
+    this.avatar.zombieLook = infectedLook(kind, this.i);
     if (this.gone) return;
-    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), `zombie_${kind}`);
+    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), `zombie_${bodyOf(kind, this.i).body}`);
     if (this.gone) return this.avatar.dispose();
-    this.avatar.root.scale.setScalar(KIND_HEIGHT[kind]);
+    // (its own size: a little broader or narrower, taller or shorter than its kind)
+    const [across, up] = sizeOf(kind, this.i);
+    this.avatar.root.scale.set(across, up, across);
     drawFar(this.avatar.root, true);
     // (and its run at its own moment: the walk's is the body's own, at random)
     this.avatar.sickRun = roll(this.i, 14) * 10;
@@ -807,7 +813,9 @@ export class Infected implements Damageable {
     const off = this.pos.distanceToSquared(eye);
     const far = off > DRAWN * DRAWN;
     this.avatar.root.visible = !far;
-    drawFar(this.avatar.root, off > (FAR_FROM * this.horde.lens) ** 2);
+    // (a band of four metres between the two, so that one standing at the line is not drawn now near and now far)
+    const lens = this.horde.lens, farNow = off > ((FAR_FROM + (this.drawnFar ? -2 : 2)) * lens) ** 2;
+    if (farNow !== this.drawnFar) drawFar(this.avatar.root, (this.drawnFar = farNow));
     if (dt > 0) {
       const k = 1 - Math.exp(-14 * dt);
       this.vel.x += ((this.pos.x - px) / dt - this.vel.x) * k;

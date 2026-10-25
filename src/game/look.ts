@@ -9,12 +9,11 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { assets } from '../core/assets';
-import type { InfectedKind } from './infected-kinds';
 
 const MASK_URL = 'assets/characters/survivor_mask.webp';
 
-/** the bodies there are: a survivor (every player), and each kind of the infected (src/game/infected-kinds.ts, scripts/infected.mjs) */
-export type BodyFile = 'survivor' | `zombie_${InfectedKind}`;
+/** the bodies there are: a survivor (every player), and the infected's (BODIES in src/game/infected-kinds.ts, scripts/infected.mjs) */
+export type BodyFile = 'survivor' | `zombie_${string}`;
 
 const characters = new Map<BodyFile, Promise<GLTF>>();
 
@@ -105,6 +104,19 @@ export function lookUniforms(): LookUniforms {
   return { uWounds: { value: Array.from({ length: MAX_WOUNDS }, () => new THREE.Vector4(0, 0, 0, 0)) }, tLook: { value: tLook }, uJacket: { value: new THREE.Color(1, 1, 1) }, uTrousers: { value: new THREE.Color(1, 1, 1) }, uSkin: { value: new THREE.Color(1, 1, 1) } };
 }
 
+/** one of the infected's: its look's clothes, skin and grime (src/game/infected-look.ts) */
+export interface InfectedUniforms extends LookUniforms {
+  /** what the colour of the clothes of the upper body and of the legs is turned by (hue, depth of colour, lightness) */
+  uUpper: { value: THREE.Matrix3 };
+  uLower: { value: THREE.Matrix3 };
+  /** where the grime's blotches lie (xyz, an offset into them) and how thick it is (w) */
+  uGrime: { value: THREE.Vector4 };
+}
+
+export function infectedUniforms(): InfectedUniforms {
+  return { ...lookUniforms(), uUpper: { value: new THREE.Matrix3() }, uLower: { value: new THREE.Matrix3() }, uGrime: { value: new THREE.Vector4(0, 0, 0, 0) } };
+}
+
 export function setLookUniforms(u: LookUniforms, look: Look) {
   u.uJacket.value.copy(look.jacket).multiplyScalar(CLOTH_GAIN);
   u.uTrousers.value.copy(look.trousers).multiplyScalar(CLOTH_GAIN);
@@ -166,8 +178,26 @@ export function lookPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matr
 }
 
 /**
- * Shader patch for the bodies of the infected: they come painted as they are, and take
- * nothing but the blood of what is done to them.
+ * Shader patch for the bodies of the infected: painted as they came, the clothes of the upper body, of the legs and the
+ * skin each tinted by the look the body was given (`_tone` says which of it is which: scripts/infected.mjs; a body
+ * without it is left as it came), grime laid on in blotches, and the blood of what is done to it.
+ */
+export function infectedPatch(shader: Shader, u: InfectedUniforms, rest = new THREE.Matrix4()) {
+  Object.assign(shader.uniforms, { uWounds: u.uWounds, uUpper: u.uUpper, uLower: u.uLower, uSkin: u.uSkin, uGrime: u.uGrime });
+  stained(shader, rest, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform mat3 uUpper;\nuniform mat3 uLower;\nuniform vec3 uSkin;\nuniform vec4 uGrime;\nvarying vec3 vTone;', `
+  // (cloth near white stays white, a coat or a clog that hangs over the legs as well: only what has colour takes dye)
+  vec3 was = diffuseColor.rgb;
+  float dyed = 1.0 - smoothstep(0.42, 0.72, dot(was, vec3(0.299, 0.587, 0.114)));
+  vec3 upper = mix(was, max(uUpper * was, 0.0), dyed), lower = mix(was, max(uLower * was, 0.0), dyed);
+  diffuseColor.rgb = upper * vTone.r + lower * vTone.g + was * uSkin * vTone.b + was * (1.0 - min(1.0, vTone.r + vTone.g + vTone.b));
+  // (blotches a hand or two across, thickest in their middles, dirt brown)
+  float grime = smoothstep(0.45, 0.9, woundNoise(vRest * 6.0 + uGrime.xyz) * 0.7 + woundNoise(vRest * 17.0 + uGrime.zxy) * 0.3) * uGrime.w;
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.52, 0.44, 0.34), grime);`);
+}
+
+/**
+ * Shader patch for a survivor's own body (src/game/survivors.ts): painted as it came, and taking
+ * nothing but the blood of what is done to it.
  */
 export function stainPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matrix4()) {
   Object.assign(shader.uniforms, { uWounds: u.uWounds });

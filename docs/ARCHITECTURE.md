@@ -117,9 +117,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `overlap.ts` | 131 | Where two faces lie in one plane, facing the same way, over the same ground: the two are drawn turn and turn about and the wall flickers there ("z-fighting"). |
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
+| `sandbox-infected.ts` | 79 | The infected in the sandbox as the game draws them (src/dev/sandbox.ts, &infected=): made by the game's own Avatar, with their kind's movements and the look their number gives them, and stepped by the game's own pose... |
 | `sandbox-inventory.ts` | 178 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
-| `sandbox.ts` | 281 | The sandbox (the stage until 2026-10-24, the owner: |
+| `sandbox.ts` | 291 | The sandbox (the stage until 2026-10-24, the owner: |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
 | `stance.ts` | 553 | Development-only measure of how a gun is held by a body seen from outside (window.ST), beside the harness that drives the game (window.T). |
 | `sweep.ts` | 313 | Development-only numbers for every animation (window.S), beside the harness that drives the game (window.T) and the tools that photograph it (window.D). |
@@ -133,7 +134,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
 | `animals.ts` | 584 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 642 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 645 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 
 ## src/game/avatar/
 
@@ -146,11 +147,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gear.ts` | 203 | What is worn, and where it sits on the body: hats, masks and vests on their bones, and what a mask hides of the head under it. |
 | `gestures.ts` | 147 | The arms at the things they do of their own: fists up on guard and a punch thrown from it, the hands at work on something that is not a weapon (food, a drink, a dressing), and the wheel's calls (a wave, a point,... |
 | `hands.ts` | 240 | The hands: what is held (taken up, put away), the two-bone arms reaching for grips, fingers curled and thumbs laid. |
-| `make.ts` | 414 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
+| `make.ts` | 417 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
 | `pose.ts` | 232 | The body's clips and the numbers they are played by: which clips there are, lying, sitting, the live-tunable POSE table and the stances a gun is held in. |
 | `sick.ts` | 120 | The infected's own way of going: feet kept on the ground, the sick gait. |
 | `update.ts` | 737 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
-| `wounds.ts` | 67 | Wounds on the body, and the infected's shared paints while they are unhurt. |
+| `wounds.ts` | 77 | Wounds on the body, and the infected's shared paints while they are unhurt. |
 
 ## src/game/
 
@@ -207,16 +208,17 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `held-mocap.ts` | 68 | First person on the motion capture (the owner, 2026-10-25: |
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
-| `infected-kinds.ts` | 106 | The twelve kinds of the infected, and which one each is (the owner, 2026-10-25: |
+| `infected-kinds.ts` | 115 | The twelve kinds of the infected, and which one each is (the owner, 2026-10-25: |
+| `infected-look.ts` | 125 | Each of the infected dressed as no other of its kind is (2026-10-25, from the owner's AAA bar: |
 | `infected-moves.ts` | 78 | How the infected move: motion capture from Higgsfield's library (the owner, 2026-10-25: |
-| `infected.ts` | 1363 | The infected, as this game draws and (for the ones near its own player) moves them. |
+| `infected.ts` | 1371 | The infected, as this game draws and (for the ones near its own player) moves them. |
 | `key-hints.ts` | 153 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
-| `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
+| `look.ts` | 228 | What a survivor looks like: jacket and trouser colours, skin, hair. |
 | `loot.ts` | 1167 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
 | `menu-order.ts` | 90 | Which of the menu's scenes are shown first, which are said to be new, and what a browser remembers of having been shown. |
-| `menu-scenes.ts` | 1706 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
+| `menu-scenes.ts` | 1709 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
 | `modes.ts` | 144 | The three games of one page (the owner, 2026-10-21: |
 | `muzzle.ts` | 131 | The flash at a muzzle: burning gas, seen for two or three frames. |
 | `my-perks.ts` | 26 | What this player has from the store, as their server says it (S2C 'perks', server/perks.ts): the finishes they may put on their guns (Apply in the inventory: server/plates.ts), VIP (a gold dog tag round their neck),... |

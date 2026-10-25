@@ -56,8 +56,9 @@ import { Avatar } from './avatar';
 import type { Effects } from './effects';
 import type { Grips } from './arms';
 import { lookFor } from './look';
-import { drawFar } from './infected-kinds';
+import { bodyOf, drawFar } from './infected-kinds';
 import { infectedMoves } from './infected-moves';
+import { infectedLook } from './infected-look';
 import type { Stash } from './loot';
 import { menuOrder, recall, remember, visit, type SceneRow } from './menu-order';
 
@@ -247,7 +248,8 @@ export class MenuScenes {
       // (the townsfolk and a worker: the menu's scenes are of the open country)
       const kind = (['villager', 'babushka', 'worker', 'oldman', 'conscript'] as const)[k];
       body.zombieMoves = await infectedMoves(kind, k);
-      await body.load(atmo, 0, false, lookFor(''), `zombie_${kind}`);
+      body.zombieLook = infectedLook(kind, k);
+      await body.load(atmo, 0, false, lookFor(''), `zombie_${bodyOf(kind, k).body}`);
       if (this.gone) return body.dispose();
       drawFar(body.root, false);
       body.sick = { roused: 1, claw: -1, seed: (k * 7.31) % 20 };
@@ -259,6 +261,7 @@ export class MenuScenes {
     for (let k = 0; k < (TOUCH ? 0 : 3); k++) {
       const body = new Avatar();
       body.zombieMoves = await infectedMoves('hazmat', k + 5);
+      body.zombieLook = infectedLook('hazmat', k + 5);
       await body.load(atmo, 0, false, lookFor(''), 'zombie_hazmat');
       if (this.gone) return body.dispose();
       drawFar(body.root, false);
