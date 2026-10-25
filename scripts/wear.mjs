@@ -47,7 +47,8 @@ const REGION = { scalp: 0, face: 1, neck: 2, chest: 3, belly: 4, hips: 5, should
  * surely covers (`core`: its own colour is learnt there; `covers`: all of it there is the piece, as the item's own
  * `hides` in src/sim/items/wear.ts), and its picture's size. Gloves have fingers (`fingers`: bound to the finger bones
  * as the body is, scripts/meshy.mjs fitHand). A piece of one colour (`plain`) has its picture made that colour all
- * over at its own lightness, Meshy's leftovers painted out (see plainCloth).
+ * over at its own lightness, Meshy's leftovers painted out (see plainCloth). A piece whose body is grey as the body's
+ * undershirt is (`grey`: the tactical shirt) keeps what is of that colour.
  */
 const TOP = ['neck', 'face', 'chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm', 'hand', 'thigh'];
 const LEGS = ['belly', 'hips', 'thigh', 'aboveKnee', 'shin', 'foot'];
@@ -83,7 +84,7 @@ const PIECES = {
   smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
   // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)
   tactical_jacket: { src: 'wear_tactical_jacket.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
-  combat_shirt: { src: 'wear_combat_shirt.glb', body: 1, ...JACKET, tex: 2048 },
+  combat_shirt: { src: 'wear_combat_shirt.glb', body: 1, ...JACKET, grey: true, tex: 2048 },
   tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048 },
   winter_boots: { src: 'wear_winter_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   // (the stab vest that takes the all-black one's place, the owner: "the stab vest I think needs a new model"; its
@@ -206,10 +207,19 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // a point is the piece where it is nearer the piece's colour than the colour of the body under it (the skin at a cuff or
   // a collar, the shorts below a hem), and over a part the piece can be over
   const off = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-  const why = { part: new Array(14).fill(0), body: 0, kept: 0, stretched: 0 };
+  const why = { part: new Array(14).fill(0), body: 0, shirt: 0, kept: 0, stretched: 0 };
+  // (and not the body's own grey undershirt, which Meshy dressed every piece over: under a jacket's hem and over a pair
+  // of trousers' waist it came with the piece, a white band at the hips under every top (the navigator, 2026-10-25).
+  // Its colour is the body's over the chest; a piece of about that colour keeps it, as the T-shirt itself does.)
+  const shirt = [0, 1, 2].map((ch) => {
+    const v = B.C.flatMap((c, n) => (region.getScalar(n) === REGION.chest ? [c[ch]] : [])).sort((x, y) => x - y);
+    return v[Math.floor(v.length / 2)];
+  });
+  const notShirt = piece.grey || off(own, shirt) < 0.25;
   let keep = D.P.map((p, i) => {
     const n = near[i];
     if (n < 0 || !parts.has(region.getScalar(n))) return (why.part[n < 0 ? 0 : region.getScalar(n)]++, false);
+    if (!notShirt && off(D.C[i], shirt) < 0.2 && off(D.C[i], own) > 0.2) return (why.shirt++, false);
     if (covers.has(region.getScalar(n)) ? peeks.has(region.getScalar(n)) && off(own, B.C[n]) > 0.3 && off(D.C[i], B.C[n]) * 2 < off(D.C[i], own) : off(D.C[i], own) >= off(D.C[i], B.C[n])) return (why.body++, false);
     return (why.kept++, true);
   });
@@ -440,18 +450,66 @@ for (const [id, piece] of Object.entries(PIECES)) {
 
   // ---- every triangle wound as its points face (Meshy turned a few dozen of them inside out: drawn from both sides, the
   // cloth lit them as its own inside, a grey patch on a T-shirt's back and grey teeth at its sleeves)
+  // (each triangle wound as its neighbours are, across every edge they share; each piece of cloth so wound turned to
+  // face away from the body by the vote of all its triangles; and the normals made again from them. Meshy's own
+  // normals pointed in under a work jacket's hem, and the cloth there shone white, 2026-10-25.)
   {
-    const pos = D.prim.getAttribute('POSITION'), nor = D.prim.getAttribute('NORMAL'), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), m = new THREE.Vector3(), e = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), out = new THREE.Vector3(), e = [];
+    const edges = new Map();
+    tris.forEach((t, k) => {
+      for (let s = 0; s < 3; s++) {
+        const u = one[t[s]], v = one[t[(s + 1) % 3]], key = u < v ? `${u},${v}` : `${v},${u}`;
+        (edges.get(key) ?? edges.set(key, []).get(key)).push(k);
+      }
+    });
+    const runs = (t, u, v) => t.some((x, s) => one[x] === u && one[t[(s + 1) % 3]] === v);
+    const done = new Uint8Array(tris.length);
     let turned = 0;
-    tris = tris.map((t) => {
+    for (let seed = 0; seed < tris.length; seed++) {
+      if (done[seed]) continue;
+      const lot = [seed];
+      done[seed] = 1;
+      for (let h = 0; h < lot.length; h++) {
+        const t = tris[lot[h]];
+        for (let s = 0; s < 3; s++) {
+          const u = one[t[s]], v = one[t[(s + 1) % 3]];
+          for (const k of edges.get(u < v ? `${u},${v}` : `${v},${u}`)) {
+            if (done[k]) continue;
+            // (a neighbour wound the same way runs the shared edge the other way)
+            if (runs(tris[k], u, v)) tris[k] = [tris[k][0], tris[k][2], tris[k][1]];
+            done[k] = 1;
+            lot.push(k);
+          }
+        }
+      }
+      let vote = 0;
+      for (const k of lot) {
+        const t = tris[k];
+        a.copy(D.P[t[0]]);
+        b.copy(D.P[t[1]]).sub(a);
+        c.copy(D.P[t[2]]).sub(a);
+        out.set(0, 0, 0);
+        for (const i of t) if (near[i] >= 0) out.add(D.P[i]).sub(B.P[near[i]]);
+        vote += Math.sign(b.cross(c).dot(out));
+      }
+      if (vote < 0) for (const k of lot) (tris[k] = [tris[k][0], tris[k][2], tris[k][1]]), turned++;
+    }
+    why.turned = turned;
+    const pos = D.prim.getAttribute('POSITION'), sum = new Float64Array(D.P.length * 3);
+    for (const t of tris) {
       a.fromArray(pos.getElement(t[0], e));
       b.fromArray(pos.getElement(t[1], e)).sub(a);
       c.fromArray(pos.getElement(t[2], e)).sub(a);
-      m.set(0, 0, 0);
-      for (const i of t) m.x += nor.getElement(i, e)[0], m.y += e[1], m.z += e[2];
-      return b.cross(c).dot(m) < 0 ? (turned++, [t[0], t[2], t[1]]) : t;
-    });
-    why.turned = turned;
+      b.cross(c);
+      for (const i of t) for (let k = 0; k < 3; k++) sum[one[i] * 3 + k] += b.getComponent(k);
+    }
+    const N = new Float32Array(D.P.length * 3);
+    for (let i = 0; i < D.P.length; i++) {
+      const o = one[i] * 3, l = Math.hypot(sum[o], sum[o + 1], sum[o + 2]) || 1;
+      for (let k = 0; k < 3; k++) N[i * 3 + k] = sum[o + k] / l;
+    }
+    D.prim.setAttribute('NORMAL', dressed.doc.createAccessor().setType('VEC3').setArray(N));
+    D.prim.setAttribute('TANGENT', null);
   }
 
   // ---- the piece: only its own points, in the order they are first used

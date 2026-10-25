@@ -70,6 +70,8 @@ export interface Worn {
   under?: number;
   /** and how far, metres (UNDER unsaid) */
   underBy?: number;
+  /** the parts of it not drawn at all under what is over it (a high waist under a jacket) */
+  underHide?: number;
 }
 
 /**
@@ -114,7 +116,8 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
   }
   for (const w of inner) if (over) w.under = over;
   // (and trousers in under a top over the hips, a little: a parka's hem stood behind the white of snow trousers' waist)
-  for (const w of legs) if (coat) (w.under = (w.under ?? 0) | coat), (w.underBy = coat & hides(['thigh']) ? UNDER : 0.008);
+  // (and their waist above the hips not drawn at all: a gorka's high waist stood out through a parka's front)
+  for (const w of legs) if (coat) (w.under = (w.under ?? 0) | coat), (w.underBy = coat & hides(['thigh']) ? UNDER : 0.008), (w.underHide = hides(['belly']));
   return { worn, gear };
 }
 
@@ -398,6 +401,11 @@ export class Wardrobe {
     const now = on ? key : '';
     if (!f || now === this.wornShown) return;
     const got = on ? await Promise.all(worn.map((w) => (w.model ? load(`assets/characters/wear/${w.model}.glb`).catch(() => null) : null))) : [];
+    // (and the camouflages' tiles in before any of it is put on: a camouflaged piece was black until its tile came)
+    if (on && worn.some((w) => w.camo)) {
+      for (const w of worn) if (w.camo) camoTile(w.camo);
+      await assets.idle();
+    }
     // (asked for something else meanwhile, or the body changed: that is seen to instead)
     if (key !== this.wornKey || this.frame !== f || (this.shown !== null) !== on) return;
     for (const s of this.wornShapes) s.removeFromParent();
@@ -421,7 +429,7 @@ export class Wardrobe {
         const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
         // (its parts under a vest drawn in: see Worn.under, and the regions each of its points lies over, scripts/wear.mjs)
-        const under: Hidden = { hide: { value: 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 } };
+        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 } };
         f.atmo.register(
           mat,
           (shader) => {
