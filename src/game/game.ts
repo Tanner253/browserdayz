@@ -40,6 +40,7 @@ import '../sim/blood';
 import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
 import { Doll } from './doll';
+import { torchInFist } from './in-fist';
 import { GunRacks, RACK_PLAN } from './racks';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
@@ -1510,6 +1511,8 @@ export class Game {
 
   makeHeld = (id: string | null, mods: string[], finish?: Finish | null) => {
     if (!id) return null;
+    // (a torch in the fist, as everybody else is shown it, lit or not: src/game/in-fist.ts)
+    if (id === 'torch') return torchInFist();
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
     const grips = this.weapons.gripsOf(id, mods);

@@ -39,6 +39,7 @@ import { PrintView } from './prints';
 import { TorchView, type TorchHost } from './torches';
 import { printCost, printOf } from '../../sim/build/blueprints';
 import { BaseSolids } from '../../sim/build/solid';
+import { inRoom, shutRoom, type Room } from '../../sim/build/rooms';
 
 export interface BuildHost {
   scene: THREE.Scene;
@@ -157,7 +158,7 @@ export class Building {
       joinClaim: (b) => this.claims.toggle(b),
     }, () => this.store, this.doors, this.boxes);
     this.ladders = new LadderView(h.input, () => this.store, h.climber);
-    this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me }, () => this.store);
+    this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me, shut: (at) => this.lightShut(at) }, () => this.store);
     this.prints = new PrintView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, yaw: h.yaw, who: () => this.me, name: h.name, count: h.count, take: h.take,
       changed: (b) => {
@@ -176,6 +177,32 @@ export class Building {
   }
   /** the bases' solids as this game knows them, for what its colliders do not reach (a body laid far off: src/sim/build/solid.ts) */
   readonly solids = new BaseSolids(() => this.store.bases.values());
+
+  /** the rooms lights were last found in, by where they were (to half a metre), for half a second */
+  private rooms = new Map<string, { at: number; room: Room | null; b: Base | null }>();
+  /**
+   * A light at a place is in a room shut all round in stone or metal, and the eye is not in it: nobody outside sees it
+   * (the owner: "light should not be seen outside an enclosed stone+ base that originates within"; src/sim/build/rooms.ts).
+   */
+  lightShut(at: THREE.Vector3): boolean {
+    const key = `${Math.round(at.x * 2)},${Math.round(at.y * 2)},${Math.round(at.z * 2)}`, now = performance.now();
+    let c = this.rooms.get(key);
+    if (!c || now - c.at > 500) {
+      if (this.rooms.size > 64) this.rooms.clear();
+      c = { at: now, room: null, b: null };
+      for (const b of this.solids.around(at.x, at.z, 2)) {
+        const room = shutRoom(b, at.x, at.y, at.z);
+        if (room) {
+          c = { at: now, room, b };
+          break;
+        }
+      }
+      this.rooms.set(key, c);
+    }
+    if (!c.room || !c.b) return false;
+    const eye = this.h.camera().position;
+    return !inRoom(c.room, c.b, eye.x, eye.y, eye.z);
+  }
 
   /** somebody is stood somewhere new (come in, woken, put there): the pieces about them solid at once */
   stood(at: THREE.Vector3) {

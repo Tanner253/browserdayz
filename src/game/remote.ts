@@ -18,6 +18,7 @@ import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
 import type { Jeep } from './vehicle';
 import { Timeline, between, caughtUp } from '../net/timeline';
+import { torchHead } from './in-fist';
 
 
 interface Snap {
@@ -268,7 +269,9 @@ export class RemotePlayer implements Damageable {
     this.mods = mods;
     const h = this.makeHeld(id, mods, finish);
     const put = () => {
-      if (this.heldKey === key) this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+      if (this.heldKey !== key) return;
+      this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+      this.heldObj = h?.obj ?? null;
     };
     if (h?.obj) void RemotePlayer.readyHeld(h.obj).then(put, put);
     else put();
@@ -396,13 +399,22 @@ export class RemotePlayer implements Damageable {
    * they carry, from the chest, the way they are looking.
    */
   lamp(pos: THREE.Vector3, dir: THREE.Vector3): { power: number; wide: number } | null {
-    if (!this.lit || !this.ready || !this.alive) return null;
+    // (a torch in the hands is its own light, at its head: `torchTip`)
+    if (!this.lit || !this.ready || !this.alive || this.weapon === 'torch') return null;
     const gun = this.mods.includes('gun_light') ? this.avatar.muzzle(pos, dir) : null;
     if (gun) return { power: 1.5, wide: 0.85 };
     const cp = Math.cos(this.pitch);
     dir.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
     pos.set(this.pos.x + dir.x * 0.25, this.pos.y + (this.crouched ? 0.85 : 1.32), this.pos.z + dir.z * 0.25);
     return { power: 1, wide: 1.3 };
+  }
+
+  /** what is in their hands as they are drawn (a torch's head is found on it) */
+  private heldObj: THREE.Object3D | null = null;
+  /** the head of the torch they have lit in their hands, as they are seen now (null: none lit) */
+  torchTip(out: THREE.Vector3): THREE.Vector3 | null {
+    if (!this.lit || !this.ready || !this.alive || this.weapon !== 'torch' || !this.heldObj) return null;
+    return torchHead(this.heldObj, out);
   }
 
   /** the end of the barrel they are holding, and which way it points, as they are seen now (null if they are not, or hold no gun) */
