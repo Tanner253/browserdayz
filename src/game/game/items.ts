@@ -7,7 +7,8 @@ import { physics, SIGHT_GROUPS, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import type { Barrel } from '../../world/vegetation';
-import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag } from '../../sim/items';
+import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag, itemName } from '../../sim/items';
+import { BLADES, bandagesFrom, cuttable } from '../../sim/condition';
 import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
@@ -28,6 +29,7 @@ import { heightAt } from '../../world/worldgen';
 import { COOKS, COOK_KINDS, FUEL, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
 import { POISON, fallsIll } from '../../sim/sickness';
 import { WHEEL_REACH, type TimedAction, type Game } from '../game';
+import { chosen } from '../survivors';
 
 export const itemsMethods = {
   // ------------------------------------------------------------ item actions
@@ -396,7 +398,7 @@ export const itemsMethods = {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     // where the hand is: a little ahead of the eye, to the right and below it
     const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
-    this.emptyOfGrenade();
+    this.emptyOfGrenade(left > 0);
     if (left <= 0) {
       // Held to the end of its fuse: it goes off in the hand. (Said to the server as a grenade that has left the
       // hand and is not moving: it has counted the fuse itself, and knows what that means.)
@@ -426,8 +428,10 @@ export const itemsMethods = {
   },
 
   /** the grenade is out of the hands, thrown or gone off or gone with them: they are empty */
-  emptyOfGrenade(this: Game) {
+  /** @param thrown it left the hand thrown: the hand goes on through the throw (see Weapons.throwOut), and only then do the hands take up what is in them */
+  emptyOfGrenade(this: Game, thrown = false) {
     this.cook = null;
+    if (thrown && this.weapons.throwOut(this.inHand ? () => this.rest() : undefined)) return;
     if (this.inHand) this.rest();
     else this.weapons.endUse();
   },
@@ -459,7 +463,7 @@ export const itemsMethods = {
       this.avatar.emote(e.move, e.dur);
       this.armsUntil = now + (e.dur ?? 1.5) * 1000;
     }
-    audio.shout(id, undefined, 0, voiceOf(playerName()));
+    audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
     this.hud.note('“' + e.say + '”');
     this.net.send({ t: 'emote', e: id });
   },
@@ -696,6 +700,24 @@ export const itemsMethods = {
       this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
       this.inventoryChanged();
     }, 'unbox');
+  },
+
+  /** A piece of clothing cut into bandages with a blade carried, as DayZ cuts clothes into rags (src/sim/condition.ts). */
+  cutUp(this: Game, it: ItemInstance) {
+    if (!cuttable(it) || !this.canCut()) return;
+    const n = bandagesFrom(it), name = itemName(it);
+    this.inv.remove(it);
+    const left = this.inv.add(makeItem('bandage', n));
+    if (left) this.dropItem(left);
+    audio.click(900, 0.35, 0.06);
+    audio.click(700, 0.35, 0.06, 0.1);
+    this.hud.note(`The ${name} is cut into ${n} bandage${n === 1 ? '' : 's'}`, 'good');
+    this.inventoryChanged();
+  },
+
+  /** whether a blade is carried to cut clothes up with */
+  canCut(this: Game) {
+    return !!this.inv.find((x) => BLADES.includes(x.id));
   },
 
   /**

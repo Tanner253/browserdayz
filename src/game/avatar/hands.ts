@@ -51,8 +51,8 @@ export const handsMethods = {
       _m2.makeBasis(Lf, Lp, new THREE.Vector3().crossVectors(Lf, Lp));
       const fist = new THREE.Group();
       fist.quaternion.setFromRotationMatrix(_m2.multiply(_m1.transpose()));
-      // the hand is a bone of a scaled body: the weapon keeps its own size
-      const k = 1 / BODY_SCALE;
+      // the hand is a bone of a scaled body: the weapon keeps its own size (whatever size the survivor is drawn: stature)
+      const k = 1 / (BODY_SCALE * this.stature);
       fist.scale.setScalar(k);
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);

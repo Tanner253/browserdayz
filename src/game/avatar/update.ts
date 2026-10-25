@@ -3,9 +3,14 @@
 // Avatar.prototype as the file loads. Nothing in them was changed but `this: Avatar` said as the first parameter.)
 
 import * as THREE from 'three';
+import { stretch } from './gait';
+import { MOCAP, MOVES } from './deeds';
+import { slashAt } from '../held-mocap';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+
+const _way = new THREE.Vector3();
 
 export const updateMethods = {
   /**
@@ -65,7 +70,8 @@ export const updateMethods = {
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
     // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
-    const free = !firstPerson && !armed && !fists;
+    // (a survivor on motion capture steps sideways and back facing the aim: only flat out does the body turn to the way it runs)
+    const free = !firstPerson && !armed && !fists && (!this.gait || speedNow > 5.2);
     const velYaw = Math.atan2(-velocity.x, -velocity.z);
     const targetYaw = free && speedNow > 0.6 ? velYaw : facingYaw;
     if (this.placed) this.yaw += wrap(targetYaw - this.yaw) * ease(firstPerson ? 40 : armed ? 18 : 10);
@@ -82,6 +88,8 @@ export const updateMethods = {
       const side = Math.abs(rel);
       if (this.backing ? side < 1.4 : side > 1.75) this.backing = !this.backing;
       twistTo = THREE.MathUtils.clamp(this.backing ? wrap(rel + Math.PI) : rel, -POSE.maxTwist, POSE.maxTwist) * Math.min(1, speedNow / 1.2);
+      // (on motion capture the legs step the way they go, and are turned only for a gait drawn ahead alone: see Gait)
+      if (this.gait && this.proneT < 0.5) twistTo = this.gait.twist;
       if (this.backing) dirSign = -1;
     } else this.backing = false;
     this.twist += (twistTo - this.twist) * ease(9);
@@ -176,6 +184,12 @@ export const updateMethods = {
       w.proneDown += lying * (1 - this.crawlK);
       w.crawl += lying * this.crawlK;
     }
+    // (a survivor's steps are the motion capture's: its gait takes the walk's, the run's and the crouched walk's share)
+    const gait = this.gait;
+    if (gait) {
+      gait.step(dt, speed, wrap(velYaw - this.yaw), w.walk + w.run, w.crouchWalk, hold, this.limpT);
+      w.walk = w.run = w.crouchWalk = 0;
+    }
     // (the crawl keeps time with the ground: a pull of the arms for so much of it, backwards when going backwards)
     const pulled = this.crawlAt;
     this.crawlAt = (((this.crawlAt + (dt * speedNow * dirSign) / POSE.crawlStride) % 1) + 1) % 1;
@@ -216,6 +230,10 @@ export const updateMethods = {
     // (not two in a breath: the place moving the other way can bring the same foot past it twice)
     this.sinceStep += dt;
     this.footfall = footfall && stepping > 0.35 && speedNow > 0.5 && this.sinceStep > 0.25;
+    if (gait) {
+      this.phase = gait.phase;
+      this.footfall = gait.footfall && this.sinceStep > 0.25;
+    }
     if (this.footfall) this.sinceStep = 0;
     this.clock += dt;
     // (one of the pack's movements in place of the body's own dance, with all of the dance's weight: see setClip)
@@ -243,6 +261,20 @@ export const updateMethods = {
       else if (n === 'run' && this.sick) a.time = this.sickRun % this.dur[n];
       else if (n === 'walk' || n === 'run' || n === 'crouchWalk') a.time = ((this.phase + POSE.offset[n]) % 1) * this.dur[n];
       else a.time = this.clock % this.dur[n];
+    }
+    // (a survivor goes down and flinches on the motion capture: the old clips' weights handed to it)
+    const deeds = this.deeds;
+    if (deeds) {
+      deeds.mute();
+      const fall = MOCAP[this.deathClip], flinch = MOCAP[this.hitClip];
+      if (w[this.deathClip] > 0) deeds.set(fall, w[this.deathClip], this.downT);
+      if (w[this.hitClip] > 0) deeds.set(flinch, w[this.hitClip], this.hitT);
+      // (and stands on it: see MOVES.idle)
+      if (w.idle > 0) deeds.set('idle', w.idle, this.clock % MOVES.idle.dur);
+      this.actions.idle.setEffectiveWeight(0);
+      this.actions[this.deathClip].setEffectiveWeight(0);
+      this.actions.hit.setEffectiveWeight(0);
+      this.actions.hitHead.setEffectiveWeight(0);
     }
     this.mixer.update(0);
     for (const [from, to] of this.drive) {
@@ -272,13 +304,38 @@ export const updateMethods = {
     if (this.strikeT >= 0) {
       this.strikeT += dt;
       const u = this.strikeT / this.strikeDur;
+      // (a survivor's on the motion capture: the slash, as the eye sees its own: see held-mocap.ts)
+      const slash = deeds?.get('slash');
       if (u >= 1 || dead) this.strikeT = -1;
+      else if (slash) this.layer(slash, slashAt(u), strikeShare(u));
       else this.layer('strike', strikeAt(u), strikeShare(u));
     }
     if (this.sick && this.sick.claw >= 0 && !dead) {
       // (it throws its whole body after its arm: the lunge is the clip's own)
       const u = this.sick.claw / CLAW;
       this.layer('strike', strikeAt(u, CLAW_HIT), strikeShare(u), 1);
+    }
+    // --- on the motion capture: what is kept up (a ladder, the water, a bedroll), the whole body; and what is done once
+    // over it, the legs too while standing (a pick-up, a swing, a throw), the arms alone for a drink
+    if (deeds) {
+      this.stayT += ((this.stay && !dead ? 1 : 0) - this.stayT) * ease(this.stay ? 6 : 4);
+      if (this.stay) {
+        this.stay.t += dt * this.stay.rate;
+        this.stayWas = this.stay.name;
+      }
+      const kept = this.stay?.name ?? this.stayWas, a = kept && this.stayT > 0.002 ? deeds.get(kept) : null;
+      if (a) this.layer(a, ((((this.stay?.t ?? 0) % a.getClip().duration) + a.getClip().duration) % a.getClip().duration), this.stayT, 1);
+      else if (!this.stay) this.stayWas = null;
+      const d = this.deed;
+      if (d) {
+        d.t += dt;
+        const act = deeds.get(d.name);
+        if (d.t >= d.dur || dead) this.deed = null;
+        else if (act) {
+          const k = d.k * THREE.MathUtils.smoothstep(d.t, 0, Math.min(0.2, d.dur * 0.25)) * (1 - THREE.MathUtils.smoothstep(d.t, d.dur - Math.min(0.3, d.dur * 0.35), d.dur));
+          this.layer(act, (d.from + ((d.to - d.from) * d.t) / d.dur) * act.getClip().duration, k, d.legs * (1 - this.moveT));
+        }
+      }
     }
 
     this.root.position.copy(pos);
@@ -308,6 +365,11 @@ export const updateMethods = {
       this.root.rotation.set(tip * pr, this.yaw + this.twist + Math.sin(this.crawl) * 0.05 * going, roll * pr);
     }
     if (this.dive) this.root.rotation.x = this.dive;
+    // (the steps stretched to the pace the body goes at: see Gait's warp. Not past 60 m: a foot that slides is not seen there)
+    if (gait && gait.share > 0.02 && Math.abs(gait.warp - 1) > 0.03 && !dead && pr < 0.01 && speedNow > 0.3 && this.joints.pelvis && pos.distanceToSquared(Avatar.eye) < 3600) {
+      settle(this.root);
+      stretch(this.legs, this.joints.pelvis, _way.set(velocity.x, 0, velocity.z).normalize(), 1 + (gait.warp - 1) * Math.min(1, gait.share) * (1 - this.airT));
+    }
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
     if (this.inHand) this.inHand.obj.visible = !using;
@@ -625,164 +687,15 @@ export const updateMethods = {
       }
     }
 
-    // --- bare hands: a guard, the left leading, and a punch thrown from it
-    if (this.fistsT > 0.02 && this.armR && this.armL && this.neck.length) {
-      let out = 0, wind = 0;
-      if (this.punchT >= 0) {
-        this.punchT += dt;
-        const k = this.punchT / POSE.punch[0];
-        if (k >= 1) this.punchT = -1;
-        else {
-          // the same shape as the first-person arms throw: drawn back, out fast, held, home slower
-          wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
-          const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
-          out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
-        }
-      }
-      const side = this.punchT >= 0 ? this.punchSide : 0;
-      // the shoulder goes in behind the punch
-      if (this.chest) this.turn(this.chest, UP, side * (side > 0 ? 0.38 : 0.26) * out - side * 0.08 * wind * (1 - out));
-      settle(this.root);
-      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
-      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
-      _right.set(1, 0, 0).applyQuaternion(aimQ);
-      const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
-      const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(head).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      for (const s of [1, -1] as const) {
-        const strike = s === side ? out : 0;
-        // the right fist by the chin, the left a hand's length out in front of it
-        const guard = s > 0 ? at(0.2, -0.2, 0.13) : at(0.3, -0.16, -0.11);
-        const end = s > 0 ? at(0.64, -0.13, 0.02) : at(0.62, -0.11, -0.03);
-        const to = guard.lerp(end, strike);
-        if (s === side) to.addScaledVector(fwd, -0.05 * wind * (1 - out));
-        // palms in toward each other in the guard; the fist turns over, palm down, as it goes out
-        const F = dirOf(0.5, 0.8, -s * 0.2).lerp(dirOf(1, 0.1, -s * 0.15), strike);
-        const N = dirOf(-0.3, -0.1, -s).lerp(dirOf(0, -1, -s * 0.2), strike);
-        this.reach(s > 0 ? this.armR : this.armL, to, F, N, [1.7, 1.72, 1.74, 1.76], aimQ, this.fistsT);
-      }
-    }
-
-    // --- hands busy with something that is not a weapon
-    if (using && ges && this.armR && this.armL && this.neck.length) {
-      settle(this.root);
-      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
-      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
-      _right.set(1, 0, 0).applyQuaternion(aimQ);
-      const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
-      // a point measured from the head: ahead of it, above it, to its right
-      const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(head).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      const wgt = THREE.MathUtils.smoothstep(ges.t, 0, 0.3) * (1 - THREE.MathUtils.smoothstep(ges.t, ges.dur - 0.25, ges.dur)) * left(ges);
-      // (No hand is sent further than its arm goes with a bend left in it. These places are measured from the head,
-      // and crouched the head is further from the shoulders: the arms went out dead straight and stopped short.)
-      const near = (to: THREE.Vector3, r: ArmRig) => {
-        const from = r.arm.getWorldPosition(_v2), d = to.distanceTo(from), most = (r.la + r.lb) * 0.93;
-        return d > most ? to.sub(from).multiplyScalar(most / d).add(from) : to;
-      };
-      if (ges.kind === 'eat' || ges.kind === 'drink') {
-        // up to the mouth and back down, once a bite or a gulp
-        const period = ges.kind === 'eat' ? 0.95 : 1.25;
-        const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, ges.t - 0.3) / period) * Math.PI * 2);
-        const m = ges.kind === 'drink' ? Math.pow(cyc, 0.6) : cyc;
-        this.reach(this.armR, near(at(0.3, -0.36, 0.12).lerp(at(0.17, -0.06, 0.05), m), this.armR), dirOf(-0.2 * m, 0.8, -0.5), dirOf(-1, 0, -0.4), [1.0, 1.05, 1.1, 1.15], aimQ, wgt);
-      } else {
-        // both hands in front of the belly: the left held still, the right working round it
-        const l = near(at(0.28, -0.4, -0.07), this.armL);
-        this.reach(this.armL, l, dirOf(1, 0, 0.6), dirOf(0, 1, 0), [0.5, 0.55, 0.6, 0.65], aimQ, wgt);
-        const a = ges.t * (ges.kind === 'bandage' ? 5.5 : 9);
-        const r = l.clone().addScaledVector(_right, 0.08).addScaledVector(UP, 0.05 + Math.cos(a) * 0.045).addScaledVector(fwd, 0.02 + Math.sin(a) * 0.045);
-        this.reach(this.armR, near(r, this.armR), dirOf(0.4, 0, -1), dirOf(0, -1, 0), [0.9, 0.95, 1, 1.05], aimQ, wgt);
-      }
-    }
-
-    // --- a call from the wheel, or the hands kept up: the arms say it as well
-    if (!dead && (mv || this.handsT > 0.02) && this.armR && this.armL && this.neck.length) {
-      settle(this.root);
-      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
-      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
-      _right.set(1, 0, 0).applyQuaternion(aimQ);
-      const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
-      const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(head).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      const open: [number, number, number, number] = [0.12, 0.1, 0.12, 0.18];
-      const R = this.armR, L = this.armL;
-      const arm = (s: number) => (s > 0 ? R : L);
-      // hands up beside the head, palms out, and kept there
-      if (this.handsT > 0.02) {
-        const tire = Math.sin(this.clock * 1.3) * 0.012;
-        for (const s of [1, -1]) this.reach(arm(s), at(0.1, 0.2 + tire * s, s * 0.34), dirOf(0, 1, s * 0.12), dirOf(1, 0, 0), open, aimQ, this.handsT);
-      }
-      if (mv) {
-        const k = mv.t;
-        const wgt = THREE.MathUtils.smoothstep(k, 0, 0.22) * (1 - THREE.MathUtils.smoothstep(k, mv.dur - 0.3, mv.dur)) * (1 - this.handsT) * left(mv);
-        if (mv.kind === 'wave') {
-          // a hand up beside the head, waved from the elbow
-          const s = Math.sin(k * 16);
-          this.reach(R, at(0.14, 0.3, 0.33 + s * 0.11), dirOf(0, 1, s * 0.45), dirOf(1, 0, 0), open, aimQ, wgt);
-        } else if (mv.kind === 'beckon') {
-          // the whole arm over the head, swung wide and slow: made to be seen from a long way off
-          const s = Math.sin(k * 10.5);
-          this.reach(R, at(0.06, 0.46, 0.2 + s * 0.24), dirOf(0, 1, s * 0.6), dirOf(1, 0, 0), open, aimQ, wgt);
-        } else if (mv.kind === 'distress') {
-          // both arms over the head, crossing and parting
-          const s = Math.sin(k * 11);
-          for (const side of [1, -1]) this.reach(arm(side), at(0.06, 0.44, side * (0.24 + s * 0.2)), dirOf(0, 1, side * s * 0.5), dirOf(1, 0, 0), open, aimQ, wgt);
-        } else if (mv.kind === 'palms') {
-          // both hands shown, open and empty, in front of the shoulders
-          const s = Math.sin(k * 9) * 0.02;
-          for (const side of [1, -1]) this.reach(arm(side), at(0.3, -0.12 + s, side * 0.3), dirOf(0.2, 1, side * 0.15), dirOf(1, 0, 0), open, aimQ, wgt);
-        } else if (mv.kind === 'point') {
-          // the arm out straight the way they are looking, one finger along it
-          const up = Math.sin(pitch);
-          this.reach(R, at(0.6, -0.22 + up * 0.5, 0.2), dirOf(1, up, 0), dirOf(0, -1, 0), [0.05, 1.5, 1.6, 1.7], aimQ, wgt);
-        } else if (mv.kind === 'nod' || mv.kind === 'shake') {
-          // yes and no: the head, twice over (the hands left where they are)
-          const headBone = this.neck[this.neck.length - 1];
-          const s = Math.sin(k * (mv.kind === 'nod' ? 11 : 13));
-          this.turn(headBone, mv.kind === 'nod' ? _right : UP, (mv.kind === 'nod' ? -0.24 : 0.36) * s * wgt);
-        } else if (mv.kind === 'halt') {
-          // wait: the right hand held up and out, palm to whoever it is said to
-          this.reach(R, at(0.42, -0.04, 0.2), dirOf(0.15, 1, 0), dirOf(1, 0, 0), open, aimQ, wgt);
-        } else if (mv.kind === 'down') {
-          // get down: both hands out low, palms down, pressed down twice
-          const s = Math.abs(Math.sin(k * 7)) * 0.07;
-          for (const side of [1, -1]) this.reach(arm(side), at(0.34, -0.42 - s, side * 0.26), dirOf(1, 0, side * 0.15), dirOf(0, -1, 0), open, aimQ, wgt);
-        } else if (mv.kind === 'back') {
-          // behind you: the right thumb jerked back over the shoulder
-          const s = Math.sin(k * 9) * 0.04;
-          this.reach(R, at(0.08 + s, -0.02, 0.34), dirOf(-1, 0.35, 0.2), dirOf(0, 0, 1), [0.9, 1.4, 1.5, 1.6], aimQ, wgt);
-        } else {
-          // two fingers to the brow, and away
-          const out = THREE.MathUtils.smoothstep(k, mv.dur * 0.45, mv.dur * 0.75);
-          this.reach(R, at(0.13, 0.03, 0.17).lerp(at(0.34, 0.08, 0.36), out), dirOf(0.1, 0.5, -0.85).lerp(dirOf(0.6, 0.7, -0.2), out), dirOf(0.3, -0.9, 0), [0.1, 0.12, 1.4, 1.5], aimQ, wgt);
-        }
-      }
-    }
+    // --- the arms at their own business: a guard and a punch, hands at work, the wheel's calls (gestures.ts)
+    this.gestures(dt, dead, using, ges, mv, pitch);
 
     if (this.sick && !dead && this.downT <= 0) {
       this.sicken(dt);
       this.plant(dt);
     }
-    // on a broken leg: once a stride the hips drop over it and the back goes after them
+    // (on a broken leg: how much of a limp the steps are, see Gait)
     this.limpT += ((this.limping && !dead ? 1 : 0) - this.limpT) * ease(5);
-    if (this.limpT > 0.02 && !this.sick && this.downT <= 0) {
-      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
-      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
-      _right.set(1, 0, 0).applyQuaternion(aimQ);
-      const going = THREE.MathUtils.clamp(this.speed / 0.5, 0, 1) * this.limpT;
-      // (down on the bad side for half of each stride, and quickly off it again)
-      const drop = Math.max(0, Math.sin(this.phase * Math.PI * 2)) * going;
-      const pelvis = this.joints.pelvis;
-      if (pelvis) {
-        this.lean(pelvis, fwd, 0.05 * this.limpT + drop * 0.21);
-        this.lean(pelvis, UP, drop * 0.09);
-      }
-      for (const b of this.spine) this.lean(b, _right, -(0.04 * this.limpT + drop * 0.05));
-      if (this.spine[1]) this.lean(this.spine[1], fwd, -drop * 0.13);
-      const head = this.neck[this.neck.length - 1];
-      if (head) this.lean(head, fwd, -drop * 0.08);
-    }
     // (a thumb is not seen from across the street, nor on the body the eye is in)
     if (!firstPerson && this.root.position.distanceToSquared(Avatar.eye) < THUMB_SEEN * THUMB_SEEN) {
       if (this.armR) this.thumb(this.armR);

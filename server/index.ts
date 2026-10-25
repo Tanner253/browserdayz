@@ -154,6 +154,8 @@ export interface Box {
   ride?: { i: number; seat: number };
   /** the body of one of the infected (its number): not kept through a restart, as its body is not (server/bodies.ts) */
   zed?: number;
+  /** a player's body: which of the survivors' bodies it was (not kept through a restart: then it is the one their name gives) */
+  bd?: number;
 }
 
 export const boxes = new Map<string, Box>();

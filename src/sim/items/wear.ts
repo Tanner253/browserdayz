@@ -10,8 +10,8 @@ export const WEAR_ITEMS: ItemDef[] = [
   // spawns in with (the default inventory slots) clothing items"). They were two grids of the body's own, and could
   // not be taken off; they are things now, worn in `top` and `legs`. Their pockets were the size those grids were
   // (4x4 and 4x3) and are bigger since (see GRIDS below): never smaller either way, so that nothing anybody carried
-  // in them has to move. Taken off, dropped or left on a body, each keeps what is in its pockets. (There is no model
-  // of either: on the ground and in a pocket each is the hospital's folded blanket, dyed. Proper art is wanted.)
+  // in them has to move. Taken off, dropped or left on a body, each keeps what is in its pockets. (On the ground and in a
+  // pocket each is still the hospital's folded blanket, dyed; worn, it is drawn as it is: see `dress`.)
   //
   // GRIDS. How much each thing that is worn holds (2026-10-13: "i think we need to expand every equipable item with
   // an inventory (lik ebackpacks and jackets) with more rows and colluns for example the largest backpack should b e
@@ -42,15 +42,184 @@ export const WEAR_ITEMS: ItemDef[] = [
   // Weights are as they were: what a load costs is its weight (src/sim/load.ts), as in DayZ, and a pack full of
   // rifles is paid for in breath. What is not worn is not part of this: the cases, the body, an admin's hold.
   // (test/inventory.test.ts holds the old sizes, and lays an inventory kept under them thing for thing.)
+  // The clothes (the owner, 2026-10-24: "i like the clothes they have on. but i want to make them items to be looted on
+  // the ground like dayz has tiers of clothing items that provide warmth etc and bigger storage etc.. and durability
+  // color etc... camoflaughe is nice obviously"). Each is drawn on the body as it is worn (`dress`: scripts/wear.mjs),
+  // in any of its colours, and is found where its kind is: the basics in houses on the coast, work clothes in the
+  // farms and yards, hunting clothes in the cabins, the army's in the army's places, and the gorka and the ghillie suit,
+  // rare, in the army's places of the third step. None lies under the gas or down the bunker: every place there is
+  // spoken for, and a jacket there was a sniper rifle fewer (test/loot.test.ts). Pockets on DayZ's ladder (see GRIDS above). No warmth yet (the owner,
+  // 2026-10-25: "dont worry about temperature for now").
   {
-    id: 'field_jacket', name: 'Field Jacket', model: 'folded_blanket', tint: 0x7d8a58, scale: 1.1, w: 3, h: 3, weight: 1.3, category: 'clothing', slot: 'top',
-    desc: 'The padded jacket every survivor starts in. 25 slots in its pockets. Take it off and what is in them goes with it: with nothing on your top, you have no pockets there.', wear: { cargo: [5, 5] },
-    loot: { pair: 'M65Jacket_Olive' },
+    // (the M65: the army's field jacket; still `field_jacket`, which everybody wore until 2026-10-25 and many still do)
+    id: 'field_jacket', name: 'Field Jacket', model: 'folded_blanket', tint: 0x4b5235, scale: 1.1, w: 3, h: 3, weight: 1.3, category: 'clothing', slot: 'top',
+    desc: 'An M65 army field jacket: stand collar, four flapped pockets, drawstring waist. 25 slots in its pockets. Take it off and what is in them goes with it.', wear: { cargo: [5, 5] },
+    dress: { model: 'm65', hides: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], shrinks: ['hips'] },
+    colours: [{ name: 'Olive', tint: 0x4b5235 }, { name: 'Black', tint: 0x26282a }, { name: 'Woodland', camo: 'woodland' }, { name: 'Autumn', camo: 'autumn' }],
+    loot: { pair: 'M65Jacket_Olive', at: [0, 0, 8, 0, 0], restock: 900, usage: ARMY, favour: { Military: 2 } },
+    worth: 10,
   },
   {
-    id: 'field_trousers', name: 'Field Trousers', model: 'folded_blanket', tint: 0x5a5f6e, scale: 0.85, w: 3, h: 2, weight: 0.6, category: 'clothing', slot: 'legs',
-    desc: 'The hard-wearing trousers every survivor starts in. 20 slots in their pockets. Take them off and what is in them goes with them.', wear: { cargo: [5, 4] },
-    loot: { pair: 'BDUPants' },
+    id: 'field_trousers', name: 'Field Trousers', model: 'folded_blanket', tint: 0x5b5d3e, scale: 0.85, w: 3, h: 2, weight: 0.8, category: 'clothing', slot: 'legs',
+    desc: 'Army field trousers with thigh pockets and knee pads strapped on. 20 slots in their pockets, and the pads take a tenth off a fall.', wear: { cargo: [5, 4], fall: 0.9 },
+    dress: { model: 'field_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Olive', tint: 0x4b5235 }, { name: 'Black', tint: 0x26282a }, { name: 'Woodland', camo: 'woodland' }, { name: 'Autumn', camo: 'autumn' }],
+    loot: { pair: 'BDUPants', at: [0, 0, 8, 0, 0], restock: 900, usage: ARMY, favour: { Military: 2 } },
+    worth: 8,
+  },
+  // ---- the basics, that every new survivor wakes in (CLOTHES), and that any house has (DayZ's own spawn: a T-shirt, a
+  // tracksuit and trainers; the owner, 2026-10-25: "we should do dayz styled basics")
+  {
+    id: 'tshirt', name: 'T-Shirt', model: 'folded_blanket', tint: 0xe8e4da, scale: 0.7, w: 3, h: 2, weight: 0.2, category: 'clothing', slot: 'top',
+    desc: 'A cotton T-shirt. 6 slots in it, and it keeps nothing out.', wear: { cargo: [3, 2] },
+    dress: { model: 'tshirt', hides: ['chest', 'belly', 'shoulder'], shrinks: ['hips'] },
+    colours: [{ name: 'White' }, { name: 'Grey', tint: 0x8d8e8a }, { name: 'Black', tint: 0x2a2a2a }, { name: 'Olive', tint: 0x556040 }, { name: 'Red', tint: 0x8e2a24 }, { name: 'Navy', tint: 0x23304f }],
+    loot: { pair: 'TShirt_White', at: [6, 4, 4, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
+    worth: 1,
+  },
+  {
+    id: 'tracksuit_pants', name: 'Tracksuit Trousers', model: 'folded_blanket', tint: 0x23304f, scale: 0.7, w: 3, h: 2, weight: 0.4, category: 'clothing', slot: 'legs',
+    desc: 'Thin polyester tracksuit trousers. 6 slots in their pockets.', wear: { cargo: [3, 2] },
+    dress: { model: 'tracksuit_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Navy' }, { name: 'Black', tint: 0x26262a }, { name: 'Grey', tint: 0x7a7c80 }, { name: 'Red', tint: 0x8a2626 }],
+    loot: { pair: 'TrackSuitPants_Blue', at: [4, 3, 3, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
+    worth: 1,
+  },
+  {
+    id: 'trainers', name: 'Trainers', model: 'combat_boots', tint: 0xd8d8d2, w: 2, h: 2, weight: 0.6, category: 'clothing', slot: 'feet',
+    desc: 'Cheap running shoes. Better than bare feet, and that is all.', wear: {},
+    dress: { model: 'trainers', hides: ['foot'] },
+    colours: [{ name: 'White' }, { name: 'Grey', tint: 0x7d7f80 }, { name: 'Black', tint: 0x2a2a2c }],
+    loot: { pair: 'AthleticShoes_Grey', at: [4, 3, 3, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
+    worth: 1,
+  },
+  // ---- the towns and the houses
+  {
+    id: 'flannel_shirt', name: 'Flannel Shirt', model: 'folded_blanket', tint: 0x8e2a24, scale: 0.75, w: 3, h: 2, weight: 0.3, category: 'clothing', slot: 'top',
+    desc: 'A checked flannel shirt. 9 slots in its pockets.', wear: { cargo: [3, 3] },
+    dress: { model: 'flannel', hides: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], shrinks: ['hips'] },
+    colours: [{ name: 'Red check' }, { name: 'Blue check', tint: 0x3a5a94 }, { name: 'Green check', tint: 0x3d6b3d }],
+    loot: { pair: 'Shirt_RedCheck', at: [3, 3, 4, 0, 0], restock: 600, usage: [...HOMES, 'Farm'] },
+    worth: 2,
+  },
+  {
+    id: 'hoodie', name: 'Hoodie', model: 'folded_blanket', tint: 0x8d8e8a, scale: 0.85, w: 3, h: 3, weight: 0.6, category: 'clothing', slot: 'top',
+    desc: 'A cotton pullover hoodie. 15 slots in its pocket and sleeves.', wear: { cargo: [5, 3] },
+    dress: { model: 'hoodie', hides: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], shrinks: ['hips'] },
+    // (and in the two camouflages of the mountain, as Sumrak's Namalsk has them: found where the army is)
+    colours: [{ name: 'Grey' }, { name: 'Black', tint: 0x262626 }, { name: 'Green', tint: 0x3d5a3a }, { name: 'Red', tint: 0x7e2a24 }, { name: 'Snow', camo: 'snow' }, { name: 'Forest', camo: 'forest' }],
+    loot: { pair: 'Hoodie_Grey', at: [3, 3, 4, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
+    worth: 3,
+  },
+  {
+    id: 'jeans', name: 'Jeans', model: 'folded_blanket', tint: 0x3e5d86, scale: 0.8, w: 3, h: 2, weight: 0.7, category: 'clothing', slot: 'legs',
+    desc: 'Denim jeans. 6 slots in their pockets.', wear: { cargo: [3, 2] },
+    dress: { model: 'jeans', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Blue' }, { name: 'Black', tint: 0x2a2b2e }, { name: 'Grey', tint: 0x6e7073 }],
+    loot: { pair: 'Jeans_Blue', at: [3, 3, 4, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
+    worth: 2,
+  },
+  {
+    id: 'leather_jacket', name: 'Leather Jacket', model: 'folded_blanket', tint: 0x5a3e2a, scale: 1.0, w: 3, h: 3, weight: 1.8, category: 'clothing', slot: 'top',
+    desc: 'A heavy leather jacket. 16 slots in its pockets, and the hide takes the edge off a hit to the body: five in a hundred less.', wear: { cargo: [4, 4], armor: 0.95 },
+    dress: { model: 'leather_jacket', hides: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], shrinks: ['hips'] },
+    colours: [{ name: 'Brown' }, { name: 'Black', tint: 0x1f1d1c }],
+    loot: { pair: 'LeatherJacket_Natural', at: [0, 3, 4, 0, 0], restock: 900, usage: ['Town'] },
+    worth: 6,
+  },
+  // ---- the farms, the works and the depots
+  {
+    id: 'quilted_jacket', name: 'Quilted Jacket', model: 'folded_blanket', tint: 0x3a3b3c, scale: 1.0, w: 3, h: 3, weight: 1.6, category: 'clothing', slot: 'top',
+    desc: 'A telogreika: the quilted cotton jacket of every Soviet workman. 16 slots in its pockets.', wear: { cargo: [4, 4] },
+    dress: { model: 'telogreika', hides: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], shrinks: ['hips'] },
+    colours: [{ name: 'Charcoal' }, { name: 'Grey', tint: 0x6b6c6a }, { name: 'Navy', tint: 0x26304a }, { name: 'Olive', tint: 0x4b5235 }],
+    loot: { pair: 'QuiltedJacket_Black', at: [1, 4, 6, 0, 0], restock: 900, usage: [...SHEDS, 'Village'] },
+    worth: 4,
+  },
+  {
+    id: 'work_trousers', name: 'Work Trousers', model: 'folded_blanket', tint: 0x4a3626, scale: 0.8, w: 3, h: 2, weight: 0.8, category: 'clothing', slot: 'legs',
+    desc: 'Heavy cotton work trousers. 12 slots in their pockets.', wear: { cargo: [4, 3] },
+    dress: { model: 'work_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Brown' }, { name: 'Black', tint: 0x28282a }, { name: 'Khaki', tint: 0x8f8160 }],
+    loot: { pair: 'CanvasPants_Beige', at: [2, 4, 4, 0, 0], restock: 600, usage: SHEDS },
+    worth: 2,
+  },
+  {
+    id: 'work_boots', name: 'Work Boots', model: 'combat_boots', tint: 0x6b4a30, w: 2, h: 2, weight: 1.2, category: 'clothing', slot: 'feet',
+    desc: 'Leather lace-up work boots. A seventh off a bad landing.', wear: { fall: 0.85 },
+    dress: { model: 'work_boots', hides: ['foot'] },
+    colours: [{ name: 'Brown' }, { name: 'Black', tint: 0x262626 }],
+    loot: { pair: 'WorkingBoots_Brown', at: [2, 4, 4, 0, 0], restock: 600, usage: SHEDS },
+    worth: 2,
+  },
+  {
+    id: 'leather_gloves', name: 'Leather Gloves', model: 'garden_gloves_01', tint: 0x6b4a30, w: 2, h: 1, weight: 0.2, category: 'clothing', slot: 'hands',
+    desc: 'Worn leather work gloves. Your punches land a little harder.', wear: { fist: 3 },
+    dress: { model: 'leather_gloves', hides: ['hand'] },
+    colours: [{ name: 'Brown' }, { name: 'Black', tint: 0x242424 }],
+    loot: { pair: 'LeatherGloves_Brown', at: [1, 3, 4, 0, 0], restock: 600, usage: SHEDS },
+    worth: 2,
+  },
+  // ---- the hunting cabins and the mountain
+  {
+    id: 'parka', name: 'Parka', model: 'folded_blanket', tint: 0x4b5235, scale: 1.15, w: 4, h: 3, weight: 1.9, category: 'clothing', slot: 'top',
+    desc: 'A long waxed-cotton parka with a hood. 20 slots in its pockets.', wear: { cargo: [5, 4] },
+    dress: { model: 'parka', hides: ['chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm'], shrinks: ['thigh'] },
+    colours: [{ name: 'Olive' }, { name: 'Grey', tint: 0x6b6d6b }, { name: 'Winter white', tint: 0xd8dcd8 }, { name: 'Snow', camo: 'snow' }],
+    loot: { pair: 'Parka_Green', at: [0, 3, 6, 0, 0], restock: 900, usage: ['Hunting', 'Village'] },
+    worth: 6,
+  },
+  {
+    id: 'cargo_pants', name: 'Cargo Trousers', model: 'folded_blanket', tint: 0x3a3b3c, scale: 0.85, w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'legs',
+    desc: 'Ripstop cargo trousers with big thigh pockets. 16 slots in them.', wear: { cargo: [4, 4] },
+    dress: { model: 'cargo_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Charcoal' }, { name: 'Olive', tint: 0x4b5235 }, { name: 'Tan', tint: 0x9c8562 }],
+    loot: { pair: 'CargoPants_Grey', at: [0, 4, 8, 0, 0], restock: 900, usage: ['Hunting', 'Industrial'] },
+    worth: 4,
+  },
+  {
+    id: 'hiking_boots', name: 'Hiking Boots', model: 'combat_boots', tint: 0x7a6a58, w: 2, h: 2, weight: 1.1, category: 'clothing', slot: 'feet',
+    desc: 'Suede hiking boots with a padded ankle. A fifth off a bad landing.', wear: { fall: 0.8 },
+    dress: { model: 'hiking_boots', hides: ['foot'] },
+    colours: [{ name: 'Grey' }, { name: 'Brown', tint: 0x5a3e2a }],
+    loot: { pair: 'HikingBootsLow_Grey', at: [0, 4, 8, 0, 0], restock: 900, usage: ['Hunting'] },
+    worth: 4,
+  },
+  // ---- the army's
+  {
+    id: 'fingerless_gloves', name: 'Fingerless Gloves', model: 'tactical_gloves', tint: 0x2a2a2a, w: 2, h: 1, weight: 0.15, category: 'clothing', slot: 'hands',
+    desc: 'Tactical gloves with the fingertips cut off, for the trigger. Your punches land a little harder.', wear: { fist: 3 },
+    dress: { model: 'fingerless', hides: [] },
+    colours: [{ name: 'Black' }, { name: 'Olive', tint: 0x4b5235 }],
+    loot: { pair: 'TacticalGloves_Black', at: [0, 2, 8, 0, 0], restock: 900, usage: ARMY },
+    worth: 3,
+  },
+  // ---- the mountain's: Sumrak's kind (the owner, 2026-10-25: "sumrak mod also has some cool clothes like new field
+  // bags and snow camo pants and hoodies and parkas"), in snow at the fort and in the forest further down
+  {
+    id: 'mountain_smock', name: 'Mountain Smock', model: 'folded_blanket', tint: 0x9a9c94, scale: 1.1, w: 3, h: 3, weight: 1.4, category: 'clothing', slot: 'top',
+    desc: 'A loose gorka-cut canvas smock with a hood and patched elbows. 30 slots in its pockets: the most of any top.', wear: { cargo: [6, 5] },
+    dress: { model: 'smock', hides: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], shrinks: ['hips'] },
+    colours: [{ name: 'Snow', camo: 'snow' }, { name: 'Forest', camo: 'forest' }, { name: 'Flat', tint: 0x7d7a62 }],
+    loot: { pair: 'GorkaEJacket_Winter', at: [0, 0, 2, 0, 0], restock: 1200, usage: ARMY },
+    worth: 12,
+  },
+  {
+    id: 'mountain_trousers', name: 'Mountain Trousers', model: 'folded_blanket', tint: 0x9a9c94, scale: 0.85, w: 3, h: 2, weight: 0.9, category: 'clothing', slot: 'legs',
+    desc: 'Loose gorka-cut canvas trousers with patched knees. 20 slots in their pockets.', wear: { cargo: [5, 4] },
+    dress: { model: 'smock_pants', hides: ['hips', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Snow', camo: 'snow' }, { name: 'Forest', camo: 'forest' }, { name: 'Flat', tint: 0x7d7a62 }],
+    loot: { pair: 'GorkaPants_Winter', at: [0, 0, 2, 0, 0], restock: 1200, usage: ARMY },
+    worth: 10,
+  },
+  {
+    // (worn on the back, as DayZ has it: no pack with it. A shape in the grass, not a survivor.)
+    id: 'ghillie_suit', name: 'Ghillie Suit', model: 'folded_blanket', tint: 0x4f5a34, scale: 1.2, w: 4, h: 3, weight: 2.5, category: 'clothing', slot: 'back',
+    desc: 'A sniper\'s suit of burlap strips, head to ankle. Worn on the back: there is no pack with it, and nothing in its pockets.', wear: {},
+    dress: { model: 'ghillie_suit', hides: ['chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm', 'thigh', 'aboveKnee', 'shin'] },
+    colours: [{ name: 'Woodland' }, { name: 'Mossy', tint: 0x55663a }, { name: 'Desert', tint: 0xb39d70 }, { name: 'Winter', tint: 0xd8dcd6 }],
+    loot: { pair: 'GhillieSuit_Woodland', at: [0, 0, 1, 0, 0], restock: 1800, usage: ['Military', 'Hunting'] },
+    worth: 20,
   },
   {
     // (still `boonie_hat`, so that what is carried and what is kept in the world still means it: a helmet now)
@@ -95,9 +264,6 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'garden_gloves', name: 'Work Gloves', model: 'garden_gloves_01', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'hands',
     desc: 'Canvas gloves from somebody\'s shed. Your punches land a little harder.', wear: { fist: 2 },
-    // (The Field Jacket and the Field Trousers have no rule: everybody is dressed in them from the start and only one
-    // of each is worn, so a spare is room for nothing. They come off the dead. The places for clothes on the first
-    // step are full as it is: two more kinds there, and the bags that are wanted went short.)
     loot: { pair: 'WoolGloves_Tan', at: [6, 0, 14, 0, 0], restock: 600, usage: ['Village', 'Farm', 'Industrial'] },
     worth: 2,
   },
@@ -161,6 +327,8 @@ export const WEAR_ITEMS: ItemDef[] = [
     // (still `rubber_boots`)
     id: 'rubber_boots', name: 'Combat Boots', model: 'combat_boots', w: 2, h: 2, weight: 1.4, category: 'clothing', slot: 'feet',
     desc: 'Laced leather boots with a stiff sole. Cushions a bad landing: a third less fall damage.', wear: { fall: 0.67 },
+    dress: { model: 'combat_boots', hides: ['foot'] },
+    colours: [{ name: 'Black' }, { name: 'Tan', tint: 0x9c8562 }],
     loot: { pair: 'Wellies_Green', at: [3, 1, 14, 0, 0], restock: 900, usage: ['Industrial', 'Farm', 'Military', 'Police'], favour: { Industrial: 2 } },
     worth: 3,
   },

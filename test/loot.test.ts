@@ -76,11 +76,10 @@ ok('every place for a thing is on a step, and every step has places: the camp an
 });
 
 ok('every sort of thing has a rule, and gets what its rule says on every step it is kept on', () => {
-  // (the jacket and the trousers everybody starts in lie nowhere: a spare of either is room for nothing)
   // (nor the launcher and its grenades: the owner, "the grenade launcher and its ammo is an admin only weapon")
   // (nor what only comes off an animal: its meat, fat, bones, hide and pelt, as in DayZ)
   const hunted = new Set(KINDS.flatMap((k) => yieldOf(k, 1).map(([id]) => id)));
-  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'field_jacket', 'field_trousers', 'm32', 'ammo_40mm'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
+  for (const id of Object.keys(ITEMS)) if (!hunted.has(id) && !['dogtag', 'watch', 'm32', 'ammo_40mm'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
   const { ruled: on, e } = worlds[0];
   // (how full each step is: a thing short where there is room, two or a fifth where a step is nearly full (the police

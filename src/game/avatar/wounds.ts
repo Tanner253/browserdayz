@@ -14,7 +14,8 @@ export const woundsMethods = {
    * @param dir the way the bullet or blade was travelling (world)
    */
   wound(this: Avatar, point: THREE.Vector3, dir: THREE.Vector3, size = 0.08, through = false) {
-    const skin = this.skin;
+    // (on the survivor's own body when one is on: its shape is bound as it stands, not as the suit's is)
+    const skin = this.wardrobe.skin ?? this.skin;
     if (!skin || !this.uniforms || !this.woundBones.length) return;
     this.own();
     const stain = (at: THREE.Vector3, r: number) => {

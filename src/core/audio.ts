@@ -4,6 +4,7 @@
 
 import type { Surface } from './physics';
 import { EMOTE } from '../sim/emotes';
+import { VOICES } from '../sim/survivor';
 import { alarmShare, alarmTop } from '../sim/heard';
 import { ITEMS } from '../sim/items';
 
@@ -324,6 +325,22 @@ function lateRecording(name: string): Promise<void> {
   return asked;
 }
 export const rotorRecording = () => lateRecording('rotor');
+
+/** the calls in each voice, fetched the first time each is heard: the recording, null where there is none, or the fetch under way */
+const called = new Map<string, AudioBuffer | null | Promise<AudioBuffer | null>>();
+function voiceLine(name: string): Promise<AudioBuffer | null> {
+  const p = (async () => {
+    try {
+      const res = await fetch(`assets/sounds/voices/${name}.mp3`);
+      if (!res.ok) return null;
+      return await new OfflineAudioContext(1, 1, 44100).decodeAudioData(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  })().then((buf) => (called.set(name, buf), buf));
+  called.set(name, p);
+  return p;
+}
 export const sirenRecording = () => lateRecording('siren');
 
 /** how loud the siren's recording is played: as loud as the made-up wail it replaced */
@@ -1996,14 +2013,30 @@ export class AudioEngine {
   }
 
   /**
-   * Somebody calls out (src/sim/emotes.ts): the words, said by the browser's speaking voice. (There was a voice
-   * made up out of a buzz and three resonances under them, and before them: it is gone.)
+   * Somebody calls out (src/sim/emotes.ts), in the voice they picked (src/sim/survivor.ts VOICES): its recording,
+   * fetched the first time that call in that voice is heard (the owner, 2026-10-24: "we can offer multiple voice
+   * options for the oplayer to pick from in the settings"). A call not recorded in it is said by the browser's
+   * speaking voice, as every call was before.
    * @param pos where they stand; none for the player's own voice
-   * @param voice whose voice, 0..1: the same caller has the same one every time
+   * @param voice which of VOICES
+   * @param pitch the browser's voice for them, 0..1: the same caller has the same one every time
    */
-  shout(id: string, _pos?: V3, distance = 0, voice = 0.5) {
+  shout(id: string, pos?: V3, distance = 0, voice = 0, pitch = 0.5) {
     if (!this.ready) return;
-    this.speak(EMOTE[id]?.say ?? '', distance, voice);
+    const name = `${VOICES[voice]?.id ?? VOICES[0].id}/${id}`, had = called.get(name);
+    const say = (buf: AudioBuffer | null) => {
+      if (!buf) return void this.speak(EMOTE[id]?.say ?? '', distance, pitch);
+      const src = this.ctx.createBufferSource(), g = this.ctx.createGain();
+      src.buffer = buf;
+      // (as loud as a shout is: a voice raised to carry across a field, and quieter for every metre past the first eight)
+      g.gain.value = 0.9;
+      src.connect(g).connect(this.out(pos, 8, 1, distance, this.bus.voice));
+      src.start(this.ctx.currentTime + distance / 343);
+    };
+    if (had instanceof AudioBuffer || had === null) return say(had);
+    // (fetched now, and said when it comes if that is soon: a call heard a second late is a call out of its moment)
+    const asked = performance.now();
+    void (had ?? voiceLine(name)).then((buf) => performance.now() - asked < 1500 && say(buf));
   }
 
   // ------------------------------------------------------------ ambience

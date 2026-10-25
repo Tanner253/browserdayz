@@ -28,6 +28,7 @@ import { plating } from './plates';
 import { bodyInfo } from './bodies';
 import { SHOP, type ItemId } from '../api/_lib/shop-items';
 import { forget } from './searched';
+import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 
 export interface Client {
   ws: WebSocket;
@@ -51,6 +52,9 @@ export interface Client {
   f?: string;
   g: string[];
   b: Slung[];
+  /** which of the bodies they are and the voice they call out in, as their game picked (src/sim/survivor.ts): null, none said */
+  bd: number | null;
+  vo: number | null;
   alive: boolean;
   inv: SerializedInventory | null;
   vitals: Vitals | null;
@@ -189,7 +193,7 @@ export function broadcastNear(m: S2C, x: number, z: number, within: number, exce
   }
 }
 
-export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, ...(c.f ? { f: c.f } : {}), g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key), ...(c.tagWorn ? { tag: true as const } : {}) });
+export const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, ...(c.f ? { f: c.f } : {}), g: c.g, b: c.b, ...(c.bd !== null ? { bd: c.bd } : {}), ...(c.vo !== null ? { vo: c.vo } : {}), alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}), ...perkInfo(c.key), ...(c.tagWorn ? { tag: true as const } : {}) });
 
 /** what a player has from the store, as the others are told it (server/perks.ts): nothing said where there is nothing */
 function perkInfo(key: string): { sk?: string[]; vip?: true } {
@@ -360,7 +364,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
     // else as somebody in the air, arms out, for as long as their game took to start, or for good if it never did)
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, F_GROUND],
-    w: null, m: [], g: [], b: [], alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false },
+    w: null, m: [], g: [], b: [], bd: pickOf(m.bd, BODY_NAMES.length), vo: pickOf(m.vo, VOICES.length), alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false },
     heardAt: Date.now(), hitAway: 0, kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,

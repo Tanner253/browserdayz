@@ -10,6 +10,7 @@ import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
 import { CUT } from '../../../arena/rules';
 import { newUid, ITEMS, fittedOf, quietOf } from '../../sim/items';
+import { wearOut } from '../../sim/condition';
 import type { WorldLoot } from '../../sim/economy';
 import { WEAPON_RULES } from '../../sim/combat';
 import { shotOf } from '../../sim/gunplay';
@@ -155,6 +156,12 @@ export const dropsMethods = {
     let amount = m.amount;
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
+    // (and what covers where it landed is worn by it, as in DayZ: src/sim/condition.ts)
+    if (m.w !== 'crash') {
+      for (const it of wearOut(this.inv.slots, m.zone, m.amount)) this.hud.note(`Your ${ITEMS[it.id].name} is ruined`, 'warn');
+      this.saveSoon();
+      this.invUI.soon();
+    }
     // the jeep they are in ran into something: no wound, and nobody to look round for
     if (m.w === 'crash') {
       p.damage(m.amount, 'a crash');
