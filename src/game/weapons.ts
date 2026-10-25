@@ -723,7 +723,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.16, -0.125, -0.42], tip: [-0.3, 0.84, -0.45], edge: [-0.25, -0.45, -0.86] },
     guard: { p: [0.1, -0.04, -0.4], tip: [-0.88, 0.46, -0.12], edge: [0.1, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.33, -0.34, -0.2],
+    elbow: [0.3, -0.24, -0.16],
     two: false,
     // (its rubber grip is the lower twelve centimetres, under the collar)
     grip: 0.062,
@@ -732,7 +732,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.16, -0.135, -0.42], tip: [-0.34, 0.8, -0.5], edge: [-0.25, -0.5, -0.83] },
     guard: { p: [0.13, -0.05, -0.4], tip: [-0.93, 0.36, -0.1], edge: [0.1, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.33, -0.35, -0.2],
+    elbow: [0.3, -0.25, -0.16],
     two: false,
     // (a long handle, twenty-eight centimetres of it: held at its middle)
     grip: 0.13,
@@ -741,7 +741,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.4, 0.85, -0.34], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.2, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.34, -0.36, -0.18],
+    elbow: [0.31, -0.26, -0.15],
     two: true,
     grip: 0.175,
   },
@@ -751,7 +751,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     rest: { p: [0.12, -0.13, -0.42], tip: [0.2, 0.86, 0.42], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.34, -0.36, -0.18],
+    elbow: [0.31, -0.26, -0.15],
     two: true,
     // (the left hand above the knob, the right a hand's width up the tape)
     grip: 0.175,
@@ -761,7 +761,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.42, 0.84, -0.34], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
-    elbow: [0.34, -0.36, -0.18],
+    elbow: [0.31, -0.26, -0.15],
     two: true,
     grip: 0.3,
   },
@@ -1881,12 +1881,13 @@ export class Weapons {
         root, kind: 'melee', flash, body, melee: style,
         grips: {
           // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
-          // (a fist round the handle: the thumb comes over the fingers, not out along the handle; and the fingers square
-          // across it, along the forearm, so the wrist is straight. They ran a third of the way down the handle and away
+          // (a fist round the handle: the thumb comes over the fingers, not out along the handle; and the fingers across
+          // it and a little up it, toward the forearm, the elbow raised to match (the styles' `elbow`): the wrist bent 48
+          // degrees where it was 96. They ran a third of the way down the handle and away
           // from the forearm, and the wrist folded down to make them: "the wris tholding the tool is all bent downwards
           // it doesnt look natural at all", the owner, 2026-10-25)
-          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.16, 0, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
-          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.16, 0, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
+          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.16, 0.25, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
+          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.16, 0.25, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
         hip: new THREE.Vector3(...MELEE.hip),
