@@ -37,6 +37,7 @@ import { BedsView } from './beds';
 import { LadderView, type Climber } from './ladders';
 import { PrintView } from './prints';
 import { TorchView, type TorchHost } from './torches';
+import { RaidView } from './raid';
 import { printCost, printOf } from '../../sim/build/blueprints';
 import { BaseSolids } from '../../sim/build/solid';
 import { inRoom, shutRoom, type Room } from '../../sim/build/rooms';
@@ -84,7 +85,12 @@ export interface BuildHost {
   flames: TorchHost['flames'];
   glow: TorchHost['glow'];
   tip: TorchHost['tip'];
+  /** a blast gone off: its fire and sound, and alone what it does to this game's bodies (Game.explode) */
+  explode: (at: THREE.Vector3, mine: boolean, w: string) => void;
 }
+
+/** what in the hands has its left button here, not the hands' (the plan lays, a lock is fitted, a charge stuck) */
+export const LEFT_HELD = new Set(['building_plan', 'code_lock', 'key_lock', 'c4', 'satchel']);
 
 /** how far the mouse moves for the pointer to cross the wheel, px */
 const RING = { reach: 260 };
@@ -171,6 +177,10 @@ export class Building {
     }, () => this.store, this.doors, this.boxes);
     this.ladders = new LadderView(h.input, () => this.store, h.climber);
     this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me, shut: (at) => this.lightShut(at) }, () => this.store);
+    this.raid = new RaidView({
+      scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, camera: h.camera, player: h.player, me: h.me, take: h.take,
+      changed: h.changed, flames: h.flames, glow: h.glow, explode: h.explode, broken: (b, ids) => this.brokeAlone(b, ids),
+    }, () => this.store, this.solids);
     this.prints = new PrintView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, yaw: h.yaw, who: () => this.me, name: h.name, count: h.count, take: h.take,
       changed: (b) => {
@@ -249,6 +259,8 @@ export class Building {
   readonly prints: PrintView;
   /** torches: in the hands, and on walls (src/game/building/torches.ts) */
   readonly torches: TorchView;
+  /** raiding: blows at pieces, charges stuck and going off (src/game/building/raid.ts) */
+  readonly raid: RaidView;
 
   /** a base's stores (its claim's, its boxes') as it now stands */
   private synced(b: Base) {
@@ -287,6 +299,11 @@ export class Building {
     this.torches.update(dt, ok && !this.wheel.isOpen);
     const ladder = this.ladders.frame(dt, ok && !this.wheel.isOpen);
     if (ladder && !this.prompt) this.prompt = ladder;
+    // (a charge in the hands, or one that did not go off; the health of a piece just struck)
+    this.raid.update(dt);
+    const raid = this.raid.frame(free);
+    if (raid && !plan && !hammer) this.prompt = raid;
+    if (!this.prompt) this.prompt = this.raid.shown();
     // (while the hands are at it, the ring round the crosshair says what they are doing: the card stands aside)
     if (this.h.busy()) this.prompt = null;
   }
@@ -578,6 +595,16 @@ export class Building {
       this.bump(base.id);
       this.h.changed();
     }, 'You stopped: it is as it was');
+  }
+
+  /** pieces of a base broken in this game's own copy of it (alone: a raid, src/game/building/raid.ts), with what stood only on them */
+  private brokeAlone(base: Base, ids: number[]) {
+    for (const id of ids) {
+      if (!base.pieces.has(id)) continue;
+      this.draw.remove(base.id, this.local.remove(base.id, id));
+    }
+    this.synced(base);
+    this.bump(base.id);
   }
 
   private takeDown(hammer: ItemInstance, base: Base, id: number) {

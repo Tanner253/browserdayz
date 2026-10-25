@@ -118,15 +118,18 @@ export function upkeep(now = Date.now(), minutes = 1) {
     if (kept) continue;
     const { hurt, broken } = rot(b, hours, now, !!b.claim);
     if (hurt.length) tellBase(b.id, { t: 'bhp', b: b.id, hp: hurt.map((p) => [p.id, Math.round(p.hp)] as [number, number]) });
-    for (const id of broken) {
-      if (!b.pieces.has(id)) continue;
-      const claimed = b.claim?.p;
-      const gone = all.remove(b.id, id);
-      if (claimed !== undefined && gone.includes(claimed)) spill(b.id);
-      spillBoxes(b.id, gone);
-      if (gone.length) tellBase(b.id, { t: 'bout', b: b.id, ids: gone });
-    }
+    for (const id of broken) broke(b, id);
   }
+}
+
+/** A piece come to nothing (rotted, or broken by a raid: server/raid.ts): gone, with whatever stood only on it, its boxes' and its claim's stores spilt. */
+export function broke(b: Base, id: number) {
+  if (!b.pieces.has(id)) return;
+  const claimed = b.claim?.p;
+  const gone = bases().remove(b.id, id);
+  if (claimed !== undefined && gone.includes(claimed)) spill(b.id);
+  spillBoxes(b.id, gone);
+  if (gone.length) tellBase(b.id, { t: 'bout', b: b.id, ids: gone });
 }
 
 /** a claim's members near enough to have been told its base: how long it is kept, and what it costs a day */

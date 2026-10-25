@@ -585,7 +585,7 @@ export const itemsMethods = {
    * @param skip what went up, if it is still standing in the way of its own blast
    * @param inHand a grenade of this player's own that was never thrown: it went off in the hand that held it
    */
-  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' = 'grenade', skip?: Barrel['collider'], inHand = false) {
+  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' | 'c4' | 'satchel' = 'grenade', skip?: Barrel['collider'], inHand = false) {
     // (a jeep goes up as a drum of fuel does; online the server says who it reached)
     const jeep = what === 'jeep';
     const drum = what === 'barrel' || jeep;
@@ -594,7 +594,8 @@ export const itemsMethods = {
     const spec = { damage: rule.damage, radius: rule.blast! };
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
-    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' ? 'frag' : 'grenade');
+    // (a C4 goes up as a frag does, a satchel charge as a stick grenade: src/sim/build/raid.ts)
+    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' || what === 'c4' ? 'frag' : 'grenade');
     audio.explosion(at, far, drum);
     if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
     /** how much of the blast reaches a point: nothing through a wall, less with every metre */

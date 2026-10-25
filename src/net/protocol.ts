@@ -72,7 +72,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (66, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
-// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; scrap salvaged, 'salvage').)
+// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; scrap salvaged, 'salvage');
+// raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz').)
 export const PROTOCOL = 66;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -367,6 +368,11 @@ export type C2S =
   | { t: 'bunlock'; b: number; p: number; u: string }
   /** a blueprint laid with the plan `u` (src/sim/build/blueprints.ts): begun on the ground, or carried on with on base `b` */
   | { t: 'bprint'; id: string; b?: number; x: number; z: number; yaw: number; u: string }
+  /** raiding (src/sim/build/raid.ts): a blow of the tool in the hands `u` landed on piece `p` of base `b` at `at`; a charge
+   * (item `u`, `w` 'c4' or 'satchel') stuck at `at` on a face turned to `n`; a charge that did not go off, lit again */
+  | { t: 'bhit'; b: number; p: number; u: string; at: [number, number, number] }
+  | { t: 'bplant'; w: string; u: string; at: [number, number, number]; n: [number, number, number] }
+  | { t: 'blight'; i: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -469,6 +475,10 @@ export type S2C =
   /** a base's claim as it is now (null: gone), with no store; the health of its pieces rotting */
   | { t: 'bclaim'; b: number; c: KeptClaim | null }
   | { t: 'bhp'; b: number; hp: [number, number][] }
+  /** a charge stuck to a base, burning with `f` seconds left (-1: it did not go off), by player `by`; gone off; gone out */
+  | { t: 'bcharge'; i: number; w: string; o: [number, number, number]; n: [number, number, number]; f: number; by: number }
+  | { t: 'bboom'; i: number; w: string; o: [number, number, number]; by: number }
+  | { t: 'bfizz'; i: number }
   /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */
   | { t: 'bkeep'; b: number; s: number; dry: boolean; day: [string, number][] }
   /** the server's word on the hammer begun at a piece */

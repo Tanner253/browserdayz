@@ -77,6 +77,13 @@ export const BUILD_ITEMS: ItemDef[] = [
     loot: { pair: 'LongTorch', at: [3, 4, 2, 0, 0], restock: 420, usage: [...HOMES, ...SHEDS], favour: { Hunting: 2, Farm: 1.5 } },
     worth: 2,
   },
+  // (raiding, base building's fifth step: the navigator, "C4 as loot". Plan v2: "explosive loot rare; crafted later". Found
+  // only where the army was, and seldom; crafting's satchel charge is the cheaper way through a door: src/sim/build/raid.ts)
+  { id: 'c4', name: 'C4 Charge', model: 'c4', w: 1, h: 2, weight: 1.2, category: 'tool',
+    desc: 'Three blocks of plastic explosive taped to a timer. In your hands, the left button sticks it to a wall, a door or a floor within reach: ten seconds later it goes off. One takes a wooden wall, two a stone one, four a metal one.',
+    loot: { pair: 'PlasticExplosive', at: [0, 0, 0, 1, 2], restock: 3600, usage: ['Military'] },
+    worth: 40,
+  },
   { id: 'key', name: 'Key', model: 'key', w: 1, h: 1, weight: 0.02, category: 'misc',
     desc: 'A key to one key lock. Carried, it opens that lock: lose it, and so does whoever finds it.',
   },

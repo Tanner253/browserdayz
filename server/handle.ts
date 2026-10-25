@@ -52,6 +52,7 @@ import { chop, keepWear, mine, saw } from './gather';
 import { craft, enqueue, unqueue } from './craft';
 import { salvage } from './salvage';
 import { hammer, lay, owing, print, sightFor, takeDown } from './build';
+import { blow, plant, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
 import { tellBeds, wakeAt } from './beds';
@@ -387,6 +388,12 @@ export function handle(c: Client, m: C2S) {
       return takeDown(c, m);
     case 'bprint':
       return print(c, m);
+    case 'bhit':
+      return blow(c, m);
+    case 'bplant':
+      return plant(c, m);
+    case 'blight':
+      return relight(c, m);
     case 'bjoin':
       return joinClaim(c, m);
     case 'mybeds':

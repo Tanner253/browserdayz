@@ -240,8 +240,8 @@ export function fallen(t: Thrower, feet: Vec3, now: number): { w: string; from: 
   return { w: h.w, from: [feet[0], feet[1] + NADE.hand, feet[2]], lies: [feet[0], feet[1] + NADE.lies, feet[2]], left: Math.max(0, (due - now) / 1000) };
 }
 
-/** What a grenade that goes off where it lies does to a body whose chest is at `chest`, before anything worn: by how far that is from it, as any blast is reckoned. */
-export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROWN[w] ? hitDamage(w, 'torso', Math.hypot(chest[0] - lies[0], chest[1] - lies[1], chest[2] - lies[2])) : 0);
+/** What a grenade that goes off where it lies (or a charge stuck to a wall, src/sim/build/raid.ts) does to a body whose chest is at `chest`, before anything worn: by how far that is from it, as any blast is reckoned. */
+export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROWN[w] || WEAPON_RULES[w]?.blast ? hitDamage(w, 'torso', Math.hypot(chest[0] - lies[0], chest[1] - lies[1], chest[2] - lies[2])) : 0);
 
 /**
  * A game says a blast of its player's reached somebody or something. Is it believed, and from how far?

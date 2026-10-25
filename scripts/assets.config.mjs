@@ -885,6 +885,9 @@ export const LOCAL_MODELS = {
     changes: 'Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.',
     credit: { name: 'Satchel charge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
   },
+  // (C4, base building's raiding: of the two the owner downloaded, the one of three blocks taped to a timer, picked in
+  // the sandbox over a cartoon one)
+  c4: { dir: '../incoming/simple_old_c4', file: 'scene.gltf', size: 0.2, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle and made 20 cm tall; textures re-encoded as WebP at 1024; geometry compressed.' },
   // (charcoal with no maker's print on it, as the sack the owner downloaded had all over; and the tin powder is kept in)
   // (made grey as stone: darkened to charcoal's black)
   charcoal_lumps: {
