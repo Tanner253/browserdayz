@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import PATHS from './paths.json';
 
-type Path = { fps: number; dur: number; rh: number[][]; re: number[][]; rs: number[][]; rf: number[][]; lh: number[][]; le: number[][]; ls: number[][]; lf: number[][]; head: number[][] };
+type Path = { fps: number; /** the seconds of the movement its first frame is at */ t0: number; dur: number; rh: number[][]; re: number[][]; rs: number[][]; rf: number[][]; lh: number[][]; le: number[][]; ls: number[][]; lf: number[][]; head: number[][] };
 const TABLE = PATHS as unknown as Record<string, Path>;
 
 /** where the right shoulder is from the eye in the first-person picture (x right, y up, z behind), metres */
@@ -105,12 +105,14 @@ export function cutPose(c: Cut, u: number, hitU: number, rest: { arm: THREE.Vect
   const t = u < hitU ? THREE.MathUtils.lerp(c.from, c.hit, u / hitU) : THREE.MathUtils.lerp(c.hit, c.to, (u - hitU) / (1 - hitU));
   const [kr, ku] = c.reach ?? [0.5, 0.5];
   out.w = THREE.MathUtils.smoothstep(u, 0, 0.1) * (1 - THREE.MathUtils.smoothstep(u, 0.75, 1));
-  rowAt(p.rs, p.fps, t, _s);
-  rowAt(p.rh, p.fps, t, _h).sub(_s);
-  rowAt(p.re, p.fps, t, _e).sub(_s);
-  rowAt(p.rs, p.fps, c.hit, _sh);
-  rowAt(p.rh, p.fps, c.hit, _hh).sub(_sh);
-  rowAt(p.re, p.fps, c.hit, _eh).sub(_sh);
+  // (the frames are of the seconds the blows use only: see scripts/melee-paths.mjs)
+  const T = t - p.t0, H = c.hit - p.t0;
+  rowAt(p.rs, p.fps, T, _s);
+  rowAt(p.rh, p.fps, T, _h).sub(_s);
+  rowAt(p.re, p.fps, T, _e).sub(_s);
+  rowAt(p.rs, p.fps, H, _sh);
+  rowAt(p.rh, p.fps, H, _hh).sub(_sh);
+  rowAt(p.re, p.fps, H, _eh).sub(_sh);
   // The arm, round and up from where the captured arm was as the blow landed, a share as far, from where the fist is
   // put as it lands (the middle of the picture): so every blow lands where it is seen, however it was captured.
   const [ar, au] = c.at ?? [0.35, 0];
@@ -118,10 +120,10 @@ export function cutPose(c: Cut, u: number, hitU: number, rest: { arm: THREE.Vect
   wayOf(roundOf(rest.upper) - ar + wrap(roundOf(_e) - roundOf(_eh)) * kr, upOf(rest.upper) + au + (upOf(_e) - upOf(_eh)) * ku, out.upper);
   out.stretch = _h.length() / Math.max(0.05, _hh.length());
   // (the hand's turn since the blow landed, a share of it)
-  handAt(p.rf, p.fps, t, _qa);
-  handAt(p.rf, p.fps, c.hit, _qh);
+  handAt(p.rf, p.fps, T, _qa);
+  handAt(p.rf, p.fps, H, _qh);
   out.turn.copy(_qa).multiply(_qh.invert()).slerp(_id, 1 - (c.turn ?? 0.7));
-  const h = p.head[Math.round(THREE.MathUtils.clamp(t * p.fps, 0, p.head.length - 1))], h0 = p.head[Math.round(THREE.MathUtils.clamp(c.from * p.fps, 0, p.head.length - 1))];
+  const h = p.head[Math.round(THREE.MathUtils.clamp(T * p.fps, 0, p.head.length - 1))], h0 = p.head[Math.round(THREE.MathUtils.clamp((c.from - p.t0) * p.fps, 0, p.head.length - 1))];
   out.head.set(h[0] - h0[0], h[1] - h0[1], h[2] - h0[2]).multiplyScalar((c.lean ?? 0.25) * out.w);
   return out;
 }

@@ -7,7 +7,9 @@
 // laid in it by its grip is held the same way in both views.
 // It is written as from eyes that keep looking the way the body faced as it began (a player keeps the aim on what they
 // hit); how the head itself turns from the body's facing is written too, for the picture to lean with the blow.
-//   node scripts/melee-paths.mjs [Clip ...]   -> src/game/melee/paths.json (the named ones, or every movement in the file)
+//   node scripts/melee-paths.mjs Clip:from-to ...   -> src/game/melee/paths.json: each named movement, only the seconds
+//   its blows use (src/game/melee/cuts.ts: from the first one's `from` to the last one's `to`), the rest of it is not
+//   in the game's bundle; a name alone writes all of it
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
@@ -25,7 +27,7 @@ const EYES = new THREE.Vector3(0, 0.07, 0.1);
 
 await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
-const r4 = (v) => Math.round(v * 1e4) / 1e4;
+const r4 = (v) => Math.round(v * 1e3) / 1e3;
 const M4 = (a) => new THREE.Matrix4().fromArray(a);
 
 const doc = await io.read(SRC);
@@ -55,11 +57,14 @@ const laid = Object.fromEntries(['r', 'l'].map((s) => {
   return [s, { fingers: fingers.applyQuaternion(into), palm: palm.applyQuaternion(into) }];
 }));
 
-const table = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : {};
-const wanted = process.argv.slice(2);
+const wanted = new Map(process.argv.slice(2).map((a) => {
+  const [name, span] = a.split(':');
+  return [name, span ? span.split('-').map(Number) : null];
+}));
+const table = {};
 for (const anim of root.listAnimations()) {
   const name = anim.getName();
-  if (wanted.length && !wanted.includes(name)) continue;
+  if (!wanted.has(name)) continue;
   let dur = 0;
   const ch = anim.listChannels().map((c) => {
     const s = c.getSampler(), t = s.getInput().getArray(), v = s.getOutput().getArray();
@@ -82,10 +87,12 @@ for (const anim of root.listAnimations()) {
       else c.node.setScale(v);
     }
   };
-  const frames = Math.max(1, Math.round(dur * FPS));
-  const out = { fps: FPS, dur: r4(dur), rh: [], re: [], rs: [], rf: [], lh: [], le: [], ls: [], lf: [], head: [] };
+  // (the seconds used, and a tenth either side)
+  const span = wanted.get(name), t0 = span ? Math.max(0, span[0] - 0.1) : 0, t1 = span ? Math.min(dur, span[1] + 0.1) : dur;
+  const frames = Math.max(1, Math.round((t1 - t0) * FPS));
+  const out = { fps: FPS, t0: r4(t0), dur: r4(dur), rh: [], re: [], rs: [], rf: [], lh: [], le: [], ls: [], lf: [], head: [] };
   for (let f = 0; f <= frames; f++) {
-    pose((f / frames) * dur);
+    pose(t0 + (f / FPS));
     // The eyes, where the head has put them, but looking where the body was facing as it began: a player keeps the
     // aim on what they hit, and the blow comes down across the picture (the head itself looks down with it).
     const turn = rot('Head').multiply(head0.clone().invert());
