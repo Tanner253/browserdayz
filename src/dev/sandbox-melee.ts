@@ -8,6 +8,7 @@
 //   &guard=1                          on guard (the right button), held
 //   &inspect=1                        looked over, through its length
 //   &carry=draw|stow                  something long drawn off the back, or put away there
+//   &close=1                          close on the right hand (its fingers on the handle)
 //   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
 //                                     places them (meleeAt), through the hands' own lens (48 degrees)
 
@@ -70,8 +71,10 @@ export async function stageMelee(id: string, s: {
   const camera = new THREE.PerspectiveCamera(30, s.cw / s.ch, 0.05, 100);
   const view = s.q.get('views')?.split(',')[0] ?? 'q';
   const dir = ({ side: new THREE.Vector3(1, 0.12, 0), front: new THREE.Vector3(0, 0.12, -1), back: new THREE.Vector3(0, 0.25, 1), q: new THREE.Vector3(0.75, 0.3, -0.9) }[view] ?? new THREE.Vector3(0.75, 0.3, -0.9)).normalize();
-  const mid = new THREE.Vector3(0, 1.15, 0);
-  camera.position.copy(mid).addScaledVector(dir, 4.2);
+  // (&close=1: close on the right hand, to see the fingers on the handle)
+  const close = s.q.get('close') === '1';
+  const mid = close ? body.armR!.hand.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1.15, 0);
+  camera.position.copy(mid).addScaledVector(dir, close ? 0.45 : 4.2);
   camera.lookAt(mid);
   s.sun.target.position.copy(mid);
   s.renderer.setScissorTest(true);
