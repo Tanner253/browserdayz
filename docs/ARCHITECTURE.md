@@ -133,7 +133,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
 | `animals.ts` | 584 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 646 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 642 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 
 ## src/game/avatar/
 
@@ -148,7 +148,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hands.ts` | 240 | The hands: what is held (taken up, put away), the two-bone arms reaching for grips, fingers curled and thumbs laid. |
 | `make.ts` | 414 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
 | `pose.ts` | 232 | The body's clips and the numbers they are played by: which clips there are, lying, sitting, the live-tunable POSE table and the stances a gun is held in. |
-| `sick.ts` | 127 | The infected's own way of going: feet kept on the ground, the sick gait. |
+| `sick.ts` | 120 | The infected's own way of going: feet kept on the ground, the sick gait. |
 | `update.ts` | 737 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
 | `wounds.ts` | 67 | Wounds on the body, and the infected's shared paints while they are unhurt. |
 

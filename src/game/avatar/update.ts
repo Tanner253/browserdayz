@@ -137,7 +137,7 @@ export const updateMethods = {
     const push = this.jumpT >= 0 ? 1 - THREE.MathUtils.smoothstep(this.jumpT, POSE.jump[1] * 0.4, POSE.jump[1]) : 0;
     const move = this.moveT;
     const runK = this.sick ? THREE.MathUtils.smoothstep(speed, SICK_GAIT.from, SICK_GAIT.to) : THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
-    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / (this.zombieMoves?.paces.run ?? SICK_GAIT.pace), SICK_GAIT.give[0], SICK_GAIT.give[1]);
+    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / (this.zombieMoves?.paces.run ?? 1), SICK_GAIT.give[0], SICK_GAIT.give[1]);
     let hit = 0;
     const hitLen = this.dur[this.hitClip];
     if (this.hitT >= 0) {

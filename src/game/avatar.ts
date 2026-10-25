@@ -82,15 +82,11 @@ export const THUMB_SEEN = 16;
 export const CLAW = INFECTED.lunge;
 
 /**
- * How the infected get about. Their walk is the game's own, at whatever pace they are going;
- * their run is another body's, drawn to another length with several strides in it, so it is
- * not stepped in time with the walk (which played it at better than twice its pace): above
- * `from` metres a second it is faded in over the walk, all of it by `to`, and it keeps its
- * own time, at the pace it was drawn for (`pace`, metres a second) or as near as `give` lets it be.
+ * How the infected get about (src/game/infected-moves.ts): their run is drawn to another length than their walk, so it
+ * is not stepped in time with it: above `from` metres a second it is faded in over the walk, all of it by `to`, and it
+ * keeps its own time, at the pace it was captured at or as near as `give` lets it be.
  */
-// (Measured on the body: a foot on the ground goes back under it at about 2.3 m/s as the clip
-// was drawn. Played at that pace under a body going 3.3, the feet slid a metre a second.)
-export const SICK_GAIT = { from: 1.9, to: 2.7, pace: 2.3, give: [0.8, 1.5] };
+export const SICK_GAIT = { from: 1.9, to: 2.7, give: [0.8, 1.5] };
 
 /** how far through it the blow lands */
 export const CLAW_HIT = INFECTED.windup / CLAW;

@@ -66,23 +66,19 @@ export const sickMethods = {
     _right.set(1, 0, 0).applyQuaternion(aimQ);
     const side = s.seed % 2 < 1 ? 1 : -1;
     const slack = 1 - s.roused;
-    // (on motion capture, src/game/infected-moves.ts, the gait is the capture's own, limp and stoop and arms: only the
-    // head and the groping hands are laid over it)
-    const own = this.zombieMoves ? 0 : 1;
-    // At a walk it limps: once a stride the hips roll over the bad leg and the back goes with them.
-    const going = THREE.MathUtils.clamp(this.speed / 0.5, 0, 1) * slack * own;
-    const limp = Math.sin(this.phase * Math.PI * 2) * going;
+    // (the gait is the motion capture's own, its limp, stoop and arms: src/game/infected-moves.ts. Laid over it: the
+    // head hung and rolling, a slight stoop more, and the hands groping once it is roused)
     // Standing it is never still: a slow sway, and every few seconds something goes through it.
     const sway = Math.sin(t * 0.83) * 0.035 + Math.sin(t * 1.9) * 0.02;
     const jerk = Math.pow(Math.max(0, Math.sin(t * 0.61 + s.seed)), 40) * Math.sin(t * 31) * 0.1;
     const pelvis = this.joints.pelvis;
     if (pelvis) {
-      this.lean(pelvis, fwd, side * (0.05 + limp * 0.12));
-      this.lean(pelvis, UP, side * 0.1 * slack + limp * 0.09);
+      this.lean(pelvis, fwd, side * 0.05);
+      this.lean(pelvis, UP, side * 0.1 * slack);
     }
     // (about its right, a turn the positive way tips the body back: forward is the other)
-    for (const b of this.spine) this.lean(b, _right, (-(0.1 + 0.03 * s.roused + 0.03 * going) + sway * 0.4) * (own ? 1 : 0.35));
-    if (this.spine[1]) this.lean(this.spine[1], fwd, side * 0.08 - limp * 0.08 + sway + jerk);
+    for (const b of this.spine) this.lean(b, _right, (-(0.1 + 0.03 * s.roused) + sway * 0.4) * 0.35);
+    if (this.spine[1]) this.lean(this.spine[1], fwd, side * 0.08 + sway + jerk);
     const head = this.neck[this.neck.length - 1];
     if (head) {
       this.lean(head, fwd, side * (0.32 - 0.14 * s.roused) + Math.sin(t * 0.7) * 0.08 + jerk * 2);
@@ -91,9 +87,6 @@ export const sickMethods = {
     // The hands are not fists: the fingers hang half closed, and are hooked when it is after
     // somebody. (Whatever the movement playing has done with them is put aside first.)
     for (const r of [this.armR, this.armL]) r?.fingers.forEach((chain, f) => chain.forEach((b, j) => b.quaternion.copy(r.open[f][j])));
-    // one arm hangs, the other is carried bent and jumps when the rest of it does
-    const carried = side > 0 ? this.armL : this.armR;
-    if (carried && slack > 0.02 && own) this.lean(carried.fore, _right, (0.5 + jerk * 3) * slack);
     // (a blow is the library's drawing of one, laid over the body before this: the arms are left to it while it lasts)
     const strike = 0;
     let given = 0;
