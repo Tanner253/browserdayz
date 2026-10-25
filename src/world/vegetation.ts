@@ -20,6 +20,8 @@ import { Cells, boxInside } from './cells';
 import { BARREL } from '../sim/barrels';
 import { HUNG } from '../sim/crates';
 import { FIRE } from '../sim/fires';
+import { rockOf } from '../sim/gather';
+import { RockRef, TreeRef } from './felling';
 
 interface Level {
   meshes: THREE.InstancedMesh[];
@@ -593,6 +595,7 @@ class Impostors {
     for (const t of trees) {
       const v = this.variants.get(t.kind);
       if (!v) continue;
+      this.cardOf.set(t, this.full.length);
       // (the card stands where the tree it is a picture of is seated)
       this.full.push({ x: t.x, y: footY(t), z: t.z, s: t.scale, v: v.row, r: t.rot });
     }
@@ -653,6 +656,7 @@ class Impostors {
       this.packVar[j] = t.v;
     });
     this.order = new Int32Array(this.all.length + this.cells.w * this.cells.h);
+    this.packedAt = null;
     // (and the buffers written again on the next frame, whatever it draws)
     this.sig = NaN;
   }
@@ -663,6 +667,29 @@ class Impostors {
     this.all = area ? this.full.filter((t) => area(t.x, t.z)) : this.full;
     this.index();
   }
+
+  /** each tree's card, by the tree */
+  private cardOf = new Map<Instance, number>();
+  /**
+   * A felled tree's card is drawn at no size (and at its own again when it stands): only its number is changed in what
+   * is sent to the card, never the squares made again (src/world/felling.ts).
+   */
+  hide(t: Instance, down: boolean) {
+    const k = this.cardOf.get(t);
+    if (k === undefined || !this.cells) return;
+    const card = this.full[k];
+    card.s = down ? 0 : t.scale;
+    // (where each card is in the packed lists, worked out once: a player coming in to a server with hundreds of trees
+    // down would otherwise go through every card for each of them)
+    if (!this.packedAt) {
+      this.packedAt = new Map();
+      for (let j = 0; j < this.all.length; j++) this.packedAt.set(this.all[this.cells.idx[j]], j);
+    }
+    const j = this.packedAt.get(card);
+    if (j !== undefined) this.packPos[j * 4 + 3] = card.s;
+    this.sig = NaN;
+  }
+  private packedAt: Map<object, number> | null = null;
 
   private sig = 0;
   private cells!: Cells;
@@ -932,6 +959,9 @@ export class Vegetation {
     add(this.world.trees);
     add(this.world.rocks);
     add(this.world.props);
+    // (each tree and rock by its number in the world's lists: the server says which was felled or struck by it)
+    const treeNo = new Map(this.world.trees.map((t, i) => [t, i]));
+    const rockNo = new Map(this.world.rocks.map((r, i) => [r, i]));
     /** the ground that is seen: what a thing set down on it is seated in (src/world/seat.ts) */
     const ground = (x: number, z: number) => heightAt(this.world.surface, x, z);
 
@@ -983,14 +1013,17 @@ export class Vegetation {
       if (!isBush) {
         const bm = this.treeMaterials(e, false, 0);
         bakeKinds.push({ name: k, parts: [{ name: 'bark', geometry: lod0.bark, material: bm.bark }, { name: 'leaves', geometry: lod0.leaves, material: bm.leaves }], entry: e });
-        // trunk colliders
-        for (const t of instances) {
+        this.kinds.set(k, { lod0, entry: e, sway, fall: null });
+        // trunk colliders (a blow that lands on one is told which tree it was: felled for its logs, src/sim/gather.ts)
+        instances.forEach((t, n) => {
           // (one young pine is measured across its lowest boughs, not its trunk: without the cap
           // every one of them stood inside an unseen pillar four metres across)
           const r = Math.max(0.12, Math.min(e.trunkRadius, 0.5) * t.scale * 0.9);
           const h = Math.min(8, e.height * t.scale * 0.5);
-          physics.addStatic(physics.R.ColliderDesc.cylinder(h / 2, r), 'wood', { x: t.x, y: footY(t) + h / 2, z: t.z });
-        }
+          const no = treeNo.get(t)!;
+          const col = physics.addStatic(physics.R.ColliderDesc.cylinder(h / 2, r), 'wood', { x: t.x, y: footY(t) + h / 2, z: t.z }, 0, new TreeRef(no));
+          this.treeAt.set(no, { set, n, col });
+        });
       }
       this.sets.push(set);
     }
@@ -1109,7 +1142,9 @@ export class Vegetation {
                 verts[v * 3 + 2] = posAttr.getZ(v) * it.scale;
               }
               const indices = idxAttr ? new Uint32Array(idxAttr.array) : new Uint32Array(posAttr.count).map((_, i) => i);
-              physics.addStaticQuat(physics.R.ColliderDesc.trimesh(verts, indices), 'rock', { x: it.x, y: footY(it), z: it.z }, turnOf(it));
+              // (a boulder a pickaxe breaks stone off is told by its number: src/sim/gather.ts)
+              const no = rockOf(it) ? rockNo.get(it) : undefined;
+              physics.addStaticQuat(physics.R.ColliderDesc.trimesh(verts, indices), 'rock', { x: it.x, y: footY(it), z: it.z }, turnOf(it), no === undefined ? undefined : new RockRef(no));
             }
           } else if (SOLID[id]) {
             const [surface, shrink] = SOLID[id];
@@ -1150,6 +1185,35 @@ export class Vegetation {
 
   private detailK = 1;
   private reachK = 1;
+
+  /** each tree that can be felled: where it is drawn and its trunk's collider, by its number in world.trees */
+  private treeAt = new Map<number, { set: LodSet; n: number; col: RAPIER.Collider }>();
+  /** each kind of tree's full model, for one falling (its materials made the first time one falls, see `falling`) */
+  private kinds = new Map<string, { lod0: { bark: THREE.BufferGeometry; leaves: THREE.BufferGeometry }; entry: TreeEntry; sway: number; fall: { bark: THREE.Material; leaves: THREE.Material } | null }>();
+
+  /** tree `i` taken out of the world (felled) or stood again: its models, its card and its trunk's collider */
+  fell(i: number, down: boolean) {
+    const at = this.treeAt.get(i);
+    if (!at) return;
+    at.set.show(at.n, !down);
+    at.col.setEnabled(!down);
+    this.impostors.hide(this.world.trees[i], down);
+  }
+
+  /**
+   * Tree `i` as it stands, to be drawn falling (src/world/felling.ts): its full model with materials of their own that
+   * never fade with distance, and where it stands (its matrix). Null: not a tree that falls.
+   */
+  falling(i: number): { parts: { geometry: THREE.BufferGeometry; material: THREE.Material }[]; matrix: THREE.Matrix4 } | null {
+    const at = this.treeAt.get(i), t = this.world.trees[i], k = t && this.kinds.get(t.kind);
+    if (!at || !k) return null;
+    if (!k.fall) {
+      const m = this.treeMaterials(k.entry, true, k.sway);
+      for (const lod of [m.barkLod, m.leafLod]) setLodFade(lod, null, null);
+      k.fall = { bark: m.bark, leaves: m.leaves };
+    }
+    return { parts: [{ geometry: k.lod0.bark, material: k.fall.bark }, { geometry: k.lod0.leaves, material: k.fall.leaves }], matrix: new THREE.Matrix4().fromArray(at.set.matrices, at.n * 16) };
+  }
 
   /** Graphics option: how far the full-detail trees and bushes reach (1 = as built). */
   /** only what stands where `area` says is drawn (null: everything): a game played on part of the map, src/game/modes.ts */

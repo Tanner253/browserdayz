@@ -10,7 +10,7 @@ import type { HandGrip } from '../arms';
 import { guardOne, holdLeft, lookOverBody } from '../melee/body';
 import { DRAW, GUARD } from '../melee/cuts';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
-import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, RAISE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
 const _way = new THREE.Vector3();
 
@@ -709,6 +709,22 @@ export const updateMethods = {
     else this.inHand?.spin?.rotation.set(0, 0, 0);
     if (this.inHand && !this.inHand.left && !dead) guardOne(this, this.guardK * (1 - this.deedK));
     if (this.inHand?.left && !dead && !using && !this.deed?.way) holdLeft(this, 1 - this.shoulderT);
+
+    // --- a torch, carried: held up before the chest (RAISE)
+    {
+      const up = !!this.inHand?.raise && !dead && !using && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02;
+      this.raiseT += ((up ? 1 : 0) - this.raiseT) * ease(up ? 6 : 14);
+      if (this.raiseT > 0.02 && this.inHand && this.armR && this.neck.length) {
+        settle(this.root);
+        const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+        const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+        _right.set(1, 0, 0).applyQuaternion(aimQ);
+        const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+        const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r).normalize();
+        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, RAISE.at[0]).addScaledVector(UP, RAISE.at[1]).addScaledVector(_right, RAISE.at[2]);
+        this.reach(this.armR, to, dirOf(...RAISE.fingers), dirOf(...RAISE.palm), this.inHand.curl, aimQ, this.raiseT);
+      }
+    }
 
     // --- the arms at their own business: a guard and a punch, hands at work, the wheel's calls (gestures.ts)
     this.gestures(dt, dead, using, ges, mv, pitch);

@@ -119,6 +119,13 @@ export function keyHints(g: Game): KeyHints | null {
     click(own, 'Block', 'r', P.l2);
     put(own, 'Look it over', [k('KeyI')], ['→']);
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
+  } else if (g.inHand?.id === 'building_plan') {
+    // (the plan's own: laid in one click, or a thing set down in two, turned between them: src/game/building/index.ts)
+    const turning = g.build.turning;
+    click(own, turning ? 'Set it down' : 'Lay', 'l', P.r2);
+    click(own, turning ? 'Back' : 'Pieces (hold)', 'r', P.l2);
+    put(own, 'Turn', [k('KeyR')], [P.sq]);
+    put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
   } else if (g.inHand) {
     // (the mouse for what is held is drawn above, by handActs)
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
@@ -139,7 +146,10 @@ export function keyHints(g: Game): KeyHints | null {
     put(rest, 'Take · revive', [k('KeyF')], null);
     put(rest, 'Drop', [k('KeyG')], null);
     if (g.br.phase === 'wait') put(rest, 'Vote to start', [k('KeyV')], null);
-  } else put(rest, 'Inventory', [k('Tab')], [P.menu]);
+  } else {
+    put(rest, 'Inventory', [k('Tab')], [P.menu]);
+    put(rest, 'Crafting', [k('KeyJ')], null);
+  }
   put(rest, 'Map', [k('KeyM')], ['↑']);
   put(rest, 'Call out (hold)', [k('KeyT')], ['↓ held']);
   if (w.hasLamp || g.inv.count('flashlight') > 0) put(rest, 'Light', [k('KeyL')], w.aiming ? null : [P.r3]);
@@ -149,5 +159,5 @@ export function keyHints(g: Game): KeyHints | null {
     put(rest, 'Noclip', ['N'], null);
     put(rest, 'Free camera', ['K'], null);
   }
-  return done(it ? it.id : g.inHand ? 'hand' : 'fists');
+  return done(it ? it.id : g.inHand ? `hand ${g.inHand.id === 'building_plan' && g.build.turning ? 'turning' : ''}` : 'fists');
 }

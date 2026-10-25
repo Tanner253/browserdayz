@@ -129,6 +129,8 @@ export interface Flown {
   /** where it left from, and how fast */
   from: Vec3;
   speed: number;
+  /** and which way (what flies it along its arc to where it struck: server/solid.ts) */
+  v?: Vec3;
   /** it never left the hand */
   hand: boolean;
   /** fired from a launcher: it goes off where it strikes, whenever that is before `due` */
@@ -160,7 +162,7 @@ export function launch(t: Thrower, w: string, o: Vec3, v: Vec3, feet: Vec3, now:
   if (Math.hypot(o[0] - feet[0], o[2] - feet[2]) > NADE.from || Math.abs(o[1] - feet[1]) > NADE.up || speed > spec.speed * 1.1) return null;
   if (now - (t.lastLaunch ?? -1e12) < 200) return null;
   t.lastLaunch = now;
-  const f: Flown = { w, due: now + spec.flight * 1000, thrownAt: now, from: o, speed, hand: false, impact: true, reached: new Set(), people: 0 };
+  const f: Flown = { w, due: now + spec.flight * 1000, thrownAt: now, from: o, speed, v, hand: false, impact: true, reached: new Set(), people: 0 };
   t.flown.push(f);
   return f;
 }
@@ -200,7 +202,7 @@ export function letGo(t: Thrower, o: Vec3, v: Vec3, feet: Vec3, now: number): { 
   if (hand && now < due - NADE.early) return null;
   const from: Vec3 = hand ? [feet[0], feet[1] + NADE.hand, feet[2]] : o;
   t.held = null;
-  t.flown.push({ w: h.w, due, thrownAt: Math.min(now, due), from, speed: hand ? 0 : speed, hand, reached: new Set(), people: 0 });
+  t.flown.push({ w: h.w, due, thrownAt: Math.min(now, due), from, speed: hand ? 0 : speed, v, hand, reached: new Set(), people: 0 });
   return { w: h.w, o: from, left: Math.max(0, (due - now) / 1000), hand };
 }
 
@@ -238,8 +240,8 @@ export function fallen(t: Thrower, feet: Vec3, now: number): { w: string; from: 
   return { w: h.w, from: [feet[0], feet[1] + NADE.hand, feet[2]], lies: [feet[0], feet[1] + NADE.lies, feet[2]], left: Math.max(0, (due - now) / 1000) };
 }
 
-/** What a grenade that goes off where it lies does to a body whose chest is at `chest`, before anything worn: by how far that is from it, as any blast is reckoned. */
-export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROWN[w] ? hitDamage(w, 'torso', Math.hypot(chest[0] - lies[0], chest[1] - lies[1], chest[2] - lies[2])) : 0);
+/** What a grenade that goes off where it lies (or a charge stuck to a wall, src/sim/build/raid.ts) does to a body whose chest is at `chest`, before anything worn: by how far that is from it, as any blast is reckoned. */
+export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROWN[w] || WEAPON_RULES[w]?.blast ? hitDamage(w, 'torso', Math.hypot(chest[0] - lies[0], chest[1] - lies[1], chest[2] - lies[2])) : 0);
 
 /**
  * A game says a blast of its player's reached somebody or something. Is it believed, and from how far?
@@ -251,15 +253,17 @@ export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROW
  *
  * ON TRUST, still: that the thrower had a grenade at all (what is in a pocket is its own game's to say, and the
  * trader sells these); where inside the reach of its flight the grenade went off, and so how hard it struck
- * anybody inside that reach; that no wall stood between; and what a thrown one did to its own thrower.
+ * anybody inside that reach; that no wall of the world stood between (a base's is asked: `walled`); and what a
+ * thrown one did to its own thrower.
  *
  * @param key which body or car, in a word of its own ('p' + a player's number, 'i' + an infected's, 'v' + a car's)
  * @param at where that is (of a body: its chest)
  * @param said how far from the blast its game says that was, metres
  * @param within how far the blast reaches such a thing, metres (as far as its rule says, if not given)
+ * @param walled whether a base stands between where a grenade can have gone off and that body (server/solid.ts)
  * @returns the distance to reckon what it did by; null if it is not believed
  */
-export function judge(t: Thrower, w: string, key: string, at: Vec3, said: number, now: number, within?: number): number | null {
+export function judge(t: Thrower, w: string, key: string, at: Vec3, said: number, now: number, within?: number, walled?: (f: Flown) => boolean): number | null {
   const rule = WEAPON_RULES[w];
   if ((!THROWN[w] && !LAUNCHED[w]) || !rule?.blast || !Number.isFinite(said)) return null;
   // (what went off long enough ago is forgotten)
@@ -272,6 +276,8 @@ export function judge(t: Thrower, w: string, key: string, at: Vec3, said: number
     const flown = (Math.max(0, (f.impact ? Math.min(now, f.due) : f.due) - f.thrownAt) + NADE.lag) / 1000;
     const least = Math.max(0, Math.hypot(at[0] - f.from[0], at[1] - f.from[1], at[2] - f.from[2]) - travel(f.speed, flown));
     if (least > (within ?? rule.blast) + NADE.slack) continue;
+    // (nor through a base's wall, floor or shut door from where it can have gone off)
+    if (walled?.(f)) continue;
     if (!best || least < best.least) best = { f, least };
   }
   if (!best) return null;

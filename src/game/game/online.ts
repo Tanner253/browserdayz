@@ -8,7 +8,7 @@ import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { shown } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
-import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
+import { ITEMS, GEAR_SLOTS, holds, type ItemInstance } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
@@ -29,6 +29,8 @@ import { cashedTags, setPinned } from '../../ui/rewards';
 import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
 import { diffOps, laidIn, type Laid } from '../../sim/box-ops';
+import { bodyFor, voiceFor } from '../../sim/survivor';
+import { wornKey, sortWorn } from '../survivors';
 
 /** how near a crate is asked what is in it, and how often again while near (peekNear) */
 const PEEK_AT = 3.5, PEEK_AGAIN = 8000;
@@ -61,6 +63,8 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (what the old trader's book held, paid out in scrap once: src/game/camp.ts)
+    this.camp.payBook();
     // (a new connection knows nothing of how far this game draws animals: told again, by the next frame)
     this.animalsAsked = 0;
     // (whether this player's name and wallet are fixed is the server's to say: server/pinned.ts)
@@ -107,6 +111,11 @@ export const onlineMethods = {
     this.fires.clear();
     for (const [i, x, y, z] of w.built ?? []) this.fires.add(i, x, y, z, (gx, gz) => heightAt(this.s.world.heights, gx, gz));
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
+    // the trees that are down (src/game/gathering.ts); the bases are told as they come into sight (src/game/building)
+    this.gather.welcome(w.felled);
+    this.build.reset();
+    this.forges.reset();
+    this.recyclers.reset();
     // the lockers somebody is searching at the moment: their doors stand open
     this.lockers.clear();
     for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
@@ -122,6 +131,8 @@ export const onlineMethods = {
     this.wild.leaveAlone();
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
+    // (the bases about them, solid under them before the first frame and before anything is laid on them)
+    for (const b of w.bases ?? []) this.build.onBase({ t: 'base', b });
     if (w.me) {
       for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
       this.takeVitals(w.me.vitals);
@@ -175,6 +186,10 @@ export const onlineMethods = {
     }
     this.stashComing.clear();
     for (const st of [...this.loot.stashes]) this.loot.removeStash(st);
+    this.gather.welcome([]);
+    this.build.reset();
+    this.forges.reset();
+    this.recyclers.reset();
     this.riders.clear();
     this.airdrops.clear();
     this.markDrops();
@@ -322,12 +337,47 @@ export const onlineMethods = {
     net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('fire+', (m) => this.fires.add(m.i, m.x, m.y, m.z, (x, z) => heightAt(this.s.world.heights, x, z)));
     net.on('fire-', (m) => this.fires.remove(m.i));
+    net.on('fell', (m) => this.gather.onFell(m));
+    net.on('grow', (m) => this.gather.onGrow(m));
+    net.on('work', (m) => this.gather.onWork(m));
+    net.on('wear', (m) => this.gather.onWear(m));
+    net.on('saw', (m) => this.gather.onSaw(m));
+    net.on('craft', (m) => this.craft.onCraft(m));
+    net.on('cq', (m) => this.craft.onQueue(m));
+    net.on('known', (m) => this.craft.onKnown(m));
+    net.on('trade', (m) => this.camp.onTrade(m));
+    net.on('tday', (m) => this.camp.onDay(m));
+    net.on('recy', (m) => this.recyclers.onRun(m));
+    net.on('learn', (m) => this.craft.onLearn(m));
+    net.on('forge', (m) => this.forges.onForge(m));
+    net.on('salvage', (m) => this.salvage.onSalvage(m));
+    net.on('base', (m) => this.build.onBase(m));
+    net.on('bgone', (m) => this.build.onGone(m));
+    net.on('bpc', (m) => this.build.onPiece(m));
+    net.on('bout', (m) => this.build.onOut(m));
+    net.on('spent', (m) => this.build.onSpent(m));
+    net.on('bup', (m) => this.build.onUp(m));
+    net.on('bclaim', (m) => this.build.onClaim(m));
+    net.on('bkeep', (m) => this.build.onKeep(m));
+    net.on('bhp', (m) => this.build.onHp(m));
+    net.on('bcharge', (m) => this.build.raid.onCharge(m));
+    net.on('bboom', (m) => this.build.raid.onBoom(m));
+    net.on('bfizz', (m) => this.build.raid.onFizz(m));
+    net.on('bdoor', (m) => this.build.doors.onDoor(m));
+    net.on('beds', (m) => this.build.beds.onBeds(m));
+    net.on('knock', (m) => this.build.doors.onKnock(m));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => {
       this.gearOf.set(m.id, m.g);
       if (this.remotes.get(m.id)) void this.wear(this.remotes.get(m.id)!.avatar, m.g);
     });
     net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
+    net.on('who', (m) => {
+      const r = this.remotes.get(m.id);
+      if (!r) return;
+      r.avatar.wardrobe.setBody(m.bd);
+      r.voice = m.vo;
+    });
     net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
     net.on('hitok', (m) => {
@@ -496,7 +546,9 @@ export const onlineMethods = {
     });
     net.on('spawn', (m) => {
       const p = this.player;
-      p.spawn(m.x, heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      // (at a bed, on it: its height is the server's word)
+      p.spawn(m.x, m.y ?? heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      this.build.stood(p.pos);
       this.freshKit();
       this.deathSent = false;
       this.deathInfo = '';
@@ -622,6 +674,7 @@ export const onlineMethods = {
       const pitch = p.pitch;
       // (the arena faces a body set down for a round toward the other end; anybody else keeps their own way)
       p.spawn(m.x, y + 0.1, m.z, m.yaw ?? p.yaw);
+      this.build.stood(p.pos);
       p.pitch = m.yaw === undefined ? pitch : 0;
       p.landSoft();
       this.buriedT = 0;
@@ -815,6 +868,12 @@ export const onlineMethods = {
     if (p.id === this.net.id || this.remotes.has(p.id)) return;
     const r = new RemotePlayer(p.id, p.name, this.makeHeld);
     this.remotes.set(p.id, r);
+    // (who they are and what they wear, as they were when they came: what is said of either while their body is being
+    // made is put on when it is, and not undone by this; a game from before there were survivors to pick is given the
+    // one its name gives)
+    this.gearOf.set(p.id, p.g ?? []);
+    r.avatar.wardrobe.setBody(p.bd ?? bodyFor(p.name));
+    r.voice = p.vo ?? voiceFor(p.bd ?? bodyFor(p.name));
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
@@ -822,8 +881,7 @@ export const onlineMethods = {
     r.tagged = !!p.tag;
     r.wearTag();
     r.setWeapon(p.w, p.m, p.f);
-    void this.wear(r.avatar, p.g ?? []);
-    this.gearOf.set(p.id, p.g ?? []);
+    void this.wear(r.avatar, this.gearOf.get(p.id) ?? []);
     r.setGhost(!!p.hidden);
     r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);
@@ -842,7 +900,10 @@ export const onlineMethods = {
   /** hat, vest and pack as they sit on a body */
   async wear(this: Game, body: Avatar, ids: string[]) {
     const out: { id: string; obj: THREE.Object3D }[] = [];
-    for (const id of ids) {
+    // (the clothes as they are worn, and the rest hung on the body)
+    const { worn, gear } = sortWorn(ids);
+    body.wardrobe.setWorn(worn);
+    for (const id of gear) {
       if (!GEAR_SHOWN.has(id)) continue;
       const model = (await this.loot.models.get(id)).group.clone();
       out.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
@@ -860,11 +921,14 @@ export const onlineMethods = {
     this.net.send({ t: 'back', b });
   },
 
+  /** what this player wears that a body shows: the clothes by their colours (src/game/survivors.ts), and the hats, vests and packs (GEAR) */
+  wornKeys(this: Game): string[] {
+    return GEAR_SLOTS.map((s) => this.inv.slots[s]).filter((x): x is ItemInstance => !!x && (GEAR_SHOWN.has(x.id) || !!ITEMS[x.id]?.dress)).map(wornKey);
+  },
+
   /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
   syncGear(this: Game) {
-    // (every place a thing is worn in, and of what is worn there whatever has a model for the body: head, face, vest
-    // and back today, as it was when those four were named here; a thing made for any other place is sent the day it is)
-    const ids = GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x));
+    const ids = this.wornKeys();
     const key = ids.join(',');
     if (key === this.gearKey) return;
     this.gearKey = key;
@@ -952,8 +1016,12 @@ export const onlineMethods = {
       from = under.point.y - 0.02;
       under = physics.raycast({ x: c.x, y: from, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
     }
+    // (and on a base's floor where its colliders are not made, far off: src/sim/build/solid.ts)
+    const floor = this.build.solids.top(c.x, c.y + 0.5, c.z);
+    if (floor > -Infinity && (!under || floor > under.point.y + 0.02)) under = null;
     const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
     if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
+    else if (!under && floor > -Infinity) c = { ...c, y: floor };
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);
     stash.corpse = true;
     // (dog tags lie on a body, and are taken off it: see Container.refusal)
@@ -965,7 +1033,7 @@ export const onlineMethods = {
     this.corpses.set(c.uid, { stash, body });
     if (wait) await new Promise((r) => setTimeout(r, wait));
     if (!this.corpses.has(c.uid)) return;
-    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope);
+    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope, c.bd ?? bodyFor(c.name));
     // and what has run out of it by then
     this.effects.pool(c.x - Math.sin(c.rot) * ahead * 0.75 - Math.cos(c.rot) * left, c.y, c.z - Math.cos(c.rot) * ahead * 0.75 + Math.sin(c.rot) * left);
   },
@@ -982,6 +1050,6 @@ export const onlineMethods = {
 
   /** any server-held container by id: map crate, stash or body */
   findBox(this: Game, cid: string): Stash | undefined {
-    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash;
+    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash ?? this.build.claims.byCid(cid) ?? this.build.boxes.byCid(cid);
   },
 };

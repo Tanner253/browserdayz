@@ -1,5 +1,5 @@
 // The animals' models (2026-10-23), brought in whole: skin, skeleton and the movements the game plays, which the props'
-// way (scripts/props.mjs) throws away. `node scripts/animals.mjs <id> [<id> ...] [--force]`, then `npx tsx scripts/lean.mjs`.
+// way (scripts/props.mjs) throws away. `node scripts/animals.mjs <id> [<id> ...] [--force]`, then `node scripts/lean.mjs`.
 //
 // Each comes out standing on y = 0 about its own middle, nose toward -z (as a person faces), so many metres from nose
 // to tail, its pictures at no more than 2048 a side (the owner: "2048 should be our max for new models"). Of the

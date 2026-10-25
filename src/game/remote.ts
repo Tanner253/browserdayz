@@ -20,6 +20,7 @@ import type { Jeep } from './vehicle';
 import { Timeline, between, caughtUp } from '../net/timeline';
 import { cutFor } from './melee/cuts';
 import { HEAVY } from '../sim/combat';
+import { torchHead } from './in-fist';
 
 
 interface Snap {
@@ -97,6 +98,8 @@ export const SEARCHED = { hands: 1.4, heard: 18 };
 
 export class RemotePlayer implements Damageable {
   alive = true;
+  /** the voice they call out in (src/sim/survivor.ts VOICES) */
+  voice = 0;
   pos = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
@@ -269,8 +272,12 @@ export class RemotePlayer implements Damageable {
     this.weapon = id;
     this.mods = mods;
     const h = this.makeHeld(id, mods, finish);
+    // (a thing whose model is not here yet, a torch's as the game starts: asked again with the next word of them)
+    if (id && !h && id === 'torch') this.heldKey = '';
     const put = () => {
-      if (this.heldKey === key) this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+      if (this.heldKey !== key) return;
+      this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+      this.heldObj = h?.obj ?? null;
     };
     if (h?.obj) void RemotePlayer.readyHeld(h.obj).then(put, put);
     else put();
@@ -398,13 +405,22 @@ export class RemotePlayer implements Damageable {
    * they carry, from the chest, the way they are looking.
    */
   lamp(pos: THREE.Vector3, dir: THREE.Vector3): { power: number; wide: number } | null {
-    if (!this.lit || !this.ready || !this.alive) return null;
+    // (a torch in the hands is its own light, at its head: `torchTip`)
+    if (!this.lit || !this.ready || !this.alive || this.weapon === 'torch') return null;
     const gun = this.mods.includes('gun_light') ? this.avatar.muzzle(pos, dir) : null;
     if (gun) return { power: 1.5, wide: 0.85 };
     const cp = Math.cos(this.pitch);
     dir.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
     pos.set(this.pos.x + dir.x * 0.25, this.pos.y + (this.crouched ? 0.85 : 1.32), this.pos.z + dir.z * 0.25);
     return { power: 1, wide: 1.3 };
+  }
+
+  /** what is in their hands as they are drawn (a torch's head is found on it) */
+  private heldObj: THREE.Object3D | null = null;
+  /** the head of the torch they have lit in their hands, as they are seen now (null: none lit) */
+  torchTip(out: THREE.Vector3): THREE.Vector3 | null {
+    if (!this.lit || !this.ready || !this.alive || this.weapon !== 'torch' || !this.heldObj) return null;
+    return torchHead(this.heldObj, out);
   }
 
   /** the end of the barrel they are holding, and which way it points, as they are seen now (null if they are not, or hold no gun) */
@@ -455,7 +471,7 @@ export class RemotePlayer implements Damageable {
     if (e.move) this.avatar.emote(e.move, e.dur);
     const head = this.head(new THREE.Vector3());
     const d = head.distanceTo(listener);
-    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, voiceOf(this.name));
+    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, this.voice, voiceOf(this.name));
   }
 
   /** your shot or blow landed on them: the server decides what it did, this is the flinch and the grunt */
@@ -684,8 +700,10 @@ export class CorpseBody {
   private gone = false;
   /** @param name whose body it is: it is dressed the way they were */
   /** @param slope which way is up out of what it lies on (on a hillside it lies along the hill, not level in the air over it) */
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3) {
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3, bd: number | null = null) {
+    this.avatar.wardrobe.setBody(bd);
     await this.avatar.load(atmo, 0, false, lookFor(name));
+    await this.avatar.wardrobe.ready();
     if (this.gone) return void this.avatar.dispose();
     scene.add(this.avatar.root);
     this.avatar.layDown(variant);

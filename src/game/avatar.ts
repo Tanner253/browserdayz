@@ -21,6 +21,7 @@ import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
+import { Wardrobe } from './survivors';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -129,12 +130,26 @@ export const SHOULDER = {
   palm: [0, 0.14, -1] as [number, number, number],
 };
 
+/**
+ * A torch, carried: the fist before the chest and out to the right, the forearm up, the torch standing in it and leaning a
+ * little out, so its flame is at the shoulder's height and clear of the body (the navigator, of one held at the hip: "he
+ * looks like his jacket is on fire ... Hold it as DayZ and Rust do"). From the head, as SHOULDER: forward, up, right.
+ */
+export const RAISE = {
+  at: [0.4, -0.44, 0.32] as [number, number, number],
+  fingers: [0.92, -0.18, -0.34] as [number, number, number],
+  palm: [0.1, 0.12, -1] as [number, number, number],
+};
+
 export interface ArmRig {
   arm: THREE.Bone;
   fore: THREE.Bone;
   hand: THREE.Bone;
   la: number;
   lb: number;
+  /** the reach as the skeleton was made, before a body's own lengths (see Avatar.proportion) */
+  la0?: number;
+  lb0?: number;
   fingersLocal: THREE.Vector3;
   palmLocal: THREE.Vector3;
   fingers: THREE.Bone[][];
@@ -445,9 +460,11 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; /** what the left hand closes on, for a thing held in both (in its own space) */ left: HandGrip | null; /** carried slung on the back, and drawn from there */ long: boolean; /** what of it is spun round a ring when it is looked over (a karambit's) */ spin: THREE.Object3D | null } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; /** what the left hand closes on, for a thing held in both (in its own space) */ left: HandGrip | null; /** carried slung on the back, and drawn from there */ long: boolean; /** what of it is spun round a ring when it is looked over (a karambit's) */ spin: THREE.Object3D | null; /** carried held up before the chest (a torch: RAISE) */ raise: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
+  /** how far a torch is held up (0 at the side, 1 up: RAISE) */
+  raiseT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are
@@ -522,6 +539,10 @@ export class Avatar {
 
   /** the dog tag at the breastbone: steel, gold on a VIP, or none (see WornTag) */
   tag: WornTag | null = null;
+  /** which survivor this is, and what they wear over their skin (src/game/survivors.ts) */
+  readonly wardrobe = new Wardrobe();
+  /** how much taller than the skeleton as made this survivor stands (see Avatar.proportion) */
+  stature = 1;
 
   /** the atmosphere an infected's shared paints were made with, for its own when it is first hit */
   paintAtmo: Atmosphere | null = null;
@@ -592,6 +613,7 @@ export interface Avatar {
   veil: Methods<typeof makeMethods>['veil'];
   setLook: Methods<typeof makeMethods>['setLook'];
   makeArm: Methods<typeof makeMethods>['makeArm'];
+  proportion: Methods<typeof dressMethods>['proportion'];
   setSlung: Methods<typeof dressMethods>['setSlung'];
   setGear: Methods<typeof dressMethods>['setGear'];
   wearTag: Methods<typeof dressMethods>['wearTag'];

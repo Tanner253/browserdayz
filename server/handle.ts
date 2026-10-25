@@ -3,6 +3,8 @@
 
 import { holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/sim/items';
+import { LOOT_BAG } from '../src/sim/items/build';
+import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { ANIMALS } from '../src/sim/animals';
@@ -48,6 +50,19 @@ import { espAnswer, espRows } from './esp';
 import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
 import { animalHit, animalSkin, animalsHear, herd } from './animals';
+import { chop, keepWear, mine, saw } from './gather';
+import { craft, enqueue, unqueue } from './craft';
+import { salvage } from './salvage';
+import { learn } from './learn';
+import { recycle } from './recycle';
+import { book, campKill, safe, trade } from './camp';
+import { hammer, lay, mend, owing, print, sightFor, takeDown } from './build';
+import { blow, plant, relight } from './raid';
+import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
+import { knock, swing } from './doors';
+import { tellBeds, wakeAt } from './beds';
+import { code as lockCode, cutKey, fit as fitLock, lockLets, onOff as lockOnOff, unfit as unfitLock } from './locks';
+import { join as joinClaim } from './claims';
 import { POISON } from '../src/sim/sickness';
 
 export function handle(c: Client, m: C2S) {
@@ -90,6 +105,8 @@ export function handle(c: Client, m: C2S) {
       c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
+      // (nor through a base's wall, floor or shut door: server/solid.ts)
+      if (c.pose === m.p && stepWalled(c, was, m.p)) c.pose = [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       // (where they look, kept a moment for the aim's own checks: see aimwatch.ts)
       looked(c, m.p[3], m.p[4]);
       // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
@@ -218,8 +235,23 @@ export function handle(c: Client, m: C2S) {
     case 'gear': {
       // only things that are worn, and only as many as there are places to wear them (there were six places, and
       // the list was cut to six: there are eleven now, and whatever is drawn of any of them has room in it)
-      c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, GEAR_SLOTS.length);
+      // (a piece of clothing comes as id~colour, its colour one of those it has)
+      c.g = (Array.isArray(m.g) ? m.g : []).filter((x): x is string => {
+        if (typeof x !== 'string') return false;
+        const [id, k, more] = x.split('~'), def = ITEMS[id];
+        if (!def?.wear || more !== undefined) return false;
+        return k === undefined || (/^[1-9]d?$/.test(k) && +k < (def.colours?.length ?? 0));
+      }).slice(0, GEAR_SLOTS.length);
       broadcast({ t: 'gear', id: c.id, g: c.g }, c);
+      return;
+    }
+    case 'who': {
+      // another body or voice picked: anything but one there is, and nothing is changed
+      const bd = pickOf(m.bd, BODY_NAMES.length), vo = pickOf(m.vo, VOICES.length);
+      if (bd === null || vo === null || (bd === c.bd && vo === c.vo)) return;
+      c.bd = bd;
+      c.vo = vo;
+      broadcast({ t: 'who', id: c.id, bd, vo }, c);
       return;
     }
     case 'back': {
@@ -241,6 +273,8 @@ export function handle(c: Client, m: C2S) {
       if (buried(c, now)) return;
       const d = Math.hypot(c.pose[0] - target.pose[0], c.pose[1] - target.pose[1], c.pose[2] - target.pose[2]);
       if (d > rule.range + 4) return;
+      // (nobody is hurt by anybody at the trader camp: src/sim/camp.ts, Rust's outpost)
+      if (safe(c.pose[0], c.pose[2]) || safe(target.pose[0], target.pose[2])) return;
       let amount: number;
       /** where it came from, for the one who is hit: the shooter, or whatever went off */
       let from: [number, number] = [c.pose[0], c.pose[2]];
@@ -254,6 +288,8 @@ export function handle(c: Client, m: C2S) {
           if (now - q.at < 4000 && bd < reach && (!best || bd < best.d)) best = { q, d: bd };
         }
         if (!best || ++best.q.hits > 12 || !num(m.dist)) return;
+        const drum = world.barrels[best.q.i];
+        if (blastWalled([drum.x, drum.y + BARREL.centre - 0.3, drum.z], [target.pose[0], target.pose[1] + 1.1, target.pose[2]])) return;
         // the game says how far off they were; it is not believed by more than a couple of metres
         amount = hitDamage(m.w, 'torso', Math.max(0, m.dist, best.d - 2));
         m.zone = 'torso';
@@ -262,7 +298,8 @@ export function handle(c: Client, m: C2S) {
         // A grenade of theirs, gone off when the server's own count of its fuse says, no further from where it left
         // the hand than it can have flown, and reaching this body for the first time: see `judge`. The game says how
         // far off they were; it is believed no nearer than the grenade can have got.
-        const far = num(m.dist) ? judge(c.nades, m.w, `p${target.id}`, [target.pose[0], target.pose[1] + 1.1, target.pose[2]], m.dist, now) : null;
+        const chest: [number, number, number] = [target.pose[0], target.pose[1] + 1.1, target.pose[2]];
+        const far = num(m.dist) ? judge(c.nades, m.w, `p${target.id}`, chest, m.dist, now, undefined, blastFrom(chest)) : null;
         if (far === null) return;
         amount = hitDamage(m.w, 'torso', far);
         m.zone = 'torso';
@@ -284,6 +321,8 @@ export function handle(c: Client, m: C2S) {
         // (a round does not go through a hill)
         const hill = rule.melee || CHECKS === 'off' ? 0 : hillBetween(c.pose, target.pose);
         if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
+        // (nor through a base's wall, floor or shut door, nor struck through one: server/solid.ts)
+        if (walled(c.pose, zoneAt(target.pose, m.zone))) return void log(`${c.name} hit ${target.name} through a base: not let through`);
         c.lastHit = now;
         // (what the round left in the bodies it went through first: see PIERCE)
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p) * heavyOf(c, m.hv, rule, now);
@@ -318,7 +357,8 @@ export function handle(c: Client, m: C2S) {
         // something of theirs went off: a drum set off in the last few seconds, or a grenade, held to what any
         // blast of a grenade is held to (when, where, and each of them once: `judge`)
         if (!num(m.dist)) return;
-        const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `i${m.i}`, [b.s[0], b.s[1] + 1.2, b.s[2]], m.dist, now);
+        const chest: [number, number, number] = [b.s[0], b.s[1] + 1.2, b.s[2]];
+        const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `i${m.i}`, chest, m.dist, now, undefined, blastFrom(chest));
         if (far === null) return;
         amount = hitDamage(m.w, 'torso', far);
         m.zone = 'torso';
@@ -331,6 +371,7 @@ export function handle(c: Client, m: C2S) {
       } else {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (!mayHit(c, `i${m.i}`, now, rule.interval * 700)) return;
+        if (walled(c.pose, zoneAt([b.s[0], b.s[1], b.s[2], 0, 0, 0], m.zone))) return;
         c.lastHit = now;
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1) * piercedBy(m.w, m.p) * heavyOf(c, m.hv, rule, now);
       }
@@ -340,6 +381,8 @@ export function handle(c: Client, m: C2S) {
       const dir: [number, number] = [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len];
       // (what it had on it is in its body)
       const body = r.dead ? infectedBody(b, dir) : undefined;
+      // (and counted toward the trader's work of the day: server/camp.ts)
+      if (r.dead) campKill(c, m.zone === 'head');
       broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir, melee: !!rule.melee && !rule.blast, ...(body ? { body } : {}) });
       return;
     }
@@ -347,6 +390,62 @@ export function handle(c: Client, m: C2S) {
       return animalHit(c, m);
     case 'askin':
       return animalSkin(c, m);
+    case 'chop':
+      return chop(c, m);
+    case 'mine':
+      return mine(c, m);
+    case 'saw':
+      return saw(c, m);
+    case 'craft':
+      return craft(c, m);
+    case 'cq':
+      return enqueue(c, m);
+    case 'cqx':
+      return unqueue(c, m);
+    case 'salvage':
+      return salvage(c, m);
+    case 'learn':
+      return learn(c, m);
+    case 'recy':
+      return recycle(c, m);
+    case 'trade':
+      return trade(c, m);
+    case 'book':
+      return book(c, m);
+    case 'blay':
+      return lay(c, m);
+    case 'bup':
+      return hammer(c, m);
+    case 'bdel':
+      return takeDown(c, m);
+    case 'bfix':
+      return mend(c, m);
+    case 'bprint':
+      return print(c, m);
+    case 'bhit':
+      return blow(c, m);
+    case 'bplant':
+      return plant(c, m);
+    case 'blight':
+      return relight(c, m);
+    case 'bjoin':
+      return joinClaim(c, m);
+    case 'mybeds':
+      return tellBeds(c);
+    case 'bdoor':
+      return swing(c, m);
+    case 'bknock':
+      return knock(c, m);
+    case 'block':
+      return fitLock(c, m);
+    case 'bcode':
+      return lockCode(c, m);
+    case 'blockon':
+      return lockOnOff(c, m);
+    case 'bkey':
+      return cutKey(c, m);
+    case 'bunlock':
+      return unfitLock(c, m);
     case 'iatk': {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
@@ -398,6 +497,8 @@ export function handle(c: Client, m: C2S) {
       // first request wins; the economy's despawn event tells everyone it is gone
       // (and nobody reaches the ground from a jeep's seat)
       const lying = economy.loot.get(m.uid);
+      // (a broken box's bag is gone through where it lies, never carried off: see LOOT_BAG)
+      if (lying?.item.id === LOOT_BAG.id) return void send(c, { t: 'denied', uid: m.uid });
       const far = lying && CHECKS !== 'off' ? Math.hypot(lying.x - c.pose[0], lying.z - c.pose[2]) : 0;
       if (lying && far > CHECK.reach && flag(c, `took ${ITEMS[lying.item.id]?.name ?? lying.item.id} from ${Math.round(far)} m away`)) {
         send(c, { t: 'denied', uid: m.uid });
@@ -471,6 +572,8 @@ export function handle(c: Client, m: C2S) {
       // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat; nor a body still in the air in one)
       if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
+      // (a base's box or claim with a lock on it opens only for whoever the lock lets in: server/locks.ts)
+      if (!lockLets(c, m.cid)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is locked' });
       // (open by as many as like at once: searched.ts. Another crate they had open is shut first.)
       if (c.openCid && c.openCid !== m.cid) shutIt(c, c.openCid);
       if (!hasOpen(c, m.cid)) openIt(c, m.cid);
@@ -556,6 +659,9 @@ export function handle(c: Client, m: C2S) {
       if (c.inv?.slots?.neck && tagTime(c) < TAG_FRESH_MS) c.inv.slots.neck = null;
       // (nobody without the power puts a thing in a hold: see `carryOrder`)
       if (c.inv && !c.power.bottomless) holdOnlyEmpties(c.inv, had);
+      // (no tool newer than the server has worn it: server/gather.ts; and nothing the server took to build with still in them: server/build.ts)
+      keepWear(c.inv, had);
+      owing(c, m.sp);
       pockets(c);
       // (somebody with a keycard: remembered a moment, for when they put it in the bunker's reader)
       if (carries(c.inv, 'keycard')) cardSeen.set(c.id, Date.now());
@@ -605,18 +711,23 @@ export function handle(c: Client, m: C2S) {
         log(`${c.name} asks to come back while alive here and dead by their own game: taken as a death`);
         kill(c, 'injuries');
       }
-      const sp = pickSpawn({ x: c.pose[0], z: c.pose[2] });
+      // (at a bed of their own, if they asked and may: server/beds.ts; else at the map's edge as ever)
+      const bed = m.bed ? wakeAt(c, m.bed) : null;
+      if (m.bed && !bed) return;
+      const sp = bed ?? pickSpawn({ x: c.pose[0], z: c.pose[2] });
       c.alive = true;
       c.lifeAt = Date.now();
       c.zonaMs = 0;
       c.inv = null;
       c.vitals = null;
-      c.pose = [sp.x, world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
+      c.pose = [sp.x, bed ? bed.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
       c.check.free = Date.now() + CHECK.free;
       c.check.hp = 100;
       c.check.hpAt = Date.now();
       c.check.downAt = 0;
-      send(c, { t: 'spawn', ...sp });
+      // (the bases about a bed told before they are stood on it)
+      sightFor(c);
+      send(c, { t: 'spawn', x: sp.x, z: sp.z, yaw: sp.yaw, ...(bed ? { y: bed.y } : {}) });
       broadcast({ t: 'alive', id: c.id }, c);
       return;
     }

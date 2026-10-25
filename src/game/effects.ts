@@ -539,6 +539,28 @@ export class Effects {
     if (decal && surface !== 'foliage' && surface !== 'glass') this.decal(point, n, HOLE_OF[surface] ?? 'masonry', attachTo);
   }
 
+  /**
+   * A blow of a tool or a fist on the world (2026-10-24, the navigator of a bullet's cloud thrown up by a hatchet, bigger
+   * than the trunk: "a small burst of wood chips and a little pale dust at the cut, about the size of the axe head,
+   * gone in under a second ... grey chips and dust" for stone). A few chips flung a hand's breadth, and a breath of
+   * dust; a spark or two off metal. No mark is left.
+   */
+  knock(surface: Surface | string, point: THREE.Vector3, normal: THREE.Vector3) {
+    const n = normal.clone().normalize(), rand = () => new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+    const wood = surface === 'wood' || surface === 'foliage', stone = surface === 'rock' || surface === 'concrete';
+    const chip = wood ? [0xd4b483, 0x7a5a3a] : stone ? [0x8c8a84, 0x5f5d58] : [SURF_DUST[surface as Surface] ?? 0x777060, 0x5a5448];
+    const dust = new THREE.Color(wood ? 0xd8caa8 : stone ? 0xb4b2ac : (SURF_DUST[surface as Surface] ?? 0x8a8478));
+    for (let i = 0; i < (wood || stone ? 7 : 4); i++) {
+      this.spawn({ p: point.clone().addScaledVector(n, 0.02), v: n.clone().multiplyScalar(0.8 + Math.random() * 1.2).add(rand().multiplyScalar(1.6)), max: 0.3 + Math.random() * 0.3, size: 0.012 + Math.random() * 0.01, grow: 0, color: new THREE.Color(chip[i % 2]), alpha: 1, gravity: 9.8, drag: 1.2 });
+    }
+    for (let i = 0; i < 2; i++) {
+      this.spawn({ p: point.clone().addScaledVector(n, 0.04), v: n.clone().multiplyScalar(0.25).add(rand().multiplyScalar(0.3)), max: 0.5 + Math.random() * 0.3, size: 0.05, grow: 0.22, color: dust.clone(), alpha: 0.3, gravity: -0.05, drag: 3 });
+    }
+    if (surface === 'metal') {
+      for (let i = 0; i < 4; i++) this.spawn({ p: point, v: n.clone().multiplyScalar(1.5).add(rand().multiplyScalar(4)), max: 0.12 + Math.random() * 0.12, size: 0.012, color: new THREE.Color(3.5, 2.0, 0.7), alpha: 1, gravity: 9.8, drag: 0.2, additive: true });
+    }
+  }
+
   /** A foot coming down in water `depth` deep, the water's surface at `at`: drops thrown up and a ring of spray. */
   splash(at: THREE.Vector3, depth: number) {
     const k = Math.min(1, 0.4 + depth), rand = () => (Math.random() - 0.5) * 2;

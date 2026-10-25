@@ -170,6 +170,132 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood head up, 95 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
 - "Pitchfork" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood head up, 130 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
+- This work is based on "Isopropyl Rubbing Alcohol Bottle Game Ready" (https://sketchfab.com/3d-models/isopropyl-rubbing-alcohol-bottle-game-ready-a323700f7c93400aba8000f2f2a7e8e0) by KQ92 (https://sketchfab.com/KQ92) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
+- This work is based on "Blacksmith Ingots (game ready asset)" (https://sketchfab.com/3d-models/blacksmith-ingots-game-ready-asset-6ea0ab1141de40d68db5bcdccdb91d68) by Pixel Life (https://sketchfab.com/pixellife) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only its three iron bars are used here, scaled to 26 cm across and stood on the ground about their own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Primitive stone axe" (https://sketchfab.com/3d-models/primitive-stone-axe-ce612acd03664358a5841316e35e0db7) by Yahor Yurkavets (https://sketchfab.com/Got2b) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 46 cm and stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
+- This work is based on "Bone Knife 1" (https://sketchfab.com/3d-models/bone-knife-1-b50e0642376a48389c94b128e797f892) by Sir Erdees (https://sketchfab.com/sirerdees) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 26 cm and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Scrap Metal" (https://sketchfab.com/3d-models/scrap-metal-1e57de80d46442a38c8c5b2fb06888f4) by Rurre (https://sketchfab.com/rurre) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 40 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- "Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.
+- "Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.
+- "Charcoal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, at the size it was made, its colour darkened; textures re-encoded as WebP at 1024; geometry compressed.
+- "Gunpowder tin" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on its base on the ground, about its own middle, at the size it was made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Forge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, at the size it was made, simplified to about 10,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- "Sledgehammer" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood straight up its handle, at its true length of 0.9 m, about its own middle; textures at 1024; geometry compressed.
+- "Coiled rope" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 30 cm across; textures at 1024; geometry compressed.
+- "Rags" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 20 cm long; textures at 1024; geometry compressed.
+- "ZIL truck wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 6.6 m long as made, simplified to about 20,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- "Tractor wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 4.2 m long as made, simplified to about 18,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- This work is based on "Pirozhok Scan Retopo (Free Scan)" (https://sketchfab.com/3d-models/pirozhok-scan-retopo-free-scan-07bc48134b364d4f8a43d288b3a0282d) by Renafox (https://sketchfab.com/kryik1023), itself from Mikhail Volkov's scan "Abandoned Soviet Car — IZH-2715" (https://sketchfab.com/3d-models/abandoned-soviet-car-izh-2715-b97884f0730d42a68c1a6a9a9874159d), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to its 4 m and stood on the ground about its own middle; its lamps left unlit (the glow taken off); textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- "Birch log" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Stones" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Box of nails" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Sheet metal" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Felling axe" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Claw hammer" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Pickaxe" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Torch" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Code lock" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Sleeping bag" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Panel saw" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Key lock" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Key" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Building plan" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Planks" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal fragments" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 22 cm across as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal pipe" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 35 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Spring" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 12 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Rifle body" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 45 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Research table" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 1.2 m long as made; textures re-encoded as WebP at 2048; geometry compressed.
+- "Recycler" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 2 m wide as made; textures re-encoded as WebP at 2048; geometry compressed.
+- "Market stall" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 2.6 m deep as made; textures re-encoded as WebP at 2048; geometry compressed.
+- This work is based on "Simple Old C4" (https://sketchfab.com/3d-models/simple-old-c4-43d3b6a933b04aea8006d790627f9555) by Blender3D (https://sketchfab.com/Blender3D) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood on the ground about its own middle and made 20 cm tall; textures re-encoded as WebP at 1024; geometry compressed.
+- "Hardware tin" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Made its real size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Steel plate" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Made its real size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Wooden door leaf" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal door leaf" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Hatch lid" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Garage door" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Small box" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Large box" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Workbench" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Bed" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Wall torch" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Ladder" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Palisade log" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Wooden gate" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Steel gate leaf" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Sleeping bag" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- This work is based on "Pirate Flag animated" (https://sketchfab.com/3d-models/pirate-flag-animated-e6b2c8a5be864ad6afba3bdfdde1aff2) by SusanKing (https://sketchfab.com/krolzuzannapl) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/); its post and strongbox made for ZONA with Higgsfield (text-to-3D) on the owner’s account
+  Changes made: The post and strongbox made for ZONA in Higgsfield, the flag set on the post; kept at its size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Wooden door leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal door leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Hatch lid" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Garage door" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Small box" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Ladder" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Steel gate leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -260,6 +386,8 @@ The doors, a heavy blow and steel struck are out of the same two. A fist landing
 [Punch](https://opengameart.org/content/punch) by qubodup (CC0), and the infected are the Zombies Sound Pack by
 artisticdude (CC0). The police car's siren is [Police Siren](https://freesound.org/s/746302/) by TitanKaempfer (CC0).
 The animals' sounds are recordings cut by the same `npm run sounds` (the two credited above aside): a bear, [R19-13-Bear Roaring](https://freesound.org/s/479825/) by craigsmith; hooves, [Horse Running](https://freesound.org/s/792860/) by ebenvie; wolves, [Wolf howl](https://freesound.org/s/398430/) by NaturesTemper and [Howling wolves](https://freesound.org/s/378334/) by Kingcornz, and a snarl out of [Dog Growling Snarling Grumbling](https://freesound.org/s/122183/) by qubodup; a cow, [Cow moos](https://freesound.org/s/177253/) by JosephSardin; and a sick player throwing up, [Vomit, puking spilling water onto grass](https://freesound.org/s/338116/) by SpliceSound (all CC0).
+A raid's sounds are cut the same way, all CC0: a C4's timer, twoTone1 out of [Digital Audio](https://kenney.nl/assets/digital-audio) by Kenney; a satchel's fuse, [Fuse burning](https://freesound.org/s/45650/) by elonen; a wooden piece splintering, [R29-30-Breaking Wooden Poles](https://freesound.org/s/481936/) by craigsmith; a stone one crumbling, [Stone crumble 2](https://freesound.org/s/521956/) by kastenfrosch; a steel one coming down, [Big falling debris crash](https://freesound.org/s/703247/) by xkeril; and a sledgehammer on a wall, [sledgehammer hitting drywall stonewall](https://freesound.org/s/827432/) by jerryberumen.
+Building's own sounds are cut the same way, all CC0: a nail driven, out of [100 CC0 metal and wood SFX](https://opengameart.org/content/100-cc0-metal-and-wood-sfx) by rubberduck; a key lock's click, a latch, a box's lid, a ladder's creaks and a sleeping bag's rustle out of [RPG Audio](https://kenney.nl/assets/rpg-audio), a keypad's key and a code taken and refused out of [Interface Sounds](https://kenney.nl/assets/interface-sounds), and a wrong code's shock out of [Digital Audio](https://kenney.nl/assets/digital-audio), by Kenney; a knock, [knocking on wood door](https://freesound.org/s/629987/) by flem0527; a garage door, [roller shutter](https://freesound.org/s/335364/) by nicola_ariutti; a hand saw at a log, [Hand Saw Sawing Wood](https://freesound.org/s/383725/) by deleted_user_7146007.
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).
@@ -403,6 +531,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
 | texture | [Leaves Forest Ground](https://polyhaven.com/a/leaves_forest_ground) | Dario Barresi, Dimitrios Savva |
 | texture | [Medieval Blocks 06](https://polyhaven.com/a/medieval_blocks_06) | Rob Tuytel |
+| texture | [Metal Plate 02](https://polyhaven.com/a/metal_plate_02) | Rob Tuytel |
 | texture | [Mossy Rock](https://polyhaven.com/a/mossy_rock) | Rob Tuytel |
 | texture | [Mud Cracked Dry Riverbed 002](https://polyhaven.com/a/mud_cracked_dry_riverbed_002) | Dario Barresi, Dimitrios Savva |
 | texture | [Mud Forest](https://polyhaven.com/a/mud_forest) | eye-candy.xyz |

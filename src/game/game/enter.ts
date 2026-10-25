@@ -218,6 +218,7 @@ export const enterMethods = {
         return;
       } else if (remoteServer()) this.hud.note('The server could not be reached: you are playing OFFLINE, alone. Reload the page to try again.', 'warn');
       await this.enterOffline();
+      this.camp.payBook();
     }
     this.joining = false;
     this.started = true;
@@ -388,7 +389,7 @@ export const enterMethods = {
 
   /** A new life: bare hands, one thing to eat and one thing to drink. Everything else is out there. */
   freshKit(this: Game) {
-    // (`clear` leaves them in a new Field Jacket and Field Trousers, which are things now and have the pockets: 2026-10-13)
+    // (`clear` leaves them in the basics, CLOTHES, which have the pockets)
     this.inv.clear();
     const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
     this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
@@ -430,8 +431,10 @@ export const enterMethods = {
       const me = publicId();
       inv.sortTags((tag) => tag.pid === me);
       const neck = inv.neck, pouch = inv.tags.items.map((q) => q.item);
-      // (a kit replaces everything: the jacket and the trousers that were on go too, with what was in them, and `clear` leaves new ones on)
+      // (a kit replaces everything: the clothes that were on go too, with what was in them; `clear` leaves the basics on,
+      // and those the kit has its own of come off)
       inv.clear();
+      inv.makeWay(m.items);
       inv.neck = neck;
       for (const tag of pouch) inv.tags.add(tag);
       this.ready = null;
@@ -695,7 +698,7 @@ export const enterMethods = {
     // says it is cashed ('cashed', tagCashed) or sends its own clock back ('tagclock', tagClock). Taken out at once, a tag
     // the server turned down was lost from the pockets for good.
     if (this.online) {
-      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
+      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals }, sp: this.build.sp });
       const wallet = walletAddress();
       for (const it of done) {
         this.cashing.set(it.uid, performance.now());

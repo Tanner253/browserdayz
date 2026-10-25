@@ -286,11 +286,12 @@ export const makeMethods = {
       for (const [old, mine] of Object.entries(MOCAP)) (this.dur as Record<string, number>)[old] = MOVES[mine].dur;
     }
 
+    let fpModel: THREE.Group | null = null;
     if (firstPersonBody) {
       // A second copy of the rig that mirrors the animated one bone for bone, with the head
       // and arms shrunk to nothing: looking down shows your own chest, legs and feet walking.
       await breathe();
-      const fp = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+      const fp = (fpModel = SkeletonUtils.clone(gltf.scene) as THREE.Group);
       const shown = new Map<string, THREE.Object3D>();
       model.traverse((o) => {
         if ((o as THREE.Bone).isBone) shown.set(o.name, o);
@@ -314,6 +315,23 @@ export const makeMethods = {
       fpRig.scale.setScalar(BODY_SCALE);
       fpRig.add(fp);
       this.fpRoot.add(fpRig);
+    }
+    // which survivor this is, and what they wear over their skin (src/game/survivors.ts): put on these bones by name
+    if (file === 'survivor' && this.skin && this.uniforms) {
+      const named = (r: THREE.Object3D | null) => {
+        if (!r) return null;
+        const m = new Map<string, THREE.Bone>();
+        r.traverse((o) => void ((o as THREE.Bone).isBone && m.set(o.name, o as THREE.Bone)));
+        return m;
+      };
+      const of = (r: THREE.Object3D | null, names: string[]) => (r ? names.map((n) => r.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o) : []);
+      const SUIT = ['body', 'head', 'pads'];
+      this.wardrobe.attach({
+        bones: named(model)!, fpBones: named(fpModel), suit: of(model, SUIT), fpSuit: of(fpModel, ['body']),
+        into: this.skin.parent ?? model, fpInto: fpModel?.getObjectByName('body')?.parent ?? null,
+        atmo, uniforms: this.uniforms, ref: this.skin, layers: () => this.layerMask, fpLayer: FP_BODY_LAYER, inSight, dressed: (parts) => Avatar.onDressed(parts),
+        lengths: (l, scale) => this.proportion(l, scale),
+      });
     }
     restBones(this.root);
     restBones(this.fpRoot);

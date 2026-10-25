@@ -1,8 +1,8 @@
 // A copy of every model file for a computer, its pictures already at the size a computer cuts them to as it loads
 // (DESK_CAP in src/core/assets.ts: 512 a side for colour, 256 for the rest, since 2026-10-25); and for a phone, of the
 // things it draws far, at PHONE_FAR. Most of each file was pictures that were downloaded at up to 2048 and thrown away
-// on arrival; the owner, on shrinking the files to match: "we should do this". What a computer draws at 1024 (bodies,
-// clothes, what is held: src/core/near-models.ts) it loads whole, and has no computer's copy.
+// on arrival; the owner, on shrinking the files to match: "we should do this". (What a computer draws a size up when
+// close, it fetches as the file itself: see `sharpen` there.)
 //
 // The pixels are the game's own: each picture is unpacked and cut by Chrome with the very calls the game makes
 // (`shrink` in assets.ts), read back off a WebGL texture, stored lossless (webp, colour under clear pixels kept), and
@@ -12,8 +12,7 @@
 // Each copy is named by the version of the file it was made from (the sha1 the build puts in assets/versions.json),
 // so a model that is changed and not run through this again is loaded whole, never with an old copy.
 //
-//   npx tsx scripts/lean.mjs [--force]      after a model is brought in or changed (packs.mjs, tier-now.mjs, lods.mjs)
-// (tsx, as it reads which files are drawn near out of the items themselves)
+//   node scripts/lean.mjs [--force]      after a model is brought in or changed (packs.mjs, tier-now.mjs, lods.mjs)
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -21,7 +20,6 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import WebSocket from 'ws';
-import { drawnNear, nearModels } from '../src/core/near-models.ts';
 
 /** DESK_CAP and PHONE_FAR in src/core/assets.ts, which looks for the copies under these names: out of step, the game loads the files whole */
 const DESK = { colour: 512, other: 256 };
@@ -30,7 +28,6 @@ const ROOT = path.resolve('public/assets');
 const dirOf = (cap) => path.join(ROOT, 'lean', `${cap.colour}-${cap.other}`);
 const OUTS = [dirOf(DESK), dirOf(FAR)];
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
-const near = nearModels(manifest.models);
 /** what a phone draws far (`far` in assets.ts): the manifest's models and their lighter copies */
 const phoneFar = new Set(Object.values(manifest.models).flatMap((e) => [e.url, ...e.lods.map((l) => l.url)]));
 const force = process.argv.includes('--force');
@@ -244,7 +241,8 @@ try {
     const bytes = fs.readFileSync(file);
     const name = `${rel.slice(0, -4)}.${version(bytes)}.glb`;
     const url = `assets/${rel}`;
-    for (const cap of [...(drawnNear(url, near) ? [] : [DESK]), ...(phoneFar.has(url) ? [FAR] : [])]) {
+    // (every file at DESK; and at FAR as well what a phone draws far)
+    for (const cap of phoneFar.has(url) ? [DESK, FAR] : [DESK]) {
       const dest = path.join(dirOf(cap), name);
       const { json, bin } = readGlb(bytes);
       const caps = cuts(json, cap);

@@ -59,15 +59,15 @@ export const handsMethods = {
       _m2.makeBasis(Lf, Lp, new THREE.Vector3().crossVectors(Lf, Lp));
       const fist = new THREE.Group();
       fist.quaternion.setFromRotationMatrix(_m2.multiply(_m1.transpose()));
-      // the hand is a bone of a scaled body: the weapon keeps its own size
-      const k = 1 / BODY_SCALE;
+      // the hand is a bone of a scaled body: the weapon keeps its own size (whatever size the survivor is drawn: stature)
+      const k = 1 / (BODY_SCALE * this.stature);
       fist.scale.setScalar(k);
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
       // (carried on the back, not in a pocket: as long as a slung thing is, and drawn from there)
       const long = new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length() > 0.5;
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long, spin: obj.getObjectByName('spin') ?? null };
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long, spin: obj.getObjectByName('spin') ?? null, raise: !!g.raise };
       if (long && this.placed && this.root.visible) this.carry('draw');
       Avatar.onDressed([obj]);
       return;

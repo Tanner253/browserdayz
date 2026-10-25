@@ -8,6 +8,7 @@ import { physics, USE_GROUPS, SIGHT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { Door } from '../../world/buildings';
 import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf, ZONA_VOID } from '../../sim/items';
+import { LOOT_BAG } from '../../sim/items/build';
 import { inPlay } from '../../world/worldgen';
 import { CRATE_RESTOCK } from '../../sim/crates';
 import { POLICE_CAR } from '../../sim/vehicles';
@@ -18,7 +19,7 @@ import { Jeep } from '../vehicle';
 import type { HotbarEntry } from '../../ui/hud';
 import { WELL } from '../../sim/wells';
 import { waterName } from '../../sim/water';
-import { jobsFor, progress as jobDone } from '../../sim/jobs';
+import { STALLS } from '../../sim/camp';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 import { finishDay, finishOn, type Finish } from '../finish';
 import { formOf, lookOf, type ItemId } from '../../../api/_lib/shop-items';
@@ -42,12 +43,23 @@ export const interactMethods = {
     // (src/game/br/mode.ts); of the game's own, only doors and cars)
     if (this.br?.busy) return;
     // at a shop's counter, looking at the man behind it
-    if (!this.br && this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
-      const book = this.jobBook();
-      const owed = jobsFor(book.day).some((j) => !book.done.includes(j.id) && jobDone(j, book, (id) => this.countOf(id)) >= j.n);
-      this.prompt = `<kbd>F</kbd>Trade${owed ? ' <small>· he owes you for a job</small>' : ''}`;
-      if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.openShop();
+    const stall = !this.br && this.started && !this.garage.ride ? this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion)) : null;
+    if (stall) {
+      const owed = stall === 'building' && this.camp.owed();
+      this.prompt = `<kbd>F</kbd>Trade · ${STALLS[stall].name.toLowerCase()}${owed ? ' <small>· he owes you for a job</small>' : ''}`;
+      if (this.input.pressed('KeyF') && !this.hud.chatOpen) {
+        this.camp.stall = stall;
+        this.openShop();
+      }
       return;
+    }
+    // at a recycler, looking at it (src/game/craft-recyclers.ts)
+    if (!this.br && this.started && !this.garage.ride) {
+      const recy = this.recyclers.prompt(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion), !this.hud.chatOpen);
+      if (recy) {
+        this.prompt = recy;
+        return;
+      }
     }
     // at the way down to the second level: it is not to be opened yet, and says so
     {
@@ -91,7 +103,16 @@ export const interactMethods = {
       const wet = well ? null : this.waterHere();
       if (wet) c.set(wet.under ? this.player.pos.x + dir.x * 1.2 : wet.x, wet.surface, wet.under ? this.player.pos.z + dir.z * 1.2 : wet.z);
       else if (well) c.set(well.x, well.y + 0.8, well.z);
-      if ((well || wet) && c.sub(cam.position).normalize().dot(dir) > 0.55) {
+      // (water only when it is looked down into, the aim meeting its surface within reach: wading through the swamp
+      // looking ahead it said drink the whole way, the owner, 2026-10-25: "i should not see 'hold f to drink' unless im
+      // looking down into the water")
+      let into = false;
+      if (wet && dir.y < -0.3) {
+        const t = (wet.surface - cam.position.y) / dir.y, hx = cam.position.x + dir.x * t, hz = cam.position.z + dir.z * t;
+        const w = this.player.water(hx, hz);
+        into = t > 0 && Math.hypot(hx - this.player.pos.x, hz - this.player.pos.z) < 2.4 && !!w && Math.abs(w.surface - wet.surface) < 0.3;
+      }
+      if ((well && c.sub(cam.position).normalize().dot(dir) > 0.55) || into) {
         const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
         const dry = this.player.vitals.water < 99;
         const held = this.inHand && ITEMS[this.inHand.id].use?.sips ? this.inHand : null;
@@ -154,8 +175,16 @@ export const interactMethods = {
       const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : 'no mag') : capacityOf(item)}</small>` : d.mag ? ` <small>${item.rounds ?? 0}/${d.mag.capacity}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
       // (a case, a suitcase or a bag, and a shovel in the hands: the left button, held, buries it where it lies)
       const spade = d.category === 'stash' && this.weapons.equippedItem?.id === 'shovel';
-      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : ''}`;
+      // (a log, and a saw in the hands: the left button saws it into planks where it lies, src/game/gathering.ts)
+      const saw = item.id === 'log' && this.gather.canSaw();
+      // (a broken box's bag is gone through where it lies, never taken: see LOOT_BAG)
+      if (item.id === LOOT_BAG.id) {
+        this.prompt = `<kbd>Tab</kbd>Go through the ${d.name}${qty}`;
+        return;
+      }
+      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : saw ? ' <small>the left button saws it into planks</small>' : ''}`;
       if (spade && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
+      if (saw && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.gather.saw(owner.loot);
       // four corners round it, so there is no doubt which thing that is
       const at = new THREE.Vector3(owner.loot.x, owner.loot.y + 0.05, owner.loot.z).project(cam);
       if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];

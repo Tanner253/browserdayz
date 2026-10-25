@@ -17,7 +17,7 @@ import WebSocket from 'ws';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (ASSETS_SRC: the sources elsewhere, as for a worktree, which has no assets-src of its own)
-const SOURCES = process.env.ASSETS_SRC ?? SOURCES;
+const SOURCES = process.env.ASSETS_SRC ?? path.join(ROOT, 'assets-src');
 const SRC = path.join(SOURCES, 'sounds', 'kenney-impact', 'Audio'), OUT = path.join(SOURCES, 'sounds', 'decoded');
 const args = process.argv.slice(2);
 const pack = args[0] === '--dir' ? args[1] : null;

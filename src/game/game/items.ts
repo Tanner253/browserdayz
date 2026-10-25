@@ -7,7 +7,8 @@ import { physics, SIGHT_GROUPS, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import type { Barrel } from '../../world/vegetation';
-import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag } from '../../sim/items';
+import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag, itemName } from '../../sim/items';
+import { BLADES, bandagesFrom, cuttable } from '../../sim/condition';
 import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
@@ -28,6 +29,7 @@ import { heightAt } from '../../world/worldgen';
 import { COOKS, COOK_KINDS, FUEL, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
 import { POISON, fallsIll } from '../../sim/sickness';
 import { WHEEL_REACH, type TimedAction, type Game } from '../game';
+import { chosen } from '../survivors';
 
 export const itemsMethods = {
   // ------------------------------------------------------------ item actions
@@ -461,7 +463,7 @@ export const itemsMethods = {
       this.avatar.emote(e.move, e.dur);
       this.armsUntil = now + (e.dur ?? 1.5) * 1000;
     }
-    audio.shout(id, undefined, 0, voiceOf(playerName()));
+    audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
     this.hud.note('“' + e.say + '”');
     this.net.send({ t: 'emote', e: id });
   },
@@ -587,7 +589,7 @@ export const itemsMethods = {
    * @param skip what went up, if it is still standing in the way of its own blast
    * @param inHand a grenade of this player's own that was never thrown: it went off in the hand that held it
    */
-  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' = 'grenade', skip?: Barrel['collider'], inHand = false) {
+  explode(this: Game, at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' | 'ammo_40mm' | 'c4' | 'satchel' = 'grenade', skip?: Barrel['collider'], inHand = false) {
     // (a jeep goes up as a drum of fuel does; online the server says who it reached)
     const jeep = what === 'jeep';
     const drum = what === 'barrel' || jeep;
@@ -596,7 +598,8 @@ export const itemsMethods = {
     const spec = { damage: rule.damage, radius: rule.blast! };
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
-    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' ? 'frag' : 'grenade');
+    // (a C4 goes up as a frag does, a satchel charge as a stick grenade: src/sim/build/raid.ts)
+    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : what === 'frag' || what === 'c4' ? 'frag' : 'grenade');
     audio.explosion(at, far, drum);
     if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
     /** how much of the blast reaches a point: nothing through a wall, less with every metre */
@@ -698,6 +701,24 @@ export const itemsMethods = {
       this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
       this.inventoryChanged();
     }, 'unbox');
+  },
+
+  /** A piece of clothing cut into bandages with a blade carried, as DayZ cuts clothes into rags (src/sim/condition.ts). */
+  cutUp(this: Game, it: ItemInstance) {
+    if (!cuttable(it) || !this.canCut()) return;
+    const n = bandagesFrom(it), name = itemName(it);
+    this.inv.remove(it);
+    const left = this.inv.add(makeItem('bandage', n));
+    if (left) this.dropItem(left);
+    audio.click(900, 0.35, 0.06);
+    audio.click(700, 0.35, 0.06, 0.1);
+    this.hud.note(`The ${name} is cut into ${n} bandage${n === 1 ? '' : 's'}`, 'good');
+    this.inventoryChanged();
+  },
+
+  /** whether a blade is carried to cut clothes up with */
+  canCut(this: Game) {
+    return !!this.inv.find((x) => BLADES.includes(x.id));
   },
 
   /**
