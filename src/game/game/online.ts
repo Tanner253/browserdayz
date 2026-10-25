@@ -16,6 +16,7 @@ import { playerName, remoteServer, serverSays } from '../../net/client';
 import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
 import { bloodOf, bleedOf } from '../../sim/blood';
 import { type Avatar, GEAR_SHOWN, facepiece, DEATH_REST } from '../avatar';
+import { MOCAP_REST } from '../avatar/deeds';
 import { lookFor } from '../look';
 import { RemotePlayer, CorpseBody } from '../remote';
 import { Stash } from '../loot';
@@ -48,8 +49,8 @@ function searched(g: Game, at: THREE.Vector3): 'hard' | 'soft' | null {
  * The box to search on a body is where the body lies: behind where they stood if they went over backwards, ahead if
  * they went down on their face, beside it if they folded up. @returns how far ahead and to the left that is
  */
-export function searchedAt(stash: Stash, v: number): [number, number] {
-  const [ahead, left] = DEATH_REST[v] ?? DEATH_REST[0];
+export function searchedAt(stash: Stash, v: number, rest: [number, number][] = DEATH_REST): [number, number] {
+  const [ahead, left] = rest[v] ?? rest[0];
   if (v === 2) stash.trigger(0.6, 0.25, 0.6, -ahead, left);
   else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
   return [ahead, left];
@@ -845,7 +846,8 @@ export const onlineMethods = {
 
   /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
   act(this: Game, a: Act, d = 1) {
-    if (a === 'stop') this.avatar.act(null);
+    if (a === 'take') this.avatar.pickUp(d);
+    else if (a === 'stop') this.avatar.act(null);
     else this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, d);
     this.net.send({ t: 'act', a, d });
   },
@@ -976,7 +978,8 @@ export const onlineMethods = {
     // (dog tags lie on a body, and are taken off it: see Container.refusal)
     stash.container.tagsHere = true;
     const v = c.v ?? 0;
-    const [ahead, left] = searchedAt(stash, v);
+    // (a survivor falls on the motion capture, and lies where that leaves them)
+    const [ahead, left] = searchedAt(stash, v, MOCAP_REST);
     const body = new CorpseBody();
     this.corpses.set(c.uid, { stash, body });
     if (wait) await new Promise((r) => setTimeout(r, wait));

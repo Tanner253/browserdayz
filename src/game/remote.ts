@@ -425,6 +425,7 @@ export class RemotePlayer implements Damageable {
   act(a: Act, dur: number, listener: THREE.Vector3, searched: 'hard' | 'soft' | null = null) {
     if (!this.ready || !this.alive) return;
     if (a === 'stop') return this.avatar.act(null);
+    if (a === 'take') return this.avatar.pickUp(dur);
     // (rounds going into a magazine and a box being torn open are hands at work in front of the body, as opening anything is)
     this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, dur);
     if (searched) {

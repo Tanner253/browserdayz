@@ -398,7 +398,7 @@ export const itemsMethods = {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     // where the hand is: a little ahead of the eye, to the right and below it
     const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
-    this.emptyOfGrenade();
+    this.emptyOfGrenade(left > 0);
     if (left <= 0) {
       // Held to the end of its fuse: it goes off in the hand. (Said to the server as a grenade that has left the
       // hand and is not moving: it has counted the fuse itself, and knows what that means.)
@@ -428,8 +428,10 @@ export const itemsMethods = {
   },
 
   /** the grenade is out of the hands, thrown or gone off or gone with them: they are empty */
-  emptyOfGrenade(this: Game) {
+  /** @param thrown it left the hand thrown: the hand goes on through the throw (see Weapons.throwOut), and only then do the hands take up what is in them */
+  emptyOfGrenade(this: Game, thrown = false) {
     this.cook = null;
+    if (thrown && this.weapons.throwOut(this.inHand ? () => this.rest() : undefined)) return;
     if (this.inHand) this.rest();
     else this.weapons.endUse();
   },
