@@ -1,0 +1,185 @@
+// What the body is told to do: blows, flinches, deaths, gestures, emotes and the wheel's calls, lying, sitting, leaning; and a clip laid over the rest.
+// (Methods of Avatar cut out of avatar.ts whole on 2026-10-24, so that they can be read and worked on alone: put back on
+// Avatar.prototype as the file loads. Nothing in them was changed but `this: Avatar` said as the first parameter.)
+
+import * as THREE from 'three';
+import { POSE, DEATHS, type Gesture, type Move, type Hold, type SeatPose, type Clip, CLIPS } from './pose';
+import { CUT, _a, _q1, _q2, _q3, emoteClips, type Avatar } from '../avatar';
+
+export const actsMethods = {
+  /**
+   * A blow. With something in the right hand it is swung, overhand; with nothing a punch is
+   * thrown from a guard, left and right in turn.
+   * @param overhand swing the empty arm all the same (a throw)
+   */
+  swing(this: Avatar, overhand = false, seconds = 0.62) {
+    if (this.inHand && !overhand) {
+      // something in the fist to strike with: the blow the library draws
+      this.strikeT = 0;
+      this.strikeDur = seconds;
+      return;
+    }
+    if (overhand || this.held) {
+      this.swingT = 0;
+      return;
+    }
+    this.punchSide = -this.punchSide;
+    this.punchT = 0;
+    this.fistsHold = POSE.punch[1];
+  },
+
+  /** A shot or a blow landed: the body jolts (the head snaps back if that is where it landed). */
+  hit(this: Avatar, head = false) {
+    this.hitT = 0;
+    this.hitClip = head ? 'hitHead' : 'hit';
+  },
+
+  /** The infected strike: both arms brought down on whoever is in front of them. */
+  claw(this: Avatar) {
+    if (this.sick) this.sick.claw = 0;
+  },
+
+  /** Which way it goes down the next time it dies: an index into DEATHS. */
+  setDeath(this: Avatar, variant: number) {
+    this.deathClip = DEATHS[((variant % DEATHS.length) + DEATHS.length) % DEATHS.length];
+  },
+
+  /** A body that was already lying there when we arrived: no fall to watch. */
+  layDown(this: Avatar, variant = 0) {
+    this.setDeath(variant);
+    this.downT = 1e3;
+  },
+
+  /** The hands start on something: working the bolt, a reload, eating, dressing a wound. null stops it. */
+  act(this: Avatar, kind: Gesture | null, dur = 1) {
+    // (broken off, the hands are not put back where they were in one frame: see `stop`)
+    if (kind) this.gesture = { kind, t: 0, dur };
+    else if (this.gesture && this.gesture.stop === undefined) this.gesture.stop = this.gesture.t + CUT;
+  },
+
+  /** A call from the wheel: what the arms do with it (a wave, a point). null drops them. */
+  emote(this: Avatar, kind: Move | null, dur = 1.5) {
+    if (kind) this.move = { kind, t: 0, dur };
+    else if (this.move && this.move.stop === undefined) this.move.stop = this.move.t + CUT;
+  },
+
+  /** Dancing, standing with the hands up, or neither. */
+  /**
+   * One of the emote pack's movements, danced (with setHold('dance')) in place of the body's own dance; null: the
+   * body's own. Played once (`once`) it stops on its last moment and says so (emoteOver).
+   */
+  setClip(this: Avatar, id: string | null, once = false) {
+    if ((this.emo?.id ?? null) === id) return;
+    this.emo?.act?.setEffectiveWeight(0);
+    this.emoteOver = false;
+    this.emo = id ? { id, act: this.emoActs.get(id) ?? null, t: 0, once } : null;
+  },
+
+  /** the movement wanted, made an action of this body's own once the pack has come */
+  loadEmote(this: Avatar, id: string) {
+    this.emoLoading = true;
+    void emoteClips()
+      .then((lib) => {
+        const clip = lib.get(id);
+        if (!clip || !this.mixer) return;
+        const a = this.mixer.clipAction(clip);
+        // (scrubbed by hand, as every clip is: see update())
+        a.timeScale = 0;
+        a.setEffectiveWeight(0);
+        a.play();
+        this.emoActs.set(id, a);
+        if (this.emo?.id === id) this.emo.act = a;
+      })
+      .catch(() => {})
+      .finally(() => (this.emoLoading = false));
+  },
+
+  setHold(this: Avatar, hold: Hold | null) {
+    this.hold = hold;
+  },
+
+  /**
+   * Where the body is, in the world, as it stands this frame: the middle of the head, the
+   * base of the neck and the hips. Whatever is to be hit is hung on these, so that a shot at
+   * the head that is seen is a shot at the head that counts, whatever the body is doing.
+   * @returns false until the body has been loaded
+   */
+  frame(this: Avatar, head: THREE.Vector3, neck: THREE.Vector3, pelvis: THREE.Vector3): boolean {
+    const j = this.joints;
+    if (!j.head || !j.neck || !j.pelvis) return false;
+    j.head.updateWorldMatrix(true, false);
+    // (the middle of the head as this body draws it; where that is not known, the joint is at the base of the skull
+    // and the middle of the head is a hand's breadth up it)
+    if (this.headMid) head.copy(this.headMid).applyMatrix4(j.head.matrixWorld);
+    else head.setFromMatrixPosition(j.head.matrixWorld).addScaledVector(_a.setFromMatrixColumn(j.head.matrixWorld, 1).normalize(), 0.097);
+    neck.setFromMatrixPosition(j.neck.matrixWorld);
+    pelvis.setFromMatrixPosition(j.pelvis.matrixWorld);
+    return true;
+  },
+
+  /** Lying down, or up again. */
+  setProne(this: Avatar, on: boolean) {
+    this.prone = on;
+  },
+
+  /** Sitting in a jeep's seat (whoever seats it puts it there and turns it with the jeep: see Garage.seatBody). */
+  setSeat(this: Avatar, on: boolean, how: SeatPose | null = null) {
+    this.seated = on;
+    if (on) this.seatHow = how;
+  },
+
+  /** Leaning out to one side: -1 all the way left, 1 all the way right, 0 upright. */
+  setLean(this: Avatar, lean: number) {
+    this.leanT = THREE.MathUtils.clamp(lean, -1, 1);
+  },
+
+  /**
+   * One clip at one moment, laid over the body as the others have left it: the chest, the
+   * arms and the head take it (see LAID), and the legs go on with what they were doing.
+   * @param legs 0..1: how far the hips and legs are given over to it as well (the whole body lunges)
+   */
+  layer(this: Avatar, clip: Clip, time: number, weight: number, legs = 0) {
+    if (weight <= 0.001) return;
+    for (const n of CLIPS) this.actions[n].setEffectiveWeight(n === clip ? 1 : 0);
+    this.actions[clip].time = THREE.MathUtils.clamp(time, 0, this.dur[clip] - 1e-3);
+    this.mixer.update(0);
+    // The clip turns its hips as it pleases (a blow is thrown side-on). When the hips are not
+    // given over to it, the lowest bone that is has to end up facing the way the CLIP has it
+    // face, not that way again from wherever these hips are: so that one is set by where it
+    // points from the root, and the ones above it follow from there as the clip has them.
+    let seam = legs < 0.999;
+    for (const [from, to, share, low] of this.laid) {
+      const k = weight * (low ? legs : Math.max(share, legs));
+      if (k <= 0.001) continue;
+      if (seam && !low) {
+        seam = false;
+        this.driverRoot.updateWorldMatrix(true, true);
+        this.modelRoot.updateWorldMatrix(true, false);
+        to.parent!.updateWorldMatrix(true, false);
+        const want = this.driverRoot.getWorldQuaternion(_q1).invert().multiply(from.getWorldQuaternion(_q2));
+        const have = this.modelRoot.getWorldQuaternion(_q3).invert().multiply(to.parent!.getWorldQuaternion(_q2));
+        to.quaternion.slerp(have.invert().multiply(want), k);
+        continue;
+      }
+      to.quaternion.slerp(from.quaternion, k);
+      if (low === 2) to.position.lerp(from.position, k);
+    }
+  },
+
+  /** Development: stand in one clip at one moment, nothing blended. */
+  debugPose(this: Avatar, clip: Clip, time: number) {
+    for (const n of CLIPS) {
+      this.actions[n].setEffectiveWeight(n === clip ? 1 : 0);
+      if (n === clip) this.actions[n].time = Math.min(this.dur[n] - 1e-3, time);
+    }
+    this.mixer.update(0);
+    for (const [from, to] of this.drive) {
+      to.position.copy(from.position);
+      to.quaternion.copy(from.quaternion);
+    }
+  },
+
+  clipLength(this: Avatar, clip: Clip) {
+    return this.dur[clip];
+  },
+};
