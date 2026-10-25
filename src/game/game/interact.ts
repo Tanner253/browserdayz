@@ -103,7 +103,16 @@ export const interactMethods = {
       const wet = well ? null : this.waterHere();
       if (wet) c.set(wet.under ? this.player.pos.x + dir.x * 1.2 : wet.x, wet.surface, wet.under ? this.player.pos.z + dir.z * 1.2 : wet.z);
       else if (well) c.set(well.x, well.y + 0.8, well.z);
-      if ((well || wet) && c.sub(cam.position).normalize().dot(dir) > 0.55) {
+      // (water only when it is looked down into, the aim meeting its surface within reach: wading through the swamp
+      // looking ahead it said drink the whole way, the owner, 2026-10-25: "i should not see 'hold f to drink' unless im
+      // looking down into the water")
+      let into = false;
+      if (wet && dir.y < -0.3) {
+        const t = (wet.surface - cam.position.y) / dir.y, hx = cam.position.x + dir.x * t, hz = cam.position.z + dir.z * t;
+        const w = this.player.water(hx, hz);
+        into = t > 0 && Math.hypot(hx - this.player.pos.x, hz - this.player.pos.z) < 2.4 && !!w && Math.abs(w.surface - wet.surface) < 0.3;
+      }
+      if ((well && c.sub(cam.position).normalize().dot(dir) > 0.55) || into) {
         const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
         const dry = this.player.vitals.water < 99;
         const held = this.inHand && ITEMS[this.inHand.id].use?.sips ? this.inHand : null;

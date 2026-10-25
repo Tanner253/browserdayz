@@ -60,6 +60,8 @@ export interface BuildHost {
   give: (items: ItemInstance[], gift: string) => void;
   begin: (label: string, dur: number, valid: () => boolean, done: () => void, lost: string) => void;
   busy: () => boolean;
+  /** a blow of what is in the hands at the work, hitting nobody (false: the hands are at something else) */
+  work: (dur: number) => boolean;
   breakOff: () => void;
   changed: () => void;
   /** the felled trees (a stump is no trunk) */
@@ -98,6 +100,8 @@ export const LEFT_HELD = new Set(['building_plan', 'code_lock', 'key_lock', 'c4'
 
 /** how far the mouse moves for the pointer to cross the wheel, px */
 const RING = { reach: 260 };
+/** a hammer's blow at a nail, seconds, and how far through it the nail is struck */
+const NAIL = { blow: 0.55, lands: 0.45 };
 /** how far from the eye, along the ground, a foundation begun on its own is laid at most (see `alone`) */
 const PLACE = { reach: 6 };
 /** a player who lays is told nothing of a refusal they have already been told, for this long */
@@ -283,11 +287,17 @@ export class Building {
     // (building's sounds asked for once a building tool is first in the hands)
     if (plan || hammer) void buildRecordings();
     // (the hammer driving nails while it works at a piece)
+    // (the hammer's blows seen, its own and everybody's: each nail rings as its blow lands. The plan alone, nails only)
     if (this.nailing && this.h.busy()) {
-      const now = performance.now();
-      if (now >= this.nailing.next) {
-        this.nailing.next = now + 360 + Math.random() * 280;
-        audio.built('nail', this.nailing.at, 0.9, 0.94 + Math.random() * 0.12);
+      const now = performance.now(), n = this.nailing;
+      if (now >= n.next) {
+        const blow = hammer && this.h.work(NAIL.blow);
+        n.next = now + (blow ? NAIL.blow * 1000 + 60 + Math.random() * 120 : 360 + Math.random() * 280);
+        n.ring = now + (blow ? NAIL.lands * NAIL.blow * 1000 : 0);
+      }
+      if (n.ring && now >= n.ring) {
+        n.ring = 0;
+        audio.built('nail', n.at, 0.9, 0.94 + Math.random() * 0.12);
       }
     } else this.nailing = null;
     this.draw.update(dt, this.h.me());
@@ -636,10 +646,10 @@ export class Building {
   }
 
   /** the hammer heard at a piece while it works at it (the nails go in until the work is done or stopped) */
-  private nailing: { at: { x: number; y: number; z: number }; next: number } | null = null;
+  private nailing: { at: { x: number; y: number; z: number }; next: number; ring: number } | null = null;
   private nail(base: Base, p: { x: number; y: number; z: number; k: string }) {
     const [x, y, z] = toWorld(base, p.x, p.y + (PIECES[p.k].role === 'floor' ? 0 : 1.2), p.z);
-    this.nailing = { at: { x, y, z }, next: 0 };
+    this.nailing = { at: { x, y, z }, next: 0, ring: 0 };
   }
 
   /** pieces of a base broken in this game's own copy of it (alone: a raid, src/game/building/raid.ts), with what stood only on them */
