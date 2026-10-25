@@ -196,7 +196,10 @@ if (sim) {
   if (survivors.length) {
     const { wearBody, wearOn, BODIES } = await import('../game/survivors');
     const { hides } = await import('../sim/survivor');
+    const { ITEMS } = await import('../sim/items');
     const hide = hides(list('hide') as Parameters<typeof hides>[0]);
+    // (what a piece hides and draws in is its item's, src/sim/items/wear.ts, unless &hide or &shrink says)
+    const dressOf = (model: string) => Object.values(ITEMS).find((d) => d.dress?.model === model)?.dress;
     const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
     for (const n of survivors) {
       const o = cloneSkinned(gltf.scene) as THREE.Group;
@@ -205,7 +208,8 @@ if (sim) {
       // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
       const worn = list('wear').map((w) => {
         const [model, c] = w.split('~');
-        return { model, hides: hide, shrinks: hides(list('shrink') as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
+        const own = dressOf(model);
+        return { model, hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
       });
       if (worn.length) await wearOn(o, body, worn);
       const playing = playOn(o, gltf.animations);

@@ -10,9 +10,15 @@
 //
 //   1. That body and the dressed one are both carried onto the game's skeleton (scripts/meshy.mjs, carry) and stood
 //      at the skeleton's rest, where every point of the one can be laid against the other.
-//   2. What of the dressed one is the body again (as near it as a centimetre and a bit, and as like it in colour: the
-//      skin, the base layer showing below a hem) is cut away; and what lies over parts of the body the piece does not
-//      cover (`parts`: REGION in src/sim/survivor.ts). What is left is the piece, bound as Meshy bound it.
+//   2. What lies over parts of the body the piece cannot be over is cut away (`parts`: REGION in src/sim/survivor.ts);
+//      and at its edges (the parts it does not wholly cover, `covers`) what is as like the body under it in colour as
+//      it is like the piece (the skin at a cuff, the shorts below a hem). Over the parts it covers, only what is far
+//      more like the body than the piece, where the piece is unlike the body there, and only where the base layer can
+//      show (`peeks`: under a red shirt's hem, a T-shirt hem over a waistband; not down a leg, where faded denim is as
+//      light as skin). A grey hoodie over the grey base layer was cut to lace by colour alone.
+//   3. Where Meshy joined a sleeve to the side (a loose sleeve hanging against it), the skin it made between them is
+//      stretched far more than the rest when the arm is raised: those triangles are cut away.
+//   What is left is the piece, bound as Meshy bound it.
 //
 // On the other bodies it is worn as cut; the skin under it is hidden there (src/game/survivors.ts), so nothing pokes
 // through. Its colours and camouflages are its one picture made another colour in the game.
@@ -38,10 +44,33 @@ const REGION = { scalp: 0, face: 1, neck: 2, chest: 3, belly: 4, hips: 5, should
 
 /**
  * Each piece: its Meshy file, the body it was made on, the parts of the body it can be over (`parts`) and those it
- * surely covers (`core`: its own colour is learnt there), and its picture's size.
+ * surely covers (`core`: its own colour is learnt there; `covers`: all of it there is the piece, as the item's own
+ * `hides` in src/sim/items/wear.ts), and its picture's size. Gloves have fingers (`fingers`: bound to the finger bones
+ * as the body is, scripts/meshy.mjs fitHand).
  */
+const TOP = ['neck', 'face', 'chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm', 'hand', 'thigh'];
+const LEGS = ['belly', 'hips', 'thigh', 'aboveKnee', 'shin', 'foot'];
+const FEET = ['shin', 'foot'];
+const HANDS = ['forearm', 'hand'];
+const JACKET = { parts: TOP, core: ['chest', 'upperArm'], covers: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], peeks: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'] };
+const TROUSERS = { parts: LEGS, core: ['thigh', 'shin'], covers: ['hips', 'thigh', 'aboveKnee', 'shin'], peeks: ['hips'] };
+const BOOTS = { parts: FEET, core: ['foot'], covers: ['foot'] };
 const PIECES = {
-  m65: { src: 'wear_m65.glb', body: 0, parts: ['neck', 'face', 'chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm', 'hand', 'thigh'], core: ['chest', 'upperArm'], tex: 2048 },
+  m65: { src: 'wear_m65.glb', body: 0, ...JACKET, tex: 2048 },
+  telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, tex: 2048 },
+  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, tex: 2048 },
+  flannel: { src: 'wear_flannel.glb', body: 3, ...JACKET, tex: 2048 },
+  leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, tex: 2048 },
+  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips'], tex: 2048 },
+  field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, tex: 2048 },
+  jeans: { src: 'wear_jeans.glb', body: 1, ...TROUSERS, tex: 2048 },
+  cargo_pants: { src: 'wear_cargo_pants.glb', body: 2, ...TROUSERS, tex: 2048 },
+  work_pants: { src: 'wear_work_pants.glb', body: 3, ...TROUSERS, tex: 2048 },
+  combat_boots: { src: 'wear_combat_boots.glb', body: 0, ...BOOTS, tex: 1024 },
+  work_boots: { src: 'wear_work_boots.glb', body: 1, ...BOOTS, tex: 1024 },
+  hiking_boots: { src: 'wear_hiking_boots.glb', body: 2, ...BOOTS, tex: 1024 },
+  leather_gloves: { src: 'wear_leather_gloves.glb', body: 2, parts: HANDS, core: ['hand'], covers: ['hand'], tex: 1024, fingers: true },
+  fingerless: { src: 'wear_fingerless.glb', body: 0, parts: HANDS, core: ['hand'], covers: [], tex: 1024, fingers: true },
 };
 /** the bodies as Meshy made them (scripts/survivors.mjs) */
 const BODIES = ['body0_rigged.glb', 'body1_rigged.glb', 'body2_rigged.glb', 'body3_rigged.glb'];
@@ -78,7 +107,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
   if (ONLY.length && !ONLY.includes(id)) continue;
   const body = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, BODIES[piece.body])), fingers: true });
   markRegions(body.doc, body.node);
-  const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: false });
+  const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: !!piece.fingers });
   const B = await laid(body.node), D = await laid(dressed.node);
   const region = body.node.getMesh().listPrimitives()[0].getAttribute('_REGION');
 
@@ -104,7 +133,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
     return [best, Math.sqrt(bd)];
   };
   // ---- what colour the piece is: the middle of the colours of what lies over the parts it surely covers
-  const parts = new Set(piece.parts.map((p) => REGION[p])), core = new Set(piece.core.map((p) => REGION[p]));
+  const parts = new Set(piece.parts.map((p) => REGION[p])), core = new Set(piece.core.map((p) => REGION[p])), covers = new Set(piece.covers.map((p) => REGION[p])), peeks = new Set((piece.peeks ?? []).map((p) => REGION[p]));
   const near = D.P.map((p) => nearest(p)[0]);
   const own = [0, 1, 2].map((ch) => {
     const v = near.flatMap((n, i) => (n >= 0 && core.has(region.getScalar(n)) ? [D.C[i][ch]] : [])).sort((a, b) => a - b);
@@ -113,14 +142,13 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // a point is the piece where it is nearer the piece's colour than the colour of the body under it (the skin at a cuff or
   // a collar, the shorts below a hem), and over a part the piece can be over
   const off = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-  const why = { part: new Array(14).fill(0), body: 0, kept: 0 };
+  const why = { part: new Array(14).fill(0), body: 0, kept: 0, stretched: 0 };
   let keep = D.P.map((p, i) => {
     const n = near[i];
     if (n < 0 || !parts.has(region.getScalar(n))) return (why.part[n < 0 ? 0 : region.getScalar(n)]++, false);
-    if (off(D.C[i], own) >= off(D.C[i], B.C[n])) return (why.body++, false);
+    if (covers.has(region.getScalar(n)) ? peeks.has(region.getScalar(n)) && off(own, B.C[n]) > 0.3 && off(D.C[i], B.C[n]) * 2 < off(D.C[i], own) : off(D.C[i], own) >= off(D.C[i], B.C[n])) return (why.body++, false);
     return (why.kept++, true);
   });
-  if (process.env.WHY) console.log(JSON.stringify({ own: own.map((c) => +c.toFixed(3)), ...why }));
 
   // ---- evened out over the surface (a point's neighbours outvote it, twice), then the triangles all of whose points are kept.
   // (The surface as one: Meshy cuts it apart along every seam of its picture, a few hundred islands, so the points at
@@ -147,6 +175,19 @@ for (const [id, piece] of Object.entries(PIECES)) {
     });
   }
   let tris = T.filter((t) => t.every((i) => keep[i]));
+  // (the skin Meshy made between a sleeve and the side: how much longer a triangle's longest edge is at rest, arms out,
+  // than as it was made, arms down, against how much longer they are on the whole; four times is no cloth's)
+  {
+    const pos = D.prim.getAttribute('POSITION'), a = new THREE.Vector3(), b = new THREE.Vector3();
+    const made = (i, j) => a.fromArray(pos.getElement(i, [])).distanceTo(b.fromArray(pos.getElement(j, [])));
+    const long = (t, d) => Math.max(d(t[0], t[1]), d(t[1], t[2]), d(t[2], t[0]));
+    const ratio = tris.map((t) => long(t, (i, j) => D.P[i].distanceTo(D.P[j])) / Math.max(1e-9, long(t, made)));
+    const usual = [...ratio].sort((x, y) => x - y)[Math.floor(ratio.length / 2)];
+    const was = tris.length;
+    tris = tris.filter((t, k) => ratio[k] < usual * +(process.env.STRETCH ?? 4));
+    why.stretched = was - tris.length;
+  }
+  if (process.env.WHY) console.log(JSON.stringify({ own: own.map((c) => +c.toFixed(3)), ...why }));
   // (and no crumbs: a piece of it apart from the rest, of fewer than fifty triangles, is cut away too)
   {
     const of = new Map();
