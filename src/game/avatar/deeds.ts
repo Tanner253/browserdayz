@@ -14,18 +14,29 @@ export const MOVES = TABLE as Record<string, Row>;
 /** the old clips' deaths and flinches (DEATHS, `hit`, `hitHead` in pose.ts) -> the motion capture's */
 export const MOCAP: Record<string, string> = { death: 'deathB', deathFront: 'deathF', deathSide: 'deathS', hit: 'hitBody', hitHead: 'hitHead' };
 
+/** where a survivor lies once down, as DEATH_REST says it for the old falls (the infected's): from the motion capture's own */
+export const MOCAP_REST = (['deathB', 'deathF', 'deathS'] as const).map((n) => (MOVES[n].rest ?? [0, 0]) as [number, number]);
+
 /** a performance done once (the name of its movement) or kept up until told otherwise (`stay`) */
 export type Deed = 'pickUp' | 'drink' | 'chop' | 'hammer' | 'throw' | 'vault' | 'jabR' | 'jabL';
 export type Stay = 'ladder' | 'swim' | 'tread' | 'sleep';
 
 let late: Promise<THREE.AnimationClip[]> | null = null;
 const lateClips = () => (late ??= assets.loadGLTF('assets/characters/moves-late.glb').then((g) => g.animations));
+let soon = false;
+/** the late ones fetched a while after the first body is made, off the way in: the first grenade thrown is seen thrown */
+export function lateSoon() {
+  if (soon) return;
+  soon = true;
+  setTimeout(() => void lateClips().catch(() => (late = null)), 12000);
+}
 
 export class Deeds {
   private acts = new Map<string, THREE.AnimationAction>();
   private loading = false;
   constructor(private mixer: THREE.AnimationMixer, clips: THREE.AnimationClip[]) {
     for (const c of clips) if (MOVES[c.name] && !MOVES[c.name].way) this.add(c);
+    lateSoon();
   }
 
   private add(c: THREE.AnimationClip) {

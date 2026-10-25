@@ -135,7 +135,6 @@ export class Gait {
       this.turnW += share;
       return;
     }
-    const add = (s: Step, k: number) => this.add(s, k);
     this.turnW += share;
     // the two ways either side of it, each by how near
     let lo: Step = steps[0], hi: Step = steps[0], dlo = -Infinity, dhi = Infinity;
@@ -144,10 +143,10 @@ export class Gait {
       if (d <= 0 && d > dlo) { dlo = d; lo = s; }
       if (d >= 0 && d < dhi) { dhi = d; hi = s; }
     }
-    if (lo === hi || dhi - dlo < 1e-4) return add(lo, share);
+    if (lo === hi || dhi - dlo < 1e-4) return this.add(lo, share);
     const k = -dlo / (dhi - dlo);
-    add(lo, share * (1 - k));
-    add(hi, share * k);
+    this.add(lo, share * (1 - k));
+    this.add(hi, share * k);
   }
 
   private add(s: Step, k: number) {
