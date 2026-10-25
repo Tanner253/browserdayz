@@ -1500,7 +1500,7 @@ export function meleeAt(st: MeleeStyle, k: number, n: number, cut: Cut | null, p
     quat.premultiply(swing);
   }
   if (cut && k >= 0) {
-    layOn(cut, k, 0.35, pos, quat, elbow, cutAt);
+    layOn(cut, k, 0.35, pos, quat, elbow, cutAt, st.two);
   }
 }
 export class Weapons {

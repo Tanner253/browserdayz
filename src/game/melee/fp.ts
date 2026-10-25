@@ -20,6 +20,8 @@ const TABLE = PATHS as unknown as Record<string, Path>;
 
 /** where the right shoulder is from the eye in the first-person picture (x right, y up, z behind), metres */
 export const FP_SHOULDER = new THREE.Vector3(0.19, -0.27, 0.1);
+/** and the middle of the chest: what a thing in both hands is swung about, so that both stay in front of the body */
+export const FP_CHEST = new THREE.Vector3(0.05, -0.3, 0.1);
 /** the nearest the fist comes to the eye, ahead of it (metres) */
 const NEAREST = -0.32;
 
@@ -135,15 +137,15 @@ export function stanceQuat(s: { tip: readonly number[]; edge: readonly number[] 
   return out.setFromRotationMatrix(_sm.makeBasis(_sx, _sy, _sz));
 }
 const _rest = { arm: new THREE.Vector3(), upper: new THREE.Vector3() };
-/** A blow, from where the fist and the elbow rest in the picture and how the thing is held there. */
-export function layOn(c: Cut, u: number, hitU: number, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3, at: FpPose) {
-  const L = _rest.arm.copy(pos).sub(FP_SHOULDER).length(), Lu = _rest.upper.copy(elbow).sub(FP_SHOULDER).length();
+/** A blow, from where the fist and the elbow rest in the picture and how the thing is held there. `two`: in both hands. */
+export function layOn(c: Cut, u: number, hitU: number, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3, at: FpPose, two = false) {
+  const pivot = two ? FP_CHEST : FP_SHOULDER;
+  const L = _rest.arm.copy(pos).sub(pivot).length(), Lu = _rest.upper.copy(elbow).sub(FP_SHOULDER).length();
   cutPose(c, u, hitU, _rest, at);
-  pos.lerp(_v.copy(at.arm).multiplyScalar(L * at.stretch).add(FP_SHOULDER), at.w);
-  // (never into the eye: an arm swung round past the side or up over the head stays in front of it and under it, and
-  // the elbow under the eye: raised past it, the sleeve filled the picture)
+  pos.lerp(_v.copy(at.arm).multiplyScalar(L * at.stretch).add(pivot), at.w);
+  // (never into the eye: an arm swung round past the side or up over the head stays in front of it, going out of the
+  // top of the picture rather than over the eye; and the elbow under the eye: raised past it, the sleeve filled the picture)
   pos.z = Math.min(pos.z, NEAREST);
-  pos.y = Math.min(pos.y, 0.12);
   elbow.lerp(_v.copy(at.upper).multiplyScalar(Lu).add(FP_SHOULDER), at.w);
   elbow.y = Math.min(elbow.y, -0.08);
   if (c.lands) stanceQuat(c.lands, _l);
