@@ -95,6 +95,8 @@ export const SEARCHED = { hands: 1.4, heard: 18 };
 
 export class RemotePlayer implements Damageable {
   alive = true;
+  /** the voice they call out in (src/sim/survivor.ts VOICES) */
+  voice = 0;
   pos = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
@@ -447,7 +449,7 @@ export class RemotePlayer implements Damageable {
     if (e.move) this.avatar.emote(e.move, e.dur);
     const head = this.head(new THREE.Vector3());
     const d = head.distanceTo(listener);
-    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, voiceOf(this.name));
+    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, this.voice, voiceOf(this.name));
   }
 
   /** your shot or blow landed on them: the server decides what it did, this is the flinch and the grunt */

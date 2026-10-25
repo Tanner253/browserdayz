@@ -39,6 +39,7 @@ import { CARRY_LIMIT, Player } from './player';
 import '../sim/blood';
 import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
+import { chosen, choose } from './survivors';
 import { Doll } from './doll';
 import { GunRacks, RACK_PLAN } from './racks';
 import { roadLift } from '../world/road';
@@ -674,6 +675,25 @@ export class Game {
     // (the print of the places is said with hello, for the server to hold against its own: see lootPrint)
     let printed = '';
     this.net.lootPrint = () => (printed ||= lootPrint(buildings.lootPoints));
+    // (which survivor this player is, and their voice: said with hello, and to everybody when another is picked on the menu or in Settings)
+    this.net.who = () => {
+      const w = chosen(playerName());
+      return { bd: w.body, vo: w.voice };
+    };
+    const pickWho = (pick: { body?: number; voice?: number }) => {
+      const w = choose(playerName(), pick);
+      this.avatar.wardrobe.setBody(w.body);
+      this.hud.who.show(w.body);
+      this.hud.callVoice = w.voice;
+      if (this.net.online) this.net.send({ t: 'who', bd: w.body, vo: w.voice });
+    };
+    this.hud.who.onPick = (body) => pickWho({ body });
+    // (a voice picked says a call in it, to be heard)
+    this.hud.onVoice = (voice) => {
+      pickWho({ voice });
+      audio.shout('friendly', undefined, 0, voice, voiceOf(playerName()));
+    };
+    pickWho({});
     // crates standing around the map become searchable containers, and the furniture that holds things (src/sim/storage.ts)
     for (const c of veg.crates) {
       const own = FURNITURE[c.kind], spec = CRATE_SPECS[c.kind] ?? (own ? { w: own.grid[0], h: own.grid[1], label: own.label } : null);
@@ -954,7 +974,7 @@ export class Game {
       }));
     this.hud.emotes.figure = { grab: () => this.emoteFig?.grab(), turn: (by) => this.emoteFig?.turn(by), drop: () => this.emoteFig?.drop() };
     // (a call picked there is heard as it is called in the game)
-    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, voiceOf(playerName()));
+    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
     this.hud.emotes.onClose = () => this.toggleEmotes(false);
     this.pad = new Gamepad(this.input, {
       on: () => controls().pad,

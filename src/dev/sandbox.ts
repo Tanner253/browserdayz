@@ -10,6 +10,9 @@
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length
 //   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
+//   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
+//   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
+//   &shrink=hips,thigh                           the parts only partly under them drawn a little in)
 //                                               one of its clips; today's survivor beside them plays it too
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
@@ -20,6 +23,7 @@
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
+//   &bg=20231f&floor=0                          a plain backdrop of that colour and no floor (pictures for the page)
 //   &person=0                                   no survivor beside it
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
@@ -58,7 +62,7 @@ document.body.appendChild(renderer.domElement);
 
 await assets.init();
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(dusk ? 0x4a4f63 : 0xb9c7d6);
+scene.background = new THREE.Color(q.get('bg') ? Number(`0x${q.get('bg')}`) : dusk ? 0x4a4f63 : 0xb9c7d6);
 // (the game's own sky for light, so a material that is wrong in the game is wrong here too: the wolf's pale coat was)
 const env = await assets.hdri(assets.manifest.hdri.env);
 env.mapping = THREE.EquirectangularReflectionMapping;
@@ -93,6 +97,7 @@ floorTex.anisotropy = 8;
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
+floor.visible = q.get('floor') !== '0';
 scene.add(floor);
 
 // (the words on each view: which camera, and the moment of the clip)
@@ -189,12 +194,20 @@ if (sim) {
     return clip.name;
   };
   if (survivors.length) {
-    const { wearBody, BODIES } = await import('../game/survivors');
+    const { wearBody, wearOn, BODIES } = await import('../game/survivors');
+    const { hides } = await import('../sim/survivor');
+    const hide = hides(list('hide') as Parameters<typeof hides>[0]);
     const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
     for (const n of survivors) {
       const o = cloneSkinned(gltf.scene) as THREE.Group;
       o.traverse((m) => { if (m.name.startsWith('gear_')) m.visible = false; });
-      await wearBody(o, n);
+      const body = await wearBody(o, n, list('wear').length ? 0 : hide);
+      // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
+      const worn = list('wear').map((w) => {
+        const [model, c] = w.split('~');
+        return { model, hides: hide, shrinks: hides(list('shrink') as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
+      });
+      if (worn.length) await wearOn(o, body, worn);
       const playing = playOn(o, gltf.animations);
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }

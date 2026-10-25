@@ -37,6 +37,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import type { Grips } from './arms';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from './avatar';
 import { lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch } from './look';
+import { chosen } from './survivors';
 import type { ItemModels } from './loot';
 
 /** a thing as it is seen in somebody's hands (`plumb`: the part of it that hangs from the hand, and is kept upright: see `inFist`) */
@@ -591,6 +592,8 @@ export class Doll {
       this.name = name;
       this.dress();
     }
+    // (which survivor: their own pick, src/game/survivors.ts)
+    this.body.wardrobe.setBody(chosen(name).body);
     const worn = h.worn(), wornKey = worn.join(',');
     if (wornKey !== this.wornKey) {
       this.wornKey = wornKey;

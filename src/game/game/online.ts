@@ -28,6 +28,7 @@ import { cashedTags, setPinned } from '../../ui/rewards';
 import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
 import { diffOps, laidIn, type Laid } from '../../sim/box-ops';
+import { bodyFor, voiceFor } from '../../sim/survivor';
 
 /** how near a crate is asked what is in it, and how often again while near (peekNear) */
 const PEEK_AT = 3.5, PEEK_AGAIN = 8000;
@@ -325,6 +326,12 @@ export const onlineMethods = {
       if (this.remotes.get(m.id)) void this.wear(this.remotes.get(m.id)!.avatar, m.g);
     });
     net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
+    net.on('who', (m) => {
+      const r = this.remotes.get(m.id);
+      if (!r) return;
+      r.avatar.wardrobe.setBody(m.bd);
+      r.voice = m.vo;
+    });
     net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
     net.on('hitok', (m) => {
@@ -818,6 +825,9 @@ export const onlineMethods = {
     r.setWeapon(p.w, p.m, p.f);
     void this.wear(r.avatar, p.g ?? []);
     this.gearOf.set(p.id, p.g ?? []);
+    // (which survivor, and their voice: a game from before there were any to pick is given the one its name gives)
+    r.avatar.wardrobe.setBody(p.bd ?? bodyFor(p.name));
+    r.voice = p.vo ?? voiceFor(p.bd ?? bodyFor(p.name));
     r.setGhost(!!p.hidden);
     r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);

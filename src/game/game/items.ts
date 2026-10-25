@@ -28,6 +28,7 @@ import { heightAt } from '../../world/worldgen';
 import { COOKS, COOK_KINDS, FUEL, HEAT, cookable, mealOf, rotten, stageOf } from '../../sim/cooking';
 import { POISON, fallsIll } from '../../sim/sickness';
 import { WHEEL_REACH, type TimedAction, type Game } from '../game';
+import { chosen } from '../survivors';
 
 export const itemsMethods = {
   // ------------------------------------------------------------ item actions
@@ -459,7 +460,7 @@ export const itemsMethods = {
       this.avatar.emote(e.move, e.dur);
       this.armsUntil = now + (e.dur ?? 1.5) * 1000;
     }
-    audio.shout(id, undefined, 0, voiceOf(playerName()));
+    audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
     this.hud.note('“' + e.say + '”');
     this.net.send({ t: 'emote', e: id });
   },

@@ -3,6 +3,7 @@
 
 import { holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/sim/items';
+import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
@@ -219,6 +220,15 @@ export function handle(c: Client, m: C2S) {
       // the list was cut to six: there are eleven now, and whatever is drawn of any of them has room in it)
       c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, GEAR_SLOTS.length);
       broadcast({ t: 'gear', id: c.id, g: c.g }, c);
+      return;
+    }
+    case 'who': {
+      // another body or voice picked: anything but one there is, and nothing is changed
+      const bd = pickOf(m.bd, BODY_NAMES.length), vo = pickOf(m.vo, VOICES.length);
+      if (bd === null || vo === null || (bd === c.bd && vo === c.vo)) return;
+      c.bd = bd;
+      c.vo = vo;
+      broadcast({ t: 'who', id: c.id, bd, vo }, c);
       return;
     }
     case 'back': {

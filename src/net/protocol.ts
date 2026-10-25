@@ -66,7 +66,9 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
-export const PROTOCOL = 64;
+// (65, 2026-10-25: which survivor each player is and the voice they call out in (`bd`, `vo` on hello and on a player;
+// 'who' when it is changed: src/sim/survivor.ts). A page of 64 would draw everybody in the old suit.)
+export const PROTOCOL = 65;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -140,6 +142,9 @@ export interface PlayerInfo {
   f?: string;
   /** what they wear that shows: hat, vest, pack */
   g: string[];
+  /** which of the bodies they are, and their voice (src/sim/survivor.ts): not said, a game from before there were any to pick */
+  bd?: number;
+  vo?: number;
   /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
   b?: Slung[];
   alive: boolean;
@@ -209,7 +214,7 @@ export type C2S =
    * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
    * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
    */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string }
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string; /** the body and the voice they picked (src/sim/survivor.ts) */ bd?: number; vo?: number }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -238,6 +243,8 @@ export type C2S =
   /** a keycard was put to the bunker's door */
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
+  /** another body or voice picked (src/sim/survivor.ts) */
+  | { t: 'who'; bd: number; vo: number }
   | { t: 'back'; b: Slung[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number }
   | { t: 'take'; uid: string }
@@ -404,6 +411,7 @@ export type S2C =
   /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
+  | { t: 'who'; id: number; bd: number; vo: number }
   | { t: 'back'; id: number; b: Slung[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number]; /** an animal's: whether it opened a wound (the server's roll, not the game's) */ bleed?: boolean }
   /** the animals near this player (src/sim/animals.ts AnimalRow), five times a second; once a second all within its reach (`all`: any it knows of that is not in it has gone) */
