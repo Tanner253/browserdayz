@@ -3,7 +3,7 @@
 // (The clothes themselves, and what becomes of an inventory kept from before they were things: test/clothes.test.ts.)
 
 import assert from 'node:assert/strict';
-import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { CLOTHES, ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
 import { BODY_GRID, Container, HOLD, HOLD_MOST, HOLD_W, PlayerInventory, bagGrid, cleanInventory, heldIn, holdOnlyEmpties, layOnBody, splitPile, swapPlaces, type SerializedInventory } from '../src/sim/inventory';
 
 let n = 0;
@@ -351,8 +351,8 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     // it is carried: it weighs what it weighs, and a hot key finds what is in it
     assert.ok(inv.weight() > 38 * ITEMS.ak.weight, `forty rifles weigh ${inv.weight().toFixed(1)} kg`);
     assert.ok([...inv.carried()].includes(rifles[39]) && inv.containerOf(rifles[39]) === inv.theHold && inv.find((it) => it === rifles[39]) === rifles[39]);
-    // (forty rifles, the tin, the jacket and the trousers, the pack on her back, and the day pack with the tin in it)
-    assert.equal(all(inv).length, 40 + 1 + 2 + 1 + 2, 'a thing is not among what is carried');
+    // (forty rifles, the tin, the three things every life begins in, the pack on her back, and the day pack with the tin in it)
+    assert.equal(all(inv).length, 40 + 1 + CLOTHES.length + 1 + 2, 'a thing is not among what is carried');
   });
 
   ok('it is kept and sent as one more grid, read back whole by the server past the 120 any other grid is read to, and laid as it lay', () => {
@@ -503,6 +503,8 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
   const WAS: Record<string, [number, number]> = { field_jacket: [4, 4], field_trousers: [4, 3], chest_rig: [4, 2], soft_vest: [2, 2], armor_vest: [3, 2], heavy_armor: [3, 2], life_vest: [4, 3], sack_pack: [4, 4], camping_pack: [6, 5], suitcase: [7, 6] };
   /** and as it is */
   const IS: Record<string, [number, number]> = { field_jacket: [5, 5], field_trousers: [5, 4], chest_rig: [5, 3], soft_vest: [3, 3], armor_vest: [4, 3], heavy_armor: [4, 3], life_vest: [5, 4], sack_pack: [5, 5], camping_pack: [7, 6], suitcase: [9, 7] };
+  /** and the clothes made since (2026-10-25, src/sim/items/wear.ts), which were nothing before: nothing was kept in them */
+  const NEW = ['tshirt', 'tracksuit_pants', 'flannel_shirt', 'hoodie', 'jeans', 'leather_jacket', 'quilted_jacket', 'work_trousers', 'parka', 'cargo_pants', 'mountain_smock', 'mountain_trousers'];
   /** the most DayZ has in any one thing of each class (its wiki's Clothing page, the tables of game version 1.29.163451): Field Backpack 8x8, OMK Jacket 6x5, cargo pants 5x4, Field Vest 5x4 */
   const DAYZ_MOST: Record<string, number> = { back: 64, top: 30, legs: 20, vest: 20 };
   const worn = Object.values(ITEMS).filter((d) => d.wear?.cargo);
@@ -521,15 +523,17 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
   };
 
   ok('every thing that is worn and holds things holds more than it did, across AND down; none holds more than DayZ\'s most of its class; and each says what it holds', () => {
-    assert.deepEqual(worn.map((d) => d.id).sort(), Object.keys(WAS).sort(), 'a thing that is worn and holds things is not among those that were: say here what it was, or that it is new');
+    assert.deepEqual(worn.map((d) => d.id).sort(), [...Object.keys(WAS), ...NEW].sort(), 'a thing that is worn and holds things is not among those that were: say here what it was, or that it is new');
     for (const d of worn) {
-      const [w, h] = d.wear!.cargo!, [ow, oh] = WAS[d.id];
+      const [w, h] = d.wear!.cargo!;
+      assert.ok(w * h <= DAYZ_MOST[d.slot!], `${d.id} holds ${w * h}: more than DayZ's most for what is worn there, ${DAYZ_MOST[d.slot!]}`);
+      assert.match(d.desc, new RegExp(`\\b${w * h}( more)? slots`), `${d.id} does not say it holds ${w * h}`);
+      if (NEW.includes(d.id)) continue;
+      const [ow, oh] = WAS[d.id];
       assert.deepEqual([w, h], IS[d.id], `${d.id} is ${w}x${h}`);
       // (never smaller either way, or what was kept in it has no place: this is the rule. Bigger both ways is what was asked.)
       assert.ok(w >= ow && h >= oh, `${d.id} is ${w}x${h}, smaller one way than the ${ow}x${oh} it was: what is kept in it would have to move`);
       assert.ok(w > ow && h > oh, `${d.id} is ${w}x${h}: it was ${ow}x${oh}, and is not bigger both ways`);
-      assert.ok(w * h <= DAYZ_MOST[d.slot!], `${d.id} holds ${w * h}: more than DayZ's most for what is worn there, ${DAYZ_MOST[d.slot!]}`);
-      assert.match(d.desc, new RegExp(`\\b${w * h}( more)? slots`), `${d.id} does not say it holds ${w * h}`);
     }
     // the ladders are the ladders they were: packs small to large, and the vests in the order of what they carried
     assert.deepEqual(['sack_pack', 'camping_pack', 'suitcase'].map(cells), [25, 42, 63]);

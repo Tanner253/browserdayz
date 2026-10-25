@@ -742,8 +742,8 @@ export class PlayerInventory {
   }
 
   /**
-   * Everything carried goes, and the survivor stands in a new jacket and new trousers with nothing in them: what a
-   * body had by itself when its pockets were its own, and what every new life starts in (2026-10-13). Whoever is
+   * Everything carried goes, and the survivor stands in the clothes every new life starts in (CLOTHES), with nothing
+   * in them (2026-10-13). Whoever is
    * given a kit by an admin, which "replaces everything", is left the same.
    */
   clear() {
@@ -760,9 +760,17 @@ export class PlayerInventory {
     this.dress();
   }
 
-  /** A jacket and trousers put on, wherever nothing is worn in their place. */
+  /** The clothes every survivor begins in put on (CLOTHES), wherever nothing is worn in their place. */
   dress() {
     for (const [slot, id] of CLOTHES) this.slots[slot] ??= makeItem(id);
+  }
+
+  /** Those clothes, while nothing is in them, taken off where one of these is to be worn instead: a kit's boots go on the feet, not into a pocket. */
+  makeWay(items: ItemInstance[]) {
+    for (const [slot, id] of CLOTHES) {
+      const on = this.slots[slot];
+      if (on?.id === id && !on.cargo?.length && items.some((it) => ITEMS[it.id]?.slot === slot)) this.slots[slot] = null;
+    }
   }
 
   /**
@@ -987,6 +995,8 @@ const isItem = (id: unknown): id is string => typeof id === 'string' && Object.h
 
 /** the grids that were the body's own, and the place the thing that has each one's pockets is worn in now */
 const OLD_POCKETS = new Map<unknown, Slot>([['jacket', 'top'], ['pants', 'legs']]);
+/** what was made of those grids: the clothes everybody began in then (CLOTHES has been the basics since 2026-10-25) */
+const OLD_CLOTHES: [Slot, string][] = [['top', 'field_jacket'], ['legs', 'field_trousers']];
 /** the grid the server keeps things in that found no room while an old inventory was made new (see `cleanInventory`) */
 export const SPILL = 'spill';
 
@@ -1018,7 +1028,7 @@ export function upgradeInventory(d: SerializedInventory): { inv: SerializedInven
   };
   /** what has no place yet: each thing, where it lay, and the place on the body whose grid it lay in */
   const stray: { st: Stored; slot: Slot }[] = [];
-  for (const [slot, id] of CLOTHES) {
+  for (const [slot, id] of OLD_CLOTHES) {
     const grids = kept.filter((c) => OLD_POCKETS.get(c?.id) === slot);
     if (!grids.length) continue;
     const old = grids.flatMap((c) => (Array.isArray(c.items) ? c.items : []));
@@ -1095,6 +1105,9 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   if (num(r.cook) && r.cook > 0) it.cook = Math.min(600, r.cook);
   if (num(r.hot) && r.hot > 0) it.hot = Math.min(wall + 300, r.hot);
   if (num(r.made) && r.made > 0) it.made = Math.min(wall, r.made);
+  // (a piece of clothing's colour, one of its own, and how worn it is: src/sim/items/wear.ts)
+  if (Number.isInteger(r.c) && r.c! > 0 && r.c! < (def.colours?.length ?? 0)) it.c = r.c;
+  if (num(r.hp) && r.hp >= 0 && r.hp < 1) it.hp = r.hp;
   if (r.id === 'dogtag') {
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
     it.owner = name(r.owner);

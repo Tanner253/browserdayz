@@ -45,8 +45,12 @@ export const SLOT_LABEL: Record<Slot, string> = {
 };
 /** the places for what is worn as the inventory stands them either side of the survivor, each column from the top down */
 export const DOLL_SLOTS: [Slot[], Slot[]] = [['head', 'face', 'eyes', 'top', 'vest', 'belt'], ['back', 'armband', 'hands', 'legs', 'feet']];
-/** what every survivor stands in to begin with: its place on them, and the thing */
-export const CLOTHES: [Slot, string][] = [['top', 'field_jacket'], ['legs', 'field_trousers']];
+/**
+ * what every survivor stands in to begin with: its place on them, and the thing. DayZ's own: a T-shirt, tracksuit
+ * trousers and trainers (the owner, 2026-10-25: "we should do dayz styled basics"); the field jacket and trousers
+ * everybody wore until then are found now (src/sim/items/wear.ts), and whoever has them on keeps them.
+ */
+export const CLOTHES: [Slot, string][] = [['top', 'tshirt'], ['legs', 'tracksuit_pants'], ['feet', 'trainers']];
 
 export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap' | 'light' | 'grip';
 
@@ -305,7 +309,10 @@ export function makeItem(id: string, qty?: number): ItemInstance {
   if (def.mag) it.rounds = 0;
   if (def.use?.sips) it.left = def.use.sips;
   // (a thing that comes in colours comes in any of them)
-  if (def.colours && def.colours.length > 1) it.c = Math.floor(Math.random() * def.colours.length);
+  if (def.colours && def.colours.length > 1) {
+    const c = Math.floor(Math.random() * def.colours.length);
+    if (c) it.c = c;
+  }
   return it;
 }
 
