@@ -17,7 +17,6 @@ import { type SerializedInventory, Container, keepHotHeld } from '../src/sim/inv
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { PLAN, inPlay, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
-import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
 import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
@@ -127,7 +126,7 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 
 export interface Box {
   cid: string;
-  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox';
+  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox' | 'recycler';
   /** furniture: where in its grid each of the economy's things inside it was last put, by uid (server/storages.ts) */
   layout?: Record<string, [number, number, boolean]>;
   /** a drop that is the cargo of a helicopter that came down */
@@ -236,11 +235,13 @@ export const isVState = (s: unknown): s is VState => Array.isArray(s) && s.lengt
 export const hearths = new Hearths(world.fires);
 
 /**
- * The things that are only ever found, never made by a player's own game: guns, blades, armour, helmets and
- * hats, the keycard. (What the trader sells is made by the game that buys it, and so are a meal, a dressing, a
- * round taken out of a gun, a sight taken off one: none of those can be told from an invention, and none is here.)
+ * The things that are only ever found, crafted or bought from the server, never made by a player's own game: guns,
+ * blades, armour, helmets and hats, the keycard. (What the camp's stalls sell and what is crafted the server gives, and
+ * issues; a meal, a dressing, a round taken out of a gun, a sight taken off one cannot be told from an invention, and
+ * none is here.)
  */
-const GUARDED = new Set(Object.values(ITEMS).filter((d) => !STOCK.includes(d.id) && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
+// (but the gas mask, which the old trader sold made by the game that bought it: those already carried were never issued)
+const GUARDED = new Set(Object.values(ITEMS).filter((d) => d.id !== 'gasmask' && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
 
 /** every such thing the server has put in the world, by its own number: laid out as loot, packed in a crate or a drop, left on a body */
 const issued = new Set<string>();

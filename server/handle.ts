@@ -52,6 +52,9 @@ import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
 import { craft, enqueue, unqueue } from './craft';
 import { salvage } from './salvage';
+import { learn } from './learn';
+import { recycle } from './recycle';
+import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, sightFor, takeDown } from './build';
 import { blow, plant, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
@@ -269,6 +272,8 @@ export function handle(c: Client, m: C2S) {
       if (buried(c, now)) return;
       const d = Math.hypot(c.pose[0] - target.pose[0], c.pose[1] - target.pose[1], c.pose[2] - target.pose[2]);
       if (d > rule.range + 4) return;
+      // (nobody is hurt by anybody at the trader camp: src/sim/camp.ts, Rust's outpost)
+      if (safe(c.pose[0], c.pose[2]) || safe(target.pose[0], target.pose[2])) return;
       let amount: number;
       /** where it came from, for the one who is hit: the shooter, or whatever went off */
       let from: [number, number] = [c.pose[0], c.pose[2]];
@@ -375,6 +380,8 @@ export function handle(c: Client, m: C2S) {
       const dir: [number, number] = [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len];
       // (what it had on it is in its body)
       const body = r.dead ? infectedBody(b, dir) : undefined;
+      // (and counted toward the trader's work of the day: server/camp.ts)
+      if (r.dead) campKill(c, m.zone === 'head');
       broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir, melee: !!rule.melee && !rule.blast, ...(body ? { body } : {}) });
       return;
     }
@@ -396,6 +403,14 @@ export function handle(c: Client, m: C2S) {
       return unqueue(c, m);
     case 'salvage':
       return salvage(c, m);
+    case 'learn':
+      return learn(c, m);
+    case 'recy':
+      return recycle(c, m);
+    case 'trade':
+      return trade(c, m);
+    case 'book':
+      return book(c, m);
     case 'blay':
       return lay(c, m);
     case 'bup':

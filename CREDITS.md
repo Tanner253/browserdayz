@@ -212,6 +212,20 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Planks" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal fragments" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 22 cm across as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Metal pipe" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 35 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Spring" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 12 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Rifle body" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 45 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Research table" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 1.2 m long as made; textures re-encoded as WebP at 2048; geometry compressed.
+- "Recycler" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 2 m wide as made; textures re-encoded as WebP at 2048; geometry compressed.
+- "Market stall" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 2.6 m deep as made; textures re-encoded as WebP at 2048; geometry compressed.
 - This work is based on "Simple Old C4" (https://sketchfab.com/3d-models/simple-old-c4-43d3b6a933b04aea8006d790627f9555) by Blender3D (https://sketchfab.com/Blender3D) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Stood on the ground about its own middle and made 20 cm tall; textures re-encoded as WebP at 1024; geometry compressed.
 - "Hardware tin" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms

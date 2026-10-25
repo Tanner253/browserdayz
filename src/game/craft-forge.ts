@@ -1,6 +1,7 @@
 // Forges as the game draws them (2026-10-25, plan-crafting; the rules are src/sim/craft/forge.ts, the server's side
-// server/forge.ts): the drum's own model where each forge piece stands (base building draws only its solids), and while
-// it burns, a fire in its door and a warm light round it ("glowing at night: a light that gives your base away"),
+// server/forge.ts), and the other pieces of crafting drawn by a model of their own (the research table): each model where
+// its piece stands (base building draws only their solids, src/sim/build/solids.ts `unseen`), and while a forge
+// burns, a fire in its door and a warm light round it ("glowing at night: a light that gives your base away"),
 // unseen from outside a room shut all round in stone or metal, as a torch is (src/sim/build/rooms.ts). Online, whether
 // one burns is the server's word; played alone, this game runs its own forges on their stores.
 
@@ -10,7 +11,7 @@ import type { Flames, Fire } from './flames';
 import type { Bases } from '../sim/build/bases';
 import { PIECES } from '../sim/build/pieces';
 import { toWorld, worldYaw } from '../sim/build/snap';
-import { cold, forgeStep, lit, type Fire as Burn } from '../sim/craft/forge';
+import { FORGE, cold, forgeStep, lit, type Fire as Burn } from '../sim/craft/forge';
 import type { Container } from '../sim/inventory';
 import type { StoredItem } from '../net/protocol';
 import type { S2C } from '../net/protocol';
@@ -31,6 +32,8 @@ export interface ForgeHost {
   changed: () => void;
 }
 
+/** the model each of crafting's pieces is drawn with */
+const MODEL: Record<string, string> = { forge: 'forge_hf', research_table: 'research_table' };
 /** how far off a forge is drawn, and its fire seen */
 const SEEN = { model: 160, fire: 90 };
 /** its fire (of a campfire's 1) where its door is, and its light (of a street lamp's 1, and how far it reaches) */
@@ -43,10 +46,12 @@ interface Drawn {
   root: THREE.Object3D;
   door: THREE.Vector3;
   fire: Fire | null;
+  /** a forge (it has a fire); else only drawn */
+  forge: boolean;
 }
 
 export class ForgeView {
-  private model: THREE.Object3D | null = null;
+  private models = new Map<string, THREE.Object3D>();
   private drawn = new Map<string, Drawn>();
   /** online: when each forge was last said to burn (performance.now, s) */
   private told = new Map<string, number>();
@@ -56,7 +61,7 @@ export class ForgeView {
   private tick = 0;
 
   constructor(private h: ForgeHost) {
-    void assets.model('forge_hf').then((m) => (this.model = m));
+    for (const [k, id] of Object.entries(MODEL)) void assets.model(id).then((m) => this.models.set(k, m)).catch(() => {});
   }
 
   onForge(m: Extract<S2C, { t: 'forge' }>) {
@@ -76,21 +81,22 @@ export class ForgeView {
   /** each frame: the forges near drawn (found twice a second), their fires lit or put out; played alone, run once a second */
   update(dt: number) {
     const me = this.h.me();
-    if ((this.t -= dt) <= 0 && this.model) {
+    if ((this.t -= dt) <= 0 && this.models.size) {
       this.t = 0.5;
       const near = new Set<string>();
       for (const b of this.h.bases().near(me.x, me.z, SEEN.model)) {
         for (const p of b.pieces.values()) {
-          if (p.k !== 'forge') continue;
+          const model = this.models.get(p.k);
+          if (!model) continue;
           const key = `${b.id}:${p.id}`;
           near.add(key);
           if (this.drawn.has(key)) continue;
-          const root = this.model.clone(), yaw = worldYaw(b, p.r);
+          const root = model.clone(), yaw = worldYaw(b, p.r);
           root.position.set(...toWorld(b, p.x, p.y, p.z));
           root.rotation.y = yaw;
           this.h.scene.add(root);
           const door = new THREE.Vector3(...FIRE.at).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).add(root.position);
-          this.drawn.set(key, { root, door, fire: null });
+          this.drawn.set(key, { root, door, fire: null, forge: p.k === 'forge' });
         }
       }
       for (const [key, d] of this.drawn) {
@@ -105,6 +111,7 @@ export class ForgeView {
       this.runOwn();
     }
     for (const [key, d] of this.drawn) {
+      if (!d.forge) continue;
       const [b, p] = key.split(':').map(Number);
       const on = this.burning(b, p) && d.door.distanceTo(me) < SEEN.fire;
       if (on && !d.fire) {
@@ -116,6 +123,22 @@ export class ForgeView {
       }
       if (on && !this.h.shut(d.door)) this.h.glow(d.door, WARM, FIRE.power, FIRE.reach);
     }
+  }
+
+  /** the bar over a forge's store in the inventory (null: the store is no forge's) */
+  bar(st: { uid: string }): { sig: string; el: () => HTMLElement } | null {
+    const m = /^bbox:(\d+):(\d+)$/.exec(st.uid), b = m && this.h.bases().bases.get(Number(m[1]));
+    if (!m || b?.pieces.get(Number(m[2]))?.k !== 'forge') return null;
+    const on = this.burning(Number(m[1]), Number(m[2]));
+    return {
+      sig: `forge:${on}`,
+      el: () => {
+        const el = document.createElement('div');
+        el.className = `inv-machine forge ${on ? 'on' : ''}`;
+        el.innerHTML = `<span><b>${on ? 'Burning' : 'Cold'}</b><em>${on ? `Smelting: ${FORGE.frags} fragments into a bar every ${FORGE.smelt} s, while its wood lasts` : `It lights itself with wood in it and ${FORGE.frags} metal fragments to smelt`}</em></span><i></i>`;
+        return el;
+      },
+    };
   }
 
   /** played alone: every forge of this game's own run a second on, its store changed in place */

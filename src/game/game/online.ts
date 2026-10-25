@@ -63,6 +63,8 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (what the old trader's book held, paid out in scrap once: src/game/camp.ts)
+    this.camp.payBook();
     // (a new connection knows nothing of how far this game draws animals: told again, by the next frame)
     this.animalsAsked = 0;
     // (whether this player's name and wallet are fixed is the server's to say: server/pinned.ts)
@@ -113,6 +115,7 @@ export const onlineMethods = {
     this.gather.welcome(w.felled);
     this.build.reset();
     this.forges.reset();
+    this.recyclers.reset();
     // the lockers somebody is searching at the moment: their doors stand open
     this.lockers.clear();
     for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
@@ -186,6 +189,7 @@ export const onlineMethods = {
     this.gather.welcome([]);
     this.build.reset();
     this.forges.reset();
+    this.recyclers.reset();
     this.riders.clear();
     this.airdrops.clear();
     this.markDrops();
@@ -340,6 +344,11 @@ export const onlineMethods = {
     net.on('saw', (m) => this.gather.onSaw(m));
     net.on('craft', (m) => this.craft.onCraft(m));
     net.on('cq', (m) => this.craft.onQueue(m));
+    net.on('known', (m) => this.craft.onKnown(m));
+    net.on('trade', (m) => this.camp.onTrade(m));
+    net.on('tday', (m) => this.camp.onDay(m));
+    net.on('recy', (m) => this.recyclers.onRun(m));
+    net.on('learn', (m) => this.craft.onLearn(m));
     net.on('forge', (m) => this.forges.onForge(m));
     net.on('salvage', (m) => this.salvage.onSalvage(m));
     net.on('base', (m) => this.build.onBase(m));

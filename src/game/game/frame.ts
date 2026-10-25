@@ -314,6 +314,8 @@ export const frameMethods = {
     this.gather.update(dt);
     this.craft.update(dt);
     this.forges.update(dt);
+    this.recyclers.update(dt, this.player.pos);
+    audio.machine(dt, this.recyclers.loudest(this.player.pos));
     this.salvage.update(dt);
     this.wrecks.update(dt);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
@@ -429,7 +431,9 @@ export const frameMethods = {
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
     this.garage.frame(dt, now, physics.alpha, cam.position);
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.build.wheelOpen && !this.hold && !ride);
+    // (at the trader camp the guns stay down: nobody is hurt there, src/game/camp.ts)
+    const camped = this.camp.within(this.player.pos);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.build.wheelOpen && !this.hold && !ride && !camped);
     this.grenades.update(dt);
     this.throwing.update(dt);
     this.updateBarrels(dt);
@@ -509,7 +513,7 @@ export const frameMethods = {
     if (this.build.prompt) this.prompt = this.build.prompt;
     this.traders?.update(dt, cam.position);
     // (whoever walks off from the counter, or is killed at it, is done trading)
-    if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos))) this.shop.close();
+    if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos, this.camp.stall))) this.shop.close();
     this.minimap.update(interp.x, interp.z, p.yaw);
     this.map.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);

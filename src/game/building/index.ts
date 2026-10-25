@@ -69,6 +69,8 @@ export interface BuildHost {
   player: () => import('@dimforge/rapier3d-compat').Collider | undefined;
   /** a store opened in the inventory (a claim's) */
   open: (s: Stash) => void;
+  /** another system's word on a piece looked at (crafting's research table): what the corner says, and F is its */
+  use?: (free: boolean, t: { base: Base; id: number } | null) => string | null;
   /** the player's name, as their claim's members are listed */
   name: () => string;
   /** the numbers of the keys carried (src/sim/build/locks.ts) */
@@ -306,7 +308,7 @@ export class Building {
     const lock = this.locks.frame(dt, free, t);
     const claim = this.claims.frame(dt, free, lock ? null : t);
     if (claim) this.prompt = claim;
-    const door = lock ?? this.doors.frame(free, t) ?? this.boxes.frame(free, t);
+    const door = lock ?? this.doors.frame(free, t) ?? this.boxes.frame(free, t) ?? this.h.use?.(free, t) ?? null;
     if (door && !plan && !hammer) this.prompt = door;
     this.torches.update(dt, ok && !this.wheel.isOpen);
     const ladder = this.ladders.frame(dt, ok && !this.wheel.isOpen);

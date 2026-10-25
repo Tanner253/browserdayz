@@ -148,7 +148,7 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'box_large', name: 'Large Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 25, nails: 20 }, hp: 300, store: [10, 8] },
     { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 2, planks: 20, nails: 20 }, hp: 500, levels: true },
     // (crafting's forge, plan-crafting: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts while it
-    // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the scrap and what comes out, src/sim/craft/forge.ts)
+    // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the fragments and what comes out, src/sim/craft/forge.ts)
     { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
     // (the owner, 2026-10-24: "players can place a bed or bedroll in their base when they have a TC down like rust". Plan
     // v2: "Sleeping bag: found ... Wake here after a death, with nothing, at most every 10 min"; a bed, Rust's, sooner)
@@ -160,6 +160,8 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     // about twice metal's": two C4 for the door, four for the garage door, src/sim/build/raid.ts)
     { id: 'door_armoured', name: 'Armoured Door', cat: 'doors', role: 'fit', fits: 'door', only: 4, cost: { steel_plate: 2, iron_bar: 4, hardware: 2, nails: 20 }, hp: 1000, bench: 3 },
     { id: 'garage_door_armoured', name: 'Armoured Garage Door', cat: 'doors', role: 'fit', fits: 'wide', only: 4, cost: { steel_plate: 4, iron_bar: 8, hardware: 3, nails: 40 }, hp: 2000, bench: 3 },
+    // (crafting's research table, progression v3: "put a found item in with scrap, and the item is used up; you know it for good"; laid by a bench, as Bench I makes it; on the end, as every new piece goes)
+    { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 25 }, hp: 300, bench: 1 },
   ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
 

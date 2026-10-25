@@ -13548,6 +13548,176 @@
    ],
    "lods": []
   },
+  "metal_frags": {
+   "url": "assets/models/metal_frags.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 307656,
+   "srcTris": 2652,
+   "tris": 2652,
+   "min": [
+    -0.1057,
+    0,
+    -0.11
+   ],
+   "max": [
+    0.1057,
+    0.0559,
+    0.11
+   ],
+   "lods": [
+    {
+     "url": "assets/models/metal_frags_lod1.glb",
+     "tris": 2506,
+     "far": 2,
+     "of": "307656:1792908242962"
+    }
+   ]
+  },
+  "metal_pipe": {
+   "url": "assets/models/metal_pipe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 307408,
+   "srcTris": 1908,
+   "tris": 1908,
+   "min": [
+    -0.0389,
+    0,
+    -0.175
+   ],
+   "max": [
+    0.0389,
+    0.0786,
+    0.175
+   ],
+   "lods": []
+  },
+  "spring_coil": {
+   "url": "assets/models/spring_coil.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 121288,
+   "srcTris": 2889,
+   "tris": 2889,
+   "min": [
+    -0.0195,
+    0,
+    -0.06
+   ],
+   "max": [
+    0.0195,
+    0.0391,
+    0.06
+   ],
+   "lods": [
+    {
+     "url": "assets/models/spring_coil_lod1.glb",
+     "tris": 2327,
+     "far": 2,
+     "of": "121288:1792910923362"
+    }
+   ]
+  },
+  "gun_body_rifle": {
+   "url": "assets/models/gun_body_rifle.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 270928,
+   "srcTris": 2964,
+   "tris": 2964,
+   "min": [
+    -0.225,
+    0,
+    -0.0854
+   ],
+   "max": [
+    0.225,
+    0.0653,
+    0.0854
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gun_body_rifle_lod1.glb",
+     "tris": 2010,
+     "far": 2,
+     "of": "270928:1792908243792"
+    }
+   ]
+  },
+  "research_table": {
+   "url": "assets/models/research_table.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 268812,
+   "srcTris": 7639,
+   "tris": 7639,
+   "min": [
+    -0.6,
+    0,
+    -0.2885
+   ],
+   "max": [
+    0.6,
+    0.9619,
+    0.2885
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/research_table.glb",
+   "hiBytes": 838764,
+   "hiCard": 64
+  },
+  "recycler": {
+   "url": "assets/models/recycler.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 360120,
+   "srcTris": 10900,
+   "tris": 10900,
+   "min": [
+    -1,
+    0,
+    -0.7951
+   ],
+   "max": [
+    1,
+    1.7395,
+    0.7951
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/recycler.glb",
+   "hiBytes": 1059240,
+   "hiCard": 64
+  },
+  "market_stall": {
+   "url": "assets/models/market_stall.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 285848,
+   "srcTris": 9038,
+   "tris": 9038,
+   "min": [
+    -0.9866,
+    0,
+    -1.3
+   ],
+   "max": [
+    0.9866,
+    2.1243,
+    1.3
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/market_stall.glb",
+   "hiBytes": 760000,
+   "hiCard": 64
+  },
   "c4": {
    "url": "assets/models/c4.glb",
    "tags": [

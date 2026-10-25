@@ -72,9 +72,10 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (66, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
-// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; scrap salvaged, 'salvage');
+// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; metal salvaged, 'salvage');
 // raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
-// a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels.)
+// a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels;
+// progression v3 ('known' and 'learn': blueprints; 'recy': recyclers; 'trade', 'tday' and 'book': the trader camp, paid in scrap).)
 // (65 on the live line, 2026-10-25, a hotfix: a dog tag stays in the pockets until the server says it is cashed, and the
 // game's countdown follows the server's clock ('tagclock'). Raised so every open page loads the fixed game: a page of 64
 // drops the tag the moment its own countdown ends. The working branch's own 65 to 67 are renumbered at its release.)
@@ -82,6 +83,16 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // 'who' when it is changed: src/sim/survivor.ts), and what they wear by its colour ('gear' as id~colour). A page of 66
 // would draw everybody in the old suit. (66 is base building's; the navigator sets the last number at release.)
 export const PROTOCOL = 67;
+
+/** a player's day at the trader camp (src/sim/camp.ts) */
+export interface TradeDay {
+  day: number;
+  bought: Record<string, number>;
+  sold: number;
+  done: string[];
+  kills: number;
+  heads: number;
+}
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -364,6 +375,14 @@ export type C2S =
   | { t: 'cqx'; i: number }
   /** a blow that landed on salvage spot `i` with the tool `u` (src/sim/craft/salvage.ts) */
   | { t: 'salvage'; i: number; u: string }
+  /** a blueprint learned: at a research table from the thing `u`, or recipe `r` of a bench's tech tree (src/sim/craft/learn.ts) */
+  | { t: 'learn'; op: 'research' | 'tree'; u?: string; r?: string }
+  /** recycler `i` switched on or off (src/sim/craft/recycle.ts) */
+  | { t: 'recy'; i: number; on: boolean }
+  /** at the trader camp's stall `s`: a thing bought (`id`), a thing sold (`u`, its uid), or a job handed in (`id`) (src/sim/camp.ts) */
+  | { t: 'trade'; s: string; op: 'buy' | 'sell' | 'job'; id?: string; u?: string }
+  /** the credit this browser had in the old trader's book, to be paid out in scrap once */
+  | { t: 'book'; n: number }
   /** a piece laid with the building plan `u` (src/sim/build/bases.ts Ask): in base `b` at its frame's place, or a new base at a world place turned `yaw` */
   | { t: 'blay'; k: string; b?: number; x: number; y: number; z: number; r: number; yaw?: number; u: string }
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
@@ -484,6 +503,16 @@ export type S2C =
   | { t: 'forge'; b: number; p: number; lit: boolean }
   /** a blow on salvage spot `i` believed: how far through it the work is (1: stripped) */
   | { t: 'salvage'; i: number; done: number }
+  /** the blueprints this player has learned (besides those known from the start) */
+  | { t: 'known'; r: string[] }
+  /** a blueprint learned, or why not; the thing used up by its number (`used`; what stacks comes out as 'spent') */
+  | { t: 'learn'; ok: boolean; why?: string; r?: string; used?: string[] }
+  /** recycler `i` running or not */
+  | { t: 'recy'; i: number; on: boolean }
+  /** a trade done (what the trader says) or not (why); a thing sold, by its number (`used`) */
+  | { t: 'trade'; ok: boolean; say: string; used?: string[] }
+  /** this player's day at the camp: how many of each thing bought, scrap taken for things sold, jobs paid, infected put down and shot in the head */
+  | { t: 'tday'; day: TradeDay }
   /** a base in sight (whole), or out of it / gone; a piece of one laid or changed; pieces of one gone (src/sim/build/bases.ts) */
   | { t: 'base'; b: KeptBase }
   | { t: 'bgone'; b: number }

@@ -1,26 +1,48 @@
-// Where a workbench's or a forge's recipes are made (2026-10-25): near one of them standing in a base, any base's (Rust's
-// bench is anybody's who stands at it). Read by the game for its screen and by the server, which runs the queue.
+// Where a workbench's, a forge's or a research table's work is done (2026-10-25): near one of them standing in a base,
+// any base's (Rust's bench is anybody's who stands at it). Read by the game for its screen and by the server.
 
 import type { Bases } from '../build/bases';
-import { toWorld } from '../build/snap';
-import { NEAR, type Place } from './recipes';
+import { toWorld, type Piece } from '../build/snap';
+import { benchLevel } from '../build/pieces';
+import { NEAR, type Level, type Place } from './recipes';
 
-/** the piece each place is */
-export const PLACE_PIECE: Record<Exclude<Place, 'hand'>, string> = { bench: 'workbench', forge: 'forge' };
+export type Spot = Exclude<Place, 'hand'> | 'research';
+/** the pieces each place is */
+export const PLACE_PIECE: Record<Spot, string> = { bench: 'workbench', forge: 'forge', research: 'research_table' };
+const REACH: Record<Spot, number> = { ...NEAR, research: 3 };
 
-/** the nearest workbench or forge within reach of a place (on the same floor, near enough), or null */
-export function placeNear(bases: Bases, at: Exclude<Place, 'hand'>, x: number, y: number, z: number, within = NEAR[at]): { b: number; p: number; x: number; y: number; z: number } | null {
+/** a workbench's level (progression v3: "three bench levels"), as base building keeps it: its piece's tier (src/sim/build/pieces.ts benchLevel) */
+export const levelOf = (p: Piece): Level => {
+  const lv = benchLevel(p);
+  return lv >= 3 ? 3 : lv === 2 ? 2 : 1;
+};
+
+export interface Near {
+  b: number;
+  p: number;
+  x: number;
+  y: number;
+  z: number;
+  /** a workbench's level: the best of those within reach */
+  lv: Level;
+}
+
+/** the nearest of a place's pieces within reach (on the same floor, near enough), or null; for a workbench, the best level among those within reach */
+export function placeNear(bases: Bases, at: Spot, x: number, y: number, z: number, within = REACH[at]): Near | null {
   const k = PLACE_PIECE[at];
-  let best: { b: number; p: number; x: number; y: number; z: number } | null = null, d = within;
+  let best: Near | null = null, d = within, lv: Level = 1;
   for (const b of bases.bases.values()) {
     for (const p of b.pieces.values()) {
       if (p.k !== k) continue;
       const [px, py, pz] = toWorld(b, p.x, p.y, p.z), h = Math.hypot(px - x, pz - z);
-      if (h < d && Math.abs(py - y) < 2.5) {
+      if (h >= within || Math.abs(py - y) >= 2.5) continue;
+      lv = Math.max(lv, levelOf(p)) as Level;
+      if (h < d) {
         d = h;
-        best = { b: b.id, p: p.id, x: px, y: py, z: pz };
+        best = { b: b.id, p: p.id, x: px, y: py, z: pz, lv: 1 };
       }
     }
   }
+  if (best) best.lv = lv;
   return best;
 }

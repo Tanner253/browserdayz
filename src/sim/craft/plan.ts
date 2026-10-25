@@ -3,7 +3,7 @@
 // up lies in the hands or in a pocket, never what is worn; a tool may be anywhere on you, and is worn a use for each one
 // made (DayZ). A piece of clothing is cut up only with nothing left in its pockets.
 
-import { ITEMS, type ItemInstance } from '../items';
+import { ITEMS, makeItem, type ItemInstance } from '../items';
 import type { SerializedInventory } from '../inventory';
 import { condition } from '../gather';
 import { MOST, RECIPES, optionsOf, type Recipe } from './recipes';
@@ -166,3 +166,14 @@ export function recipesFor(a: ItemInstance, b: ItemInstance): Recipe[] {
 
 /** what a recipe is called on a card: what it makes, or what it does where that says more */
 export const recipeName = (r: Recipe) => (r.id === 'rags' ? 'Cut into rags' : r.id === 'gunpowder' ? 'Pull the powder' : ITEMS[r.makes]?.name ?? r.makes);
+
+/** what `n` of a thing made comes to: piles as big as it stacks, a gun whole with its own magazine in it, empty */
+export function madeItems(id: string, n: number): ItemInstance[] {
+  const def = ITEMS[id], max = def.stack ?? 1, out: ItemInstance[] = [];
+  for (let left = n; left > 0; left -= max) {
+    const it = makeItem(id, Math.min(max, left));
+    if (def.weapon?.mag) it.mag = def.weapon.mag;
+    out.push(it);
+  }
+  return out;
+}

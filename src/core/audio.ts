@@ -394,6 +394,8 @@ export class AudioEngine {
   private maskIn = true;
   private fireT = 0;
   private crackT = 0;
+  private machineT = 0;
+  private crunchT = 0;
   private heartT = 0;
   private stepSide = 1;
   ready = false;
@@ -1874,6 +1876,45 @@ export class AudioEngine {
       const g = ctx.createGain();
       this.env(g, t, (0.05 + Math.random() * 0.13) * near, 0.002, 0.018 + Math.random() * 0.03);
       src.connect(f).connect(g).connect(this.bus.ambience);
+    }
+  }
+
+  /**
+   * A recycler running near by (crafting, progression v3: "A run takes a minute and is loud"): a motor's rumble, and the
+   * crunch of metal in its teeth, heard a long way off. Made up until recordings come, but for the clank of metal.
+   * @param distance metres to the nearest one running (-1 = none near enough to hear)
+   */
+  machine(dt: number, distance: number) {
+    if (!this.ready || distance < 0 || distance > 90) {
+      this.machineT = 0.1;
+      this.crunchT = 0.4;
+      return;
+    }
+    const ctx = this.ctx, t = ctx.currentTime;
+    const near = 1 / (1 + (distance * distance) / 260);
+    this.machineT -= dt;
+    if (this.machineT <= 0) {
+      // the motor: a low growl of noise, one length laid over the end of the last
+      this.machineT = 0.6;
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuf;
+      src.loop = true;
+      src.start(t, Math.random());
+      src.stop(t + 1);
+      const lo = this.filter('lowpass', 150, 1.4), g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.16 * near, t + 0.3);
+      g.gain.linearRampToValueAtTime(0.0001, t + 0.95);
+      src.connect(lo).connect(g).connect(this.sfx);
+    }
+    this.crunchT -= dt;
+    if (this.crunchT <= 0) {
+      // the teeth on metal: never at an even pace
+      this.crunchT = 0.25 + Math.random() * 0.6;
+      if (this.rec('hit_metal', this.sfx, t, 0.55 * near, 0.55 + Math.random() * 0.35, false, true)) return;
+      const src = this.noise(t, 0.08), bp = this.filter('bandpass', 900 + Math.random() * 900, 1.2), g = ctx.createGain();
+      this.env(g, t, 0.12 * near, 0.004, 0.07);
+      src.connect(bp).connect(g).connect(this.sfx);
     }
   }
 

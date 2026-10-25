@@ -31,6 +31,9 @@ import { SHOP, type ItemId } from '../api/_lib/shop-items';
 import { forget } from './searched';
 import { wakeClear } from './solid';
 import { basesFor } from './build';
+import { tellKnown } from './learn';
+import { tellDay } from './camp';
+import { tellRecyclers } from './recycle';
 import { chargesNow } from './raid';
 import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 
@@ -432,6 +435,10 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   c.perkKey = perkKey(c.key);
   if (c.perkKey !== '{}') send(c, { t: 'perks', id: c.id, sk: perks.skins(c.key), ...(perks.vip(c.key) ? { vip: true as const } : {}) });
   partyIn(c);
+  // (and the blueprints they have learned, their day at the trader camp, the recyclers running: server/learn.ts, camp.ts, recycle.ts)
+  tellKnown(c);
+  tellDay(c);
+  tellRecyclers(c);
   // back under another name: the board says so, to everybody
   const had = scores.get(c.key);
   if (had && had.name !== c.name) {

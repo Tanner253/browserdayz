@@ -4,17 +4,20 @@
 // anything used up and made. At a workbench (Rust's): up to five jobs queued, run here one after another while their maker
 // stands at a bench, waiting while they are away; each one made takes what it needs as it is finished, so nothing queued
 // is ever owed back. What stacks is taken as building's costs are ('spent'); a thing used up by its number (a jacket cut
-// into rags) is said back by its number; the tools wear a use each; what is made goes into the pockets.
+// into rags) is said back by its number; the tools wear a use each; what is made goes into the pockets. Only what the
+// player has learned is made (server/learn.ts), and a bench's recipe only at a bench of its level.
 
-import { MOST, NEAR, RECIPE, STILL } from '../src/sim/craft/recipes';
-import { plan, pocketsOf, type Plan } from '../src/sim/craft/plan';
+import { LEVEL_NAME, MOST, NEAR, RECIPE, STILL, type Recipe } from '../src/sim/craft/recipes';
+import { madeItems, plan, pocketsOf, type Plan } from '../src/sim/craft/plan';
 import { placeNear } from '../src/sim/craft/places';
-import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, type ItemInstance } from '../src/sim/items';
 import type { C2S } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
-import { takeOut, things } from './index';
+import { issue, things } from './index';
 import { bases, pay } from './build';
 import { use } from './gather';
+import { mayMake } from './learn';
+import { refuse } from './searched';
 // (every forge runs on its own clock from here: server/forge.ts)
 import './forge';
 
@@ -27,6 +30,7 @@ export function craft(c: Client, m: Extract<C2S, { t: 'craft' }>) {
   const no = (why: string) => send(c, { t: 'craft', r: r.id, ok: false, why });
   // (a workbench's are queued: 'cq'; the forge's are its own)
   if (r.at !== 'hand') return void no(r.at === 'bench' ? 'Made at a workbench' : 'Smelted at a forge');
+  if (!mayMake(c, r.id)) return void no('You have not learned it');
   const u = Array.isArray(m.u) ? m.u.filter((x): x is string => typeof x === 'string').slice(0, 4) : [];
   if (m.go === 1) {
     const q = plan(r, Number(m.n), pocketsOf(c.inv), u);
@@ -52,7 +56,7 @@ export function craft(c: Client, m: Extract<C2S, { t: 'craft' }>) {
 /** a plan carried out on a player's pockets: what it takes taken, the tools worn, what it makes given (and its uids gone) */
 function make(c: Client, q: Plan) {
   pay(c, q.pay);
-  if (q.uids.length) takeOut(c.inv, new Set(q.uids));
+  if (q.uids.length) refuse(c, q.uids);
   for (const uid of q.wear) {
     const it = find(c, uid);
     if (it) use(c, it);
@@ -65,10 +69,11 @@ function find(c: Client, uid: string): ItemInstance | null {
   return null;
 }
 
-/** `n` of a thing into the pockets (what finds no room at the feet, by the game), in piles as big as it stacks */
+/** `n` of a thing into the pockets (what finds no room at the feet, by the game), in piles as big as it stacks; a gun or a
+ * tool the server's own, so that it is not taken for one a game made up (index.ts's `issue`) */
 export function give(c: Client, id: string, n: number) {
-  const max = ITEMS[id].stack ?? 1, items: ItemInstance[] = [];
-  for (let left = n; left > 0; left -= max) items.push(makeItem(id, Math.min(max, left)));
+  const items = madeItems(id, n);
+  for (const it of items) issue(it);
   send(c, { t: 'kit', name: ITEMS[id].name, items, adds: true, gift: `${n} ${ITEMS[id].name}` });
 }
 
@@ -80,8 +85,11 @@ const queues = new Map<Client, { jobs: { r: string; n: number }[]; done: number;
 const STEP = 0.25;
 let timer: ReturnType<typeof setInterval> | null = null;
 
-/** a bench within reach of a player (a little more than its recipes light up within, for the lateness of their word) */
-const atBench = (c: Client, slack = 0) => !!placeNear(bases(), 'bench', c.pose[0], c.pose[1], c.pose[2], NEAR.bench + slack);
+/** a bench within reach of a player (a little more than its recipes light up within, for the lateness of their word), of a recipe's level */
+const atBench = (c: Client, r: Recipe, slack = 0) => {
+  const near = placeNear(bases(), 'bench', c.pose[0], c.pose[1], c.pose[2], NEAR.bench + slack);
+  return !!near && near.lv >= (r.lv ?? 1);
+};
 
 const tellQueue = (c: Client) => {
   const q = queues.get(c);
@@ -92,7 +100,8 @@ export function enqueue(c: Client, m: Extract<C2S, { t: 'cq' }>) {
   const r = typeof m.r === 'string' ? RECIPE[m.r] : undefined;
   if (!c.alive || !r || r.at !== 'bench') return;
   const no = (why: string) => send(c, { t: 'craft', r: r.id, ok: false, why });
-  if (!atBench(c, 1)) return void no(`Needs a workbench within ${NEAR.bench} m`);
+  if (!mayMake(c, r.id)) return void no('You have not learned it');
+  if (!atBench(c, r, 1)) return void no(r.lv && r.lv > 1 ? `Needs a ${LEVEL_NAME[r.lv]} within ${NEAR.bench} m` : `Needs a workbench within ${NEAR.bench} m`);
   const q = queues.get(c) ?? { jobs: [], done: 0, paused: false };
   if (q.jobs.length >= MOST.queue) return void no(`The bench takes ${MOST.queue} jobs at a time`);
   const p = plan(r, Math.max(1, Math.min(99, Math.floor(Number(m.n)) || 1)), pocketsOf(c.inv));
@@ -120,13 +129,13 @@ function runQueues() {
       queues.delete(c);
       continue;
     }
-    const paused = !atBench(c, 1.5);
+    const job = q.jobs[0], r = RECIPE[job.r];
+    const paused = !atBench(c, r, 1.5);
     if (paused !== q.paused) {
       q.paused = paused;
       tellQueue(c);
     }
     if (paused) continue;
-    const job = q.jobs[0], r = RECIPE[job.r];
     q.done += STEP;
     if (q.done + 1e-6 < r.time) continue;
     q.done = 0;
