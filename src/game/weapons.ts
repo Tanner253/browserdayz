@@ -26,7 +26,7 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
-import { fpPose, layOn, type Cut, type FpPose } from './melee/fp';
+import { fpPose, layOn, stanceQuat as stanceOf, type Cut, type FpPose } from './melee/fp';
 import { cutFor } from './melee/cuts';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
@@ -798,17 +798,10 @@ const BLADE = {
   /** a thing in its own pack whose guard is not the knife's: the pitchfork's shaft, turned as the knife is, swung across the whole picture */
   own: { pitchfork: { guard: { p: [0, 0.05, 0.03] as [number, number, number], r: [0.04, 0, -0.08] as [number, number, number] } } } as Record<string, { guard: { p: [number, number, number]; r: [number, number, number] } }>,
 };
-const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
 const _bh = new THREE.Vector3();
 /** a stance as a place and a turn: the thing's own up is toward its head, and its edge is on its far side (-z) */
-function stanceQuat(s: Stance, out: THREE.Quaternion) {
-  _sy.set(...s.tip).normalize();
-  _sz.set(...s.edge);
-  _sz.addScaledVector(_sy, -_sz.dot(_sy)).normalize().negate();
-  _sx.crossVectors(_sy, _sz);
-  return out.setFromRotationMatrix(_sm.makeBasis(_sx, _sy, _sz));
-}
+const stanceQuat = (s: Stance, out: THREE.Quaternion) => stanceOf(s, out);
 
 /** What seats the body's hands on a pack's gun (see `grips` in packGun), in the gun's own space: x toward the muzzle, y up. */
 const SEAT = {

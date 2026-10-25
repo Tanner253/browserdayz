@@ -20,12 +20,17 @@ const TABLE = PATHS as unknown as Record<string, Path>;
 
 /** where the right shoulder is from the eye in the first-person picture (x right, y up, z behind), metres */
 export const FP_SHOULDER = new THREE.Vector3(0.19, -0.27, 0.1);
+/** the nearest the fist comes to the eye, ahead of it (metres) */
+const NEAREST = -0.32;
 
 /**
  * One blow cut out of a captured movement: which, from when it is drawn back (`from`), when the thing is through the
  * middle of the picture (`hit`) and when it has come home (`to`), seconds into the movement.
- *   reach – the share of the arm's angles shown (round, and up)
- *   lands – how the thing is turned from how it rests, as it lands: nose up, nose left, roll (radians, the eye's space)
+ *   reach – the share of the arm's swing shown (round, and up), from where it is as the blow lands
+ *   at    – where the fist is as it lands: round to the left and up from where it rests, radians (by default a
+ *           fifth of a turn round toward the middle of the picture)
+ *   lands – how the thing is held as it lands: which way its head points and its edge faces (the eye's space, as a
+ *           stance says it: see stanceQuat); as it rests, where none is said
  *   turn  – the share of the captured hand's turning about that
  *   lean  – how much of the head's turning the picture takes
  */
@@ -35,7 +40,8 @@ export interface Cut {
   hit: number;
   to: number;
   reach?: [number, number];
-  lands?: [number, number, number];
+  at?: [number, number];
+  lands?: { tip: [number, number, number]; edge: [number, number, number] };
   turn?: number;
   lean?: number;
 }
@@ -56,7 +62,9 @@ export interface FpPose {
 
 export const fpPose = (): FpPose => ({ arm: new THREE.Vector3(), upper: new THREE.Vector3(), stretch: 1, turn: new THREE.Quaternion(), w: 0, head: new THREE.Vector3() });
 
-const _h = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Vector3(), _b = new THREE.Vector3(), _hh = new THREE.Vector3(), _sh = new THREE.Vector3();
+const _h = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Vector3(), _b = new THREE.Vector3(), _hh = new THREE.Vector3(), _sh = new THREE.Vector3(), _eh = new THREE.Vector3();
+/** an angle brought within half a turn either way */
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const _f = new THREE.Vector3(), _n = new THREE.Vector3(), _m = new THREE.Matrix4(), _qa = new THREE.Quaternion(), _qh = new THREE.Quaternion(), _id = new THREE.Quaternion();
 
 /** a row of the path at a time in seconds, between its frames */
@@ -100,9 +108,12 @@ export function cutPose(c: Cut, u: number, hitU: number, rest: { arm: THREE.Vect
   rowAt(p.re, p.fps, t, _e).sub(_s);
   rowAt(p.rs, p.fps, c.hit, _sh);
   rowAt(p.rh, p.fps, c.hit, _hh).sub(_sh);
-  // the arm, round and up from straight ahead as the captured arm is, a share as far, from where it rests
-  wayOf(roundOf(rest.arm) + roundOf(_h) * kr, upOf(rest.arm) + upOf(_h) * ku, out.arm);
-  wayOf(roundOf(rest.upper) + roundOf(_e) * kr, upOf(rest.upper) + upOf(_e) * ku, out.upper);
+  rowAt(p.re, p.fps, c.hit, _eh).sub(_sh);
+  // The arm, round and up from where the captured arm was as the blow landed, a share as far, from where the fist is
+  // put as it lands (the middle of the picture): so every blow lands where it is seen, however it was captured.
+  const [ar, au] = c.at ?? [0.35, 0];
+  wayOf(roundOf(rest.arm) - ar + wrap(roundOf(_h) - roundOf(_hh)) * kr, upOf(rest.arm) + au + (upOf(_h) - upOf(_hh)) * ku, out.arm);
+  wayOf(roundOf(rest.upper) - ar + wrap(roundOf(_e) - roundOf(_eh)) * kr, upOf(rest.upper) + au + (upOf(_e) - upOf(_eh)) * ku, out.upper);
   out.stretch = _h.length() / Math.max(0.05, _hh.length());
   // (the hand's turn since the blow landed, a share of it)
   handAt(p.rf, p.fps, t, _qa);
@@ -113,15 +124,29 @@ export function cutPose(c: Cut, u: number, hitU: number, rest: { arm: THREE.Vect
   return out;
 }
 
-const _v = new THREE.Vector3(), _r = new THREE.Quaternion(), _l = new THREE.Quaternion(), _le = new THREE.Euler();
+const _v = new THREE.Vector3(), _r = new THREE.Quaternion(), _l = new THREE.Quaternion();
+const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
+/** a thing's turn from which way its head points (its own up) and its edge faces (its far side, -z), in the eye's space */
+export function stanceQuat(s: { tip: readonly number[]; edge: readonly number[] }, out: THREE.Quaternion) {
+  _sy.set(s.tip[0], s.tip[1], s.tip[2]).normalize();
+  _sz.set(s.edge[0], s.edge[1], s.edge[2]);
+  _sz.addScaledVector(_sy, -_sz.dot(_sy)).normalize().negate();
+  _sx.crossVectors(_sy, _sz);
+  return out.setFromRotationMatrix(_sm.makeBasis(_sx, _sy, _sz));
+}
 const _rest = { arm: new THREE.Vector3(), upper: new THREE.Vector3() };
 /** A blow, from where the fist and the elbow rest in the picture and how the thing is held there. */
 export function layOn(c: Cut, u: number, hitU: number, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3, at: FpPose) {
   const L = _rest.arm.copy(pos).sub(FP_SHOULDER).length(), Lu = _rest.upper.copy(elbow).sub(FP_SHOULDER).length();
   cutPose(c, u, hitU, _rest, at);
   pos.lerp(_v.copy(at.arm).multiplyScalar(L * at.stretch).add(FP_SHOULDER), at.w);
+  // (never into the eye: an arm swung round past the side or up over the head stays in front of it and under it, and
+  // the elbow under the eye: raised past it, the sleeve filled the picture)
+  pos.z = Math.min(pos.z, NEAREST);
+  pos.y = Math.min(pos.y, 0.12);
   elbow.lerp(_v.copy(at.upper).multiplyScalar(Lu).add(FP_SHOULDER), at.w);
-  const [x, y, z] = c.lands ?? [0, 0, 0];
-  _l.setFromEuler(_le.set(x, y, z, 'YXZ'));
-  quat.slerp(_r.copy(at.turn).multiply(_l).multiply(quat), at.w);
+  elbow.y = Math.min(elbow.y, -0.08);
+  if (c.lands) stanceQuat(c.lands, _l);
+  else _l.copy(quat);
+  quat.slerp(_r.copy(at.turn).multiply(_l), at.w);
 }

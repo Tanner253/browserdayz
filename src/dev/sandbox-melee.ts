@@ -2,8 +2,8 @@
 // one of its blows, each moment in its own cell. The body is the game's own (Avatar, as the lineup makes one), the thing
 // in its fist the game's own (meleeHeld), and the blow laid on it by the game's own code (src/game/melee/body.ts).
 //   &melee=hatchet&n=0                the hatchet's first blow of a run (src/game/melee/cuts.ts)
-//   &blow=Right_Hand_Sword_Slash,0.15,0.57,0.95[,0,1.4,0.3]   a blow cut by hand instead: the movement, from, hit, to
-//                                     (seconds), and how the thing is turned as it lands (radians: see Cut)
+//   &blow=Right_Hand_Sword_Slash,0.15,0.57,0.95[,tip x,y,z,edge x,y,z]   a blow cut by hand instead: the movement, from,
+//                                     hit, to (seconds), and how the thing is held as it lands (see Cut)
 //   &strip=8&views=q                  eight moments, from three-quarters (side, front, q, back)
 //   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
 //                                     places them (meleeAt), through the hands' own lens (48 degrees)
@@ -40,7 +40,7 @@ export async function stageMelee(id: string, s: {
   const def = ITEMS[id];
   if (!def?.melee) throw new Error(`not something to hit with: ${id}`);
   const by = s.q.get('blow')?.split(',');
-  const cut: Cut | null = by ? { clip: by[0], from: +by[1], hit: +by[2], to: +by[3], ...(by.length >= 7 ? { lands: [+by[4], +by[5], +by[6]] as [number, number, number] } : {}) } : cutFor(id, +(s.q.get('n') ?? 0));
+  const cut: Cut | null = by ? { clip: by[0], from: +by[1], hit: +by[2], to: +by[3], ...(by.length >= 10 ? { lands: { tip: [+by[4], +by[5], +by[6]] as [number, number, number], edge: [+by[7], +by[8], +by[9]] as [number, number, number] } } : {}) } : cutFor(id, +(s.q.get('n') ?? 0));
   if (!cut) throw new Error(`no captured blow for ${id}`);
   const dur = def.melee.rate * 0.9;
   if (s.q.get('fp') === '1') return firstPerson(id, cut, dur, s);
