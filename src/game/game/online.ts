@@ -817,6 +817,12 @@ export const onlineMethods = {
     if (p.id === this.net.id || this.remotes.has(p.id)) return;
     const r = new RemotePlayer(p.id, p.name, this.makeHeld);
     this.remotes.set(p.id, r);
+    // (who they are and what they wear, as they were when they came: what is said of either while their body is being
+    // made is put on when it is, and not undone by this; a game from before there were survivors to pick is given the
+    // one its name gives)
+    this.gearOf.set(p.id, p.g ?? []);
+    r.avatar.wardrobe.setBody(p.bd ?? bodyFor(p.name));
+    r.voice = p.vo ?? voiceFor(p.bd ?? bodyFor(p.name));
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     // (gone again while their body was being made: see RemotePlayer.gone)
     if (this.remotes.get(p.id) !== r) return;
@@ -824,11 +830,7 @@ export const onlineMethods = {
     r.tagged = !!p.tag;
     r.wearTag();
     r.setWeapon(p.w, p.m, p.f);
-    void this.wear(r.avatar, p.g ?? []);
-    this.gearOf.set(p.id, p.g ?? []);
-    // (which survivor, and their voice: a game from before there were any to pick is given the one its name gives)
-    r.avatar.wardrobe.setBody(p.bd ?? bodyFor(p.name));
-    r.voice = p.vo ?? voiceFor(p.bd ?? bodyFor(p.name));
+    void this.wear(r.avatar, this.gearOf.get(p.id) ?? []);
     r.setGhost(!!p.hidden);
     r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);
