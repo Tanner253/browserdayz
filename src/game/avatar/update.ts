@@ -3,9 +3,13 @@
 // Avatar.prototype as the file loads. Nothing in them was changed but `this: Avatar` said as the first parameter.)
 
 import * as THREE from 'three';
+import { stretch } from './gait';
+import { MOCAP } from './deeds';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+
+const _way = new THREE.Vector3();
 
 export const updateMethods = {
   /**
@@ -65,7 +69,8 @@ export const updateMethods = {
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
     // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
-    const free = !firstPerson && !armed && !fists;
+    // (a survivor on motion capture steps sideways and back facing the aim: only flat out does the body turn to the way it runs)
+    const free = !firstPerson && !armed && !fists && (!this.gait || speedNow > 5.2);
     const velYaw = Math.atan2(-velocity.x, -velocity.z);
     const targetYaw = free && speedNow > 0.6 ? velYaw : facingYaw;
     if (this.placed) this.yaw += wrap(targetYaw - this.yaw) * ease(firstPerson ? 40 : armed ? 18 : 10);
@@ -82,6 +87,8 @@ export const updateMethods = {
       const side = Math.abs(rel);
       if (this.backing ? side < 1.4 : side > 1.75) this.backing = !this.backing;
       twistTo = THREE.MathUtils.clamp(this.backing ? wrap(rel + Math.PI) : rel, -POSE.maxTwist, POSE.maxTwist) * Math.min(1, speedNow / 1.2);
+      // (on motion capture the legs step the way they go, and are turned only for a gait drawn ahead alone: see Gait)
+      if (this.gait && this.proneT < 0.5) twistTo = this.gait.twist;
       if (this.backing) dirSign = -1;
     } else this.backing = false;
     this.twist += (twistTo - this.twist) * ease(9);
@@ -176,6 +183,12 @@ export const updateMethods = {
       w.proneDown += lying * (1 - this.crawlK);
       w.crawl += lying * this.crawlK;
     }
+    // (a survivor's steps are the motion capture's: its gait takes the walk's, the run's and the crouched walk's share)
+    const gait = this.gait;
+    if (gait) {
+      gait.step(dt, speed, wrap(velYaw - this.yaw), w.walk + w.run, w.crouchWalk, hold, this.limpT);
+      w.walk = w.run = w.crouchWalk = 0;
+    }
     // (the crawl keeps time with the ground: a pull of the arms for so much of it, backwards when going backwards)
     const pulled = this.crawlAt;
     this.crawlAt = (((this.crawlAt + (dt * speedNow * dirSign) / POSE.crawlStride) % 1) + 1) % 1;
@@ -216,6 +229,10 @@ export const updateMethods = {
     // (not two in a breath: the place moving the other way can bring the same foot past it twice)
     this.sinceStep += dt;
     this.footfall = footfall && stepping > 0.35 && speedNow > 0.5 && this.sinceStep > 0.25;
+    if (gait) {
+      this.phase = gait.phase;
+      this.footfall = gait.footfall && this.sinceStep > 0.25;
+    }
     if (this.footfall) this.sinceStep = 0;
     this.clock += dt;
     // (one of the pack's movements in place of the body's own dance, with all of the dance's weight: see setClip)
@@ -243,6 +260,17 @@ export const updateMethods = {
       else if (n === 'run' && this.sick) a.time = this.sickRun % this.dur[n];
       else if (n === 'walk' || n === 'run' || n === 'crouchWalk') a.time = ((this.phase + POSE.offset[n]) % 1) * this.dur[n];
       else a.time = this.clock % this.dur[n];
+    }
+    // (a survivor goes down and flinches on the motion capture: the old clips' weights handed to it)
+    const deeds = this.deeds;
+    if (deeds) {
+      deeds.mute();
+      const fall = MOCAP[this.deathClip], flinch = MOCAP[this.hitClip];
+      if (w[this.deathClip] > 0) deeds.set(fall, w[this.deathClip], this.downT);
+      if (w[this.hitClip] > 0) deeds.set(flinch, w[this.hitClip], this.hitT);
+      this.actions[this.deathClip].setEffectiveWeight(0);
+      this.actions.hit.setEffectiveWeight(0);
+      this.actions.hitHead.setEffectiveWeight(0);
     }
     this.mixer.update(0);
     for (const [from, to] of this.drive) {
@@ -280,6 +308,28 @@ export const updateMethods = {
       const u = this.sick.claw / CLAW;
       this.layer('strike', strikeAt(u, CLAW_HIT), strikeShare(u), 1);
     }
+    // --- on the motion capture: what is kept up (a ladder, the water, a bedroll), the whole body; and what is done once
+    // over it, the legs too while standing (a pick-up, a swing, a throw), the arms alone for a drink
+    if (deeds) {
+      this.stayT += ((this.stay && !dead ? 1 : 0) - this.stayT) * ease(this.stay ? 6 : 4);
+      if (this.stay) {
+        this.stay.t += dt * this.stay.rate;
+        this.stayWas = this.stay.name;
+      }
+      const kept = this.stay?.name ?? this.stayWas, a = kept && this.stayT > 0.002 ? deeds.get(kept) : null;
+      if (a) this.layer(a, ((((this.stay?.t ?? 0) % a.getClip().duration) + a.getClip().duration) % a.getClip().duration), this.stayT, 1);
+      else if (!this.stay) this.stayWas = null;
+      const d = this.deed;
+      if (d) {
+        d.t += dt;
+        const act = deeds.get(d.name);
+        if (d.t >= d.dur || dead) this.deed = null;
+        else if (act) {
+          const k = d.k * THREE.MathUtils.smoothstep(d.t, 0, Math.min(0.2, d.dur * 0.25)) * (1 - THREE.MathUtils.smoothstep(d.t, d.dur - Math.min(0.3, d.dur * 0.35), d.dur));
+          this.layer(act, (d.from + ((d.to - d.from) * d.t) / d.dur) * act.getClip().duration, k, d.legs * (1 - this.moveT));
+        }
+      }
+    }
 
     this.root.position.copy(pos);
     this.root.position.y -= SIT.drop * onGround;
@@ -308,6 +358,11 @@ export const updateMethods = {
       this.root.rotation.set(tip * pr, this.yaw + this.twist + Math.sin(this.crawl) * 0.05 * going, roll * pr);
     }
     if (this.dive) this.root.rotation.x = this.dive;
+    // (the steps stretched to the pace the body goes at: see Gait's warp)
+    if (gait && gait.share > 0.02 && Math.abs(gait.warp - 1) > 0.02 && !dead && pr < 0.01 && speedNow > 0.3 && this.joints.pelvis) {
+      settle(this.root);
+      stretch(this.legs, this.joints.pelvis, _way.set(velocity.x, 0, velocity.z).normalize(), 1 + (gait.warp - 1) * Math.min(1, gait.share) * (1 - this.airT));
+    }
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
     if (this.inHand) this.inHand.obj.visible = !using;
@@ -680,7 +735,11 @@ export const updateMethods = {
         const from = r.arm.getWorldPosition(_v2), d = to.distanceTo(from), most = (r.la + r.lb) * 0.93;
         return d > most ? to.sub(from).multiplyScalar(most / d).add(from) : to;
       };
-      if (ges.kind === 'eat' || ges.kind === 'drink') {
+      const sip = (ges.kind === 'eat' || ges.kind === 'drink') && this.deeds?.get('drink');
+      if (sip) {
+        // (a survivor's on the motion capture: the arms and the chest of somebody drinking, a sip after a sip)
+        this.layer(sip, ges.t % sip.getClip().duration, wgt, 0);
+      } else if (ges.kind === 'eat' || ges.kind === 'drink') {
         // up to the mouth and back down, once a bite or a gulp
         const period = ges.kind === 'eat' ? 0.95 : 1.25;
         const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, ges.t - 0.3) / period) * Math.PI * 2);
@@ -766,7 +825,7 @@ export const updateMethods = {
     }
     // on a broken leg: once a stride the hips drop over it and the back goes after them
     this.limpT += ((this.limping && !dead ? 1 : 0) - this.limpT) * ease(5);
-    if (this.limpT > 0.02 && !this.sick && this.downT <= 0) {
+    if (this.limpT > 0.02 && !this.sick && !this.gait && this.downT <= 0) {
       const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
       const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
       _right.set(1, 0, 0).applyQuaternion(aimQ);

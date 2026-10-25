@@ -829,7 +829,8 @@ export const onlineMethods = {
 
   /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
   act(this: Game, a: Act, d = 1) {
-    if (a === 'stop') this.avatar.act(null);
+    if (a === 'take') this.avatar.pickUp(d);
+    else if (a === 'stop') this.avatar.act(null);
     else this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, d);
     this.net.send({ t: 'act', a, d });
   },
