@@ -21,6 +21,7 @@ import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
+import type { BodyBlow } from './melee/body';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -328,6 +329,8 @@ export class Avatar {
   /** a blow with something in the fist: seconds into it (-1 none), and how long it takes */
   strikeT = -1;
   strikeDur = 0.6;
+  /** a captured blow being thrown with what is in the fist (src/game/melee/body.ts), made the first time one is */
+  blow: BodyBlow | null = null;
   fpBones: [THREE.Object3D, THREE.Object3D, boolean][] = [];
   yaw = 0;
   /** false until the first update: a body that appears is already facing its way, not turning to it */

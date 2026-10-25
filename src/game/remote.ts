@@ -18,6 +18,7 @@ import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
 import type { Jeep } from './vehicle';
 import { Timeline, between, caughtUp } from '../net/timeline';
+import { cutFor } from './melee/cuts';
 
 
 interface Snap {
@@ -410,11 +411,16 @@ export class RemotePlayer implements Damageable {
     return this.ready && this.alive ? this.avatar.muzzle() : null;
   }
 
+  /** which blow of a run they threw last, and when (performance.now, ms): the same run as their own game counts */
+  private strokeN = 0;
+  private strokeAt = -1e9;
   /** they threw a punch or swung what they are holding */
   swing() {
     if (!this.ready || !this.alive) return;
-    const melee = this.weapon ? ITEMS[this.weapon]?.melee : undefined;
-    this.avatar.swing(false, melee ? melee.rate * 0.9 : undefined);
+    const melee = this.weapon ? ITEMS[this.weapon]?.melee : undefined, now = performance.now();
+    this.strokeN = melee && now - this.strokeAt < (melee.rate + 0.7) * 1000 ? this.strokeN + 1 : 0;
+    this.strokeAt = now;
+    this.avatar.swing(false, melee ? melee.rate * 0.9 : undefined, melee ? cutFor(this.weapon!, this.strokeN) : null);
     if (this.pos.distanceToSquared(this.heard) < 30 * 30) audio.whoosh(this.weapon ? 0.6 : 0, this.pos);
   }
 

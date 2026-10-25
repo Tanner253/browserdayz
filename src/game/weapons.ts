@@ -26,6 +26,8 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
+import { cutPose, type FpPose } from './melee/fp';
+import { cutFor } from './melee/cuts';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -1334,6 +1336,138 @@ async function holoParts(): Promise<MeshPart[]> {
   return parts;
 }
 
+/**
+ * Something held to strike with, made out of its model: held upright in the right hand, the handle in the middle of
+ * the fist, its grips said in its own space. The view in the hands and the copy in everybody else's are made from
+ * it (and the sandbox, src/dev/sandbox-melee.ts).
+ */
+export async function meleeHeld(id: string) {
+  const def = ITEMS[id];
+  const sc = await assets.model(def.model);
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  const parts = extractParts(sc);
+  const box = new THREE.Box3();
+  for (const p of parts) {
+    p.geometry.computeBoundingBox();
+    box.union(p.geometry.boundingBox!);
+  }
+  const size = box.getSize(new THREE.Vector3());
+  const c = box.getCenter(new THREE.Vector3());
+  const longAxis = size.y >= size.x && size.y >= size.z ? 'y' : size.x >= size.z ? 'x' : 'z';
+  for (const p of parts) {
+    // bare steel with nothing around it to reflect draws as a black cut-out this close to
+    // the eye: let a blade or an axe head take the light like worn metal does
+    const mat = plainMaterial(p.material) as THREE.MeshStandardMaterial;
+    mat.metalness = Math.min(mat.metalness, 0.45);
+    mat.roughness = Math.max(mat.roughness, 0.5);
+    const mesh = new THREE.Mesh(p.geometry, mat);
+    mesh.position.set(-c.x, -box.min.y, -c.z);
+    if (longAxis === 'x') {
+      mesh.position.set(-box.min.x, -c.y, -c.z);
+    }
+    body.add(mesh);
+  }
+  // Which way the head faces. An axe's edge, a crowbar's claw: the side of the head that
+  // stands furthest off the handle leads the swing, away from whoever holds it. Two of the
+  // models are drawn the other way round and were held edge-first toward the face.
+  if (longAxis === 'y') {
+    const L = size.y;
+    let hx = 0, hz = 0, n = 0, far = -1e9, near = 1e9;
+    const each = (fn: (x: number, y: number, z: number) => void) => {
+      for (const mesh of body.children as THREE.Mesh[]) {
+        const P = mesh.geometry.getAttribute('position');
+        for (let i = 0; i < P.count; i += 2) fn(P.getX(i) + mesh.position.x, P.getY(i) + mesh.position.y, P.getZ(i) + mesh.position.z);
+      }
+    };
+    each((x, y, z) => {
+      if (y < L * 0.3) {
+        hx += x;
+        hz += z;
+        n++;
+      }
+    });
+    hx /= Math.max(1, n);
+    hz /= Math.max(1, n);
+    each((_x, y, z) => {
+      if (y > L * 0.72) {
+        far = Math.max(far, z - hz);
+        near = Math.min(near, z - hz);
+      }
+    });
+    // toward +z is toward the eye: turn it about the handle so it faces out
+    // (a machete's blade stands off its handle no more one way than the other, and this
+    // one is drawn edge to the eye: it is turned because it is known to be)
+    if ((far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id)) {
+      const turn = new THREE.Group();
+      turn.position.set(hx, 0, hz);
+      turn.rotation.y = Math.PI;
+      for (const mesh of [...body.children]) {
+        mesh.position.x -= hx;
+        mesh.position.z -= hz;
+        turn.add(mesh);
+      }
+      body.add(turn);
+    }
+  }
+  if (longAxis === 'x') body.rotation.z = Math.PI / 2;
+  if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
+  // Where along it the fist closes: a hand's width up from the butt of a long handle, the
+  // middle of a short one. That point is what is held out in front: the fist is in the
+  // picture whatever the length of the thing.
+  const style = MELEE_STYLE[id];
+  // Where along it the fist closes (the middle of the part of the handle that is made to
+  // be held), and in both hands, where the left closes under the right.
+  const held = style.grip;
+  const under = style.two ? held - 0.105 : 0;
+  body.position.y = -held;
+  // (how it stands, and how it moves, is all in its style: see animateMelee)
+  const holder = new THREE.Group();
+  holder.add(body);
+  root.add(holder);
+  // The HANDLE in the middle of the fist, not the middle of the whole thing: an axe's head
+  // and a crowbar's claw stand out to one side, and the middle of the lot is three and
+  // four centimetres off the middle of the handle. Where the handle is, at the height the
+  // hand closes round it, is found from its own points.
+  root.updateMatrixWorld(true);
+  const handleAt = (h: number) => {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    const v = new THREE.Vector3();
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const P = mesh.geometry.getAttribute('position');
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
+        if (Math.abs(v.y - (h - held)) > 0.035) continue;
+        x0 = Math.min(x0, v.x);
+        x1 = Math.max(x1, v.x);
+        z0 = Math.min(z0, v.z);
+        z1 = Math.max(z1, v.z);
+      }
+    });
+    return x0 <= x1 ? new THREE.Vector3((x0 + x1) / 2, h - held, (z0 + z1) / 2) : new THREE.Vector3(0, h - held, 0);
+  };
+  const mid = handleAt(held);
+  holder.position.set(-mid.x, 0, -mid.z);
+  root.updateMatrixWorld(true);
+  // (the grips are said in the thing's own space: where the handle is there, at each hand)
+  const inBody = (h: number) => body.worldToLocal(handleAt(h));
+  const rightAt = inBody(held), leftAt = inBody(under);
+  return {
+    root, kind: 'melee' as const, body, melee: style,
+    grips: {
+      // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
+      // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
+      right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
+      left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
+    },
+    // high enough that the fist on the handle is in the picture, not only the head
+    hip: new THREE.Vector3(...MELEE.hip),
+    ads: new THREE.Vector3(MELEE.hip[0] - 0.05, MELEE.hip[1] + 0.025, MELEE.hip[2]),
+    muzzle: new THREE.Vector3(),
+  };
+}
 export class Weapons {
   private vmRoot = new THREE.Group();
   private models = new Map<string, VmModel>();
@@ -1486,9 +1620,8 @@ export class Weapons {
   onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
   /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
   onStruck: (owner: unknown, weapon: string) => void = () => {};
-  /** a punch or a melee swing has started */
-  /** a punch has been thrown, or what is held swung (which takes this many seconds) */
-  onSwing: (seconds?: number) => void = () => {};
+  /** a punch or a swing has started: how long it takes, and which blow of a run it is (a swing of something to hit with) */
+  onSwing: (seconds?: number, stroke?: number) => void = () => {};
   /** loot models, so consumables can be shown in the hands while they are used */
   itemModels: ItemModels | null = null;
   // bare hands: fists come up to punch (LMB) or guard (RMB) and drop again after a moment
@@ -1718,134 +1851,9 @@ export class Weapons {
       spare: ['Pmag2_063', akRide.mag],
     }));
 
-    // ---- melee weapons: held upright in the right hand
+    // ---- melee weapons: held upright in the right hand (see meleeHeld)
     for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork']) {
-      const def = ITEMS[id];
-      const sc = await assets.model(def.model);
-      const root = new THREE.Group();
-      const body = new THREE.Group();
-      const parts = extractParts(sc);
-      const box = new THREE.Box3();
-      for (const p of parts) {
-        p.geometry.computeBoundingBox();
-        box.union(p.geometry.boundingBox!);
-      }
-      const size = box.getSize(new THREE.Vector3());
-      const c = box.getCenter(new THREE.Vector3());
-      const longAxis = size.y >= size.x && size.y >= size.z ? 'y' : size.x >= size.z ? 'x' : 'z';
-      for (const p of parts) {
-        // bare steel with nothing around it to reflect draws as a black cut-out this close to
-        // the eye: let a blade or an axe head take the light like worn metal does
-        const mat = plainMaterial(p.material) as THREE.MeshStandardMaterial;
-        mat.metalness = Math.min(mat.metalness, 0.45);
-        mat.roughness = Math.max(mat.roughness, 0.5);
-        const mesh = new THREE.Mesh(p.geometry, mat);
-        mesh.position.set(-c.x, -box.min.y, -c.z);
-        if (longAxis === 'x') {
-          mesh.position.set(-box.min.x, -c.y, -c.z);
-        }
-        body.add(mesh);
-      }
-      // Which way the head faces. An axe's edge, a crowbar's claw: the side of the head that
-      // stands furthest off the handle leads the swing, away from whoever holds it. Two of the
-      // models are drawn the other way round and were held edge-first toward the face.
-      if (longAxis === 'y') {
-        const L = size.y;
-        let hx = 0, hz = 0, n = 0, far = -1e9, near = 1e9;
-        const each = (fn: (x: number, y: number, z: number) => void) => {
-          for (const mesh of body.children as THREE.Mesh[]) {
-            const P = mesh.geometry.getAttribute('position');
-            for (let i = 0; i < P.count; i += 2) fn(P.getX(i) + mesh.position.x, P.getY(i) + mesh.position.y, P.getZ(i) + mesh.position.z);
-          }
-        };
-        each((x, y, z) => {
-          if (y < L * 0.3) {
-            hx += x;
-            hz += z;
-            n++;
-          }
-        });
-        hx /= Math.max(1, n);
-        hz /= Math.max(1, n);
-        each((_x, y, z) => {
-          if (y > L * 0.72) {
-            far = Math.max(far, z - hz);
-            near = Math.min(near, z - hz);
-          }
-        });
-        // toward +z is toward the eye: turn it about the handle so it faces out
-        // (a machete's blade stands off its handle no more one way than the other, and this
-        // one is drawn edge to the eye: it is turned because it is known to be)
-        if ((far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id)) {
-          const turn = new THREE.Group();
-          turn.position.set(hx, 0, hz);
-          turn.rotation.y = Math.PI;
-          for (const mesh of [...body.children]) {
-            mesh.position.x -= hx;
-            mesh.position.z -= hz;
-            turn.add(mesh);
-          }
-          body.add(turn);
-        }
-      }
-      if (longAxis === 'x') body.rotation.z = Math.PI / 2;
-      if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
-      // Where along it the fist closes: a hand's width up from the butt of a long handle, the
-      // middle of a short one. That point is what is held out in front: the fist is in the
-      // picture whatever the length of the thing.
-      const style = MELEE_STYLE[id];
-      // Where along it the fist closes (the middle of the part of the handle that is made to
-      // be held), and in both hands, where the left closes under the right.
-      const held = style.grip;
-      const under = style.two ? held - 0.105 : 0;
-      body.position.y = -held;
-      // (how it stands, and how it moves, is all in its style: see animateMelee)
-      const holder = new THREE.Group();
-      holder.add(body);
-      root.add(holder);
-      // The HANDLE in the middle of the fist, not the middle of the whole thing: an axe's head
-      // and a crowbar's claw stand out to one side, and the middle of the lot is three and
-      // four centimetres off the middle of the handle. Where the handle is, at the height the
-      // hand closes round it, is found from its own points.
-      root.updateMatrixWorld(true);
-      const handleAt = (h: number) => {
-        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-        const v = new THREE.Vector3();
-        root.traverse((o) => {
-          const mesh = o as THREE.Mesh;
-          if (!mesh.isMesh) return;
-          const P = mesh.geometry.getAttribute('position');
-          for (let i = 0; i < P.count; i++) {
-            v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
-            if (Math.abs(v.y - (h - held)) > 0.035) continue;
-            x0 = Math.min(x0, v.x);
-            x1 = Math.max(x1, v.x);
-            z0 = Math.min(z0, v.z);
-            z1 = Math.max(z1, v.z);
-          }
-        });
-        return x0 <= x1 ? new THREE.Vector3((x0 + x1) / 2, h - held, (z0 + z1) / 2) : new THREE.Vector3(0, h - held, 0);
-      };
-      const mid = handleAt(held);
-      holder.position.set(-mid.x, 0, -mid.z);
-      root.updateMatrixWorld(true);
-      // (the grips are said in the thing's own space: where the handle is there, at each hand)
-      const inBody = (h: number) => body.worldToLocal(handleAt(h));
-      const rightAt = inBody(held), leftAt = inBody(under);
-      const flash = mkFlash();
-      this.models.set(id, {
-        root, kind: 'melee', flash, body, melee: style,
-        grips: {
-          // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
-          // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
-          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
-          left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
-        },
-        // high enough that the fist on the handle is in the picture, not only the head
-        hip: new THREE.Vector3(...MELEE.hip),
-        ads: new THREE.Vector3(MELEE.hip[0] - 0.05, MELEE.hip[1] + 0.025, MELEE.hip[2]),
-        muzzle: new THREE.Vector3(),
-      });
+      this.models.set(id, { ...(await meleeHeld(id)), flash: mkFlash() });
     }
     // ---- the knife, for whoever holds it: its own pack, hands and all, moved by its own animation (see BLADE).
     // What was made of it just above is still what everybody else sees in its holder's fist. Its arms are the
@@ -3739,7 +3747,7 @@ export class Weapons {
     this.strokeN = this.time - this.strokeAt < melee.rate + 0.7 ? this.strokeN + 1 : 0;
     this.strokeAt = this.time;
     this.start('swing', melee.rate * 0.9, undefined, { hit: 0, dmg: melee.damage, range: melee.range, stroke: this.strokeN });
-    this.onSwing(melee.rate * 0.9);
+    this.onSwing(melee.rate * 0.9, this.strokeN);
     void camera;
   }
 
@@ -4515,6 +4523,8 @@ export class Weapons {
    * round the elbow as one piece (the wrist is held firm, as it is in life), drawn back
    * slowly, brought through fast, carried on, and brought home.
    */
+  /** where the captured blow being thrown is (see animateMelee) */
+  private cutAt: FpPose = { move: new THREE.Vector3(), turn: new THREE.Quaternion(), elbow: new THREE.Vector3(), head: new THREE.Vector3() };
   private animateMelee(dt: number, m: VmModel, st: MeleeStyle) {
     const p = this.player;
     const a = this.action;
@@ -4526,9 +4536,9 @@ export class Weapons {
     const quat = stanceQuat(st.idle, _mq);
     const elbow = _mel.set(...st.elbow);
     let pitch = 0, yaw = 0;
-    // (The body's own drawn blow is not what is shown here: seen from its own eyes nearly all
-    // of it passes outside the picture. The hands throw one made to be seen from the eye.)
-    if (a && a.name === 'swing') {
+    // (A captured blow, where the thing has one: see src/game/melee/fp.ts. Otherwise one made to be seen from the eye.)
+    const cut = a && a.name === 'swing' && !a.data?.dig ? cutFor(this.currentItem?.id, a.data?.stroke ?? 0) : null;
+    if (a && a.name === 'swing' && !cut) {
       const k = Math.min(1, a.t / a.dur);
       const stroke = st.strokes[(a.data?.stroke ?? 0) % st.strokes.length];
       let i = 0;
@@ -4555,6 +4565,12 @@ export class Weapons {
       const swing = turned(round0 + yaw, up0 + pitch, _mq2).multiply(turned(round0, up0, _mq3).invert());
       pos.copy(fore.applyQuaternion(swing)).add(elbow);
       quat.premultiply(swing);
+    }
+    if (cut) {
+      cutPose(cut, Math.min(1, a!.t / a!.dur), 0.35, this.cutAt);
+      pos.add(this.cutAt.move);
+      quat.premultiply(this.cutAt.turn);
+      elbow.add(this.cutAt.elbow);
     }
     // Carried, it lies where its style rests it. For a blow the fists go at once to where it is
     // struck from; what is in them stays laid back while the arms are drawn up, and comes over

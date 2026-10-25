@@ -121,6 +121,7 @@ import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
 import { MyPerks } from './my-perks';
 import { finishLighting, wearFinish, type Finish } from './finish';
+import { cutFor } from './melee/cuts';
 import type { StoredItem } from '../net/protocol';
 
 export const _gasHead = new THREE.Vector3();
@@ -780,8 +781,8 @@ export class Game {
       this.hud.note(`No room for the ${ITEMS[item.id].name.toLowerCase()}: it is at your feet`, 'warn');
     };
     // a punch or a swing: your own body throws it, and everyone near you sees it
-    this.weapons.onSwing = (seconds) => {
-      this.avatar.swing(false, seconds);
+    this.weapons.onSwing = (seconds, stroke) => {
+      this.avatar.swing(false, seconds, stroke === undefined ? null : cutFor(this.weapons.equippedItem?.id, stroke));
       this.net.send({ t: 'swing' });
     };
     progress('compiling shaders');

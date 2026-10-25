@@ -275,6 +275,10 @@ export const updateMethods = {
       if (u >= 1 || dead) this.strikeT = -1;
       else this.layer('strike', strikeAt(u), strikeShare(u));
     }
+    if (this.blow?.busy) {
+      if (dead || !this.inHand) this.blow.stop();
+      else this.blow.update(dt);
+    }
     if (this.sick && this.sick.claw >= 0 && !dead) {
       // (it throws its whole body after its arm: the lunge is the clip's own)
       const u = this.sick.claw / CLAW;

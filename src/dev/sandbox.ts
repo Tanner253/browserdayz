@@ -19,6 +19,7 @@
 //   &sun=day|dusk                               default day
 //   &person=0                                   no survivor beside it
 //   &gap=0.05                                   metres between things laid side by side (0.5)
+//   &melee=hatchet&n=0&strip=8                  a survivor at moments of one of its blows (src/dev/sandbox-melee.ts)
 //   &finish=emerald,ruby&as=knife               the store finish each model wears in turn (as: the gun it is plated as)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
@@ -43,7 +44,7 @@ const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
 const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0', gap = +(q.get('gap') ?? 0.5);
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
-const sim = q.get('sim');
+const sim = q.get('sim'), melee = q.get('melee');
 const cells = sim ? 8 : strip > 0 ? strip : views.length;
 const cols = Math.min(cells, strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -121,6 +122,12 @@ if (sim) {
   };
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   out.stageInfo = await stageSim(sim, { q, scene, renderer, sun, floor, cw, ch, cols, rows, say, body });
+  out.staged = true;
+} else if (melee) {
+  // (a survivor holding something to hit with, at moments of one of its blows: src/dev/sandbox-melee.ts)
+  const { stageMelee } = await import('./sandbox-melee');
+  const out = window as unknown as { staged: boolean; stageInfo: unknown };
+  out.stageInfo = await stageMelee(melee, { q, scene, renderer, sun, cw, ch, cols, rows, cells, say });
   out.staged = true;
 } else {
   // ---- the thing(s): side by side along x, each standing on the floor

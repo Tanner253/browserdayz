@@ -5,16 +5,24 @@
 import * as THREE from 'three';
 import { POSE, DEATHS, type Gesture, type Move, type Hold, type SeatPose, type Clip, CLIPS } from './pose';
 import { CUT, _a, _q1, _q2, _q3, emoteClips, type Avatar } from '../avatar';
+import { BodyBlow } from '../melee/body';
+import type { Cut } from '../melee/fp';
 
 export const actsMethods = {
   /**
    * A blow. With something in the right hand it is swung, overhand; with nothing a punch is
    * thrown from a guard, left and right in turn.
    * @param overhand swing the empty arm all the same (a throw)
+   * @param cut the captured blow it throws, where it has one (src/game/melee/cuts.ts)
    */
-  swing(this: Avatar, overhand = false, seconds = 0.62) {
+  swing(this: Avatar, overhand = false, seconds = 0.62, cut: Cut | null = null) {
     if (this.inHand && !overhand) {
-      // something in the fist to strike with: the blow the library draws
+      // something in the fist to strike with: its captured blow, or (none, or its file not here yet) the library's
+      if (cut && BodyBlow.has(cut.clip) && (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).start(cut, seconds)) {
+        this.strikeT = -1;
+        return;
+      }
+      this.blow?.stop();
       this.strikeT = 0;
       this.strikeDur = seconds;
       return;
