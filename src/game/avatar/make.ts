@@ -10,6 +10,8 @@ import { type Look, type LookUniforms, lookFor, type BodyFile, loadCharacter, HA
 import { restBones } from '../../core/bones';
 import { WornTag } from '../worn-tag';
 import { CLIPS } from './pose';
+import { Gait, moveClips } from './gait';
+import { Deeds, MOCAP, MOVES } from './deeds';
 import { AVATAR_LAYER, BODY_REACH, BODY_SCALE, CLEAN, FP_BODY_LAYER, FP_HIDDEN, LAID, SOLE_UNDER, WOUND_BONES, _m1, _q1, _v1, _v2, _v3, shareSkeleton, unread, Avatar, type ArmRig } from '../avatar';
 
 /** (the wounds those paints show: none; see CLEAN) */
@@ -164,6 +166,11 @@ export const makeMethods = {
     // (as the body rests, before anything has moved it, a leg is straight)
     this.knees = ['calf_l', 'calf_r'].map(bone).filter((b): b is THREE.Bone => !!b).map((b) => [b, b.quaternion.clone()]);
     this.thighs = ['thigh_l', 'thigh_r'].map(bone).filter((b): b is THREE.Bone => !!b);
+    this.legs = [];
+    for (const s of ['l', 'r']) {
+      const thigh = bone(`thigh_${s}`), calf = bone(`calf_${s}`), foot = bone(`foot_${s}`);
+      if (thigh && calf && foot) this.legs.push({ thigh, calf, foot });
+    }
     // The infected's feet, as each body was MADE standing (see `plant`): which way the foot lies, how its toes lie
     // on it, and how high its ankle is over its sole. Not as its skeleton rests: these bodies wear a skeleton
     // that was brought to them, which rests as the game's own body stands and not as they do, and a foot laid
@@ -269,6 +276,14 @@ export const makeMethods = {
       a.play();
       this.actions[name] = a;
       this.dur[name] = clip.duration;
+    }
+    // (a survivor steps on motion capture, every body from the one file of movements; the infected on their own clips)
+    if (!file.startsWith('zombie')) {
+      const moves = await moveClips();
+      this.gait = new Gait(this.mixer, moves);
+      this.deeds = new Deeds(this.mixer, moves);
+      // (it goes down and flinches on the motion capture, as long as those take: see MOCAP)
+      for (const [old, mine] of Object.entries(MOCAP)) (this.dur as Record<string, number>)[old] = MOVES[mine].dur;
     }
 
     if (firstPersonBody) {

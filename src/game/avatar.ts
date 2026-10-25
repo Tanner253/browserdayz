@@ -31,6 +31,9 @@ import { woundsMethods } from './avatar/wounds';
 import { actsMethods } from './avatar/acts';
 import { sickMethods } from './avatar/sick';
 import { updateMethods } from './avatar/update';
+import { gesturesMethods } from './avatar/gestures';
+import type { Gait, Leg } from './avatar/gait';
+import type { Deeds, Deed, Stay } from './avatar/deeds';
 
 export { DEATHS, DEATH_REST, PRONE, SIT, CAR_SIT, POSE } from './avatar/pose';
 export type { Gesture, Move, Hold, SeatPose } from './avatar/pose';
@@ -461,6 +464,15 @@ export class Avatar {
   guarding = false;
   /** on a broken leg (see src/sim/injury.ts): it is seen in how they go */
   limping = false;
+  /** the steps on motion capture (src/game/avatar/gait.ts), and the legs they are stretched on; none for the infected, who keep their own */
+  gait?: Gait;
+  legs: Leg[] = [];
+  /** the rest of a survivor's motion capture (src/game/avatar/deeds.ts); a performance done once (seconds into it), and one kept up */
+  deeds?: Deeds;
+  deed: { name: Deed; t: number; dur: number; legs: number; k: number; from: number; to: number } | null = null;
+  stay: { name: Stay; t: number; rate: number } | null = null;
+  stayT = 0;
+  stayWas: Stay | null = null;
   limpT = 0;
   // how far the weapon is up at the eye, and how far it is in its running carry, 0..1
   aimT = 0;
@@ -551,6 +563,8 @@ export class Avatar {
   }
 
   get plantAt() {
+    // (on motion capture every loop starts on the left heel)
+    if (this.gait) return 0;
     const k = THREE.MathUtils.clamp((this.speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
     const [walk, jog, low] = this.backing ? POSE.plant.back : POSE.plant.fwd;
     // backwards nobody gets beyond a slow jog, and the feet are already landing as at one well before that
@@ -608,12 +622,16 @@ export interface Avatar {
   setSeat: Methods<typeof actsMethods>['setSeat'];
   setLean: Methods<typeof actsMethods>['setLean'];
   layer: Methods<typeof actsMethods>['layer'];
+  perform: Methods<typeof actsMethods>['perform'];
+  pickUp: Methods<typeof actsMethods>['pickUp'];
+  setStay: Methods<typeof actsMethods>['setStay'];
   debugPose: Methods<typeof actsMethods>['debugPose'];
   clipLength: Methods<typeof actsMethods>['clipLength'];
   update: Methods<typeof updateMethods>['update'];
+  gestures: Methods<typeof gesturesMethods>['gestures'];
   setGhost: Methods<typeof makeMethods>['setGhost'];
   dispose: Methods<typeof makeMethods>['dispose'];
 }
-for (const part of [makeMethods, dressMethods, handsMethods, woundsMethods, actsMethods, sickMethods, updateMethods]) {
+for (const part of [makeMethods, dressMethods, handsMethods, woundsMethods, actsMethods, sickMethods, updateMethods, gesturesMethods]) {
   for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Avatar.prototype, name, { ...d, enumerable: false });
 }
