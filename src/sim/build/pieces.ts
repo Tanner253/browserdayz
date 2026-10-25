@@ -15,6 +15,11 @@ export const STOREY = 3;
  * ever shows a gap under it"). It may be laid no higher over its lowest ground than slab and skirt reach.
  */
 export const FOUND = { lift: 0.25, deep: 0.6, skirt: 2.5 };
+/**
+ * A high wall's or a gate's footing: how far its logs, its stone and its posts reach down into the ground, so that one
+ * stood on a slope meets the ground at both ends; and how far over its foot the ground may rise.
+ */
+export const FREE = { skirt: 1.5, rise: 0.6 };
 /** a floor's thickness, under the level it makes */
 export const FLOOR_T = 0.2;
 export const WALL_T = 0.2;

@@ -3,7 +3,7 @@
 // the way it faces (a wall's outside), +x along it, y up from its foot (a floor-like piece: down from its top).
 // Built cheap by design: a wall is one box, a doorway three.
 
-import { CELL, FLOOR_T, FOUND, PIECES, STOREY, WALL_T } from './pieces';
+import { CELL, FLOOR_T, FOUND, FREE, PIECES, STOREY, WALL_T } from './pieces';
 
 export type Solid = (
   /** a box: its middle and its size */
@@ -127,11 +127,12 @@ const SHAPES: Record<string, () => Shape> = {
     return { solid: [{ hull: [...c, [0, 1.3, 0]] }] };
   },
   // (sharpened logs, six to a length, and the rail that holds them)
+  // (each reaching FREE.skirt into the ground, to meet it at both ends on a slope)
   high_wall_wood: () => ({
-    solid: [box(-H, 0, -0.25, H, 6, 0.25)],
+    solid: [box(-H, -FREE.skirt, -0.25, H, 6, 0.25)],
     dress: Array.from({ length: 6 }, (_, i) => ({ hull: [[-H + i * 0.5 + 0.02, 6, -0.23], [-H + i * 0.5 + 0.48, 6, -0.23], [-H + i * 0.5 + 0.02, 6, 0.23], [-H + i * 0.5 + 0.48, 6, 0.23], [-H + i * 0.5 + 0.25, 6.6, 0]] as [number, number, number][] })),
   }),
-  high_wall_stone: () => ({ solid: [box(-H, 0, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
+  high_wall_stone: () => ({ solid: [box(-H, -FREE.skirt, -0.4, H, 6, 0.4), box(-H - 0.05, 6, -0.45, H + 0.05, 6.25, 0.45)] }),
   // (the claim: its upkeep box, and over it a pole with the flag of whoever holds it)
   // (as its model stands, src/game/building/models.ts: a rusted strongbox, the post on it, the flag off the post to +x)
   claim: () => ({ lockAt: { at: [0, 0.24, 0.34] }, solid: [box(-0.49, 0, -0.34, 0.49, 0.45, 0.34), box(0.01, 0.45, -0.11, 0.13, 2.1, 0.01)], cloth: { paint: 'flag', solid: [box(0.17, 1.42, -0.065, 1.17, 2.04, -0.035)] } }),
@@ -162,14 +163,14 @@ const SHAPES: Record<string, () => Shape> = {
   // (a gate the length of a high wall: its posts and head, and two leaves 1.2 m wide and 5.1 high)
   gate_wood: () => ({
     lockAt: { leaf: 0, at: [1.02, 1.4, 0] },
-    solid: [box(-1.5, 0, -0.3, -1.2, 6, 0.3), box(1.2, 0, -0.3, 1.5, 6, 0.3), box(-1.2, 5.25, -0.25, 1.2, 6, 0.25)],
+    solid: [box(-1.5, -FREE.skirt, -0.3, -1.2, 6, 0.3), box(1.2, -FREE.skirt, -0.3, 1.5, 6, 0.3), box(-1.2, 5.25, -0.25, 1.2, 6, 0.25)],
     dress: [-1.35, 1.35].map((x) => ({ hull: [[x - 0.15, 6, -0.3], [x + 0.15, 6, -0.3], [x - 0.15, 6, 0.3], [x + 0.15, 6, 0.3], [x, 6.6, 0]] as [number, number, number][] })),
     // (hung at their outside faces, as the doors are, and opening square: clear of the posts)
     leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.2, 0, 0.1], axis: 'y', open: (s * Math.PI) / 2, solid: [box(Math.min(0, -s * 1.19), 0.08, -0.2, Math.max(0, -s * 1.19), 5.2, 0)], dress: [0.7, 4.4].map((y) => tinted(box(Math.min(-s * 0.14, -s * 0.9), y, 0, Math.max(-s * 0.14, -s * 0.9), y + 0.12, 0.04), IRON)) })),
   }),
   gate_stone: () => ({
     lockAt: { leaf: 0, at: [0.98, 1.4, 0] },
-    solid: [box(-1.5, 0, -0.45, -1.15, 6, 0.45), box(1.15, 0, -0.45, 1.5, 6, 0.45), box(-1.15, 5.25, -0.4, 1.15, 6.25, 0.4)],
+    solid: [box(-1.5, -FREE.skirt, -0.45, -1.15, 6, 0.45), box(1.15, -FREE.skirt, -0.45, 1.5, 6, 0.45), box(-1.15, 5.25, -0.4, 1.15, 6.25, 0.4)],
     leaves: [-1, 1].map((s): Leaf => ({ hinge: [s * 1.15, 0, 0.06], axis: 'y', open: (s * Math.PI) / 2, paint: 'steel', solid: [box(Math.min(0, -s * 1.14), 0.08, -0.12, Math.max(0, -s * 1.14), 5.2, 0)], dress: [0.6, 2.6, 4.6].flatMap((y) => [tinted(box(Math.min(-s * 0.12, -s * 1.1), y, 0, Math.max(-s * 0.12, -s * 1.1), y + 0.14, 0.03), IRON), tinted(box(Math.min(0, -s * 1.1), y, -0.15, Math.max(0, -s * 1.1), y + 0.14, -0.12), IRON)]) })),
   }),
   // (a ladder of two rails and its rungs, a storey high and a little over, leant on the face behind it (-z))

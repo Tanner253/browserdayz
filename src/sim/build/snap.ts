@@ -10,7 +10,7 @@
 //
 // Directions: an angle a is the way (sin a, cos a) on the ground (x, z), as three.js's rotation.y turns +z.
 
-import { CELL, FOUND, PIECES, STOREY, WALL_T, type Hole, type PieceKind, type Shape, type Tier } from './pieces';
+import { CELL, FOUND, FREE, PIECES, STOREY, WALL_T, type Hole, type PieceKind, type Shape, type Tier } from './pieces';
 import { swept, swings } from './doors';
 import { shapeOf } from './solids';
 import type { Lock } from './locks';
@@ -405,6 +405,12 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     const hs = pts.map(([x, z]) => ground(x, z));
     if (K.ground && Math.max(...hs) > s.y + 0.05) return 'The ground is in the way';
     if (K.ground && Math.min(...hs) < s.y - FOUND.skirt - FOUND.deep) return 'Too high off the ground';
+    // (a high wall or a gate: the ground at both its ends within its footing, below, and not over its foot)
+    if (K.role === 'free') {
+      const half = (K.long ?? CELL) / 2, ends = [-1, 1].map((e) => ground(s.x + e * half * cos(s.r), s.z - e * half * sin(s.r)));
+      if (Math.max(...ends) > s.y + FREE.rise) return 'The ground is in the way';
+      if (Math.min(...ends) < s.y - FREE.skirt + 0.1) return 'Too high off the ground';
+    }
   }
   return null;
 }

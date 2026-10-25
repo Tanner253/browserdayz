@@ -10,6 +10,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../../core/assets';
 import type { Atmosphere } from '../../world/atmosphere';
 import { shapeOf, type Solid } from '../../sim/build/solids';
+import { FREE } from '../../sim/build/pieces';
 
 type V3 = [number, number, number];
 interface Part {
@@ -188,9 +189,9 @@ async function palisade(atmo: Atmosphere | null): Promise<Built> {
   const all: Part[][] = [];
   for (let k = 0; k < n; k++) {
     const m = new THREE.Matrix4()
-      .makeTranslation(lo[0] + (k + 0.5) * (long / n), (rnd() - 0.6) * 0.12, (rnd() - 0.5) * 0.04)
+      .makeTranslation(lo[0] + (k + 0.5) * (long / n), -FREE.skirt + (rnd() - 0.6) * 0.12, (rnd() - 0.5) * 0.04)
       .multiply(turnY(rnd() * Math.PI * 2))
-      .multiply(new THREE.Matrix4().makeScale(girth / size.x, (6.5 + rnd() * 0.25) / size.y, girth / size.z));
+      .multiply(new THREE.Matrix4().makeScale(girth / size.x, (6.5 + FREE.skirt + rnd() * 0.25) / size.y, girth / size.z));
     all.push(moved(clone(log), m));
   }
   // (and two logs laid across its inside face, a man's height up and near its top: what holds them together)

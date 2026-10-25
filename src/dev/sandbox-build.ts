@@ -418,9 +418,11 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     // it, and the high walls and their gates outside)
     const bs = new Bases({ ground: () => 0, why: () => null });
     const house = layPrint(bs, 'bp:house', { x: 0, z: 0, yaw: 0 }, 'me', 0, 'Me', () => true).base!;
+    // (the tier asked for, &tier=; stone by default)
+    const tier = Number(new URLSearchParams(location.search).get('tier') ?? 2) as Tier;
     for (const p of house.pieces.values()) if (PIECES[p.k].only === undefined) {
-      p.t = 2;
-      p.hp = hpOf(p.k, 2);
+      p.t = tier;
+      p.hp = hpOf(p.k, tier);
     }
     const said: string[] = [];
     const put = (k: string, x: number, z: number, b = house) => {

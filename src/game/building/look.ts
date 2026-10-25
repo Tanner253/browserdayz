@@ -14,7 +14,7 @@ import { shapeOf, shutOf, type Paint, type Solid } from '../../sim/build/solids'
 import { leafPoint } from '../../sim/build/doors';
 
 /** metres of a piece to one picture of each paint */
-const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1, iron: 1 };
+const TILE: Record<string, number> = { 0: 3, 1: 1.6, 2: 2, 3: 1.5, 4: 1.5, door: 1.2, steel: 1, galv: 1.5, trim: 1.2, flag: 1, bag: 1, iron: 1 };
 
 /** a box with its pictures laid on in metres (each face by its own two ways) */
 function boxGeo(c: [number, number, number, number, number, number], tile: number): THREE.BufferGeometry {
@@ -229,8 +229,9 @@ export function paintsOf(atmo: Atmosphere | null): THREE.MeshStandardMaterial[] 
     pbr('weathered_planks', { name: 'build-wood' }),
     pbr('castle_wall_slates', { name: 'build-stone' }),
     pbr('rusty_corrugated_iron', { metalnessMap: assets.pbr('rusty_corrugated_iron').armMap, metalness: 1, name: 'build-metal' }),
-    // (the armoured tier: welded plates of dark steel, the progression plan's fifth)
-    pbr('metal_plate_02', { metalnessMap: assets.pbr('metal_plate_02').armMap, metalness: 1, name: 'build-armour' }),
+    // (the armoured tier: welded plates of dark steel, the progression plan's fifth. Its picture's steel is all metal:
+    // drawn so it mirrored the sky and went black under a dull one, so a little under half as much)
+    pbr('metal_plate_02', { metalnessMap: assets.pbr('metal_plate_02').armMap, metalness: 0.45, name: 'build-armour' }),
   ];
   if (atmo) for (const m of paints) atmo.register(m);
   return paints;
