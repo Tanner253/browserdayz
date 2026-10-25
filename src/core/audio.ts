@@ -327,6 +327,10 @@ export const rotorRecording = () => lateRecording('rotor');
 /** a raid's (src/game/building/raid.ts): fetched when a charge is first stuck or a piece first struck */
 const RAID_SOUNDS = ['c4_beep', 'fuse', 'break_wood', 'break_stone', 'break_metal', 'sledge'];
 export const raidRecordings = () => Promise.all(RAID_SOUNDS.map(lateRecording));
+/** building's own (scripts/sounds.mjs): fetched when a base is first near, or the plan or the hammer first in the hands */
+const BUILD_SOUNDS = ['nail', 'lock_click', 'crate_latch', 'crate_open', 'crate_shut', 'creak', 'cloth', 'keypad', 'code_ok', 'code_wrong', 'shock', 'knock', 'garage'] as const;
+export type BuildSound = (typeof BUILD_SOUNDS)[number];
+export const buildRecordings = () => Promise.all(BUILD_SOUNDS.map(lateRecording));
 export const sirenRecording = () => lateRecording('siren');
 
 /** how loud the siren's recording is played: as loud as the made-up wail it replaced */
@@ -2354,6 +2358,16 @@ export class AudioEngine {
     if (!land) return void this.rec('hit_wood', out, t, 1.3, 0.42, false, true);
     this.rec('thud', out, t, 2.4, 0.5, false, true);
     this.rec('hit_wood', out, t + 0.04, 1.6, 0.55, false, true);
+  }
+
+  /**
+   * One of building's sounds (a nail driven, a lock's click, a box's lid, a ladder's creak, a keypad...): at a place, or
+   * in the ear with none. False when its recording has not come yet (it is asked for: the next one is heard).
+   */
+  built(name: BuildSound, pos?: V3, gain = 1, rate = 1): boolean {
+    if (!this.ready) return false;
+    void buildRecordings();
+    return this.rec(name, pos ? this.out(pos, 3, 1.3) : this.sfx, this.ctx.currentTime, gain, rate, false, true);
   }
 
   /** A C4's timer beeping where it is stuck (made up, a short tone, until the recording has come). */

@@ -11,6 +11,7 @@ import { inTheWay, middleOf, swings } from '../../sim/build/doors';
 import type { Bases } from '../../sim/build/bases';
 import type { C2S, S2C } from '../../net/protocol';
 import type { BaseDraw } from './draw';
+import { knock } from './locks';
 
 export interface DoorHost {
   input: Input;
@@ -28,7 +29,9 @@ export class DoorView {
   constructor(private h: DoorHost, private store: () => Bases, private draw: BaseDraw) {
     draw.onSwing = (b, p, at) => {
       const d = at.distanceTo(h.camera().position), [x, y, z] = toWorld(b, ...middleOf(p));
-      if (PIECES[p.k].only === 3 || PIECES[p.k].fits === 'hatch') audio.locker(!!p.open, { x, y, z }, d);
+      // (a garage door runs up or down on its rollers; steel swings as a locker's door does)
+      if (p.k.startsWith('garage_door') && audio.built('garage', { x, y, z }, 0.9)) return;
+      if ((PIECES[p.k].only ?? 0) >= 3 || PIECES[p.k].fits === 'hatch') audio.locker(!!p.open, { x, y, z }, d);
       else audio.door(!!p.open, { x, y, z }, d);
     };
   }
@@ -61,6 +64,6 @@ export class DoorView {
   /** a knock: three raps, from the door */
   onKnock(m: Extract<S2C, { t: 'knock' }>) {
     const d = this.h.camera().position.distanceTo({ x: m.x, y: m.y, z: m.z } as THREE.Vector3);
-    for (let i = 0; i < 3; i++) setTimeout(() => audio.impact(m.metal ? 'metal' : 'wood', { x: m.x, y: m.y, z: m.z }, d), i * 170);
+    knock([m.x, m.y, m.z], m.metal, d);
   }
 }

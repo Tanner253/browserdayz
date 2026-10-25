@@ -5,6 +5,7 @@
 
 import type * as THREE from 'three';
 import type { Input } from '../../core/input';
+import { audio } from '../../core/audio';
 import { shapeOf } from '../../sim/build/solids';
 import { inBase } from '../../sim/build/doors';
 import { toWorld, worldYaw } from '../../sim/build/snap';
@@ -33,6 +34,8 @@ const card = (head: string, keys: string, kbd?: string) => `<span class="bc">${k
 export class LadderView {
   private lines: Line[] = [];
   private t = 0;
+  /** till the next creak of the rungs, s */
+  private creakT = 0;
 
   constructor(private input: Input, private store: () => Bases, private body: () => Climber) {}
 
@@ -65,6 +68,11 @@ export class LadderView {
     const me = this.body();
     if (me.climb) {
       if (me.dead) me.climb = null;
+      // (its rungs creak under a body going up or down them)
+      if (me.climb && (this.input.held('KeyW') || this.input.held('KeyS')) && (this.creakT -= dt) <= 0) {
+        this.creakT = 0.55 + Math.random() * 0.4;
+        audio.built('creak', { x: me.pos.x, y: me.pos.y + 0.6, z: me.pos.z }, 0.7, 0.92 + Math.random() * 0.16);
+      }
       return me.climb ? card('On the ladder', 'W up · S down · Space lets go') : null;
     }
     if ((this.t -= dt) <= 0) {

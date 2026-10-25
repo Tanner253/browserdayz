@@ -12,7 +12,7 @@
 
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS } from '../../core/physics';
-import { audio } from '../../core/audio';
+import { audio, buildRecordings } from '../../core/audio';
 import type { Input } from '../../core/input';
 import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
@@ -276,6 +276,16 @@ export class Building {
     const held = this.h.held();
     const plan = ok && held?.id === 'building_plan', hammer = ok && !!held && !!HAMMERS[held.id];
     this.prompt = null;
+    // (building's sounds asked for once a building tool is first in the hands)
+    if (plan || hammer) void buildRecordings();
+    // (the hammer driving nails while it works at a piece)
+    if (this.nailing && this.h.busy()) {
+      const now = performance.now();
+      if (now >= this.nailing.next) {
+        this.nailing.next = now + 360 + Math.random() * 280;
+        audio.built('nail', this.nailing.at, 0.9, 0.94 + Math.random() * 0.12);
+      }
+    } else this.nailing = null;
     this.draw.update(dt, this.h.me());
     // (the plan put away, another piece chosen, or the mouse let go of (Esc): a thing being turned goes back to its first click)
     if (this.placing && (!plan || this.placing.k !== this.kind || (this.placing.locked && !this.h.input.locked))) this.placing = null;
@@ -505,6 +515,8 @@ export class Building {
     }
     const [x, y, z] = this.ghost ? [this.ghost.position.x, this.ghost.position.y, this.ghost.position.z] : [ask.x, 0, ask.z];
     audio.impact('wood', { x, y, z }, 1);
+    // (a frame nailed together; a sleeping bag or a bed's bedding laid out)
+    audio.built(PIECES[ask.k].sleep ? 'cloth' : 'nail', { x, y: y + 0.5, z }, 0.9);
     if (this.h.online()) return void this.h.send({ t: 'blay', ...ask, u: plan.uid });
     const r = this.local.lay(ask, this.me, Date.now(), this.h.name());
     if (typeof r === 'string') return void this.h.note(r, 'warn');
@@ -586,6 +598,7 @@ export class Building {
     if (!p) return;
     const still = () => this.h.held()?.uid === hammer.uid && this.target()?.id === id && this.target()?.base === base;
     if (this.h.online()) this.h.send({ t: 'bup', b: base.id, p: id, to, go: 1, u: hammer.uid });
+    this.nail(base, p);
     this.h.begin(PIECES[p.k].levels ? `Bringing the ${PIECES[p.k].name.toLowerCase()} up to level ${ROMAN[to]}` : `Nailing the ${PIECES[p.k].name.toLowerCase()} up to ${TIERS[to].toLowerCase()}`, TIER_S[to], still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bup', b: base.id, p: id, to, go: 2, u: hammer.uid });
@@ -598,6 +611,13 @@ export class Building {
       this.bump(base.id);
       this.h.changed();
     }, 'You stopped: it is as it was');
+  }
+
+  /** the hammer heard at a piece while it works at it (the nails go in until the work is done or stopped) */
+  private nailing: { at: { x: number; y: number; z: number }; next: number } | null = null;
+  private nail(base: Base, p: { x: number; y: number; z: number; k: string }) {
+    const [x, y, z] = toWorld(base, p.x, p.y + (PIECES[p.k].role === 'floor' ? 0 : 1.2), p.z);
+    this.nailing = { at: { x, y, z }, next: 0 };
   }
 
   /** pieces of a base broken in this game's own copy of it (alone: a raid, src/game/building/raid.ts), with what stood only on them */
@@ -756,6 +776,7 @@ export class Building {
       return false;
     }
     const name = PIECES[p.k].name.toLowerCase(), still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
+    this.nail(base, p);
     this.h.begin(turn ? `Turning the ${name} about` : `Mending the ${name}`, turn ? 1.5 : 3, still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bfix', b: base.id, p: id, u: hammer.uid, ...(turn ? { turn: true } : {}) });

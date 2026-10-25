@@ -37,6 +37,7 @@ import { castleDark } from '../../sim/castle';
 import { HELI } from '../../sim/heli';
 import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEARCHLIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
 import { diffOps, type Laid } from '../../sim/box-ops';
+import { shocked } from '../building/locks';
 
 /** how far off a lit street lamp is seen, metres: within the camera's reach (1800) */
 const LAMP_SEEN = 1600;
@@ -156,7 +157,8 @@ export const dropsMethods = {
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
     // the jeep they are in ran into something: no wound, and nobody to look round for
-    // (or a code lock shocked the hand that got its code wrong)
+    // (or a code lock shocked the hand that got its code wrong: its refusal and its shock heard, src/game/building/locks.ts)
+    if (m.w === 'shock') shocked();
     if (m.w === 'crash' || m.w === 'shock') {
       p.damage(m.amount, m.w === 'shock' ? 'a code lock' : 'a crash');
       this.weapons.flinch(1);

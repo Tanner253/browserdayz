@@ -3,6 +3,8 @@
 // change its code, cut a key, join its claim). The figures are typed or clicked; Enter puts them in, Escape, F or Tab
 // put the panel away. Styles: `.keypad` in hud.css.
 
+import { audio } from '../core/audio';
+
 export interface PadAction {
   id: string;
   label: string;
@@ -78,6 +80,7 @@ export class Keypad {
 
   private digit(d: string) {
     if (this.typed.length >= DIGITS) return;
+    audio.built('keypad', undefined, 0.8, 0.94 + Number(d) * 0.012);
     this.typed += d;
     this.render();
     if (this.typed.length === DIGITS) setTimeout(() => this.isOpen && this.typed.length === DIGITS && this.enter(), 140);
