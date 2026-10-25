@@ -37,6 +37,8 @@ export const TEXTURES = {
   white_bricks: { res: '2k', tex: 1024 },
   // the mountain fort's stone (2026-10-13, fetched on the owner's yes): rough stacked blocks, dressed fortress blocks, an aged defence wall
   castle_wall_slates: { res: '2k', tex: 1024 },
+  // (base building's armoured tier, 2026-10-25: dark welded plates of steel, weathered)
+  metal_plate_02: { res: '2k', tex: 1024 },
   medieval_blocks_06: { res: '2k', tex: 1024 },
   defense_wall: { res: '2k', tex: 1024 },
   // the desert's ground (2026-10-13, fetched on the owner's word): dry trampled sand, pale desert gravel, the cracked silt of a dry river bed
@@ -868,6 +870,157 @@ export const LOCAL_MODELS = {
   // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
   // pictures at the size they came.
   frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // ---------------------------------------------------------------- crafting (2026-10-25): the owner's downloads for its
+  // items (progress/base-models/incoming-map.md), each judged in the sandbox beside the stand-in it replaced. Their folders
+  // are the downloads as they came, in assets-src/incoming/; textures at 1024 for what is carried in the hand (the navigator).
+  alcohol_bottle: { dir: '../incoming/isopropyl_rubbing_alcohol_bottle_game_ready', size: 0.25, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.' },
+  // (the iron ones of the set: three bars, two lying and one on them)
+  iron_ingots: { dir: '../incoming/blacksmith_ingots_game_ready_asset', only: /Iron/, size: 0.26, tex: 1024, tags: ['loot'], changes: 'Only its three iron bars are used here, scaled to 26 cm across and stood on the ground about their own middle; textures re-encoded as WebP; geometry compressed.' },
+  stone_axe: { dir: '../incoming/primitive_stone_axe', size: 0.46, tex: 1024, tags: ['loot'], changes: 'Scaled to 46 cm and stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.' },
+  bone_knife: { dir: '../incoming/bone_knife_1', size: 0.26, tex: 1024, tags: ['loot'], changes: 'Scaled to 26 cm and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (Rurre's, of the three the owner downloaded: picked in the sandbox, 2026-10-25, as the pile that reads as scrap and is lightest;
+  // it is fan art of Team Fortress 2, which the owner allows: "fan art is allowed, it is not ripped")
+  scrap_pile: { dir: '../incoming/scrap_metal', size: 0.4, tex: 1024, tags: ['loot'], changes: 'Scaled to 40 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (made in Higgsfield on the owner's account, 2026-10-25: Tripo's text-to-3D; scaled to size by the navigator, kept so)
+  satchel_charge: {
+    dir: '../incoming/higgsfield', file: 'satchel_charge_30cm.glb', scale: 1, tex: 2048, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.',
+    credit: { name: 'Satchel charge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (base building's pieces drawn from models, 2026-10-25, src/game/building/models.ts: made for them in Higgsfield on the
+  // owner's account. Each is fitted into its piece's solids as the game draws it, so it comes at the size it was made.)
+  ...Object.fromEntries([
+    ['bb_door_wood', 'Wooden door leaf', 'remade/door_wood.glb'], ['bb_door_metal', 'Metal door leaf', 'remade/door_metal.glb'],
+    ['bb_hatch', 'Hatch lid', 'remade/hatch.glb'], ['bb_garage', 'Garage door', 'remade/garage.glb'],
+    ['bb_small_box', 'Small box', 'remade/small_box.glb'], ['bb_large_box', 'Large box', 'base/large_box_sized.glb'],
+    ['bb_workbench', 'Workbench', 'base/workbench_sized.glb'], ['bb_bed', 'Bed', 'base/bed_sized.glb'],
+    ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'remade/ladder.glb'],
+    ['bb_palisade_log', 'Palisade log', 'base/palisade_log_sized.glb'], ['bb_gate_wood', 'Wooden gate', 'base/gate_wood_sized.glb'],
+    ['bb_gate_steel', 'Steel gate leaf', 'remade/gate_steel.glb'],
+    ['bb_bedroll', 'Sleeping bag', 'base/bedroll.glb'],
+  ].map(([id, name, file]) => [id, {
+    dir: '../incoming/higgsfield', file, scale: 1, tex: 1024, tags: ['base'],
+    changes: 'Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name, author: 'ZONA (Higgsfield)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (${file.startsWith('remade/') ? 'Meshy multi-image-to-3D from front, side and back views' : 'text-to-3D'}), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+  }])),
+  // (the claim: a post on a rusted strongbox, made in Higgsfield, with the owner's pirate flag nailed to it: "i prefer the
+  // look of the pirate flag i porovided". The flag is SusanKing's, waved by the game: src/game/building/models.ts)
+  bb_claim: {
+    dir: '../incoming/higgsfield', file: 'claim_pirate.glb', scale: 1, tex: 1024, tags: ['base'],
+    changes: 'The post and strongbox made for ZONA in Higgsfield, the flag set on the post; kept at its size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Pirate Flag animated', author: 'SusanKing', url: 'https://sketchfab.com/3d-models/pirate-flag-animated-e6b2c8a5be864ad6afba3bdfdde1aff2', line: 'This work is based on "Pirate Flag animated" (https://sketchfab.com/3d-models/pirate-flag-animated-e6b2c8a5be864ad6afba3bdfdde1aff2) by SusanKing (https://sketchfab.com/krolzuzannapl) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/); its post and strongbox made for ZONA with Higgsfield (text-to-3D) on the owner’s account' },
+  },
+  // (the progression plan's two looted parts, made for it in Higgsfield, 2026-10-25: a tin of hinges and bolts, and a
+  // plate of armour steel, laid flat and pressed to three centimetres thick)
+  ...Object.fromEntries([['hardware', 'Hardware tin', { size: 0.13 }], ['steel_plate', 'Steel plate', { rot: [0, 0, Math.PI / 2], squash: [1, 0.3, 1], size: 0.5 }]].map(([id, name, more]) => [id, {
+    dir: '../incoming/higgsfield/parts', file: `${id}.glb`, tex: 1024, tags: ['loot'], ...more,
+    changes: 'Made its real size, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+  }])),
+  // (C4, base building's raiding: of the two the owner downloaded, the one of three blocks taped to a timer, picked in
+  // the sandbox over a cartoon one)
+  c4: { dir: '../incoming/simple_old_c4', file: 'scene.gltf', size: 0.2, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle and made 20 cm tall; textures re-encoded as WebP at 1024; geometry compressed.' },
+  // (charcoal with no maker's print on it, as the sack the owner downloaded had all over; and the tin powder is kept in)
+  // (made grey as stone: darkened to charcoal's black)
+  charcoal_lumps: {
+    dir: '../incoming/higgsfield', file: 'charcoal_sized.glb', scale: 1, tex: 1024, tags: ['loot'], dye: { brightness: 0.45, saturation: 0.5 },
+    changes: 'Stood on the ground about its own middle, at the size it was made, its colour darkened; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Charcoal', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Charcoal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (made lying on its side: stood on its base)
+  gunpowder_tin: {
+    dir: '../incoming/higgsfield', file: 'gunpowder_tin_sized.glb', rot: [0, 0, -Math.PI / 2], scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on its base on the ground, about its own middle, at the size it was made; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Gunpowder tin', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Gunpowder tin" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (the forge: Higgsfield's drum with a chimney, judged in the sandbox beside Poly Haven's barrel_stove)
+  forge_hf: {
+    dir: '../incoming/higgsfield', file: 'forge_cold.glb', scale: 1, budget: 10000, tex: 2048, tags: ['prop'],
+    changes: 'Stood on the ground about its own middle, at the size it was made, simplified to about 10,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'Forge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Forge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (made for crafting in Higgsfield, 2026-10-25, sized at intake by progress/tools/intake.mjs: a slim sledgehammer, a coil of
+  // hemp rope and a bundle of rags, in place of the downloads judged too thick, untextured and whole clothes)
+  sledgehammer_slim: {
+    dir: '../incoming/higgsfield', file: 'sledgehammer_slim_sized.glb', rot: [0, 0, -0.1822], scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood straight up its handle, at its true length of 0.9 m, about its own middle; textures at 1024; geometry compressed.',
+    credit: { name: 'Sledgehammer', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Sledgehammer" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  rope_coil_hemp: {
+    dir: '../incoming/higgsfield', file: 'rope_coil_hemp_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 30 cm across; textures at 1024; geometry compressed.',
+    credit: { name: 'Coiled rope', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Coiled rope" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  rags_bundle: {
+    dir: '../incoming/higgsfield', file: 'rags_bundle_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 20 cm long; textures at 1024; geometry compressed.',
+    credit: { name: 'Rags', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Rags" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (salvage's wrecks, a layer of their own laid by src/sim/craft/wrecks.ts: each with a far copy, as a vehicle has)
+  zil_wreck: {
+    dir: '../incoming/higgsfield', file: 'zil_truck_wreck_sized.glb', scale: 1, budget: 20000, tex: 2048, tags: ['prop', 'vehicle'],
+    changes: 'Stood on the ground about its own middle, 6.6 m long as made, simplified to about 20,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'ZIL truck wreck', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"ZIL truck wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  tractor_wreck: {
+    dir: '../incoming/higgsfield', file: 'tractor_wreck_sized.glb', scale: 1, budget: 18000, tex: 2048, tags: ['prop', 'vehicle'],
+    changes: 'Stood on the ground about its own middle, 4.2 m long as made, simplified to about 18,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'Tractor wreck', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Tractor wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (the owner's download: Renafox's retopology of Mikhail Volkov's scan, both credited; its glowing lamps left dark)
+  pirozhok_wreck: {
+    dir: '../incoming/pirozhok_scan_retopo_free_scan', size: 4.0, tex: 2048, bare: true, tags: ['prop', 'vehicle'],
+    changes: 'Scaled to its 4 m and stood on the ground about its own middle; its lamps left unlit (the glow taken off); textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'Pirozhok Scan Retopo (Free Scan)', author: 'Renafox', url: 'https://sketchfab.com/3d-models/pirozhok-scan-retopo-free-scan-07bc48134b364d4f8a43d288b3a0282d', line: 'This work is based on "Pirozhok Scan Retopo (Free Scan)" (https://sketchfab.com/3d-models/pirozhok-scan-retopo-free-scan-07bc48134b364d4f8a43d288b3a0282d) by Renafox (https://sketchfab.com/kryik1023), itself from Mikhail Volkov\'s scan "Abandoned Soviet Car — IZH-2715" (https://sketchfab.com/3d-models/abandoned-soviet-car-izh-2715-b97884f0730d42a68c1a6a9a9874159d), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)' },
+  },
+  junk_heap: {
+    dir: '../incoming/higgsfield', file: 'junk_heap_3m.glb', scale: 1, tex: 2048, tags: ['prop', 'vehicle'],
+    changes: 'Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.',
+    credit: { name: 'Junk heap', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // Progression v3's things (crafting, 2026-10-25), made in Higgsfield on the owner's account (Tripo text-to-3D) and sized
+  // at intake (progress/tools/intake.mjs): the metal fragments, the spring, the pipe, the rifle body, the research table,
+  // the recycler and the trader camp's stall (the pistol body is the Colt's own frame: src/sim/items/craft.ts). What is carried at 1024, what stands at 2048 (the navigator: "textures 2048, 1024 for hand items").
+  ...Object.fromEntries(
+    [
+      ['metal_frags', 'Metal fragments', '22 cm across', 1024, ['loot']],
+      ['metal_pipe', 'Metal pipe', '35 cm long', 1024, ['loot']],
+      ['spring_coil', 'Spring', '12 cm long', 1024, ['loot']],
+      ['gun_body_rifle', 'Rifle body', '45 cm long', 1024, ['loot']],
+      ['research_table', 'Research table', '1.2 m long', 2048, ['prop']],
+      ['recycler', 'Recycler', '2 m wide', 2048, ['prop']],
+      ['market_stall', 'Market stall', '2.6 m deep', 2048, ['prop']],
+    ].map(([id, name, size, tex, tags]) => [id, {
+      dir: '../incoming/higgsfield', file: `${id}_sized.glb`, scale: 1, tex, tags,
+      changes: `Stood on the ground about its own middle, ${size} as made; textures re-encoded as WebP at ${tex}; geometry compressed.`,
+      credit: { name, author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+    }]),
+  ),
+  // Base building's things (2026-10-25), made in Higgsfield in place of the stand-ins (the owner: "all of thes eitems
+  // look terrible and need models done in higgsfield ... they all look extremely low quality"). Each came at its real
+  // size, foot on the ground, centred (the navigator's *_sized.glb), 1.6 to 3.3 thousand triangles: put in
+  // assets-src/models/higgsfield_items/ (a worktree's own assets-src: `node scripts/packs.mjs <id>` reads it).
+  ...Object.fromEntries(
+    [
+      ['log', 'Birch log'], ['stone', 'Stones'], ['nails', 'Box of nails'], ['sheet_metal', 'Sheet metal'], ['felling_axe', 'Felling axe'],
+      ['hammer', 'Claw hammer'], ['pickaxe', 'Pickaxe'], ['torch', 'Torch'], ['code_lock', 'Code lock'], ['sleeping_bag', 'Sleeping bag'],
+      // (and those made again: the saw twice, its blade first as short as its handle, a padlock made a lock box as
+      // Rust's, the key, the plan a clipboard, the planks a bundle)
+      ['hand_saw', 'Panel saw'], ['key_lock', 'Key lock', 'key_lock2'], ['key', 'Key', 'key2'], ['building_plan', 'Building plan', 'building_plan2'], ['planks', 'Planks', 'planks3'],
+    ].map(([id, name, file = id]) => [id, {
+      dir: 'higgsfield_items', file: `${file}_sized.glb`, scale: 1, tex: 1024, tags: ['loot'],
+      // (the tools came leaning, their handles 41 to 50 degrees off upright: stood up, head uppermost, as the
+      // hatchet's is, which the hands' hold of a thing to hit with goes by; and made their true length along it. The
+      // clipboard came stood on its edge, its sketch to +x: laid face up. The saw, made a third time (the owner,
+      // 2026-10-25: "the handsaw looks so short"), came at no size and 17 degrees off level: laid level, its handle
+      // to -z where the hands hold it by the butt, and made a panel saw's length; its blade came polished as a mirror, which drew near black with no bright sky in it ("this
+      // does not look good"): two fifths as much metal, so its grey steel shows)
+      ...({ felling_axe: { rot: [0.714, 0, 0], size: 0.9 }, hammer: { rot: [-0.577, 0, -0.148], size: 0.33 }, pickaxe: { rot: [0.834, 0, -0.298], size: 0.9 }, building_plan: { rot: [0, 0, Math.PI / 2] }, hand_saw: { file: 'hand_saw3.glb', size: 0.62, rot: [-0.3005, Math.PI, 0], metalBy: 0.4 } }[id] ?? {}),
+      ...(['felling_axe', 'hammer', 'pickaxe', 'hand_saw'].includes(id) ? { scale: undefined } : {}),
+      changes: 'Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+      credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+    }]),
+  ),
 };
 
 /**

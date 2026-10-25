@@ -16,7 +16,11 @@ import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { LAUNCHED, NADE, THROWN, fallen, fuseLeft, inHandDamage, judge, launch, letGo, lyingBlast, newThrower, overdue, pullPin, travel, type Vec3 } from '../src/sim/grenades';
 import { ITEMS } from '../src/sim/items';
 import { TYPES } from '../src/sim/economy';
-import { STOCK, worth } from '../src/sim/trade';
+import { STALLS } from '../src/sim/camp';
+
+/** what the trader camp's stalls sell, and what a thing is worth to them (src/sim/camp.ts) */
+const STOCK = Object.values(STALLS).flatMap((s) => s.sells.map((g) => g.id));
+const worth = (id: string) => ITEMS[id]?.worth ?? 0;
 import { JEEP, carDamage, type VehicleInfo } from '../src/sim/vehicles';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 

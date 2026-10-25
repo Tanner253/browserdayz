@@ -19,8 +19,9 @@ export interface RadialEntry {
   label: string;
   /** a picture over the label: a URL, or the name of one of `ICONS` (none given: `ICONS.item`) */
   icon?: string;
-  /** kept up until stopped (drawn quieter), on now (drawn in the accent), or not to be had (dimmed) */
-  mark?: 'keeps' | 'held' | 'dim';
+  /** kept up until stopped (drawn quieter), on now (drawn in the accent), not to be had (dimmed), or nothing there at all
+   * (not drawn and not picked: a ring only partly filled, its entries kept in their places, as the building plan's) */
+  mark?: 'keeps' | 'held' | 'dim' | 'gap';
 }
 /** a ring, of the wheel's radius of 210: from the hub out, and where its words sit */
 export interface RadialRing {
@@ -104,6 +105,7 @@ function layout(n: number, rings: RadialRing[], per: number): { ring: number; k:
 export function radialSvg(entries: RadialEntry[], rings: RadialRing[], per: number): string {
   const wedges = layout(entries.length, rings, per).map(({ ring, k, entry }) => {
     const given: RadialEntry = entry === Radial.CANCEL ? { id: 'cancel', label: 'Cancel', icon: 'cancel' } : entries[entry];
+    if (given.mark === 'gap') return `<g class="gap" data-slot="${entry}" data-k="${k}"></g>`;
     const e = { ...given, icon: given.icon ?? 'item' };
     const { r0, r1, text: tr } = rings[ring];
     const a = ((k + offOf(per)) / per) * Math.PI * 2, half = Math.PI / per - 0.022 * (58 / r0);
@@ -148,6 +150,8 @@ export class Radial {
   private title: HTMLElement;
   private sub: HTMLElement;
   private count = 0;
+  /** the entries that are nothing there (`gap`) */
+  private gaps = new Set<number>();
   private lit = -1;
   /** the bar's turn, in degrees, carried on past a whole turn so that it always goes the short way round */
   private turn = 0;
@@ -172,6 +176,7 @@ export class Radial {
     const box = this.el.querySelector('.radial-svg') as HTMLElement;
     box.innerHTML = radialSvg(entries, this.o.rings, this.o.per);
     this.count = entries.length;
+    this.gaps = new Set(entries.flatMap((e, i) => (e.mark === 'gap' ? [i] : [])));
     this.wedges = [];
     for (const g of box.querySelectorAll<SVGGElement>('g[data-slot]')) {
       if (g.dataset.slot === 'cancel') this.cancelWedge = g;
@@ -200,7 +205,7 @@ export class Radial {
     for (let i = 1; i < R.length; i++) if (r >= (R[i - 1].r1 + R[i].r0) / 2) ring = i;
     const per = this.o.per, k = ((Math.round((Math.atan2(at[0], -at[1]) / (Math.PI * 2)) * per - offOf(per)) % per) + per) % per;
     const wedge = layout(this.count, R, per).find((w) => w.ring === ring && w.k === k);
-    return wedge ? wedge.entry : -1;
+    return wedge && !this.gaps.has(wedge.entry) ? wedge.entry : -1;
   }
 
   open() {

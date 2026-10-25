@@ -16,6 +16,7 @@ import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 import type { AnimalRow, Call } from '../sim/animals';
+import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
@@ -66,10 +67,34 @@ import type { AnimalRow, Call } from '../sim/animals';
 // src/sim/box-ops.ts), and a crate's contents are asked for on the way to it ('cpeek'). A page of 61 says the whole
 // crate after each change, and would write over whoever else has it open.)
 // (63, 2026-10-24: an admin's far sight of every animal and every one of the infected ('aesp').)
+// (64, 2026-10-24: the hands' slot, the fixes path's release.)
+// (65, 2026-10-24: an animal's distance asked of the server ('adist'), battle-royale's.)
+// (66, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
+// `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
+// 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
+// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; metal salvaged, 'salvage');
+// raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
+// a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels;
+// progression v3 ('known' and 'learn': blueprints; 'recy': recyclers; 'trade', 'tday' and 'book': the trader camp, paid in scrap).)
 // (65 on the live line, 2026-10-25, a hotfix: a dog tag stays in the pockets until the server says it is cashed, and the
 // game's countdown follows the server's clock ('tagclock'). Raised so every open page loads the fixed game: a page of 64
 // drops the tag the moment its own countdown ends. The working branch's own 65 to 67 are renumbered at its release.)
-export const PROTOCOL = 65;
+// (67, 2026-10-25: which survivor each player is and the voice they call out in (`bd`, `vo` on hello and on a player;
+// 'who' when it is changed: src/sim/survivor.ts), and what they wear by its colour ('gear' as id~colour). A page of 66
+// would draw everybody in the old suit. (66 is base building's; the navigator sets the last number at release.)
+// (68, 2026-10-25: a survivor's own body gives back their gear at one press ('reclaim', 'reclaimed'; `own` on the
+// 'cdata' that answers 'copen': src/sim/reclaim.ts). A page of 67 shows no button and is never told it can.)
+export const PROTOCOL = 68;
+
+/** a player's day at the trader camp (src/sim/camp.ts) */
+export interface TradeDay {
+  day: number;
+  bought: Record<string, number>;
+  sold: number;
+  done: string[];
+  kills: number;
+  heads: number;
+}
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -108,7 +133,7 @@ export const LEAN_REACH = 0.34;
 // ('load': one round pushed into a magazine; 'unbox': a box of rounds torn open. Both are small sounds, heard close to.)
 // ('check': a gun turned over in the hands and looked at.)
 // ('take': something picked up, the body bending for it, 2026-10-25; an older game that hears it does nothing with it)
-export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop'] as const;
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop', 'saw'] as const;
 export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */
@@ -144,6 +169,9 @@ export interface PlayerInfo {
   f?: string;
   /** what they wear that shows: hat, vest, pack */
   g: string[];
+  /** which of the bodies they are, and their voice (src/sim/survivor.ts): not said, a game from before there were any to pick */
+  bd?: number;
+  vo?: number;
   /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
   b?: Slung[];
   alive: boolean;
@@ -182,6 +210,8 @@ export interface CorpseInfo extends StashInfo {
   ride?: { i: number; seat: number };
   /** the body of one of the infected (its `i`): drawn by them, and only searched here */
   zed?: number;
+  /** whose body it was of the survivors' (src/sim/survivor.ts): when it is not said, the one the name gives */
+  bd?: number;
 }
 
 /**
@@ -213,7 +243,7 @@ export type C2S =
    * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
    * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
    */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string }
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string; /** the body and the voice they picked (src/sim/survivor.ts) */ bd?: number; vo?: number }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -242,6 +272,8 @@ export type C2S =
   /** a keycard was put to the bunker's door */
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
+  /** another body or voice picked (src/sim/survivor.ts) */
+  | { t: 'who'; bd: number; vo: number }
   | { t: 'back'; b: Slung[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number }
   | { t: 'take'; uid: string }
@@ -256,6 +288,8 @@ export type C2S =
   | { t: 'cops'; cid: string; ops: BoxOp[] }
   /** what is in a crate within reach, asked for on the way to it (no doors open, nothing is held): it is shown at once when it is opened */
   | { t: 'cpeek'; cid: string }
+  /** everything on this player's own body, open, back onto them as it was worn and carried (src/sim/reclaim.ts) */
+  | { t: 'reclaim'; cid: string }
   | { t: 'cclose'; cid: string }
   /**
    * What lies within reach that holds things (a pack, a vest, a jacket, a case), opened with the pockets: each is the
@@ -272,9 +306,12 @@ export type C2S =
   /** a shovel put to a stash: it is buried, or dug up */
   | { t: 'bury'; uid: string; on: boolean }
   | { t: 'door'; i: number; open: boolean; swing: number }
-  | { t: 'me'; inv: SerializedInventory; vitals: Vitals }
+  | { t: 'me'; inv: SerializedInventory; vitals: Vitals; /** the last 'spent' this game has taken out of its pockets */ sp?: number }
   | { t: 'died'; cause: string; v?: number }
-  | { t: 'respawn' }
+  /** back after a death: at the map's edge, or at a bed of one's own (server/beds.ts) */
+  | { t: 'respawn'; bed?: { b: number; p: number } }
+  /** one's beds, asked for on the death screen */
+  | { t: 'mybeds' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
   | { t: 'admin'; pw: string }
@@ -330,6 +367,52 @@ export type C2S =
   | { t: 'ahit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; n?: number; p?: number }
   /** kneeling at a body to gut and skin it (go 1), and done (go 2) */
   | { t: 'askin'; i: number; go: 1 | 2 }
+  /** a blow that landed on tree `i` (world.trees) or rock `i` (world.rocks) with the tool whose uid is `u` (src/sim/gather.ts) */
+  | { t: 'chop'; i: number; u: string }
+  | { t: 'mine'; i: number; u: string }
+  /** sawing the log lying on the ground whose uid is `l`, with the saw `u`: begun (go 1), and done (go 2) */
+  | { t: 'saw'; l: string; u: string; go: 1 | 2 }
+  /** a craft begun (go 1) or its hold done (go 2): recipe `r`, `n` of it, the things dragged onto each other first (`u`, uids; src/sim/craft) */
+  | { t: 'craft'; r: string; n: number; go: 1 | 2; u?: string[] }
+  /** `n` of a workbench's recipe `r` put on its queue; or the queue's job `i` taken off it (src/sim/craft) */
+  | { t: 'cq'; r: string; n: number }
+  | { t: 'cqx'; i: number }
+  /** a blow that landed on salvage spot `i` with the tool `u` (src/sim/craft/salvage.ts) */
+  | { t: 'salvage'; i: number; u: string }
+  /** a blueprint learned: at a research table from the thing `u`, or recipe `r` of a bench's tech tree (src/sim/craft/learn.ts) */
+  | { t: 'learn'; op: 'research' | 'tree'; u?: string; r?: string }
+  /** recycler `i` switched on or off (src/sim/craft/recycle.ts) */
+  | { t: 'recy'; i: number; on: boolean }
+  /** at the trader camp's stall `s`: a thing bought (`id`), a thing sold (`u`, its uid), or a job handed in (`id`) (src/sim/camp.ts) */
+  | { t: 'trade'; s: string; op: 'buy' | 'sell' | 'job'; id?: string; u?: string }
+  /** the credit this browser had in the old trader's book, to be paid out in scrap once */
+  | { t: 'book'; n: number }
+  /** a piece laid with the building plan `u` (src/sim/build/bases.ts Ask): in base `b` at its frame's place, or a new base at a world place turned `yaw` */
+  | { t: 'blay'; k: string; b?: number; x: number; y: number; z: number; r: number; yaw?: number; u: string }
+  /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
+  | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
+  | { t: 'bdel'; b: number; p: number; u: string }
+  /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
+  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean }
+  /** joining a base's claim, or leaving it (stood at it) */
+  | { t: 'bjoin'; b: number }
+  /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
+  | { t: 'bdoor'; b: number; p: number; open: boolean }
+  | { t: 'bknock'; b: number; p: number }
+  /** a lock (item `u`) fitted to a piece, on a code for a code lock; a code entered at one (`set`: a new code, by one who may);
+   * a lock locked or unlocked; a key cut at a key lock; a lock taken off with the hammer `u` */
+  | { t: 'block'; b: number; p: number; u: string; code?: string }
+  | { t: 'bcode'; b: number; p: number; code: string; set?: boolean }
+  | { t: 'blockon'; b: number; p: number; on: boolean }
+  | { t: 'bkey'; b: number; p: number }
+  | { t: 'bunlock'; b: number; p: number; u: string }
+  /** a blueprint laid with the plan `u` (src/sim/build/blueprints.ts): begun on the ground, or carried on with on base `b` */
+  | { t: 'bprint'; id: string; b?: number; x: number; z: number; yaw: number; u: string }
+  /** raiding (src/sim/build/raid.ts): a blow of the tool in the hands `u` landed on piece `p` of base `b` at `at`; a charge
+   * (item `u`, `w` 'c4' or 'satchel') stuck at `at` on a face turned to `n`; a charge that did not go off, lit again */
+  | { t: 'bhit'; b: number; p: number; u: string; at: [number, number, number] }
+  | { t: 'bplant'; w: string; u: string; at: [number, number, number]; n: [number, number, number] }
+  | { t: 'blight'; i: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
   | { t: 'bait'; what: string }
@@ -372,6 +455,8 @@ export type S2C =
       racks?: [string, string[]][];
       /** the fireplaces that are alight: [which, seconds left] */
       fires?: [number, number][];
+      /** the trees that are down (world.trees), felled for their logs and not grown again yet */
+      felled?: number[];
       /** the fires built by players that stand now: [number, x, y, z] (told before which are alight) */
       built?: [number, number, number, number][];
       /** the jeeps: where each stands, what state it is in and who is in it */
@@ -384,6 +469,8 @@ export type S2C =
       bunker?: boolean;
       /** the map's containers that somebody is searching at the moment: a locker among them stands with its doors open (see 'cdoor'). Not said by a server from before 2026-10-13 */
       ajar?: string[];
+      /** the bases in sight of where they come in: there before anything is laid on them, or they on it (server/build.ts) */
+      bases?: KeptBase[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -404,12 +491,60 @@ export type S2C =
   | { t: 'barrel+'; i: number }
   /** fireplace number i is alight, with so many seconds of burning left */
   | { t: 'fire'; i: number; left: number }
+  /** tree `i` has been felled by `by`, and falls toward `a` (radians, as a yaw); trees standing again */
+  | { t: 'fell'; i: number; a: number; by: number }
+  | { t: 'grow'; i: number[] }
+  /** to the one working it: how far through a tree (k 0) or a rock's stone (k 1) they are, 0..1 */
+  | { t: 'work'; k: 0 | 1; i: number; done: number }
+  /** a tool of this player's has worn: its condition now (0 ruined) */
+  | { t: 'wear'; u: string; c: number }
+  | { t: 'saw'; l: string; ok: boolean; why?: string; done?: boolean }
+  /** a craft let begin or not (`n` of it, `time` s), or done: the things used up by their number (`used`; what stacks comes out as 'spent') */
+  | { t: 'craft'; r: string; ok: boolean; why?: string; n?: number; time?: number; done?: true; used?: string[] }
+  /** a workbench's queue as it stands: each job and how many are left of it, the seconds the first is through, and whether it waits for its maker to come back to a bench */
+  | { t: 'cq'; q: { r: string; n: number }[]; done: number; paused: boolean }
+  /** forge `p` of base `b` burning or out (src/sim/craft/forge.ts) */
+  | { t: 'forge'; b: number; p: number; lit: boolean }
+  /** a blow on salvage spot `i` believed: how far through it the work is (1: stripped) */
+  | { t: 'salvage'; i: number; done: number }
+  /** the blueprints this player has learned (besides those known from the start) */
+  | { t: 'known'; r: string[] }
+  /** a blueprint learned, or why not; the thing used up by its number (`used`; what stacks comes out as 'spent') */
+  | { t: 'learn'; ok: boolean; why?: string; r?: string; used?: string[] }
+  /** recycler `i` running or not */
+  | { t: 'recy'; i: number; on: boolean }
+  /** a trade done (what the trader says) or not (why); a thing sold, by its number (`used`) */
+  | { t: 'trade'; ok: boolean; say: string; used?: string[] }
+  /** this player's day at the camp: how many of each thing bought, scrap taken for things sold, jobs paid, infected put down and shot in the head */
+  | { t: 'tday'; day: TradeDay }
+  /** a base in sight (whole), or out of it / gone; a piece of one laid or changed; pieces of one gone (src/sim/build/bases.ts) */
+  | { t: 'base'; b: KeptBase }
+  | { t: 'bgone'; b: number }
+  | { t: 'bpc'; b: number; p: KeptPiece }
+  | { t: 'bout'; b: number; ids: number[] }
+  /** a base's claim as it is now (null: gone), with no store; the health of its pieces rotting */
+  | { t: 'bclaim'; b: number; c: KeptClaim | null }
+  | { t: 'bhp'; b: number; hp: [number, number][] }
+  /** a charge stuck to a base, burning with `f` seconds left (-1: it did not go off), by player `by`; gone off; gone out */
+  | { t: 'bcharge'; i: number; w: string; o: [number, number, number]; n: [number, number, number]; f: number; by: number }
+  | { t: 'bboom'; i: number; w: string; o: [number, number, number]; by: number }
+  | { t: 'bfizz'; i: number }
+  /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */
+  | { t: 'bkeep'; b: number; s: number; dry: boolean; day: [string, number][] }
+  /** the server's word on the hammer begun at a piece */
+  | { t: 'bup'; b: number; p: number; ok: boolean; why?: string }
+  /** a base's door swung open or shut (by player `by`), and a knock on one, heard where it is */
+  | { t: 'bdoor'; b: number; p: number; o: 0 | 1; by: number }
+  | { t: 'knock'; x: number; y: number; z: number; metal: boolean }
+  /** materials the server took for what was built (`n` its number, said back in 'me' `sp` once they are out of the pockets) */
+  | { t: 'spent'; n: number; items: [string, number][] }
   /** a fire built by somebody (numbered after the map's own), and one cleared away */
   | { t: 'fire+'; i: number; x: number; y: number; z: number }
   | { t: 'fire-'; i: number }
   /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
+  | { t: 'who'; id: number; bd: number; vo: number }
   | { t: 'back'; id: number; b: Slung[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number]; /** an animal's: whether it opened a wound (the server's roll, not the game's) */ bleed?: boolean }
   /** the animals near this player (src/sim/animals.ts AnimalRow), five times a second; once a second all within its reach (`all`: any it knows of that is not in it has gone) */
@@ -426,7 +561,10 @@ export type S2C =
   | { t: 'loot+'; l: WorldLoot }
   | { t: 'loot-'; uid: string }
   | { t: 'denied'; uid: string }
-  | { t: 'cdata'; cid: string; items: StoredItem[] }
+  /** what is in a crate or a body; `own`: the body is this player's own, whose gear they may take back at one press ('reclaim'), said only in answer to 'copen' */
+  | { t: 'cdata'; cid: string; items: StoredItem[]; own?: true }
+  /** their own body gone through ('reclaim'): what they carry now, how many things came off it, and how many found no room and lie on it still */
+  | { t: 'reclaimed'; cid: string; inv: SerializedInventory; took: number; left: number }
   | { t: 'cbusy'; cid: string }
   /** what of this player's moves in a crate (`cid`) or a bag lying about (`l`) could not be done: taken by somebody else first (out of their pockets again), or no room (back into them) */
   | ({ t: 'cno'; cid?: string; l?: string } & Refused)
@@ -458,7 +596,9 @@ export type S2C =
   /** a body that rode down in a helicopter, laid on the ground beside it now that it is down: there to be searched */
   | { t: 'corpse@'; corpse: CorpseInfo }
   | { t: 'door'; i: number; open: boolean; swing: number }
-  | { t: 'spawn'; x: number; z: number; yaw: number }
+  | { t: 'spawn'; x: number; z: number; yaw: number; /** at a bed: how high (none: on the ground) */ y?: number }
+  /** one's beds: [base, piece, kind, x, z, seconds until it may be woken at] */
+  | { t: 'beds'; list: [number, number, string, number, number, number][] }
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }

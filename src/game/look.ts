@@ -12,9 +12,8 @@ import { assets } from '../core/assets';
 
 const MASK_URL = 'assets/characters/survivor_mask.webp';
 
-/** the bodies there are: a survivor (every player), the three the infected come in, and the one in an orange suit that is found in the gas and down the bunker (scripts/zombies.mjs) */
-export type BodyFile = 'survivor' | 'zombie_cop' | 'zombie_male' | 'zombie_female' | 'zombie_hazmat';
-export const ZOMBIES: BodyFile[] = ['zombie_male', 'zombie_female', 'zombie_cop'];
+/** the bodies there are: a survivor (every player), and the infected's (BODIES in src/game/infected-kinds.ts, scripts/infected.mjs) */
+export type BodyFile = 'survivor' | `zombie_${string}`;
 
 const characters = new Map<BodyFile, Promise<GLTF>>();
 
@@ -105,6 +104,46 @@ export function lookUniforms(): LookUniforms {
   return { uWounds: { value: Array.from({ length: MAX_WOUNDS }, () => new THREE.Vector4(0, 0, 0, 0)) }, tLook: { value: tLook }, uJacket: { value: new THREE.Color(1, 1, 1) }, uTrousers: { value: new THREE.Color(1, 1, 1) }, uSkin: { value: new THREE.Color(1, 1, 1) } };
 }
 
+/** one of the infected's: its look's clothes, skin and grime (src/game/infected-look.ts) */
+export interface InfectedUniforms extends LookUniforms {
+  /** what the colour of the clothes of the upper body and of the legs is turned by (hue, depth of colour, lightness) */
+  uUpper: { value: THREE.Matrix3 };
+  uLower: { value: THREE.Matrix3 };
+  /** where the grime's blotches lie (xyz, an offset into them) and how thick it is (w); and its colour, mud or soot */
+  uGrime: { value: THREE.Vector4 };
+  uGrimeTint: { value: THREE.Color };
+  /** the hair's colour (rgb) and how far it is taken there (w: 0 for a cap or a helmet); and how high on the head, as the body rests, the hair begins */
+  uHair: { value: THREE.Vector4 };
+  uHairFrom: { value: number };
+  /** how much of the skin is blotched, the blood settled in it */
+  uMottle: { value: number };
+}
+
+export function infectedUniforms(): InfectedUniforms {
+  return {
+    ...lookUniforms(),
+    uUpper: { value: new THREE.Matrix3() },
+    uLower: { value: new THREE.Matrix3() },
+    uGrime: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uGrimeTint: { value: new THREE.Color(0.52, 0.44, 0.34) },
+    uHair: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uHairFrom: { value: 99 },
+    uMottle: { value: 0 },
+  };
+}
+
+/** a look's paint put on another set of uniforms (a body's own once it is hurt: src/game/avatar/wounds.ts), its wounds left to it */
+export function copyInfected(to: InfectedUniforms, from: InfectedUniforms) {
+  to.uUpper.value.copy(from.uUpper.value);
+  to.uLower.value.copy(from.uLower.value);
+  to.uSkin.value.copy(from.uSkin.value);
+  to.uGrime.value.copy(from.uGrime.value);
+  to.uGrimeTint.value.copy(from.uGrimeTint.value);
+  to.uHair.value.copy(from.uHair.value);
+  to.uHairFrom.value = from.uHairFrom.value;
+  to.uMottle.value = from.uMottle.value;
+}
+
 export function setLookUniforms(u: LookUniforms, look: Look) {
   u.uJacket.value.copy(look.jacket).multiplyScalar(CLOTH_GAIN);
   u.uTrousers.value.copy(look.trousers).multiplyScalar(CLOTH_GAIN);
@@ -166,8 +205,33 @@ export function lookPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matr
 }
 
 /**
- * Shader patch for the bodies of the infected: they come painted as they are, and take
- * nothing but the blood of what is done to them.
+ * Shader patch for the bodies of the infected: painted as they came, the clothes of the upper body, of the legs and the
+ * skin each tinted by the look the body was given (`_tone` says which of it is which: scripts/infected.mjs; a body
+ * without it is left as it came), grime laid on in blotches, and the blood of what is done to it.
+ */
+export function infectedPatch(shader: Shader, u: InfectedUniforms, rest = new THREE.Matrix4()) {
+  Object.assign(shader.uniforms, { uWounds: u.uWounds, uUpper: u.uUpper, uLower: u.uLower, uSkin: u.uSkin, uGrime: u.uGrime, uGrimeTint: u.uGrimeTint, uHair: u.uHair, uHairFrom: u.uHairFrom, uMottle: u.uMottle });
+  stained(shader, rest, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform mat3 uUpper;\nuniform mat3 uLower;\nuniform vec3 uSkin;\nuniform vec4 uGrime;\nuniform vec3 uGrimeTint;\nuniform vec4 uHair;\nuniform float uHairFrom;\nuniform float uMottle;\nvarying vec3 vTone;', `
+  // (cloth near white stays white, a coat or a clog that hangs over the legs as well: only what has colour takes dye)
+  vec3 was = diffuseColor.rgb;
+  float dyed = 1.0 - smoothstep(0.42, 0.72, dot(was, vec3(0.299, 0.587, 0.114)));
+  vec3 upper = mix(was, max(uUpper * was, 0.0), dyed), lower = mix(was, max(uLower * was, 0.0), dyed);
+  float lum = dot(was, vec3(0.299, 0.587, 0.114));
+  // (the skin blotched where the blood has settled in it, grey-violet, each body's in places of its own)
+  float mottle = smoothstep(0.5, 0.85, woundNoise(vRest * 9.0 + uGrime.zxy * 1.7)) * uMottle;
+  vec3 skin = was * uSkin * mix(vec3(1.0), vec3(0.66, 0.55, 0.74), mottle);
+  // (the hair: what is dark on the head above where the hair begins, taken to the look's colour, its strands' light and dark kept)
+  float hair = (1.0 - smoothstep(0.14, 0.3, lum)) * smoothstep(uHairFrom - 0.03, uHairFrom + 0.03, vRest.y) * uHair.w;
+  skin = mix(skin, uHair.rgb * (0.45 + lum * 3.5), hair);
+  diffuseColor.rgb = upper * vTone.r + lower * vTone.g + skin * vTone.b + was * (1.0 - min(1.0, vTone.r + vTone.g + vTone.b));
+  // (blotches a hand or two across, thickest in their middles, mud or soot; thicker on the face and hands, which nothing covered)
+  float grime = min(1.0, smoothstep(0.42, 0.9, woundNoise(vRest * 6.0 + uGrime.xyz) * 0.7 + woundNoise(vRest * 17.0 + uGrime.zxy) * 0.3) * uGrime.w * (1.0 + vTone.b * 0.6));
+  diffuseColor.rgb *= mix(vec3(1.0), uGrimeTint, grime);`);
+}
+
+/**
+ * Shader patch for a survivor's own body (src/game/survivors.ts): painted as it came, and taking
+ * nothing but the blood of what is done to it.
  */
 export function stainPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matrix4()) {
   Object.assign(shader.uniforms, { uWounds: u.uWounds });

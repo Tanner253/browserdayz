@@ -59,6 +59,8 @@ const WIND_BACK = 45;
 const STEEP = riseOf(SLOPE.steep);
 /** what the controller is told it may climb, and stand on without slipping, where nothing is steep: its settings as they have always been (degrees) */
 const CLIMB_MAX = 50;
+/** up or down a ladder, m/s */
+const CLIMB_SPEED = 2.1;
 const SLIP_MIN = 58;
 /** what it steps up onto without being asked: how high, how deep a tread it needs, and that things that can be pushed count */
 const AUTOSTEP: [number, number, boolean] = [0.42, 0.22, true];
@@ -263,6 +265,8 @@ export class Player {
   god = false;
   /** it flies, and through anything: see `flyStep` */
   fly = false;
+  /** on a ladder: its line in the world, the way out from its rungs to whoever climbs it, its foot and its top (null: on none) */
+  climb: { x: number; z: number; nx: number; nz: number; y0: number; y1: number } | null = null;
   /** the next landing costs nothing (flying was stopped in the air) */
   private softLanding = false;
 
@@ -300,6 +304,45 @@ export class Player {
   }
 
   /** Flying: where the eyes point is forward, Space is up and Ctrl down, Shift is fast and Alt slow. Nothing is run into. */
+  /**
+   * On a ladder (src/game/building/ladders.ts, 2026-10-24): W climbs and S goes down it, the body hung off its rungs;
+   * at the top it steps off forward onto what the ladder leans on, at the foot it lets go; Space jumps off backward.
+   * What is overhead (a hatch shut) stops it, as anything stops a body.
+   */
+  private climbStep(h: number, input: MoveInput) {
+    const c = this.climb!, t = this.body.translation(), feet = t.y - this.half() - RADIUS;
+    const up = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
+    const off = (vx: number, vy: number, vz: number) => {
+      this.climb = null;
+      this.vel.set(vx, vy, vz);
+    };
+    if (input.pressedFixed('Space')) return off(c.nx * 2.2, 2.4, c.nz * 2.2);
+    if (up < 0 && feet <= c.y0 + 0.02) return off(0, 0, 0);
+    // (over the top: forward onto it, a little up, and let go there)
+    const top = up > 0 && feet >= c.y1 + 0.06;
+    const hx = c.x + c.nx * (RADIUS + 0.14), hz = c.z + c.nz * (RADIUS + 0.14), k = Math.min(1, 12 * h);
+    const desired = top ? { x: -c.nx * 3 * h, y: 0.5 * h, z: -c.nz * 3 * h } : { x: (hx - t.x) * k, y: up * CLIMB_SPEED * h, z: (hz - t.z) * k };
+    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+    const mv = this.kcc.computedMovement(), next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
+    this.body.setNextKinematicTranslation(next);
+    this.pos.set(next.x, next.y - this.half() - RADIUS, next.z);
+    if (top && Math.hypot(next.x - hx, next.z - hz) > RADIUS + 0.45) off(0, 0, 0);
+    this.grounded = false;
+    this.moving = up ? 1 : 0;
+    this.vel.set(0, up * CLIMB_SPEED, 0);
+    this.lastFallSpeed = 0;
+    this.fallTop = this.pos.y;
+    this.lean += (0 - this.lean) * (1 - Math.exp(-10 * h));
+  }
+
+  /** put on a ladder's rungs (from its top, going down it): the body moved there as it stands */
+  hang(x: number, y: number, z: number) {
+    this.body.setTranslation({ x, y: y + this.half() + RADIUS, z }, true);
+    this.pos.set(x, y, z);
+    this.prevPos.copy(this.pos);
+    this.vel.set(0, 0, 0);
+  }
+
   private flyStep(h: number, input: MoveInput) {
     const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
     const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
@@ -324,6 +367,7 @@ export class Player {
   }
 
   spawn(x: number, y: number, z: number, yaw: number) {
+    this.climb = null;
     const R = physics.R;
     if (!this.body) {
       this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(x, y + STAND_HALF + RADIUS, z));
@@ -463,6 +507,7 @@ export class Player {
       this.winded = false;
     }
     if (this.fly) return void this.flyStep(h, input);
+    if (this.climb && !this.seated) return void this.climbStep(h, input);
     if (this.seated) {
       // carried: the legs get their breath back, and that is all they do
       this.sprinting = this.scurrying = false;

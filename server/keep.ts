@@ -21,6 +21,10 @@ import { seen } from './seen';
 import { pinned, type Pin } from './pinned';
 import { elite } from './elite';
 import { plating } from './plates';
+import { keepBases, restoreBases, sightFor } from './build';
+import type { KeptBase } from '../src/sim/build/bases';
+import { keepLearned, restoreLearned } from './learn';
+import { keepCamp, restoreCamp } from './camp';
 
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
 const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
@@ -135,10 +139,16 @@ interface Snapshot {
   tags?: TagsKept;
   /** the guns with a store finish put on them, by uid (plates.ts) */
   plates?: ReturnType<typeof plating.keep>;
+  /** every base and its pieces, said short (server/build.ts) */
+  bases?: KeptBase[];
+  /** the blueprints each player has learned, by key hash (server/learn.ts) */
+  learned?: [string, string[]][];
+  /** each player's day at the trader camp, and whose old book is paid out (server/camp.ts) */
+  camp?: ReturnType<typeof keepCamp>;
 }
 
 /** a body as it is kept: where it lies, whose it was, how it fell, what is on it, and the seconds it has left */
-interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; name: string; v: number; left: number; items: Box['items'] }
+interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; name: string; v: number; left: number; items: Box['items']; pid?: string }
 
 /**
  * The dead lying on the ground, kept through a restart and a deploy with the time each had left (2026-10-17: a player
@@ -148,7 +158,7 @@ interface KeptBody { cid: string; x: number; y: number; z: number; rot: number; 
 function bodies(): KeptBody[] {
   return [...boxes.values()]
     .filter((b) => b.kind === 'corpse' && !b.ride && b.zed === undefined && (b.expires ?? 0) > economy.time)
-    .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items }));
+    .map((b) => ({ cid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, left: Math.round((b.expires ?? 0) - economy.time), items: b.items, ...(b.pid ? { pid: b.pid } : {}) }));
 }
 
 /** the kept bodies laid out again, each with the time it had left, and everybody on told of each @returns how many */
@@ -162,7 +172,7 @@ function layBodies(list: KeptBody[] | undefined, moved: boolean): number {
     });
     for (const it of items) issue(it);
     const y = moved ? world.groundAt(b.x, b.z) : b.y, name = String(b.name ?? 'Survivor').slice(0, 24), v = num(b.v) ? b.v : 0;
-    boxes.set(b.cid, { cid: b.cid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items, x: b.x, y, z: b.z, rot: b.rot, emptiedAt: -1, name, v, expires: economy.time + Math.min(CORPSE_LIFETIME, b.left) });
+    boxes.set(b.cid, { cid: b.cid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items, x: b.x, y, z: b.z, rot: b.rot, emptiedAt: -1, name, v, expires: economy.time + Math.min(CORPSE_LIFETIME, b.left), ...(typeof b.pid === 'string' ? { pid: b.pid.slice(0, 32) } : {}) });
     broadcast({ t: 'corpse@', corpse: { uid: b.cid, x: b.x, y, z: b.z, rot: b.rot, name, v } });
     n++;
   }
@@ -217,7 +227,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags(), plates: plating.keep() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), pinned: pinned.keep(), powers: [...POWERS_KEPT], elite: elite.keep(), bodies: bodies(), tags: keepTags(), plates: plating.keep(), bases: keepBases(), learned: keepLearned(), camp: keepCamp() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -280,6 +290,9 @@ function takeInLate(save: KeptFile) {
   pinned.restore(snap.pinned);
   elite.restore(snap.elite);
   plating.restore(snap.plates);
+  restoreBases(snap.bases);
+  restoreLearned(snap.learned);
+  restoreCamp(snap.camp);
   takePowers(snap.powers);
   // (from a last word only: see loadKept)
   if (save.final) takeTags(snap.tags);
@@ -532,6 +545,9 @@ export async function loadKept() {
     const moved = snap.rev !== WORLD_REV, now = Date.now();
     // (which guns are plated, before any gun is read: each is read wearing what the record says)
     plating.restore(snap.plates);
+    restoreBases(snap.bases);
+    restoreLearned(snap.learned);
+    restoreCamp(snap.camp);
     let bad = 0;
     for (const [k, r] of snap.chars ?? []) {
       try {
@@ -699,6 +715,8 @@ export function place(t: Client, x: number, y: number | null, z: number, by: Cli
   t.check.lag = 0;
   t.check.owed = 0;
   t.underAt = 0;
+  // (the bases about where they are set down told first: server/build.ts)
+  sightFor(t);
   send(t, { t: 'put', x, ...(y === null ? {} : { y }), z, ...(by === t ? {} : { by: by.name }) });
 }
 

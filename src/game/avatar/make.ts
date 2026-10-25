@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { breathe } from '../../core/breathe';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { type Atmosphere, castsInto } from '../../world/atmosphere';
-import { type Look, type LookUniforms, lookFor, type BodyFile, loadCharacter, HAIR_STYLES, BEARD, lookUniforms, stainPatch, suitPatch, lookPatch, setLookUniforms } from '../look';
+import { type Look, type InfectedUniforms, lookFor, type BodyFile, loadCharacter, HAIR_STYLES, BEARD, lookUniforms, infectedPatch, infectedUniforms, suitPatch, lookPatch, setLookUniforms } from '../look';
+import { bleed } from '../infected-look';
 import { restBones } from '../../core/bones';
 import { WornTag } from '../worn-tag';
 import { CLIPS } from './pose';
@@ -15,7 +16,7 @@ import { Deeds, MOCAP, MOVES } from './deeds';
 import { AVATAR_LAYER, BODY_REACH, BODY_SCALE, CLEAN, FP_BODY_LAYER, FP_HIDDEN, LAID, SOLE_UNDER, WOUND_BONES, _m1, _q1, _v1, _v2, _v3, shareSkeleton, unread, Avatar, type ArmRig } from '../avatar';
 
 /** (the wounds those paints show: none; see CLEAN) */
-let CLEAN_U: LookUniforms | null = null;
+let CLEAN_U: InfectedUniforms | null = null;
 
 export const makeMethods = {
   load(this: Avatar, atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
@@ -91,12 +92,14 @@ export const makeMethods = {
           // shares one paint a piece until it is first hit, and has its own from then (see own()): a paint each was a
           // hundred-odd paints in sight, each made ready again for every draw of it, and every one kept for good by the
           // sun's maps (2026-10-18, the research session's fifth round)
-          const at = rest(m), key = `${file}|${m.name}`;
+          // (and every one of a kind's VARIANTS looks shares its own: src/game/infected-look.ts)
+          const look = this.zombieLook, at = rest(m), key = `${file}|${look?.key ?? ''}|${m.name}`;
           let mat = CLEAN.get(key);
           if (!mat) {
-            const u = (CLEAN_U ??= lookUniforms());
+            const u = look?.u ?? (CLEAN_U ??= infectedUniforms());
+            if (look && m.name === 'body') bleed(look, m.geometry);
             mat = src.clone();
-            atmo.register(mat, (shader) => stainPatch(shader, u, at), 'zombie');
+            atmo.register(mat, (shader) => infectedPatch(shader, u, at), 'zombie');
             CLEAN.set(key, mat);
           }
           m.material = mat;
@@ -264,8 +267,8 @@ export const makeMethods = {
     for (const r of [driver, model]) r.traverse((o) => void ((o as THREE.Bone).isBone && (o.quaternion as unknown as { _onChange(f: () => void): void })._onChange(unread)));
     this.mixer = new THREE.AnimationMixer(driver);
     for (const name of CLIPS) {
-      // (the infected's files have no lying down or crawling, and they never do either: a copy of the fall stands in)
-      const own = gltf.animations.find((c) => c.name === name);
+      // (the infected's are their own, of their kind: src/game/infected-moves.ts)
+      const own = this.zombieMoves?.clips[name] ?? gltf.animations.find((c) => c.name === name);
       const clip = own ?? (name === 'proneDown' || name === 'crawl' ? gltf.animations.find((c) => c.name === 'deathFront')?.clone() : undefined);
       if (!clip) throw new Error(`character has no "${name}" clip`);
       await breathe();
@@ -286,11 +289,12 @@ export const makeMethods = {
       for (const [old, mine] of Object.entries(MOCAP)) (this.dur as Record<string, number>)[old] = MOVES[mine].dur;
     }
 
+    let fpModel: THREE.Group | null = null;
     if (firstPersonBody) {
       // A second copy of the rig that mirrors the animated one bone for bone, with the head
       // and arms shrunk to nothing: looking down shows your own chest, legs and feet walking.
       await breathe();
-      const fp = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+      const fp = (fpModel = SkeletonUtils.clone(gltf.scene) as THREE.Group);
       const shown = new Map<string, THREE.Object3D>();
       model.traverse((o) => {
         if ((o as THREE.Bone).isBone) shown.set(o.name, o);
@@ -314,6 +318,23 @@ export const makeMethods = {
       fpRig.scale.setScalar(BODY_SCALE);
       fpRig.add(fp);
       this.fpRoot.add(fpRig);
+    }
+    // which survivor this is, and what they wear over their skin (src/game/survivors.ts): put on these bones by name
+    if (file === 'survivor' && this.skin && this.uniforms) {
+      const named = (r: THREE.Object3D | null) => {
+        if (!r) return null;
+        const m = new Map<string, THREE.Bone>();
+        r.traverse((o) => void ((o as THREE.Bone).isBone && m.set(o.name, o as THREE.Bone)));
+        return m;
+      };
+      const of = (r: THREE.Object3D | null, names: string[]) => (r ? names.map((n) => r.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o) : []);
+      const SUIT = ['body', 'head', 'pads'];
+      this.wardrobe.attach({
+        bones: named(model)!, fpBones: named(fpModel), suit: of(model, SUIT), fpSuit: of(fpModel, ['body']),
+        into: this.skin.parent ?? model, fpInto: fpModel?.getObjectByName('body')?.parent ?? null,
+        atmo, uniforms: this.uniforms, ref: this.skin, layers: () => this.layerMask, fpLayer: FP_BODY_LAYER, inSight, dressed: (parts) => Avatar.onDressed(parts),
+        lengths: (l, scale) => this.proportion(l, scale),
+      });
     }
     restBones(this.root);
     restBones(this.fpRoot);

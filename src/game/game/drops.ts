@@ -10,6 +10,7 @@ import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
 import { CUT } from '../../../arena/rules';
 import { newUid, ITEMS, fittedOf, quietOf } from '../../sim/items';
+import { wearOut } from '../../sim/condition';
 import type { WorldLoot } from '../../sim/economy';
 import { WEAPON_RULES } from '../../sim/combat';
 import { shotOf } from '../../sim/gunplay';
@@ -30,13 +31,13 @@ import { INFECTED } from '../../sim/infected';
 import { TOUCH } from '../../core/device';
 import { phaseOf, DAY } from '../../sim/daynight';
 import { breaksOnHit } from '../../sim/injury';
-import { KEPT_ON_DEATH } from '../../sim/trade';
 import { inBunker, BUNKER, bunkerDark } from '../../sim/bunker';
 import { CRESSET } from '../../world/castle';
 import { castleDark } from '../../sim/castle';
 import { HELI } from '../../sim/heli';
 import { BUNKER_LAMP, HEADLAMP, HEADLAMP_CAR, NIGHT_SIGHT, SEARCHLIGHT, SEND_HZ, STREET_LAMP, _lampDir, _lampPos, type Game } from '../game';
 import { diffOps, type Laid } from '../../sim/box-ops';
+import { shocked } from '../building/locks';
 
 /** how far off a lit street lamp is seen, metres: within the camera's reach (1800) */
 const LAMP_SEEN = 1600;
@@ -155,9 +156,17 @@ export const dropsMethods = {
     let amount = m.amount;
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
+    // (and what covers where it landed is worn by it, as in DayZ: src/sim/condition.ts)
+    if (m.w !== 'crash') {
+      for (const it of wearOut(this.inv.slots, m.zone, m.amount)) this.hud.note(`Your ${ITEMS[it.id].name} is ruined`, 'warn');
+      this.saveSoon();
+      this.invUI.soon();
+    }
     // the jeep they are in ran into something: no wound, and nobody to look round for
-    if (m.w === 'crash') {
-      p.damage(m.amount, 'a crash');
+    // (or a code lock shocked the hand that got its code wrong: its refusal and its shock heard, src/game/building/locks.ts)
+    if (m.w === 'shock') shocked();
+    if (m.w === 'crash' || m.w === 'shock') {
+      p.damage(m.amount, m.w === 'shock' ? 'a code lock' : 'a crash');
       this.weapons.flinch(1);
       this.meDirty = true;
       return;
@@ -212,8 +221,9 @@ export const dropsMethods = {
       // (what is over is kept: thrown away, sixty frames a second made thirteen reports of fifteen, and whoever
       // was watching saw a runner stop for a tick now and then)
       this.sendT = this.sendT > 2 / SEND_HZ ? 0 : this.sendT - 1 / SEND_HZ;
-      const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0) | (this.hold === 'dance' && this.danced ? (EMOTE[this.danced]?.n ?? 0) << EMOTE_SHIFT : 0);
+      // (what is in the hands, as everybody else is shown it: a gun, a thing to hit with, or a torch, lit or not)
+      const torch = this.inv.held()?.id === 'torch' ? this.inv.held() : null, it = this.weapons.equippedItem ?? torch;
+      const flags =(p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | ((this.lit || this.build.torches.lit) && !this.garage.ride ? F_LIGHT : 0) | (this.hold === 'dance' && this.danced ? (EMOTE[this.danced]?.n ?? 0) << EMOTE_SHIFT : 0);
       // With the pockets open (or the map, or a panel) the mouse is free and the head is not steered: it was told
       // to the server turned exactly as it had been, report after report. The server takes a body that goes to
       // and fro with its head held like a statue's for one walked by a program (`gaitCheck`), and put a player
@@ -228,10 +238,11 @@ export const dropsMethods = {
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;
-    if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
+    // (nothing said of the pockets while the server is putting their own body's gear on them: it says what they carry then)
+    if (!p.dead && performance.now() > this.reclaimUntil && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
       this.meT = 0;
       this.meDirty = false;
-      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
+      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals }, sp: this.build.sp });
     }
   },
 
@@ -387,7 +398,8 @@ export const dropsMethods = {
     this.input.unlock();
   },
 
-  respawn(this: Game) {
+  /** back after a death: at the map's edge, or alone at `at` (a bed: src/game/building/beds.ts) */
+  respawn(this: Game, at?: { x: number; y: number; z: number; yaw: number }) {
     this.handsFree = false;
     if (this.online) {
       // the server picks the spawn and answers with 'spawn'
@@ -397,9 +409,8 @@ export const dropsMethods = {
     const p = this.player;
     // everything you carried stays where you fell
     for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
-    // (and the trader writes off half of what he owed a dead man: credit is not a way to carry nothing and lose nothing)
-    if (this.credit > 0) this.setCredit(Math.floor(this.credit * KEPT_ON_DEATH));
-    this.spawnAtEdge();
+    if (at) this.player.spawn(at.x, at.y, at.z, at.yaw);
+    else this.spawnAtEdge();
     this.freshKit();
     this.deathInfo = '';
     this.hitsOn.clear();
@@ -439,7 +450,8 @@ export const dropsMethods = {
   lightStep(this: Game, dt: number, free: boolean) {
     const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
     const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
-    if (free && this.input.pressed('KeyL')) {
+    // (a torch in the hands is lit with L itself: src/game/building/torches.ts)
+    if (free && this.input.pressed('KeyL') && this.inv.held()?.id !== 'torch') {
       if (this.garage.ride) this.hud.note('It lights its own lamps while somebody drives', 'warn');
       else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');
       else {
@@ -455,8 +467,11 @@ export const dropsMethods = {
     }
     for (const r of this.remotes.values()) {
       const l = r.lamp(_lampPos, _lampDir);
-      if (l) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide, 0);
+      // (nor a lamp shut in a stone room the eye is not in: src/sim/build/rooms.ts)
+      if (l && !this.build.lightShut(_lampPos)) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide, 0);
     }
+    // (and a torch lit in anybody's hands, its flames and its light at its head: src/game/building/torches.ts)
+    this.build.torches.others(this.remotes.values());
     const dark = atmo.night > 0.3;
     // headlights: a jeep's lamps are on while it is driven, and after dark they light the road
     if (dark) {

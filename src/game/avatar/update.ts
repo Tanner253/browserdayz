@@ -8,7 +8,7 @@ import { MOCAP, MOVES } from './deeds';
 import { slashAt } from '../held-mocap';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
-import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, RAISE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
 const _way = new THREE.Vector3();
 
@@ -136,7 +136,7 @@ export const updateMethods = {
     const push = this.jumpT >= 0 ? 1 - THREE.MathUtils.smoothstep(this.jumpT, POSE.jump[1] * 0.4, POSE.jump[1]) : 0;
     const move = this.moveT;
     const runK = this.sick ? THREE.MathUtils.smoothstep(speed, SICK_GAIT.from, SICK_GAIT.to) : THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
-    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / SICK_GAIT.pace, SICK_GAIT.give[0], SICK_GAIT.give[1]);
+    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / (this.zombieMoves?.paces.run ?? 1), SICK_GAIT.give[0], SICK_GAIT.give[1]);
     let hit = 0;
     const hitLen = this.dur[this.hitClip];
     if (this.hitT >= 0) {
@@ -196,7 +196,7 @@ export const updateMethods = {
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
     const rate: Record<Stride, number> = {
-      walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / POSE.pace.walk, 0.6, 2.1),
+      walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / (this.zombieMoves?.paces.walk ?? POSE.pace.walk), 0.6, 2.1),
       run: THREE.MathUtils.clamp(speed / POSE.pace.run, 1, 1.2),
       // (to 4.8: the hurried crouch is 3.3 m/s, and at 2.8 the legs crept at 1.9 under a body going nearly twice that)
       crouchWalk: THREE.MathUtils.clamp(speed / POSE.pace.crouchWalk, 0.6, 4.8),
@@ -313,6 +313,12 @@ export const updateMethods = {
       // (it throws its whole body after its arm: the lunge is the clip's own)
       const u = this.sick.claw / CLAW;
       this.layer('strike', strikeAt(u, CLAW_HIT), strikeShare(u), 1);
+    }
+    // (and what else one of them is doing: see Avatar.zombieAct)
+    const act = this.zombieAct;
+    if (act && !dead && act.k > 0.002) {
+      this.layer(act.a, act.t, act.k, act.legs);
+      act.a.setEffectiveWeight(0);
     }
     // --- on the motion capture: what is kept up (a ladder, the water, a bedroll), the whole body; and what is done once
     // over it, the legs too while standing (a pick-up, a swing, a throw), the arms alone for a drink
@@ -690,11 +696,24 @@ export const updateMethods = {
       }
     }
 
+    // --- a torch, carried: held up before the chest (RAISE)
+    {
+      const up = !!this.inHand?.raise && !dead && !using && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02;
+      this.raiseT += ((up ? 1 : 0) - this.raiseT) * ease(up ? 6 : 14);
+      if (this.raiseT > 0.02 && this.inHand && this.armR && this.neck.length) {
+        settle(this.root);
+        const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+        const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+        _right.set(1, 0, 0).applyQuaternion(aimQ);
+        const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+        const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r).normalize();
+        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, RAISE.at[0]).addScaledVector(UP, RAISE.at[1]).addScaledVector(_right, RAISE.at[2]);
+        this.reach(this.armR, to, dirOf(...RAISE.fingers), dirOf(...RAISE.palm), this.inHand.curl, aimQ, this.raiseT);
+      }
+    }
+
     // --- the arms at their own business: a guard and a punch, hands at work, the wheel's calls (gestures.ts)
     this.gestures(dt, dead, using, ges, mv, pitch);
-    // (what hangs from the hand hangs straight down, turned as the body is, whichever way the hand has turned)
-    const hung = this.inHand?.plumb;
-    if (hung?.parent) hung.quaternion.copy(hung.parent.getWorldQuaternion(_qa).invert().multiply(this.root.getWorldQuaternion(_qb)));
 
     if (this.sick && !dead && this.downT <= 0) {
       this.sicken(dt);

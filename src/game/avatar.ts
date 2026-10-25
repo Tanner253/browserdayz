@@ -21,6 +21,9 @@ import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
+import { Wardrobe } from './survivors';
+import type { InfectedMoves } from './infected-moves';
+import type { InfectedLook } from './infected-look';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -80,15 +83,11 @@ export const THUMB_SEEN = 16;
 export const CLAW = INFECTED.lunge;
 
 /**
- * How the infected get about. Their walk is the game's own, at whatever pace they are going;
- * their run is another body's, drawn to another length with several strides in it, so it is
- * not stepped in time with the walk (which played it at better than twice its pace): above
- * `from` metres a second it is faded in over the walk, all of it by `to`, and it keeps its
- * own time, at the pace it was drawn for (`pace`, metres a second) or as near as `give` lets it be.
+ * How the infected get about (src/game/infected-moves.ts): their run is drawn to another length than their walk, so it
+ * is not stepped in time with it: above `from` metres a second it is faded in over the walk, all of it by `to`, and it
+ * keeps its own time, at the pace it was captured at or as near as `give` lets it be.
  */
-// (Measured on the body: a foot on the ground goes back under it at about 2.3 m/s as the clip
-// was drawn. Played at that pace under a body going 3.3, the feet slid a metre a second.)
-export const SICK_GAIT = { from: 1.9, to: 2.7, pace: 2.3, give: [0.8, 1.5] };
+export const SICK_GAIT = { from: 1.9, to: 2.7, give: [0.8, 1.5] };
 
 /** how far through it the blow lands */
 export const CLAW_HIT = INFECTED.windup / CLAW;
@@ -129,12 +128,26 @@ export const SHOULDER = {
   palm: [0, 0.14, -1] as [number, number, number],
 };
 
+/**
+ * A torch, carried: the fist before the chest and out to the right, the forearm up, the torch standing in it and leaning a
+ * little out, so its flame is at the shoulder's height and clear of the body (the navigator, of one held at the hip: "he
+ * looks like his jacket is on fire ... Hold it as DayZ and Rust do"). From the head, as SHOULDER: forward, up, right.
+ */
+export const RAISE = {
+  at: [0.4, -0.44, 0.32] as [number, number, number],
+  fingers: [0.92, -0.18, -0.34] as [number, number, number],
+  palm: [0.1, 0.12, -1] as [number, number, number],
+};
+
 export interface ArmRig {
   arm: THREE.Bone;
   fore: THREE.Bone;
   hand: THREE.Bone;
   la: number;
   lb: number;
+  /** the reach as the skeleton was made, before a body's own lengths (see Avatar.proportion) */
+  la0?: number;
+  lb0?: number;
   fingersLocal: THREE.Vector3;
   palmLocal: THREE.Vector3;
   fingers: THREE.Bone[][];
@@ -444,10 +457,12 @@ export class Avatar {
   holdT = 0;
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
-  /** a one-handed weapon in the right fist, or a thing (`plumb`: the part of it that hangs from the hand, see ./avatar/fist.ts) */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; plumb?: THREE.Object3D } | null = null;
+  /** a one-handed weapon in the right fist */
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
+  /** how far a torch is held up (0 at the side, 1 up: RAISE) */
+  raiseT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are
@@ -514,6 +529,10 @@ export class Avatar {
 
   /** the dog tag at the breastbone: steel, gold on a VIP, or none (see WornTag) */
   tag: WornTag | null = null;
+  /** which survivor this is, and what they wear over their skin (src/game/survivors.ts) */
+  readonly wardrobe = new Wardrobe();
+  /** how much taller than the skeleton as made this survivor stands (see Avatar.proportion) */
+  stature = 1;
 
   /** the atmosphere an infected's shared paints were made with, for its own when it is first hit */
   paintAtmo: Atmosphere | null = null;
@@ -528,6 +547,15 @@ export class Avatar {
    * into it, -1 none); `seed` keeps one from swaying in time with the next.
    */
   sick: { roused: number; claw: number; seed: number } | null = null;
+  /**
+   * One of the infected's own movements (src/game/infected-moves.ts), set before the body is made: every clip it
+   * plays, and the paces its walk and run were captured at. And one done over whatever it is doing (eating, a scream),
+   * `t` seconds into it, `k` of the body given to it, `legs` of the legs.
+   */
+  zombieMoves: InfectedMoves | null = null;
+  /** and the look it is given among its kind (src/game/infected-look.ts), also set before it is made */
+  zombieLook: InfectedLook | null = null;
+  zombieAct: { a: THREE.AnimationAction; t: number; k: number; legs: number } | null = null;
 
   /**
    * Where the middle of the head as a body draws it is, on its Head bone: the middle of every point of its mesh that
@@ -584,6 +612,7 @@ export interface Avatar {
   veil: Methods<typeof makeMethods>['veil'];
   setLook: Methods<typeof makeMethods>['setLook'];
   makeArm: Methods<typeof makeMethods>['makeArm'];
+  proportion: Methods<typeof dressMethods>['proportion'];
   setSlung: Methods<typeof dressMethods>['setSlung'];
   setGear: Methods<typeof dressMethods>['setGear'];
   wearTag: Methods<typeof dressMethods>['wearTag'];

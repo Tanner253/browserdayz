@@ -34,14 +34,13 @@ import { made, programsOf, type Renderer } from '../core/renderer';
 import type { Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import type { Atmosphere } from '../world/atmosphere';
-import type { Grips } from './arms';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from './avatar';
-import { fistOf } from './avatar/fist';
 import { lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch } from './look';
+import { chosen, sortWorn } from './survivors';
 import type { ItemModels } from './loot';
+import { inFist, type Held } from './in-fist';
 
 /** a thing as it is seen in somebody's hands (`plumb`: the part of it that hangs from the hand, and is kept upright: see `inFist`) */
-type Held = { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee'; plumb?: THREE.Object3D };
 
 /** Where things are on the page, in the page's own pixels from its top left (asked of the inventory each frame). */
 export interface DollBox {
@@ -592,6 +591,8 @@ export class Doll {
       this.name = name;
       this.dress();
     }
+    // (which survivor: their own pick, src/game/survivors.ts)
+    this.body.wardrobe.setBody(chosen(name).body);
     const worn = h.worn(), wornKey = worn.join(',');
     if (wornKey !== this.wornKey) {
       this.wornKey = wornKey;
@@ -628,7 +629,10 @@ export class Doll {
         this.livelyTill = performance.now() + LIVELY;
       }
       const items: { id: string; obj: THREE.Object3D }[] = [];
-      for (const id of ids) {
+      // (the clothes as they are worn: src/game/survivors.ts)
+      const { worn, gear } = sortWorn(ids);
+      this.body.wardrobe.setWorn(worn);
+      for (const id of gear) {
         if (!GEAR_SHOWN.has(id)) continue;
         // (what is on already stays as it is; a thing that is a piece of the suit itself has no model to hang on the body: it is there or not)
         const on = kept.find((i) => i.id === id);
@@ -695,10 +699,10 @@ export class Doll {
     }
   }
 
-  /** a thing that is neither gun nor club, in the right fist, as every body holds one (./avatar/fist.ts) */
+  /** A thing that is neither gun nor club, in the right fist (src/game/in-fist.ts): a bandage, a tin, a flask, a magazine. */
   private async inFist(id: string): Promise<Held | null> {
     if (!ITEMS[id]) return null;
-    return fistOf((await this.models.get(id)).group.clone());
+    return inFist((await this.models.get(id)).group.clone(), id);
   }
 
   // ------------------------------------------------------------ the turn
