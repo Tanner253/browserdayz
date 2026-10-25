@@ -473,6 +473,8 @@ export class Avatar {
   deed: { name: Deed; t: number; dur: number; legs: number; k: number; from: number; to: number; hit?: number; at?: number; way?: 'draw' | 'stow' } | null = null;
   /** how far up the guard with something in the fist is, 0..1 (see melee/cuts.ts GUARD) */
   guardK = 0;
+  /** how much of the body the deed being done has this frame, 0..1 */
+  deedK = 0;
   stay: { name: Stay; t: number; rate: number } | null = null;
   stayT = 0;
   stayWas: Stay | null = null;

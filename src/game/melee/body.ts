@@ -51,3 +51,28 @@ export function lookOverBody(a: Avatar, k: number, live: number) {
   r.hand.updateWorldMatrix(true, false);
   a.curl(r, held.curl, r.hand.getWorldQuaternion(_tq));
 }
+
+/**
+ * The guard with a thing in one fist (the right button), over the boxer's guard the body takes for it (melee/cuts.ts
+ * GUARD): the fist up before the face and a little to the right, the thing raised across the face, its head up and over
+ * to the left, the back of the hand and the edge out (the navigator, 2026-10-25: the hatchet "must stay in right hand
+ * raised across"). `w`: how far up, less what a blow thrown from it has taken over.
+ */
+export function guardOne(a: Avatar, w: number) {
+  const r = a.armR, held = a.inHand;
+  if (!r || !held || w < 0.02 || !a.neck.length) return;
+  a.root.updateWorldMatrix(true, false);
+  _aq.setFromAxisAngle(_up, a.yaw);
+  _fw.set(0, 0, -1).applyQuaternion(_aq);
+  _rt.set(1, 0, 0).applyQuaternion(_aq);
+  a.neck[a.neck.length - 1].getWorldPosition(_hd);
+  _to.copy(_hd).addScaledVector(_fw, GUARD_ONE.ahead).addScaledVector(_up, GUARD_ONE.up).addScaledVector(_rt, GUARD_ONE.right);
+  // (the fingers across to the left and down a little, the palm to the face: the haft through the fist leans up and over to the left)
+  _fi.copy(_rt).negate().addScaledVector(_up, -GUARD_ONE.lean).normalize();
+  _pa.copy(_fw).negate();
+  a.reach(r, _to, _fi, _pa, held.curl, _aq, w);
+  r.hand.updateWorldMatrix(true, false);
+  a.curl(r, held.curl, r.hand.getWorldQuaternion(_tq));
+}
+/** where that fist is from the head (metres ahead, up, to the right), and how far the thing in it leans over */
+const GUARD_ONE = { ahead: 0.32, up: -0.16, right: 0.12, lean: 2.5 };

@@ -116,6 +116,7 @@ const NEAREST = -0.32;
  *   lands – how the thing is held as it lands: which way its head points and its edge faces (the eye's space, as a
  *           stance says it: see stanceQuat); as it rests, where none is said
  *   turn  – the share of the captured hand's turning about that
+ *   keep  – how far round and up the arm may be shown going, if not as far as KEEP lets it
  */
 export interface Cut {
   clip: string;
@@ -126,6 +127,7 @@ export interface Cut {
   at?: [number, number];
   lands?: { tip: [number, number, number]; edge: [number, number, number] };
   turn?: number;
+  keep?: [number, number, number, number];
 }
 
 export interface FpPose {
@@ -146,6 +148,14 @@ const _h = new THREE.Vector3(), _s = new THREE.Vector3(), _e = new THREE.Vector3
 const _qa = new THREE.Quaternion(), _qh = new THREE.Quaternion(), _id = new THREE.Quaternion();
 /** an angle brought within half a turn either way */
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+/**
+ * How far round and up from where it lands the arm may be shown going, radians: right, left, up, down. The capture's
+ * swing is eased toward these, never cut off at them, so a wind-up is a short pull back to the right and the
+ * follow-through stays in the picture (the navigator, 2026-10-25: "keep weapon in view through wind-up").
+ */
+const KEEP: [number, number, number, number] = [0.32, 0.7, 0.4, 0.32];
+/** `x` eased toward `hi` above nought and `-lo` below it */
+const soft = (x: number, lo: number, hi: number) => (x > 0 ? hi * Math.tanh(x / hi) : lo * Math.tanh(x / lo));
 /** a place along a row of places at a share `u` of it */
 function placeAt(rows: number[][], u: number, out: THREE.Vector3) {
   const [a, b, w] = at(rows.length, u);
@@ -185,18 +195,26 @@ export function cutPose(c: Cut, u: number, hitU: number, rest: { arm: THREE.Vect
   placeAt(p.e!, H, _eh).sub(_sh);
   // The arm, round and up from where the captured arm was as the blow landed, a share as far, from where the fist is
   // put as it lands (the middle of the picture): so every blow lands where it is seen, however it was captured.
-  const [ar, au] = c.at ?? [0.35, 0];
-  wayOf(roundOf(rest.arm) - ar + wrap(roundOf(_h) - roundOf(_hh)) * kr, upOf(rest.arm) + au + (upOf(_h) - upOf(_hh)) * ku, out.arm);
-  wayOf(roundOf(rest.upper) - ar + wrap(roundOf(_e) - roundOf(_eh)) * kr, upOf(rest.upper) + au + (upOf(_e) - upOf(_eh)) * ku, out.upper);
+  const [ar, au] = c.at ?? [0.35, 0], [kR, kL, kU, kD] = c.keep ?? KEEP;
+  const round = (d: number) => soft(wrap(d) * kr, kL, kR), up = (d: number) => soft(d * ku, kD, kU);
+  wayOf(roundOf(rest.arm) - ar + round(roundOf(_h) - roundOf(_hh)), upOf(rest.arm) + au + up(upOf(_h) - upOf(_hh)), out.arm);
+  wayOf(roundOf(rest.upper) - ar + round(roundOf(_e) - roundOf(_eh)), upOf(rest.upper) + au + up(upOf(_e) - upOf(_eh)), out.upper);
   out.stretch = _h.length() / Math.max(0.05, _hh.length());
   // (the hand's turn since the blow landed, a share of it: as the captured hand turned, whatever its fingers' frame)
   turnAt(p.r, T, _qa);
   turnAt(p.r, H, _qh);
-  out.turn.copy(_qa).multiply(_qh.invert()).slerp(_id, 1 - (c.turn ?? 0.7));
+  out.turn.copy(_qa).multiply(_qh.invert()).slerp(_id, 1 - (c.turn ?? 0.3));
   return out;
 }
 
 const _v = new THREE.Vector3(), _r = new THREE.Quaternion(), _l = new THREE.Quaternion();
+/** where in the picture the fist may go, as shares of how far ahead it is (the lens is 48 degrees high) */
+const FRAME = { left: -0.62, right: 0.5, low: -0.27, high: 0.3 };
+/** `v` eased into lo..hi, all the more the nearer an edge it is */
+const squeeze = (v: number, lo: number, hi: number) => {
+  const mid = (lo + hi) / 2, half = (hi - lo) / 2;
+  return mid + half * Math.tanh((v - mid) / half);
+};
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 /** a thing's turn from which way its head points (its own up) and its edge faces (its far side, -z), in the eye's space */
 export function stanceQuat(s: { tip: readonly number[]; edge: readonly number[] }, out: THREE.Quaternion) {
@@ -216,8 +234,13 @@ export function layOn(c: Cut, u: number, hitU: number, pos: THREE.Vector3, quat:
   // (never into the eye: an arm swung round past the side or up over the head stays in front of it, going out of the
   // top of the picture rather than over the eye; and the elbow under the eye: raised past it, the sleeve filled the picture)
   pos.z = Math.min(pos.z, NEAREST);
+  // (and the fist eased in from the edges of the picture, as far ahead as it is: what is in it is always seen)
+  const d = -pos.z, x0 = pos.x, y0 = pos.y;
+  pos.x = squeeze(pos.x, FRAME.left * d, FRAME.right * d);
+  pos.y = squeeze(pos.y, FRAME.low * d, FRAME.high * d);
   elbow.lerp(_v.copy(at.upper).multiplyScalar(Lu).add(FP_SHOULDER), at.w);
-  elbow.y = Math.min(elbow.y, -0.08);
+  elbow.x += pos.x - x0;
+  elbow.y = Math.min(elbow.y + pos.y - y0, -0.08);
   if (c.lands) stanceQuat(c.lands, _l);
   else _l.copy(quat);
   quat.slerp(_r.copy(at.turn).multiply(_l), at.w);

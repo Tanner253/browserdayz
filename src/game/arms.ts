@@ -50,7 +50,7 @@ export interface HandGrip {
   thumb: number;
   /** 0..1: fold the thumb across the curled fingers (a closed fist) */
   tuck?: number;
-  /** the right hand closed on it as the knife pack's own hand closes on its knife (GRIP_PACK): the curl, thumb and tuck are not used */
+  /** the hand closed on it as the knife pack's own right hand closes on its knife (GRIP_PACK; the left as its twin): the curl, thumb and tuck are not used */
   pose?: 'knife';
   /** how far out from the first finger the thumb stands, 1 as it comes (less for a hand at rest, its thumb in beside the finger) */
   spread?: number;
@@ -443,8 +443,14 @@ export class FPArms {
     _m2.makeBasis(F, N, new THREE.Vector3().crossVectors(F, N));
     const handWorld = new THREE.Quaternion().setFromRotationMatrix(_m2.multiply(_m1.transpose()));
     this.setWorldQuat(a.hand, handWorld);
-    if (grip.pose && a === this.right && this.grasp.size) {
-      for (const chain of [...a.fingers, a.thumb]) for (const b of chain) b.quaternion.copy(this.grasp.get(partOf(b.name)) ?? b.quaternion);
+    if (grip.pose && this.grasp.size) {
+      // (the left hand the right's twin: these hands' bones are turned as in a mirror, the turn's y and z the other way)
+      const twin = a === this.left;
+      for (const chain of [...a.fingers, a.thumb])
+        for (const b of chain) {
+          const q = this.grasp.get(partOf(b.name));
+          if (q) b.quaternion.set(q.x, twin ? -q.y : q.y, twin ? -q.z : q.z, q.w);
+        }
       a.hand.updateMatrixWorld(true);
       return;
     }

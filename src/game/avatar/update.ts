@@ -7,7 +7,7 @@ import { stretch } from './gait';
 import { MOCAP, MOVES } from './deeds';
 import { slashAt } from '../held-mocap';
 import type { HandGrip } from '../arms';
-import { holdLeft, lookOverBody } from '../melee/body';
+import { guardOne, holdLeft, lookOverBody } from '../melee/body';
 import { DRAW, GUARD } from '../melee/cuts';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
@@ -338,6 +338,7 @@ export const updateMethods = {
       if (a) this.layer(a, ((((this.stay?.t ?? 0) % a.getClip().duration) + a.getClip().duration) % a.getClip().duration), this.stayT, 1);
       else if (!this.stay) this.stayWas = null;
       const d = this.deed;
+      this.deedK = 0;
       if (d) {
         d.t += dt;
         const act = deeds.get(d.name);
@@ -348,6 +349,7 @@ export const updateMethods = {
           const s = d.t / d.dur, at = d.at ?? 0;
           const share = d.hit === undefined ? d.from + (d.to - d.from) * s : s < at ? d.from + ((d.hit - d.from) * s) / at : d.hit + ((d.to - d.hit) * (s - at)) / (1 - at);
           this.layer(act, share * act.getClip().duration, k, d.legs * (1 - this.moveT));
+          this.deedK = k;
         }
       }
     }
@@ -706,6 +708,7 @@ export const updateMethods = {
     // --- something held in both hands: the left closes on it where its grip says, but while it lies on the shoulder
     if (this.inHand && ges?.kind === 'check' && !dead) lookOverBody(this, ges.t / ges.dur, left(ges));
     else this.inHand?.spin?.rotation.set(0, 0, 0);
+    if (this.inHand && !this.inHand.left && !dead) guardOne(this, this.guardK * (1 - this.deedK));
     if (this.inHand?.left && !dead && !using && !this.deed?.way) holdLeft(this, 1 - this.shoulderT);
 
     // --- the arms at their own business: a guard and a punch, hands at work, the wheel's calls (gestures.ts)

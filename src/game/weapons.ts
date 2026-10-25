@@ -26,8 +26,9 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
+import { KNIVES } from '../../api/_lib/shop-items';
 import { cutFor } from './melee/cuts';
-import { LOOK, fpPose, handMove, hasCut, jabAt, layOn, lengthOf, lookOver, mouthAt, slashAt, stanceQuat as stanceOf, type Cut, type FpPose } from './held-mocap';
+import { LOOK, fpPose, handMove, hasCut, jabAt, layOn, lengthOf, lookOver, mouthAt, slashAt, spinOf, stanceQuat as stanceOf, type Cut, type FpPose } from './held-mocap';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -233,6 +234,8 @@ interface VmModel {
   melee?: MeleeStyle;
   /** a pack's own right wrist (the knife's: see BLADE.wrist) */
   wrist?: THREE.Object3D | null;
+  /** what a finish is worn on, where that is not the whole of what is drawn (a knife in the pack's hands: not the hands) */
+  worn?: THREE.Object3D;
   grips?: Grips;
   /** a long gun with sights of its own to aim along when it has no optic (the shotgun): no cross is drawn over them */
   ownSights?: boolean;
@@ -1368,6 +1371,24 @@ function ringOf(o: THREE.Object3D, tall: number) {
   return box.isEmpty() ? new THREE.Vector3(0, tall, 0) : box.getCenter(v.clone());
 }
 
+/**
+ * A knife of ours in the knife pack's hand, where the pack's own was: the middle of the pack's knife node is the middle
+ * of its handle, its +y toward the point and its flat across x, as a thing to hit with stands (meleeHeld, whose root is
+ * the middle of its handle), at the pack's scale. @returns what it hangs by (what a finish is worn on)
+ */
+function hangKnife(rig: WeaponRig, thing: THREE.Object3D) {
+  const node = rig.node('knife')!;
+  rig.strip(['knife']);
+  rig.root.updateMatrixWorld(true);
+  const held = new THREE.Group();
+  held.scale.setScalar(rig.root.getWorldScale(new THREE.Vector3()).x / node.getWorldScale(new THREE.Vector3()).x);
+  // (the pack's knife has its edge on the node's +z: a thing to hit with stands edge to -z)
+  held.rotation.y = Math.PI;
+  held.add(thing);
+  node.add(held);
+  return held;
+}
+
 export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { body: THREE.Group; grips: Grips; melee: MeleeStyle }> {
   const def = ITEMS[id];
   const sc = await assets.model(def.model);
@@ -1502,7 +1523,7 @@ export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { 
       // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
       // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
       right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, pose: 'knife', shoulder: !!style.rest },
-      left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
+      left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, pose: 'knife' } : null,
     },
     // high enough that the fist on the handle is in the picture, not only the head
     hip: new THREE.Vector3(...MELEE.hip),
@@ -1950,6 +1971,20 @@ export class Weapons {
       blade.root.add(rig.root);
       blade.rig = rig;
       blade.hip = HELD.knife;
+    }
+    // ---- every other knife in the same hands and movements (the owner, 2026-10-25: "high quality knives"): the pack's
+    // own knife taken out, and this one hung where it was held. (Not the karambit: held point down, its blade is under
+    // the pack's fist and out of sight. It is held in our own arms, closed as the pack's hand closes: see GRIP_PACK.)
+    for (const id of KNIVES) {
+      const m = this.models.get(id);
+      if (id === 'knife' || MELEE_STYLE[id]?.flip || !m || !bladeFp?.rig) continue;
+      const rig = new WeaponRig(await assets.gltfOf('knife_fp'), bladeFp.rig, packMaterial);
+      if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
+      m.worn = hangKnife(rig, m.root);
+      m.root = new THREE.Group();
+      m.root.add(rig.root);
+      m.rig = rig;
+      m.hip = HELD.knife;
     }
     // ---- the pitchfork, for whoever holds it: its pack's movements in our own arms, the fork hung on its node
     const fork = this.models.get('pitchfork');
@@ -2745,7 +2780,7 @@ export class Weapons {
   /** a gun's model as it is held in the hands (what must stay on the card while it is carried: see CardKeep.wanted) */
   /** a finish has been put on a gun (src/game/finish.ts): the one in the hands plated afresh */
   refinish() {
-    if (this.current && this.currentItem) wearFinish(this.current.root, this.currentItem.id, finishOn(this.currentItem));
+    if (this.current && this.currentItem) wearFinish(this.current.worn ?? this.current.root, this.currentItem.id, finishOn(this.currentItem));
   }
 
   heldModel(id: string): THREE.Object3D | null {
@@ -2938,7 +2973,7 @@ export class Weapons {
       this.going = undefined;
       this.current = next ? this.models.get(next.id) ?? null : null;
       if (this.current) {
-        wearFinish(this.current.root, next!.id, finishOn(next));
+        wearFinish(this.current.worn ?? this.current.root, next!.id, finishOn(next));
         this.vmRoot.add(this.current.root);
         this.boltReady = true;
         audio.equip(ITEMS[next!.id].weapon ? 'gun' : 'melee');
@@ -4788,9 +4823,12 @@ export class Weapons {
     );
     // looked over (see lookOver): the hands, knife and all, brought in toward the middle and turned one way and the other
     // (turned about the wrist: about the pack's own origin, a hand's length behind it, the arm swept across the picture)
+    // (a karambit is spun twice round the finger in its ring, the hand held still: held-mocap.ts spinOf)
+    const spin = m.worn?.getObjectByName('spin');
+    if (spin) spin.rotation.x = a?.name === 'check' ? spinOf(Math.min(1, a.t / a.dur)) : 0;
     if (a?.name === 'check') {
       const k = Math.min(1, a.t / a.dur), S = THREE.MathUtils.smoothstep, w = S(k, 0, 0.15) * (1 - S(k, 0.86, 1));
-      const yaw = LOOK.turn * (S(k, 0.1, 0.32) - 2 * S(k, 0.45, 0.68) + S(k, 0.78, 0.95));
+      const yaw = spin ? 0 : LOOK.turn * (S(k, 0.1, 0.32) - 2 * S(k, 0.45, 0.68) + S(k, 0.78, 0.95));
       m.root.position.x -= 0.05 * w;
       m.root.position.y += 0.03 * w;
       m.wrist ??= m.root.getObjectByName(BLADE.wrist) ?? null;
