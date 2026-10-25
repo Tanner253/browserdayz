@@ -289,7 +289,9 @@ export class ItemModels {
       // (and a tool with a broad head, which is no stick across its head: a claw hammer, a pickaxe, stood on its butt
       // as it came. 2026-10-25: the hammer and the pickaxe stood up on end where they were dropped.)
       const tool = def.category === 'melee' && sz.y > Math.max(sz.x, sz.z) * 1.6 && sz.y * k > 0.3;
-      if (def.category !== 'weapon' && (stick || onEdge || tool)) {
+      // (and a blade lying along the ground as it came but up on its edge: the panel saw, 2026-10-25)
+      const blade = def.category === 'melee' && Math.max(sz.x, sz.z) > sz.y && minH < sz.y * 0.4;
+      if (def.category !== 'weapon' && (stick || onEdge || tool || blade)) {
         // tip it over its thinnest side so it rests on its biggest face
         const lay = sz.x <= sz.z ? new THREE.Matrix4().makeRotationZ(Math.PI / 2) : new THREE.Matrix4().makeRotationX(-Math.PI / 2);
         for (const p of parts) {

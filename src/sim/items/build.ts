@@ -13,7 +13,7 @@ export const BUILD_ITEMS: ItemDef[] = [
   { id: 'log', name: 'Log', model: 'log', w: 2, h: 6, weight: 6, category: 'misc',
     desc: 'A length of trunk, from a tree you felled. Lay it down and saw it into six planks.',
   },
-  { id: 'planks', name: 'Planks', model: '@planks', w: 2, h: 4, weight: 0.3, stack: 20, fresh: 8, category: 'misc',
+  { id: 'planks', name: 'Planks', model: 'planks', w: 2, h: 4, weight: 0.3, stack: 20, fresh: 8, category: 'misc',
     desc: 'Sawn boards. Every frame of a base is made of them, and a wooden wall is nailed up out of more.',
     // (a few, sawn already, where wood was worked and kept. Each of these is kept off the outskirts, or nearly, whose sheds
     // are full of the tools, the firewood and the lights already, and found inland, where most of the works and yards are.)
@@ -32,7 +32,7 @@ export const BUILD_ITEMS: ItemDef[] = [
     loot: { pair: 'MetalPlate', at: [0, 5, 8, 0, 0], restock: 360, usage: ['Industrial', 'Farm', 'Military'], favour: { Industrial: 3 }, qty: [0.2, 0.6] },
   },
   // ---------------------------------------------------------------- tools (each wears out: see TOOL_LIFE in src/sim/gather.ts)
-  { id: 'hand_saw', name: 'Hand Saw', model: 'machete', tint: 0xb8c4cc, w: 1, h: 4, weight: 0.6, category: 'melee', desc: 'Saws a log lying on the ground into planks.', melee: { damage: 18, range: 1.6, rate: 0.7 },
+  { id: 'hand_saw', name: 'Hand Saw', model: 'hand_saw', w: 1, h: 4, weight: 0.6, category: 'melee', desc: 'Saws a log lying on the ground into planks.', melee: { damage: 18, range: 1.6, rate: 0.7 },
     loot: { pair: 'HandSaw', at: [1, 3, 6, 0, 0], restock: 180, usage: SHEDS, favour: { Farm: 2, Industrial: 2 }, on: IN_SHEDS, rack: { any: 1.4 } },
     worth: 4,
   },
@@ -42,8 +42,8 @@ export const BUILD_ITEMS: ItemDef[] = [
   },
   // (base building's second step: Rust's two, the owner: "We will need a building hammer and blueprint paper like rust
   // has ... why change something thats not broken". The plan lays frames; the hammer nails them up, and takes them down.)
-  { id: 'building_plan', name: 'Building Plan', model: '@plan', w: 1, h: 2, weight: 0.1, category: 'tool',
-    desc: 'Blueprint paper. In your hands, it lays the frame of a base: hold the right button for the pieces, the left lays one.',
+  { id: 'building_plan', name: 'Building Plan', model: 'building_plan', w: 1, h: 2, weight: 0.1, category: 'tool',
+    desc: 'A clipboard of plans. In your hands, it lays the frame of a base: hold the right button for the pieces, the left lays one.',
     // (where things were built and mended: the works, the farms' sheds and the hunters' cabins)
     loot: { pair: 'Paper', at: [1, 5, 8, 0, 0], restock: 240, usage: SHEDS, favour: { Industrial: 2 } },
     worth: 2,
@@ -59,7 +59,7 @@ export const BUILD_ITEMS: ItemDef[] = [
     loot: { pair: 'CodeLock', at: [0, 1, 3, 0, 0], restock: 600, usage: ['Police', 'Industrial', 'Military'], favour: { Police: 2 } },
     worth: 8,
   },
-  { id: 'key_lock', name: 'Key Lock', model: '@keylock', w: 1, h: 1, weight: 0.3, category: 'tool',
+  { id: 'key_lock', name: 'Key Lock', model: 'key_lock', w: 1, h: 1, weight: 0.3, category: 'tool',
     desc: 'A lock and its key. In your hands, the left button fits it to a door, a gate, a hatch, a box or a claim you may build at, and gives you its key. Whoever carries a key to it may open it; more keys are cut at it from a plank.',
     loot: { pair: 'CombinationLock', at: [1, 3, 3, 0, 0], restock: 480, usage: [...SHEDS, ...HOMES], favour: { Farm: 1.5 } },
     worth: 4,
@@ -77,7 +77,7 @@ export const BUILD_ITEMS: ItemDef[] = [
     loot: { pair: 'LongTorch', at: [3, 4, 2, 0, 0], restock: 420, usage: [...HOMES, ...SHEDS], favour: { Hunting: 2, Farm: 1.5 } },
     worth: 2,
   },
-  { id: 'key', name: 'Key', model: '@key', w: 1, h: 1, weight: 0.02, category: 'misc',
+  { id: 'key', name: 'Key', model: 'key', w: 1, h: 1, weight: 0.02, category: 'misc',
     desc: 'A key to one key lock. Carried, it opens that lock: lose it, and so does whoever finds it.',
   },
   { id: 'pickaxe', name: 'Pickaxe', model: 'pickaxe', w: 2, h: 6, weight: 2.8, category: 'melee', slot: 'long', desc: 'Breaks stone off a boulder. Swung in both hands: slow, and heavy where it lands.', melee: { damage: 50, range: 2.0, rate: 1.05 },

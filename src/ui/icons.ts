@@ -61,12 +61,14 @@ const FACE_UP = new Set(['gasmask']);
 /**
  * A thing whose picture the rules above leave on its side or edge on, posed by hand (2026-10-24, the owner: "make sure
  * the model photos are upright and look proper in the icon images for items not upside down or backwards"): `pivot`
- * how the model is stood (in place of the rules' turn), `frame` how the whole is then turned to the eye. The key lock
- * lay flat, its shackle out sideways: stood on its foot, shackle up, its face to the eye. (The hand saw is a sliver
- * whichever way it is turned: it is the machete's model until its own comes.)
+ * how the model is stood (in place of the rules' turn), `frame` how the whole is then turned to the eye. The rules
+ * turned the key lock's back plate to the eye, looked at the saw along its length, and laid the clipboard across its
+ * tall place: each is turned face to the eye, the saw's handle and the clipboard's clip at the ends they are held by.
  */
 const POSED: Record<string, { pivot?: [number, number, number]; frame?: [number, number, number] }> = {
-  key_lock: { pivot: [Math.PI / 2, 0, 0], frame: [0.15, 0.4, 0] },
+  key_lock: { pivot: [0.15, -Math.PI / 2 + 0.35, 0] },
+  hand_saw: { pivot: [Math.PI / 2 - 0.2, 0, 0] },
+  building_plan: { pivot: [Math.PI / 2 - 0.25, 0, 0], frame: [0, 0, -Math.PI / 2] },
 };
 
 /** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */

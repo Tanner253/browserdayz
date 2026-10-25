@@ -7,13 +7,15 @@
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { assets } from '../../core/assets';
 import { BODY_QUERY, physics } from '../../core/physics';
 import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES } from '../../sim/build/pieces';
 import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
 import { DOOR } from '../../sim/build/doors';
-import { clothGeometry, drawnAt, geometryOf, leafGeometry, lockGeometry, paintFor, surfaceOf } from './look';
+import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
 
 /** what a blow or a bullet that lands on a piece struck */
 export class PieceRef {
@@ -63,8 +65,39 @@ export class BaseDraw {
   private solidT = 0;
   /** a door swung by somebody (its first move), and one held by the player's own body */
   onSwing: (b: Base, p: Piece, at: THREE.Vector3) => void = () => {};
+  /** each kind of lock as it is fitted, out of its item's own model (null while that loads) */
+  private locks = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material | THREE.Material[] } | null>();
 
   constructor(private scene: THREE.Scene, private atmo: Atmosphere | null) {}
+
+  /**
+   * A key lock's or a code lock's model (`key_lock`, `code_lock`), fitted as the lock is at a piece's `lockAt`: its
+   * back plate flat on the leaf at z 0, about its own middle, its front out along +z and its bolt toward the leaf's
+   * free edge. (The models face +x, their back plates at -x. The navigator, 2026-10-25: "Mount it at your door's
+   * lockAt with its back plate flat on the leaf, the bolt toward the frame. On the ground and in hand it's the same
+   * model.")
+   */
+  private lockModel(k: string) {
+    if (!this.locks.has(k)) {
+      this.locks.set(k, null);
+      void assets.model(`${k}_lock`).then((root) => {
+        root.updateMatrixWorld(true);
+        const meshes: THREE.Mesh[] = [];
+        root.traverse((o) => void ((o as THREE.Mesh).isMesh && meshes.push(o as THREE.Mesh)));
+        const parts = meshes.map((m) => m.geometry.clone().applyMatrix4(m.matrixWorld));
+        const geo = parts.length === 1 ? parts[0] : mergeGeometries(parts, true)!;
+        geo.rotateY(-Math.PI / 2).computeBoundingBox();
+        const b = geo.boundingBox!;
+        geo.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -b.min.z).computeBoundingSphere();
+        // (its own copy of the paint, put in the world's light as the ground's things are: src/game/loot.ts seenParts)
+        const mats = meshes.map((m) => (m.material as THREE.Material).clone());
+        for (const m of mats) this.atmo?.register(m);
+        this.locks.set(k, { geo, mat: mats.length === 1 ? mats[0] : mats });
+        this.dirty.add(`__lock:steel:${k}`);
+      }, () => {});
+    }
+    return this.locks.get(k) ?? null;
+  }
 
   private id = (b: number, p: number) => `${b}:${p}`;
 
@@ -237,9 +270,12 @@ export class BaseDraw {
         m.dispose();
       }
       const [kind, name, more] = key.split(':'), paint = (/^\d$/.test(name) ? Number(name) : name) as Paint;
-      const geo = kind === '__lock' ? lockGeometry(more) : more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
+      // (a lock is drawn once its model is in: lockModel marks it to be drawn again then)
+      const lock = kind === '__lock' ? this.lockModel(more) : null;
+      if (kind === '__lock' && !lock) return;
+      const geo = lock ? lock.geo : more?.startsWith('L') ? leafGeometry(kind, Number(more.slice(1)), paint) : more === 'C' ? clothGeometry(kind) : geometryOf(kind, paint);
       // (a leaf with ironwork is two groups, its paint and its iron: see leafGeometry)
-      const mat = geo.groups.length > 1 ? [paintFor(paint, this.atmo), paintFor('iron', this.atmo)] : paintFor(paint, this.atmo);
+      const mat = lock ? lock.mat : geo.groups.length > 1 ? [paintFor(paint, this.atmo), paintFor('iron', this.atmo)] : paintFor(paint, this.atmo);
       m = new THREE.InstancedMesh(geo, mat, Math.max(16, Math.ceil(list.length * 1.5)));
       m.castShadow = m.receiveShadow = true;
       m.name = `base:${key}`;

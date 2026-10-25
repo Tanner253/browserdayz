@@ -779,7 +779,10 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.shovel = { ...styles.bat, grip: 0.2 };
   // (the tools of gathering, src/sim/gather.ts: the saw held as the machete is, the long axe and the pickaxe as the
   // bat, in both hands)
-  styles.hand_saw = styles.machete;
+  // (the saw held lower and pointed away, its teeth down and its flat turned partly to the eye: held as the machete
+  // was, upright by the eye, its broad blade filled a third of the picture. The owner, 2026-10-25: "this does not look
+  // good". Gripped at the middle of its handle, which is the bottom 14 cm of it.)
+  styles.hand_saw = { ...styles.machete, idle: { p: [0.2, -0.2, -0.46], tip: [-0.4, 0.55, -0.73], edge: [0.35, 0.85, 0.35] }, grip: 0.07 };
   styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };
@@ -3713,8 +3716,9 @@ export class Weapons {
             obj.rotation.y = Math.PI / 2;
             size.set(size.z, size.y, size.x);
           }
-          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it)
-          if (isBag(id)) obj.rotation.y += Math.PI;
+          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it, and
+          // the building plan's clipboard with its sketch so, its clip away from them)
+          if (isBag(id) || id === 'building_plan') obj.rotation.y += Math.PI;
           obj.position.y = -size.y / 2;
           root.add(obj);
         }

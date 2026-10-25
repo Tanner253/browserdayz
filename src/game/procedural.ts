@@ -250,8 +250,8 @@ export function dogTagGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-// ---- base building's stand-ins (2026-10-24): until real models of a bundle of planks and a sheet of corrugated steel
-// are downloaded (the owner: "make due with placeholders if needed until i get back"; listed for them)
+// ---- stand-ins (2026-10-24) left only for crafting's things with no model yet (src/sim/items/craft.ts: the iron bar
+// drawn as planks, scrap as the sheet); base building's own planks and sheet metal have models of their own
 
 let pine: THREE.MeshStandardMaterial | null = null;
 /** sawn pine: a canvas of grain, pale with darker lines along the board */
@@ -292,7 +292,6 @@ function planksGeometry() {
 }
 
 let galv: THREE.MeshStandardMaterial | null = null;
-let plan: THREE.MeshStandardMaterial | null = null;
 /** two sheets of corrugated galvanised steel, 90 by 60 cm, the corrugations along X */
 function sheetGeometry() {
   const one = (y: number) => {
@@ -306,29 +305,7 @@ function sheetGeometry() {
   return g;
 }
 
-let brass: THREE.MeshStandardMaterial | null = null;
-/** the key lock and the key (2026-10-24, base building): stand-ins until models of them come, lying flat */
-function lockParts(model: string): MeshPart[] {
-  brass ??= new THREE.MeshStandardMaterial({ color: 0xb8913f, metalness: 0.85, roughness: 0.35, name: 'brass' });
-  if (model === '@keylock') {
-    // (a padlock: its body, and its shackle lying out from it)
-    const shackle = new THREE.TorusGeometry(0.022, 0.005, 6, 14, Math.PI).rotateX(-Math.PI / 2).translate(0, 0.0125, -0.035);
-    return [{ name: 'lock', geometry: mergeGeometries([new THREE.BoxGeometry(0.06, 0.025, 0.07).translate(0, 0.0125, 0), shackle], false)!, material: brass }];
-  }
-  // (a key: its bow and its blade, with its bits)
-  const bow = new THREE.TorusGeometry(0.012, 0.0035, 6, 14).rotateX(-Math.PI / 2).translate(-0.03, 0.0035, 0);
-  const blade = new THREE.BoxGeometry(0.045, 0.003, 0.008).translate(0.004, 0.0035, 0);
-  const bits = new THREE.BoxGeometry(0.014, 0.003, 0.007).translate(0.018, 0.0035, 0.007);
-  return [{ name: 'key', geometry: mergeGeometries([bow, blade, bits], false)!, material: brass }];
-}
-
 export function proceduralParts(model: string): MeshPart[] {
-  if (model === '@keylock' || model === '@key') return lockParts(model);
-  if (model === '@plan') {
-    // (a roll of blueprint paper, tied: a stand-in until a model of one is downloaded)
-    plan ??= new THREE.MeshStandardMaterial({ color: 0x3f6fa8, roughness: 0.9, name: 'blueprint' });
-    return [{ name: 'plan', geometry: new THREE.CylinderGeometry(0.035, 0.035, 0.6, 12).rotateZ(Math.PI / 2).translate(0.3, 0.035, 0), material: plan }];
-  }
   if (model === '@planks') return [{ name: 'planks', geometry: planksGeometry(), material: sawnPine() }];
   if (model === '@sheet') {
     galv ??= new THREE.MeshStandardMaterial({ color: 0x9aa3a8, metalness: 0.7, roughness: 0.45, side: THREE.DoubleSide, name: 'galvanised' });

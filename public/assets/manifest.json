@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T02:11:46.332Z",
+ "generated": "2026-10-25T04:44:01.918Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -13042,6 +13042,106 @@
     0.3,
     0.1625,
     0.1076
+   ],
+   "lods": []
+  },
+  "hand_saw": {
+   "url": "assets/models/hand_saw.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 470680,
+   "srcTris": 2438,
+   "tris": 2438,
+   "min": [
+    -0.0621,
+    0,
+    -0.3
+   ],
+   "max": [
+    0.0621,
+    0.4311,
+    0.3
+   ],
+   "lods": []
+  },
+  "key_lock": {
+   "url": "assets/models/key_lock.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 182500,
+   "srcTris": 1428,
+   "tris": 1428,
+   "min": [
+    -0.0294,
+    0,
+    -0.06
+   ],
+   "max": [
+    0.0294,
+    0.1195,
+    0.06
+   ],
+   "lods": []
+  },
+  "key": {
+   "url": "assets/models/key.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 377948,
+   "srcTris": 970,
+   "tris": 970,
+   "min": [
+    -0.0139,
+    0,
+    -0.035
+   ],
+   "max": [
+    0.0139,
+    0.0084,
+    0.035
+   ],
+   "lods": []
+  },
+  "building_plan": {
+   "url": "assets/models/building_plan.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 291044,
+   "srcTris": 1203,
+   "tris": 1203,
+   "min": [
+    -0.175,
+    0,
+    -0.1064
+   ],
+   "max": [
+    0.175,
+    0.0935,
+    0.1064
+   ],
+   "lods": []
+  },
+  "planks": {
+   "url": "assets/models/planks.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 643104,
+   "srcTris": 2145,
+   "tris": 2145,
+   "min": [
+    -0.6,
+    0,
+    -0.0888
+   ],
+   "max": [
+    0.6,
+    0.1695,
+    0.0888
    ],
    "lods": []
   }

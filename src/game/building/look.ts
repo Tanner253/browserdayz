@@ -160,20 +160,6 @@ export function ghostGeometry(kind: string): THREE.BufferGeometry {
 }
 
 
-/** a lock as it is seen fitted (src/sim/build/locks.ts), facing +z: a code lock's keypad, a key lock's brass padlock */
-export function lockGeometry(k: string): THREE.BufferGeometry {
-  const key = `lock:${k}`;
-  let g = geos.get(key);
-  if (!g) {
-    const b = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, c: number): Solid => ({ box: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, x1 - x0, y1 - y0, z1 - z0], c });
-    const parts = k === 'code'
-      ? [b(-0.04, -0.06, 0, 0.04, 0.06, 0.035, 0x2a2d31), b(-0.03, -0.045, 0.035, 0.03, 0.03, 0.041, 0x9aa0a6), b(-0.008, 0.038, 0.035, 0.008, 0.048, 0.041, 0xd04030)]
-      : [b(-0.03, -0.035, 0, 0.03, 0.025, 0.026, 0xb8913f), b(-0.024, 0.025, 0.008, -0.016, 0.06, 0.018, 0xa8a8a0), b(0.016, 0.025, 0.008, 0.024, 0.06, 0.018, 0xa8a8a0), b(-0.024, 0.052, 0.008, 0.024, 0.06, 0.018, 0xa8a8a0)];
-    geos.set(key, (g = merged(parts, 1)));
-  }
-  return g;
-}
-
 /** a frame's lattice: timber round the edge of every 3 m and across it corner to corner, open between */
 function lattice(): THREE.Texture {
   const c = document.createElement('canvas');
