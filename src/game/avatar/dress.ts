@@ -6,8 +6,30 @@ import * as THREE from 'three';
 import { POSE } from './pose';
 import { WORN, GEAR, placeWorn } from './gear';
 import { _k6, _m1, _m2, Avatar } from '../avatar';
+import { proportion, type Lengths } from '../survivors';
+import { BODY_SCALE } from '../avatar';
 
 export const dressMethods = {
+  /**
+   * A survivor's own bone lengths (src/game/survivors.ts, proportion): on the skeleton the clips play on and the one
+   * drawn, which takes its places from it; and the arms' reach, which their hold on a weapon is worked out by.
+   */
+  proportion(this: Avatar, lengths: Lengths | null, scale: number | null) {
+    proportion(this.drive.flatMap(([from, to]) => [from, to]), lengths);
+    // (and as tall as that survivor stands: the whole body drawn bigger or smaller, so that the clips' hips still stand
+    // its feet on the ground; what is in its hands keeps its own size, see Avatar.hold)
+    this.stature = (scale ?? BODY_SCALE) / BODY_SCALE;
+    this.modelRoot?.parent?.scale.setScalar(BODY_SCALE * this.stature);
+    for (const r of [this.armR, this.armL]) {
+      if (!r) continue;
+      const own = (b: THREE.Object3D) => (b.userData.ownPlace as THREE.Vector3 | undefined)?.length() ?? b.position.length();
+      r.la0 ??= r.la;
+      r.lb0 ??= r.lb;
+      r.la = ((r.la0 * r.fore.position.length()) / own(r.fore)) * this.stature;
+      r.lb = ((r.lb0 * r.hand.position.length()) / own(r.hand)) * this.stature;
+    }
+  },
+
   /**
    * Puts copies of what is slung on the back there: the first with its muzzle up over the left shoulder, flat
    * against the back, and a second crossing it, up over the right.

@@ -150,6 +150,37 @@ export interface Frame {
   inSight: THREE.SkinnedMesh['intersectsFrustum'];
   /** told of what was put on, so that it is made ready before it is drawn (Avatar.onDressed) */
   dressed: (parts: THREE.Object3D[]) => void;
+  /**
+   * the body's own bone lengths put on the survivor's skeleton, or (null) its own given back: see `proportion`; and
+   * how big it is drawn, as it stands (`stands` metres, against the `height` it was built: scripts/survivors.mjs)
+   */
+  lengths: (l: Lengths | null, scale: number | null) => void;
+}
+
+/** a body's own bone lengths: each bone's place on the one above it, by name (the build fits them: scripts/meshy.mjs, fitProportions) */
+export type Lengths = Map<string, THREE.Vector3>;
+export function lengthsOf(scene: THREE.Object3D): Lengths {
+  const out: Lengths = new Map();
+  // (not the pelvis: the clips move it, and the legs are the game's length)
+  scene.traverse((o) => void ((o as THREE.Bone).isBone && o.name !== 'pelvis' && o.name !== 'root' && out.set(o.name, o.position.clone())));
+  return out;
+}
+
+/** how big a body is drawn so that it stands as tall as it is said to (null: as it is built) */
+export const scaleOf = (body: THREE.Object3D): number | null => {
+  const { height, stands } = body.userData as { height?: number; stands?: number };
+  return height && stands ? stands / height : null;
+};
+
+/**
+ * Gives a skeleton a body's own proportions (the owner, 2026-10-25: "stretched limbs and unrealistic proportions"):
+ * each bone set as far from the one above it as on the body, along the way it points; with null, as it was made.
+ */
+export function proportion(bones: Iterable<THREE.Object3D>, lengths: Lengths | null) {
+  for (const b of bones) {
+    const own = (b.userData.ownPlace ??= b.position.clone()) as THREE.Vector3;
+    b.position.copy(lengths?.get(b.name) ?? own);
+  }
 }
 
 /** A shape of a body file, on another skeleton's bones of the same names, sharing its geometry and its paint. */
@@ -203,6 +234,11 @@ export async function wearBody(model: THREE.Object3D, n: number, hide = 0): Prom
   const gltf = await loadBody(n);
   const bones = new Map<string, THREE.Bone>();
   model.traverse((o) => void ((o as THREE.Bone).isBone && bones.set(o.name, o as THREE.Bone)));
+  proportion(bones.values(), lengthsOf(gltf.scene));
+  let first: THREE.Object3D | null = null;
+  gltf.scene.traverse((o) => void (!first && (o as THREE.SkinnedMesh).isSkinnedMesh && (first = o)));
+  const scale = first ? scaleOf(first) : null;
+  if (scale) model.scale.setScalar(scale);
   const into = model.getObjectByName('body')?.parent ?? model;
   for (const name of SUIT) {
     const o = model.getObjectByName(name);
@@ -360,6 +396,8 @@ export class Wardrobe {
     const src: THREE.SkinnedMesh[] = [];
     gltf?.scene.traverse((o) => void ((o as THREE.SkinnedMesh).isSkinnedMesh && src.push(o as THREE.SkinnedMesh)));
     for (const o of [...f.suit, ...f.fpSuit]) o.visible = !src.length;
+    // (the body's own proportions on the bones it is drawn on, or the suit's back)
+    f.lengths(gltf && src.length ? lengthsOf(gltf.scene) : null, src.length ? scaleOf(src[0]) : null);
     if (!src.length) return void this.dress();
     for (const s of src) {
       // its own paint, stained where this survivor is hurt (measured in its own shape's space: see `rest`)

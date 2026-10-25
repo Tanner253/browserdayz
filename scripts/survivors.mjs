@@ -30,7 +30,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { carry, markRegions } from './meshy.mjs';
+import { carry, markRegions, padTexture } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -44,6 +44,12 @@ const TEX_ROUGH = 1024;
 
 /** the bodies, by the number a player picks */
 const BODIES = ['body0_rigged.glb', 'body1_rigged.glb', 'body2_rigged.glb', 'body3_rigged.glb'];
+/**
+ * how tall each stands, metres: Mikhail, Pavel, Anya, Grigori (Meshy rigged all four 1.8 m tall; carried on legs of the
+ * game's length they came out one height, the woman with the men). Said on the body (`stands`, with its `height` as
+ * built), and the game draws it so (Avatar.proportion).
+ */
+const STANDS = [1.8, 1.82, 1.68, 1.76];
 const ONLY = process.argv.slice(2).map(Number);
 
 await MeshoptDecoder.ready;
@@ -54,7 +60,7 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
  * The base layer's cloth made clean (the navigator, 2026-10-25: the shorts "carry orange-red streaks that read as texture
  * faults up close"). Meshy's picture has slivers of skin in the shorts and the T-shirt: in every triangle of the body
  * that is cloth (grey at two of its corners, over the trunk, the upper arms and the thighs), what of the picture is
- * skin-coloured is painted over from the cloth around it, a ring at a time.
+ * coloured (skin, and the orange streaks the shorts had) is painted over from the grey cloth around it, a ring at a time.
  */
 async function cleanCloth(doc, node) {
   const prim = node.getMesh().listPrimitives()[0], tex = prim.getMaterial().getBaseColorTexture();
@@ -65,13 +71,41 @@ async function cleanCloth(doc, node) {
   const grey = (o) => Math.max(data[o], data[o + 1], data[o + 2]) - Math.min(data[o], data[o + 1], data[o + 2]) < 26;
   const skin = (o) => data[o] >= data[o + 1] && data[o] >= data[o + 2] && data[o] - Math.min(data[o + 1], data[o + 2]) > 28;
   const CLOTH = new Set([3, 4, 5, 6, 7, 10, 11]);
+  // (Which triangles are cloth: grey at two corners, and then by the surface round them, five times over, so that a
+  // patch of skin colour inside the cloth is cloth: Meshy drew the hands, hanging by the thighs in its picture, onto the
+  // shorts' sides. A patch as wide as the leg below the hem stays skin.)
+  const pos = prim.getAttribute('POSITION'), V = pos.getCount(), N3 = idx.getCount() / 3;
+  const weld = new Map(), at = new Int32Array(V);
+  for (let i = 0; i < V; i++) {
+    const k = pos.getElement(i, []).map((v) => Math.round(v * 2e4)).join(',');
+    if (!weld.has(k)) weld.set(k, weld.size);
+    at[i] = weld.get(k);
+  }
+  const corner = (t) => [idx.getScalar(t * 3), idx.getScalar(t * 3 + 1), idx.getScalar(t * 3 + 2)];
+  const byPoint = Array.from({ length: weld.size }, () => []);
+  for (let t = 0; t < N3; t++) for (const i of corner(t)) byPoint[at[i]].push(t);
+  let isCloth = new Uint8Array(N3);
+  const within = new Uint8Array(N3);
+  for (let t = 0; t < N3; t++) {
+    const v = corner(t);
+    within[t] = v.every((i) => CLOTH.has(region.getScalar(i))) ? 1 : 0;
+    isCloth[t] = within[t] && v.filter((i) => grey((px(...uv.getElement(i, []))[1] * W + px(...uv.getElement(i, []))[0]) * C)).length >= 2 ? 1 : 0;
+  }
+  for (let pass = 0; pass < 5; pass++) {
+    const was = isCloth.slice();
+    for (let t = 0; t < N3; t++) {
+      if (!within[t]) continue;
+      let yes = 0, all = 0;
+      for (const i of corner(t)) for (const u of byPoint[at[i]]) if (u !== t) (yes += was[u]), all++;
+      if (all) isCloth[t] = yes * 2 > all ? 1 : was[t];
+    }
+  }
   const mask = new Uint8Array(W * H);
   let tris = 0;
-  for (let t = 0; t < idx.getCount(); t += 3) {
-    const v = [idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2)];
-    if (!v.every((i) => CLOTH.has(region.getScalar(i)))) continue;
+  for (let t3 = 0; t3 < idx.getCount(); t3 += 3) {
+    if (!isCloth[t3 / 3]) continue;
+    const v = corner(t3 / 3);
     const P = v.map((i) => px(...uv.getElement(i, [])));
-    if (P.filter(([x, y]) => grey((y * W + x) * C)).length < 2) continue;
     tris++;
     // (every texel the triangle covers on the picture, and one more round it)
     const [x0, x1] = [Math.min(...P.map((p) => p[0])) - 1, Math.max(...P.map((p) => p[0])) + 1], [y0, y1] = [Math.min(...P.map((p) => p[1])) - 1, Math.max(...P.map((p) => p[1])) + 1];
@@ -90,9 +124,20 @@ async function cleanCloth(doc, node) {
     const [x, y] = px(...uv.getElement(i, [])), o = (y * W + x) * C;
     if (grey(o) && data[o] > 70) region.setScalar(i, 3);
   }
+  // (and three texels round them: the shorts are made of needles of triangles, each drawn from a strip of the picture a
+  // texel or two wide, and the picture's smoothing reads the skin beside the strip into it)
+  for (let r = 0; r < 3; r++) {
+    const grow = [];
+    for (let k = 0; k < W * H; k++) {
+      if (mask[k]) continue;
+      const x = k % W, y = (k / W) | 0;
+      if ((x > 0 && mask[k - 1] === 1) || (x < W - 1 && mask[k + 1] === 1) || (y > 0 && mask[k - W] === 1) || (y < H - 1 && mask[k + W] === 1)) grow.push(k);
+    }
+    for (const k of grow) mask[k] = 1;
+  }
   // (painted over from the cloth beside it: each pass, a skin texel with cloth next to it takes their mean)
   let bad = [];
-  for (let k = 0; k < W * H; k++) if (mask[k] && skin(k * C)) bad.push(k);
+  for (let k = 0; k < W * H; k++) if (mask[k] && !grey(k * C)) bad.push(k);
   const fixed = bad.length;
   for (let pass = 0; pass < 40 && bad.length; pass++) {
     const left = [], took = [];
@@ -101,7 +146,7 @@ async function cleanCloth(doc, node) {
       let n = 0;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const q = (y + dy) * W + x + dx;
-        if ((dx || dy) && x + dx >= 0 && x + dx < W && y + dy >= 0 && y + dy < H && mask[q] === 1 && !skin(q * C)) {
+        if ((dx || dy) && x + dx >= 0 && x + dx < W && y + dy >= 0 && y + dy < H && mask[q] === 1 && grey(q * C)) {
           for (let c = 0; c < 3; c++) m[c] += data[q * C + c];
           n++;
         }
@@ -121,10 +166,27 @@ await fs.access(TEMPLATE).catch(() => {
 });
 for (const [n, file] of BODIES.entries()) {
   if (ONLY.length && !ONLY.includes(n)) continue;
-  const { doc, node, hands, worn } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
+  const { doc, node, hands, worn, proportions } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
   const root = doc.getRoot();
   const regions = markRegions(doc, node);
+  // (the picture between its islands filled from them first: what lay there came in at every island's edge; then the
+  // cloth mended, as its strips are narrower than what the filling shaves off an island's edge)
+  {
+    const prim = node.getMesh().listPrimitives()[0], idx = prim.getIndices(), tris = [];
+    for (let t = 0; t < idx.getCount(); t += 3) tris.push([idx.getScalar(t), idx.getScalar(t + 1), idx.getScalar(t + 2)]);
+    await padTexture(prim, tris);
+  }
   const cloth = await cleanCloth(doc, node);
+  {
+    const pos = node.getMesh().listPrimitives()[0].getAttribute('POSITION');
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < pos.getCount(); i++) {
+      const v = pos.getElement(i, [])[1];
+      lo = Math.min(lo, v);
+      hi = Math.max(hi, v);
+    }
+    node.setExtras({ ...node.getExtras(), height: +(hi - lo).toFixed(4), stands: STANDS[n] });
+  }
   for (const m of root.listMaterials()) m.setName(`survivor_${n}`);
   await doc.transform(
     unpartition(),
@@ -138,5 +200,5 @@ for (const [n, file] of BODIES.entries()) {
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const triangles = root.listMeshes().reduce((k, m) => k + m.listPrimitives().reduce((s, p) => s + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
-  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  hands: ${hands}\n  ${regions}\n  ${cloth}\n  ${worn}`);
+  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles\n  ${proportions}\n  hands: ${hands}\n  ${regions}\n  ${cloth}\n  ${worn}`);
 }

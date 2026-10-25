@@ -136,6 +136,9 @@ export interface ArmRig {
   hand: THREE.Bone;
   la: number;
   lb: number;
+  /** the reach as the skeleton was made, before a body's own lengths (see Avatar.proportion) */
+  la0?: number;
+  lb0?: number;
   fingersLocal: THREE.Vector3;
   palmLocal: THREE.Vector3;
   fingers: THREE.Bone[][];
@@ -517,6 +520,8 @@ export class Avatar {
   tag: WornTag | null = null;
   /** which survivor this is, and what they wear over their skin (src/game/survivors.ts) */
   readonly wardrobe = new Wardrobe();
+  /** how much taller than the skeleton as made this survivor stands (see Avatar.proportion) */
+  stature = 1;
 
   /** the atmosphere an infected's shared paints were made with, for its own when it is first hit */
   paintAtmo: Atmosphere | null = null;
@@ -587,6 +592,7 @@ export interface Avatar {
   veil: Methods<typeof makeMethods>['veil'];
   setLook: Methods<typeof makeMethods>['setLook'];
   makeArm: Methods<typeof makeMethods>['makeArm'];
+  proportion: Methods<typeof dressMethods>['proportion'];
   setSlung: Methods<typeof dressMethods>['setSlung'];
   setGear: Methods<typeof dressMethods>['setGear'];
   wearTag: Methods<typeof dressMethods>['wearTag'];

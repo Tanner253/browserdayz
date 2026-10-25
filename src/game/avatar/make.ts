@@ -330,6 +330,7 @@ export const makeMethods = {
         bones: named(model)!, fpBones: named(fpModel), suit: of(model, SUIT), fpSuit: of(fpModel, ['body']),
         into: this.skin.parent ?? model, fpInto: fpModel?.getObjectByName('body')?.parent ?? null,
         atmo, uniforms: this.uniforms, ref: this.skin, layers: () => this.layerMask, fpLayer: FP_BODY_LAYER, inSight, dressed: (parts) => Avatar.onDressed(parts),
+        lengths: (l, scale) => this.proportion(l, scale),
       });
     }
     restBones(this.root);

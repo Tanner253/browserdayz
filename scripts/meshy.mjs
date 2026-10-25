@@ -2,6 +2,7 @@
 // its paint made plain, its bones named as Mixamo's, fingers found and bound, and the parts of a body marked.
 
 import * as THREE from 'three';
+import sharp from 'sharp';
 import { ours as suitName, wearSuit } from './suit.mjs';
 
 export const M4 = (a) => new THREE.Matrix4().fromArray(a);
@@ -405,9 +406,69 @@ export function plainBones(doc) {
  * @param fingers find and bind its fingers (a body); or not (a thing worn: its hands are cut away)
  * @returns the document, its one shape (`survivor`), and what was done, for the build's line
  */
-export async function carry({ io, template, src, fingers }) {
+/**
+ * The game's skeleton given the body's own proportions (the owner, 2026-10-25: "The player models still dont look right
+ * with stretched limbs and unrealistic proportions? We are not driving the survivor body from the skeleton bones which
+ * are likely incomplete and inhuman are we?" We were: every body was stretched onto the old skeleton, its back 15% long,
+ * its arms up to 16% short, its shoulders narrowed, and all four one height).
+ *
+ * Each bone is made as long as the body's own, along the way it already points (the clips turn bones; only the pelvis is
+ * moved by them, and every pose is made for bones that point as these do). The legs are held to the game's length, the
+ * whole body brought to that scale, so that the clips' hips stand the feet on the ground; the back, the neck, the
+ * shoulders, the arms and the hips are the body's. The game puts the same lengths on a survivor's bones when the body is
+ * put on (src/game/survivors.ts), and its clothes are bound to the body they were made on.
+ * @param fit the Meshy rig whose joints say the proportions (the body itself, or for a piece, the body it was made on)
+ */
+function fitProportions(doc, fit) {
+  const skin = doc.getRoot().listNodes().find((x) => x.getName() === 'body').getSkin(), joints = skin.listJoints();
+  const node = new Map(joints.map((j) => [j.getName(), j]));
+  const g = new Map(joints.map((j) => [j.getName(), at(M4(j.getWorldMatrix()))]));
+  const fSkin = fit.getRoot().listSkins()[0], ibm = fSkin.getInverseBindMatrices(), m = new Map();
+  fSkin.listJoints().forEach((j, k) => {
+    const name = suitName(`${MIXAMO[j.getName()] ?? j.getName()}_0`, '');
+    if (name) m.set(name, at(M4(ibm.getElement(k, [])).invert()));
+  });
+  const d = (P, a, b) => P.get(a).distanceTo(P.get(b));
+  const leg = (P) => (d(P, 'thigh_l', 'calf_l') + d(P, 'calf_l', 'foot_l') + d(P, 'thigh_r', 'calf_r') + d(P, 'calf_r', 'foot_r')) / 2;
+  const s = leg(g) / leg(m);
+  const ratio = (a, b) => (s * d(m, a, b)) / d(g, a, b);
+  const length = (name, k) => {
+    const j = node.get(name);
+    if (j) j.setTranslation(j.getTranslation().map((v) => v * k));
+  };
+  const said = {};
+  const put = (names, k, label) => {
+    for (const n of names) length(n, k);
+    said[label] = +k.toFixed(3);
+  };
+  // The back by heights over the hip joints, not from the pelvis: Meshy's pelvis is a hand above its hip joints and
+  // ours a little below them, and measured from it the back was read 15% short when it is 20% long (the game's
+  // skeleton has a short trunk on long legs: carried onto it, every body's trunk was squashed by a fifth).
+  const S = ratio('upperarm_l', 'upperarm_r');
+  put(['clavicle_l', 'clavicle_r', 'upperarm_l', 'upperarm_r'], S, 'shoulders');
+  const y = (P, n) => (n === 'hips' ? (P.get('thigh_l').y + P.get('thigh_r').y) / 2 : n === 'shoulders' ? (P.get('upperarm_l').y + P.get('upperarm_r').y) / 2 : P.get(n).y);
+  const over = (P, n, k = 1) => (y(P, n) - y(P, 'hips')) * k;
+  const lift = over(g, 'shoulders') - over(g, 'spine_03');
+  const kBack = (over(m, 'shoulders', s) - lift * S + (y(g, 'hips') - y(g, 'pelvis'))) / (y(g, 'spine_03') - y(g, 'pelvis'));
+  put(['spine_01', 'spine_02', 'spine_03'], kBack, 'back');
+  const sp3 = kBack * (y(g, 'spine_03') - y(g, 'pelvis')) - (y(g, 'hips') - y(g, 'pelvis'));
+  put(['neck_01'], (over(m, 'neck_01', s) - sp3) / (y(g, 'neck_01') - y(g, 'spine_03')), 'neck');
+  put(['Head'], (over(m, 'Head', s) - over(m, 'neck_01', s)) / (y(g, 'Head') - y(g, 'neck_01')), 'head');
+  for (const side of ['l', 'r']) {
+    put([`lowerarm_${side}`], ratio(`upperarm_${side}`, `lowerarm_${side}`), `upperArm_${side}`);
+    put([`hand_${side}`], ratio(`lowerarm_${side}`, `hand_${side}`), `forearm_${side}`);
+    put([`calf_${side}`], ratio(`thigh_${side}`, `calf_${side}`), `thigh_${side}`);
+    put([`foot_${side}`], ratio(`calf_${side}`, `foot_${side}`), `shin_${side}`);
+  }
+  put(['thigh_l', 'thigh_r'], ratio('thigh_l', 'thigh_r'), 'hips');
+  return { said: `proportions ${JSON.stringify(said)} at x${s.toFixed(3)}`, scale: s };
+}
+
+export async function carry({ io, template, src, fingers, fit = src }) {
   const doc = await io.read(template);
   const root = doc.getRoot();
+  // (the skeleton first made the body's shape: see fitProportions)
+  const { said: proportions, scale } = fitProportions(doc, fit);
   const nodes = new Map(root.listNodes().map((x) => [x.getName(), x]));
   // the skeleton it goes on, as it rests: its joints, and how tall it is from the foot to the head joint (as wearSuit measures)
   const rest = new Map(nodes.get('body').getSkin().listJoints().map((j) => [j.getName(), at(M4(j.getWorldMatrix()))]));
@@ -415,7 +476,7 @@ export async function carry({ io, template, src, fingers }) {
   const hands = fingers ? giveFingers(src, { rest, height: rest.get('Head').y - rest.get('foot_l').y }) : (plainBones(src), '');
   const old = ['eyes', 'eyebrows', 'hair_buzzed', 'hair_parted', 'hair_long', 'hair_beard'].map((x) => nodes.get(x)).filter(Boolean);
   // (the toes lie as the foot lies: Meshy's toe bone has no end to lie along)
-  const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit: src, pieces: { survivor: [[/^survivor$/, null]] }, moved: {}, prefix: '', toes: false });
+  const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit: src, pieces: { survivor: [[/^survivor$/, null]] }, moved: {}, prefix: '', toes: false, scale });
   // the shape alone: no clips (the survivor's file has them), and no metal in skin and cloth
   for (const a of root.listAnimations()) {
     for (const c of a.listChannels()) c.dispose();
@@ -423,5 +484,75 @@ export async function carry({ io, template, src, fingers }) {
     a.dispose();
   }
   for (const m of root.listMaterials()) m.setMetallicFactor(0);
-  return { doc, node: root.listNodes().find((x) => x.getName() === 'survivor'), hands, worn };
+  return { doc, node: root.listNodes().find((x) => x.getName() === 'survivor'), hands, worn, proportions };
+}
+
+/** a primitive's colour picture filled out from the triangles it is drawn with: each texel they do not cover takes the colour of the nearest one they do */
+export async function padTexture(prim, tris) {
+  const tex = prim.getMaterial().getBaseColorTexture(), uv = prim.getAttribute('TEXCOORD_0');
+  const { data, info } = await sharp(Buffer.from(tex.getImage())).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, C = 4, N = W * H;
+  const done = new Uint8Array(N);
+  const P = (i) => {
+    const [s, t] = uv.getElement(i, []);
+    return [s * W - 0.5, t * H - 0.5];
+  };
+  for (const tri of tris) {
+    const [[ax, ay], [bx, by], [cx, cy]] = tri.map(P), den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx)) - 1), x1 = Math.min(W - 1, Math.ceil(Math.max(ax, bx, cx)) + 1);
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy)) - 1), y1 = Math.min(H - 1, Math.ceil(Math.max(ay, by, cy)) + 1);
+    if (!den) continue;
+    const e = 0.75 / Math.max(1, Math.sqrt(Math.abs(den)));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / den, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / den;
+      if (l1 >= -e && l2 >= -e && 1 - l1 - l2 >= -e) done[y * W + x] = 1;
+    }
+  }
+  // (less the two outermost texels of every island: Meshy darkens an island's rim, and drawn smaller it showed as
+  // dark cracks along every seam)
+  for (let r = 0; r < 2; r++) {
+    const rim = [];
+    for (let k = 0; k < N; k++) {
+      if (!done[k]) continue;
+      const x = k % W, y = (k / W) | 0;
+      if (x === 0 || y === 0 || x === W - 1 || y === H - 1 || !done[k - 1] || !done[k + 1] || !done[k - W] || !done[k + W]) rim.push(k);
+    }
+    for (const k of rim) done[k] = 0;
+  }
+  // (out from them a ring at a time, each texel the mean of those beside it already done: typed rings, as a 4096
+  // picture is sixteen million texels)
+  let front = new Int32Array(N), nf = 0;
+  for (let k = 0; k < N; k++) if (!done[k]) {
+    const x = k % W, y = (k / W) | 0;
+    if ((x > 0 && done[k - 1] === 1) || (x < W - 1 && done[k + 1] === 1) || (y > 0 && done[k - W] === 1) || (y < H - 1 && done[k + W] === 1)) (front[nf++] = k), (done[k] = 2);
+  }
+  let next = new Int32Array(N);
+  const at = [0, 0, 0, 0];
+  while (nf) {
+    let nn = 0;
+    // (first what each takes, from those done before this ring; then all of the ring is done at once)
+    const took = new Uint8Array(nf * 3);
+    for (let f2 = 0; f2 < nf; f2++) {
+      const k = front[f2], x = k % W, y = (k / W) | 0;
+      at[0] = x > 0 ? k - 1 : -1; at[1] = x < W - 1 ? k + 1 : -1; at[2] = y > 0 ? k - W : -1; at[3] = y < H - 1 ? k + W : -1;
+      let r = 0, g = 0, bl = 0, n = 0;
+      for (let e = 0; e < 4; e++) {
+        const q = at[e];
+        if (q < 0) continue;
+        if (done[q] === 1) (r += data[q * C]), (g += data[q * C + 1]), (bl += data[q * C + 2]), n++;
+        else if (!done[q]) (done[q] = 2), (next[nn++] = q);
+      }
+      if (n) (took[f2 * 3] = Math.round(r / n)), (took[f2 * 3 + 1] = Math.round(g / n)), (took[f2 * 3 + 2] = Math.round(bl / n));
+    }
+    for (let f2 = 0; f2 < nf; f2++) {
+      const k = front[f2];
+      data[k * C] = took[f2 * 3];
+      data[k * C + 1] = took[f2 * 3 + 1];
+      data[k * C + 2] = took[f2 * 3 + 2];
+      done[k] = 1;
+    }
+    [front, next] = [next, front];
+    nf = nn;
+  }
+  tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer())).setMimeType('image/png');
 }

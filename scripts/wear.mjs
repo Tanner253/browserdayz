@@ -32,7 +32,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { M4, carry, markRegions } from './meshy.mjs';
+import { M4, carry, markRegions, padTexture } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -111,81 +111,12 @@ async function laid(node) {
   return { P, C, prim };
 }
 
-/** a primitive's colour picture filled out from the triangles it is drawn with: each texel they do not cover takes the colour of the nearest one they do */
-async function padTexture(prim, tris) {
-  const tex = prim.getMaterial().getBaseColorTexture(), uv = prim.getAttribute('TEXCOORD_0');
-  const { data, info } = await sharp(Buffer.from(tex.getImage())).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const W = info.width, H = info.height, C = 4, N = W * H;
-  const done = new Uint8Array(N);
-  const P = (i) => {
-    const [s, t] = uv.getElement(i, []);
-    return [s * W - 0.5, t * H - 0.5];
-  };
-  for (const tri of tris) {
-    const [[ax, ay], [bx, by], [cx, cy]] = tri.map(P), den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
-    const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx)) - 1), x1 = Math.min(W - 1, Math.ceil(Math.max(ax, bx, cx)) + 1);
-    const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy)) - 1), y1 = Math.min(H - 1, Math.ceil(Math.max(ay, by, cy)) + 1);
-    if (!den) continue;
-    const e = 0.75 / Math.max(1, Math.sqrt(Math.abs(den)));
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / den, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / den;
-      if (l1 >= -e && l2 >= -e && 1 - l1 - l2 >= -e) done[y * W + x] = 1;
-    }
-  }
-  // (less the two outermost texels of every island: Meshy darkens an island's rim, and drawn smaller it showed as
-  // dark cracks along every seam)
-  for (let r = 0; r < 2; r++) {
-    const rim = [];
-    for (let k = 0; k < N; k++) {
-      if (!done[k]) continue;
-      const x = k % W, y = (k / W) | 0;
-      if (x === 0 || y === 0 || x === W - 1 || y === H - 1 || !done[k - 1] || !done[k + 1] || !done[k - W] || !done[k + W]) rim.push(k);
-    }
-    for (const k of rim) done[k] = 0;
-  }
-  // (out from them a ring at a time, each texel the mean of those beside it already done: typed rings, as a 4096
-  // picture is sixteen million texels)
-  let front = new Int32Array(N), nf = 0;
-  for (let k = 0; k < N; k++) if (!done[k]) {
-    const x = k % W, y = (k / W) | 0;
-    if ((x > 0 && done[k - 1] === 1) || (x < W - 1 && done[k + 1] === 1) || (y > 0 && done[k - W] === 1) || (y < H - 1 && done[k + W] === 1)) (front[nf++] = k), (done[k] = 2);
-  }
-  let next = new Int32Array(N);
-  const at = [0, 0, 0, 0];
-  while (nf) {
-    let nn = 0;
-    // (first what each takes, from those done before this ring; then all of the ring is done at once)
-    const took = new Uint8Array(nf * 3);
-    for (let f2 = 0; f2 < nf; f2++) {
-      const k = front[f2], x = k % W, y = (k / W) | 0;
-      at[0] = x > 0 ? k - 1 : -1; at[1] = x < W - 1 ? k + 1 : -1; at[2] = y > 0 ? k - W : -1; at[3] = y < H - 1 ? k + W : -1;
-      let r = 0, g = 0, bl = 0, n = 0;
-      for (let e = 0; e < 4; e++) {
-        const q = at[e];
-        if (q < 0) continue;
-        if (done[q] === 1) (r += data[q * C]), (g += data[q * C + 1]), (bl += data[q * C + 2]), n++;
-        else if (!done[q]) (done[q] = 2), (next[nn++] = q);
-      }
-      if (n) (took[f2 * 3] = Math.round(r / n)), (took[f2 * 3 + 1] = Math.round(g / n)), (took[f2 * 3 + 2] = Math.round(bl / n));
-    }
-    for (let f2 = 0; f2 < nf; f2++) {
-      const k = front[f2];
-      data[k * C] = took[f2 * 3];
-      data[k * C + 1] = took[f2 * 3 + 1];
-      data[k * C + 2] = took[f2 * 3 + 2];
-      done[k] = 1;
-    }
-    [front, next] = [next, front];
-    nf = nn;
-  }
-  tex.setImage(new Uint8Array(await sharp(data, { raw: { width: W, height: H, channels: C } }).png().toBuffer())).setMimeType('image/png');
-}
-
 for (const [id, piece] of Object.entries(PIECES)) {
   if (ONLY.length && !ONLY.includes(id)) continue;
   const body = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, BODIES[piece.body])), fingers: true });
   markRegions(body.doc, body.node);
-  const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: !!piece.fingers });
+  // (on the skeleton made the shape of the body it was made on, as that body is: see fitProportions in scripts/meshy.mjs)
+  const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: !!piece.fingers, fit: await io.read(path.join(SRC, BODIES[piece.body])) });
   const B = await laid(body.node), D = await laid(dressed.node);
   const region = body.node.getMesh().listPrimitives()[0].getAttribute('_REGION');
 
