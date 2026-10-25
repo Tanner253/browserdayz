@@ -1,17 +1,25 @@
-// Every recipe, as data (2026-10-24, plan-crafting, which the owner said yes to; "when in doubt just ask how does
-// rust/dayz do it"). Three places to make things: by hand anywhere, DayZ's way (a timed hold, standing still); at a
-// workbench within 4 m, Rust's (queued); at a forge, ours (it smelts while it burns). Every recipe is known from the
-// start, DayZ's way: no research to grind. Found, never made: C4, the code lock, rubbing alcohol, guns and rounds.
-// Tuned to the economy's targets: a wood hut in 20-30 min, a stone 2x2 in 1-1.5 h, a metal 2x2 in 3-4 h, solo.
+// Every recipe, as data (2026-10-24, plan-crafting; progression v3, the owner's yes 2026-10-25). Three places to make
+// things: by hand anywhere, DayZ's way (a timed hold, standing still); at a workbench within 4 m, Rust's (queued), each
+// recipe needing a bench of its level ("three bench levels"); at a forge, ours (it smelts while it burns). What may be
+// made is learned (src/sim/craft/learn.ts). Never made: nails, hardware and steel plate (the owner: nails "must be looted
+// which is hard and time consuming ... think like how dayz does it"), the code lock, rubbing alcohol, gun parts, and the
+// best guns, which stay loot-only (gas, bunker, airdrops). A crafted gun costs iron bars plus a spring, a pipe and a body.
+
+import { MAT } from './materials';
+import { FORGE } from './forge';
 
 export type Place = 'hand' | 'bench' | 'forge';
+/** a workbench's level: what it crafts (v3: "I iron tools ... II pistols, simple attachments ... III rifles, SMGs, scopes, suppressors") */
+export type Level = 1 | 2 | 3;
+export const LEVEL_NAME: Record<Level, string> = { 1: 'Bench I', 2: 'Bench II', 3: 'Bench III' };
 /** the screen's rail: what a recipe is filed under */
-export type Cat = 'survival' | 'medical' | 'tools' | 'build' | 'raid';
+export type Cat = 'survival' | 'medical' | 'tools' | 'build' | 'weapons' | 'raid';
 export const CATS: { id: Cat; name: string }[] = [
   { id: 'survival', name: 'Survival' },
   { id: 'medical', name: 'Medical' },
   { id: 'tools', name: 'Tools' },
   { id: 'build', name: 'Building' },
+  { id: 'weapons', name: 'Weapons' },
   { id: 'raid', name: 'Raiding' },
 ];
 
@@ -34,6 +42,8 @@ export interface Recipe {
   by?: Readonly<Record<string, number>>;
   needs: Need[];
   at: Place;
+  /** a workbench's: the level of bench it needs */
+  lv?: Level;
   /** seconds each one takes */
   time: number;
   cat: Cat;
@@ -57,8 +67,12 @@ export const POWDER: Readonly<Record<string, number>> = {
   ammo_127x55: 4, ammo_50bmg: 5,
 };
 
+const F = MAT.frags, BAR = MAT.bar;
 const hand = (id: string, makes: string, qty: number, needs: Need[], time: number, cat: Cat, by?: Record<string, number>): Recipe => ({ id, makes, qty, needs, at: 'hand', time, cat, ...(by ? { by } : {}) });
-const bench = (id: string, makes: string, qty: number, needs: Need[], time: number, cat: Cat): Recipe => ({ id, makes, qty, needs, at: 'bench', time, cat });
+const bench = (lv: Level, id: string, makes: string, qty: number, needs: Need[], time: number, cat: Cat): Recipe => ({ id, makes, qty, needs, at: 'bench', lv, time, cat });
+/** a gun: bars, and the parts that are found (v3: "a spring, a pipe and a gun body") */
+const gun = (lv: Level, id: string, bars: number, springs: number, pipes: number, body: 'pistol' | 'rifle', time: number, more: Need[] = []) =>
+  bench(lv, id, id, 1, [{ id: BAR, n: bars }, { id: 'spring', n: springs }, { id: 'metal_pipe', n: pipes }, { id: `gun_body_${body}`, n: 1 }, ...more], time, 'weapons');
 
 export const RECIPES: Recipe[] = [
   // ---------------------------------------------------------------- by hand, anywhere (DayZ)
@@ -71,20 +85,36 @@ export const RECIPES: Recipe[] = [
   hand('stone_hatchet', 'stone_hatchet', 1, [{ id: 'stone', n: 5 }, { id: 'planks', n: 1 }], 6, 'tools'),
   hand('bone_knife', 'bone_knife', 1, [{ id: 'bones', n: 2 }], 4, 'tools'),
   hand('gunpowder', 'gunpowder', 0, [{ id: Object.keys(POWDER), n: 10, name: 'Rounds of one kind' }], 5, 'raid', POWDER),
-  // ---------------------------------------------------------------- at a workbench, queued (Rust)
-  bench('nails', 'nails', 20, [{ id: 'iron_bar', n: 1 }], 6, 'build'),
-  bench('sheet_metal', 'sheet_metal', 1, [{ id: 'iron_bar', n: 3 }], 10, 'build'),
-  bench('building_plan', 'building_plan', 1, [{ id: 'rags', n: 2 }, { id: 'coal', n: 1 }], 5, 'build'),
-  bench('key_lock', 'key_lock', 1, [{ id: 'iron_bar', n: 2 }], 10, 'build'),
-  bench('sleeping_bag', 'sleeping_bag', 1, [{ id: 'rags', n: 10 }, { id: 'rope', n: 1 }], 15, 'build'),
-  bench('hammer', 'hammer', 1, [{ id: 'iron_bar', n: 1 }, { id: 'planks', n: 1 }], 10, 'tools'),
-  bench('hatchet', 'hatchet', 1, [{ id: 'iron_bar', n: 2 }, { id: 'planks', n: 1 }], 12, 'tools'),
-  bench('hand_saw', 'hand_saw', 1, [{ id: 'iron_bar', n: 2 }, { id: 'planks', n: 1 }], 12, 'tools'),
-  bench('pickaxe', 'pickaxe', 1, [{ id: 'iron_bar', n: 2 }, { id: 'planks', n: 1 }], 12, 'tools'),
-  bench('sledgehammer', 'sledgehammer', 1, [{ id: 'iron_bar', n: 4 }, { id: 'planks', n: 1 }], 14, 'tools'),
-  bench('satchel', 'satchel', 1, [{ id: 'gunpowder', n: 10 }, { id: 'rags', n: 2 }, { id: 'rope', n: 1 }, { id: 'tin_can', n: 1 }], 20, 'raid'),
-  // ---------------------------------------------------------------- at a forge (ours): five scrap and its fire's wood make a bar
-  { id: 'iron_bar', makes: 'iron_bar', qty: 1, needs: [{ id: 'scrap', n: 5 }], at: 'forge', time: 20, cat: 'build' },
+  // ---------------------------------------------------------------- Bench I: iron tools, a bed, a plan, key cutting, the first pistol rounds
+  bench(1, 'hammer', 'hammer', 1, [{ id: F, n: 50 }, { id: 'planks', n: 1 }], 10, 'tools'),
+  bench(1, 'hatchet', 'hatchet', 1, [{ id: F, n: 75 }, { id: 'planks', n: 1 }], 12, 'tools'),
+  bench(1, 'hand_saw', 'hand_saw', 1, [{ id: F, n: 75 }, { id: 'planks', n: 1 }], 12, 'tools'),
+  bench(1, 'pickaxe', 'pickaxe', 1, [{ id: F, n: 100 }, { id: 'planks', n: 1 }], 12, 'tools'),
+  bench(1, 'building_plan', 'building_plan', 1, [{ id: 'rags', n: 2 }, { id: MAT.coal, n: 1 }], 5, 'build'),
+  bench(1, 'sleeping_bag', 'sleeping_bag', 1, [{ id: 'rags', n: 10 }, { id: 'rope', n: 1 }], 15, 'build'),
+  bench(1, 'key_lock', 'key_lock', 1, [{ id: F, n: 75 }], 10, 'build'),
+  bench(1, 'ammo_9mm', 'ammo_9mm', 10, [{ id: 'gunpowder', n: 2 }, { id: F, n: 10 }], 8, 'weapons'),
+  bench(1, 'ammo_45', 'ammo_45', 10, [{ id: 'gunpowder', n: 2 }, { id: F, n: 12 }], 8, 'weapons'),
+  // ---------------------------------------------------------------- Bench II: sheet metal, the sledgehammer, the satchel, pistols, simple fittings
+  bench(2, 'sheet_metal', 'sheet_metal', 1, [{ id: BAR, n: 3 }], 10, 'build'),
+  bench(2, 'sledgehammer', 'sledgehammer', 1, [{ id: BAR, n: 3 }, { id: 'planks', n: 1 }], 14, 'tools'),
+  bench(2, 'satchel', 'satchel', 1, [{ id: 'gunpowder', n: 10 }, { id: 'rags', n: 2 }, { id: 'rope', n: 1 }, { id: 'tin_can', n: 1 }], 20, 'raid'),
+  bench(2, 'gun_light', 'gun_light', 1, [{ id: F, n: 60 }, { id: 'spring', n: 1 }], 15, 'weapons'),
+  bench(2, 'red_dot', 'red_dot', 1, [{ id: BAR, n: 2 }, { id: F, n: 50 }], 20, 'weapons'),
+  gun(2, 'colt', 4, 1, 1, 'pistol', 30),
+  gun(2, 'm9', 5, 1, 1, 'pistol', 30),
+  // ---------------------------------------------------------------- Bench III: rifles, submachine guns, scopes, suppressors, rifle rounds
+  bench(3, 'ammo_762', 'ammo_762', 10, [{ id: 'gunpowder', n: 4 }, { id: F, n: 20 }], 10, 'weapons'),
+  bench(3, 'ammo_739', 'ammo_739', 10, [{ id: 'gunpowder', n: 4 }, { id: F, n: 20 }], 10, 'weapons'),
+  bench(3, 'suppressor_9', 'suppressor_9', 1, [{ id: BAR, n: 2 }, { id: 'metal_pipe', n: 1 }, { id: F, n: 50 }], 25, 'weapons'),
+  bench(3, 'suppressor_739', 'suppressor_739', 1, [{ id: BAR, n: 3 }, { id: 'metal_pipe', n: 1 }, { id: F, n: 75 }], 30, 'weapons'),
+  bench(3, 'pu_scope', 'pu_scope', 1, [{ id: BAR, n: 3 }, { id: 'metal_pipe', n: 1 }, { id: F, n: 100 }], 30, 'weapons'),
+  gun(3, 'mosin9130', 8, 1, 2, 'rifle', 45, [{ id: 'planks', n: 4 }]),
+  gun(3, 'mpa', 8, 2, 1, 'rifle', 45),
+  gun(3, 'scorpion', 9, 2, 1, 'rifle', 45),
+  gun(3, 'ak', 12, 2, 1, 'rifle', 60),
+  // ---------------------------------------------------------------- at a forge (ours): ten fragments and half a minute of its fire make a bar
+  { id: 'iron_bar', makes: BAR, qty: 1, needs: [{ id: F, n: FORGE.frags }], at: 'forge', time: FORGE.smelt, cat: 'build' },
 ];
 
 export const RECIPE: Record<string, Recipe> = Object.fromEntries(RECIPES.map((r) => [r.id, r]));

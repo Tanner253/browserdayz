@@ -9,7 +9,11 @@
 //   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
 //                                  a recipe's card (src/ui/craft-card.ts), whose Craft makes it at once here
 //   &tab=craft                     the Crafting tab open (src/ui/crafting-ui.ts)
-//   &bench=1                       and a workbench as if near, three jobs on its queue, the first part way
+//   &bench=1|2|3                   and a workbench of that level as if near, three jobs on its queue, the first part way
+//   &table=1                       and a research table as if near
+//   &learned=all|tree1|none        the blueprints learned: every one, Bench I's tree, or none (the default) beyond the start's
+//   &view=tree|research|weapons    the Crafting tab on that view of its rail
+//   &scrap=n                       and n scrap in the pockets (with a pistol, a pipe, a spring and a pistol body, to research)
 //   &touch=1                       as a phone has it
 // What is done in it (a drag, a key, a drop) is done to these pockets alone, and nothing is kept.
 
@@ -31,8 +35,9 @@ import type * as THREE from 'three';
 import type { Stash, WorldItem } from '../game/loot';
 import { CraftCard } from '../ui/craft-card';
 import { CraftingScreen } from '../ui/crafting-ui';
-import { RECIPE } from '../sim/craft/recipes';
-import { plan, pocketsOf, recipesFor } from '../sim/craft/plan';
+import { LEVEL_NAME, RECIPE, RECIPES, type Level } from '../sim/craft/recipes';
+import { madeItems, plan, pocketsOf, recipesFor } from '../sim/craft/plan';
+import { TREE, knows, waysToLearn } from '../sim/craft/learn';
 
 const made = (th: KitThing): ItemInstance => {
   const it = makeItem(th.id, th.qty);
@@ -69,6 +74,9 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   const crafting = q.get('craft') === '1' ? ([['field_trousers'], ['knife'], ['rags', 9], ['rubbing_alcohol', 5], ['ammo_556', 20], ['stone', 10], ['planks', 4], ['bones', 4]] as [string, number?][]) : [];
   for (const th of kit.things) if (!crafting.length || ITEMS[th.id].wear) inv.add(made(th));
   for (const [id, k] of crafting) inv.add(makeItem(id, k));
+  // (to research: a found pistol, the parts of one, and scrap)
+  const scrapN = Number(q.get('scrap') ?? 0);
+  if (scrapN > 0) for (const it of [makeItem('scrap', scrapN), ...madeItems('colt', 1), makeItem('metal_pipe', 1), makeItem('spring', 2), makeItem('gun_body_pistol', 1), makeItem('metal_frags', 120), makeItem('iron_bar', 6)]) inv.add(it);
   if (crafting.length) for (const th of kit.things) if (!ITEMS[th.id].wear) inv.add(made(th));
   inv.autoBind();
   for (const it of [...inv.carried()]) {
@@ -167,19 +175,28 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
       const it = inv.everything().get(uid);
       if (it) inv.remove(it);
     }
-    if (got.makes) inv.add(makeItem(RECIPE[rid].makes, got.makes));
+    if (got.makes) for (const it of madeItems(RECIPE[rid].makes, got.makes)) inv.add(it);
     screen?.render();
   };
   const card = new CraftCard({ icons: () => icons, pockets: () => pocketsOf(inv.serialize()), craft: makeNow });
   screen = new InventoryUI(inv, actions);
   screen.icons = icons;
   const ui2 = screen;
-  const bench = q.get('bench') === '1', jobs = bench ? [{ r: 'nails', n: 3 }, { r: 'sheet_metal', n: 1 }, { r: 'sledgehammer', n: 1 }] : [];
+  const lv = (Number(q.get('bench') ?? 0) || 0) as Level | 0, table = q.get('table') === '1', jobs = lv ? [{ r: 'hammer', n: 3 }, { r: 'sheet_metal', n: 1 }, { r: 'sledgehammer', n: 1 }] : [];
+  const learnedQ = q.get('learned') ?? 'none';
+  const known = new Set<string>(learnedQ === 'all' ? RECIPES.map((x) => x.id) : learnedQ === 'tree1' ? TREE[1].map(([id]) => id) : []);
+  const where = (x: (typeof RECIPES)[number]) => (x.at === 'hand' ? null : x.at === 'forge' ? 'Smelted at a forge' : lv >= (x.lv ?? 1) ? null : (x.lv ?? 1) > 1 ? `Needs a ${LEVEL_NAME[x.lv ?? 1]} near` : 'Needs a workbench near');
   screen.craftPane = new CraftingScreen({
     icons: () => icons,
     pockets: () => pocketsOf(inv.serialize()),
     craft: makeNow,
-    near: (at) => bench && at === 'bench',
+    where,
+    ways: (x) => waysToLearn(x, known, pocketsOf(inv.serialize()).all, lv, table),
+    unlock: (rid) => void known.add(rid),
+    research: () => {},
+    knows: (id) => knows(known, id),
+    level: () => lv,
+    atTable: () => table,
     light: (ids) => ui2.lightUp(ids),
     making: () => null,
     queue: () => jobs,
@@ -189,6 +206,8 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
   if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
   screen.open(vicinity, opened ?? body, freshVitals());
+  const view = q.get('view');
+  if (view) (screen.craftPane as CraftingScreen).showView(view as Parameters<CraftingScreen['showView']>[0]);
   if (q.get('tab') === 'craft') screen.setMode('craft');
   (window as unknown as { stageInv: unknown }).stageInv = { inv, screen, vicinity, card, recipesFor };
   await pictures(ui);

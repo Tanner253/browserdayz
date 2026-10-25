@@ -1,10 +1,11 @@
 // Salvage as the game has it (2026-10-25, plan-crafting; the rules are src/sim/craft/salvage.ts, the server's side
 // server/salvage.ts). A swing of a hammer, a pickaxe or a sledgehammer that lands on a wreck, a drum or a heap of junk
-// is told to the server, which gives the scrap and wears the tool; how far through the thing the work is shows in the
+// is told to the server, which gives the fragments and wears the tool; how far through the thing the work is shows in the
 // ring round the crosshair a moment after each blow, as at a tree. Played alone, this game's own scrapyard says the same.
 
 import * as THREE from 'three';
 import { SALVAGE, Scrapyard, spotAt, type SalvageSpot } from '../sim/craft/salvage';
+import { MAT } from '../sim/craft/materials';
 import { condition, worn } from '../sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../sim/items';
 import type { C2S, S2C } from '../net/protocol';
@@ -25,7 +26,7 @@ export interface SalvageHost {
 const SHOWN = 1.8;
 
 export class Salvage {
-  /** played alone: this game's own spots' scrap */
+  /** played alone: this game's own spots' fragments */
   private yard: Scrapyard;
   private blowAt = 0;
   private rustT = 0;
@@ -35,7 +36,7 @@ export class Salvage {
     this.yard = new Scrapyard(spots);
   }
 
-  /** a swing that landed at a point (Weapons.onWhack), with something that knocks scrap off */
+  /** a swing that landed at a point (Weapons.onWhack), with something that knocks fragments off */
   whack(at: THREE.Vector3, weapon: string) {
     const it = this.h.held();
     if (!it || it.id !== weapon || !SALVAGE.tools[weapon]) return;
@@ -54,7 +55,7 @@ export class Salvage {
     if (it.cond <= 0) this.h.note(`Your ${ITEMS[it.id].name.toLowerCase()} is ruined`, 'warn');
     this.h.changed();
     this.onSalvage({ t: 'salvage', i, done: r.done });
-    this.h.give([makeItem('scrap', r.give)], `${r.give} Scrap Metal`);
+    this.h.give([makeItem(MAT.frags, r.give), ...(r.scrap ? [makeItem(MAT.scrap, r.scrap)] : [])], `${r.give} ${ITEMS[MAT.frags].name}${r.scrap ? ` and ${r.scrap} ${ITEMS[MAT.scrap].name}` : ''}`);
   }
 
   onSalvage(m: Extract<S2C, { t: 'salvage' }>) {
@@ -66,10 +67,10 @@ export class Salvage {
     const w = this.work;
     if (!w || performance.now() - w.at > SHOWN * 1000) return null;
     const s = this.spots[w.i];
-    return { label: w.done >= 1 ? `Nothing more comes off this ${s.name}` : `Knocking scrap off the ${s.name}`, t: w.done };
+    return { label: w.done >= 1 ? `Nothing more comes off this ${s.name}` : `Knocking metal off the ${s.name}`, t: w.done };
   }
 
-  /** played alone, every half minute: the spots whose time is up have their scrap again */
+  /** played alone, every half minute: the spots whose time is up have their fragments again */
   update(dt: number) {
     if (this.h.online() || (this.rustT += dt) < 30) return;
     this.rustT = 0;

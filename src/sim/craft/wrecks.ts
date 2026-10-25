@@ -12,12 +12,12 @@ import type { World } from '../../world/worldgen';
 import { wetAt } from '../build/land';
 import type { SalvageSpot } from './salvage';
 
-/** each wreck: its model, its name, its scrap, and how long and wide it lies, m */
+/** each wreck: its model, its name, its fragments and scrap, and how long and wide it lies, m */
 export const WRECK_KINDS = {
-  zil: { model: 'zil_wreck', name: 'ZIL truck', scrap: 30, l: 6.6, w: 2.6 },
-  tractor: { model: 'tractor_wreck', name: 'tractor', scrap: 24, l: 4.2, w: 2.4 },
-  pirozhok: { model: 'pirozhok_wreck', name: 'car', scrap: 18, l: 4.0, w: 1.7 },
-  junk: { model: 'junk_heap', name: 'heap of junk', scrap: 18, l: 3.0, w: 2.3 },
+  zil: { model: 'zil_wreck', name: 'ZIL truck', frags: 40, scrap: 5, l: 6.6, w: 2.6 },
+  tractor: { model: 'tractor_wreck', name: 'tractor', frags: 30, scrap: 4, l: 4.2, w: 2.4 },
+  pirozhok: { model: 'pirozhok_wreck', name: 'car', frags: 22, scrap: 3, l: 4.0, w: 1.7 },
+  junk: { model: 'junk_heap', name: 'heap of junk', frags: 22, scrap: 6, l: 3.0, w: 2.3 },
 } as const;
 export type WreckKind = keyof typeof WRECK_KINDS;
 
@@ -109,5 +109,5 @@ export function wreckLayer(world: Pick<World, 'heights' | 'buildings' | 'roads' 
 export const wreckSpots = (wrecks: Wreck[]): SalvageSpot[] =>
   wrecks.map((w) => {
     const K = WRECK_KINDS[w.kind];
-    return { x: w.x, y: w.y, z: w.z, kind: w.kind, name: K.name, scrap: K.scrap, reach: K.l / 2 + 1 };
+    return { x: w.x, y: w.y, z: w.z, kind: w.kind, name: K.name, frags: K.frags, scrap: K.scrap, reach: K.l / 2 + 1 };
   });

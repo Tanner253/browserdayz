@@ -10,10 +10,12 @@
 // kind, more from a rifle's; a batch makes as many as the pockets allow; two things dragged onto each other find their
 // recipes. On the server: a craft is let begin only with what it takes, is done only after its time and standing still,
 // takes what stacks as building's costs ('spent') and the clothes by their number, wears the blade, and gives what is made;
-// a workbench's recipe is queued only at a bench, runs while its maker stays, waits while they are away, and comes off;
-// a forge lights itself with wood and scrap enough, makes a bar every 20 s of fire and leaves charcoal, and goes out;
-// scrap comes off a spot a blow at a time, twice as fast with a sledgehammer, and comes back two hours after it was
-// stripped; the wrecks' layer is the same every time, clear of every building and road, and leaves the map as it was.
+// a workbench's recipe is queued only at a bench of its level, runs while its maker stays, waits while they are away, and
+// comes off; a forge lights itself with wood and ten fragments, makes a bar every 30 s of fire and leaves charcoal, and
+// goes out; fragments come off a spot a blow at a time, twice as fast with a sledgehammer, the spot's scrap with the last,
+// and come back two hours after; the wrecks' layer is the same every time, clear of every building and road. Blueprints
+// (progression v3): the basics known from the start, the rest learned in a bench's tree in order for scrap, or at a
+// research table from the thing itself; nothing unlearned is made; nails, hardware, steel plate and the best guns never.
 
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -24,7 +26,9 @@ import WebSocket from 'ws';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
 import { CRAFT_ITEMS } from '../src/sim/items/craft';
 import { RECIPE, RECIPES, RAGS, optionsOf } from '../src/sim/craft/recipes';
-import { most, needsOf, plan, pocketsOf, recipesFor, type Plan, type Pockets } from '../src/sim/craft/plan';
+import { madeItems, most, needsOf, plan, pocketsOf, recipesFor, type Plan, type Pockets } from '../src/sim/craft/plan';
+import { KNOWN_AT_START, TREE, learnable, mayUnlock, researchCost, teaches, waysToLearn } from '../src/sim/craft/learn';
+import { MAT, PER_BAR } from '../src/sim/craft/materials';
 import { TOOL_LIFE } from '../src/sim/gather';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { placeNear } from '../src/sim/craft/places';
@@ -33,7 +37,7 @@ import { SALVAGE, Scrapyard, salvageSpots, spotAt } from '../src/sim/craft/salva
 import { WRECK_KINDS, wreckLayer, wreckSpots } from '../src/sim/craft/wrecks';
 import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 import type { StoredItem } from '../src/net/protocol';
-import { PIECES } from '../src/sim/build/pieces';
+import { PIECES, PIECE_IDS } from '../src/sim/build/pieces';
 import { Container } from '../src/sim/inventory';
 import { Bases, heard, type Land } from '../src/sim/build/bases';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
@@ -69,8 +73,11 @@ ok('every recipe makes a real thing out of real things; by hand in 2 to 6 s; the
     if (r.by) for (const id of optionsOf(r.needs[0])) assert.ok(r.by[id] > 0, `${r.id}: nothing comes of ${id}`);
   }
   assert.ok(RECIPES.some((r) => r.at === 'bench') && RECIPES.some((r) => r.at === 'forge'));
-  // (found, never made: the plan)
-  for (const id of ['code_lock', 'rubbing_alcohol', 'ak', 'ammo_556']) assert.ok(!RECIPES.some((r) => r.makes === id), `${id} is made`);
+  // (found, never made: the plan; nails loot-only, the owner: "they must be looted which is hard and time consuming";
+  // the best guns loot-only, v3: "The best guns stay loot-only (gas, bunker, airdrops)")
+  for (const id of ['code_lock', 'rubbing_alcohol', 'ammo_556', 'nails', 'metal_pipe', 'spring', 'gun_body_pistol', 'gun_body_rifle', 'deagle', 'benelli', 'barrett', 'sniper50', 'vssk', 'ar15', 'mp7a1', 'm32', 'scope_50'])
+    assert.ok(!RECIPES.some((r) => r.makes === id), `${id} is made`);
+  for (const r of RECIPES) if (r.at === 'bench') assert.ok(r.lv && r.lv >= 1 && r.lv <= 3, `${r.id} has no bench level`);
   assert.ok(ITEMS.rubbing_alcohol.loot && ITEMS.tin_can.loot, 'rubbing alcohol and the tin can are not found');
   assert.ok(ITEMS.satchel, 'the satchel charge is not an item');
 });
@@ -154,13 +161,49 @@ ok('a workbench is near when one stands within 4 m on the same floor, not on the
   assert.equal(placeNear(bs, 'bench', wx + 5, wy, wz), null, 'a bench 5 m off was near');
   assert.equal(placeNear(bs, 'bench', wx + 1, wy + 3, wz), null, 'a bench on the floor below was near');
   assert.equal(placeNear(bs, 'forge', wx, wy, wz), null, 'a bench was a forge');
+  // (its level: one unsaid, the best of those within reach)
+  assert.equal(placeNear(bs, 'bench', wx + 1, wy, wz)?.lv, 1);
+  const p = [...b.pieces.values()].find((q) => q.k === 'workbench')! as { lv?: number };
+  p.lv = 3;
+  assert.equal(placeNear(bs, 'bench', wx + 1, wy, wz)?.lv, 3, 'a Bench III was not three');
 });
 
-ok('a forge with logs and ten scrap makes a bar every 20 s, leaves two charcoal a log, and goes out with no scrap left', () => {
+ok('blueprints: the basics known; each tree in order, at its level, for its scrap; research costs less and uses the thing up', () => {
+  // (every recipe still to learn is in exactly one tree, at its own bench's level; the start knows every hand recipe)
+  const inTrees = Object.entries(TREE).flatMap(([lv, line]) => line.map(([id]) => ({ id, lv: Number(lv) })));
+  for (const r of RECIPES.filter((x) => learnable(x))) {
+    const at = inTrees.filter((t) => t.id === r.id);
+    assert.equal(at.length, 1, `${r.id} is in ${at.length} trees`);
+    assert.equal(at[0].lv, r.lv, `${r.id} is a Bench ${r.lv} recipe in the Bench ${at[0].lv} tree`);
+  }
+  for (const t of inTrees) assert.ok(learnable(RECIPE[t.id]), `${t.id} is in a tree and needs no learning`);
+  for (const r of RECIPES.filter((x) => x.at === 'hand')) assert.ok(KNOWN_AT_START.has(r.id), `${r.id} is not known by hand`);
+  for (const line of Object.values(TREE)) for (let i = 1; i < line.length; i++) assert.ok(line[i][1] >= line[i - 1][1], 'a tree is not cheaper first');
+  const none = new Set<string>();
+  assert.equal(mayUnlock('pickaxe', none, 1, 999), null);
+  assert.match(mayUnlock('hand_saw', none, 1, 999)!, /first/, 'a tree was skipped along');
+  assert.match(mayUnlock('colt', new Set(TREE[2].slice(0, 4).map(([id]) => id)), 1, 999)!, /Bench II/, 'a Bench II recipe was unlocked at a Bench I');
+  assert.match(mayUnlock('pickaxe', none, 0, 999)!, /Bench I/);
+  assert.match(mayUnlock('pickaxe', none, 1, 5)!, /takes/);
+  assert.ok(researchCost('colt') < TREE[2].find(([id]) => id === 'colt')![1]);
+  assert.equal(teaches('colt')?.id, 'colt');
+  assert.equal(teaches('deagle'), undefined, 'a loot-only gun taught a blueprint');
+  assert.equal(teaches('hammer'), undefined, 'a thing known from the start taught one');
+  // (the card's ways: at a table with the gun and the scrap, it may be researched)
+  const colt = madeItems('colt', 1)[0], scrap = makeItem(MAT.scrap, 200);
+  assert.equal(waysToLearn(RECIPE.colt, none, [colt, scrap], 0, true)?.research.why, null);
+  assert.match(waysToLearn(RECIPE.colt, none, [colt, scrap], 0, false)!.research.why!, /research table/);
+  assert.equal(waysToLearn(RECIPE.hammer, none, [], 0, true), null, 'a known recipe has ways to learn it');
+  // (a made gun is whole: its own magazine in it, empty)
+  assert.equal(colt.mag, ITEMS.colt.weapon!.mag);
+  assert.equal(colt.loaded, 0);
+});
+
+ok(`a forge with logs and ${PER_BAR * 2} fragments makes a bar every 30 s, leaves two charcoal a log, and goes out with none left`, () => {
   // (its store takes a log: six wide, a log lies in it on its side)
   const [sw, sh] = PIECES.forge.store!;
   assert.ok(Container.size(makeItem('log'), true)[0] <= sw && Container.size(makeItem('log'), true)[1] <= sh, `a log does not fit the forge's ${sw}x${sh}`);
-  const items: StoredItem[] = [{ ...makeItem('log', 1), x: 0, y: 0, rot: false }, { ...makeItem('scrap', 10), x: 2, y: 0, rot: false }];
+  const items: StoredItem[] = [{ ...makeItem('log', 1), x: 0, y: 0, rot: false }, { ...makeItem(MAT.frags, PER_BAR * 2), x: 2, y: 0, rot: false }];
   const f = cold();
   let t = 0;
   const count = (id: string) => items.reduce((n, it) => n + (it.id === id ? it.qty : 0), 0);
@@ -168,20 +211,20 @@ ok('a forge with logs and ten scrap makes a bar every 20 s, leaves two charcoal 
   assert.ok(lit(f) && count('log') === 0, 'it did not light on its log');
   for (t = 1; t < FORGE.smelt; t++) forgeStep(f, items, 6, 4, 1);
   assert.equal(count('iron_bar'), 1, `after ${t} s: ${count('iron_bar')} bars`);
-  assert.equal(count('scrap'), 5);
+  assert.equal(count(MAT.frags), PER_BAR);
   for (; t < FORGE.smelt * 2; t++) forgeStep(f, items, 6, 4, 1);
   assert.equal(count('iron_bar'), 2);
-  assert.equal(count('scrap'), 0);
+  assert.equal(count(MAT.frags), 0);
   for (; t < FORGE.fuel.log + 2; t++) forgeStep(f, items, 6, 4, 1);
   assert.ok(!lit(f), 'it burned on with nothing to smelt');
   assert.equal(count('coal'), FORGE.ash.log, `charcoal: ${count('coal')}`);
-  // (wood and no scrap, or scrap and no wood: it does not light)
-  const dry: StoredItem[] = [{ ...makeItem('log', 2), x: 0, y: 0, rot: false }], g = cold();
+  // (wood and no fragments: it does not light)
+  const dry: StoredItem[] = [{ ...makeItem('log', 2), x: 0, y: 0, rot: false }, { ...makeItem(MAT.scrap, 50), x: 2, y: 0, rot: false }], g = cold();
   forgeStep(g, dry, 6, 4, 1);
-  assert.ok(!lit(g) && dry[0].qty === 2, 'a forge with no scrap burned its wood');
+  assert.ok(!lit(g) && dry[0].qty === 2, 'a forge with no fragments burned its wood');
 });
 
-ok('scrap comes off a spot a blow at a time, twice as fast with a sledgehammer; stripped, it comes back two hours on', () => {
+ok('fragments come off a spot a blow at a time, twice as fast with a sledgehammer, its scrap with the last; back two hours on', () => {
   const spots = salvageSpots([{ kind: 'covered_car', x: 0, y: 0, z: 0, rot: 0, scale: 1 }, { kind: 'Barrel_01', x: 20, y: 0, z: 0, rot: 0, scale: 1 }, { kind: 'pine_a', x: 40, y: 0, z: 0, rot: 0, scale: 1 }]);
   assert.equal(spots.length, 2, 'a tree is salvage');
   assert.equal(spotAt(spots, 1, 1, 0.5), 0);
@@ -190,14 +233,19 @@ ok('scrap comes off a spot a blow at a time, twice as fast with a sledgehammer; 
   const yard = new Scrapyard(spots), t0 = 1e6;
   assert.equal(yard.blow(0, SALVAGE.tools.hammer, t0)!.give, 1);
   assert.equal(yard.blow(0, SALVAGE.tools.sledgehammer, t0)!.give, 2);
-  let got = 3;
-  while (yard.left(0) > 0) got += yard.blow(0, SALVAGE.tools.sledgehammer, t0)!.give;
-  assert.equal(got, spots[0].scrap);
-  assert.equal(yard.blow(0, 1, t0)!.give, 0, 'a stripped car still gave scrap');
+  let got = 3, scrap = 0;
+  while (yard.left(0) > 0) {
+    const b = yard.blow(0, SALVAGE.tools.sledgehammer, t0)!;
+    got += b.give;
+    scrap += b.scrap;
+  }
+  assert.equal(got, spots[0].frags);
+  assert.equal(scrap, spots[0].scrap, 'the stripping blow gave no scrap');
+  assert.equal(yard.blow(0, 1, t0)!.give, 0, 'a stripped car still gave fragments');
   assert.deepEqual(yard.rust(t0 + SALVAGE.back * 1000 - 1, () => false), []);
   assert.deepEqual(yard.rust(t0 + SALVAGE.back * 1000 + 1, () => true), [], 'it came back with somebody stood at it');
   assert.deepEqual(yard.rust(t0 + SALVAGE.back * 1000 + 1, () => false), [0]);
-  assert.equal(yard.left(0), spots[0].scrap);
+  assert.equal(yard.left(0), spots[0].frags);
 });
 
 ok('every crafting thing is drawn with a model of its own, brought in, and has its picture in the pockets', () => {
@@ -311,8 +359,10 @@ async function serverTest() {
     console.log('  ok  a craft is not let begin without what it takes, and says what is short');
 
     // a workbench's recipe is not made by hand
-    send({ t: 'craft', r: 'nails', n: 1, go: 1 });
-    assert.ok((await until('craft', (m) => m.r === 'nails'))?.why?.includes('workbench'));
+    send({ t: 'craft', r: 'hammer', n: 1, go: 1 });
+    assert.ok((await until('craft', (m) => m.r === 'hammer'))?.why?.includes('workbench'));
+    // (and what has been learned is told when they come in: nothing yet)
+    assert.deepEqual((await until('known'))?.r, [], 'the known list was not told on joining');
 
     // the jacket into rags: begun; said done at once, not believed; done after its time, standing still
     send({ t: 'craft', r: 'rags', n: 1, go: 1, u: [jacket.uid, knife.uid] });
@@ -379,7 +429,7 @@ async function serverTest() {
     };
     const [sx, sz] = site!;
     const planPaper = (await kit('/give building_plan'))[0];
-    pockets = [planPaper, ...(await kit('/give planks 30')), ...(await kit('/give log 4')), ...(await kit('/give nails 20'))];
+    pockets = [planPaper, ...(await kit('/give planks 50')), ...(await kit('/give log 4')), ...(await kit('/give nails 20')), ...(await kit('/give metal_frags 75')), ...(await kit('/give scrap 25'))];
     me();
     await go(sx - 2, sz);
     send({ t: 's', p: [pos[0], pos[1], pos[2], 0, 0, 0], w: 'building_plan', m: [] });
@@ -392,23 +442,28 @@ async function serverTest() {
     send({ t: 'blay', k: 'workbench', b: b.id, ...spot, u: planPaper.uid });
     assert.ok(await until('bpc'), `no workbench: ${JSON.stringify(of('tell').slice(-2))}`);
     const [bx, , bz] = toWorld(b, spot.x, spot.y, spot.z);
+    // (and a research table beside it: by a bench, as Bench I makes it)
+    const tspot = deployAt(b, 'research_table', { x: 0, y: 0, z: 1.05 });
+    assert.ok(tspot, 'no room on the foundation for a research table beside the bench');
+    send({ t: 'blay', k: 'research_table', b: b.id, ...tspot, u: planPaper.uid });
+    assert.ok(await until('bpc', (m) => m.p[1] === PIECE_IDS.indexOf('research_table')), `no research table: ${JSON.stringify(of('tell').slice(-2))}`);
 
-    // nails, queued at the bench: two lots, one bar each; made one after the other while the maker stays
-    pockets = [makeItem('iron_bar', 3)];
+    // hammers, queued at the bench: two lots; made one after the other while the maker stays, the fragments taken as each is
+    pockets = [makeItem(MAT.frags, 150), makeItem('planks', 3)];
     me();
     await go(bx + 2, bz);
     const k0 = of('kit').length, g0 = got.length;
-    send({ t: 'cq', r: 'nails', n: 2 });
+    send({ t: 'cq', r: 'hammer', n: 2 });
     const q1 = await until('cq', (m) => m.q.length === 1);
-    assert.deepEqual(q1?.q, [{ r: 'nails', n: 2 }], `queued: ${JSON.stringify(q1)} ${JSON.stringify(of('craft').slice(-1))}`);
-    await until('kit', (m) => m.items.some((it) => it.id === 'nails'), RECIPE.nails.time * 1000 + 5000, g0);
-    const nails = of('kit').slice(k0).flatMap((m) => m.items).filter((it) => it.id === 'nails');
-    assert.equal(nails.reduce((t, it) => t + it.qty, 0), 20, `after one job's time: ${JSON.stringify(nails)}`);
-    assert.ok(await until('spent', (m) => m.items.some(([id]) => id === 'iron_bar')), 'no bar was taken for the nails');
-    console.log(`  ok  nails queued at a workbench: the first 20 made after ${RECIPE.nails.time} s, a bar taken as they were`);
+    assert.deepEqual(q1?.q, [{ r: 'hammer', n: 2 }], `queued: ${JSON.stringify(q1)} ${JSON.stringify(of('craft').slice(-1))}`);
+    await until('kit', (m) => m.items.some((it) => it.id === 'hammer'), RECIPE.hammer.time * 1000 + 5000, g0);
+    const hammers = of('kit').slice(k0).flatMap((m) => m.items).filter((it) => it.id === 'hammer');
+    assert.equal(hammers.length, 1, `after one job's time: ${JSON.stringify(hammers)}`);
+    assert.ok(await until('spent', (m) => m.items.some(([id, k]) => id === MAT.frags && k === 50)), 'no fragments were taken for the hammer');
+    console.log(`  ok  hammers queued at a workbench: the first made after ${RECIPE.hammer.time} s, its fragments taken as it was`);
 
     // walked off: it waits; back: it goes on; taken off: the queue is empty and nothing more is made
-    pockets = [makeItem('iron_bar', 2)];
+    pockets = [makeItem(MAT.frags, 100), makeItem('planks', 2)];
     me();
     await go(bx + 12, bz);
     assert.ok(await until('cq', (m) => m.paused && m.q.length === 1), 'walking off the bench did not pause the queue');
@@ -418,17 +473,45 @@ async function serverTest() {
     assert.ok(await until('cq', (m) => !m.paused && m.q.length === 1, 4000, back), 'coming back did not run the queue on');
     send({ t: 'cqx', i: 0 });
     assert.ok(await until('cq', (m) => m.q.length === 0), 'the job did not come off');
-    await sleep(RECIPE.nails.time * 1000 + 500);
-    assert.equal(of('kit').slice(k1).flatMap((m) => m.items).filter((it) => it.id === 'nails').length, 0, 'nails were made after the job came off');
+    await sleep(RECIPE.hammer.time * 1000 + 500);
+    assert.equal(of('kit').slice(k1).flatMap((m) => m.items).filter((it) => it.id === 'hammer').length, 0, 'hammers were made after the job came off');
     console.log('  ok  walked off it waits, back it goes on, and taken off nothing more is made');
+
+    // blueprints: not learned, not queued; the tree's first unlocked for its scrap; the second not before the first;
+    // a Bench II recipe not at a Bench I; a found pistol researched at the table, used up, learned for good
+    const g1 = got.length;
+    pockets = [makeItem(MAT.scrap, 200), makeItem(MAT.frags, 100), makeItem('planks', 2), ...madeItems('colt', 1)];
+    const colt = pockets[3];
+    me();
+    await sleep(120);
+    send({ t: 'cq', r: 'pickaxe', n: 1 });
+    assert.ok(await until('craft', (m) => m.r === 'pickaxe' && !m.ok && /learned/.test(m.why ?? ''), 4000, g1), 'an unlearned recipe was queued');
+    send({ t: 'learn', op: 'tree', r: 'hand_saw' });
+    assert.ok(await until('learn', (m) => !m.ok && /first/.test(m.why ?? ''), 4000, g1), 'the tree was skipped along');
+    send({ t: 'learn', op: 'tree', r: 'pickaxe' });
+    assert.ok(await until('known', (m) => m.r.includes('pickaxe'), 4000, g1), 'the pickaxe was not learned');
+    assert.ok(await until('spent', (m) => m.items.some(([id, k]) => id === MAT.scrap && k === TREE[1][0][1]), 4000, g1), 'its scrap was not taken');
+    send({ t: 'cq', r: 'sheet_metal', n: 1 });
+    assert.ok(await until('craft', (m) => m.r === 'sheet_metal' && !m.ok, 4000, g1), 'a Bench II recipe went on unlearned');
+    send({ t: 'learn', op: 'research', u: colt.uid });
+    const learned = await until('learn', (m) => m.ok && m.r === 'colt', 4000, g1);
+    assert.ok(learned, `the pistol was not researched: ${JSON.stringify(of('learn').slice(-1))}`);
+    assert.deepEqual(learned.used, [colt.uid], 'the pistol was not used up by its number');
+    assert.ok(await until('known', (m) => m.r.includes('colt') && m.r.includes('pickaxe'), 4000, g1));
+    pockets = [makeItem(MAT.scrap, 200 - TREE[1][0][1] - researchCost('colt')), makeItem(MAT.frags, 100), makeItem('planks', 2), makeItem('iron_bar', 6), makeItem('spring', 1), makeItem('metal_pipe', 1), makeItem('gun_body_pistol', 1)];
+    me();
+    await sleep(120);
+    send({ t: 'cq', r: 'colt', n: 1 });
+    assert.ok(await until('craft', (m) => m.r === 'colt' && !m.ok && /Bench II/.test(m.why ?? ''), 4000, g1), 'a pistol was queued at a Bench I');
+    console.log('  ok  blueprints: unlearned refused, the tree in order for its scrap, a pistol researched and used up, and Bench II\'s pistol not made at a Bench I');
 
     // queued far from any bench: refused
     await go(bx + 30, bz);
-    send({ t: 'cq', r: 'nails', n: 1 });
-    assert.ok(await until('craft', (m) => m.r === 'nails' && !m.ok && /workbench/.test(m.why ?? '')), 'queued with no bench near');
+    send({ t: 'cq', r: 'hammer', n: 1 });
+    assert.ok(await until('craft', (m) => m.r === 'hammer' && !m.ok && /workbench/.test(m.why ?? '')), 'queued with no bench near');
     console.log('  ok  nothing is queued away from a workbench');
 
-    // salvage: a hammer on a fuel drum gives a scrap a blow, and the server says how far through it is
+    // salvage: a hammer on a fuel drum gives a fragment a blow, and the server says how far through it is
     const drum = data.salvage.findIndex((q) => q.kind === 'Barrel_01' && Math.abs(q.x) < 1500 && Math.abs(q.z) < 1500);
     const D = data.salvage[drum];
     const hammer = (await kit('/give hammer'))[0];
@@ -441,7 +524,7 @@ async function serverTest() {
     send({ t: 'salvage', i: drum, u: hammer.uid });
     const blow = await until('salvage', (m) => m.i === drum);
     assert.ok(blow && blow.done > 0, `no blow: ${JSON.stringify(of('tell').slice(-1))}`);
-    assert.ok(await until('kit', (m) => m.items.some((it) => it.id === 'scrap' && it.qty === 1)), 'no scrap given');
+    assert.ok(await until('kit', (m) => m.items.some((it) => it.id === MAT.frags && it.qty === 1)), 'no fragment given');
     // (too soon after: not believed; from too far: not believed)
     send({ t: 'salvage', i: drum, u: hammer.uid });
     await sleep(200);
@@ -453,7 +536,7 @@ async function serverTest() {
     await sleep(300);
     assert.equal(of('salvage').filter((m) => m.i === drum).length, 1, 'a blow from 6 m off was believed');
     assert.ok(of('kit').slice(k2).length >= 1);
-    console.log('  ok  a hammer on a fuel drum knocks a scrap off, not faster than it swings nor from 6 m off');
+    console.log('  ok  a hammer on a fuel drum knocks a fragment off, not faster than it swings nor from 6 m off');
   } catch (e) {
     fail = e;
   } finally {

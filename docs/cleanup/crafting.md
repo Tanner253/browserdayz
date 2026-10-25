@@ -8,6 +8,9 @@ The crafting path's list (format: docs/cleanup/README.md on battle-royale). One 
 - [x] model rope_coil (Rope Knots, untextured, tinted) | replaced by rope_coil_hemp (Higgsfield: a coil of hemp) | step 4 | grep "'rope_coil'" src scripts: nothing
 - [x] model sledgehammer_01 (Poly Haven, yellow fibreglass) | replaced by sledgehammer_slim (Higgsfield: wood, a slim handle) | step 4 | grep sledgehammer_01 src scripts public/assets/manifest.json CREDITS.md: nothing
 (Their files, far copies and computer copies deleted with them; their credits taken out.)
+- [x] the workbench's nails recipe (an iron bar into 20 nails) | none: nails are loot-only (the owner, 2026-10-25: "they must be looted which is hard and time consuming") | progression v3, step 1 | grep "bench(.*'nails'" src/sim/craft: nothing
+- [x] scrap smelted at the forge and knocked off wrecks | metal fragments (`MAT.frags`, src/sim/craft/materials.ts); scrap is the currency now, found in loot | progression v3, step 1 | grep "'scrap'" src/sim/craft server/forge.ts server/salvage.ts: only materials.ts
+- [x] the recipe card's `near` (whether a bench or a forge is near) | `where` (why not here: no bench, too low a bench, no forge) | progression v3, step 1 | grep "near?: (at" src/ui: nothing
 
 Before step 4 nothing in the repository was dead. What was tried and dropped in step 2 was taken out before it was committed:
 the two other scrap models (Skipperino's, Zuckergelee's), Poly Haven's cleaner_tin_01 (beside Higgsfield's gunpowder tin)

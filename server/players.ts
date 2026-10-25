@@ -31,6 +31,7 @@ import { SHOP, type ItemId } from '../api/_lib/shop-items';
 import { forget } from './searched';
 import { wakeClear } from './solid';
 import { basesFor } from './build';
+import { tellKnown } from './learn';
 
 export interface Client {
   ws: WebSocket;
@@ -425,6 +426,8 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   c.perkKey = perkKey(c.key);
   if (c.perkKey !== '{}') send(c, { t: 'perks', id: c.id, sk: perks.skins(c.key), ...(perks.vip(c.key) ? { vip: true as const } : {}) });
   partyIn(c);
+  // (and the blueprints they have learned: server/learn.ts)
+  tellKnown(c);
   // back under another name: the board says so, to everybody
   const had = scores.get(c.key);
   if (had && had.name !== c.name) {

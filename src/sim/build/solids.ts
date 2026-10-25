@@ -190,6 +190,8 @@ const SHAPES: Record<string, () => Shape> = {
   }),
   // (crafting's forge: the drum, as high as its rim of stones; the chimney stops nothing)
   forge: () => ({ solid: [box(-0.4, 0, -0.4, 0.4, 0.95, 0.4)], unseen: true }),
+  // (crafting's research table: its top and what stands on it; drawn by its own model, src/game/craft-forge.ts)
+  research_table: () => ({ solid: [box(-0.6, 0, -0.3, 0.6, 0.92, 0.3)], unseen: true }),
   // (a heavy table: its top, its four legs and a shelf between them)
   workbench: () => ({
     solid: [box(-0.85, 0.82, -0.45, 0.85, 0.94, 0.45), box(-0.8, 0.15, -0.4, 0.8, 0.22, 0.4), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.78 - 0.05, 0, sz * 0.38 - 0.05, sx * 0.78 + 0.05, 0.82, sz * 0.38 + 0.05)))],

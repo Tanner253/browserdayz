@@ -753,6 +753,16 @@ export class Game {
         this.focus = s;
         this.toggleInventory(true);
       },
+      // (crafting's research table: F opens the Crafting tab on what it would teach)
+      use: (free, t) => {
+        if (t?.base.pieces.get(t.id)?.k !== 'research_table') return null;
+        if (free && this.input.pressed('KeyF')) {
+          (this.invUI.craftPane as CraftingScreen | null)?.showView('research');
+          this.toggleInventory(true);
+          if (this.invUI.isOpen) this.invUI.setMode('craft');
+        }
+        return '<kbd>F</kbd>Research';
+      },
       name: () => playerName(),
       keys: () => [...this.inv.everything().values()].filter((it) => it.id === 'key' && it.key).map((it) => it.key!),
       panel: (open) => {
@@ -1058,13 +1068,19 @@ export class Game {
       craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
       craftOpen: () => this.craftCard.open,
     });
-    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u), near: (at) => this.craft.near(at) });
+    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u), where: (r) => this.craft.where(r) });
     // (the Crafting tab: J, or the tab at the top of the inventory)
     this.invUI.craftPane = new CraftingScreen({
       icons: () => this.invUI.icons,
       pockets: () => pocketsOf(this.inv.serialize()),
       craft: (rid, n, u) => void this.craft.craft(rid, n, u),
-      near: (at) => this.craft.near(at),
+      where: (r) => this.craft.where(r),
+      ways: (r) => this.craft.ways(r),
+      unlock: (rid) => this.craft.unlock(rid),
+      research: (uid) => this.craft.research(uid),
+      knows: (id) => this.craft.knows(id),
+      level: () => this.craft.level(),
+      atTable: () => this.craft.atTable(),
       queue: () => this.craft.queue.jobs,
       running: () => this.craft.running(),
       unqueue: (i) => this.craft.unqueue(i),

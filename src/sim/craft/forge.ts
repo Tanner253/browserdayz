@@ -1,16 +1,18 @@
 // The forge (2026-10-25, plan-crafting, ours: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts
-// while it burns, even while you are away"). Its store takes wood and scrap; while it has scrap to smelt and wood to burn
-// it burns, five scrap and twenty seconds of fire making an iron bar, and every log it burns leaves charcoal. Run by the
-// server for every forge there is, whoever is near (and by the game, played alone, for its own).
+// while it burns, even while you are away"). Its store takes wood and metal fragments; while it has fragments to smelt
+// and wood to burn it burns, ten fragments and half a minute of fire making an iron bar (v3: "10 fragments make 1 bar,
+// with time and fuel"), and every log it burns leaves charcoal. Run by the server for every forge there is, whoever is
+// near (and by the game, played alone, for its own). An armoured wall's six bars are sixty fragments and a log and a half.
 
 import { Container } from '../inventory';
 import { makeItem, ITEMS, type ItemInstance } from '../items';
 import type { StoredItem } from '../../net/protocol';
+import { MAT, PER_BAR } from './materials';
 
 export const FORGE = {
-  /** seconds of fire a bar takes, and the scrap it takes */
-  smelt: 20,
-  scrap: 5,
+  /** seconds of fire a bar takes, and the fragments it takes */
+  smelt: 30,
+  frags: PER_BAR,
   /** seconds each fuel burns, and the charcoal it leaves */
   fuel: { log: 120, firewood: 60, coal: 40 } as Record<string, number>,
   ash: { log: 2, firewood: 1 } as Record<string, number>,
@@ -61,7 +63,7 @@ function put(items: StoredItem[], w: number, h: number, id: string, n: number): 
 }
 
 /**
- * A forge `dt` seconds on: what it burns, what it makes. Lights itself when it has scrap enough for a bar and something
+ * A forge `dt` seconds on: what it burns, what it makes. Lights itself when it has fragments enough for a bar and something
  * to burn; goes out when what it burns is spent and it has nothing more to smelt (or nothing to burn). The store is
  * changed in place; true when anything in it changed.
  */
@@ -69,7 +71,7 @@ export function forgeStep(f: Fire, items: StoredItem[], w: number, h: number, dt
   let changed = false;
   const fuel = () => Object.keys(FORGE.fuel).find((id) => count(items, id) > 0);
   if (f.burn <= 0) {
-    const next = count(items, 'scrap') >= FORGE.scrap ? fuel() : undefined;
+    const next = count(items, MAT.frags) >= FORGE.frags ? fuel() : undefined;
     if (!next) return false;
     take(items, next, 1);
     f.burn = FORGE.fuel[next];
@@ -77,19 +79,19 @@ export function forgeStep(f: Fire, items: StoredItem[], w: number, h: number, dt
     changed = true;
   }
   f.burn -= dt;
-  if (count(items, 'scrap') >= FORGE.scrap && (f.done += dt) >= FORGE.smelt) {
+  if (count(items, MAT.frags) >= FORGE.frags && (f.done += dt) >= FORGE.smelt) {
     // (out of room for the bar: it waits, hot, until there is)
-    if (put(items, w, h, 'iron_bar', 1)) {
-      take(items, 'scrap', FORGE.scrap);
+    if (put(items, w, h, MAT.bar, 1)) {
+      take(items, MAT.frags, FORGE.frags);
       f.done = 0;
       changed = true;
     } else f.done = FORGE.smelt;
   }
   if (f.burn <= 0) {
-    // (what it burned is spent: its charcoal, and the next if there is still scrap to smelt)
-    if (FORGE.ash[f.of]) changed = put(items, w, h, 'coal', FORGE.ash[f.of]) || changed;
+    // (what it burned is spent: its charcoal, and the next if there are still fragments to smelt)
+    if (FORGE.ash[f.of]) changed = put(items, w, h, MAT.coal, FORGE.ash[f.of]) || changed;
     f.burn = 0;
-    if (count(items, 'scrap') < FORGE.scrap) f.done = 0;
+    if (count(items, MAT.frags) < FORGE.frags) f.done = 0;
   }
   return changed;
 }

@@ -65,10 +65,10 @@ function tell(k: string, m: S2C) {
   }
 }
 
-/** what somebody's game took that somebody else had taken first: not believed to be in their pockets for a moment, until their game has heard so (see 'me') */
+/** what somebody's game took that somebody else had taken first, or that the server used up (a thing researched, sold): not believed to be in their pockets for a moment, until their game has heard so (see 'me') */
 const refusedOf = new Map<number, Map<string, number>>();
 const REFUSED_MS = 4000;
-function refuse(c: Client, uids: string[]) {
+export function refuse(c: Client, uids: string[]) {
   if (!uids.length) return;
   let m = refusedOf.get(c.id);
   if (!m) refusedOf.set(c.id, (m = new Map()));

@@ -130,15 +130,18 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'box_small', name: 'Small Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 12, nails: 8 }, hp: 150, store: [6, 5] },
     { id: 'box_large', name: 'Large Box', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 25, nails: 20 }, hp: 300, store: [10, 8] },
     { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 2, planks: 20, nails: 20 }, hp: 500 },
-    // (crafting's forge, plan-crafting: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts while it
-    // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the scrap and what comes out, src/sim/craft/forge.ts)
-    { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
     // (the owner, 2026-10-24: "players can place a bed or bedroll in their base when they have a TC down like rust". Plan
     // v2: "Sleeping bag: found ... Wake here after a death, with nothing, at most every 10 min"; a bed, Rust's, sooner)
     { id: 'bedroll', name: 'Sleeping Bag', cat: 'deploy', role: 'deploy', only: 1, cost: { sleeping_bag: 1 }, hp: 100, sleep: 600 },
     // (the owner, 2026-10-24: torches "hung on walls"; the torch itself, set in an iron bracket)
     { id: 'torch_wall', name: 'Wall Torch', cat: 'deploy', role: 'lean', only: 1, cost: { torch: 1 }, hp: 50 },
     { id: 'bed', name: 'Bed', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, nails: 12, sleeping_bag: 1 }, hp: 250, sleep: 300 },
+    // (crafting's, on the end as every new piece goes)
+    // (crafting's forge, plan-crafting: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts while it
+    // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the fragments and what comes out, src/sim/craft/forge.ts)
+    { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
+    // (crafting's research table, progression v3: "put a found item in with scrap, and the item is used up; you know it for good"; laid by a bench, as Bench I makes it)
+    { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 25 }, hp: 300, bench: true },
   ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
 

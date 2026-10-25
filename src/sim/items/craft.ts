@@ -1,14 +1,15 @@
 // What crafting makes and is made of (2026-10-24, plan-crafting: the owner, "We need some sort of crafting like how rust
 // has crafting ... clearly we need crafting"; "clothing could be cut up with a knife or sharp object to make cloth which
-// could be combined with rubbing alcohols to make iFAK's"). The recipes are src/sim/craft/recipes.ts. Rubbing alcohol
-// and the tin can are found; the rest is made, smelted or salvaged. The models are the owner's downloads, and
-// the rags, rope, sledgehammer, satchel, charcoal and gunpowder tin made in Higgsfield (progress/base-models/incoming-map.md).
+// could be combined with rubbing alcohols to make iFAK's"). The recipes are src/sim/craft/recipes.ts, the metals' numbers
+// src/sim/craft/materials.ts. Rubbing alcohol, the tin can, scrap and the gun parts are found; the rest is made, smelted
+// or salvaged. The models are the owner's downloads and Higgsfield's (progress/base-models/incoming-map.md).
 
 import type { ItemDef } from '../items';
-import { HOMES } from './rules';
+import { ARMOURY, ARMY, HOMES, SHEDS } from './rules';
+import { PILES } from '../craft/materials';
 
 /** what is only ever made, smelted or salvaged: never found lying about (the plan: 'Found, never made' is the other way round) */
-export const MADE_ONLY = ['rags', 'rope', 'gunpowder', 'scrap', 'iron_bar', 'coal', 'stone_hatchet', 'bone_knife', 'sledgehammer', 'satchel'];
+export const MADE_ONLY = ['rags', 'rope', 'gunpowder', 'metal_frags', 'iron_bar', 'coal', 'stone_hatchet', 'bone_knife', 'sledgehammer', 'satchel'];
 
 export const CRAFT_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- made by hand
@@ -37,14 +38,40 @@ export const CRAFT_ITEMS: ItemDef[] = [
     desc: 'An empty can, rusted through in places. A satchel charge is packed into one.',
     loot: { pair: 'TacticalBaconCan_Opened', at: [8, 3, 6, 0, 0], restock: 300, usage: [...HOMES, 'Farm', 'Industrial'] },
   },
-  // ---------------------------------------------------------------- smelted and salvaged (the forge and the wrecks: plan-base-economy)
-  { id: 'scrap', name: 'Scrap Metal', model: 'scrap_pile', w: 2, h: 1, weight: 0.25, stack: 40, fresh: 5, category: 'misc',
-    desc: 'Rusted metal knocked off a wreck with a hammer, a pickaxe or a sledgehammer. Five of it smelt into an iron bar at a forge.',
+  // ---------------------------------------------------------------- the metals and the currency (progression v3: Rust's)
+  // (scrap: junk found in sheds, works and drums, and out of recyclers; what traders, blueprints and bench levels are paid in)
+  { id: 'scrap', name: 'Scrap', model: 'scrap_pile', w: 2, h: 1, weight: PILES.scrap.weight, stack: PILES.scrap.stack, fresh: 20, category: 'misc',
+    desc: 'Useful junk: springs, screws, wire, bits of motors. Traders take it as money, and blueprints are learned with it.',
+    loot: { pair: 'MetalWire', at: [6, 10, 14, 6, 3], restock: 300, usage: [...SHEDS, ...HOMES], favour: { Industrial: 3, Farm: 1.5 }, qty: [0.01, 0.04] },
     worth: 1,
   },
-  { id: 'iron_bar', name: 'Iron Bar', model: 'iron_ingots', w: 2, h: 1, weight: 0.5, stack: 20, fresh: 2, category: 'misc',
-    desc: 'A bar of iron smelted from scrap. At a workbench it is drawn into nails and rolled into sheet metal, and made into tools.',
+  { id: 'metal_frags', name: 'Metal Fragments', model: 'metal_frags', w: 1, h: 1, weight: PILES.frags.weight, stack: PILES.frags.stack, fresh: 25, category: 'misc',
+    desc: 'Bent and torn bits of steel knocked off wrecks with a hammer, a pickaxe or a sledgehammer. Tools, locks and fittings are made of them; ten smelt into an iron bar at a forge.',
+  },
+  { id: 'iron_bar', name: 'Iron Bar', model: 'iron_ingots', w: 2, h: 1, weight: PILES.bar.weight, stack: PILES.bar.stack, fresh: 2, category: 'misc',
+    desc: 'A bar of iron smelted from fragments at a forge. Guns, sheet metal and the armoured tier are made of it.',
     worth: 3,
+  },
+  // ---------------------------------------------------------------- gun parts: found, never made (v3: "a crafted gun costs iron bars plus a spring, a pipe and a gun body")
+  { id: 'metal_pipe', name: 'Metal Pipe', model: 'metal_pipe', w: 2, h: 1, weight: 0.6, category: 'misc',
+    desc: 'A threaded length of steel pipe. A gun barrel is turned from it at a workbench.',
+    loot: { pair: 'Pipe', at: [3, 6, 8, 3, 1], restock: 420, usage: [...SHEDS, ...ARMY], favour: { Industrial: 3 } },
+    worth: 4,
+  },
+  { id: 'spring', name: 'Spring', model: 'spring_coil', w: 1, h: 1, weight: 0.1, category: 'misc',
+    desc: 'A stiff coil spring out of a machine. The action of a gun is sprung with one.',
+    loot: { pair: 'SparkPlug', at: [2, 5, 8, 4, 2], restock: 420, usage: [...SHEDS, ...ARMY], favour: { Industrial: 2, Military: 2 } },
+    worth: 4,
+  },
+  { id: 'gun_body_pistol', name: 'Pistol Body', model: 'gun_body_pistol', w: 2, h: 1, weight: 0.4, category: 'misc',
+    desc: 'A bare pistol frame, never finished. At a workbench it is built into a pistol.',
+    loot: { pair: 'FNX45', at: [0, 2, 4, 3, 1], restock: 600, usage: ARMY, favour: ARMOURY },
+    worth: 10,
+  },
+  { id: 'gun_body_rifle', name: 'Rifle Body', model: 'gun_body_rifle', w: 4, h: 1, weight: 1.2, category: 'misc',
+    desc: 'A bare rifle receiver, never finished. At a workbench it is built into a rifle or a submachine gun.',
+    loot: { pair: 'SKS', at: [0, 0, 3, 4, 2], restock: 900, usage: ARMY, favour: ARMOURY },
+    worth: 20,
   },
   // (not the charcoal tablets, which end food poisoning: what a forge leaves as its wood burns)
   { id: 'coal', name: 'Charcoal Lumps', model: 'charcoal_lumps', w: 1, h: 1, weight: 0.1, stack: 30, fresh: 4, category: 'misc',
