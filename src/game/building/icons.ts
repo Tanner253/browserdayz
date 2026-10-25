@@ -10,8 +10,8 @@ import { FOUND, PIECES } from '../../sim/build/pieces';
 const YAW = 0.55, PITCH = 0.5;
 const V = new THREE.Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
 const LIGHT = new THREE.Vector3(-0.45, 1, 0.7).normalize();
-/** a tier's colour on the wheel: frame, wood, stone, metal */
-export const TIER_INK = ['#d9c9a3', '#a77a48', '#97948b', '#7f8c98'];
+/** a tier's colour on the wheel: frame, wood, stone, metal, armoured */
+export const TIER_INK = ['#d9c9a3', '#a77a48', '#97948b', '#7f8c98', '#4f5b66'];
 
 type Face = THREE.Vector3[];
 

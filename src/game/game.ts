@@ -773,6 +773,7 @@ export class Game {
       glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
       tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
       explode: (at, mine, w) => this.explode(at, mine, w === 'c4' || w === 'satchel' ? w : 'grenade'),
+      impact: (surface, at, normal) => this.effects.impact(surface, at, normal, false),
     });
     this.forges = new ForgeView({
       scene: r.scene,

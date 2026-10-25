@@ -21,8 +21,8 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
 import { inPlay } from '../src/world/worldgen/layout';
-import { Bases, heard, heardPiece, said, saidPiece, type Land } from '../src/sim/build/bases';
-import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
+import { Bases, MEND, heard, heardPiece, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
+import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 import { inBase, inTheWay, swept } from '../src/sim/build/doors';
@@ -63,15 +63,18 @@ console.log('Building: pieces');
 ok('costs and health by tier, as the plan says; half pieces half; a foundation\'s frame on two logs', () => {
   assert.deepEqual(costOf('wall', 0), { planks: 4 });
   assert.deepEqual(costOf('wall', 1), { planks: 10, nails: 12 });
-  assert.deepEqual(costOf('wall', 2), { stone: 30 });
+  // (the progression plan, approved 2026-10-25: stone takes nails too, and the armoured tier is looted plate and forged bars)
+  assert.deepEqual(costOf('wall', 2), { stone: 30, nails: 6 });
   assert.deepEqual(costOf('wall', 3), { sheet_metal: 4, nails: 24 });
+  assert.deepEqual(costOf('wall', 4), { steel_plate: 2, iron_bar: 6, nails: 30 });
   assert.deepEqual(costOf('wall_half', 1), { planks: 5, nails: 6 });
   assert.deepEqual(costOf('foundation', 0), { planks: 4, log: 2 });
-  assert.deepEqual([0, 1, 2, 3].map((t) => hpOf('wall', t as Tier)), [60, 500, 1000, 2000]);
-  // (plan v2: 22 pieces, less the ladder that is set down, and 12 fittings: the doors, the windows' and the gates)
+  assert.deepEqual([0, 1, 2, 3, 4].map((t) => hpOf('wall', t as Tier)), [60, 500, 1000, 2000, 4000]);
+  // (plan v2: 22 pieces, less the ladder that is set down, and 12 fittings: the doors, the windows' and the gates; and
+  // the progression plan's two armoured doors)
   const fitting = (k: string) => PIECES[k].role === 'fit' || k.startsWith('gate_');
   assert.equal(Object.keys(PIECES).filter((k) => PIECES[k].role !== 'deploy' && PIECES[k].role !== 'lean' && !fitting(k)).length, 21);
-  assert.equal(Object.keys(PIECES).filter(fitting).length, 12);
+  assert.equal(Object.keys(PIECES).filter(fitting).length, 14);
 });
 
 console.log('Building: snapping');
@@ -301,10 +304,13 @@ ok('upkeep is paid a whole thing at a time, the parts owed over; short, the stor
   assert.equal(pay({ planks: 12 }, 2, due, store), false);
 });
 
-ok('rot: a frame is gone in 2 h, wood 12 h, stone 24 h, metal 36 h; with no claim, after 10 minutes of grace', () => {
-  for (const [t, h] of [[0, 2], [1, 12], [2, 24], [3, 36]] as const) {
+ok('rot: a frame is gone in 2 h, wood 12 h, stone 24 h, metal 36 h, armoured 48 h; with no claim, after 10 minutes of grace', () => {
+  for (const [t, h] of [[0, 2], [1, 12], [2, 24], [3, 36], [4, 48]] as const) {
     const bs = new Bases(flat), b = start(bs);
-    bs.upgrade(b.id, 1, t);
+    // (straight to its tier: the workbench the top two are nailed up near is not what is asked here)
+    const p = b.pieces.get(1)!;
+    p.t = t;
+    p.hp = hpOf(p.k, t);
     b.pieces.get(1)!.at = 0;
     assert.equal(rot(b, h * 0.99, 1e9, true).broken.length, 0, `tier ${t} gone before ${h} h`);
     assert.deepEqual(rot(b, h * 0.02, 1e9, true).broken, [1], `tier ${t} not gone at ${h} h`);
@@ -355,15 +361,40 @@ ok('a fitting hangs in an opening of its sort, one to an opening, either way rou
   assert.ok(bs.remove(b.id, 2).includes(d.id));
 });
 
-ok('the metal fittings need a workbench near; the wooden ones do not', () => {
+ok('the metal fittings need a workbench II near, the armoured ones a III; the wooden ones none', () => {
   const { bs, b } = hut();
   const s = spots(b, 'door_metal')[0];
-  assert.match(String(bs.lay({ b: b.id, k: 'door_metal', ...s }, ME, 0)), /needs a workbench/);
+  assert.match(String(bs.lay({ b: b.id, k: 'door_metal', ...s }, ME, 0)), /needs a level II workbench/);
   assert.ok(typeof bs.lay({ b: b.id, k: 'bars_wood', ...spots(b, 'bars_wood')[0] }, ME, 0) !== 'string');
-  const h = hut(true);
+  const h = hut(true), bench = [...h.b.pieces.values()].find((p) => p.k === 'workbench')!;
+  // (a level I bench is not enough; brought up a level at a time, for its own cost, it is)
+  assert.match(String(h.bs.lay({ b: h.b.id, k: 'door_metal', ...spots(h.b, 'door_metal')[0] }, ME, 0)), /needs a level II workbench/);
+  assert.equal(h.bs.canUpgrade(h.b.id, bench.id, 3), 'A level at a time');
+  assert.deepEqual(costOf('workbench', 2), { iron_bar: 10, nails: 40, hardware: 2 });
+  assert.ok(h.bs.upgrade(h.b.id, bench.id, 2));
+  assert.equal(benchLevel(bench), 2);
   assert.ok(typeof h.bs.lay({ b: h.b.id, k: 'door_metal', ...spots(h.b, 'door_metal')[0] }, ME, 0) !== 'string');
-  assert.deepEqual(costOf('door_metal', 3), { sheet_metal: 4, nails: 20 });
-  assert.deepEqual([hpOf('door_wood', 1), hpOf('door_metal', 3), hpOf('garage_door', 3)], [250, 500, 1000]);
+  assert.match(String(h.bs.canUpgrade(h.b.id, 2, 4)), /level III workbench/, 'a wall up to armoured');
+  assert.deepEqual(costOf('door_metal', 3), { sheet_metal: 4, nails: 20, hardware: 1 });
+  assert.deepEqual([hpOf('door_wood', 1), hpOf('door_metal', 3), hpOf('garage_door', 3), hpOf('door_armoured', 4)], [250, 500, 1000, 1000]);
+});
+
+ok('a piece is mended for a share of its cost, nails and all, by the health it lost; not within half a minute of a blow', () => {
+  const { bs, b } = hut(), p = [...b.pieces.values()].find((q) => q.k === 'wall')!;
+  bs.upgrade(b.id, p.id, 1);
+  assert.equal(bs.canRepair(b.id, p.id, 0, 1e9), 'It is whole');
+  p.hp = 250;
+  assert.deepEqual(repairOf(p), { planks: 3, nails: 3 }, 'half its health: a quarter of what it cost');
+  assert.equal(bs.canRepair(b.id, p.id, 1e9 - 10_000, 1e9), 'It was struck: in a while');
+  assert.equal(bs.canRepair(b.id, p.id, 1e9 - MEND.after - 1, 1e9), null);
+  bs.repair(b.id, p.id);
+  assert.equal(p.hp, 500);
+  // (and turned about within ten minutes of being laid, not after)
+  const r = p.r;
+  assert.equal(bs.canTurn(b.id, p.id, p.at + 1000), null);
+  bs.turn(b.id, p.id);
+  assert.equal(p.r, (r + 6) % 12);
+  assert.equal(bs.canTurn(b.id, p.id, p.at + MEND.turn + 1), 'It has stood too long to turn');
 });
 
 ok('a door swings one way through where it sweeps, and not through a body there', () => {

@@ -23,7 +23,7 @@ export type Solid = (
  * plate and rivets". A wooden door is painted boards, a metal one a plate of painted steel, a garage door galvanised
  * sheet; an opening's frame is dark timber; the claim's flag is cloth.
  */
-export type Paint = 0 | 1 | 2 | 3 | 'door' | 'steel' | 'galv' | 'trim' | 'flag' | 'bag' | 'iron';
+export type Paint = 0 | 1 | 2 | 3 | 4 | 'door' | 'steel' | 'galv' | 'trim' | 'flag' | 'bag' | 'iron';
 
 export interface Shape {
   /** what stops a body and a bullet, and is drawn */
@@ -195,7 +195,13 @@ const SHAPES: Record<string, () => Shape> = {
     solid: [box(-0.85, 0.82, -0.45, 0.85, 0.94, 0.45), box(-0.8, 0.15, -0.4, 0.8, 0.22, 0.4), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.78 - 0.05, 0, sz * 0.38 - 0.05, sx * 0.78 + 0.05, 0.82, sz * 0.38 + 0.05)))],
     dress: [box(0.45, 0.94, -0.42, 0.7, 1.12, -0.24), box(-0.8, 0.94, 0.38, 0.8, 1.4, 0.44)],
   }),
+  // (the armoured tier's doors, the progression plan: the metal ones' shapes, their leaves in its heavy plate)
+  door_armoured: () => armoured(SHAPES.door_metal()),
+  garage_door_armoured: () => armoured(SHAPES.garage_door()),
 };
+
+/** a shape whose leaves are the armoured tier's plate */
+const armoured = (s: Shape): Shape => ({ ...s, leaves: s.leaves?.map((l) => ({ ...l, paint: 4 as Paint })) });
 
 /** iron (straps, hinges, handles) and the heads of rivets, as the paint is shaded for them */
 const IRON = 0x2e2c2a, RIVET = 0xb4b0a8;

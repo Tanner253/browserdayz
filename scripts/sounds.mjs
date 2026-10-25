@@ -31,7 +31,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (ASSETS_SRC: the sources elsewhere, as for a worktree, which has no assets-src of its own)
-const SOURCES = process.env.ASSETS_SRC ?? SOURCES;
+const SOURCES = process.env.ASSETS_SRC ?? path.join(ROOT, 'assets-src');
 const SRC = path.join(SOURCES, 'sounds');
 const OUT = path.join(ROOT, 'public', 'assets', 'sounds');
 const snake = (p) => path.join(SRC, 'snake', "Snake's Authentic Gun Sounds", p);
@@ -251,6 +251,13 @@ const DOOR = fsnd('125958__ryding__wooden-door-open-close.wav');
 SOUNDS.door_opened = { src: DOOR, len: 1.3, rate: 44100, gain: 0.6, fade: 0.2 };
 SOUNDS.door_shut = { src: DOOR, from: 1.8, len: 0.95, rate: 44100, gain: 0.9, fade: 0.2 };
 SOUNDS.metal_creak = { src: fsnd('119468__ingudios__metal-creak-4.wav'), len: 1.6, rate: 44100, gain: 0.8, fade: 0.3 };
+// Raiding (base building, 2026-10-25; the picks: progress/base-models/sound-picks.md and incoming-map.md, all CC0): a C4's
+// timer (Kenney's "Digital Audio", twoTone1, decoded from Ogg), a satchel's fuse burning (elonen's, looped), and a stone
+// and a metal piece coming down (kastenfrosch's crumble, decoded from Ogg; xkeril's falling debris)
+SOUNDS.c4_beep = { src: dec('c-twoTone1'), len: 0.32, rate: 32000, gain: 0.7, fade: 0.04 };
+SOUNDS.fuse = { src: fsnd('45650__elonen__fuse_burning_48khz.wav'), from: 0.4, len: 6, loop: true, rate: 32000, gain: 0.8 };
+SOUNDS.break_stone = { src: dec('c-521956__kastenfrosch__stone-crumble-2'), len: 3.8, rate: 32000, gain: 2.2, fade: 0.6 };
+SOUNDS.break_metal = { src: fsnd('703247__xkeril__big-falling-debris-crash.wav'), len: 4.5, rate: 32000, gain: 1, fade: 0.7 };
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
 async function readWav(file, side) {
@@ -400,6 +407,12 @@ const ANIMALS = {
   // food poisoning: SpliceSound's, the three fullest of it
   vomit: { src: path.join(SRCS, '338116__splicesound__vomit-puking-spilling-water-onto-grass-splat.wav'), cuts: [[10.3, 1.2], [20.65, 1.6], [4.7, 0.9]], high: 120, top: 11000, gate: -30, level: -14, rise: 0.02, fade: 0.25, rate: 32000 },
 };
+// And base building's, cut the same way (2026-10-25, CC0): a wooden piece splintering (three of craigsmith's poles
+// breaking) and a sledgehammer on a wall (four of jerryberumen's blows, each to its ring)
+Object.assign(ANIMALS, {
+  break_wood: { src: path.join(SRCS, '481936__craigsmith__r29-30-breaking-wooden-poles.wav'), cuts: [[13.48, 1.5], [31.26, 1.3], [28.86, 1.3]], high: 60, top: 12000, gate: -34, level: -10, rise: 0.01, fade: 0.35, rate: 32000 },
+  sledge: { src: path.join(SRCS, '827432__jerryberumen__destrcrsh_-sledgehammer-hitting-drywall-stonewall-variation-construction-debris-hard-continous_gabr_fcs2.wav'), cuts: [[5.62, 0.55], [8.64, 0.5], [9.6, 0.5], [7.68, 0.5]], high: 50, top: 12000, level: -10, rise: 0.005, fade: 0.15, rate: 32000 },
+});
 // (the howls are one take from each of two recordings)
 for (const [name, cfg] of Object.entries(ANIMALS)) {
   if (!Array.isArray(cfg)) continue;

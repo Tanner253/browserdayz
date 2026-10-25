@@ -320,6 +320,11 @@
    "diff": "assets/tex/distressed_painted_planks_diff.webp",
    "nor": "assets/tex/distressed_painted_planks_nor.webp",
    "arm": "assets/tex/distressed_painted_planks_arm.webp"
+  },
+  "metal_plate_02": {
+   "diff": "assets/tex/metal_plate_02_diff.webp",
+   "nor": "assets/tex/metal_plate_02_nor.webp",
+   "arm": "assets/tex/metal_plate_02_arm.webp"
   }
  },
  "models": {

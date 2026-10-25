@@ -48,8 +48,6 @@ export const RAID = {
   reach: { blow: 3.4, plant: 2.8 },
   /** a charge that did not go off goes out of the world this long after (ms), if nobody lights it again */
   dudFor: 5 * 60_000,
-  /** a piece struck is not mended within this long of the blow (ms): Rust's */
-  mendAfter: 30_000,
 };
 
 /** the tier a piece is struck as: a fitting's, a high wall's or a box's own (a metal door is metal in a wooden frame) */

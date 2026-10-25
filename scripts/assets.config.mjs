@@ -37,6 +37,8 @@ export const TEXTURES = {
   white_bricks: { res: '2k', tex: 1024 },
   // the mountain fort's stone (2026-10-13, fetched on the owner's yes): rough stacked blocks, dressed fortress blocks, an aged defence wall
   castle_wall_slates: { res: '2k', tex: 1024 },
+  // (base building's armoured tier, 2026-10-25: dark welded plates of steel, weathered)
+  metal_plate_02: { res: '2k', tex: 1024 },
   medieval_blocks_06: { res: '2k', tex: 1024 },
   defense_wall: { res: '2k', tex: 1024 },
   // the desert's ground (2026-10-13, fetched on the owner's word): dry trampled sand, pale desert gravel, the cracked silt of a dry river bed

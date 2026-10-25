@@ -7,13 +7,13 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../../core/assets';
 import { audio } from '../../core/audio';
-import { physics, SOLID_GROUPS } from '../../core/physics';
+import { physics, SOLID_GROUPS, type Surface } from '../../core/physics';
 import type { Input } from '../../core/input';
 import { PIECES, TIERS, hpOf } from '../../sim/build/pieces';
 import { RAID, blastOn, blowOf, fuseOf, struckAs } from '../../sim/build/raid';
 import type { Bases } from '../../sim/build/bases';
 import type { BaseSolids } from '../../sim/build/solid';
-import type { Base } from '../../sim/build/snap';
+import { toWorld, type Base, type Piece } from '../../sim/build/snap';
 import { HAMMERS, worn } from '../../sim/gather';
 import { ITEMS, type ItemInstance } from '../../sim/items';
 import type { C2S, S2C } from '../../net/protocol';
@@ -38,12 +38,19 @@ export interface RaidHost {
   explode: (at: THREE.Vector3, mine: boolean, w: string) => void;
   /** pieces of a base broken alone, in this game's own copy of it */
   broken: (b: Base, ids: number[]) => void;
+  /** chips and dust off a surface where something struck it (Effects.impact, with no mark left) */
+  impact: (surface: Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
 }
 
 /** the item in the hands that is a charge, by its id: the model it is drawn with */
 const CHARGES: Record<string, string> = { c4: 'c4', satchel: 'satchel_charge' };
 /** how a charge's light and sound go: C4's beep every second, faster in its last three; a satchel's fuse fizzing */
-const LOOK = { beep: { every: 1, fast: 0.25, from: 3, hz: 3100, len: 0.06, heard: 30 }, fuse: { size: 0.035, smoke: 0.35, glow: 0.22, reach: 3 } };
+const LOOK = { beep: { every: 1, fast: 0.25, from: 3, heard: 40 }, fuse: { size: 0.035, smoke: 0.35, glow: 0.22, reach: 3 } };
+/** a piece coming down: how many bursts of chips and dust over it, how far out from its middle, and how many pieces of one
+ * message are heard and seen (a whole base rotting at once is not a hundred crashes) */
+const BREAK = { bursts: 9, spread: 1.3, most: 4, seen: 90 };
+/** what flies off a piece of each tier when it breaks or is struck */
+const SURFACE: Surface[] = ['wood', 'wood', 'concrete', 'metal', 'metal'];
 
 interface Drawn {
   i: number;
@@ -56,6 +63,7 @@ interface Drawn {
   led?: THREE.Mesh;
   beepT: number;
   fire?: ReturnType<ReturnType<TorchHost['flames']>['add']>;
+  hiss?: { stop: () => void };
   /** alone: this game's own charge, who goes off by its own count */
   mine: boolean;
 }
@@ -70,6 +78,11 @@ export class RaidView {
   private next = -1;
   /** the piece last struck, and till when its health is shown */
   private hit: { b: number; p: number; until: number } | null = null;
+  /** when each piece was last struck from here, by `b:p` (it is not mended for a while after: src/sim/build/bases.ts MEND) */
+  private struck = new Map<string, number>();
+  struckAt = (b: number, p: number) => this.struck.get(`${b}:${p}`) ?? 0;
+  /** a piece struck now (a blow, a blast, or the server's word that it lost health) */
+  mark = (b: number, p: number) => void this.struck.set(`${b}:${p}`, Date.now());
   private toldAt = 0;
   private models = new Map<string, Promise<THREE.Object3D>>();
 
@@ -85,6 +98,9 @@ export class RaidView {
     if (!base || !p) return;
     this.hit = { b: base.id, p: p.id, until: performance.now() + 2500 };
     const dmg = blowOf(weapon, p);
+    // (the weight of a sledgehammer or a pickaxe landing on stone or steel, over the hit the swing makes of itself)
+    if (dmg > 0 && struckAs(p) >= 2) audio.sledge(at);
+    if (dmg > 0) this.mark(base.id, p.id);
     if (dmg <= 0) {
       if (performance.now() - this.toldAt > 4000) {
         this.toldAt = performance.now();
@@ -95,7 +111,10 @@ export class RaidView {
     if (this.h.online()) return void this.h.send({ t: 'bhit', b: base.id, p: p.id, u: it.uid, at: [at.x, at.y, at.z] });
     it.cond = worn(it.id, it.cond);
     p.hp -= dmg;
-    if (p.hp <= 0) this.h.broken(base, [p.id]);
+    if (p.hp <= 0) {
+      this.broke(base, [p.id]);
+      this.h.broken(base, [p.id]);
+    }
     this.h.changed();
   }
 
@@ -218,6 +237,32 @@ export class RaidView {
     this.charges.delete(d.i);
     if (d.obj) this.h.scene.remove(d.obj);
     if (d.fire) this.h.flames().remove(d.fire);
+    d.hiss?.stop();
+  }
+
+  /** where a piece's middle is in the world, near enough: a floor's just under its top, anything else's half way up */
+  private middle(base: Base, p: Piece) {
+    const K = PIECES[p.k], up = K.role === 'floor' ? -0.1 : (K.h ?? (K.role === 'deploy' ? 0.6 : 1.2)) / 2;
+    return new THREE.Vector3(...toWorld(base, p.x, p.y + up, p.z));
+  }
+
+  /** pieces about to go (broken by a raid, rotted, or taken down): each heard coming down, and its chips and dust thrown */
+  broke(base: Base, ids: number[]) {
+    const me = this.h.me();
+    let n = 0;
+    for (const id of ids) {
+      const p = base.pieces.get(id);
+      if (!p || n >= BREAK.most) continue;
+      const at = this.middle(base, p);
+      if (at.distanceTo(me) > BREAK.seen) continue;
+      n++;
+      const tier = struckAs(p);
+      audio.breakPiece(tier, at);
+      for (let k = 0; k < BREAK.bursts; k++) {
+        const off = new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 2).multiplyScalar(BREAK.spread);
+        this.h.impact(SURFACE[tier] ?? 'wood', at.clone().add(off), off.clone().normalize());
+      }
+    }
   }
 
   update(dt: number) {
@@ -227,6 +272,8 @@ export class RaidView {
           this.h.flames().remove(d.fire);
           d.fire = undefined;
         }
+        d.hiss?.stop();
+        d.hiss = undefined;
         if (d.led) d.led.visible = false;
         continue;
       }
@@ -237,13 +284,14 @@ export class RaidView {
         d.beepT -= dt;
         if (d.beepT <= 0) {
           d.beepT = every;
-          if (far < LOOK.beep.heard) audio.click(LOOK.beep.hz, LOOK.beep.len, 0.03 * (1 - far / LOOK.beep.heard));
+          if (far < LOOK.beep.heard) audio.beep(d.at);
         }
         if (d.led) d.led.visible = d.beepT > every * 0.6;
       } else {
         // (the satchel's fuse, burning where it comes out of the bag's top)
         const tip = _o.copy(d.at).addScaledVector(d.n, 0.1).add(_y.set(0, 0.12, 0));
         d.fire ??= this.h.flames().add(tip.clone(), { size: LOOK.fuse.size, smoke: LOOK.fuse.smoke });
+        d.hiss ??= audio.fuse(d.at);
         this.h.glow(tip, new THREE.Color(1, 0.62, 0.3), LOOK.fuse.glow * (0.8 + Math.random() * 0.4), LOOK.fuse.reach);
       }
       // (alone, this game's own charge goes off by its own count; online the server says when)
@@ -260,13 +308,17 @@ export class RaidView {
     this.drop(d);
     const by = new Map<Base, number[]>();
     for (const { base, p, hp } of blastOn(this.solids, [d.at.x, d.at.y, d.at.z], d.w)) {
+      this.mark(base.id, p.id);
       if (hp > 0) p.hp = hp;
       else {
         if (!by.has(base)) by.set(base, []);
         by.get(base)!.push(p.id);
       }
     }
-    for (const [base, ids] of by) this.h.broken(base, ids);
+    for (const [base, ids] of by) {
+      this.broke(base, ids);
+      this.h.broken(base, ids);
+    }
     this.h.explode(d.at.clone(), true, d.w);
   }
 

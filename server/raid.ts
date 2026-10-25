@@ -21,7 +21,7 @@ type V3 = [number, number, number];
 const SWUNG: Record<string, number> = Object.fromEntries(Object.values(ITEMS).filter((d) => d.melee).map((d) => [d.id, 1]));
 /** when each player's last blow at a base landed (a blow comes no faster than its tool swings) */
 const lastBlow = new WeakMap<Client, number>();
-/** when each piece was last struck, by `b:p` (a piece is not mended within RAID.mendAfter of a blow: Rust's) */
+/** when each piece was last struck, by `b:p` (a piece is not mended within MEND.after of a blow: Rust's, src/sim/build/bases.ts) */
 const struck = new Map<string, number>();
 export const struckAt = (b: number, p: number) => struck.get(`${b}:${p}`) ?? 0;
 

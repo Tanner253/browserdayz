@@ -2,7 +2,7 @@
 // (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. The rules
 // of where a piece goes are src/sim/build/snap.ts; what it is and costs, src/sim/build/pieces.ts.
 
-import { BENCH_NEAR, FOUND, PIECES, PIECE_IDS, costOf, hpOf, laidAt, type Tier } from './pieces';
+import { BENCH_NEAR, FOUND, PIECES, PIECE_IDS, TIER_BENCH, benchLevel, costOf, hpOf, laidAt, topOf, type Tier } from './pieces';
 import { blocked, cornersOf, deployTurn, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
 import { ROT } from './upkeep';
 import { heardLock, saidLock, type KeptLock } from './locks';
@@ -16,6 +16,27 @@ export const LIMITS = {
   /** claims a player may hold (the owner's yes: "One claim a player") */
   claims: 1,
 };
+
+/** a workbench's level, as it is said */
+const ROMAN = ['', 'I', 'II', 'III'];
+
+/**
+ * Mending and turning with the hammer (polish pass 1: "Repair costs a share of the tier cost; not within 30 s of damage
+ * (Rust)"; the progression plan: "Repairs cost a share of the piece's cost, nails included"). A piece is mended whole for
+ * `share` of what it cost, by the health it has lost; one struck within `after` ms is not; a piece is turned about only
+ * within `turn` ms of being laid, as Rust's.
+ */
+export const MEND = { share: 0.5, after: 30_000, turn: 10 * 60_000 };
+
+/** what mending a piece whole takes: `MEND.share` of what it cost (a workbench, its first level's), by the health it lost */
+export function repairOf(p: Piece): Record<string, number> {
+  const lost = Math.max(0, 1 - p.hp / hpOf(p.k, p.t)), out: Record<string, number> = {};
+  for (const [id, n] of Object.entries(costOf(p.k, PIECES[p.k].levels ? laidAt(p.k) : p.t))) {
+    const k = Math.ceil(n * lost * MEND.share - 1e-9);
+    if (k > 0) out[id] = k;
+  }
+  return out;
+}
 
 /** what a world says of the ground to a base (the server's world and the game's are the same, from one seed) */
 export interface Land {
@@ -116,7 +137,7 @@ export class Bases {
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
     if (theirs && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";
-    if (K.bench && !this.benchNear(wx, wz)) return `It needs a workbench within ${BENCH_NEAR} m`;
+    if (K.bench && !this.benchNear(wx, wz, K.bench)) return `It needs a ${K.bench > 1 ? `level ${ROMAN[K.bench]} ` : ''}workbench within ${BENCH_NEAR} m`;
     if (K.sleep && !base.claim?.members.some((m) => m.pid === by)) return 'A bed goes only in a base whose claim you are on';
     if (ask.k === 'claim') {
       if (base.claim) return 'This base has its claim already';
@@ -143,11 +164,11 @@ export class Bases {
     return null;
   }
 
-  /** whether a workbench stands near a place (what a metal fitting is made at) */
-  benchNear(x: number, z: number) {
+  /** whether a workbench of level `level` or better stands near a place (what a metal fitting is made at) */
+  benchNear(x: number, z: number, level = 1) {
     for (const b of this.bases.values()) {
       for (const p of b.pieces.values()) {
-        if (p.k !== 'workbench') continue;
+        if (benchLevel(p) < level) continue;
         const [px, , pz] = toWorld(b, p.x, p.y, p.z);
         if (Math.hypot(px - x, pz - z) < BENCH_NEAR) return true;
       }
@@ -192,10 +213,19 @@ export class Bases {
 
   /** why a piece may not be brought up to tier `t` (null: it may) */
   canUpgrade(b: number, id: number, t: Tier): string | null {
-    const p = this.bases.get(b)?.pieces.get(id);
-    if (!p) return 'It is gone';
-    if (PIECES[p.k].only !== undefined) return 'It comes as it is: it is not built up';
-    if (t <= p.t) return `It is ${['a frame', 'wood', 'stone', 'metal'][p.t]} already`;
+    const base = this.bases.get(b), p = base?.pieces.get(id);
+    if (!base || !p) return 'It is gone';
+    const K = PIECES[p.k];
+    if (K.only !== undefined && !K.levels) return 'It comes as it is: it is not built up';
+    if (t <= p.t) return K.levels ? `It is level ${ROMAN[p.t]} already` : `It is ${['a frame', 'wood', 'stone', 'metal', 'armoured'][p.t]} already`;
+    if (t > topOf(p.k)) return 'It goes no higher';
+    if (K.levels && t !== p.t + 1) return 'A level at a time';
+    // (metal is nailed up near a workbench II, armoured near a III: the progression plan)
+    const need = K.levels ? 0 : TIER_BENCH[t];
+    if (need) {
+      const [x, , z] = toWorld(base, p.x, p.y, p.z);
+      if (!this.benchNear(x, z, need)) return `It needs a level ${ROMAN[need]} workbench within ${BENCH_NEAR} m`;
+    }
     return null;
   }
 
@@ -205,6 +235,42 @@ export class Bases {
     if (!p || this.canUpgrade(b, id, t)) return null;
     p.t = t;
     p.hp = hpOf(p.k, t);
+    return p;
+  }
+
+  /** why a piece may not be mended now (null: it may), when it was last struck (ms) */
+  canRepair(b: number, id: number, struck: number, now: number): string | null {
+    const p = this.bases.get(b)?.pieces.get(id);
+    if (!p) return 'It is gone';
+    if (p.hp >= hpOf(p.k, p.t) - 0.5) return 'It is whole';
+    // (Rust's: not under attack. A piece struck in the last half minute is not mended)
+    if (now - struck < MEND.after) return 'It was struck: in a while';
+    return null;
+  }
+
+  /** mended whole */
+  repair(b: number, id: number): Piece | null {
+    const p = this.bases.get(b)?.pieces.get(id);
+    if (!p) return null;
+    p.hp = hpOf(p.k, p.t);
+    return p;
+  }
+
+  /** why a piece may not be turned about (null: it may): a wall, a fitting, stairs or what is set down, within MEND.turn of its laying */
+  canTurn(b: number, id: number, now: number): string | null {
+    const p = this.bases.get(b)?.pieces.get(id);
+    if (!p) return 'It is gone';
+    const role = PIECES[p.k].role;
+    if (role !== 'wall' && role !== 'fit' && role !== 'stairs' && role !== 'deploy') return 'It goes only the one way';
+    if (now - p.at > MEND.turn) return 'It has stood too long to turn';
+    return null;
+  }
+
+  /** turned about: a wall, a fitting or stairs half round (its hard side the other way), what is set down a quarter */
+  turn(b: number, id: number): Piece | null {
+    const p = this.bases.get(b)?.pieces.get(id);
+    if (!p) return null;
+    p.r = (p.r + (PIECES[p.k].role === 'deploy' ? 3 : 6)) % 12;
     return p;
   }
 
@@ -234,7 +300,9 @@ export class Bases {
       for (const [k, n] of Object.entries(c)) out[k] = (out[k] ?? 0) + n;
     };
     add(costOf(p.k, laidAt(p.k)));
-    if (p.t !== laidAt(p.k)) add(costOf(p.k, p.t));
+    // (a workbench, every level it was brought up through)
+    if (PIECES[p.k].levels) for (let l = laidAt(p.k) + 1; l <= p.t; l++) add(costOf(p.k, l as Tier));
+    else if (p.t !== laidAt(p.k)) add(costOf(p.k, p.t));
     // (a box or a bench is picked up whole, Rust's way: only what is built is half lost)
     if (PIECES[p.k].role === 'deploy' && p.k !== 'claim') return out;
     for (const k of Object.keys(out)) out[k] = Math.floor(out[k] / 2);

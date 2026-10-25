@@ -51,7 +51,7 @@ import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
 import { craft, enqueue, unqueue } from './craft';
 import { salvage } from './salvage';
-import { hammer, lay, owing, print, sightFor, takeDown } from './build';
+import { hammer, lay, mend, owing, print, sightFor, takeDown } from './build';
 import { blow, plant, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
@@ -386,6 +386,8 @@ export function handle(c: Client, m: C2S) {
       return hammer(c, m);
     case 'bdel':
       return takeDown(c, m);
+    case 'bfix':
+      return mend(c, m);
     case 'bprint':
       return print(c, m);
     case 'bhit':

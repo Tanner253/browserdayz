@@ -73,7 +73,8 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
 // who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; scrap salvaged, 'salvage');
-// raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz').)
+// raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
+// a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels.)
 export const PROTOCOL = 66;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -354,6 +355,8 @@ export type C2S =
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
   | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
   | { t: 'bdel'; b: number; p: number; u: string }
+  /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
+  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean }
   /** joining a base's claim, or leaving it (stood at it) */
   | { t: 'bjoin'; b: number }
   /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */

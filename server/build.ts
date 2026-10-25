@@ -6,7 +6,8 @@
 // they go far off (the owner: "imagine 100's of bases on the map, how will we handle this without pickup a performance
 // cost"). Kept in the one save (server/keep.ts), with no write of its own.
 
-import { Bases, LIMITS, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
+import { Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
+import { struckAt } from './raid';
 import { PIECES, TIER_S, costOf, type Tier } from '../src/sim/build/pieces';
 import { toWorld } from '../src/sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
@@ -248,7 +249,7 @@ function atPiece(c: Client, b: number, p: number, u: unknown): { it: ItemInstanc
 }
 
 export function hammer(c: Client, m: Extract<C2S, { t: 'bup' }>) {
-  if (!Number.isInteger(m.b) || !Number.isInteger(m.p) || ![1, 2, 3].includes(m.to)) return;
+  if (!Number.isInteger(m.b) || !Number.isInteger(m.p) || ![1, 2, 3, 4].includes(m.to)) return;
   const at = atPiece(c, m.b, m.p, m.u);
   if (!at) return;
   const d = of(c), all = bases(), to = m.to as Tier;
@@ -287,6 +288,26 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   tellBase(m.b, { t: 'bout', b: m.b, ids: gone });
   const items = Object.entries(back).map(([id, n]) => makeItem(id, n));
   if (items.length) send(c, { t: 'kit', name: 'Taken down', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
+}
+
+/** the hammer at a piece: mended whole for a share of what it cost (not within half a minute of a blow), or turned about */
+export function mend(c: Client, m: Extract<C2S, { t: 'bfix' }>) {
+  if (!Number.isInteger(m.b) || !Number.isInteger(m.p)) return;
+  const at = atPiece(c, m.b, m.p, m.u);
+  if (!at) return;
+  const all = bases(), now = Date.now();
+  const why = at.why ?? (m.turn ? all.canTurn(m.b, m.p, now) : all.canRepair(m.b, m.p, struckAt(m.b, m.p), now));
+  if (why) return void send(c, { t: 'tell', kind: 'warn', text: why });
+  const piece = all.bases.get(m.b)!.pieces.get(m.p)!;
+  if (m.turn) all.turn(m.b, m.p);
+  else {
+    const cost = repairOf(piece), no = short(c.inv, cost);
+    if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
+    pay(c, cost);
+    all.repair(m.b, m.p);
+  }
+  use(c, at.it);
+  tellBase(m.b, { t: 'bpc', b: m.b, p: saidPiece(piece) });
 }
 
 // ---- kept
