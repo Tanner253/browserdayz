@@ -21,8 +21,8 @@ function lib() {
   }
   return hands;
 }
-/** fetched now, so that the first blow is already on them */
-export const warmHands = () => void lib();
+// (fetched a while after the game starts, off the way in, so that the first blow is already on them)
+if (typeof window !== 'undefined') setTimeout(() => void lib(), 10000);
 
 const _q = new THREE.Quaternion();
 /** where along a track `u` (0..1 of it) falls: the frame before, and how far on to the next */

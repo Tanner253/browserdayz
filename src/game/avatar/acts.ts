@@ -16,7 +16,7 @@ export const actsMethods = {
   swing(this: Avatar, overhand = false, seconds = 0.62) {
     // (a survivor throws on the motion capture: from the arm drawn back, so the hand comes through as it lets go, a
     // sixth of a second on, which is when the game throws it)
-    if (overhand && this.deeds && !this.held) return this.perform('throw', { from: 0.08, to: 0.5, dur: 0.85 });
+    if (overhand && this.deeds && !this.held) return this.perform('throw', { from: 0.12, to: 0.5, dur: 0.8 });
     if (this.inHand && !overhand) {
       // something in the fist to strike with: the blow the library draws
       this.strikeT = 0;
