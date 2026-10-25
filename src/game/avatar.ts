@@ -479,6 +479,8 @@ export class Avatar {
   hangT = 0;
   /** the player's own body: its stride clock is the old clips' (see update.ts) */
   ownClock = false;
+  /** how much further behind the eye the first-person body is set, for the chest leant ahead of the hips (eased) */
+  fpLean = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are

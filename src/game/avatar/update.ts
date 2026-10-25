@@ -14,6 +14,9 @@ import { CLAW, CLAW_HIT, CUT, FP_BACK, HANG, HOLD_GONE, RAISE, SHOULDER, SICK_GA
 const _way = new THREE.Vector3();
 
 const _hangNow = new THREE.Vector3(), _hangAt = new THREE.Vector3(), _hangWant = new THREE.Vector3();
+const _fpN = new THREE.Vector3(), _fpP = new THREE.Vector3(), _fpF = new THREE.Vector3();
+/** how far a body standing at ease carries its neck ahead of its hips, metres (the first-person body steps back for more) */
+const FP_UPRIGHT = 0.06;
 
 export const updateMethods = {
   /**
@@ -756,8 +759,21 @@ export const updateMethods = {
         to.quaternion.copy(from.quaternion);
         if (hidden) to.scale.setScalar(0.0001);
         else to.scale.copy(from.scale);
+        // (the head shrunk into the neck's joint, not its own: the survivors' bodies are one skin, head and all, and
+        // a head shrunk where it stands left the skin of the neck pulled out to it in spikes, which a chest leant
+        // into a run brought under the eye: the owner, 2026-10-25, "when im moving forward and look down my body
+        // seems to get bugged")
+        if (hidden && to.name === 'Head') to.position.set(0, 0, 0);
       }
-      this.fpRoot.position.set(pos.x + Math.sin(this.yaw) * FP_BACK, pos.y, pos.z + Math.cos(this.yaw) * FP_BACK);
+      // (and the whole of it as far again behind the eye as the chest leans ahead of the hips, over what it does
+      // standing: a body leant into a run or a crouch had its neck under the eye)
+      const pel = this.joints.pelvis, nk = this.joints.neck;
+      if (pel && nk && !dead) {
+        const ahead = nk.getWorldPosition(_fpN).sub(pel.getWorldPosition(_fpP)).dot(_fpF.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)));
+        this.fpLean += (THREE.MathUtils.clamp(ahead - FP_UPRIGHT, 0, 0.45) - this.fpLean) * ease(12);
+      } else this.fpLean = 0;
+      const back = FP_BACK + this.fpLean;
+      this.fpRoot.position.set(pos.x + Math.sin(this.yaw) * back, pos.y, pos.z + Math.cos(this.yaw) * back);
       this.fpRoot.rotation.set(0, this.yaw + this.twist, 0);
       // Lying down, the body that is seen from its own eyes lies where the body lies: behind them, on the ground
       // and tipped to it. (It was left where a standing body is, a step behind the eyes and upright in its
