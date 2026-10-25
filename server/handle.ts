@@ -36,9 +36,9 @@ import { roleRows } from './roles';
 const LYING_REACH = 4;
 import { broadcast, broadcastNear, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { shotHeard } from '../src/sim/heard';
-import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, releaseLock, seatOf } from './acts';
+import { findCarried, hurtJeep, infectedBody, kill, leaveSeat, pidOf, releaseLock, seatOf } from './acts';
 import { cameTo, holdsTag, keepToTheirs, payingTags, wentFrom } from './custody';
-import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, refusedNow, shutIt } from './searched';
+import { boxItems, boxOps, boxSet, goneFrom, hasOpen, laidIn, lyingOps, lyingSet, mayPeek, openIt, reclaimBody, refusedNow, shutIt } from './searched';
 import { scores } from './queue';
 import { partyAct, partyCommand } from './party';
 import { sendDrop } from './drops';
@@ -579,7 +579,15 @@ export function handle(c: Client, m: C2S) {
       if (!hasOpen(c, m.cid)) openIt(c, m.cid);
       c.openCid = m.cid;
       touched(b);
-      send(c, { t: 'cdata', cid: m.cid, items: boxItems(b) });
+      // (their own body: its gear theirs to take back at one press, 'reclaim')
+      send(c, { t: 'cdata', cid: m.cid, items: boxItems(b), ...(b.pid && b.pid === pidOf(c.key) ? { own: true as const } : {}) });
+      return;
+    }
+    case 'reclaim': {
+      const b = typeof m.cid === 'string' ? boxes.get(m.cid) : undefined;
+      if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
+      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
+      reclaimBody(c, b);
       return;
     }
     case 'cpeek': {

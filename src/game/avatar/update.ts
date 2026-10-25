@@ -69,9 +69,8 @@ export const updateMethods = {
     const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0)) && !dead && !armed && !using;
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
-    // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
-    // (a survivor on motion capture steps sideways and back facing the aim: only flat out does the body turn to the way it runs)
-    const free = !firstPerson && !armed && !fists && (!this.gait || speedNow > 5.2);
+    // face the movement direction when going unarmed, else the look direction (a punch goes where the eyes do)
+    const free = !firstPerson && !armed && !fists;
     const velYaw = Math.atan2(-velocity.x, -velocity.z);
     const targetYaw = free && speedNow > 0.6 ? velYaw : facingYaw;
     if (this.placed) this.yaw += wrap(targetYaw - this.yaw) * ease(firstPerson ? 40 : armed ? 18 : 10);
@@ -137,7 +136,7 @@ export const updateMethods = {
     const push = this.jumpT >= 0 ? 1 - THREE.MathUtils.smoothstep(this.jumpT, POSE.jump[1] * 0.4, POSE.jump[1]) : 0;
     const move = this.moveT;
     const runK = this.sick ? THREE.MathUtils.smoothstep(speed, SICK_GAIT.from, SICK_GAIT.to) : THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
-    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / SICK_GAIT.pace, SICK_GAIT.give[0], SICK_GAIT.give[1]);
+    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / (this.zombieMoves?.paces.run ?? 1), SICK_GAIT.give[0], SICK_GAIT.give[1]);
     let hit = 0;
     const hitLen = this.dur[this.hitClip];
     if (this.hitT >= 0) {
@@ -197,7 +196,7 @@ export const updateMethods = {
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
     const rate: Record<Stride, number> = {
-      walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / POSE.pace.walk, 0.6, 2.1),
+      walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / (this.zombieMoves?.paces.walk ?? POSE.pace.walk), 0.6, 2.1),
       run: THREE.MathUtils.clamp(speed / POSE.pace.run, 1, 1.2),
       // (to 4.8: the hurried crouch is 3.3 m/s, and at 2.8 the legs crept at 1.9 under a body going nearly twice that)
       crouchWalk: THREE.MathUtils.clamp(speed / POSE.pace.crouchWalk, 0.6, 4.8),
@@ -315,6 +314,12 @@ export const updateMethods = {
       const u = this.sick.claw / CLAW;
       this.layer('strike', strikeAt(u, CLAW_HIT), strikeShare(u), 1);
     }
+    // (and what else one of them is doing: see Avatar.zombieAct)
+    const act = this.zombieAct;
+    if (act && !dead && act.k > 0.002) {
+      this.layer(act.a, act.t, act.k, act.legs);
+      act.a.setEffectiveWeight(0);
+    }
     // --- on the motion capture: what is kept up (a ladder, the water, a bedroll), the whole body; and what is done once
     // over it, the legs too while standing (a pick-up, a swing, a throw), the arms alone for a drink
     if (deeds) {
@@ -368,7 +373,7 @@ export const updateMethods = {
     // (the steps stretched to the pace the body goes at: see Gait's warp. Not past 60 m: a foot that slides is not seen there)
     if (gait && gait.share > 0.02 && Math.abs(gait.warp - 1) > 0.03 && !dead && pr < 0.01 && speedNow > 0.3 && this.joints.pelvis && pos.distanceToSquared(Avatar.eye) < 3600) {
       settle(this.root);
-      stretch(this.legs, this.joints.pelvis, _way.set(velocity.x, 0, velocity.z).normalize(), 1 + (gait.warp - 1) * Math.min(1, gait.share) * (1 - this.airT));
+      stretch(this.legs, _way.set(velocity.x, 0, velocity.z).normalize(), 1 + (gait.warp - 1) * Math.min(1, gait.share) * (1 - this.airT));
     }
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
@@ -502,7 +507,11 @@ export const updateMethods = {
           // already are, and not at all lying down (it would be in the ground).
           const butt = held.butt, chest = butt && this.gearRest.get('spine_03');
           const level = (1 - pr) * THREE.MathUtils.clamp(1 + Math.min(0, pitch) / 0.8, 0, 1);
-          const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] } : set.ready;
+          // (a pistol, lying, out ahead and level a hand under the aim: at the ready as it is stood with, low and dipped,
+          // it was pointed into the ground under the chest)
+          const p = set.ready.p, a = set.aim.p, lie = held.long ? 0 : pr;
+          const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] }
+            : lie > 0.001 ? { p: [p[0] + (a[0] - p[0]) * lie, p[1] + (a[1] - 0.06 - p[1]) * lie, p[2] + (a[2] - p[2]) * lie], r: [set.ready.r[0] * (1 - lie), set.ready.r[1] * (1 - lie), set.ready.r[2]] } : set.ready;
           if (butt && chest) {
             this.heldPivot.updateWorldMatrix(false, false);
             chest.bone.updateWorldMatrix(true, false);

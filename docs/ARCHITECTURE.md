@@ -37,7 +37,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `acts.ts` | 536 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
+| `acts.ts` | 541 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
 | `admin-bodies.ts` | 75 | Bodies cleared away by an admin, with whatever is on them: one (the one looked at, by its number, or the nearest), or every one within so many metres, as /delz puts down the infected (the owner, 2026-10-23: |
 | `admin.ts` | 977 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `aimwatch.ts` | 70 | The server: the bot check's own judging of an aim, run on every shot that hits a player in the world (2026-10-18, the owner, of bots that had passed the course and were punching players: |
@@ -61,9 +61,9 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `forge.ts` | 52 | The server: forges (2026-10-25, plan-crafting; the rules are src/sim/craft/forge.ts). |
 | `gate.ts` | 746 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 142 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 1065 | The server: handle, every message a player sends, checked and acted on. |
-| `index.ts` | 1362 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
-| `keep.ts` | 790 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
+| `handle.ts` | 1073 | The server: handle, every message a player sends, checked and acted on. |
+| `index.ts` | 1364 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
+| `keep.ts` | 789 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `learn.ts` | 89 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
 | `locks.ts` | 140 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
 | `party.ts` | 145 | Parties (2026-10-19), the lite first one: the owner, "players want to be able to team up with eachother, can we do a simple party system, with a very LITE indicator on friendlies ... |
@@ -76,7 +76,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `recycle.ts` | 61 | The server: recyclers (progression v3; the rules are src/sim/craft/recyclers.ts). |
 | `roles.ts` | 72 | The server: the roles as the panel's Roles shows them, and whether an admin leaves a dog tag, set by an admin above them. |
 | `salvage.ts` | 45 | The server: salvage (2026-10-25, plan-crafting; the rules are src/sim/craft/salvage.ts). |
-| `searched.ts` | 190 | Crates, bodies, stashes, drops, furniture and bags lying about, gone through by several at once (2026-10-23, the owner's list: the "Opening…" wait and "Someone else is searching that"; "We should not have cut any... |
+| `searched.ts` | 217 | Crates, bodies, stashes, drops, furniture and bags lying about, gone through by several at once (2026-10-23, the owner's list: the "Opening…" wait and "Someone else is searching that"; "We should not have cut any... |
 | `seen.ts` | 40 | Who has played lately, for the door's "N played today" (the owner, offered a true number in place of fake players to fill the count: |
 | `solid.ts` | 134 | A base's pieces as solid as the game has them, where the server judges (2026-10-24). |
 | `stash-guard.ts` | 49 | The players' stashes against what this release changed on the map (2026-10-23, the owner: |
@@ -95,7 +95,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `assets.ts` | 918 |  |
-| `audio.ts` | 2742 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
+| `audio.ts` | 2762 | Procedural audio. Every sound is synthesised from noise + oscillators at runtime: no licensed sample packs, tiny download, and endless variation per shot/step. Positional sounds use HRTF panners; gunshots get an... |
 | `bones.ts` | 137 |  |
 | `breathe.ts` | 114 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `card-keep.ts` | 260 | Pictures taken off the graphics card that nothing in the world uses any more (2026-10-20, the owner: the card's memory at "7.4 of 8 GB — how do we reduce this?"). |
@@ -133,10 +133,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `overlap.ts` | 131 | Where two faces lie in one plane, facing the same way, over the same ground: the two are drawn turn and turn about and the wall flickers there ("z-fighting"). |
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
+| `sandbox-body.ts` | 165 | The game's own bodies on the sandbox floor (src/dev/sandbox.ts `&bodies=`): each one stood, crouched or lying, holding what it is told and going the way it is told, posed by the game's own Avatar (the motion... |
 | `sandbox-build.ts` | 623 | The sandbox's base-building scenes (2026-10-24): each step of base building looked at on the plain floor before the world (the owner: |
-| `sandbox-inventory.ts` | 241 | The sandbox's screens (2026-10-24, the owner: |
+| `sandbox-infected.ts` | 117 | The infected in the sandbox as the game draws them (src/dev/sandbox.ts, &infected=): made by the game's own Avatar, with their kind's movements and the look their number gives them, and stepped by the game's own pose... |
+| `sandbox-inventory.ts` | 242 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
-| `sandbox.ts` | 322 | The sandbox (the stage until 2026-10-24, the owner: |
+| `sandbox.ts` | 352 | The sandbox (the stage until 2026-10-24, the owner: |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
 | `stance.ts` | 553 | Development-only measure of how a gun is held by a body seen from outside (window.ST), beside the harness that drives the game (window.T). |
 | `sweep.ts` | 313 | Development-only numbers for every animation (window.S), beside the harness that drives the game (window.T) and the tools that photograph it (window.D). |
@@ -150,7 +152,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
 | `animals.ts` | 584 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 513 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 657 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 664 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 
 ## src/game/avatar/
 
@@ -159,15 +161,15 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `acts.ts` | 233 | What the body is told to do: blows, flinches, deaths, gestures, emotes and the wheel's calls, lying, sitting, leaning; and a clip laid over the rest. |
 | `deeds.ts` | 79 | What a survivor's body does besides stepping, on the same motion capture as its steps (src/game/avatar/gait.ts): how it goes down and how it takes a shot (in the body's own blend, in place of the old clips), and the... |
 | `dress.ts` | 153 | What the body wears and carries: slung guns, worn gear, the dog tag, and what is on the face that a stock goes round. |
-| `gait.ts` | 268 | The body's steps, on motion capture (the owner, 2026-10-25: |
+| `gait.ts` | 286 | The body's steps, on motion capture (the owner, 2026-10-25: |
 | `gear.ts` | 203 | What is worn, and where it sits on the body: hats, masks and vests on their bones, and what a mask hides of the head under it. |
-| `gestures.ts` | 147 | The arms at the things they do of their own: fists up on guard and a punch thrown from it, the hands at work on something that is not a weapon (food, a drink, a dressing), and the wheel's calls (a wave, a point,... |
+| `gestures.ts` | 153 | The arms at the things they do of their own: fists up on guard and a punch thrown from it, the hands at work on something that is not a weapon (food, a drink, a dressing), and the wheel's calls (a wave, a point,... |
 | `hands.ts` | 240 | The hands: what is held (taken up, put away), the two-bone arms reaching for grips, fingers curled and thumbs laid. |
-| `make.ts` | 415 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
+| `make.ts` | 418 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
 | `pose.ts` | 232 | The body's clips and the numbers they are played by: which clips there are, lying, sitting, the live-tunable POSE table and the stances a gun is held in. |
-| `sick.ts` | 124 | The infected's own way of going: feet kept on the ground, the sick gait. |
-| `update.ts` | 747 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
-| `wounds.ts` | 67 | Wounds on the body, and the infected's shared paints while they are unhurt. |
+| `sick.ts` | 120 | The infected's own way of going: feet kept on the ground, the sick gait. |
+| `update.ts` | 756 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
+| `wounds.ts` | 74 | Wounds on the body, and the infected's shared paints while they are unhurt. |
 
 ## src/game/
 
@@ -196,10 +198,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `draw.ts` | 368 | The bases as they are drawn and stood on (2026-10-24). |
 | `flags.ts` | 132 | Each claim's pole and its flag. |
 | `icons.ts` | 102 | The wheel's pictures (2026-10-24, the owner: |
-| `index.ts` | 912 | Base building as the game has it (2026-10-24, the second step; the rules are src/sim/build/, the server's side server/build.ts). |
+| `index.ts` | 922 | Base building as the game has it (2026-10-24, the second step; the rules are src/sim/build/, the server's side server/build.ts). |
 | `ladders.ts` | 103 | Ladders in the game (2026-10-24, base building's fourth step): a ladder leant on a wall, and the ladder under a hatch. |
 | `locks.ts` | 261 | Locks in the game (2026-10-24, base building's fourth step; the rules src/sim/build/locks.ts, the server's side server/locks.ts). |
-| `look.ts` | 272 | How a piece of a base looks (2026-10-24): its solids (src/sim/build/solids.ts) made into one shape for each kind and tier, and one paint for each tier, from Poly Haven's pictures (the owner's yes, plan v2: |
+| `look.ts` | 322 | How a piece of a base looks (2026-10-24): its solids (src/sim/build/solids.ts) made into one shape for each kind and tier, and one paint for each tier, from Poly Haven's pictures (the owner's yes, plan v2: |
 | `models.ts` | 386 | Base pieces drawn from models (2026-10-25: the navigator's queue, "Every Higgsfield model in: items, doors, furniture, palisade, gates"), in place of the boxes their solids are drawn as (src/sim/build/solids.ts). |
 | `prints.ts` | 152 | Blueprints in the game (2026-10-24, base building's fourth step; the rules src/sim/build/blueprints.ts). |
 | `raid.ts` | 344 | Raiding in the game (src/sim/build/raid.ts the rules, server/raid.ts the server's side). |
@@ -224,21 +226,22 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `finish.ts` | 152 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 2063 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 2073 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
 | file | lines | what it is |
 |---|---:|---|
-| `drops.ts` | 603 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
+| `drops.ts` | 604 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 793 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 783 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 784 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 505 | The game: attachments and magazines. |
-| `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
+| `hands.ts` | 757 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
-| `interact.ts` | 422 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
+| `interact.ts` | 431 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 760 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 1056 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 1062 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `reclaim.ts` | 40 | The game: a survivor's gear taken back off their own body at one press (the owner, 2026-10-25: |
 
 ## src/game/
 
@@ -246,7 +249,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `garage.ts` | 1124 | Every jeep in this game, and the one the player is sitting in: getting in and out, the view from behind it, who it runs over, what it sounds like, how it burns, and keeping the server (and through it everybody else)... |
 | `gas.ts` | 341 | The gas as the game has it. |
-| `gathering.ts` | 210 | Gathering as the game has it (2026-10-24, base building's first step; the rules are src/sim/gather.ts, the server's side server/gather.ts). |
+| `gathering.ts` | 229 | Gathering as the game has it (2026-10-24, base building's first step; the rules are src/sim/gather.ts, the server's side server/gather.ts). |
 | `grenades.ts` | 130 | Thrown grenades. A grenade is a point flying under gravity that bounces off the world and goes off when its fuse runs out. Everyone is told where it left the hand and how fast (see the 'nade' message), and every game... |
 | `hands-on.ts` | 285 | Our own arms on a pack drawn round another maker's arms (2026-10-17). |
 | `held-mocap.ts` | 68 | First person on the motion capture (the owner, 2026-10-25: |
@@ -254,14 +257,17 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
 | `in-fist.ts` | 81 | A thing that is neither gun nor club, in a body's right fist (2026-10-24, moved here out of src/game/doll.ts, where the inventory's figure holds a bandage, a tin, a flask or a magazine so): the way a thing to hit... |
-| `infected.ts` | 1251 | The infected, as this game draws and (for the ones near its own player) moves them. |
+| `infected-kinds.ts` | 115 | The twelve kinds of the infected, and which one each is (the owner, 2026-10-25: |
+| `infected-look.ts` | 172 | Each of the infected dressed as no other of its kind is (2026-10-25, from the owner's AAA bar: |
+| `infected-moves.ts` | 78 | How the infected move: motion capture from Higgsfield's library (the owner, 2026-10-25: |
+| `infected.ts` | 1388 | The infected, as this game draws and (for the ones near its own player) moves them. |
 | `key-hints.ts` | 163 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
-| `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
-| `loot.ts` | 1174 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
+| `look.ts` | 262 | What a survivor looks like: jacket and trouser colours, skin, hair. |
+| `loot.ts` | 1176 | World items: the Central Economy decides *what* exists where; this module gives each entry a mesh + an interaction trigger, rests it properly on whatever it lies on (shelf, table, floor, sloped ground) and manages... |
 | `menu-order.ts` | 90 | Which of the menu's scenes are shown first, which are said to be new, and what a browser remembers of having been shown. |
-| `menu-scenes.ts` | 1698 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
+| `menu-scenes.ts` | 1709 | What goes on behind the menu before a game is started: the Zone itself, with things happening in it. |
 | `modes.ts` | 144 | The three games of one page (the owner, 2026-10-21: |
 | `muzzle.ts` | 131 | The flash at a muzzle: burning gas, seen for two or three frames. |
 | `my-perks.ts` | 26 | What this player has from the store, as their server says it (S2C 'perks', server/perks.ts): the finishes they may put on their guns (Apply in the inventory: server/plates.ts), VIP (a gold dog tag round their neck),... |
@@ -278,7 +284,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 91 | The traders as they are seen: a body behind each counter of the trader camp, the shop at the trading post and the stalls before it (src/sim/camp.ts says where they stand, what each sells and for what). |
 | `vehicle.ts` | 623 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5219 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5257 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
@@ -296,7 +302,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `client.ts` | 485 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `orders.ts` | 234 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 771 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 778 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -395,7 +401,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `heard.ts` | 57 | How far off a shot is heard (2026-10-19), by the round it fires: as loud as its distance makes it out to the first figure, then falling away steeply to nothing at the second. |
 | `heli.ts` | 181 | The helicopter a player flies (2026-10-14), its rules shared by the game and the server: what it is, how it flies (src/game/heli.ts flies it by these numbers), and where it stands when the world is new. |
 | `hitclock.ts` | 24 | How often a shooter's hits on one body are believed (server/tags.ts, mayHit): no oftener than the gun fires, over a run of them, with one allowed a gap early when the one before came late. |
-| `infected.ts` | 595 | The infected: the people who lived here, and did not leave. |
+| `infected.ts` | 644 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
 | `inventory.ts` | 1229 | Grid inventory (DayZ / Tarkov style). |
 | `items.ts` | 608 |  |
@@ -434,6 +440,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `posts.ts` | 98 | The army's field posts in the west: a WW2 pillbox (the model "WW2 Field Bunker" by Golden, the one stood over Bunker 17's stair: see src/world/bunker.ts) by four of the western roads, its door to the road, a rack, a... |
 | `powers.ts` | 112 | Four of an admin's tools that are about what is carried (2026-10-13: |
 | `range.ts` | 359 | The bot check (2026-10-12: |
+| `reclaim.ts` | 64 | A survivor's gear taken back off their own body at one press (the owner, 2026-10-25: |
 | `ruins-keep.ts` | 180 | The keep in Kalat's flat middle (2026-10-24, the owner: |
 | `ruins.ts` | 1303 | The ruined walled town in the desert: a palace-fort at its point, the best stretch of its wall with three towers, the bent gate over a causeway, a quarter of dug-out houses, the footings of the north wall with four... |
 | `save.ts` | 58 | Local persistence for the single-player slice. |
@@ -544,7 +551,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `inv-search.ts` | 21 | The search box at the top of Carried (idea 5, 2026-10-18: typing "9mm" dims everything else, lit as the things that go with a chosen one are). |
 | `inv-take.ts` | 20 | The buttons over a crate or a body (idea 10, 2026-10-18): |
 | `inv-types.ts` | 59 | A bag set for a kind of thing (2026-10-23, the owner: |
-| `inventory-ui.ts` | 3196 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
+| `inventory-ui.ts` | 3208 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
 | `keypad.ts` | 109 | A lock's panel (2026-10-24, base building's fourth step, the owner: |
 | `keys-view.ts` | 42 | The keys that do something now, drawn in the corner under the hands' mouse (what they are is src/game/key-hints.ts). |
 | `kind-icons.ts` | 85 | What kind of thing an item is, as a small symbol in the top right of it in the inventory and on its hot keys, in the colour of its kind: so that a gun, its rounds, a bandage or a tin is told at a glance without the card. |

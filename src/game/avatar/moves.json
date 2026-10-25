@@ -1,6 +1,6 @@
 {
  "idle": {
-  "dur": 1.9
+  "dur": 10
  },
  "walkF": {
   "way": "F",
@@ -68,17 +68,15 @@
   "pace": 0.867,
   "dur": 1.3
  },
- "crouchL": {
-  "way": "L",
-  "gait": "crouch",
-  "pace": 0.986,
+ "walkLow": {
+  "way": "F",
+  "pace": 0.876,
   "dur": 1.2
  },
- "crouchR": {
-  "way": "R",
-  "gait": "crouch",
-  "pace": 0.839,
-  "dur": 1.3
+ "walkLowB": {
+  "way": "B",
+  "pace": 0.975,
+  "dur": 0.9
  },
  "limpF": {
   "way": "F",
@@ -180,17 +178,5 @@
   "gait": "aim",
   "pace": 0.743,
   "dur": 1.533
- },
- "aimL": {
-  "way": "L",
-  "gait": "aim",
-  "pace": 0.487,
-  "dur": 1.233
- },
- "aimR": {
-  "way": "R",
-  "gait": "aim",
-  "pace": 0.487,
-  "dur": 1.233
  }
 }

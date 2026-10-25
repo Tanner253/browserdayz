@@ -152,6 +152,8 @@ export interface Box {
   filled?: string[];
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
+  /** a player's body: the public mark of their key (pidOf in server/acts.ts), whose alone it is to take back at one press ('reclaim') */
+  pid?: string;
   expires?: number;
   v?: number;
   /** a corpse still sat in a helicopter's seat, until it is down (see `riders` in server/acts.ts): not to be searched until then */

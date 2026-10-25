@@ -238,7 +238,8 @@ export const dropsMethods = {
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;
-    if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
+    // (nothing said of the pockets while the server is putting their own body's gear on them: it says what they carry then)
+    if (!p.dead && performance.now() > this.reclaimUntil && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
       this.meT = 0;
       this.meDirty = false;
       this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals }, sp: this.build.sp });

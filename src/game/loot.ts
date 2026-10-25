@@ -694,6 +694,8 @@ export class Stash {
   sent: StoredItem[] | null = null;
   /** a dead player's body: searched like a crate, gone once it despawns */
   corpse = false;
+  /** this player's own body, as the server said on opening it: its gear theirs to take back at one press */
+  own = false;
   /** prop kind of a map crate (selects its loot table) */
   kind = '';
   /** game time when a map crate was last found empty (drives restocking) */

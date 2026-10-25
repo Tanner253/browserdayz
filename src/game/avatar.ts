@@ -22,6 +22,8 @@ import { INFECTED } from '../sim/infected';
 import { keepBones } from '../core/bones';
 import { WornTag } from './worn-tag';
 import { Wardrobe } from './survivors';
+import type { InfectedMoves } from './infected-moves';
+import type { InfectedLook } from './infected-look';
 import { DEATHS, POSE, type Clip, type Gesture, type Hold, type Move, type SeatPose } from './avatar/pose';
 import './avatar/gear';
 import { makeMethods } from './avatar/make';
@@ -81,15 +83,11 @@ export const THUMB_SEEN = 16;
 export const CLAW = INFECTED.lunge;
 
 /**
- * How the infected get about. Their walk is the game's own, at whatever pace they are going;
- * their run is another body's, drawn to another length with several strides in it, so it is
- * not stepped in time with the walk (which played it at better than twice its pace): above
- * `from` metres a second it is faded in over the walk, all of it by `to`, and it keeps its
- * own time, at the pace it was drawn for (`pace`, metres a second) or as near as `give` lets it be.
+ * How the infected get about (src/game/infected-moves.ts): their run is drawn to another length than their walk, so it
+ * is not stepped in time with it: above `from` metres a second it is faded in over the walk, all of it by `to`, and it
+ * keeps its own time, at the pace it was captured at or as near as `give` lets it be.
  */
-// (Measured on the body: a foot on the ground goes back under it at about 2.3 m/s as the clip
-// was drawn. Played at that pace under a body going 3.3, the feet slid a metre a second.)
-export const SICK_GAIT = { from: 1.9, to: 2.7, pace: 2.3, give: [0.8, 1.5] };
+export const SICK_GAIT = { from: 1.9, to: 2.7, give: [0.8, 1.5] };
 
 /** how far through it the blow lands */
 export const CLAW_HIT = INFECTED.windup / CLAW;
@@ -553,6 +551,15 @@ export class Avatar {
    * into it, -1 none); `seed` keeps one from swaying in time with the next.
    */
   sick: { roused: number; claw: number; seed: number } | null = null;
+  /**
+   * One of the infected's own movements (src/game/infected-moves.ts), set before the body is made: every clip it
+   * plays, and the paces its walk and run were captured at. And one done over whatever it is doing (eating, a scream),
+   * `t` seconds into it, `k` of the body given to it, `legs` of the legs.
+   */
+  zombieMoves: InfectedMoves | null = null;
+  /** and the look it is given among its kind (src/game/infected-look.ts), also set before it is made */
+  zombieLook: InfectedLook | null = null;
+  zombieAct: { a: THREE.AnimationAction; t: number; k: number; legs: number } | null = null;
 
   /**
    * Where the middle of the head as a body draws it is, on its Head bone: the middle of every point of its mesh that

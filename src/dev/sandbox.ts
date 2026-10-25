@@ -20,6 +20,9 @@
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
 //                                               picture (src/dev/sandbox-sim.ts)
+//   &infected=nurse,nurse&n=3,17&speed=0.6   the infected as the game draws them, each by its number (src/dev/sandbox-infected.ts)
+//   &moves=assets/characters/moves-infected.glb  the movements of that file, for g= files with none of their own (the infected)
+//   &hide=body_far                              the parts of a g= file by those names not drawn (an infected's far body)
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
@@ -30,6 +33,8 @@
 //   &person=0                                   no survivor beside it; &body=2 which survivor (src/game/survivors.ts BODIES)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
+//   &bodies=ak.aim.crouch.walk.L,free.jog        the game's own bodies, stood, crouched or lying, holding and going as
+//                                               told, at successive moments with &frames= (src/dev/sandbox-body.ts)
 //   &bb=items | fell                            base building's scenes (src/dev/sandbox-build.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
 // Headless, in one pass and off the graphics card's queue:
@@ -53,8 +58,12 @@ const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
 const sim = q.get('sim'), bb = q.get('bb');
 const { BUILD_CELLS, BUILD_COLS } = bb ? await import('./sandbox-build') : { BUILD_CELLS: {} as Record<string, number>, BUILD_COLS: {} as Record<string, number> };
-const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : strip > 0 ? strip : views.length;
-const cols = Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = Math.ceil(cells / cols);
+// (bodies: a block of them for each moment drawn, `across` blocks to a row: a picture is drawn no more than 8192 a side)
+const bodies = list('bodies').length, bodyCols = Math.min(bodies, Math.max(1, +(q.get('cols') ?? 4)));
+const blocks = Math.max(1, Math.floor(+(q.get('frames') ?? 1))), across = Math.min(blocks, Math.max(1, Math.floor(+(q.get('across') ?? 1))));
+const blockRows = Math.ceil(bodies / bodyCols);
+const cells = bb ? BUILD_CELLS[bb] ?? 1 : sim ? 8 : bodies ? blockRows * bodyCols * blocks : strip > 0 ? strip : views.length;
+const cols = bodies ? bodyCols * across : Math.min(cells, bb ? BUILD_COLS[bb] ?? 2 : strip > 0 || sim ? 4 : 2), rows = bodies ? blockRows * Math.ceil(blocks / across) : Math.ceil(cells / cols);
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.setSize(cw * cols, ch * rows);
@@ -138,6 +147,11 @@ if (bb) {
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   out.stageInfo = await stageSim(sim, { q, scene, renderer, sun, floor, cw, ch, cols, rows, say, body });
   out.staged = true;
+} else if (bodies) {
+  const { stageBodies } = await import('./sandbox-body');
+  const out = window as unknown as { staged: boolean; stageInfo: unknown };
+  out.stageInfo = await stageBodies({ q, scene, renderer, sun, cw, ch, cols, rows, say });
+  out.staged = true;
 } else {
   // ---- the thing(s): side by side along x, each standing on the floor
   const thing = new THREE.Group();
@@ -190,9 +204,13 @@ if (bb) {
     info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), picture: picture(o), ...extra });
   };
   for (const id of ids) place(await assets.model(id), id);
+  // (a body with no movements of its own, one of the infected, played in another file's: &moves=)
+  const borrowed = q.get('moves') ? (await assets.loadGLTF(q.get('moves')!)).animations : null;
   for (const [k, f] of files.entries()) {
-    const gltf = await assets.loadGLTF(f);
+    const own = await assets.loadGLTF(f);
+    const gltf = borrowed && !own.animations.length ? { ...own, animations: borrowed } : own;
     const o = gltf.animations.length ? cloneSkinned(gltf.scene) : gltf.scene;
+    o.traverse((n) => void (list('hide').includes(n.name) && (n.visible = false)));
     const clips = gltf.animations.map((c) => `${c.name} (${c.duration.toFixed(2)} s)`);
     // (placed and framed as it rests, before any clip moves it: the cameras then hold still across a strip)
     const want = list('clip')[k] ?? list('clip')[0] ?? null;
@@ -275,6 +293,17 @@ if (bb) {
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }
   }
+  // (the infected as the game makes and poses them, each by its number: src/dev/sandbox-infected.ts)
+  const infected = q.get('infected') ? await (await import('./sandbox-infected')).stageInfected(q) : [];
+  const secs = +(q.get('secs') ?? 2);
+  for (const s of infected) {
+    place(s.root, s.name, {}, true);
+    s.pos.copy(s.root.position);
+  }
+  // (gathered round the survivor, who stands in the middle: &round=1)
+  const round = infected.length > 0 && q.get('round') === '1';
+  if (round) (await import('./sandbox-infected')).gatherRound(infected);
+  for (const s of infected) s.at(strip > 0 ? 0 : +(q.get('t') ?? 0.5) * secs);
   if (animal) {
     const { MODES, stageAnimal } = await import('../game/animals');
     const mode = q.get('mode') ?? 'idle', a = await stageAnimal(animal, MODES[mode] ?? +mode);
@@ -307,11 +336,11 @@ if (bb) {
     const idle = gltf.animations.find((c) => /^idle/i.test(c.name));
     if (!(survivors.length && playOn(body, gltf.animations)) && idle) new THREE.AnimationMixer(body).clipAction(idle).play().getMixer().setTime(0);
     shadowed(body);
-    body.position.set(subject.max.x + 0.9, 0, 0);
+    body.position.set(round ? 0 : subject.max.x + 0.9, 0, 0);
     scene.add(body);
   }
   const all = new THREE.Box3().setFromObject(thing);
-  if (person) all.expandByPoint(new THREE.Vector3(subject.max.x + 1.3, 1.85, 0));
+  if (person) all.expandByPoint(new THREE.Vector3(round ? 0 : subject.max.x + 1.3, 1.85, 0));
   const mid = all.getCenter(new THREE.Vector3()), span = all.getSize(new THREE.Vector3());
   sun.target.position.copy(mid);
   const reach = Math.max(span.x, span.y, span.z) * 0.75 + 0.5;
@@ -342,6 +371,7 @@ if (bb) {
     const view = strip > 0 ? views[0] : views[i];
     if (strip > 0 && mixer && action) mixer.setTime(action.getClip().duration * (i / strip));
     if (strip > 0) for (const a of played) if (a !== action) a.getMixer().setTime(a.getClip().duration * (i / strip));
+    if (strip > 0) for (const s of infected) s.at(secs * (i / strip));
     thing.updateMatrixWorld(true);
     frame(view);
     const vx = (i % cols) * cw, vy = (rows - 1 - Math.floor(i / cols)) * ch;

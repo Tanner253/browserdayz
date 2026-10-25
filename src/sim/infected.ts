@@ -141,6 +141,55 @@ export const I_IDLE = 0, I_WANDER = 1, I_ALERT = 2, I_CHASE = 3, I_ATTACK = 4, I
 /** [x, y, z, yaw, what it is doing, who it is after (a player's number, 0 nobody)] */
 export type IState = [number, number, number, number, number, number];
 
+/** as near as two of them stand to each other, centre to centre: a body's width */
+export const APART = 0.62;
+
+/**
+ * How far one of them (`a`, at ax, az) is moved off another (`b`) it stands inside: straight away from it, by half of how
+ * far in it is. The other is moved the other half by whichever game moves it, so that every game, moving its own by
+ * this, has those at one survivor stand round them, each a body's width from the next (the navigator, 2026-10-25: two
+ * nurses clawing at one player stood one inside the other, each moved by another player's game). Two on the very same
+ * spot part by their numbers, the same way in every game.
+ * @returns the step [dx, dz], or null if they are not inside each other (most pairs: told by the box alone)
+ */
+export function parting(ax: number, az: number, a: number, bx: number, bz: number, b: number): [number, number] | null {
+  const dx = ax - bx, dz = az - bz;
+  if (Math.abs(dx) >= APART || Math.abs(dz) >= APART) return null;
+  const d = Math.hypot(dx, dz);
+  if (d >= APART) return null;
+  if (d < 1e-3) {
+    const t = (Math.min(a, b) * 2.399963) % (Math.PI * 2), s = a < b ? APART / 2 : -APART / 2;
+    return [Math.cos(t) * s, Math.sin(t) * s];
+  }
+  const push = (APART - d) / 2 / d;
+  return [dx * push, dz * push];
+}
+
+/** how far from whoever they are upon those at one survivor stand, centre to centre: within reach, round them */
+export const ROUND = 0.85;
+/** the least angle between two of them round one survivor: a body's width at ROUND */
+const ROUND_APART = 2 * Math.asin(APART / 2 / ROUND);
+
+/**
+ * Where one of them at x, z, upon a survivor at qx, qz, goes to stand: on a ring round them at arm's length, at the angle
+ * it came at them from, turned off the angles of the others upon them until each is a body's width from the next. Every
+ * game turns its own so a little each frame, and those at one survivor go round them, left, front, right and at last
+ * behind, each in reach (the navigator, 2026-10-25: three nurses queued in a column at one survivor, the back two inside
+ * the first, and only she could reach).
+ * @param others the others upon the same survivor (two at one angle part by their numbers, the same way in every game)
+ */
+export function roundSpot(qx: number, qz: number, x: number, z: number, i: number, others: Iterable<{ x: number; z: number; i: number }>): [number, number] {
+  let a = Math.atan2(z - qz, x - qx), turn = 0;
+  for (const o of others) {
+    if (o.i === i) continue;
+    const at = Math.atan2(o.z - qz, o.x - qx) - a, d = Math.atan2(Math.sin(at), Math.cos(at));
+    if (Math.abs(d) >= ROUND_APART) continue;
+    turn += (d > 0 || (d === 0 && i < o.i) ? -1 : 1) * ((ROUND_APART - Math.abs(d)) / 2);
+  }
+  a += turn;
+  return [qx + Math.cos(a) * ROUND, qz + Math.sin(a) * ROUND];
+}
+
 export interface InfectedInfo {
   i: number;
   s: IState;

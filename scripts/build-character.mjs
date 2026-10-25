@@ -54,7 +54,7 @@ const EMOTES = process.argv.includes('--emotes');
 /**
  * `--infected`: the game's skeleton and every movement it has, on the plain body it had before
  * the suit, written to assets-src/characters/plain.glb. Nothing of that is shipped: it is what
- * scripts/zombies.mjs puts the infected's bodies on. The survivor's file and the mask are left
+ * scripts/infected.mjs puts the infected's bodies on. The survivor's file and the mask are left
  * as they are.
  */
 const INFECTED = process.argv.includes('--infected');

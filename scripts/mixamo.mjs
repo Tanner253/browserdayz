@@ -1,7 +1,7 @@
 // A movement read off a body on a Mixamo skeleton (as Sketchfab hands them over) and carried onto this game's
 // skeleton, bone by bone: each bone turned from how it stands at rest by what the other's is turned by from how
-// that stands at rest. Made for the infected (scripts/zombies.mjs, where these were first written), and used too
-// for the player's own lying down and crawling (scripts/build-character.mjs).
+// that stands at rest. Made for the infected (scripts/zombies.mjs, since gone), and used now by the motion capture
+// (scripts/mocap.mjs) and the player's own lying down and crawling (scripts/build-character.mjs).
 import * as THREE from 'three';
 import { ours } from './suit.mjs';
 
@@ -133,8 +133,11 @@ export function runOf(cop, prefix = '', onTheSpot = true) {
 }
 
 const ID = new THREE.Quaternion();
-/** one of the character's movements (`run`, unless another is named) made the one that was read */
-export function giveRun(doc, run, clip = 'run') {
+/**
+ * one of the character's movements (`run`, unless another is named) made the one that was read. `lay`: which limb
+ * bones are first laid along the other body's (see below; all of NEXT unless said)
+ */
+export function giveRun(doc, run, clip = 'run', { lay = null } = {}) {
   const root = doc.getRoot();
   const nodes = new Map(root.listNodes().map((n) => [n.getName(), n]));
   const parentOf = new Map();
@@ -164,7 +167,7 @@ export function giveRun(doc, run, clip = 'run') {
   const laid = new Map();
   for (const [, node] of mine) {
     const m = node.getName().match(/^(.+?)(_[lr])$/);
-    const next = m && NEXT[m[1]] && m[1] + m[2] && NEXT[m[1]] + m[2];
+    const next = m && NEXT[m[1]] && (!lay || lay.includes(m[1])) && NEXT[m[1]] + m[2];
     const to = next && nodes.get(next);
     if (!to || !run.rig.name.includes(next)) continue;
     const here = at(to).sub(at(node)).normalize(), there = run.rig.at(next).sub(run.rig.at(node.getName())).normalize();

@@ -762,7 +762,7 @@ function cap() {
  * in the game: see below.)
  */
 async function severedHand(roll: number, pitch: number) {
-  const gl = await assets.loadGLTF('assets/characters/zombie_male.glb');
+  const gl = await assets.loadGLTF('assets/characters/zombie_villager.glb');
   const sc = gl.scene;
   const at = (name: string) => {
     const p = new THREE.Vector3();

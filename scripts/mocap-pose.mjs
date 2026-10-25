@@ -121,6 +121,27 @@ export function heelFirst(doc, sk, name, way) {
   return best / n;
 }
 
+/**
+ * A movement stooped: the chest bent forward from the hips by `angle` (radians, a third at each joint of the spine), the
+ * head and the upper arms turned back by as much, so that the eyes are where they looked and the arms hang and swing
+ * as they did. The walk's upper body laid over the crouch's legs (src/game/avatar/gait.ts), as a body crouched carries
+ * its chest.
+ */
+export function stoop(doc, sk, name, angle) {
+  const clip = readClip(doc, sk, name), { Q, T } = frameOf(clip), n = clip.frames + 1;
+  const S = ['spine_01', 'spine_02', 'spine_03'].map(sk.index), back = ['neck_01', 'upperarm_l', 'upperarm_r'].map(sk.index);
+  const side = new THREE.Vector3(1, 0, 0);
+  const turnWorld = (f, i, q) => {
+    const W = sk.pose(Q[f], T[f]);
+    Q[f][i] = rotOf(W[sk.parent[i]]).invert().multiply(q.clone().multiply(rotOf(W[i]))).normalize();
+  };
+  for (let f = 0; f < n; f++) {
+    for (const i of S) turnWorld(f, i, new THREE.Quaternion().setFromAxisAngle(side, angle / S.length));
+    for (const i of back) turnWorld(f, i, new THREE.Quaternion().setFromAxisAngle(side, -angle));
+  }
+  writeClip(doc, clip, Q, T, clip.dur);
+}
+
 /** part of a movement done once: from `a` to `b` seconds */
 export function trim(doc, sk, name, a, b) {
   const clip = readClip(doc, sk, name);
@@ -149,14 +170,13 @@ function yawOf(W, rest, a, b) {
  * way it was) and turned half way back with the hips. Most of the library is done side-on, an archer's walk, a stance
  * with a gun at the hip: a chest that is not to the front is not behind the gun the arms hold up, and a body turned to
  * one side cannot be blended with one turned to the other.
- * With `ref`, a crouched movement stood up too: the hips raised to the height `ref` carries them at, and the chest
- * brought up to lean as that one's does. What comes of it is the same steps, taken standing and facing ahead: the
- * library steps sideways only crouched, and a gun held up is walked sideways standing, facing the aim.
+ * With `ref`, a lower movement stood up too: the hips raised to the height `ref` carries them at, and the chest
+ * brought up to lean as that one's does. What comes of it is the same steps, taken standing and facing ahead.
  * With `head`, the body let down (or raised) until its head is that high on the whole, the chest leaning as it did:
  * a crouch as low as the game's own, whose eye is a crouched body's eye (see EYE_CROUCH in src/game/player.ts). What
  * is shot at on a body is where its head is drawn: a crouch drawn higher than the eye stood up out of cover.
  */
-export function reshape(doc, sk, name, { keep = 0, ref = null, head = null, narrow = 1 } = {}) {
+export function reshape(doc, sk, name, { keep = 0, ref = null, head = null } = {}) {
   const clip = readClip(doc, sk, name), other = readClip(doc, sk, ref ?? name);
   const { Q, T } = frameOf(clip);
   const n = clip.frames + 1;
@@ -170,17 +190,11 @@ export function reshape(doc, sk, name, { keep = 0, ref = null, head = null, narr
     Q[f][i] = parentQ(W, i).invert().multiply(q.clone().multiply(rotOf(W[i]))).normalize();
   };
   const UP = new THREE.Vector3(0, 1, 0);
-  // where the feet were stepped, and how they were turned, before anything is moved (`narrow`: drawn in toward under
-  // the hips by that share, a crouch's wide footing that a body standing has no leg to stand on)
+  // where the feet were stepped, and how they were turned, before anything is moved
   const feet = [];
   for (let f = 0; f < n; f++) {
-    const W = sk.pose(Q[f], T[f]), hips = posOf(W[P]);
-    feet.push(legs.map(([a, b, c]) => {
-      const at = posOf(W[c]);
-      at.x = hips.x + (at.x - hips.x) * narrow;
-      at.z = hips.z + (at.z - hips.z) * narrow;
-      return { at, turn: rotOf(W[c]), bend: posOf(W[b]).sub(posOf(W[a]).add(posOf(W[c])).multiplyScalar(0.5)) };
-    }));
+    const W = sk.pose(Q[f], T[f]);
+    feet.push(legs.map(([a, b, c]) => ({ at: posOf(W[c]), turn: rotOf(W[c]), bend: posOf(W[b]).sub(posOf(W[a]).add(posOf(W[c])).multiplyScalar(0.5)) })));
   }
   // squared: the hips turned back to the front by as much as they are turned on the whole, the chest the rest of its way
   let hips = 0, chest = 0;
@@ -261,6 +275,30 @@ export function reshape(doc, sk, name, { keep = 0, ref = null, head = null, narr
   }
   writeClip(doc, clip, Q, T, clip.dur);
   return { up: +up.toFixed(3), tilt: +tilt.toFixed(3), turned: +turn.toFixed(3), chest: +chest.toFixed(3) };
+}
+
+/**
+ * Which way a loop really goes, and how fast, as it is once made (a library movement's name does not always say which
+ * way its steps go: its 'Walk_Left_with_Gun' steps to the right): read from whichever toe is the lower, the one down,
+ * travelling back under the hips (a walk's: a run's feet are both off the ground a while, and read short).
+ * @returns m/s along the ground, and degrees to the body's left of its front
+ */
+export function goes(doc, sk, name) {
+  const clip = readClip(doc, sk, name), P = sk.index('pelvis'), n = clip.frames;
+  const at = [];
+  for (let f = 0; f <= n; f++) {
+    const W = sk.pose(clip.qAt(f), clip.tAt(f)), p = posOf(W[P]).setY(0);
+    at.push(['ball_l', 'ball_r'].map((b) => posOf(W[sk.index(b)]).sub(p)));
+  }
+  const way = new THREE.Vector3();
+  let frames = 0;
+  for (let f = 0; f < n; f++) {
+    const k = at[f][0].y < at[f][1].y ? 0 : 1;
+    if ((at[f + 1][0].y < at[f + 1][1].y ? 0 : 1) !== k) continue;
+    way.add(at[f][k].clone().sub(at[f + 1][k]).setY(0));
+    frames++;
+  }
+  return { pace: +(way.length() / Math.max(1e-6, (frames * clip.dur) / n)).toFixed(3), deg: Math.round((Math.atan2(way.x, way.z) * 180) / Math.PI) };
 }
 
 /** how far a movement has the hips and the chest turned from the front, on the whole, radians (to the body's left: +) */
