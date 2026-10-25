@@ -32,6 +32,20 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
   10x17), the shared radial menu (`src/ui/radial.ts`: an icon per entry, Cancel always at six o'clock), the inventory's
   middle 348 px so Carried holds two containers side by side, a shot bear going for its shooter and holding to them
   (`answer` in src/sim/animal-fight.ts), Kalat's two wall gaps and the south bank stump. Suite 135 files, 0 failing.
+- **Paused 2026-10-25 ~00:34 UTC for a Claude Desktop restart** (the owner, to pick up the Higgsfield MCP). On
+  battle-royale since the release, not deployed: bodies keep the floor they died on (479c8898), animals smooth to
+  600 m + the admin's Animal distance ('adist', PROTOCOL 65) + wolves settle after a kill (81dac28c), the Kalat keep
+  (3d1aeed2, merged 76041f3a), the Zona drawn smaller (14545621: rounds round the towns east of the line, the
+  wilderness for bases; a rule of the tags, from the next server release), docs/assets-wanted.md. Base building
+  (`claude/base-building-d2c3d5`, PROTOCOL 66, worktree base-building-d2c3d5, 6 files uncommitted at the pause): done
+  steps 1-4, collision 0ad9869f, placement rules b0bfe25d, battle-royale merged c37f524a; next in its order: the held
+  torch seen by others (campfire flames; no light out of a sealed stone+ room), door straps, Rust two-click placement
+  and rotation (crates in 90° steps) + upright item icons, raiding, the economy changes (8 nails, iron-bar upkeep),
+  polish pass 1 (list, 11 Poly Haven models, the owner's 31 Sketchfab models in assets-src/incoming mapped in
+  progress/base-models/incoming-map.md, Kenney + Freesound sounds in sound-picks.md / incoming-map.md). Crafting
+  (the old fixes session, worktree zona-fixes-006de5, new branch `claude/crafting` from c37f524a, nothing done yet):
+  plan marketing/plan-crafting.html (git-ignored; card zona-plan-crafting.jpg), owns src/sim/craft/*, server/craft.ts,
+  src/sim/items/craft.ts, the Crafting tab, the forge and salvage. After the restart each needs its task sent again.
 - **Side sessions as of that release**: the fixes path (`claude/zona-fixes-006de5`) builds the Kalat keep from
   `progress/kalat-keep/plan-kalat-keep.png` in its worktree (server side, for a later release, the owner to see it in
   the game first). Base building (`claude/base-building-d2c3d5`, PROTOCOL 65 there) has steps 1 to 4 part 1 done
