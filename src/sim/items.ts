@@ -278,12 +278,28 @@ export function tagClock(it: ItemInstance): string {
 /** a word after a thing's name for the stage it is at ("raw", "rotten"): said by src/sim/cooking.ts, which this file cannot import */
 export const NAMING: { stage?: (it: ItemInstance) => string } = {};
 
-/** what an item is called: a dog tag carries its owner's name; meat says whether it is raw, cooked, burned or rotten */
+/** how worn a thing is, DayZ's five states from the best down, each from this much of its health (src/sim/condition.ts) */
+export const STATES: { name: string; from: number }[] = [
+  { name: 'Pristine', from: 0.7 },
+  { name: 'Worn', from: 0.5 },
+  { name: 'Damaged', from: 0.3 },
+  { name: 'Badly damaged', from: 1e-6 },
+  { name: 'Ruined', from: 0 },
+];
+export const healthOf = (it: ItemInstance) => it.hp ?? 1;
+export const ruined = (it: ItemInstance) => healthOf(it) <= 0;
+export const stateOf = (it: ItemInstance) => STATES.find((s) => healthOf(it) >= s.from)!.name;
+
+/** what an item is called: a dog tag carries its owner's name; meat says whether it is raw, cooked, burned or rotten; clothes say their colour, and how worn they are when they are */
 export function itemName(it: ItemInstance): string {
   const d = ITEMS[it.id];
   if (it.id === 'dogtag' && it.owner) return `${tagOwner(it)}'s Dog Tag`;
   const stage = NAMING.stage?.(it);
   if (stage) return `${d.name} (${stage})`;
+  if (d.category === 'clothing') {
+    const said = [d.colours && d.colours.length > 1 ? colourOf(it)?.name ?? d.colours[0].name : '', it.hp !== undefined && it.hp < STATES[0].from ? stateOf(it).toLowerCase() : ''].filter(Boolean);
+    if (said.length) return `${d.name} (${said.join(', ')})`;
+  }
   const look = lookOf(it.finish);
   return look ? `${look === 'gold' ? 'Gold' : 'Nickel'}-plated ${d.name}` : d.name;
 }

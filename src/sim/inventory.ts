@@ -20,7 +20,7 @@
 // other people go in a pouch of ten, so they do not fill the pockets; an eleventh goes
 // wherever there is room.
 
-import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, isBagKind, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
+import { ALL_SLOTS, CLOTHES, GEAR_SLOTS, ruined, ITEMS, SLOT_KIND, TAG_HOLD, WEAPON_SLOTS, holds, isBagKind, itemWeight, magFits, makeItem, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
 
 const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(['held', ...ALL_SLOTS].map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
 /** the places whose things are looked into for room, in the order they are filled: jacket and trousers first, as ever, then the rest of what is worn */
@@ -886,7 +886,8 @@ export class PlayerInventory {
     for (const s of GEAR_SLOTS) {
       const it = this.slots[s];
       const v = it ? ITEMS[it.id].wear?.[key] : undefined;
-      if (v !== undefined) out.push(v);
+      // (a ruined piece does nothing it did: src/sim/condition.ts)
+      if (v !== undefined && !ruined(it!)) out.push(v);
     }
     return out;
   }

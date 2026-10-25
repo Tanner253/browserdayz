@@ -7,7 +7,8 @@ import { physics, SIGHT_GROUPS, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import type { Barrel } from '../../world/vegetation';
-import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag } from '../../sim/items';
+import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag, itemName } from '../../sim/items';
+import { BLADES, bandagesFrom, cuttable } from '../../sim/condition';
 import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
@@ -697,6 +698,24 @@ export const itemsMethods = {
       this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
       this.inventoryChanged();
     }, 'unbox');
+  },
+
+  /** A piece of clothing cut into bandages with a blade carried, as DayZ cuts clothes into rags (src/sim/condition.ts). */
+  cutUp(this: Game, it: ItemInstance) {
+    if (!cuttable(it) || !this.canCut()) return;
+    const n = bandagesFrom(it), name = itemName(it);
+    this.inv.remove(it);
+    const left = this.inv.add(makeItem('bandage', n));
+    if (left) this.dropItem(left);
+    audio.click(900, 0.35, 0.06);
+    audio.click(700, 0.35, 0.06, 0.1);
+    this.hud.note(`The ${name} is cut into ${n} bandage${n === 1 ? '' : 's'}`, 'good');
+    this.inventoryChanged();
+  },
+
+  /** whether a blade is carried to cut clothes up with */
+  canCut(this: Game) {
+    return !!this.inv.find((x) => BLADES.includes(x.id));
   },
 
   /**

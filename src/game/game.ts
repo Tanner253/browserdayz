@@ -680,20 +680,6 @@ export class Game {
       const w = chosen(playerName());
       return { bd: w.body, vo: w.voice };
     };
-    const pickWho = (pick: { body?: number; voice?: number }) => {
-      const w = choose(playerName(), pick);
-      this.avatar.wardrobe.setBody(w.body);
-      this.hud.who.show(w.body);
-      this.hud.callVoice = w.voice;
-      if (this.net.online) this.net.send({ t: 'who', bd: w.body, vo: w.voice });
-    };
-    this.hud.who.onPick = (body) => pickWho({ body });
-    // (a voice picked says a call in it, to be heard)
-    this.hud.onVoice = (voice) => {
-      pickWho({ voice });
-      audio.shout('friendly', undefined, 0, voice, voiceOf(playerName()));
-    };
-    pickWho({});
     // crates standing around the map become searchable containers, and the furniture that holds things (src/sim/storage.ts)
     for (const c of veg.crates) {
       const own = FURNITURE[c.kind], spec = CRATE_SPECS[c.kind] ?? (own ? { w: own.grid[0], h: own.grid[1], label: own.label } : null);
@@ -884,6 +870,21 @@ export class Game {
     this.hud = new HUD(icons);
     this.hud.adsHere = () => this.modes.mode === 'zona';
     this.hud.setName(playerName());
+    // (the survivor and the voice picked on the menu and in Settings: see net.who above)
+    const pickWho = (pick: { body?: number; voice?: number }) => {
+      const w = choose(playerName(), pick);
+      this.avatar.wardrobe.setBody(w.body);
+      this.hud.who.show(w.body);
+      this.hud.callVoice = w.voice;
+      if (this.net.online) this.net.send({ t: 'who', bd: w.body, vo: w.voice });
+    };
+    this.hud.who.onPick = (body) => pickWho({ body });
+    // (a voice picked says a call in it, to be heard)
+    this.hud.onVoice = (voice) => {
+      pickWho({ voice });
+      audio.shout('friendly', undefined, 0, voice, voiceOf(playerName()));
+    };
+    pickWho({});
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
     this.gas = new Gas(atmo.gases, atmo, r.scene, {
@@ -911,6 +912,8 @@ export class Game {
       open: (item) => this.openBox(item),
       onGround: (w, how) => this.onGround(w, how),
       unload: (item) => this.unloadWeapon(item),
+      cut: (item) => this.cutUp(item),
+      canCut: () => this.canCut(),
       attachTargets: (att) => this.attachTargets(att),
       attach: (att, weapon, loose) => this.attachMod(att, weapon, loose),
       detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
@@ -1815,6 +1818,8 @@ export interface Game {
   explode: Methods<typeof itemsMethods>['explode'];
   openBox: Methods<typeof itemsMethods>['openBox'];
   unloadWeapon: Methods<typeof itemsMethods>['unloadWeapon'];
+  cutUp: Methods<typeof itemsMethods>['cutUp'];
+  canCut: Methods<typeof itemsMethods>['canCut'];
   attachTargets: Methods<typeof gunsMethods>['attachTargets'];
   gunInHands: Methods<typeof gunsMethods>['gunInHands'];
   attachMod: Methods<typeof gunsMethods>['attachMod'];
