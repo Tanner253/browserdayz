@@ -67,10 +67,13 @@ export const MOVES = {
   walkF: { from: 'walking_2', way: 'F', gait: 'walk' },
   walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk' },
   // a gun up: the knees soft, the chest still over them (the bow's walk: the arms are the gun's)
-  aimF: { from: 'Walk_Forward_with_Bow_Aimed', way: 'F', gait: 'aim', square: 0 },
-  aimB: { from: 'Walk_Backward_with_Bow_Aimed', way: 'B', gait: 'aim', square: 0 },
-  aimL: { from: 'Walk_Left_with_Gun', way: 'L', gait: 'aim', stand: 'aimF' },
-  aimR: { from: 'Walk_Left_with_Gun', way: 'R', gait: 'aim', stand: 'aimF', mirror: true },
+  // (raised toward the walk's hips and its chest's lean, as far as the legs let them: the eye does not go down with the
+  // knees, and a head drawn under the eye was a head under cover the eye could shoot over)
+  aimF: { from: 'Walk_Forward_with_Bow_Aimed', way: 'F', gait: 'aim', square: 0, stand: 'walkF' },
+  aimB: { from: 'Walk_Backward_with_Bow_Aimed', way: 'B', gait: 'aim', square: 0, stand: 'walkB' },
+  // (its footing drawn in to stand up higher: its steps as much the shorter, 0.696 m/s as captured, and stepped faster)
+  aimL: { from: 'Walk_Left_with_Gun', way: 'L', gait: 'aim', stand: 'aimF', narrow: 0.7, pace: 0.487 },
+  aimR: { from: 'Walk_Left_with_Gun', way: 'R', gait: 'aim', stand: 'aimF', narrow: 0.7, pace: 0.487, mirror: true },
   // a jog, eight ways (left and right are the corners between)
   jogF: { from: 'Run_02', way: 'F', gait: 'jog' },
   jogFL: { from: 'ForwardLeft_Run_Fight', way: 'FL', gait: 'jog', square: 0.5 },
@@ -179,7 +182,7 @@ if (!cands) {
     await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way });
     const said = {};
     said.was = facing(doc, sk, name);
-    if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
+    if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null, narrow: m.narrow ?? 1 }));
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
     const r = report[name], got = readClip(doc, sk, name);

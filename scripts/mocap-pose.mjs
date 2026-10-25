@@ -156,7 +156,7 @@ function yawOf(W, rest, a, b) {
  * a crouch as low as the game's own, whose eye is a crouched body's eye (see EYE_CROUCH in src/game/player.ts). What
  * is shot at on a body is where its head is drawn: a crouch drawn higher than the eye stood up out of cover.
  */
-export function reshape(doc, sk, name, { keep = 0, ref = null, head = null } = {}) {
+export function reshape(doc, sk, name, { keep = 0, ref = null, head = null, narrow = 1 } = {}) {
   const clip = readClip(doc, sk, name), other = readClip(doc, sk, ref ?? name);
   const { Q, T } = frameOf(clip);
   const n = clip.frames + 1;
@@ -170,11 +170,17 @@ export function reshape(doc, sk, name, { keep = 0, ref = null, head = null } = {
     Q[f][i] = parentQ(W, i).invert().multiply(q.clone().multiply(rotOf(W[i]))).normalize();
   };
   const UP = new THREE.Vector3(0, 1, 0);
-  // where the feet were stepped, and how they were turned, before anything is moved
+  // where the feet were stepped, and how they were turned, before anything is moved (`narrow`: drawn in toward under
+  // the hips by that share, a crouch's wide footing that a body standing has no leg to stand on)
   const feet = [];
   for (let f = 0; f < n; f++) {
-    const W = sk.pose(Q[f], T[f]);
-    feet.push(legs.map(([a, b, c]) => ({ at: posOf(W[c]), turn: rotOf(W[c]), bend: posOf(W[b]).sub(posOf(W[a]).add(posOf(W[c])).multiplyScalar(0.5)) })));
+    const W = sk.pose(Q[f], T[f]), hips = posOf(W[P]);
+    feet.push(legs.map(([a, b, c]) => {
+      const at = posOf(W[c]);
+      at.x = hips.x + (at.x - hips.x) * narrow;
+      at.z = hips.z + (at.z - hips.z) * narrow;
+      return { at, turn: rotOf(W[c]), bend: posOf(W[b]).sub(posOf(W[a]).add(posOf(W[c])).multiplyScalar(0.5)) };
+    }));
   }
   // squared: the hips turned back to the front by as much as they are turned on the whole, the chest the rest of its way
   let hips = 0, chest = 0;
@@ -204,7 +210,8 @@ export function reshape(doc, sk, name, { keep = 0, ref = null, head = null } = {
     hy += posOf(W[P]).y / n;
     ly += lean(W) / n;
   }
-  // (no higher than leaves every leg a bend: a straight one locks and pops)
+  // (no higher than leaves every leg a bend, a straight one locks and pops; but 5 cm whatever, a trailing foot's heel
+  // coming up as it pushes off, as a heel does)
   let up = ref ? oh - hy : 0;
   if (head !== null) {
     const HEAD = sk.index('Head');
@@ -218,7 +225,7 @@ export function reshape(doc, sk, name, { keep = 0, ref = null, head = null } = {
       const hip = posOf(W[a]), foot = feet[f][k].at, most = (len[k][0] + len[k][1]) * 0.985;
       // the most the hip can rise over this foot: where its distance comes to `most`
       const flat = Math.hypot(hip.x - foot.x, hip.z - foot.z), rise = Math.sqrt(Math.max(0, most * most - flat * flat)) - (hip.y - foot.y);
-      if (ref) up = Math.min(up, rise);
+      if (ref || up > 0) up = Math.min(up, Math.max(rise, 0.05));
     });
   }
   const tilt = ref ? ol - ly : 0;

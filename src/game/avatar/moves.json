@@ -14,18 +14,6 @@
   "pace": 0.975,
   "dur": 0.9
  },
- "aimF": {
-  "way": "F",
-  "gait": "aim",
-  "pace": 0.94,
-  "dur": 1.233
- },
- "aimB": {
-  "way": "B",
-  "gait": "aim",
-  "pace": 0.743,
-  "dur": 1.533
- },
  "jogF": {
   "way": "F",
   "gait": "jog",
@@ -181,16 +169,28 @@
   "dur": 1,
   "late": true
  },
+ "aimF": {
+  "way": "F",
+  "gait": "aim",
+  "pace": 0.94,
+  "dur": 1.233
+ },
+ "aimB": {
+  "way": "B",
+  "gait": "aim",
+  "pace": 0.743,
+  "dur": 1.533
+ },
  "aimL": {
   "way": "L",
   "gait": "aim",
-  "pace": 0.696,
+  "pace": 0.487,
   "dur": 1.233
  },
  "aimR": {
   "way": "R",
   "gait": "aim",
-  "pace": 0.696,
+  "pace": 0.487,
   "dur": 1.233
  }
 }
