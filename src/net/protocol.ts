@@ -72,7 +72,7 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // (66, 2026-10-24: base building: bases ('base', 'bpc', 'bout', 'blay', 'bup', 'bdel'; 'spent' and `sp` on 'me'), and gathering: trees felled and standing again ('chop', 'fell', 'grow',
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
-// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft').)
+// who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx').)
 export const PROTOCOL = 66;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
@@ -343,6 +343,9 @@ export type C2S =
   | { t: 'saw'; l: string; u: string; go: 1 | 2 }
   /** a craft begun (go 1) or its hold done (go 2): recipe `r`, `n` of it, the things dragged onto each other first (`u`, uids; src/sim/craft) */
   | { t: 'craft'; r: string; n: number; go: 1 | 2; u?: string[] }
+  /** `n` of a workbench's recipe `r` put on its queue; or the queue's job `i` taken off it (src/sim/craft) */
+  | { t: 'cq'; r: string; n: number }
+  | { t: 'cqx'; i: number }
   /** a piece laid with the building plan `u` (src/sim/build/bases.ts Ask): in base `b` at its frame's place, or a new base at a world place turned `yaw` */
   | { t: 'blay'; k: string; b?: number; x: number; y: number; z: number; r: number; yaw?: number; u: string }
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
@@ -450,6 +453,8 @@ export type S2C =
   | { t: 'saw'; l: string; ok: boolean; why?: string; done?: boolean }
   /** a craft let begin or not (`n` of it, `time` s), or done: the things used up by their number (`used`; what stacks comes out as 'spent') */
   | { t: 'craft'; r: string; ok: boolean; why?: string; n?: number; time?: number; done?: true; used?: string[] }
+  /** a workbench's queue as it stands: each job and how many are left of it, the seconds the first is through, and whether it waits for its maker to come back to a bench */
+  | { t: 'cq'; q: { r: string; n: number }[]; done: number; paused: boolean }
   /** a base in sight (whole), or out of it / gone; a piece of one laid or changed; pieces of one gone (src/sim/build/bases.ts) */
   | { t: 'base'; b: KeptBase }
   | { t: 'bgone'; b: number }

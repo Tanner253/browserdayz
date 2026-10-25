@@ -50,7 +50,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `build.ts` | 306 | The server: base building (2026-10-24, the second step; the rules are src/sim/build/). |
 | `checks.ts` | 453 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
 | `claims.ts` | 145 | The server: claims, upkeep and rot (2026-10-24, base building's third step; the rules are src/sim/build/upkeep.ts). |
-| `craft.ts` | 64 | The server: crafting (2026-10-24, plan-crafting; the rules are src/sim/craft/). |
+| `craft.ts` | 147 | The server: crafting (2026-10-24, plan-crafting; the rules are src/sim/craft/). |
 | `custody.ts` | 72 | Who holds each dog tag that can pay (one in `lootedTags`), as this server saw it change hands (2026-10-23, the owner: |
 | `device.ts` | 91 | The server: the devices games run on (2026-10-16). |
 | `doors.ts` | 55 | A base's doors as the server keeps them (2026-10-24, base building's fourth step; how a leaf swings, and what it may not swing through, is src/sim/build/doors.ts). |
@@ -59,7 +59,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `esp.ts` | 69 | An admin's far sight of the things about them (the owner, 2026-10-23: |
 | `gate.ts` | 746 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 142 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
-| `handle.ts` | 983 | The server: handle, every message a player sends, checked and acted on. |
+| `handle.ts` | 987 | The server: handle, every message a player sends, checked and acted on. |
 | `index.ts` | 1356 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 779 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `locks.ts` | 140 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
@@ -127,7 +127,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
 | `sandbox-build.ts` | 541 | The sandbox's base-building scenes (2026-10-24): each step of base building looked at on the plain floor before the world (the owner: |
-| `sandbox-inventory.ts` | 208 | The sandbox's screens (2026-10-24, the owner: |
+| `sandbox-inventory.ts` | 220 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
 | `sandbox.ts` | 249 | The sandbox (the stage until 2026-10-24, the owner: |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
@@ -166,7 +166,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `doors.ts` | 67 | A base's doors in the game (2026-10-24, base building's fourth step): |
 | `draw.ts` | 300 | The bases as they are drawn and stood on (2026-10-24). |
 | `icons.ts` | 102 | The wheel's pictures (2026-10-24, the owner: |
-| `index.ts` | 802 | Base building as the game has it (2026-10-24, the second step; the rules are src/sim/build/, the server's side server/build.ts). |
+| `index.ts` | 806 | Base building as the game has it (2026-10-24, the second step; the rules are src/sim/build/, the server's side server/build.ts). |
 | `ladders.ts` | 95 | Ladders in the game (2026-10-24, base building's fourth step): a ladder leant on a wall, and the ladder under a hatch. |
 | `locks.ts` | 244 | Locks in the game (2026-10-24, base building's fourth step; the rules src/sim/build/locks.ts, the server's side server/locks.ts). |
 | `look.ts` | 252 | How a piece of a base looks (2026-10-24): its solids (src/sim/build/solids.ts) made into one shape for each kind and tier, and one paint for each tier, from Poly Haven's pictures (the owner's yes, plan v2: |
@@ -181,13 +181,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `camera.ts` | 103 | Camera director: the view from the survivor's eyes, and the flight into them from the menu's aerial shot. |
 | `cellars.ts` | 72 | The basements as the game has them (src/sim/basements.ts): a bulb hung in each of their rooms and over the foot of their steps, lit for whoever is near enough to see by it, and how dark it is down there for the eye. |
 | `character.ts` | 93 | A character other than the local player: body, hit zones (head / torso / legs) and health. |
-| `crafting.ts` | 98 | Crafting as the game has it (2026-10-24, plan-crafting; the rules are src/sim/craft/, the server's side server/craft.ts). |
+| `crafting.ts` | 176 | Crafting as the game has it (2026-10-24, plan-crafting; the rules are src/sim/craft/, the server's side server/craft.ts). |
 | `doll.ts` | 1014 | The survivor in the middle of the inventory, alive. |
 | `effects.ts` | 1015 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `finish.ts` | 152 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1981 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1986 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -195,13 +195,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `drops.ts` | 597 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 758 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 774 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 775 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 534 | The game: attachments and magazines. |
 | `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 397 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 737 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 1014 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 1015 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
 ## src/game/
 
@@ -257,7 +257,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `client.ts` | 483 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
 | `orders.ts` | 234 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 701 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 706 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -324,6 +324,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
+| `places.ts` | 27 | Where a workbench's or a forge's recipes are made (2026-10-25): near one of them standing in a base, any base's (Rust's bench is anybody's who stands at it). |
 | `plan.ts` | 169 | What a craft takes out of a set of pockets, and what comes of it (2026-10-24): one rule, read by the game for its screen and by the server, which judges every craft on its own copy of the pockets (as building does). |
 | `recipes.ts` | 94 | Every recipe, as data (2026-10-24, plan-crafting, which the owner said yes to; "when in doubt just ask how does rust/dayz do it"). |
 
@@ -480,7 +481,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `craft-card.ts` | 141 | A recipe's card (2026-10-24, plan-crafting): what it makes, what it needs with what you carry in green and red, the place it needs, its time, how many (1, 5, the most), and Craft. |
-| `crafting-ui.ts` | 148 | The Crafting tab (2026-10-25, plan-crafting): the inventory's left and middle turned to crafting, Carried kept on the right, where what the chosen recipe needs lights up. |
+| `crafting-ui.ts` | 169 | The Crafting tab (2026-10-25, plan-crafting): the inventory's left and middle turned to crafting, Carried kept on the right, where what the chosen recipe needs lights up. |
 | `discord.ts` | 14 | The way in to the Discord, as a button beside every Store (the owner, 2026-10-24: |
 | `dogtag.ts` | 166 | The dog tag on the menu: two steel tags on a ball chain, the player's name stamped into the front one as it is typed. |
 | `door.ts` | 170 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |

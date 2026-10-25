@@ -311,6 +311,7 @@ export const frameMethods = {
     // the fires: the infected hear one crackle, and whoever is beside one mends
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
     this.gather.update(dt);
+    this.craft.update(dt);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
     this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
     // (offline a rack shows what is in it as it is; online the server says: see GunRacks)

@@ -711,6 +711,7 @@ export class Game {
       take: (id, n) => void this.inv.take(id, n),
       give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
       changed: () => this.inventoryChanged(),
+      bases: () => this.build.known,
     });
     this.build = new Building({
       scene: r.scene,
@@ -1015,12 +1016,16 @@ export class Game {
       craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
       craftOpen: () => this.craftCard.open,
     });
-    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u) });
+    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u), near: (at) => this.craft.near(at) });
     // (the Crafting tab: J, or the tab at the top of the inventory)
     this.invUI.craftPane = new CraftingScreen({
       icons: () => this.invUI.icons,
       pockets: () => pocketsOf(this.inv.serialize()),
       craft: (rid, n, u) => void this.craft.craft(rid, n, u),
+      near: (at) => this.craft.near(at),
+      queue: () => this.craft.queue.jobs,
+      running: () => this.craft.running(),
+      unqueue: (i) => this.craft.unqueue(i),
       light: (ids) => this.invUI.lightUp(ids),
       making: () => {
         const u = this.use;

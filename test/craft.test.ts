@@ -1,6 +1,7 @@
 // Crafting (src/sim/craft/, server/craft.ts, src/game/crafting.ts), of 2026-10-24.
 //   npx tsx test/craft.test.ts            the recipes and the rule: a second or two
-//   npx tsx test/craft.test.ts --server   and a real server on a port of its own (8393), played over its socket
+//   npx tsx test/craft.test.ts --server   and a real server on a port of its own (8393), played over its socket: a hand
+//                                         craft, and a workbench laid in the country and its queue
 //
 // What was asked: "We need some sort of crafting like how rust has crafting"; "clothing could be cut up with a knife or
 // sharp object to make cloth which could be combined with rubbing alcohols to make iFAK's"; "when in doubt just ask how
@@ -8,7 +9,8 @@
 // into rags by their size, only empty and never worn, with a blade that wears; powder comes out of ten rounds of one
 // kind, more from a rifle's; a batch makes as many as the pockets allow; two things dragged onto each other find their
 // recipes. On the server: a craft is let begin only with what it takes, is done only after its time and standing still,
-// takes what stacks as building's costs ('spent') and the clothes by their number, wears the blade, and gives what is made.
+// takes what stacks as building's costs ('spent') and the clothes by their number, wears the blade, and gives what is made;
+// a workbench's recipe is queued only at a bench, runs while its maker stays, waits while they are away, and comes off.
 
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -22,6 +24,11 @@ import { RECIPE, RECIPES, RAGS, optionsOf } from '../src/sim/craft/recipes';
 import { most, needsOf, plan, pocketsOf, recipesFor, type Plan, type Pockets } from '../src/sim/craft/plan';
 import { TOOL_LIFE } from '../src/sim/gather';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { placeNear } from '../src/sim/craft/places';
+import { Bases, heard, type Land } from '../src/sim/build/bases';
+import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
+import { blocked, deployAt, nearestSpot, spots, toWorld } from '../src/sim/build/snap';
+import { buildWorldData } from '../server/world';
 
 let n = 0;
 const failed: string[] = [];
@@ -125,6 +132,20 @@ ok('two things dragged onto each other find their recipes: a knife on a jacket, 
   assert.deepEqual(ids('iron_bar', 'planks'), []);
 });
 
+ok('a workbench is near when one stands within 4 m on the same floor, not on the floor above', () => {
+  const land: Land = { ground: () => 0, why: () => null, solids: () => [] };
+  const bs = new Bases(land), base = bs.lay({ k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+  assert.ok(typeof base !== 'string', String(base));
+  const b = (base as { base: Parameters<typeof deployAt>[0] }).base;
+  const at = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 })!;
+  assert.ok(typeof bs.lay({ b: b.id, k: 'workbench', ...at }, 'me', 0) !== 'string');
+  const [wx, wy, wz] = toWorld(b, at.x, at.y, at.z);
+  assert.ok(placeNear(bs, 'bench', wx + 3, wy, wz), 'a bench 3 m off was not near');
+  assert.equal(placeNear(bs, 'bench', wx + 5, wy, wz), null, 'a bench 5 m off was near');
+  assert.equal(placeNear(bs, 'bench', wx + 1, wy + 3, wz), null, 'a bench on the floor below was near');
+  assert.equal(placeNear(bs, 'forge', wx, wy, wz), null, 'a bench was a forge');
+});
+
 ok('every crafting thing is drawn with a model of its own, brought in, and has its picture in the pockets', () => {
   const models = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')).models, icons = JSON.parse(readFileSync('public/assets/icons/index.json', 'utf8'));
   for (const d of CRAFT_ITEMS) {
@@ -147,6 +168,18 @@ async function serverTest() {
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   assert.match(readFileSync('.env.local-server', 'utf8'), /^SITE_URL=http:\/\/127\.0\.0\.1:9\s*$/m, '.env.local-server does not hold SITE_URL=http://127.0.0.1:9: not starting a server');
   console.log('Crafting: on a server (port 8393)');
+  // (a place out in the country a base may go, as the server will judge it: base building's test finds one the same way)
+  const data = buildWorldData(process.cwd());
+  const solids = new Solids(data.trees, data.rocks), wet = wetAt(data.water, (x, z) => data.groundAt(x, z));
+  const land: Land = { ground: (x, z) => data.groundAt(x, z), why: (x, z) => noBuilding(x, z, data.places, data.buildings, data.spawns, wet), solids: (x, z, w) => solids.near(x, z, w) };
+  let site: [number, number] | null = null;
+  for (let x = -2400; x < 2400 && !site; x += 37) for (let z = -1500; z < 1500 && !site; z += 41) {
+    const bs = new Bases(land), got = bs.lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, 'craft-test', 0);
+    if (typeof got === 'string') continue;
+    const sp = nearestSpot(spots(got.base, 'foundation'), 'foundation', { x: 3, y: 0, z: 0 }, 1);
+    if (sp && !blocked(got.base, 'foundation', sp, bs.groundIn(got.base))) site = [x, z];
+  }
+  assert.ok(site, 'no place on the map a base may go');
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-craft-'));
   const server = spawn(process.execPath, ['--env-file=.env.local-server', path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
     env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off' },
@@ -173,9 +206,9 @@ async function serverTest() {
   ws.on('message', (d) => got.push(JSON.parse(String(d)) as S2C));
   const send = (m: unknown) => ws.send(JSON.stringify(m));
   const of = <T extends S2C['t']>(t: T) => got.filter((m) => m.t === t) as Extract<S2C, { t: T }>[];
-  const until = async <T extends S2C['t']>(t: T, test: (m: Extract<S2C, { t: T }>) => boolean = () => true, ms = 4000) => {
+  const until = async <T extends S2C['t']>(t: T, test: (m: Extract<S2C, { t: T }>) => boolean = () => true, ms = 4000, from = 0) => {
     for (let k = 0; k < ms / 25; k++) {
-      const m = of(t).find(test);
+      const m = (got.slice(from).filter((q) => q.t === t) as Extract<S2C, { t: T }>[]).find(test);
       if (m) return m;
       await sleep(25);
     }
@@ -254,6 +287,74 @@ async function serverTest() {
     send({ t: 'craft', r: 'rope', n: 1, go: 2 });
     assert.ok(await until('craft', (m) => m.r === 'rope' && !m.ok && /moved/.test(m.why ?? '')), 'a craft walked away from was still made');
     console.log('  ok  walking off during the hold stops it, and nothing is used up');
+
+    // a workbench, laid in the country: a foundation and the bench on it, paid for out of what /give gave
+    const kit = async (text: string) => {
+      const had = of('kit').length;
+      send({ t: 'chat', text });
+      for (let k = 0; k < 160 && of('kit').length === had; k++) await sleep(25);
+      const items = of('kit')[had]?.items ?? [];
+      assert.ok(items.length, `${text} gave nothing`);
+      return items;
+    };
+    const go = async (x: number, z: number) => {
+      const had = of('put').length;
+      send({ t: 'chat', text: `/tp ${x.toFixed(2)} ${z.toFixed(2)}` });
+      for (let k = 0; k < 160 && of('put').length === had; k++) await sleep(25);
+      pos = [x, data.groundAt(x, z), z];
+      pose();
+      await sleep(80);
+    };
+    const [sx, sz] = site!;
+    const planPaper = (await kit('/give building_plan'))[0];
+    pockets = [planPaper, ...(await kit('/give planks 30')), ...(await kit('/give log 4')), ...(await kit('/give nails 20'))];
+    me();
+    await go(sx - 2, sz);
+    send({ t: 's', p: [pos[0], pos[1], pos[2], 0, 0, 0], w: 'building_plan', m: [] });
+    await sleep(80);
+    send({ t: 'blay', k: 'foundation', x: sx, y: 0, z: sz, r: 0, yaw: 0, u: planPaper.uid });
+    const told = await until('base');
+    assert.ok(told, `no base: ${JSON.stringify(of('tell').slice(-2))}`);
+    const b = heard(told.b)!;
+    const spot = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 })!;
+    send({ t: 'blay', k: 'workbench', b: b.id, ...spot, u: planPaper.uid });
+    assert.ok(await until('bpc'), `no workbench: ${JSON.stringify(of('tell').slice(-2))}`);
+    const [bx, , bz] = toWorld(b, spot.x, spot.y, spot.z);
+
+    // nails, queued at the bench: two lots, one bar each; made one after the other while the maker stays
+    pockets = [makeItem('iron_bar', 3)];
+    me();
+    await go(bx + 2, bz);
+    const k0 = of('kit').length, g0 = got.length;
+    send({ t: 'cq', r: 'nails', n: 2 });
+    const q1 = await until('cq', (m) => m.q.length === 1);
+    assert.deepEqual(q1?.q, [{ r: 'nails', n: 2 }], `queued: ${JSON.stringify(q1)} ${JSON.stringify(of('craft').slice(-1))}`);
+    await until('kit', (m) => m.items.some((it) => it.id === 'nails'), RECIPE.nails.time * 1000 + 5000, g0);
+    const nails = of('kit').slice(k0).flatMap((m) => m.items).filter((it) => it.id === 'nails');
+    assert.equal(nails.reduce((t, it) => t + it.qty, 0), 20, `after one job's time: ${JSON.stringify(nails)}`);
+    assert.ok(await until('spent', (m) => m.items.some(([id]) => id === 'iron_bar')), 'no bar was taken for the nails');
+    console.log(`  ok  nails queued at a workbench: the first 20 made after ${RECIPE.nails.time} s, a bar taken as they were`);
+
+    // walked off: it waits; back: it goes on; taken off: the queue is empty and nothing more is made
+    pockets = [makeItem('iron_bar', 2)];
+    me();
+    await go(bx + 12, bz);
+    assert.ok(await until('cq', (m) => m.paused && m.q.length === 1), 'walking off the bench did not pause the queue');
+    await sleep(1000);
+    const k1 = of('kit').length, back = got.length;
+    await go(bx + 2, bz);
+    assert.ok(await until('cq', (m) => !m.paused && m.q.length === 1, 4000, back), 'coming back did not run the queue on');
+    send({ t: 'cqx', i: 0 });
+    assert.ok(await until('cq', (m) => m.q.length === 0), 'the job did not come off');
+    await sleep(RECIPE.nails.time * 1000 + 500);
+    assert.equal(of('kit').slice(k1).flatMap((m) => m.items).filter((it) => it.id === 'nails').length, 0, 'nails were made after the job came off');
+    console.log('  ok  walked off it waits, back it goes on, and taken off nothing more is made');
+
+    // queued far from any bench: refused
+    await go(bx + 30, bz);
+    send({ t: 'cq', r: 'nails', n: 1 });
+    assert.ok(await until('craft', (m) => m.r === 'nails' && !m.ok && /workbench/.test(m.why ?? '')), 'queued with no bench near');
+    console.log('  ok  nothing is queued away from a workbench');
   } catch (e) {
     fail = e;
   } finally {

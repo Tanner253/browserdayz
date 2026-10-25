@@ -113,3 +113,18 @@
 
 /* what the chosen recipe takes, lit among what is carried */
 .inv-item.craft-need { box-shadow: inset 0 0 0 2px rgba(111, 214, 168, 0.85), 0 0 12px rgba(111, 214, 168, 0.35); transition: box-shadow 160ms; }
+
+/* the workbench's queue in the strip: each job its picture, the first its bar (paused: waiting at no bench), every one its cancel */
+.ic-job { position: relative; flex: none; display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 22px 0 4px; overflow: hidden; color: var(--ink); background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(233, 228, 216, 0.2); animation: cc-pop 150ms ease-out; }
+.ic-job .ic-pic { display: inline-block; flex: none; width: 22px; height: 22px; background: center / contain no-repeat; }
+.ic-job span { font-size: 13px; white-space: nowrap; }
+.ic-job b { font: 600 11px var(--mono); color: var(--ink-dim); }
+.ic-job em { position: relative; z-index: 1; font: 11px var(--mono); font-style: normal; color: #6fd6a8; }
+.ic-job i.bar { position: absolute; left: 0; bottom: 0; height: 3px; background: #6fd6a8; transition: width 200ms linear; }
+.ic-job.first { min-width: 96px; border-color: rgba(111, 214, 168, 0.6); }
+.ic-job.paused { border-color: rgba(255, 211, 90, 0.6); }
+.ic-job.paused em { color: #ffd35a; }
+.ic-job.paused i.bar { background: #ffd35a; }
+.ic-job button { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0; font: 15px/1 var(--font); color: var(--ink-faint); background: none; border: 0; cursor: pointer; }
+.ic-job button:hover { color: #ee7a6e; }
+.ic-strip { flex-wrap: wrap; }

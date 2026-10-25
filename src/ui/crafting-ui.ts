@@ -14,6 +14,10 @@ export interface CraftScreenHost extends CardHost {
   light: (ids: Set<string> | null) => void;
   /** what the hands are making now, and how far through (0..1): the strip under the grid */
   making: () => { label: string; t: number; left: number } | null;
+  /** the workbench's queue, its first job's progress, and a job taken off it */
+  queue: () => { r: string; n: number }[];
+  running: () => { r: Recipe; t: number; left: number; paused: boolean } | null;
+  unqueue: (i: number) => void;
 }
 
 /** each kind's mark, a path in a box of 24 (as the wheel's: src/ui/radial.ts) */
@@ -25,7 +29,7 @@ const GLYPH: Record<Cat | 'all' | 'bench' | 'forge', string> = {
   build: 'M3 6h18v4H3zM3 14h18v4H3zM9 6v4M15 14v4',
   raid: 'M12 2l2 6 6-2-4 5 5 4-6 0-1 6-3-5-4 4 1-6-6-2 6-2-2-5z',
   bench: 'M3 10h18v3H3zM5 13v7M19 13v7M8 6l3 4M14 4v6',
-  forge: 'M6 21h12l-1-9H7zM9 12V8M15 12V8M12 3c1 2 2 3 2 5a2 2 0 0 1-4 0c0-2 1-3 2-5z',
+  forge: 'M3 8h14a4 4 0 0 1-4 4h-1v3h3v3H7v-3h3v-3H7a4 4 0 0 1-4-4zM19 8h2',
 };
 const svg = (d: string) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -38,6 +42,8 @@ export class CraftingScreen {
   private card: CraftCard;
   private parts: { rail: HTMLElement; grid: HTMLElement; detail: HTMLElement; strip: HTMLElement; search: HTMLInputElement };
   private tick = 0;
+  /** what the strip was last built of: built again only when that changes, its bars moved in between */
+  private stripSig = '';
 
   constructor(private h: CraftScreenHost) {
     this.card = new CraftCard(h);
@@ -64,6 +70,10 @@ export class CraftingScreen {
     this.parts.grid.addEventListener('dblclick', (e) => {
       const t = (e.target as HTMLElement).closest<HTMLElement>('[data-r]');
       if (t && t.classList.contains('can')) h.craft(t.dataset.r!, 1, []);
+    });
+    this.parts.strip.addEventListener('click', (e) => {
+      const x = (e.target as HTMLElement).closest<HTMLElement>('[data-x]');
+      if (x) h.unqueue(Number(x.dataset.x));
     });
     this.parts.search.addEventListener('input', () => {
       this.find = this.parts.search.value.trim().toLowerCase();
@@ -124,24 +134,35 @@ export class CraftingScreen {
     this.strip();
   }
 
+  /** the strip: the hold, then the workbench's queue, the first job's bar and every job's cancel */
   private strip() {
-    const m = this.h.making();
-    const was = this.parts.strip.dataset.on === '1';
-    if (!m) {
-      if (was) {
-        this.parts.strip.dataset.on = '0';
-        this.parts.strip.innerHTML = '<span class="ic-idle">Nothing being made</span>';
-      } else if (!this.parts.strip.innerHTML) this.parts.strip.innerHTML = '<span class="ic-idle">Nothing being made</span>';
+    const m = this.h.making(), jobs = this.h.queue(), run = this.h.running(), icons = this.h.icons();
+    const sig = JSON.stringify([m?.label ?? '', jobs, run?.paused ?? false]);
+    const el = this.parts.strip;
+    if (sig === this.stripSig) {
+      // (only the bars and the seconds move)
+      const hand = el.querySelector<HTMLElement>('.ic-run.hand');
+      if (hand && m) {
+        hand.querySelector('i')!.style.width = `${Math.round(m.t * 100)}%`;
+        hand.querySelector('em')!.textContent = `${Math.ceil(m.left)} s`;
+      }
+      const first = el.querySelector<HTMLElement>('.ic-job.first');
+      if (first && run) {
+        first.querySelector<HTMLElement>('i.bar')!.style.width = `${Math.round(run.t * 100)}%`;
+        first.querySelector('em')!.textContent = run.paused ? 'away' : `${Math.ceil(run.left)} s`;
+      }
       return;
     }
-    this.parts.strip.dataset.on = '1';
-    const left = `${Math.ceil(m.left)} s`;
-    const bar = this.parts.strip.querySelector<HTMLElement>('.ic-run i');
-    if (bar && this.parts.strip.querySelector('.ic-run b')?.textContent === m.label) {
-      bar.style.width = `${Math.round(m.t * 100)}%`;
-      this.parts.strip.querySelector('.ic-run em')!.textContent = left;
-      return;
-    }
-    this.parts.strip.innerHTML = `<span class="ic-run"><b>${esc(m.label)}</b><em>${left}</em><i style="width:${Math.round(m.t * 100)}%"></i></span>`;
+    this.stripSig = sig;
+    const parts: string[] = [];
+    if (m) parts.push(`<span class="ic-run hand"><b>${esc(m.label)}</b><em>${Math.ceil(m.left)} s</em><i style="width:${Math.round(m.t * 100)}%"></i></span>`);
+    jobs.forEach((j, i) => {
+      const r = RECIPES.find((x) => x.id === j.r);
+      if (!r) return;
+      const first = i === 0 && run;
+      const tip = first && run.paused ? 'Waiting: stand at a workbench' : `${recipeName(r)}${j.n > 1 ? ` × ${j.n}` : ''}`;
+      parts.push(`<span class="ic-job ${first ? 'first' : ''} ${first && run.paused ? 'paused' : ''}" title="${esc(tip)}"><i class="ic-pic" style="background-image:url(${icons[r.makes] ?? ''})"></i><span>${esc(recipeName(r))}</span>${j.n > 1 ? `<b>×${j.n}</b>` : ''}${first ? `<em>${run.paused ? 'away' : `${Math.ceil(run.left)} s`}</em><i class="bar" style="width:${Math.round(run.t * 100)}%"></i>` : ''}<button data-x="${i}" title="Take it off the bench">×</button></span>`);
+    });
+    el.innerHTML = parts.length ? parts.join('') : '<span class="ic-idle">Nothing being made</span>';
   }
 }

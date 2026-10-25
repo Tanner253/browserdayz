@@ -9,6 +9,7 @@
 //   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
 //                                  a recipe's card (src/ui/craft-card.ts), whose Craft makes it at once here
 //   &tab=craft                     the Crafting tab open (src/ui/crafting-ui.ts)
+//   &bench=1                       and a workbench as if near, three jobs on its queue, the first part way
 //   &touch=1                       as a phone has it
 // What is done in it (a drag, a key, a drop) is done to these pockets alone, and nothing is kept.
 
@@ -173,7 +174,18 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   screen = new InventoryUI(inv, actions);
   screen.icons = icons;
   const ui2 = screen;
-  screen.craftPane = new CraftingScreen({ icons: () => icons, pockets: () => pocketsOf(inv.serialize()), craft: makeNow, light: (ids) => ui2.lightUp(ids), making: () => null });
+  const bench = q.get('bench') === '1', jobs = bench ? [{ r: 'nails', n: 3 }, { r: 'sheet_metal', n: 1 }, { r: 'sledgehammer', n: 1 }] : [];
+  screen.craftPane = new CraftingScreen({
+    icons: () => icons,
+    pockets: () => pocketsOf(inv.serialize()),
+    craft: makeNow,
+    near: (at) => bench && at === 'bench',
+    light: (ids) => ui2.lightUp(ids),
+    making: () => null,
+    queue: () => jobs,
+    running: () => (jobs[0] ? { r: RECIPE[jobs[0].r], t: 0.4, left: RECIPE[jobs[0].r].time * 0.6, paused: false } : null),
+    unqueue: (i) => void jobs.splice(i, 1),
+  });
   // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
   if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
   screen.open(vicinity, opened ?? body, freshVitals());
