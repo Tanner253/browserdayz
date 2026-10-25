@@ -9,7 +9,7 @@ import { prune, cloneDocument, resample } from '@gltf-transform/functions';
 import * as THREE from 'three';
 import { readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop, flat } from './mocap-pose.mjs';
+import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop, flat, relax } from './mocap-pose.mjs';
 import { ROOT, SRC, io, loadBody, carry as carryOnto } from './mocap-carry.mjs';
 export { meshyBone } from './mocap-carry.mjs';
 import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
@@ -23,13 +23,19 @@ import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
  * `late` loaded the first time it is wanted, not with the body. The owner, 2026-10-25: "we want tarkov quality military
  * animations realism".
  */
+/**
+ * The shoulders of the idle and the walks let down and the arms hung at the sides (see mocap-pose.mjs relax): as captured
+ * they ride 4 to 10 cm up, a shrug (the owner, 2026-10-25: "their shoulders are all bunched up")
+ */
+const SHOULDERS = { drop: 0.01, inward: 0.09 };
+
 export const MOVES = {
   // standing still, breathing, the weight shifting a little, its soles laid flat (it stood rocked back on its heels) (the library's 'Idle' turns round to look behind it: a
   // body that is seen to look elsewhere than it aims tells lies in a shooter)
-  idle: { from: 'Idle_3', flat: true, soft: 0.21 },
+  idle: { from: 'Idle_3', flat: true, soft: 0.21, relax: SHOULDERS },
   // standing, nothing held up: an easy walk
-  walkF: { from: 'walking_2', way: 'F', gait: 'walk' },
-  walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk' },
+  walkF: { from: 'walking_2', way: 'F', gait: 'walk', relax: SHOULDERS },
+  walkB: { from: 'Walk_Backward', way: 'B', gait: 'walk', relax: SHOULDERS },
   // a gun up: the knees soft, the chest still over them (the bow's walk: the arms are the gun's)
   // (raised toward the walk's hips and its chest's lean, as far as the legs let them: the eye does not go down with the
   // knees, and a head drawn under the eye was a head under cover the eye could shoot over)
@@ -55,8 +61,8 @@ export const MOVES = {
   // leans. The cautious crouch holds both arms out wide, which squared to the front stood out to the sides. Stepped by
   // the crouch's legs, so without a gait of their own: in step with them as every loop is, left heel first; only the
   // arms are kept)
-  walkLow: { from: 'walking_2', way: 'F', stoop: 0.5, arms: true },
-  walkLowB: { from: 'Walk_Backward', way: 'B', stoop: 0.5, arms: true },
+  walkLow: { from: 'walking_2', way: 'F', stoop: 0.5, arms: true, relax: SHOULDERS },
+  walkLowB: { from: 'Walk_Backward', way: 'B', stoop: 0.5, arms: true, relax: SHOULDERS },
   // on a broken leg
   limpF: { from: 'Limping_Walk_1', way: 'F', gait: 'limp', square: 0.5 },
   limpB: { from: 'Injured_Walk_Backward', way: 'B', gait: 'limp', square: 0.5 },
@@ -107,6 +113,7 @@ if (!cands) {
     said.was = facing(doc, sk, name);
     if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
     if (m.stoop) stoop(doc, sk, name, m.stoop);
+    if (m.relax) relax(doc, sk, name, m.relax);
     if (m.flat) flat(doc, sk, name, { soft: m.soft ?? null });
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);

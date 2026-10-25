@@ -207,6 +207,46 @@ export function flat(doc, sk, name, { soft = null } = {}) {
   writeClip(doc, clip, Q, T, clip.dur);
 }
 
+/**
+ * A movement's shoulders let down and its arms hung at the sides: each collarbone turned down until the shoulder stands
+ * over the top of the spine, on the whole, `drop` metres under where it rests (by one turn for the whole of it, so it
+ * keeps its own rise and fall), the upper arm kept hanging the way it hung, then brought `inward` (radians) toward the
+ * body. The library's idle and walks carry the shoulders 4 to 10 cm up toward the ears as captured, the arms hung out
+ * from the body: the owner, 2026-10-25, "survivors in this image look like their shoulders are all bunched up".
+ */
+export function relax(doc, sk, name, { drop = 0, inward = 0 } = {}) {
+  const clip = readClip(doc, sk, name), { Q, T } = frameOf(clip), n = clip.frames + 1;
+  const rest = sk.pose([], null), C = sk.index('spine_03'), FWD = new THREE.Vector3(0, 0, 1);
+  const parentQ = (W, i) => rotOf(W[sk.parent[i]]);
+  const aim = (f, i, from, toward, kid) => {
+    const W = sk.pose(Q[f], T[f]);
+    const now = posOf(W[kid]).sub(posOf(W[i])).normalize(), want = toward.clone().sub(from).normalize();
+    Q[f][i] = parentQ(W, i).invert().multiply(new THREE.Quaternion().setFromUnitVectors(now, want).multiply(rotOf(W[i]))).normalize();
+  };
+  for (const [s, out] of [['l', 1], ['r', -1]]) {
+    const [K, U, L] = ['clavicle', 'upperarm', 'lowerarm'].map((x) => sk.index(`${x}_${s}`));
+    const restRise = posOf(rest[U]).y - posOf(rest[C]).y;
+    // (how far up the shoulder rides on the whole, over where it rests and what is asked)
+    let over = 0;
+    for (let f = 0; f < n; f++) {
+      const W = sk.pose(Q[f], T[f]);
+      over += (posOf(W[U]).y - posOf(W[C]).y - restRise + drop) / n;
+    }
+    if (over <= 0 && !inward) continue;
+    for (let f = 0; f < n; f++) {
+      let W = sk.pose(Q[f], T[f]);
+      const arm = posOf(W[L]).sub(posOf(W[U]));
+      if (over > 0) aim(f, K, posOf(W[K]), posOf(W[U]).add(new THREE.Vector3(0, -over, 0)), U);
+      W = sk.pose(Q[f], T[f]);
+      // (the upper arm hung as it was, and turned in toward the body: about the body's front, the left one to its right)
+      arm.applyAxisAngle(FWD, -out * inward);
+      const shoulder = posOf(W[U]);
+      aim(f, U, shoulder, shoulder.clone().add(arm), L);
+    }
+  }
+  writeClip(doc, clip, Q, T, clip.dur);
+}
+
 /** part of a movement done once: from `a` to `b` seconds */
 export function trim(doc, sk, name, a, b) {
   const clip = readClip(doc, sk, name);
