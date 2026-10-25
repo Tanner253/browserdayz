@@ -395,7 +395,11 @@ export const onlineMethods = {
     net.on('cdata', (m) => {
       const st = this.findBox(m.cid);
       if (!st) return;
-      if (m.own) st.own = true;
+      // (their own body: the button that puts it all back on is shown, src/game/game/reclaim.ts)
+      if (m.own && !st.own) {
+        st.own = true;
+        if (this.openStash === st && this.invUI.isOpen) this.invUI.render();
+      }
       // (What the server says is in it: what this game's moves are reckoned from. Its answer to this game's own moves
       // is what this game has already, and nothing is laid out again for it.)
       const same = st.known && JSON.stringify(st.container.serialize().items) === JSON.stringify(m.items);
