@@ -380,6 +380,9 @@ const SMG_CARRY = {
 };
 /** a stroke of the spade when something is being buried or dug up, seconds */
 const DIG_STROKE = 1.15;
+/** a saw's stroke at a log, there and back, seconds; and how far it goes along its blade, metres */
+const SAW_STROKE = { time: 0.7, reach: 0.1 };
+const _sawQ = new THREE.Quaternion(), _sawX = new THREE.Vector3(1, 0, 0), _sawTip = new THREE.Vector3();
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
 /**
@@ -3794,6 +3797,21 @@ export class Weapons {
     if (this.action?.name === 'swing' && this.action.data?.dig) this.action = null;
   }
 
+  /**
+   * Work with what is in the hands, a blow at a time for as long as this is called: the hammer driving nails while a
+   * piece is put up, mended or turned (the owner, 2026-10-25: "We need sawing and hammering animations"). A swing's
+   * blow, seen by everybody as one is, that hits nobody. @returns true when a new blow has just begun
+   */
+  work(dur = 0.6): boolean {
+    if (this.action) return false;
+    this.start('swing', dur, undefined, { hit: 1, dmg: 0, range: 0, stroke: 0 });
+    this.onSwing(dur);
+    return true;
+  }
+  /** a saw drawn to and fro over a log, for as long as this is true (`animateMelee`) */
+  sawing = false;
+  private sawT = 0;
+
   private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera) {
     this.fireCooldown = melee.rate;
     this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
@@ -4706,6 +4724,13 @@ export class Weapons {
     elbow.add(_mv);
     // (what the arms have just taken: a blow landed, or one stopped)
     quat.premultiply(_mq2.setFromEuler(_me.set(-0.35 * sp + Math.cos(ph) * 0.02 * amp + kr.x * 0.012 - down * 0.9, 0.25 * sp, 0.3 * sp + Math.cos(ph) * 0.025 * amp + kr.z * 0.01, 'XYZ')));
+    // (a saw at a log: tipped down at it, and drawn to and fro along its blade)
+    if (this.sawing && !a) {
+      this.sawT += dt;
+      const s = Math.sin((this.sawT * Math.PI * 2) / SAW_STROKE.time);
+      quat.premultiply(_sawQ.setFromAxisAngle(_sawX, -0.45));
+      pos.addScaledVector(_sawTip.set(0, 1, 0).applyQuaternion(quat), s * SAW_STROKE.reach).y += 0.02;
+    } else this.sawT = 0;
     m.root.position.copy(pos);
     m.root.quaternion.copy(quat);
     m.root.visible = true;

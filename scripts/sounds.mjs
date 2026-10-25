@@ -265,6 +265,8 @@ SOUNDS.break_metal = { src: fsnd('703247__xkeril__big-falling-debris-crash.wav')
 // (flem0527's), a garage door run up or down (nicola_ariutti's roller shutter)
 [1, 2, 3, 4].forEach((n) => (SOUNDS[`nail${n > 1 ? `_${n}` : ''}`] = { src: dec(`c-hammer_0${n}`), len: 0.45, rate: 32000, gain: 0.85, fade: 0.12 }));
 SOUNDS.lock_click = { src: dec('c-metalClick'), len: 0.45, rate: 32000, gain: 0.8, fade: 0.08 };
+// (and a hand saw at a log, deleted_user_7146007's "Hand Saw Sawing Wood", CC0: four seconds of its strokes, looped while a log is sawn)
+SOUNDS.saw = { src: fsnd('383725__deleted_user_7146007__hand-saw-sawing-wood.wav'), from: 12, len: 4, loop: true, rate: 32000, gain: 0.9 };
 SOUNDS.crate_latch = { src: dec('c-metalLatch'), len: 0.26, rate: 32000, gain: 0.8, fade: 0.06 };
 SOUNDS.crate_open = { src: dec('c-doorOpen_1'), len: 0.9, rate: 32000, gain: 0.8, fade: 0.15 };
 SOUNDS.crate_shut = { src: dec('c-doorClose_1'), len: 0.68, rate: 32000, gain: 0.85, fade: 0.12 };

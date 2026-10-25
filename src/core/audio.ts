@@ -329,7 +329,7 @@ export const rotorRecording = () => lateRecording('rotor');
 const RAID_SOUNDS = ['c4_beep', 'fuse', 'break_wood', 'break_stone', 'break_metal', 'sledge'];
 export const raidRecordings = () => Promise.all(RAID_SOUNDS.map(lateRecording));
 /** building's own (scripts/sounds.mjs): fetched when a base is first near, or the plan or the hammer first in the hands */
-const BUILD_SOUNDS = ['nail', 'lock_click', 'crate_latch', 'crate_open', 'crate_shut', 'creak', 'cloth', 'keypad', 'code_ok', 'code_wrong', 'shock', 'knock', 'garage'] as const;
+const BUILD_SOUNDS = ['nail', 'lock_click', 'crate_latch', 'crate_open', 'crate_shut', 'creak', 'cloth', 'keypad', 'code_ok', 'code_wrong', 'shock', 'knock', 'garage', 'saw'] as const;
 export type BuildSound = (typeof BUILD_SOUNDS)[number];
 export const buildRecordings = () => Promise.all(BUILD_SOUNDS.map(lateRecording));
 
@@ -2475,6 +2475,26 @@ export class AudioEngine {
       stop: () => {
         g.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
         src.stop(ctx.currentTime + 0.2);
+      },
+    };
+  }
+
+  /** A saw at a log, over and over until it is told to stop (src/game/gathering.ts). */
+  sawing(pos: V3): { stop: () => void } {
+    const ctx = this.ctx;
+    void buildRecordings();
+    const buf = this.ready ? bank.get('saw')?.[0] : undefined;
+    if (!buf) return { stop: () => {} };
+    const out = this.out(pos, 2, 1.5), src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    src.loop = true;
+    g.gain.value = 0.7;
+    src.connect(g).connect(out);
+    src.start();
+    return {
+      stop: () => {
+        g.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+        src.stop(ctx.currentTime + 0.25);
       },
     };
   }

@@ -707,6 +707,8 @@ export class Game {
       changed: () => this.inventoryChanged(),
       begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
       breakOff: () => this.breakOff(),
+      busy: () => !!this.use,
+      sawing: (on) => void (this.weapons.sawing = on),
     });
     this.craft = new Crafting({
       online: () => this.online,
@@ -744,6 +746,7 @@ export class Game {
       give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
       begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
       busy: () => !!this.use || this.weapons.working,
+      work: (dur) => this.weapons.work(dur),
       breakOff: () => this.breakOff(),
       changed: () => this.inventoryChanged(),
       felled: (i) => this.gather.felling.isDown(i),

@@ -39,6 +39,10 @@ export interface GatherHost {
   begin: (label: string, dur: number, valid: () => boolean, done: () => void, lost: string) => void;
   /** the hands put off what they were at */
   breakOff: () => void;
+  /** the hands at anything */
+  busy: () => boolean;
+  /** the saw in the hands drawn to and fro, or not */
+  sawing: (on: boolean) => void;
 }
 
 /** seconds the ring shows how far through a tree or a rock the work is, after a blow */
@@ -119,6 +123,10 @@ export class Gathering {
     if (!it || !SAWS[it.id]) return;
     const near = () => this.h.held()?.uid === it.uid && Math.hypot(l.x - this.h.me().x, l.z - this.h.me().z) < SAW.reach;
     if (this.h.online()) this.h.send({ t: 'saw', l: l.uid, u: it.uid, go: 1 });
+    // (the saw drawn to and fro, and heard, until the work is done or left: `update`)
+    this.h.sawing(true);
+    this.sawSound?.stop();
+    this.sawSound = audio.sawing({ x: l.x, y: l.y + 0.3, z: l.z });
     this.h.begin('Sawing the log into planks', SAW.time, near, () => {
       if (!near()) return;
       if (this.h.online()) return void this.h.send({ t: 'saw', l: l.uid, u: it.uid, go: 2 });
@@ -145,8 +153,15 @@ export class Gathering {
   }
 
   private regrowT = 0;
+  private sawSound: { stop: () => void } | null = null;
+
   update(dt: number) {
     this.felling.update(dt);
+    if (this.sawSound && !this.h.busy()) {
+      this.sawSound.stop();
+      this.sawSound = null;
+      this.h.sawing(false);
+    }
     // (played alone, the felled trees whose time is up stand again: the server does it otherwise)
     if (!this.h.online() && (this.regrowT += dt) > 30) {
       this.regrowT = 0;
