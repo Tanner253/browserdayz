@@ -890,18 +890,18 @@ export const LOCAL_MODELS = {
   // (base building's pieces drawn from models, 2026-10-25, src/game/building/models.ts: made for them in Higgsfield on the
   // owner's account. Each is fitted into its piece's solids as the game draws it, so it comes at the size it was made.)
   ...Object.fromEntries([
-    ['bb_door_wood', 'Wooden door leaf', 'doors/door_wood_leaf.glb'], ['bb_door_metal', 'Metal door leaf', 'doors/door_metal_leaf.glb'],
-    ['bb_hatch', 'Hatch lid', 'doors/hatch_leaf.glb'], ['bb_garage', 'Garage door', 'doors/garage_door_slab.glb'],
-    ['bb_small_box', 'Small box', 'base/small_box_sized.glb'], ['bb_large_box', 'Large box', 'base/large_box_sized.glb'],
+    ['bb_door_wood', 'Wooden door leaf', 'remade/door_wood.glb'], ['bb_door_metal', 'Metal door leaf', 'remade/door_metal.glb'],
+    ['bb_hatch', 'Hatch lid', 'remade/hatch.glb'], ['bb_garage', 'Garage door', 'remade/garage.glb'],
+    ['bb_small_box', 'Small box', 'remade/small_box.glb'], ['bb_large_box', 'Large box', 'base/large_box_sized.glb'],
     ['bb_workbench', 'Workbench', 'base/workbench_sized.glb'], ['bb_bed', 'Bed', 'base/bed_sized.glb'],
-    ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'base/ladder2_sized.glb'],
+    ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'remade/ladder.glb'],
     ['bb_palisade_log', 'Palisade log', 'base/palisade_log_sized.glb'], ['bb_gate_wood', 'Wooden gate', 'base/gate_wood_sized.glb'],
-    ['bb_gate_steel', 'Steel gate leaf', 'base/gate_steel_leaf.glb'],
+    ['bb_gate_steel', 'Steel gate leaf', 'remade/gate_steel.glb'],
     ['bb_bedroll', 'Sleeping bag', 'base/bedroll.glb'],
   ].map(([id, name, file]) => [id, {
     dir: '../incoming/higgsfield', file, scale: 1, tex: 1024, tags: ['base'],
     changes: 'Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
-    credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+    credit: { name, author: 'ZONA (Higgsfield)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (${file.startsWith('remade/') ? 'Meshy multi-image-to-3D from front, side and back views' : 'text-to-3D'}), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
   }])),
   // (the claim: a post on a rusted strongbox, made in Higgsfield, with the owner's pirate flag nailed to it: "i prefer the
   // look of the pirate flag i porovided". The flag is SusanKing's, waved by the game: src/game/building/models.ts)

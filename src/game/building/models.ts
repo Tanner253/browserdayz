@@ -120,11 +120,11 @@ const leafBox = (kind: string, i: number) => boxOf(shapeOf(kind).leaves![i].soli
 /** whether a leaf reaches toward -x from its hinge (a right-hand leaf): its model is mirrored */
 const leftward = (kind: string, i: number) => leafBox(kind, i)[1][0] <= 0.01;
 
-/** a door's leaf from a model standing face to x, width along z: turned to the leaf's frame and fitted into it (the
- * models' hinges come at the far end: mirrored for a leaf that reaches +x from its hinge, as most do) */
+/** a door's leaf from a model standing face to z, width along x, its hinges at -x (remade from three views, 2026-10-25):
+ * its face to +z, where a lock is fitted (`lockAt`), fitted into the leaf, mirrored for a leaf that reaches -x from its hinge */
 const doorLeaf = (id: string) => async (kind: string, i: number, atmo: Atmosphere | null) => {
-  const p = moved(await partsOf(id, atmo), turnY(Math.PI / 2));
-  return built(into(leftward(kind, i) ? p : mirrored(p), leafBox(kind, i)));
+  const p = await partsOf(id, atmo);
+  return built(into(leftward(kind, i) ? mirrored(p) : p, leafBox(kind, i)));
 };
 
 /** the armoured tier's leaves: the metal door's model, its paint darkened to plate steel */
@@ -315,12 +315,12 @@ const LEAF: Record<string, (kind: string, i: number, atmo: Atmosphere | null) =>
     if (atmo) atmo.register(m);
     return { geo: b.geo, mat: m };
   },
-  // (a hatch's lid lies flat: its face, to x, turned up)
-  hatch: async (kind, i, atmo) => built(into(moved(await partsOf('bb_hatch', atmo), new THREE.Matrix4().makeRotationZ(Math.PI / 2)), leafBox(kind, i))),
+  // (a hatch's lid lies flat: its face, to z, turned up, and its hinges, at -x, to the hinge's edge at -z)
+  hatch: async (kind, i, atmo) => built(into(moved(await partsOf('bb_hatch', atmo), new THREE.Matrix4().makeRotationX(-Math.PI / 2).multiply(new THREE.Matrix4().makeRotationZ(-Math.PI / 2))), leafBox(kind, i))),
   gate_wood: gateHalf,
   // (timber bound in iron straps, as a gatehouse's leaves are)
   gate_stone: async (kind, i, atmo) => {
-    const p = moved(await partsOf('bb_gate_steel', atmo), turnY(Math.PI / 2));
+    const p = moved(await partsOf('bb_gate_steel', atmo), turnY(Math.PI));
     return built(into(leftward(kind, i) ? mirrored(p) : p, leafBox(kind, i)));
   },
 };
