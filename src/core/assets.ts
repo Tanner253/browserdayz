@@ -5,6 +5,7 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { LEAN, TOUCH } from './device';
 import { STRIP_OVER, Strips } from './strips';
 import { breathe } from './breathe';
+import { drawnNear, nearModels } from './near-models';
 
 export interface ModelEntry {
   url: string;
@@ -74,32 +75,24 @@ const PHONE_CAP = { colour: 512, other: 256 };
  */
 const PHONE_FAR = { colour: 256, other: 128 };
 /**
- * And on a computer every model is drawn so as well, near or far, with no copy as it came for what is close (2026-10-21,
- * the owner, shown each thing at three sizes: "we can do C"). Six minutes online had put 1.3 GB of models' pictures on
- * an 8 GB card, and every copy as it came was 22 to 405 MB more each time somebody walked up to the thing.
+ * On a computer every model is drawn at one size, near or far, with no copy as it came for what is close (2026-10-21:
+ * six minutes online had put 1.3 GB of models' pictures on an 8 GB card). 256 until 2026-10-25, when the owner found
+ * it too soft: "1024 should be used on the player model zombies and hand held models we brought in then 512 should be
+ * used for things that arent righht in the users face all the time or in their hands ... want good UX". Which files
+ * are which: src/core/near-models.ts.
  */
 const DESK = !TOUCH;
-const DESK_CAP = PHONE_FAR;
+const DESK_CAP = { colour: 512, other: 256 };
+const DESK_NEAR = { colour: 1024, other: 512 };
 /**
- * Each model's file made at DESK_CAP already, for a computer (scripts/lean.mjs): the files carried their pictures at up
+ * Each model's file made at DESK_CAP already, for a computer (scripts/lean.mjs): the files carry their pictures at up
  * to 2048 and a computer threw most of every one away on arrival (the owner: "we should do this"). The pixels are the
  * ones the game would have cut (Chrome's own cut, stored lossless). A copy is named by the version of the file it was
- * made from: a file changed since is loaded whole. A phone loads them too for what it draws at PHONE_FAR, the same
- * size: unpacked whole first, each file's pictures were up to 16 MB apiece in the page before they were cut, two
- * files at a time (2026-10-23, iPhones). Its near pictures still come from the files themselves.
+ * made from: a file changed since is loaded whole. A phone loads the ones at PHONE_FAR for what it draws far: unpacked
+ * whole first, each file's pictures were up to 16 MB apiece in the page before they were cut (2026-10-23, iPhones).
+ * What a computer draws at DESK_NEAR has no copy: lossless at 1024 outweighs the files' own pictures, which are cut here.
  */
 const leanDir = (cap: Cap) => `assets/lean/${cap.colour}-${cap.other}/`;
-/**
- * Kamenka's two downloaded buildings a size up (the owner, 2026-10-23: "the 2 story wooden POI and the red buildings ...
- * are TOO LOW of textures, we should bump them up by 1 incriment ... they are too low quality and jarring against the
- * rest of the game"): a wall walked up to is a whole picture across the screen, where a crate is a corner of one. The
- * two hold 10.1 MB on the card, against 2.5. scripts/lean.mjs (UP) would copy them at this size, but lossless at 512
- * outweighs the files' own 1024s: a computer loads the files themselves (1.5 MB, against 0.8) and cuts them here. A
- * phone keeps their copies at PHONE_FAR.
- */
-const DESK_UP = { colour: 512, other: 256 };
-const DESK_UP_MODELS = new Set(['assets/models/house_interior.glb', 'assets/models/shanty_mansion.glb']);
-const deskCap = (url: string): Cap => (DESK_UP_MODELS.has(url) ? DESK_UP : DESK_CAP);
 /** somebody's body, on a phone: it is not one of the things made sharper when near, and is never far when it matters */
 const PHONE_BODY = { colour: 512, other: 256 };
 type Cap = typeof PHONE_CAP;
@@ -358,9 +351,13 @@ export class Assets {
       this.far.add(e.url);
       for (const l of e.lods) this.far.add(l.url);
     }
+    this.near = nearModels(this.manifest.models);
   }
   /** the files of the things that are made sharper when they are near (see PHONE_FAR) */
   private far = new Set<string>();
+  /** the manifest's files a computer draws at DESK_NEAR (with every body's: see drawnNear) */
+  private near = new Set<string>();
+  private deskCap = (url: string): Cap => (drawnNear(url, this.near) ? DESK_NEAR : DESK_CAP);
 
   private idleWaiters: (() => void)[] = [];
 
@@ -508,8 +505,8 @@ export class Assets {
           const g = await this.gltf.parseAsync(data, '');
           // (on a phone its pictures are made small before anything is drawn with them: see PHONE_FAR)
           if (TOUCH) return shrinkModel(g, this.far.has(url) ? PHONE_FAR : PHONE_BODY);
-          // (and on a computer to DESK_CAP: kept small in the page, so that a picture taken off the card can be put back)
-          if (DESK && !this.allSharp) return shrinkModel(g, deskCap(url));
+          // (and on a computer to DESK_CAP or DESK_NEAR: kept small in the page, so that a picture taken off the card can be put back)
+          if (DESK && !this.allSharp) return shrinkModel(g, this.deskCap(url));
           // (its pictures are let go of here once they are on the card: see `thin`)
           if (!this.kept.has(url)) g.scene.traverse((o) => paints(o).forEach((mat) => MAPS.forEach((slot) => mat[slot] && thin(mat[slot]!))));
           return g;
@@ -527,8 +524,8 @@ export class Assets {
   /** a computer's copy of a model's file, where there is one made from the file as it is now (see leanDir); a phone's, for what it draws at PHONE_FAR */
   private leanOf(url: string) {
     const v = this.versions[url];
-    if ((!DESK && !this.far.has(url)) || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
-    const lean = `${leanDir(DESK ? deskCap(url) : PHONE_FAR)}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
+    if ((!DESK && !this.far.has(url)) || (DESK && drawnNear(url, this.near)) || this.allSharp || this.whole || !v || !url.startsWith('assets/') || !url.endsWith('.glb')) return url;
+    const lean = `${leanDir(DESK ? DESK_CAP : PHONE_FAR)}${url.slice('assets/'.length, -'.glb'.length)}.${v}.glb`;
     return this.versions[lean] ? lean : url;
   }
 

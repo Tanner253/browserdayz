@@ -622,11 +622,26 @@ export const enterMethods = {
   /** These tags were carried out of the Zona and are void: out of the pockets they go, and it is said why. */
   /** the server's clock for a tag held: the countdown follows it (it starts again when the tag comes back to you, server/custody.ts) */
   tagClock(this: Game, uid: string, held: number) {
+    this.cashing.delete(uid);
     const it = this.inv.find((i) => i.uid === uid);
     if (!it) return;
     it.holder = publicId();
     it.held = held;
     this.meDirty = true;
+  },
+
+  /** the server cashed one of this player's tags: only now does it leave the pockets */
+  tagCashed(this: Game, owner: string) {
+    const asked = this.inv.find((i) => this.cashing.has(i.uid) && tagOwner(i) === owner) ?? this.inv.find((i) => this.cashing.has(i.uid));
+    if (asked) {
+      this.cashing.delete(asked.uid);
+      this.inv.remove(asked);
+    }
+    addCashedTag();
+    this.hud.note(`Dog tag cashed in: ${owner}`, 'good');
+    audio.ui('pickup');
+    this.inventoryChanged();
+    if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
   },
 
   voidTags(this: Game, uids: string[]) {
@@ -661,6 +676,11 @@ export const enterMethods = {
         this.hud.note(`${tagOwner(it)}'s dog tag: stay alive for ${TAG_HOLD_MIN} minutes to cash it in`, 'good');
       }
       it.held = (it.held ?? 0) + dt;
+      // (asked of the server already: it stays in the pockets until the server says it is cashed, or sends its clock back)
+      if (this.cashing.has(it.uid)) {
+        if (performance.now() - this.cashing.get(it.uid)! > 20_000) this.cashing.delete(it.uid);
+        else return false;
+      }
       if (it.held >= TAG_HOLD) done.push(it);
       else carried.push({ name: tagOwner(it), clock: tagClock(it) });
       return false;
@@ -670,24 +690,27 @@ export const enterMethods = {
     this.hud.setTags(carried);
     if (this.invUI.isOpen) this.invUI.tickTags();
     if (!done.length) return;
-    // (the server is shown the tag with its time served before it is asked to cash it: asked from a hidden tab, its last sight of it may be minutes old)
-    if (this.online) this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
+    // Online the server keeps the clock and decides (the owner, 2026-10-25: "server authority to client how is it even
+    // possible for there to be a discrepancy"): the tag is only asked for here, and stays in the pockets until the server
+    // says it is cashed ('cashed', tagCashed) or sends its own clock back ('tagclock', tagClock). Taken out at once, a tag
+    // the server turned down was lost from the pockets for good.
+    if (this.online) {
+      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
+      const wallet = walletAddress();
+      for (const it of done) {
+        this.cashing.set(it.uid, performance.now());
+        this.net.send({ t: 'cash', uid: it.uid, ...(wallet ? { wallet } : {}) });
+      }
+      if (!wallet && REWARDS_UI && !EMBED) this.hud.note('No wallet address saved: add one in Settings, on the Account page', 'warn');
+      return;
+    }
     for (const it of done) {
       this.inv.remove(it);
       const n = addCashedTag();
       const owner = tagOwner(it);
       this.hud.note(`Dog tag cashed in: ${owner}`, 'good');
-      // online the server checks the tag and announces it to everyone; a payout would be issued there
-      // the address goes with it: the tag is listed for a reward under it
-      if (this.online) {
-        const wallet = walletAddress();
-        this.net.send({ t: 'cash', uid: it.uid, ...(wallet ? { wallet } : {}) });
-        if (!wallet && REWARDS_UI && !EMBED) this.hud.note('No wallet address saved: add one in Settings, on the Account page', 'warn');
-      }
-      else {
-        this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);
-        this.hud.chatLine('system', '', `That is ${n} cashed in so far.`);
-      }
+      this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);
+      this.hud.chatLine('system', '', `That is ${n} cashed in so far.`);
     }
     audio.ui('pickup');
     this.inventoryChanged();

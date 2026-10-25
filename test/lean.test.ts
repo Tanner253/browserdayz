@@ -22,12 +22,12 @@ for (const cap of fs.existsSync(LEAN) ? fs.readdirSync(LEAN) : []) {
   };
   walk(path.join(LEAN, cap));
 }
-assert.ok(copies.size > 0, 'no copies: node scripts/lean.mjs');
+assert.ok(copies.size > 0, 'no copies: npx tsx scripts/lean.mjs');
 const stale: string[] = [];
 for (const [rel, versions] of copies) {
   const file = path.join(ROOT, `${rel}.glb`);
   const now = fs.existsSync(file) ? createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 10) : 'gone';
   if (!versions.has(now)) stale.push(`${rel}.glb`);
 }
-assert.deepEqual(stale, [], `copies made from older files (node scripts/lean.mjs): ${stale.join(', ')}`);
+assert.deepEqual(stale, [], `copies made from older files (npx tsx scripts/lean.mjs): ${stale.join(', ')}`);
 console.log(`lean: ${copies.size} copies, all of the files as they are`);

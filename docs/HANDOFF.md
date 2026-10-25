@@ -172,12 +172,15 @@ develop single things on the stage first; never change the ground round buried s
 - Pictures of work go in `progress/<topic>/` (kept out of git, kept for the story).
 
 ## 6. Must-know nuances (beyond CLAUDE.md)
-- **Models ship as copies**: computers draw every model from its lean copy (`public/assets/lean/256-128/`, pictures 256 and
-  128); phones draw the world copy (pictures up to 1024) near; `public/assets/models/hi/` holds each model as it came,
+- **Models ship as copies**: since 2026-10-25 computers draw bodies, clothes and whatever is held at 1024/512 (the files
+  themselves, cut on arrival; which ones: `src/core/near-models.ts`) and every other model from its lean copy at 512/256
+  (`public/assets/lean/512-256/`); phones draw far things from `lean/256-128/` and the world copy (pictures up to 1024)
+  near (the owner: "1024 ... on the player model zombies and hand held models ... 512 ... for things that arent righht
+  in the users face"). `public/assets/models/hi/` holds each model as it came,
   which no player loads (`.vercelignore` keeps it off the site; tools like `scripts/sight-profile.mjs` read it).
 - **Fixing a downloaded model**: edit its source in `assets-src/models/<dir>/` (keep the original beside it as
   `*.orig.*`), then `node scripts/packs.mjs <id> --force`, `node scripts/tier-now.mjs`, `node scripts/lods.mjs <id>`,
-  `node scripts/lean.mjs`, and `npm run icons -- --only <item>` if its picture changes. `tier-now` also makes the copies
+  `npx tsx scripts/lean.mjs`, and `npm run icons -- --only <item>` if its picture changes. `tier-now` also makes the copies
   of any other model that lacks them. Example: `assets-src/_wf/me/benelli-hood-fit.mjs` (the holo sight's hood).
 - **One holographic sight**: the Benelli's `sight` piece, taken off it by `holoParts()` for every gun that has `FIT.dot`;
   the item `red_dot` is the same piece (`model: 'benelli_m3', nodeRe: '^sight'`); `holo_sight.glb` only lends its lit
