@@ -147,11 +147,36 @@ export function stoop(doc, sk, name, angle) {
  * as the movement turns it, its ankle as high as it stands at rest (the heel on the ground, the ball too), and the leg
  * worked out again to reach it, the knee bent the way it was. The library's calm idle stood rocked back 21 degrees on
  * its heels, the ball of the foot 3.5 cm off the ground and the heel 2 cm into it: the owner, 2026-10-25, "The feet".
+ * With `soft` (radians), the hips raised (by one height for the whole of it, so it keeps its own rise and fall) until
+ * the knees are bent that far on the whole: stood flat, the idle's knees were bent a third of a right angle and more, a
+ * half-crouch and not a body at ease (the navigator, 2026-10-25).
  */
-export function flat(doc, sk, name) {
+export function flat(doc, sk, name, { soft = null } = {}) {
   const clip = readClip(doc, sk, name), { Q, T } = frameOf(clip), n = clip.frames + 1;
   const rest = sk.pose([], null), UP = new THREE.Vector3(0, 1, 0);
   const parentQ = (W, i) => rotOf(W[sk.parent[i]]);
+  if (soft !== null) {
+    // how high each hip joint stands over its foot laid flat, with its knee bent `soft`: the hips raised the mean of
+    // what that asks of each frame's lower leg
+    const P = sk.index('pelvis');
+    let up = 0;
+    for (let f = 0; f < n; f++) {
+      const W = sk.pose(Q[f], T[f]);
+      let need = Infinity;
+      for (const s of ['l', 'r']) {
+        const [a, b, c] = ['thigh', 'calf', 'foot'].map((x) => sk.index(`${x}_${s}`));
+        const la = posOf(rest[b]).distanceTo(posOf(rest[a])), lb = posOf(rest[c]).distanceTo(posOf(rest[b]));
+        const d = Math.sqrt(la * la + lb * lb + 2 * la * lb * Math.cos(soft)), hip = posOf(W[a]), foot = posOf(W[c]).setY(posOf(rest[c]).y);
+        const flatWay = Math.hypot(hip.x - foot.x, hip.z - foot.z);
+        need = Math.min(need, foot.y + Math.sqrt(Math.max(0, d * d - flatWay * flatWay)) - hip.y);
+      }
+      up += need / n;
+    }
+    for (let f = 0; f < n; f++) {
+      const W = sk.pose(Q[f], T[f]);
+      T[f] = T[f].clone().add(new THREE.Vector3(0, up, 0).applyQuaternion(parentQ(W, P).invert()).divide(new THREE.Vector3().setFromMatrixScale(W[sk.parent[P]])));
+    }
+  }
   const aim = (f, i, from, toward, kid) => {
     const W = sk.pose(Q[f], T[f]);
     const now = posOf(W[kid]).sub(posOf(W[i])).normalize(), want = toward.clone().sub(from).normalize();
