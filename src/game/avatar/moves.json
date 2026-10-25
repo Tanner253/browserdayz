@@ -68,18 +68,6 @@
   "pace": 0.867,
   "dur": 1.3
  },
- "crouchL": {
-  "way": "L",
-  "gait": "crouch",
-  "pace": 0.986,
-  "dur": 1.2
- },
- "crouchR": {
-  "way": "R",
-  "gait": "crouch",
-  "pace": 0.839,
-  "dur": 1.3
- },
  "limpF": {
   "way": "F",
   "gait": "limp",

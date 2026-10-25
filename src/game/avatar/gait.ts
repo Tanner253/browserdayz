@@ -17,9 +17,10 @@ const AT: Record<Way, number> = { F: 0, FR: Math.PI / 4, R: Math.PI / 2, BR: (3 
 /** a step of a gait: what the legs play, and what the body above them does where that is another movement's */
 type Step = [Way, string, string?];
 /**
- * The gaits. The walks step to a side as the old clips did, ahead with the hips turned toward it: the library's one
- * standing side step is a crouched one, and stood up it was a bow-legged cross-step (the owner, 2026-10-25, of it
- * beside the old: "This one looks good, the most recent images in chat dont look as good as this one"). The jog has no
+ * The gaits. The walks and the crouch step to a side as the old clips did, ahead with the hips turned toward it: the
+ * library's standing side step is a crouched one, and stood up it was a bow-legged cross-step, and its crouched ones,
+ * stretched to the game's pace, lunged (the owner, 2026-10-25, of the rifle's beside the old: "This one looks good, the
+ * most recent images in chat dont look as good as this one"). The jog has no
  * side steps: it runs the nearest of its ways and is turned at the hips the rest (no more than to a corner), as
  * somebody runs across: two corners blended half each jogged on the spot.
  */
@@ -27,15 +28,15 @@ const GAITS = {
   walk: [['F', 'walkF'], ['B', 'walkB']],
   aim: [['F', 'aimF'], ['B', 'aimB']],
   jog: [['F', 'jogF'], ['FL', 'jogFL'], ['FR', 'jogFR'], ['BL', 'jogBL'], ['BR', 'jogBR']],
-  crouch: [['F', 'crouchF'], ['B', 'crouchB'], ['L', 'crouchL'], ['R', 'crouchR']],
+  crouch: [['F', 'crouchF'], ['B', 'crouchB']],
   sprint: [['F', 'sprint']],
   sprintGun: [['F', 'sprintGun']],
   limp: [['F', 'limpF'], ['B', 'limpB']],
 } satisfies Record<string, Step[]>;
 type GaitName = keyof typeof GAITS;
 /** the gaits drawn only ahead (and back): they are turned at the hips to go to a side, by as much as this at most
- * (the walks as far as the old clips' hips went, POSE.maxTwist; flat out and limping, as far as a waist goes) */
-const TURNED = new Map<GaitName, number>([['walk', 1.35], ['aim', 1.35], ['sprint', 1.1], ['sprintGun', 1.1], ['limp', 1.1]]);
+ * (the walks and the crouch as far as the old clips' hips went, POSE.maxTwist; flat out and limping, as far as a waist goes) */
+const TURNED = new Map<GaitName, number>([['walk', 1.35], ['aim', 1.35], ['crouch', 1.35], ['sprint', 1.1], ['sprintGun', 1.1], ['limp', 1.1]]);
 /** the gaits run the nearest way and turned the rest */
 const NEAREST = new Set<GaitName>(['jog']);
 

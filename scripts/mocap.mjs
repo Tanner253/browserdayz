@@ -72,7 +72,7 @@ export const MOVES = {
   aimF: { from: 'Walk_Forward_with_Bow_Aimed', way: 'F', gait: 'aim', square: 0, stand: 'walkF' },
   aimB: { from: 'Walk_Backward_with_Bow_Aimed', way: 'B', gait: 'aim', square: 0, stand: 'walkB' },
   // (no side steps: the library's one standing is a crouched one, and stood up it was a bow-legged cross-step. The walks
-  // go to a side as the old clips did, ahead with the hips turned: see src/game/avatar/gait.ts GAITS)
+  // and the crouch go to a side as the old clips did, ahead with the hips turned: see src/game/avatar/gait.ts GAITS)
   // a jog, eight ways (left and right are the corners between)
   jogF: { from: 'Run_02', way: 'F', gait: 'jog' },
   jogFL: { from: 'ForwardLeft_Run_Fight', way: 'FL', gait: 'jog', square: 0.5 },
@@ -83,12 +83,10 @@ export const MOVES = {
   // flat out: empty handed, and with a gun (the arms are the gun's)
   sprint: { from: 'run_fast_2', way: 'F', gait: 'sprint' },
   sprintGun: { from: 'Rifle_Charge', way: 'F', gait: 'sprint' },
-  // the cautious crouch, four ways, let down to the old crouch's head (0.92 m as the file stands, under the crouched
-  // eye: the library's carries it a third of a metre higher)
+  // the cautious crouch, ahead and back (to a side it is turned, as the walks are), let down to the old crouch's head
+  // (0.92 m as the file stands, under the crouched eye: the library's carries it a third of a metre higher)
   crouchF: { from: 'Cautious_Crouch_Walk_Forward', way: 'F', gait: 'crouch', square: 0.4, head: 0.92 },
   crouchB: { from: 'Cautious_Crouch_Walk_Backward', way: 'B', gait: 'crouch', square: 0.4, head: 0.92 },
-  crouchL: { from: 'Cautious_Crouch_Walk_Left', way: 'L', gait: 'crouch', square: 0.4, head: 0.92 },
-  crouchR: { from: 'Cautious_Crouch_Walk_Right', way: 'R', gait: 'crouch', square: 0.4, head: 0.92 },
   // on a broken leg
   limpF: { from: 'Limping_Walk_1', way: 'F', gait: 'limp', square: 0.5 },
   limpB: { from: 'Injured_Walk_Backward', way: 'B', gait: 'limp', square: 0.5 },

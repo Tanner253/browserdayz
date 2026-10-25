@@ -69,9 +69,8 @@ export const updateMethods = {
     const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0)) && !dead && !armed && !using;
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
-    // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
-    // (a survivor on motion capture steps sideways and back facing the aim: only flat out does the body turn to the way it runs)
-    const free = !firstPerson && !armed && !fists && (!this.gait || speedNow > 5.2);
+    // face the movement direction when going unarmed, else the look direction (a punch goes where the eyes do)
+    const free = !firstPerson && !armed && !fists;
     const velYaw = Math.atan2(-velocity.x, -velocity.z);
     const targetYaw = free && speedNow > 0.6 ? velYaw : facingYaw;
     if (this.placed) this.yaw += wrap(targetYaw - this.yaw) * ease(firstPerson ? 40 : armed ? 18 : 10);
