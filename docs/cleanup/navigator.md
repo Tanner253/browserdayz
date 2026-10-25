@@ -26,4 +26,4 @@ Each line becomes dead once its replacement is judged better and merged. The pat
 
 ## Texture sizes (2026-10-25, the owner: 1024 for bodies, clothes, the infected and held things; 512 for the rest)
 - [x] `DESK_UP` / `DESK_UP_MODELS` (Kamenka's two buildings a size up) in `src/core/assets.ts` and `UP` / `UP_FILES` in `scripts/lean.mjs` | replaced by DESK_CAP 512/256 for every model | removed | grep `DESK_UP\|UP_FILES`
-- [x] computers' 256/128 copies of files no phone draws far (bodies, trees, kits) in `public/assets/lean/256-128/` | swept by `npx tsx scripts/lean.mjs` (it now makes 512/256 for computers, 256/128 only for a phone's far things) | removed | `npx tsx test/lean.test.ts`
+- [x] computers' 256/128 copies of files no phone draws far (bodies, trees, kits) in `public/assets/lean/256-128/` | swept by `node scripts/lean.mjs` (it now makes 512/256 for computers, 256/128 only for a phone's far things) | removed | `npx tsx test/lean.test.ts`
