@@ -113,6 +113,11 @@ ok('no thing there was is worn anywhere else than it was', () => {
     field_jacket: 'top', field_trousers: 'legs', flannel_shirt: 'top', hoodie: 'top', tracksuit_pants: 'legs', leather_jacket: 'top', quilted_jacket: 'top',
     work_trousers: 'legs', work_boots: 'feet', leather_gloves: 'hands', parka: 'top', cargo_pants: 'legs', hiking_boots: 'feet',
     fingerless_gloves: 'hands', mountain_smock: 'top', mountain_trousers: 'legs', ghillie_suit: 'back',
+    // (and the survivors' card, the owner's yes of 2026-10-25: the new pieces, the belt worn at last)
+    tracksuit_jacket: 'top', beanie: 'head', ushanka: 'head', hip_pack: 'belt', balaclava: 'face', field_bag: 'back', tactical_jacket: 'top',
+    combat_shirt: 'top', combat_trousers: 'legs', beret: 'head', military_belt: 'belt', assault_pack: 'back', winter_boots: 'feet', ghillie_hood: 'head',
+    // (and the tools of base building, on the back as every long thing is)
+    felling_axe: 'long', pickaxe: 'long', sledgehammer: 'long',
   };
   const now = Object.fromEntries(Object.values(ITEMS).filter((d) => d.slot && !CLOTHES.some(([, id]) => id === d.id)).map((d) => [d.id, d.slot]));
   assert.deepEqual(now, was);
@@ -135,9 +140,12 @@ ok('the jacket and the trousers are things: worn on the top and the legs, with p
   assert.notEqual(j.tint, t.tint);
 });
 
-ok('nothing is made yet for the eyes, the belt or the arm: the places are there and empty, and nothing minds', () => {
-  const none = ['eyes', 'belt', 'armband'] as const;
+ok('nothing is made yet for the eyes or the arm: the places are there and empty, and nothing minds; the belt has its first two', () => {
+  const none = ['eyes', 'armband'] as const;
   for (const s of none) assert.deepEqual(Object.values(ITEMS).filter((d) => d.slot === SLOT_KIND[s]), [], `something is made for ${s}: this check is out of date, and so may the body's grid be`);
+  // (the survivors' card, 2026-10-25: a hip pack and the army's belt, each with a pocket or two, put on the belt when picked up)
+  assert.deepEqual(Object.values(ITEMS).filter((d) => d.slot === 'belt').map((d) => d.id).sort(), ['hip_pack', 'military_belt']);
+  for (const id of ['hip_pack', 'military_belt']) assert.equal(new PlayerInventory().freeSlotFor(makeItem(id)), 'belt');
   const inv = new PlayerInventory();
   for (const d of Object.values(ITEMS)) {
     if (d.id === 'dogtag') continue;
@@ -585,8 +593,13 @@ ok('every set of things a person can have on at once, with their own tag and a f
   };
   const biggest = (kind: string) => all.filter((d) => d.slot === kind).sort((a, b) => b.w * b.h - a.w * a.h)[0]?.id ?? null;
   const long = shapes('long'), others = GEAR_SLOTS.map((s) => SLOT_KIND[s]);
-  /** the places whose things come in more than one shape: every shape of each is tried against every pair of long things */
-  const varied = others.filter((k) => shapes(k).length > 2);
+  /**
+   * the places whose things come in more than one shape: every shape of each is tried against every pair of long things.
+   * (Not the face and the belt, whose biggest is four cells: their biggest and nothing are enough, and each of their
+   * shapes more had made the sets nine times as many, 2026-10-25.)
+   */
+  const area = (id: string | null) => (id ? ITEMS[id].w * ITEMS[id].h : 0);
+  const varied = others.filter((k) => shapes(k).length > 2 && area(biggest(k)) > 4);
   const fixed = ['holster', ...others.filter((k) => !varied.includes(k))];
   let sets = 0, most = 0;
   const lay = (ids: (string | null)[]) => {
@@ -611,8 +624,9 @@ ok('every set of things a person can have on at once, with their own tag and a f
     for (const off of fixed) lay([a, b, c, ...fixed.map((k) => (k === off ? null : biggest(k))), ...varied.map(biggest)]);
   }
   assert.ok(sets > 3000, `only ${sets} sets were laid out`);
-  // (168 since the clothes of 2026-10-25: the parka, 4x3, and the cargo trousers, 3x3, are bigger than what was worn there, and still lie in it)
-  assert.equal(most, 168, 'the most a person can have on is not what it was when the grid was sized: see BODY_GRID');
+  // (168 since the clothes of 2026-10-25: the parka, 4x3, and the cargo trousers, 3x3, are bigger than what was worn there,
+  // and still lie in it; 172 with the belt's hip pack the same day, and the grid a row taller for it)
+  assert.equal(most, 172, `the most a person can have on is ${most}, not what it was when the grid was sized: see BODY_GRID`);
   assert.ok(BODY_GRID[0] * BODY_GRID[1] >= most);
   // (a grid sent is read to as many things as a body has cells: here, and cleanStored in server/players.ts likewise)
   assert.equal(cleanStored(Array.from({ length: 200 }, (_, i) => ({ id: 'bandage', uid: `b${i}`, x: 0, y: 0 })), (v) => String(v)).length, BODY_GRID[0] * BODY_GRID[1], 'the server reads fewer things out of a grid than a body has cells');

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T09:00:32.666Z",
+ "generated": "2026-10-25T10:13:04.597Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -14335,6 +14335,26 @@
     0.0674,
     0.1216,
     0.15
+   ],
+   "lods": []
+  },
+  "ground_stab_vest": {
+   "url": "assets/models/ground_stab_vest.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 124632,
+   "srcTris": 9087,
+   "tris": 9087,
+   "min": [
+    -0.3,
+    0,
+    -0.2577
+   ],
+   "max": [
+    0.3,
+    0.3381,
+    0.2577
    ],
    "lods": []
   }

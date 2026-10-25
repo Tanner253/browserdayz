@@ -302,6 +302,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Steel gate leaf" made for ZONA with Higgsfield (Meshy multi-image-to-3D from front, side and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
+- "Stab vest" made for ZONA with Higgsfield (gpt_image_2_5 and Meshy multi-image-to-3D, front and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Its worn piece let go of the body and laid flat; scaled to 60 cm at its longest and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

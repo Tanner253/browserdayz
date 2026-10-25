@@ -898,6 +898,12 @@ export const LOCAL_MODELS = {
       },
     ]),
   ),
+  // (the stab vest lying down: its worn piece let go of the body and laid flat, scripts/unskin.mjs and lay-flat.mjs)
+  ground_stab_vest: {
+    dir: '../incoming/higgsfield/survivors/gear', file: 'ground_stab_vest_flat.glb', size: 0.6, tex: 1024, tags: ['loot'],
+    changes: 'Its worn piece let go of the body and laid flat; scaled to 60 cm at its longest and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Stab vest', author: 'ZONA (Higgsfield, Meshy)', url: 'https://higgsfield.ai', line: '"Stab vest" made for ZONA with Higgsfield (gpt_image_2_5 and Meshy multi-image-to-3D, front and back views), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // ---------------------------------------------------------------- crafting (2026-10-25): the owner's downloads for its
   // items (progress/base-models/incoming-map.md), each judged in the sandbox beside the stand-in it replaced. Their folders
   // are the downloads as they came, in assets-src/incoming/; textures at 1024 for what is carried in the hand (the navigator).

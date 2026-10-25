@@ -70,7 +70,6 @@ export const GEAR: Record<string, Worn> = {
   // heights, and the size, lean and place found that leave a finger or two of air on both sides and no more. As
   // they were first put on, the two vests stood a hand off the back and over the shoulders.)
   chest_rig: { bone: 'spine_03', p: [0, 1.0, 0.03], r: [-0.045, Math.PI, 0], s: [1.0, 0.9, 1.08] },
-  soft_vest: { bone: 'spine_03', p: [0, 1.0, -0.014], r: [0.15, 0, 0], s: [1.0, 0.92, 1.05] },
   armor_vest: { bone: 'spine_03', p: [0, 1.0, -0.014], r: [0.15, 0, 0], s: [1.0, 0.88, 1.1] },
   heavy_armor: { bone: 'spine_03', p: [0, 0.95, 0.07], r: [-0.18, Math.PI, 0], s: [1.2, 1.02, 1.15] },
   // (the cap and the soft hat: their bands at the brow. The cap's peak is toward +z as its model lies, so it is turned round.)

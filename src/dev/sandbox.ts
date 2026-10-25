@@ -10,8 +10,8 @@
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length; with
 //                                               several files, one each (clip=walk,mc_walk: the old beside the new)
-//   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
-//                                               one of its clips; today's survivor beside them plays it too
+//   &survivor=0,1,2,3&clip=jogF&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
+//                                               one of the game's movements (moves.glb) or the file's own; the one beside too
 //   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
 //   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
 //   &shrink=hips,thigh                           the parts only partly under them drawn a little in)
@@ -23,6 +23,7 @@
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
 //   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
+//   &near=1.2,0.8                                or at that height over the middle of what is shown, from that far
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
 //   &bg=20231f&floor=0                          a plain backdrop of that colour and no floor (pictures for the page)
@@ -206,9 +207,11 @@ if (bb) {
       played.push(a);
     }
   }
-  // (every survivor, and today's beside them, in one clip at one moment: see `played`)
-  const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
-    const want = q.get('clip');
+  // (every survivor, and today's beside them, in one clip at one moment: see `played`. The game's own movements first,
+  // the motion capture (moves.glb, moves-late.glb: src/game/avatar/gait.ts), then the character file's old ones)
+  const mocap = survivors.length || person ? (await Promise.all(['moves', 'moves-late'].map((f) => assets.loadGLTF(`assets/characters/${f}.glb`)))).flatMap((g) => g.animations) : [];
+  const playOn = (o: THREE.Object3D, own: THREE.AnimationClip[]) => {
+    const want = q.get('clip'), clips = [...mocap, ...own];
     const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
     if (!clip) return null;
     const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
@@ -321,8 +324,9 @@ if (bb) {
     const fit = Math.max(span.x / camera.aspect, span.y, span.z * (view === 'top' ? 1 / camera.aspect : 0.6));
     const d = (fit * 0.62) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) + Math.max(span.x, span.z) * 0.5;
     const near = q.get('near')?.split(',').map(Number);
-    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : mid;
-    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : d);
+    // (or, of two, at that height over the middle of what is shown, from that far: a body in a strip, wherever its clip puts it)
+    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : near?.length === 2 ? new THREE.Vector3(mid.x, near[0], mid.z) : mid;
+    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : near?.length === 2 ? near[1] : d);
     camera.lookAt(at);
   };
 
