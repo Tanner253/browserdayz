@@ -381,8 +381,8 @@ const SMG_CARRY = {
 /** a stroke of the spade when something is being buried or dug up, seconds */
 const DIG_STROKE = 1.15;
 /** a saw's stroke at a log, there and back, seconds; and how far it goes along its blade, metres */
-const SAW_STROKE = { time: 0.7, reach: 0.1 };
-const _sawQ = new THREE.Quaternion(), _sawX = new THREE.Vector3(1, 0, 0), _sawTip = new THREE.Vector3();
+const SAW_STROKE = { time: 0.7, reach: 0.12 };
+const _sawQ = new THREE.Quaternion(), _sawX = new THREE.Vector3(1, 0, 0);
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
 /**
@@ -798,7 +798,9 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // (the saw pointed away, its teeth in and its flat turned partly to the eye: held as the machete was, upright by
   // the eye, its broad blade filled a third of the picture. The owner, 2026-10-25: "this does not look good". Gripped
   // at the middle of its handle, which is the bottom 14 cm of it.)
-  styles.hand_saw = { ...styles.machete, idle: { p: [0.2, -0.13, -0.5], tip: [-0.4, 0.55, -0.73], edge: [0.35, 0.85, 0.35] }, grip: 0.07 };
+  // (the saw held as the hammer is, its wooden handle in the fist where the hammer's is: the owner, 2026-10-25, "the hand
+  // positionc an be the sam eas the hammer, the wooden handle goes in the hand where the base of the hammer would go")
+  styles.hand_saw = { ...styles.hatchet, grip: 0.07 };
   styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };
@@ -4728,8 +4730,11 @@ export class Weapons {
     if (this.sawing && !a) {
       this.sawT += dt;
       const s = Math.sin((this.sawT * Math.PI * 2) / SAW_STROKE.time);
-      quat.premultiply(_sawQ.setFromAxisAngle(_sawX, -0.45));
-      pos.addScaledVector(_sawTip.set(0, 1, 0).applyQuaternion(quat), s * SAW_STROKE.reach).y += 0.02;
+      // (the hand and the arm with it drawn forward and back, the saw in the fist: "sawing animation is moving the hand
+      // and arm forweward and backward with the saw attached", the owner, 2026-10-25)
+      quat.premultiply(_sawQ.setFromAxisAngle(_sawX, -0.6));
+      pos.z -= s * SAW_STROKE.reach;
+      elbow.z -= s * SAW_STROKE.reach;
     } else this.sawT = 0;
     m.root.position.copy(pos);
     m.root.quaternion.copy(quat);
