@@ -75,7 +75,13 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; scrap salvaged, 'salvage');
 // raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
 // a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels.)
-export const PROTOCOL = 66;
+// (65 on the live line, 2026-10-25, a hotfix: a dog tag stays in the pockets until the server says it is cashed, and the
+// game's countdown follows the server's clock ('tagclock'). Raised so every open page loads the fixed game: a page of 64
+// drops the tag the moment its own countdown ends. The working branch's own 65 to 67 are renumbered at its release.)
+// (67, 2026-10-25: which survivor each player is and the voice they call out in (`bd`, `vo` on hello and on a player;
+// 'who' when it is changed: src/sim/survivor.ts), and what they wear by its colour ('gear' as id~colour). A page of 66
+// would draw everybody in the old suit. (66 is base building's; the navigator sets the last number at release.)
+export const PROTOCOL = 67;
 /** a course's variety, as the game is told it (see Course in src/sim/course.ts) */
 export interface RangeLayout { flip: boolean; shift: number[]; mover: number; civ: number }
 
@@ -113,7 +119,8 @@ export const LEAN_REACH = 0.34;
 /** things a player does with their hands that the people around them can see (and hear) */
 // ('load': one round pushed into a magazine; 'unbox': a box of rounds torn open. Both are small sounds, heard close to.)
 // ('check': a gun turned over in the hands and looked at.)
-export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'stop'] as const;
+// ('take': something picked up, the body bending for it, 2026-10-25; an older game that hears it does nothing with it)
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop'] as const;
 export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */
@@ -149,6 +156,9 @@ export interface PlayerInfo {
   f?: string;
   /** what they wear that shows: hat, vest, pack */
   g: string[];
+  /** which of the bodies they are, and their voice (src/sim/survivor.ts): not said, a game from before there were any to pick */
+  bd?: number;
+  vo?: number;
   /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
   b?: Slung[];
   alive: boolean;
@@ -187,6 +197,8 @@ export interface CorpseInfo extends StashInfo {
   ride?: { i: number; seat: number };
   /** the body of one of the infected (its `i`): drawn by them, and only searched here */
   zed?: number;
+  /** whose body it was of the survivors' (src/sim/survivor.ts): when it is not said, the one the name gives */
+  bd?: number;
 }
 
 /**
@@ -218,7 +230,7 @@ export type C2S =
    * `fp`: the device this game runs on, as one hash (src/net/device.ts; since protocol 44: a swarm of programs
    * on one machine is one device to the server, whatever it calls itself and wherever it comes from)
    */
-  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string }
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string; fp?: string; /** what the graphics card says it is (src/net/device.ts, glName) */ gl?: string; /** the game's print of its places for things (src/sim/economy.ts, lootPrint) */ lp?: string; /** the body and the voice they picked (src/sim/survivor.ts) */ bd?: number; vo?: number }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number; /** the held gun's uid, said only of one with a finish (server/plates.ts) */ u?: string }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -247,6 +259,8 @@ export type C2S =
   /** a keycard was put to the bunker's door */
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
+  /** another body or voice picked (src/sim/survivor.ts) */
+  | { t: 'who'; bd: number; vo: number }
   | { t: 'back'; b: Slung[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number; /** how many bodies the round went through first (see PIERCE) */ p?: number }
   | { t: 'take'; uid: string }
@@ -497,6 +511,7 @@ export type S2C =
   /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
+  | { t: 'who'; id: number; bd: number; vo: number }
   | { t: 'back'; id: number; b: Slung[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number]; /** an animal's: whether it opened a wound (the server's roll, not the game's) */ bleed?: boolean }
   /** the animals near this player (src/sim/animals.ts AnimalRow), five times a second; once a second all within its reach (`all`: any it knows of that is not in it has gone) */

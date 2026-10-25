@@ -87,7 +87,7 @@ export const BUILD_ITEMS: ItemDef[] = [
   // you have a torch)": lit with L in the hands, or set on a wall with the building plan)
   { id: 'torch', name: 'Torch', model: 'torch', w: 1, h: 4, weight: 0.5, category: 'tool',
     desc: 'A stick with a rag-wrapped head soaked in fuel. In your hands, L lights it: a flame and a warm light all round, as far as a campfire throws one. Set on a wall with the building plan, it burns there.',
-    loot: { pair: 'LongTorch', at: [3, 4, 2, 0, 0], restock: 420, usage: [...HOMES, ...SHEDS], favour: { Hunting: 2, Farm: 1.5 } },
+    loot: { pair: 'LongTorch', at: [2, 4, 2, 0, 0], restock: 420, usage: HOMES, favour: { Hunting: 2, Farm: 1.5 } },
     worth: 2,
   },
   // (raiding, base building's fifth step: the navigator, "C4 as loot". Plan v2: "explosive loot rare; crafted later". Found

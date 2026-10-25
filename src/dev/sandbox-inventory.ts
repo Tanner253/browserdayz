@@ -126,6 +126,8 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     open: () => {},
     onGround: () => {},
     unload: () => {},
+    cut: () => {},
+    canCut: () => true,
     attachTargets: () => [],
     attach: () => {},
     detach: () => null,

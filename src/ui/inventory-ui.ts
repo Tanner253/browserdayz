@@ -23,6 +23,7 @@
 
 import { ALL_SLOTS, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { TOOL_LIFE, condition } from '../sim/gather';
+import { bandagesFrom, cuttable } from '../sim/condition';
 import { Container, bagGrid, poured, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
@@ -62,6 +63,9 @@ export interface InvActions {
   onGround(w: WorldItem, how: 'use' | 'open'): void;
   /** take the rounds out of a weapon */
   unload(item: ItemInstance): void;
+  /** cut a piece of clothing into bandages, and whether a blade is carried to (src/sim/condition.ts) */
+  cut(item: ItemInstance): void;
+  canCut(): boolean;
   /** carried weapons this attachment can be fitted to right now */
   attachTargets(att: ItemInstance): ItemInstance[];
   /** @param loose picked up off the ground to be fitted: held by nothing */
@@ -2135,6 +2139,11 @@ export class InventoryUI {
       // ground, and the entry says so before it is chosen. A gun with no room for it is put down with Drop.)
       const room = this.inv.containers.some((c) => c.hasRoom(it));
       if (room || d.category === 'clothing') out.push({ label: d.category === 'clothing' ? (room ? 'Take off' : 'Take off, onto the ground (no room for it)') : 'Stow', icon: room ? 'out' : 'drop', id: 'off', run: () => this.takeOff(loc) });
+    }
+    // (clothes taken off and empty are cut into bandages with a blade carried, as DayZ cuts them into rags)
+    if (this.carried(loc) && loc.kind !== 'slot' && cuttable(it) && this.actions.canCut()) {
+      const n = bandagesFrom(it);
+      out.push({ label: `Cut into ${n} bandage${n === 1 ? '' : 's'}`, icon: { kind: 'bandage' }, id: 'cut', run: () => this.actions.cut(it) });
     }
     if (d.mag) {
       // (filled from the loose rounds carried, as letting them go on it does: Fettah 2026-10-18, "instead of dragging rounds in by hand")

@@ -21,7 +21,7 @@ import '../world/buildings';
 import type { Buildings } from '../world/buildings';
 import { PLAN, SQUARE_HALF, passPlan, ridgeWall, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { FLOOR_CACHE, caveSpansUnder, passWorld, wallParts } from '../sim/pass';
-import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
+import { ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
 import { Economy, lootPrint, type WorldLoot } from '../sim/economy';
@@ -37,8 +37,9 @@ import { crateId, type EspRow, type ZedSpot } from '../net/protocol';
 import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
 import '../sim/blood';
-import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
+import { Avatar, AVATAR_LAYER, type Hold } from './avatar';
 import { lookFor } from './look';
+import { chosen, choose } from './survivors';
 import { Doll } from './doll';
 import { inFist } from './in-fist';
 import { GunRacks, RACK_PLAN } from './racks';
@@ -811,6 +812,11 @@ export class Game {
     // (the print of the places is said with hello, for the server to hold against its own: see lootPrint)
     let printed = '';
     this.net.lootPrint = () => (printed ||= lootPrint(buildings.lootPoints));
+    // (which survivor this player is, and their voice: said with hello, and to everybody when another is picked on the menu or in Settings)
+    this.net.who = () => {
+      const w = chosen(playerName());
+      return { bd: w.body, vo: w.voice };
+    };
     // crates standing around the map become searchable containers, and the furniture that holds things (src/sim/storage.ts)
     for (const c of veg.crates) {
       const own = FURNITURE[c.kind], spec = CRATE_SPECS[c.kind] ?? (own ? { w: own.grid[0], h: own.grid[1], label: own.label } : null);
@@ -1009,6 +1015,21 @@ export class Game {
     this.hud = new HUD(icons);
     this.hud.adsHere = () => this.modes.mode === 'zona';
     this.hud.setName(playerName());
+    // (the survivor and the voice picked on the menu and in Settings: see net.who above)
+    const pickWho = (pick: { body?: number; voice?: number }) => {
+      const w = choose(playerName(), pick);
+      this.avatar.wardrobe.setBody(w.body);
+      this.hud.who.show(w.body);
+      this.hud.callVoice = w.voice;
+      if (this.net.online) this.net.send({ t: 'who', bd: w.body, vo: w.voice });
+    };
+    this.hud.who.onPick = (body) => pickWho({ body });
+    // (a voice picked says a call in it, to be heard)
+    this.hud.onVoice = (voice) => {
+      pickWho({ voice });
+      audio.shout('friendly', undefined, 0, voice, voiceOf(playerName()));
+    };
+    pickWho({});
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
     this.gas = new Gas(atmo.gases, atmo, r.scene, {
@@ -1036,6 +1057,8 @@ export class Game {
       open: (item) => this.openBox(item),
       onGround: (w, how) => this.onGround(w, how),
       unload: (item) => this.unloadWeapon(item),
+      cut: (item) => this.cutUp(item),
+      canCut: () => this.canCut(),
       attachTargets: (att) => this.attachTargets(att),
       attach: (att, weapon, loose) => this.attachMod(att, weapon, loose),
       detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
@@ -1091,7 +1114,7 @@ export class Game {
     // slung, and says when it has been drawn; until it is made, the still picture above is what is shown.)
     this.doll = new Doll(r, atmo, this.loot.models, {
       name: () => playerName(),
-      worn: () => GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x)),
+      worn: () => this.wornKeys(),
       hands: () => {
         const it = this.inv.held() ?? this.inHand;
         return it ? { id: it.id, mods: fittedOf(it) } : null;
@@ -1108,7 +1131,7 @@ export class Game {
     this.emoteDoll = () =>
       (this.emoteFig ??= new Doll(r, atmo, this.loot.models, {
         name: () => playerName(),
-        worn: () => GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x)),
+        worn: () => this.wornKeys(),
         hands: () => null,
         held: (id, mods) => this.makeHeld(id, mods),
         back: () => '',
@@ -1118,7 +1141,7 @@ export class Game {
       }));
     this.hud.emotes.figure = { grab: () => this.emoteFig?.grab(), turn: (by) => this.emoteFig?.turn(by), drop: () => this.emoteFig?.drop() };
     // (a call picked there is heard as it is called in the game)
-    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, voiceOf(playerName()));
+    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, chosen(playerName()).voice, voiceOf(playerName()));
     this.hud.emotes.onClose = () => this.toggleEmotes(false);
     this.pad = new Gamepad(this.input, {
       on: () => controls().pad,
@@ -1892,6 +1915,7 @@ export interface Game {
   act: Methods<typeof onlineMethods>['act'];
   wear: Methods<typeof onlineMethods>['wear'];
   syncBack: Methods<typeof onlineMethods>['syncBack'];
+  wornKeys: Methods<typeof onlineMethods>['wornKeys'];
   syncGear: Methods<typeof onlineMethods>['syncGear'];
   drawHeads: Methods<typeof onlineMethods>['drawHeads'];
   portrait: Methods<typeof onlineMethods>['portrait'];
@@ -1989,6 +2013,8 @@ export interface Game {
   explode: Methods<typeof itemsMethods>['explode'];
   openBox: Methods<typeof itemsMethods>['openBox'];
   unloadWeapon: Methods<typeof itemsMethods>['unloadWeapon'];
+  cutUp: Methods<typeof itemsMethods>['cutUp'];
+  canCut: Methods<typeof itemsMethods>['canCut'];
   attachTargets: Methods<typeof gunsMethods>['attachTargets'];
   gunInHands: Methods<typeof gunsMethods>['gunInHands'];
   attachMod: Methods<typeof gunsMethods>['attachMod'];
@@ -2017,6 +2043,7 @@ export interface Game {
   toggleMap: Methods<typeof gunsMethods>['toggleMap'];
   toggleInventory: Methods<typeof gunsMethods>['toggleInventory'];
   updateInteraction: Methods<typeof interactMethods>['updateInteraction'];
+  bendFor: Methods<typeof interactMethods>['bendFor'];
   nearestLoose: Methods<typeof interactMethods>['nearestLoose'];
   dropInHands: Methods<typeof interactMethods>['dropInHands'];
   tickCrates: Methods<typeof interactMethods>['tickCrates'];

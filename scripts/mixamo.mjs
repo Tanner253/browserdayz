@@ -10,6 +10,7 @@ const M4 = (a) => new THREE.Matrix4().fromArray(a);
 
 // ---------------------------------------------------------------- a skeleton, as it was bound
 
+/** @param prefix what stands before every joint's name in a Mixamo file (see ours), or a joint's name -> ours for another skeleton's (scripts/mocap.mjs) */
 export function rigOf(doc, prefix = '') {
   const skin = doc.getRoot().listSkins()[0];
   const joints = skin.listJoints();
@@ -20,7 +21,7 @@ export function rigOf(doc, prefix = '') {
     for (let n = j.getParentNode(); n; n = n.getParentNode()) if (index.has(n)) return index.get(n);
     return -1;
   });
-  const name = joints.map((j) => ours(j.getName(), prefix));
+  const name = joints.map((j) => (typeof prefix === 'function' ? prefix(j.getName()) : ours(j.getName(), prefix)));
   const at = (n) => new THREE.Vector3().setFromMatrixPosition(bind[name.indexOf(n)]);
   return { skin, joints, bind, index, parent, name, at };
 }
@@ -101,7 +102,7 @@ export function runOf(cop, prefix = '', onTheSpot = true) {
   };
   const frames = Math.round(dur * FPS);
   const hips = rig.name.indexOf('pelvis');
-  const turned = [], moved = [];
+  const turned = [], moved = [], where = [];
   const _p = new THREE.Vector3(), _s = new THREE.Vector3();
   const rot = (m) => {
     const q = new THREE.Quaternion();
@@ -116,16 +117,19 @@ export function runOf(cop, prefix = '', onTheSpot = true) {
     const W = pose(Q, T);
     turned.push(W.map((m, i) => rot(m).multiply(boundQ[i].clone().invert())));
     moved.push(new THREE.Vector3().setFromMatrixPosition(W[hips]).sub(hipsAt));
+    where.push(W.map((m) => new THREE.Vector3().setFromMatrixPosition(m)));
   }
-  // (it runs on the spot: whatever way it drifts over the two seconds is taken out)
-  const drift = onTheSpot ? moved[frames].clone().sub(moved[0]) : new THREE.Vector3();
+  // (it runs on the spot: whatever way it drifts over the two seconds is taken out; how far that was is said, as `travel`)
+  const travel = moved[frames].clone().sub(moved[0]);
+  const drift = onTheSpot ? travel.clone() : new THREE.Vector3();
   moved.forEach((m, f) => m.addScaledVector(drift, -f / frames));
   const mean = moved.reduce((s, m) => s.add(m), new THREE.Vector3()).divideScalar(moved.length);
   for (const m of moved) {
     m.x -= mean.x;
     m.z -= mean.z;
   }
-  return { rig, dur, frames, turned, moved, hipsHigh: hipsAt.y };
+  // (`where`: every joint's place, frame by frame, as the file has it: what the feet do on the ground is read from it)
+  return { rig, dur, frames, turned, moved, hipsHigh: hipsAt.y, travel, where };
 }
 
 const ID = new THREE.Quaternion();

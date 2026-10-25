@@ -31,6 +31,7 @@ export interface BodyBox {
   ride?: { i: number; seat: number };
   zed?: number;
   buried?: boolean;
+  bd?: number;
 }
 
 /** the uid of the body of one of the infected (its number is its own for as long as the server runs, and the body is not kept through a restart) */
@@ -60,7 +61,7 @@ export function zedBody(b: Body, way: number, time: number, rnd: () => number = 
 
 /** what the games are told of a body: where it lies, and whose (one of the infected's says which: it is drawn by them) */
 export function bodyInfo(b: BodyBox): CorpseInfo {
-  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, ...(b.ride ? { ride: b.ride } : {}), ...(b.zed !== undefined ? { zed: b.zed } : {}) };
+  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0, ...(b.ride ? { ride: b.ride } : {}), ...(b.zed !== undefined ? { zed: b.zed } : {}), ...(b.bd !== undefined ? { bd: b.bd } : {}) };
 }
 
 /** the dog tags in what a body holds, in its bags and pockets too (a body taken away says how many went with it) */

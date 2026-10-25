@@ -24,19 +24,24 @@ const ok = (name: string, fn: () => void) => {
 const near = (a: number, b: number, eps = 1e-9) => Math.abs(a - b) < eps;
 const many = (k: number, t: KitThing): KitThing[] => Array.from({ length: k }, () => ({ ...t }));
 
-/** what somebody weighs down with these things on a new survivor, in kilograms: all of it has to find room */
+/** what somebody weighs down with these things on a new survivor, in kilograms: all of it has to find room (and what
+ * is worn of it is put on in place of the basics a new survivor stands in, as a kit is: PlayerInventory.makeWay) */
 const carried = (things: KitThing[]): number => {
   const inv = new PlayerInventory();
-  for (const t of things) {
+  const made = things.map((t) => {
     const it = makeItem(t.id, t.qty);
     if (t.mag !== undefined) it.mag = t.mag;
     if (t.loaded !== undefined) it.loaded = t.loaded;
     if (t.rounds !== undefined) it.rounds = t.rounds;
     if (t.mods) it.mods = [...t.mods];
-    assert.equal(inv.add(it), null, `no room for ${t.id}`);
-  }
+    return it;
+  });
+  inv.makeWay(made);
+  for (const it of made) assert.equal(inv.add(it), null, `no room for ${it.id}`);
   return inv.weight();
 };
+/** the army's clothes, that the fighters further east have found (everybody began in them until 2026-10-25) */
+const ARMY: KitThing[] = [{ id: 'field_jacket' }, { id: 'field_trousers' }];
 
 // Five survivors, as they are found at each step of the map. (What is worn comes first, so that its pockets are there.)
 const M9: KitThing = { id: 'm9', mag: 'mag_m9', loaded: 16 };
@@ -46,19 +51,19 @@ const SCAVENGER: KitThing[] = [
   { id: 'hatchet' }, { id: 'flashlight' }, { id: 'compass' }, { id: 'beans' }, { id: 'sprats' }, { id: 'flask' }, { id: 'bandage', qty: 2 },
 ];
 const FIGHTER: KitThing[] = [
-  { id: 'sack_pack' }, { id: 'soft_vest' }, { id: 'helmet_m1' }, { id: 'rubber_boots' }, { id: 'garden_gloves' },
+  ...ARMY, { id: 'sack_pack' }, { id: 'soft_vest' }, { id: 'helmet_m1' }, { id: 'rubber_boots' }, { id: 'garden_gloves' },
   { id: 'mpa', mag: 'mag_mpa', loaded: 31, mods: ['red_dot'] }, ...many(3, { id: 'mag_mpa', rounds: 30 }), M9, { id: 'mag_m9', rounds: 15 }, ...many(2, { id: 'box_9mm' }),
   { id: 'knife' }, { id: 'flashlight' }, { id: 'compass' }, { id: 'bandage', qty: 3 }, { id: 'stim', qty: 1 }, { id: 'beans' }, { id: 'sardines' }, { id: 'flask' },
 ];
 const RIFLEMAN: KitThing[] = [
-  { id: 'camping_pack' }, { id: 'life_vest' }, { id: 'boonie_hat' }, { id: 'gasmask' }, { id: 'rubber_boots' }, { id: 'work_gloves' },
+  ...ARMY, { id: 'camping_pack' }, { id: 'life_vest' }, { id: 'boonie_hat' }, { id: 'gasmask' }, { id: 'rubber_boots' }, { id: 'work_gloves' },
   { id: 'ar15', mag: 'mag_ar', loaded: 31, mods: ['red_dot', 'suppressor_556', 'foregrip', 'gun_light'] }, ...many(5, { id: 'mag_ar', rounds: 30 }),
   M9, { id: 'mag_m9', rounds: 15 }, ...many(2, { id: 'box_556' }), { id: 'grenade' },
   { id: 'firstaid' }, { id: 'bandage', qty: 5 }, { id: 'stim', qty: 2 }, { id: 'blood_bag' }, { id: 'saline' }, { id: 'splint' },
   { id: 'beans' }, { id: 'sprats' }, { id: 'flask' }, { id: 'binoculars' }, { id: 'compass' }, { id: 'flashlight' }, { id: 'knife' },
 ];
 const MULE: KitThing[] = [
-  { id: 'suitcase' }, { id: 'heavy_armor' }, { id: 'helmet_k63' }, { id: 'rubber_boots' }, { id: 'work_gloves' },
+  ...ARMY, { id: 'suitcase' }, { id: 'heavy_armor' }, { id: 'helmet_k63' }, { id: 'rubber_boots' }, { id: 'work_gloves' },
   { id: 'ak', mag: 'drum_ak', loaded: 76, mods: ['red_dot', 'suppressor_739'] }, { id: 'ar15', mag: 'mag_ar_60', loaded: 61, mods: ['red_dot', 'suppressor_556', 'foregrip', 'gun_light'] },
   { id: 'deagle', mag: 'mag_deagle', loaded: 8 },
   ...many(2, { id: 'drum_ak', rounds: 75 }), ...many(4, { id: 'mag_ak', rounds: 30 }), ...many(2, { id: 'mag_ar_60', rounds: 60 }), ...many(4, { id: 'mag_ar', rounds: 30 }),

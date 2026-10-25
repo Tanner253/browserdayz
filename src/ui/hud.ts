@@ -30,6 +30,8 @@ import { crownEl, hideCrownTip } from './elite-crown';
 import { reportPlay } from '../core/conversion';
 import { EMBED } from '../core/embed';
 import { DISCORD, discordBtn } from './discord';
+import { WhoPicker } from './who';
+import { VOICES } from '../sim/survivor';
 import { AO_MODES, DEFAULT_GRAPHICS, DRAWS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 export type Stance = 'stand' | 'crouch' | 'prone';
@@ -223,6 +225,11 @@ export class HUD {
   root: HTMLDivElement;
   /** Emotes: the wheel's slots set, each watched first; opened in the game from the wheel (src/ui/emotes-menu.ts) */
   readonly emotes = new EmotesMenu();
+  /** which survivor you are, on the menu (src/ui/who.ts) */
+  readonly who = new WhoPicker();
+  /** the voice your calls are said in (src/sim/survivor.ts VOICES), and a new one picked in Settings */
+  callVoice = 0;
+  onVoice: (n: number) => void = () => {};
   private el: Record<string, HTMLElement> = {};
   private notes: HTMLDivElement;
   private last: Record<string, string> = {};
@@ -563,6 +570,7 @@ export class HUD {
     });
     (this.root.querySelector('.sm-close') as HTMLButtonElement).onclick = () => this.sheet('play');
     this.root.append(this.emotes.root);
+    (this.root.querySelector('.sm-main') as HTMLElement).append(this.who.root);
     window.addEventListener('keydown', (e) => {
       // (Escape shuts an open sheet before it does anything else: the game's own Escape is the pause, and that is this menu)
       if (e.code === 'Escape' && this.el.start.classList.contains('sheet') && !this.el.start.classList.contains('paused')) this.sheet('play');
@@ -1381,6 +1389,11 @@ export class HUD {
       this.keysChanged(c);
       return this.renderGraphics();
     }
+    if (key === 'voice') {
+      this.callVoice = Number(value);
+      this.onVoice(this.callVoice);
+      return this.renderGraphics();
+    }
     if (key === 'figures') {
       wantFigures(value === '1');
       this.status.figures = value === '1';
@@ -1449,6 +1462,7 @@ export class HUD {
           : ''),
       audio:
         loud('Master', 'volume', g.volume, 'Everything') +
+        row('Your voice', 'voice', this.callVoice, VOICES.map((v, n) => [n, v.name]), 'What everybody hears you call out (hold T). Picked, it calls once') +
         `<h4 class="set-h">Mix</h4>` +
         GROUPS.map((id) => loud(MIX_ROWS[id][0], id, this.mix[id], MIX_ROWS[id][1])).join(''),
       video:

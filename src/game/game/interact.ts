@@ -27,6 +27,12 @@ import { renderIcons } from '../../ui/icons';
 export const interactMethods = {
   // ------------------------------------------------------------ interaction
 
+  /** the body bends to take something up, right down for what lies at the feet (see Avatar.pickUp), and everybody sees it */
+  bendFor(this: Game, w: WorldItem) {
+    if (this.player.prone || this.garage.ride) return;
+    this.act('take', w.loot.y - this.player.pos.y < 0.5 ? 1.4 : 1.0);
+  },
+
   updateInteraction(this: Game, cam: THREE.PerspectiveCamera) {
     this.prompt = null;
     this.mark = null;
@@ -168,12 +174,14 @@ export const interactMethods = {
             return;
           }
           if (!this.takeWorldItem(owner)) return;
+          this.bendFor(owner);
           if (!this.takeUp(item, true)) return;
           audio.ui('pickup', undefined, item.id);
           this.hud.note(`${d.name}: in your hands, there is no room to put it away`, 'info');
           return;
         }
         if (!this.takeWorldItem(owner)) return;
+        this.bendFor(owner);
         const left = this.inv.add(item);
         if (left) this.dropItem(left);
         audio.ui('pickup', undefined, item.id);
