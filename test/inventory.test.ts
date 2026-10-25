@@ -507,9 +507,9 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
   /** and as it is */
   const IS: Record<string, [number, number]> = { field_jacket: [5, 5], field_trousers: [5, 4], chest_rig: [5, 3], soft_vest: [3, 3], armor_vest: [4, 3], heavy_armor: [4, 3], life_vest: [5, 4], sack_pack: [5, 5], camping_pack: [7, 6], suitcase: [9, 7] };
   /** and the clothes made since (2026-10-25, src/sim/items/wear.ts), which were nothing before: nothing was kept in them */
-  const NEW = ['tshirt', 'tracksuit_pants', 'flannel_shirt', 'hoodie', 'jeans', 'leather_jacket', 'quilted_jacket', 'work_trousers', 'parka', 'cargo_pants', 'mountain_smock', 'mountain_trousers'];
+  const NEW = ['tshirt', 'tracksuit_pants', 'flannel_shirt', 'hoodie', 'jeans', 'leather_jacket', 'quilted_jacket', 'work_trousers', 'parka', 'cargo_pants', 'mountain_smock', 'mountain_trousers', 'tracksuit_jacket', 'hip_pack', 'field_bag', 'tactical_jacket', 'combat_shirt', 'combat_trousers', 'military_belt', 'assault_pack'];
   /** the most DayZ has in any one thing of each class (its wiki's Clothing page, the tables of game version 1.29.163451): Field Backpack 8x8, OMK Jacket 6x5, cargo pants 5x4, Field Vest 5x4 */
-  const DAYZ_MOST: Record<string, number> = { back: 64, top: 30, legs: 20, vest: 20 };
+  const DAYZ_MOST: Record<string, number> = { back: 64, top: 30, legs: 20, vest: 20, belt: 6 };
   const worn = Object.values(ITEMS).filter((d) => d.wear?.cargo);
   const cells = (id: string) => ITEMS[id].wear!.cargo![0] * ITEMS[id].wear!.cargo![1];
   /** every thing in a list of things, and in them, by its number */
@@ -545,8 +545,8 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     assert.deepEqual(order(vests, cells), order(vests, (id) => WAS[id][0] * WAS[id][1]), 'the vests are no longer in the order of what they carried');
     // (a jacket's pockets are what the smallest pack is, as they were, and well under the others)
     assert.ok(cells('field_jacket') <= cells('sack_pack') && cells('field_jacket') * 1.5 < cells('camping_pack') && cells('field_trousers') < cells('field_jacket'));
-    // what is not worn is as it was: the cases but the stash crate, a body
-    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[10, 15], [6, 5], [5, 4], [10, 17]]);
+    // what is not worn is as it was: the cases but the stash crate; a body a row deeper since 2026-10-25, for the clothes now found
+    assert.deepEqual([ITEMS.stash_kit.stash, ITEMS.old_suitcase.stash, ITEMS.black_bag.stash, BODY_GRID], [[10, 15], [6, 5], [5, 4], [10, 18]]);
   });
 
   ok('a stash crate holds five Barretts (the owner, 2026-10-18: "large enough to hold 5 barretts")', () => {

@@ -170,9 +170,11 @@ ok('the pouch is a soldier\'s: kept where the army and the police were before a 
   assert.ok(r.usage.includes('Military') && r.usage.includes('Police') && (r.favour?.Military ?? 0) > 1 && !r.usage.includes('Village') && !r.usage.includes('Shop'));
   // (what lay on each step in bandages, kits and pouches together: the village's share of the second step moved to the third with it, 2026-10-17)
   assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.bandage.at[t] + TYPES.firstaid.at[t] + r.at[t]), [16, 5, 151, 5, 6]);
-  // (and the same of the caps and the steel helmet; the bunker's Combat Helmets are the four they were)
-  assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.patrol_cap.at[t] + TYPES.helmet_m1.at[t]), [0, 6, 12, 0, 0]);
-  assert.equal(TYPES.boonie_hat.at[4], 4);
+  // (and the same of the caps and the steel helmet, each on one step since 2026-10-25, the owner: "Theres clothing for
+  // all tiers exclusively"; the bunker's Combat Helmets are the four they were)
+  assert.deepEqual([0, 1, 2, 3, 4].map((t) => TYPES.patrol_cap.at[t] + TYPES.helmet_m1.at[t]), [0, 0, 16, 0, 0]);
+  // (the boonie hat under the gas since 2026-10-25, each piece of clothing on one step)
+  assert.equal(TYPES.boonie_hat.at[3], 4);
   // (every kit an admin hands out that has the First Aid Kit in it has the pouch)
   for (const kit of KITS) assert.equal(kit.things.some((t) => t.id === 'firstaid'), kit.things.some((t) => t.id === 'aid_pouch'), kit.id);
 });

@@ -2081,7 +2081,8 @@ export class AudioEngine {
       src.connect(g).connect(this.out(pos, 8, 1, distance, this.bus.voice));
       src.start(this.ctx.currentTime + distance / 343);
     };
-    if (had instanceof AudioBuffer || had === null) return say(had);
+    // (a buffer, or nothing to say: anything but a promise still on its way; asked so, as a test has no AudioBuffer)
+    if (had === null || (had !== undefined && !(had instanceof Promise))) return say(had);
     // (fetched now, and said when it comes if that is soon: a call heard a second late is a call out of its moment)
     const asked = performance.now();
     void (had ?? voiceLine(name)).then((buf) => performance.now() - asked < 1500 && say(buf));

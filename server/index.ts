@@ -244,7 +244,7 @@ export const hearths = new Hearths(world.fires);
  * none is here.)
  */
 // (but the gas mask, which the old trader sold made by the game that bought it: those already carried were never issued)
-const GUARDED = new Set(Object.values(ITEMS).filter((d) => d.id !== 'gasmask' && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
+const GUARDED = new Set(Object.values(ITEMS).filter((d) => !d.wear?.gas && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
 
 /** every such thing the server has put in the world, by its own number: laid out as loot, packed in a crate or a drop, left on a body */
 const issued = new Set<string>();

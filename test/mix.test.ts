@@ -275,12 +275,16 @@ ok("another player's voice goes in at the Voice group, and nowhere else", () => 
   assert.equal(new AudioEngine().voiceBus(), null, 'a voice has somewhere to go before the sound is started');
 });
 
+// (A call is asked for as a recording first (src/core/audio.ts voiceLine), and a test has none: once that asking has come
+// back empty, the call is said by the speaking voice at once, which is what is measured here.)
+engine.shout('hey');
+await new Promise((r) => setTimeout(r, 50));
 ok('the calls said aloud are turned by Voice too: as loud as they were at 100 %, to the last digit; half at 50 %; not said at all at 0', () => {
   const said = (volume: number, voice: number, distance: number) => {
     engine.setVolume(volume);
     engine.setMix({ voice });
     spoken.length = 0;
-    engine.shout('hey', distance ? THERE : undefined, distance, 0.5);
+    engine.shout('hey', distance ? THERE : undefined, distance, 0, 0.5);
     return spoken.map((u) => u.volume);
   };
   // (as it was worked out before there were groups)
