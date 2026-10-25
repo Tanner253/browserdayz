@@ -19,6 +19,7 @@
 //   &sun=day|dusk                               default day
 //   &person=0                                   no survivor beside it
 //   &gap=0.05                                   metres between things laid side by side (0.5)
+//   &roll=90                                    the thing laid over on its side, degrees (a long thing across a wide picture)
 //   &melee=hatchet&n=0&strip=8                  a survivor at moments of one of its blows (src/dev/sandbox-melee.ts)
 //   &finish=emerald,ruby&as=knife               the store finish each model wears in turn (as: the gun it is plated as)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
@@ -41,7 +42,7 @@ const views = list('views').length ? list('views') : ['side', 'front', 'q', 'top
 const strip = Math.max(0, Math.floor(+(q.get('strip') ?? 0)));
 // (an animal faces -z, as the game has them: turned a quarter by default, so that 'side' sees its side)
 const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
-const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0', gap = +(q.get('gap') ?? 0.5);
+const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0', gap = +(q.get('gap') ?? 0.5), roll = (+(q.get('roll') ?? 0) * Math.PI) / 180;
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
 const sim = q.get('sim'), melee = q.get('melee');
@@ -152,6 +153,9 @@ if (sim) {
   let x = 0;
   const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> = {}, asIs = false) => {
     o.rotation.y = yaw;
+    // (laid over about the line of sight, after it is turned)
+    o.rotation.z = roll;
+    if (roll) o.rotation.order = 'ZYX';
     shadowed(o);
     o.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(o);

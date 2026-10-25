@@ -89,7 +89,7 @@ function list(v: StoreView) {
   const skin = (id: ItemId) => {
     const it = SHOP[id], n = serial(id), l = left(id);
     const act = owned(id) ? `<span class="st-owned">Yours${n ? ` · No. ${n}` : ''}</span>` : l === 0 ? '<span class="st-sold">Sold out</span>' : `<button type="button" class="st-buy" data-buy="${id}">Buy</button>`;
-    return `<article class="st-card skin ${it.skin!.finish}">
+    return `<article class="st-card skin ${it.skin!.finish ?? it.skin!.form}">
       <img src="/shop/${id}.jpg" alt="" loading="lazy" onerror="this.remove()"><i class="st-swatch"></i>
       <h3>${it.name}</h3><p>${it.say}</p>
       ${it.limit ? `<p class="st-limit">Limited: ${l === undefined ? it.limit : l} of ${it.limit} left${n ? '' : ', each numbered'}</p>` : ''}
@@ -116,7 +116,7 @@ function list(v: StoreView) {
       ${skin('deagle_gold')}
       <div class="st-more">${(['m9_nickel', 'colt_nickel'] as ItemId[]).map(skin).join('')}</div>
       <h2 class="st-head">Knives <em>a finish goes on any knife you carry</em></h2>
-      <div class="st-more">${(['knife_emerald', 'knife_ruby', 'knife_gold', 'knife_damascus', 'knife_carbon', 'knife_nightcamo'] as ItemId[]).map(skin).join('')}</div>
+      <div class="st-more">${(['karambit', 'knife_emerald', 'knife_ruby', 'knife_gold', 'knife_damascus', 'knife_carbon', 'knife_nightcamo'] as ItemId[]).map(skin).join('')}</div>
       <article class="st-card noads">
         <h3>No ads <em>30 days</em></h3><p>${SHOP.noads.say}</p>
         <div class="st-row"><b class="st-price">${money(SHOP.noads.usd)}</b>${vip ? '<span class="st-owned">With VIP</span>' : `<button type="button" class="st-buy" data-buy="noads">${p.noads > now ? 'Add 30 days' : 'Buy'}</button>`}</div>
@@ -238,7 +238,7 @@ function done(q: Quote, status: 'ok' | 'look', sig: string, p: Perks, serial?: n
         : q.item === 'coffee' ? 'Thank you. A cup is by your name in chat for a week.'
           : `${it.name}${serial ? `, No. ${serial}${it.limit ? ` of ${it.limit}` : ''}` : ''}: yours. Open your inventory and Apply it to any you carry: that gun keeps it, whoever holds it next.`;
   // (the moment it is theirs, shown as such: the thing itself, gold or nickel or VIP's purple, and its number if it has one)
-  const look = it.skin ? it.skin.finish : q.item === 'vip' ? 'vip' : 'plain';
+  const look = it.skin ? it.skin.finish ?? it.skin.form : q.item === 'vip' ? 'vip' : 'plain';
   const shown = status !== 'ok' ? '' : it.skin
     ? `<figure class="st-reveal ${look}"><img src="/shop/${q.item}.jpg" alt=""><i class="st-sheen"></i>${serial ? `<figcaption>No. ${serial}${it.limit ? `<small> of ${it.limit}</small>` : ''}</figcaption>` : ''}</figure>`
     : q.item === 'vip' ? '<figure class="st-reveal vip"><b>VIP</b><i class="st-sheen"></i></figure>' : '';

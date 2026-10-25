@@ -9,12 +9,14 @@
 //   &inspect=1                        looked over, through its length
 //   &carry=draw|stow                  something long drawn off the back, or put away there
 //   &close=1                          close on the right hand (its fingers on the handle)
+//   &finish=emerald                   wearing a store finish
 //   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
 //                                     places them (meleeAt), through the hands' own lens (48 degrees)
 
 import * as THREE from 'three';
 import { Avatar } from '../game/avatar';
 import { lookFor } from '../game/look';
+import { wearFinish, type Finish } from '../game/finish';
 import { meleeAt, meleeHeld } from '../game/weapons';
 import { FPArms } from '../game/arms';
 import { BodyBlow, meleeClips } from '../game/melee/body';
@@ -53,6 +55,9 @@ export async function stageMelee(id: string, s: {
   await body.load(atmo, 0, false, lookFor('sandbox'));
   s.scene.add(body.root);
   const held = await meleeHeld(id);
+  // (&finish=emerald: wearing a store finish, as others see it)
+  const finish = s.q.get('finish');
+  if (finish) wearFinish(held.root, id, finish as Finish);
   body.setHeld(held.root, held.grips, 'melee', true);
   const at = new THREE.Vector3(), still = new THREE.Vector3(), face = 0;
   for (let k = 0; k < 30; k++) body.update(0.05, at, still, face, false, false, false, 0, true, false);

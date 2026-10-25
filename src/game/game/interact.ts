@@ -21,7 +21,7 @@ import { waterName } from '../../sim/water';
 import { jobsFor, progress as jobDone } from '../../sim/jobs';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 import { finishDay, finishOn, type Finish } from '../finish';
-import { lookOf, type ItemId } from '../../../api/_lib/shop-items';
+import { formOf, lookOf, type ItemId } from '../../../api/_lib/shop-items';
 import { renderIcons } from '../../ui/icons';
 
 export const interactMethods = {
@@ -352,10 +352,13 @@ export const interactMethods = {
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   },
 
-  /** the store finishes of theirs this gun can be given, but the one it wears (server/plates.ts) */
-  finishFor(this: Game, it: ItemInstance): { id: ItemId; look: Finish }[] {
+  /** the store finishes of theirs this gun can be given, but the one it wears; and the kinds a knife can be made (server/plates.ts) */
+  finishFor(this: Game, it: ItemInstance): { id: ItemId; look: Finish | null; form: string | null }[] {
     if (!this.online) return [];
-    return this.perks.skinsFor(it.id).filter((f) => it.finish !== f).map((f) => ({ id: f, look: lookOf(f)! }));
+    return this.perks
+      .skinsFor(it.id)
+      .map((f) => ({ id: f, look: lookOf(f), form: formOf(f) }))
+      .filter((o) => (o.form ? it.id !== o.form : it.finish !== o.id));
   },
 
   /** a plated gun's picture, drawn once from its model with the finish on (src/ui/icons.ts) and shared by the inventory and the hot keys */
@@ -380,10 +383,18 @@ export const interactMethods = {
   },
 
   /** the server has put a finish on one of our guns: on it from now, wherever it goes */
-  finished(this: Game, uid: string, f: string) {
+  finished(this: Game, uid: string, f: string, id?: string) {
     const it = this.inv.find((t) => t.uid === uid) ?? (this.inHand?.uid === uid ? this.inHand : null);
     if (!it) return;
-    it.finish = f;
+    // (a knife made another kind: taken up again in the hands if it is there, as what it is now)
+    const form = formOf(f);
+    if (form) {
+      it.id = id ?? form;
+      if (this.weapons.equippedItem === it) {
+        this.weapons.take(null);
+        this.weapons.take(it);
+      }
+    } else it.finish = f;
     this.weapons.refinish();
     this.syncHeld();
     this.inventoryChanged();

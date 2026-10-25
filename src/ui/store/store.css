@@ -36,6 +36,7 @@
 .st-card.ruby .st-swatch { background: radial-gradient(circle at 35% 30%, #ffd0d8, #e3102f 30%, #5a000e 80%); }
 .st-card.damascus .st-swatch { background: repeating-radial-gradient(circle at 20% 110%, #cfd4da 0 3px, #5d636b 4px 7px); }
 .st-card.carbon .st-swatch { background: repeating-linear-gradient(45deg, #15171a 0 4px, #3a3f46 4px 8px); }
+.st-card.karambit .st-swatch { background: radial-gradient(circle at 70% 30%, transparent 7px, #d9dde2 8px 10px, transparent 11px), radial-gradient(circle at 35% 55%, #2b2e33 0 12px, transparent 13px), #15171a; }
 .st-card.nightcamo .st-swatch { background: radial-gradient(circle at 30% 35%, #3c4630 0 6px, transparent 7px), radial-gradient(circle at 70% 65%, #12150f 0 8px, transparent 9px), #262c22; }
 .st-head { grid-column: 1 / -1; margin: 6px 0 -4px; font: 700 15px 'JetBrains Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #f1eee6; }
 .st-head em { font-style: normal; font-weight: 400; letter-spacing: 0.02em; text-transform: none; color: #9d988c; margin-left: 8px; }

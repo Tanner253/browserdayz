@@ -459,7 +459,7 @@ export type S2C =
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }
   /** a finish put on one of this player's guns: the shop's item id */
-  | { t: 'finish'; uid: string; f: string }
+  | { t: 'finish'; uid: string; f: string; /** what it is now (a knife made a karambit) */ id?: string }
   /** a player's own dog tag has come round their neck, or gone (server/worn.ts) */
   | { t: 'tagged'; id: number; on: boolean }
   /** the store's book for an admin's STORE tab (api/_lib/shop.ts, adminView), or why their order was not done */

@@ -239,7 +239,7 @@ export const onlineMethods = {
       r.wearTag();
     });
     net.on('perks', (m) => (m.id === net.id ? this.perks.set(m.sk, !!m.vip) : this.remotes.get(m.id)?.setVip(!!m.vip)));
-    net.on('finish', (m) => this.finished(m.uid, m.f));
+    net.on('finish', (m) => this.finished(m.uid, m.f, m.id));
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
