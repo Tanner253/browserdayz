@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T04:44:01.918Z",
+ "generated": "2026-10-25T04:53:07.512Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -13050,18 +13050,18 @@
    "tags": [
     "loot"
    ],
-   "bytes": 470680,
-   "srcTris": 2438,
-   "tris": 2438,
+   "bytes": 423324,
+   "srcTris": 7316,
+   "tris": 7316,
    "min": [
-    -0.0621,
+    -0.0298,
     0,
-    -0.3
+    -0.31
    ],
    "max": [
-    0.0621,
-    0.4311,
-    0.3
+    0.0298,
+    0.1877,
+    0.31
    ],
    "lods": []
   },

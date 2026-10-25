@@ -779,10 +779,10 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.shovel = { ...styles.bat, grip: 0.2 };
   // (the tools of gathering, src/sim/gather.ts: the saw held as the machete is, the long axe and the pickaxe as the
   // bat, in both hands)
-  // (the saw held lower and pointed away, its teeth down and its flat turned partly to the eye: held as the machete
-  // was, upright by the eye, its broad blade filled a third of the picture. The owner, 2026-10-25: "this does not look
-  // good". Gripped at the middle of its handle, which is the bottom 14 cm of it.)
-  styles.hand_saw = { ...styles.machete, idle: { p: [0.2, -0.2, -0.46], tip: [-0.4, 0.55, -0.73], edge: [0.35, 0.85, 0.35] }, grip: 0.07 };
+  // (the saw pointed away, its teeth in and its flat turned partly to the eye: held as the machete was, upright by
+  // the eye, its broad blade filled a third of the picture. The owner, 2026-10-25: "this does not look good". Gripped
+  // at the middle of its handle, which is the bottom 14 cm of it.)
+  styles.hand_saw = { ...styles.machete, idle: { p: [0.2, -0.13, -0.5], tip: [-0.4, 0.55, -0.73], edge: [0.35, 0.85, 0.35] }, grip: 0.07 };
   styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };

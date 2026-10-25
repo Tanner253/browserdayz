@@ -67,7 +67,7 @@ const FACE_UP = new Set(['gasmask']);
  */
 const POSED: Record<string, { pivot?: [number, number, number]; frame?: [number, number, number] }> = {
   key_lock: { pivot: [0.15, -Math.PI / 2 + 0.35, 0] },
-  hand_saw: { pivot: [Math.PI / 2 - 0.2, 0, 0] },
+  hand_saw: { pivot: [Math.PI / 2 - 0.2, 0, 0], frame: [0, 0, Math.PI] },
   building_plan: { pivot: [Math.PI / 2 - 0.25, 0, 0], frame: [0, 0, -Math.PI / 2] },
 };
 
