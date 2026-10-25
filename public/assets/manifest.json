@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T06:48:44.332Z",
+ "generated": "2026-10-25T06:58:56.535Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -13619,33 +13619,6 @@
      "tris": 2327,
      "far": 2,
      "of": "121288:1792910923362"
-    }
-   ]
-  },
-  "gun_body_pistol": {
-   "url": "assets/models/gun_body_pistol.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 311192,
-   "srcTris": 2868,
-   "tris": 2868,
-   "min": [
-    -0.0131,
-    0,
-    -0.075
-   ],
-   "max": [
-    0.0131,
-    0.0845,
-    0.075
-   ],
-   "lods": [
-    {
-     "url": "assets/models/gun_body_pistol_lod1.glb",
-     "tris": 1964,
-     "far": 2,
-     "of": "311192:1792910924233"
     }
    ]
   },

@@ -978,14 +978,13 @@ export const LOCAL_MODELS = {
     credit: { name: 'Junk heap', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
   },
   // Progression v3's things (crafting, 2026-10-25), made in Higgsfield on the owner's account (Tripo text-to-3D) and sized
-  // at intake (progress/tools/intake.mjs): the metal fragments, the three gun parts, the research table, the recycler and
+  // at intake (progress/tools/intake.mjs): the metal fragments, the spring, the pipe and the rifle body, the research table, the recycler and
   // the trader camp's stall. What is carried at 1024, what stands at 2048 (the navigator: "textures 2048, 1024 for hand items").
   ...Object.fromEntries(
     [
       ['metal_frags', 'Metal fragments', '22 cm across', 1024, ['loot']],
       ['metal_pipe', 'Metal pipe', '35 cm long', 1024, ['loot']],
       ['spring_coil', 'Spring', '12 cm long', 1024, ['loot']],
-      ['gun_body_pistol', 'Pistol body', '15 cm long', 1024, ['loot']],
       ['gun_body_rifle', 'Rifle body', '45 cm long', 1024, ['loot']],
       ['research_table', 'Research table', '1.2 m long', 2048, ['prop']],
       ['recycler', 'Recycler', '2 m wide', 2048, ['prop']],
