@@ -1,6 +1,7 @@
 // Crafting (src/sim/craft/, server/craft.ts, src/game/crafting.ts), of 2026-10-24.
 //   npx tsx test/craft.test.ts            the recipes and the rule: a second or two
-//   npx tsx test/craft.test.ts --server   and a real server on a port of its own (8393), played over its socket
+//   npx tsx test/craft.test.ts --server   and a real server on a port of its own (8393), played over its socket: a hand
+//                                         craft, and a workbench laid in the country and its queue
 //
 // What was asked: "We need some sort of crafting like how rust has crafting"; "clothing could be cut up with a knife or
 // sharp object to make cloth which could be combined with rubbing alcohols to make iFAK's"; "when in doubt just ask how
@@ -8,7 +9,11 @@
 // into rags by their size, only empty and never worn, with a blade that wears; powder comes out of ten rounds of one
 // kind, more from a rifle's; a batch makes as many as the pockets allow; two things dragged onto each other find their
 // recipes. On the server: a craft is let begin only with what it takes, is done only after its time and standing still,
-// takes what stacks as building's costs ('spent') and the clothes by their number, wears the blade, and gives what is made.
+// takes what stacks as building's costs ('spent') and the clothes by their number, wears the blade, and gives what is made;
+// a workbench's recipe is queued only at a bench, runs while its maker stays, waits while they are away, and comes off;
+// a forge lights itself with wood and scrap enough, makes a bar every 20 s of fire and leaves charcoal, and goes out;
+// scrap comes off a spot a blow at a time, twice as fast with a sledgehammer, and comes back two hours after it was
+// stripped; the wrecks' layer is the same every time, clear of every building and road, and leaves the map as it was.
 
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -17,10 +22,23 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { CRAFT_ITEMS } from '../src/sim/items/craft';
 import { RECIPE, RECIPES, RAGS, optionsOf } from '../src/sim/craft/recipes';
 import { most, needsOf, plan, pocketsOf, recipesFor, type Plan, type Pockets } from '../src/sim/craft/plan';
 import { TOOL_LIFE } from '../src/sim/gather';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { placeNear } from '../src/sim/craft/places';
+import { FORGE, cold, forgeStep, lit } from '../src/sim/craft/forge';
+import { SALVAGE, Scrapyard, salvageSpots, spotAt } from '../src/sim/craft/salvage';
+import { WRECK_KINDS, wreckLayer, wreckSpots } from '../src/sim/craft/wrecks';
+import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
+import type { StoredItem } from '../src/net/protocol';
+import { PIECES } from '../src/sim/build/pieces';
+import { Container } from '../src/sim/inventory';
+import { Bases, heard, type Land } from '../src/sim/build/bases';
+import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
+import { blocked, deployAt, nearestSpot, spots, toWorld } from '../src/sim/build/snap';
+import { buildWorldData } from '../server/world';
 
 let n = 0;
 const failed: string[] = [];
@@ -124,6 +142,72 @@ ok('two things dragged onto each other find their recipes: a knife on a jacket, 
   assert.deepEqual(ids('iron_bar', 'planks'), []);
 });
 
+ok('a workbench is near when one stands within 4 m on the same floor, not on the floor above', () => {
+  const land: Land = { ground: () => 0, why: () => null, solids: () => [] };
+  const bs = new Bases(land), base = bs.lay({ k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+  assert.ok(typeof base !== 'string', String(base));
+  const b = (base as { base: Parameters<typeof deployAt>[0] }).base;
+  const at = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 })!;
+  assert.ok(typeof bs.lay({ b: b.id, k: 'workbench', ...at }, 'me', 0) !== 'string');
+  const [wx, wy, wz] = toWorld(b, at.x, at.y, at.z);
+  assert.ok(placeNear(bs, 'bench', wx + 3, wy, wz), 'a bench 3 m off was not near');
+  assert.equal(placeNear(bs, 'bench', wx + 5, wy, wz), null, 'a bench 5 m off was near');
+  assert.equal(placeNear(bs, 'bench', wx + 1, wy + 3, wz), null, 'a bench on the floor below was near');
+  assert.equal(placeNear(bs, 'forge', wx, wy, wz), null, 'a bench was a forge');
+});
+
+ok('a forge with logs and ten scrap makes a bar every 20 s, leaves two charcoal a log, and goes out with no scrap left', () => {
+  // (its store takes a log: six wide, a log lies in it on its side)
+  const [sw, sh] = PIECES.forge.store!;
+  assert.ok(Container.size(makeItem('log'), true)[0] <= sw && Container.size(makeItem('log'), true)[1] <= sh, `a log does not fit the forge's ${sw}x${sh}`);
+  const items: StoredItem[] = [{ ...makeItem('log', 1), x: 0, y: 0, rot: false }, { ...makeItem('scrap', 10), x: 2, y: 0, rot: false }];
+  const f = cold();
+  let t = 0;
+  const count = (id: string) => items.reduce((n, it) => n + (it.id === id ? it.qty : 0), 0);
+  forgeStep(f, items, 6, 4, 1);
+  assert.ok(lit(f) && count('log') === 0, 'it did not light on its log');
+  for (t = 1; t < FORGE.smelt; t++) forgeStep(f, items, 6, 4, 1);
+  assert.equal(count('iron_bar'), 1, `after ${t} s: ${count('iron_bar')} bars`);
+  assert.equal(count('scrap'), 5);
+  for (; t < FORGE.smelt * 2; t++) forgeStep(f, items, 6, 4, 1);
+  assert.equal(count('iron_bar'), 2);
+  assert.equal(count('scrap'), 0);
+  for (; t < FORGE.fuel.log + 2; t++) forgeStep(f, items, 6, 4, 1);
+  assert.ok(!lit(f), 'it burned on with nothing to smelt');
+  assert.equal(count('coal'), FORGE.ash.log, `charcoal: ${count('coal')}`);
+  // (wood and no scrap, or scrap and no wood: it does not light)
+  const dry: StoredItem[] = [{ ...makeItem('log', 2), x: 0, y: 0, rot: false }], g = cold();
+  forgeStep(g, dry, 6, 4, 1);
+  assert.ok(!lit(g) && dry[0].qty === 2, 'a forge with no scrap burned its wood');
+});
+
+ok('scrap comes off a spot a blow at a time, twice as fast with a sledgehammer; stripped, it comes back two hours on', () => {
+  const spots = salvageSpots([{ kind: 'covered_car', x: 0, y: 0, z: 0, rot: 0, scale: 1 }, { kind: 'Barrel_01', x: 20, y: 0, z: 0, rot: 0, scale: 1 }, { kind: 'pine_a', x: 40, y: 0, z: 0, rot: 0, scale: 1 }]);
+  assert.equal(spots.length, 2, 'a tree is salvage');
+  assert.equal(spotAt(spots, 1, 1, 0.5), 0);
+  assert.equal(spotAt(spots, 20.5, 0.5, 0), 1);
+  assert.equal(spotAt(spots, 10, 0.5, 0), -1);
+  const yard = new Scrapyard(spots), t0 = 1e6;
+  assert.equal(yard.blow(0, SALVAGE.tools.hammer, t0)!.give, 1);
+  assert.equal(yard.blow(0, SALVAGE.tools.sledgehammer, t0)!.give, 2);
+  let got = 3;
+  while (yard.left(0) > 0) got += yard.blow(0, SALVAGE.tools.sledgehammer, t0)!.give;
+  assert.equal(got, spots[0].scrap);
+  assert.equal(yard.blow(0, 1, t0)!.give, 0, 'a stripped car still gave scrap');
+  assert.deepEqual(yard.rust(t0 + SALVAGE.back * 1000 - 1, () => false), []);
+  assert.deepEqual(yard.rust(t0 + SALVAGE.back * 1000 + 1, () => true), [], 'it came back with somebody stood at it');
+  assert.deepEqual(yard.rust(t0 + SALVAGE.back * 1000 + 1, () => false), [0]);
+  assert.equal(yard.left(0), spots[0].scrap);
+});
+
+ok('every crafting thing is drawn with a model of its own, brought in, and has its picture in the pockets', () => {
+  const models = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')).models, icons = JSON.parse(readFileSync('public/assets/icons/index.json', 'utf8'));
+  for (const d of CRAFT_ITEMS) {
+    assert.ok(models[d.model], `${d.id}'s model ${d.model} is not in the manifest`);
+    assert.ok(icons[d.id], `${d.id} has no picture`);
+  }
+});
+
 // ---------------------------------------------------------------- the server
 if (process.argv.includes('--server')) await serverTest();
 if (failed.length) {
@@ -138,6 +222,36 @@ async function serverTest() {
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   assert.match(readFileSync('.env.local-server', 'utf8'), /^SITE_URL=http:\/\/127\.0\.0\.1:9\s*$/m, '.env.local-server does not hold SITE_URL=http://127.0.0.1:9: not starting a server');
   console.log('Crafting: on a server (port 8393)');
+  // (a place out in the country a base may go, as the server will judge it: base building's test finds one the same way)
+  const data = buildWorldData(process.cwd());
+  const solids = new Solids(data.trees, data.rocks), wet = wetAt(data.water, (x, z) => data.groundAt(x, z));
+  const land: Land = { ground: (x, z) => data.groundAt(x, z), why: (x, z) => noBuilding(x, z, data.places, data.buildings, data.spawns, wet), solids: (x, z, w) => solids.near(x, z, w) };
+  let site: [number, number] | null = null;
+  for (let x = -2400; x < 2400 && !site; x += 37) for (let z = -1500; z < 1500 && !site; z += 41) {
+    const bs = new Bases(land), got = bs.lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, 'craft-test', 0);
+    if (typeof got === 'string') continue;
+    const sp = nearestSpot(spots(got.base, 'foundation'), 'foundation', { x: 3, y: 0, z: 0 }, 1);
+    if (sp && !blocked(got.base, 'foundation', sp, bs.groundIn(got.base))) site = [x, z];
+  }
+  assert.ok(site, 'no place on the map a base may go');
+  // (the wrecks' layer, on the map as it is (its buildings planned, their furniture among the props, as both the game and
+  // the server have it): the same twice, clear of buildings and roads, and every one a salvage spot)
+  const { generateWorld } = await import('../src/world/worldgen');
+  const { Buildings } = await import('../src/world/buildings');
+  const gw = generateWorld();
+  new Buildings(gw, null as never).plan();
+  const wrecks = wreckLayer(gw);
+  assert.deepEqual(wreckLayer(gw), wrecks, 'the layer is not the same twice');
+  assert.ok(wrecks.length >= 20, `only ${wrecks.length} wrecks`);
+  for (const w of wrecks) {
+    for (const b of gw.buildings) {
+      const [fw, fd] = BUILDING_FOOTPRINT[b.type] ?? [10, 10];
+      assert.ok(Math.hypot(w.x - b.x, w.z - b.z) > Math.min(fw, fd) / 2, `a ${w.kind} at ${w.x.toFixed(0)}, ${w.z.toFixed(0)} is in a ${b.type}`);
+    }
+  }
+  assert.equal(data.salvage.length, salvageSpots(gw.props).length + wrecks.length, 'the server numbers salvage otherwise');
+  assert.deepEqual(data.salvage.slice(-wrecks.length).map((q) => q.kind), wreckSpots(wrecks).map((q) => q.kind));
+  console.log(`  ok  ${wrecks.length} wrecks laid by their own layer (${Object.keys(WRECK_KINDS).map((k) => `${wrecks.filter((w) => w.kind === k).length} ${k}`).join(', ')}), the same twice, clear of every building; ${data.salvage.length} salvage spots`);
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-craft-'));
   const server = spawn(process.execPath, ['--env-file=.env.local-server', path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
     env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off' },
@@ -164,9 +278,9 @@ async function serverTest() {
   ws.on('message', (d) => got.push(JSON.parse(String(d)) as S2C));
   const send = (m: unknown) => ws.send(JSON.stringify(m));
   const of = <T extends S2C['t']>(t: T) => got.filter((m) => m.t === t) as Extract<S2C, { t: T }>[];
-  const until = async <T extends S2C['t']>(t: T, test: (m: Extract<S2C, { t: T }>) => boolean = () => true, ms = 4000) => {
+  const until = async <T extends S2C['t']>(t: T, test: (m: Extract<S2C, { t: T }>) => boolean = () => true, ms = 4000, from = 0) => {
     for (let k = 0; k < ms / 25; k++) {
-      const m = of(t).find(test);
+      const m = (got.slice(from).filter((q) => q.t === t) as Extract<S2C, { t: T }>[]).find(test);
       if (m) return m;
       await sleep(25);
     }
@@ -245,6 +359,101 @@ async function serverTest() {
     send({ t: 'craft', r: 'rope', n: 1, go: 2 });
     assert.ok(await until('craft', (m) => m.r === 'rope' && !m.ok && /moved/.test(m.why ?? '')), 'a craft walked away from was still made');
     console.log('  ok  walking off during the hold stops it, and nothing is used up');
+
+    // a workbench, laid in the country: a foundation and the bench on it, paid for out of what /give gave
+    const kit = async (text: string) => {
+      const had = of('kit').length;
+      send({ t: 'chat', text });
+      for (let k = 0; k < 160 && of('kit').length === had; k++) await sleep(25);
+      const items = of('kit')[had]?.items ?? [];
+      assert.ok(items.length, `${text} gave nothing`);
+      return items;
+    };
+    const go = async (x: number, z: number) => {
+      const had = of('put').length;
+      send({ t: 'chat', text: `/tp ${x.toFixed(2)} ${z.toFixed(2)}` });
+      for (let k = 0; k < 160 && of('put').length === had; k++) await sleep(25);
+      pos = [x, data.groundAt(x, z), z];
+      pose();
+      await sleep(80);
+    };
+    const [sx, sz] = site!;
+    const planPaper = (await kit('/give building_plan'))[0];
+    pockets = [planPaper, ...(await kit('/give planks 30')), ...(await kit('/give log 4')), ...(await kit('/give nails 20'))];
+    me();
+    await go(sx - 2, sz);
+    send({ t: 's', p: [pos[0], pos[1], pos[2], 0, 0, 0], w: 'building_plan', m: [] });
+    await sleep(80);
+    send({ t: 'blay', k: 'foundation', x: sx, y: 0, z: sz, r: 0, yaw: 0, u: planPaper.uid });
+    const told = await until('base');
+    assert.ok(told, `no base: ${JSON.stringify(of('tell').slice(-2))}`);
+    const b = heard(told.b)!;
+    const spot = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 })!;
+    send({ t: 'blay', k: 'workbench', b: b.id, ...spot, u: planPaper.uid });
+    assert.ok(await until('bpc'), `no workbench: ${JSON.stringify(of('tell').slice(-2))}`);
+    const [bx, , bz] = toWorld(b, spot.x, spot.y, spot.z);
+
+    // nails, queued at the bench: two lots, one bar each; made one after the other while the maker stays
+    pockets = [makeItem('iron_bar', 3)];
+    me();
+    await go(bx + 2, bz);
+    const k0 = of('kit').length, g0 = got.length;
+    send({ t: 'cq', r: 'nails', n: 2 });
+    const q1 = await until('cq', (m) => m.q.length === 1);
+    assert.deepEqual(q1?.q, [{ r: 'nails', n: 2 }], `queued: ${JSON.stringify(q1)} ${JSON.stringify(of('craft').slice(-1))}`);
+    await until('kit', (m) => m.items.some((it) => it.id === 'nails'), RECIPE.nails.time * 1000 + 5000, g0);
+    const nails = of('kit').slice(k0).flatMap((m) => m.items).filter((it) => it.id === 'nails');
+    assert.equal(nails.reduce((t, it) => t + it.qty, 0), 20, `after one job's time: ${JSON.stringify(nails)}`);
+    assert.ok(await until('spent', (m) => m.items.some(([id]) => id === 'iron_bar')), 'no bar was taken for the nails');
+    console.log(`  ok  nails queued at a workbench: the first 20 made after ${RECIPE.nails.time} s, a bar taken as they were`);
+
+    // walked off: it waits; back: it goes on; taken off: the queue is empty and nothing more is made
+    pockets = [makeItem('iron_bar', 2)];
+    me();
+    await go(bx + 12, bz);
+    assert.ok(await until('cq', (m) => m.paused && m.q.length === 1), 'walking off the bench did not pause the queue');
+    await sleep(1000);
+    const k1 = of('kit').length, back = got.length;
+    await go(bx + 2, bz);
+    assert.ok(await until('cq', (m) => !m.paused && m.q.length === 1, 4000, back), 'coming back did not run the queue on');
+    send({ t: 'cqx', i: 0 });
+    assert.ok(await until('cq', (m) => m.q.length === 0), 'the job did not come off');
+    await sleep(RECIPE.nails.time * 1000 + 500);
+    assert.equal(of('kit').slice(k1).flatMap((m) => m.items).filter((it) => it.id === 'nails').length, 0, 'nails were made after the job came off');
+    console.log('  ok  walked off it waits, back it goes on, and taken off nothing more is made');
+
+    // queued far from any bench: refused
+    await go(bx + 30, bz);
+    send({ t: 'cq', r: 'nails', n: 1 });
+    assert.ok(await until('craft', (m) => m.r === 'nails' && !m.ok && /workbench/.test(m.why ?? '')), 'queued with no bench near');
+    console.log('  ok  nothing is queued away from a workbench');
+
+    // salvage: a hammer on a fuel drum gives a scrap a blow, and the server says how far through it is
+    const drum = data.salvage.findIndex((q) => q.kind === 'Barrel_01' && Math.abs(q.x) < 1500 && Math.abs(q.z) < 1500);
+    const D = data.salvage[drum];
+    const hammer = (await kit('/give hammer'))[0];
+    pockets = [hammer];
+    me();
+    await go(D.x + 1, D.z);
+    send({ t: 's', p: [pos[0], pos[1], pos[2], 0, 0, 0], w: 'hammer', m: [] });
+    await sleep(100);
+    const k2 = of('kit').length;
+    send({ t: 'salvage', i: drum, u: hammer.uid });
+    const blow = await until('salvage', (m) => m.i === drum);
+    assert.ok(blow && blow.done > 0, `no blow: ${JSON.stringify(of('tell').slice(-1))}`);
+    assert.ok(await until('kit', (m) => m.items.some((it) => it.id === 'scrap' && it.qty === 1)), 'no scrap given');
+    // (too soon after: not believed; from too far: not believed)
+    send({ t: 'salvage', i: drum, u: hammer.uid });
+    await sleep(200);
+    assert.equal(of('salvage').filter((m) => m.i === drum).length, 1, 'a second blow at once was believed');
+    await go(D.x + 6, D.z);
+    send({ t: 's', p: [pos[0], pos[1], pos[2], 0, 0, 0], w: 'hammer', m: [] });
+    await sleep(ITEMS.hammer.melee!.rate * 1000 + 100);
+    send({ t: 'salvage', i: drum, u: hammer.uid });
+    await sleep(300);
+    assert.equal(of('salvage').filter((m) => m.i === drum).length, 1, 'a blow from 6 m off was believed');
+    assert.ok(of('kit').slice(k2).length >= 1);
+    console.log('  ok  a hammer on a fuel drum knocks a scrap off, not faster than it swings nor from 6 m off');
   } catch (e) {
     fail = e;
   } finally {

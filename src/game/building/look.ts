@@ -96,7 +96,10 @@ export function geometryOf(kind: string, p: Paint, dress = true): THREE.BufferGe
   let g = geos.get(key);
   if (!g) {
     const s = shapeOf(kind);
-    geos.set(key, (g = merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p])));
+    // (a piece drawn by a model of its own elsewhere: nothing here)
+    if (s.unseen) (g = new THREE.BufferGeometry()).setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    else g = merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
+    geos.set(key, g);
   }
   return g;
 }

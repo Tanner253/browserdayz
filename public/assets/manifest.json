@@ -12845,6 +12845,404 @@
    "hiBytes": 805220,
    "hiCard": 21
   },
+  "alcohol_bottle": {
+   "url": "assets/models/alcohol_bottle.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 186240,
+   "srcTris": 450,
+   "tris": 450,
+   "min": [
+    -0.0533,
+    0,
+    -0.0531
+   ],
+   "max": [
+    0.0533,
+    0.25,
+    0.0531
+   ],
+   "lods": []
+  },
+  "iron_ingots": {
+   "url": "assets/models/iron_ingots.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 654216,
+   "srcTris": 4176,
+   "tris": 1392,
+   "min": [
+    -0.13,
+    0,
+    -0.1242
+   ],
+   "max": [
+    0.13,
+    0.1164,
+    0.1242
+   ],
+   "lods": []
+  },
+  "stone_axe": {
+   "url": "assets/models/stone_axe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 327296,
+   "srcTris": 1912,
+   "tris": 1912,
+   "min": [
+    -0.0388,
+    0,
+    -0.1257
+   ],
+   "max": [
+    0.0388,
+    0.46,
+    0.1257
+   ],
+   "lods": []
+  },
+  "bone_knife": {
+   "url": "assets/models/bone_knife.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 401200,
+   "srcTris": 1104,
+   "tris": 1104,
+   "min": [
+    -0.0314,
+    0,
+    -0.13
+   ],
+   "max": [
+    0.0314,
+    0.0382,
+    0.13
+   ],
+   "lods": []
+  },
+  "satchel_charge": {
+   "url": "assets/models/satchel_charge.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 274760,
+   "srcTris": 7607,
+   "tris": 7607,
+   "min": [
+    -0.0965,
+    0,
+    -0.1457
+   ],
+   "max": [
+    0.0965,
+    0.3,
+    0.1457
+   ],
+   "lods": [
+    {
+     "url": "assets/models/satchel_charge_lod1.glb",
+     "tris": 1964,
+     "far": 2,
+     "of": "274760:1792890756600"
+    }
+   ],
+   "hi": "assets/models/hi/satchel_charge.glb",
+   "hiBytes": 865600,
+   "hiCard": 64
+  },
+  "junk_heap": {
+   "url": "assets/models/junk_heap.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 434208,
+   "srcTris": 18758,
+   "tris": 18758,
+   "min": [
+    -1.1413,
+    0,
+    -1.5
+   ],
+   "max": [
+    1.1413,
+    1.5981,
+    1.5
+   ],
+   "lods": [
+    {
+     "url": "assets/models/junk_heap_lod1.glb",
+     "tris": 13969,
+     "far": 2,
+     "of": "434208:1792890756840"
+    }
+   ],
+   "hi": "assets/models/hi/junk_heap.glb",
+   "hiBytes": 1158860,
+   "hiCard": 64
+  },
+  "scrap_pile": {
+   "url": "assets/models/scrap_pile.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 400528,
+   "srcTris": 1320,
+   "tris": 1320,
+   "min": [
+    -0.2,
+    0,
+    -0.167
+   ],
+   "max": [
+    0.2,
+    0.2081,
+    0.167
+   ],
+   "lods": []
+  },
+  "charcoal_lumps": {
+   "url": "assets/models/charcoal_lumps.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 206940,
+   "srcTris": 5773,
+   "tris": 5773,
+   "min": [
+    -0.125,
+    0,
+    -0.1247
+   ],
+   "max": [
+    0.125,
+    0.108,
+    0.1247
+   ],
+   "lods": [
+    {
+     "url": "assets/models/charcoal_lumps_lod1.glb",
+     "tris": 2046,
+     "far": 2,
+     "of": "206940:1792891420782"
+    }
+   ]
+  },
+  "gunpowder_tin": {
+   "url": "assets/models/gunpowder_tin.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 199800,
+   "srcTris": 4811,
+   "tris": 4811,
+   "min": [
+    -0.075,
+    0,
+    -0.0749
+   ],
+   "max": [
+    0.075,
+    0.0701,
+    0.0749
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gunpowder_tin_lod1.glb",
+     "tris": 2319,
+     "far": 2,
+     "of": "199800:1792891574783"
+    }
+   ]
+  },
+  "forge_hf": {
+   "url": "assets/models/forge_hf.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 346400,
+   "srcTris": 19205,
+   "tris": 9987,
+   "min": [
+    -0.4863,
+    0,
+    -0.5531
+   ],
+   "max": [
+    0.4863,
+    1.3,
+    0.5532
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/forge_hf.glb",
+   "hiBytes": 996788,
+   "hiCard": 64
+  },
+  "sledgehammer_slim": {
+   "url": "assets/models/sledgehammer_slim.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 294608,
+   "srcTris": 2955,
+   "tris": 2955,
+   "min": [
+    -0.0938,
+    0,
+    -0.1838
+   ],
+   "max": [
+    0.0938,
+    0.9108,
+    0.1838
+   ],
+   "lods": [
+    {
+     "url": "assets/models/sledgehammer_slim_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "294608:1792900899107"
+    }
+   ]
+  },
+  "rope_coil_hemp": {
+   "url": "assets/models/rope_coil_hemp.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 558680,
+   "srcTris": 2796,
+   "tris": 2796,
+   "min": [
+    -0.15,
+    0,
+    -0.0971
+   ],
+   "max": [
+    0.15,
+    0.0583,
+    0.0971
+   ],
+   "lods": [
+    {
+     "url": "assets/models/rope_coil_hemp_lod1.glb",
+     "tris": 2482,
+     "far": 2,
+     "of": "558680:1792900876209"
+    }
+   ]
+  },
+  "rags_bundle": {
+   "url": "assets/models/rags_bundle.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 251488,
+   "srcTris": 1672,
+   "tris": 1672,
+   "min": [
+    -0.0741,
+    0,
+    -0.1
+   ],
+   "max": [
+    0.0741,
+    0.1182,
+    0.1
+   ],
+   "lods": []
+  },
+  "zil_wreck": {
+   "url": "assets/models/zil_wreck.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 541704,
+   "srcTris": 27018,
+   "tris": 19999,
+   "min": [
+    -3.3,
+    0,
+    -1.3035
+   ],
+   "max": [
+    3.3,
+    2.6782,
+    1.3035
+   ],
+   "lods": [
+    {
+     "url": "assets/models/zil_wreck_lod1.glb",
+     "tris": 13998,
+     "far": 2,
+     "of": "541704:1792902335583"
+    }
+   ],
+   "hi": "assets/models/hi/zil_wreck.glb",
+   "hiBytes": 1286128,
+   "hiCard": 64
+  },
+  "tractor_wreck": {
+   "url": "assets/models/tractor_wreck.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 516536,
+   "srcTris": 24282,
+   "tris": 17984,
+   "min": [
+    -2.1,
+    0,
+    -1.1634
+   ],
+   "max": [
+    2.1,
+    2.7242,
+    1.1634
+   ],
+   "lods": [
+    {
+     "url": "assets/models/tractor_wreck_lod1.glb",
+     "tris": 13984,
+     "far": 2,
+     "of": "516536:1792902337038"
+    }
+   ],
+   "hi": "assets/models/hi/tractor_wreck.glb",
+   "hiBytes": 1303144,
+   "hiCard": 64
+  },
+  "pirozhok_wreck": {
+   "url": "assets/models/pirozhok_wreck.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 319072,
+   "srcTris": 4851,
+   "tris": 4851,
+   "min": [
+    -2,
+    0,
+    -0.8354
+   ],
+   "max": [
+    2,
+    1.6633,
+    0.8354
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/pirozhok_wreck.glb",
+   "hiBytes": 1378776,
+   "hiCard": 43
+  },
   "log": {
    "url": "assets/models/log.glb",
    "tags": [

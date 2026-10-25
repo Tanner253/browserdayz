@@ -150,6 +150,38 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle and scaled to a pelt 2.2 m long; a copy of about 7,300 triangles made for seeing it from further off (scripts/lods.mjs), the whole one kept for near; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "wolf animated" (https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c) by victory_mirosya (https://sketchfab.com/victory_mirosya) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Kept whole with its skeleton and the movements the game plays (graze, idle, alert, rest), the others left out; turned nose to -z, scaled to 1.6 m nose to tail and stood on the ground; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.
+- This work is based on "Isopropyl Rubbing Alcohol Bottle Game Ready" (https://sketchfab.com/3d-models/isopropyl-rubbing-alcohol-bottle-game-ready-a323700f7c93400aba8000f2f2a7e8e0) by KQ92 (https://sketchfab.com/KQ92) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
+- This work is based on "Blacksmith Ingots (game ready asset)" (https://sketchfab.com/3d-models/blacksmith-ingots-game-ready-asset-6ea0ab1141de40d68db5bcdccdb91d68) by Pixel Life (https://sketchfab.com/pixellife) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only its three iron bars are used here, scaled to 26 cm across and stood on the ground about their own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Primitive stone axe" (https://sketchfab.com/3d-models/primitive-stone-axe-ce612acd03664358a5841316e35e0db7) by Yahor Yurkavets (https://sketchfab.com/Got2b) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 46 cm and stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
+- This work is based on "Bone Knife 1" (https://sketchfab.com/3d-models/bone-knife-1-b50e0642376a48389c94b128e797f892) by Sir Erdees (https://sketchfab.com/sirerdees) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 26 cm and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Scrap Metal" (https://sketchfab.com/3d-models/scrap-metal-1e57de80d46442a38c8c5b2fb06888f4) by Rurre (https://sketchfab.com/rurre) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 40 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- "Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.
+- "Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.
+- "Charcoal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, at the size it was made, its colour darkened; textures re-encoded as WebP at 1024; geometry compressed.
+- "Gunpowder tin" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on its base on the ground, about its own middle, at the size it was made; textures re-encoded as WebP at 1024; geometry compressed.
+- "Forge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, at the size it was made, simplified to about 10,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- "Sledgehammer" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood straight up its handle, at its true length of 0.9 m, about its own middle; textures at 1024; geometry compressed.
+- "Coiled rope" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 30 cm across; textures at 1024; geometry compressed.
+- "Rags" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 20 cm long; textures at 1024; geometry compressed.
+- "ZIL truck wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 6.6 m long as made, simplified to about 20,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- "Tractor wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 4.2 m long as made, simplified to about 18,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
+- This work is based on "Pirozhok Scan Retopo (Free Scan)" (https://sketchfab.com/3d-models/pirozhok-scan-retopo-free-scan-07bc48134b364d4f8a43d288b3a0282d) by Renafox (https://sketchfab.com/kryik1023), itself from Mikhail Volkov's scan "Abandoned Soviet Car — IZH-2715" (https://sketchfab.com/3d-models/abandoned-soviet-car-izh-2715-b97884f0730d42a68c1a6a9a9874159d), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to its 4 m and stood on the ground about its own middle; its lamps left unlit (the glow taken off); textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.
 - "Birch log" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Stones" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms

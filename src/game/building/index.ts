@@ -187,6 +187,10 @@ export class Building {
   private get store() {
     return this.h.online() ? this.seen : this.local;
   }
+  /** the bases this game knows (crafting looks for its workbenches and forges in them) */
+  get known(): Bases {
+    return this.store;
+  }
   /** the bases' solids as this game knows them, for what its colliders do not reach (a body laid far off: src/sim/build/solid.ts) */
   readonly solids = new BaseSolids(() => this.store.bases.values());
 

@@ -37,7 +37,7 @@ export class CraftCard {
     if (e.key === 'Escape' && this.floating) {
       e.stopPropagation();
       this.close();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && (e.target as HTMLElement | null)?.tagName !== 'INPUT') {
       e.preventDefault();
       this.go();
     }
@@ -117,7 +117,7 @@ export class CraftCard {
       <div class="cc-meta"><span>${PLACE[r.at]}</span><span>${makes === null ? '' : `Makes ${makes}`} · ${secs(time)}</span></div>
       ${r.at === 'forge' ? '' : `<div class="cc-qty">${qty}</div>`}
       ${why ? `<div class="cc-why">${esc(why)}</div>` : ''}
-      <button class="cc-go" data-go ${ok ? '' : 'disabled'}>Craft${typeof q !== 'string' && q.n > 1 ? ` ${q.n}` : ''}<kbd>Enter</kbd></button>`;
+      <button class="cc-go" data-go ${ok ? '' : 'disabled'}>${r.at === 'bench' ? 'Queue' : 'Craft'}${typeof q !== 'string' && q.n > 1 ? ` ${q.n}` : ''}<kbd>Enter</kbd></button>`;
   }
 
   private click(e: MouseEvent) {

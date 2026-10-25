@@ -868,6 +868,81 @@ export const LOCAL_MODELS = {
   // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
   // pictures at the size they came.
   frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // ---------------------------------------------------------------- crafting (2026-10-25): the owner's downloads for its
+  // items (progress/base-models/incoming-map.md), each judged in the sandbox beside the stand-in it replaced. Their folders
+  // are the downloads as they came, in assets-src/incoming/; textures at 1024 for what is carried in the hand (the navigator).
+  alcohol_bottle: { dir: '../incoming/isopropyl_rubbing_alcohol_bottle_game_ready', size: 0.25, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.' },
+  // (the iron ones of the set: three bars, two lying and one on them)
+  iron_ingots: { dir: '../incoming/blacksmith_ingots_game_ready_asset', only: /Iron/, size: 0.26, tex: 1024, tags: ['loot'], changes: 'Only its three iron bars are used here, scaled to 26 cm across and stood on the ground about their own middle; textures re-encoded as WebP; geometry compressed.' },
+  stone_axe: { dir: '../incoming/primitive_stone_axe', size: 0.46, tex: 1024, tags: ['loot'], changes: 'Scaled to 46 cm and stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.' },
+  bone_knife: { dir: '../incoming/bone_knife_1', size: 0.26, tex: 1024, tags: ['loot'], changes: 'Scaled to 26 cm and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (Rurre's, of the three the owner downloaded: picked in the sandbox, 2026-10-25, as the pile that reads as scrap and is lightest;
+  // it is fan art of Team Fortress 2, which the owner allows: "fan art is allowed, it is not ripped")
+  scrap_pile: { dir: '../incoming/scrap_metal', size: 0.4, tex: 1024, tags: ['loot'], changes: 'Scaled to 40 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (made in Higgsfield on the owner's account, 2026-10-25: Tripo's text-to-3D; scaled to size by the navigator, kept so)
+  satchel_charge: {
+    dir: '../incoming/higgsfield', file: 'satchel_charge_30cm.glb', scale: 1, tex: 2048, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.',
+    credit: { name: 'Satchel charge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (charcoal with no maker's print on it, as the sack the owner downloaded had all over; and the tin powder is kept in)
+  // (made grey as stone: darkened to charcoal's black)
+  charcoal_lumps: {
+    dir: '../incoming/higgsfield', file: 'charcoal_sized.glb', scale: 1, tex: 1024, tags: ['loot'], dye: { brightness: 0.45, saturation: 0.5 },
+    changes: 'Stood on the ground about its own middle, at the size it was made, its colour darkened; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Charcoal', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Charcoal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (made lying on its side: stood on its base)
+  gunpowder_tin: {
+    dir: '../incoming/higgsfield', file: 'gunpowder_tin_sized.glb', rot: [0, 0, -Math.PI / 2], scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on its base on the ground, about its own middle, at the size it was made; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Gunpowder tin', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Gunpowder tin" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (the forge: Higgsfield's drum with a chimney, judged in the sandbox beside Poly Haven's barrel_stove)
+  forge_hf: {
+    dir: '../incoming/higgsfield', file: 'forge_cold.glb', scale: 1, budget: 10000, tex: 2048, tags: ['prop'],
+    changes: 'Stood on the ground about its own middle, at the size it was made, simplified to about 10,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'Forge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Forge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (made for crafting in Higgsfield, 2026-10-25, sized at intake by progress/tools/intake.mjs: a slim sledgehammer, a coil of
+  // hemp rope and a bundle of rags, in place of the downloads judged too thick, untextured and whole clothes)
+  sledgehammer_slim: {
+    dir: '../incoming/higgsfield', file: 'sledgehammer_slim_sized.glb', rot: [0, 0, -0.1822], scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood straight up its handle, at its true length of 0.9 m, about its own middle; textures at 1024; geometry compressed.',
+    credit: { name: 'Sledgehammer', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Sledgehammer" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  rope_coil_hemp: {
+    dir: '../incoming/higgsfield', file: 'rope_coil_hemp_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 30 cm across; textures at 1024; geometry compressed.',
+    credit: { name: 'Coiled rope', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Coiled rope" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  rags_bundle: {
+    dir: '../incoming/higgsfield', file: 'rags_bundle_sized.glb', scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 20 cm long; textures at 1024; geometry compressed.',
+    credit: { name: 'Rags', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Rags" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (salvage's wrecks, a layer of their own laid by src/sim/craft/wrecks.ts: each with a far copy, as a vehicle has)
+  zil_wreck: {
+    dir: '../incoming/higgsfield', file: 'zil_truck_wreck_sized.glb', scale: 1, budget: 20000, tex: 2048, tags: ['prop', 'vehicle'],
+    changes: 'Stood on the ground about its own middle, 6.6 m long as made, simplified to about 20,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'ZIL truck wreck', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"ZIL truck wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  tractor_wreck: {
+    dir: '../incoming/higgsfield', file: 'tractor_wreck_sized.glb', scale: 1, budget: 18000, tex: 2048, tags: ['prop', 'vehicle'],
+    changes: 'Stood on the ground about its own middle, 4.2 m long as made, simplified to about 18,000 triangles; textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'Tractor wreck', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Tractor wreck" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (the owner's download: Renafox's retopology of Mikhail Volkov's scan, both credited; its glowing lamps left dark)
+  pirozhok_wreck: {
+    dir: '../incoming/pirozhok_scan_retopo_free_scan', size: 4.0, tex: 2048, bare: true, tags: ['prop', 'vehicle'],
+    changes: 'Scaled to its 4 m and stood on the ground about its own middle; its lamps left unlit (the glow taken off); textures re-encoded as WebP at 2048 (they came at 4096); geometry compressed.',
+    credit: { name: 'Pirozhok Scan Retopo (Free Scan)', author: 'Renafox', url: 'https://sketchfab.com/3d-models/pirozhok-scan-retopo-free-scan-07bc48134b364d4f8a43d288b3a0282d', line: 'This work is based on "Pirozhok Scan Retopo (Free Scan)" (https://sketchfab.com/3d-models/pirozhok-scan-retopo-free-scan-07bc48134b364d4f8a43d288b3a0282d) by Renafox (https://sketchfab.com/kryik1023), itself from Mikhail Volkov\'s scan "Abandoned Soviet Car — IZH-2715" (https://sketchfab.com/3d-models/abandoned-soviet-car-izh-2715-b97884f0730d42a68c1a6a9a9874159d), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)' },
+  },
+  junk_heap: {
+    dir: '../incoming/higgsfield', file: 'junk_heap_3m.glb', scale: 1, tex: 2048, tags: ['prop', 'vehicle'],
+    changes: 'Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.',
+    credit: { name: 'Junk heap', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
   // Base building's things (2026-10-25), made in Higgsfield in place of the stand-ins (the owner: "all of thes eitems
   // look terrible and need models done in higgsfield ... they all look extremely low quality"). Each came at its real
   // size, foot on the ground, centred (the navigator's *_sized.glb), 1.6 to 3.3 thousand triangles: put in

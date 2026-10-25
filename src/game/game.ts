@@ -120,6 +120,13 @@ import { huntMethods } from './game/hunt';
 import { Gathering } from './gathering';
 import { Crafting } from './crafting';
 import { CraftCard } from '../ui/craft-card';
+import { CraftingScreen } from '../ui/crafting-ui';
+import { ForgeView } from './craft-forge';
+import { Salvage } from './craft-salvage';
+import { salvageSpots } from '../sim/craft/salvage';
+import { wreckLayer, wreckSpots } from '../sim/craft/wrecks';
+import { WreckView } from './craft-wrecks';
+import { RockRef, TreeRef } from '../world/felling';
 import { pocketsOf } from '../sim/craft/plan';
 import { Building } from './building';
 import { gunsMethods } from './game/guns';
@@ -253,6 +260,12 @@ export class Game {
   /** things made by hand, and a recipe's card (src/game/crafting.ts, src/ui/craft-card.ts) */
   craft!: Crafting;
   craftCard!: CraftCard;
+  /** forges drawn, burning (src/game/craft-forge.ts) */
+  forges!: ForgeView;
+  /** scrap knocked off wrecks, drums and junk (src/game/craft-salvage.ts) */
+  salvage!: Salvage;
+  /** salvage's wrecks, a layer of their own (src/game/craft-wrecks.ts) */
+  wrecks!: WreckView;
   /** bases: the plan, the hammer, the pieces (src/game/building/index.ts) */
   build!: Building;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
@@ -712,6 +725,7 @@ export class Game {
       take: (id, n) => void this.inv.take(id, n),
       give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
       changed: () => this.inventoryChanged(),
+      bases: () => this.build.known,
     });
     this.build = new Building({
       scene: r.scene,
@@ -758,6 +772,30 @@ export class Game {
       glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
       tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
     });
+    this.forges = new ForgeView({
+      scene: r.scene,
+      online: () => this.online,
+      bases: () => this.build.known,
+      flames: () => this.effects.fire,
+      glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
+      shut: (at) => this.build.lightShut(at),
+      me: () => this.player.pos,
+      store: (cid) => this.build.boxes.byCid(cid)?.container,
+      changed: () => {
+        if (this.invUI.isOpen) this.invUI.render();
+      },
+    });
+    const wrecks = wreckLayer(world);
+    this.salvage = new Salvage({
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      held: () => this.weapons.equippedItem,
+      me: () => this.player.pos,
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      changed: () => this.inventoryChanged(),
+    }, salvageSpots(world.props, wreckSpots(wrecks)));
+    this.wrecks = new WreckView(r.scene, wrecks, () => this.player.pos);
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
@@ -877,7 +915,11 @@ export class Game {
     };
     // a punch or a swing: your own body throws it, and everyone near you sees it
     // (a swing that lands on a tree or a rock: src/game/gathering.ts)
-    this.weapons.onWhack = (owner, _at, w) => this.gather.whack(owner, w);
+    this.weapons.onWhack = (owner, at, w) => {
+      this.gather.whack(owner, w);
+      // (or on a wreck, a drum, a heap of junk: src/game/craft-salvage.ts)
+      if (!(owner instanceof TreeRef || owner instanceof RockRef)) this.salvage.whack(at, w);
+    };
     this.weapons.onSwing = (seconds) => {
       this.avatar.swing(false, seconds);
       this.net.send({ t: 'swing' });
@@ -1016,7 +1058,22 @@ export class Game {
       craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
       craftOpen: () => this.craftCard.open,
     });
-    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u) });
+    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u), near: (at) => this.craft.near(at) });
+    // (the Crafting tab: J, or the tab at the top of the inventory)
+    this.invUI.craftPane = new CraftingScreen({
+      icons: () => this.invUI.icons,
+      pockets: () => pocketsOf(this.inv.serialize()),
+      craft: (rid, n, u) => void this.craft.craft(rid, n, u),
+      near: (at) => this.craft.near(at),
+      queue: () => this.craft.queue.jobs,
+      running: () => this.craft.running(),
+      unqueue: (i) => this.craft.unqueue(i),
+      light: (ids) => this.invUI.lightUp(ids),
+      making: () => {
+        const u = this.use;
+        return u && u.label === this.craft.label ? { label: u.label, t: Math.min(1, u.t / u.dur), left: Math.max(0, u.dur - u.t) } : null;
+      },
+    });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
     this.gas.under = (x, y, z) => bunkerUnder(this.bunker.place, x, y, z);

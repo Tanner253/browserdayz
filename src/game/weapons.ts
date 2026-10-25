@@ -786,6 +786,11 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };
+  // (crafting's: the stone hatchet in one hand as the hatchet is; the bone knife as the combat knife, at its bound grip; the
+  // sledgehammer in both hands as the bat)
+  styles.stone_hatchet = styles.hatchet;
+  styles.bone_knife = { ...styles.knife, grip: 0.045 };
+  styles.sledgehammer = { ...styles.bat, grip: 0.22 };
   return styles;
 })();
 /**
@@ -1744,7 +1749,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe', 'hammer']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife', 'pitchfork', 'hand_saw', 'felling_axe', 'pickaxe', 'hammer', 'stone_hatchet', 'bone_knife', 'sledgehammer']) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();
