@@ -153,6 +153,17 @@ if (sim) {
     });
     return n;
   };
+  /** the biggest colour picture it is drawn with, as the game cut it (see DESK_NEAR in src/core/assets.ts) */
+  const picture = (o: THREE.Object3D) => {
+    let n = 0;
+    o.traverse((m) => {
+      for (const mat of ([] as THREE.Material[]).concat((m as THREE.Mesh).material ?? [])) {
+        const img = (mat as THREE.MeshStandardMaterial).map?.image as { width?: number; height?: number } | undefined;
+        if (img?.width) n = Math.max(n, img.width, img.height ?? 0);
+      }
+    });
+    return n;
+  };
   let x = 0;
   const place = (o: THREE.Object3D, name: string, extra: Record<string, unknown> = {}, asIs = false) => {
     o.rotation.y = yaw;
@@ -172,7 +183,7 @@ if (sim) {
     o.position.z -= (box.min.z + box.max.z) / 2;
     x += size.x + gap;
     thing.add(o);
-    info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), ...extra });
+    info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), picture: picture(o), ...extra });
   };
   // (&finish=emerald,ruby: the store finish each model wears, in turn; its picture's light, as the inventory's)
   const finishes = list('finish');
