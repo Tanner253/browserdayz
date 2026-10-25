@@ -41,9 +41,17 @@ const reader = (t: THREE.KeyframeTrack) => new THREE.QuaternionLinearInterpolant
  */
 const PARRY = { one: { clip: 'Two_Handed_Parry', at: 0.6 }, two: { clip: 'Two_Handed_Parry', at: 0.6 } };
 
+/**
+ * Something long, off the back and onto it again (the owner's brief, 2026-10-25: "draw and holster"): the library's
+ * reach over the shoulder for what is slung there. Drawn: the hand goes up behind the head, the thing is in it from
+ * when it closes there (`at` of the way), and comes down to the side. Put away: the other way, gone from the hand as it
+ * reaches the back, and the hand comes down empty. A thing carried in a pocket is in the hand at once, as before.
+ */
+const DRAW = { draw: { clip: 'Draw_and_Shoot_from_Back', from: 0.3, hit: 0.8, to: 1.9 }, stow: { clip: 'Draw_and_Shoot_from_Back', from: 1.9, hit: 0.8, to: 0.3 }, dur: 0.9, at: 0.45 };
+
 export class BodyBlow {
-  /** the blow being thrown: its cut, seconds into it, and how long the game gives it */
-  private now: { cut: Cut; t: number; dur: number; hitU: number; taken: Taken[]; pelvis: THREE.Interpolant | null } | null = null;
+  /** the blow being thrown: its cut, seconds into it, and how long the game gives it; or a long thing drawn or put away */
+  private now: { cut: Cut; t: number; dur: number; hitU: number; taken: Taken[]; pelvis: THREE.Interpolant | null; way?: 'draw' | 'stow' } | null = null;
   private made = new Map<string, { taken: Taken[]; pelvis: THREE.Interpolant | null }>();
   /** what stands between the body's root and its hips, as it rests (it does not move) */
   private above: THREE.Quaternion | null = null;
@@ -95,6 +103,31 @@ export class BodyBlow {
 
   get busy() {
     return !!this.now;
+  }
+
+  /** A long thing drawn off the back, or put away there. Whether it could be (the movements' file is here). */
+  carry(way: 'draw' | 'stow') {
+    if (!this.start(DRAW[way], DRAW.dur, DRAW.at)) return false;
+    this.now!.way = way;
+    return true;
+  }
+
+  /** drawn or being put away: the left hand keeps off it meanwhile */
+  get carrying() {
+    return !!this.now?.way;
+  }
+
+  /** being put away: what is to be taken up next waits for it */
+  get stowing() {
+    return this.now?.way === 'stow';
+  }
+
+  /** whether what is in the fist is out of sight: before the hand closes on it behind the shoulder, or after it lets it go there */
+  get hides() {
+    const n = this.now;
+    if (!n?.way) return false;
+    const u = n.t / n.dur;
+    return n.way === 'draw' ? u < n.hitU : u >= n.hitU;
   }
 
   /** On in its time, and laid over the body as the mixer has just left it. */

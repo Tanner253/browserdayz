@@ -7,6 +7,7 @@
 //   &strip=8&views=q                  eight moments, from three-quarters (side, front, q, back)
 //   &guard=1                          on guard (the right button), held
 //   &inspect=1                        looked over, through its length
+//   &carry=draw|stow                  something long drawn off the back, or put away there
 //   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
 //                                     places them (meleeAt), through the hands' own lens (48 degrees)
 
@@ -15,7 +16,7 @@ import { Avatar } from '../game/avatar';
 import { lookFor } from '../game/look';
 import { meleeAt, meleeHeld } from '../game/weapons';
 import { FPArms } from '../game/arms';
-import { meleeClips } from '../game/melee/body';
+import { BodyBlow, meleeClips } from '../game/melee/body';
 import { cutFor } from '../game/melee/cuts';
 import { LOOK, fpPose, lookOver, type Cut } from '../game/melee/fp';
 import type { Atmosphere } from '../world/atmosphere';
@@ -61,7 +62,7 @@ export async function stageMelee(id: string, s: {
     }
   });
   // (&guard=1: on guard, held, from each of the views asked for)
-  const guard = s.q.get('guard') === '1', inspect = s.q.get('inspect') === '1';
+  const guard = s.q.get('guard') === '1', inspect = s.q.get('inspect') === '1', carry = s.q.get('carry') as 'draw' | 'stow' | null;
   if (guard) {
     body.guarding = true;
     for (let k = 0; k < 20; k++) body.update(0.05, at, still, face, false, false, false, 0, true, false);
@@ -78,13 +79,21 @@ export async function stageMelee(id: string, s: {
   for (let i = 0; i < s.cells; i++) {
     const u = s.cells === 1 ? 0.35 : i / (s.cells - 1);
     moments.push(u);
-    // (the blow begun again and stood at its moment: the body's own update lays it over the rest; or looked over)
-    if (inspect) {
+    // (the blow begun again and stood at its moment: the body's own update lays it over the rest; or looked over; or a
+    // long thing drawn off the back or put away there, the movement's own seconds)
+    if (carry) {
+      body.blow ??= new BodyBlow(body.modelRoot, body.laid);
+      body.blow.carry(carry);
+      const now = (body.blow as unknown as { now: { t: number; dur: number } | null }).now;
+      if (now) now.t = Math.min(u, 0.999) * now.dur;
+    } else if (inspect) {
       body.act('check', LOOK.dur);
       (body.gesture as { t: number }).t = u * LOOK.dur;
-    } else if (!guard) body.swing(false, dur, cut);
-    const now = (body.blow as unknown as { now: { t: number } | null } | null)?.now;
-    if (now) now.t = Math.min(u, 0.999) * dur;
+    } else if (!guard) {
+      body.swing(false, dur, cut);
+      const now = (body.blow as unknown as { now: { t: number } | null } | null)?.now;
+      if (now) now.t = Math.min(u, 0.999) * dur;
+    }
     // (off the shoulder at once: in the game it is let down over the first tenth of a second)
     body.shoulderT = 0;
     body.update(0, at, still, face, false, false, false, 0, true, false);

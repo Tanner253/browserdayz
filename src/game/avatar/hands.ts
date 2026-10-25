@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { type Grips, type HandGrip, type Curl, bent } from '../arms';
 import { POSE } from './pose';
-import { meleeClips } from '../melee/body';
+import { BodyBlow, meleeClips } from '../melee/body';
 import { BODY_SCALE, EAGER, GUN_ELBOW, HOLD_GONE, THUMB_BESIDE, UP, _a, _b, _ca, _ch, _cq, _cq2, _k1, _k2, _k3, _k4, _k5, _kq, _m1, _m2, _q1, _q2, _q3, _qa, _qb, buttOf, settle, Avatar, type ArmRig } from '../avatar';
 
 export const handsMethods = {
@@ -17,6 +17,12 @@ export const handsMethods = {
     else if (this.held && this.placed && this.root.visible && this.holdT > HOLD_GONE) {
       this.nextHeld = { obj, grips, kind };
       return;
+    } else if (this.inHand?.long && this.placed && this.root.visible && obj !== this.inHand.obj.children[0]) {
+      // something long in the fist is put away over the shoulder first (src/game/melee/body.ts), then the next taken up
+      if (this.blow?.stowing || (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).carry('stow')) {
+        this.nextHeld = { obj, grips, kind };
+        return;
+      }
     }
     this.nextHeld = null;
     this.takeUp(obj, grips, kind);
@@ -59,7 +65,10 @@ export const handsMethods = {
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
-      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left };
+      // (carried on the back, not in a pocket: as long as a slung thing is, and drawn from there)
+      const long = new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()).length() > 0.5;
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder, left: grips.left, long };
+      if (long && this.placed && this.root.visible) (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).carry('draw');
       Avatar.onDressed([obj]);
       return;
     }

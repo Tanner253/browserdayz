@@ -51,7 +51,7 @@ export const updateMethods = {
     const wantHold = !!this.held && !busy && !dead && !this.nextHeld;
     if (!this.placed) this.holdT = wantHold ? 1 : 0;
     else this.holdT += ((wantHold ? 1 : 0) - this.holdT) * ease(wantHold ? 11 : dead ? 26 : 16);
-    if (this.nextHeld && this.holdT <= HOLD_GONE) {
+    if (this.nextHeld && this.holdT <= HOLD_GONE && !this.blow?.stowing) {
       const n = this.nextHeld;
       this.nextHeld = null;
       this.takeUp(n.obj, n.grips, n.kind);
@@ -317,7 +317,7 @@ export const updateMethods = {
     if (this.dive) this.root.rotation.x = this.dive;
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
-    if (this.inHand) this.inHand.obj.visible = !using;
+    if (this.inHand) this.inHand.obj.visible = !using && !this.blow?.hides;
     this.heldPivot.rotation.set(pitch, -this.twist, 0);
     this.aimT += ((aiming && !dead ? 1 : 0) - this.aimT) * ease(12);
     this.carryT += (THREE.MathUtils.smoothstep(speed, 2.6, 3.6) * (1 - this.aimT) - this.carryT) * ease(7);
@@ -634,7 +634,7 @@ export const updateMethods = {
 
     // --- something held in both hands: the left closes on it where its grip says, but while it lies on the shoulder
     if (this.inHand && ges?.kind === 'check' && !dead) lookOverBody(this, ges.t / ges.dur, left(ges));
-    if (this.inHand?.left && !dead && !using) holdLeft(this, 1 - this.shoulderT);
+    if (this.inHand?.left && !dead && !using && !this.blow?.carrying) holdLeft(this, 1 - this.shoulderT);
 
     // --- bare hands: a guard, the left leading, and a punch thrown from it
     if (this.fistsT > 0.02 && this.armR && this.armL && this.neck.length) {

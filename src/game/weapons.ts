@@ -4712,6 +4712,16 @@ export class Weapons {
       R.r[1] * sp + G.r[1] * g,
       R.r[2] * sp + G.r[2] * g + Math.cos(ph) * 0.025 * amp + kr.z * 0.01 - p.strafe * 0.03,
     );
+    // looked over (see lookOver): the hands, knife and all, brought in toward the middle and turned one way and the other
+    if (a?.name === 'check') {
+      const k = Math.min(1, a.t / a.dur), S = THREE.MathUtils.smoothstep, w = S(k, 0, 0.15) * (1 - S(k, 0.86, 1));
+      const yaw = LOOK.turn * (S(k, 0.1, 0.32) - 2 * S(k, 0.45, 0.68) + S(k, 0.78, 0.95));
+      m.root.position.x -= 0.07 * w;
+      m.root.position.y += 0.035 * w;
+      m.root.rotation.x += LOOK.tilt * 0.5 * w;
+      m.root.rotation.y += 0.55 * yaw;
+      m.root.rotation.z += 0.5 * yaw;
+    }
     m.root.visible = true;
     // (a pack brings its own arms)
     this.arms.update(null, null, this.vmCamera.quaternion, false);
