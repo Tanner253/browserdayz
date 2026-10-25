@@ -2,15 +2,13 @@
 // tractors"): a layer of their own, laid after everything else with a seed of their own, so that nothing the map already
 // has moves (the navigator: "New wrecks are allowed only in a layer of their own: own seed, placed after everything else,
 // so nothing existing moves"; generateWorld is left as it is). A tractor or a heap of junk in the yard of a barn, a shed
-// or the sawmill; a ZIL, a Pirozhok or a heap of junk beside a garage or the works; each on open, level ground, clear of
-// every building, road, tree, rock and thing already there, and sunk a little into it where it meets it.
+// or the sawmill; a ZIL, a Pirozhok or a heap of junk beside a garage or the works; each where src/sim/craft/layer.ts
+// finds room.
 
 import { RNG } from '../../core/noise';
-import { heightAt } from '../../world/worldgen/ground';
 import { BUILDING_FOOTPRINT } from '../../world/worldgen/layout';
-import type { World } from '../../world/worldgen';
-import { wetAt } from '../build/land';
 import type { SalvageSpot } from './salvage';
+import { roomOn, type LayerWorld } from './layer';
 
 /** each wreck: its model, its name, its fragments and scrap, and how long and wide it lies, m */
 export const WRECK_KINDS = {
@@ -45,40 +43,8 @@ const SEED = 0x5c4a77, MOST = 30, EACH: Record<WreckKind, number> = { zil: 8, pi
 const WORKS = new Set(['garage', 'police_garage', 'works_hall', 'works_office']);
 
 /** the wrecks' layer, the same for the game and the server (the world as generateWorld makes it) */
-export function wreckLayer(world: Pick<World, 'heights' | 'buildings' | 'roads' | 'props' | 'trees' | 'rocks' | 'water'>): Wreck[] {
-  const rng = new RNG(SEED), ground = (x: number, z: number) => heightAt(world.heights, x, z), wet = wetAt(world.water, ground);
-  // (what stands already, in cells of 8 m: a wreck keeps clear of every one of them)
-  const CELL = 8, cells = new Map<string, { x: number; z: number; r: number }[]>();
-  const key = (x: number, z: number) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
-  const stand = (x: number, z: number, r: number) => {
-    const k = key(x, z);
-    let l = cells.get(k);
-    if (!l) cells.set(k, (l = []));
-    l.push({ x, z, r });
-  };
-  for (const list of [world.props, world.trees, world.rocks]) for (const t of list) stand(t.x, t.z, 0.6 + 0.6 * (t.scale ?? 1));
-  const clear = (x: number, z: number, r: number) => {
-    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
-      for (const s of cells.get(`${Math.floor(x / CELL) + dx},${Math.floor(z / CELL) + dz}`) ?? []) if (Math.hypot(s.x - x, s.z - z) < r + s.r) return false;
-    }
-    return true;
-  };
-  const inBuilding = (x: number, z: number, margin: number) =>
-    world.buildings.some((b) => {
-      const [fw, fd] = BUILDING_FOOTPRINT[b.type] ?? [10, 10], dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
-      const lx = dx * c - dz * s, lz = dx * s + dz * c;
-      return Math.abs(lx) < fw / 2 + margin && Math.abs(lz) < fd / 2 + margin;
-    });
-  const nearRoad = (x: number, z: number, r: number) =>
-    world.roads.some((road) => {
-      const p = road.points, half = road.width / 2 + r;
-      for (let i = 0; i + 5 < p.length; i += 3) {
-        const ax = p[i], az = p[i + 2], bx = p[i + 3], bz = p[i + 5], vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz;
-        const t = l2 ? Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / l2)) : 0;
-        if (Math.hypot(ax + vx * t - x, az + vz * t - z) < half) return true;
-      }
-      return false;
-    });
+export function wreckLayer(world: LayerWorld): Wreck[] {
+  const rng = new RNG(SEED), room = roomOn(world);
   const out: Wreck[] = [];
   // (the buildings in an order of the layer's own, so that which get one is spread over the map: the works before the farms)
   const yards = world.buildings.filter((b) => BESIDE[b.type]).map((b) => ({ b, k: rng.next() + (WORKS.has(b.type) ? 0 : 1) })).sort((a, c) => a.k - c.k).map((q) => q.b);
@@ -93,12 +59,10 @@ export function wreckLayer(world: Pick<World, 'heights' | 'buildings' | 'roads' 
     for (let t = 0; t < 10; t++) {
       const a = rng.range(0, Math.PI * 2), d = Math.max(fw, fd) / 2 + r + rng.range(2, 7);
       const x = b.x + Math.sin(a) * d, z = b.z + Math.cos(a) * d, rot = rng.range(0, Math.PI * 2);
-      if (inBuilding(x, z, r + 1.5) || nearRoad(x, z, r + 1) || wet(x, z) || !clear(x, z, r)) continue;
-      // (on level ground, seated: its lowest corner taken, and a hand's breadth into it)
-      const c = Math.cos(rot), s = Math.sin(rot), corners = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([u, v]) => ground(x + (u * K.w * c) / 2 + (v * K.l * s) / 2, z - (u * K.w * s) / 2 + (v * K.l * c) / 2));
-      if (Math.max(...corners) - Math.min(...corners) > 0.7) continue;
-      out.push({ kind, x, y: Math.min(...corners) - 0.1, z, rot });
-      stand(x, z, r);
+      const y = room.fit(x, z, K.l, K.w, rot);
+      if (y === null) continue;
+      out.push({ kind, x, y, z, rot });
+      room.stand(x, z, r);
       break;
     }
   }

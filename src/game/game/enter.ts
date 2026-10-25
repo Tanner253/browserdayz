@@ -218,6 +218,7 @@ export const enterMethods = {
         return;
       } else if (remoteServer()) this.hud.note('The server could not be reached: you are playing OFFLINE, alone. Reload the page to try again.', 'warn');
       await this.enterOffline();
+      this.camp.payBook();
     }
     this.joining = false;
     this.started = true;

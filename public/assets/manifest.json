@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T06:04:05.560Z",
+ "generated": "2026-10-25T06:48:44.332Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -13595,25 +13595,25 @@
    "tags": [
     "loot"
    ],
-   "bytes": 264520,
-   "srcTris": 2537,
-   "tris": 2537,
+   "bytes": 121288,
+   "srcTris": 2889,
+   "tris": 2889,
    "min": [
-    -0.06,
+    -0.0195,
     0,
-    -0.0474
+    -0.06
    ],
    "max": [
-    0.06,
-    0.0912,
-    0.0474
+    0.0195,
+    0.0391,
+    0.06
    ],
    "lods": [
     {
      "url": "assets/models/spring_coil_lod1.glb",
-     "tris": 2407,
+     "tris": 2327,
      "far": 2,
-     "of": "264520:1792908243358"
+     "of": "121288:1792910923362"
     }
    ]
   },
@@ -13622,25 +13622,25 @@
    "tags": [
     "loot"
    ],
-   "bytes": 322768,
-   "srcTris": 2828,
-   "tris": 2828,
+   "bytes": 311192,
+   "srcTris": 2868,
+   "tris": 2868,
    "min": [
-    -0.0125,
+    -0.0131,
     0,
-    -0.09
+    -0.075
    ],
    "max": [
-    0.0125,
-    0.1217,
-    0.09
+    0.0131,
+    0.0845,
+    0.075
    ],
    "lods": [
     {
      "url": "assets/models/gun_body_pistol_lod1.glb",
-     "tris": 1896,
+     "tris": 1964,
      "far": 2,
-     "of": "322768:1792908243589"
+     "of": "311192:1792910924233"
     }
    ]
   },

@@ -951,7 +951,7 @@ export const LOCAL_MODELS = {
       ['metal_frags', 'Metal fragments', '22 cm across', 1024, ['loot']],
       ['metal_pipe', 'Metal pipe', '35 cm long', 1024, ['loot']],
       ['spring_coil', 'Spring', '12 cm long', 1024, ['loot']],
-      ['gun_body_pistol', 'Pistol body', '18 cm long', 1024, ['loot']],
+      ['gun_body_pistol', 'Pistol body', '15 cm long', 1024, ['loot']],
       ['gun_body_rifle', 'Rifle body', '45 cm long', 1024, ['loot']],
       ['research_table', 'Research table', '1.2 m long', 2048, ['prop']],
       ['recycler', 'Recycler', '2 m wide', 2048, ['prop']],

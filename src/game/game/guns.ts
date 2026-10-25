@@ -15,7 +15,6 @@ import { pileGrids } from '../../ui/inv-piles';
 import { noBurying, BURY } from '../../sim/stash';
 import { callSite, describeSpot, DROP } from '../../sim/drops';
 import { planFlight, type Flight, flightTimes, comesFrom, restAt } from '../../sim/airdrop';
-import { type JobBook, bookFor, dayOf } from '../../sim/jobs';
 import { DIG_SECONDS, Game } from '../game';
 import { economyCargo } from '../../sim/storage';
 import { SEARCHED } from '../remote';
@@ -419,34 +418,6 @@ export const gunsMethods = {
     const at = new THREE.Vector3(f.x, f.y, f.z);
     audio.bodyFall(at, at.distanceTo(this.s.r.camera.position));
     if (!this.online) void this.addDrop({ uid: f.uid, x: f.x, y: f.y, z: f.z, rot: restAt(f.uid), left: DROP.life }, true);
-  },
-
-  /** today's page of the trader's work for this player (a new day is a clean page) */
-  jobBook(this: Game): JobBook {
-    let kept: Partial<JobBook> | null = null;
-    try {
-      kept = JSON.parse(localStorage.getItem('zona.jobs') ?? 'null');
-    } catch {
-      // (nothing kept, or nothing that can be read: a clean page)
-    }
-    return bookFor(dayOf(Date.now()), kept);
-  },
-
-  keepBook(this: Game, book: JobBook) {
-    try {
-      localStorage.setItem('zona.jobs', JSON.stringify(book));
-    } catch {
-      // (a browser that keeps nothing)
-    }
-  },
-
-  setCredit(this: Game, n: number) {
-    this.credit = Math.max(0, Math.round(n));
-    try {
-      localStorage.setItem('zona.credit', String(this.credit));
-    } catch {
-      // (a browser that keeps nothing: the book is good until the page is shut)
-    }
   },
 
   openShop(this: Game) {

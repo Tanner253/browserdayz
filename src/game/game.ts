@@ -99,8 +99,9 @@ import '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
-import { STOCK, aDay, asks, pays, sold } from '../sim/trade';
-import { jobsFor, progress as jobDone } from '../sim/jobs';
+import { TraderCamp } from './camp';
+import { RecyclerView } from './craft-recyclers';
+import { recyclerLayer } from '../sim/craft/recyclers';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
@@ -368,13 +369,7 @@ export class Game {
     killed: (zone, distance) => {
       this.weapons.confirmKill();
       // (counted toward the trader's work of the day, whether or not he has been asked about it)
-      const book = this.jobBook();
-      book.kills++;
-      if (zone === 'head') book.heads++;
-      this.keepBook(book);
-      const job = jobsFor(book.day).find((j) => (j.kind === 'cull' || (j.kind === 'heads' && zone === 'head')) && !book.done.includes(j.id));
-      const done = job ? jobDone(job, book, () => 0) : 0;
-      const work = job ? (done >= job.n ? ` · the trader's job is done: ${job.pays} to collect` : ` · trader's job ${done}/${job.n}`) : '';
+      const work = this.camp.killed(zone === 'head');
       this.hud.note(`Infected down${zone === 'head' ? ' · headshot' : ''}${distance > 8 ? ` · ${Math.round(distance)} m` : ''}${work}`, 'good');
     },
   });
@@ -425,6 +420,10 @@ export class Game {
   rangeHeard = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
   traders: Traders | null = null;
+  /** the trader camp (src/game/camp.ts) */
+  camp!: TraderCamp;
+  /** the recyclers (src/game/craft-recyclers.ts) */
+  recyclers!: RecyclerView;
   /** talking to whoever is near: hold V (src/game/voice.ts) */
   readonly voice = new Voice(() => (audio.ready ? audio.ctx : null), () => audio.voiceBus(), (piece) => this.net.sendVoice(piece));
   voiceSaid = false;
@@ -438,7 +437,6 @@ export class Game {
   calls: { at: THREE.Vector3; until: number; smoke: { owed: number } }[] = [];
   shop!: ShopUI;
   /** what is written against this player in the trader's book: kept by the browser */
-  credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
   /** seconds G has been held (drop what is in the hands), and whether that press has done its work */
   dropHeld = 0;
   dropDone = false;
@@ -1067,6 +1065,7 @@ export class Game {
       craftWith: (a, b) => this.craft.recipesFor(a, b).length > 0,
       craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
       craftOpen: () => this.craftCard.open,
+      stashBar: (st) => this.recyclers?.bar(st) ?? this.forges?.bar(st) ?? null,
     });
     this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u), where: (r) => this.craft.where(r) });
     // (the Crafting tab: J, or the tab at the top of the inventory)
@@ -1440,66 +1439,26 @@ export class Game {
         }
       }
     }
-    this.traders = new Traders(world);
-    this.minimap.setTraders(this.traders.places);
-    this.wells = wellSpots(world);
-    this.minimap.setWells(this.wells);
-    void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
-    this.shop = new ShopUI({
-      credit: () => this.credit,
+    // (the trader camp: its stalls, their traders and the counter's screen; src/game/camp.ts)
+    this.camp = new TraderCamp(world, {
+      online: () => this.online,
+      send: (m) => this.net?.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      scene: r.scene,
       // (what is carried, and the guns on the back and in the holster: not what is in the hands, nor what is worn, nor a bag with things in it)
-      wares: () =>
-        [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.map((sl) => this.inv.slots[sl])]
-          .filter((it): it is ItemInstance => !!it && !it.cargo?.length && pays(it) > 0)
-          .map((item) => ({ item, pays: pays(item) })),
-      stock: () => {
-        const bought = this.jobBook().bought ?? {};
-        return STOCK.map((id) => ({ id, asks: asks(id), left: aDay(id) - (bought[id] ?? 0) })).filter((x) => x.asks > 0);
-      },
+      wares: () => [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.map((sl) => this.inv.slots[sl])].filter((it): it is ItemInstance => !!it && !it.cargo?.length),
+      count: (id) => this.countOf(id),
       icon: (id) => this.invUI.icons[id],
-      jobs: () => {
-        const book = this.jobBook();
-        return jobsFor(book.day).map((j) => ({ id: j.id, text: j.text, n: j.n, pays: j.pays, have: jobDone(j, book, (id) => this.countOf(id)), paid: book.done.includes(j.id) }));
+      take: (id, n) => {
+        this.inv.take(id, n);
+        this.inventoryChanged();
       },
-      handIn: (id) => {
-        const book = this.jobBook();
-        const job = jobsFor(book.day).find((j) => j.id === id);
-        if (!job || book.done.includes(id)) return 'That one is settled.';
-        if (jobDone(job, book, (x) => this.countOf(x)) < job.n) return 'Not yet it is not.';
-        if (job.kind === 'bring') {
-          if (this.inv.take(job.item!, job.n) < job.n) return 'You have not got them on you.';
-          this.inventoryChanged();
-        }
-        book.done.push(id);
-        this.keepBook(book);
-        this.setCredit(this.credit + job.pays);
-        audio.ui('open');
-        return null;
-      },
-      sell: (item) => {
-        const got = pays(item);
-        if (!got) return;
+      remove: (item) => {
         this.inv.remove(item);
-        this.setCredit(this.credit + got);
         this.inventoryChanged();
-        audio.ui('close');
       },
-      buy: (id) => {
-        const cost = asks(id);
-        if (!cost) return 'I do not sell that.';
-        const book = this.jobBook();
-        if ((book.bought?.[id] ?? 0) >= aDay(id)) return 'No more of those today. Come back tomorrow.';
-        if (cost > this.credit) return `That is ${cost}. You have ${this.credit} with me.`;
-        const it = makeItem(id, sold(id));
-        if (!this.inv.hasRoom(it)) return 'You have nowhere to put it. Sell me something first.';
-        this.inv.add(it);
-        book.bought = { ...book.bought, [id]: (book.bought?.[id] ?? 0) + 1 };
-        this.keepBook(book);
-        this.setCredit(this.credit - cost);
-        this.inventoryChanged();
-        audio.ui('open');
-        return null;
-      },
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      hasRoom: (items) => items.every((it) => this.inv.hasRoom(it)),
       closed: () => {
         this.input.uiMode = false;
         if (this.started && !this.player.dead) this.input.lock();
@@ -1509,6 +1468,31 @@ export class Game {
         this.save();
       },
     });
+    // (the recyclers: the trader camp's and four more, a layer of their own; src/game/craft-recyclers.ts)
+    this.recyclers = new RecyclerView(
+      {
+        scene: r.scene,
+        input: this.input,
+        online: () => this.online,
+        send: (m) => this.net?.send(m),
+        note: (text, kind) => this.hud.note(text, kind),
+        open: (s) => {
+          this.focus = s;
+          this.toggleInventory(true);
+        },
+        changed: () => {
+          if (this.invUI.isOpen) this.invUI.render();
+        },
+      },
+      recyclerLayer(world, this.camp.camp),
+    );
+    this.traders = new Traders(this.camp.camp?.stalls ?? []);
+    if (this.camp.camp) this.minimap.setTraders([new THREE.Vector3(this.camp.camp.x, 0, this.camp.camp.z)]);
+    this.wells = wellSpots(world);
+    this.minimap.setWells(this.wells);
+    void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
+    this.shop = new ShopUI(this.camp.shopHost());
+    this.camp.redraw = () => this.shop.refresh();
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
@@ -2017,9 +2001,6 @@ export interface Game {
   callDrop: Methods<typeof gunsMethods>['callDrop'];
   flightBegun: Methods<typeof gunsMethods>['flightBegun'];
   dropLanded: Methods<typeof gunsMethods>['dropLanded'];
-  jobBook: Methods<typeof gunsMethods>['jobBook'];
-  keepBook: Methods<typeof gunsMethods>['keepBook'];
-  setCredit: Methods<typeof gunsMethods>['setCredit'];
   openShop: Methods<typeof gunsMethods>['openShop'];
   toggleMap: Methods<typeof gunsMethods>['toggleMap'];
   toggleInventory: Methods<typeof gunsMethods>['toggleInventory'];

@@ -11,7 +11,7 @@ import type { Flames, Fire } from './flames';
 import type { Bases } from '../sim/build/bases';
 import { PIECES } from '../sim/build/pieces';
 import { toWorld, worldYaw } from '../sim/build/snap';
-import { cold, forgeStep, lit, type Fire as Burn } from '../sim/craft/forge';
+import { FORGE, cold, forgeStep, lit, type Fire as Burn } from '../sim/craft/forge';
 import type { Container } from '../sim/inventory';
 import type { StoredItem } from '../net/protocol';
 import type { S2C } from '../net/protocol';
@@ -123,6 +123,22 @@ export class ForgeView {
       }
       if (on && !this.h.shut(d.door)) this.h.glow(d.door, WARM, FIRE.power, FIRE.reach);
     }
+  }
+
+  /** the bar over a forge's store in the inventory (null: the store is no forge's) */
+  bar(st: { uid: string }): { sig: string; el: () => HTMLElement } | null {
+    const m = /^bbox:(\d+):(\d+)$/.exec(st.uid), b = m && this.h.bases().bases.get(Number(m[1]));
+    if (!m || b?.pieces.get(Number(m[2]))?.k !== 'forge') return null;
+    const on = this.burning(Number(m[1]), Number(m[2]));
+    return {
+      sig: `forge:${on}`,
+      el: () => {
+        const el = document.createElement('div');
+        el.className = `inv-machine forge ${on ? 'on' : ''}`;
+        el.innerHTML = `<span><b>${on ? 'Burning' : 'Cold'}</b><em>${on ? `Smelting: ${FORGE.frags} fragments into a bar every ${FORGE.smelt} s, while its wood lasts` : `It lights itself with wood in it and ${FORGE.frags} metal fragments to smelt`}</em></span><i></i>`;
+        return el;
+      },
+    };
   }
 
   /** played alone: every forge of this game's own run a second on, its store changed in place */

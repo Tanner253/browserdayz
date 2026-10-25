@@ -108,6 +108,8 @@ export interface InvActions {
   craftOnto?(a: ItemInstance, b: ItemInstance, at: { x: number; y: number }): void;
   /** whether that card is up (the card by the pointer keeps out of its way) */
   craftOpen?(): boolean;
+  /** a bar over a store that is a machine (a recycler's switch, a forge's fire): what it is drawn of, and the bar (crafting's) */
+  stashBar?(st: Stash): { sig: string; el: () => HTMLElement } | null;
 }
 
 type Source =
@@ -1637,14 +1639,15 @@ export class InventoryUI {
       }
       return [g];
     });
-    const st = this.stash;
+    const st = this.stash, bar = st ? (this.actions.stashBar?.(st) ?? null) : null;
     const stashPart = !st
       ? []
-      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}`, () => {
+      : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}|${bar?.sig ?? ''}`, () => {
           const out: Node[] = [];
           const head = document.createElement('h3');
           head.innerHTML = `${st.label} <span>${st.container.w}×${st.container.h}</span>`;
           out.push(head);
+          if (bar) out.push(bar.el());
           if (this.stashState) {
             out.push(Object.assign(document.createElement('div'), { className: 'inv-empty', textContent: this.stashState }));
             return out;

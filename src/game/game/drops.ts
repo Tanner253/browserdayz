@@ -30,7 +30,6 @@ import { INFECTED } from '../../sim/infected';
 import { TOUCH } from '../../core/device';
 import { phaseOf, DAY } from '../../sim/daynight';
 import { breaksOnHit } from '../../sim/injury';
-import { KEPT_ON_DEATH } from '../../sim/trade';
 import { inBunker, BUNKER, bunkerDark } from '../../sim/bunker';
 import { CRESSET } from '../../world/castle';
 import { castleDark } from '../../sim/castle';
@@ -400,8 +399,6 @@ export const dropsMethods = {
     const p = this.player;
     // everything you carried stays where you fell
     for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
-    // (and the trader writes off half of what he owed a dead man: credit is not a way to carry nothing and lose nothing)
-    if (this.credit > 0) this.setCredit(Math.floor(this.credit * KEPT_ON_DEATH));
     if (at) this.player.spawn(at.x, at.y, at.z, at.yaw);
     else this.spawnAtEdge();
     this.freshKit();

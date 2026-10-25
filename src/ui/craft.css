@@ -188,3 +188,22 @@
 .cc-way button:active { transform: translateY(1px); }
 .cc-way button:disabled { color: rgba(17, 17, 17, 0.55); background: rgba(255, 211, 90, 0.28); cursor: default; filter: none; transform: none; }
 .cc-coin { display: inline-block; width: 14px; height: 14px; margin-left: 3px; background: center / contain no-repeat; }
+
+/* a store that is a machine (src/game/craft-recyclers.ts, craft-forge.ts): what it is doing, over its grid; a recycler's switch */
+.inv-machine { position: relative; display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 7px 10px 9px; overflow: hidden; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line); border-left: 3px solid rgba(233, 228, 216, 0.25); }
+.inv-machine span { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.inv-machine b { font: 700 13px var(--font); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-dim); }
+.inv-machine em { font-style: normal; font-size: 12.5px; color: var(--ink-faint); }
+.inv-machine button { flex: none; padding: 5px 11px; font: 800 12.5px var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: #111; background: #ffd35a; border: 0; cursor: pointer; transition: filter 120ms, transform 80ms; }
+.inv-machine button:hover { filter: brightness(1.08); }
+.inv-machine button:active { transform: translateY(1px); }
+.inv-machine.on { border-left-color: #6fd6a8; }
+.inv-machine.on b { color: #6fd6a8; }
+.inv-machine.on button { color: var(--ink); background: rgba(233, 228, 216, 0.12); }
+.inv-machine.forge.on { border-left-color: #ff9a4a; }
+.inv-machine.forge.on b { color: #ff9a4a; }
+/* (running: a band of light sweeps along its foot) */
+.inv-machine i { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: transparent; }
+.inv-machine.on i { background: linear-gradient(90deg, transparent, #6fd6a8, transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: inv-run 1.4s linear infinite; }
+.inv-machine.forge.on i { background-image: linear-gradient(90deg, transparent, #ff9a4a, transparent); }
+@keyframes inv-run { from { background-position: -40% 0; } to { background-position: 140% 0; } }

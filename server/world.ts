@@ -14,6 +14,8 @@ import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
 import { salvageSpots } from '../src/sim/craft/salvage';
 import { wreckLayer, wreckSpots } from '../src/sim/craft/wrecks';
+import { recyclerLayer } from '../src/sim/craft/recyclers';
+import { campLayer } from '../src/sim/camp';
 import { JEEP, POLICE_CAR, jeepSpots, policeSpots, westSpots } from '../src/sim/vehicles';
 import { HELI, heliSpots } from '../src/sim/heli';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
@@ -137,6 +139,8 @@ export function buildWorldData(root: string) {
   if (under) for (const c of bunkerCrates(under)) crates.push({ cid: crateId(c.x, c.z), kind: c.kind, x: c.x, y: c.y, z: c.z });
   // (where the cars stand: a search of the whole map, done once)
   const parked = jeepSpots(world), stations = policeSpots(world, parked);
+  // (crafting's layers of their own, after everything else: the trader camp's stalls first, then the recyclers)
+  const camp = campLayer(world);
   return {
     lootPoints: buildings.lootPoints,
     /** where every building stands, and how it is turned (nothing is buried under a floor) */
@@ -155,8 +159,11 @@ export function buildWorldData(root: string) {
     gas: gasZone(world.pois, (x, z) => heightAt(world.heights, x, z)),
     /** the fuel drums, numbered as the game numbers them */
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
-    /** what scrap is knocked off, numbered as the game numbers it (src/sim/craft/salvage.ts) */
+    /** what metal is knocked off, numbered as the game numbers it (src/sim/craft/salvage.ts) */
     salvage: salvageSpots(world.props, wreckSpots(wreckLayer(world))),
+    /** the trader camp: its stalls and its yard (src/sim/camp.ts), and the recyclers, numbered as the game numbers them (src/sim/craft/recyclers.ts) */
+    camp,
+    recyclers: recyclerLayer(world, camp),
     /** the fireplaces, numbered as the game numbers them */
     fires: fireSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     /** the trees and the rocks, numbered as the game numbers them: felled for logs and broken for stone (server/gather.ts) */

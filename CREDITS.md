@@ -220,6 +220,7 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle, 12 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
 - "Pistol body" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood on the ground about its own middle, 18 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
+  Also: Stood on the ground about its own middle, 15 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
 - "Rifle body" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood on the ground about its own middle, 45 cm long as made; textures re-encoded as WebP at 1024; geometry compressed.
 - "Research table" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
