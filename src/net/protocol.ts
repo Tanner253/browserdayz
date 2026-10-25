@@ -76,6 +76,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
 // a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels;
 // progression v3 ('known' and 'learn': blueprints; 'recy': recyclers; 'trade', 'tday' and 'book': the trader camp, paid in scrap).)
+// (65 on the live line, 2026-10-25, a hotfix: a dog tag stays in the pockets until the server says it is cashed, and the
+// game's countdown follows the server's clock ('tagclock'). Raised so every open page loads the fixed game: a page of 64
+// drops the tag the moment its own countdown ends. The working branch's own 65 to 67 are renumbered at its release.)
 export const PROTOCOL = 66;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
