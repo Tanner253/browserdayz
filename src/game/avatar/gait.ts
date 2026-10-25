@@ -1,9 +1,9 @@
 // The body's steps, on motion capture (the owner, 2026-10-25: "rehaul our body movement ... so that the game feels much
 // more high quality"; "we want tarkov quality military animations realism"). The movements are Higgsfield's library
 // carried onto our skeleton (scripts/mocap.mjs: public/assets/characters/moves.glb, their paces in moves.json). Every
-// loop starts on the left heel, so the ways of a gait blend in step: the legs go the way the body goes (ahead, back, to
-// a side, a corner) while the body faces its aim. Nothing is twisted round to stand in for a side step, but a gait drawn
-// only ahead (the sprint, the limp), which is turned at the hips as far as a waist goes.
+// loop starts on the left heel, so the ways of a gait blend in step: the legs go the way the body goes while the body
+// faces its aim. A gait drawn only ahead and back (the walks, the sprint, the limp) is turned at the hips to go to a
+// side, the chest turned back to the aim (see Avatar's twist).
 // How fast the legs turn over and how long each step is share out the difference between the body's pace and the one
 // the movement was captured at (`warp`, laid on the legs after the mixer: see Avatar's stride): the feet stay put.
 
@@ -17,14 +17,15 @@ const AT: Record<Way, number> = { F: 0, FR: Math.PI / 4, R: Math.PI / 2, BR: (3 
 /** a step of a gait: what the legs play, and what the body above them does where that is another movement's */
 type Step = [Way, string, string?];
 /**
- * The gaits. The gun's side steps are the library's crouched one stood up (see scripts/mocap-pose.mjs reshape): empty
- * handed, the arms swing as they do walking ahead. The jog has no side steps: it runs the nearest of its ways and is
- * turned at the hips the rest (no more than to a corner), as somebody runs across: two corners blended half each
- * jogged on the spot.
+ * The gaits. The walks step to a side as the old clips did, ahead with the hips turned toward it: the library's one
+ * standing side step is a crouched one, and stood up it was a bow-legged cross-step (the owner, 2026-10-25, of it
+ * beside the old: "This one looks good, the most recent images in chat dont look as good as this one"). The jog has no
+ * side steps: it runs the nearest of its ways and is turned at the hips the rest (no more than to a corner), as
+ * somebody runs across: two corners blended half each jogged on the spot.
  */
 const GAITS = {
-  walk: [['F', 'walkF'], ['B', 'walkB'], ['L', 'aimL.legs', 'walkF.upper'], ['R', 'aimR.legs', 'walkF.upper']],
-  aim: [['F', 'aimF'], ['B', 'aimB'], ['L', 'aimL'], ['R', 'aimR']],
+  walk: [['F', 'walkF'], ['B', 'walkB']],
+  aim: [['F', 'aimF'], ['B', 'aimB']],
   jog: [['F', 'jogF'], ['FL', 'jogFL'], ['FR', 'jogFR'], ['BL', 'jogBL'], ['BR', 'jogBR']],
   crouch: [['F', 'crouchF'], ['B', 'crouchB'], ['L', 'crouchL'], ['R', 'crouchR']],
   sprint: [['F', 'sprint']],
@@ -32,8 +33,9 @@ const GAITS = {
   limp: [['F', 'limpF'], ['B', 'limpB']],
 } satisfies Record<string, Step[]>;
 type GaitName = keyof typeof GAITS;
-/** the gaits drawn only ahead (and back): they are turned at the hips to go to a side */
-const TURNED = new Set<GaitName>(['sprint', 'sprintGun', 'limp']);
+/** the gaits drawn only ahead (and back): they are turned at the hips to go to a side, by as much as this at most
+ * (the walks as far as the old clips' hips went, POSE.maxTwist; flat out and limping, as far as a waist goes) */
+const TURNED = new Map<GaitName, number>([['walk', 1.35], ['aim', 1.35], ['sprint', 1.1], ['sprintGun', 1.1], ['limp', 1.1]]);
 /** the gaits run the nearest way and turned the rest */
 const NEAREST = new Set<GaitName>(['jog']);
 
@@ -76,6 +78,8 @@ export class Gait {
   private turnW = 0;
   /** a gait run its nearest way: which way that is now, and how much of each way is still in it (eased across a change) */
   private near = new Map<GaitName, { at: Way; k: Map<Way, number> }>();
+  /** a gait turned to a side: whether it is stepping back, and how much of it is (eased across a change) */
+  private back = new Map<GaitName, { on: boolean; k: number }>();
   constructor(mixer: THREE.AnimationMixer, clips: THREE.AnimationClip[]) {
     const byName = new Map(clips.map((c) => [c.name, c]));
     for (const steps of Object.values(GAITS) as Step[][]) {
@@ -123,18 +127,23 @@ export class Gait {
       this.turnW += share;
       return;
     }
-    if (share < 1e-4) return;
-    if (TURNED.has(gait)) {
-      // ahead or back, whichever is nearer (eased across the side), the hips turned the rest of the way
+    const most = TURNED.get(gait);
+    if (most !== undefined) {
+      // ahead or back, the hips turned the rest of the way: back once a little behind the side, ahead again a little
+      // before it (as the old clips did: half of each at the side is stepped on the spot), eased over a sixth of a second
       const back = steps.find((s) => s[0] === 'B');
-      const k = back ? THREE.MathUtils.smoothstep(Math.abs(at), 1.4, 1.75) : 0;
-      this.add(steps[0], share * (1 - k));
-      if (back) this.add(back, share * k);
-      const ahead = Math.abs(at) < 1.6 || !back ? at : wrap(at - Math.PI);
-      this.turns += share * THREE.MathUtils.clamp(-ahead, -1.1, 1.1);
+      let b = this.back.get(gait);
+      if (!b) this.back.set(gait, (b = { on: false, k: 0 }));
+      if (back && (b.on ? Math.abs(at) < 1.4 : Math.abs(at) > 1.75)) b.on = !b.on;
+      b.k += ((b.on ? 1 : 0) - b.k) * (1 - Math.exp(-12 * dt));
+      if (share < 1e-4) return;
+      this.add(steps[0], share * (1 - b.k));
+      if (back) this.add(back, share * b.k);
+      this.turns += share * THREE.MathUtils.clamp(-(b.on ? wrap(at - Math.PI) : at), -most, most);
       this.turnW += share;
       return;
     }
+    if (share < 1e-4) return;
     this.turnW += share;
     // the two ways either side of it, each by how near
     let lo: Step = steps[0], hi: Step = steps[0], dlo = -Infinity, dhi = Infinity;
@@ -223,7 +232,7 @@ export class Gait {
 
 /** a leg, hip to ankle */
 export interface Leg { thigh: THREE.Object3D; calf: THREE.Object3D; foot: THREE.Object3D }
-const _h = new THREE.Vector3(), _k = new THREE.Vector3(), _f = new THREE.Vector3(), _t = new THREE.Vector3(), _p = new THREE.Vector3();
+const _h = new THREE.Vector3(), _k = new THREE.Vector3(), _f = new THREE.Vector3(), _t = new THREE.Vector3();
 const _d = new THREE.Vector3(), _s = new THREE.Vector3(), _n = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _fq = new THREE.Quaternion();
 /** a bone turned (in the world) so that what lies `from` it lies `to` */
@@ -236,19 +245,20 @@ function swing(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3) {
 
 /**
  * Each step made `s` times as long along the way gone (`way`, a level unit in the world): each foot put out from under
- * the hips along it by that much, and its leg worked out again to reach it, the knee bent to the side it was bent to,
- * the foot turned as it was. The movements were captured at a pace of their own: stepped faster and no longer, a body
- * going twice as fast as its movement took steps twice as quick and as short as they were, its feet sliding.
+ * its own hip along it by that much, and its leg worked out again to reach it, the knee bent to the side it was bent
+ * to, the foot turned as it was. The movements were captured at a pace of their own: stepped faster and no longer, a
+ * body going twice as fast as its movement took steps twice as quick and as short as they were, its feet sliding.
+ * (From its own hip, not the middle of the hips: stepping sideways, the width of the hips is not a step, and stretched
+ * it bowed the legs and crossed them the more.)
  */
-export function stretch(legs: Leg[], hips: THREE.Object3D, way: THREE.Vector3, s: number) {
-  hips.getWorldPosition(_p);
+export function stretch(legs: Leg[], way: THREE.Vector3, s: number) {
   for (const L of legs) {
     L.thigh.getWorldPosition(_h);
     L.calf.getWorldPosition(_k);
     L.foot.getWorldPosition(_f);
     L.foot.getWorldQuaternion(_fq);
     const turn = _fq.clone(), la = _k.distanceTo(_h), lb = _f.distanceTo(_k);
-    _t.copy(_f).addScaledVector(way, _n.copy(_f).sub(_p).dot(way) * (s - 1));
+    _t.copy(_f).addScaledVector(way, _n.copy(_f).sub(_h).dot(way) * (s - 1));
     const d = Math.max(0.05, Math.min(_t.distanceTo(_h), (la + lb) * 0.999));
     _d.copy(_t).sub(_h).normalize();
     _s.copy(_k).sub(_h);

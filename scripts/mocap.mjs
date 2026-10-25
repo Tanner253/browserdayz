@@ -19,7 +19,7 @@ import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runOf, giveRun } from './mixamo.mjs';
-import { skeleton, heelFirst, leftOf, reshape, trim, wayOf, facing, readClip } from './mocap-pose.mjs';
+import { skeleton, heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes } from './mocap-pose.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAIN = process.env.ZONA_MAIN ?? ROOT;
@@ -71,9 +71,8 @@ export const MOVES = {
   // knees, and a head drawn under the eye was a head under cover the eye could shoot over)
   aimF: { from: 'Walk_Forward_with_Bow_Aimed', way: 'F', gait: 'aim', square: 0, stand: 'walkF' },
   aimB: { from: 'Walk_Backward_with_Bow_Aimed', way: 'B', gait: 'aim', square: 0, stand: 'walkB' },
-  // (its footing drawn in to stand up higher: its steps as much the shorter, 0.696 m/s as captured, and stepped faster)
-  aimL: { from: 'Walk_Left_with_Gun', way: 'L', gait: 'aim', stand: 'aimF', narrow: 0.7, pace: 0.487 },
-  aimR: { from: 'Walk_Left_with_Gun', way: 'R', gait: 'aim', stand: 'aimF', narrow: 0.7, pace: 0.487, mirror: true },
+  // (no side steps: the library's one standing is a crouched one, and stood up it was a bow-legged cross-step. The walks
+  // go to a side as the old clips did, ahead with the hips turned: see src/game/avatar/gait.ts GAITS)
   // a jog, eight ways (left and right are the corners between)
   jogF: { from: 'Run_02', way: 'F', gait: 'jog' },
   jogFL: { from: 'ForwardLeft_Run_Fight', way: 'FL', gait: 'jog', square: 0.5 },
@@ -182,11 +181,17 @@ if (!cands) {
     await carry(m.from, name, { mirror: !!m.mirror, still: m.still ?? !!m.way });
     const said = {};
     said.was = facing(doc, sk, name);
-    if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null, narrow: m.narrow ?? 1 }));
+    if (m.square !== undefined || m.stand || m.head) Object.assign(said, reshape(doc, sk, name, { keep: m.square ?? 0, ref: m.stand ?? null, head: m.head ?? null }));
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
     const r = report[name], got = readClip(doc, sk, name);
-    // (its pace: by the hips where it travels, by the feet where it was drawn on the spot)
+    // (its pace: by the hips where it travels, by the feet where it was drawn on the spot; and a loop that goes another
+    // way than it is said to stops the build: the library's 'Walk_Left_with_Gun' steps to the right, and was laid in
+    // as a step to the left, its feet sliding along with the body)
+    if (m.way) {
+      const went = goes(doc, sk, name), want = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 }[m.way];
+      if (Math.abs(((went.deg - want + 540) % 360) - 180) > 40) throw new Error(`${name} goes ${went.deg} degrees to the left of its front, not ${m.way}`);
+    }
     table[name] = { ...(m.way ? { way: m.way, gait: m.gait, pace: m.pace ?? (r.hips > 0.3 ? r.hips : r.pace) } : {}), dur: +got.dur.toFixed(3), ...(m.late ? { late: true } : {}) };
     // (a fall: where the hips end up lying from where it stood, metres ahead and to the left)
     if (/^death/.test(name)) {

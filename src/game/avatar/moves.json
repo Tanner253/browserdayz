@@ -180,17 +180,5 @@
   "gait": "aim",
   "pace": 0.743,
   "dur": 1.533
- },
- "aimL": {
-  "way": "L",
-  "gait": "aim",
-  "pace": 0.487,
-  "dur": 1.233
- },
- "aimR": {
-  "way": "R",
-  "gait": "aim",
-  "pace": 0.487,
-  "dur": 1.233
  }
 }
