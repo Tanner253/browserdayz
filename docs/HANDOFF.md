@@ -26,8 +26,18 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 5. Tell the owner in two lines what you see and what is first on the list (section 3), and start it.
 
 ## 2. Where things stand right now
-- **LIVE 2026-10-24 16:05 UTC**: site, game server and `main` all from `44bd0e60` (PROTOCOL 63, server boot 722015f9;
-  805 characters and 136 stashes kept). `site-live` and `hotfix` there too. Changelog entries `#equipment-wheel-herds`,
+- **LIVE 2026-10-24 21:14 UTC**: site, game server and `main` all from `20fe45d4` (PROTOCOL 64, server boot ace5d1df;
+  807 characters and 135 stashes kept). `site-live` and `hotfix` there too. Changelog `#hands-wheel-bears`: DayZ hands
+  (a held slot of its own, two long guns on the back and one in the hands, keys 1 and 2 always the back's, bodies
+  10x17), the shared radial menu (`src/ui/radial.ts`: an icon per entry, Cancel always at six o'clock), the inventory's
+  middle 348 px so Carried holds two containers side by side, a shot bear going for its shooter and holding to them
+  (`answer` in src/sim/animal-fight.ts), Kalat's two wall gaps and the south bank stump. Suite 135 files, 0 failing.
+- **Side sessions as of that release**: the fixes path (`claude/zona-fixes-006de5`) builds the Kalat keep from
+  `progress/kalat-keep/plan-kalat-keep.png` in its worktree (server side, for a later release, the owner to see it in
+  the game first). Base building (`claude/base-building-d2c3d5`, PROTOCOL 65 there) has steps 1 to 4 part 1 done
+  (gathering, pieces and snapping, claim and upkeep, doors and boxes) and is on part 2 (locks, beds, ladder,
+  blueprints, torches), then raiding; it merges only when whole.
+- **The release before, 2026-10-24 16:05 UTC**: `44bd0e60` (PROTOCOL 63). Changelog entries `#equipment-wheel-herds`,
   `#safari-carried-food`, `#animals-shot`. That release: Carried's equipment folds under its own bar, grids drawn
   smaller to fit (no sideways scroll, a stash case too), moves keep the scroll, shift-click from a bag lying about, the
   wheel through every hot key, raw meat harmful and food's card as it is, "food" for energy, sprats and saline, the

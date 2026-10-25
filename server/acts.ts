@@ -337,8 +337,14 @@ export function leftAlone(v: Veh, now: number): boolean {
 function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null {
   const inv = c.inv;
   const [x, , z, yaw] = c.pose;
-  // (on what is under where they died: dead in the air, off a jump or out of a helicopter, the body falls (see kill))
-  const at = c.pose[1], under = world.standAt(x, at, z), y = !ride && at - under > 1.5 ? under : at;
+  // (on what is under where they died: dead in the air, off a jump or out of a helicopter, the body falls (see kill).
+  // Near anything that could be stood on, a house's upper floor, a roof, a rock, it stays at their height: the server
+  // knows the ground and not every floor, and each game lays the body on whatever is under it (Game.addCorpse).
+  // It was put on the ground under the building: 2026-10-24, "when i kill someone on the 3rd floor their body falls
+  // to the ground rather than staying on the floor of where they were killed at". A floor the server does know, a
+  // base's or a bridge's deck, it falls to: server/solid.ts.)
+  const at = c.pose[1], under = world.standAt(x, at, z), known = under > world.coverAt(x, z) + 0.05;
+  const y = !ride && at - under > 1.5 && (known || !world.supportNear(x, z)) ? under : at;
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
   const box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
   const spill: ItemInstance[] = [];

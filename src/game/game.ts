@@ -80,7 +80,7 @@ import { Perf } from '../core/perf';
 import { loadGraphics, loadMix, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
 import { Beast, Wildlife } from './animals';
-import type { AnimalRow } from '../sim/animals';
+import { ANIMALS, type AnimalRow } from '../sim/animals';
 import { Heli } from './heli';
 import { shotHeard } from '../sim/heard';
 import { INFECTED, INFECTED_GRID, guarded } from '../sim/infected';
@@ -1282,6 +1282,15 @@ export class Game {
           }
           this.adminUI.setSelf(this.adminSelf());
         },
+        animalsFar: (m) => {
+          this.animalsFar = m;
+          try {
+            localStorage.setItem('zona.admin.animalsFar', String(m));
+          } catch {
+            /* not kept: it is as it was the next time */
+          }
+          this.adminUI.setSelf(this.adminSelf());
+        },
         look: () => this.adminLook(),
         // (whoever is picked in the panel is ringed on the map as well)
         picked: (id) => this.map.pick(id === this.net?.id ? 0 : id),
@@ -1619,6 +1628,20 @@ export class Game {
       return false;
     }
   })();
+  /**
+   * How far off an admin has animals drawn, metres (the panel's Animal distance; remembered): ANIMALS.told for
+   * everybody else, and nobody's past their draw distance (2026-10-24: "make it a setting in the admin panel so it is
+   * controlled indepeneently like the render distance is"; "a animal render distance cannot be higher than the main
+   * render distance obviously"). What the server was last asked for on this connection beside it (0: not yet).
+   */
+  animalsFar = (() => {
+    try {
+      return Number(localStorage.getItem('zona.admin.animalsFar')) || ANIMALS.told;
+    } catch {
+      return ANIMALS.told;
+    }
+  })();
+  animalsAsked = 0;
   farAsked = 0;
   /** every animal and every one of the infected, as the server last said (server/esp.ts) */
   espAnimals: AnimalRow[] = [];

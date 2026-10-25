@@ -20,13 +20,14 @@
 
 import type { Place } from './bunker';
 
+import { KEEP_FOOT, KEEP_LOOT, KEEP_STOOD, keepParts } from './ruins-keep';
 export type { Place };
 export type V2 = [number, number];
 export type V3 = [number, number, number];
 
 /** the pieces: the palace-fort, the south-east wall, the gate, the houses, the wall to the river, the north footings, and three remnants of the bank's wall to stand wherever a wall is gone */
-export type Piece = 'alcazar' | 'curtain' | 'gate' | 'honeycomb' | 'spur' | 'north' | 'stubA' | 'stubB' | 'stump';
-export const PIECE_NAMES: Piece[] = ['alcazar', 'curtain', 'gate', 'honeycomb', 'spur', 'north', 'stubA', 'stubB', 'stump'];
+export type Piece = 'alcazar' | 'curtain' | 'gate' | 'honeycomb' | 'spur' | 'north' | 'stubA' | 'stubB' | 'stump' | 'keep';
+export const PIECE_NAMES: Piece[] = ['alcazar', 'curtain', 'gate', 'honeycomb', 'spur', 'north', 'stubA', 'stubB', 'stump', 'keep'];
 
 /** what a part is made of: rubble limestone in mortar; the rammed earth and stones of a wall's heart (seen where it is broken); fallen stone and earth; sand, blown in and trodden; what is walked on along a wall and through a gate; old timber */
 export type Paint = 'stone' | 'core' | 'earth' | 'sand' | 'paving' | 'timber';
@@ -336,6 +337,8 @@ const apron = (a: V2, b: V2, out: V2, y: number, drop = 0.2, len = 0.9): Slab =>
 
 /** the level a doorway's own floor is at over the ground outside it: a sill, a hand's breadth */
 const SILL = 0.14;
+/** the makings of a piece, for a piece made in a file of its own (src/sim/ruins-keep.ts) */
+export const build = { wall, opening, fallen, crenels, floor, flight, beam, post, heap, strewn, apron, rect, SILL };
 
 export const ALCAZAR = {
   /** the two walls that leave its west front: the south one over the moat, in the palace's own measure, and how it is turned from the front */
@@ -830,7 +833,7 @@ const made = new Map<Piece, Part[]>();
 /** Every part of a piece, in the piece's own measure. (Worked out once: it is the same every time.) */
 export function ruinParts(piece: Piece): Part[] {
   let p = made.get(piece);
-  if (!p) made.set(piece, (p = piece === 'alcazar' ? alcazar() : piece === 'curtain' ? curtain() : piece === 'gate' ? gate() : piece === 'honeycomb' ? honeycomb() : piece === 'spur' ? spur() : piece === 'north' ? north() : stub(piece)));
+  if (!p) made.set(piece, (p = piece === 'alcazar' ? alcazar() : piece === 'curtain' ? curtain() : piece === 'gate' ? gate() : piece === 'honeycomb' ? honeycomb() : piece === 'spur' ? spur() : piece === 'north' ? north() : piece === 'keep' ? keepParts() : stub(piece)));
   return p;
 }
 
@@ -850,6 +853,7 @@ export interface Ground { y: number; hold: Hold; kind: GroundKind }
 const FOOT: Record<Piece, V2[]> = {
   alcazar: [[-3, -6], [22, -26], [41, -7], [78, 22], [80, 40], [-3, 58]],
   curtain: [[-3, -4], [93, -11], [93, 2], [67, 7], [43, 15], [31, 15], [12, 7], [-3, 3]],
+  keep: KEEP_FOOT,
   gate: [[-22, -9], [16, -9], [16, 11], [10, 25], [2, 25], [-22, 11]],
   honeycomb: rect(-1, -1, HONEYCOMB.w + 1, HONEYCOMB.d + 1),
   spur: [[-1, -3], [70, -3], [70, -4], [79, -4], [79, 4], [70, 4], [70, 6], [24, 6], [-1, 3]],
@@ -930,6 +934,11 @@ export function ruinGround(piece: Piece, x: number, z: number): Ground {
     // (no moat on this side: a bank down to a shelf, the shelf, and a second bank down to the river's flats)
     const y = through([[2.5, 0], [11, -4.4], [33, -5.4], [45, -8.7]], z);
     return { y, hold: z < 7 ? 1 : 0, kind: z < 2.5 ? 'top' : z < 11 ? 'scarp' : z < 33 ? 'berm' : z < 45 ? 'scarp' : 'flats' };
+  }
+  if (piece === 'keep') {
+    // (the land under it, as it is, from the keep's own level: it is set as high as the land reaches, so this is never above its floors)
+    const k = keepStood();
+    return { y: land(k.x + x, k.z + z).y - k.y, hold: 0, kind: 'top' };
   }
   return { y: 0, hold: piece === 'honeycomb' ? 1 : 0, kind: 'top' };
 }
@@ -1014,7 +1023,21 @@ export function ruinsLayout(): Stood[] {
     const x = a[0] + (b[0] - a[0]) * t - d[1] * inset, z = a[1] + (b[1] - a[1]) * t + d[0] * inset;
     out.push({ piece: kinds[k % kinds.length], x, z, yaw: Math.atan2(-d[1], d[0]), y: Math.round(land(x, z).y * 10) / 10 - 0.2 });
   });
+  // (and the keep in the flat middle, built since: last, as its places for things are laid last)
+  out.push(keepStood());
   return (laid = out);
+}
+/**
+ * Where the keep stands (src/sim/ruins-keep.ts): in the flat middle of the town's top, where the land falls 0.2 m end
+ * to end and every piece is fifty metres off, square to the town; as high as the land under it reaches (to a tenth).
+ */
+let keepAt: Stood | null = null;
+function keepStood(): Stood {
+  if (keepAt) return keepAt;
+  const x = -65, z = 40;
+  let top = -Infinity;
+  for (let dx = -24; dx <= 23; dx += 1) for (let dz = -21; dz <= 18; dz += 1) if (inside(dx, dz, KEEP_FOOT)) top = Math.max(top, land(x + dx, z + dz).y);
+  return (keepAt = { piece: 'keep', x, z, yaw: 0, y: Math.ceil(top * 10) / 10 });
 }
 /** Where each piece stands in the world, for a town set down at a place as it really stood. */
 export function ruinsPlan(site: Place): { piece: Piece; place: Place }[] {
@@ -1108,7 +1131,8 @@ export function ruinsGround(x: number, z: number): Ground {
     // either side of it, a shelf it runs down, and eased out past that.)
     const off = outside(lx, lz, FOOT[st.piece]), [held, ease] = st.piece === 'spur' ? [5, 18] : [0, 14];
     if (off > ease) continue;
-    const g = ruinGround(st.piece, lx, lz), w = g.hold === 2 ? 1e6 : (1 - smooth(held, ease, off)) * (st.piece.startsWith('stu') ? 0 : 1);
+    // (the remnants of the bank's wall and the keep stand on the land as it is: none of the ground is theirs)
+    const g = ruinGround(st.piece, lx, lz), w = g.hold === 2 ? 1e6 : (1 - smooth(held, ease, off)) * (st.piece.startsWith('stu') || st.piece === 'keep' ? 0 : 1);
     if (w <= 0) continue;
     sum += (g.y + st.y) * w;
     weight += w;
@@ -1142,7 +1166,7 @@ export function ruinsGround(x: number, z: number): Ground {
  * kinds out up there), so the kinds matter for the town and are only good sense for the palace.
  */
 // (Kalat on the second step, the first town east of the coast: the owner, 2026-10-18: "kalat should be tier 2 loot zavo tier 2, the pass tier 3 pipki tier 3 mokroye tier 3 zalena tier 3 and kamenka tier 4 orlanoy tier 5 (not as dense as bunker, but still top tier loot, player should still want to go to bunker)")
-export const RUIN_TIER: Record<Piece, 2 | 3 | 4> = { alcazar: 2, curtain: 2, gate: 2, honeycomb: 2, spur: 2, north: 2, stubA: 2, stubB: 2, stump: 2 };
+export const RUIN_TIER: Record<Piece, 2 | 3 | 4> = { alcazar: 2, curtain: 2, gate: 2, honeycomb: 2, spur: 2, north: 2, stubA: 2, stubB: 2, stump: 2, keep: 2 };
 export type RuinUsage = 'Hunting' | 'Farm' | 'Industrial' | 'Military';
 export interface RuinLoot {
   x: number;
@@ -1195,6 +1219,7 @@ function lootSpots(piece: Piece): Spot[] {
     return [[P.turrets[0], 4, P.top, CAMP], [P.turrets[1], 4, P.top, NEST], [P.turrets[2], 4, P.top, CAMP], [75, 0.4, P.top, NEST, 'any'], [74.6, 0.6, P.plain + SILL, CAMP], [50, 0, P.top, DIG]];
   }
   if (piece === 'north') return [...NORTH.towers.map((x, k): Spot => [x, 2.6, null, k % 2 ? CAMP : DIG]), [90, -2, null, DIG], [118, -2, null, DIG]];
+  if (piece === 'keep') return KEEP_LOOT.map(([x, z, y, kind, arms]): Spot => [x, z, y, kind === 'dig' ? DIG : kind === 'camp' ? CAMP : NEST, arms]);
   return [[0, piece === 'stump' ? 0 : 1.6, null, piece === 'stump' ? CAMP : DIG]];
 }
 
@@ -1244,6 +1269,7 @@ function stood(piece: Piece): [string, number, number, number | null, number][] 
   if (piece === 'honeycomb') return [['stone_fire_pit', 9, 9.4, null, 0], ['wooden_crate_01', 26, 22, null, 0.4], ['shovel', 12.5, 23.8, null, 1.2], ['wooden_crate_01', 30.5, 5.5, null, 1.2], ['wooden_crate_01', 6, 27, null, 2.1]];
   if (piece === 'spur') return [['wooden_crate_01', 43, 4.2, SPUR.top, 0.3], ['wooden_crate_01', 73.6, 1.4, SPUR.plain + SILL, 0.5], ['stone_fire_pit', 75, -0.2, SPUR.top + 0.19, 0]];
   if (piece === 'north') return [['stone_fire_pit', 42, 2.8, null, 0], ['wooden_crate_01', 22, 2.6, null, 0.3]];
+  if (piece === 'keep') return KEEP_STOOD;
   return [];
 }
 /** What stands in a piece off the shelf, as the world's own list of such things has them: crates and cases are searched, a fire pit can be lit. */

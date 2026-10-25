@@ -79,6 +79,11 @@ export interface Beast {
   /** a way it has turned to after getting nowhere, and for how much longer it keeps to it, seconds */
   detourYaw: number;
   detourT: number;
+  /** the herd's spot it is making for, the nearest it has come to it, and when it last came nearer (and was last at it) */
+  toward: { x: number; z: number } | null;
+  towardD: number;
+  towardAt: number;
+  towardSeen: number;
   // --- a fight (a bear, a wolf)
   foe: number;
   fightAt: number;
@@ -280,7 +285,7 @@ export class Herd {
       const slot = at ?? slotFor(this, g, k);
       const b: Beast = {
         i: this.next++, k, g: g.i, x, z, yaw: this.rnd() * PI2, mode: A_IDLE, hp: kind.hp, diedAt: 0, skinned: false, bleeds: false, speed: 0,
-        aware: 0, fearX: x, fearZ: z, ranFor: 0, slot, act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0, detourYaw: 0, detourT: 0,
+        aware: 0, fearX: x, fearZ: z, ranFor: 0, slot, act: A_GRAZE, next: now + this.rnd() * 6000, side: this.rnd() < 0.5 ? 1 : -1, stuckT: 0, detourYaw: 0, detourT: 0, toward: null, towardD: Infinity, towardAt: 0, towardSeen: 0,
         foe: 0, fightAt: 0, fightX: x, fightZ: z, reach: 0, sensedAt: 0, seenX: x, seenZ: z, warnUntil: 0, rushUntil: 0, move: null, moveAt: 0, restUntil: 0, dashUntil: 0, snarlUntil: 0,
         hurtBy: 0, hurtAt: 0, answered: 0, calmUntil: 0, skinner: null, eaten: false,
       };
@@ -415,7 +420,8 @@ export class Herd {
   private wake(g: Group, now: number, people: Seen[]) {
     if (now - g.sleptAt < 90_000 || g.flee) return;
     this.plan(g, now);
-    const seen = (x: number, z: number) => people.some((q) => Math.hypot(q.x - x, q.z - z) < 160);
+    // (seen: within the distance a player is told of them, so none is seen to jump)
+    const seen = (x: number, z: number) => people.some((q) => Math.hypot(q.x - x, q.z - z) < ANIMALS.told);
     for (const i of g.members) {
       const b = this.beasts.get(i)!, k = KINDS[b.k];
       if (b.diedAt || seen(b.x, b.z)) continue;
@@ -447,6 +453,22 @@ export class Herd {
       g.nextSpot = now + 600_000;
       return;
     }
+  }
+
+  /**
+   * The herd makes its ground where it is, and lies up close by: a pack fed far out on its kill, or a herd that could
+   * get no nearer its spot. Its range comes back home in time, as after it was hunted off (ANIMALS.pressure.home).
+   */
+  settle(g: Group, x: number, z: number, now: number) {
+    const h = HERDS[g.herd];
+    if (h.farm) return;
+    if (groundFor(this, h, x, z) >= 0) {
+      g.mid = { x, z };
+      g.movedAt = now;
+    }
+    g.at = this.spotFor(g, 'rest', undefined, { x, z }) ?? { x, z };
+    g.spot = 'rest';
+    g.nextSpot = now + 240_000;
   }
 
   private press(g: Group, by: number, now: number) {
@@ -597,6 +619,12 @@ export class Herd {
     // with its herd, at its place in it
     const tx = g.at.x + b.slot[0], tz = g.at.z + b.slot[1], d = Math.hypot(tx - b.x, tz - b.z);
     if (d > 7 || (astray && d > 0.8)) {
+      // (one that comes no nearer for twelve seconds, walled off from it by water, a cliff or a town, stops trying: its
+      // herd makes its ground where it is. Wolves back from a kill far out paced to and fro at whatever lay between,
+      // 2026-10-24: "they get bugged and pace back and forth")
+      if (b.toward !== g.at || now - b.towardSeen > 1000 || d < b.towardD - 3) [b.toward, b.towardD, b.towardAt] = [g.at, d, now];
+      b.towardSeen = now;
+      if (d > 30 && now - b.towardAt > 12_000) return void this.settle(g, b.x, b.z, now);
       const far = d > 90 || (g.movedAt && now - g.movedAt < 120_000);
       this.go(b, k, tx, tz, far ? k.trot : k.walk, dt);
       return;

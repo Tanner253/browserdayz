@@ -29,7 +29,7 @@ import { ITEMS } from '../src/sim/items';
 import { KINDS, yieldOf } from '../src/sim/animals';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
-import { inZona } from '../src/world/zona';
+import { eastOfLine } from '../src/world/zona';
 import { eastOnly } from '../src/sim/items/rules';
 
 let n = 0;
@@ -464,7 +464,7 @@ ok('nothing of the fourth step and up west of the Zona’s line, not at a guard 
   // seen some bunkers in the desert with ak's)"; "bunker cards should only be found in gas zones, and super rare T4 and
   // regular rare in T5 like the castle"; "50 caliber ammo should only be found in the bunker and very rare in the castle")
   for (const { all, fort, e } of worlds) {
-    const west = [...all, ...fort].filter(({ p }) => !inZona(p.x, p.z));
+    const west = [...all, ...fort].filter(({ p }) => !eastOfLine(p.x, p.z));
     assert.ok(west.length > 200 && west.some(({ p }) => p.arms), `${west.length} things west of the line, none at an armed place`);
     assert.deepEqual(west.filter(({ id, p }) => eastOnly(ITEMS[id], p.tier)).map(({ id, p }) => `${id} at ${p.building}`), [], 'things of the fourth step and up west of the line');
     assert.equal([...all, ...fort].filter(({ id, p }) => id === 'keycard' && p.usage.includes('Bunker')).length, 0, 'a keycard in the bunker');

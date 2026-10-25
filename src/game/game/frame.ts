@@ -28,6 +28,7 @@ import { hourAt, DAY } from '../../sim/daynight';
 import { FIRE } from '../../sim/fires';
 import { bunkerDark } from '../../sim/bunker';
 import { rackShows } from '../../sim/crates';
+import { ANIMALS } from '../../sim/animals';
 import { keyHints } from '../key-hints';
 import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../game';
 
@@ -723,6 +724,13 @@ export const frameMethods = {
     if (r.camera.far !== far) {
       r.camera.far = far;
       r.camera.updateProjectionMatrix();
+    }
+    // (animals within ANIMALS.told, or an admin's own distance, and never past the draw distance: the server told of it)
+    const reach = Math.min(this.role ? this.animalsFar : ANIMALS.told, this.started ? Math.max(200, this.gfx.draw) : ANIMALS.told);
+    this.wild.far = reach;
+    if (this.online && this.animalsAsked !== reach) {
+      this.animalsAsked = reach;
+      this.net.send({ t: 'adist', m: reach });
     }
     r.render(dt);
     // (the inventory painted unseen once, two seconds into the first play of the page, so its first Tab is like any other: InventoryUI.paintAhead)

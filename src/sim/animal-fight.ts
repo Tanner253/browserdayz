@@ -3,7 +3,7 @@
 // needs a paw swipe animation and bite for attacking, and basic ai etc... player should be able to outrun it if breaks
 // line of sight and or isnt too close when the bear first engages".
 
-import { ANIMALS, A_ALERT, A_GRAZE, A_IDLE, A_ROAR, KINDS, smellReach, yawTo, type Kind } from './animals';
+import { ANIMALS, A_ALERT, A_GRAZE, A_IDLE, A_ROAR, HERDS, KINDS, smellReach, yawTo, type Kind } from './animals';
 import type { Beast, Group, Herd, Seen, Turn } from './animal-mind';
 import { DAY } from './daynight';
 
@@ -240,7 +240,7 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
       let deer: Beast | undefined, best: number = H.scent;
       for (const o of h.beasts.values()) {
         const d = Math.hypot(o.x - b.x, o.z - b.z);
-        if (!o.diedAt && d < best && (KINDS[o.k].id === 'doe' || KINDS[o.k].id === 'stag')) [deer, best] = [o, d];
+        if (!o.diedAt && d < best && (KINDS[o.k].id === 'doe' || KINDS[o.k].id === 'stag') && Math.hypot(o.x - g.mid.x, o.z - g.mid.z) < HERDS[g.herd].range + H.chase) [deer, best] = [o, d];
       }
       if (deer) g.hunt = { foe: -deer.i, since: now, x: b.x, z: b.z };
     }
@@ -306,7 +306,8 @@ export function pack(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: numb
 export function chaseDeer(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, turn: Turn, alive: Beast[]): boolean {
   const H = ANIMALS.hunger, hunt = g.hunt!;
   let deer = h.beasts.get(-hunt.foe);
-  if (!deer || deer.diedAt || now - hunt.since > 120_000) {
+  // (let go once it is H.chase past its range: chases ran on from one herd to the next to the edge of the map)
+  if (!deer || deer.diedAt || now - hunt.since > 120_000 || Math.hypot(b.x - g.mid.x, b.z - g.mid.z) > HERDS[g.herd].range + H.chase) {
     g.hunt = null;
     for (const w of alive) w.calmUntil = now + 60_000;
     return false;
@@ -353,8 +354,8 @@ function eat(h: Herd, b: Beast, g: Group, k: Kind, now: number, dt: number, peop
     g.ateAt = now - HUNGRY_MS * (1 - Math.min(1, (now - meal.since) / (H.eat * 1000)));
     g.meal = null;
     g.warnAt = 0;
-    g.spot = 'rest';
-    g.nextSpot = now + 240_000;
+    // (and lies up near its kill: it had trotted a kilometre home from one, and paced at whatever lay between)
+    h.settle(g, meal.x, meal.z, now);
     return false;
   }
   let near: Seen | undefined, nd: number = H.growl;

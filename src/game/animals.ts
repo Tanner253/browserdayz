@@ -1,7 +1,7 @@
 // The animals as the game draws them (2026-10-23). Every one is moved by the server (src/sim/animal-mind.ts); this
 // draws each where it is told, between one word of it and the next, sat to the slope it stands on, playing the movement
 // for what it is doing (the clip for its mode, as fast as it goes), and gives it places to be shot in. Drawn within
-// DRAWN metres of the eye, moving within MOVED; past that a still body, and further, nothing.
+// Wildlife.far of the eye, and moving all the way out to it.
 
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
@@ -60,8 +60,6 @@ const SOUNDS: Record<string, Record<string, [name: string, reach: number]>> = {
  */
 const GAP: Record<string, number> = { hooves: 2000, wolf_growl: 1500 };
 const saidAt = new Map<string, number>();
-const DRAWN = 500;
-const MOVED = 120;
 /** how far behind the server's word it is drawn, so that there is always a word on either side of now, ms */
 const BEHIND = 320;
 /** one turn and one sphere, reused every frame */
@@ -247,13 +245,22 @@ export class Beast implements Damageable {
 
   /** where the server says it is */
   push(r: AnimalRow, now: number) {
-    const s = { t: now, x: r[2] / 10, z: r[3] / 10, yaw: r[4] / 100, mode: r[5] };
+    // (timed a step after the last at the least: two words that come together, held up on the way or in a long frame,
+    // were drawn as one leap of a step's ground in no time; never more than a step ahead of now)
+    const prev = this.snaps[this.snaps.length - 1], step = ANIMALS.step * 1000;
+    const t = prev && now - prev.t < step ? Math.min(now + step, prev.t + step * 0.8) : now;
+    const s = { t, x: r[2] / 10, z: r[3] / 10, yaw: r[4] / 100, mode: r[5] };
     if (!this.snaps.length) {
       this.x = s.x;
       this.z = s.z;
       this.yaw = s.yaw;
       this.mode = s.mode;
     }
+    // (one standing still is told of only once a second: on moving off, where it stood is said again a step before, so
+    // that it walks off from there over the step and does not leap. One moving is told of every step, a word late now
+    // and then: no stop is put in for that)
+    const last = this.snaps[this.snaps.length - 1];
+    if (last && now - last.t > ANIMALS.step * 2500) this.snaps.push({ ...last, t: now - ANIMALS.step * 1000 });
     this.snaps.push(s);
     if (this.snaps.length > 10) this.snaps.shift();
     this.bleeds = !!(r[6] & ROW_BLEEDS);
@@ -283,7 +290,8 @@ export class Beast implements Damageable {
   pressAt: THREE.Vector4 | null = null;
   private deadFor = 0;
 
-  update(dt: number, now: number, eye: THREE.Vector3, view?: THREE.Frustum) {
+  /** @param far drawn within this, metres (Wildlife.far) */
+  update(dt: number, now: number, eye: THREE.Vector3, far: number, view?: THREE.Frustum) {
     // where it was BEHIND ago, between the two words either side of then
     const t = now - BEHIND, s = this.snaps;
     let a = s[0], b = s[s.length - 1];
@@ -305,7 +313,7 @@ export class Beast implements Damageable {
     }
     const d = Math.hypot(this.x - eye.x, this.z - eye.z);
     this.away = d;
-    this.root.visible = !!this.model && d < DRAWN;
+    this.root.visible = !!this.model && d < far;
     if (!this.model) return;
     // sat on the ground it stands on, nose up a slope and down one
     const w = this.host.world(), k = this.kind;
@@ -343,12 +351,13 @@ export class Beast implements Damageable {
       }
       this.pressAt = new THREE.Vector4(mid.x, y, mid.z, this.kind.len * 0.75);
     }
-    // (posed every frame near the eye and in view; further off, or out of view, a few times a second, and at once on
-    // coming into view. Out of view is with room for its shadow, which falls into view from beside it.)
+    // (posed every frame in view, however far: four times a second past 120 m was seen as a stutter, 2026-10-24; out of
+    // view twice a second, and at once on coming into view. Out of view is with room for its shadow, which falls into
+    // view from beside it.)
     this.poseT += dt;
     SEEN.center.set(this.x, y + this.kind.tall * 0.5, this.z);
     SEEN.radius = this.kind.len + 12;
-    const inView = !view || view.intersectsSphere(SEEN), every = d < MOVED && inView ? 0 : inView ? 0.25 : 0.5;
+    const inView = !view || view.intersectsSphere(SEEN), every = inView ? 0 : 0.5;
     if (this.poseT >= every || (inView && !this.wasInView)) {
       this.mixer!.update(this.poseT);
       this.poseT = 0;
@@ -439,6 +448,9 @@ export class Wildlife {
 
   constructor(private host: WildHost) {}
 
+  /** drawn within this, metres: ANIMALS.told, or an admin's own (the admin panel), and never past the draw distance (Game.animalReach) */
+  far: number = ANIMALS.told;
+
   /** Playing alone: the herds are stood a moment after the world is up (they take most of a second), away from the player. */
   alone() {
     this.clear();
@@ -485,7 +497,7 @@ export class Wildlife {
       this.call(k.call, k.x, k.z);
     }
     const at = me ?? { x: 0, z: 0 };
-    this.rows(this.herd.rows(at.x, at.z, ANIMALS.told), true, performance.now());
+    this.rows(this.herd.rows(at.x, at.z, this.far), true, performance.now());
   }
 
   /** a call heard (online, the server's 'acall'): from where it was, at the height of the ground there */
@@ -557,7 +569,7 @@ export class Wildlife {
       return;
     }
     if (camera) this.view.setFromProjectionMatrix(this.viewing.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-    for (const b of this.beasts.values()) b.update(dt, now, eye, camera ? this.view : undefined);
+    for (const b of this.beasts.values()) b.update(dt, now, eye, this.far, camera ? this.view : undefined);
     // (the grass pressed flat under the four dead nearest the eye)
     const far = (b: Beast) => (b.pressAt!.x - eye.x) ** 2 + (b.pressAt!.z - eye.z) ** 2;
     const lying = [...this.beasts.values()].filter((b) => b.pressAt && !b.gone).sort((a, b) => far(a) - far(b));

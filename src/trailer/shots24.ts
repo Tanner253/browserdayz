@@ -9,7 +9,7 @@ import type { Shot, Stage } from './director';
 import { scoreMusic17, type Kind17, type Row17 } from './music17';
 import { BRACED, DRONE, Hand, ON_FOOT, Operator, Speeds, yawTo } from './human';
 import { loadGraphics, saveGraphics } from '../core/settings';
-import { inZona } from '../world/zona';
+import { eastOfLine } from '../world/zona';
 import { physics } from '../core/physics';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -480,7 +480,7 @@ export function buildShots(S: Stage): Shot[] {
       let best: THREE.Vector3 | null = null;
       for (const r of [120, 160, 200, 250, 300]) for (let k = 0; k < 24; k++) {
         const a = (k / 24) * Math.PI * 2, x = -1890 + Math.cos(a) * r, z = 34 + Math.sin(a) * r, h = S.ground(x, z);
-        if (!inZona(x, z, 20) || h - S.ground(-1900, 34) < 2 || (best && h <= best.y)) continue;
+        if (!eastOfLine(x, z, 20) || h - S.ground(-1900, 34) < 2 || (best && h <= best.y)) continue;
         if (!S.clearLine(V(x, h + 1.3, z), town)) continue;
         best = V(x, h, z);
       }
@@ -503,7 +503,7 @@ export function buildShots(S: Stage): Shot[] {
         P().setCrouch(true);
         hand.set(yaw - 0.06, -0.03);
         await run(40);
-        say(`fair play: the man at ${at.x.toFixed(0)},${at.z.toFixed(0)}, ${(at.y - town.y + 4).toFixed(1)} m over the lane, ${inZona(at.x, at.z) ? 'inside' : 'OUTSIDE'} the Zona`);
+        say(`fair play: the man at ${at.x.toFixed(0)},${at.z.toFixed(0)}, ${(at.y - town.y + 4).toFixed(1)} m over the lane, ${eastOfLine(at.x, at.z) ? 'east' : 'WEST'} of the line`);
         op.reset(lensAt, town);
       },
       tick: (t, _S, dt) => {

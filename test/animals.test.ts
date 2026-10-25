@@ -445,8 +445,22 @@ ok('a hungry pack runs down one deer of a herd, eats it where it fell, sees off 
   assert.ok(!g.hunt && g.meal, 'back at its kill');
   for (const end = killedAt + ANIMALS.hunger.eat * 1000 + 2000; t < end; t += 200) h.tick(t, [man]);
   assert.ok(!g.meal && t - g.ateAt < 3000, 'eaten, and fed');
+  // (and it makes its ground there and lies up near it, not a trot of a kilometre home: 2026-10-24, "they get bugged and pace back and forth")
+  assert.ok(Math.hypot(g.mid.x - body.x, g.mid.z - body.z) < 1 && g.spot === 'rest' && Math.hypot(g.at.x - body.x, g.at.z - body.z) <= HERDS.find((x) => x.id === 'wolves')!.range, 'lies up near its kill');
   // (and what is left of it gives less: some meat gone, the hide torn)
   assert.deepEqual(Object.fromEntries(yieldOf(KIND.doe, 1, true)), { meat_venison: 2, animal_fat: 1, bones: 4 });
+});
+
+ok('a herd walled off from its spot by water does not pace at the edge: it makes its ground where it is', () => {
+  const wet = (z: number) => z > 400 && z < 430;
+  const h = new Herd({ ...ground, open: (x, z, s) => ground.open(x, z, s) && !wet(z), biome: (x, z) => (wet(z) ? 'water' : ground.biome(x, z)) }, (k) => k.id === 'doe', () => PH, seeded(3));
+  const deer = h.place('doe', 100, 700, 0, 4), g = h.groups[deer[0].g], was = { x: 100, z: 100 };
+  g.at = was;
+  g.nextSpot = Infinity;
+  let t = 0;
+  for (; t < 120_000 && g.at === was; t += 200) h.tick(t, [person(9, deer[0].x, deer[0].z + 60, { unseen: true })]);
+  assert.ok(g.at !== was && t < 100_000, `gave its spot up at ${t / 1000} s`);
+  assert.ok(deer.every((d) => d.z > 430) && Math.abs(g.at.z - deer[0].z) < 200, 'and lies up on its own side');
 });
 
 ok('gutting and skinning: a blade, six seconds at the body, and what it gives by the blade', () => {

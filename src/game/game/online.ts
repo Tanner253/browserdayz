@@ -60,6 +60,8 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (a new connection knows nothing of how far this game draws animals: told again, by the next frame)
+    this.animalsAsked = 0;
     // (whether this player's name and wallet are fixed is the server's to say: server/pinned.ts)
     setPinned(w.pinned ?? null);
     // (bought at the store in the last ten minutes: the server is asked to look again, as the store itself asks it

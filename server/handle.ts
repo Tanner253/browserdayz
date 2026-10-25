@@ -5,6 +5,7 @@ import { holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/sim/items';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
+import { ANIMALS } from '../src/sim/animals';
 import { WEAPON_RULES, hitDamage, piercedBy } from '../src/sim/combat';
 import { THROWN, LAUNCHED, pullPin, letGo, judge, launch } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
@@ -731,6 +732,10 @@ export function handle(c: Client, m: C2S) {
       if (l) send(c, { t: 'esp', l });
       return;
     }
+    case 'adist':
+      // how far off their game draws animals: a player's to ANIMALS.told, an admin's to ANIMALS.admin (the admin panel)
+      if (num(m.m)) c.animalsFar = Math.max(100, Math.min(roleOf(c) ? ANIMALS.admin : ANIMALS.told, m.m));
+      return;
     case 'aesp': {
       // and of every animal on the map (a hundred and twenty at most: src/sim/animals.ts ANIMALS.max), and every one
       // of the infected, as asked
