@@ -61,6 +61,15 @@ export const frameMethods = {
     this.pad?.update(dt);
 
     if (input.pressed('Tab') && playing) this.toggleInventory();
+    // (J: the Crafting tab, straight: shut it from there, or turn the inventory to it. On foot: at a police car's
+    // wheel J is the siren, src/game/garage.ts)
+    else if (input.pressed('KeyJ') && playing && !this.garage.ride) {
+      if (!this.invUI.isOpen) {
+        this.toggleInventory(true);
+        if (this.invUI.isOpen) this.invUI.setMode('craft');
+      } else if (this.invUI.mode === 'craft') this.toggleInventory(false);
+      else this.invUI.setMode('craft');
+    }
     if (this.awaitClick && (this.input.locked || !playing || this.invUI.isOpen)) this.awaitClick = false;
     if (this.vicinityDue.length && now >= this.vicinityDue[0]) {
       this.vicinityDue.shift();

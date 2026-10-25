@@ -127,7 +127,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `poster.ts` | 1542 | The squad's map: a poster. |
 | `ruins.ts` | 160 | `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the game as it is, to be walked and looked at before it has a place on the map. |
 | `sandbox-build.ts` | 541 | The sandbox's base-building scenes (2026-10-24): each step of base building looked at on the plain floor before the world (the owner: |
-| `sandbox-inventory.ts` | 206 | The sandbox's screens (2026-10-24, the owner: |
+| `sandbox-inventory.ts` | 208 | The sandbox's screens (2026-10-24, the owner: |
 | `sandbox-sim.ts` | 167 | The sandbox's behaviour checks (2026-10-24, the owner: |
 | `sandbox.ts` | 249 | The sandbox (the stage until 2026-10-24, the owner: |
 | `sounds.ts` | 476 | Development only: `?sounds` on the dev page (http://localhost:5173/?sounds). Not the game: a page to hear its sounds on, for whoever can hear. Whoever chose the recordings could not, and chose them by their names and... |
@@ -181,13 +181,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `camera.ts` | 103 | Camera director: the view from the survivor's eyes, and the flight into them from the menu's aerial shot. |
 | `cellars.ts` | 72 | The basements as the game has them (src/sim/basements.ts): a bulb hung in each of their rooms and over the foot of their steps, lit for whoever is near enough to see by it, and how dark it is down there for the eye. |
 | `character.ts` | 93 | A character other than the local player: body, hit zones (head / torso / legs) and health. |
-| `crafting.ts` | 96 | Crafting as the game has it (2026-10-24, plan-crafting; the rules are src/sim/craft/, the server's side server/craft.ts). |
+| `crafting.ts` | 98 | Crafting as the game has it (2026-10-24, plan-crafting; the rules are src/sim/craft/, the server's side server/craft.ts). |
 | `doll.ts` | 1067 | The survivor in the middle of the inventory, alive. |
 | `effects.ts` | 1015 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `finish.ts` | 152 | A finish bought at the store (2026-10-22): the gun's own model, its metal plated in gold or nickel and buffed. |
 | `fires.ts` | 352 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1966 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1978 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -195,7 +195,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `drops.ts` | 593 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 758 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 765 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 774 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 534 | The game: attachments and magazines. |
 | `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
@@ -216,7 +216,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `heli.ts` | 253 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `horns.ts` | 89 | A car's horn (H, held) and a police car's siren (J, on and off): the owner, 2026-10-14, "we need to add honking to the cars, and maybe a siren for the cop car, but siren not important definitley need honk". |
 | `infected.ts` | 1251 | The infected, as this game draws and (for the ones near its own player) moves them. |
-| `key-hints.ts` | 153 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
+| `key-hints.ts` | 156 | The keys that do something now, for the bottom-left corner: swapped as what the player is doing changes. |
 | `lamps.ts` | 378 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
 | `look.ts` | 198 | What a survivor looks like: jacket and trouser colours, skin, hair. |
@@ -238,7 +238,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
 | `vehicle.ts` | 623 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5128 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5133 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
@@ -478,6 +478,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `craft-card.ts` | 141 | A recipe's card (2026-10-24, plan-crafting): what it makes, what it needs with what you carry in green and red, the place it needs, its time, how many (1, 5, the most), and Craft. |
+| `crafting-ui.ts` | 148 | The Crafting tab (2026-10-25, plan-crafting): the inventory's left and middle turned to crafting, Carried kept on the right, where what the chosen recipe needs lights up. |
 | `discord.ts` | 14 | The way in to the Discord, as a button beside every Store (the owner, 2026-10-24: |
 | `dogtag.ts` | 166 | The dog tag on the menu: two steel tags on a ball chain, the player's name stamped into the front one as it is typed. |
 | `door.ts` | 170 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
@@ -485,13 +486,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `emotes-menu.ts` | 241 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
 | `howto-more.ts` | 87 | The How to Play card's second half (the owner, 2026-10-19: |
 | `hud.ts` | 2171 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
-| `icons.ts` | 481 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
+| `icons.ts` | 483 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inv-card.ts` | 107 | What a thing is, and what to do with it (idea 15 of Fettah, a contributor, 2026-10-18). |
 | `inv-piles.ts` | 166 | The inventory's tidying (Fettah's inventory pull request, a contributor's, 2026-10-18): a grid sorted kind by kind, piles of one thing joined, a bag's weight, and which things feed one another. |
 | `inv-search.ts` | 21 | The search box at the top of Carried (idea 5, 2026-10-18: typing "9mm" dims everything else, lit as the things that go with a chosen one are). |
 | `inv-take.ts` | 20 | The buttons over a crate or a body (idea 10, 2026-10-18): |
 | `inv-types.ts` | 59 | A bag set for a kind of thing (2026-10-23, the owner: |
-| `inventory-ui.ts` | 3132 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
+| `inventory-ui.ts` | 3184 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
 | `keypad.ts` | 106 | A lock's panel (2026-10-24, base building's fourth step, the owner: |
 | `keys-view.ts` | 42 | The keys that do something now, drawn in the corner under the hands' mouse (what they are is src/game/key-hints.ts). |
 | `kind-icons.ts` | 85 | What kind of thing an item is, as a small symbol in the top right of it in the inventory and on its hot keys, in the colour of its kind: so that a gun, its rounds, a bandage or a tin is told at a glance without the card. |

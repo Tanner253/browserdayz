@@ -8,6 +8,7 @@
 //   &ui=wheel                      the wheel on T (src/ui/radial.ts) by itself: window.wheel is it, to be pointed by a script
 //   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
 //                                  a recipe's card (src/ui/craft-card.ts), whose Craft makes it at once here
+//   &tab=craft                     the Crafting tab open (src/ui/crafting-ui.ts)
 //   &touch=1                       as a phone has it
 // What is done in it (a drag, a key, a drop) is done to these pockets alone, and nothing is kept.
 
@@ -28,6 +29,7 @@ import { lookFor } from '../game/look';
 import type * as THREE from 'three';
 import type { Stash, WorldItem } from '../game/loot';
 import { CraftCard } from '../ui/craft-card';
+import { CraftingScreen } from '../ui/crafting-ui';
 import { RECIPE } from '../sim/craft/recipes';
 import { plan, pocketsOf, recipesFor } from '../sim/craft/plan';
 
@@ -156,26 +158,26 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     craftOpen: () => card.open,
   };
   // (made at once here, by the same rule: the hold and the server are the game's)
-  const card = new CraftCard({
-    icons: () => icons,
-    pockets: () => pocketsOf(inv.serialize()),
-    craft: (rid, k, u) => {
-      const got = plan(RECIPE[rid], k, pocketsOf(inv.serialize()), u);
-      if (typeof got === 'string') return console.info(got);
-      for (const [id, m] of Object.entries(got.pay)) inv.take(id, m);
-      for (const uid of got.uids) {
-        const it = inv.everything().get(uid);
-        if (it) inv.remove(it);
-      }
-      if (got.makes) inv.add(makeItem(RECIPE[rid].makes, got.makes));
-      screen?.render();
-    },
-  });
+  const makeNow = (rid: string, k: number, u: string[]) => {
+    const got = plan(RECIPE[rid], k, pocketsOf(inv.serialize()), u);
+    if (typeof got === 'string') return console.info(got);
+    for (const [id, m] of Object.entries(got.pay)) inv.take(id, m);
+    for (const uid of got.uids) {
+      const it = inv.everything().get(uid);
+      if (it) inv.remove(it);
+    }
+    if (got.makes) inv.add(makeItem(RECIPE[rid].makes, got.makes));
+    screen?.render();
+  };
+  const card = new CraftCard({ icons: () => icons, pockets: () => pocketsOf(inv.serialize()), craft: makeNow });
   screen = new InventoryUI(inv, actions);
   screen.icons = icons;
+  const ui2 = screen;
+  screen.craftPane = new CraftingScreen({ icons: () => icons, pockets: () => pocketsOf(inv.serialize()), craft: makeNow, light: (ids) => ui2.lightUp(ids), making: () => null });
   // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
   if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
   screen.open(vicinity, opened ?? body, freshVitals());
+  if (q.get('tab') === 'craft') screen.setMode('craft');
   (window as unknown as { stageInv: unknown }).stageInv = { inv, screen, vicinity, card, recipesFor };
   await pictures(ui);
   shown.carried = [...inv.carried()].length;

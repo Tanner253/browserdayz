@@ -138,7 +138,10 @@ export function keyHints(g: Game): KeyHints | null {
     put(rest, 'Take · revive', [k('KeyF')], null);
     put(rest, 'Drop', [k('KeyG')], null);
     if (g.br.phase === 'wait') put(rest, 'Vote to start', [k('KeyV')], null);
-  } else put(rest, 'Inventory', [k('Tab')], [P.menu]);
+  } else {
+    put(rest, 'Inventory', [k('Tab')], [P.menu]);
+    put(rest, 'Crafting', [k('KeyJ')], null);
+  }
   put(rest, 'Map', [k('KeyM')], ['↑']);
   put(rest, 'Call out (hold)', [k('KeyT')], ['↓ held']);
   if (w.hasLamp || g.inv.count('flashlight') > 0) put(rest, 'Light', [k('KeyL')], w.aiming ? null : [P.r3]);

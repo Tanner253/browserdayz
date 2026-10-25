@@ -34,6 +34,8 @@ export interface CraftHost {
 }
 
 export class Crafting {
+  /** what the hands were last set to make (the Crafting tab's strip shows the hold while it is this) */
+  label = '';
   constructor(private h: CraftHost) {}
 
   /** the hand recipes two carried things dragged onto each other go into */
@@ -54,7 +56,7 @@ export class Crafting {
     const from = this.h.me().clone();
     const still = () => Math.hypot(this.h.me().x - from.x, this.h.me().z - from.z) < STILL;
     if (this.h.online()) this.h.send({ t: 'craft', r: r.id, n: q.n, go: 1, u });
-    const label = r.id === 'rags' ? 'Cutting clothes into rags' : `Making ${q.n > 1 ? `${q.n} × ` : ''}${recipeName(r)}`;
+    const label = (this.label = r.id === 'rags' ? 'Cutting clothes into rags' : `Making ${q.n > 1 ? `${q.n} × ` : ''}${recipeName(r)}`);
     this.h.begin(label, q.time, still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'craft', r: r.id, n: q.n, go: 2, u });

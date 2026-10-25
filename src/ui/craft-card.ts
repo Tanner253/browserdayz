@@ -37,7 +37,7 @@ export class CraftCard {
     if (e.key === 'Escape' && this.floating) {
       e.stopPropagation();
       this.close();
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && (e.target as HTMLElement | null)?.tagName !== 'INPUT') {
       e.preventDefault();
       this.go();
     }

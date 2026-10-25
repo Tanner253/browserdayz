@@ -175,6 +175,12 @@ const holdable = (d: Def) => d.category !== 'clothing';
 export class InventoryUI {
   root: HTMLDivElement;
   isOpen = false;
+  /** which tab is open: the inventory, or Crafting (src/ui/crafting-ui.ts), which takes the left and middle columns */
+  mode: 'inv' | 'craft' = 'inv';
+  /** the Crafting tab, given by the game: no tabs are shown without it */
+  craftPane: { el: HTMLElement; render(): void; shown(on: boolean): void } | null = null;
+  /** what the chosen recipe takes, lit among what is carried */
+  private need: Set<string> | null = null;
   /** `paintAhead`: the frames it has still to stand, when it may begin, and whether it has been done in this page */
   private aheadLeft = 0;
   private aheadFrom = 0;
@@ -630,7 +636,38 @@ export class InventoryUI {
     this.cancelDrag();
     this.hideCard();
     this.figureLetGo();
+    // (opened again, by Tab or by a crate, it is the inventory: J is what opens Crafting)
+    if (this.mode === 'craft') this.setMode('inv', false);
     this.root.classList.remove('show');
+  }
+
+  /** the inventory or Crafting shown (drawn again unless `draw` is false) */
+  setMode(m: 'inv' | 'craft', draw = true) {
+    if (m === 'craft' && !this.craftPane) return;
+    this.mode = m;
+    this.root.classList.toggle('crafting', m === 'craft');
+    for (const b of this.root.querySelectorAll<HTMLElement>('.inv-tabs [data-tab]')) b.classList.toggle('on', b.dataset.tab === m);
+    const pane = this.craftPane;
+    if (pane) {
+      if (m === 'craft') this.sk?.vic.parentElement?.prepend(pane.el);
+      else pane.el.remove();
+      pane.shown(m === 'craft');
+    }
+    if (m === 'inv') this.lightUp(null);
+    if (draw && this.isOpen) this.render();
+  }
+
+  /** these kinds lit among what is carried (null: none) */
+  lightUp(ids: Set<string> | null) {
+    this.need = ids;
+    this.lit();
+  }
+
+  private lit() {
+    for (const el of this.root.querySelectorAll<HTMLElement>('.inv-item')) {
+      const src = this.bound.get(el), on = !!this.need && !!src && src.kind !== 'ground' && this.need.has(src.item.id);
+      el.classList.toggle('craft-need', on);
+    }
   }
 
   // ------------------------------------------------------------ the card by the pointer
@@ -1414,7 +1451,20 @@ export class InventoryUI {
           ['Point + 1–0', 'put it on that key', 'Point at a thing and press 1 to 0: it is put on that key'],
           ['Point + G', 'drop it', 'Point at a thing and press G: it is dropped'],
         ]);
-    r.append(wrap, foot, ...this.veil, this.hoverOutline, this.card);
+    // (the tabs, Inventory and Crafting, where the game has given the Crafting tab)
+    const tabs: HTMLElement[] = [];
+    if (this.craftPane) {
+      const t = div('inv-tabs');
+      t.innerHTML = `<button data-tab="inv" class="${this.mode === 'inv' ? 'on' : ''}">Inventory<kbd>Tab</kbd></button><button data-tab="craft" class="${this.mode === 'craft' ? 'on' : ''}">Crafting<kbd>J</kbd></button>`;
+      t.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tab]');
+        if (b) this.setMode(b.dataset.tab as 'inv' | 'craft');
+      });
+      tabs.push(t);
+      if (this.mode === 'craft') wrap.prepend(this.craftPane.el);
+    }
+    r.classList.toggle('tabbed', tabs.length > 0);
+    r.append(...tabs, wrap, foot, ...this.veil, this.hoverOutline, this.card);
     this.sk = { vic, gear, cargo, grids, scroll, status, foot, vicHead, gearHead, help: foot.firstElementChild as HTMLElement, doll, dollFig };
     return this.sk;
   }
@@ -1757,6 +1807,8 @@ export class InventoryUI {
     requestAnimationFrame(back);
     this.marks();
     this.shares();
+    if (this.mode === 'craft') this.craftPane?.render();
+    this.lit();
     for (const [k, v] of this.gridEls) if (!v.g.isConnected) this.gridEls.delete(k);
     for (const [k, v] of this.gboxes) if (!v.box.isConnected) this.gboxes.delete(k);
 

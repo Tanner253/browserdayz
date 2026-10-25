@@ -119,6 +119,7 @@ import { huntMethods } from './game/hunt';
 import { Gathering } from './gathering';
 import { Crafting } from './crafting';
 import { CraftCard } from '../ui/craft-card';
+import { CraftingScreen } from '../ui/crafting-ui';
 import { pocketsOf } from '../sim/craft/plan';
 import { Building } from './building';
 import { gunsMethods } from './game/guns';
@@ -1014,6 +1015,17 @@ export class Game {
       craftOpen: () => this.craftCard.open,
     });
     this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u) });
+    // (the Crafting tab: J, or the tab at the top of the inventory)
+    this.invUI.craftPane = new CraftingScreen({
+      icons: () => this.invUI.icons,
+      pockets: () => pocketsOf(this.inv.serialize()),
+      craft: (rid, n, u) => void this.craft.craft(rid, n, u),
+      light: (ids) => this.invUI.lightUp(ids),
+      making: () => {
+        const u = this.use;
+        return u && u.label === this.craft.label ? { label: u.label, t: Math.min(1, u.t / u.dur), left: Math.max(0, u.dur - u.t) } : null;
+      },
+    });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
     this.gas.under = (x, y, z) => bunkerUnder(this.bunker.place, x, y, z);
