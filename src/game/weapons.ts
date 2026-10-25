@@ -26,7 +26,7 @@ import type { ItemModels } from './loot';
 import { ONE_SHOT, WEAPON_RULES, ownHit, pierceOf, piercedBy } from '../sim/combat';
 import { roundsSpent } from '../sim/powers';
 import { finishOn, wearFinish } from './finish';
-import { cutPose, type FpPose } from './melee/fp';
+import { fpPose, layOn, type Cut, type FpPose } from './melee/fp';
 import { cutFor } from './melee/cuts';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
@@ -1341,7 +1341,7 @@ async function holoParts(): Promise<MeshPart[]> {
  * the fist, its grips said in its own space. The view in the hands and the copy in everybody else's are made from
  * it (and the sandbox, src/dev/sandbox-melee.ts).
  */
-export async function meleeHeld(id: string) {
+export async function meleeHeld(id: string): Promise<Omit<VmModel, 'flash'> & { body: THREE.Group; grips: Grips; melee: MeleeStyle }> {
   const def = ITEMS[id];
   const sc = await assets.model(def.model);
   const root = new THREE.Group();
@@ -1467,6 +1467,48 @@ export async function meleeHeld(id: string) {
     ads: new THREE.Vector3(MELEE.hip[0] - 0.05, MELEE.hip[1] + 0.025, MELEE.hip[2]),
     muzzle: new THREE.Vector3(),
   };
+}
+/**
+ * Where something held to strike with is in the picture (the eye's space): `k` of the way through the `n`th blow of a
+ * run, or at rest (k < 0). From its stance and the blow: a captured one (src/game/melee/fp.ts) where it has one, or
+ * one of its style's strokes, made to be seen from the eye. The walk, the guard and a bat laid on the shoulder are
+ * the view's own (animateMelee); the sandbox shows this alone (src/dev/sandbox-melee.ts).
+ */
+export function meleeAt(st: MeleeStyle, k: number, n: number, cut: Cut | null, pos: THREE.Vector3, quat: THREE.Quaternion, elbow: THREE.Vector3, cutAt: FpPose) {
+  pos.set(...st.idle.p);
+  stanceQuat(st.idle, quat);
+  elbow.set(...st.elbow);
+  let pitch = 0, yaw = 0;
+  if (k >= 0 && !cut) {
+    const stroke = st.strokes[n % st.strokes.length];
+    let i = 0;
+    while (i < stroke.length && k >= stroke[i].at) i++;
+    const from = i === 0 ? null : stroke[i - 1], to = i < stroke.length ? stroke[i] : null;
+    const t0 = from?.at ?? 0, t1 = to?.at ?? 1;
+    const u = THREE.MathUtils.clamp((k - t0) / (t1 - t0), 0, 1);
+    // drawn back easing in and out; brought through gathering speed; carried on and brought home losing it
+    const e = i === 0 ? THREE.MathUtils.smoothstep(u, 0, 1) : i === 1 ? u * u * (3 - 2 * u) * 0.35 + u * u * 0.65 : i === stroke.length ? THREE.MathUtils.smootherstep(u, 0, 1) : 1 - (1 - u) * (1 - u);
+    const mix = (f: (s: Stroke[number]) => number) => THREE.MathUtils.lerp(from ? f(from) : 0, to ? f(to) : 0, e);
+    pitch = mix((s) => s.pitch) * (Math.PI / 180);
+    yaw = mix((s) => s.yaw) * (Math.PI / 180);
+    elbow.x += mix((s) => s.by[0]);
+    elbow.y += mix((s) => s.by[1]);
+    elbow.z += mix((s) => s.by[2]);
+  }
+  {
+    // The forearm as it rests, elbow to fist, and as it is swung: round and up from there.
+    // What is in the fist turns exactly as the forearm does.
+    const fore = _mv.copy(pos).sub(_mel2.set(...st.elbow));
+    const len = fore.length();
+    const round0 = Math.atan2(-fore.x, -fore.z), up0 = Math.asin(fore.y / len);
+    const turned = (round: number, up: number, out: THREE.Quaternion) => out.setFromEuler(_me.set(up, round, 0, 'YXZ'));
+    const swing = turned(round0 + yaw, up0 + pitch, _mq2).multiply(turned(round0, up0, _mq3).invert());
+    pos.copy(fore.applyQuaternion(swing)).add(elbow);
+    quat.premultiply(swing);
+  }
+  if (cut && k >= 0) {
+    layOn(cut, k, 0.35, pos, quat, elbow, cutAt);
+  }
 }
 export class Weapons {
   private vmRoot = new THREE.Group();
@@ -4524,7 +4566,7 @@ export class Weapons {
    * slowly, brought through fast, carried on, and brought home.
    */
   /** where the captured blow being thrown is (see animateMelee) */
-  private cutAt: FpPose = { move: new THREE.Vector3(), turn: new THREE.Quaternion(), elbow: new THREE.Vector3(), head: new THREE.Vector3() };
+  private cutAt: FpPose = fpPose();
   private animateMelee(dt: number, m: VmModel, st: MeleeStyle) {
     const p = this.player;
     const a = this.action;
@@ -4532,46 +4574,10 @@ export class Weapons {
     const want = this.guardHold > 0 && !p.dead && !(a && a.name === 'swing') ? 1 : 0;
     this.guardT += (want - this.guardT) * (1 - Math.exp(-(want ? 16 : 9) * dt));
     const g = this.guardT;
-    const pos = _mp.set(...st.idle.p);
-    const quat = stanceQuat(st.idle, _mq);
-    const elbow = _mel.set(...st.elbow);
-    let pitch = 0, yaw = 0;
     // (A captured blow, where the thing has one: see src/game/melee/fp.ts. Otherwise one made to be seen from the eye.)
-    const cut = a && a.name === 'swing' && !a.data?.dig ? cutFor(this.currentItem?.id, a.data?.stroke ?? 0) : null;
-    if (a && a.name === 'swing' && !cut) {
-      const k = Math.min(1, a.t / a.dur);
-      const stroke = st.strokes[(a.data?.stroke ?? 0) % st.strokes.length];
-      let i = 0;
-      while (i < stroke.length && k >= stroke[i].at) i++;
-      const from = i === 0 ? null : stroke[i - 1], to = i < stroke.length ? stroke[i] : null;
-      const t0 = from?.at ?? 0, t1 = to?.at ?? 1;
-      const u = THREE.MathUtils.clamp((k - t0) / (t1 - t0), 0, 1);
-      // drawn back easing in and out; brought through gathering speed; carried on and brought home losing it
-      const e = i === 0 ? THREE.MathUtils.smoothstep(u, 0, 1) : i === 1 ? u * u * (3 - 2 * u) * 0.35 + u * u * 0.65 : i === stroke.length ? THREE.MathUtils.smootherstep(u, 0, 1) : 1 - (1 - u) * (1 - u);
-      const mix = (f: (s: Stroke[number]) => number) => THREE.MathUtils.lerp(from ? f(from) : 0, to ? f(to) : 0, e);
-      pitch = mix((s) => s.pitch) * (Math.PI / 180);
-      yaw = mix((s) => s.yaw) * (Math.PI / 180);
-      elbow.x += mix((s) => s.by[0]);
-      elbow.y += mix((s) => s.by[1]);
-      elbow.z += mix((s) => s.by[2]);
-    }
-    {
-      // The forearm as it rests, elbow to fist, and as it is swung: round and up from there.
-      // What is in the fist turns exactly as the forearm does.
-      const fore = _mv.copy(pos).sub(_mel2.set(...st.elbow));
-      const len = fore.length();
-      const round0 = Math.atan2(-fore.x, -fore.z), up0 = Math.asin(fore.y / len);
-      const turned = (round: number, up: number, out: THREE.Quaternion) => out.setFromEuler(_me.set(up, round, 0, 'YXZ'));
-      const swing = turned(round0 + yaw, up0 + pitch, _mq2).multiply(turned(round0, up0, _mq3).invert());
-      pos.copy(fore.applyQuaternion(swing)).add(elbow);
-      quat.premultiply(swing);
-    }
-    if (cut) {
-      cutPose(cut, Math.min(1, a!.t / a!.dur), 0.35, this.cutAt);
-      pos.add(this.cutAt.move);
-      quat.premultiply(this.cutAt.turn);
-      elbow.add(this.cutAt.elbow);
-    }
+    const swung = a && a.name === 'swing' ? Math.min(1, a.t / a.dur) : -1, n = a?.data?.stroke ?? 0;
+    const pos = _mp, quat = _mq, elbow = _mel;
+    meleeAt(st, swung, n, swung >= 0 && !a?.data?.dig ? cutFor(this.currentItem?.id, n) : null, pos, quat, elbow, this.cutAt);
     // Carried, it lies where its style rests it. For a blow the fists go at once to where it is
     // struck from; what is in them stays laid back while the arms are drawn up, and comes over
     // the top as they start down (the first blow of a run: one that comes back the other way

@@ -2,16 +2,20 @@
 // one of its blows, each moment in its own cell. The body is the game's own (Avatar, as the lineup makes one), the thing
 // in its fist the game's own (meleeHeld), and the blow laid on it by the game's own code (src/game/melee/body.ts).
 //   &melee=hatchet&n=0                the hatchet's first blow of a run (src/game/melee/cuts.ts)
-//   &blow=Right_Hand_Sword_Slash,0.15,0.57,0.95   a blow cut by hand instead: the movement, from, hit, to (seconds)
+//   &blow=Right_Hand_Sword_Slash,0.15,0.57,0.95[,0,1.4,0.3]   a blow cut by hand instead: the movement, from, hit, to
+//                                     (seconds), and how the thing is turned as it lands (radians: see Cut)
 //   &strip=8&views=q                  eight moments, from three-quarters (side, front, q, back)
+//   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
+//                                     places them (meleeAt), through the hands' own lens (48 degrees)
 
 import * as THREE from 'three';
 import { Avatar } from '../game/avatar';
 import { lookFor } from '../game/look';
-import { meleeHeld } from '../game/weapons';
+import { meleeAt, meleeHeld } from '../game/weapons';
+import { FPArms } from '../game/arms';
 import { meleeClips } from '../game/melee/body';
 import { cutFor } from '../game/melee/cuts';
-import type { Cut } from '../game/melee/fp';
+import { fpPose, type Cut } from '../game/melee/fp';
 import type { Atmosphere } from '../world/atmosphere';
 import { ITEMS } from '../sim/items';
 
@@ -36,9 +40,10 @@ export async function stageMelee(id: string, s: {
   const def = ITEMS[id];
   if (!def?.melee) throw new Error(`not something to hit with: ${id}`);
   const by = s.q.get('blow')?.split(',');
-  const cut: Cut | null = by ? { clip: by[0], from: +by[1], hit: +by[2], to: +by[3] } : cutFor(id, +(s.q.get('n') ?? 0));
+  const cut: Cut | null = by ? { clip: by[0], from: +by[1], hit: +by[2], to: +by[3], ...(by.length >= 7 ? { lands: [+by[4], +by[5], +by[6]] as [number, number, number] } : {}) } : cutFor(id, +(s.q.get('n') ?? 0));
   if (!cut) throw new Error(`no captured blow for ${id}`);
   const dur = def.melee.rate * 0.9;
+  if (s.q.get('fp') === '1') return firstPerson(id, cut, dur, s);
   await meleeClips();
   const body = new Avatar();
   await body.load(atmo, 0, false, lookFor('sandbox'));
@@ -69,6 +74,8 @@ export async function stageMelee(id: string, s: {
     body.swing(false, dur, cut);
     const now = (body.blow as unknown as { now: { t: number } | null } | null)?.now;
     if (now) now.t = Math.min(u, 0.999) * dur;
+    // (off the shoulder at once: in the game it is let down over the first tenth of a second)
+    body.shoulderT = 0;
     body.update(0, at, still, face, false, false, false, 0, true, false);
     s.scene.updateMatrixWorld(true);
     const vx = (i % s.cols) * s.cw, vy = (s.rows - 1 - Math.floor(i / s.cols)) * s.ch;
@@ -78,4 +85,43 @@ export async function stageMelee(id: string, s: {
     s.say(i, `${id} · ${cut.clip} · ${(u * 100).toFixed(0)}%${Math.abs(u - 0.35) < 0.5 / s.cells ? ' (lands)' : ''}`);
   }
   return { id, cut, dur, moments, blow: !!body.blow };
+}
+
+type Stage = Parameters<typeof stageMelee>[1];
+
+/** The same blow from the eyes: the view the game draws over the world, here over the sandbox's floor. */
+async function firstPerson(id: string, cut: Cut, dur: number, s: Stage) {
+  const held = await meleeHeld(id), st = held.melee!;
+  const arms = new FPArms();
+  await arms.load();
+  const camera = new THREE.PerspectiveCamera(48, s.cw / s.ch, 0.01, 100);
+  camera.position.set(0, 1.62, 0);
+  camera.lookAt(0, 1.55, -5);
+  const hands = new THREE.Group();
+  camera.add(hands);
+  hands.add(arms.root, held.root);
+  s.scene.add(camera);
+  const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), elbow = new THREE.Vector3();
+  const at = fpPose();
+  const n = +(s.q.get('n') ?? 0);
+  s.renderer.setScissorTest(true);
+  const moments: number[] = [];
+  for (let i = 0; i < s.cells; i++) {
+    const u = s.cells === 1 ? 0.35 : i / (s.cells - 1);
+    moments.push(u);
+    meleeAt(st, u, n, cut, pos, quat, elbow, at);
+    held.root.position.copy(pos);
+    held.root.quaternion.copy(quat);
+    camera.updateMatrixWorld(true);
+    const grips = held.grips;
+    if (grips.right && held.body) grips.right.elbow = held.body.worldToLocal(elbow.clone().applyMatrix4(camera.matrixWorld));
+    arms.update(held.body ?? null, grips, camera.quaternion, true, true);
+    s.scene.updateMatrixWorld(true);
+    const vx = (i % s.cols) * s.cw, vy = (s.rows - 1 - Math.floor(i / s.cols)) * s.ch;
+    s.renderer.setViewport(vx, vy, s.cw, s.ch);
+    s.renderer.setScissor(vx, vy, s.cw, s.ch);
+    s.renderer.render(s.scene, camera);
+    s.say(i, `${id} · first person · ${cut.clip} · ${(u * 100).toFixed(0)}%${Math.abs(u - 0.35) < 0.5 / s.cells ? ' (lands)' : ''}`);
+  }
+  return { id, cut, dur, moments, fp: true };
 }

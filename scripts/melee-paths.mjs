@@ -1,11 +1,13 @@
-// The hands of a captured swing as its own eyes see them (the owner, 2026-10-25: "Make sure Melle weapons are properly
-// rigged and animated"). First person throws the same blow the body throws in third person: each movement of
-// Higgsfield's library, played on a plain copy of our survivor (assets-src/incoming/higgsfield/anim/mocap/<Name>.glb, as
-// scripts/mocap.mjs reads them), is stepped through frame by frame, and where each hand and elbow is from the eyes, and
-// which way each hand is turned, is written down. The game fits that path into its picture (src/game/melee/fp.ts).
+// The hands of a captured blow as its own eyes see them (the owner, 2026-10-25: "Make sure Melle weapons are properly
+// rigged and animated"). First person throws the same blow the body throws in third person: each melee movement, as
+// scripts/mocap.mjs carried it onto our skeleton (public/assets/characters/melee.glb), is stepped through frame by frame,
+// and where each hand, elbow and shoulder is from the eyes, and which way each hand's fingers point and its palm faces,
+// is written down. The game fits that into its picture (src/game/melee/fp.ts). The hand is measured as a body measures
+// its own (src/game/avatar/make.ts, makeArm: fingers to the middle knuckle, the palm across the knuckles), so a thing
+// laid in it by its grip is held the same way in both views.
 // It is written as from eyes that keep looking the way the body faced as it began (a player keeps the aim on what they
 // hit); how the head itself turns from the body's facing is written too, for the picture to lean with the blow.
-//   node scripts/melee-paths.mjs Charged_Axe_Chop Heavy_Hammer_Swing ...   -> src/game/melee/paths.json (added to what is there)
+//   node scripts/melee-paths.mjs [Clip ...]   -> src/game/melee/paths.json (the named ones, or every movement in the file)
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
@@ -15,25 +17,49 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MAIN = process.env.ZONA_MAIN ?? path.resolve(ROOT, '../../..');
-const SRC = [ROOT, MAIN].map((r) => path.join(r, 'assets-src', 'incoming', 'higgsfield', 'anim', 'mocap')).find(existsSync);
+const SRC = path.join(ROOT, 'public', 'assets', 'characters', 'melee.glb');
 const OUT = path.join(ROOT, 'src', 'game', 'melee', 'paths.json');
 const FPS = 30;
-/** the eyes from the head's joint, metres on a 1.8 m body: ahead of it and above it */
+/** the eyes from the head's joint, metres: ahead of it and above it */
 const EYES = new THREE.Vector3(0, 0.07, 0.1);
 
 await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
-const M4 = (a) => new THREE.Matrix4().fromArray(a);
 const r4 = (v) => Math.round(v * 1e4) / 1e4;
+const M4 = (a) => new THREE.Matrix4().fromArray(a);
+
+const doc = await io.read(SRC);
+const root = doc.getRoot();
+const nodes = new Map(root.listNodes().map((n) => [n.getName(), n]));
+const node = (n) => {
+  const x = nodes.get(n);
+  if (!x) throw new Error(`no ${n} in ${SRC}`);
+  return x;
+};
+const rest = new Map(root.listNodes().map((n) => [n, [n.getTranslation(), n.getRotation(), n.getScale()]]));
+const world = (n) => M4(node(n).getWorldMatrix());
+const pos = (n) => new THREE.Vector3().setFromMatrixPosition(world(n));
+const rot = (n) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(world(n)));
+
+// how the body stands as it was bound: which way it faces (heels to toes), and its hands' fingers and palms in their own frames
+const forward = pos('ball_l').add(pos('ball_r')).sub(pos('foot_l')).sub(pos('foot_r')).setY(0).normalize();
+const up = new THREE.Vector3(0, 1, 0);
+const eyeQ = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(forward, up), up, forward.clone().negate()));
+const eyeInv = eyeQ.clone().invert();
+const head0 = rot('Head');
+const laid = Object.fromEntries(['r', 'l'].map((s) => {
+  const into = rot(`hand_${s}`).invert();
+  const fingers = pos(`middle_01_${s}`).sub(pos(`hand_${s}`)).normalize();
+  const palm = new THREE.Vector3().crossVectors(fingers, pos(`pinky_01_${s}`).sub(pos(`index_01_${s}`))).normalize();
+  if (s === 'l') palm.negate();
+  return [s, { fingers: fingers.applyQuaternion(into), palm: palm.applyQuaternion(into) }];
+}));
 
 const table = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : {};
-for (const name of process.argv.slice(2)) {
-  const doc = await io.read(path.join(SRC, `${name}.glb`));
-  const nodes = new Map(doc.getRoot().listNodes().map((n) => [n.getName(), n]));
-  const need = ['Head', 'Hips', 'RightHand', 'RightForeArm', 'LeftHand', 'LeftForeArm', 'head_end'];
-  for (const n of need) if (!nodes.has(n)) throw new Error(`${name}: no ${n}`);
-  const anim = doc.getRoot().listAnimations()[0];
+const wanted = process.argv.slice(2);
+for (const anim of root.listAnimations()) {
+  const name = anim.getName();
+  if (wanted.length && !wanted.includes(name)) continue;
   let dur = 0;
   const ch = anim.listChannels().map((c) => {
     const s = c.getSampler(), t = s.getInput().getArray(), v = s.getOutput().getArray();
@@ -47,11 +73,8 @@ for (const name of process.argv.slice(2)) {
     const a = Array.from(c.v.subarray(k * c.size, (k + 1) * c.size)), b = Array.from(c.v.subarray((k + 1) * c.size, (k + 2) * c.size));
     return c.size === 4 ? new THREE.Quaternion(...a).slerp(new THREE.Quaternion(...b), u).toArray() : a.map((x, i) => x + (b[i] - x) * u);
   };
-  const world = (n) => M4(nodes.get(n).getWorldMatrix());
-  const pos = (m) => new THREE.Vector3().setFromMatrixPosition(m);
-  const rot = (m) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(m));
-  // (the body's height, head top over the floor as it was bound, makes every length one on a 1.8 m body)
   const pose = (time) => {
+    for (const [n, [t, r, s]] of rest) n.setTranslation(t).setRotation(r).setScale(s);
     for (const c of ch) {
       const v = at(c, time);
       if (c.path === 'rotation') c.node.setRotation(v);
@@ -59,34 +82,29 @@ for (const name of process.argv.slice(2)) {
       else c.node.setScale(v);
     }
   };
-  const k = 1.8 / pos(world('head_end')).y;
-  pose(0);
-  // Meshy's bodies face +z: the eyes' own right is -x, up +y, behind -z (the game's: x right, y up, z behind)
-  const restEye = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1)));
-  const head0 = rot(world('Head'));
   const frames = Math.max(1, Math.round(dur * FPS));
-  const out = { fps: FPS, dur: r4(dur), rh: [], re: [], lh: [], le: [], head: [] };
+  const out = { fps: FPS, dur: r4(dur), rh: [], re: [], rs: [], rf: [], lh: [], le: [], ls: [], lf: [], head: [] };
   for (let f = 0; f <= frames; f++) {
     pose((f / frames) * dur);
-    const H = world('Head');
     // The eyes, where the head has put them, but looking where the body was facing as it began: a player keeps the
     // aim on what they hit, and the blow comes down across the picture (the head itself looks down with it).
-    const turn = rot(H).multiply(head0.clone().invert());
-    const eyeQ = restEye, eyeInv = eyeQ.clone().invert();
-    const eyeP = pos(H).multiplyScalar(k).add(EYES.clone().applyQuaternion(turn.clone().multiply(restEye)));
-    const seen = (n) => pos(world(n)).multiplyScalar(k).sub(eyeP).applyQuaternion(eyeInv);
-    const hand = (n) => [...seen(n).toArray().map(r4), ...eyeInv.clone().multiply(rot(world(n))).toArray().map(r4)];
-    out.rh.push(hand('RightHand'));
-    out.lh.push(hand('LeftHand'));
-    out.re.push(seen('RightForeArm').toArray().map(r4));
-    out.le.push(seen('LeftForeArm').toArray().map(r4));
-    // (the head against the hips' facing, as nose up, nose left, roll: radians)
-    const hipsYaw = new THREE.Euler().setFromQuaternion(rot(world('Hips')), 'YXZ').y;
-    const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -hipsYaw, 0)).multiply(turn), 'YXZ');
+    const turn = rot('Head').multiply(head0.clone().invert());
+    const eyeP = pos('Head').add(EYES.clone().applyQuaternion(turn.clone().multiply(eyeQ)));
+    const seen = (n) => pos(n).sub(eyeP).applyQuaternion(eyeInv).toArray().map(r4);
+    for (const s of ['r', 'l']) {
+      out[`${s}h`].push(seen(`hand_${s}`));
+      out[`${s}e`].push(seen(`lowerarm_${s}`));
+      out[`${s}s`].push(seen(`upperarm_${s}`));
+      // (which way the hand's fingers point and its palm faces, from the eyes)
+      const q = eyeInv.clone().multiply(rot(`hand_${s}`));
+      out[`${s}f`].push([...laid[s].fingers.clone().applyQuaternion(q).toArray(), ...laid[s].palm.clone().applyQuaternion(q).toArray()].map(r4));
+    }
+    // (the head against the body's facing, as nose up, nose left, roll: radians)
+    const e = new THREE.Euler().setFromQuaternion(eyeInv.clone().multiply(turn).multiply(eyeQ), 'YXZ');
     out.head.push([r4(e.x), r4(e.y), r4(e.z)]);
   }
   table[name] = out;
-  console.log(`${name.padEnd(28)} ${dur.toFixed(2)} s, ${frames + 1} frames; right hand from the eyes at the start ${out.rh[0].slice(0, 3).join(', ')}`);
+  console.log(`${name.padEnd(28)} ${dur.toFixed(2)} s, ${frames + 1} frames; right hand from the eyes at the start ${out.rh[0].join(', ')}`);
 }
 writeFileSync(OUT, JSON.stringify(table) + '\n');
 console.log('wrote', path.relative(ROOT, OUT));

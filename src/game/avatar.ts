@@ -14,7 +14,7 @@ import 'three/addons/utils/SkeletonUtils.js';
 import '../world/atmosphere';
 import type { Atmosphere } from '../world/atmosphere';
 import './arms';
-import type { Grips, Curl } from './arms';
+import type { Grips, Curl, HandGrip } from './arms';
 import './look';
 import type { LookUniforms } from './look';
 import { assets } from '../core/assets';
@@ -445,7 +445,7 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; /** what the left hand closes on, for a thing held in both (in its own space) */ left: HandGrip | null } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */

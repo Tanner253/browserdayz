@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { assets } from '../../core/assets';
 import type { Cut } from './fp';
+import type { Avatar } from '../avatar';
 
 /** the captured blows, as one file of movements on our skeleton */
 export const MELEE_FILE = 'assets/characters/melee.glb';
@@ -110,4 +111,21 @@ export class BodyBlow {
       k.bone.quaternion.slerp(_q, w * k.share);
     }
   }
+}
+
+const _t = new THREE.Vector3(), _F = new THREE.Vector3(), _N = new THREE.Vector3(), _aq = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
+/**
+ * The left hand on something held in both: reached to where the thing's own grip says it closes (its pos, fingers and
+ * palm, in the thing's space, as the right is laid in the fist), and closed round it. Whatever the right arm is doing,
+ * a blow or a guard, the left goes with the thing. `w`: how much (none while it lies on the shoulder).
+ */
+export function holdLeft(a: Avatar, w: number) {
+  const r = a.armL, held = a.inHand, g = held?.left, thing = held?.obj.children[0];
+  if (!r || !g || !thing || w < 0.02) return;
+  thing.updateWorldMatrix(true, false);
+  _t.copy(g.pos).applyMatrix4(thing.matrixWorld);
+  _F.copy(g.fingers).transformDirection(thing.matrixWorld);
+  _N.copy(g.palm).transformDirection(thing.matrixWorld);
+  a.reach(r, _t, _F, _N, g.curl, _aq.setFromAxisAngle(_up, a.yaw), w);
+  a.curl(r, g.curl, r.hand.getWorldQuaternion(_aq));
 }

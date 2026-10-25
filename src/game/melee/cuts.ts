@@ -6,7 +6,7 @@
 import { hasCut, type Cut } from './fp';
 
 /** a one-handed cut, right to left and down, the arm thrown out from the shoulder */
-const SLASH: Cut = { clip: 'Right_Hand_Sword_Slash', from: 0.15, hit: 0.57, to: 0.95 };
+const SLASH: Cut = { clip: 'Right_Hand_Sword_Slash', from: 0.28, hit: 0.57, to: 0.95, lands: [0, 1.4, 0.3], reach: [0.38, 0.45] };
 
 export const CUTS: Record<string, Cut[]> = {
   hatchet: [SLASH],
