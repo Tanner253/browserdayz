@@ -312,6 +312,9 @@ export const frameMethods = {
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
     this.gather.update(dt);
     this.craft.update(dt);
+    this.forges.update(dt);
+    this.salvage.update(dt);
+    this.wrecks.update(dt);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
     this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
     // (offline a rack shows what is in it as it is; online the server says: see GunRacks)
@@ -694,7 +697,7 @@ export const frameMethods = {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? (this.ready && this.ready.item.id !== 'building_plan' ? { label: `${ITEMS[this.ready.item.id].name}: ${this.ready.item.id === 'torch' ? (this.build.torches.lit ? 'L puts it out' : 'L lights it') : ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
+      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? this.salvage.shown() ?? (this.ready && this.ready.item.id !== 'building_plan' ? { label: `${ITEMS[this.ready.item.id].name}: ${this.ready.item.id === 'torch' ? (this.build.torches.lit ? 'L puts it out' : 'L lights it') : ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

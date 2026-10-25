@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T01:57:57.879Z",
+ "generated": "2026-10-25T04:25:32.323Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12845,60 +12845,6 @@
    "hiBytes": 805220,
    "hiCard": 21
   },
-  "cloth_pile": {
-   "url": "assets/models/cloth_pile.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 214184,
-   "srcTris": 2558,
-   "tris": 2558,
-   "min": [
-    -0.12,
-    0,
-    -0.1145
-   ],
-   "max": [
-    0.12,
-    0.1093,
-    0.1145
-   ],
-   "lods": [
-    {
-     "url": "assets/models/cloth_pile_lod1.glb",
-     "tris": 1599,
-     "far": 2,
-     "of": "214184:1792891252176"
-    }
-   ]
-  },
-  "rope_coil": {
-   "url": "assets/models/rope_coil.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 41840,
-   "srcTris": 32208,
-   "tris": 5999,
-   "min": [
-    -0.0697,
-    0,
-    -0.0274
-   ],
-   "max": [
-    0.0695,
-    0.3398,
-    0.0295
-   ],
-   "lods": [
-    {
-     "url": "assets/models/rope_coil_lod1.glb",
-     "tris": 4772,
-     "far": 2,
-     "of": "41840:1792890704937"
-    }
-   ]
-  },
   "alcohol_bottle": {
    "url": "assets/models/alcohol_bottle.glb",
    "tags": [
@@ -13012,7 +12958,8 @@
   "junk_heap": {
    "url": "assets/models/junk_heap.glb",
    "tags": [
-    "prop"
+    "prop",
+    "vehicle"
    ],
    "bytes": 434208,
    "srcTris": 18758,
@@ -13027,7 +12974,14 @@
     1.5981,
     1.5
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/junk_heap_lod1.glb",
+     "tris": 13969,
+     "far": 2,
+     "of": "434208:1792890756840"
+    }
+   ],
    "hi": "assets/models/hi/junk_heap.glb",
    "hiBytes": 1158860,
    "hiCard": 64
@@ -13106,32 +13060,188 @@
     }
    ]
   },
-  "sledgehammer_01": {
-   "url": "assets/models/sledgehammer_01.glb",
+  "forge_hf": {
+   "url": "assets/models/forge_hf.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 346400,
+   "srcTris": 19205,
+   "tris": 9987,
+   "min": [
+    -0.4863,
+    0,
+    -0.5531
+   ],
+   "max": [
+    0.4863,
+    1.3,
+    0.5532
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/forge_hf.glb",
+   "hiBytes": 996788,
+   "hiCard": 64
+  },
+  "sledgehammer_slim": {
+   "url": "assets/models/sledgehammer_slim.glb",
    "tags": [
     "loot"
    ],
-   "bytes": 401180,
-   "srcTris": 2596,
-   "tris": 2596,
+   "bytes": 294608,
+   "srcTris": 2955,
+   "tris": 2955,
    "min": [
-    -0.1043,
-    -0.7466,
-    -0.0452
+    -0.0938,
+    0,
+    -0.1838
    ],
    "max": [
-    0.1042,
-    0.2591,
-    0.0452
+    0.0938,
+    0.9108,
+    0.1838
    ],
    "lods": [
     {
-     "url": "assets/models/sledgehammer_01_lod1.glb",
-     "tris": 1600,
+     "url": "assets/models/sledgehammer_slim_lod1.glb",
+     "tris": 1599,
      "far": 2,
-     "of": "401180:1792893477839"
+     "of": "294608:1792900899107"
     }
    ]
+  },
+  "rope_coil_hemp": {
+   "url": "assets/models/rope_coil_hemp.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 558680,
+   "srcTris": 2796,
+   "tris": 2796,
+   "min": [
+    -0.15,
+    0,
+    -0.0971
+   ],
+   "max": [
+    0.15,
+    0.0583,
+    0.0971
+   ],
+   "lods": [
+    {
+     "url": "assets/models/rope_coil_hemp_lod1.glb",
+     "tris": 2482,
+     "far": 2,
+     "of": "558680:1792900876209"
+    }
+   ]
+  },
+  "rags_bundle": {
+   "url": "assets/models/rags_bundle.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 251488,
+   "srcTris": 1672,
+   "tris": 1672,
+   "min": [
+    -0.0741,
+    0,
+    -0.1
+   ],
+   "max": [
+    0.0741,
+    0.1182,
+    0.1
+   ],
+   "lods": []
+  },
+  "zil_wreck": {
+   "url": "assets/models/zil_wreck.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 541704,
+   "srcTris": 27018,
+   "tris": 19999,
+   "min": [
+    -3.3,
+    0,
+    -1.3035
+   ],
+   "max": [
+    3.3,
+    2.6782,
+    1.3035
+   ],
+   "lods": [
+    {
+     "url": "assets/models/zil_wreck_lod1.glb",
+     "tris": 13998,
+     "far": 2,
+     "of": "541704:1792902335583"
+    }
+   ],
+   "hi": "assets/models/hi/zil_wreck.glb",
+   "hiBytes": 1286128,
+   "hiCard": 64
+  },
+  "tractor_wreck": {
+   "url": "assets/models/tractor_wreck.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 516536,
+   "srcTris": 24282,
+   "tris": 17984,
+   "min": [
+    -2.1,
+    0,
+    -1.1634
+   ],
+   "max": [
+    2.1,
+    2.7242,
+    1.1634
+   ],
+   "lods": [
+    {
+     "url": "assets/models/tractor_wreck_lod1.glb",
+     "tris": 13984,
+     "far": 2,
+     "of": "516536:1792902337038"
+    }
+   ],
+   "hi": "assets/models/hi/tractor_wreck.glb",
+   "hiBytes": 1303144,
+   "hiCard": 64
+  },
+  "pirozhok_wreck": {
+   "url": "assets/models/pirozhok_wreck.glb",
+   "tags": [
+    "prop",
+    "vehicle"
+   ],
+   "bytes": 319072,
+   "srcTris": 4851,
+   "tris": 4851,
+   "min": [
+    -2,
+    0,
+    -0.8354
+   ],
+   "max": [
+    2,
+    1.6633,
+    0.8354
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/pirozhok_wreck.glb",
+   "hiBytes": 1378776,
+   "hiCard": 43
   }
  }
 }

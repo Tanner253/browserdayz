@@ -42,6 +42,8 @@ export interface Shape {
   flame?: [number, number, number];
   /** where a lock fitted to it is seen: on a leaf (its frame) or on the piece, facing +z, or lying face up (a hatch's) */
   lockAt?: { leaf?: number; at: [number, number, number]; up?: boolean };
+  /** drawn by a model of its own elsewhere (crafting's forge: src/game/craft-forge.ts): here it only stops things */
+  unseen?: true;
 }
 
 /**
@@ -186,6 +188,8 @@ const SHAPES: Record<string, () => Shape> = {
     solid: [box(-0.5, 0.28, -1.05, 0.5, 0.4, 1.05), box(-0.5, 0.4, 0.98, 0.5, 0.95, 1.05), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.44 - 0.05, 0, sz * 1 - 0.05, sx * 0.44 + 0.05, 0.28, sz * 1 + 0.05)))],
     cloth: { paint: 'bag', solid: [box(-0.44, 0.4, -1, 0.44, 0.52, 0.96), box(-0.36, 0.52, 0.6, 0.36, 0.6, 0.92)] },
   }),
+  // (crafting's forge: the drum, as high as its rim of stones; the chimney stops nothing)
+  forge: () => ({ solid: [box(-0.4, 0, -0.4, 0.4, 0.95, 0.4)], unseen: true }),
   // (a heavy table: its top, its four legs and a shelf between them)
   workbench: () => ({
     solid: [box(-0.85, 0.82, -0.45, 0.85, 0.94, 0.45), box(-0.8, 0.15, -0.4, 0.8, 0.22, 0.4), ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(sx * 0.78 - 0.05, 0, sz * 0.38 - 0.05, sx * 0.78 + 0.05, 0.82, sz * 0.38 + 0.05)))],

@@ -1,8 +1,8 @@
 // What crafting makes and is made of (2026-10-24, plan-crafting: the owner, "We need some sort of crafting like how rust
 // has crafting ... clearly we need crafting"; "clothing could be cut up with a knife or sharp object to make cloth which
 // could be combined with rubbing alcohols to make iFAK's"). The recipes are src/sim/craft/recipes.ts. Rubbing alcohol
-// and the tin can are found; the rest is made, smelted or salvaged. The models are the owner's downloads, the
-// sledgehammer from Poly Haven, and the satchel, charcoal and gunpowder tin made in Higgsfield (progress/base-models/incoming-map.md).
+// and the tin can are found; the rest is made, smelted or salvaged. The models are the owner's downloads, and
+// the rags, rope, sledgehammer, satchel, charcoal and gunpowder tin made in Higgsfield (progress/base-models/incoming-map.md).
 
 import type { ItemDef } from '../items';
 import { HOMES } from './rules';
@@ -13,11 +13,11 @@ export const MADE_ONLY = ['rags', 'rope', 'gunpowder', 'scrap', 'iron_bar', 'coa
 export const CRAFT_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- made by hand
   // (DayZ's rags: cut from clothes, and bound on a wound they stop the bleeding, slower than a dressing)
-  { id: 'rags', name: 'Rags', model: 'cloth_pile', w: 1, h: 1, weight: 0.05, stack: 10, fresh: 4, category: 'medical',
+  { id: 'rags', name: 'Rags', model: 'rags_bundle', w: 1, h: 1, weight: 0.05, stack: 10, fresh: 4, category: 'medical',
     desc: 'Strips of cloth cut from old clothes. Bound on a wound they stop the bleeding; rope, bandages, splints, torches and bags are made of them.',
     use: { verb: 'Bind a wound with', time: 6, stopBleed: true, sound: 'bandage' },
   },
-  { id: 'rope', name: 'Rope', model: 'rope_coil', tint: 0xb8986a, w: 2, h: 2, weight: 0.5, category: 'misc',
+  { id: 'rope', name: 'Rope', model: 'rope_coil_hemp', w: 2, h: 2, weight: 0.5, category: 'misc',
     desc: 'Rags twisted and plaited into a rope. A sleeping bag is rolled and a satchel charge tied with it.',
     worth: 2,
   },
@@ -60,7 +60,7 @@ export const CRAFT_ITEMS: ItemDef[] = [
     melee: { damage: 20, range: 1.4, rate: 0.45 },
   },
   // (plan-base-economy, change 4: "Sledgehammer: breaks scrap twice as fast; the slow raid tool")
-  { id: 'sledgehammer', name: 'Sledgehammer', model: 'sledgehammer_01', w: 2, h: 6, weight: 4.5, category: 'melee', slot: 'long',
+  { id: 'sledgehammer', name: 'Sledgehammer', model: 'sledgehammer_slim', w: 2, h: 6, weight: 4.5, category: 'melee', slot: 'long',
     desc: 'A heavy hammer swung in both hands. It knocks scrap off a wreck twice as fast as a hammer, and breaks down a wall, slowly.',
     melee: { damage: 70, range: 2.1, rate: 1.35 },
     worth: 6,

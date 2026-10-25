@@ -12,6 +12,8 @@ import { crateId } from '../src/net/protocol';
 import { isSearchable, storageId } from '../src/sim/storage';
 import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
+import { salvageSpots } from '../src/sim/craft/salvage';
+import { wreckLayer, wreckSpots } from '../src/sim/craft/wrecks';
 import { JEEP, POLICE_CAR, jeepSpots, policeSpots, westSpots } from '../src/sim/vehicles';
 import { HELI, heliSpots } from '../src/sim/heli';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
@@ -153,6 +155,8 @@ export function buildWorldData(root: string) {
     gas: gasZone(world.pois, (x, z) => heightAt(world.heights, x, z)),
     /** the fuel drums, numbered as the game numbers them */
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    /** what scrap is knocked off, numbered as the game numbers it (src/sim/craft/salvage.ts) */
+    salvage: salvageSpots(world.props, wreckSpots(wreckLayer(world))),
     /** the fireplaces, numbered as the game numbers them */
     fires: fireSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     /** the trees and the rocks, numbered as the game numbers them: felled for logs and broken for stone (server/gather.ts) */

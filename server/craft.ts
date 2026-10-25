@@ -15,6 +15,8 @@ import { clients, send, type Client } from './players';
 import { takeOut, things } from './index';
 import { bases, pay } from './build';
 import { use } from './gather';
+// (every forge runs on its own clock from here: server/forge.ts)
+import './forge';
 
 /** the hand craft each player is at: which, how many, since when, where they stood, what they dragged together */
 const doing = new WeakMap<Client, { r: string; n: number; at: number; x: number; z: number; u: string[] }>();

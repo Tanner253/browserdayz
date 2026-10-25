@@ -109,6 +109,7 @@ export const onlineMethods = {
     // the trees that are down (src/game/gathering.ts); the bases are told as they come into sight (src/game/building)
     this.gather.welcome(w.felled);
     this.build.reset();
+    this.forges.reset();
     // the lockers somebody is searching at the moment: their doors stand open
     this.lockers.clear();
     for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
@@ -181,6 +182,7 @@ export const onlineMethods = {
     for (const st of [...this.loot.stashes]) this.loot.removeStash(st);
     this.gather.welcome([]);
     this.build.reset();
+    this.forges.reset();
     this.riders.clear();
     this.airdrops.clear();
     this.markDrops();
@@ -335,6 +337,8 @@ export const onlineMethods = {
     net.on('saw', (m) => this.gather.onSaw(m));
     net.on('craft', (m) => this.craft.onCraft(m));
     net.on('cq', (m) => this.craft.onQueue(m));
+    net.on('forge', (m) => this.forges.onForge(m));
+    net.on('salvage', (m) => this.salvage.onSalvage(m));
     net.on('base', (m) => this.build.onBase(m));
     net.on('bgone', (m) => this.build.onGone(m));
     net.on('bpc', (m) => this.build.onPiece(m));
