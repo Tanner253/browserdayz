@@ -8,6 +8,7 @@ import { physics, USE_GROUPS, SIGHT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { Door } from '../../world/buildings';
 import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf, ZONA_VOID } from '../../sim/items';
+import { LOOT_BAG } from '../../sim/items/build';
 import { inPlay } from '../../world/worldgen';
 import { CRATE_RESTOCK } from '../../sim/crates';
 import { POLICE_CAR } from '../../sim/vehicles';
@@ -18,7 +19,7 @@ import { Jeep } from '../vehicle';
 import type { HotbarEntry } from '../../ui/hud';
 import { WELL } from '../../sim/wells';
 import { waterName } from '../../sim/water';
-import { jobsFor, progress as jobDone } from '../../sim/jobs';
+import { STALLS } from '../../sim/camp';
 import { _lampPos, _sealed, _sealedDir, _sealedLook, type Game } from '../game';
 import { finishDay, finishOn, type Finish } from '../finish';
 import { lookOf } from '../../../api/_lib/shop-items';
@@ -42,12 +43,23 @@ export const interactMethods = {
     // (src/game/br/mode.ts); of the game's own, only doors and cars)
     if (this.br?.busy) return;
     // at a shop's counter, looking at the man behind it
-    if (!this.br && this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
-      const book = this.jobBook();
-      const owed = jobsFor(book.day).some((j) => !book.done.includes(j.id) && jobDone(j, book, (id) => this.countOf(id)) >= j.n);
-      this.prompt = `<kbd>F</kbd>Trade${owed ? ' <small>· he owes you for a job</small>' : ''}`;
-      if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.openShop();
+    const stall = !this.br && this.started && !this.garage.ride ? this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion)) : null;
+    if (stall) {
+      const owed = stall === 'building' && this.camp.owed();
+      this.prompt = `<kbd>F</kbd>Trade · ${STALLS[stall].name.toLowerCase()}${owed ? ' <small>· he owes you for a job</small>' : ''}`;
+      if (this.input.pressed('KeyF') && !this.hud.chatOpen) {
+        this.camp.stall = stall;
+        this.openShop();
+      }
       return;
+    }
+    // at a recycler, looking at it (src/game/craft-recyclers.ts)
+    if (!this.br && this.started && !this.garage.ride) {
+      const recy = this.recyclers.prompt(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion), !this.hud.chatOpen);
+      if (recy) {
+        this.prompt = recy;
+        return;
+      }
     }
     // at the way down to the second level: it is not to be opened yet, and says so
     {
@@ -154,8 +166,16 @@ export const interactMethods = {
       const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : 'no mag') : capacityOf(item)}</small>` : d.mag ? ` <small>${item.rounds ?? 0}/${d.mag.capacity}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
       // (a case, a suitcase or a bag, and a shovel in the hands: the left button, held, buries it where it lies)
       const spade = d.category === 'stash' && this.weapons.equippedItem?.id === 'shovel';
-      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : ''}`;
+      // (a log, and a saw in the hands: the left button saws it into planks where it lies, src/game/gathering.ts)
+      const saw = item.id === 'log' && this.gather.canSaw();
+      // (a broken box's bag is gone through where it lies, never taken: see LOOT_BAG)
+      if (item.id === LOOT_BAG.id) {
+        this.prompt = `<kbd>Tab</kbd>Go through the ${d.name}${qty}`;
+        return;
+      }
+      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : saw ? ' <small>the left button saws it into planks</small>' : ''}`;
       if (spade && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
+      if (saw && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.gather.saw(owner.loot);
       // four corners round it, so there is no doubt which thing that is
       const at = new THREE.Vector3(owner.loot.x, owner.loot.y + 0.05, owner.loot.z).project(cam);
       if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];

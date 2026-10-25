@@ -7,8 +7,8 @@
 // eye comes within a few lengths of it, which is well before they could be told from the world's, and gives them
 // up again when the eye has gone.
 //
-// (Things that are carried are not seen to here: what is in the hands is the weapons' to sharpen, and what is
-// looked at within reach is the game's. See Assets.sharpen.)
+// (On a phone things that are carried are not seen to here: what is in the hands is the weapons' to sharpen, and what
+// is looked at within reach is the game's. See Assets.sharpen. On a computer, bodies and what is held or worn are.)
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
@@ -53,9 +53,16 @@ const REACH = TOUCH ? 6.5 : 5.4;
  * as it is from a few steps further off, until there is. The nearest thing of all is never left out, and what
  * is in the hands or looked at is not this file's to refuse: it is taken off what is left for the rest.
  */
-const SHARP_BUDGET_MB = 900;
+// (A computer's sharper pictures are a size up from 512 (DESK_NEAR), for bodies and what is held or worn, close: the
+// owner, 2026-10-25, "we need to be more performant". Room for one's own body, the gear on it and three or four others.)
+const SHARP_BUDGET_MB = TOUCH ? 900 : 160;
 
 const _v = new THREE.Vector3(), _m = new THREE.Matrix4();
+/** whether it and everything it hangs from are shown */
+const shown = (o: THREE.Object3D | null) => {
+  for (; o; o = o.parent) if (!o.visible) return false;
+  return true;
+};
 
 export class Near {
   private seen = new Map<string, Seen>();
@@ -76,8 +83,13 @@ export class Near {
       for (const mat of mats) {
         const tag = (mat?.userData as { hi?: [string, number] } | undefined)?.hi;
         if (!tag) continue;
+        // (On a computer only bodies and what is held or worn are marked (Assets.mark), and here they are all seen to:
+        // a gun lying at the feet, or the vest on a body close by. A body that is not shown, as one's own in first
+        // person, is not.)
+        const body = tag[0].startsWith('assets/characters/');
+        if (body && !shown(mesh)) continue;
         const entry = assets.manifest.models[tag[0]];
-        if (!entry || entry.tags.some((t) => SMALL.includes(t))) continue;
+        if (!body && (!entry || (TOUCH && entry.tags.some((t) => SMALL.includes(t))))) continue;
         let s = this.seen.get(tag[0]);
         if (!s) this.seen.set(tag[0], (s = { mats: new Set(), at: [], drop: null }));
         s.mats.add(mat);

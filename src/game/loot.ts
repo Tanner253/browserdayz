@@ -286,7 +286,12 @@ export class ItemModels {
       const minH = Math.min(sz.x, sz.z);
       const stick = sz.y > Math.max(sz.x, sz.z) * 2 && (sz.y * k > 0.34 || !!def.pile);
       const onEdge = sz.y > minH * 1.5 && (minH * k < 0.05 || (sz.y / minH > 4 && sz.y * k > 0.34));
-      if (def.category !== 'weapon' && (stick || onEdge)) {
+      // (and a tool with a broad head, which is no stick across its head: a claw hammer, a pickaxe, stood on its butt
+      // as it came. 2026-10-25: the hammer and the pickaxe stood up on end where they were dropped.)
+      const tool = def.category === 'melee' && sz.y > Math.max(sz.x, sz.z) * 1.6 && sz.y * k > 0.3;
+      // (and a blade lying along the ground as it came but up on its edge: the panel saw, 2026-10-25)
+      const blade = def.category === 'melee' && Math.max(sz.x, sz.z) > sz.y && minH < sz.y * 0.4;
+      if (def.category !== 'weapon' && (stick || onEdge || tool || blade)) {
         // tip it over its thinnest side so it rests on its biggest face
         const lay = sz.x <= sz.z ? new THREE.Matrix4().makeRotationZ(Math.PI / 2) : new THREE.Matrix4().makeRotationX(-Math.PI / 2);
         for (const p of parts) {
@@ -351,6 +356,8 @@ export class ItemModels {
       const mesh = new THREE.Mesh(p.geometry, p.material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      // (its part's name kept: a torch's head is where its flame burns, src/game/weapons.ts heldTip)
+      if (p.name === 'head') mesh.name = p.name;
       this.atmo.register(p.material);
       group.add(mesh);
     }

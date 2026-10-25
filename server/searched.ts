@@ -6,6 +6,7 @@
 // in it after. What could not be done is said back to whoever did it ('cno'), and their game puts it right.
 
 import { applyOps, diffOps, laidIn, type BoxOp, type Laid } from '../src/sim/box-ops';
+import { UPKEEP } from '../src/sim/build/upkeep';
 export { laidIn };
 import { bagGrid } from '../src/sim/inventory';
 import { ITEMS, type ItemInstance } from '../src/sim/items';
@@ -54,6 +55,9 @@ export function goneFrom(k: string) {
 
 export const hasOpen = (c: Client, k: string) => !!openers.get(k)?.has(c.id);
 
+/** to whoever has a box open (a claim's store, when its upkeep is taken: server/claims.ts) */
+export const tellOpeners = (k: string, m: S2C) => tell(k, m);
+
 function tell(k: string, m: S2C) {
   for (const id of openers.get(k) ?? []) {
     const o = clients.get(id);
@@ -61,10 +65,10 @@ function tell(k: string, m: S2C) {
   }
 }
 
-/** what somebody's game took that somebody else had taken first: not believed to be in their pockets for a moment, until their game has heard so (see 'me') */
+/** what somebody's game took that somebody else had taken first, or that the server used up (a thing researched, sold): not believed to be in their pockets for a moment, until their game has heard so (see 'me') */
 const refusedOf = new Map<number, Map<string, number>>();
 const REFUSED_MS = 4000;
-function refuse(c: Client, uids: string[]) {
+export function refuse(c: Client, uids: string[]) {
   if (!uids.length) return;
   let m = refusedOf.get(c.id);
   if (!m) refusedOf.set(c.id, (m = new Map()));
@@ -93,7 +97,8 @@ export function boxOps(c: Client, b: Box, ops: BoxOp[]) {
   const before = (furniture ? contents(b) : b.items) as Laid[];
   // (A dog tag lies on a body and nowhere else that holds things: the owner, "dogtags should not be stashed"; and on a
   // body only by whoever holds it, custody.ts. One that may not go in is given back, not lost.)
-  const mayPut = (it: ItemInstance) => (body ? payingTags(it).every((t) => holdsTag(c.key, t.uid)) : !hasTag(it)) && !madeUp(c, it, `a ${b.kind}`);
+  // (and a claim's store takes what a base is kept with, and nothing else: server/claims.ts)
+  const mayPut = (it: ItemInstance) => (body ? payingTags(it).every((t) => holdsTag(c.key, t.uid)) : !hasTag(it)) && !madeUp(c, it, `a ${b.kind}`) && (b.kind !== 'claim' || UPKEEP.has(it.id));
   const was = JSON.stringify(before);
   const r = applyOps(before, b.w, b.h, ops, mayPut, clean, true);
   if (body) {

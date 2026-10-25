@@ -218,6 +218,7 @@ export const enterMethods = {
         return;
       } else if (remoteServer()) this.hud.note('The server could not be reached: you are playing OFFLINE, alone. Reload the page to try again.', 'warn');
       await this.enterOffline();
+      this.camp.payBook();
     }
     this.joining = false;
     this.started = true;
@@ -697,7 +698,7 @@ export const enterMethods = {
     // says it is cashed ('cashed', tagCashed) or sends its own clock back ('tagclock', tagClock). Taken out at once, a tag
     // the server turned down was lost from the pockets for good.
     if (this.online) {
-      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
+      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals }, sp: this.build.sp });
       const wallet = walletAddress();
       for (const it of done) {
         this.cashing.set(it.uid, performance.now());

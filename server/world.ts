@@ -12,6 +12,10 @@ import { crateId } from '../src/net/protocol';
 import { isSearchable, storageId } from '../src/sim/storage';
 import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
+import { salvageSpots } from '../src/sim/craft/salvage';
+import { wreckLayer, wreckSpots } from '../src/sim/craft/wrecks';
+import { recyclerLayer } from '../src/sim/craft/recyclers';
+import { campLayer } from '../src/sim/camp';
 import { JEEP, POLICE_CAR, jeepSpots, policeSpots, westSpots } from '../src/sim/vehicles';
 import { HELI, heliSpots } from '../src/sim/heli';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
@@ -41,6 +45,17 @@ function onRuins(plan: { piece: Piece; place: Place }[], ground: number, x: numb
     if (inRuin(lx, lz, foot) || offRuin(lx, lz, foot) < 2) return true;
   }
   return false;
+}
+
+/**
+ * The bases, as this file knows them: what of one a body stands on, and whether one is near. Set by server/solid.ts
+ * (this file is read before any base is): a body dead on a base's floor lies there, and a thing dropped on it rests
+ * on it (the owner, 2026-10-24: "items i drop on the ground should not clip through the floor of my base").
+ */
+const based = { top: (_x: number, _y: number, _z: number) => -Infinity, near: (_x: number, _z: number) => false };
+export function baseGround(top: typeof based.top, near: typeof based.near) {
+  based.top = top;
+  based.near = near;
 }
 
 export interface CrateSpot {
@@ -124,12 +139,14 @@ export function buildWorldData(root: string) {
   if (under) for (const c of bunkerCrates(under)) crates.push({ cid: crateId(c.x, c.z), kind: c.kind, x: c.x, y: c.y, z: c.z });
   // (where the cars stand: a search of the whole map, done once)
   const parked = jeepSpots(world), stations = policeSpots(world, parked);
+  // (crafting's layers of their own, after everything else: the trader camp's stalls first, then the recyclers)
+  const camp = campLayer(world);
   return {
     lootPoints: buildings.lootPoints,
     /** where every building stands, and how it is turned (nothing is buried under a floor) */
     buildings: world.buildings.map((q) => ({ type: q.type, x: q.x, z: q.z, rot: q.rot })),
     /** the towns, camps and other named places, each as far round as it reaches (nothing is buried in one) */
-    places: world.pois.map((q) => ({ x: q.x, z: q.z, radius: q.radius })),
+    places: world.pois.map((q) => ({ x: q.x, z: q.z, radius: q.radius, name: q.name })),
     crates,
     /** where the bunker stands (null: the world has none) */
     bunker: bunkerPlace(world),
@@ -142,8 +159,18 @@ export function buildWorldData(root: string) {
     gas: gasZone(world.pois, (x, z) => heightAt(world.heights, x, z)),
     /** the fuel drums, numbered as the game numbers them */
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    /** what metal is knocked off, numbered as the game numbers it (src/sim/craft/salvage.ts) */
+    salvage: salvageSpots(world.props, wreckSpots(wreckLayer(world))),
+    /** the trader camp: its stalls and its yard (src/sim/camp.ts), and the recyclers, numbered as the game numbers them (src/sim/craft/recyclers.ts) */
+    camp,
+    recyclers: recyclerLayer(world, camp),
     /** the fireplaces, numbered as the game numbers them */
     fires: fireSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    /** the trees and the rocks, numbered as the game numbers them: felled for logs and broken for stone (server/gather.ts) */
+    trees: world.trees,
+    rocks: world.rocks,
+    /** the lakes and the rivers (no base is built in water: src/sim/build/land.ts) */
+    water: world.water,
     /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
     jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? parked : [],
     /** and the police cars, one beside each police station: none without the jeeps, or without a model of their own */
@@ -188,7 +215,7 @@ export function buildWorldData(root: string) {
       if (inCastle(world.castle, x, y, z)) return Math.max(ground, y);
       // (and on the monastery's walls in Pokrov, a pier, and what is left of Kalat: plan v5)
       if (onTownWall(world.towns, x, y, z) || onRuins(kalat, ground, x, y, z)) return Math.max(ground, y);
-      return standAt(world.bridges, ground, x, y, z);
+      return Math.max(based.top(x, y, z), standAt(world.bridges, ground, x, y, z));
     },
     /** where the fort stands (null: the world has none) */
     castle: world.castle,
@@ -203,7 +230,7 @@ export function buildWorldData(root: string) {
     /** the bridges the road goes over */
     bridges: world.bridges,
     /** whether anything a body could stand on, climb or be up is within reach of a place: see server/bodywatch.ts */
-    supportNear: supports(world, crates),
+    supportNear: ((near) => (x: number, z: number) => near(x, z) || based.near(x, z))(supports(world, crates)),
     /** somewhere open and level to set a supply drop down */
     dropSite: (rnd?: () => number, inside = false, avoid: { x: number; z: number }[] = []) => pickDropSite(world, rnd, inside, avoid),
     /** where a drop called on a radio comes down, for somebody standing at a place and facing a way */

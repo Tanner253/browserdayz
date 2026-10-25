@@ -172,8 +172,13 @@ develop single things on the stage first; never change the ground round buried s
 - Pictures of work go in `progress/<topic>/` (kept out of git, kept for the story).
 
 ## 6. Must-know nuances (beyond CLAUDE.md)
-- **Models ship as copies**: computers draw every model from its lean copy (`public/assets/lean/256-128/`, pictures 256 and
-  128); phones draw the world copy (pictures up to 1024) near; `public/assets/models/hi/` holds each model as it came,
+- **Models ship as copies**: since 2026-10-25 computers draw every model from its lean copy at 512/256
+  (`public/assets/lean/512-256/`), and bodies, clothes and whatever is held a size up (1024/512, the file itself cut on
+  arrival) only while close: in the hands, looked at, or within a few metres (`Assets.sharpen`, `src/game/near.ts`,
+  budget 160 MB; which models: `src/core/near-models.ts`). The owner: "1024 ... on the player model zombies and hand held
+  models ... 512 ... for things that arent righht in the users face", then "we need to be more performant" (1024 always
+  was up to 2.7 GB). Phones draw far things from `lean/256-128/` and the world copy (pictures up to 1024) near.
+  `public/assets/models/hi/` holds each model as it came,
   which no player loads (`.vercelignore` keeps it off the site; tools like `scripts/sight-profile.mjs` read it).
 - **Fixing a downloaded model**: edit its source in `assets-src/models/<dir>/` (keep the original beside it as
   `*.orig.*`), then `node scripts/packs.mjs <id> --force`, `node scripts/tier-now.mjs`, `node scripts/lods.mjs <id>`,

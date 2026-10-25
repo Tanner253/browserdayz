@@ -845,6 +845,14 @@ export class PlayerInventory {
   take(id: string, n: number) {
     let t = 0;
     for (const c of this.containers) t += c.take(id, n - t);
+    // (and what is in the hands, last: a lock fitted from them, a stack laid out of them)
+    const h = this.slots.held;
+    if (t < n && h?.id === id) {
+      const k = Math.min(h.qty, n - t);
+      h.qty -= k;
+      t += k;
+      if (h.qty <= 0) this.slots.held = null;
+    }
     return t;
   }
 
@@ -1106,6 +1114,9 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   if (num(r.cook) && r.cook > 0) it.cook = Math.min(600, r.cook);
   if (num(r.hot) && r.hot > 0) it.hot = Math.min(wall + 300, r.hot);
   if (num(r.made) && r.made > 0) it.made = Math.min(wall, r.made);
+  // (a tool's condition, worn by work: src/sim/gather.ts; the server holds it to no newer than it wore it, server/gather.ts)
+  if (num(r.cond) && r.cond < 1) it.cond = Math.max(0, r.cond);
+  if (r.id === 'key' && Number.isInteger(r.key) && (r.key as number) > 0) it.key = r.key;
   // (a piece of clothing's colour, one of its own, and how worn it is: src/sim/items/wear.ts)
   if (Number.isInteger(r.c) && r.c! > 0 && r.c! < (def.colours?.length ?? 0)) it.c = r.c;
   if (num(r.hp) && r.hp >= 0 && r.hp < 1) it.hp = r.hp;

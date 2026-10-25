@@ -30,6 +30,7 @@ import { bunkerDark } from '../../sim/bunker';
 import { rackShows } from '../../sim/crates';
 import { ANIMALS } from '../../sim/animals';
 import { keyHints } from '../key-hints';
+import { LEFT_HELD } from '../building';
 import { HOLO_ZOOM, HOT_CODES, _drip, _gasHead, _still, type Game } from '../game';
 
 /** the server unheard this long (ms), the line is said to have stalled */
@@ -61,6 +62,15 @@ export const frameMethods = {
     this.pad?.update(dt);
 
     if (input.pressed('Tab') && playing) this.toggleInventory();
+    // (J: the Crafting tab, straight: shut it from there, or turn the inventory to it. On foot: at a police car's
+    // wheel J is the siren, src/game/garage.ts)
+    else if (input.pressed('KeyJ') && playing && !this.garage.ride) {
+      if (!this.invUI.isOpen) {
+        this.toggleInventory(true);
+        if (this.invUI.isOpen) this.invUI.setMode('craft');
+      } else if (this.invUI.mode === 'craft') this.toggleInventory(false);
+      else this.invUI.setMode('craft');
+    }
     if (this.awaitClick && (this.input.locked || !playing || this.invUI.isOpen)) this.awaitClick = false;
     if (this.vicinityDue.length && now >= this.vicinityDue[0]) {
       this.vicinityDue.shift();
@@ -121,7 +131,7 @@ export const frameMethods = {
     }
     if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
     if (this.hud.emotes.isOpen && (!playing || this.player.dead)) this.toggleEmotes(false);
-    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen;
+    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen || this.build.locks.padOpen;
     // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
     const uiOpen = panels || !!this.freecam;
     // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
@@ -163,6 +173,9 @@ export const frameMethods = {
       this.glassDown = now;
     }
     this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
+    // (the building plan and the hammer: before the hands, so that the hammer at a piece is not a swing: src/game/building)
+    this.build.update(dt, playing && !uiOpen && !typing && !p.dead && !this.wheelOn && !this.garage.ride);
+    this.build.beds.frame(dt, this.started && p.dead);
     // a dance, or hands that are up, ends with the first step, shot or anything else done
     // (one of the pack's movements played once, at its end)
     if (this.hold === 'dance' && this.danced && this.avatar.emoteOver) this.setHold(null);
@@ -190,7 +203,7 @@ export const frameMethods = {
     // (slower while aiming, by what the game was made with and by the player's own multiple of that: Settings, Controls)
     const aimed = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     const sens = aimed < 1 ? aimed * controls().aim : 1;
-    if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
+    if (!uiOpen && playing && !this.wheelOn && !this.build.wheelOpen) p.look(input, sens);
     // (kept with whoever it is watching: it goes as they go, and is flown about them)
     if (this.freecam && this.watching) {
       const r = this.remotes.get(this.watching.id);
@@ -298,6 +311,13 @@ export const frameMethods = {
     this.lightStep(dt, playing && !uiOpen && !typing);
     // the fires: the infected hear one crackle, and whoever is beside one mends
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
+    this.gather.update(dt);
+    this.craft.update(dt);
+    this.forges.update(dt);
+    this.recyclers.update(dt, this.player.pos);
+    audio.machine(dt, this.recyclers.loudest(this.player.pos));
+    this.salvage.update(dt);
+    this.wrecks.update(dt);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
     this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
     // (offline a rack shows what is in it as it is; online the server says: see GunRacks)
@@ -358,7 +378,8 @@ export const frameMethods = {
       // (the wheel goes on to the next thing on the hot bar from this one; with no other, it is put away)
       if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.wheelStep(input.wheel > 0 ? 1 : -1)) input.wheel = 0;
       if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
-      else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
+      // (the building plan's left button is the building's: it lays a piece; a lock's fits it, a charge's sticks it)
+      else if (playing && !uiOpen && !typing && r.t > 0.3 && !LEFT_HELD.has(r.item.id) && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }
 
     // a grenade: its pin coming out, and then live in the hand until the button is let go (see `cook`)
@@ -410,7 +431,9 @@ export const frameMethods = {
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
     this.garage.frame(dt, now, physics.alpha, cam.position);
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
+    // (at the trader camp the guns stay down: nobody is hurt there, src/game/camp.ts)
+    const camped = this.camp.within(this.player.pos);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.build.wheelOpen && !this.hold && !ride && !camped);
     this.grenades.update(dt);
     this.throwing.update(dt);
     this.updateBarrels(dt);
@@ -487,9 +510,10 @@ export const frameMethods = {
     }
 
     this.updateInteraction(cam);
+    if (this.build.prompt) this.prompt = this.build.prompt;
     this.traders?.update(dt, cam.position);
     // (whoever walks off from the counter, or is killed at it, is done trading)
-    if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos))) this.shop.close();
+    if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos, this.camp.stall))) this.shop.close();
     this.minimap.update(interp.x, interp.z, p.yaw);
     this.map.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);
@@ -678,7 +702,7 @@ export const frameMethods = {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
+      progress: this.throwing.power !== null ? { label: 'Throw', t: this.throwing.power } : this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.gather.shown() ?? this.salvage.shown() ?? (this.ready && !LEFT_HELD.has(this.ready.item.id) ? { label: `${ITEMS[this.ready.item.id].name}: ${this.ready.item.id === 'torch' ? (this.build.torches.lit ? 'L puts it out' : 'L lights it') : ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null),
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

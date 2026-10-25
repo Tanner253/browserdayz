@@ -1,22 +1,28 @@
-// The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts
-// for what he pays and asks). The same on everybody's screen without a word passing between
-// them: where a shop stands is the map's, and he stands in it.
+// The traders as they are seen: a body behind each counter of the trader camp, the shop at the trading post and the
+// stalls before it (src/sim/camp.ts says where they stand, what each sells and for what). The same on everybody's screen
+// without a word passing between them: where the camp stands is the map's, and they stand in it.
 
 import * as THREE from 'three';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Atmosphere } from '../world/atmosphere';
-import type { World } from '../world/worldgen';
 import { physics } from '../core/physics';
+import type { StallId, StallSpot } from '../sim/camp';
 
-/** where he stands in a shop, in the shop's own measure: behind the counter, between it and the shelves, facing the door */
-const BEHIND = { x: -0.9, z: -0.45 };
-/** how near, and how squarely looked at, he has to be to be spoken to */
+/** how near, and how squarely looked at, one has to be to be spoken to */
 const REACH = 3.2, FACING = 0.8;
-/** he is posed only for somebody this near (a body standing still costs what a body costs) */
+/** each is posed only for somebody this near (a body standing still costs what a body costs) */
 const SEEN = 45;
+/** what each stall's trader wears */
+const DRESS: Record<StallId, string[]> = {
+  building: ['boonie_hat', 'life_vest', 'work_gloves'],
+  weapons: ['patrol_cap', 'chest_rig', 'work_gloves'],
+  medical: ['fishermans_hat', 'garden_gloves'],
+  clothing: ['field_jacket', 'patrol_cap'],
+};
 
 interface Stand {
+  stall: StallId;
   pos: THREE.Vector3;
   /** the way he faces when nobody is by */
   yaw: number;
@@ -29,22 +35,10 @@ const _to = new THREE.Vector3();
 const _still = new THREE.Vector3();
 
 export class Traders {
-  private stands: Stand[] = [];
+  private stands: Stand[];
 
-  constructor(world: World) {
-    // (not in the shops of the village and the hamlet: at the trading post, which is his own place)
-    const posts = world.sites.filter((st) => st.kind === 'market');
-    for (const b of world.buildings) {
-      if (b.type !== 'store' || !posts.some((st) => Math.hypot(st.x - b.x, st.z - b.z) < 40)) continue;
-      const c = Math.cos(b.rot), s = Math.sin(b.rot);
-      const yaw = b.rot + Math.PI;
-      this.stands.push({ pos: new THREE.Vector3(b.x + BEHIND.x * c + BEHIND.z * s, b.floorY, b.z - BEHIND.x * s + BEHIND.z * c), yaw, now: yaw, body: null });
-    }
-  }
-
-  /** where they all are (for the map) */
-  get places() {
-    return this.stands.map((s) => s.pos);
+  constructor(spots: StallSpot[]) {
+    this.stands = spots.map((s) => ({ stall: s.id, pos: new THREE.Vector3(...s.at), yaw: s.yaw, now: s.yaw, body: null }));
   }
 
   async load(scene: THREE.Scene, atmo: Atmosphere, wear: (body: Avatar, ids: string[]) => Promise<void>) {
@@ -52,7 +46,7 @@ export class Traders {
       this.stands.map(async (s, i) => {
         const body = new Avatar();
         await body.load(atmo, 0, false, lookFor(`trader ${i}`));
-        await wear(body, ['boonie_hat', 'life_vest', 'work_gloves']);
+        await wear(body, DRESS[s.stall]);
         body.update(0, s.pos, _still, s.yaw, false, false);
         scene.add(body.root);
         // (he is solid: not walked through, and a shot at him stops at him. He is not hurt by it.)
@@ -76,20 +70,20 @@ export class Traders {
     }
   }
 
-  /** the one that is being looked at from close by, if any: where his chest is */
-  at(eye: THREE.Vector3, look: THREE.Vector3): THREE.Vector3 | null {
+  /** the one that is being looked at from close by, if any: his stall */
+  at(eye: THREE.Vector3, look: THREE.Vector3): StallId | null {
     for (const s of this.stands) {
       if (!s.body) continue;
       _to.set(s.pos.x, s.pos.y + 1.3, s.pos.z).sub(eye);
       const d = _to.length();
-      if (d < REACH && _to.multiplyScalar(1 / d).dot(look) > FACING) return s.pos;
+      if (d < REACH && _to.multiplyScalar(1 / d).dot(look) > FACING) return s.stall;
     }
     return null;
   }
 
-  /** whether a place is still within speaking distance of one of them */
-  by(p: THREE.Vector3) {
-    return this.stands.some((s) => Math.hypot(s.pos.x - p.x, s.pos.z - p.z) < REACH + 1.5);
+  /** whether a place is still within speaking distance of a stall's trader */
+  by(p: THREE.Vector3, stall: StallId) {
+    return this.stands.some((s) => s.stall === stall && Math.hypot(s.pos.x - p.x, s.pos.z - p.z) < REACH + 1.5);
   }
 }
 

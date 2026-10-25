@@ -63,6 +63,8 @@ export const onlineMethods = {
     const { world, buildings } = this.s;
     // (in no party until this server says otherwise: a party is the server's, server/party.ts)
     this.party.set([], w.you);
+    // (what the old trader's book held, paid out in scrap once: src/game/camp.ts)
+    this.camp.payBook();
     // (a new connection knows nothing of how far this game draws animals: told again, by the next frame)
     this.animalsAsked = 0;
     // (whether this player's name and wallet are fixed is the server's to say: server/pinned.ts)
@@ -109,6 +111,11 @@ export const onlineMethods = {
     this.fires.clear();
     for (const [i, x, y, z] of w.built ?? []) this.fires.add(i, x, y, z, (gx, gz) => heightAt(this.s.world.heights, gx, gz));
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
+    // the trees that are down (src/game/gathering.ts); the bases are told as they come into sight (src/game/building)
+    this.gather.welcome(w.felled);
+    this.build.reset();
+    this.forges.reset();
+    this.recyclers.reset();
     // the lockers somebody is searching at the moment: their doors stand open
     this.lockers.clear();
     for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
@@ -124,6 +131,8 @@ export const onlineMethods = {
     this.wild.leaveAlone();
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
+    // (the bases about them, solid under them before the first frame and before anything is laid on them)
+    for (const b of w.bases ?? []) this.build.onBase({ t: 'base', b });
     if (w.me) {
       for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
       this.takeVitals(w.me.vitals);
@@ -177,6 +186,10 @@ export const onlineMethods = {
     }
     this.stashComing.clear();
     for (const st of [...this.loot.stashes]) this.loot.removeStash(st);
+    this.gather.welcome([]);
+    this.build.reset();
+    this.forges.reset();
+    this.recyclers.reset();
     this.riders.clear();
     this.airdrops.clear();
     this.markDrops();
@@ -324,6 +337,35 @@ export const onlineMethods = {
     net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('fire+', (m) => this.fires.add(m.i, m.x, m.y, m.z, (x, z) => heightAt(this.s.world.heights, x, z)));
     net.on('fire-', (m) => this.fires.remove(m.i));
+    net.on('fell', (m) => this.gather.onFell(m));
+    net.on('grow', (m) => this.gather.onGrow(m));
+    net.on('work', (m) => this.gather.onWork(m));
+    net.on('wear', (m) => this.gather.onWear(m));
+    net.on('saw', (m) => this.gather.onSaw(m));
+    net.on('craft', (m) => this.craft.onCraft(m));
+    net.on('cq', (m) => this.craft.onQueue(m));
+    net.on('known', (m) => this.craft.onKnown(m));
+    net.on('trade', (m) => this.camp.onTrade(m));
+    net.on('tday', (m) => this.camp.onDay(m));
+    net.on('recy', (m) => this.recyclers.onRun(m));
+    net.on('learn', (m) => this.craft.onLearn(m));
+    net.on('forge', (m) => this.forges.onForge(m));
+    net.on('salvage', (m) => this.salvage.onSalvage(m));
+    net.on('base', (m) => this.build.onBase(m));
+    net.on('bgone', (m) => this.build.onGone(m));
+    net.on('bpc', (m) => this.build.onPiece(m));
+    net.on('bout', (m) => this.build.onOut(m));
+    net.on('spent', (m) => this.build.onSpent(m));
+    net.on('bup', (m) => this.build.onUp(m));
+    net.on('bclaim', (m) => this.build.onClaim(m));
+    net.on('bkeep', (m) => this.build.onKeep(m));
+    net.on('bhp', (m) => this.build.onHp(m));
+    net.on('bcharge', (m) => this.build.raid.onCharge(m));
+    net.on('bboom', (m) => this.build.raid.onBoom(m));
+    net.on('bfizz', (m) => this.build.raid.onFizz(m));
+    net.on('bdoor', (m) => this.build.doors.onDoor(m));
+    net.on('beds', (m) => this.build.beds.onBeds(m));
+    net.on('knock', (m) => this.build.doors.onKnock(m));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => {
       this.gearOf.set(m.id, m.g);
@@ -504,7 +546,9 @@ export const onlineMethods = {
     });
     net.on('spawn', (m) => {
       const p = this.player;
-      p.spawn(m.x, heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      // (at a bed, on it: its height is the server's word)
+      p.spawn(m.x, m.y ?? heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      this.build.stood(p.pos);
       this.freshKit();
       this.deathSent = false;
       this.deathInfo = '';
@@ -630,6 +674,7 @@ export const onlineMethods = {
       const pitch = p.pitch;
       // (the arena faces a body set down for a round toward the other end; anybody else keeps their own way)
       p.spawn(m.x, y + 0.1, m.z, m.yaw ?? p.yaw);
+      this.build.stood(p.pos);
       p.pitch = m.yaw === undefined ? pitch : 0;
       p.landSoft();
       this.buriedT = 0;
@@ -971,8 +1016,12 @@ export const onlineMethods = {
       from = under.point.y - 0.02;
       under = physics.raycast({ x: c.x, y: from, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
     }
+    // (and on a base's floor where its colliders are not made, far off: src/sim/build/solid.ts)
+    const floor = this.build.solids.top(c.x, c.y + 0.5, c.z);
+    if (floor > -Infinity && (!under || floor > under.point.y + 0.02)) under = null;
     const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
     if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
+    else if (!under && floor > -Infinity) c = { ...c, y: floor };
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);
     stash.corpse = true;
     // (dog tags lie on a body, and are taken off it: see Container.refusal)
@@ -1001,6 +1050,6 @@ export const onlineMethods = {
 
   /** any server-held container by id: map crate, stash or body */
   findBox(this: Game, cid: string): Stash | undefined {
-    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash;
+    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash ?? this.build.claims.byCid(cid) ?? this.build.boxes.byCid(cid);
   },
 };

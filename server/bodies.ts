@@ -16,7 +16,7 @@ import { makeItem, type ItemInstance } from '../src/sim/items';
  */
 export interface BodyBox {
   cid: string;
-  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture';
+  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox' | 'recycler';
   w: number;
   h: number;
   items: StoredItem[];

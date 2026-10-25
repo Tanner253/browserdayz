@@ -17,7 +17,6 @@ import { type SerializedInventory, Container, keepHotHeld } from '../src/sim/inv
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { PLAN, inPlay, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
-import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
 import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
@@ -43,6 +42,11 @@ import { perks } from './perks';
 import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
 import { animalsTick, startAnimals } from './animals';
+import { regrowing } from './gather';
+import { keepBases, restoreBases, sighting } from './build';
+import { charges } from './raid';
+import { upkeep } from './claims';
+import { ROT } from '../src/sim/build/upkeep';
 import { HELI_HOLD_MS, blowJeep, leftAlone, rackChanged, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
@@ -122,7 +126,7 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 
 export interface Box {
   cid: string;
-  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture';
+  kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox' | 'recycler';
   /** furniture: where in its grid each of the economy's things inside it was last put, by uid (server/storages.ts) */
   layout?: Record<string, [number, number, boolean]>;
   /** a drop that is the cargo of a helicopter that came down */
@@ -231,11 +235,13 @@ export const isVState = (s: unknown): s is VState => Array.isArray(s) && s.lengt
 export const hearths = new Hearths(world.fires);
 
 /**
- * The things that are only ever found, never made by a player's own game: guns, blades, armour, helmets and
- * hats, the keycard. (What the trader sells is made by the game that buys it, and so are a meal, a dressing, a
- * round taken out of a gun, a sight taken off one: none of those can be told from an invention, and none is here.)
+ * The things that are only ever found, crafted or bought from the server, never made by a player's own game: guns,
+ * blades, armour, helmets and hats, the keycard. (What the camp's stalls sell and what is crafted the server gives, and
+ * issues; a meal, a dressing, a round taken out of a gun, a sight taken off one cannot be told from an invention, and
+ * none is here.)
  */
-const GUARDED = new Set(Object.values(ITEMS).filter((d) => !STOCK.includes(d.id) && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
+// (but the gas mask, which the old trader sold made by the game that bought it: those already carried were never issued)
+const GUARDED = new Set(Object.values(ITEMS).filter((d) => d.id !== 'gasmask' && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
 
 /** every such thing the server has put in the world, by its own number: laid out as loot, packed in a crate or a drop, left on a body */
 const issued = new Set<string>();
@@ -354,12 +360,15 @@ function loadWorld() {
     economy: { time: number; lastRestock: Record<string, number>; loot: WorldLoot[] };
     boxes: Box[];
     doors: [number, boolean, number][];
+    bases?: import('../src/sim/build/bases').KeptBase[];
   } | null = null;
   try {
     if (existsSync(SAVE_FILE)) saved = JSON.parse(readFileSync(SAVE_FILE, 'utf8'));
   } catch (e) {
     log('could not read save, starting fresh:', (e as Error).message);
   }
+  // (the bases, kept with the world on this disk as well as in the save: a crash between saves loses none of them)
+  if (saved?.bases) restoreBases(saved.bases);
   if (saved && saved.rev === WORLD_REV) {
     economy.time = saved.economy.time;
     economy.lastRestock = saved.economy.lastRestock;
@@ -401,8 +410,10 @@ function saveWorld() {
       rev: WORLD_REV,
       economy: economy.serialize(),
       // (and the dead lying on the ground, not one riding in a seat: see `bodies` in keep.ts)
-      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
+      // (and no claim's store, nor a base's box: they are kept with their base)
+      boxes: [...boxes.values()].filter((b) => b.kind !== 'drop' && b.kind !== 'claim' && b.kind !== 'bbox' && !(b.kind === 'corpse' && (b.ride || b.zed !== undefined))),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
+      bases: keepBases(),
     };
     writeFileSync(SAVE_FILE, JSON.stringify(data));
   } catch (e) {
@@ -433,6 +444,18 @@ setInterval(() => keeping(Date.now()), 1000);
 setInterval(() => standing(Date.now()), 500);
 
 setInterval(() => inHands(Date.now()), 250);
+// (the charges stuck to bases: server/raid.ts)
+setInterval(() => charges(Date.now()), 250);
+
+// felled trees standing again, out of everybody's sight (server/gather.ts); bases told to whoever comes near them (server/build.ts)
+setInterval(() => regrowing(), 30_000);
+setInterval(() => sighting(), 2000);
+// upkeep taken out of every claim's store, and the bases with none rotting (server/claims.ts). (For a test, a server
+// may be told to live its upkeep faster, `UPKEEP_EVERY_S` and `UPKEEP_SPEED`, and to give a piece with no claim less
+// grace, `ROT_GRACE_S`: a live server is told none of them.)
+const UPKEEP_S = Number(process.env.UPKEEP_EVERY_S) || 60, UPKEEP_K = Number(process.env.UPKEEP_SPEED) || 1;
+if (Number.isFinite(Number(process.env.ROT_GRACE_S)) && process.env.ROT_GRACE_S) ROT.grace = Number(process.env.ROT_GRACE_S) * 1000;
+setInterval(() => upkeep(Date.now(), (UPKEEP_S / 60) * UPKEEP_K), UPKEEP_S * 1000);
 
 /**
  * Who is not let in. BAN_KEYS and BAN_IPS in the environment (lists, commas between) are kept off for as long as

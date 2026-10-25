@@ -18,7 +18,7 @@ import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWor
 import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
-import { leaveSeat, racksNow, releaseLock } from './acts';
+import { leaveSeat, pidOf, racksNow, releaseLock } from './acts';
 import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
 import { partyIn, partyOut } from './party';
@@ -26,8 +26,15 @@ import { pinned } from './pinned';
 import { perks } from './perks';
 import { plating } from './plates';
 import { bodyInfo } from './bodies';
+import { woods } from './gather';
 import { SHOP, type ItemId } from '../api/_lib/shop-items';
 import { forget } from './searched';
+import { wakeClear } from './solid';
+import { basesFor } from './build';
+import { tellKnown } from './learn';
+import { tellDay } from './camp';
+import { tellRecyclers } from './recycle';
+import { chargesNow } from './raid';
 import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 
 export interface Client {
@@ -358,7 +365,13 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // (and whoever was kept by its lid stands on that ground as it is now: it was made again round the lid, 2026-10-19,
   // and the world's number kept, for nobody anywhere else is to be moved: the owner, "i dont want this")
   const byLid = !!resume && !!world.bunker && Math.hypot(resume.pose[0] - world.bunker.x, resume.pose[2] - world.bunker.z) < 50;
-  const sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: byLid ? world.coverAt(resume.pose[0], resume.pose[2]) : resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
+  let sp = !resume || resume.afresh ? pickSpawn() : out ? { x: out[0], y: world.coverAt(out[0], out[2]), z: out[2], yaw: resume.pose[3] } : { x: resume.pose[0], y: byLid ? world.coverAt(resume.pose[0], resume.pose[2]) : resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] };
+  // (and nobody comes back inside a piece of a base, or shut in a base that is not theirs: set down clear of it, as
+  // Rust puts out a sleeper. The owner, 2026-10-24: "cant be shot through or noclipped into somehow via relogging")
+  if (resume && !resume.afresh && 'y' in sp && sp.y !== undefined) {
+    const clear = wakeClear(pidOf(key), [sp.x, sp.y, sp.z], cleanName(m.name));
+    if (clear) sp = { ...sp, x: clear[0], y: clear[1], z: clear[2] };
+  }
   const c: Client = {
     ws, id: nextId++, key, name: pinned.of(key)?.name ?? cleanName(m.name),
     // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
@@ -391,6 +404,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     racks: racksNow(),
     built: [...hearths.built].map(([i, b]): [number, number, number, number] => [i, b.x, b.y, b.z]),
     fires: hearths.alight(Date.now() / 1000),
+    felled: [...woods().felled.keys()],
     bunker: bunkerDoor.open,
     // (the map's containers that somebody has open at this moment: a locker among them is seen standing open)
     ajar: [...locks.keys()].filter((cid) => boxes.get(cid)?.kind === 'crate'),
@@ -400,8 +414,11 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     hour: phaseOf(Date.now() / 1000),
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 }, tag: resume.tagMs ?? 0 } : null,
+    bases: basesFor(c),
     max: MAX_PLAYERS,
   });
+  // (and the charges burning on bases, or lying unlit: server/raid.ts)
+  for (const ch of chargesNow()) send(c, { t: 'bcharge', ...ch });
   // Dead when they last left, and back to start again: told how. (2026-10-20, a player: "the server just reloads my
   // game out of nowhere and when i get in i spawn fresh". A game whose line went quiet in a fight is seen and shot by
   // everybody while it shows nothing new; its death reaches the server and not the game, the line drops, the page
@@ -418,6 +435,10 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   c.perkKey = perkKey(c.key);
   if (c.perkKey !== '{}') send(c, { t: 'perks', id: c.id, sk: perks.skins(c.key), ...(perks.vip(c.key) ? { vip: true as const } : {}) });
   partyIn(c);
+  // (and the blueprints they have learned, their day at the trader camp, the recyclers running: server/learn.ts, camp.ts, recycle.ts)
+  tellKnown(c);
+  tellDay(c);
+  tellRecyclers(c);
   // back under another name: the board says so, to everybody
   const had = scores.get(c.key);
   if (had && had.name !== c.name) {

@@ -130,6 +130,17 @@ export const SHOULDER = {
   palm: [0, 0.14, -1] as [number, number, number],
 };
 
+/**
+ * A torch, carried: the fist before the chest and out to the right, the forearm up, the torch standing in it and leaning a
+ * little out, so its flame is at the shoulder's height and clear of the body (the navigator, of one held at the hip: "he
+ * looks like his jacket is on fire ... Hold it as DayZ and Rust do"). From the head, as SHOULDER: forward, up, right.
+ */
+export const RAISE = {
+  at: [0.4, -0.44, 0.32] as [number, number, number],
+  fingers: [0.92, -0.18, -0.34] as [number, number, number],
+  palm: [0.1, 0.12, -1] as [number, number, number],
+};
+
 export interface ArmRig {
   arm: THREE.Bone;
   fore: THREE.Bone;
@@ -453,9 +464,11 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
+  /** how far a torch is held up (0 at the side, 1 up: RAISE) */
+  raiseT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are

@@ -41,6 +41,7 @@ import { Avatar, AVATAR_LAYER, type Hold } from './avatar';
 import { lookFor } from './look';
 import { chosen, choose } from './survivors';
 import { Doll } from './doll';
+import { inFist } from './in-fist';
 import { GunRacks, RACK_PLAN } from './racks';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
@@ -48,7 +49,7 @@ import { CorpseBody, RemotePlayer } from './remote';
 import { CameraDirector } from './camera';
 import { Effects } from './effects';
 import { Weapons, type HitInfo } from './weapons';
-import { LootManager, Stash, WorldItem } from './loot';
+import { LootManager, Stash, WorldItem, type ItemTemplate } from './loot';
 import { Grenades } from './grenades';
 import { Throwing } from './throwing';
 import { Garage } from './garage';
@@ -99,8 +100,9 @@ import '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
-import { STOCK, aDay, asks, pays, sold } from '../sim/trade';
-import { jobsFor, progress as jobDone } from '../sim/jobs';
+import { TraderCamp } from './camp';
+import { RecyclerView } from './craft-recyclers';
+import { recyclerLayer } from '../sim/craft/recyclers';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
@@ -117,6 +119,19 @@ import { dropsMethods } from './game/drops';
 import { handsMethods } from './game/hands';
 import { itemsMethods } from './game/items';
 import { huntMethods } from './game/hunt';
+import { Gathering } from './gathering';
+import { Crafting } from './crafting';
+import { CraftCard } from '../ui/craft-card';
+import { CraftingScreen } from '../ui/crafting-ui';
+import { ForgeView } from './craft-forge';
+import { Salvage } from './craft-salvage';
+import { salvageSpots } from '../sim/craft/salvage';
+import { wreckLayer, wreckSpots } from '../sim/craft/wrecks';
+import { WreckView } from './craft-wrecks';
+import { RockRef, TreeRef } from '../world/felling';
+import { pocketsOf } from '../sim/craft/plan';
+import { Building } from './building';
+import { PieceRef } from './building/draw';
 import { gunsMethods } from './game/guns';
 import { interactMethods } from './game/interact';
 import { frameMethods } from './game/frame';
@@ -243,6 +258,19 @@ export class Game {
   throwing!: Throwing;
   /** the jeeps (see garage.ts) */
   garage!: Garage;
+  /** trees felled, stone broken, logs sawn (src/game/gathering.ts) */
+  gather!: Gathering;
+  /** things made by hand, and a recipe's card (src/game/crafting.ts, src/ui/craft-card.ts) */
+  craft!: Crafting;
+  craftCard!: CraftCard;
+  /** forges drawn, burning (src/game/craft-forge.ts) */
+  forges!: ForgeView;
+  /** scrap knocked off wrecks, drums and junk (src/game/craft-salvage.ts) */
+  salvage!: Salvage;
+  /** salvage's wrecks, a layer of their own (src/game/craft-wrecks.ts) */
+  wrecks!: WreckView;
+  /** bases: the plan, the hammer, the pieces (src/game/building/index.ts) */
+  build!: Building;
   /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
   riders!: Riders;
   economy!: Economy;
@@ -343,13 +371,7 @@ export class Game {
     killed: (zone, distance) => {
       this.weapons.confirmKill();
       // (counted toward the trader's work of the day, whether or not he has been asked about it)
-      const book = this.jobBook();
-      book.kills++;
-      if (zone === 'head') book.heads++;
-      this.keepBook(book);
-      const job = jobsFor(book.day).find((j) => (j.kind === 'cull' || (j.kind === 'heads' && zone === 'head')) && !book.done.includes(j.id));
-      const done = job ? jobDone(job, book, () => 0) : 0;
-      const work = job ? (done >= job.n ? ` · the trader's job is done: ${job.pays} to collect` : ` · trader's job ${done}/${job.n}`) : '';
+      const work = this.camp.killed(zone === 'head');
       this.hud.note(`Infected down${zone === 'head' ? ' · headshot' : ''}${distance > 8 ? ` · ${Math.round(distance)} m` : ''}${work}`, 'good');
     },
   });
@@ -400,6 +422,10 @@ export class Game {
   rangeHeard = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
   traders: Traders | null = null;
+  /** the trader camp (src/game/camp.ts) */
+  camp!: TraderCamp;
+  /** the recyclers (src/game/craft-recyclers.ts) */
+  recyclers!: RecyclerView;
   /** talking to whoever is near: hold V (src/game/voice.ts) */
   readonly voice = new Voice(() => (audio.ready ? audio.ctx : null), () => audio.voiceBus(), (piece) => this.net.sendVoice(piece));
   voiceSaid = false;
@@ -413,7 +439,6 @@ export class Game {
   calls: { at: THREE.Vector3; until: number; smoke: { owed: number } }[] = [];
   shop!: ShopUI;
   /** what is written against this player in the trader's book: kept by the browser */
-  credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
   /** seconds G has been held (drop what is in the hands), and whether that press has done its work */
   dropHeld = 0;
   dropDone = false;
@@ -537,6 +562,8 @@ export class Game {
     for (const pad of this.pads) r.scene.add(pad);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
+    // (the torch's model at hand for everybody else's fist, which is made at once when one is held: makeHeld)
+    void this.loot.models.get('torch').then((t) => (this.torchModel = t), () => {});
     this.party = new Party(r.scene);
     this.airdrops = new Airdrops(r.scene, {
       // (the crate that comes down is the crate that stands there after: the same model, as big)
@@ -663,6 +690,124 @@ export class Game {
       },
     });
     await this.garage.load();
+    this.gather = new Gathering({
+      scene: r.scene,
+      forest: this.s.veg,
+      world,
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      held: () => this.weapons.equippedItem,
+      me: () => this.player.pos,
+      eye: () => this.s.r.camera.position,
+      find: (uid) => this.inv.everything().get(uid) ?? null,
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      lay: (item, at) => this.dropItem(item, at, 0.2),
+      takeUp: (uid) => !!this.economy.take(uid),
+      changed: () => this.inventoryChanged(),
+      begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
+      breakOff: () => this.breakOff(),
+    });
+    this.craft = new Crafting({
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      pockets: () => pocketsOf(this.inv.serialize()),
+      find: (uid) => this.inv.everything().get(uid) ?? null,
+      me: () => this.player.pos,
+      begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
+      busy: () => !!this.use || this.weapons.working,
+      breakOff: () => this.breakOff(),
+      remove: (uid) => {
+        const it = this.inv.everything().get(uid);
+        if (it) this.inv.remove(it);
+      },
+      take: (id, n) => void this.inv.take(id, n),
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      changed: () => this.inventoryChanged(),
+      bases: () => this.build.known,
+    });
+    this.build = new Building({
+      scene: r.scene,
+      atmo,
+      world,
+      input: this.input,
+      camera: () => this.s.r.camera,
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      held: () => this.inv.held(),
+      me: () => this.player.pos,
+      yaw: () => this.player.yaw,
+      count: (id) => [...this.inv.everything().values()].filter((it) => it.id === id).reduce((n, it) => n + it.qty, 0),
+      take: (id, n) => void this.inv.take(id, n),
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
+      busy: () => !!this.use || this.weapons.working,
+      breakOff: () => this.breakOff(),
+      changed: () => this.inventoryChanged(),
+      felled: (i) => this.gather.felling.isDown(i),
+      hud: () => this.hud.root,
+      player: () => this.player.collider,
+      open: (s) => {
+        this.focus = s;
+        this.toggleInventory(true);
+      },
+      // (crafting's research table: F opens the Crafting tab on what it would teach)
+      use: (free, t) => {
+        if (t?.base.pieces.get(t.id)?.k !== 'research_table') return null;
+        if (free && this.input.pressed('KeyF')) {
+          (this.invUI.craftPane as CraftingScreen | null)?.showView('research');
+          this.toggleInventory(true);
+          if (this.invUI.isOpen) this.invUI.setMode('craft');
+        }
+        return '<kbd>F</kbd>Research';
+      },
+      name: () => playerName(),
+      keys: () => [...this.inv.everything().values()].filter((it) => it.id === 'key' && it.key).map((it) => it.key!),
+      panel: (open) => {
+        // (as the shop's: the mouse let go while it is up, taken again when it is put away)
+        this.input.releaseAll();
+        this.input.uiMode = open;
+        if (open) this.input.unlock();
+        else if (this.started && !this.paused) this.input.lock();
+      },
+      hurt: (n) => {
+        this.player.damage(n, 'a code lock');
+        this.weapons.flinch(1);
+      },
+      wake: (x, y, z, yaw) => this.respawn({ x, y, z, yaw }),
+      climber: () => this.player,
+      flames: () => this.effects.fire,
+      glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
+      tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
+      explode: (at, mine, w) => this.explode(at, mine, w === 'c4' || w === 'satchel' ? w : 'grenade'),
+      impact: (surface, at, normal) => this.effects.impact(surface, at, normal, false),
+    });
+    this.forges = new ForgeView({
+      scene: r.scene,
+      online: () => this.online,
+      bases: () => this.build.known,
+      flames: () => this.effects.fire,
+      glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
+      shut: (at) => this.build.lightShut(at),
+      me: () => this.player.pos,
+      store: (cid) => this.build.boxes.byCid(cid)?.container,
+      changed: () => {
+        if (this.invUI.isOpen) this.invUI.render();
+      },
+    });
+    const wrecks = wreckLayer(world);
+    this.salvage = new Salvage({
+      online: () => this.online,
+      send: (m) => this.net.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      held: () => this.weapons.equippedItem,
+      me: () => this.player.pos,
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      changed: () => this.inventoryChanged(),
+    }, salvageSpots(world.props, wreckSpots(wrecks)));
+    this.wrecks = new WreckView(r.scene, wrecks, () => this.player.pos);
     this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
@@ -786,6 +931,14 @@ export class Game {
       this.hud.note(`No room for the ${ITEMS[item.id].name.toLowerCase()}: it is at your feet`, 'warn');
     };
     // a punch or a swing: your own body throws it, and everyone near you sees it
+    // (a swing that lands on a tree or a rock: src/game/gathering.ts)
+    this.weapons.onWhack = (owner, at, w) => {
+      this.gather.whack(owner, w);
+      // (or on a piece of a base: a raid, src/game/building/raid.ts)
+      if (owner instanceof PieceRef) return this.build.raid.whack(owner, at, w);
+      // (or on a wreck, a drum, a heap of junk: src/game/craft-salvage.ts)
+      if (!(owner instanceof TreeRef || owner instanceof RockRef)) this.salvage.whack(at, w);
+    };
     this.weapons.onSwing = (seconds) => {
       this.avatar.swing(false, seconds);
       this.net.send({ t: 'swing' });
@@ -937,6 +1090,32 @@ export class Game {
       finishFor: (item) => this.finishFor(item),
       applyFinish: (item) => this.applyFinish(item),
       plateIcon: (id, f) => this.plateIcon(id, f),
+      craftWith: (a, b) => this.craft.recipesFor(a, b).length > 0,
+      craftOnto: (a, b, at) => this.craftCard.float(this.craft.recipesFor(a, b), at, [a.uid, b.uid]),
+      craftOpen: () => this.craftCard.open,
+      stashBar: (st) => this.recyclers?.bar(st) ?? this.forges?.bar(st) ?? null,
+    });
+    this.craftCard = new CraftCard({ icons: () => this.invUI.icons, pockets: () => pocketsOf(this.inv.serialize()), craft: (rid, n, u) => void this.craft.craft(rid, n, u), where: (r) => this.craft.where(r) });
+    // (the Crafting tab: J, or the tab at the top of the inventory)
+    this.invUI.craftPane = new CraftingScreen({
+      icons: () => this.invUI.icons,
+      pockets: () => pocketsOf(this.inv.serialize()),
+      craft: (rid, n, u) => void this.craft.craft(rid, n, u),
+      where: (r) => this.craft.where(r),
+      ways: (r) => this.craft.ways(r),
+      unlock: (rid) => this.craft.unlock(rid),
+      research: (uid) => this.craft.research(uid),
+      knows: (id) => this.craft.knows(id),
+      level: () => this.craft.level(),
+      atTable: () => this.craft.atTable(),
+      queue: () => this.craft.queue.jobs,
+      running: () => this.craft.running(),
+      unqueue: (i) => this.craft.unqueue(i),
+      light: (ids) => this.invUI.lightUp(ids),
+      making: () => {
+        const u = this.use;
+        return u && u.label === this.craft.label ? { label: u.label, t: Math.min(1, u.t / u.dur), left: Math.max(0, u.dur - u.t) } : null;
+      },
     });
     // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
     // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
@@ -1288,66 +1467,26 @@ export class Game {
         }
       }
     }
-    this.traders = new Traders(world);
-    this.minimap.setTraders(this.traders.places);
-    this.wells = wellSpots(world);
-    this.minimap.setWells(this.wells);
-    void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
-    this.shop = new ShopUI({
-      credit: () => this.credit,
+    // (the trader camp: its stalls, their traders and the counter's screen; src/game/camp.ts)
+    this.camp = new TraderCamp(world, {
+      online: () => this.online,
+      send: (m) => this.net?.send(m),
+      note: (text, kind) => this.hud.note(text, kind),
+      scene: r.scene,
       // (what is carried, and the guns on the back and in the holster: not what is in the hands, nor what is worn, nor a bag with things in it)
-      wares: () =>
-        [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.map((sl) => this.inv.slots[sl])]
-          .filter((it): it is ItemInstance => !!it && !it.cargo?.length && pays(it) > 0)
-          .map((item) => ({ item, pays: pays(item) })),
-      stock: () => {
-        const bought = this.jobBook().bought ?? {};
-        return STOCK.map((id) => ({ id, asks: asks(id), left: aDay(id) - (bought[id] ?? 0) })).filter((x) => x.asks > 0);
-      },
+      wares: () => [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.map((sl) => this.inv.slots[sl])].filter((it): it is ItemInstance => !!it && !it.cargo?.length),
+      count: (id) => this.countOf(id),
       icon: (id) => this.invUI.icons[id],
-      jobs: () => {
-        const book = this.jobBook();
-        return jobsFor(book.day).map((j) => ({ id: j.id, text: j.text, n: j.n, pays: j.pays, have: jobDone(j, book, (id) => this.countOf(id)), paid: book.done.includes(j.id) }));
+      take: (id, n) => {
+        this.inv.take(id, n);
+        this.inventoryChanged();
       },
-      handIn: (id) => {
-        const book = this.jobBook();
-        const job = jobsFor(book.day).find((j) => j.id === id);
-        if (!job || book.done.includes(id)) return 'That one is settled.';
-        if (jobDone(job, book, (x) => this.countOf(x)) < job.n) return 'Not yet it is not.';
-        if (job.kind === 'bring') {
-          if (this.inv.take(job.item!, job.n) < job.n) return 'You have not got them on you.';
-          this.inventoryChanged();
-        }
-        book.done.push(id);
-        this.keepBook(book);
-        this.setCredit(this.credit + job.pays);
-        audio.ui('open');
-        return null;
-      },
-      sell: (item) => {
-        const got = pays(item);
-        if (!got) return;
+      remove: (item) => {
         this.inv.remove(item);
-        this.setCredit(this.credit + got);
         this.inventoryChanged();
-        audio.ui('close');
       },
-      buy: (id) => {
-        const cost = asks(id);
-        if (!cost) return 'I do not sell that.';
-        const book = this.jobBook();
-        if ((book.bought?.[id] ?? 0) >= aDay(id)) return 'No more of those today. Come back tomorrow.';
-        if (cost > this.credit) return `That is ${cost}. You have ${this.credit} with me.`;
-        const it = makeItem(id, sold(id));
-        if (!this.inv.hasRoom(it)) return 'You have nowhere to put it. Sell me something first.';
-        this.inv.add(it);
-        book.bought = { ...book.bought, [id]: (book.bought?.[id] ?? 0) + 1 };
-        this.keepBook(book);
-        this.setCredit(this.credit - cost);
-        this.inventoryChanged();
-        audio.ui('open');
-        return null;
-      },
+      give: (items, gift) => this.kitUp({ t: 'kit', name: gift, items, adds: true, gift }),
+      hasRoom: (items) => items.every((it) => this.inv.hasRoom(it)),
       closed: () => {
         this.input.uiMode = false;
         if (this.started && !this.player.dead) this.input.lock();
@@ -1357,6 +1496,31 @@ export class Game {
         this.save();
       },
     });
+    // (the recyclers: the trader camp's and four more, a layer of their own; src/game/craft-recyclers.ts)
+    this.recyclers = new RecyclerView(
+      {
+        scene: r.scene,
+        input: this.input,
+        online: () => this.online,
+        send: (m) => this.net?.send(m),
+        note: (text, kind) => this.hud.note(text, kind),
+        open: (s) => {
+          this.focus = s;
+          this.toggleInventory(true);
+        },
+        changed: () => {
+          if (this.invUI.isOpen) this.invUI.render();
+        },
+      },
+      recyclerLayer(world, this.camp.camp),
+    );
+    this.traders = new Traders(this.camp.camp?.stalls ?? []);
+    if (this.camp.camp) this.minimap.setTraders([new THREE.Vector3(this.camp.camp.x, 0, this.camp.camp.z)]);
+    this.wells = wellSpots(world);
+    this.minimap.setWells(this.wells);
+    void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
+    this.shop = new ShopUI(this.camp.shopHost());
+    this.camp.redraw = () => this.shop.refresh();
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
@@ -1462,8 +1626,12 @@ export class Game {
   /** the jeep the view was last behind (so going in and out of one is a move of the view, not a cut) */
   rode: Jeep | null = null;
 
+  /** the torch's model, for everybody else's fist (its loot model, asked for as the game starts: see makeHeld) */
+  torchModel: ItemTemplate | null = null;
   makeHeld = (id: string | null, mods: string[], finish?: Finish | null) => {
     if (!id) return null;
+    // (a torch in the fist, as everybody else is shown it, lit or not: its own model, fetched as the game starts)
+    if (id === 'torch') return this.torchModel ? inFist(this.torchModel.group.clone(), 'torch') : null;
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
     const grips = this.weapons.gripsOf(id, mods);
@@ -1868,9 +2036,6 @@ export interface Game {
   callDrop: Methods<typeof gunsMethods>['callDrop'];
   flightBegun: Methods<typeof gunsMethods>['flightBegun'];
   dropLanded: Methods<typeof gunsMethods>['dropLanded'];
-  jobBook: Methods<typeof gunsMethods>['jobBook'];
-  keepBook: Methods<typeof gunsMethods>['keepBook'];
-  setCredit: Methods<typeof gunsMethods>['setCredit'];
   openShop: Methods<typeof gunsMethods>['openShop'];
   toggleMap: Methods<typeof gunsMethods>['toggleMap'];
   toggleInventory: Methods<typeof gunsMethods>['toggleInventory'];

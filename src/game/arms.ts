@@ -54,6 +54,8 @@ export interface HandGrip {
   elbow?: THREE.Vector3;
   /** something long that is carried, when nothing is being done with it, laid back on the shoulder (a bat) */
   shoulder?: boolean;
+  /** held up before the chest, the forearm raised, what is in the fist standing up and a little out (a torch) */
+  raise?: boolean;
 }
 
 export interface Grips {

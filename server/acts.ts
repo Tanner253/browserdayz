@@ -59,7 +59,7 @@ export function ajar(cid: string, open: boolean, by?: Client) {
 }
 
 /** The short public mark of a key, as a player's own game stamps it on their tag (publicId in src/net/client.ts: the same sum). */
-function pidOf(key: string): string {
+export function pidOf(key: string): string {
   let a = 2166136261, b = 5381;
   for (let i = 0; i < key.length; i++) {
     a = Math.imul(a ^ key.charCodeAt(i), 16777619);
@@ -341,8 +341,10 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   // Near anything that could be stood on, a house's upper floor, a roof, a rock, it stays at their height: the server
   // knows the ground and not every floor, and each game lays the body on whatever is under it (Game.addCorpse).
   // It was put on the ground under the building: 2026-10-24, "when i kill someone on the 3rd floor their body falls
-  // to the ground rather than staying on the floor of where they were killed at".)
-  const at = c.pose[1], under = world.standAt(x, at, z), y = !ride && at - under > 1.5 && !world.supportNear(x, z) ? under : at;
+  // to the ground rather than staying on the floor of where they were killed at". A floor the server does know, a
+  // base's or a bridge's deck, it falls to: server/solid.ts.)
+  const at = c.pose[1], under = world.standAt(x, at, z), known = under > world.coverAt(x, z) + 0.05;
+  const y = !ride && at - under > 1.5 && (known || !world.supportNear(x, z)) ? under : at;
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
   const box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
   const spill: ItemInstance[] = [];
@@ -419,7 +421,9 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;
-    economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
+    // (at the body's height, or on what is under each about there: a base's floor, which the body may be a hair off)
+    const ix = x + Math.cos(a) * 0.9, iz = z + Math.sin(a) * 0.9, under = world.standAt(ix, y + 0.3, iz);
+    economy.drop(it, ix, Math.abs(under - y) < 0.6 ? under + 0.03 : y, iz, Math.random() * 6.28);
   }
   lieAt(spill, 'g');
   if (!box.items.length) return null;

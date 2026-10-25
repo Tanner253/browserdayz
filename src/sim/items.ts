@@ -5,6 +5,8 @@ import { KIT_ITEMS } from './items/kit';
 import { WEAR_ITEMS } from './items/wear';
 import { TOOL_ITEMS } from './items/tools';
 import { HUNT_ITEMS } from './items/hunt';
+import { BUILD_ITEMS } from './items/build';
+import { CRAFT_ITEMS } from './items/craft';
 import type { LootRule } from './items/rules';
 import { lookOf } from '../../api/_lib/shop-items';
 import type { Region } from './survivor';
@@ -163,7 +165,7 @@ export interface ItemDef {
 
 // (the items themselves are in src/sim/items/, by sort, each with its loot rule and its price)
 
-const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS];
+const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS, ...BUILD_ITEMS, ...CRAFT_ITEMS];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));
 
@@ -214,6 +216,10 @@ export interface ItemInstance {
   held?: number;
   /** a bottle (see `sips`): how many drinks are left in it */
   left?: number;
+  /** a tool's condition, 1 new and 0 ruined (DayZ's health of an item; src/sim/gather.ts `condition`): not said, new */
+  cond?: number;
+  /** a key: the number of the key lock it opens (src/sim/build/locks.ts), never shown */
+  key?: number;
   /**
    * a gun with a store finish put on it (the shop's item id, 'deagle_gold'): it goes with the gun until the gun is
    * gone, Rust's way. Only ever the server's word (server/plates.ts); a game's own is not read.
@@ -579,6 +585,13 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   // (its sights: one of the ranges that gun's can be set for, or as it comes)
   if (it.zero !== undefined && !(d.weapon && GUNS[it.id]?.zero.includes(it.zero))) delete it.zero;
   if (it.mods) it.mods = it.mods.filter((m) => !ITEMS[m]?.mag && ITEMS[m]?.attach?.fits.includes(it.id));
+  // (a tool's condition: between ruined and new, and not said at all when new)
+  if (it.cond !== undefined) {
+    const c = Number(it.cond);
+    if (Number.isFinite(c) && c < 1) it.cond = Math.max(0, c);
+    else delete it.cond;
+  }
+  if (it.key !== undefined && !(it.id === 'key' && Number.isInteger(it.key) && it.key > 0)) delete it.key;
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));
     if (!holds(it.id)) delete it.cargo;
