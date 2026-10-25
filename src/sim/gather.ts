@@ -28,7 +28,7 @@ export const TREE = {
 };
 
 /** how hard each tool bites into wood (blows a tree takes are its toughness over this) */
-export const CHOPS: Record<string, number> = { hatchet: 1, felling_axe: 2.5 };
+export const CHOPS: Record<string, number> = { hatchet: 1, felling_axe: 2.5, stone_hatchet: 0.5 };
 /** and into stone */
 export const MINES: Record<string, number> = { pickaxe: 1 };
 /** what saws a log */
@@ -78,7 +78,9 @@ export const SAW = {
 // ---- the tools wearing (DayZ's health of an item: Pristine, Worn, Damaged, Badly damaged, Ruined)
 
 /** how many uses a tool has in it, pristine to ruined: a blow, a log sawn (each use takes 1/life of its condition) */
-export const TOOL_LIFE: Record<string, number> = { hatchet: 450, felling_axe: 650, pickaxe: 500, hand_saw: 70, hammer: 400 };
+export const TOOL_LIFE: Record<string, number> = { hatchet: 450, felling_axe: 650, pickaxe: 500, hand_saw: 70, hammer: 400,
+  // (crafting's: the stone hatchet made by hand, the sledgehammer, and the blades that cut clothes into rags)
+  stone_hatchet: 150, sledgehammer: 900, bone_knife: 120, knife: 400, machete: 450 };
 /** what nails a base up and takes it down: the building hammer (Rust's), base building's second step */
 export const HAMMERS: Record<string, number> = { hammer: 1 };
 

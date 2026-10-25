@@ -49,6 +49,7 @@ import { landing, tossed } from './throws';
 import { aimWatch, looked } from './aimwatch';
 import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
+import { craft } from './craft';
 import { hammer, lay, owing, print, sightFor, takeDown } from './build';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
@@ -369,6 +370,8 @@ export function handle(c: Client, m: C2S) {
       return mine(c, m);
     case 'saw':
       return saw(c, m);
+    case 'craft':
+      return craft(c, m);
     case 'blay':
       return lay(c, m);
     case 'bup':

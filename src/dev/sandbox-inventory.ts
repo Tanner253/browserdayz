@@ -6,6 +6,8 @@
 //   &body=marksman                 the kit on the body beside (default: assault)
 //   &ui=hud                        the hot bar at the foot of the screen, as in play
 //   &ui=wheel                      the wheel on T (src/ui/radial.ts) by itself: window.wheel is it, to be pointed by a script
+//   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
+//                                  a recipe's card (src/ui/craft-card.ts), whose Craft makes it at once here
 //   &touch=1                       as a phone has it
 // What is done in it (a drag, a key, a drop) is done to these pockets alone, and nothing is kept.
 
@@ -25,6 +27,9 @@ import { renderDoll } from '../ui/icons';
 import { lookFor } from '../game/look';
 import type * as THREE from 'three';
 import type { Stash, WorldItem } from '../game/loot';
+import { CraftCard } from '../ui/craft-card';
+import { RECIPE } from '../sim/craft/recipes';
+import { plan, pocketsOf, recipesFor } from '../sim/craft/plan';
 
 const made = (th: KitThing): ItemInstance => {
   const it = makeItem(th.id, th.qty);
@@ -57,7 +62,11 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   const inv = new PlayerInventory();
   inv.clear();
   const kit = kitOf(q.get('kit'));
-  for (const th of kit.things) inv.add(made(th));
+  // (with &craft=1, what is worn first, then the things crafting is made of, and the rest of the kit where it finds room)
+  const crafting = q.get('craft') === '1' ? ([['field_trousers'], ['knife'], ['rags', 9], ['rubbing_alcohol', 5], ['ammo_556', 20], ['stone', 10], ['planks', 4], ['bones', 4]] as [string, number?][]) : [];
+  for (const th of kit.things) if (!crafting.length || ITEMS[th.id].wear) inv.add(made(th));
+  for (const [id, k] of crafting) inv.add(makeItem(id, k));
+  if (crafting.length) for (const th of kit.things) if (!ITEMS[th.id].wear) inv.add(made(th));
   inv.autoBind();
   for (const it of [...inv.carried()]) {
     if (!ITEMS[it.id].use || inv.hot.some((b) => b?.id === it.id)) continue;
@@ -142,13 +151,32 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     finishFor: () => null,
     applyFinish: () => {},
     plateIcon: () => {},
+    craftWith: (a, b) => recipesFor(a, b).length > 0,
+    craftOnto: (a, b, at) => card.float(recipesFor(a, b), at, [a.uid, b.uid]),
+    craftOpen: () => card.open,
   };
+  // (made at once here, by the same rule: the hold and the server are the game's)
+  const card = new CraftCard({
+    icons: () => icons,
+    pockets: () => pocketsOf(inv.serialize()),
+    craft: (rid, k, u) => {
+      const got = plan(RECIPE[rid], k, pocketsOf(inv.serialize()), u);
+      if (typeof got === 'string') return console.info(got);
+      for (const [id, m] of Object.entries(got.pay)) inv.take(id, m);
+      for (const uid of got.uids) {
+        const it = inv.everything().get(uid);
+        if (it) inv.remove(it);
+      }
+      if (got.makes) inv.add(makeItem(RECIPE[rid].makes, got.makes));
+      screen?.render();
+    },
+  });
   screen = new InventoryUI(inv, actions);
   screen.icons = icons;
   // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
   if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
   screen.open(vicinity, opened ?? body, freshVitals());
-  (window as unknown as { stageInv: unknown }).stageInv = { inv, screen, vicinity };
+  (window as unknown as { stageInv: unknown }).stageInv = { inv, screen, vicinity, card, recipesFor };
   await pictures(ui);
   shown.carried = [...inv.carried()].length;
   shown.lying = vicinity.length;

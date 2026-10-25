@@ -6,6 +6,7 @@ import { WEAR_ITEMS } from './items/wear';
 import { TOOL_ITEMS } from './items/tools';
 import { HUNT_ITEMS } from './items/hunt';
 import { BUILD_ITEMS } from './items/build';
+import { CRAFT_ITEMS } from './items/craft';
 import type { LootRule } from './items/rules';
 import { lookOf } from '../../api/_lib/shop-items';
 // Item database. Pure data; shared by the client UI, world spawning and the server.
@@ -148,7 +149,7 @@ export interface ItemDef {
 
 // (the items themselves are in src/sim/items/, by sort, each with its loot rule and its price)
 
-const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS, ...BUILD_ITEMS];
+const D: ItemDef[] = [...GUN_ITEMS, ...PART_ITEMS, ...KIT_ITEMS, ...WEAR_ITEMS, ...TOOL_ITEMS, ...HUNT_ITEMS, ...BUILD_ITEMS, ...CRAFT_ITEMS];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));
 
