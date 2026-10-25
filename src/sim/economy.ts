@@ -17,6 +17,7 @@ import { APART_FILL, APART_KIND, APART_LEAN, APART_LEAST, APART_RICH, OWN, apart
 
 export { APART, APART_KIND, apartOf } from './apart';
 import { eastOnly, typeRule, type TypeRule } from './items/rules';
+import { LOOT_BAG } from './items/build';
 import { eastOfLine } from '../world/zona';
 
 export type { TypeRule };
@@ -810,6 +811,11 @@ export class Economy {
       // (a dog tag on the ground is gone ten minutes on, near anybody or not: see TAG_GROUND)
       if (l.item.id === 'dogtag') {
         if (this.time - l.spawnedAt > TAG_GROUND) this.take(l.uid, false);
+        continue;
+      }
+      // (a broken box's bag, once it is emptied or ten minutes on: see LOOT_BAG)
+      if (l.item.id === LOOT_BAG.id) {
+        if (!l.item.cargo?.length || now - (l.keptAt ?? 0) > LOOT_BAG.life) this.take(l.uid, false);
         continue;
       }
       // (a container somebody dropped goes by the calendar, and not by how long this game has been running)

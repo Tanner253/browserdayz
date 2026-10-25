@@ -8,6 +8,7 @@ import { physics, USE_GROUPS, SIGHT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { Door } from '../../world/buildings';
 import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf, ZONA_VOID } from '../../sim/items';
+import { LOOT_BAG } from '../../sim/items/build';
 import { inPlay } from '../../world/worldgen';
 import { CRATE_RESTOCK } from '../../sim/crates';
 import { POLICE_CAR } from '../../sim/vehicles';
@@ -167,6 +168,11 @@ export const interactMethods = {
       const spade = d.category === 'stash' && this.weapons.equippedItem?.id === 'shovel';
       // (a log, and a saw in the hands: the left button saws it into planks where it lies, src/game/gathering.ts)
       const saw = item.id === 'log' && this.gather.canSaw();
+      // (a broken box's bag is gone through where it lies, never taken: see LOOT_BAG)
+      if (item.id === LOOT_BAG.id) {
+        this.prompt = `<kbd>Tab</kbd>Go through the ${d.name}${qty}`;
+        return;
+      }
       this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : saw ? ' <small>the left button saws it into planks</small>' : ''}`;
       if (spade && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
       if (saw && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.gather.saw(owner.loot);

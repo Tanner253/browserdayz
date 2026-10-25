@@ -99,6 +99,15 @@ ok('two C4 on one stone wall break it; the C4 on a wooden door breaks the door',
   const on = blastOn(solid, w(0, door.y + 1.1, 4.5 + 0.12), 'c4').find((h) => h.p === door);
   assert.ok(on && on.hp <= 0, 'the door');
 });
+ok('a C4 in the corner of two walls brings down the one it is stuck to; the other is barely marked', () => {
+  const { piece, solid, w } = house(1), wall = piece('wall', 0, -1.5), side = piece('wall', -1.5, 0);
+  // (on the inside face of the back wall, hard in the corner with the side wall)
+  const at = w(-1.5 + WALL_T / 2 + 0.06, wall.y + 1.2, -1.5 + WALL_T / 2 + 0.04);
+  const hit = blastOn(solid, at, 'c4', [0, 0, 1]);
+  assert.ok(hit.find((h) => h.p === wall)!.hp <= 0, 'the wall it is on, broken');
+  const other = hit.find((h) => h.p === side);
+  assert.ok(!other || other.hp > side.hp * 0.85, `the wall beside it left ${other?.hp} of ${side.hp}`);
+});
 ok('a charge reaches less the further it is, and nothing past its reach', () => {
   const { piece } = house(2), wall = piece('wall', 0, -1.5);
   assert.ok(chargeOf('c4', wall, 1) < chargeOf('c4', wall, 0) && chargeOf('c4', wall, 1) > 0);

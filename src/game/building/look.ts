@@ -163,16 +163,17 @@ export function ghostGeometry(kind: string): THREE.BufferGeometry {
 }
 
 
-/** a frame's poles in a 512 square (one to every 3 m): round the edge, corner to corner, and across the middle; and where they are tied */
+/** a frame's poles in a 512 square (one to every 3 m, drawn at four times that): round the edge, corner to corner, and across the middle; and where they are tied */
 const POLES: [number, number, number, number, number][] = [[0, 18, 512, 18, 34], [0, 494, 512, 494, 34], [18, 0, 18, 512, 34], [494, 0, 494, 512, 34], [26, 486, 486, 26, 28], [26, 256, 486, 256, 22]];
 const TIED: [number, number, number][] = [[18, 18, 0.785], [494, 494, 0.785], [494, 18, -0.785], [18, 494, -0.785], [18, 256, 0], [494, 256, 0], [256, 256, 0.785]];
 /**
  * A frame's lattice: poles lashed round the edge of every 3 m and across it, open between (the navigator's tier plan:
  * "lashed poles for twig"). Painted from the bark of a real tree (Poly Haven's bark_brown_02), each pole shaded round
- * and tied with rope where it crosses another; drawn plain until the bark has come, and again then.
+ * and tied with rope where it crosses another; drawn plain until the bark has come, and again then. At 2048 a side,
+ * the castle's sharpness (the owner, 2026-10-25: "can be the same quality as the castle is"; it was 512).
  */
 function lattice(): THREE.Texture {
-  const N = 512, c = document.createElement('canvas');
+  const N = 2048, c = document.createElement('canvas');
   c.width = c.height = N;
   const g = c.getContext('2d')!;
   const t = new THREE.CanvasTexture(c);
@@ -185,7 +186,9 @@ function lattice(): THREE.Texture {
     g.stroke();
   };
   const paint = (bark: ImageBitmap | null) => {
+    g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, N, N);
+    g.scale(N / 512, N / 512);
     g.lineCap = 'round';
     for (const [x0, y0, x1, y1, w] of POLES) {
       // (its edges in shadow, its bark along it, a little light down its middle: a pole, not a plank)
@@ -211,7 +214,7 @@ function lattice(): THREE.Texture {
   if (rel) void fetch(assets.url(rel)).then((r) => r.blob()).then((b) => createImageBitmap(b)).then(paint, () => {});
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 

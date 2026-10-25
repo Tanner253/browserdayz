@@ -10,7 +10,11 @@ const HELD = new Set<Category>(['weapon', 'magazine', 'attachment', 'melee', 'to
 /** every body (survivors, their clothes, the infected) is under here */
 const BODIES = 'assets/characters/';
 
-/** the manifest's model files drawn at 1024 when close: the items held or worn, and the first-person guns */
+/**
+ * the manifest's model files drawn at 1024 when close: the items held or worn, the first-person guns, and a base's
+ * pieces (the owner, 2026-10-25: "should just be proximity based so further away the textures are downscaled but up
+ * close nice and HD")
+ */
 export function nearModels(models: Record<string, { url: string; tags: string[] }>): Set<string> {
   const near = new Set<string>();
   for (const d of Object.values(ITEMS)) {
@@ -19,7 +23,7 @@ export function nearModels(models: Record<string, { url: string; tags: string[] 
     const e = models[d.model];
     if (e) near.add(e.url);
   }
-  for (const e of Object.values(models)) if (e.tags.includes('viewmodel')) near.add(e.url);
+  for (const e of Object.values(models)) if (e.tags.includes('viewmodel') || e.tags.includes('base')) near.add(e.url);
   return near;
 }
 

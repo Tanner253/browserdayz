@@ -3,6 +3,7 @@
 
 import { holdOnlyEmpties } from '../src/sim/inventory';
 import { ITEMS, GEAR_SLOTS, holds, TAG_HOLD, type ItemInstance } from '../src/sim/items';
+import { LOOT_BAG } from '../src/sim/items/build';
 import { BODY_NAMES, VOICES, pickOf } from '../src/sim/survivor';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
@@ -496,6 +497,8 @@ export function handle(c: Client, m: C2S) {
       // first request wins; the economy's despawn event tells everyone it is gone
       // (and nobody reaches the ground from a jeep's seat)
       const lying = economy.loot.get(m.uid);
+      // (a broken box's bag is gone through where it lies, never carried off: see LOOT_BAG)
+      if (lying?.item.id === LOOT_BAG.id) return void send(c, { t: 'denied', uid: m.uid });
       const far = lying && CHECKS !== 'off' ? Math.hypot(lying.x - c.pose[0], lying.z - c.pose[2]) : 0;
       if (lying && far > CHECK.reach && flag(c, `took ${ITEMS[lying.item.id]?.name ?? lying.item.id} from ${Math.round(far)} m away`)) {
         send(c, { t: 'denied', uid: m.uid });

@@ -307,7 +307,7 @@ export class RaidView {
     }
     this.drop(d);
     const by = new Map<Base, number[]>();
-    for (const { base, p, hp } of blastOn(this.solids, [d.at.x, d.at.y, d.at.z], d.w)) {
+    for (const { base, p, hp } of blastOn(this.solids, [d.at.x, d.at.y, d.at.z], d.w, [d.n.x, d.n.y, d.n.z])) {
       this.mark(base.id, p.id);
       if (hp > 0) p.hp = hp;
       else {
