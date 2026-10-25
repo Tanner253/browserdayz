@@ -474,6 +474,8 @@ export const HOLD = {
  * much of the right hand's way it goes (`by`, each way: across, up, back), and how much of its turn.
  */
 const SWUNG = { by: new THREE.Vector3(0.35, 0.3, 0.25), turn: 0.55 };
+/** the empty hand through a throw (see Weapons.throwOut): over which part of the captured throw, how long, how much of its way and its turn */
+const THROWN_OUT = { from: 0.06, to: 0.4, time: 0.5, by: new THREE.Vector3(0.3, 0.25, 0.3), turn: 0.4 };
 const _swungP = new THREE.Vector3(), _swungQ = new THREE.Quaternion(), _swungI = new THREE.Quaternion(), _swungE = new THREE.Euler();
 
 export const LIVE = {
@@ -1539,7 +1541,7 @@ export class Weapons {
    * `wait`: taken into the hand and not yet used (an injector: see `ready` in game.ts). `age` is how long it has
    * been in the hand, `t` how far into its use it is; `from` is where it was held when the use began.
    */
-  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number } | null = null;
+  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number; /** seconds since it was thrown: the empty hand goes on through the throw */ thrown?: number } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3; round?: THREE.Object3D }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
   private lowerT = 0;
@@ -3719,6 +3721,18 @@ export class Weapons {
   }
 
   /**
+   * A grenade thrown: it has left the hand, and the hand goes on through the throw as the body everybody else sees
+   * throws (the motion capture's, see held-mocap.ts), then is let down. Without the paths yet, it is put away as before.
+   */
+  throwOut() {
+    const h = this.held;
+    if (!h || h.ending || h.thrown !== undefined) return;
+    if (!lengthOf('throw')) return this.endUse();
+    h.thrown = 0;
+    for (const c of h.root.children) c.visible = false;
+  }
+
+  /**
    * Digging: a stroke of the spade, and the next when that one is done, for as long as this is called every frame.
    * It is the movement a thing is hit with, driven down at the ground in front of the feet, and hits nobody.
    * @returns true when a new stroke has just begun
@@ -4789,6 +4803,13 @@ export class Weapons {
       this.arms.update(null, null, this.vmCamera.quaternion, false);
       return;
     }
+    // (thrown: the hand goes on through the throw, see the grenade below, and then it is done)
+    if (h.thrown !== undefined && (h.thrown += dt) >= THROWN_OUT.time) {
+      this.vmRoot.remove(h.root);
+      this.held = null;
+      this.arms.update(null, null, this.vmCamera.quaternion, false);
+      return;
+    }
     const t = h.t;
     // bigger things are held a little further out so the hand and the item both stay in frame
     const sy = h.size.y;
@@ -4967,6 +4988,15 @@ export class Weapons {
       const L = h.size.z > 0.2 ? LIVE.stick : LIVE;
       pos.set(L.at[0] + Math.sin(t * 37) * s, L.at[1] + Math.sin(t * 29 + 1) * s, L.at[2] + Math.sin(t * 23 + 2) * s * 0.5);
       rot.set(L.turn[0], L.turn[1], L.turn[2] + Math.sin(t * 31) * s * 6);
+      // Thrown: the empty fist on from where it let go, forward and over and down, by a share of the captured throw's
+      // way (see THROWN_OUT), and let down out of the picture as it ends.
+      if (h.thrown !== undefined) {
+        const k = Math.min(1, h.thrown / THROWN_OUT.time), u = THREE.MathUtils.lerp(THROWN_OUT.from, THROWN_OUT.to, Math.sqrt(k));
+        handMove('throw', 'r', u, THROWN_OUT.from, _swungP, _swungQ);
+        pos.set(L.at[0], L.at[1] - THREE.MathUtils.smoothstep(k, 0.5, 1) * 0.35, L.at[2]).add(_swungP.multiply(THROWN_OUT.by));
+        _swungE.setFromQuaternion(_swungQ.slerp(_swungI, 1 - THROWN_OUT.turn), 'XYZ');
+        rot.set(L.turn[0] + _swungE.x, L.turn[1] + _swungE.y, L.turn[2] + _swungE.z);
+      }
     } else {
       pos.set(H.work[0], H.work[1] + sy * H.workBy[0] + Math.sin(t * 9) * 0.004, H.work[2] + sy * H.workBy[1]);
       rot.set(0.45, 0.25 + Math.sin(t * 4.5) * 0.05, 0);

@@ -30,6 +30,7 @@ import { woundsMethods } from './avatar/wounds';
 import { actsMethods } from './avatar/acts';
 import { sickMethods } from './avatar/sick';
 import { updateMethods } from './avatar/update';
+import { gesturesMethods } from './avatar/gestures';
 import type { Gait, Leg } from './avatar/gait';
 import type { Deeds, Deed, Stay } from './avatar/deeds';
 
@@ -624,9 +625,10 @@ export interface Avatar {
   debugPose: Methods<typeof actsMethods>['debugPose'];
   clipLength: Methods<typeof actsMethods>['clipLength'];
   update: Methods<typeof updateMethods>['update'];
+  gestures: Methods<typeof gesturesMethods>['gestures'];
   setGhost: Methods<typeof makeMethods>['setGhost'];
   dispose: Methods<typeof makeMethods>['dispose'];
 }
-for (const part of [makeMethods, dressMethods, handsMethods, woundsMethods, actsMethods, sickMethods, updateMethods]) {
+for (const part of [makeMethods, dressMethods, handsMethods, woundsMethods, actsMethods, sickMethods, updateMethods, gesturesMethods]) {
   for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Avatar.prototype, name, { ...d, enumerable: false });
 }

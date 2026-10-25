@@ -133,7 +133,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `airdrop.ts` | 363 | The helicopter that brings a supply drop, and the crate coming down under its canopy: what is seen of them and what is heard (2026-10-13). |
 | `animals.ts` | 584 | The animals as the game draws them (2026-10-23). |
 | `arms.ts` | 511 | First-person arms, for everything that is held and has no hands of its own: a hatchet, a tin of beans, bare fists. |
-| `avatar.ts` | 633 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
+| `avatar.ts` | 635 | The survivor's body. Used for the local player (the shadow, the flight in from the menu, and the body you see when you look down) and for every other character in the world. |
 
 ## src/game/avatar/
 
@@ -144,11 +144,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `dress.ts` | 131 | What the body wears and carries: slung guns, worn gear, the dog tag, and what is on the face that a stock goes round. |
 | `gait.ts` | 269 | The body's steps, on motion capture (the owner, 2026-10-25: |
 | `gear.ts` | 203 | What is worn, and where it sits on the body: hats, masks and vests on their bones, and what a mask hides of the head under it. |
+| `gestures.ts` | 158 | The arms at the things they do of their own: fists up on guard and a punch thrown from it, the hands at work on something that is not a weapon (food, a drink, a dressing), and the wheel's calls (a wave, a point,... |
 | `hands.ts` | 240 | The hands: what is held (taken up, put away), the two-bone arms reaching for grips, fingers curled and thumbs laid. |
 | `make.ts` | 397 | The body: making it from its file (the skeleton the clips play on, the one drawn, the first-person copy), its look, and putting it away. |
 | `pose.ts` | 232 | The body's clips and the numbers they are played by: which clips there are, lying, sitting, the live-tunable POSE table and the stances a gun is held in. |
 | `sick.ts` | 124 | The infected's own way of going: feet kept on the ground, the sick gait. |
-| `update.ts` | 887 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
+| `update.ts` | 731 | Each frame: the clips blended by what the body is doing, and everything posed on top of them. |
 | `wounds.ts` | 66 | Wounds on the body, and the infected's shared paints while they are unhurt. |
 
 ## src/game/
@@ -192,7 +193,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `hands.ts` | 754 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 402 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
-| `items.ts` | 737 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
+| `items.ts` | 739 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
 | `online.ts` | 985 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
 ## src/game/
@@ -229,7 +230,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
 | `vehicle.ts` | 623 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5125 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5155 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
