@@ -620,6 +620,15 @@ export const enterMethods = {
   },
 
   /** These tags were carried out of the Zona and are void: out of the pockets they go, and it is said why. */
+  /** the server's clock for a tag held: the countdown follows it (it starts again when the tag comes back to you, server/custody.ts) */
+  tagClock(this: Game, uid: string, held: number) {
+    const it = this.inv.find((i) => i.uid === uid);
+    if (!it) return;
+    it.holder = publicId();
+    it.held = held;
+    this.meDirty = true;
+  },
+
   voidTags(this: Game, uids: string[]) {
     let n = 0;
     for (let it = this.inv.find((i) => uids.includes(i.uid)); it; it = this.inv.find((i) => uids.includes(i.uid))) {
