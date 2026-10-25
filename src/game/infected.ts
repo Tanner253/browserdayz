@@ -13,11 +13,12 @@ import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
-import { Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, roundHouse, suited, type IState, type InfectedInfo } from '../sim/infected';
+import { Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, roundHouse, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
-import { ZOMBIES, lookFor } from './look';
+import { lookFor } from './look';
+import { FAR_FROM, KIND_HEIGHT, drawFar, kindOf } from './infected-kinds';
 import { REST_STEP, inSight } from './remote';
 import type { Damageable, HitZone } from './weapons';
 
@@ -174,9 +175,12 @@ export class Infected implements Damageable {
     this.still = info.w === 1;
     // (the still ones live on the bunker's floor, whatever height they were found at)
     if (this.still) this.home.y = this.horde.floorY ?? y;
-    // (which of the three bodies it is goes by its number: every game draws the same one. The ones of the gas and of the bunker wear the orange suit.)
-    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), suited(this.host.world(), this.home.x, this.home.z) ? 'zombie_hazmat' : ZOMBIES[this.i % ZOMBIES.length]);
+    // (which kind it is goes by its number and where it lives: every game draws the same one. See infected-kinds.ts.)
+    const kind = kindOf(this.host.world(), this.i, this.home.x, this.home.z);
+    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), `zombie_${kind}`);
     if (this.gone) return this.avatar.dispose();
+    this.avatar.root.scale.setScalar(KIND_HEIGHT[kind]);
+    drawFar(this.avatar.root, true);
     this.avatar.sick = { roused: 0, claw: -1, seed: (this.i * 7.31) % 20 };
     this.host.scene().add(this.avatar.root);
     const R = physics.R;
@@ -770,6 +774,7 @@ export class Infected implements Damageable {
     const off = this.pos.distanceToSquared(eye);
     const far = off > DRAWN * DRAWN;
     this.avatar.root.visible = !far;
+    drawFar(this.avatar.root, off > (FAR_FROM * this.horde.lens) ** 2);
     if (dt > 0) {
       const k = 1 - Math.exp(-14 * dt);
       this.vel.x += ((this.pos.x - px) / dt - this.vel.x) * k;
@@ -969,6 +974,8 @@ export class Horde {
   }
   /** where this game's player is listening and looking from */
   readonly eye = new THREE.Vector3();
+  /** how much nearer the lens brings things than the eye alone (set each frame by the game): what is far is drawn far by it */
+  lens = 1;
   /** playing alone: this game is the director too */
   private director: Director | null = null;
   private dirT = 0;

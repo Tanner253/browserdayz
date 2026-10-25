@@ -9,12 +9,12 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { assets } from '../core/assets';
+import type { InfectedKind } from './infected-kinds';
 
 const MASK_URL = 'assets/characters/survivor_mask.webp';
 
-/** the bodies there are: a survivor (every player), the three the infected come in, and the one in an orange suit that is found in the gas and down the bunker (scripts/zombies.mjs) */
-export type BodyFile = 'survivor' | 'zombie_cop' | 'zombie_male' | 'zombie_female' | 'zombie_hazmat';
-export const ZOMBIES: BodyFile[] = ['zombie_male', 'zombie_female', 'zombie_cop'];
+/** the bodies there are: a survivor (every player), and each kind of the infected (src/game/infected-kinds.ts, scripts/infected.mjs) */
+export type BodyFile = 'survivor' | `zombie_${InfectedKind}`;
 
 const characters = new Map<BodyFile, Promise<GLTF>>();
 
