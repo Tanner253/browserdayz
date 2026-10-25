@@ -110,7 +110,7 @@ ok('no thing there was is worn anywhere else than it was', () => {
     chest_rig: 'vest', soft_vest: 'vest', armor_vest: 'vest', heavy_armor: 'vest', life_vest: 'vest',
     sack_pack: 'back', camping_pack: 'back', suitcase: 'back', garden_gloves: 'hands', work_gloves: 'hands', rubber_boots: 'feet',
     // (and the clothes of 2026-10-25, src/sim/items/wear.ts: the jacket and trousers everybody began in, found now, and the rest)
-    field_jacket: 'top', field_trousers: 'legs', flannel_shirt: 'top', hoodie: 'top', jeans: 'legs', leather_jacket: 'top', quilted_jacket: 'top',
+    field_jacket: 'top', field_trousers: 'legs', flannel_shirt: 'top', hoodie: 'top', tracksuit_pants: 'legs', leather_jacket: 'top', quilted_jacket: 'top',
     work_trousers: 'legs', work_boots: 'feet', leather_gloves: 'hands', parka: 'top', cargo_pants: 'legs', hiking_boots: 'feet',
     fingerless_gloves: 'hands', mountain_smock: 'top', mountain_trousers: 'legs', ghillie_suit: 'back',
   };
@@ -126,7 +126,7 @@ ok('the jacket and the trousers are things: worn on the top and the legs, with p
   assert.deepEqual([t.slot, t.w, t.h, t.wear?.cargo, t.category], ['legs', 3, 2, [5, 4], 'clothing']);
   assert.ok(j.wear!.cargo![0] >= 4 && j.wear!.cargo![1] >= 4 && t.wear!.cargo![0] >= 4 && t.wear!.cargo![1] >= 3, 'a pocket is smaller than the grid the body had: what was kept in it has no place');
   // (nobody begins in them since 2026-10-25, the owner: "we should do dayz styled basics")
-  assert.deepEqual(CLOTHES, [['top', 'tshirt'], ['legs', 'tracksuit_pants'], ['feet', 'trainers']]);
+  assert.deepEqual(CLOTHES, [['top', 'tshirt'], ['legs', 'jeans'], ['feet', 'trainers']]);
   const models = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')).models as Record<string, unknown>;
   for (const d of [j, t]) {
     assert.ok(models[d.model], `${d.id} is drawn with ${d.model}, which is not among the game's models`);
@@ -157,13 +157,13 @@ ok('nothing is made yet for the eyes, the belt or the arm: the places are there 
   assert.deepEqual(cleanInventory(kept, name)!.slots, kept.slots);
 });
 
-ok("every new life stands in DayZ's basics (a T-shirt, tracksuit trousers, trainers) with nothing in them, and what it is given goes into their pockets", () => {
+ok('every new life stands in a T-shirt, jeans and trainers with very little room in them and nothing in it, and what it is given goes into their pockets', () => {
   const inv = new PlayerInventory();
   const check = () => {
-    assert.deepEqual([inv.slots.top?.id, inv.slots.legs?.id, inv.slots.feet?.id], ['tshirt', 'tracksuit_pants', 'trainers']);
-    assert.deepEqual([inv.jacket.w, inv.jacket.h, inv.pants.w, inv.pants.h], [3, 3, 3, 2]);
+    assert.deepEqual([inv.slots.top?.id, inv.slots.legs?.id, inv.slots.feet?.id], ['tshirt', 'jeans', 'trainers']);
+    assert.deepEqual([inv.jacket.w, inv.jacket.h, inv.pants.w, inv.pants.h], [3, 2, 3, 2]);
     assert.deepEqual([inv.jacket.items.length, inv.pants.items.length], [0, 0]);
-    assert.deepEqual(inv.containers.map((c) => c.name), ['Dog tags', 'T-Shirt', 'Tracksuit Trousers']);
+    assert.deepEqual(inv.containers.map((c) => c.name), ['Dog tags', 'T-Shirt', 'Jeans']);
     assert.equal(inv.topLevel().length, 3);
   };
   check();
@@ -173,11 +173,12 @@ ok("every new life stands in DayZ's basics (a T-shirt, tracksuit trousers, train
   check();
   assert.notEqual(inv.slots.top, first, 'the shirt of the life before is still on');
   for (const id of ['beans', 'thermos', 'bandage']) assert.equal(inv.add(makeItem(id)), null);
-  assert.deepEqual(inv.slots.top!.cargo!.map((p) => p.item.id), ['beans', 'thermos', 'bandage']);
+  const pocketed = () => [...(inv.slots.top!.cargo ?? []), ...(inv.slots.legs!.cargo ?? [])].map((p) => p.item.id).sort();
+  assert.deepEqual(pocketed(), ['bandage', 'beans', 'thermos']);
   // (what is kept of it: the pouch is the only grid that is no thing's; the pockets are in the two things)
   const kept = inv.serialize();
   assert.deepEqual(kept.containers.map((c) => c.id), ['tags']);
-  assert.equal(kept.slots.top!.cargo!.length, 3);
+  assert.equal(kept.slots.top!.cargo!.length + kept.slots.legs!.cargo!.length, 3);
 });
 
 ok('with nothing on the top or the legs there are no pockets there: hands only (and barefoot, nothing is carried at all)', () => {

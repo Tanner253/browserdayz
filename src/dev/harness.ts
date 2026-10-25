@@ -232,7 +232,7 @@ export function installHarness(g: Game) {
     get row() {
       return row;
     },
-    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; mods?: string[][]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string; limp?: boolean } = {}) {
+    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; mods?: string[][]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[] | string[][]; body?: number[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string; limp?: boolean } = {}) {
       for (const a of row) a.dispose();
       row.length = 0;
       const n = o.n ?? 8;
@@ -245,6 +245,11 @@ export function installHarness(g: Game) {
       for (let i = 0; i < n; i++) {
         const a = new Avatar();
         await a.load(g.s.atmo, 0, false, lookFor(o.name ?? `row ${i}`));
+        // (one of the survivors' bodies each, src/game/survivors.ts)
+        if (o.body) {
+          a.wardrobe.setBody(o.body[i % o.body.length]);
+          await a.wardrobe.ready();
+        }
         g.s.r.scene.add(a.root);
         const gap = o.step ?? 1.05;
         const at = new THREE.Vector3(base.x + (i - (n - 1) / 2) * gap, heightAt(g.s.world.heights, base.x + (i - (n - 1) / 2) * gap, base.z - 5), base.z - 5);
@@ -268,7 +273,7 @@ export function installHarness(g: Game) {
           any.hitT = ((i + 0.5) / n) * any.dur.hit;
         }
         if (o.death !== undefined) a.setDeath(o.death);
-        if (o.gear) await anyG.wear(a, o.gear);
+        if (o.gear) await anyG.wear(a, Array.isArray(o.gear[0]) ? (o.gear as string[][])[i % o.gear.length] : (o.gear as string[]));
         if (o.act) {
           a.act(o.act as never, o.actDur ?? 2);
           any.gesture.t = ((i + 0.5) / n) * (o.actDur ?? 2);

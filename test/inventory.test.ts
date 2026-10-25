@@ -106,6 +106,9 @@ ok('a pile is halved, the smaller half laid beside it as a thing of its own; wit
 /** somebody with a jacket and trousers on (as everybody has), a plate carrier and the big rucksack; and a crate and a body beside them */
 const dressed = () => {
   const inv = new PlayerInventory();
+  // (in the army's jacket and trousers, which have room for a rig in a pocket: what every life begins in has very little)
+  inv.slots.top = makeItem('field_jacket');
+  inv.slots.legs = makeItem('field_trousers');
   inv.slots.vest = makeItem('life_vest');
   inv.slots.back = makeItem('suitcase');
   const [jacket, trousers, vest, pack] = (['top', 'legs', 'vest', 'back'] as const).map((s) => inv.cargoOf(inv.slots[s]!)!);
