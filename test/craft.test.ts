@@ -17,6 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { CRAFT_ITEMS } from '../src/sim/items/craft';
 import { RECIPE, RECIPES, RAGS, optionsOf } from '../src/sim/craft/recipes';
 import { most, needsOf, plan, pocketsOf, recipesFor, type Plan, type Pockets } from '../src/sim/craft/plan';
 import { TOOL_LIFE } from '../src/sim/gather';
@@ -122,6 +123,14 @@ ok('two things dragged onto each other find their recipes: a knife on a jacket, 
   assert.deepEqual(ids('knife', 'apple'), []);
   // (a workbench's recipes are not made by dragging)
   assert.deepEqual(ids('iron_bar', 'planks'), []);
+});
+
+ok('every crafting thing is drawn with a model of its own, brought in, and has its picture in the pockets', () => {
+  const models = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')).models, icons = JSON.parse(readFileSync('public/assets/icons/index.json', 'utf8'));
+  for (const d of CRAFT_ITEMS) {
+    assert.ok(models[d.model], `${d.id}'s model ${d.model} is not in the manifest`);
+    assert.ok(icons[d.id], `${d.id} has no picture`);
+  }
 });
 
 // ---------------------------------------------------------------- the server

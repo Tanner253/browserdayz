@@ -868,6 +868,44 @@ export const LOCAL_MODELS = {
   // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
   // pictures at the size they came.
   frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // ---------------------------------------------------------------- crafting (2026-10-25): the owner's downloads for its
+  // items (progress/base-models/incoming-map.md), each judged in the sandbox beside the stand-in it replaced. Their folders
+  // are the downloads as they came, in assets-src/incoming/; textures at 1024 for what is carried in the hand (the navigator).
+  cloth_pile: { dir: '../incoming/large_pile_of_cloth', size: 0.24, tex: 1024, tags: ['loot'], changes: 'Scaled to a pile of rags 24 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (it came untextured, as knots tied in a rope: the game gives it the rope's colour, a tint)
+  rope_coil: { dir: '../incoming/rope_knots', size: 0.34, budget: 6000, tex: 2048, tags: ['loot'], changes: 'Scaled to 34 cm, stood on the ground about its own middle, and simplified to about 6,000 triangles; geometry compressed.' },
+  alcohol_bottle: { dir: '../incoming/isopropyl_rubbing_alcohol_bottle_game_ready', size: 0.25, tex: 1024, tags: ['loot'], changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.' },
+  // (the iron ones of the set: three bars, two lying and one on them)
+  iron_ingots: { dir: '../incoming/blacksmith_ingots_game_ready_asset', only: /Iron/, size: 0.26, tex: 1024, tags: ['loot'], changes: 'Only its three iron bars are used here, scaled to 26 cm across and stood on the ground about their own middle; textures re-encoded as WebP; geometry compressed.' },
+  stone_axe: { dir: '../incoming/primitive_stone_axe', size: 0.46, tex: 1024, tags: ['loot'], changes: 'Scaled to 46 cm and stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.' },
+  bone_knife: { dir: '../incoming/bone_knife_1', size: 0.26, tex: 1024, tags: ['loot'], changes: 'Scaled to 26 cm and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (Rurre's, of the three the owner downloaded: picked in the sandbox, 2026-10-25, as the pile that reads as scrap and is lightest;
+  // it is fan art of Team Fortress 2, which the owner allows: "fan art is allowed, it is not ripped")
+  scrap_pile: { dir: '../incoming/scrap_metal', size: 0.4, tex: 1024, tags: ['loot'], changes: 'Scaled to 40 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.' },
+  // (made in Higgsfield on the owner's account, 2026-10-25: Tripo's text-to-3D; scaled to size by the navigator, kept so)
+  satchel_charge: {
+    dir: '../incoming/higgsfield', file: 'satchel_charge_30cm.glb', scale: 1, tex: 2048, tags: ['loot'],
+    changes: 'Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.',
+    credit: { name: 'Satchel charge', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (charcoal with no maker's print on it, as the sack the owner downloaded had all over; and the tin powder is kept in)
+  // (made grey as stone: darkened to charcoal's black)
+  charcoal_lumps: {
+    dir: '../incoming/higgsfield', file: 'charcoal_sized.glb', scale: 1, tex: 1024, tags: ['loot'], dye: { brightness: 0.45, saturation: 0.5 },
+    changes: 'Stood on the ground about its own middle, at the size it was made, its colour darkened; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Charcoal', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Charcoal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  // (made lying on its side: stood on its base)
+  gunpowder_tin: {
+    dir: '../incoming/higgsfield', file: 'gunpowder_tin_sized.glb', rot: [0, 0, -Math.PI / 2], scale: 1, tex: 1024, tags: ['loot'],
+    changes: 'Stood on its base on the ground, about its own middle, at the size it was made; textures re-encoded as WebP at 1024; geometry compressed.',
+    credit: { name: 'Gunpowder tin', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Gunpowder tin" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
+  junk_heap: {
+    dir: '../incoming/higgsfield', file: 'junk_heap_3m.glb', scale: 1, tex: 2048, tags: ['prop'],
+    changes: 'Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.',
+    credit: { name: 'Junk heap', author: 'ZONA (Higgsfield, Tripo text-to-3D)', url: 'https://higgsfield.ai', line: '"Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+  },
 };
 
 /**
@@ -1509,6 +1547,9 @@ export const MODELS = {
 
   // loot
   russian_food_cans_01: { res: '1k', tex: 1024, tags: ['loot'] },
+  // (crafting's sledgehammer, 2026-10-25: judged in the sandbox and in the hands beside Higgsfield's, wooden and rusted,
+  // whose handle came three times as thick as a real one's and filled the eye; this one is true to size)
+  sledgehammer_01: { res: '2k', tex: 1024, tags: ['loot'] },
   long_life_food: { res: '1k', tex: 1024, tags: ['loot'] },
   metal_jerrycan_green: { res: '1k', tex: 1024, tags: ['loot'] },
   plastic_thermos: { res: '1k', tex: 1024, tags: ['loot'] },

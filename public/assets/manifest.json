@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T12:59:43.267Z",
+ "generated": "2026-10-25T01:57:57.879Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12844,6 +12844,294 @@
    "hi": "assets/models/hi/animal_wolf.glb",
    "hiBytes": 805220,
    "hiCard": 21
+  },
+  "cloth_pile": {
+   "url": "assets/models/cloth_pile.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 214184,
+   "srcTris": 2558,
+   "tris": 2558,
+   "min": [
+    -0.12,
+    0,
+    -0.1145
+   ],
+   "max": [
+    0.12,
+    0.1093,
+    0.1145
+   ],
+   "lods": [
+    {
+     "url": "assets/models/cloth_pile_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "214184:1792891252176"
+    }
+   ]
+  },
+  "rope_coil": {
+   "url": "assets/models/rope_coil.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 41840,
+   "srcTris": 32208,
+   "tris": 5999,
+   "min": [
+    -0.0697,
+    0,
+    -0.0274
+   ],
+   "max": [
+    0.0695,
+    0.3398,
+    0.0295
+   ],
+   "lods": [
+    {
+     "url": "assets/models/rope_coil_lod1.glb",
+     "tris": 4772,
+     "far": 2,
+     "of": "41840:1792890704937"
+    }
+   ]
+  },
+  "alcohol_bottle": {
+   "url": "assets/models/alcohol_bottle.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 186240,
+   "srcTris": 450,
+   "tris": 450,
+   "min": [
+    -0.0533,
+    0,
+    -0.0531
+   ],
+   "max": [
+    0.0533,
+    0.25,
+    0.0531
+   ],
+   "lods": []
+  },
+  "iron_ingots": {
+   "url": "assets/models/iron_ingots.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 654216,
+   "srcTris": 4176,
+   "tris": 1392,
+   "min": [
+    -0.13,
+    0,
+    -0.1242
+   ],
+   "max": [
+    0.13,
+    0.1164,
+    0.1242
+   ],
+   "lods": []
+  },
+  "stone_axe": {
+   "url": "assets/models/stone_axe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 327296,
+   "srcTris": 1912,
+   "tris": 1912,
+   "min": [
+    -0.0388,
+    0,
+    -0.1257
+   ],
+   "max": [
+    0.0388,
+    0.46,
+    0.1257
+   ],
+   "lods": []
+  },
+  "bone_knife": {
+   "url": "assets/models/bone_knife.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 401200,
+   "srcTris": 1104,
+   "tris": 1104,
+   "min": [
+    -0.0314,
+    0,
+    -0.13
+   ],
+   "max": [
+    0.0314,
+    0.0382,
+    0.13
+   ],
+   "lods": []
+  },
+  "satchel_charge": {
+   "url": "assets/models/satchel_charge.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 274760,
+   "srcTris": 7607,
+   "tris": 7607,
+   "min": [
+    -0.0965,
+    0,
+    -0.1457
+   ],
+   "max": [
+    0.0965,
+    0.3,
+    0.1457
+   ],
+   "lods": [
+    {
+     "url": "assets/models/satchel_charge_lod1.glb",
+     "tris": 1964,
+     "far": 2,
+     "of": "274760:1792890756600"
+    }
+   ],
+   "hi": "assets/models/hi/satchel_charge.glb",
+   "hiBytes": 865600,
+   "hiCard": 64
+  },
+  "junk_heap": {
+   "url": "assets/models/junk_heap.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 434208,
+   "srcTris": 18758,
+   "tris": 18758,
+   "min": [
+    -1.1413,
+    0,
+    -1.5
+   ],
+   "max": [
+    1.1413,
+    1.5981,
+    1.5
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/junk_heap.glb",
+   "hiBytes": 1158860,
+   "hiCard": 64
+  },
+  "scrap_pile": {
+   "url": "assets/models/scrap_pile.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 400528,
+   "srcTris": 1320,
+   "tris": 1320,
+   "min": [
+    -0.2,
+    0,
+    -0.167
+   ],
+   "max": [
+    0.2,
+    0.2081,
+    0.167
+   ],
+   "lods": []
+  },
+  "charcoal_lumps": {
+   "url": "assets/models/charcoal_lumps.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 206940,
+   "srcTris": 5773,
+   "tris": 5773,
+   "min": [
+    -0.125,
+    0,
+    -0.1247
+   ],
+   "max": [
+    0.125,
+    0.108,
+    0.1247
+   ],
+   "lods": [
+    {
+     "url": "assets/models/charcoal_lumps_lod1.glb",
+     "tris": 2046,
+     "far": 2,
+     "of": "206940:1792891420782"
+    }
+   ]
+  },
+  "gunpowder_tin": {
+   "url": "assets/models/gunpowder_tin.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 199800,
+   "srcTris": 4811,
+   "tris": 4811,
+   "min": [
+    -0.075,
+    0,
+    -0.0749
+   ],
+   "max": [
+    0.075,
+    0.0701,
+    0.0749
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gunpowder_tin_lod1.glb",
+     "tris": 2319,
+     "far": 2,
+     "of": "199800:1792891574783"
+    }
+   ]
+  },
+  "sledgehammer_01": {
+   "url": "assets/models/sledgehammer_01.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 401180,
+   "srcTris": 2596,
+   "tris": 2596,
+   "min": [
+    -0.1043,
+    -0.7466,
+    -0.0452
+   ],
+   "max": [
+    0.1042,
+    0.2591,
+    0.0452
+   ],
+   "lods": [
+    {
+     "url": "assets/models/sledgehammer_01_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "401180:1792893477839"
+    }
+   ]
   }
  }
 }

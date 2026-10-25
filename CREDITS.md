@@ -150,6 +150,28 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle and scaled to a pelt 2.2 m long; a copy of about 7,300 triangles made for seeing it from further off (scripts/lods.mjs), the whole one kept for near; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "wolf animated" (https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c) by victory_mirosya (https://sketchfab.com/victory_mirosya) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Kept whole with its skeleton and the movements the game plays (graze, idle, alert, rest), the others left out; turned nose to -z, scaled to 1.6 m nose to tail and stood on the ground; textures re-encoded as WebP at no more than 2048 a side; geometry compressed.
+- This work is based on "Large Pile Of Cloth" (https://sketchfab.com/3d-models/large-pile-of-cloth-145f510921ba45489e1536b3c47b6b85) by Ujjval Singhal (https://sketchfab.com/ujjvalvfxartist9211) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to a pile of rags 24 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Rope Knots" (https://sketchfab.com/3d-models/rope-knots-aa6380f3e5d442b1a1971d4cb1c88ccb) by aneeqayounas (https://sketchfab.com/aneeqayounas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 34 cm, stood on the ground about its own middle, and simplified to about 6,000 triangles; geometry compressed.
+- This work is based on "Isopropyl Rubbing Alcohol Bottle Game Ready" (https://sketchfab.com/3d-models/isopropyl-rubbing-alcohol-bottle-game-ready-a323700f7c93400aba8000f2f2a7e8e0) by KQ92 (https://sketchfab.com/KQ92) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
+- This work is based on "Blacksmith Ingots (game ready asset)" (https://sketchfab.com/3d-models/blacksmith-ingots-game-ready-asset-6ea0ab1141de40d68db5bcdccdb91d68) by Pixel Life (https://sketchfab.com/pixellife) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only its three iron bars are used here, scaled to 26 cm across and stood on the ground about their own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Primitive stone axe" (https://sketchfab.com/3d-models/primitive-stone-axe-ce612acd03664358a5841316e35e0db7) by Yahor Yurkavets (https://sketchfab.com/Got2b) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 46 cm and stood on the ground about its own middle; textures re-encoded as WebP at 1024 (they came at 4096); geometry compressed.
+- This work is based on "Bone Knife 1" (https://sketchfab.com/3d-models/bone-knife-1-b50e0642376a48389c94b128e797f892) by Sir Erdees (https://sketchfab.com/sirerdees) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 26 cm and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Scrap Metal" (https://sketchfab.com/3d-models/scrap-metal-1e57de80d46442a38c8c5b2fb06888f4) by Rurre (https://sketchfab.com/rurre) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to 40 cm across and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
+- "Satchel charge" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 30 cm tall as made; textures re-encoded as WebP; geometry compressed.
+- "Junk heap" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, 3 m across as made; textures re-encoded as WebP; geometry compressed.
+- "Charcoal" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on the ground about its own middle, at the size it was made, its colour darkened; textures re-encoded as WebP at 1024; geometry compressed.
+- "Gunpowder tin" made for ZONA with Higgsfield (Tripo text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
+  Changes made: Stood on its base on the ground, about its own middle, at the size it was made; textures re-encoded as WebP at 1024; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -327,6 +349,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Seadogs Compass](https://polyhaven.com/a/seadogs_compass) | Benny Weimer |
 | model | [Service Pistol](https://polyhaven.com/a/service_pistol) | Mateusz Sadek |
 | model | [Shelf 01](https://polyhaven.com/a/Shelf_01) | Gabriel Radić |
+| model | [Sledgehammer 01](https://polyhaven.com/a/sledgehammer_01) | Dylan Guzman |
 | model | [Sofa 02](https://polyhaven.com/a/sofa_02) | Kirill Sannikov |
 | model | [Steel Frame Shelves 01](https://polyhaven.com/a/steel_frame_shelves_01) | James Ray Cock |
 | model | [Stick Grenade](https://polyhaven.com/a/stick_grenade) | singaii |

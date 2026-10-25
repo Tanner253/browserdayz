@@ -26,7 +26,9 @@ const ICONS_REV = 3;
 // and, every picture looked at on 2026-10-19 ("you should check all the icons for proper orientations"), two boxes of
 // rounds whose printing read upside down and the tin of tomatoes standing on its lid)
 // (and the Mosin's clip, its rounds tip down as it came: 2026-10-19)
-const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin']);
+// (and crafting's, 2026-10-25, the owner: "make sure the model photos are upright and look proper in the icon images for items
+// not upside down or backwards": the stone hatchet and the sledgehammer head up, the bone knife grip up as the combat knife)
+const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin', 'stone_hatchet', 'sledgehammer', 'bone_knife']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
  * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip
