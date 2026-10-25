@@ -19,6 +19,8 @@ import { F_DEAD, PROTOCOL, type S2C } from '../src/net/protocol';
 import type { ItemInstance } from '../src/sim/items';
 import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
+import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
+import { inPlay } from '../src/world/worldgen/layout';
 import { Bases, heard, heardPiece, said, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
@@ -449,6 +451,23 @@ ok('every blueprint is laid whole by the rules; short of planks one lays what it
   assert.equal(first.base!.pieces.size, asksOf('bp:hut').length);
 });
 
+console.log('Building: where on the map');
+ok('nothing is built within 60 m of a named place or a building, nor inside the Zona; and it says which', () => {
+  // (out in the west, where the map is open: nothing of the world's own near)
+  const [x, z] = [-1950, 200], kind = Object.keys(BUILDING_FOOTPRINT)[0] as keyof typeof BUILDING_FOOTPRINT, half = BUILDING_FOOTPRINT[kind]![0] / 2;
+  assert.equal(noBuilding(x, z, [], []), null, 'the open ground itself');
+  assert.equal(noBuilding(x, z, [{ x: x + 95, z, radius: 40, name: 'Kamenka' }], []), 'Too near Kamenka');
+  assert.equal(noBuilding(x, z, [{ x: x + 105, z, radius: 40, name: 'Kamenka' }], []), null, '65 m past its reach');
+  assert.equal(noBuilding(x, z, [], [{ type: kind, x: x + half + 55, z, rot: 0 }]), 'Too near a building');
+  assert.equal(noBuilding(x, z, [], [{ type: kind, x: x + half + 65, z, rot: 0 }]), null, '65 m past its walls');
+  assert.ok(inPlay(0, 0) && noBuilding(0, 0, [], []) === 'Inside the Zona', 'in the Zona');
+  // (and not across the west's ridge, whose wall nobody is let past but at its pass)
+  let ridge: [number, number] | null = null;
+  for (let rz = -300; rz < 300 && !ridge; rz += 50) for (let rx = PLAN.ridge.crest - 40; rx <= PLAN.ridge.crest + 40 && !ridge; rx += 0.5) if (onRidgeWall(rx, rz)) ridge = [rx, rz];
+  assert.ok(ridge, 'no ridge wall found');
+  assert.equal(noBuilding(ridge![0] + 8, ridge![1], [], []), 'Not on the ridge');
+});
+
 console.log('Building: solid (what stops a round, a step and a body: src/sim/build/solid.ts)');
 /** the two-storey house from its blueprint on flat ground, its pieces by kind, and its solids */
 const house = () => {
@@ -523,7 +542,8 @@ async function serverTest() {
   const wet = wetAt(data.water, (x, z) => data.groundAt(x, z));
   const land: Land = { ground: (x, z) => data.groundAt(x, z), why: (x, z) => noBuilding(x, z, data.places, data.buildings, data.spawns, wet), solids: (x, z, w) => solids.near(x, z, w) };
   let site: [number, number] | null = null;
-  for (let x = -700; x < 700 && !site; x += 37) for (let z = -700; z < 700 && !site; z += 41) {
+  // (out of the Zona and 60 m off every named place and building: the west, as the map is now)
+  for (let x = -2400; x < 2400 && !site; x += 37) for (let z = -1500; z < 1500 && !site; z += 41) {
     const bs = new Bases(land), r = bs.lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, ME, 0);
     if (typeof r === 'string') continue;
     const b = r.base;
@@ -615,6 +635,15 @@ async function serverTest() {
     await a.give('planks', 12);
     await a.give('log', 2);
     const [sx, sz] = site!;
+    // the server's own word on where nothing is built: in the Zona, and by a named place (as the ghost says it)
+    await a.go(0, 0);
+    a.send({ t: 'blay', k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0, u: plan.uid });
+    assert.ok(await a.until('tell', (m) => m.text === 'Inside the Zona'), `laid in the Zona: ${JSON.stringify(a.of('tell').slice(-1))}`);
+    const town = data.places.find((p) => p.name && !inPlay(p.x, p.z) && noBuilding(p.x + p.radius + 30, p.z, [], [], [], wet) === null)!;
+    await a.go(town.x + town.radius + 30, town.z);
+    a.send({ t: 'blay', k: 'foundation', x: town.x + town.radius + 30, y: 0, z: town.z, r: 0, yaw: 0, u: plan.uid });
+    assert.ok(await a.until('tell', (m) => m.text === `Too near ${town.name}`), `laid by ${town.name}: ${JSON.stringify(a.of('tell').slice(-1))}`);
+    console.log(`  ok  the server lays nothing in the Zona ("Inside the Zona") nor 30 m past ${town.name} ("Too near ${town.name}")`);
     await a.go(sx - 3, sz);
     // a first foundation: paid for, and the base told
     a.send({ t: 'blay', k: 'foundation', x: sx, y: 0, z: sz, r: 0, yaw: 0, u: plan.uid });
@@ -728,7 +757,14 @@ async function serverTest() {
     await me.give('log', 2);
     await me.give('log', 1);
     await me.give('nails', 20);
-    const [cx, cz] = [sx + 60, sz];
+    // (a place of its own, 60 m and more east of the first, where a foundation may go)
+    let claimAt: [number, number] | null = null;
+    for (let r = 60; r < 400 && !claimAt; r += 17) for (let q = -1.2; q < 1.2 && !claimAt; q += 0.3) {
+      const x = sx + Math.cos(q) * r, z = sz + Math.sin(q) * r;
+      if (x > sx + 30 && typeof new Bases(land).lay({ k: 'foundation', x, y: 0, z, r: 0, yaw: 0 }, ME, 0) !== 'string') claimAt = [x, z];
+    }
+    assert.ok(claimAt, 'no place for the claim');
+    const [cx, cz] = claimAt!;
     await me.go(cx - 2, cz);
     // the base from before is out of its grace and has no claim: it is rotting already, and is no matter here
     me.send({ t: 'blay', k: 'foundation', x: cx, y: 0, z: cz, r: 0, yaw: 0, u: plan3.uid });
@@ -805,7 +841,7 @@ async function serverTest() {
     const sinceD = me.got.length;
     me.send({ t: 'blay', k: 'foundation', x: dx, y: 0, z: dz, r: 0, yaw: 0, u: plan3.uid });
     const toldD = await me.until('base', (m) => Math.hypot(m.b[1] - dx, m.b[3] - dz) < 1, 5000, sinceD);
-    assert.ok(toldD, `no base for the door: ${JSON.stringify(me.of('tell').slice(-2))}`);
+    assert.ok(toldD, `no base for the door at ${dx.toFixed(0)}, ${dz.toFixed(0)}: ${JSON.stringify(me.of('tell').slice(-2))}`);
     const D = heard(toldD!.b)!;
     const dwy = nearestSpot(spots(D, 'doorway'), 'doorway', { x: 0, y: 1.5, z: 1.5 })!;
     me.send({ t: 'blay', k: 'doorway', b: D.id, ...dwy, u: plan3.uid });

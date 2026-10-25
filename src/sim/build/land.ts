@@ -1,30 +1,40 @@
-// Where a base may stand (2026-10-24): out in the country, as a stash is buried (src/sim/stash.ts), and not on a tree or
-// a rock. Plan v2: "Not in towns, on roads, by loot buildings, the fort, the bunker, the coast starts".
+// Where a base may stand (2026-10-24): out in the country, and not on a tree or a rock. Plan v2: "Not in towns, on
+// roads, by loot buildings, the fort, the bunker, the coast starts". The owner, the same day: "players cannot build
+// inside or too close to POI's we want people to be basing raiding and exploring the wilderness and making bases out
+// there"; and none in the Zona, where nobody is to earn tags camping their own roof.
 
-import { BUILDING_FOOTPRINT, type BuildingType, type Instance } from '../../world/worldgen';
+import { BUILDING_FOOTPRINT, PLAN, onRidgeWall, type BuildingType, type Instance } from '../../world/worldgen';
 import { SEA_LEVEL, onWorld } from '../../world/worldgen/places';
+import { inPlay } from '../../world/worldgen/layout';
 import { TREE_KINDS, treeOf } from '../gather';
 import { waterAt, type Waters } from '../water';
 
 export const KEEP_OFF = {
-  /** metres past a town's or a camp's reach */
-  place: 15,
+  /** metres past a named place's reach (a town, a camp, the fort), anywhere on the map */
+  place: 60,
   /** past a building's walls */
-  building: 12,
+  building: 60,
   /** from where people come ashore (a fresh start) */
   spawn: 45,
   /** in from the edge of the map */
   edge: 80,
+  /** off the west's ridge wall and its barrier */
+  ridge: 12,
 };
 
 /** whether a place is under the sea, a lake or a river (as the animals have it: src/sim/animal-ground.ts) */
 export const wetAt = (water: Waters | undefined, ground: (x: number, z: number) => number) => (x: number, z: number) => ground(x, z) < SEA_LEVEL + 0.4 || (!!water && !!waterAt(water, x, z, ground));
 
 /** why nothing is built at this place (null: it may be) */
-export function noBuilding(x: number, z: number, places: { x: number; z: number; radius: number }[], buildings: { type: BuildingType; x: number; z: number; rot: number }[], spawns: { x: number; z: number }[] = [], wet?: (x: number, z: number) => boolean): string | null {
-  if (!onWorld(x, z, KEEP_OFF.edge)) return 'Too near the edge of the map';
+export function noBuilding(x: number, z: number, places: { x: number; z: number; radius: number; name?: string }[], buildings: { type: BuildingType; x: number; z: number; rot: number }[], spawns: { x: number; z: number }[] = [], wet?: (x: number, z: number) => boolean): string | null {
+  if (!onWorld(x, z, KEEP_OFF.edge) || x < PLAN.barrier + KEEP_OFF.ridge) return 'Too near the edge of the map';
+  // (nor across the west's ridge, whose wall the server holds everybody off: stairs over it would be a way over)
+  for (let d = -KEEP_OFF.ridge; d <= KEEP_OFF.ridge; d += 2.5) if (onRidgeWall(x + d, z)) return 'Not on the ridge';
   if (wet?.(x, z)) return 'Not in the water';
-  if (places.some((p) => Math.hypot(x - p.x, z - p.z) < p.radius + KEEP_OFF.place)) return 'Not in a town or a camp: build out in the country';
+  // (the Zona's own word on where it is: it is to be made smaller, rounds about the towns joined by corridors)
+  if (inPlay(x, z)) return 'Inside the Zona';
+  const at = places.find((p) => Math.hypot(x - p.x, z - p.z) < p.radius + KEEP_OFF.place);
+  if (at) return at.name ? `Too near ${at.name}` : 'Too near a town';
   for (const b of buildings) {
     const f = BUILDING_FOOTPRINT[b.type];
     if (!f) continue;

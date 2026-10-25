@@ -282,7 +282,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `bases.ts` | 332 | Every base on the map, as the server keeps them (server/build.ts) and as a game played alone keeps its own (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. |
 | `blueprints.ts` | 113 | Blueprints (2026-10-24, base building's fourth step). |
 | `doors.ts` | 85 | Doors, hatches, shutters and gates as they swing (2026-10-24, base building's fourth step). |
-| `land.ts` | 68 | Where a base may stand (2026-10-24): out in the country, as a stash is buried (src/sim/stash.ts), and not on a tree or a rock. |
+| `land.ts` | 78 | Where a base may stand (2026-10-24): out in the country, and not on a tree or a rock. |
 | `locks.ts` | 70 | Locks on a base (2026-10-24, base building's fourth step). |
 | `pieces.ts` | 162 | What a base is built of (2026-10-24, base building's second step; plan v2, approved by the owner with "think like rust how does rust do it"): |
 | `snap.ts` | 505 | Where a piece can go (2026-10-24, base building's second step): |
