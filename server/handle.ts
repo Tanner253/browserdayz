@@ -463,7 +463,10 @@ export function handle(c: Client, m: C2S) {
       }
       if (c.seatAt || !economy.take(m.uid)) return void send(c, { t: 'denied', uid: m.uid });
       // (a tag in what was picked up is theirs from now on, its clock started now: custody.ts)
-      if (lying) for (const t of payingTags(lying.item)) cameTo(c.key, t.uid);
+      if (lying) for (const t of payingTags(lying.item)) {
+        cameTo(c.key, t.uid);
+        send(c, { t: 'tagclock', uid: t.uid, held: 0 });
+      }
       // (a pack picked up that others were going through where it lay: gone from under them, told by 'loot-')
       goneFrom(`l:${m.uid}`);
       return;
@@ -619,10 +622,19 @@ export function handle(c: Client, m: C2S) {
       pockets(c);
       // (somebody with a keycard: remembered a moment, for when they put it in the bunker's reader)
       if (carries(c.inv, 'keycard')) cardSeen.set(c.id, Date.now());
-      // the clock on a looted tag starts the first time the server sees it in somebody else's pockets
+      // the clock on a looted tag starts the first time the server sees it in somebody else's pockets; and the game's
+      // countdown, which only shows the server's, is set back whenever it has run ahead of it (the owner, 2026-10-25:
+      // "server authority to client")
       for (const t of carriedTags(c.inv)) {
         const from = lootedTags.get(t.uid);
-        if (from && !theirOwn(from, c.key) && !tagSeen.has(seenOf(c.key) + t.uid)) tagSeen.set(seenOf(c.key) + t.uid, Date.now());
+        if (!from || theirOwn(from, c.key)) continue;
+        const k = seenOf(c.key) + t.uid;
+        if (!tagSeen.has(k)) tagSeen.set(k, Date.now());
+        const served = Math.floor((Date.now() - tagSeen.get(k)!) / 1000);
+        if ((t.held ?? 0) > served + 15) {
+          t.held = served;
+          send(c, { t: 'tagclock', uid: t.uid, held: served });
+        }
       }
       // (there is no honest way to come by one in a seat: see 'take' and 'copen')
       if (c.seatAt && takenTag(c)) {
@@ -945,13 +957,33 @@ export function handle(c: Client, m: C2S) {
       // our copy of their inventory is a few seconds behind theirs
       const tag = findCarried(c, m.uid);
       const seenAt = tag ? tagSeen.get(seenOf(c.key) + tag.uid) : undefined;
-      if (!tag || tag.id !== 'dogtag' || ((tag.held ?? 0) < TAG_HOLD - 30 && !(seenAt !== undefined && Date.now() - seenAt >= CASH_HOLD_MS))) return;
+      if (!tag || tag.id !== 'dogtag') return;
+      // (asked too soon by its own count: the game is told the server's, which is the one that counts)
+      if ((tag.held ?? 0) < TAG_HOLD - 30 && !(seenAt !== undefined && Date.now() - seenAt >= CASH_HOLD_MS)) {
+        if (seenAt !== undefined) send(c, { t: 'tagclock', uid: tag.uid, held: Math.floor((Date.now() - seenAt) / 1000) });
+        return;
+      }
       // (and one that can pay is cashed in only by whoever the server saw take it, and still holds it: custody.ts)
       if (lootedTags.has(tag.uid) && !holdsTag(c.key, tag.uid)) return void log(`${c.name} asked to cash in a dog tag they do not hold (${tag.uid.slice(0, 12)}): refused`);
       // (nothing is earned by somebody nothing can hurt, nobody can see, or no wall stops)
       if (c.power.god || c.power.hidden || c.power.clip) return void sys(c, 'No tag is cashed in with god mode, vanish or noclip on: put them off first.');
       // (nor once the last word is written: one cashed after it would be in the pockets, and on the list, of the server that comes next)
       if (stoppingNow()) return void send(c, { t: 'tell', kind: 'warn', text: 'The server is restarting: cash the tag in when it is back. It is kept.' });
+      // (one that can pay waits for the server's own clock, which starts again each time the tag comes back to them,
+      // custody.ts. Their game's went on counting, let them cash in early, and the tag was eaten for nothing (a
+      // player, 2026-10-25: "No reward for capnascimento's tag: it was not held for the full time"). Kept now, and
+      // their countdown set to the server's.)
+      const owed = lootedTags.get(tag.uid);
+      if (owed && !theirOwn(owed, c.key) && !voided.has(tag.uid) && (seenAt === undefined || Date.now() - seenAt < CASH_HOLD_MS)) {
+        const at = seenAt ?? Date.now();
+        if (seenAt === undefined) tagSeen.set(seenOf(c.key) + tag.uid, at);
+        tag.held = Math.floor((Date.now() - at) / 1000);
+        send(c, { t: 'tagclock', uid: tag.uid, held: tag.held });
+        // (minutes to the end of the countdown the game shows, which runs to the full hold: the server takes it a minute sooner)
+        const left = Math.max(1, Math.ceil(TAG_HOLD / 60 - tag.held / 60));
+        log(`${c.name} asked to cash in ${tag.owner ?? 'Survivor'}'s dog tag ${left} min early: kept, the game's clock set to the server's`);
+        return void send(c, { t: 'tell', kind: 'warn', text: `Not yet: keep ${tag.owner ?? 'Survivor'}'s tag ${left} more minute${left === 1 ? '' : 's'}; it is still yours. Its clock starts again each time it comes back to you.` });
+      }
       tag.held = 0;
       const owner = tag.owner ?? 'Survivor';
       const from = lootedTags.get(tag.uid);

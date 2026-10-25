@@ -671,7 +671,10 @@ export const onlineMethods = {
     net.on('score', (m) => this.arenaHud?.score(m));
     net.on('kill', (m) => this.arenaHud?.kill(m));
     net.on('void', (m) => this.voidTags(m.uids));
+    net.on('tagclock', (m) => this.tagClock(m.uid, m.held));
     net.on('cashed', (m) => {
+      // (one of ours: it leaves the pockets only now, on the server's word: see tickTags)
+      if (m.id === net.id) this.tagCashed(m.owner);
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);
       this.hud.feed(text, m.id === net.id);

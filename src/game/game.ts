@@ -1555,6 +1555,8 @@ export class Game {
   outFor = 0;
   /** the tags they carry that they took off somebody (as of the last look, a second ago at most) */
   takenTags: string[] = [];
+  /** tags asked of the server to be cashed, by uid, with when: they stay in the pockets until it answers (tickTags) */
+  cashing = new Map<string, number>();
 
   maxPlayers = 0;
   /** the server said it was about to restart: why, and when it said so (by this game's clock) */
@@ -1864,6 +1866,8 @@ export interface Game {
   tagWhenDue: Methods<typeof enterMethods>['tagWhenDue'];
   tickZone: Methods<typeof enterMethods>['tickZone'];
   voidTags: Methods<typeof enterMethods>['voidTags'];
+  tagClock: Methods<typeof enterMethods>['tagClock'];
+  tagCashed: Methods<typeof enterMethods>['tagCashed'];
   tickTags: Methods<typeof enterMethods>['tickTags'];
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];
