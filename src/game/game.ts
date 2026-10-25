@@ -709,6 +709,7 @@ export class Game {
       breakOff: () => this.breakOff(),
       busy: () => !!this.use,
       sawing: (on) => void (this.weapons.sawing = on),
+      act: (a, d) => this.act(a, d),
     });
     this.craft = new Crafting({
       online: () => this.online,
