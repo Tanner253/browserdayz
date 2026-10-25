@@ -1025,7 +1025,7 @@ export class Game {
           void this.join();
         }
       });
-    const doll = await renderDoll(r.renderer, atmo.envMap, lookFor(playerName()));
+    const doll = await renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), [], undefined, false, chosen(playerName()).body);
 
     this.hud = new HUD(icons);
     this.hud.adsHere = () => this.modes.mode === 'zona';

@@ -68,6 +68,8 @@ export interface Worn {
   camo?: string;
   /** the parts of it that something worn over it lies on (a jacket's chest under a vest): drawn a little in, under it */
   under?: number;
+  /** and how far, metres (UNDER unsaid) */
+  underBy?: number;
 }
 
 /**
@@ -81,6 +83,8 @@ const OVER: Record<string, Region[]> = { chest_rig: ['chest'], armor_vest: ['che
  */
 const BARE: Record<string, Region[]> = { balaclava: ['hair'], ghillie_hood: ['hair'] };
 export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id]) } : null);
+/** the parts of the trousers that a top long enough lies over */
+const WAIST = hides(['belly', 'hips', 'thigh']);
 /** worn over the clothes: a vest, or a suit over everything (the ghillie) */
 const outer = (id: string) => ITEMS[id]?.slot === 'vest' || ITEMS[id]?.slot === 'back';
 
@@ -89,8 +93,8 @@ export const wornKey = (it: { id: string; c?: number }) => (it.c ? `${it.id}~${i
 
 /** What is said of a body's things worn, sorted: those drawn as they are worn (`dress`: Worn), and the rest by their ids (GEAR in avatar.ts). */
 export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
-  const worn: Worn[] = [], gear: string[] = [], inner: Worn[] = [];
-  let over = 0;
+  const worn: Worn[] = [], gear: string[] = [], inner: Worn[] = [], legs: Worn[] = [];
+  let over = 0, coat = 0;
   for (const k of keys) {
     const [id, c] = k.split('~'), d = ITEMS[id];
     if (!d?.dress) {
@@ -105,8 +109,12 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
     worn.push(w);
     if (outer(id)) over |= w.hides;
     else inner.push(w);
+    if (d.slot === 'top') coat |= (w.hides | (w.shrinks ?? 0)) & WAIST;
+    if (d.slot === 'legs') legs.push(w);
   }
   for (const w of inner) if (over) w.under = over;
+  // (and trousers in under a top over the hips, a little: a parka's hem stood behind the white of snow trousers' waist)
+  for (const w of legs) if (coat) (w.under = (w.under ?? 0) | coat), (w.underBy = coat & hides(['thigh']) ? UNDER : 0.008);
   return { worn, gear };
 }
 
@@ -424,7 +432,7 @@ export class Wardrobe {
           `survivor-wear|${w.camo ? 'camo' : w.tint !== undefined ? 'tint' : 'own'}`,
         );
         const m = onto(s, f.bones, mat);
-        under.by.value = UNDER / unitOf(m);
+        under.by.value = (w.underBy ?? UNDER) / unitOf(m);
         m.castShadow = m.receiveShadow = true;
         m.intersectsFrustum = f.inSight;
         m.layers.mask = f.layers();

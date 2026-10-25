@@ -38,7 +38,7 @@ interface Stage {
 /** the ways, radians to the body's left of ahead */
 const WAYS: Record<string, number> = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 };
 
-export interface BodySpec { words: string; held: string | null; body: number | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean }
+export interface BodySpec { words: string; held: string | null; body: number | null; wear: string[] | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean }
 
 /** what a cell's words ask for, at the pace the game would go at (src/game/player.ts: 1.7 walking, 4.0 at a jog, 6.2 flat out, 1.9 crouched) */
 export function specOf(words: string): BodySpec {
@@ -60,7 +60,9 @@ export function specOf(words: string): BodySpec {
   }
   // (b0..b3: one of the survivors' bodies, as the game puts it on, in what a new life wears; none: the old suit)
   const body = w.find((k) => /^b\d$/.test(k));
-  return { words, held, body: body ? +body.slice(1) : null, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing') };
+  // (wear-parka-smock_pants: what it wears instead of a new life's clothes)
+  const wear = w.find((k) => k.startsWith('wear-'))?.slice(5).split('-') ?? null;
+  return { words, held, body: body ? +body.slice(1) : null, wear, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing') };
 }
 
 /** a stand-in for the game's sky and sun: what a body and a gun ask of it */
@@ -106,7 +108,7 @@ export async function stageBodies(o: Stage) {
     if (s.body !== null) {
       a.wardrobe.setBody(s.body);
       await a.wardrobe.ready();
-      a.wardrobe.setWorn(sortWorn(CLOTHES.map(([, id]) => id)).worn);
+      a.wardrobe.setWorn(sortWorn(s.wear ?? CLOTHES.map(([, id]) => id)).worn);
       await a.wardrobe.dressed();
     }
     scene.add(a.root);
@@ -175,5 +177,18 @@ export async function stageBodies(o: Stage) {
       say(cell, frames > 1 ? `${b.s.words} ${(f / fps).toFixed(2)} s` : b.s.words);
     }
   }
-  return { bodies: specs.map((s, i) => ({ words: s.words, speed: +s.speed.toFixed(2), head: heads[i].map((v) => +v.toFixed(3)) })), frames, fps, across, block: [per * cw, blockRows * ch] };
+  // (and how low its skin comes over the floor (0), and its left toe joint: the soles, or a body that floats over it)
+  const v = new THREE.Vector3();
+  const sole = bodies.map(({ a }) => {
+    let low = Infinity;
+    a.root.updateMatrixWorld(true);
+    a.root.traverse((m) => {
+      const s = m as THREE.SkinnedMesh;
+      if (!s.isSkinnedMesh || !s.visible || !s.geometry.attributes.position) return;
+      for (let k = 0; k < s.geometry.attributes.position.count; k += 3) low = Math.min(low, s.localToWorld(s.getVertexPosition(k, v)).y);
+    });
+    const ball = a.root.getObjectByName('ball_l')?.getWorldPosition(new THREE.Vector3()).y ?? NaN;
+    return [+low.toFixed(3), +ball.toFixed(3)];
+  });
+  return { bodies: specs.map((s, i) => ({ words: s.words, speed: +s.speed.toFixed(2), head: heads[i].map((v) => +v.toFixed(3)), sole: sole[i] })), frames, fps, across, block: [per * cw, blockRows * ch] };
 }

@@ -30,7 +30,7 @@ import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
 import { diffOps, laidIn, type Laid } from '../../sim/box-ops';
 import { bodyFor, voiceFor } from '../../sim/survivor';
-import { wornKey, sortWorn } from '../survivors';
+import { chosen, wornKey, sortWorn } from '../survivors';
 
 /** how near a crate is asked what is in it, and how often again while near (peekNear) */
 const PEEK_AT = 3.5, PEEK_AGAIN = 8000;
@@ -960,7 +960,8 @@ export const onlineMethods = {
         const name = mine ? playerName() : q.name, key = `${name}|${worn.join(',')}`;
         if (!this.heads.has(key) && fresh < 3) {
           fresh++;
-          this.heads.set(key, await renderDoll(r.renderer, atmo.envMap, lookFor(name), worn, this.loot.models, true).catch(() => ''));
+          const body = mine ? chosen(name).body : this.remotes.get(q.id)?.avatar.wardrobe.body ?? bodyFor(name);
+          this.heads.set(key, await renderDoll(r.renderer, atmo.envMap, lookFor(name), worn, this.loot.models, true, body).catch(() => ''));
         }
         const url = this.heads.get(key);
         if (url) out[q.id] = url;
@@ -978,7 +979,7 @@ export const onlineMethods = {
     const { r, atmo } = this.s;
     const worn = this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : [];
     const mine = ++this.portraitN;
-    void renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), worn, this.loot.models).then((doll) => {
+    void renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), worn, this.loot.models, false, chosen(playerName()).body).then((doll) => {
       // (a later one may have been asked for while this was drawn)
       if (mine !== this.portraitN || !this.invUI) return;
       this.invUI.doll = doll;

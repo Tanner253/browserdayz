@@ -9,6 +9,9 @@ import type { ItemModels } from '../game/loot';
 import { wearFinish, type Finish } from '../game/finish';
 import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look } from '../game/look';
 import { BODY_SCALE, GEAR, WORN, placeWorn } from '../game/avatar';
+import { hangFit } from '../game/avatar/gear';
+import { MOVE_FILE } from '../game/avatar/gait';
+import { sortWorn, wearBody, wearOn, type BodyFit } from '../game/survivors';
 import { made, programsOf } from '../core/renderer';
 
 const PX = 64; // pixels per grid cell
@@ -363,9 +366,18 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
  * @param models where a pack's own model comes from (the cap, the headset and the plate carrier are pieces of the body itself)
  * @param face the head alone, square and small: who somebody is, in a list of people
  */
-export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look, worn: string[] = [], models?: ItemModels, face = false): Promise<string> {
+/**
+ * @param body one of the survivors' bodies (src/game/survivors.ts), as worn in the world: the old suit is drawn only
+ * without one. (The owner, 2026-10-25, of the still figure, the old suit at its file's rest with its toes pointed and
+ * nothing under it: "looks like hes floating it doesnt look right he feet look weird".)
+ */
+export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look, worn: string[] = [], models?: ItemModels, face = false, body: number | null = null): Promise<string> {
   const gltf = await loadCharacter();
   const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+  model.updateMatrixWorld(true);
+  // (the body put on first, its own lengths on the bones, so that what is hung on it is hung where it is: see Avatar.gearFit)
+  const skin = body === null ? null : await wearBody(model, body);
+  const fit = (skin?.[0]?.userData.fit as BodyFit | undefined) ?? null;
   model.updateMatrixWorld(true);
   const suit = !!model.getObjectByName('pads');
   const shown = new Set(worn.flatMap((id) => WORN[id] ?? []));
@@ -384,7 +396,8 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
       const place = placeWorn(id, thing, worn);
       if (!place) continue;
       const toFile = new THREE.Matrix4().makeScale(1 / BODY_SCALE, 1 / BODY_SCALE, 1 / BODY_SCALE).multiply(new THREE.Matrix4().makeRotationY(Math.PI));
-      holder.matrix.copy(bone.matrixWorld).invert().multiply(toFile).multiply(place);
+      const inv = bone.matrixWorld.clone().invert().multiply(toFile);
+      holder.matrix.copy(inv).multiply(hangFit(fit, g, inv)).multiply(place);
       holder.add(thing);
       bone.add(holder);
       carried.push(holder);
@@ -403,7 +416,8 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   const own: THREE.Material[] = [];
   model.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
-    if (!m.isMesh) return;
+    // (the body's own paint is its own: see wearBody)
+    if (!m.isMesh || skin?.includes(m)) return;
     m.frustumCulled = false;
     // (the pieces of the suit that are worn or not: only what is worn)
     if (m.name.startsWith('gear_') && !shown.has(m.name)) m.visible = false;
@@ -427,11 +441,25 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
     m.material = c;
     own.push(c);
   });
-  const idle = gltf.animations.find((a) => a.name === 'idle');
+  // (and what is worn on it, as in the world: their own paints, after the suit's are made the doll's)
+  if (skin) await wearOn(model, skin, sortWorn(worn).worn);
+  // (standing as a body in the world stands: the motion capture's idle, its feet flat on the ground; the file's own
+  // idle stood the old suit on its toes)
+  const moves = skin ? (await assets.loadGLTF(MOVE_FILE)).animations : gltf.animations;
+  const idle = moves.find((a) => a.name === 'idle');
   if (idle) {
+    // (the hips and the feet as they rest, the soles flat on the ground: played on bare bones the idle lifts the hips
+    // and points the toes, which the game's body puts right as it stands, and a still figure would hang in the air)
+    const kept = ['foot_l', 'foot_r', 'ball_l', 'ball_r'].flatMap((n) => {
+      const b = model.getObjectByName(n);
+      return b ? [[b, b.quaternion.clone()] as const] : [];
+    });
+    const hips = model.getObjectByName('pelvis'), at = hips?.position.clone();
     const mixer = new THREE.AnimationMixer(model);
     mixer.clipAction(idle).play();
     mixer.update(0.4);
+    for (const [b, q] of kept) b.quaternion.copy(q);
+    if (hips && at) hips.position.copy(at);
   }
   const scene = new THREE.Scene();
   scene.environment = env;
@@ -441,6 +469,21 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   const rim = new THREE.DirectionalLight(0x9fc0ff, 1.4);
   rim.position.set(-3, 2.5, -3);
   scene.add(key, rim, model);
+  // (and a shadow under the feet, soft, as the live figure stands on its own: without one it floated on the page)
+  if (!face) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!, grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    const shade = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.5), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+    shade.rotation.x = -Math.PI / 2;
+    shade.position.y = 0.002;
+    scene.add(shade);
+    own.push(shade.material);
+  }
   // (a head in a list of people is an inch across: lit from the front, and well, so that the face is seen)
   if (face) {
     scene.environmentIntensity = 1.3;

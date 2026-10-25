@@ -76,7 +76,7 @@ const PIECES = {
   // (the basics every life begins in: src/sim/items.ts, CLOTHES)
   // (all of it over the chest, the belly and the shoulders is the shirt: white over the body's own grey shirt, it was
   // taken for the body there by its colour, and had holes)
-  tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], plain: true, tex: 2048 },
+  tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], plain: 0.85, tex: 2048 },
   tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, tex: 2048 },
   trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, tex: 1024 },
   smock: { src: 'wear_smock.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
@@ -129,9 +129,10 @@ async function laid(node) {
  * skin in a crease and blocks of shadow on the cloth (a grey patch stood on a T-shirt's back). What is far from the
  * piece's own colour, in hue or in lightness, is painted from the cloth about it; then every texel takes the piece's
  * own hue at its own lightness, so the folds and seams stay and nothing else does.
- * @param own the piece's colour, 0..1
+ * @param own the piece's colour, 0..1; @param least the darkest a fold of it is, against it (a white T-shirt's are
+ * light: a grey patch on one's back was Meshy's paint, at two thirds of the shirt's lightness)
  */
-async function plainCloth(prim, own) {
+async function plainCloth(prim, own, least = 0.45) {
   const tex = prim.getMaterial().getBaseColorTexture();
   const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, N = W * H, luma = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
@@ -144,7 +145,7 @@ async function plainCloth(prim, own) {
     // too unsteady to judge it by)
     const k = L / lo, off = Math.hypot(r - own[0] * k, g - own[1] * k, b - own[2] * k);
     // (a fold's shadow is half as light as the cloth, its top lit half again: kept)
-    const ok = k > 0.45 && k < 1.6 && off < 0.12;
+    const ok = k > least && k < 1.6 && off < 0.12;
     if (!ok) bad++;
     good[i] = ok ? 255 : 0;
     if (ok) data.copy(held, i * 3, i * 3, i * 3 + 3);
@@ -156,7 +157,7 @@ async function plainCloth(prim, own) {
   for (let i = 0; i < N; i++) {
     let r = data[i * 3], g = data[i * 3 + 1], b = data[i * 3 + 2];
     if (!good[i] && share[i] > 2) [r, g, b] = [0, 1, 2].map((c) => (sum[i * 3 + c] * 255) / share[i]);
-    const k = Math.min(1.6, Math.max(0.45, luma(r, g, b) / 255 / lo));
+    const k = Math.min(1.6, Math.max(least, luma(r, g, b) / 255 / lo));
     for (let c = 0; c < 3; c++) out[i * 3 + c] = Math.max(0, Math.min(255, Math.round(own[c] * k * 255)));
   }
   tex.setImage(new Uint8Array(await sharp(out, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer())).setMimeType('image/png');
@@ -379,7 +380,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // (skin, the shirt), and came in at every island's edge as pink and light slivers, nearer at a distance as the
   // picture is drawn smaller. Everything of the picture the piece does not cover takes the colour of the nearest cloth.
   await padTexture(D.prim, tris);
-  const plain = piece.plain ? await plainCloth(D.prim, own) : '';
+  const plain = piece.plain ? await plainCloth(D.prim, own, piece.plain === true ? undefined : piece.plain) : '';
 
   // ---- weighted as the skin under it is (the owner, 2026-10-25: "the player models are super buggy especially during
   // animations ... our previous player model was better with no stretching textures or distortions"). Meshy rigged the

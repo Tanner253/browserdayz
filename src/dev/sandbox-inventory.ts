@@ -4,6 +4,7 @@
 //
 //   &ui=inventory&kit=heavy        the inventory, open, as a survivor with that kit has it (src/sim/kits.ts KITS)
 //   &body=marksman                 the kit on the body beside (default: assault)
+//   &who=2                         the figure in the middle one of the survivors' bodies (default 0)
 //   &ui=hud                        the hot bar at the foot of the screen, as in play
 //   &ui=wheel                      the wheel on T (src/ui/radial.ts) by itself: window.wheel is it, to be pointed by a script
 //   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
@@ -30,6 +31,7 @@ import { KITS, type KitThing } from '../sim/kits';
 import { freshVitals } from '../game/player';
 import { assets } from '../core/assets';
 import { renderDoll } from '../ui/icons';
+import { wornKey } from '../game/survivors';
 import { lookFor } from '../game/look';
 import type * as THREE from 'three';
 import type { Stash, WorldItem } from '../game/loot';
@@ -207,7 +209,8 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
     unqueue: (i) => void jobs.splice(i, 1),
   });
   // (the survivor, as the inventory shows them until the live figure is ready: the game's still picture, wearing the kit)
-  if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [it.id] : [])));
+  // (the figure as the game draws it still: one of the survivors' bodies, &who=0..3, the first unsaid)
+  if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [wornKey(it)] : [])), undefined, false, +(q.get('who') ?? 0));
   screen.open(vicinity, opened ?? body, freshVitals());
   const view = q.get('view');
   if (view) (screen.craftPane as CraftingScreen).showView(view as Parameters<CraftingScreen['showView']>[0]);
