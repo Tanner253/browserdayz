@@ -678,8 +678,10 @@ export class CorpseBody {
   private gone = false;
   /** @param name whose body it is: it is dressed the way they were */
   /** @param slope which way is up out of what it lies on (on a hillside it lies along the hill, not level in the air over it) */
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3) {
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3, bd: number | null = null) {
+    this.avatar.wardrobe.setBody(bd);
     await this.avatar.load(atmo, 0, false, lookFor(name));
+    await this.avatar.wardrobe.ready();
     if (this.gone) return void this.avatar.dispose();
     scene.add(this.avatar.root);
     this.avatar.layDown(variant);

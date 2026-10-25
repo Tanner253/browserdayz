@@ -218,7 +218,13 @@ export function handle(c: Client, m: C2S) {
     case 'gear': {
       // only things that are worn, and only as many as there are places to wear them (there were six places, and
       // the list was cut to six: there are eleven now, and whatever is drawn of any of them has room in it)
-      c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, GEAR_SLOTS.length);
+      // (a piece of clothing comes as id~colour, its colour one of those it has)
+      c.g = (Array.isArray(m.g) ? m.g : []).filter((x): x is string => {
+        if (typeof x !== 'string') return false;
+        const [id, k, more] = x.split('~'), def = ITEMS[id];
+        if (!def?.wear || more !== undefined) return false;
+        return k === undefined || (/^[1-9]d?$/.test(k) && +k < (def.colours?.length ?? 0));
+      }).slice(0, GEAR_SLOTS.length);
       broadcast({ t: 'gear', id: c.id, g: c.g }, c);
       return;
     }

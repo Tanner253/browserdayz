@@ -8,7 +8,8 @@ import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { assets } from '../core/assets';
 import type { Atmosphere } from '../world/atmosphere';
 import { stainPatch, type LookUniforms } from './look';
-import { BODY_NAMES, VOICES, bodyFor, pickOf, voiceFor } from '../sim/survivor';
+import { BODY_NAMES, VOICES, bodyFor, hides, pickOf, voiceFor } from '../sim/survivor';
+import { ITEMS } from '../sim/items';
 
 /** the survivors to be picked from, by the number a player's pick is sent as (as DayZ has a few faces to choose from) */
 export const BODIES = BODY_NAMES.map((name, n) => ({ name, file: `body_${n}` }));
@@ -64,6 +65,24 @@ export interface Worn {
   shrinks?: number;
   tint?: number;
   camo?: string;
+}
+
+/** how a thing worn is said to everybody: its id, and its colour after a ~ where that is not its kind's first */
+export const wornKey = (it: { id: string; c?: number }) => (it.c ? `${it.id}~${it.c}` : it.id);
+
+/** What is said of a body's things worn, sorted: those drawn as they are worn (`dress`: Worn), and the rest by their ids (GEAR in avatar.ts). */
+export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
+  const worn: Worn[] = [], gear: string[] = [];
+  for (const k of keys) {
+    const [id, c] = k.split('~'), d = ITEMS[id];
+    if (!d?.dress) {
+      gear.push(id);
+      continue;
+    }
+    const col = d.colours?.[Number(c) || 0];
+    worn.push({ model: d.dress.model, hides: hides(d.dress.hides), shrinks: hides(d.dress.shrinks ?? []), ...(col?.tint !== undefined ? { tint: col.tint } : {}), ...(col?.camo ? { camo: col.camo } : {}) });
+  }
+  return { worn, gear };
 }
 
 /** the camouflages' tiles, each fetched once (mirrored where they repeat, so that no seam shows) */
@@ -246,16 +265,22 @@ export class Wardrobe {
   private wornKey = '[]';
   private wornShown = '';
   private wornShapes: THREE.Object3D[] = [];
+  private putting: Promise<void> = Promise.resolve();
+
+  /** once the body last asked for is on (a body lying still is posed once, with it on: see CorpseBody) */
+  ready() {
+    return this.putting;
+  }
 
   attach(frame: Frame) {
     this.frame = frame;
-    void this.apply();
+    this.putting = this.apply();
   }
 
   /** @param n one of BODIES, or null for the suit */
   setBody(n: number | null) {
     this.want = bodyOf(n);
-    void this.apply();
+    this.putting = this.apply();
   }
 
   get body() {

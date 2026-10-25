@@ -37,7 +37,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import type { Grips } from './arms';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from './avatar';
 import { lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch } from './look';
-import { chosen } from './survivors';
+import { chosen, sortWorn } from './survivors';
 import type { ItemModels } from './loot';
 
 /** a thing as it is seen in somebody's hands (`plumb`: the part of it that hangs from the hand, and is kept upright: see `inFist`) */
@@ -630,7 +630,10 @@ export class Doll {
         this.livelyTill = performance.now() + LIVELY;
       }
       const items: { id: string; obj: THREE.Object3D }[] = [];
-      for (const id of ids) {
+      // (the clothes as they are worn: src/game/survivors.ts)
+      const { worn, gear } = sortWorn(ids);
+      this.body.wardrobe.setWorn(worn);
+      for (const id of gear) {
         if (!GEAR_SHOWN.has(id)) continue;
         // (what is on already stays as it is; a thing that is a piece of the suit itself has no model to hang on the body: it is there or not)
         const on = kept.find((i) => i.id === id);

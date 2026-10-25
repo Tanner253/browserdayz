@@ -21,7 +21,7 @@ import '../world/buildings';
 import type { Buildings } from '../world/buildings';
 import { PLAN, SQUARE_HALF, passPlan, ridgeWall, WORLD_X0, WORLD_X1, WORLD_Z0, WORLD_Z1, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { FLOOR_CACHE, caveSpansUnder, passWorld, wallParts } from '../sim/pass';
-import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
+import { ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
 import { PlayerInventory } from '../sim/inventory';
 import '../sim/powers';
 import { Economy, lootPrint, type WorldLoot } from '../sim/economy';
@@ -37,7 +37,7 @@ import { crateId, type EspRow, type ZedSpot } from '../net/protocol';
 import { FURNITURE, storageId } from '../sim/storage';
 import { CARRY_LIMIT, Player } from './player';
 import '../sim/blood';
-import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
+import { Avatar, AVATAR_LAYER, type Hold } from './avatar';
 import { lookFor } from './look';
 import { chosen, choose } from './survivors';
 import { Doll } from './doll';
@@ -947,7 +947,7 @@ export class Game {
     // slung, and says when it has been drawn; until it is made, the still picture above is what is shown.)
     this.doll = new Doll(r, atmo, this.loot.models, {
       name: () => playerName(),
-      worn: () => GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x)),
+      worn: () => this.wornKeys(),
       hands: () => {
         const it = this.inv.held() ?? this.inHand;
         return it ? { id: it.id, mods: fittedOf(it) } : null;
@@ -964,7 +964,7 @@ export class Game {
     this.emoteDoll = () =>
       (this.emoteFig ??= new Doll(r, atmo, this.loot.models, {
         name: () => playerName(),
-        worn: () => GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x)),
+        worn: () => this.wornKeys(),
         hands: () => null,
         held: (id, mods) => this.makeHeld(id, mods),
         back: () => '',
@@ -1717,6 +1717,7 @@ export interface Game {
   act: Methods<typeof onlineMethods>['act'];
   wear: Methods<typeof onlineMethods>['wear'];
   syncBack: Methods<typeof onlineMethods>['syncBack'];
+  wornKeys: Methods<typeof onlineMethods>['wornKeys'];
   syncGear: Methods<typeof onlineMethods>['syncGear'];
   drawHeads: Methods<typeof onlineMethods>['drawHeads'];
   portrait: Methods<typeof onlineMethods>['portrait'];

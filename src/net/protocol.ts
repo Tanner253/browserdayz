@@ -183,6 +183,8 @@ export interface CorpseInfo extends StashInfo {
   ride?: { i: number; seat: number };
   /** the body of one of the infected (its `i`): drawn by them, and only searched here */
   zed?: number;
+  /** whose body it was of the survivors' (src/sim/survivor.ts): when it is not said, the one the name gives */
+  bd?: number;
 }
 
 /**

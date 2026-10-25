@@ -8,7 +8,7 @@ import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { shown } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
-import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
+import { ITEMS, GEAR_SLOTS, holds, type ItemInstance } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
 import { LAUNCHED, THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
@@ -29,6 +29,7 @@ import type { Game } from '../game';
 import { BOUGHT, onBought } from '../../ui/store/account';
 import { diffOps, laidIn, type Laid } from '../../sim/box-ops';
 import { bodyFor, voiceFor } from '../../sim/survivor';
+import { wornKey, sortWorn } from '../survivors';
 
 /** how near a crate is asked what is in it, and how often again while near (peekNear) */
 const PEEK_AT = 3.5, PEEK_AGAIN = 8000;
@@ -845,7 +846,10 @@ export const onlineMethods = {
   /** hat, vest and pack as they sit on a body */
   async wear(this: Game, body: Avatar, ids: string[]) {
     const out: { id: string; obj: THREE.Object3D }[] = [];
-    for (const id of ids) {
+    // (the clothes as they are worn, and the rest hung on the body)
+    const { worn, gear } = sortWorn(ids);
+    body.wardrobe.setWorn(worn);
+    for (const id of gear) {
       if (!GEAR_SHOWN.has(id)) continue;
       const model = (await this.loot.models.get(id)).group.clone();
       out.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
@@ -863,11 +867,14 @@ export const onlineMethods = {
     this.net.send({ t: 'back', b });
   },
 
+  /** what this player wears that a body shows: the clothes by their colours (src/game/survivors.ts), and the hats, vests and packs (GEAR) */
+  wornKeys(this: Game): string[] {
+    return GEAR_SLOTS.map((s) => this.inv.slots[s]).filter((x): x is ItemInstance => !!x && (GEAR_SHOWN.has(x.id) || !!ITEMS[x.id]?.dress)).map(wornKey);
+  },
+
   /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
   syncGear(this: Game) {
-    // (every place a thing is worn in, and of what is worn there whatever has a model for the body: head, face, vest
-    // and back today, as it was when those four were named here; a thing made for any other place is sent the day it is)
-    const ids = GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x));
+    const ids = this.wornKeys();
     const key = ids.join(',');
     if (key === this.gearKey) return;
     this.gearKey = key;
@@ -967,7 +974,7 @@ export const onlineMethods = {
     this.corpses.set(c.uid, { stash, body });
     if (wait) await new Promise((r) => setTimeout(r, wait));
     if (!this.corpses.has(c.uid)) return;
-    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope);
+    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope, c.bd ?? bodyFor(c.name));
     // and what has run out of it by then
     this.effects.pool(c.x - Math.sin(c.rot) * ahead * 0.75 - Math.cos(c.rot) * left, c.y, c.z - Math.cos(c.rot) * ahead * 0.75 + Math.sin(c.rot) * left);
   },
