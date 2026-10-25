@@ -51,7 +51,9 @@ export function inFist(model: THREE.Object3D, id: string): Held | null {
     lay(order[0], order[1], order[2], new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
     // (held low on its length where it is held so: a torch by its stick, its head up out of the fist)
     turned.position.y = (0.5 - (GRIPPED_AT[id] ?? 0.5)) * size[order[0]];
-    return { obj, grips: { right: fist(0.012 + thick / 2, THREE.MathUtils.clamp(1.2 - (thick - 0.03) * 9, 0.6, 1.3)), left: null }, kind: 'melee' };
+    const right = fist(0.012 + thick / 2, THREE.MathUtils.clamp(1.2 - (thick - 0.03) * 9, 0.6, 1.3));
+    // (a torch is held up, its flame at the shoulder's height and clear of the body, as DayZ and Rust hold one)
+    return { obj, grips: { right: id === 'torch' ? { ...right, raise: true } : right, left: null }, kind: 'melee' };
   }
   // (Said in the room's own frame, which the part that hangs is kept to. Its thinnest way is across the leg, as
   // a case is carried. What stands upright as it comes, a fuel can, hangs upright; what lies flat as it comes, a

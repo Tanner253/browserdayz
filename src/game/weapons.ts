@@ -488,6 +488,17 @@ export const LIVE = {
 };
 
 /**
+ * A torch in the hands, in the eye's space: up on the right in the fist, its head uppermost and leaning a little out
+ * and forward, the flame clear at the top right of the picture (the navigator, 2026-10-24: "the forearm raised, the
+ * torch up and a little out, the flame about shoulder height and clear of the body"). `turn` stands it up off the
+ * line it lies along when held (its head away from the eye).
+ */
+export const TORCH_UP = {
+  at: [0.23, -0.14, -0.48] as [number, number, number],
+  turn: [1.3, 0.12, -0.2] as [number, number, number],
+};
+
+/**
  * A roll of dressing (the bandage, the splint tape), in the eye's space. It lies in the hollow of the left palm,
  * held up left of the middle and tipped to the eye; the right hand takes the end of it, draws a length off, goes
  * down out of the picture to where the wound is, and comes back for more.
@@ -4814,7 +4825,11 @@ export class Weapons {
     let drawn = -1;
     // an injection: where the left hand is held out to take it (in the eye's space), and how far the shot has gone in
     let offered: { pos: THREE.Vector3; elbow: THREE.Vector3; fingers: THREE.Vector3; palm: THREE.Vector3; clench: number } | null = null;
-    if (h.kind === 'eat' || h.kind === 'drink') {
+    if (h.id === 'torch') {
+      const T = TORCH_UP;
+      pos.set(T.at[0] + Math.sin(h.age * 1.3) * 0.002, T.at[1] + Math.sin(h.age * 1.9) * 0.003, T.at[2]);
+      rot.set(T.turn[0], T.turn[1], T.turn[2]);
+    } else if (h.kind === 'eat' || h.kind === 'drink') {
       // up to the mouth and back, once per bite / gulp
       const period = h.kind === 'eat' ? 0.95 : 1.25;
       const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, t - 0.3) / period) * Math.PI * 2);
