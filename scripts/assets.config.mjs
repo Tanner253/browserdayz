@@ -897,6 +897,7 @@ export const LOCAL_MODELS = {
     ['bb_wall_torch', 'Wall torch', 'base/wall_torch_sized.glb'], ['bb_ladder', 'Ladder', 'base/ladder2_sized.glb'],
     ['bb_palisade_log', 'Palisade log', 'base/palisade_log_sized.glb'], ['bb_gate_wood', 'Wooden gate', 'base/gate_wood_sized.glb'],
     ['bb_gate_steel', 'Steel gate leaf', 'base/gate_steel_leaf.glb'],
+    ['bb_bedroll', 'Sleeping bag', 'base/bedroll.glb'],
   ].map(([id, name, file]) => [id, {
     dir: '../incoming/higgsfield', file, scale: 1, tex: 1024, tags: ['base'],
     changes: 'Kept at the size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',

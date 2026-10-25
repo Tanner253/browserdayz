@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T06:35:26.678Z",
+ "generated": "2026-10-25T07:17:14.641Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -13885,6 +13885,26 @@
     0.8288,
     2.1,
     0.3392
+   ],
+   "lods": []
+  },
+  "bb_bedroll": {
+   "url": "assets/models/bb_bedroll.glb",
+   "tags": [
+    "base"
+   ],
+   "bytes": 399100,
+   "srcTris": 4900,
+   "tris": 4900,
+   "min": [
+    -0.5,
+    0,
+    -0.1688
+   ],
+   "max": [
+    0.5,
+    0.1759,
+    0.1688
    ],
    "lods": []
   }

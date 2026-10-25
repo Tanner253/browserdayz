@@ -269,6 +269,8 @@ const BODY: Record<string, (atmo: Atmosphere | null) => Promise<Built>> = {
   workbench: async (atmo) => built(into(moved(await partsOf('bb_workbench', atmo), turnY(Math.PI / 2)), [[-0.85, 0, -0.45], [0.85, 1.25, 0.45]])),
   // (its pallets the solid, its bedding over them: the model is the two)
   bed: async (atmo) => built(into(moved(await partsOf('bb_bed', atmo), turnY(Math.PI / 2)), [[-0.55, 0, -1.05], [0.55, 0.6, 1.05]])),
+  // (a sleeping bag, opened out, its loft over the solid's ten centimetres: made along x)
+  bedroll: async (atmo) => built(into(moved(await partsOf('bb_bedroll', atmo), turnY(Math.PI / 2)), [[-0.4, 0, -1], [0.4, 0.16, 1]])),
   // (the bracket's plate on the wall behind it, -z: the model has it at +z)
   torch_wall: async (atmo) => built(into(moved(await partsOf('bb_wall_torch', atmo), turnY(Math.PI)), [[-0.08, 1.62, -0.13], [0.08, 2.2, 0.17]])),
   ladder: async (atmo) => built(into(upright(await partsOf('bb_ladder', atmo)), boxOf(shapeOf('ladder').solid))),
