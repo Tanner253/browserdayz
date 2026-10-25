@@ -5,14 +5,20 @@
 
 export type ItemId = 'vip' | 'noads' | 'deagle_gold' | 'm9_nickel' | 'colt_nickel' | 'knife_gold' | 'coffee';
 
+/** how a finish looks (src/game/finish.ts paints each) */
+export type Look = 'gold' | 'nickel' | 'emerald' | 'ruby' | 'damascus' | 'carbon' | 'nightcamo';
+
+/** every knife a knife's finish goes on (the owner, 2026-10-25: "high quality knives ... in the store as cosmetics") */
+export const KNIVES: readonly string[] = ['knife', 'hunting_knife', 'bayonet', 'karambit'];
+
 export interface ShopItem {
   name: string;
   /** dollars; 0 for the coffee, whose amount the buyer picks */
   usd: number;
   /** a perk that runs out: each payment adds this many days to what is left */
   days?: number;
-  /** a finish on one of the game's own models, by its item id (src/sim/items.ts): numbered, each one sold its own */
-  skin?: { gun: string; finish: 'gold' | 'nickel' };
+  /** a finish on one of the game's own models, by its item id (src/sim/items.ts), or on any knife ('knife'): numbered, each one sold its own */
+  skin?: { gun: string; finish: Look };
   /** how many will ever be sold (the owner, 2026-10-22: "we will make these items nft's in the future so each cosmetic sold should be reserved. we will only sell 100 gold deagles and 100 gold knives") */
   limit?: number;
   say: string;
@@ -62,11 +68,17 @@ export const isAcct = (v: unknown): v is string => typeof v === 'string' && /^[0
 /** whether ads are kept from this account now: VIP or no-ads running */
 export const adFree = (p: Perks, now = Date.now()) => p.vip > now || p.noads > now;
 
+/** whether a finish made for `skin` (a gun's id, or 'knife' for every knife) goes on a gun of this id */
+export const skinFits = (skin: string, gun: string) => skin === gun || (skin === 'knife' && KNIVES.includes(gun));
+
 /** the finish of theirs that can be put on a gun of this id, if they own one */
 export function skinFor(skins: readonly string[], gun: string): ItemId | null {
-  for (const id of skins) if ((SHOP as Record<string, ShopItem>)[id]?.skin?.gun === gun) return id as ItemId;
+  for (const id of skins) {
+    const s = (SHOP as Record<string, ShopItem>)[id]?.skin;
+    if (s && skinFits(s.gun, gun)) return id as ItemId;
+  }
   return null;
 }
 
 /** how a gun wearing this finish (a shop item id, as on the gun: ItemInstance.finish) looks, or null for none */
-export const lookOf = (id: string | undefined): 'gold' | 'nickel' | null => (id && (SHOP as Record<string, ShopItem>)[id]?.skin?.finish) || null;
+export const lookOf = (id: string | undefined): Look | null => (id && (SHOP as Record<string, ShopItem>)[id]?.skin?.finish) || null;

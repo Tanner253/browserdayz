@@ -18,6 +18,8 @@
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
 //   &person=0                                   no survivor beside it
+//   &gap=0.05                                   metres between things laid side by side (0.5)
+//   &finish=emerald,ruby&as=knife               the store finish each model wears in turn (as: the gun it is plated as)
 //   &cell=640x360                               each view's size; the page is laid out to hold them all
 //   &ui=inventory&kit=heavy, &ui=hud, &touch=1  a screen of the game over it (src/dev/sandbox-inventory.ts)
 // When the picture is drawn, window.staged is true and window.stageInfo says what was drawn (size, triangles, clips).
@@ -27,6 +29,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assets } from '../core/assets';
+import { wearFinish, type Finish } from '../game/finish';
 
 const q = new URLSearchParams(location.search);
 const list = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean);
@@ -37,7 +40,7 @@ const views = list('views').length ? list('views') : ['side', 'front', 'q', 'top
 const strip = Math.max(0, Math.floor(+(q.get('strip') ?? 0)));
 // (an animal faces -z, as the game has them: turned a quarter by default, so that 'side' sees its side)
 const yaw = (+(q.get('yaw') ?? (q.get('animal') ? 90 : 0)) * Math.PI) / 180;
-const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0';
+const dusk = q.get('sun') === 'dusk', person = q.get('person') !== '0', gap = +(q.get('gap') ?? 0.5);
 const [cw, ch] = (q.get('cell') ?? '640x360').split('x').map(Number);
 
 const sim = q.get('sim');
@@ -153,11 +156,19 @@ if (sim) {
     // (an animal stands where the game stands it, its root on the ground, and is not set down by its box)
     if (!asIs) o.position.y -= box.min.y;
     o.position.z -= (box.min.z + box.max.z) / 2;
-    x += size.x + 0.5;
+    x += size.x + gap;
     thing.add(o);
     info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), ...extra });
   };
-  for (const id of ids) place(await assets.model(id), id);
+  // (&finish=emerald,ruby: the store finish each model wears, in turn; its picture's light, as the inventory's)
+  const finishes = list('finish');
+  for (const [i, id] of ids.entries()) {
+    const f = finishes.length ? finishes[i % finishes.length] : '';
+    // (a copy each, as one id may be laid out in several finishes)
+    const o = f ? (await assets.model(id)).clone() : await assets.model(id);
+    if (f && f !== 'none') wearFinish(o, q.get('as') ?? id, f as Finish, true);
+    place(o, f ? `${id} ${f}` : id);
+  }
   for (const f of files) {
     const gltf = await assets.loadGLTF(f);
     const o = gltf.animations.length ? cloneSkinned(gltf.scene) : gltf.scene;

@@ -8,7 +8,7 @@
 // (the owner: "why would we allow the client to have ANY authority?"). A buyer may plate as many guns of that kind as
 // they like; a gun keeps it until it is gone.
 
-import { SHOP, lookOf, type ItemId } from '../api/_lib/shop-items';
+import { SHOP, lookOf, skinFits, type ItemId } from '../api/_lib/shop-items';
 import type { ItemInstance } from '../src/sim/items';
 import type { SerializedInventory } from '../src/sim/inventory';
 
@@ -40,8 +40,9 @@ export const plating = {
     if (!it) return it;
     const p = plates.get(it.uid);
     delete it.finish;
-    // (only on a gun of the kind it was put on: a uid said of another thing is not plated by it)
-    if (p && SHOP[p.f]?.skin?.gun === it.id) {
+    // (only on a gun of the kind it was put on, or any knife for a knife's: a uid said of another thing is not plated by it)
+    const skin = p && SHOP[p.f]?.skin;
+    if (p && skin && skinFits(skin.gun, it.id)) {
       it.finish = p.f;
       p.seen = now;
     }

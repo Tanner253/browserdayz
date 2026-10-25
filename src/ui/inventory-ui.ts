@@ -27,7 +27,7 @@ import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, would
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import { actIcon } from './act-icons';
-import { lookOf } from '../../api/_lib/shop-items';
+import { lookOf, type Look } from '../../api/_lib/shop-items';
 import { kindIcon, kindView, setKindView } from './kind-icons';
 import { searchMatch, searchTerms } from './inv-search';
 import { TAKE_GROUPS, fitsGuns, inTakeGroup, type TakeGroup } from './inv-take';
@@ -96,11 +96,11 @@ export interface InvActions {
   /** a line said to the player */
   note(text: string): void;
   /** the store finish of theirs this gun can be given ('gold', 'nickel'), where it does not wear it already; else null */
-  finishFor(item: ItemInstance): 'gold' | 'nickel' | null;
+  finishFor(item: ItemInstance): Look | null;
   /** that finish put on it for good, by the server (server/plates.ts) */
   applyFinish(item: ItemInstance): void;
   /** a plated gun's picture drawn, once, from its model with the finish on: put in `icons` as `<id>|<finish>` */
-  plateIcon(id: string, f: 'gold' | 'nickel'): void;
+  plateIcon(id: string, f: Look): void;
 }
 
 type Source =
