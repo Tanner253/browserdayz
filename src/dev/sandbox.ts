@@ -9,12 +9,15 @@
 //   /tools/sandbox.html?m=plate_carrier          models by their manifest id (as the game loads them)
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
 //   &clip=run&t=0.25                            that animation (name or number) at that share of its length
+//   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
+//                                               one of its clips; today's survivor beside them plays it too
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
 //                                               picture (src/dev/sandbox-sim.ts)
 //   &strip=8                                    eight moments across the clip instead, from the first view
 //   &views=side,front,back,top,q                which cameras (q: three-quarter); default side,front,q,top
+//   &near=0.4,1.1,0,0.6                         every camera on that point (x, y, z in metres) from that far: a hand, a face
 //   &yaw=90                                     the thing turned, degrees
 //   &sun=day|dusk                               default day
 //   &person=0                                   no survivor beside it
@@ -30,9 +33,9 @@ import { assets } from '../core/assets';
 
 const q = new URLSearchParams(location.search);
 const list = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean);
-const files = list('g'), animal = q.get('animal');
+const files = list('g'), animal = q.get('animal'), survivors = list('survivor').map(Number);
 // (a screen of the game with nothing named to stand behind it: a pack on the floor, so there is something)
-const ids = list('m').length || files.length || animal || !q.get('ui') ? list('m') : ['military_backpack'];
+const ids = list('m').length || files.length || animal || survivors.length || !q.get('ui') ? list('m') : ['military_backpack'];
 const views = list('views').length ? list('views') : ['side', 'front', 'q', 'top'];
 const strip = Math.max(0, Math.floor(+(q.get('strip') ?? 0)));
 // (an animal faces -z, as the game has them: turned a quarter by default, so that 'side' sees its side)
@@ -173,6 +176,29 @@ if (sim) {
       mixer.setTime(clip.duration * +(q.get('t') ?? 0));
     }
   }
+  // (every survivor, and today's beside them, in one clip at one moment: see `played`)
+  const played: [THREE.AnimationMixer, THREE.AnimationAction][] = [];
+  const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
+    const want = q.get('clip');
+    const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
+    if (!clip) return null;
+    const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
+    a.play();
+    m.setTime(clip.duration * +(q.get('t') ?? 0));
+    played.push([m, a]);
+    return clip.name;
+  };
+  if (survivors.length) {
+    const { wearBody, BODIES } = await import('../game/survivors');
+    const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
+    for (const n of survivors) {
+      const o = cloneSkinned(gltf.scene) as THREE.Group;
+      o.traverse((m) => { if (m.name.startsWith('gear_')) m.visible = false; });
+      await wearBody(o, n);
+      const playing = playOn(o, gltf.animations);
+      place(o, BODIES[n]?.name ?? String(n), { playing });
+    }
+  }
   if (animal) {
     const { MODES, stageAnimal } = await import('../game/animals');
     const mode = q.get('mode') ?? 'idle', a = await stageAnimal(animal, MODES[mode] ?? +mode);
@@ -192,6 +218,7 @@ if (sim) {
     // (a copy: the file's own is the one the game's pictures of the survivor are made from, and it is moved aside here)
     const body = cloneSkinned((await assets.loadGLTF('assets/characters/survivor.glb')).scene) as THREE.Group;
     body.traverse((o) => { if (o.name.startsWith('gear_')) o.visible = false; });
+    if (survivors.length) playOn(body, (await assets.loadGLTF('assets/characters/survivor.glb')).animations);
     shadowed(body);
     body.position.set(subject.max.x + 0.9, 0, 0);
     scene.add(body);
@@ -215,8 +242,10 @@ if (sim) {
     dir.normalize();
     const fit = Math.max(span.x / camera.aspect, span.y, span.z * (view === 'top' ? 1 / camera.aspect : 0.6));
     const d = (fit * 0.62) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) + Math.max(span.x, span.z) * 0.5;
-    camera.position.copy(mid).addScaledVector(dir, d);
-    camera.lookAt(mid);
+    const near = q.get('near')?.split(',').map(Number);
+    const at = near?.length === 4 ? new THREE.Vector3(near[0], near[1], near[2]) : mid;
+    camera.position.copy(at).addScaledVector(dir, near?.length === 4 ? near[3] : d);
+    camera.lookAt(at);
   };
 
 
@@ -224,6 +253,7 @@ if (sim) {
   for (let i = 0; i < cells; i++) {
     const view = strip > 0 ? views[0] : views[i];
     if (strip > 0 && mixer && action) mixer.setTime(action.getClip().duration * (i / strip));
+    if (strip > 0) for (const [m, a] of played) m.setTime(a.getClip().duration * (i / strip));
     thing.updateMatrixWorld(true);
     frame(view);
     const vx = (i % cols) * cw, vy = (rows - 1 - Math.floor(i / cols)) * ch;

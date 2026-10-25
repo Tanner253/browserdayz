@@ -19,6 +19,7 @@ import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 import { keepBones, restBones } from '../core/bones';
 import { WornTag } from './worn-tag';
+import { Wardrobe } from './survivors';
 
 keepBones();
 
@@ -1107,11 +1108,12 @@ export class Avatar {
       this.dur[name] = clip.duration;
     }
 
+    let fpModel: THREE.Group | null = null;
     if (firstPersonBody) {
       // A second copy of the rig that mirrors the animated one bone for bone, with the head
       // and arms shrunk to nothing: looking down shows your own chest, legs and feet walking.
       await breathe();
-      const fp = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+      const fp = (fpModel = SkeletonUtils.clone(gltf.scene) as THREE.Group);
       const shown = new Map<string, THREE.Object3D>();
       model.traverse((o) => {
         if ((o as THREE.Bone).isBone) shown.set(o.name, o);
@@ -1135,6 +1137,22 @@ export class Avatar {
       fpRig.scale.setScalar(BODY_SCALE);
       fpRig.add(fp);
       this.fpRoot.add(fpRig);
+    }
+    // which survivor this is, and what they wear over their skin (src/game/survivors.ts): put on these bones by name
+    if (file === 'survivor' && this.skin && this.uniforms) {
+      const named = (r: THREE.Object3D | null) => {
+        if (!r) return null;
+        const m = new Map<string, THREE.Bone>();
+        r.traverse((o) => void ((o as THREE.Bone).isBone && m.set(o.name, o as THREE.Bone)));
+        return m;
+      };
+      const of = (r: THREE.Object3D | null, names: string[]) => (r ? names.map((n) => r.getObjectByName(n)).filter((o): o is THREE.Object3D => !!o) : []);
+      const SUIT = ['body', 'head', 'pads'];
+      this.wardrobe.attach({
+        bones: named(model)!, fpBones: named(fpModel), suit: of(model, SUIT), fpSuit: of(fpModel, ['body']),
+        into: this.skin.parent ?? model, fpInto: fpModel?.getObjectByName('body')?.parent ?? null,
+        atmo, uniforms: this.uniforms, ref: this.skin, layers: () => this.layerMask, fpLayer: FP_BODY_LAYER, inSight, dressed: (parts) => Avatar.onDressed(parts),
+      });
     }
     restBones(this.root);
     restBones(this.fpRoot);
@@ -1239,6 +1257,8 @@ export class Avatar {
 
   /** the dog tag at the breastbone: steel, gold on a VIP, or none (see WornTag) */
   tag: WornTag | null = null;
+  /** which survivor this is, and what they wear over their skin */
+  readonly wardrobe = new Wardrobe();
   wearTag(kind: 'steel' | 'gold' | null) {
     this.tag?.wear(kind);
   }
@@ -1536,7 +1556,8 @@ export class Avatar {
    * @param dir the way the bullet or blade was travelling (world)
    */
   wound(point: THREE.Vector3, dir: THREE.Vector3, size = 0.08, through = false) {
-    const skin = this.skin;
+    // (on the survivor's own body when one is on: its shape is bound as it stands, not as the suit's is)
+    const skin = this.wardrobe.skin ?? this.skin;
     if (!skin || !this.uniforms || !this.woundBones.length) return;
     this.own();
     const stain = (at: THREE.Vector3, r: number) => {
