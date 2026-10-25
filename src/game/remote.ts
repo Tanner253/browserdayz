@@ -268,6 +268,8 @@ export class RemotePlayer implements Damageable {
     this.weapon = id;
     this.mods = mods;
     const h = this.makeHeld(id, mods, finish);
+    // (a thing whose model is not here yet, a torch's as the game starts: asked again with the next word of them)
+    if (id && !h && id === 'torch') this.heldKey = '';
     const put = () => {
       if (this.heldKey !== key) return;
       this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);

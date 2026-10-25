@@ -25,9 +25,9 @@ const ICONS_REV = 3;
 // and the stick grenade, drawn handle up: "the stick grenade in this image is upside down in the icon", 2026-10-19;
 // and, every picture looked at on 2026-10-19 ("you should check all the icons for proper orientations"), two boxes of
 // rounds whose printing read upside down and the tin of tomatoes standing on its lid)
-// (and the Mosin's clip, its rounds tip down as it came: 2026-10-19; and the building's axe and hammer, which are the
-// hatchet's model, its head down as it came: 2026-10-24, "make sure the model photos are upright")
-const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin', 'felling_axe', 'hammer']);
+// (and the Mosin's clip, its rounds tip down as it came: 2026-10-19; and the long tools, which lie head down: 2026-10-25,
+// "make sure the model photos are upright")
+const HEAD_UP = new Set(['hatchet', 'firstaid', 'grenade', 'box_739', 'box_9mm', 'tomatoes', 'clip_mosin', 'felling_axe', 'hammer', 'pickaxe']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
  * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip

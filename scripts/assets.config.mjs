@@ -868,6 +868,24 @@ export const LOCAL_MODELS = {
   // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
   // pictures at the size they came.
   frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // Base building's things (2026-10-25), made in Higgsfield in place of the stand-ins (the owner: "all of thes eitems
+  // look terrible and need models done in higgsfield ... they all look extremely low quality"). Each came at its real
+  // size, foot on the ground, centred (the navigator's *_sized.glb), 1.6 to 3.3 thousand triangles: put in
+  // assets-src/models/higgsfield_items/ (a worktree's own assets-src: `node scripts/packs.mjs <id>` reads it).
+  ...Object.fromEntries(
+    [
+      ['log', 'Birch log'], ['stone', 'Stones'], ['nails', 'Box of nails'], ['sheet_metal', 'Sheet metal'], ['felling_axe', 'Felling axe'],
+      ['hammer', 'Claw hammer'], ['pickaxe', 'Pickaxe'], ['torch', 'Torch'], ['code_lock', 'Code lock'], ['sleeping_bag', 'Sleeping bag'],
+    ].map(([id, name]) => [id, {
+      dir: 'higgsfield_items', file: `${id}_sized.glb`, scale: 1, tex: 1024, tags: ['loot'],
+      // (the tools came leaning, their handles 41 to 50 degrees off upright: stood up, head uppermost, as the
+      // hatchet's is, which the hands' hold of a thing to hit with goes by; and made their true length along it)
+      ...({ felling_axe: { rot: [0.714, 0, 0], size: 0.9 }, hammer: { rot: [-0.577, 0, -0.148], size: 0.33 }, pickaxe: { rot: [0.834, 0, -0.298], size: 0.9 } }[id] ?? {}),
+      ...(id === 'felling_axe' || id === 'hammer' || id === 'pickaxe' ? { scale: undefined } : {}),
+      changes: 'Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+      credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+    }]),
+  ),
 };
 
 /**

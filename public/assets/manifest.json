@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-24T12:59:43.267Z",
+ "generated": "2026-10-25T02:11:46.332Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12844,6 +12844,206 @@
    "hi": "assets/models/hi/animal_wolf.glb",
    "hiBytes": 805220,
    "hiCard": 21
+  },
+  "log": {
+   "url": "assets/models/log.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 512848,
+   "srcTris": 3318,
+   "tris": 3318,
+   "min": [
+    -0.8,
+    0,
+    -0.2126
+   ],
+   "max": [
+    0.8,
+    0.5846,
+    0.2126
+   ],
+   "lods": []
+  },
+  "stone": {
+   "url": "assets/models/stone.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 575764,
+   "srcTris": 2456,
+   "tris": 2456,
+   "min": [
+    -0.1638,
+    0,
+    -0.175
+   ],
+   "max": [
+    0.1638,
+    0.2257,
+    0.175
+   ],
+   "lods": []
+  },
+  "nails": {
+   "url": "assets/models/nails.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 298680,
+   "srcTris": 2376,
+   "tris": 2376,
+   "min": [
+    -0.0601,
+    0,
+    -0.075
+   ],
+   "max": [
+    0.0601,
+    0.058,
+    0.075
+   ],
+   "lods": []
+  },
+  "sheet_metal": {
+   "url": "assets/models/sheet_metal.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 392312,
+   "srcTris": 2175,
+   "tris": 2175,
+   "min": [
+    -0.5,
+    0,
+    -0.4578
+   ],
+   "max": [
+    0.5,
+    0.25,
+    0.4578
+   ],
+   "lods": []
+  },
+  "felling_axe": {
+   "url": "assets/models/felling_axe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 431316,
+   "srcTris": 2950,
+   "tris": 2950,
+   "min": [
+    -0.0645,
+    0,
+    -0.1966
+   ],
+   "max": [
+    0.0645,
+    0.9,
+    0.1966
+   ],
+   "lods": []
+  },
+  "hammer": {
+   "url": "assets/models/hammer.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 391248,
+   "srcTris": 2478,
+   "tris": 2478,
+   "min": [
+    -0.0276,
+    0,
+    -0.0892
+   ],
+   "max": [
+    0.0276,
+    0.33,
+    0.0892
+   ],
+   "lods": []
+  },
+  "pickaxe": {
+   "url": "assets/models/pickaxe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 397860,
+   "srcTris": 2986,
+   "tris": 2986,
+   "min": [
+    -0.1159,
+    0,
+    -0.2257
+   ],
+   "max": [
+    0.1159,
+    0.9,
+    0.2257
+   ],
+   "lods": []
+  },
+  "torch": {
+   "url": "assets/models/torch.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 527948,
+   "srcTris": 2394,
+   "tris": 2394,
+   "min": [
+    -0.062,
+    0,
+    -0.0665
+   ],
+   "max": [
+    0.062,
+    0.6,
+    0.0665
+   ],
+   "lods": []
+  },
+  "code_lock": {
+   "url": "assets/models/code_lock.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 186764,
+   "srcTris": 1658,
+   "tris": 1658,
+   "min": [
+    -0.0209,
+    0,
+    -0.0486
+   ],
+   "max": [
+    0.0209,
+    0.15,
+    0.0486
+   ],
+   "lods": []
+  },
+  "sleeping_bag": {
+   "url": "assets/models/sleeping_bag.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 348680,
+   "srcTris": 2901,
+   "tris": 2901,
+   "min": [
+    -0.3,
+    0,
+    -0.1076
+   ],
+   "max": [
+    0.3,
+    0.1625,
+    0.1076
+   ],
+   "lods": []
   }
  }
 }

@@ -29,7 +29,7 @@ export interface TorchHost {
 /** how far off a wall torch burns for the player (its flames and its light), m */
 const SEEN = 70;
 /** a torch's flame (of a campfire's 1, as big as a real torch's: in the hands, at arm's length from the eye, smaller) and its light (of a street lamp's 1, and how far it reaches) */
-const TORCH = { size: 0.15, hand: 0.045, power: 0.55, reach: 11 };
+const TORCH = { size: 0.15, hand: 0.07, power: 0.55, reach: 11 };
 const WARM = new THREE.Color(1, 0.62, 0.3);
 
 export class TorchView {

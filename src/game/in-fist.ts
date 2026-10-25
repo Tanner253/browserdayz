@@ -8,12 +8,14 @@
 import * as THREE from 'three';
 import type { Grips } from './arms';
 import { HELD_FIT } from './held-size';
-import { proceduralParts } from './procedural';
 
 export type Held = { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee'; plumb?: THREE.Object3D };
 
-/** where along its length the fist closes round a thing held so, from its foot (its middle, unless said) */
-const GRIPPED_AT: Record<string, number> = { torch: 0.22 };
+/**
+ * Where along its length the fist closes round a thing held so, from its foot (its middle, unless said), and how thick
+ * it is there: a torch by its stick, whatever the thickness of its head.
+ */
+const GRIPPED_AT: Record<string, { at: number; thick: number }> = { torch: { at: 0.22, thick: 0.04 } };
 
 /** `model` (the thing as it lies, a copy the hand may keep) held in the right fist, in the hand's own frame */
 export function inFist(model: THREE.Object3D, id: string): Held | null {
@@ -46,11 +48,11 @@ export function inFist(model: THREE.Object3D, id: string): Held | null {
   const obj = new THREE.Group();
   obj.add(turned);
   const fist = (x: number, curl: number) => ({ pos: new THREE.Vector3(x, 0, 0.05), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: [curl, curl + 0.04, curl + 0.08, curl + 0.1] as [number, number, number, number], thumb: 0.9, tuck: 0.8 });
-  const order = [0, 1, 2].sort((a, b) => size[b] - size[a]), thick = size[order[2]];
+  const order = [0, 1, 2].sort((a, b) => size[b] - size[a]), gripped = GRIPPED_AT[id], thick = gripped?.thick ?? size[order[2]];
   if (thick <= 0.095) {
     lay(order[0], order[1], order[2], new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
     // (held low on its length where it is held so: a torch by its stick, its head up out of the fist)
-    turned.position.y = (0.5 - (GRIPPED_AT[id] ?? 0.5)) * size[order[0]];
+    turned.position.y = (0.5 - (gripped?.at ?? 0.5)) * size[order[0]];
     const right = fist(0.012 + thick / 2, THREE.MathUtils.clamp(1.2 - (thick - 0.03) * 9, 0.6, 1.3));
     // (a torch is held up, its flame at the shoulder's height and clear of the body, as DayZ and Rust hold one)
     return { obj, grips: { right: id === 'torch' ? { ...right, raise: true } : right, left: null }, kind: 'melee' };
@@ -68,22 +70,11 @@ export function inFist(model: THREE.Object3D, id: string): Held | null {
   return { obj, grips: { right: fist(0.03, 1.12), left: null }, kind: 'melee', plumb };
 }
 
-/** a torch in somebody's fist, made at once (its model is the game's own: src/game/procedural.ts), its head named so */
-export function torchInFist(): Held | null {
-  const g = new THREE.Group();
-  for (const p of proceduralParts('@torch')) {
-    const m = new THREE.Mesh(p.geometry, p.material);
-    m.name = p.name;
-    g.add(m);
-  }
-  return inFist(g, 'torch');
-}
-
-/** where the head of a torch held so is in the world: the top of its part named `head` (null: none in it) */
+/** where the head of a torch held up is in the world: the top of it (it stands in the fist: RAISE in src/game/avatar.ts) */
 export function torchHead(obj: THREE.Object3D, out: THREE.Vector3): THREE.Vector3 | null {
-  const head = obj.getObjectByName('head');
-  if (!head) return null;
   obj.updateWorldMatrix(true, true);
-  const box = new THREE.Box3().setFromObject(head);
-  return box.isEmpty() ? null : box.getCenter(out).setY(box.max.y);
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return null;
+  // (the middle of its top end: the head's, a hand under the very top, where the rag is)
+  return box.getCenter(out).setY(box.max.y - 0.03);
 }
