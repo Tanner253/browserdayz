@@ -109,12 +109,39 @@ export interface InfectedUniforms extends LookUniforms {
   /** what the colour of the clothes of the upper body and of the legs is turned by (hue, depth of colour, lightness) */
   uUpper: { value: THREE.Matrix3 };
   uLower: { value: THREE.Matrix3 };
-  /** where the grime's blotches lie (xyz, an offset into them) and how thick it is (w) */
+  /** where the grime's blotches lie (xyz, an offset into them) and how thick it is (w); and its colour, mud or soot */
   uGrime: { value: THREE.Vector4 };
+  uGrimeTint: { value: THREE.Color };
+  /** the hair's colour (rgb) and how far it is taken there (w: 0 for a cap or a helmet); and how high on the head, as the body rests, the hair begins */
+  uHair: { value: THREE.Vector4 };
+  uHairFrom: { value: number };
+  /** how much of the skin is blotched, the blood settled in it */
+  uMottle: { value: number };
 }
 
 export function infectedUniforms(): InfectedUniforms {
-  return { ...lookUniforms(), uUpper: { value: new THREE.Matrix3() }, uLower: { value: new THREE.Matrix3() }, uGrime: { value: new THREE.Vector4(0, 0, 0, 0) } };
+  return {
+    ...lookUniforms(),
+    uUpper: { value: new THREE.Matrix3() },
+    uLower: { value: new THREE.Matrix3() },
+    uGrime: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uGrimeTint: { value: new THREE.Color(0.52, 0.44, 0.34) },
+    uHair: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uHairFrom: { value: 99 },
+    uMottle: { value: 0 },
+  };
+}
+
+/** a look's paint put on another set of uniforms (a body's own once it is hurt: src/game/avatar/wounds.ts), its wounds left to it */
+export function copyInfected(to: InfectedUniforms, from: InfectedUniforms) {
+  to.uUpper.value.copy(from.uUpper.value);
+  to.uLower.value.copy(from.uLower.value);
+  to.uSkin.value.copy(from.uSkin.value);
+  to.uGrime.value.copy(from.uGrime.value);
+  to.uGrimeTint.value.copy(from.uGrimeTint.value);
+  to.uHair.value.copy(from.uHair.value);
+  to.uHairFrom.value = from.uHairFrom.value;
+  to.uMottle.value = from.uMottle.value;
 }
 
 export function setLookUniforms(u: LookUniforms, look: Look) {
@@ -183,16 +210,23 @@ export function lookPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matr
  * without it is left as it came), grime laid on in blotches, and the blood of what is done to it.
  */
 export function infectedPatch(shader: Shader, u: InfectedUniforms, rest = new THREE.Matrix4()) {
-  Object.assign(shader.uniforms, { uWounds: u.uWounds, uUpper: u.uUpper, uLower: u.uLower, uSkin: u.uSkin, uGrime: u.uGrime });
-  stained(shader, rest, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform mat3 uUpper;\nuniform mat3 uLower;\nuniform vec3 uSkin;\nuniform vec4 uGrime;\nvarying vec3 vTone;', `
+  Object.assign(shader.uniforms, { uWounds: u.uWounds, uUpper: u.uUpper, uLower: u.uLower, uSkin: u.uSkin, uGrime: u.uGrime, uGrimeTint: u.uGrimeTint, uHair: u.uHair, uHairFrom: u.uHairFrom, uMottle: u.uMottle });
+  stained(shader, rest, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform mat3 uUpper;\nuniform mat3 uLower;\nuniform vec3 uSkin;\nuniform vec4 uGrime;\nuniform vec3 uGrimeTint;\nuniform vec4 uHair;\nuniform float uHairFrom;\nuniform float uMottle;\nvarying vec3 vTone;', `
   // (cloth near white stays white, a coat or a clog that hangs over the legs as well: only what has colour takes dye)
   vec3 was = diffuseColor.rgb;
   float dyed = 1.0 - smoothstep(0.42, 0.72, dot(was, vec3(0.299, 0.587, 0.114)));
   vec3 upper = mix(was, max(uUpper * was, 0.0), dyed), lower = mix(was, max(uLower * was, 0.0), dyed);
-  diffuseColor.rgb = upper * vTone.r + lower * vTone.g + was * uSkin * vTone.b + was * (1.0 - min(1.0, vTone.r + vTone.g + vTone.b));
-  // (blotches a hand or two across, thickest in their middles, dirt brown)
+  float lum = dot(was, vec3(0.299, 0.587, 0.114));
+  // (the skin blotched where the blood has settled in it, grey-violet, each body's in places of its own)
+  float mottle = smoothstep(0.5, 0.85, woundNoise(vRest * 9.0 + uGrime.zxy * 1.7)) * uMottle;
+  vec3 skin = was * uSkin * mix(vec3(1.0), vec3(0.66, 0.55, 0.74), mottle);
+  // (the hair: what is dark on the head above where the hair begins, taken to the look's colour, its strands' light and dark kept)
+  float hair = (1.0 - smoothstep(0.14, 0.3, lum)) * smoothstep(uHairFrom - 0.03, uHairFrom + 0.03, vRest.y) * uHair.w;
+  skin = mix(skin, uHair.rgb * (0.45 + lum * 3.5), hair);
+  diffuseColor.rgb = upper * vTone.r + lower * vTone.g + skin * vTone.b + was * (1.0 - min(1.0, vTone.r + vTone.g + vTone.b));
+  // (blotches a hand or two across, thickest in their middles, mud or soot)
   float grime = smoothstep(0.45, 0.9, woundNoise(vRest * 6.0 + uGrime.xyz) * 0.7 + woundNoise(vRest * 17.0 + uGrime.zxy) * 0.3) * uGrime.w;
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.52, 0.44, 0.34), grime);`);
+  diffuseColor.rgb *= mix(vec3(1.0), uGrimeTint, grime);`);
 }
 
 /**

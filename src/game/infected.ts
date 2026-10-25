@@ -13,7 +13,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
 import { BUNKER, bunkerAt, bunkerLocal, bunkerWays, inBunker, levelY, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
-import { Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, roundHouse, type IState, type InfectedInfo } from '../sim/infected';
+import { APART, Director, HOUSE, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, parting, roundHouse, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
@@ -77,8 +77,6 @@ const MAKE_WITHIN = 200;
 const MAKING = 3;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
-/** as near as two of them stand to each other, metres */
-const APART = 0.62;
 /** a way through a wall: the middle of a doorway, which way it faces (level), the door in it, and the building it belongs to */
 interface Doorway {
   plot: string;
@@ -1335,20 +1333,23 @@ export class Horde {
         for (const [i, to] of turn.owned) this.own(i, to);
       }
     }
-    // the ones this game moves keep out of each other
-    const mine: Infected[] = [];
+    // The ones this game moves keep out of each other, and out of those another game moves, which that game moves off
+    // these by the same rule (`parting`). (Only this game's own were kept apart: two at one player, each moved by
+    // another game, stood one inside the other.)
+    const mine: Infected[] = [], standing: Infected[] = [];
     for (const b of this.all.values()) {
       b.update(dt, now, eye);
-      if (b.mine && !b.dead && b.ready) mine.push(b);
+      if (b.dead || !b.ready) continue;
+      standing.push(b);
+      if (b.mine) mine.push(b);
     }
-    for (let a = 0; a < mine.length; a++) {
-      for (let c = a + 1; c < mine.length; c++) {
-        const dx = mine[c].pos.x - mine[a].pos.x, dz = mine[c].pos.z - mine[a].pos.z;
-        const d = Math.hypot(dx, dz);
-        if (d > APART || d < 1e-3 || Math.abs(mine[c].pos.y - mine[a].pos.y) > 1.2) continue;
-        const push = (APART - d) / 2 / d;
-        mine[a].nudge(-dx * push, -dz * push);
-        mine[c].nudge(dx * push, dz * push);
+    for (const a of mine) {
+      for (const o of standing) {
+        if (o === a || (o.mine && o.i < a.i) || Math.abs(o.pos.y - a.pos.y) > 1.2) continue;
+        const p = parting(a.pos.x, a.pos.z, a.i, o.pos.x, o.pos.z, o.i);
+        if (!p) continue;
+        a.nudge(p[0], p[1]);
+        if (o.mine) o.nudge(-p[0], -p[1]);
       }
     }
     // say where they are: eight times a second what has moved, all of them once a second

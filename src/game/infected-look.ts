@@ -10,7 +10,7 @@ import { MAX_WOUNDS, infectedUniforms, type InfectedUniforms } from './look';
 import { KINDS, bodyOf, roll, type InfectedKind } from './infected-kinds';
 
 /** the paints a kind's bodies share */
-export const VARIANTS = 8;
+export const VARIANTS = 16;
 
 /** How far the clothes' colour may be turned: its hue round the wheel by up to `turn` radians either way, its depth of colour by `deep`, its lightness by `light`. */
 interface Cloth {
@@ -31,9 +31,19 @@ const WORN: Cloth = { turn: 0.6, deep: [0.45, 1.15], light: [0.82, 1.12] };
 const ISSUED: Cloth = { turn: 0.12, deep: [0.55, 1.1], light: [0.78, 1.08] };
 /** the rare three's are mostly their skin */
 const FLESH: Cloth = { turn: 0.15, deep: [0.7, 1.15], light: [0.85, 1.05] };
-/** the dead's skin: toward grey-green or jaundice, never alive; or bruised */
-const DEAD: Skin = { hues: [0.12, 0.4], pull: 0.18, light: [0.82, 1.08] };
-const BRUISED: Skin = { hues: [0.72, 0.9], pull: 0.16, light: [0.82, 1.04] };
+/**
+ * The dead's skin: toward jaundice, grey-green or a cold grey-blue, never alive; or bruised. Far enough apart that two
+ * of one body side by side are two people at two metres (the navigator, 2026-10-25: two nurses "are clones").
+ */
+const DEAD: Skin = { hues: [0.1, 0.55], pull: 0.42, light: [0.68, 1.1] };
+const BRUISED: Skin = { hues: [0.7, 0.92], pull: 0.34, light: [0.7, 1.06] };
+/** what hair the dead have, dulled: near black, dark brown, brown, auburn, dirty blonde, grey */
+const HAIR: [number, number, number][] = [[0.17, 0.14, 0.12], [0.33, 0.24, 0.17], [0.48, 0.35, 0.22], [0.55, 0.28, 0.16], [0.7, 0.58, 0.38], [0.58, 0.57, 0.55]];
+const GREYS: [number, number, number][] = [[0.58, 0.57, 0.55], [0.76, 0.75, 0.72], [0.66, 0.64, 0.6]];
+/** what is dark on these heads is a helmet, a peaked cap, a hood or what the fire left: not hair */
+const NO_HAIR = new Set(['conscript', 'conscript2', 'militia', 'hazmat', 'burned']);
+/** the grime: mud, soot, or old dried muck */
+const GRIME: [number, number, number][] = [[0.52, 0.44, 0.34], [0.42, 0.41, 0.4], [0.48, 0.38, 0.31]];
 const LOOKS_OF: Record<InfectedKind, { upper: Cloth; legs: Cloth; skin: Skin; blood: [number, number] }> = {
   villager: { upper: ANY, legs: ANY, skin: DEAD, blood: [0, 3] },
   babushka: { upper: ANY, legs: ANY, skin: DEAD, blood: [0, 3] },
@@ -85,12 +95,17 @@ export function infectedLook(kind: InfectedKind, i: number): InfectedLook {
   const seed = KINDS.indexOf(kind) * 131 + n * 17 + 5;
   let k = 0;
   const r = () => roll(seed, 40 + k++);
-  const of = LOOKS_OF[kind], u = infectedUniforms();
+  const of = LOOKS_OF[kind], u = infectedUniforms(), body = bodyOf(kind, i).body;
   turnOf(u.uUpper.value, of.upper, r);
   turnOf(u.uLower.value, of.legs, r);
   skinOf(u.uSkin.value, of.skin, r);
-  // grime: where it lies on the body and how thick
-  u.uGrime.value.set(r() * 50, r() * 50, r() * 50, 0.1 + r() * 0.5);
+  u.uMottle.value = 0.15 + r() * 0.75;
+  // grime: where it lies on the body, how thick, and what it is
+  u.uGrime.value.set(r() * 50, r() * 50, r() * 50, 0.2 + r() * 0.65);
+  u.uGrimeTint.value.setRGB(...GRIME[Math.floor(r() * GRIME.length)]);
+  // (the old go grey)
+  const hairs = kind === 'babushka' || kind === 'oldman' ? GREYS : HAIR;
+  if (!NO_HAIR.has(body)) u.uHair.value.set(...hairs[Math.floor(r() * hairs.length)], 0.9);
   const blood = Math.min(MAX_WOUNDS - 2, of.blood[0] + Math.floor(r() * (of.blood[1] - of.blood[0] + 1)));
   look = { key, u, blood, bled: false, seed };
   LOOKS.set(id, look);
@@ -106,7 +121,14 @@ export function bleed(look: InfectedLook, geometry: THREE.BufferGeometry) {
   if (look.bled) return;
   look.bled = true;
   const pos = geometry.getAttribute('position'), tone = geometry.getAttribute('_tone');
-  if (!pos || !look.blood) return;
+  if (!pos) return;
+  // (where the hair begins: a hand below the top of the head, the brow; the hair at the back comes down to it as well)
+  if (tone) {
+    let top = -Infinity;
+    for (let v = 0; v < pos.count; v++) if (tone.getZ(v) > 0.5 && pos.getY(v) > top) top = pos.getY(v);
+    if (top > -Infinity) look.u.uHairFrom.value = top - 0.13;
+  }
+  if (!look.blood) return;
   let k = 0;
   const r = () => roll(look.seed, 80 + k++);
   for (let w = 0, tries = 0; w < look.blood && tries < 200; tries++) {
