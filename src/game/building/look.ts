@@ -100,6 +100,24 @@ function sheetGeo(s: Solid, tile: number): THREE.BufferGeometry | null {
     planar(out, tile);
     return out;
   }
+  if ('hull' in s) {
+    // (a roof's wedge: its slope alone, the rafters; not its underside, its back or the triangles at its ends)
+    const g = hullGeo(s.hull, tile), P = g.getAttribute('position'), keep: number[] = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let i = 0; i < P.count; i += 3) {
+      a.fromBufferAttribute(P, i);
+      b.fromBufferAttribute(P, i + 1);
+      c.fromBufferAttribute(P, i + 2);
+      const n = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+      if (n.y > 0.2 && n.y < 0.98) keep.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    }
+    if (!keep.length) return null;
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(keep, 3));
+    out.computeVertexNormals();
+    planar(out, tile);
+    return out;
+  }
   return null;
 }
 
