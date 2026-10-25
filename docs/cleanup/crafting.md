@@ -18,3 +18,14 @@ and Higgsfield's first sledgehammer (beside Poly Haven's sledgehammer_01); in st
 
 Outside the repository (assets-src is never deleted, but these are not used): assets-src/incoming/scrap_metal_1,
 scrap_metal_lowpoly and charcoal_bag_photoscan_medpoly (Kingsford's print all over it), sledgehammer_sized.glb, and assets-src/models/cleaner_tin_01, sledgehammer_01 and barrel_stove. Kept: the higgsfield forge_sized.glb (forge_cold.glb is made from it by progress/crafting/cold-forge.mjs).
+
+Progression v3, step 2 (the trader camp, c60bd5bc):
+- [x] src/sim/trade.ts (the one trader: STOCK, aDay, worth, pays, asks, sold, KEPT_ON_DEATH) | src/sim/camp.ts (four stalls, prices in scrap) | c60bd5bc | grep -rn "sim/trade" src server test api: nothing
+- [x] test/trade.test.ts | test/camp.test.ts | c60bd5bc | ls test/trade.test.ts: none
+- [x] the browser's book: Game.credit, jobBook, keepBook, setCredit, the credit halved on a death (drops.ts) | the server's day at the camp (server/camp.ts), scrap carried | c60bd5bc | grep -rn "setCredit\|jobBook\|KEPT_ON_DEATH" src: nothing
+- [x] JobBook and bookFor (src/sim/jobs.ts) | TradeDay (src/net/protocol.ts), dayFor (src/sim/camp.ts) | c60bd5bc | grep -rn "JobBook\|bookFor" src test: nothing
+- [x] the trader's shelf tabs (src/ui/shop.ts TABS) | each stall's own shelf | c60bd5bc | grep -n "shop-tabs\|TABS" src/ui/shop.ts: nothing
+- [x] Traders finding the shop at the trading post itself (src/game/trader.ts) | campLayer (src/sim/camp.ts) gives every stall's trader | c60bd5bc | grep -n "sites.filter" src/game/trader.ts: nothing
+- [x] the old STOCK left out of the server's guarded things (server/index.ts GUARDED) | what the stalls sell is issued by the server; only the gas mask stays out, for those already bought | c60bd5bc | grep -n "STOCK" server/index.ts: nothing
+- [ ] the items' `sells` (how many a day the old trader sold; on items in guns.ts, hunt.ts, kit.ts, parts.ts, tools.ts, wear.ts, and its type in items.ts) | STALLS[...].sells in src/sim/camp.ts | c60bd5bc | grep -rn "sells: [0-9]" src/sim/items: left for the integration, as those files are other paths' too (survivors edits wear.ts)
+- [ ] the browser's 'zona.jobs' (the old job book) | nothing reads it | c60bd5bc | a browser left with it keeps a few bytes; 'zona.credit' is paid out once and removed (src/game/camp.ts payBook)
