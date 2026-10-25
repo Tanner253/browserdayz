@@ -8,7 +8,7 @@ import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { assets } from '../core/assets';
 import type { Atmosphere } from '../world/atmosphere';
 import { stainPatch, type LookUniforms } from './look';
-import { BODY_NAMES, VOICES, bodyFor, hides, pickOf, voiceFor } from '../sim/survivor';
+import { BODY_NAMES, VOICES, bodyFor, hides, pickOf, voiceFor, type Region } from '../sim/survivor';
 import { ITEMS } from '../sim/items';
 
 /** the survivors to be picked from, by the number a player's pick is sent as (as DayZ has a few faces to choose from) */
@@ -59,29 +59,54 @@ const loadBody = (n: number) => load(`assets/characters/${BODIES[n].file}.glb`);
  * assets/tex/camo/), or neither, as it was drawn.
  */
 export interface Worn {
+  /** none: nothing drawn, the parts only hidden (see bareWorn) */
   model: string;
   hides: number;
   /** the parts it is only partly over (a hip under a hem): drawn a little in from the skin, not hidden (see Hidden) */
   shrinks?: number;
   tint?: number;
   camo?: string;
+  /** the parts of it that something worn over it lies on (a jacket's chest under a vest): drawn a little in, under it */
+  under?: number;
 }
+
+/**
+ * What is worn over the clothes as a thing of its own (GEAR in src/game/avatar/gear.ts), and what of a body it lies on:
+ * what is worn under it is drawn in there, or a puffy jacket stood out through a vest.
+ */
+const OVER: Record<string, Region[]> = { chest_rig: ['chest'], armor_vest: ['chest', 'belly'], heavy_armor: ['chest', 'belly', 'shoulder'], life_vest: ['chest', 'belly'] };
+/**
+ * Things hung as they are (GEAR) that close round the head: the hair that stands off the skull is not drawn under them
+ * (Anya's bun stood out through a balaclava). As a Worn of no model, which only hides.
+ */
+const BARE: Record<string, Region[]> = { balaclava: ['hair'], ghillie_hood: ['hair'] };
+export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id]) } : null);
+/** worn over the clothes: a vest, or a suit over everything (the ghillie) */
+const outer = (id: string) => ITEMS[id]?.slot === 'vest' || ITEMS[id]?.slot === 'back';
 
 /** how a thing worn is said to everybody: its id, and its colour after a ~ where that is not its kind's first */
 export const wornKey = (it: { id: string; c?: number }) => (it.c ? `${it.id}~${it.c}` : it.id);
 
 /** What is said of a body's things worn, sorted: those drawn as they are worn (`dress`: Worn), and the rest by their ids (GEAR in avatar.ts). */
 export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
-  const worn: Worn[] = [], gear: string[] = [];
+  const worn: Worn[] = [], gear: string[] = [], inner: Worn[] = [];
+  let over = 0;
   for (const k of keys) {
     const [id, c] = k.split('~'), d = ITEMS[id];
     if (!d?.dress) {
       gear.push(id);
+      over |= hides(OVER[id] ?? []);
+      const bare = bareWorn(id);
+      if (bare) worn.push(bare);
       continue;
     }
     const col = d.colours?.[Number(c) || 0];
-    worn.push({ model: d.dress.model, hides: hides(d.dress.hides), shrinks: hides(d.dress.shrinks ?? []), ...(col?.tint !== undefined ? { tint: col.tint } : {}), ...(col?.camo ? { camo: col.camo } : {}) });
+    const w: Worn = { model: d.dress.model, hides: hides(d.dress.hides), shrinks: hides(d.dress.shrinks ?? []), ...(col?.tint !== undefined ? { tint: col.tint } : {}), ...(col?.camo ? { camo: col.camo } : {}) };
+    worn.push(w);
+    if (outer(id)) over |= w.hides;
+    else inner.push(w);
   }
+  for (const w of inner) if (over) w.under = over;
   return { worn, gear };
 }
 
@@ -154,7 +179,7 @@ export interface Frame {
    * the body's own bone lengths put on the survivor's skeleton, or (null) its own given back: see `proportion`; and
    * how big it is drawn, as it stands (`stands` metres, against the `height` it was built: scripts/survivors.mjs)
    */
-  lengths: (l: Lengths | null, scale: number | null) => void;
+  lengths: (l: Lengths | null, scale: number | null, fit: BodyFit | null) => void;
 }
 
 /** a body's own bone lengths: each bone's place on the one above it, by name (the build fits them: scripts/meshy.mjs, fitProportions) */
@@ -164,6 +189,19 @@ export function lengthsOf(scene: THREE.Object3D): Lengths {
   // (not the pelvis: the clips move it, and the legs are the game's length)
   scene.traverse((o) => void ((o as THREE.Bone).isBone && o.name !== 'pelvis' && o.name !== 'root' && out.set(o.name, o.position.clone())));
   return out;
+}
+
+/**
+ * A body's head and chest against the joints that carry what is worn there (Head, spine_03), at rest, metres, facing
+ * +z as the file stands (scripts/survivors.mjs): hats, vests and packs are hung by it (Avatar.gearFit).
+ */
+export interface BodyFit {
+  crown: number;
+  headZ: number;
+  headDepth: number;
+  chestMin: number;
+  chestMax: number;
+  chestWidth: number;
 }
 
 /** how big a body is drawn so that it stands as tall as it is said to (null: as it is built) */
@@ -190,6 +228,7 @@ function onto(src: THREE.SkinnedMesh, bones: Map<string, THREE.Bone>, material: 
   const m = new THREE.SkinnedMesh(src.geometry, material);
   m.name = src.name;
   m.bind(new THREE.Skeleton(list as THREE.Bone[], src.skeleton.boneInverses), src.bindMatrix);
+  m.userData = { ...src.userData };
   return m;
 }
 
@@ -220,6 +259,8 @@ interface Hidden {
 }
 /** how far in a part only partly under something worn is drawn, metres */
 const SHRINK = 0.022;
+/** and a piece of clothing under a vest (a vest sits close on the body it was fitted to: the cloth goes in under it) */
+const UNDER = 0.018;
 /** a shape's own unit, in metres: its points are packed (quantized), and unpacked by its first bone's binding */
 const unitOf = (m: THREE.SkinnedMesh) => new THREE.Vector3().setFromMatrixColumn(new THREE.Matrix4().copy(m.skeleton.boneInverses[0]).multiply(m.bindMatrix), 0).length();
 
@@ -265,6 +306,7 @@ export async function wearOn(model: THREE.Object3D, body: THREE.SkinnedMesh[], w
   const hide: Hidden = { hide: { value: worn.reduce((m, w) => m | w.hides, 0) }, shrink: { value: worn.reduce((m, w) => m | (w.shrinks ?? 0), 0) }, by: { value: SHRINK / unitOf(body[0]) } };
   for (const b of body) (b.material as THREE.Material).onBeforeCompile = (shader) => regionPatch(shader, hide);
   for (const w of worn) {
+    if (!w.model) continue;
     const gltf = await load(`assets/characters/wear/${w.model}.glb`);
     gltf.scene.traverse((o) => {
       const s = o as THREE.SkinnedMesh;
@@ -334,7 +376,7 @@ export class Wardrobe {
     const f = this.frame, key = this.wornKey, worn = this.worn, on = this.shown !== null;
     const now = on ? key : '';
     if (!f || now === this.wornShown) return;
-    const got = on ? await Promise.all(worn.map((w) => load(`assets/characters/wear/${w.model}.glb`).catch(() => null))) : [];
+    const got = on ? await Promise.all(worn.map((w) => (w.model ? load(`assets/characters/wear/${w.model}.glb`).catch(() => null) : null))) : [];
     // (asked for something else meanwhile, or the body changed: that is seen to instead)
     if (key !== this.wornKey || this.frame !== f || (this.shown !== null) !== on) return;
     for (const s of this.wornShapes) s.removeFromParent();
@@ -343,10 +385,12 @@ export class Wardrobe {
     this.hide.hide.value = this.hide.shrink.value = 0;
     const skin = this.skin;
     got.forEach((gltf, k) => {
-      if (!gltf || !skin) return;
       const w = worn[k];
+      // (a piece that did not come leaves the skin under it drawn)
+      if (!skin || (!gltf && w.model)) return;
       this.hide.hide.value |= w.hides;
       this.hide.shrink.value |= w.shrinks ?? 0;
+      if (!gltf) return;
       gltf.scene.traverse((o) => {
         const s = o as THREE.SkinnedMesh;
         if (!s.isSkinnedMesh) return;
@@ -355,15 +399,19 @@ export class Wardrobe {
         // (stained where the body under it is: its points brought into the body's own space, as the suit's pieces are in Avatar.make)
         const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
+        // (its parts under a vest drawn in: see Worn.under, and the regions each of its points lies over, scripts/wear.mjs)
+        const under: Hidden = { hide: { value: 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 } };
         f.atmo.register(
           mat,
           (shader) => {
             stainPatch(shader, f.uniforms, at);
             clothPatch(shader, light, w, space);
+            regionPatch(shader, under);
           },
           `survivor-wear|${w.camo ? 'camo' : w.tint !== undefined ? 'tint' : 'own'}`,
         );
         const m = onto(s, f.bones, mat);
+        under.by.value = UNDER / unitOf(m);
         m.castShadow = m.receiveShadow = true;
         m.intersectsFrustum = f.inSight;
         m.layers.mask = f.layers();
@@ -397,7 +445,7 @@ export class Wardrobe {
     gltf?.scene.traverse((o) => void ((o as THREE.SkinnedMesh).isSkinnedMesh && src.push(o as THREE.SkinnedMesh)));
     for (const o of [...f.suit, ...f.fpSuit]) o.visible = !src.length;
     // (the body's own proportions on the bones it is drawn on, or the suit's back)
-    f.lengths(gltf && src.length ? lengthsOf(gltf.scene) : null, src.length ? scaleOf(src[0]) : null);
+    f.lengths(gltf && src.length ? lengthsOf(gltf.scene) : null, src.length ? scaleOf(src[0]) : null, src.length ? ((src[0].userData.fit as BodyFit | undefined) ?? null) : null);
     if (!src.length) return void this.dress();
     for (const s of src) {
       // its own paint, stained where this survivor is hurt (measured in its own shape's space: see `rest`)

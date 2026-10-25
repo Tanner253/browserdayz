@@ -225,7 +225,7 @@ export const makeMethods = {
     this.root.add(this.slung);
     this.root.updateMatrixWorld(true);
     // where the bones that carry gear are while the body stands at rest
-    for (const name of ['Head', 'spine_03']) {
+    for (const name of ['Head', 'spine_03', 'pelvis']) {
       const b = bone(name);
       if (b) this.gearRest.set(name, { bone: b, inv: b.matrixWorld.clone().invert() });
     }
@@ -330,7 +330,7 @@ export const makeMethods = {
         bones: named(model)!, fpBones: named(fpModel), suit: of(model, SUIT), fpSuit: of(fpModel, ['body']),
         into: this.skin.parent ?? model, fpInto: fpModel?.getObjectByName('body')?.parent ?? null,
         atmo, uniforms: this.uniforms, ref: this.skin, layers: () => this.layerMask, fpLayer: FP_BODY_LAYER, inSight, dressed: (parts) => Avatar.onDressed(parts),
-        lengths: (l, scale) => this.proportion(l, scale),
+        lengths: (l, scale, fit) => this.proportion(l, scale, fit),
       });
     }
     restBones(this.root);

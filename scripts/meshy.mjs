@@ -464,6 +464,22 @@ function fitProportions(doc, fit) {
   return { said: `proportions ${JSON.stringify(said)} at x${s.toFixed(3)}`, scale: s };
 }
 
+/** a skinned shape's points as its skeleton stands at rest (THREE.Vector3[]) */
+export function restPoints(node) {
+  const skin = node.getSkin(), joints = skin.listJoints(), ibm = skin.getInverseBindMatrices();
+  const M = joints.map((j, k) => M4(j.getWorldMatrix()).multiply(M4(ibm.getElement(k, []))));
+  const prim = node.getMesh().listPrimitives()[0];
+  const pos = prim.getAttribute('POSITION'), ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0');
+  const out = [], v = new THREE.Vector3();
+  for (let i = 0; i < pos.getCount(); i++) {
+    v.fromArray(pos.getElement(i, []));
+    const a = ji.getElement(i, []), w = jw.getElement(i, []), o = new THREE.Vector3();
+    for (let c = 0; c < 4; c++) if (w[c] > 0) o.addScaledVector(v.clone().applyMatrix4(M[a[c]]), w[c]);
+    out.push(o);
+  }
+  return out;
+}
+
 export async function carry({ io, template, src, fingers, fit = src }) {
   const doc = await io.read(template);
   const root = doc.getRoot();

@@ -15,6 +15,7 @@
 //   &hide=chest,belly                           (and those parts of them not drawn, as under clothes: REGION in src/sim/survivor.ts)
 //   &wear=m65~2a2a2a,jeans~woodland             (and things worn over them, src/game/survivors.ts: a colour or a camouflage after a ~;
 //   &shrink=hips,thigh                           the parts only partly under them drawn a little in)
+//   &gear=beanie,assault_pack                   (and things worn as things of their own, where the game hangs them: GEAR)
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
 //                                               its model, the movement it plays doing that, lifted as in the game
 //   &sim=wolves-vs-deer | lockon                the animals' own minds run on the floor, their moments in one
@@ -198,24 +199,50 @@ if (sim) {
     return clip.name;
   };
   if (survivors.length) {
-    const { wearBody, wearOn, BODIES } = await import('../game/survivors');
+    const { wearBody, wearOn, bareWorn, BODIES } = await import('../game/survivors');
+    type Worn = import('../game/survivors').Worn;
     const { hides } = await import('../sim/survivor');
     const { ITEMS } = await import('../sim/items');
     const hide = hides(list('hide') as Parameters<typeof hides>[0]);
     // (what a piece hides and draws in is its item's, src/sim/items/wear.ts, unless &hide or &shrink says)
     const dressOf = (model: string) => Object.values(ITEMS).find((d) => d.dress?.model === model)?.dress;
     const gltf = await assets.loadGLTF('assets/characters/survivor.glb');
+    const { GEAR, placeWorn, hangFit } = await import('../game/avatar/gear');
+    const { BODY_SCALE } = await import('../game/avatar');
+    // (the game says where gear goes on the body as the game turns it and draws it: half round, at BODY_SCALE)
+    const turned = new THREE.Matrix4().makeRotationY(Math.PI).multiply(new THREE.Matrix4().makeScale(BODY_SCALE, BODY_SCALE, BODY_SCALE));
     for (const n of survivors) {
       const o = cloneSkinned(gltf.scene) as THREE.Group;
       o.traverse((m) => { if (m.name.startsWith('gear_')) m.visible = false; });
+      // (where the bones that carry gear stand as the skeleton is made, before the body's own lengths: as Avatar.make measures them)
+      o.updateMatrixWorld(true);
+      const rest = new Map(['Head', 'spine_03', 'pelvis'].map((b) => [b, o.getObjectByName(b)?.matrixWorld.clone().invert()] as const));
       const body = await wearBody(o, n, list('wear').length ? 0 : hide);
       // (things worn over it: a model, and a colour (rrggbb) or a camouflage after a ~)
-      const worn = list('wear').map((w) => {
+      const worn: Worn[] = list('wear').map((w) => {
         const [model, c] = w.split('~');
         const own = dressOf(model);
         return { model, hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
       });
+      const gearIds = list('gear');
+      for (const id of gearIds) {
+        const bare = bareWorn(id);
+        if (bare) worn.push(bare);
+      }
       if (worn.length) await wearOn(o, body, worn);
+      for (const id of gearIds) {
+        const g = GEAR[id], bone = g && o.getObjectByName(g.bone), inv = g && rest.get(g.bone);
+        if (!g || !bone || !inv) continue;
+        const item = (await assets.model(id)).clone();
+        const holder = new THREE.Group(), m = new THREE.Matrix4();
+        placeWorn(id, item, gearIds, m);
+        // (as the game hangs it: by the body's own head and chest, Avatar.gearFit)
+        const gearInv = inv.clone().multiply(turned.clone().invert()), fit = body[0]?.userData.fit ?? null;
+        holder.matrixAutoUpdate = false;
+        holder.matrix.copy(gearInv).multiply(hangFit(fit, g, gearInv)).multiply(m);
+        holder.add(item);
+        bone.add(holder);
+      }
       const playing = playOn(o, gltf.animations);
       place(o, BODIES[n]?.name ?? String(n), { playing });
     }

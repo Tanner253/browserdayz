@@ -868,6 +868,34 @@ export const LOCAL_MODELS = {
   // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
   // pictures at the size they came.
   frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // What survivors wear as things of their own (2026-10-25, the owner's yes to the clothing card: hats, a balaclava, the
+  // ghillie hood, packs and a belt), made as the melee remodels were: a picture with no stamped words, then Tripo H3.1
+  // image to 3D, at their real sizes; worn where GEAR in src/game/avatar/gear.ts puts them, and lying as they are.
+  // The clothes' own ground models are the shared folded ones below, coloured as each piece is.
+  ...Object.fromEntries(
+    [
+      ['beanie', 0.24, 'Beanie'],
+      ['ushanka', 0.3, 'Ushanka'],
+      ['beret', 0.29, 'Beret'],
+      ['balaclava', 0.3, 'Balaclava'],
+      ['ghillie_hood', 0.5, 'Ghillie hood'],
+      ['hip_pack', 0.38, 'Hip pack'],
+      ['field_bag', 0.38, 'Field bag'],
+      ['assault_pack', 0.52, 'Assault pack'],
+      ['military_belt', 0.4, 'Military belt'],
+      ['ground_jacket', 0.62, 'Folded jacket'],
+      ['ground_trousers', 0.62, 'Folded trousers'],
+      ['ground_shirt', 0.5, 'Folded shirt'],
+      ['ground_trainers', 0.3, 'Trainers'],
+    ].map(([id, size, name, rot]) => [
+      id,
+      {
+        dir: '../incoming/higgsfield/survivors/gear', file: id.startsWith('ground_') && id !== 'ground_trainers' ? `${id}_flat.glb` : `${id}.glb`, size, ...(rot ? { rot } : {}), tex: 1024, tags: ['loot'],
+        changes: `Scaled to life size (${Math.round(size * 100)} cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.`,
+        credit: { name, author: 'ZONA (Higgsfield, Tripo H3.1)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
+      },
+    ]),
+  ),
 };
 
 /**

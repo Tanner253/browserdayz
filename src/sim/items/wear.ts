@@ -72,7 +72,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'tshirt', name: 'T-Shirt', model: 'folded_blanket', tint: 0xe8e4da, scale: 0.7, w: 3, h: 2, weight: 0.2, category: 'clothing', slot: 'top',
     desc: 'A cotton T-shirt. 6 slots in it, and it keeps nothing out.', wear: { cargo: [3, 2] },
-    dress: { model: 'tshirt', hides: ['chest', 'belly', 'shoulder'], shrinks: ['hips'] },
+    dress: { model: 'tshirt', hides: ['chest', 'belly', 'shoulder'], shrinks: ['hips', 'upperArm'] },
     colours: [{ name: 'White' }, { name: 'Grey', tint: 0x8d8e8a }, { name: 'Black', tint: 0x2a2a2a }, { name: 'Olive', tint: 0x556040 }, { name: 'Red', tint: 0x8e2a24 }, { name: 'Navy', tint: 0x23304f }],
     loot: { pair: 'TShirt_White', at: [6, 4, 4, 0, 0], restock: 600, usage: [...HOMES, 'Shop'] },
     worth: 1,

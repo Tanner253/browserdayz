@@ -58,10 +58,11 @@ const BOOTS = { parts: FEET, core: ['foot'], covers: ['foot'] };
 const PIECES = {
   m65: { src: 'wear_m65.glb', body: 0, ...JACKET, tex: 2048 },
   telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, tex: 2048 },
-  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, tex: 2048 },
+  // (down over the hips, as the parka: all of it there is the hoodie but what is plainly the body's)
+  hoodie: { src: 'wear_hoodie.glb', body: 1, ...JACKET, covers: [...JACKET.covers, 'hips'], peeks: [...JACKET.peeks, 'hips'], tex: 2048 },
   flannel: { src: 'wear_flannel.glb', body: 3, ...JACKET, tex: 2048 },
   leather_jacket: { src: 'wear_leather_jacket.glb', body: 3, ...JACKET, tex: 2048 },
-  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips'], tex: 2048 },
+  parka: { src: 'wear_parka.glb', body: 2, ...JACKET, parts: [...TOP, 'aboveKnee'], covers: [...JACKET.covers, 'hips', 'thigh'], peeks: [...JACKET.peeks, 'hips', 'thigh'], tex: 2048 },
   field_pants: { src: 'wear_field_pants.glb', body: 0, ...TROUSERS, tex: 2048 },
   jeans: { src: 'wear_jeans.glb', body: 1, ...TROUSERS, tex: 2048 },
   cargo_pants: { src: 'wear_cargo_pants.glb', body: 2, ...TROUSERS, tex: 2048 },
@@ -77,6 +78,14 @@ const PIECES = {
   trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, tex: 1024 },
   smock: { src: 'wear_smock.glb', body: 0, ...JACKET, tex: 2048 },
   smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, tex: 2048 },
+  // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)
+  tactical_jacket: { src: 'wear_tactical_jacket.glb', body: 0, ...JACKET, tex: 2048 },
+  combat_shirt: { src: 'wear_combat_shirt.glb', body: 1, ...JACKET, tex: 2048 },
+  tracksuit_jacket: { src: 'wear_tracksuit_jacket.glb', body: 1, ...JACKET, tex: 2048 },
+  winter_boots: { src: 'wear_winter_boots.glb', body: 0, ...BOOTS, tex: 1024 },
+  // (the stab vest that takes the all-black one's place, the owner: "the stab vest I think needs a new model"; its
+  // straps over the shoulders)
+  stab_vest: { src: 'wear_stab_vest.glb', body: 0, parts: ['neck', 'chest', 'belly', 'hips', 'shoulder'], core: ['chest', 'belly'], covers: ['chest', 'belly'], peeks: ['chest', 'belly'], tex: 2048 },
   // (neck to ankle, over everything: there is no base layer to show through it)
   ghillie_suit: { src: 'wear_ghillie_suit.glb', body: 0, parts: [...new Set([...TOP, ...LEGS])], core: ['chest', 'thigh'], covers: [...JACKET.covers, ...TROUSERS.covers], tex: 2048 },
 };
@@ -280,6 +289,9 @@ for (const [id, piece] of Object.entries(PIECES)) {
     }
     D.prim.setAttribute('COLOR_0', dressed.doc.createAccessor().setType('VEC3').setArray(col));
   }
+  // ---- which part of the body each of its points lies over (REGION): what is worn over it draws it in there (a
+  // jacket's chest under a vest: Worn.under in src/game/survivors.ts)
+  D.prim.setAttribute('_REGION', dressed.doc.createAccessor().setType('SCALAR').setArray(new Uint8Array(near.map((n) => (n >= 0 ? region.getScalar(n) : 0)))));
   // ---- the picture padded from the piece's own cloth: what lies between its islands on the picture was the body's
   // (skin, the shirt), and came in at every island's edge as pink and light slivers, nearer at a distance as the
   // picture is drawn smaller. Everything of the picture the piece does not cover takes the colour of the nearest cloth.

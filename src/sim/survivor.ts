@@ -39,6 +39,8 @@ export const REGION = {
   shoulder: 6, upperArm: 7, forearm: 8, hand: 9,
   /** the thigh: the half by the hip (shorts) and the half by the knee */
   thigh: 10, aboveKnee: 11, shin: 12, foot: 13,
+  /** hair that stands off the skull (a bun), hidden under what closes round the head */
+  hair: 14,
 } as const;
 export type Region = keyof typeof REGION;
 /** the parts named, as the one number the body's paint is told */
