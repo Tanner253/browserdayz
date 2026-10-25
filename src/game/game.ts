@@ -1845,6 +1845,7 @@ export interface Game {
   toggleMap: Methods<typeof gunsMethods>['toggleMap'];
   toggleInventory: Methods<typeof gunsMethods>['toggleInventory'];
   updateInteraction: Methods<typeof interactMethods>['updateInteraction'];
+  bendFor: Methods<typeof interactMethods>['bendFor'];
   nearestLoose: Methods<typeof interactMethods>['nearestLoose'];
   dropInHands: Methods<typeof interactMethods>['dropInHands'];
   tickCrates: Methods<typeof interactMethods>['tickCrates'];

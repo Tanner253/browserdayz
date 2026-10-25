@@ -232,7 +232,7 @@ export function installHarness(g: Game) {
     get row() {
       return row;
     },
-    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; mods?: string[][]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string } = {}) {
+    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; mods?: string[][]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string; limp?: boolean } = {}) {
       for (const a of row) a.dispose();
       row.length = 0;
       const n = o.n ?? 8;
@@ -255,8 +255,10 @@ export function installHarness(g: Game) {
         }
         const any = a as unknown as Record<string, any>;
         const dead = o.dead !== undefined;
+        a.limping = !!o.limp;
         for (let k = 0; k < 40; k++) a.update(0.05, at, vel, face, !!o.crouch, false, false, o.pitch ?? 0, !o.air, !!o.aim);
         any.phase = i / n;
+        if (a.gait) a.gait.phase = i / n;
         if (dead) {
           a.update(0.016, at, vel, face, !!o.crouch, true, false, 0, true);
           any.downT = (o.dead! * (i + 1)) / n;

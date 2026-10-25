@@ -8,7 +8,8 @@
 //
 //   /tools/sandbox.html?m=plate_carrier          models by their manifest id (as the game loads them)
 //   &g=assets/animals/wolf.glb                  a glTF file by its path, with its animations
-//   &clip=run&t=0.25                            that animation (name or number) at that share of its length
+//   &clip=run&t=0.25                            that animation (name or number) at that share of its length; with
+//                                               several files, one each (clip=walk,mc_walk: the old beside the new)
 //   &survivor=0,1,2,3&clip=walk&t=0.3          the survivors' bodies (src/game/survivors.ts) on the game's skeleton, playing
 //                                               one of its clips; today's survivor beside them plays it too
 //   &animal=wolf&mode=run                       an animal as the game draws it (src/game/animals.ts, stageAnimal):
@@ -129,6 +130,8 @@ if (sim) {
   scene.add(thing);
   const info: Record<string, unknown>[] = [];
   let mixer: THREE.AnimationMixer | null = null, action: THREE.AnimationAction | null = null;
+  // (every file's own, side by side: each is stepped across a strip by its own length)
+  const played: THREE.AnimationAction[] = [];
   const shadowed = (o: THREE.Object3D) => o.traverse((m) => {
     if ((m as THREE.Mesh).isMesh) {
       m.castShadow = true;
@@ -162,31 +165,25 @@ if (sim) {
     info.push({ name, size: [+size.x.toFixed(2), +size.y.toFixed(2), +size.z.toFixed(2)], triangles: triangles(o), ...extra });
   };
   for (const id of ids) place(await assets.model(id), id);
-  // (every file after the first plays the same clip too, so that a line of bodies is seen in one pose: the infected)
-  const alongside: [THREE.AnimationMixer, THREE.AnimationAction][] = [];
-  for (const f of files) {
+  for (const [k, f] of files.entries()) {
     const gltf = await assets.loadGLTF(f);
     const o = gltf.animations.length ? cloneSkinned(gltf.scene) : gltf.scene;
     o.traverse((n) => void (list('hide').includes(n.name) && (n.visible = false)));
     const clips = gltf.animations.map((c) => `${c.name} (${c.duration.toFixed(2)} s)`);
     // (placed and framed as it rests, before any clip moves it: the cameras then hold still across a strip)
-    const want = q.get('clip');
+    const want = list('clip')[k] ?? list('clip')[0] ?? null;
     const clip = !gltf.animations.length ? null : want === null ? gltf.animations[0] : gltf.animations.find((c) => c.name === want) ?? gltf.animations[+want] ?? gltf.animations[0];
-    place(o, f, { clips, playing: clip?.name ?? null });
-    if (clip && mixer) {
+    place(o, f, { clips: k ? undefined : clips, playing: clip?.name ?? null });
+    if (clip) {
       const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
       a.play();
       m.setTime(clip.duration * +(q.get('t') ?? 0));
-      alongside.push([m, a]);
-    } else if (clip) {
-      mixer = new THREE.AnimationMixer(o);
-      action = mixer.clipAction(clip);
-      action.play();
-      mixer.setTime(clip.duration * +(q.get('t') ?? 0));
+      mixer ??= m;
+      action ??= a;
+      played.push(a);
     }
   }
   // (every survivor, and today's beside them, in one clip at one moment: see `played`)
-  const played: [THREE.AnimationMixer, THREE.AnimationAction][] = [...alongside];
   const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
     const want = q.get('clip');
     const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
@@ -194,7 +191,7 @@ if (sim) {
     const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
     a.play();
     m.setTime(clip.duration * +(q.get('t') ?? 0));
-    played.push([m, a]);
+    played.push(a);
     return clip.name;
   };
   if (survivors.length) {
@@ -262,14 +259,14 @@ if (sim) {
   for (let i = 0; i < cells; i++) {
     const view = strip > 0 ? views[0] : views[i];
     if (strip > 0 && mixer && action) mixer.setTime(action.getClip().duration * (i / strip));
-    if (strip > 0) for (const [m, a] of played) m.setTime(a.getClip().duration * (i / strip));
+    if (strip > 0) for (const a of played) if (a !== action) a.getMixer().setTime(a.getClip().duration * (i / strip));
     thing.updateMatrixWorld(true);
     frame(view);
     const vx = (i % cols) * cw, vy = (rows - 1 - Math.floor(i / cols)) * ch;
     renderer.setViewport(vx, vy, cw, ch);
     renderer.setScissor(vx, vy, cw, ch);
     renderer.render(scene, camera);
-    say(i, strip > 0 && action ? `${view} · ${action.getClip().name} ${((i / strip) * action.getClip().duration).toFixed(2)} s` : view);
+    say(i, strip > 0 && action ? `${view} · ${played.length > 1 ? played.map((a) => a.getClip().name).join(' | ') : action.getClip().name} ${(i / strip).toFixed(2)}` : view);
   }
   const out = window as unknown as { staged: boolean; stageInfo: unknown };
   // (and a screen of the game over it, asked for: the inventory with a kit on, or the hot bar)
