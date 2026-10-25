@@ -190,8 +190,9 @@ if (sim) {
   }
   // (every survivor, and today's beside them, in one clip at one moment: see `played`)
   const playOn = (o: THREE.Object3D, clips: THREE.AnimationClip[]) => {
-    const want = q.get('clip');
-    const clip = want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
+    // (set upon by the infected, &round=1, the survivor stands as one does, not in the file's T)
+    const want = q.get('clip'), idle = want === null && q.get('round') === '1';
+    const clip = idle ? clips.find((c) => /idle/i.test(c.name)) ?? null : want === null ? null : clips.find((c) => c.name === want) ?? clips[+want];
     if (!clip) return null;
     const m = new THREE.AnimationMixer(o), a = m.clipAction(clip);
     a.play();
@@ -216,8 +217,11 @@ if (sim) {
   for (const s of infected) {
     place(s.root, s.name, {}, true);
     s.pos.copy(s.root.position);
-    s.at(strip > 0 ? 0 : +(q.get('t') ?? 0.5) * secs);
   }
+  // (gathered round the survivor, who stands in the middle: &round=1)
+  const round = infected.length > 0 && q.get('round') === '1';
+  if (round) (await import('./sandbox-infected')).gatherRound(infected);
+  for (const s of infected) s.at(strip > 0 ? 0 : +(q.get('t') ?? 0.5) * secs);
   if (animal) {
     const { MODES, stageAnimal } = await import('../game/animals');
     const mode = q.get('mode') ?? 'idle', a = await stageAnimal(animal, MODES[mode] ?? +mode);
@@ -237,13 +241,13 @@ if (sim) {
     // (a copy: the file's own is the one the game's pictures of the survivor are made from, and it is moved aside here)
     const body = cloneSkinned((await assets.loadGLTF('assets/characters/survivor.glb')).scene) as THREE.Group;
     body.traverse((o) => { if (o.name.startsWith('gear_')) o.visible = false; });
-    if (survivors.length) playOn(body, (await assets.loadGLTF('assets/characters/survivor.glb')).animations);
+    if (survivors.length || round) playOn(body, (await assets.loadGLTF('assets/characters/survivor.glb')).animations);
     shadowed(body);
-    body.position.set(subject.max.x + 0.9, 0, 0);
+    body.position.set(round ? 0 : subject.max.x + 0.9, 0, 0);
     scene.add(body);
   }
   const all = new THREE.Box3().setFromObject(thing);
-  if (person) all.expandByPoint(new THREE.Vector3(subject.max.x + 1.3, 1.85, 0));
+  if (person) all.expandByPoint(new THREE.Vector3(round ? 0 : subject.max.x + 1.3, 1.85, 0));
   const mid = all.getCenter(new THREE.Vector3()), span = all.getSize(new THREE.Vector3());
   sun.target.position.copy(mid);
   const reach = Math.max(span.x, span.y, span.z) * 0.75 + 0.5;

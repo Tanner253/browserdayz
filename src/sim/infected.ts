@@ -141,6 +141,30 @@ export const I_IDLE = 0, I_WANDER = 1, I_ALERT = 2, I_CHASE = 3, I_ATTACK = 4, I
 /** [x, y, z, yaw, what it is doing, who it is after (a player's number, 0 nobody)] */
 export type IState = [number, number, number, number, number, number];
 
+/** as near as two of them stand to each other, centre to centre: a body's width */
+export const APART = 0.62;
+
+/**
+ * How far one of them (`a`, at ax, az) is moved off another (`b`) it stands inside: straight away from it, by half of how
+ * far in it is. The other is moved the other half by whichever game moves it, so that every game, moving its own by
+ * this, has those at one survivor stand round them, each a body's width from the next (the navigator, 2026-10-25: two
+ * nurses clawing at one player stood one inside the other, each moved by another player's game). Two on the very same
+ * spot part by their numbers, the same way in every game.
+ * @returns the step [dx, dz], or null if they are not inside each other (most pairs: told by the box alone)
+ */
+export function parting(ax: number, az: number, a: number, bx: number, bz: number, b: number): [number, number] | null {
+  const dx = ax - bx, dz = az - bz;
+  if (Math.abs(dx) >= APART || Math.abs(dz) >= APART) return null;
+  const d = Math.hypot(dx, dz);
+  if (d >= APART) return null;
+  if (d < 1e-3) {
+    const t = (Math.min(a, b) * 2.399963) % (Math.PI * 2), s = a < b ? APART / 2 : -APART / 2;
+    return [Math.cos(t) * s, Math.sin(t) * s];
+  }
+  const push = (APART - d) / 2 / d;
+  return [dx * push, dz * push];
+}
+
 export interface InfectedInfo {
   i: number;
   s: IState;

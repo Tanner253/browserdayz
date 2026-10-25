@@ -3,7 +3,7 @@
 // Avatar.prototype as the file loads. Nothing in them was changed but `this: Avatar` said as the first parameter.)
 
 import * as THREE from 'three';
-import { MAX_WOUNDS, infectedPatch, infectedUniforms, type InfectedUniforms } from '../look';
+import { MAX_WOUNDS, copyInfected, infectedPatch, infectedUniforms, type InfectedUniforms } from '../look';
 import { BODY_SCALE, _a, _b, _m1, _m2, _w, type Avatar } from '../avatar';
 
 export const woundsMethods = {
@@ -52,10 +52,7 @@ export const woundsMethods = {
     // (its look goes with it, its clothes, grime and old blood; the old blood is its first wounds)
     const look = this.zombieLook, uniforms: InfectedUniforms = { ...infectedUniforms(), uWounds: this.uniforms.uWounds };
     if (look) {
-      uniforms.uUpper.value.copy(look.u.uUpper.value);
-      uniforms.uLower.value.copy(look.u.uLower.value);
-      uniforms.uSkin.value.copy(look.u.uSkin.value);
-      uniforms.uGrime.value.copy(look.u.uGrime.value);
+      copyInfected(uniforms, look.u);
       for (let w = 0; w < look.blood; w++) uniforms.uWounds.value[w].copy(look.u.uWounds.value[w]);
       this.woundN = look.blood;
     }
