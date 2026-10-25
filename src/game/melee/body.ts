@@ -34,12 +34,21 @@ const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE
 /** a turn's track read at any moment, turned smoothly between its frames */
 const reader = (t: THREE.KeyframeTrack) => new THREE.QuaternionLinearInterpolant(t.times, t.values, 4, new Float32Array(4));
 
+/**
+ * The guard held with something to hit with (the right button): the library's two-handed parry stood at the moment the
+ * weapon is up across the face, and its seconds into the movement. (Its one-handed parry raises the shield arm, not the
+ * weapon's: a one-handed thing is put up across the face as well, the left hand behind it.)
+ */
+const PARRY = { one: { clip: 'Two_Handed_Parry', at: 0.6 }, two: { clip: 'Two_Handed_Parry', at: 0.6 } };
+
 export class BodyBlow {
   /** the blow being thrown: its cut, seconds into it, and how long the game gives it */
   private now: { cut: Cut; t: number; dur: number; hitU: number; taken: Taken[]; pelvis: THREE.Interpolant | null } | null = null;
-  private made = new Map<string, Taken[]>();
+  private made = new Map<string, { taken: Taken[]; pelvis: THREE.Interpolant | null }>();
   /** what stands between the body's root and its hips, as it rests (it does not move) */
   private above: THREE.Quaternion | null = null;
+  /** how far up the guard is, 0..1 */
+  private guardT = 0;
   constructor(
     private root: THREE.Object3D,
     private laid: [THREE.Object3D, THREE.Object3D, number, number][],
@@ -51,14 +60,14 @@ export class BodyBlow {
     return !!ready?.has(clip);
   }
 
-  /** A blow begins: `dur` seconds of the game's, counted landed at `hitU` of them. */
-  start(cut: Cut, dur: number, hitU = 0.35) {
-    const clip = ready?.get(cut.clip);
-    if (!clip) return false;
-    let taken = this.made.get(cut.clip);
-    if (!taken) {
+  /** a movement's tracks for the bones a blow turns (made once for each) */
+  private tracksOf(name: string) {
+    const clip = ready?.get(name);
+    if (!clip) return null;
+    let m = this.made.get(name);
+    if (!m) {
       const tracks = new Map(clip.tracks.filter((t) => t.name.endsWith('.quaternion')).map((t) => [t.name.slice(0, -'.quaternion'.length), t]));
-      taken = [];
+      const taken: Taken[] = [];
       let seam = true;
       for (const [, to, share, low] of this.laid) {
         const tr = tracks.get(to.name);
@@ -66,10 +75,17 @@ export class BodyBlow {
         taken.push({ bone: to, share, read: reader(tr), seam });
         seam = false;
       }
-      this.made.set(cut.clip, taken);
+      const hips = tracks.get('pelvis');
+      this.made.set(name, (m = { taken, pelvis: hips ? reader(hips) : null }));
     }
-    const hips = clip.tracks.find((t) => t.name === 'pelvis.quaternion');
-    this.now = { cut, t: 0, dur, hitU, taken, pelvis: hips ? reader(hips) : null };
+    return m;
+  }
+
+  /** A blow begins: `dur` seconds of the game's, counted landed at `hitU` of them. */
+  start(cut: Cut, dur: number, hitU = 0.35) {
+    const m = this.tracksOf(cut.clip);
+    if (!m) return false;
+    this.now = { cut, t: 0, dur, hitU, ...m };
     return true;
   }
 
@@ -94,14 +110,30 @@ export class BodyBlow {
     const c = n.cut;
     const at = u < n.hitU ? THREE.MathUtils.lerp(c.from, c.hit, u / n.hitU) : THREE.MathUtils.lerp(c.hit, c.to, (u - n.hitU) / (1 - n.hitU));
     // (in over a tenth of the blow, out over its last quarter: as the library's own blow is laid)
-    const w = THREE.MathUtils.smoothstep(u, 0, 0.1) * (1 - THREE.MathUtils.smoothstep(u, 0.74, 1));
-    for (const k of n.taken) {
+    this.lay(n.taken, n.pelvis, at, THREE.MathUtils.smoothstep(u, 0, 0.1) * (1 - THREE.MathUtils.smoothstep(u, 0.74, 1)));
+  }
+
+  /**
+   * The guard, up or coming down, laid as a blow is (a blow thrown from it goes over it). The fists' guard is the
+   * body's own (see update.ts): with something in the fist it is this.
+   * @param two in both hands
+   */
+  guard(up: boolean, two: boolean, dt: number) {
+    this.guardT += ((up ? 1 : 0) - this.guardT) * (1 - Math.exp(-(up ? 14 : 8) * dt));
+    if (this.guardT < 0.01 || this.now) return;
+    const p = PARRY[two ? 'two' : 'one'], m = this.tracksOf(p.clip);
+    if (m) this.lay(m.taken, m.pelvis, p.at, this.guardT);
+  }
+
+  /** a movement at a moment laid over the body's upper half, `w` of the way */
+  private lay(taken: Taken[], pelvis: THREE.Interpolant | null, at: number, w: number) {
+    for (const k of taken) {
       const v = k.read.evaluate(at);
       _q.set(v[0], v[1], v[2], v[3]);
-      if (k.seam && n.pelvis) {
+      if (k.seam && pelvis) {
         // The movement turns its hips as it pleases (a blow is thrown side-on); these hips are the steps'. So the
         // lowest bone it turns is set to face, from the body's root, the way it does in the movement.
-        const p = n.pelvis.evaluate(at);
+        const p = pelvis.evaluate(at);
         const parent = k.bone.parent!;
         this.above ??= this.root.getWorldQuaternion(_q3).invert().multiply(parent.parent!.getWorldQuaternion(_q2)).clone();
         const want = _q2.copy(this.above).multiply(_q3.set(p[0], p[1], p[2], p[3])).multiply(_q);

@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type { HandGrip } from '../arms';
-import { holdLeft } from '../melee/body';
+import { BodyBlow, holdLeft } from '../melee/body';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
 import { CLAW, CLAW_HIT, CUT, FP_BACK, HOLD_GONE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
@@ -62,7 +62,8 @@ export const updateMethods = {
     const left = (m: { t: number; stop?: number } | null) => (m?.stop === undefined ? 1 : 1 - THREE.MathUtils.smoothstep(m.t, m.stop - CUT, m.stop));
     // fists come up for a punch and stay up a while after it; and on guard they are up, with whatever is in them
     this.fistsHold = Math.max(0, this.fistsHold - dt);
-    const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0)) && !dead && !armed && !using;
+    // (with something in the fist, the guard is its parry: see BodyBlow.guard)
+    const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0 && !this.inHand)) && !dead && !armed && !using;
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
     // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
@@ -280,6 +281,7 @@ export const updateMethods = {
       if (dead || !this.inHand) this.blow.stop();
       else this.blow.update(dt);
     }
+    if (this.inHand && !dead && !using && (this.guarding || this.blow)) (this.blow ??= new BodyBlow(this.modelRoot, this.laid)).guard(this.guarding, !!this.inHand.left, dt);
     if (this.sick && this.sick.claw >= 0 && !dead) {
       // (it throws its whole body after its arm: the lunge is the clip's own)
       const u = this.sick.claw / CLAW;
@@ -614,7 +616,7 @@ export const updateMethods = {
 
     // --- a bat, carried: laid back over the right shoulder, the fist on it in front of the chest
     {
-      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && !this.blow?.busy && this.swingT < 0 && this.fistsT < 0.02;
+      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && !this.blow?.busy && !this.guarding && this.swingT < 0 && this.fistsT < 0.02;
       this.shoulderT += ((laid ? 1 : 0) - this.shoulderT) * ease(laid ? 6 : 14);
       if (this.shoulderT > 0.02 && this.inHand && this.armR && this.neck.length) {
         settle(this.root);

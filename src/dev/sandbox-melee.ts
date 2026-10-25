@@ -5,6 +5,7 @@
 //   &blow=Right_Hand_Sword_Slash,0.15,0.57,0.95[,tip x,y,z,edge x,y,z]   a blow cut by hand instead: the movement, from,
 //                                     hit, to (seconds), and how the thing is held as it lands (see Cut)
 //   &strip=8&views=q                  eight moments, from three-quarters (side, front, q, back)
+//   &guard=1                          on guard (the right button), held
 //   &fp=1                             as its own eyes see it: the arms out of the packs and the thing, placed as the game
 //                                     places them (meleeAt), through the hands' own lens (48 degrees)
 
@@ -58,6 +59,12 @@ export async function stageMelee(id: string, s: {
       o.frustumCulled = false;
     }
   });
+  // (&guard=1: on guard, held, from each of the views asked for)
+  const guard = s.q.get('guard') === '1';
+  if (guard) {
+    body.guarding = true;
+    for (let k = 0; k < 20; k++) body.update(0.05, at, still, face, false, false, false, 0, true, false);
+  }
   const camera = new THREE.PerspectiveCamera(30, s.cw / s.ch, 0.05, 100);
   const view = s.q.get('views')?.split(',')[0] ?? 'q';
   const dir = ({ side: new THREE.Vector3(1, 0.12, 0), front: new THREE.Vector3(0, 0.12, -1), back: new THREE.Vector3(0, 0.25, 1), q: new THREE.Vector3(0.75, 0.3, -0.9) }[view] ?? new THREE.Vector3(0.75, 0.3, -0.9)).normalize();
@@ -71,7 +78,7 @@ export async function stageMelee(id: string, s: {
     const u = s.cells === 1 ? 0.35 : i / (s.cells - 1);
     moments.push(u);
     // (the blow begun again and stood at its moment: the body's own update lays it over the rest)
-    body.swing(false, dur, cut);
+    if (!guard) body.swing(false, dur, cut);
     const now = (body.blow as unknown as { now: { t: number } | null } | null)?.now;
     if (now) now.t = Math.min(u, 0.999) * dur;
     // (off the shoulder at once: in the game it is let down over the first tenth of a second)
