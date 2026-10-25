@@ -43,6 +43,8 @@ export interface GatherHost {
   busy: () => boolean;
   /** the saw in the hands drawn to and fro, or not */
   sawing: (on: boolean) => void;
+  /** what the hands are at, shown on the body everybody sees (src/game/game/online.ts `act`) */
+  act: (a: 'saw' | 'stop', d: number) => void;
 }
 
 /** seconds the ring shows how far through a tree or a rock the work is, after a blow */
@@ -125,6 +127,7 @@ export class Gathering {
     if (this.h.online()) this.h.send({ t: 'saw', l: l.uid, u: it.uid, go: 1 });
     // (the saw drawn to and fro, and heard, until the work is done or left: `update`)
     this.h.sawing(true);
+    this.h.act('saw', SAW.time);
     this.sawSound?.stop();
     this.sawSound = audio.sawing({ x: l.x, y: l.y + 0.3, z: l.z });
     this.h.begin('Sawing the log into planks', SAW.time, near, () => {
@@ -161,6 +164,7 @@ export class Gathering {
       this.sawSound.stop();
       this.sawSound = null;
       this.h.sawing(false);
+      this.h.act('stop', 0);
     }
     // (played alone, the felled trees whose time is up stand again: the server does it otherwise)
     if (!this.h.online() && (this.regrowT += dt) > 30) {

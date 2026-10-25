@@ -131,7 +131,7 @@ export const LEAN_REACH = 0.34;
 // ('load': one round pushed into a magazine; 'unbox': a box of rounds torn open. Both are small sounds, heard close to.)
 // ('check': a gun turned over in the hands and looked at.)
 // ('take': something picked up, the body bending for it, 2026-10-25; an older game that hears it does nothing with it)
-export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop'] as const;
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop', 'saw'] as const;
 export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */
