@@ -7,7 +7,8 @@
 import type { C2S } from '../src/net/protocol';
 import { RECIPE } from '../src/sim/craft/recipes';
 import { cleanKnown, knows, mayUnlock, researchCost, researchUses, teaches, treeCost } from '../src/sim/craft/learn';
-import { placeNear } from '../src/sim/craft/places';
+import { benchAt, placeNear } from '../src/sim/craft/places';
+import { NEAR } from '../src/sim/craft/recipes';
 import { pocketsOf, count } from '../src/sim/craft/plan';
 import { MAT } from '../src/sim/craft/materials';
 import { ITEMS } from '../src/sim/items';
@@ -40,6 +41,18 @@ function teach(c: Client, id: string) {
 
 const scrapOf = (c: Client) => count(pocketsOf(c.inv).all, MAT.scrap);
 
+/** the workbench each player uses (F at it, as Rust's: the owner, "I should have to press F on the workbench to use it"); here, as its tree is unlocked at it, and server/craft.ts reads it */
+const using = new WeakMap<Client, { b: number; p: number }>();
+export function useBench(c: Client, m: Extract<C2S, { t: 'bench' }>) {
+  if (!c.alive || !Number.isInteger(m.b) || !Number.isInteger(m.p) || !benchAt(bases(), m.b, m.p, c.pose[0], c.pose[1], c.pose[2], NEAR.bench + 1)) return;
+  using.set(c, { b: m.b, p: m.p });
+}
+/** the level of the workbench a player uses while it is within reach (a little more, for the lateness of their word), 0 with none */
+export function usedBench(c: Client, slack = 0) {
+  const u = using.get(c);
+  return u ? benchAt(bases(), u.b, u.p, c.pose[0], c.pose[1], c.pose[2], NEAR.bench + slack) : 0;
+}
+
 export function learn(c: Client, m: Extract<C2S, { t: 'learn' }>) {
   if (!c.alive) return;
   const no = (why: string) => send(c, { t: 'learn', ok: false, why });
@@ -65,8 +78,7 @@ export function learn(c: Client, m: Extract<C2S, { t: 'learn' }>) {
   if (m.op === 'tree') {
     const r = typeof m.r === 'string' ? RECIPE[m.r] : undefined, t = r && treeCost(r.id);
     if (!r || !t) return void no('Nothing to learn there');
-    const near = placeNear(bases(), 'bench', c.pose[0], c.pose[1], c.pose[2], 5.5);
-    const why = mayUnlock(r.id, knownOf(c), near?.lv ?? 0, scrapOf(c));
+    const why = mayUnlock(r.id, knownOf(c), usedBench(c, 1.5), scrapOf(c));
     if (why) return void no(why);
     pay(c, { [MAT.scrap]: t.cost });
     teach(c, r.id);

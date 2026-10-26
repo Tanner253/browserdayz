@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import { LEVEL_NAME, MOST, NEAR, RECIPE, STILL, type Level, type Place, type Recipe } from '../sim/craft/recipes';
-import { placeNear } from '../sim/craft/places';
+import { benchAt, placeNear } from '../sim/craft/places';
 import type { Bases } from '../sim/build/bases';
 import { madeItems, plan, recipeName, recipesFor, type Pockets } from '../sim/craft/plan';
 import { cleanKnown, knows, teaches, waysToLearn, type LearnWays } from '../sim/craft/learn';
@@ -60,6 +60,9 @@ export class Crafting {
   label = '';
   /** the workbench's queue: the server's word on it, or this game's own played alone */
   queue: BenchQueue = { jobs: [], done: 0, paused: false, at: 0 };
+  /** the workbench in use (F at it, as Rust's: the owner, "I should have to press F on the workbench to use it to open the
+   * crafting menu with those items unlocked"): its recipes, its level's and those below, while it is within reach */
+  private bench: { b: number; p: number } | null = null;
   /** the blueprints learned: the server's word, or this browser's own played alone */
   private learned = new Set<string>();
   private own = new Set<string>();
@@ -79,17 +82,26 @@ export class Crafting {
     return this.h.creative() || knows(this.known, id);
   }
 
-  /** whether a workbench or a forge is near enough to make its recipes (by hand: always) */
+  /** workbench `p` of base `b` used (F at it): the server told, as it judges by it too */
+  useBench(b: number, p: number) {
+    this.bench = { b, p };
+    if (this.h.online()) this.h.send({ t: 'bench', b, p });
+  }
+
+  /** whether a workbench is in use or a forge near enough to make its recipes (by hand: always) */
   near(at: Place) {
     if (at === 'hand') return true;
+    if (at === 'bench') return this.level() > 0;
     const me = this.h.me();
     return !!placeNear(this.h.bases(), at, me.x, me.y, me.z, NEAR[at]);
   }
 
-  /** the best workbench level within reach (0: none) */
+  /** the level of the workbench in use, while it is within reach (0: none, or left: F at one again) */
   level(): Level | 0 {
-    const me = this.h.me();
-    return placeNear(this.h.bases(), 'bench', me.x, me.y, me.z)?.lv ?? 0;
+    if (!this.bench) return 0;
+    const me = this.h.me(), lv = benchAt(this.h.bases(), this.bench.b, this.bench.p, me.x, me.y, me.z);
+    if (!lv) this.bench = null;
+    return lv;
   }
 
   /** why a recipe cannot be made where this player stands (null: it can) */
@@ -99,7 +111,7 @@ export class Crafting {
     if (r.at === 'forge') return this.near('forge') ? null : 'Smelted at a forge';
     const need = r.lv ?? 1;
     if (this.level() >= need) return null;
-    return need > 1 ? `Needs a ${LEVEL_NAME[need]} near` : 'Needs a workbench near';
+    return need > 1 ? `Use a ${LEVEL_NAME[need]} or better: F at it` : 'Use a workbench: F at it';
   }
 
   /** whether a research table is within reach */

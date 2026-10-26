@@ -103,6 +103,8 @@ import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
 import { TraderCamp } from './camp';
 import { CAMP, RECYCLER_MARK, STALLS, STALL_MARK } from '../sim/camp';
+import { LEVEL_NAME } from '../sim/craft/recipes';
+import { levelOf } from '../sim/craft/places';
 import { RecyclerView } from './craft-recyclers';
 import { recyclerLayer } from '../sim/craft/recyclers';
 import type { MenuSpot } from '../ui/hud';
@@ -765,9 +767,20 @@ export class Game {
         this.focus = s;
         this.toggleInventory(true);
       },
-      // (crafting's research table: F opens the Crafting tab on what it would teach)
+      // (crafting's research table: F opens the Crafting tab on what it would teach; a workbench: F uses it, the Crafting
+      // tab open with its level's recipes and those below, as Rust's)
       use: (free, t) => {
-        if (t?.base.pieces.get(t.id)?.k !== 'research_table') return null;
+        const piece = t?.base.pieces.get(t.id);
+        if (piece?.k === 'workbench') {
+          if (free && this.input.pressed('KeyF')) {
+            this.craft.useBench(t!.base.id, piece.id);
+            (this.invUI.craftPane as CraftingScreen | null)?.showView('all');
+            this.toggleInventory(true);
+            if (this.invUI.isOpen) this.invUI.setMode('craft');
+          }
+          return `<kbd>F</kbd>Use ${LEVEL_NAME[levelOf(piece)].toLowerCase()}`;
+        }
+        if (piece?.k !== 'research_table') return null;
         if (free && this.input.pressed('KeyF')) {
           (this.invUI.craftPane as CraftingScreen | null)?.showView('research');
           this.toggleInventory(true);

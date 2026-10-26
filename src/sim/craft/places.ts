@@ -27,6 +27,17 @@ export interface Near {
   lv: Level;
 }
 
+/**
+ * The level of the workbench in use (F at it, as Rust's: the owner, "I should have to press F on the workbench to use it
+ * to open the crafting menu with those items unlocked"), while it stands within reach: 0 once it is gone or left.
+ */
+export function benchAt(bases: Bases, b: number, p: number, x: number, y: number, z: number, within = REACH.bench): Level | 0 {
+  const base = bases.bases.get(b), piece = base?.pieces.get(p);
+  if (!base || !piece || piece.k !== PLACE_PIECE.bench) return 0;
+  const [px, py, pz] = toWorld(base, piece.x, piece.y, piece.z);
+  return Math.hypot(px - x, pz - z) < within && Math.abs(py - y) < 2.5 ? levelOf(piece) : 0;
+}
+
 /** the nearest of a place's pieces within reach (on the same floor, near enough), or null; for a workbench, the best level among those within reach */
 export function placeNear(bases: Bases, at: Spot, x: number, y: number, z: number, within = REACH[at]): Near | null {
   const k = PLACE_PIECE[at];
