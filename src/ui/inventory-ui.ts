@@ -24,7 +24,7 @@
 import { ALL_SLOTS, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, TAG_FRESH, WEAPON_SLOTS, ZONA_VOID, makeItem, type AttachSlot, capacityOf, handlingOf, magFits, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { TOOL_LIFE, condition } from '../sim/gather';
 import { bandagesFrom, cuttable } from '../sim/condition';
-import { Container, bagGrid, poured, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
+import { Container, RACK, RACK_ROWS, bagGrid, bayOf, poured, splitPile, suitsBay, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import { combinePiles, goesWith, gridWeight, pileGrids, sortAll, sortGrid, wouldSort } from './inv-piles';
 import { BAG_FOR, bagFor, setBagFor, typable, wants } from './inv-types';
 import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
@@ -159,6 +159,8 @@ type Target =
   | { kind: 'hot'; el: HTMLElement; i: number }
   | { kind: 'hands'; el: HTMLElement }
   | { kind: 'slot'; el: HTMLElement; slot: Slot }
+  // (a bay of the open gun rack: `bayStrip`)
+  | { kind: 'bay'; el: HTMLElement; i: number }
   | { kind: 'ground'; el: HTMLElement }
   | { kind: 'pockets'; el: HTMLElement }
   | { kind: 'into'; el: HTMLElement }
@@ -514,6 +516,9 @@ export class InventoryUI {
       const natural = parseFloat(g.style.width) || 0;
       const zoom = natural > free && free > 0 ? String(Math.max(0.35, Math.floor((free / natural) * 1000) / 1000)) : '';
       if (g.style.zoom !== zoom) g.style.zoom = zoom;
+      // (a rack's store shows its own rows only: as tall as they are drawn)
+      const clip = g.parentElement;
+      if (clip?.classList.contains('inv-rack-store')) clip.style.height = `${Number(clip.dataset.rows) * CELL * (parseFloat(zoom) || 1)}px`;
     }
   }
 
@@ -1376,6 +1381,44 @@ export class InventoryUI {
   }
 
   /**
+   * An open gun rack's five bays as places, the squares what is worn is shown in (the owner, 2026-10-26: "5 small 1:1
+   * slots, JUST LIKE THE PLAYER INVENTORY, dedicated to weapons only"): the gun in each, which stands on the rack there.
+   */
+  private bayStrip(c: Container): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'inv-strip inv-rack-strip';
+    for (let i = 0; i < RACK.bays; i++) {
+      const s = document.createElement('div');
+      s.className = 'inv-slot inv-bay';
+      s.dataset.bay = String(i);
+      s.innerHTML = `<div class="slot-label">${i < RACK.bays - 1 ? `Rifle ${i + 1}` : 'Pistol'}</div>`;
+      const p = c.items.find((q) => bayOf(q.y) === i);
+      if (p) {
+        const el = document.createElement('div'), url = this.iconOf(p.item);
+        el.className = 'inv-item in-slot' + this.mark(p.item);
+        el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(p.item)}`;
+        this.bindItem(el, { kind: 'container', c, item: p.item });
+        s.appendChild(el);
+      } else {
+        s.classList.add('empty');
+        const like = Object.values(ITEMS).find((d) => (i < RACK.bays - 1 ? d.slot === 'long' : d.slot === 'holster') && this.icons[d.id]);
+        if (like) s.insertAdjacentHTML('beforeend', `<div class="slot-ghost" style="background-image:url(${this.icons[like.id]})"></div>`);
+      }
+      row.appendChild(s);
+    }
+    return row;
+  }
+
+  /** why the open rack's bay `i` will not take a thing ('' it will) */
+  private bayRefusal(src: Source, i: number): string {
+    const c = this.stash?.container, def = ITEMS[src.item.id], name = i < RACK.bays - 1 ? `Rifle ${i + 1}` : 'Pistol';
+    if (!c?.rack || src.kind === 'fitted') return '';
+    if (!def.weapon) return 'Only guns go on the rack: the rest goes in the store under it';
+    if (!suitsBay(src.item.id, i)) return i < RACK.bays - 1 ? `Only a long gun goes on ${name}` : 'Only a pistol or a small submachine gun goes on Pistol';
+    return c.fits(src.item, 0, i * RACK.deep, false, src.item) ? '' : `${name} has a gun on it already: take that off first`;
+  }
+
+  /**
    * The screen's standing parts: the columns, and what in them is kept for good (`skeleton`). Each part inside them is
    * a block (`block`), built from what it shows and built again only when that has changed, so that a move redraws
    * the grids it touched and nothing else (the owner, 2026-10-23: "Have we made sure to optimize everything?"). What
@@ -1654,7 +1697,7 @@ export class InventoryUI {
       : this.block('v:stash', `${ui}|${st.uid}|${st.label}|${st.own}|${this.stashState}|${this.stashState ? '' : this.gridSig(st.container)}|${this.carriedGuns().join(',')}|${bar?.sig ?? ''}`, () => {
           const out: Node[] = [];
           const head = document.createElement('h3');
-          head.innerHTML = `${st.label} <span>${st.container.w}×${st.container.h}</span>`;
+          head.innerHTML = `${st.label} <span>${st.container.w}×${st.container.rack ? st.container.h - RACK_ROWS : st.container.h}</span>`;
           out.push(head);
           if (bar) out.push(bar.el());
           if (this.stashState) {
@@ -1668,7 +1711,17 @@ export class InventoryUI {
           // wherever there is room, and the rows are counted again.)
           out.push(this.takeBar());
           if (body) return [...out, ...this.bodyNodes(box)];
-          out.push(this.gridEl(box, box.h));
+          if (box.rack) {
+            // (a rack: its bays as squares, and under them its store, the rows its bays are kept in left out of sight)
+            out.push(this.bayStrip(box));
+            const clip = document.createElement('div'), g = this.gridEl(box, box.h);
+            clip.className = 'inv-rack-store';
+            clip.dataset.rows = String(box.h - RACK_ROWS);
+            clip.style.height = `${(box.h - RACK_ROWS) * CELL}px`;
+            g.style.marginTop = `${-RACK_ROWS * CELL}px`;
+            clip.appendChild(g);
+            out.push(clip);
+          } else out.push(this.gridEl(box, box.h));
           // (a pack in a crate is opened where it lies, and gone through)
           this.openBags(out, box);
           return out;
@@ -2508,6 +2561,7 @@ export class InventoryUI {
     const els = document.elementsFromPoint(x, y);
     for (const el of els) {
       const h = el as HTMLElement;
+      if (h.dataset?.bay) return { kind: 'bay' as const, el: h, i: Number(h.dataset.bay) };
       if (h.dataset?.container) return { kind: 'grid' as const, el: h, id: h.dataset.container };
       if (h.dataset?.part) return { kind: 'part' as const, el: h, gun: h.dataset.gun! };
       if (h.dataset?.hot) return { kind: 'hot' as const, el: h, i: Number(h.dataset.hot) };
@@ -2659,6 +2713,7 @@ export class InventoryUI {
       if (this.onCharacter(src)) return '';
       return src.kind === 'slot' ? `The ${n} only goes in the place marked “${this.placeName(def)}”` : this.notOnBody(src);
     }
+    if (t.kind === 'bay') return this.bayRefusal(src, t.i);
     if (t.kind === 'char') return src.kind === 'slot' || this.onCharacter(src) ? '' : this.notOnBody(src);
     if (t.kind === 'part') {
       const gun = this.gunByUid(t.gun);
@@ -2739,6 +2794,11 @@ export class InventoryUI {
     const def = ITEMS[item.id];
     this.root.classList.add('dragging');
     for (const el of this.root.querySelectorAll<HTMLElement>('.inv-slot')) {
+      if (el.dataset.bay) {
+        const i = Number(el.dataset.bay), p = this.stash?.container.items.find((q) => bayOf(q.y) === i);
+        el.classList.toggle('drop-hint', p?.item !== item && !this.bayRefusal(d.src, i));
+        continue;
+      }
       const slot = el.dataset.slot as Slot;
       const occupant = this.inv.slots[slot];
       const fits = def.slot === SLOT_KIND[slot] && !(d.src.kind === 'slot' && d.src.slot === slot);
@@ -2867,6 +2927,8 @@ export class InventoryUI {
       // (not what that place takes: letting go there does what letting go anywhere on the survivor would, and it is the survivor that lights up, not the place)
       else if (this.onCharacter(d.src)) this.root.querySelector('.inv-gear')?.classList.add('char-over');
       else t.el.classList.add('drop-bad');
+    } else if (t?.kind === 'bay') {
+      t.el.classList.add(this.bayRefusal(d.src, t.i) ? 'drop-bad' : 'drop-ok');
     } else if (t?.kind === 'pockets') {
       // (anywhere on the right-hand side that is no grid: it is put away wherever there is room)
       if (d.src.kind !== 'container' || !this.inv.containers.includes(d.src.c)) this.root.querySelector('.inv-scroll')?.classList.add('pockets-over');
@@ -2963,6 +3025,16 @@ export class InventoryUI {
       else if (!this.mine(d.src)) this.transfer(d.src);
       else if (!this.inv.containers.includes(d.src.c)) this.putAway(d.src);
       return this.render();
+    }
+    // let go on a bay of the rack open: the gun stands there, as one is slung on the back
+    if (t.kind === 'bay') {
+      const c = this.stash?.container;
+      if (!c || this.bayRefusal(d.src, t.i)) return this.refuse(d, t, e);
+      if (d.src.kind === 'container' && d.src.c === c && bayOf(c.items.find((p) => p.item === item)?.y ?? -1) === t.i) return this.render();
+      if (!this.materialize(d.src)) return this.gone();
+      this.removeFrom(d.src);
+      c.place(item, 0, t.i * RACK.deep, false);
+      return this.finish(d.src.kind === 'ground' ? 'pickup' : 'move');
     }
     if (t.kind === 'grid') {
       const c = this.containerById(t.id!);
