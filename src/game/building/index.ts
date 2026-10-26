@@ -17,7 +17,7 @@ import type { Input } from '../../core/input';
 import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
-import { Bases, heard, heardClaim, heardPiece, repairOf, said, type KeptBase } from '../../sim/build/bases';
+import { Bases, heard, heardClaim, heardPiece, heardSite, repairOf, said, type KeptBase } from '../../sim/build/bases';
 import { PLACED, PLACES, PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
 import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
@@ -96,6 +96,8 @@ export interface BuildHost {
   /** chips and dust off a surface struck (Effects.impact, no mark) */
   impact: (surface: import('../../core/physics').Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
   myId: RaidHost['myId'];
+  /** the player's own body pushed by a leaf swinging, through its controller (Player.shove) */
+  shove: (dx: number, dz: number, past: ReadonlySet<number>) => number;
   /** the store open in the inventory now, and the pictures of things (the claim's screen beside its store) */
   shown: () => import('../loot').Stash | null;
   icons: () => Record<string, string>;
@@ -200,6 +202,8 @@ export class Building {
     }, () => this.store, this.doors, this.boxes);
     this.ladders = new LadderView(h.input, () => this.store, h.climber);
     this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me, shut: (at) => this.lightShut(at) }, () => this.store);
+    this.draw.shove = (dx, dz, past) => h.shove(dx, dz, past);
+    this.draw.me = h.me;
     this.raid = new RaidView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, camera: h.camera, player: h.player, me: h.me, take: h.take,
       changed: h.changed, flames: h.flames, glow: h.glow, explode: h.explode, broken: (b, ids) => this.brokeAlone(b, ids), impact: h.impact,
@@ -214,6 +218,8 @@ export class Building {
         h.changed();
       },
       costHtml: (c) => this.costHtml(c),
+      me: h.me,
+      give: h.give,
     }, () => this.store);
     this.beds = new BedsView({ online: h.online, send: h.send, me: h.me, who: () => this.me, hud: h.hud, wake: h.wake }, () => this.store);
   }
@@ -357,6 +363,9 @@ export class Building {
     const raid = this.raid.frame(free);
     if (raid && !plan && !hammer) this.prompt = raid;
     if (!this.prompt) this.prompt = this.raid.shown();
+    // (a blueprint set down near: its ghost, and at it what F does, when nothing else is asked of the eye)
+    const site = this.prints.sites(dt, free && !this.prompt);
+    if (site && !this.prompt) this.prompt = site;
     // (while the hands are at it, the ring round the crosshair says what they are doing: the card stands aside)
     if (this.h.busy()) this.prompt = null;
   }
@@ -895,6 +904,11 @@ export class Building {
     this.draw.forget(m.b);
     this.claims.forget(m.b);
     this.boxes.forget(m.b);
+  }
+  /** a base's blueprint as it is now (filled some more, done, or called off) */
+  onSite(m: Extract<S2C, { t: 'bsite' }>) {
+    const b = this.seen.bases.get(m.b);
+    if (b) b.site = heardSite(m.s);
   }
   onPiece(m: Extract<S2C, { t: 'bpc' }>) {
     const b = this.seen.bases.get(m.b), p = heardPiece(m.p);

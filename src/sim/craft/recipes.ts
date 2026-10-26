@@ -99,6 +99,12 @@ export const RECIPES: Recipe[] = [
   }),
   bench(1, 'sleeping_bag', 'sleeping_bag', 1, [{ id: 'rags', n: 10 }, { id: 'rope', n: 1 }], 15, 'build'),
   bench(1, 'key_lock', 'key_lock', 1, [{ id: F, n: 75 }], 10, 'build'),
+  // (the code lock made, and found rarely: the owner, 2026-10-25, "i think it should be craftable and lootable, rare to loot.
+  // people should use a key and keylock for early game basing": a level II bench and its hardware, so the key lock comes first)
+  bench(2, 'code_lock', 'code_lock', 1, [{ id: F, n: 150 }, { id: 'hardware', n: 1 }], 15, 'build'),
+  // (a key copied from one held, cut to the same lock: the owner, 2026-10-25, "need a way to make key copies to share with
+  // friends"; a lock taken off or fitted again takes a new number, and every copy of its old one opens nothing)
+  hand('key_copy', 'key', 1, [{ id: 'key', n: 1, keep: true, name: 'The key to copy' }, { id: 'planks', n: 1 }], 4, 'build'),
   bench(1, 'ammo_9mm', 'ammo_9mm', 10, [{ id: 'gunpowder', n: 2 }, { id: F, n: 10 }], 8, 'weapons'),
   bench(1, 'ammo_45', 'ammo_45', 10, [{ id: 'gunpowder', n: 2 }, { id: F, n: 12 }], 8, 'weapons'),
   // ---------------------------------------------------------------- Bench II: sheet metal, the sledgehammer, the satchel, pistols, simple fittings

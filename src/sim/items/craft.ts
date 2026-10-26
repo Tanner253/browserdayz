@@ -4,12 +4,17 @@
 // src/sim/craft/materials.ts. Rubbing alcohol, the tin can, scrap and the gun parts are found; the rest is made, smelted
 // or salvaged. The models are the owner's downloads and Higgsfield's (progress/base-models/incoming-map.md).
 
+import { PLACED } from '../build/pieces';
 import type { ItemDef } from '../items';
 import { ARMOURY, ARMY, HOMES, SHEDS } from './rules';
 import { PILES } from '../craft/materials';
 
 /** what is only ever made, smelted or salvaged: never found lying about (the plan: 'Found, never made' is the other way round) */
-export const MADE_ONLY = ['rags', 'rope', 'gunpowder', 'metal_frags', 'iron_bar', 'coal', 'stone_hatchet', 'bone_knife', 'sledgehammer', 'satchel'];
+export const MADE_ONLY = [
+  'rags', 'rope', 'gunpowder', 'metal_frags', 'iron_bar', 'coal', 'stone_hatchet', 'bone_knife', 'sledgehammer', 'satchel',
+  // (what is set down from the hands, and the doors: made at the crafting screen, never found; the sleeping bag is found)
+  ...Object.values(PLACED).filter((id) => id !== 'sleeping_bag'),
+];
 
 export const CRAFT_ITEMS: ItemDef[] = [
   // ---------------------------------------------------------------- made by hand

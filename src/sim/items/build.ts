@@ -77,7 +77,8 @@ export const BUILD_ITEMS: ItemDef[] = [
   // army's places, rare; the key lock in sheds and houses)
   { id: 'code_lock', name: 'Code Lock', model: 'code_lock', w: 1, h: 1, weight: 0.4, category: 'tool',
     desc: 'A keypad lock. In your hands, the left button fits it to a door, a gate, a hatch, a box or a claim you may build at, on a four-figure code you choose. Whoever enters the code may open it; a wrong code shocks.',
-    loot: { pair: 'CodeLock', at: [0, 1, 3, 0, 0], restock: 600, usage: ['Police', 'Industrial', 'Military'], favour: { Police: 2 } },
+    // (found rarely, and made at a level II bench: src/sim/craft/recipes.ts)
+    loot: { pair: 'CodeLock', at: [0, 0, 1, 0, 0], restock: 900, usage: ['Police', 'Industrial', 'Military'], favour: { Police: 2 } },
     worth: 8,
   },
   { id: 'key_lock', name: 'Key Lock', model: 'key_lock', w: 1, h: 1, weight: 0.3, category: 'tool',
