@@ -57,7 +57,7 @@ const REACH = TOUCH ? 6.5 : 5.4;
 // what a base and the traders are made of, close. 160 MB held the 1024s of the owner's body, gear and three or four
 // others; the 2048s of the same want twice that, and nearest goes first: "proximity based so further away the textures
 // are downscaled but up close nice and HD", 2026-10-25.)
-const SHARP_BUDGET_MB = TOUCH ? 900 : 320;
+const SHARP_BUDGET_MB = TOUCH ? 900 : 160;
 
 const _v = new THREE.Vector3(), _m = new THREE.Matrix4();
 /** whether it and everything it hangs from are shown */

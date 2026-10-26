@@ -83,12 +83,15 @@ const PHONE_FAR = { colour: 256, other: 128 };
  * DESK_CAP, and bodies and what is held or worn (src/core/near-models.ts) at DESK_NEAR only while close (`sharpen`).
  * DESK_NEAR was 1024 and 512 until 2026-10-26, and close up that was still soft: "the trader stalls, and workbench look
  * like shit ... the workbench inside the user's base should be full 1024 quality at least"; the karambit "too low quality,
- * going crazy with the downgrading". Close, a thing now has all its file holds up to 2048, and its 2048 copy where it
- * has one (`hi`), within near.ts's budget for the card.
+ * going crazy with the downgrading". Close, a thing now has all its file holds up to 2048, within near.ts's budget for
+ * the card.
  */
 const DESK = !TOUCH;
 const DESK_CAP = { colour: 512, other: 256 };
-const DESK_NEAR = { colour: 2048, other: 1024 };
+// (back to 1024 and 512, 2026-10-26: at 2048 a picture of that size went to the card as it came, not made again at the cap,
+// and things lying on the ground were drawn black, the owner: "a lot of objects are rendering all black ... only when on the
+// ground". The frame was lighter at 1024 too)
+const DESK_NEAR = { colour: 1024, other: 512 };
 /**
  * Each model's file made at DESK_CAP already, for a computer (scripts/lean.mjs): the files carry their pictures at up
  * to 2048 and a computer threw most of every one away on arrival (the owner: "we should do this"). The pixels are the
@@ -765,9 +768,10 @@ export class Assets {
     let s = this.sharp.get(id);
     if (!s) {
       const pictures = new Set<THREE.Texture>();
-      // (its own file, a body's being its id; on a computer its 2048 copy where it has one: see DESK_NEAR)
-      const e = this.manifest.models[id];
-      const mats = this.bytes(e ? (DESK && e.hi ? e.hi : e.url) : id).then((data) =>
+      // (its own file, a body's being its id. Not its `hi` copy: that lists its paints in an order of its own, and its
+      // pictures went onto the wrong ones, black, on things lying on the ground; the owner, 2026-10-26, "a lot of objects
+      // are rendering all black ... only when on the ground")
+      const mats = this.bytes(this.manifest.models[id]?.url ?? id).then((data) =>
         this.sharpTurn(first, () => this.turn(async () => {
           // (only what it is painted with is unpacked: its shapes are in the world already)
           const g = await this.paint.parseAsync(data, '');
