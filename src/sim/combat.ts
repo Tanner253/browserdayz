@@ -83,6 +83,16 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   karambit: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   hunting_knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   bayonet: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
+  // (base building's and crafting's tools hit as what they are: until 2026-10-25 they had no rule here and the server
+  // threw away every blow they landed. The owner: "the new shovel and hatchet and EVERYTHING should be a weapon that is a
+  // melee weapon in the game". Each as its item's stats say, with the others' slack: reach +1.9 m, blows at 0.7 the rate)
+  hand_saw: { damage: 18, melee: true, range: 3.5, interval: 0.49, falloff: 1 },
+  felling_axe: { damage: 55, melee: true, range: 3.9, interval: 0.7, falloff: 1 },
+  hammer: { damage: 30, melee: true, range: 3.6, interval: 0.42, falloff: 1 },
+  pickaxe: { damage: 50, melee: true, range: 3.9, interval: 0.74, falloff: 1 },
+  stone_hatchet: { damage: 32, melee: true, range: 3.5, interval: 0.6, falloff: 1 },
+  bone_knife: { damage: 20, melee: true, range: 3.3, interval: 0.32, falloff: 1 },
+  sledgehammer: { damage: 70, melee: true, range: 4.0, interval: 0.95, falloff: 1 },
   // (What they do to a car, 2026-10-13: "2 stick grenades or 1 frag grenade blows up a car".)
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9, car: 0.5 },
   frag: FRAG_RULE,
