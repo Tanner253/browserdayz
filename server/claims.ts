@@ -6,7 +6,7 @@
 
 import { saidClaim } from '../src/sim/build/bases';
 import { toWorld, type Base } from '../src/sim/build/snap';
-import { perDay, pay, protectedFor, rot, UPKEEP } from '../src/sim/build/upkeep';
+import { perDay, pay, pays, protectedFor, rot } from '../src/sim/build/upkeep';
 import type { StoredItem } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
 import { boxes, economy, log, world } from './index';
@@ -68,7 +68,7 @@ export function join(c: Client, m: { b: number }) {
 /** counts of what is in a store */
 function counts(items: StoredItem[]) {
   const n: Record<string, number> = {};
-  for (const it of items) if (UPKEEP.has(it.id)) n[it.id] = (n[it.id] ?? 0) + it.qty;
+  for (const it of items) if (pays(it.id)) n[it.id] = (n[it.id] ?? 0) + it.qty;
   return n;
 }
 

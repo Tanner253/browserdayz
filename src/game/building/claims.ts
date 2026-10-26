@@ -8,7 +8,7 @@ import { ITEMS } from '../../sim/items';
 import * as THREE from 'three';
 import { Stash } from '../loot';
 import { toWorld, type Base } from '../../sim/build/snap';
-import { perDay, pay, protectedFor, rot, saidTime, UPKEEP } from '../../sim/build/upkeep';
+import { perDay, pay, pays, protectedFor, rot, saidTime, toward } from '../../sim/build/upkeep';
 import type { Bases } from '../../sim/build/bases';
 import type { S2C, C2S, StoredItem } from '../../net/protocol';
 import type { Input } from '../../core/input';
@@ -133,13 +133,13 @@ export class ClaimView {
     const dry = !!(k?.dry || b.claim.dry) || left === 0;
     const head = dry ? 'Decaying' : left === null ? '…' : left === Infinity ? 'No upkeep needed' : `Protected for ${saidTime(left)}`;
     const rows = day.filter(([, n]) => n > 0).map(([id, n]) => {
-      const got = have[id] ?? 0;
+      const got = toward(have, id);
       return `<div class="cl-row"><i style="background-image:url(${icons[id] ?? ''})"></i><b>${ITEMS[id]?.name ?? id}</b><span class="${got < n ? 'short' : ''}">${Math.ceil(n)} a day · ${got} in store</span></div>`;
     }).join('');
     const names = b.claim.members.map((m) => m.name || 'someone');
     const on = b.claim.members.some((m) => m.pid === this.h.who());
     this.panel.innerHTML = `<h4>Claim · upkeep</h4><div class="cl-left ${dry ? 'dry' : left !== null && left < 12 * 3600 ? 'low' : ''}">${head}</div>
-      <p>Every day each piece of the base takes its upkeep from this store. Put in what is listed; when it runs dry, the base decays.</p>
+      <p>Every day each piece of the base takes its upkeep from this store, in what its tier is gathered as: planks for wood, stone for stone, metal fragments for metal, iron bars for armoured. The bigger the base, the more each piece takes. When it runs dry, the base decays.</p>
       ${rows || '<p>Nothing to pay: the base costs no upkeep.</p>'}
       <div class="cl-who"><b>Authorised:</b> ${names.length ? names.join(', ') : 'nobody'}<br>${on ? 'Hold <kbd>F</kbd> at the claim to leave it.' : 'Hold <kbd>F</kbd> at the claim to join it and build here.'}</div>`;
   }
@@ -258,7 +258,7 @@ export class ClaimView {
 /** counts of what a store holds of what a base is kept with */
 function counts(items: StoredItem[]) {
   const n: Record<string, number> = {};
-  for (const it of items) if (UPKEEP.has(it.id)) n[it.id] = (n[it.id] ?? 0) + it.qty;
+  for (const it of items) if (pays(it.id)) n[it.id] = (n[it.id] ?? 0) + it.qty;
   return n;
 }
 

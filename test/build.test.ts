@@ -275,21 +275,31 @@ ok('within 20 m of a claimed base only its members build; whoever reaches the cl
   assert.ok(!bs.mayWork(b, 'you'));
 });
 
-ok("upkeep by Rust's brackets: a wood 1x1 costs 6 planks and 7 nails a day; a week's store keeps it a week", () => {
+ok("upkeep by Rust's brackets, in gathered things: a wood 1x1 costs 6 planks a day; a week's store keeps it a week; metal is kept in fragments", () => {
   const bs = new Bases(flat), b = start(bs);
   for (const [k, x, z] of [['wall', 0, -1.5], ['wall', -1.5, 0], ['wall', 1.5, 0], ['doorway', 0, 1.5]] as const) at(bs, b, k, x, 1.5, z);
   at(bs, b, 'floor', 0, 3, 0);
   bs.lay({ b: b.id, k: 'claim', ...deployAt(b, 'claim', { x: 0, y: 0, z: 0 })! }, ME, 0, 'Me');
   for (const p of b.pieces.values()) if (p.k !== 'claim') bs.upgrade(b.id, p.id, 1);
   const day = perDay(b);
-  assert.ok(Math.abs(day.planks - 6) < 1e-9 && Math.abs(day.nails - 7.2) < 1e-9, JSON.stringify(day));
-  assert.ok(Math.abs(protectedFor({ planks: 42, nails: 51 }, day) / 86400 - 7) < 0.1);
-  assert.equal(protectedFor({ planks: 42 }, day), 0, 'no nails: nothing keeps it');
-  assert.deepEqual([0, 14, 15, 49, 50, 99, 100].map(bracket), [0.1, 0.1, 0.15, 0.15, 0.2, 0.2, 0.3]);
+  assert.ok(Math.abs(day.planks - 6) < 1e-9 && !day.nails, JSON.stringify(day));
+  assert.ok(Math.abs(protectedFor({ planks: 42 }, day) / 86400 - 7) < 0.1);
+  assert.deepEqual([0, 14, 15, 49, 50, 124, 125].map(bracket), [0.1, 0.1, 0.15, 0.15, 0.2, 0.2, 1 / 3]);
+  // (the owner: "I have a full metal base and i think needing sheet metals is too expensive": metal is kept in fragments, never sheet metal or nails)
+  for (const p of b.pieces.values()) if (p.k !== 'claim') p.t = 3;
+  const metal = perDay(b);
+  assert.deepEqual(Object.keys(metal), ['metal_frags'], JSON.stringify(metal));
+  assert.ok(Math.abs(metal.metal_frags - 72) < 1e-9, JSON.stringify(metal));
+  // (an old sheet of metal in the store is cut up for its fragments when they run short, what is over kept)
+  const due: Record<string, number> = {}, store = { metal_frags: 0, sheet_metal: 1 };
+  assert.ok(Math.abs(protectedFor(store, metal) / 86400 - 30 / 72) < 1e-6);
+  assert.equal(pay(metal, 1, due, store), true);
+  assert.equal(store.sheet_metal, 0);
+  assert.ok(due.metal_frags < -26, JSON.stringify(due));
   // (a big stone base: 90 pieces)
   const big = { ...b, pieces: new Map(Array.from({ length: 90 }, (_, i) => [i + 1, { ...b.pieces.get(2)!, id: i + 1, t: 2 as Tier }])) };
   const d = perDay(big);
-  console.log(`      a day: the 1x1 in wood ${Math.round(day.planks)} planks, ${Math.round(day.nails)} nails; 90 stone pieces ${Math.round(d.stone)} stone`);
+  console.log(`      a day: the 1x1 in wood ${Math.round(day.planks)} planks, in metal ${Math.round(metal.metal_frags)} fragments; 90 stone pieces ${Math.round(d.stone)} stone`);
   assert.ok(d.stone > 300 && d.stone < 600);
 });
 
