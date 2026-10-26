@@ -47,7 +47,10 @@ export const CRAFT_ITEMS: ItemDef[] = [
   // (scrap: junk found in sheds, works and drums, and out of recyclers; what traders, blueprints and bench levels are paid in)
   { id: 'scrap', name: 'Scrap', model: 'scrap_pile', w: 2, h: 1, weight: PILES.scrap.weight, stack: PILES.scrap.stack, fresh: 20, category: 'misc',
     desc: 'Useful junk: springs, screws, wire, bits of motors. Traders take it as money, and blueprints are learned with it.',
-    loot: { pair: 'MetalWire', at: [6, 10, 14, 6, 3], restock: 300, usage: [...SHEDS, ...HOMES], favour: { Industrial: 3, Farm: 1.5 }, qty: [0.01, 0.04] },
+    // (a currency worth having, as Rust's: found now and then, a few at a time, its steady sources the recycler and breaking
+    // things down; the owner, 2026-10-26: "scrap is spawning too common in too large of piles ... can still get scrap just
+    // needs to be kinda special". It was 39 piles of 5 to 20, and 100 to 325 in a crate)
+    loot: { pair: 'MetalWire', at: [4, 6, 8, 4, 2], restock: 600, usage: [...SHEDS, ...HOMES], favour: { Industrial: 3, Farm: 1.5 }, qty: [0.004, 0.012] },
     worth: 1,
   },
   { id: 'metal_frags', name: 'Metal Fragments', model: 'metal_frags', w: 1, h: 1, weight: PILES.frags.weight, stack: PILES.frags.stack, fresh: 25, category: 'misc',

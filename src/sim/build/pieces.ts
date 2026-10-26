@@ -166,7 +166,7 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     // the gun rack inventory larger (when crafted) as a high tier storage option for the base". Its store under the bays
     // 10 by 10, more than the large box's 10 by 8: the base's best (2026-10-26, "yes do it"))
     { id: 'weapon_rack', name: 'Weapon Rack', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 40, metal_frags: 150, nails: 30, hardware: 2 }, hp: 600, bench: 2, store: [10, 25] },
-    { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 25 }, hp: 300, bench: 1 },
+    { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 10 }, hp: 300, bench: 1 },
   ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
 

@@ -25,7 +25,7 @@ export const BUILD_ITEMS: ItemDef[] = [
     desc: 'Sawn boards. Every frame of a base is made of them, and a wooden wall is nailed up out of more.',
     // (a few, sawn already, where wood was worked and kept. Each of these is kept off the outskirts, or nearly, whose sheds
     // are full of the tools, the firewood and the lights already, and found inland, where most of the works and yards are.)
-    loot: { pair: 'WoodenPlank', at: [0, 4, 5, 0, 0], restock: 300, usage: SHEDS, favour: { Farm: 2, Industrial: 2 }, qty: [0.25, 0.5] },
+    loot: { pair: 'WoodenPlank', at: [0, 4, 5, 0, 0], restock: 300, usage: SHEDS, favour: { Farm: 2, Industrial: 2 }, qty: [0.005, 0.01] },
   },
   { id: 'stone', name: 'Stone', model: 'stone', pile: 3, w: 1, h: 2, weight: 0.15, stack: 1000, fresh: 15, category: 'misc',
     desc: 'Rough stone broken off a boulder with a pickaxe. A stone wall is built of it.',

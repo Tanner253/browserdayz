@@ -19,11 +19,15 @@ export const KNOWN_AT_START: ReadonlySet<string> = new Set([
   ...Object.values(PLACED).filter((id) => id !== 'torch'),
 ]);
 
-/** each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there (less what is held back: src/sim/build/raid.ts) */
+/**
+ * each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there (less what is
+ * held back: src/sim/build/raid.ts). Two fifths of what they were when crates gave scrap by the hundred (2026-10-26: scrap
+ * a currency worth having, found a few at a time).
+ */
 const TREE_ALL: Record<Level, readonly (readonly [string, number])[]> = {
-  1: [['pickaxe', 20], ['hand_saw', 30], ['key_lock', 40], ['ammo_9mm', 50], ['ammo_45', 60]],
-  2: [['gun_light', 75], ['code_lock', 85], ['sheet_metal', 90], ['sledgehammer', 110], ['red_dot', 140], ['colt', 175], ['m9', 225], ['satchel', 300]],
-  3: [['ammo_762', 200], ['ammo_739', 225], ['suppressor_9', 260], ['pu_scope', 300], ['mosin9130', 350], ['mpa', 400], ['scorpion', 450], ['suppressor_739', 500], ['ak', 650], ['c4', 750]],
+  1: [['pickaxe', 8], ['hand_saw', 12], ['key_lock', 16], ['ammo_9mm', 20], ['ammo_45', 24]],
+  2: [['gun_light', 30], ['code_lock', 35], ['sheet_metal', 36], ['sledgehammer', 45], ['red_dot', 55], ['colt', 70], ['m9', 90], ['satchel', 120]],
+  3: [['ammo_762', 80], ['ammo_739', 90], ['suppressor_9', 105], ['pu_scope', 120], ['mosin9130', 140], ['mpa', 160], ['scorpion', 180], ['suppressor_739', 200], ['ak', 260], ['c4', 300]],
 };
 export const TREE = Object.fromEntries(Object.entries(TREE_ALL).map(([lv, list]) => [lv, list.filter(([id]) => !HELD_BACK.has(id))])) as unknown as Record<Level, readonly (readonly [string, number])[]>;
 
@@ -54,7 +58,7 @@ export const knows = (known: ReadonlySet<string>, id: string) => KNOWN_AT_START.
 export const treeCost = (id: string) => treeOf(id);
 
 /** the scrap researching a recipe costs */
-export const researchCost = (id: string) => Math.max(10, Math.round((treeOf(id)?.cost ?? 40) * RESEARCH_SHARE));
+export const researchCost = (id: string) => Math.max(4, Math.round((treeOf(id)?.cost ?? 16) * RESEARCH_SHARE));
 
 /** how many of what a recipe makes researching it uses up: one thing, or a recipe's pile of rounds */
 export const researchUses = (r: Recipe) => (ITEMS[r.makes]?.stack ? Math.max(1, r.qty) : 1);

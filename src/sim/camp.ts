@@ -49,25 +49,25 @@ export const STALLS: Record<StallId, Stall> = {
   building: {
     name: 'Building supplies',
     hello: 'Nails are dear and they stay dear. Everybody wants them.',
-    sells: [g('nails', 10, 50, 2), g('planks', 10, 15), g('key_lock', 1, 40), g('code_lock', 1, 150), g('building_plan', 1, 10), g('stash_kit', 1, 50)],
+    sells: [g('nails', 10, 20, 2), g('planks', 10, 6), g('key_lock', 1, 15), g('code_lock', 1, 60), g('building_plan', 1, 4), g('stash_kit', 1, 20)],
     buys: ['tool', 'misc'],
   },
   weapons: {
     name: 'Guns and rounds',
     hello: 'Plain guns and the rounds for them. The good ones you find yourself.',
-    sells: [g('ammo_9mm', 20, 20), g('ammo_45', 20, 24), g('ammo_762', 10, 30), g('mag_colt', 1, 25), g('mag_m9', 1, 25), g('clip_mosin', 1, 15), g('gun_light', 1, 40), g('red_dot', 1, 100, 1), g('mosin9130', 1, 120, 1), g('colt', 1, 150, 1)],
+    sells: [g('ammo_9mm', 20, 8), g('ammo_45', 20, 10), g('ammo_762', 10, 12), g('mag_colt', 1, 10), g('mag_m9', 1, 10), g('clip_mosin', 1, 6), g('gun_light', 1, 16), g('red_dot', 1, 40, 1), g('mosin9130', 1, 50, 1), g('colt', 1, 60, 1)],
     buys: ['weapon', 'ammo', 'magazine', 'attachment', 'melee'],
   },
   medical: {
     name: 'Medicine and food',
     hello: 'Dressings, drips, a splint. And something to eat.',
-    sells: [g('bandage', 1, 12), g('rags', 5, 8), g('splint', 1, 15), g('saline', 1, 35), g('blood_bag', 1, 60), g('aid_pouch', 1, 40), g('rubbing_alcohol', 5, 15), g('charcoal', 6, 12), g('beans', 1, 8), g('water_jug', 1, 8)],
+    sells: [g('bandage', 1, 5), g('rags', 5, 3), g('splint', 1, 6), g('saline', 1, 14), g('blood_bag', 1, 24), g('aid_pouch', 1, 16), g('rubbing_alcohol', 5, 6), g('charcoal', 6, 5), g('beans', 1, 3), g('water_jug', 1, 3)],
     buys: ['medical', 'food', 'drink'],
   },
   clothing: {
     name: 'Clothes and gear',
     hello: 'Something warm, something to carry it in.',
-    sells: [g('tshirt', 1, 6), g('flannel_shirt', 1, 10), g('hoodie', 1, 20), g('quilted_jacket', 1, 30), g('field_jacket', 1, 40), g('jeans', 1, 12), g('work_trousers', 1, 20), g('field_trousers', 1, 30), g('beanie', 1, 6), g('fishermans_hat', 1, 10), g('leather_gloves', 1, 12), g('trainers', 1, 8), g('work_boots', 1, 15), g('hip_pack', 1, 30), g('sack_pack', 1, 60), g('flashlight', 1, 25), g('compass', 1, 15), g('binoculars', 1, 60)],
+    sells: [g('tshirt', 1, 3), g('flannel_shirt', 1, 4), g('hoodie', 1, 8), g('quilted_jacket', 1, 12), g('field_jacket', 1, 16), g('jeans', 1, 5), g('work_trousers', 1, 8), g('field_trousers', 1, 12), g('beanie', 1, 3), g('fishermans_hat', 1, 4), g('leather_gloves', 1, 5), g('trainers', 1, 3), g('work_boots', 1, 6), g('hip_pack', 1, 12), g('sack_pack', 1, 24), g('flashlight', 1, 10), g('compass', 1, 6), g('binoculars', 1, 24)],
     buys: ['clothing', 'stash'],
   },
 };
@@ -75,15 +75,17 @@ export const STALL_IDS = Object.keys(STALLS) as StallId[];
 // (a thing that is not an item in this build, base building's hardware before it lands, is not on the shelf)
 for (const s of Object.values(STALLS)) s.sells = s.sells.filter((x) => ITEMS[x.id]);
 
+// (the prices, the pay for things sold and the old book's rate: two fifths of what they were when crates gave scrap by the
+// hundred; 2026-10-26, scrap a currency worth having, found a few at a time)
 export const CAMP = {
   /** what a stall pays for a thing, of what the thing is worth (`worth`, src/sim/items/): low, so that the camp is a sink, not a farm (the navigator) */
-  back: 0.5,
+  back: 0.2,
   /** and for a thing it sells itself, at most this share of its own price */
   backOfPrice: 0.25,
   /** the most scrap a player is paid for things sold in a day, over every stall */
-  soldADay: 150,
+  soldADay: 60,
   /** the old book: credit paid out in scrap once, at so much a scrap, to so much at most */
-  book: { per: 2, most: 250 },
+  book: { per: 5, most: 100 },
   /** each trader's safe zone: how far out from its spot, m (the stall, its recycler and a little round them) */
   safe: 30,
   /** how near a stall's counter a player must stand to trade, m (as near as to speak) */

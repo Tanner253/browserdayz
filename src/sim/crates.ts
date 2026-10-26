@@ -203,7 +203,10 @@ export function fillCrate(c: Container, kind: string, rnd: () => number = Math.r
   for (const [id, chance] of rich ? [] : (spec.also ?? [])) if (ITEMS[id] && !(west && eastOnly(ITEMS[id])) && rnd() < chance) ids.push(id);
   for (const id of ids) {
     const def = ITEMS[id];
-    const item = makeItem(id, def.stack ? Math.max(1, Math.round(def.stack * (0.2 + rnd() * 0.45))) : 1);
+    // (a pile as its rule says where it says, DayZ's quantmin and quantmax: scrap a few, planks a handful, never a share of a
+    // stack made big for a claim's store; else a fifth to two thirds of a stack)
+    const q = typeRule(def)?.qty ?? [0.2, 0.65];
+    const item = makeItem(id, def.stack ? Math.max(1, Math.round(def.stack * (q[0] + rnd() * (q[1] - q[0])))) : 1);
     if (def.weapon) {
       fitAtRandom(item, rnd);
       if (t < 5) plainMag(item);

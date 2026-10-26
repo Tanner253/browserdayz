@@ -54,7 +54,8 @@ ok('four stalls, every good a real thing at a price in scrap, so many a day; no 
   }
   // (nails are dear: the owner, "they must be looted which is hard and time consuming")
   const nails = STALLS.building.sells.find((g) => g.id === 'nails')!;
-  assert.ok(nails.price / nails.n >= 4 && (nails.day ?? 99) <= 3, 'nails are cheap');
+  // (two fifths of the old 4 a nail since scrap is a currency worth having, 2026-10-26: still dear beside planks)
+  assert.ok(nails.price / nails.n >= 2 && (nails.day ?? 99) <= 3, 'nails are cheap');
   // (nothing above the third step of the map, and only a few things of it: the owner, "like rust nothing from traders is
   // overpowered"; a sort kept mostly from the fourth step up counts as the fourth, but for the rounds of a gun sold)
   const fed = new Set(STALL_IDS.flatMap((s) => STALLS[s].sells.map((g) => ITEMS[g.id].weapon?.ammo ?? '')));
@@ -102,7 +103,7 @@ ok('a day: so many sales of a thing, scrap enough or not, and a most of scrap pa
 ok('three jobs a day, paid in scrap; the infected counted, a thing brought taken; handed in once', () => {
   const d = day0(), jobs = jobsFor(d.day);
   assert.equal(jobs.length, 3);
-  for (const j of jobs) assert.ok(j.pays >= 5, `${j.id} pays ${j.pays}`);
+  for (const j of jobs) assert.ok(j.pays >= 2, `${j.id} pays ${j.pays}`);
   const first = jobs[0];
   assert.match(mayHandIn(first.id, d, () => 0) as string, /Not yet/);
   d.kills = d.heads = 99;
@@ -112,9 +113,9 @@ ok('three jobs a day, paid in scrap; the infected counted, a thing brought taken
   assert.equal(progress(jobs[1], d, () => 99), jobs[1].n);
 });
 
-ok('the old book is paid out at a scrap for two credit, and no more than its most', () => {
+ok('the old book is paid out at a scrap for five credit, and no more than its most', () => {
   assert.equal(bookScrap(0), 0);
-  assert.equal(bookScrap(101), 50);
+  assert.equal(bookScrap(101), 20);
   assert.equal(bookScrap(1e9), CAMP.book.most);
   assert.equal(bookScrap(-5), 0);
 });
@@ -270,11 +271,11 @@ async function serverTest() {
     // the old book: paid out once
     const g3 = a.got.length;
     a.send({ t: 'book', n: 300 });
-    assert.ok(await until(a, 'kit', (m) => m.items.some((it) => it.id === MAT.scrap && it.qty === 150), 5000, g3), 'the old book was not paid out');
+    assert.ok(await until(a, 'kit', (m) => m.items.some((it) => it.id === MAT.scrap && it.qty === 60), 5000, g3), 'the old book was not paid out');
     a.send({ t: 'book', n: 300 });
     await sleep(400);
     assert.equal(a.got.slice(g3).filter((m) => m.t === 'kit').length, 1, 'the old book was paid out twice');
-    console.log('  ok  the old book paid out once, at a scrap for two credit');
+    console.log('  ok  the old book paid out once, at a scrap for five credit');
 
     // the safe zone: a punch out on the meadow lands; the same at the camp hurts nobody
     const pa = a.got.filter((m) => m.t === 'welcome')[0] as { you: number };
