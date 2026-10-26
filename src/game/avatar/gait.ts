@@ -20,14 +20,16 @@ type Step = [Way, string, string?];
  * The gaits. The walks and the crouch step to a side as the old clips did, ahead with the hips turned toward it: the
  * library's standing side step is a crouched one, and stood up it was a bow-legged cross-step, and its crouched ones,
  * stretched to the game's pace, lunged (the owner, 2026-10-25, of the rifle's beside the old: "This one looks good, the
- * most recent images in chat dont look as good as this one"). The jog has no
- * side steps: it runs the nearest of its ways and is turned at the hips the rest (no more than to a corner), as
- * somebody runs across: two corners blended half each jogged on the spot.
+ * most recent images in chat dont look as good as this one"). The jog the same: ahead, its hips turned toward where
+ * it goes, as production's run was, and its back corners only past a right angle. Its side-on forward corners came in
+ * a third of a right angle off ahead, from a way that jittered with the network: the owner, 2026-10-25, "when a
+ * player is sprinting straight ahead sometimes it shows them strafing while running straight ... it seems like we are
+ * over complicating the movement animations".
  */
 const GAITS = {
   walk: [['F', 'walkF'], ['B', 'walkB']],
   aim: [['F', 'aimF'], ['B', 'aimB']],
-  jog: [['F', 'jogF'], ['FL', 'jogFL'], ['FR', 'jogFR'], ['BL', 'jogBL'], ['BR', 'jogBR']],
+  jog: [['F', 'jogF'], ['BL', 'jogBL'], ['BR', 'jogBR']],
   // (empty handed, the crouch and the walk's arms, hung from a chest stooped as the crouch's is (scripts/mocap.mjs
   // walkLow): the cautious crouch holds both arms out wide at the chest, which squared to the front stood out to the
   // sides; behind a gun the arms are the gun's)
@@ -41,6 +43,13 @@ type GaitName = keyof typeof GAITS;
 /** the gaits drawn only ahead (and back): they are turned at the hips to go to a side, by as much as this at most
  * (the walks and the crouch as far as the old clips' hips went, POSE.maxTwist; flat out and limping, as far as a waist goes) */
 const TURNED = new Map<GaitName, number>([['walk', 1.35], ['aim', 1.35], ['crouch', 1.35], ['crouchGun', 1.35], ['sprint', 1.1], ['sprintGun', 1.1], ['limp', 1.1]]);
+/**
+ * The way gone, read for the gaits: followed over about a quarter of a second, and only while going (another player's
+ * comes from where they were told to be, and its way jitters); a way of a gait held until another is nearer by `keep`
+ * (radians); one way crossfaded into the next at `fade` (about a fifth of a second); the hips turned toward the way
+ * gone no more than `most`, as production's were (POSE.maxTwist).
+ */
+const WAY = { follow: 4, moving: 1, keep: 0.5, fade: 5, most: 1.35 };
 /** the gaits run the nearest way and turned the rest */
 const NEAREST = new Set<GaitName>(['jog']);
 
@@ -116,11 +125,11 @@ export class Gait {
       let n = this.near.get(gait);
       if (!n) this.near.set(gait, (n = { at: 'F', k: new Map() }));
       let best = n.at;
-      for (const s of steps) if (Math.abs(wrap(AT[s[0]] - at)) < Math.abs(wrap(AT[best] - at)) - 0.26) best = s[0];
+      for (const s of steps) if (Math.abs(wrap(AT[s[0]] - at)) < Math.abs(wrap(AT[best] - at)) - WAY.keep) best = s[0];
       n.at = best;
       let sum = 0;
       for (const s of steps) {
-        const k = (n.k.get(s[0]) ?? 0) + ((s[0] === best ? 1 : 0) - (n.k.get(s[0]) ?? 0)) * (1 - Math.exp(-12 * dt));
+        const k = (n.k.get(s[0]) ?? 0) + ((s[0] === best ? 1 : 0) - (n.k.get(s[0]) ?? 0)) * (1 - Math.exp(-WAY.fade * dt));
         n.k.set(s[0], k);
         sum += k;
       }
@@ -129,7 +138,7 @@ export class Gait {
         const k = (n.k.get(s[0]) ?? 0) / Math.max(1e-4, sum);
         if (k < 1e-3) continue;
         this.add(s, share * k);
-        this.turns += share * k * -wrap(at - AT[s[0]]);
+        this.turns += share * k * THREE.MathUtils.clamp(-wrap(at - AT[s[0]]), -WAY.most, WAY.most);
       }
       this.turnW += share;
       return;
@@ -142,7 +151,7 @@ export class Gait {
       let b = this.back.get(gait);
       if (!b) this.back.set(gait, (b = { on: false, k: 0 }));
       if (back && (b.on ? Math.abs(at) < 1.4 : Math.abs(at) > 1.75)) b.on = !b.on;
-      b.k += ((b.on ? 1 : 0) - b.k) * (1 - Math.exp(-12 * dt));
+      b.k += ((b.on ? 1 : 0) - b.k) * (1 - Math.exp(-WAY.fade * dt));
       if (share < 1e-4) return;
       this.add(steps[0], share * (1 - b.k));
       if (back) this.add(back, share * b.k);
@@ -181,8 +190,8 @@ export class Gait {
   step(dt: number, speed: number, rel: number, stand: number, crouch: number, gun: number, limp: number) {
     this.w.clear();
     this.turns = this.turnW = 0;
-    const ease = 1 - Math.exp(-8 * dt);
-    if (speed > 0.3) this.way += wrap(-rel - this.way) * ease;
+    const ease = 1 - Math.exp(-WAY.follow * dt);
+    if (speed > WAY.moving) this.way += wrap(-rel - this.way) * ease;
     const at = this.way;
     // standing: a walk (empty handed or behind a gun, or a limp), a jog, flat out
     const jog = THREE.MathUtils.smoothstep(speed, 2.2, 3.0) * (1 - limp), flat = THREE.MathUtils.smoothstep(speed, 5.0, 5.8);

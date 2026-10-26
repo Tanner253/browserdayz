@@ -20,18 +20,6 @@
   "pace": 3.87,
   "dur": 0.733
  },
- "jogFL": {
-  "way": "FL",
-  "gait": "jog",
-  "pace": 5.321,
-  "dur": 0.633
- },
- "jogFR": {
-  "way": "FR",
-  "gait": "jog",
-  "pace": 5.321,
-  "dur": 0.633
- },
  "jogBL": {
   "way": "BL",
   "gait": "jog",
