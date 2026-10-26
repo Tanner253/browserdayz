@@ -65,6 +65,8 @@ export interface Leaf {
 const H = CELL / 2;
 /** a wall's length: a hand past its edge each end, so that two meeting at a corner close it */
 const LONG = CELL + WALL_T;
+/** a doorway's opening: half its width and its height, m (a door fills it) */
+const DOORWAY = { half: 0.65, high: 2.3 };
 const TRI = (y0: number, y1: number, shrink = 0): Solid => {
   const R = CELL / Math.sqrt(3) - shrink;
   return { prism: [2, 6, 10].map((a) => [Math.sin((a * Math.PI) / 6) * R, Math.cos((a * Math.PI) / 6) * R]), y0, y1 };
@@ -95,7 +97,10 @@ const SHAPES: Record<string, () => Shape> = {
   wall_half: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, STOREY / 2)] }),
   wall_low: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, 1)] }),
   // (an opening a metre wide and 2.2 m high: a door is hung in it, step four)
-  doorway: () => ({ solid: [wallBox(-LONG / 2, 0, -0.5, STOREY), wallBox(0.5, 0, LONG / 2, STOREY), wallBox(-0.5, 2.2, 0.5, STOREY)], cloth: frame(0.5, 0, 2.2, false) }),
+  // (an opening 1.3 m wide and 2.3 high, as Rust's: a door opened in a triangle's doorway lies across the next doorway, the
+  // airlock the owner asked for, 2026-10-25: "you can't get into the 2nd frame because the door open blocks the open door
+  // frame of the first door")
+  doorway: () => ({ solid: [wallBox(-LONG / 2, 0, -DOORWAY.half, STOREY), wallBox(DOORWAY.half, 0, LONG / 2, STOREY), wallBox(-DOORWAY.half, DOORWAY.high, DOORWAY.half, STOREY)], cloth: frame(DOORWAY.half, 0, DOORWAY.high, false) }),
   // (a window 1.2 m across, from 1.1 m to 2.1 m: shutters or bars go in it)
   window: () => ({ solid: [wallBox(-LONG / 2, 0, LONG / 2, 1.1), wallBox(-LONG / 2, 2.1, LONG / 2, STOREY), wallBox(-LONG / 2, 1.1, -0.6, 2.1), wallBox(0.6, 1.1, LONG / 2, 2.1)], cloth: frame(0.6, 1.1, 2.1, true) }),
   // (an opening 2.4 m across and 2.6 m high: double doors or a garage door)
@@ -137,9 +142,9 @@ const SHAPES: Record<string, () => Shape> = {
   // (as its model stands, src/game/building/models.ts: a rusted strongbox, the post on it, the flag off the post to +x)
   claim: () => ({ lockAt: { at: [0, 0.24, 0.34] }, solid: [box(-0.49, 0, -0.34, 0.49, 0.45, 0.34), box(0.01, 0.45, -0.11, 0.13, 2.1, 0.01)], cloth: { paint: 'flag', solid: [box(0.17, 1.42, -0.065, 1.17, 2.04, -0.035)] } }),
   // ---- fittings: each swings out to its piece's +z, which R turns about
-  // (a leaf a metre wide in the doorway, hung on its -x jamb; braced on the inside, its handle both sides)
-  door_wood: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, true)], lockAt: { leaf: 0, at: [0.82, 1.16, 0] } }),
-  door_metal: () => ({ solid: [], leaves: [door(-0.5, 1, 2.2, false)], lockAt: { leaf: 0, at: [0.82, 1.16, 0] } }),
+  // (a leaf filling the doorway, hung on its -x jamb; braced on the inside, its handle both sides)
+  door_wood: () => ({ solid: [], leaves: [door(-DOORWAY.half, DOORWAY.half * 2, DOORWAY.high, true)], lockAt: { leaf: 0, at: [DOORWAY.half * 2 - 0.18, 1.16, 0] } }),
+  door_metal: () => ({ solid: [], leaves: [door(-DOORWAY.half, DOORWAY.half * 2, DOORWAY.high, false)], lockAt: { leaf: 0, at: [DOORWAY.half * 2 - 0.18, 1.16, 0] } }),
   double_door_wood: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, true), door(1.2, 1.2, 2.6, true)], lockAt: { leaf: 0, at: [1.02, 1.32, 0] } }),
   double_door_metal: () => ({ solid: [], leaves: [door(-1.2, 1.2, 2.6, false), door(1.2, 1.2, 2.6, false)], lockAt: { leaf: 0, at: [1.02, 1.32, 0] } }),
   // (one panel hung from the opening's head, that tips up and in to lie under the ceiling: an up-and-over door)

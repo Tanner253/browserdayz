@@ -25,7 +25,7 @@ import { Bases, MEND, heard, heardPiece, repairOf, said, saidPiece, type Land } 
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
-import { inBase, inTheWay, swept } from '../src/sim/build/doors';
+import { inBase, inTheWay, pushedBy, swept } from '../src/sim/build/doors';
 import { BaseSolids } from '../src/sim/build/solid';
 import { inRoom, shutRoom } from '../src/sim/build/rooms';
 import { lockable, mayPass } from '../src/sim/build/locks';
@@ -407,6 +407,12 @@ ok('a door swings one way through where it sweeps, and not through a body there'
   assert.ok(!inTheWay(d, [{ x: 0, y: 4, z: 2.3 }]), 'a body on the floor above');
   const pts = swept(d);
   assert.ok(pts.every(([, , z]) => z > 1.4), 'it never swings in');
+  // (a body in its swing does not stop it: it is pushed on the way the leaf goes, clear of it; shutting, back through the
+  // doorway, inside its opening: the owner, 2026-10-25)
+  const out = pushedBy(d, { x: 0, y: 0, z: 2.3 }, true), back = pushedBy(d, { x: 0.4, y: 0, z: 2.3 }, false);
+  assert.ok(out && !inTheWay(d, [{ x: out.x, y: 0, z: out.z }]), `opening, pushed clear of it: ${JSON.stringify(out)}`);
+  assert.ok(back && back.z < 1.5 && Math.abs(back.x) < 0.65, `shutting, pushed in through the doorway: ${JSON.stringify(back)}`);
+  assert.equal(pushedBy(d, { x: 0, y: 0, z: 3.4 }, true), null, 'nobody clear of it is moved');
 });
 
 ok('nothing is set down where a door swings, nor a door hung to swing into what is set down', () => {

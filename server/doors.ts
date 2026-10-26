@@ -4,12 +4,13 @@
 // a leaf through where anybody stands.
 
 import { toLocal, toWorld } from '../src/sim/build/snap';
-import { DOOR, inTheWay, middleOf, swings } from '../src/sim/build/doors';
+import { DOOR, middleOf, pushedBy, swings } from '../src/sim/build/doors';
 import { PIECES } from '../src/sim/build/pieces';
 import type { C2S } from '../src/net/protocol';
 import { broadcastNear, clients, send, type Client } from './players';
 import { bases, known, tellBase } from './build';
 import { passes } from './locks';
+import { place } from './keep';
 
 /** when each door last swung, ms (`${base}:${piece}`) */
 const swung = new Map<string, number>();
@@ -32,12 +33,15 @@ export function swing(c: Client, m: Extract<C2S, { t: 'bdoor' }>) {
   const key = `${m.b}:${m.p}`, now = Date.now();
   if (now - (swung.get(key) ?? 0) < DOOR.again) return;
   if (!passes(c, d.piece)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is locked' });
-  // (nobody in its way: whoever stands where it swings, the one opening it too)
-  const feet = [...clients.values()].filter((o) => o.alive && Math.hypot(o.pose[0] - d.x, o.pose[2] - d.z) < 8).map((o) => {
-    const [x, y, z] = toLocal(d.base, o.pose[0], o.pose[1], o.pose[2]);
-    return { x, y, z };
-  });
-  if (inTheWay(d.piece, feet)) return void send(c, { t: 'tell', kind: 'warn', text: 'Someone is in the way of it' });
+  // (whoever stands where it swings, the one swinging it too, is pushed on the way it goes, clear of it: it never
+  // refuses for a body in the way, the owner, 2026-10-25)
+  for (const o of clients.values()) {
+    if (!o.alive || Math.hypot(o.pose[0] - d.x, o.pose[2] - d.z) > 8) continue;
+    const [x, y, z] = toLocal(d.base, o.pose[0], o.pose[1], o.pose[2]), to = pushedBy(d.piece, { x, y, z }, !!m.open);
+    if (!to) continue;
+    const [wx, , wz] = toWorld(d.base, to.x, y, to.z);
+    place(o, wx, o.pose[1], wz, o);
+  }
   swung.set(key, now);
   // (what swung long ago need not be remembered)
   if (swung.size > 400) for (const [k, t] of swung) if (now - t > DOOR.again) swung.delete(k);
