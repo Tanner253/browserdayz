@@ -772,8 +772,6 @@ export function asAdmin(c: Client, fresh: boolean) {
   }
   keepPowers(c);
   send(c, { t: 'powers', ...c.power });
-  // (and told so in words as they come in: a restart puts it on again, and nothing else may say so)
-  if (c.power.voidInv) send(c, { t: 'tell', kind: 'warn', text: 'Void inventory is on: when you die, nothing you carry is left on your body (/voidinv off)' });
   if (fresh) for (const o of clients.values()) if (o !== c && o.power.hidden) send(c, { t: 'join', p: info(o) });
 }
 
