@@ -45,14 +45,11 @@ export const MOVES = {
   aimB: { from: 'Walk_Backward_with_Bow_Aimed', way: 'B', gait: 'aim', square: 0, stand: 'walkB' },
   // (no side steps: the library's one standing is a crouched one, and stood up it was a bow-legged cross-step. The walks
   // and the crouch go to a side as the old clips did, ahead with the hips turned: see src/game/avatar/gait.ts GAITS)
-  // a jog, eight ways (left and right are the corners between)
+  // a jog: ahead (to a side, ahead with the hips turned: see gait.ts GAITS), and the back corners
   // (the chest brought up toward production's run, which leans 9 degrees off rest: as captured these lean 20 to 24, a
   // charge more than a jog (the owner, 2026-10-25, of the run: "also probably third person"); the head and hanging
   // arms kept on their line, see mocap-pose.mjs stoop)
   jogF: { from: 'Run_02', way: 'F', gait: 'jog', stoop: UPRIGHT },
-  jogFL: { from: 'ForwardLeft_Run_Fight', way: 'FL', gait: 'jog', square: 0.5, stoop: UPRIGHT },
-  // (its feet are not read: it is the other's twin, at the other's pace)
-  jogFR: { from: 'ForwardRight_Run_Fight', way: 'FR', gait: 'jog', pace: 5.321, square: 0.5, stoop: UPRIGHT },
   jogBL: { from: 'BackLeft_run', way: 'BL', gait: 'jog', square: 0.5 },
   jogBR: { from: 'BackRight_Run', way: 'BR', gait: 'jog', square: 0.5 },
   // flat out: empty handed, and with a gun (the arms are the gun's)
