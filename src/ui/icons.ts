@@ -403,13 +403,14 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
       carried.push(holder);
     }
   }
-  // one hair style (and maybe a beard), carried by the head
+  // one hair style (and maybe a beard), carried by the head: the suit's, never over a body's own (the owner, 2026-10-25:
+  // "the pfp's in the admin panel are broken now with the new models")
   const head = model.getObjectByName('Head');
   [...HAIR_STYLES, BEARD].forEach((name, i) => {
     const o = model.getObjectByName(name);
     if (!o) return;
     head?.attach(o);
-    o.visible = name === BEARD ? look.beard : i === look.hair;
+    o.visible = !skin && (name === BEARD ? look.beard : i === look.hair);
   });
   const uniforms = lookUniforms();
   setLookUniforms(uniforms, look);
@@ -496,10 +497,12 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   model.updateMatrixWorld(true);
   const W = face ? 144 : 420, H = face ? 144 : 840;
   const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4, colorSpace: THREE.SRGBColorSpace });
-  // (the head alone: a square about where the head's own bone is, from the collar to over a helmet)
+  // (the head alone: a square from the collar to over a helmet, by the head's own bone and its crown over it: a body's
+  // head stands higher over that bone than the suit's did, and was cut off at the top)
   const at = new THREE.Vector3();
   (head ?? model).getWorldPosition(at);
-  const cam = face ? new THREE.OrthographicCamera(at.x - 0.2, at.x + 0.2, at.y + 0.29, at.y - 0.11, 0.01, 50) : new THREE.OrthographicCamera(-0.52, 0.52, 1.93, -0.15, 0.01, 50);
+  const top = at.y + (fit ? fit.crown * model.scale.y : 0.212) + 0.078;
+  const cam = face ? new THREE.OrthographicCamera(at.x - 0.2, at.x + 0.2, top, top - 0.4, 0.01, 50) : new THREE.OrthographicCamera(-0.52, 0.52, 1.93, -0.15, 0.01, 50);
   cam.position.set(0, 0, 10);
   cam.lookAt(0, 0, 0);
   // The figure is drawn again every time something is put on or taken off, in the middle of play. So nothing of
