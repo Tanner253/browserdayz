@@ -17,9 +17,9 @@ import type { Input } from '../../core/input';
 import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
-import { Bases, heard, heardClaim, heardPiece, heardSite, repairOf, said, type KeptBase } from '../../sim/build/bases';
+import { mendOf, Bases, heard, heardClaim, heardPiece, heardSite, repairOf, said, type KeptBase } from '../../sim/build/bases';
 import { PLACED, PLACES, PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
-import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
+import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Piece, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../../sim/items';
@@ -665,6 +665,7 @@ export class Building {
     // (a workbench goes up in levels, the rest in tiers to armoured: the progression plan)
     const top = topOf(p.k), next = Math.min(top, p.t + 1) as Tier, said = (n: number) => (K.levels ? `level ${ROMAN[n]}` : TIERS[n]);
     const head = `${K.name} · ${K.levels ? `Level ${ROMAN[p.t]} · ` : K.only !== undefined ? '' : `${TIERS[p.t]} · `}${Math.round(p.hp)}/${hpOf(p.k, p.t)}`;
+    if (this.mendFrame(hammer, t.base, p, head)) return;
     if ((K.only !== undefined && !K.levels) || p.t >= top) {
       this.prompt = card(head, '', 'hold the right button to take it down');
       return;
@@ -673,6 +674,32 @@ export class Building {
     this.prompt = card(head, `${why ? `<span class="no">${why}</span> · ` : ''}up to ${said(next)}: ${this.costHtml(cost)}`, 'hold the right button for more', why ? undefined : 'LMB');
     if (this.h.input.pressed('Mouse0') && !this.h.busy() && !why) this.upgrade(hammer, t.base, t.id, next);
   }
+
+  /** a hurt piece at the hammer: the left button held mends it a bit a blow, out of the pockets (Rust's) */
+  private mendFrame(hammer: ItemInstance, base: Base, p: Piece, head: string): boolean {
+    if (p.hp >= hpOf(p.k, p.t) - 0.5) return false;
+    const free = this.h.creative(), bit = mendOf(p), why = free ? null : this.store.canRepair(base.id, p.id, this.raid.struckAt(base.id, p.id), Date.now()) ?? this.short(bit.cost);
+    this.prompt = card(head, `${why ? `<span class="no">${why}</span> · ` : ''}repair, a blow: ${free ? '<span class="ok">Creative</span>' : this.costHtml(bit.cost)}`, 'hold the left button to mend it · the right button for more', why ? undefined : 'LMB');
+    const input = this.h.input, now = performance.now();
+    if (!input.held('Mouse0') || this.h.busy() || now < this.mendAt) return true;
+    this.mendAt = now + NAIL.blow * 1000 + 90;
+    if (why) {
+      if (input.pressed('Mouse0')) this.h.note(why, 'warn');
+      return true;
+    }
+    this.h.work(NAIL.blow);
+    const [x, y, z] = toWorld(base, p.x, p.y + 1, p.z);
+    setTimeout(() => audio.built('nail', { x, y, z }, 0.9, 0.94 + Math.random() * 0.12), NAIL.lands * NAIL.blow * 1000);
+    if (this.h.online()) return void this.h.send({ t: 'bfix', b: base.id, p: p.id, u: hammer.uid, bit: 1 }), true;
+    for (const [k, n] of Object.entries(bit.cost)) this.h.take(k, n);
+    p.hp = Math.min(hpOf(p.k, p.t), p.hp + bit.gain);
+    hammer.cond = worn(hammer.id, hammer.cond);
+    this.draw.put(base, p);
+    this.bump(base.id);
+    this.h.changed();
+    return true;
+  }
+  private mendAt = 0;
 
   /** the hammer at a piece for its tier's seconds, then up a tier (the server says whether, online) */
   private upgrade(hammer: ItemInstance, base: Base, id: number, to: Tier) {

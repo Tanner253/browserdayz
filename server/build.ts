@@ -6,7 +6,7 @@
 // they go far off (the owner: "imagine 100's of bases on the map, how will we handle this without pickup a performance
 // cost"). Kept in the one save (server/keep.ts), with no write of its own.
 
-import { Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
+import { mendOf, Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
 import { struckAt } from './raid';
 import { PIECES, PLACED, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { toWorld, type Base } from '../src/sim/build/snap';
@@ -328,6 +328,9 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   if (items.length) send(c, { t: 'kit', name: scrap ? 'Deconstructed' : 'Taken down', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
 }
 
+/** blows of the hammer mending, by player: when each last landed (a blow comes no faster than this, ms) */
+const lastMend = new WeakMap<Client, number>(), MEND_GAP = 420;
+
 /** the hammer at a piece: mended whole for a share of what it cost (not within half a minute of a blow), or turned about */
 export function mend(c: Client, m: Extract<C2S, { t: 'bfix' }>) {
   if (!Number.isInteger(m.b) || !Number.isInteger(m.p)) return;
@@ -338,7 +341,15 @@ export function mend(c: Client, m: Extract<C2S, { t: 'bfix' }>) {
   if (why) return void send(c, { t: 'tell', kind: 'warn', text: why });
   const piece = all.bases.get(m.b)!.pieces.get(m.p)!;
   if (m.turn) all.turn(m.b, m.p);
-  else {
+  else if (m.bit === 1) {
+    // (a blow of the hammer: a bit of its health back for a bit of its cost, no faster than a hammer swings)
+    if (now - (lastMend.get(c) ?? 0) < MEND_GAP) return;
+    lastMend.set(c, now);
+    const bit = mendOf(piece), no = free ? null : short(c.inv, bit.cost);
+    if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
+    if (!free) pay(c, bit.cost);
+    piece.hp = Math.min(hpOf(piece.k, piece.t), piece.hp + bit.gain);
+  } else {
     const cost = free ? {} : repairOf(piece), no = short(c.inv, cost);
     if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
     pay(c, cost);

@@ -26,11 +26,21 @@ const ROMAN = ['', 'I', 'II', 'III'];
  * `share` of what it cost, by the health it has lost; one struck within `after` ms is not; a piece is turned about only
  * within `turn` ms of being laid, as Rust's.
  */
-export const MEND = { share: 0.5, after: 30_000, turn: 10 * 60_000 };
+/** `bit`: the share of a piece's health one blow of the hammer mends (the owner, 2026-10-25: "if I have my building hammer in
+ * hand I should be able to repair my base with resources from my inventory"; Rust's hammer, a bit a blow) */
+export const MEND = { share: 0.5, after: 30_000, turn: 10 * 60_000, bit: 0.2 };
 
-/** what mending a piece whole takes: `MEND.share` of what it cost (a workbench, its first level's), by the health it lost */
-export function repairOf(p: Piece): Record<string, number> {
-  const lost = Math.max(0, 1 - p.hp / hpOf(p.k, p.t)), out: Record<string, number> = {};
+/** one blow of the hammer at a hurt piece: the health it gives back (MEND.bit of the whole, at most what was lost), and
+ * what that costs, the same share of mending it whole */
+export function mendOf(p: Piece): { gain: number; cost: Record<string, number> } {
+  const max = hpOf(p.k, p.t), gain = Math.max(0, Math.min(max * MEND.bit, max - p.hp));
+  return { gain, cost: repairOf(p, gain / max) };
+}
+
+/** what mending a piece whole takes: `MEND.share` of what it cost (a workbench, its first level's), by the health it lost
+ * (`part`: only so much of its whole health, a blow's) */
+export function repairOf(p: Piece, part?: number): Record<string, number> {
+  const lost = part ?? Math.max(0, 1 - p.hp / hpOf(p.k, p.t)), out: Record<string, number> = {};
   // (a thing set down from the hands is mended from what its item is made of, never from a share of the item)
   const of = PLACED[p.k] ? PIECES[p.k].cost ?? {} : costOf(p.k, PIECES[p.k].levels ? laidAt(p.k) : p.t);
   for (const [id, n] of Object.entries(of)) {

@@ -398,7 +398,7 @@ export type C2S =
   /** `scrap`: a thing set down from the hands broken up for some of its materials, not picked up whole */
   | { t: 'bdel'; b: number; p: number; u: string; scrap?: 1 }
   /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
-  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean }
+  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean; bit?: 1 }
   /** joining a base's claim, or leaving it (stood at it) */
   | { t: 'bjoin'; b: number }
   /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
