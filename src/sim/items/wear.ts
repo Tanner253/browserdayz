@@ -223,7 +223,11 @@ export const WEAR_ITEMS: ItemDef[] = [
   },
   {
     id: 'balaclava', name: 'Balaclava', model: 'balaclava', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'face',
-    desc: 'A black knitted balaclava: only the eyes show.', wear: {},
+    desc: 'A knitted balaclava over the whole head and neck: only the eyes show.', wear: {},
+    // (the old suit's green mask, fitted to each head; and black, the owner, 2026-10-25: "should cover face like our old
+    // player model does, we had a green face mask on our old player model ... we should have a green and black variant")
+    dress: { model: 'balaclava', hides: ['scalp', 'face', 'neck', 'hair'], each: true },
+    colours: [{ name: 'Black', tint: 0x2a2b2d }, { name: 'Green' }],
     loot: { pair: 'Balaclava3Holes_Black', at: [0, 0, 6, 0, 0], restock: 900, usage: ARMY },
     worth: 3,
   },

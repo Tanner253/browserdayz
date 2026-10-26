@@ -59,8 +59,12 @@ const loadBody = (n: number) => load(`assets/characters/${BODIES[n].file}.glb`);
  * assets/tex/camo/), or neither, as it was drawn.
  */
 export interface Worn {
+  /** the item's, for what is hung over it (a hat over a balaclava: placeWorn in src/game/avatar/gear.ts) */
+  id?: string;
   /** none: nothing drawn, the parts only hidden (see bareWorn) */
   model: string;
+  /** made for each body apart: its model is `<model>_<body>` (see wornFile) */
+  each?: boolean;
   hides: number;
   /** the parts it is only partly over (a hip under a hem): drawn a little in from the skin, not hidden (see Hidden) */
   shrinks?: number;
@@ -87,7 +91,7 @@ const BULK = 0.05;
  * Things hung as they are (GEAR) that close round the head: the hair that stands off the skull is not drawn under them
  * (Anya's bun stood out through a balaclava). As a Worn of no model, which only hides.
  */
-const BARE: Record<string, Region[]> = { balaclava: ['hair'], ghillie_hood: ['hair'], gasmask: ['hair'] };
+const BARE: Record<string, Region[]> = { ghillie_hood: ['hair'], gasmask: ['hair'] };
 export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id]) } : null);
 /** the parts of the trousers that a top long enough lies over */
 const WAIST = hides(['belly', 'hips', 'thigh']);
@@ -111,7 +115,7 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
       continue;
     }
     const col = d.colours?.[Number(c) || 0];
-    const w: Worn = { model: d.dress.model, hides: hides(d.dress.hides), shrinks: hides(d.dress.shrinks ?? []), ...(col?.tint !== undefined ? { tint: col.tint } : {}), ...(col?.camo ? { camo: col.camo } : {}) };
+    const w: Worn = { id, model: d.dress.model, ...(d.dress.each ? { each: true } : {}), hides: hides(d.dress.hides), shrinks: hides(d.dress.shrinks ?? []), ...(col?.tint !== undefined ? { tint: col.tint } : {}), ...(col?.camo ? { camo: col.camo } : {}) };
     worn.push(w);
     if (outer(id)) over |= w.hides;
     else inner.push(w);
@@ -350,15 +354,20 @@ export async function wearBody(model: THREE.Object3D, n: number, hide = 0): Prom
   return out;
 }
 
+/** a thing worn's file: its body's own where it is made for each (Worn.each) */
+const wornFile = (w: Worn, n: number) => `assets/characters/wear/${w.model}${w.each ? `_${n}` : ''}.glb`;
+/** a part of a thing worn that keeps its own colours whatever the thing's are (the eyes in a balaclava: `own` in its material) */
+const ownColour = (w: Worn, mat: THREE.Material): Worn => (mat.userData.own ? { ...w, tint: undefined, camo: undefined } : w);
+
 /** For the tools: things worn put on a copy dressed by wearBody, its skin under them hidden (see Wardrobe.setWorn). */
-export async function wearOn(model: THREE.Object3D, body: THREE.SkinnedMesh[], worn: Worn[]) {
+export async function wearOn(model: THREE.Object3D, body: THREE.SkinnedMesh[], worn: Worn[], n = 0) {
   const bones = new Map<string, THREE.Bone>();
   model.traverse((o) => void ((o as THREE.Bone).isBone && bones.set(o.name, o as THREE.Bone)));
   const hide: Hidden = { hide: { value: worn.reduce((m, w) => m | w.hides, 0) }, shrink: { value: worn.reduce((m, w) => m | (w.shrinks ?? 0), 0) }, by: { value: SHRINK / unitOf(body[0]) } };
   for (const b of body) (b.material as THREE.Material).onBeforeCompile = (shader) => regionPatch(shader, hide);
   for (const w of worn) {
     if (!w.model) continue;
-    const gltf = await load(`assets/characters/wear/${w.model}.glb`);
+    const gltf = await load(wornFile(w, n));
     gltf.scene.traverse((o) => {
       const s = o as THREE.SkinnedMesh;
       if (!s.isSkinnedMesh) return;
@@ -366,7 +375,7 @@ export async function wearOn(model: THREE.Object3D, body: THREE.SkinnedMesh[], w
       const light = (mat.userData.light as number | undefined) ?? 0.4;
       const m = onto(s, bones, mat);
       const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
-      mat.onBeforeCompile = (shader) => clothPatch(shader, light, w, space);
+      mat.onBeforeCompile = (shader) => clothPatch(shader, light, ownColour(w, mat), space);
       mat.customProgramCacheKey = () => `wear|${w.camo ?? w.tint ?? ''}`;
       body[0].parent?.add(m);
     });
@@ -417,6 +426,11 @@ export class Wardrobe {
   }
 
   /** What is worn over the skin, drawn on the body (a body must be on: on the suit nothing is). */
+  /** the ids of what is worn, as last asked for */
+  wornIds() {
+    return this.worn.flatMap((w) => (w.id ? [w.id] : []));
+  }
+
   setWorn(worn: Worn[]) {
     this.worn = worn;
     this.wornKey = JSON.stringify(worn);
@@ -433,7 +447,7 @@ export class Wardrobe {
     const f = this.frame, key = this.wornKey, worn = this.worn, on = this.shown !== null;
     const now = on ? key : '';
     if (!f || now === this.wornShown) return;
-    const got = on ? await Promise.all(worn.map((w) => (w.model ? load(`assets/characters/wear/${w.model}.glb`).catch(() => null) : null))) : [];
+    const got = on ? await Promise.all(worn.map((w) => (w.model ? load(wornFile(w, this.shown ?? 0)).catch(() => null) : null))) : [];
     // (and the camouflages' tiles in before any of it is put on: a camouflaged piece was black until its tile came)
     if (on && worn.some((w) => w.camo)) {
       for (const w of worn) if (w.camo) camoTile(w.camo);
@@ -474,10 +488,10 @@ export class Wardrobe {
           mat,
           (shader) => {
             stainPatch(shader, f.uniforms, at);
-            clothPatch(shader, light, w, space);
+            clothPatch(shader, light, ownColour(w, mat), space);
             regionPatch(shader, under);
           },
-          `survivor-wear|${w.camo ? 'camo' : w.tint !== undefined ? 'tint' : 'own'}`,
+          `survivor-wear|${mat.userData.own ? 'own' : w.camo ? 'camo' : w.tint !== undefined ? 'tint' : 'own'}`,
         );
         const m = onto(s, f.bones, mat);
         under.by.value = (w.underBy ?? UNDER) / unitOf(m);
@@ -487,7 +501,8 @@ export class Wardrobe {
         m.layers.mask = f.layers();
         f.into.add(m);
         this.wornShapes.push(m);
-        if (f.fpBones && f.fpInto) {
+        // (not what is worn on the head: the first-person camera is inside it)
+        if (f.fpBones && f.fpInto && !mat.userData.head) {
           const fp = onto(s, f.fpBones, mat);
           fp.castShadow = false;
           fp.receiveShadow = true;

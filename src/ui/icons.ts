@@ -442,7 +442,7 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
     own.push(c);
   });
   // (and what is worn on it, as in the world: their own paints, after the suit's are made the doll's)
-  if (skin) await wearOn(model, skin, sortWorn(worn).worn);
+  if (skin) await wearOn(model, skin, sortWorn(worn).worn, body ?? 0);
   // (standing as a body in the world stands: the motion capture's idle, its feet flat on the ground; the file's own
   // idle stood the old suit on its toes)
   const moves = skin ? (await assets.loadGLTF(MOVE_FILE)).animations : gltf.animations;

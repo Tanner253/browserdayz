@@ -69,7 +69,8 @@ export const dressMethods = {
     this.gearPlaced = [];
     this.packOut = 0;
     for (const p of this.pieces.values()) p.visible = false;
-    const ids = items.map(({ id }) => id);
+    // (and what is worn as clothes: a hat sits on a balaclava's knit, see placeWorn)
+    const ids = [...items.map(({ id }) => id), ...(this.wardrobe?.wornIds() ?? [])];
     const chest: { obj: THREE.Object3D; rest: THREE.Matrix4 }[] = [];
     for (const { id, obj } of items) {
       for (const name of WORN[id] ?? []) {

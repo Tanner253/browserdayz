@@ -102,10 +102,10 @@ export const GEAR: Record<string, Worn> = {
   // the hair as the suit's hood did not: the cap and the boonie set lower than on the suit, the cap tipped forward.)
   // (said against the suit's head, its crown at 1.749 and some 26 cm across both ways, its middle 1.6 cm before the joint)
   beanie: { bone: 'Head', p: [0, 1.61, -0.016], r: [0, Math.PI, 0], s: [1.08, 0.72, 1.35] },
-  ushanka: { bone: 'Head', p: [0, 1.595, -0.016], r: [0, Math.PI, 0], s: [0.88, 0.8, 0.88] },
+  // (the ushanka's front, its fur turned up over the brow, is toward +x as it came: turned a quarter, not a half; it
+  // sat with its ear flaps over the brow and the nape, the owner, 2026-10-25: "the russian hat is not rotated properly")
+  ushanka: { bone: 'Head', p: [0, 1.595, -0.016], r: [0, Math.PI / 2, 0], s: [0.88, 0.8, 0.88] },
   beret: { bone: 'Head', p: [0, 1.633, -0.016], r: [0, Math.PI, 0], s: [1.0, 0.6, 1.0] },
-  // (its front is toward +x as it came, and it is the shell of one: drawn out round a head 26 cm deep)
-  balaclava: { bone: 'Head', p: [0, 1.412, -0.022], r: [0, Math.PI / 2, 0], s: [1.24, 1.15, 1.28] },
   ghillie_hood: { bone: 'Head', p: [0, 1.48, 0.01], r: [0, Math.PI, 0], s: [1.0, 1.0, 1.0] },
   // (round the waist: the belt's buckle and the hip pack in front)
   military_belt: { bone: 'pelvis', p: [0, 0.94, 0.0], r: [0, Math.PI, 0], s: [0.9, 1.0, 0.85] },
@@ -249,7 +249,7 @@ export function placeWorn(id: string, obj: THREE.Object3D, ids: string[], into =
   const helmet = ids.some((other) => GEAR[other] === MASK) ? ids.map((other) => OVER_MASK[other]).find((h) => !!h) : undefined;
   const nudge = helmet && helmet === OVER_MASK[id] ? helmet.nudge : undefined;
   // (a hat or a helmet over a balaclava sits on its knit, a little higher and wider: a beret sank into one, 2026-10-25)
-  const knit = id !== 'balaclava' && g.bone === 'Head' && g !== MASK && ids.includes('balaclava') ? 1 : 0;
+  const knit = g.bone === 'Head' && g !== MASK && ids.some((k) => k.split('~')[0] === 'balaclava') ? 1 : 0;
   into.compose(_a.set(g.p[0] + (nudge?.[0] ?? 0), g.p[1] + (nudge?.[1] ?? 0) + knit * 0.012, g.p[2] + (nudge?.[2] ?? 0)), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s).multiplyScalar(1 + knit * 0.05));
   if (helmet && g === MASK && helmet.keep.length) under(obj, into, helmet.keep);
   return into;
