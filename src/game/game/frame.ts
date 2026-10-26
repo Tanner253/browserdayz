@@ -131,7 +131,7 @@ export const frameMethods = {
     }
     if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
     if (this.hud.emotes.isOpen && (!playing || this.player.dead)) this.toggleEmotes(false);
-    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen || this.build.locks.padOpen;
+    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen || this.build.locks.padOpen || this.guide.isOpen;
     // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
     const uiOpen = panels || !!this.freecam;
     // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet

@@ -2,6 +2,7 @@
 // what. Offline, this browser runs the whole world (loot economy, crates, save file).
 // Online, the server does, and this file mirrors it and reports what the player does.
 
+import { Guide } from '../ui/guide';
 import * as THREE from 'three';
 import { keepKeysInFullScreen, leaving, rejoining } from '../core/leave';
 import type { Renderer } from '../core/renderer';
@@ -1550,10 +1551,18 @@ export class Game {
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
     this.input.onLetGo = () => this.letGo();
+    // (the building and crafting guide: the mouse let go of while it is up, taken again after, as for a lock's keypad)
+    this.guide.onToggle = (open) => {
+      this.input.releaseAll();
+      this.input.uiMode = open;
+      if (open) this.input.unlock();
+      else if (this.started && !this.paused) this.input.lock();
+    };
+    this.hud.onGuide = () => this.guide.open();
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.guide.isOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
       // (an Arena match over: the mouse is let go for its result's card, which is no pause, and nothing takes it
       // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
       // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")
@@ -1654,6 +1663,8 @@ export class Game {
 
   /** the torch's model, for everybody else's fist (its loot model, asked for as the game starts: see makeHeld) */
   torchModel: ItemTemplate | null = null;
+  /** the building and crafting guide (src/ui/guide.ts) */
+  readonly guide = new Guide();
   makeHeld = (id: string | null, mods: string[], finish?: Finish | null) => {
     if (!id) return null;
     // (a torch in the fist, as everybody else is shown it, lit or not: its own model, fetched as the game starts)

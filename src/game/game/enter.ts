@@ -223,6 +223,8 @@ export const enterMethods = {
     this.joining = false;
     this.started = true;
     playedAd();
+    // (the building and crafting guide, until "Don't show this again": the owner, 2026-10-25)
+    if (!this.arenaHud) setTimeout(() => this.started && !this.player.dead && this.guide.welcome(), 2500);
     this.menu.dispose();
     this.hud.menuScene('', 0);
     // out of the aerial shot and down into the character's eyes (in a wager, straight in: a round starts in the eyes;
