@@ -80,7 +80,9 @@ const PIECES = {
   tshirt: { src: 'wear_tshirt.glb', body: 1, parts: TOP, core: ['chest'], covers: ['chest', 'belly', 'shoulder'], plain: 0.85, tex: 2048 },
   tracksuit_pants: { src: 'wear_tracksuit_pants.glb', body: 1, ...TROUSERS, tex: 2048 },
   // (and the skin Meshy left in its collar cut away: a pink sliver at the heel showed under a jeans hem)
-  trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, peeks: ['foot'], tex: 1024 },
+  // (and nothing of it over the shin: a low shoe, and a sliver of the figure's calf left in it stretched from the heel up
+  // the leg when the knee bent, the owner: "when player is crouched their left leg shows through their pants")
+  trainers: { src: 'wear_trainers.glb', body: 1, ...BOOTS, parts: ['foot'], peeks: ['foot'], tex: 1024 },
   smock: { src: 'wear_smock.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
   smock_pants: { src: 'wear_smock_pants.glb', body: 0, ...TROUSERS, plain: true, tex: 2048 },
   // (the more military gear the owner asked for, 2026-10-25, and the jackets and boots beside it)

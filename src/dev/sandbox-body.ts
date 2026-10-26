@@ -195,7 +195,7 @@ export async function stageBodies(o: Stage) {
       const low = b.s.prone ? 0.35 : b.s.crouch ? 0.65 : 0.95, d = b.s.prone ? 4.2 : 4.6;
       ahead.set(-Math.sin(b.face), 0, -Math.cos(b.face));
       left.set(-Math.cos(b.face), 0, Math.sin(b.face));
-      const dir = { q: ahead.clone().multiplyScalar(0.8).addScaledVector(left, -0.6), side: left.clone().negate(), front: ahead.clone(), back: ahead.clone().negate(), top: ahead.clone().multiplyScalar(0.2) }[view] ?? ahead.clone();
+      const dir = { q: ahead.clone().multiplyScalar(0.8).addScaledVector(left, -0.6), side: left.clone().negate(), left: left.clone(), front: ahead.clone(), back: ahead.clone().negate(), top: ahead.clone().multiplyScalar(0.2) }[view] ?? ahead.clone();
       at.copy(b.pos).setY(low);
       camera.position.copy(at).addScaledVector(dir.normalize(), d).setY(low + (view === 'top' ? 6 : 0.35));
       camera.lookAt(at);
