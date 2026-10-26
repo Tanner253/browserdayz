@@ -868,10 +868,10 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // own grip; the karambit's between its ring and its blade)
   styles.hunting_knife = { ...styles.knife, grip: 0.06 };
   styles.bayonet = { ...styles.knife, grip: 0.06 };
-  // (the karambit as CS:GO's, the owner's reference, 2026-10-25: the fist low on the right, the first finger through the
-  // ring at the bottom of the grip, the claw sweeping up and forward out of the top of the fist, edge forward; drawn a
-  // third bigger than it is, "the karambit knife is way too small in hand")
-  styles.karambit = { ...styles.knife, grip: 0.14, flip: true, fpScale: 1.35, idle: { p: [0.18, -0.14, -0.4], tip: [0.05, -0.95, -0.3], edge: [0, 0.25, -1] } };
+  // (the karambit as a claw, the owner, 2026-10-25: "a karambit is held with the index finger through the ring, the
+  // blade curving down and forward out of the bottom of the fist": its ring up at the top of the fist, the claw under it,
+  // the inner edge forward; drawn a third bigger than it is, "the karambit knife is way too small in hand")
+  styles.karambit = { ...styles.knife, grip: 0.14, flip: true, fpScale: 1.35, idle: { p: [0.15, -0.05, -0.4], tip: [0.25, 0.85, -0.45], edge: [-0.5, -0.3, -0.8] } };
   return styles;
 })();
 /**
