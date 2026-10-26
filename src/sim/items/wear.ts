@@ -170,7 +170,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'leather_gloves', name: 'Leather Gloves', model: 'garden_gloves_01', tint: 0x6b4a30, w: 2, h: 1, weight: 0.2, category: 'clothing', slot: 'hands',
     desc: 'Worn leather work gloves. Your punches land a little harder.', wear: { fist: 3 },
-    dress: { model: 'leather_gloves', hides: ['hand'] },
+    dress: { model: 'leather_gloves', hides: ['hand'], shrinks: ['forearm'] },
     colours: [{ name: 'Brown' }, { name: 'Black', tint: 0x242424 }],
     loot: { pair: 'LeatherGloves_Brown', at: [0, 6, 0, 0, 0], restock: 600, usage: SHEDS },
     worth: 2,
@@ -216,7 +216,7 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'fingerless_gloves', name: 'Fingerless Gloves', model: 'tactical_gloves', tint: 0x2a2a2a, w: 2, h: 1, weight: 0.15, category: 'clothing', slot: 'hands',
     desc: 'Tactical gloves with the fingertips cut off, for the trigger. Your punches land a little harder.', wear: { fist: 3 },
-    dress: { model: 'fingerless', hides: [] },
+    dress: { model: 'fingerless', hides: [], shrinks: ['forearm'] },
     colours: [{ name: 'Black' }, { name: 'Olive', tint: 0x4b5235 }],
     loot: { pair: 'TacticalGloves_Black', at: [0, 0, 8, 0, 0], restock: 900, usage: ARMY },
     worth: 3,
