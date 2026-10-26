@@ -507,7 +507,7 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
   /** and as it is */
   const IS: Record<string, [number, number]> = { field_jacket: [5, 5], field_trousers: [5, 4], chest_rig: [5, 3], soft_vest: [3, 3], armor_vest: [4, 3], heavy_armor: [4, 3], life_vest: [5, 4], sack_pack: [5, 5], camping_pack: [7, 6], suitcase: [9, 7] };
   /** and the clothes made since (2026-10-25, src/sim/items/wear.ts), which were nothing before: nothing was kept in them */
-  const NEW = ['tshirt', 'tracksuit_pants', 'flannel_shirt', 'hoodie', 'jeans', 'leather_jacket', 'quilted_jacket', 'work_trousers', 'parka', 'cargo_pants', 'mountain_smock', 'mountain_trousers', 'tracksuit_jacket', 'hip_pack', 'field_bag', 'tactical_jacket', 'combat_shirt', 'combat_trousers', 'military_belt', 'assault_pack'];
+  const NEW = ['tshirt', 'tracksuit_pants', 'flannel_shirt', 'hoodie', 'jeans', 'leather_jacket', 'quilted_jacket', 'work_trousers', 'parka', 'cargo_pants', 'mountain_smock', 'mountain_trousers', 'tracksuit_jacket', 'hip_pack', 'field_bag', 'tactical_jacket', 'combat_shirt', 'combat_trousers', 'military_belt', 'assault_pack', 'ghillie_suit'];
   /** the most DayZ has in any one thing of each class (its wiki's Clothing page, the tables of game version 1.29.163451): Field Backpack 8x8, OMK Jacket 6x5, cargo pants 5x4, Field Vest 5x4 */
   const DAYZ_MOST: Record<string, number> = { back: 64, top: 30, legs: 20, vest: 20, belt: 6 };
   const worn = Object.values(ITEMS).filter((d) => d.wear?.cargo);
@@ -529,7 +529,8 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
     assert.deepEqual(worn.map((d) => d.id).sort(), [...Object.keys(WAS), ...NEW].sort(), 'a thing that is worn and holds things is not among those that were: say here what it was, or that it is new');
     for (const d of worn) {
       const [w, h] = d.wear!.cargo!;
-      assert.ok(w * h <= DAYZ_MOST[d.slot!], `${d.id} holds ${w * h}: more than DayZ's most for what is worn there, ${DAYZ_MOST[d.slot!]}`);
+      // (but the ghillie suit, the best and rarest clothing there is, holds the most of all: the owner, 2026-10-26, "max inventory")
+      assert.ok(w * h <= DAYZ_MOST[d.slot!] || d.id === 'ghillie_suit', `${d.id} holds ${w * h}: more than DayZ's most for what is worn there, ${DAYZ_MOST[d.slot!]}`);
       assert.match(d.desc, new RegExp(`\\b${w * h}( more)? slots`), `${d.id} does not say it holds ${w * h}`);
       if (NEW.includes(d.id)) continue;
       const [ow, oh] = WAS[d.id];

@@ -81,7 +81,8 @@ ok('the mask on the face keeps the gas out: nothing asks for it by name', () => 
 ok('the masks are a policeman\'s: three in the village and two in Kamenka, as there were', () => {
   assert.deepEqual(TYPES.gasmask.at, [0, 0, 5, 0, 0]);
   assert.deepEqual(TYPES.gasmask.usage, ['Police']);
-  assert.ok(STOCK.includes('gasmask') && worth('gasmask') > worth('boonie_hat'));
+  // (no longer sold since 2026-10-26: it opens the gas, and traders sell nothing that strong, the owner: "like rust nothing from traders is overpowered")
+  assert.ok(!STOCK.includes('gasmask'));
 });
 
 ok('the K6-3 is built with its visor down and its glass apart from its steel, and nothing in it puts the visor up again', () => {

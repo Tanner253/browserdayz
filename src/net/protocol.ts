@@ -84,7 +84,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // would draw everybody in the old suit. (66 is base building's; the navigator sets the last number at release.)
 // (68, 2026-10-25: a survivor's own body gives back their gear at one press ('reclaim', 'reclaimed'; `own` on the
 // 'cdata' that answers 'copen': src/sim/reclaim.ts). A page of 67 shows no button and is never told it can.)
-export const PROTOCOL = 68;
+// (69, 2026-10-26: admins' creative mode, the C4 armed by hand and thrown, the trader spots spread and marked, the recyclers moved:
+// a page of 68 would draw the camp where it was and could not throw a charge)
+export const PROTOCOL = 69;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
