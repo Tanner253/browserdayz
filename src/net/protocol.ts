@@ -552,6 +552,8 @@ export type S2C =
   /** a base's door swung open or shut (by player `by`), and a knock on one, heard where it is */
   | { t: 'bdoor'; b: number; p: number; o: 0 | 1; by: number }
   | { t: 'knock'; x: number; y: number; z: number; metal: boolean }
+  /** a code put into a code lock at (x, y, z), right or wrong, heard by whoever is near; `by` who put it in */
+  | { t: 'bcoded'; x: number; y: number; z: number; ok: boolean; by: number }
   /** materials the server took for what was built (`n` its number, said back in 'me' `sp` once they are out of the pockets) */
   | { t: 'spent'; n: number; items: [string, number][] }
   /** a fire built by somebody (numbered after the map's own), and one cleared away */

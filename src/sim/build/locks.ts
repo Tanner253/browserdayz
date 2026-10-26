@@ -5,6 +5,8 @@
 // What a code is, and which key fits which lock, is the server's alone: a game is told only a lock's kind, whether it is
 // locked, and who knows its code.
 
+import { inBase, leafPoint } from './doors';
+import type { Piece } from './snap';
 import { PIECES } from './pieces';
 import { shapeOf } from './solids';
 
@@ -21,8 +23,12 @@ export interface Lock {
 
 export const LOCK = {
   digits: 4,
-  /** what a wrong code does to the hand on it, and how many wrong ones it takes before it shuts out whoever tries */
-  shock: 10,
+  /** what a wrong code does to the hand on it, and how much more each wrong one after it within `again` ms (the owner,
+   * 2026-10-25: "when the password is wrong we should shock the user and damage them so they can't keycode raid");
+   * and how many wrong ones it takes before it shuts out whoever tries */
+  shock: 15,
+  more: 10,
+  again: 60_000,
   tries: 3,
   out: 60_000,
   /** seconds a lock takes to fit */
@@ -33,6 +39,14 @@ export const LOCK = {
 
 /** the lock items, by the kind of lock each fits */
 export const LOCK_ITEMS: Record<string, Lock['k']> = { code_lock: 'code', key_lock: 'key' };
+
+/** where a piece's lock is, in its base's frame: its lockAt, on its leaf as it hangs shut; a piece's middle with none */
+export function lockPoint(p: Piece): [number, number, number] {
+  const s = shapeOf(p.k), at = s.lockAt;
+  if (!at) return inBase(p, [0, 1.2, 0]);
+  const l = at.leaf !== undefined ? s.leaves?.[at.leaf] : undefined;
+  return inBase(p, l ? leafPoint(l, 0, at.at) : at.at);
+}
 
 /** what takes a lock: what swings shut (not shutters, which bar from inside), a box, the claim */
 export const lockable = (kind: string) => (!!shapeOf(kind).leaves?.length && kind !== 'shutters') || !!PIECES[kind]?.store || kind === 'claim';

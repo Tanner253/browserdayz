@@ -334,6 +334,15 @@ export class BaseDraw {
   /** a door's leaves, as `pose` left them, put where they are drawn and where they stop things */
   private placeLeaves(d: Drawn) {
     const leaves = shapeOf(d.piece.k).leaves ?? [], first = d.parts.length - leaves.length;
+    // (its lock rides on the leaf it is fitted to, and swings with it: the owner, 2026-10-25, "when I put a codelock on
+    // the door it doesn't stay on the door when it is opened and closed")
+    if (d.lock) {
+      const m = this.meshes.get(d.lock.key);
+      if (m && d.lock.slot < m.count) {
+        m.setMatrixAt(d.lock.slot, d.lock.matrix);
+        m.instanceMatrix.needsUpdate = true;
+      }
+    }
     leaves.forEach((l, i) => {
       const q = d.parts[first + i], m = this.meshes.get(q.key);
       if (m && q.slot < m.count) {
