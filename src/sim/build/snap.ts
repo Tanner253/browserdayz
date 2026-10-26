@@ -36,6 +36,8 @@ export interface Piece {
   open?: boolean;
   /** a box: what was in its store when it was kept (read back by whoever keeps the store: the server's boxes) */
   kept?: unknown[];
+  /** a bed: how many wakes it has left, and when (ms) it gives them again once they are spent (src/sim/build/beds.ts) */
+  slept?: [number, number];
   /** a lock fitted to it (src/sim/build/locks.ts) */
   lock?: Lock;
 }

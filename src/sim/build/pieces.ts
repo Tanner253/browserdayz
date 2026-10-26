@@ -88,8 +88,8 @@ export interface PieceKind {
   long?: number;
   /** a box: its store, squares across and down */
   store?: [number, number];
-  /** a bed or a sleeping bag: its owner wakes at it after a death, no sooner than this many seconds after the last time */
-  sleep?: number;
+  /** a bed or a sleeping bag: its owner wakes at it after a death (how often, and how many one may have: SLEEP in src/sim/build/beds.ts) */
+  sleep?: true;
   /** laid on anybody's base, a claim's or not (a raider's ladder, Rust's) */
   anywhere?: boolean;
 }
@@ -152,10 +152,10 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
     // (the owner, 2026-10-24: "players can place a bed or bedroll in their base when they have a TC down like rust". Plan
     // v2: "Sleeping bag: found ... Wake here after a death, with nothing, at most every 10 min"; a bed, Rust's, sooner)
-    { id: 'bedroll', name: 'Sleeping Bag', cat: 'deploy', role: 'deploy', only: 1, cost: { sleeping_bag: 1 }, hp: 100, sleep: 600 },
+    { id: 'bedroll', name: 'Sleeping Bag', cat: 'deploy', role: 'deploy', only: 1, cost: { sleeping_bag: 1 }, hp: 100, sleep: true },
     // (the owner, 2026-10-24: torches "hung on walls"; the torch itself, set in an iron bracket)
     { id: 'torch_wall', name: 'Wall Torch', cat: 'deploy', role: 'lean', only: 1, cost: { torch: 1 }, hp: 50 },
-    { id: 'bed', name: 'Bed', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, nails: 12, sleeping_bag: 1 }, hp: 250, sleep: 300 },
+    { id: 'bed', name: 'Bed', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, nails: 12, sleeping_bag: 1 }, hp: 250, sleep: true },
     // (the armoured tier's doors, the progression plan: "cost in steel plates, iron bars, hardware and nails; raid cost
     // about twice metal's": two C4 for the door, four for the garage door, src/sim/build/raid.ts)
     { id: 'door_armoured', name: 'Armoured Door', cat: 'doors', role: 'fit', fits: 'door', only: 4, cost: { steel_plate: 2, iron_bar: 4, hardware: 2, nails: 20 }, hp: 1000, bench: 3 },

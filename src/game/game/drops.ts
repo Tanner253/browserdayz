@@ -398,14 +398,16 @@ export const dropsMethods = {
     this.input.unlock();
   },
 
-  /** back after a death: at the map's edge, or alone at `at` (a bed: src/game/building/beds.ts) */
+  /** back after a death: at the map's edge, or at the bed picked on the death screen's map (src/game/building/beds.ts) */
   respawn(this: Game, at?: { x: number; y: number; z: number; yaw: number }) {
     this.handsFree = false;
     if (this.online) {
-      // the server picks the spawn and answers with 'spawn'
-      this.net.send({ t: 'respawn' });
+      // the server picks the spawn, or wakes them at their bed if it may, and answers with 'spawn'
+      const bed = this.build.beds.chosen();
+      this.net.send({ t: 'respawn', ...(bed ? { bed } : {}) });
       return;
     }
+    at ??= this.build.beds.wakeAlone() ?? undefined;
     const p = this.player;
     // everything you carried stays where you fell
     for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
