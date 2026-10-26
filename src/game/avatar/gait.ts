@@ -252,6 +252,8 @@ export interface Leg { thigh: THREE.Object3D; calf: THREE.Object3D; foot: THREE.
 const _h = new THREE.Vector3(), _k = new THREE.Vector3(), _f = new THREE.Vector3(), _t = new THREE.Vector3();
 const _d = new THREE.Vector3(), _s = new THREE.Vector3(), _n = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _fq = new THREE.Quaternion();
+/** the most a stride lets the hips down, metres */
+const DROP = 0.12;
 /** a bone turned (in the world) so that what lies `from` it lies `to` */
 function swing(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3) {
   _q.setFromUnitVectors(_a.copy(from).normalize(), _b.copy(to).normalize());
@@ -266,21 +268,46 @@ function swing(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3) {
  * to, the foot turned as it was. The movements were captured at a pace of their own: stepped faster and no longer, a
  * body going twice as fast as its movement took steps twice as quick and as short as they were, its feet sliding.
  * (From its own hip, not the middle of the hips: stepping sideways, the width of the hips is not a step, and stretched
- * it bowed the legs and crossed them the more.)
+ * it bowed the legs and crossed them the more.) And the hips let down as far as a leg needs to reach where its foot is
+ * put, as anyone's go lower in a longer stride: held at the height they were captured at, a walk stretched to the
+ * game's pace (twice the captured) had both feet a hand off the ground at every step's ends, the body walking on air
+ * (the owner, 2026-10-26: "the player looks like he's floating and not standing on the ground").
  */
-export function stretch(legs: Leg[], way: THREE.Vector3, s: number) {
-  for (const L of legs) {
+export function stretch(legs: Leg[], way: THREE.Vector3, s: number, pelvis?: THREE.Object3D) {
+  const to = legs.map((L) => {
+    L.thigh.getWorldPosition(_h);
+    L.foot.getWorldPosition(_f);
+    return _f.clone().addScaledVector(way, _n.copy(_f).sub(_h).dot(way) * (s - 1));
+  });
+  if (pelvis) {
+    let drop = 0;
+    legs.forEach((L, i) => {
+      L.thigh.getWorldPosition(_h);
+      L.calf.getWorldPosition(_k);
+      L.foot.getWorldPosition(_f);
+      // (no straighter than it was, or than a leg just short of straight: a stride the movement already had is left be)
+      const long = _k.distanceTo(_h) + _f.distanceTo(_k), reach = Math.min(long * 0.999, Math.max(long * 0.98, _f.distanceTo(_h)));
+      const r = Math.hypot(to[i].x - _h.x, to[i].z - _h.z);
+      if (r < reach) drop = Math.max(drop, _h.y - to[i].y - Math.sqrt(reach * reach - r * r));
+    });
+    if (drop > 1e-4) {
+      const up = pelvis.parent!.getWorldScale(_n).y || 1;
+      pelvis.position.add(_n.set(0, -Math.min(drop, DROP) / up, 0).applyQuaternion(pelvis.parent!.getWorldQuaternion(_q2).invert()));
+      pelvis.updateWorldMatrix(false, true);
+    }
+  }
+  legs.forEach((L, i) => {
     L.thigh.getWorldPosition(_h);
     L.calf.getWorldPosition(_k);
     L.foot.getWorldPosition(_f);
     L.foot.getWorldQuaternion(_fq);
     const turn = _fq.clone(), la = _k.distanceTo(_h), lb = _f.distanceTo(_k);
-    _t.copy(_f).addScaledVector(way, _n.copy(_f).sub(_h).dot(way) * (s - 1));
+    _t.copy(to[i]);
     const d = Math.max(0.05, Math.min(_t.distanceTo(_h), (la + lb) * 0.999));
     _d.copy(_t).sub(_h).normalize();
     _s.copy(_k).sub(_h);
     _s.addScaledVector(_d, -_s.dot(_d));
-    if (_s.lengthSq() < 1e-8) continue;
+    if (_s.lengthSq() < 1e-8) return;
     _s.normalize();
     const x = (la * la - lb * lb + d * d) / (2 * d), h = Math.sqrt(Math.max(0, la * la - x * x));
     const knee = _n.copy(_h).addScaledVector(_d, x).addScaledVector(_s, h);
@@ -290,5 +317,5 @@ export function stretch(legs: Leg[], way: THREE.Vector3, s: number) {
     swing(L.calf, _a.copy(_f).sub(_k), _b.copy(_t).sub(_k));
     L.foot.quaternion.copy(L.foot.parent!.getWorldQuaternion(_q2).invert().multiply(turn));
     L.foot.updateWorldMatrix(false, true);
-  }
+  });
 }

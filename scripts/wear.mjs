@@ -99,6 +99,58 @@ const PIECES = {
   // (neck to ankle, over everything: there is no base layer to show through it)
   ghillie_suit: { src: 'wear_ghillie_suit.glb', body: 0, parts: [...new Set([...TOP, ...LEGS])], core: ['chest', 'thigh'], covers: [...JACKET.covers, ...TROUSERS.covers], tex: 2048 },
 };
+/**
+ * A shoe's sole set along the sole of the foot in it, heel and toe (the owner, 2026-10-26: "the player looks like he's
+ * floating and not standing on the ground, compare to the working legacy model"): Meshy's figure stood in its shoes, and
+ * carried onto the skeleton a shoe's heel came 2 to 7 cm under the bare heel in it and tilted heel down, so a body stood
+ * on the ground in shoes sank to their collars, a trainer a white sliver at the ground under the leg. Each foot's shoe is
+ * moved up, more at the heel than at the toe as it lies between them, to 4 mm under the foot's own sole: a body in shoes
+ * stands on them as the old suit stood on its boots. In the piece's rest and in where it was made alike.
+ * @returns a line for the build
+ */
+function soleOn(bodyNode, node, B, D) {
+  const skin = node.getSkin(), joints = skin.listJoints(), ibm = skin.getInverseBindMatrices();
+  const names = joints.map((j) => j.getName()), M = joints.map((j, k) => M4(j.getWorldMatrix()).multiply(M4(ibm.getElement(k, []))));
+  const prim = D.prim, pos = prim.getAttribute('POSITION'), ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0');
+  const breg = bodyNode.getMesh().listPrimitives()[0].getAttribute('_REGION');
+  const at = (n) => new THREE.Vector3().setFromMatrixPosition(M4(joints[names.indexOf(n)].getWorldMatrix()));
+  const told = [];
+  for (const s of ['_l', '_r']) {
+    const foot = at(`foot${s}`), ball = at(`ball${s}`), other = at(`foot${s === '_l' ? '_r' : '_l'}`);
+    const d = ball.clone().sub(foot).setY(0), len = d.length();
+    d.normalize();
+    const mine = (p) => p.distanceTo(foot) < 0.3 && Math.hypot(p.x - foot.x, p.z - foot.z) < Math.hypot(p.x - other.x, p.z - other.z);
+    const t = (p) => p.clone().sub(foot).setY(0).dot(d) / len;
+    const lows = (P, keep) => {
+      let heel = Infinity, toe = Infinity;
+      P.forEach((p, i) => {
+        if (!keep(i) || !mine(p)) return;
+        const k = t(p);
+        if (k < 0) heel = Math.min(heel, p.y);
+        if (k > 1) toe = Math.min(toe, p.y);
+      });
+      return [heel, toe];
+    };
+    const [bh, bt] = lows(B.P, (i) => breg.getScalar(i) === 13), [sh, st] = lows(D.P, () => true);
+    if (![bh, bt, sh, st].every(Number.isFinite)) continue;
+    const up = [bh - 0.004 - sh, bt - 0.004 - st];
+    const a = [], w = [], m = new THREE.Matrix4();
+    D.P.forEach((p, i) => {
+      if (!mine(p)) return;
+      const dy = THREE.MathUtils.lerp(up[0], up[1], THREE.MathUtils.clamp(t(p), 0, 1));
+      // (where it was made: the same rise undone through what carries it there)
+      ji.getElement(i, a), jw.getElement(i, w);
+      m.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      for (let c = 0; c < 4; c++) if (w[c] > 0) m.elements.forEach((v, k) => (m.elements[k] += M[a[c]].elements[k] * w[c]));
+      const delta = new THREE.Vector3(0, dy, 0).applyMatrix3(new THREE.Matrix3().setFromMatrix4(m.invert()));
+      pos.setElement(i, new THREE.Vector3().fromArray(pos.getElement(i, [])).add(delta).toArray());
+      p.y += dy;
+    });
+    told.push(`${s === '_l' ? 'left' : 'right'} heel ${(up[0] * 100).toFixed(1)}, toe ${(up[1] * 100).toFixed(1)} cm`);
+  }
+  return `soles on the feet: ${told.join(', ')}`;
+}
+
 /** the bodies as Meshy made them (scripts/survivors.mjs) */
 const BODIES = ['body0_rigged.glb', 'body1_rigged.glb', 'body2_rigged.glb', 'body3_rigged.glb'];
 const ONLY = process.argv.slice(2);
@@ -186,6 +238,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
   const dressed = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, piece.src)), fingers: !!piece.fingers, fit: await io.read(path.join(SRC, BODIES[piece.body])) });
   straightenLegs(dressed.node, legs);
   const B = await laid(body.node), D = await laid(dressed.node);
+  if (piece.core.includes('foot')) console.log(`  ${soleOn(body.node, dressed.node, B, D)}`);
   const region = body.node.getMesh().listPrimitives()[0].getAttribute('_REGION');
 
   // ---- the body's points by where they are, to find the nearest of them to each point of the dressed one

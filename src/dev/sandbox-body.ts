@@ -23,7 +23,7 @@ import { lookFor } from '../game/look';
 import { Weapons } from '../game/weapons';
 import { CLOTHES, ITEMS } from '../sim/items';
 import { sortWorn } from '../game/survivors';
-import { CRAWL, CROUCH_RUN, HANDS_FREE, AIM_SLOW } from '../game/player';
+import { CRAWL, CROUCH_RUN, HANDS_FREE, AIM_SLOW, STANDS_OVER } from '../game/player';
 import type { Atmosphere } from '../world/atmosphere';
 
 interface Stage {
@@ -152,7 +152,7 @@ export async function stageBodies(o: Stage) {
     // (every body from the same moment of its stride, so that two builds drawn side by side step together)
     (a as unknown as { phase: number }).phase = 0;
     if ((a as { gait?: { phase: number } }).gait) (a as unknown as { gait: { phase: number } }).gait.phase = 0;
-    return { a, s, pos: new THREE.Vector3((i % 8) * 12, 0, Math.floor(i / 8) * 12), face: 0, goes: 0, side: 0 };
+    return { a, s, pos: new THREE.Vector3((i % 8) * 12, STANDS_OVER, Math.floor(i / 8) * 12), face: 0, goes: 0, side: 0 };
   }));
   const vel = new THREE.Vector3();
   const step = (dt: number) => {
@@ -171,6 +171,8 @@ export async function stageBodies(o: Stage) {
   };
   // (gone on a while first, so what is shown is the going and not the start of it, at most a sixtieth at a step)
   const sub = (t: number) => { for (let k = Math.ceil(t * 60); k > 0; k--) step(t / Math.ceil(t * 60)); };
+  // (and gone on from outside, so that a probe can follow a whole stride: window.stage.step(seconds))
+  (window as unknown as { stage: { step?: (t: number) => void } }).stage.step = sub;
   // (the hands' work begun before the going, so it is under way in the first moment drawn)
   for (const b of bodies) if (b.s.act) b.a.act(b.s.act, 30);
   sub(settle);
