@@ -37,9 +37,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
+export const BUILD_CELLS: Record<string, number> = { window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+export const BUILD_COLS: Record<string, number> = { window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
 
 /** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
 async function drawnAll(draw: BaseDraw) {
@@ -288,6 +288,26 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     camera.lookAt(2.2, 0.2, 0);
     shoot(s, camera, cell, 'the stump and the logs, close');
     return { tree: kind, blows: k.blows, logs: k.logs };
+  }
+  if (name === 'window') {
+    // a window wall in each tier, close and along its sill: where its trim meets the opening (the owner, 2026-10-25: "the
+    // window variation of the wall has z-index fighting in the window cutout with the window trim")
+    const draw = new BaseDraw(s.scene, null), far = new THREE.Vector3(1e6, 0, 1e6);
+    for (const t of [0, 1, 2, 3] as Tier[]) {
+      draw.clear();
+      const base: Base = { id: 1, ox: 0, oy: 0, oz: 0, yaw: 0, owner: '', pieces: new Map(), next: 2 };
+      const p = { id: 1, k: 'window', t, x: 0, y: 0, z: 0, r: 0, hp: 1, at: 0, by: '', on: [] };
+      base.pieces.set(1, p);
+      draw.put(base, p);
+      draw.update(0, far);
+      if (t === 0) await settle();
+      camera.fov = 40;
+      camera.updateProjectionMatrix();
+      camera.position.set(1.15, 1.3, 0.55);
+      camera.lookAt(-0.1, 1.08, -0.05);
+      shoot(s, camera, t, `${TIERS[t]} window · along its sill`);
+    }
+    return { window: 4 };
   }
   if (name === 'pieces') {
     // every kind in each tier: a row of them on the floor, a cell to a tier

@@ -276,10 +276,11 @@ function rivets([x0, x1]: [number, number], [a0, a1]: [number, number], at: numb
 
 /** an opening's frame of dark timber, standing proud of both faces: its jambs at +-`half`, from `y0` (a sill too, a window's) to `y1` */
 function frame(half: number, y0: number, y1: number, sill: boolean): { paint: Paint; solid: Solid[] } {
-  // (a hair into the opening, so that its faces never lie on the jambs' and the lintel's: the owner, 2026-10-25, "theres
-  // a lot of textures arguing at the seams, where the door frames are")
+  // (a hair into the opening, so that its faces never lie on the jambs', the lintel's or a window's sill's: the owner,
+  // 2026-10-25, "theres a lot of textures arguing at the seams, where the door frames are"; "the window variation of the
+  // wall has z-index fighting in the window cutout with the window trim")
   const t = 0.12, d = WALL_T / 2 + 0.04, e = 0.012;
-  return { paint: 'trim', solid: [box(-half - t, y0, -d, -half + e, y1 + t, d), box(half - e, y0, -d, half + t, y1 + t, d), box(-half - t, y1 - e, -d, half + t, y1 + t, d), ...(sill ? [box(-half - t - 0.04, y0 - t, -d - 0.04, half + t + 0.04, y0, d + 0.04)] : [])] };
+  return { paint: 'trim', solid: [box(-half - t, y0, -d, -half + e, y1 + t, d), box(half - e, y0, -d, half + t, y1 + t, d), box(-half - t, y1 - e, -d, half + t, y1 + t, d), ...(sill ? [box(-half - t - 0.04, y0 - t, -d - 0.04, half + t + 0.04, y0 + e, d + 0.04)] : [])] };
 }
 
 /**
