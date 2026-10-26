@@ -112,7 +112,7 @@ ok('no thing there was is worn anywhere else than it was', () => {
     // (and the clothes of 2026-10-25, src/sim/items/wear.ts: the jacket and trousers everybody began in, found now, and the rest)
     field_jacket: 'top', field_trousers: 'legs', flannel_shirt: 'top', hoodie: 'top', tracksuit_pants: 'legs', leather_jacket: 'top', quilted_jacket: 'top',
     work_trousers: 'legs', work_boots: 'feet', leather_gloves: 'hands', parka: 'top', cargo_pants: 'legs', hiking_boots: 'feet',
-    fingerless_gloves: 'hands', mountain_smock: 'top', mountain_trousers: 'legs', ghillie_suit: 'back',
+    fingerless_gloves: 'hands', mountain_smock: 'top', mountain_trousers: 'legs', ghillie_suit: 'top',
     // (and the survivors' card, the owner's yes of 2026-10-25: the new pieces, the belt worn at last)
     tracksuit_jacket: 'top', beanie: 'head', ushanka: 'head', hip_pack: 'belt', balaclava: 'face', field_bag: 'back', tactical_jacket: 'top',
     combat_shirt: 'top', combat_trousers: 'legs', beret: 'head', military_belt: 'belt', assault_pack: 'back', winter_boots: 'feet', ghillie_hood: 'head',
