@@ -41,9 +41,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { free: 1, rack: 1, tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
+export const BUILD_CELLS: Record<string, number> = { stairs: 2, free: 1, rack: 1, tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { free: 1, rack: 1, tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+export const BUILD_COLS: Record<string, number> = { stairs: 2, free: 1, rack: 1, tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
 
 /** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
 async function drawnAll(draw: BaseDraw) {
@@ -292,6 +292,30 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     camera.lookAt(2.2, 0.2, 0);
     shoot(s, camera, cell, 'the stump and the logs, close');
     return { tree: kind, blows: k.blows, logs: k.logs };
+  }
+  if (name === 'stairs') {
+    // L and U stairs in the frame tier, lashed of poles (the owner, 2026-10-26: "the stairs here do not look good"), from
+    // the front and from behind
+    const bs = new Bases({ ground: () => 0, why: () => null });
+    const first = bs.lay({ k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+    if (typeof first === 'string') throw new Error(first);
+    const b = first.base;
+    for (const [k, x] of [['foundation', 3], ['stairs_l', 0], ['stairs_u', 3]] as const) {
+      const sp = nearestSpot(spots(b, k), k, { x, y: 0, z: 0 }, 2);
+      if (sp) bs.lay({ b: b.id, k, ...sp }, 'me', 0);
+    }
+    const draw = new BaseDraw(s.scene, null);
+    draw.setBase(b);
+    await drawnAll(draw);
+    camera.fov = 50;
+    camera.updateProjectionMatrix();
+    camera.position.set(2.2, 2.4, 6.2);
+    camera.lookAt(1.5, 1.3, 0);
+    shoot(s, camera, 0, 'frame stairs: L and U, from the front');
+    camera.position.set(-2.6, 3.4, -4.6);
+    camera.lookAt(1.5, 1.2, 0);
+    shoot(s, camera, 1, 'and from behind');
+    return {};
   }
   if (name === 'free') {
     // things set down wherever the aim met the floor, at any angle, beside L stairs in their own square and across the

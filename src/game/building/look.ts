@@ -121,9 +121,30 @@ function sheetGeo(s: Solid, tile: number): THREE.BufferGeometry | null {
   return null;
 }
 
+/**
+ * A frame's pole (solids.ts `pole`): the lattice's top edge pole laid along it, clear of where others cross it, shaded
+ * across each face and lit round as a round pole is.
+ */
+function poleGeo(s: Solid): THREE.BufferGeometry | null {
+  if (!s.pole || !('hull' in s)) return null;
+  const g = hullGeo(s.hull, 1), P = g.getAttribute('position'), N = g.getAttribute('normal'), uv = g.getAttribute('uv');
+  const { a, b, r } = s.pole, d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]).normalize();
+  const n = new THREE.Vector3(), t = new THREE.Vector3(), q = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) {
+    n.fromBufferAttribute(N, i);
+    q.set(P.getX(i) - a[0], P.getY(i) - a[1], P.getZ(i) - a[2]);
+    const along = q.dot(d), side = Math.abs(n.dot(d)) < 0.5;
+    const across = side ? q.dot(t.crossVectors(n, d).normalize()) / r : 0;
+    uv.setXY(i, 0.1 + along / TILE[0], 1 - (18 + 28 * across) / 512);
+    // (its sides lit as round: each corner's normal straight out from its line)
+    if (side) N.setXYZ(i, ...q.addScaledVector(d, -along).normalize().toArray());
+  }
+  return g;
+}
+
 /** a solid as drawn: its pictures laid on in metres, and its shade (white: none) in every corner; `sheet`: a frame's (sheetGeo) */
 function solidGeo(s: Solid, tile: number, sheet = false) {
-  const g = (sheet && sheetGeo(s, tile)) || ('box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile));
+  const g = poleGeo(s) || (sheet && sheetGeo(s, tile)) || ('box' in s ? boxGeo(s.box, tile) : 'prism' in s ? prismGeo(s.prism, s.y0, s.y1, tile) : hullGeo(s.hull, tile));
   // (one set of attributes for all: what a box, a prism and a hull each carry, and the shade)
   for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
   const c = new THREE.Color(s.c ?? 0xffffff), n = g.getAttribute('position').count;
@@ -148,7 +169,7 @@ export function geometryOf(kind: string, p: Paint, dress = true): THREE.BufferGe
     // (a piece drawn by a model of its own elsewhere: nothing here)
     if (s.unseen) (g = new THREE.BufferGeometry()).setAttribute('position', new THREE.Float32BufferAttribute([], 3));
     // (a frame: sheets, and none of the trim the tiers above have)
-    else g = p === 0 ? merged(s.solid, TILE[p], true) : merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
+    else g = p === 0 ? merged(s.frame ?? s.solid, TILE[p], true) : merged([...s.solid, ...(dress ? (s.dress ?? []) : [])], TILE[p]);
     geos.set(key, g);
   }
   return g;

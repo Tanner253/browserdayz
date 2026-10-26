@@ -15,7 +15,10 @@ export type Solid = (
 ) & {
   /** a shade its paint is drawn darker or lighter in (a strap's iron, a rivet's): white, none */
   c?: number;
+  /** a frame's pole (`pole`): its line and how thick, for its picture to be laid along it */
+  pole?: { a: V3; b: V3; r: number };
 };
+type V3 = [number, number, number];
 
 /**
  * What a piece is drawn in: a tier's paint, or one of its own. The navigator, 2026-10-24, of a shut door that was the
@@ -45,6 +48,9 @@ export interface Shape {
   /** slopes a body walks on, never drawn and felt by nothing else (stairs: the owner, 2026-10-25, "I am unable to run up
    * the stairs buildable once it's built, I get stuck on the steps") */
   walk?: Solid[];
+  /** drawn in the frame tier in place of its solids: stairs lashed of poles, open between (their steps as sheets were
+   * slats in the air, the owner, 2026-10-26: "the stairs here do not look good") */
+  frame?: Solid[];
   /** drawn by a model of its own elsewhere (crafting's forge: src/game/craft-forge.ts): here it only stops things */
   unseen?: true;
 }
@@ -110,6 +116,53 @@ function rail(n: number, c: number, along: [number, number], y0: number, y1: num
   return [post(0.04, y0 + rise), post(1 - 1 / n, y1), bar];
 }
 
+/** a pole from `a` to `b`, `r` thick, six-sided: what a frame's stairs are lashed of */
+function pole(a: V3, b: V3, r = 0.04): Solid {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), d = [0, 1, 2].map((i) => (b[i] - a[i]) / L);
+  // (two ways square to it)
+  const up = Math.abs(d[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const s0 = [d[1] * up[2] - d[2] * up[1], d[2] * up[0] - d[0] * up[2], d[0] * up[1] - d[1] * up[0]], sl = Math.hypot(...s0);
+  const s = s0.map((v) => v / sl), t = [d[1] * s[2] - d[2] * s[1], d[2] * s[0] - d[0] * s[2], d[0] * s[1] - d[1] * s[0]];
+  const hull: V3[] = [];
+  for (const e of [a, b]) for (let k = 0; k < 6; k++) {
+    const cs = Math.cos((k * Math.PI) / 3) * r, sn = Math.sin((k * Math.PI) / 3) * r;
+    hull.push([e[0] + s[0] * cs + t[0] * sn, e[1] + s[1] * cs + t[1] * sn, e[2] + s[2] * cs + t[2] * sn]);
+  }
+  return { hull, pole: { a, b, r } };
+}
+
+/** a flight as a frame lashes it (as `flight`): a stringer up each side under the treads' middles, from the floor at its
+ * foot to the landing, and two poles across each tread laid on them */
+function flightPoles(n: number, across: [number, number], along: [number, number], y0: number, y1: number, alongX: boolean): Solid[] {
+  const r = 0.04, rise = (y1 - y0) / n, at = (f: number) => along[0] + (along[1] - along[0]) * f;
+  const P = (u: number, c: number, y: number): V3 => (alongX ? [u, y, c] : [c, y, u]);
+  const high = (f: number) => y0 + rise * (f * n + 0.5) - 3 * r, end = 1 - 0.3 / n;
+  const out = [across[0] + 0.1, across[1] - 0.1].map((c) => pole(P(at(0), c, high(0)), P(at(end), c, high(end)), r));
+  for (let i = 0; i < n; i++) for (const k of [0.28, 0.72]) {
+    const u = at((i + k) / n), y = y0 + rise * (i + 1) - r;
+    out.push(pole(P(u, across[0] + 0.02, y), P(u, across[1] - 0.02, y), r));
+  }
+  return out;
+}
+
+/** a landing as a frame lashes it: a post at each corner, a bearer along x on each side, and poles across them */
+function deckPoles(x0: number, z0: number, x1: number, z1: number, y: number): Solid[] {
+  const r = 0.04, xs = [x0 + 0.07, x1 - 0.07], zs = [z0 + 0.07, z1 - 0.07], n = Math.round((x1 - x0) / 0.1);
+  return [
+    ...xs.flatMap((x) => zs.map((z) => pole([x, 0, z], [x, y - 3 * r, z], r))),
+    ...zs.map((z) => pole([x0 + 0.02, y - 3 * r, z], [x1 - 0.02, y - 3 * r, z], r)),
+    ...Array.from({ length: n }, (_, i) => x0 + ((x1 - x0) * (i + 0.5)) / n).map((x) => pole([x, y - r, z0 + 0.02], [x, y - r, z1 - 0.02], r)),
+  ];
+}
+
+/** a flight's handrail (as `rail`) in poles */
+function railPoles(n: number, c: number, along: [number, number], y0: number, y1: number, alongX: boolean): Solid[] {
+  const rise = (y1 - y0) / n, at = (f: number) => along[0] + (along[1] - along[0]) * f, R = 0.9;
+  const P = (u: number, y: number): V3 => (alongX ? [u, y, c] : [c, y, u]);
+  const a = P(at(0.04), y0 + rise), b = P(at(1 - 1 / n), y1), top = (p: V3): V3 => [p[0], p[1] + R, p[2]];
+  return [pole(a, top(a), 0.035), pole(b, top(b), 0.035), pole(top(a), top(b), 0.03)];
+}
+
 const SHAPES: Record<string, () => Shape> = {
   // (a block reaching down into the ground however the ground falls away under it, its slab's edge standing proud)
   // (its slab's edge a hair under its top, so that the two never share the top's plane)
@@ -143,12 +196,20 @@ const SHAPES: Record<string, () => Shape> = {
     solid: [...flight(6, [-H, -0.3], [H, -0.3], 0, STOREY / 2, false), box(-H, 0, -H, -0.3, STOREY / 2, -0.3), ...flight(6, [-H, -0.3], [-0.3, H], STOREY / 2, STOREY, true)],
     walk: [slope(6, [-H, -0.3], [H, -0.3], 0, STOREY / 2, false), slope(6, [-H, -0.3], [-0.3, H], STOREY / 2, STOREY, true)],
     dress: [...rail(6, -0.3, [H, -0.3], 0, STOREY / 2, false), ...rail(6, -0.3, [-0.3, H], STOREY / 2, STOREY, true)],
+    frame: [
+      ...flightPoles(6, [-H, -0.3], [H, -0.3], 0, STOREY / 2, false), ...deckPoles(-H, -H, -0.3, -0.3, STOREY / 2), ...flightPoles(6, [-H, -0.3], [-0.3, H], STOREY / 2, STOREY, true),
+      ...railPoles(6, -0.3, [H, -0.3], 0, STOREY / 2, false), ...railPoles(6, -0.3, [-0.3, H], STOREY / 2, STOREY, true),
+    ],
   }),
   // (up the +x side toward -z, across a landing the whole width, back down the -x side toward +z, rising)
   stairs_u: () => ({
     solid: [...flight(5, [0.3, H], [H, 0], 0, STOREY / 2, false), box(-H, 0, -H, H, STOREY / 2, 0), ...flight(5, [-H, -0.3], [0, H], STOREY / 2, STOREY, false)],
     walk: [slope(5, [0.3, H], [H, 0], 0, STOREY / 2, false), slope(5, [-H, -0.3], [0, H], STOREY / 2, STOREY, false)],
     dress: [...rail(5, 0.3, [H, 0], 0, STOREY / 2, false), ...rail(5, -0.3, [0, H], STOREY / 2, STOREY, false)],
+    frame: [
+      ...flightPoles(5, [0.3, H], [H, 0], 0, STOREY / 2, false), ...deckPoles(-H, -H, H, 0, STOREY / 2), ...flightPoles(5, [-H, -0.3], [0, H], STOREY / 2, STOREY, false),
+      ...railPoles(5, 0.3, [H, 0], 0, STOREY / 2, false), ...railPoles(5, -0.3, [0, H], STOREY / 2, STOREY, false),
+    ],
   }),
   stairs_spiral: () => {
     const out: Solid[] = [box(-0.15, 0, -0.15, 0.15, STOREY, 0.15)];
