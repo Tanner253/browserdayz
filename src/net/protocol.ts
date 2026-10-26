@@ -73,7 +73,7 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // `felled` in the welcome), stone broken ('mine'), logs sawn ('saw'), a tool's wear ('wear', `cond` on an item); claims ('bjoin',
 // 'bclaim', 'bhp', 'bkeep'); doors ('bdoor', 'bknock', 'knock'); locks ('block', 'bcode', 'blockon', 'bkey', 'bunlock'; `key` on an item); beds ('mybeds', 'beds', `bed` on 'respawn', `y` on 'spawn'); blueprints ('bprint'); the bases about a player
 // who comes in, in the welcome (`bases`: stood on from the first frame); crafting ('craft'; a workbench's queue, 'cq' and 'cqx'; a forge burning, 'forge'; metal salvaged, 'salvage');
-// raiding: a blow at a piece ('bhit'), a charge stuck and lit again ('bplant', 'blight'), burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
+// raiding: a blow at a piece ('bhit'), a charge thrown, stuck where it landed and lit again ('bthrow', 'bstick', 'blight'), flying or burning, gone off or gone out ('bcharge', 'bboom', 'bfizz');
 // a piece mended or turned with the hammer ('bfix'); the armoured tier (`to` 4 on 'bup') and a workbench's levels;
 // progression v3 ('known' and 'learn': blueprints; 'recy': recyclers; 'trade', 'tday' and 'book': the trader camp, paid in scrap).)
 // (65 on the live line, 2026-10-25, a hotfix: a dog tag stays in the pockets until the server says it is cashed, and the
@@ -133,7 +133,7 @@ export const LEAN_REACH = 0.34;
 // ('load': one round pushed into a magazine; 'unbox': a box of rounds torn open. Both are small sounds, heard close to.)
 // ('check': a gun turned over in the hands and looked at.)
 // ('take': something picked up, the body bending for it, 2026-10-25; an older game that hears it does nothing with it)
-export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop', 'saw'] as const;
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'take', 'stop', 'saw', 'arm'] as const;
 export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */
@@ -411,7 +411,9 @@ export type C2S =
   /** raiding (src/sim/build/raid.ts): a blow of the tool in the hands `u` landed on piece `p` of base `b` at `at`; a charge
    * (item `u`, `w` 'c4' or 'satchel') stuck at `at` on a face turned to `n`; a charge that did not go off, lit again */
   | { t: 'bhit'; b: number; p: number; u: string; at: [number, number, number] }
-  | { t: 'bplant'; w: string; u: string; at: [number, number, number]; n: [number, number, number] }
+  | { t: 'bthrow'; w: string; u: string; o: [number, number, number]; v: [number, number, number] }
+  /** where a charge this player threw came to rest: `n` the face it stuck to's outward line (up, lying on the ground) */
+  | { t: 'bstick'; i: number; at: [number, number, number]; n: [number, number, number] }
   | { t: 'blight'; i: number }
   | { t: 'ping'; n: number }
   /** this page's window.__game was read: by a script pasted into the console, as nothing of the game reads it (src/net/bait.ts) */
@@ -526,7 +528,8 @@ export type S2C =
   | { t: 'bclaim'; b: number; c: KeptClaim | null }
   | { t: 'bhp'; b: number; hp: [number, number][] }
   /** a charge stuck to a base, burning with `f` seconds left (-1: it did not go off), by player `by`; gone off; gone out */
-  | { t: 'bcharge'; i: number; w: string; o: [number, number, number]; n: [number, number, number]; f: number; by: number }
+  /** `v`: still in the air, thrown from `o` this fast (every game flies it till its thrower says where it stuck) */
+  | { t: 'bcharge'; i: number; w: string; o: [number, number, number]; n: [number, number, number]; f: number; by: number; v?: [number, number, number] }
   | { t: 'bboom'; i: number; w: string; o: [number, number, number]; by: number }
   | { t: 'bfizz'; i: number }
   /** to a claim's members: how long its store keeps the base (seconds), and what it costs a day */

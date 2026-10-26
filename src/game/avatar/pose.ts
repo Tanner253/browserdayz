@@ -18,7 +18,7 @@ export const DEATHS = ['death', 'deathFront', 'deathSide'] as const;
 export const DEATH_REST: [number, number][] = [[-0.85, 0], [0.9, 0], [0.05, 0.36]];
 
 /** what the hands can be seen doing */
-export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open' | 'check' | 'saw';
+export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open' | 'check' | 'saw' | 'arm';
 
 /** from the wheel (src/sim/emotes.ts): what the arms do with a call, and what the body keeps up until told otherwise */
 export type Move = NonNullable<Emote['move']>;

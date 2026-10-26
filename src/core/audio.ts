@@ -2445,15 +2445,19 @@ export class AudioEngine {
     return this.rec(name, pos ? this.out(pos, 3, 1.3) : this.sfx, this.ctx.currentTime, gain, rate, false, true);
   }
 
-  /** A C4's timer beeping where it is stuck (made up, a short tone, until the recording has come). */
-  beep(pos: V3) {
+  /**
+   * A C4's timer beeping (made up, a short tone, until the recording has come): loud and carrying, for anybody near to
+   * hear (the owner, 2026-10-25: "beeps loudly for people in proximity to hear, like rust"); `key`, a key of it pressed
+   * as it is armed, small, higher and close.
+   */
+  beep(pos: V3, key = false) {
     if (!this.ready) return;
     void raidRecordings();
-    const t = this.ctx.currentTime, out = this.out(pos, 2, 1.4);
-    if (this.rec('c4_beep', out, t, 0.45, 1)) return;
+    const t = this.ctx.currentTime, out = key ? this.out(pos, 0.6, 2) : this.out(pos, 7, 1.05);
+    if (this.rec('c4_beep', out, t, key ? 0.2 : 1, key ? 1.35 : 1)) return;
     const o = this.ctx.createOscillator(), g = this.ctx.createGain();
-    o.frequency.value = 3100;
-    g.gain.setValueAtTime(0.06, t);
+    o.frequency.value = key ? 4200 : 3100;
+    g.gain.setValueAtTime(key ? 0.03 : 0.14, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
     o.connect(g).connect(out);
     o.start(t);

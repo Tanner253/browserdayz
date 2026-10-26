@@ -86,6 +86,14 @@ export const gesturesMethods = {
           this.reach(this.armL, near(at(0.42, -0.95, -0.18), this.armL), dirOf(1, -0.3, 0.2), dirOf(0, -1, 0), [0.5, 0.55, 0.6, 0.65], aimQ, wgt);
           const r = at(0.5 + Math.sin((ges.t * Math.PI * 2) / 0.7) * 0.14, -0.85, 0.16);
           this.reach(this.armR, near(r, this.armR), dirOf(1, -0.4, 0), dirOf(-0.2, 0, -1), [1.4, 1.45, 1.5, 1.5], aimQ, wgt);
+        } else if (ges.kind === 'arm') {
+          // a charge armed in front of the chest: in the right hand, its keys pressed by the left's first finger a beat at
+          // a time (the owner, 2026-10-25: "touching the c4 multiple times like input buttons")
+          const r = near(at(0.34, -0.42, 0.08), this.armR);
+          this.reach(this.armR, r, dirOf(0.5, 0.1, -1), dirOf(0, 1, 0), [1.0, 1.05, 1.1, 1.15], aimQ, wgt);
+          const p = (ges.t % 0.34) / 0.34, down = Math.sin(Math.min(1, p / 0.5) * Math.PI);
+          const l = r.clone().addScaledVector(UP, 0.09 - down * 0.03).addScaledVector(_right, -0.05 + Math.sin(ges.t * 3.1) * 0.02);
+          this.reach(this.armL, near(l, this.armL), dirOf(0.35, -0.85, 0.4), dirOf(0.2, -0.6, 0.75), [0.05, 1.3, 1.4, 1.45], aimQ, wgt);
         } else {
           // both hands in front of the belly: the left held still, the right working round it
           const l = near(at(0.28, -0.4, -0.07), this.armL);

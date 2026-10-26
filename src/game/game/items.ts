@@ -394,10 +394,7 @@ export const itemsMethods = {
       return;
     }
     if (left > 0 && c.button) return;
-    const cam = this.s.r.camera;
-    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    // where the hand is: a little ahead of the eye, to the right and below it
-    const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
+    const { o, v } = this.throwArc();
     this.emptyOfGrenade(left > 0);
     if (left <= 0) {
       // Held to the end of its fuse: it goes off in the hand. (Said to the server as a grenade that has left the
@@ -406,12 +403,30 @@ export const itemsMethods = {
       this.explode(o, true, c.id === 'frag' ? 'frag' : 'grenade', undefined, true);
       return;
     }
-    // thrown, not dropped: forward and up, plus whatever the thrower was doing
-    const v = dir.multiplyScalar(NADE.speed).add(new THREE.Vector3(p.vel.x, NADE.lift + Math.max(0, p.vel.y), p.vel.z));
     this.grenades.throw(o, v, left, true, c.id);
     this.net.send({ t: 'nade', o: o.toArray(), v: v.toArray() });
     this.avatar.swing(true);
     audio.whoosh(0.5);
+  },
+
+  /** Where a throw leaves the hand and how fast: a little ahead of the eye, to the right and below it; forward and up,
+   * plus whatever the thrower was doing (a grenade, and a charge: src/game/building/raid.ts) */
+  throwArc(this: Game) {
+    const cam = this.s.r.camera, p = this.player;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
+    const v = dir.multiplyScalar(NADE.speed).add(new THREE.Vector3(p.vel.x, NADE.lift + Math.max(0, p.vel.y), p.vel.z));
+    return { o, v };
+  },
+
+  /** A charge thrown as a grenade is (the owner, 2026-10-25: "throwing the C4 like a grenade"): the hand on through the
+   * throw, then whatever is still in the hands taken up again. */
+  tossCharge(this: Game) {
+    const a = this.throwArc();
+    if (!this.weapons.throwOut(() => this.rest())) this.rest();
+    this.avatar.swing(true);
+    audio.whoosh(0.5);
+    return a;
   },
 
   /**

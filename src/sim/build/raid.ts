@@ -7,6 +7,7 @@ import { HAMMERS } from '../gather';
 import { PIECES } from './pieces';
 import type { Base, Piece } from './snap';
 import type { BaseSolids } from './solid';
+import { CHARGES, type Charge } from './charges';
 
 type V3 = [number, number, number];
 
@@ -17,21 +18,6 @@ type V3 = [number, number, number];
  * and their numbers here stay as they are, for when raiding opens.
  */
 export const HELD_BACK: ReadonlySet<string> = new Set(['c4', 'satchel']);
-
-export interface Charge {
-  /** what it takes off a piece it reaches at a hand's breadth, by tier (Frame, Wood, Stone, Metal, Armoured) */
-  dmg: number[];
-  /** and it falls to nothing this far off, metres */
-  reach: number;
-  /** the share of it that reaches anything but what it is stuck to (Rust's sharp falloff: one charge in the corner of
-   * two walls brings down one, not both, the owner, 2026-10-25: "as to not destroy multiple walls easily with 1 satch
-   * placement in the intersection of walls") */
-  splash: number;
-  /** its fuse, seconds: from the first figure to the second */
-  fuse: [number, number];
-  /** the share of them that do not go off when the fuse ends (lit again with a hand on it) */
-  dud: number;
-}
 
 export const RAID = {
   /**
@@ -48,15 +34,9 @@ export const RAID = {
   } as Record<string, number[]>,
   /** anything else swung at it: a machete, a bat, a crowbar, a fist's worth (the building hammer breaks nothing) */
   other: [10, 1, 0, 0, 0],
-  charge: {
-    // (one C4 takes a wooden wall, two a stone one, four a metal one, eight an armoured one, as Rust's)
-    c4: { dmg: [5000, 520, 520, 520, 520], reach: 2.5, splash: 0.1, fuse: [10, 10], dud: 0 },
-    // (crafting's satchel: "a hundred rounds of powder to blow one door". A wooden door is 250: one; a wooden wall two,
-    // a stone wall ten, a metal wall twenty-three, as Rust's; its fuse runs from six to twelve seconds, and one in five
-    // does not go off)
-    satchel: { dmg: [5000, 260, 105, 90, 90], reach: 2, splash: 0.1, fuse: [6, 12], dud: 0.2 },
-  } as Record<string, Charge>,
-  /** how far from the eye a blow is believed to land on a piece, and a charge to be stuck, metres */
+  /** the charges: tuned in src/sim/build/charges.ts, the one place */
+  charge: CHARGES as Record<string, Charge>,
+  /** how far from the eye a blow is believed to land on a piece, and a charge that did not go off is lit again, metres */
   reach: { blow: 3.4, plant: 2.8 },
   /** a charge that did not go off goes out of the world this long after (ms), if nobody lights it again */
   dudFor: 5 * 60_000,
@@ -72,7 +52,7 @@ export const blowOf = (tool: string, p: Piece) => (HAMMERS[tool] ? 0 : (RAID.blo
 export function chargeOf(w: string, p: Piece, d: number) {
   const c = RAID.charge[w];
   if (!c) return 0;
-  const k = d <= 0.15 ? 1 : Math.max(0, 1 - (d - 0.15) / Math.max(0.01, c.reach - 0.15));
+  const k = d <= c.edge ? 1 : Math.max(0, 1 - (d - c.edge) / Math.max(0.01, c.reach - c.edge));
   return (c.dmg[struckAs(p)] ?? 0) * k;
 }
 
@@ -92,7 +72,7 @@ export function blastOn(solids: BaseSolids, at: V3, w: string, n?: V3): { base: 
   const c = RAID.charge[w];
   if (!c) return [];
   const all = solids.reached(at, c.reach);
-  const near = all.reduce<(typeof all)[number] | null>((m, r) => (r.d <= 0.15 && (!m || r.d < m.d) ? r : m), null);
+  const near = all.reduce<(typeof all)[number] | null>((m, r) => (r.d <= c.edge && (!m || r.d < m.d) ? r : m), null);
   const on = n ? solids.first(at, [at[0] - n[0] * 0.2, at[1] - n[1] * 0.2, at[2] - n[2] * 0.2], 'shot')?.p ?? near?.p : near?.p;
   return all.map(({ base, p, d }) => ({ base, p, hp: p.hp - (p === on ? chargeOf(w, p, 0) : chargeOf(w, p, d) * c.splash) }));
 }

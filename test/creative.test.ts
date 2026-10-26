@@ -4,6 +4,8 @@
 //     armoured at once (no wait between the hammer's word and its blow), and no bench is asked for;
 //   - somebody else on the server, not in creative, is refused for want of what it costs; and so is the admin once
 //     creative is off. (The game can ask for creative only with /creative, which the server allows an admin alone.)
+//   - an admin, creative off, throws a C4 (held back from players, an admin's: server/raid.ts): it sticks where its
+//     thrower's game says and goes off (a short fuse here, CHARGE_FUSE), taking a C4's worth off the armoured foundation.
 //   npx tsx test/creative.test.ts
 
 import assert from 'node:assert/strict';
@@ -17,7 +19,10 @@ import type { ItemInstance } from '../src/sim/items';
 import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { Bases, heard, type Land } from '../src/sim/build/bases';
-import { blocked, nearestSpot, spots } from '../src/sim/build/snap';
+import { blocked, nearestSpot, spots, toWorld } from '../src/sim/build/snap';
+import { BaseSolids } from '../src/sim/build/solid';
+import { CHARGES } from '../src/sim/build/charges';
+import { hpOf } from '../src/sim/build/pieces';
 
 const PORT = 8396, SITE = 'http://127.0.0.1:9';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -41,7 +46,7 @@ assert.equal(sites.length, 2, 'no two places on the map a base may go');
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-creative-'));
 let logged = '';
 const server = spawn(process.execPath, ['--env-file=.env.local-server', path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off', STOP_BY_WORD: '1' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off', STOP_BY_WORD: '1', CHARGE_FUSE: '1' },
   stdio: ['pipe', 'pipe', 'pipe'],
 });
 server.stdout!.on('data', (d) => (logged += d));
@@ -142,6 +147,23 @@ try {
   a.send({ t: 'blay', k: 'foundation', x: sites[1][0], y: 0, z: sites[1][1], r: 0, yaw: 0, u: plan.uid });
   assert.ok(await a.until('tell', (m) => /Needs/.test(m.text), 4000, from), 'with creative off, the admin laid for nothing still');
   pass('and so is the admin, creative put off');
+
+  // ---- a C4 thrown by the admin, creative off: stuck on the foundation's top, gone off, a C4's worth taken
+  const c4 = await a.give('c4');
+  await a.go(sites[0], 'c4');
+  const s = new BaseSolids(() => [base]), down = s.first(toWorld(base, piece.x, piece.y + 3, piece.z), toWorld(base, piece.x, piece.y - 2, piece.z));
+  assert.ok(down, 'no top found on the foundation');
+  const top = toWorld(base, piece.x, piece.y + 3 - 5 * down!.t, piece.z);
+  from = a.got.length;
+  a.send({ t: 'bthrow', w: 'c4', u: c4.uid, o: [top[0], top[1] + 1.2, top[2]], v: [0, -1, 0] });
+  const flying = await a.until('bcharge', (m) => !!m.v && m.w === 'c4', 4000, from);
+  assert.ok(flying, `the admin's C4 was not thrown: ${JSON.stringify(a.got.slice(from).filter((m) => m.t === 'tell'))}`);
+  a.send({ t: 'bstick', i: flying!.i, at: [top[0], top[1] + 0.04, top[2]], n: [0, 1, 0] });
+  const hit = await a.until('bhp', (m) => m.b === base.id && m.hp.some(([id]) => id === piece.id), 6000, from);
+  const full = hpOf(piece.k, 4);
+  assert.ok(hit, 'the C4 did not go off on the foundation');
+  assert.equal(hit!.hp.find(([id]) => id === piece.id)![1], Math.round(full - CHARGES.c4.dmg[4]), 'not a C4 the less');
+  pass(`and an admin, creative off, throws a C4: stuck on the foundation and gone off, ${full} to ${full - CHARGES.c4.dmg[4]}`);
 } finally {
   server.stdin!.write('stop\n');
   await sleep(1500);
