@@ -42,6 +42,9 @@ export interface Shape {
   flame?: [number, number, number];
   /** where a lock fitted to it is seen: on a leaf (its frame) or on the piece, facing +z, or lying face up (a hatch's) */
   lockAt?: { leaf?: number; at: [number, number, number]; up?: boolean };
+  /** slopes a body walks on, never drawn and felt by nothing else (stairs: the owner, 2026-10-25, "I am unable to run up
+   * the stairs buildable once it's built, I get stuck on the steps") */
+  walk?: Solid[];
   /** drawn by a model of its own elsewhere (crafting's forge: src/game/craft-forge.ts): here it only stops things */
   unseen?: true;
 }
@@ -86,6 +89,27 @@ function flight(n: number, across: [number, number], along: [number, number], y0
   return out;
 }
 
+/** the slope a flight is walked up on (as `flight`): laid over its steps' front edges, from the first step's top to the
+ * landing, so the body goes up and down it as up a ramp, never catching on a tread */
+function slope(n: number, across: [number, number], along: [number, number], y0: number, y1: number, alongX: boolean): Solid {
+  const rise = (y1 - y0) / n, at = (f: number) => along[0] + (along[1] - along[0]) * f;
+  const P = (u: number, c: number, y: number): [number, number, number] => (alongX ? [u, y, c] : [c, y, u]);
+  return { hull: across.flatMap((c) => [P(at(0), c, y0), P(at(0), c, y0 + rise), P(at(1 - 1 / n), c, y1), P(at(1), c, y1), P(at(1), c, y0)]) };
+}
+
+/** a flight's handrail on its open side `c`: a post at each end and the rail between, 0.9 m over the nosings */
+function rail(n: number, c: number, along: [number, number], y0: number, y1: number, alongX: boolean): Solid[] {
+  const rise = (y1 - y0) / n, at = (f: number) => along[0] + (along[1] - along[0]) * f, R = 0.9, w = 0.03;
+  const P = (u: number, cc: number, y: number): [number, number, number] => (alongX ? [u, y, cc] : [cc, y, u]);
+  const post = (f: number, y: number) => {
+    const u = at(f);
+    return alongX ? box(u - w, y, c - w, u + w, y + R + w, c + w) : box(c - w, y, u - w, c + w, y + R + w, u + w);
+  };
+  const a = at(0.04), b = at(1 - 1 / n), ya = y0 + rise + R, yb = y1 + R;
+  const bar: Solid = { hull: [-1, 1].flatMap((s) => [P(a, c + s * w, ya - w), P(a, c + s * w, ya + w), P(b, c + s * w, yb - w), P(b, c + s * w, yb + w)]) };
+  return [post(0.04, y0 + rise), post(1 - 1 / n, y1), bar];
+}
+
 const SHAPES: Record<string, () => Shape> = {
   // (a block reaching down into the ground however the ground falls away under it, its slab's edge standing proud)
   foundation: () => ({ solid: [box(-H, -FOUND.deep - FOUND.skirt, -H, H, 0, H)], dress: [box(-H - 0.04, -0.14, -H - 0.04, H + 0.04, 0, H + 0.04)] }),
@@ -114,9 +138,17 @@ const SHAPES: Record<string, () => Shape> = {
     return { solid: [[2, 6], [6, 10], [10, 2]].map(([a, b]) => ({ prism: [at(a, R), at(b, R), at(b, r), at(a, r)], y0: -FLOOR_T, y1: 0 })) };
   },
   // (up the -x side away from +z, a landing in the far corner, along the far side to +x: it comes out on the floor above at +x)
-  stairs_l: () => ({ solid: [...flight(6, [-H, -0.3], [H, -0.3], 0, STOREY / 2, false), box(-H, 0, -H, -0.3, STOREY / 2, -0.3), ...flight(6, [-H, -0.3], [-0.3, H], STOREY / 2, STOREY, true)] }),
+  stairs_l: () => ({
+    solid: [...flight(6, [-H, -0.3], [H, -0.3], 0, STOREY / 2, false), box(-H, 0, -H, -0.3, STOREY / 2, -0.3), ...flight(6, [-H, -0.3], [-0.3, H], STOREY / 2, STOREY, true)],
+    walk: [slope(6, [-H, -0.3], [H, -0.3], 0, STOREY / 2, false), slope(6, [-H, -0.3], [-0.3, H], STOREY / 2, STOREY, true)],
+    dress: [...rail(6, -0.3, [H, -0.3], 0, STOREY / 2, false), ...rail(6, -0.3, [-0.3, H], STOREY / 2, STOREY, true)],
+  }),
   // (up the +x side toward -z, across a landing the whole width, back down the -x side toward +z, rising)
-  stairs_u: () => ({ solid: [...flight(5, [0.3, H], [H, 0], 0, STOREY / 2, false), box(-H, 0, -H, H, STOREY / 2, 0), ...flight(5, [-H, -0.3], [0, H], STOREY / 2, STOREY, false)] }),
+  stairs_u: () => ({
+    solid: [...flight(5, [0.3, H], [H, 0], 0, STOREY / 2, false), box(-H, 0, -H, H, STOREY / 2, 0), ...flight(5, [-H, -0.3], [0, H], STOREY / 2, STOREY, false)],
+    walk: [slope(5, [0.3, H], [H, 0], 0, STOREY / 2, false), slope(5, [-H, -0.3], [0, H], STOREY / 2, STOREY, false)],
+    dress: [...rail(5, 0.3, [H, 0], 0, STOREY / 2, false), ...rail(5, -0.3, [0, H], STOREY / 2, STOREY, false)],
+  }),
   stairs_spiral: () => {
     const out: Solid[] = [box(-0.15, 0, -0.15, 0.15, STOREY, 0.15)];
     for (let i = 0; i < 12; i++) {

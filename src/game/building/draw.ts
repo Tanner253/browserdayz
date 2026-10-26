@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../../core/assets';
-import { BODY_QUERY, physics } from '../../core/physics';
+import { GLASS_GROUPS, BODY_QUERY, physics } from '../../core/physics';
 import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES } from '../../sim/build/pieces';
 import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
@@ -356,6 +356,13 @@ export class BaseDraw {
       const desc = physics.R.ColliderDesc.convexHull(new Float32Array(pts));
       return desc ? physics.addStaticQuat(desc, surface, { x: d.at.x, y: d.at.y, z: d.at.z }, q, owner) : null;
     }).filter((c): c is RAPIER.Collider => !!c);
+    // (the slopes stairs are walked up on: felt by a body alone, never drawn)
+    for (const w of s.walk ?? []) {
+      if (!('hull' in w)) continue;
+      const desc = physics.R.ColliderDesc.convexHull(new Float32Array(w.hull.flat()));
+      const c = desc ? physics.addStaticQuat(desc, surface, { x: d.at.x, y: d.at.y, z: d.at.z }, q, owner, GLASS_GROUPS) : null;
+      if (c) d.colliders.push(c);
+    }
     // (each leaf a box or more, put where the leaf now is)
     d.leafCols = (s.leaves ?? []).map((l) => l.solid.map((b) => ('box' in b ? physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.box[3] / 2, b.box[4] / 2, b.box[5] / 2), surfaceOf(l.paint ?? t), { x: 0, y: 0, z: 0 }, q, owner) : null)).filter((c): c is RAPIER.Collider => !!c));
     if (d.leafCols.length) this.placeLeaves(d);
