@@ -114,11 +114,16 @@ const turnY = (a: number) => new THREE.Matrix4().makeRotationY(a);
  */
 export let torchHead: [number, number, number] | null = null;
 function headOf(geo: THREE.BufferGeometry): [number, number, number] | null {
+  // (its head is the part of it furthest out from the wall (+z), the stick's end, and the top of that: its highest points
+  // are the bracket's plate on the wall, and the flame burnt there, on the wall. The owner, 2026-10-26: "it sits on the
+  // wall rather than off the wall at the tip of the stick where the actual torch and ember is")
   const P = geo.getAttribute('position');
+  let out = -Infinity;
+  for (let i = 0; i < P.count; i++) out = Math.max(out, P.getZ(i));
   let top = -Infinity;
-  for (let i = 0; i < P.count; i++) top = Math.max(top, P.getY(i));
+  for (let i = 0; i < P.count; i++) if (P.getZ(i) > out - 0.08) top = Math.max(top, P.getY(i));
   let x = 0, z = 0, n = 0;
-  for (let i = 0; i < P.count; i++) if (P.getY(i) > top - 0.04) {
+  for (let i = 0; i < P.count; i++) if (P.getZ(i) > out - 0.08 && P.getY(i) > top - 0.05) {
     x += P.getX(i);
     z += P.getZ(i);
     n++;
