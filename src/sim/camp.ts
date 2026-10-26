@@ -1,10 +1,10 @@
 // The trader camp (progression v3, the owner's yes 2026-10-25: "a trader camp with four stalls, like Rust's outpost ...
 // Paid in scrap, which you carry and can lose when killed, instead of the book"; "Never overpowered: no top-tier gun,
 // armour or steel plate on any shelf. A daily limit per player, and prices high enough that looting stays better"; "Jobs
-// (three a day, as today) pay in scrap"). Four stalls round a yard out in the south-west wilderness (building, weapons,
-// medical, clothing and gear), with a recycler; moved there from the trading post, which is in the Zona (the owner: "the
-// trader zone must be moved from the red zone on the map away from the center of the map because this can be exploited").
-// Within it nobody is hurt by anybody (Rust's outpost: a safe zone), and no base is laid near it. Every price is data, here; the server judges every trade on
+// (three a day, as today) pay in scrap"). Its four stalls (building, weapons, medical, clothing and gear) each at a spot
+// of its own out of the Zona, in the green west and the valley, with a recycler where one fits (the owner: "the trader
+// zone must be moved from the red zone ... because this can be exploited"; "the traders should be spread out across the
+// map (green west and the valley only)"). At each nobody is hurt by anybody (Rust's outpost), and no base is laid near. Every price is data, here; the server judges every trade on
 // its own copy of the pockets, and the game played alone by the same rules.
 
 import { RNG } from '../core/noise';
@@ -12,7 +12,7 @@ import { ITEMS, type ItemInstance } from './items';
 import { roomOn, type LayerWorld } from './craft/layer';
 import type { TradeDay } from '../net/protocol';
 import { MAT } from './craft/materials';
-import { CAMP_AT } from './camp-place';
+import { TRADER_SPOTS } from './camp-place';
 
 export type StallId = 'building' | 'weapons' | 'medical' | 'clothing';
 
@@ -75,8 +75,8 @@ export const CAMP = {
   soldADay: 150,
   /** the old book: credit paid out in scrap once, at so much a scrap, to so much at most */
   book: { per: 2, most: 250 },
-  /** the safe zone: how far out from the yard's middle, m */
-  safe: 40,
+  /** each trader's safe zone: how far out from its spot, m (the stall, its recycler and a little round them) */
+  safe: 20,
   /** how near a stall's counter a player must stand to trade, m (as near as to speak) */
   reach: 4.7,
 };
@@ -135,53 +135,70 @@ export interface StallSpot {
 }
 
 export interface Camp {
-  /** the yard's middle (the safe zone is round it) */
-  x: number;
-  z: number;
+  /** each trader's spot (the safe zone is round each) */
+  spots: { id: StallId; x: number; z: number; near: string }[];
   stalls: StallSpot[];
-  /** the camp's recycler */
-  recycler: { x: number; y: number; z: number; rot: number } | null;
+  /** the recyclers at the spots, where one fits */
+  recyclers: { x: number; y: number; z: number; rot: number; at: string }[];
 }
 
 /** a stall's model (made again from three pictures, the owner: "the trader stand looks very low quality") at the size it was made; how deep it is from its counter back, roof and all (its x), and how wide (its z); its trader behind its counter */
 export const STALL = { model: 'trader_stall', scale: 1, l: 2.42, w: 2.8, behind: 0.15 };
 /** what a model whose front is its +x (the stall, the recycler: the sandbox's front camera looks from +x) is turned by, past the way it faces */
 export const FACE_TURN = -Math.PI / 2;
+/** each stall's mark on the maps: a coin of its colour with its letter (src/ui/minimap.ts, bigmap.ts) */
+export const STALL_MARK: Record<StallId, { letter: string; colour: string }> = {
+  building: { letter: 'B', colour: '#d1a654' },
+  weapons: { letter: 'G', colour: '#e0703c' },
+  medical: { letter: 'M', colour: '#5fc58e' },
+  clothing: { letter: 'C', colour: '#7fb8ff' },
+};
 const SEED = 0x7c4a11;
-/** where each stall stands about the yard's middle, m (east, south), its counter to the middle; and the recycler */
-const RING: [StallId, number, number][] = [['building', 0, -10], ['weapons', 10, 0], ['medical', -10, 0], ['clothing', 0, 10]];
-const RECYCLER_AT: [number, number] = [12, -12];
 
-/** the trader camp, the same for the game and the server: four stalls round a yard out in the wilderness, and its recycler */
+/** the traders' spots, the same for the game and the server: a stall at each facing the road, and a recycler beside it where one fits */
 export function campLayer(world: LayerWorld): Camp {
-  const room = roomOn(world, true), rng = new RNG(SEED), cx = CAMP_AT.x, cz = CAMP_AT.z;
-  const face = (x: number, z: number) => Math.atan2(cx - x, cz - z);
-  /** the nearest room to a place on the yard for a thing so big, facing the yard's middle */
-  const lay = (lx: number, lz: number, l: number, w: number) => {
-    for (let t = 0; t < 24; t++) {
-      const j = t ? 1 + t * 0.35 : 0, a = rng.range(0, Math.PI * 2);
-      const x = cx + lx + Math.sin(a) * j, z = cz + lz + Math.cos(a) * j, rot = face(x, z);
-      const y = room.fit(x, z, l, w, rot, { margin: 1, road: 0.5, level: 0.5, sink: 0.05 });
-      if (y === null) continue;
-      room.stand(x, z, Math.hypot(l, w) / 2 + 0.6);
-      return { x, y, z, rot };
-    }
-    return null;
-  };
-  const stalls: StallSpot[] = [];
-  for (const [id, lx, lz] of RING) {
-    const p = lay(lx, lz, STALL.l, STALL.w);
+  const room = roomOn(world, true), rng = new RNG(SEED);
+  const spots = TRADER_SPOTS.map((q) => ({ id: q.id as StallId, x: q.x, z: q.z, near: q.near }));
+  const stalls: StallSpot[] = [], recyclers: Camp['recyclers'] = [];
+  for (const q of spots) {
+    // (its counter to the nearest road: the way people come)
+    const r = nearestRoad(world, q.x, q.z), face = Math.atan2(r[0] - q.x, r[1] - q.z);
+    /** the nearest room to a place for a thing so big, facing `rot` */
+    const lay = (x0: number, z0: number, l: number, w: number, rot: number) => {
+      for (let t = 0; t < 24; t++) {
+        const j = t ? 1 + t * 0.4 : 0, a = rng.range(0, Math.PI * 2), x = x0 + Math.sin(a) * j, z = z0 + Math.cos(a) * j;
+        const y = room.fit(x, z, l, w, rot, { margin: 1, road: 0.5, level: 0.6, sink: 0.05 });
+        if (y === null) continue;
+        room.stand(x, z, Math.hypot(l, w) / 2 + 0.6);
+        return { x, y, z, rot };
+      }
+      return null;
+    };
+    const p = lay(q.x, q.z, STALL.l, STALL.w, face);
     if (!p) continue;
-    // (its trader behind the counter, facing out over it)
     const bx = p.x + Math.sin(p.rot) * STALL.behind, bz = p.z + Math.cos(p.rot) * STALL.behind;
-    stalls.push({ id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
+    stalls.push({ id: q.id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
+    // (the recycler to the stall's side and a little before it, facing the same way)
+    const sx = Math.cos(face), sz = -Math.sin(face), fx = Math.sin(face), fz = Math.cos(face);
+    const rc = lay(p.x + sx * 5 + fx * 2, p.z + sz * 5 + fz * 2, 2.0, 1.6, face);
+    if (rc) recyclers.push({ ...rc, at: `the ${STALLS[q.id].name.toLowerCase()} trader` });
   }
-  const recycler = lay(...RECYCLER_AT, 2.0, 1.6);
-  return { x: cx, z: cz, stalls, recycler };
+  return { spots, stalls, recyclers };
 }
 
-/** whether a place is within the camp's safe zone */
-export const inSafe = (camp: Camp | null, x: number, z: number) => !!camp && Math.hypot(x - camp.x, z - camp.z) < CAMP.safe;
+/** the nearest point of a road to a place */
+function nearestRoad(world: LayerWorld, x: number, z: number): [number, number] {
+  let best: [number, number] = [x, z + 1], d = Infinity;
+  for (const r of world.roads) for (let i = 0; i + 5 < r.points.length; i += 3) {
+    const ax = r.points[i], az = r.points[i + 2], vx = r.points[i + 3] - ax, vz = r.points[i + 5] - az, l2 = vx * vx + vz * vz;
+    const t = l2 ? Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / l2)) : 0, px = ax + vx * t, pz = az + vz * t, k = Math.hypot(px - x, pz - z);
+    if (k < d && k > 1) (d = k), (best = [px, pz]);
+  }
+  return best;
+}
+
+/** whether a place is within a trader's safe zone */
+export const inSafe = (camp: Camp | null, x: number, z: number) => !!camp && camp.spots.some((q) => Math.hypot(x - q.x, z - q.z) < CAMP.safe);
 
 // ---------------------------------------------------------------- a trade, judged (the server's, and the game's played alone)
 

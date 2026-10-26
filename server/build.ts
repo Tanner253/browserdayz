@@ -23,7 +23,7 @@ import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
 import { boxStore, boxesBack, emptyBox, heldIn, spillBoxes } from './boxes';
 import { asksOf, layPrint, printOf } from '../src/sim/build/blueprints';
 import { roleOf } from './gate';
-import { CAMP_AT, CAMP_KEEP } from '../src/sim/camp-place';
+import { CAMP_KEEP, TRADER_SPOTS } from '../src/sim/camp-place';
 
 /** an admin in creative: what they lay, nail up, mend or turn costs nothing and takes no time, and no bench is asked for (server/admin.ts) */
 export const creative = (c: Client) => !!c.power.creative && roleOf(c) === 'admin';
@@ -329,8 +329,8 @@ export function restoreBases(kept: KeptBase[] | undefined) {
   storesBack();
   boxesBack();
   log(`[build] ${all.bases.size} bases, ${all.count} pieces read back`);
-  // (a base kept from before the trader camp moved beside it, src/sim/camp-place.ts: said, for an admin to see to)
-  for (const b of all.bases.values()) if (Math.hypot(b.ox - CAMP_AT.x, b.oz - CAMP_AT.z) < CAMP_KEEP) log(`[build] base ${b.id} stands ${Math.round(Math.hypot(b.ox - CAMP_AT.x, b.oz - CAMP_AT.z))} m from the trader camp, inside its keep`);
+  // (a base kept from before a trader came beside it, src/sim/camp-place.ts: said, for an admin to see to)
+  for (const b of all.bases.values()) for (const q of TRADER_SPOTS) if (Math.hypot(b.ox - q.x, b.oz - q.z) < CAMP_KEEP) log(`[build] base ${b.id} stands ${Math.round(Math.hypot(b.ox - q.x, b.oz - q.z))} m from the ${q.id} trader, inside its keep`);
 }
 
 export { LIMITS };

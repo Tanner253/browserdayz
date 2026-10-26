@@ -113,7 +113,7 @@ export class Minimap {
   private marked = -1e9;
   /** supply drops standing in the world */
   private drops: { x: number; z: number }[] = [];
-  private traders: { x: number; z: number }[] = [];
+  private traders: TraderMark[] = [];
   private wells: { x: number; z: number }[] = [];
   /** vehicles nobody is in */
   private jeeps: { x: number; z: number; k?: number }[] = [];
@@ -327,7 +327,7 @@ export class Minimap {
   }
 
   /** Where a trader stands: a coin on the map, always. */
-  setTraders(at: { x: number; z: number }[]) {
+  setTraders(at: TraderMark[]) {
     this.traders = at;
     this.last.x = 1e9;
   }
@@ -435,23 +435,16 @@ export class Minimap {
       g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
       g.stroke();
     }
-    // the trader: a coin, where he stands
+    // the traders: a coin of the colour of what each sells, with its letter; in the corner view one off the edge sits on the rim
     for (const t of this.traders) {
-      const qx = (t.x - cx + span / 2) * k, qz = (t.z - cz + span / 2) * k;
-      if (qx < 0 || qz < 0 || qx > W || qz > W) continue;
-      const r = this.big ? W / 95 : W / 22;
-      g.beginPath();
-      g.arc(qx, qz, r, 0, Math.PI * 2);
-      g.fillStyle = '#7fd4a0';
-      g.fill();
-      g.lineWidth = Math.max(1.5, r * 0.3);
-      g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-      g.stroke();
-      g.beginPath();
-      g.arc(qx, qz, r * 0.45, 0, Math.PI * 2);
-      g.lineWidth = Math.max(1, r * 0.24);
-      g.strokeStyle = '#17402a';
-      g.stroke();
+      let qx = (t.x - cx + span / 2) * k, qz = (t.z - cz + span / 2) * k;
+      const r = this.big ? W / 70 : W / 16;
+      if (qx < 0 || qz < 0 || qx > W || qz > W) {
+        if (this.big || Math.hypot(t.x - cx, t.z - cz) > span * 1.6) continue;
+        qx = Math.max(r, Math.min(W - r, qx));
+        qz = Math.max(r, Math.min(W - r, qz));
+      }
+      traderCoin(g, qx, qz, r, t);
     }
     // supply drops: a crate, there as long as the drop is; in the corner view one off the edge sits on the rim
     for (const d of this.drops) {
@@ -588,4 +581,30 @@ function clamp(v: number, lo: number, hi: number) {
 function smooth(t: number) {
   const u = clamp(t, 0, 1);
   return u * u * (3 - 2 * u);
+}
+
+/** a trader's mark: where, the colour and the letter of what it sells (src/sim/camp.ts STALL_MARK), its name */
+export interface TraderMark {
+  x: number;
+  z: number;
+  colour: string;
+  letter: string;
+  name: string;
+  near: string;
+}
+
+/** a trader's coin: its colour, a dark rim, its letter in the middle (the corner map's and the big map's alike) */
+export function traderCoin(g: CanvasRenderingContext2D, x: number, z: number, r: number, t: Pick<TraderMark, 'colour' | 'letter'>) {
+  g.beginPath();
+  g.arc(x, z, r, 0, Math.PI * 2);
+  g.fillStyle = t.colour;
+  g.fill();
+  g.lineWidth = Math.max(1.5, r * 0.22);
+  g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+  g.stroke();
+  g.fillStyle = '#14160f';
+  g.font = `800 ${Math.round(r * 1.25)}px 'Barlow Condensed', system-ui, sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(t.letter, x, z + r * 0.06);
 }

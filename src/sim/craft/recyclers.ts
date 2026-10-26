@@ -162,8 +162,8 @@ const SEED = 0x2ec7c1;
 /** the recyclers' layer: Zavod, the army camp, the fort, the chemical works, the trader camp; the same for the game and the server */
 export function recyclerLayer(world: LayerWorld & Pick<World, 'sites' | 'towns' | 'castle'>, camp: Camp | null): Recycler[] {
   const room = roomOn(world, true), rng = new RNG(SEED), out: Recycler[] = [];
-  // (keep clear of the camp's stalls and its own recycler: laid before these)
-  for (const s of camp?.stalls ?? []) room.stand(s.x, s.z, 2.5);
+  // (keep clear of the traders' stalls and their recyclers: laid before these)
+  for (const s of [...(camp?.stalls ?? []), ...(camp?.recyclers ?? [])]) room.stand(s.x, s.z, 2.5);
   const near = (at: string, cx: number, cz: number, from = 8) => {
     for (let d = from; d < 80; d += 3) {
       const a0 = rng.range(0, Math.PI * 2);
@@ -186,7 +186,7 @@ export function recyclerLayer(world: LayerWorld & Pick<World, 'sites' | 'towns' 
   if (fort) out.push(fort);
   const works = site('works');
   if (works) near('the chemical works', works.x, works.z, 12);
-  if (camp?.recycler) out.push({ at: 'the trader camp', ...camp.recycler });
+  for (const r of camp?.recyclers ?? []) out.push(r);
   return out;
 }
 

@@ -22,7 +22,7 @@ import { RECYCLE, recycleStep, recyclable, recycles } from '../src/sim/craft/rec
 import { MAT } from '../src/sim/craft/materials';
 import { PROTOCOL, type S2C, type StoredItem } from '../src/net/protocol';
 import { buildWorldData } from '../server/world';
-import { inZona, zonaDepth } from '../src/world/zona';
+import { zonaDepth } from '../src/world/zona';
 import { noBuilding } from '../src/sim/build/land';
 
 let n = 0;
@@ -125,24 +125,26 @@ ok('a recycler breaks a thing at a time into fragments and scrap, never the meta
 });
 
 const data = buildWorldData(process.cwd());
-ok('the camp stands out in the wilderness, well clear of the Zona and the middle of the map, no base near it: four stalls on its yard; five recyclers', () => {
+ok('the traders spread over the green west and the valley: a stall at each of four spots, out of the Zona, the desert and the mountain, apart; a safe zone and no base round each', () => {
   const c = data.camp!;
   assert.ok(c, 'no camp');
   assert.deepEqual(c.stalls.map((s) => s.id), ['building', 'weapons', 'medical', 'clothing']);
-  // (the owner: "the trader zone must be moved from the red zone on the map away from the center of the map because this can be exploited")
-  assert.ok(zonaDepth(c.x, c.z) < -(CAMP.safe + 150), `the camp is ${(-zonaDepth(c.x, c.z)).toFixed(0)} m from the Zona`);
-  for (const s of c.stalls) assert.ok(!inZona(s.x, s.z, -CAMP.safe), `the ${s.id} stall is near the Zona`);
-  assert.ok(Math.hypot(c.x + 1536, c.z) > 700, 'the camp is near the middle of the map');
-  assert.equal(noBuilding(c.x + CAMP.safe, c.z, [], []), 'Too near the trader camp');
-  assert.equal(noBuilding(c.x, c.z + 60, [], []), 'Too near the trader camp');
-  for (const s of c.stalls) assert.ok(Math.hypot(s.x - c.x, s.z - c.z) < CAMP.safe - 5, `the ${s.id} stall is ${Math.hypot(s.x - c.x, s.z - c.z).toFixed(0)} m out, past the safe zone`);
-  for (let i = 1; i < c.stalls.length; i++) for (let j = i + 1; j < c.stalls.length; j++) assert.ok(Math.hypot(c.stalls[i].x - c.stalls[j].x, c.stalls[i].z - c.stalls[j].z) > 4, 'two stalls on top of each other');
-  assert.deepEqual(data.recyclers.map((r) => r.at), ['Zavod', 'the army camp', 'the fort', 'the chemical works', 'the trader camp']);
+  // (the owner: "the trader zone must be moved from the red zone"; "the traders should be spread out across the map (green west and the valley only)")
+  for (const q of c.spots) {
+    assert.ok(zonaDepth(q.x, q.z) < -(CAMP.safe + 30), `the ${q.id} trader is ${(-zonaDepth(q.x, q.z)).toFixed(0)} m from the Zona`);
+    assert.ok(q.x > -1950 && !(q.x > 250 && q.z < -150), `the ${q.id} trader is in the desert or on the mountain`);
+    assert.equal(noBuilding(q.x + CAMP.safe, q.z, [], []), 'Too near a trader');
+    const s = c.stalls.find((t) => t.id === q.id)!;
+    assert.ok(Math.hypot(s.x - q.x, s.z - q.z) < CAMP.safe - 5, `the ${q.id} stall is laid past its safe zone`);
+  }
+  for (let i = 0; i < c.spots.length; i++) for (let j = i + 1; j < c.spots.length; j++) assert.ok(Math.hypot(c.spots[i].x - c.spots[j].x, c.spots[i].z - c.spots[j].z) > 300, 'two traders close together');
+  assert.deepEqual(data.recyclers.slice(0, 4).map((r) => r.at), ['Zavod', 'the army camp', 'the fort', 'the chemical works']);
+  assert.ok(c.recyclers.length >= 2, `a recycler at only ${c.recyclers.length} traders`);
   // (the same for the game: the layers are the world's, laid the same each time)
   const again = buildWorldData(process.cwd());
   assert.deepEqual(again.recyclers, data.recyclers);
   assert.deepEqual(again.camp, data.camp);
-  console.log(`      the yard at ${c.x.toFixed(0)}, ${c.z.toFixed(0)}; recyclers at ${data.recyclers.map((r) => `${r.at} ${r.x.toFixed(0)},${r.z.toFixed(0)}`).join('; ')}`);
+  console.log(`      traders at ${c.spots.map((q) => `${q.id} ${q.x},${q.z}`).join('; ')}; recyclers at ${data.recyclers.map((r) => `${r.at} ${r.x.toFixed(0)},${r.z.toFixed(0)}`).join('; ')}`);
 });
 
 if (process.argv.includes('--server')) await serverTest();
@@ -212,6 +214,7 @@ async function serverTest() {
 
     // at the weapons stall's counter: a pistol bought for its scrap; the scrap taken as building's costs are, the pistol issued
     const camp = data.camp!, w = camp.stalls.find((s) => s.id === 'weapons')!;
+    const sp = camp.spots.find((q) => q.id === 'weapons')!;
     const scrap = await kit(a, '/give scrap 400');
     me(a, scrap);
     await tp(a, w.at[0] + Math.sin(w.rot) * 1.6, w.at[2] + Math.cos(w.rot) * 1.6);
@@ -238,7 +241,7 @@ async function serverTest() {
     const back = (await until(a, 'kit', (m) => m.items.some((it) => it.id === MAT.scrap), 5000, g1))?.items.find((it) => it.id === MAT.scrap);
     assert.ok(back && back.qty < 20, `paid ${back?.qty} scrap for a pistol it sold for ${STALLS.weapons.sells.find((x) => x.id === 'colt')!.price}`);
     // (from far off: not believed)
-    await tp(a, camp.x + 60, camp.z);
+    await tp(a, sp.x + 60, sp.z);
     const g2 = a.got.length;
     a.send({ t: 'trade', s: 'weapons', op: 'buy', id: 'ammo_9mm' });
     assert.ok(await until(a, 'trade', (m) => !m.ok && /counter/.test(m.say), 5000, g2), 'a trade from 60 m off was let through');
@@ -256,22 +259,22 @@ async function serverTest() {
     // the safe zone: a punch out on the meadow lands; the same at the camp hurts nobody
     const pa = a.got.filter((m) => m.t === 'welcome')[0] as { you: number };
     const punch = () => b.send({ t: 'hit', to: pa.you, w: 'fists', zone: 'torso', dist: 1, sup: false, bonus: 0 });
-    await tp(a, camp.x + CAMP.safe + 30.6, camp.z);
-    await tp(b, camp.x + CAMP.safe + 30, camp.z);
+    await tp(a, sp.x + CAMP.safe + 30.6, sp.z);
+    await tp(b, sp.x + CAMP.safe + 30, sp.z);
     const g4 = b.got.length;
     punch();
     assert.ok(await until(b, 'hitok', () => true, 3000, g4), 'a punch out on the meadow did not land (the check of the safe zone proves nothing)');
-    await tp(a, camp.x + 0.6, camp.z);
-    await tp(b, camp.x, camp.z);
+    await tp(a, sp.x + 0.6, sp.z);
+    await tp(b, sp.x, sp.z);
     await sleep(1200);
     const g5h = b.got.length;
     punch();
     await sleep(600);
     assert.equal(b.got.slice(g5h).filter((m) => m.t === 'hitok').length, 0, 'a punch at the camp hurt somebody');
-    console.log('  ok  a punch lands on the meadow, and nobody is hurt at the trader camp');
+    console.log('  ok  a punch lands on the meadow, and nobody is hurt at a trader');
 
     // a recycler: a spring in it, switched on, broken down into fragments and scrap, and switched itself off
-    const r = data.recyclers.findIndex((q) => q.at === 'the trader camp'), R = data.recyclers[r];
+    const r = data.recyclers.findIndex((q) => q.at.endsWith('trader')), R = data.recyclers[r];
     await tp(a, R.x + Math.sin(R.rot) * 1.8, R.z + Math.cos(R.rot) * 1.8);
     const cid = `recy:${r}`, g5 = a.got.length;
     a.send({ t: 'copen', cid });

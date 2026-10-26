@@ -101,6 +101,7 @@ import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
 import { TraderCamp } from './camp';
+import { STALLS, STALL_MARK } from '../sim/camp';
 import { RecyclerView } from './craft-recyclers';
 import { recyclerLayer } from '../sim/craft/recyclers';
 import type { MenuSpot } from '../ui/hud';
@@ -1527,7 +1528,8 @@ export class Game {
       recyclerLayer(world, this.camp.camp),
     );
     this.traders = new Traders(this.camp.camp?.stalls ?? []);
-    if (this.camp.camp) this.minimap.setTraders([new THREE.Vector3(this.camp.camp.x, 0, this.camp.camp.z)]);
+    // (each trader's spot, marked by what it sells: the owner, "We need to mark these on the map and which type")
+    this.minimap.setTraders((this.camp.camp?.spots ?? []).map((q) => ({ x: q.x, z: q.z, ...STALL_MARK[q.id], name: `Trader: ${STALLS[q.id].name}`, near: q.near })));
     this.wells = wellSpots(world);
     this.minimap.setWells(this.wells);
     void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
