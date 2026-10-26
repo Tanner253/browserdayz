@@ -9,9 +9,13 @@
 //
 //   1. The suit's head stood at its rest and set on each body's: sized to the body's head across, its skull's top on
 //      the body's (headOf in scripts/meshy.mjs: where the hats sit, so a hat sits on it as on the head).
-//   2. Pushed out wherever the body under it that is still drawn (its neck and shoulders: the scalp, face and hair are
-//      hidden under it) would come through, a few millimetres clear, the push evened over the knit.
-//   3. Weighted as the skin under it is (as the clothes are, scripts/wear.mjs), so it bends at the neck as the neck does.
+//   2. Its neck drawn down past the collar and laid on the body (the owner, 2026-10-25: "needs to go down into the chest
+//      more with it falling behind the shirt, so theres no gap ... a floating head look"): the bodies' necks are longer
+//      than the suit's, so all of it under the chin is stretched down to below the neck joint, and from the chin down it
+//      comes onto the skin, a few millimetres out, under whatever top is worn over it.
+//   3. Above that, pushed out wherever the body under it that is still drawn would come through, the push evened over
+//      the knit (the scalp, face and hair are hidden under it).
+//   4. Weighted as the skin under it is (as the clothes are, scripts/wear.mjs), so it bends at the neck as the neck does.
 //
 // Its knit is one material, coloured as the item's colour says (src/game/survivors.ts, clothPatch); the eyes and the
 // skin round them another (`own`), never coloured. Not drawn in first person (`head`): the camera is inside it.
@@ -31,8 +35,16 @@ const CHAR = path.join(ROOT, 'public', 'assets', 'characters');
 const UNDER = new Set([0, 1, 2, 14]);
 /** how far clear of what is drawn of the body it stays, in the body's own units (its file's: about 0.88 m to one) */
 const CLEAR = 0.005;
-/** how far over the neck joint its hem is (the same units) */
-const HEM = 0.01;
+/** how far under the neck joint its hem goes, into the chest under a top (the same units) */
+const HEM = 0.06;
+/** where under the Head joint it begins to come onto the body (the chin), and where it lies on it wholly */
+const CHIN = 0.045, ON = 0.085;
+/** how far off the skin it lies there, over the throat (hidden under it); and how far under the skin of the chest, so
+ * that it is behind any top and goes into the bare skin at the base of the neck */
+const SKIN = 0.003, TUCKED = 0.002;
+/** and how much further from the eye that part is drawn (the game's metres): a top stands off the neck at its collar,
+ * and the knit stood over it as a bib; drawn back, any top near it is drawn over it (see backPatch) */
+const BACK = 0.05;
 
 await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
@@ -52,16 +64,18 @@ const suit = await io.read(path.join(CHAR, 'survivor.glb'));
 const sn = suit.getRoot().listNodes().find((n) => n.getName() === 'head');
 const sp = sn.getMesh().listPrimitives()[0];
 const SP = restPoints(sn), SJ = jointAt(sn, 'Head'), STop = headOf(sn);
-const SN = (() => {
-  const skin = sn.getSkin(), ibm = skin.getInverseBindMatrices();
+/** a skinned shape's normals as its skeleton stands at rest (as restPoints its points) */
+const restNormals = (node) => {
+  const skin = node.getSkin(), ibm = skin.getInverseBindMatrices(), prim = node.getMesh().listPrimitives()[0];
   const M = skin.listJoints().map((j, k) => M4(j.getWorldMatrix()).multiply(M4(ibm.getElement(k, []))));
-  const nor = sp.getAttribute('NORMAL'), ji = sp.getAttribute('JOINTS_0'), jw = sp.getAttribute('WEIGHTS_0');
-  return SP.map((_, i) => {
+  const nor = prim.getAttribute('NORMAL'), ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0');
+  return Array.from({ length: nor.getCount() }, (_, i) => {
     const n = new THREE.Vector3().fromArray(nor.getElement(i, [])), a = ji.getElement(i, []), w = jw.getElement(i, []), o = new THREE.Vector3();
     for (let c = 0; c < 4; c++) if (w[c] > 0) o.addScaledVector(n.clone().transformDirection(M[a[c]]), w[c]);
     return o.normalize();
   });
-})();
+};
+const SN = restNormals(sn);
 const UV = sp.getAttribute('TEXCOORD_0'), IDX = sp.getIndices().getArray();
 const smat = sp.getMaterial(), base = smat.getBaseColorTexture();
 const SW = across(SP, SJ);
@@ -76,7 +90,7 @@ const knitTris = [], eyeTris = [];
 {
   // (the knit's colour: the middle of the picture's upper half, which is all knit)
   const cs = [];
-  for (let k = 0; k < 400; k++) cs.push(texel(0.1 + 0.8 * Math.random(), 0.05 + 0.6 * Math.random()));
+  for (let k = 0; k < 400; k++) cs.push(texel(0.1 + 0.04 * (k % 20), 0.05 + 0.03 * Math.floor(k / 20)));
   const knit = [0, 1, 2].map((c) => cs.map((x) => x[c]).sort((a, b) => a - b)[200]);
   const e = [];
   for (let t = 0; t < IDX.length; t += 3) {
@@ -108,14 +122,56 @@ for (let b = 0; b < 4; b++) {
   // ---- 1. the suit's head on this one's: sized across, its skull's top on this one's
   const from = new THREE.Vector3(STop.topX, STop.crown, STop.topZ).add(SJ), to = new THREE.Vector3(BTop.topX, BTop.crown, BTop.topZ).add(BJ);
   const P = SP.map((p) => p.clone().sub(from).multiplyScalar(k).add(to));
-  // (ending at the base of the neck: the suit's went on into its collar, and over a T-shirt lay on the chest as a bib
-  // with a flat edge)
-  const cut = jointAt(node, 'neck_01').y + HEM, above = (tris) => tris.filter((_, t, all) => [0, 1, 2].every((s) => P[all[t - (t % 3) + s]].y >= cut));
-  const knit = above(knitTris), eyes = above(eyeTris);
-  // ---- 2. clear of what is drawn of the body under it
-  const shown = BP.map((p, i) => (UNDER.has(reg.getScalar(i)) ? null : p)).filter((p) => p && p.y > cut - 0.05);
+  const knit = knitTris, eyes = eyeTris;
+  // ---- 2. its neck down to under the neck joint, and on the body from the chin down
+  const chin = BJ.y - CHIN, hem = jointAt(node, 'neck_01').y - HEM, low = Math.min(...P.map((p) => p.y));
+  const stretch = (chin - hem) / (chin - low);
+  for (const p of P) if (p.y < chin) p.y = chin - (chin - p.y) * stretch;
+  // (onto the body's surface itself, its nearest place on its triangles: its points are few over the chest, a hand apart,
+  // and laid by the nearest of them the knit stood off the chest over a T-shirt's collar)
+  const BN = restNormals(node), BI = bp.getIndices().getArray(), tris = [];
+  for (let t = 0; t < BI.length; t += 3) {
+    const c = [BI[t], BI[t + 1], BI[t + 2]];
+    if (c.some((i) => reg.getScalar(i) === 14) || c.every((i) => BP[i].y > chin + 0.03 || BP[i].y < hem - 0.06)) continue;
+    const tri = new THREE.Triangle(BP[c[0]], BP[c[1]], BP[c[2]]), n = tri.getNormal(new THREE.Vector3());
+    // (turned out, as the skin's own normals there are)
+    if (n.dot(BN[c[0]].clone().add(BN[c[1]]).add(BN[c[2]])) < 0) n.negate();
+    tris.push({ tri, n, c, box: new THREE.Box3().setFromPoints([BP[c[0]], BP[c[1]], BP[c[2]]]) });
+  }
+  const tucked = new Uint8Array(P.length), q = new THREE.Vector3(), at = new THREE.Vector3();
+  const onto = P.map((p, i) => {
+    const t = Math.min(1, Math.max(0, (chin - p.y) / (ON - CHIN)));
+    if (!t) return null;
+    let near = null, best = Infinity;
+    for (const s of tris) {
+      if (s.box.distanceToPoint(p) >= Math.sqrt(best)) continue;
+      s.tri.closestPointToPoint(p, q);
+      const d = q.distanceToSquared(p);
+      if (d < best) (best = d), (near = s), at.copy(q);
+    }
+    // (out over the throat, hidden under it; in under the skin of the chest and the shoulders, which a top hides and draws
+    // over: by the corner of the triangle nearest)
+    const corner = near.c.reduce((a, c) => (BP[c].distanceToSquared(at) < BP[a].distanceToSquared(at) ? c : a));
+    const off = UNDER.has(reg.getScalar(corner)) ? SKIN : -TUCKED;
+    if (off < 0 && t > 0.5) tucked[i] = 1;
+    return at.clone().addScaledVector(near.n, off).sub(p).multiplyScalar(t * t * (3 - 2 * t));
+  });
+  // (the move evened over the knit, so the line where it comes onto the body is not seen)
+  for (let pass = 0; pass < 2; pass++) {
+    const was = onto.map((v) => v?.clone() ?? null);
+    P.forEach((_, i) => {
+      if (!was[i]) return;
+      const ns = [...next[i]].filter((j) => was[j]), m = was[i].clone().multiplyScalar(0.5);
+      for (const j of ns) m.addScaledVector(was[j], 0.5 / ns.length);
+      if (ns.length) onto[i] = m;
+    });
+  }
+  P.forEach((p, i) => onto[i] && p.add(onto[i]));
+  // ---- 3. above that, clear of what is drawn of the body under it
+  const cut = chin, shown = BP.map((p, i) => (UNDER.has(reg.getScalar(i)) ? null : p)).filter((p) => p && p.y > cut - 0.05);
   const push = P.map((p, i) => {
     let most = 0;
+    if (onto[i]) return 0;
     for (const q of shown) {
       const d = q.clone().sub(p);
       if (d.lengthSq() > 0.0012) continue;
@@ -132,7 +188,8 @@ for (let b = 0; b < 4; b++) {
     });
   }
   P.forEach((p, i) => p.addScaledVector(SN[i], push[i]));
-  const used = new Set([...knit, ...eyes]), pushed = push.filter((v, i) => v > 1e-4 && used.has(i));  // ---- 3. weighted as the skin under it: the six nearest of the body's points, evened over the knit twice
+  const used = new Set([...knit, ...eyes]), pushed = push.filter((v, i) => v > 1e-4 && used.has(i));
+  // ---- 4. weighted as the skin under it: the six nearest of the body's points, evened over the knit twice
   const ja = [], wa = [], W = P.map((p) => {
     const near = BP.map((q, n) => [n, q.distanceToSquared(p)]).sort((x, y) => x[1] - y[1]).slice(0, 6), w = new Map();
     for (const [n, d2] of near) {
@@ -167,7 +224,8 @@ for (let b = 0; b < 4; b++) {
   const acc = (type, array) => doc.createAccessor().setType(type).setArray(array);
   const pos = acc('VEC3', new Float32Array(P.flatMap((p) => p.toArray()))), nor = acc('VEC3', new Float32Array(SN.flatMap((n) => n.toArray())));
   const uv = acc('VEC2', new Float32Array(SP.flatMap((_, i) => UV.getElement(i, [])))), jnt = acc('VEC4', J), wgt = acc('VEC4', V);
-  const region = acc('SCALAR', new Uint8Array(P.length).fill(1));
+  // (the face's, and the chest's where it goes in under a top: drawn back there)
+  const region = acc('SCALAR', tucked.map((v) => (v ? 3 : 1)));
   const tex = (t, name) => t && doc.createTexture(name).setImage(t.getImage()).setMimeType(t.getMimeType());
   const own = (name, extras) =>
     doc
@@ -186,7 +244,7 @@ for (let b = 0; b < 4; b++) {
   }
   const mesh = doc.createMesh('wear');
   for (const [tris, mat] of [
-    [knit, own('wear_balaclava', { light: +(sum / knit.length).toFixed(4), head: true })],
+    [knit, own('wear_balaclava', { light: +(sum / knit.length).toFixed(4), head: true, back: BACK })],
     [eyes, own('wear_balaclava_eyes', { light: 0.4, own: true, head: true })],
   ]) {
     const prim = doc.createPrimitive().setMaterial(mat).setIndices(acc('SCALAR', new Uint32Array(tris)));
@@ -203,5 +261,5 @@ for (let b = 0; b < 4; b++) {
   );
   const dest = path.join(CHAR, 'wear', `balaclava_${b}.glb`);
   await io.write(dest, doc);
-  console.log(`balaclava_${b}.glb  ${((await fs.stat(dest)).size / 1048576).toFixed(2)} MB  ${(k * 100).toFixed(1)}% of the suit's size, pushed out at ${pushed.length} points (most ${(Math.max(0, ...pushed) * 1000).toFixed(1)} mm)`);
+  console.log(`balaclava_${b}.glb  ${((await fs.stat(dest)).size / 1048576).toFixed(2)} MB  ${(k * 100).toFixed(1)}% of the suit's size, its neck ${(stretch * 100).toFixed(0)}% as long, pushed out at ${pushed.length} points (most ${(Math.max(0, ...pushed) * 1000).toFixed(1)} mm)`);
 }

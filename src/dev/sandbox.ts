@@ -76,6 +76,8 @@ document.body.appendChild(renderer.domElement);
 
 await assets.init();
 const scene = new THREE.Scene();
+// (for a script to look into what was drawn: its materials, their shaders)
+(window as unknown as { stage: unknown }).stage = { scene, renderer };
 scene.background = new THREE.Color(q.get('bg') ? Number(`0x${q.get('bg')}`) : dusk ? 0x4a4f63 : 0xb9c7d6);
 // (the game's own sky for light, so a material that is wrong in the game is wrong here too: the wolf's pale coat was)
 const env = await assets.hdri(assets.manifest.hdri.env);

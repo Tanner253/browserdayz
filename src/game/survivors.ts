@@ -8,7 +8,7 @@ import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { assets } from '../core/assets';
 import type { Atmosphere } from '../world/atmosphere';
 import { stainPatch, type LookUniforms } from './look';
-import { BODY_NAMES, VOICES, bodyFor, hides, pickOf, voiceFor, type Region } from '../sim/survivor';
+import { BODY_NAMES, REGION, VOICES, bodyFor, hides, pickOf, voiceFor, type Region } from '../sim/survivor';
 import { ITEMS } from '../sim/items';
 
 /** the survivors to be picked from, by the number a player's pick is sent as (as DayZ has a few faces to choose from) */
@@ -280,6 +280,19 @@ type Shader = { uniforms: Record<string, THREE.IUniform>; vertexShader: string; 
  * A body's paint, told which of its parts are under what is worn (REGION in src/sim/survivor.ts, as one number:
  * `hides`): those are not drawn, so that no skin pokes through cloth however a limb bends.
  */
+/**
+ * A worn thing's parts that go in under a top (its points over the chest, `back` in its material: the balaclava's
+ * neck) drawn that much further from the eye, where they are on the screen: any top near them is drawn over them (the
+ * owner, 2026-10-25: "falling behind the shirt"; a top stands off the neck at its collar, and the knit stood over it as a bib).
+ */
+function backPatch(shader: Shader, by: number) {
+  shader.uniforms.uBackBy = { value: by };
+  const own = shader.vertexShader.includes('attribute float _region') ? '' : '\nattribute float _region;';
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', `#include <common>\nuniform float uBackBy;${own}`)
+    .replace('#include <project_vertex>', `#include <project_vertex>\nif (abs(_region - ${REGION.chest}.0) < 0.5) { mvPosition.xyz *= 1.0 + uBackBy / length(mvPosition.xyz); gl_Position = projectionMatrix * mvPosition; }`);
+}
+
 function regionPatch(shader: Shader, hide: Hidden) {
   Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 } });
   shader.vertexShader = shader.vertexShader
@@ -375,8 +388,12 @@ export async function wearOn(model: THREE.Object3D, body: THREE.SkinnedMesh[], w
       const light = (mat.userData.light as number | undefined) ?? 0.4;
       const m = onto(s, bones, mat);
       const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
-      mat.onBeforeCompile = (shader) => clothPatch(shader, light, ownColour(w, mat), space);
-      mat.customProgramCacheKey = () => `wear|${w.camo ?? w.tint ?? ''}`;
+      const back = mat.userData.back as number | undefined;
+      mat.onBeforeCompile = (shader) => {
+        clothPatch(shader, light, ownColour(w, mat), space);
+        if (back) backPatch(shader, back);
+      };
+      mat.customProgramCacheKey = () => `wear|${w.camo ?? w.tint ?? ''}|${back ?? ''}`;
       body[0].parent?.add(m);
     });
     // (its camouflage's tile here before the one picture the tools draw)
@@ -490,8 +507,9 @@ export class Wardrobe {
             stainPatch(shader, f.uniforms, at);
             clothPatch(shader, light, ownColour(w, mat), space);
             regionPatch(shader, under);
+            if (mat.userData.back) backPatch(shader, mat.userData.back as number);
           },
-          `survivor-wear|${mat.userData.own ? 'own' : w.camo ? 'camo' : w.tint !== undefined ? 'tint' : 'own'}`,
+          `survivor-wear|${mat.userData.own ? 'own' : w.camo ? 'camo' : w.tint !== undefined ? 'tint' : 'own'}${mat.userData.back ? '|back' : ''}`,
         );
         const m = onto(s, f.bones, mat);
         under.by.value = (w.underBy ?? UNDER) / unitOf(m);
