@@ -84,6 +84,10 @@ export class BaseDraw {
   private solidT = 0;
   /** a door swung by somebody (its first move), and one held by the player's own body */
   onSwing: (b: Base, p: Piece, at: THREE.Vector3) => void = () => {};
+  /** the player's own body pushed by a leaf, through its controller (Player.shove): what of the push was had */
+  shove: (dx: number, dz: number, past: ReadonlySet<number>) => number = () => 0;
+  /** where the player's own body is */
+  me: () => THREE.Vector3 = () => new THREE.Vector3(1e9, 0, 1e9);
   /** each kind of lock as it is fitted, out of its item's own model (null while that loads) */
   private locks = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material | THREE.Material[] } | null>();
 
@@ -262,16 +266,39 @@ export class BaseDraw {
     d.a = to > d.a ? Math.min(1, d.a + dt / DOOR.swing) : Math.max(0, d.a - dt / DOOR.swing);
     this.pose(d);
     if (d.leafCols && this.blocked(d)) {
-      // (it stops on the body, and holds there until the way is clear)
-      d.a = was;
-      this.pose(d);
-      return;
+      // (the body in its way pushed on by just as much as the leaf moved, through the body's own controller, so a wall
+      // stops it; pinned, the door stops on it and holds there until the way is clear. The owner, 2026-10-25: "the
+      // door opening and closing is a smooth action, so should its affect on the player be")
+      const push = this.pushOf(d, was);
+      const past = new Set(d.leafCols.flat().map((c) => c.handle));
+      // (what the controller let it have is the word: the world's queries see the body where it was until the next step)
+      if (!push || this.shove(push.x, push.z, past) < 0.7) {
+        d.a = was;
+        this.pose(d);
+        return;
+      }
     }
     this.placeLeaves(d);
     if (d.a === to) {
       this.moving.delete(d);
       for (const q of d.parts.slice(d.parts.length - (shapeOf(d.piece.k).leaves?.length ?? 0))) this.meshes.get(q.key)?.computeBoundingSphere();
     }
+  }
+
+  /** how far the leaves' move from `was` carries the player's body, along the ground: the turn about each hinge applied to
+   * where the body stands from it, a little over (null: a leaf that tips, a hatch's, which only stops) */
+  private pushOf(d: Drawn, was: number): THREE.Vector3 | null {
+    const leaves = shapeOf(d.piece.k).leaves ?? [], first = d.parts.length - leaves.length, me = this.me(), out = new THREE.Vector3();
+    let any = false;
+    leaves.forEach((l, i) => {
+      if (l.axis !== 'y') return;
+      const da = angleAt(l, d.a) - angleAt(l, was), hinge = _p.setFromMatrixPosition(d.parts[first + i].matrix);
+      const rx = me.x - hinge.x, rz = me.z - hinge.z, c = Math.cos(da), s = Math.sin(da);
+      out.x += (rx * c + rz * s - rx) * 1.15;
+      out.z += (-rx * s + rz * c - rz) * 1.15;
+      any = true;
+    });
+    return any ? out : null;
   }
 
   /** whether the player's body is where a door's leaves now are */

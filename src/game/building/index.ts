@@ -96,6 +96,8 @@ export interface BuildHost {
   /** chips and dust off a surface struck (Effects.impact, no mark) */
   impact: (surface: import('../../core/physics').Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
   myId: RaidHost['myId'];
+  /** the player's own body pushed by a leaf swinging, through its controller (Player.shove) */
+  shove: (dx: number, dz: number, past: ReadonlySet<number>) => number;
   /** the store open in the inventory now, and the pictures of things (the claim's screen beside its store) */
   shown: () => import('../loot').Stash | null;
   icons: () => Record<string, string>;
@@ -200,6 +202,8 @@ export class Building {
     }, () => this.store, this.doors, this.boxes);
     this.ladders = new LadderView(h.input, () => this.store, h.climber);
     this.torches = new TorchView({ input: h.input, flames: h.flames, glow: h.glow, held: () => h.held()?.id ?? null, tip: h.tip, me: h.me, shut: (at) => this.lightShut(at) }, () => this.store);
+    this.draw.shove = (dx, dz, past) => h.shove(dx, dz, past);
+    this.draw.me = h.me;
     this.raid = new RaidView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, camera: h.camera, player: h.player, me: h.me, take: h.take,
       changed: h.changed, flames: h.flames, glow: h.glow, explode: h.explode, broken: (b, ids) => this.brokeAlone(b, ids), impact: h.impact,

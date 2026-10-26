@@ -67,36 +67,6 @@ export function inTheWay(p: Piece, feet: { x: number; y: number; z: number }[]) 
   return feet.some((f) => struck(pts, f));
 }
 
-/**
- * Where a body a leaf swings through is pushed to (the owner, 2026-10-25: "you should be able to close a door even with
- * someone in the way, the door collisions would just push the player realistically"): on along the way the leaf is
- * going, clear of it where it comes to rest. `feet` in the base's frame; null when nothing of it is in the way.
- */
-export function pushedBy(p: Piece, feet: { x: number; y: number; z: number }, opening: boolean): { x: number; z: number } | null {
-  if (!struck(swept(p), feet)) return null;
-  const a = angleOf(p.r), c = Math.cos(a), s = Math.sin(a);
-  // (into the piece's own frame: inBase undone)
-  const dx = feet.x - p.x, dz = feet.z - p.z, f: V3 = [dx * c - dz * s, feet.y - p.y, dx * s + dz * c];
-  for (const l of shapeOf(p.k).leaves ?? []) {
-    if (l.axis !== 'y') continue;
-    const end = opening ? l.open : 0, from = opening ? 0 : l.open, sn = Math.sin(end), cs = Math.cos(end);
-    // (the leaf's face where it comes to rest, and the way it is moving there: its far end goes that way)
-    const n: V3 = [sn, 0, cs], mid = l.solid.flatMap(samples).reduce((m, q) => m + q[0], 0), way = -Math.sign(end - from) * Math.sign(mid || 1);
-    const off = (f[0] - l.hinge[0]) * n[0] + (f[2] - l.hinge[2]) * n[2], need = DOOR.body + 0.12;
-    const by = way * need - off;
-    if (way * by <= 0) continue;
-    const q: V3 = [f[0] + n[0] * by, f[1], f[2] + n[2] * by];
-    // (pushed through the doorway as it shuts: through the opening the leaf fills, never through the wall beside it)
-    if (Math.sign(q[2]) !== Math.sign(f[2])) {
-      const xs = l.solid.flatMap(samples).map((v) => leafPoint(l, 0, v)[0]), lo = Math.min(...xs) + DOOR.body, hi = Math.max(...xs) - DOOR.body;
-      q[0] = lo < hi ? Math.min(hi, Math.max(lo, q[0])) : (lo + hi) / 2;
-    }
-    // (and back into the base's frame)
-    return { x: p.x + q[0] * c + q[2] * s, z: p.z - q[0] * s + q[2] * c };
-  }
-  return null;
-}
-
 /** a piece's leaves' middle, in its base's frame (what is reached for) */
 export function middleOf(p: Piece): V3 {
   const ls = shapeOf(p.k).leaves ?? [];
