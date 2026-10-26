@@ -48,13 +48,13 @@ ok('four stalls, every good a real thing at a price in scrap, so many a day; no 
     assert.ok(STALLS[s].sells.length >= 5, `${s} sells ${STALLS[s].sells.length} things`);
     for (const g of STALLS[s].sells) {
       assert.ok(ITEMS[g.id], `${g.id} is not an item`);
-      assert.ok(g.price > 0 && g.n > 0 && g.day > 0, `${g.id}: ${JSON.stringify(g)}`);
+      assert.ok(g.price > 0 && g.n > 0 && (g.day === undefined || g.day > 0), `${g.id}: ${JSON.stringify(g)}`);
       assert.ok(!top.includes(g.id), `${s} sells ${g.id}`);
     }
   }
   // (nails are dear: the owner, "they must be looted which is hard and time consuming")
   const nails = STALLS.building.sells.find((g) => g.id === 'nails')!;
-  assert.ok(nails.price / nails.n >= 4 && nails.day <= 3, 'nails are cheap');
+  assert.ok(nails.price / nails.n >= 4 && (nails.day ?? 99) <= 3, 'nails are cheap');
 });
 
 ok('nothing bought is sold back for a profit, at any stall, nor recycled for more scrap than it cost', () => {
@@ -71,7 +71,7 @@ ok('a day: so many sales of a thing, scrap enough or not, and a most of scrap pa
   const d = day0(), good = STALLS.weapons.sells.find((g) => g.id === 'colt')!;
   assert.equal(typeof mayBuy('weapons', 'colt', d, good.price - 1), 'string', 'a pistol bought with too little scrap');
   assert.equal(mayBuy('weapons', 'colt', d, good.price), good);
-  d.bought.colt = good.day;
+  d.bought.colt = good.day!;
   assert.equal(leftToday(good, d), 0);
   assert.match(mayBuy('weapons', 'colt', d, 9999) as string, /tomorrow/);
   assert.match(mayBuy('medical', 'colt', d, 9999) as string, /not sell/, 'the medical stall sold a pistol');

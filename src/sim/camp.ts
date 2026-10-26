@@ -16,12 +16,12 @@ import { TRADER_SPOTS } from './camp-place';
 
 export type StallId = 'building' | 'weapons' | 'medical' | 'clothing';
 
-/** a thing a stall sells: how many a sale hands over, its price in scrap, and how many sales of it a player gets a day */
+/** a thing a stall sells: how many a sale hands over, its price in scrap, and how many sales of it a player gets a day (unsaid: no limit) */
 export interface Good {
   id: string;
   n: number;
   price: number;
-  day: number;
+  day?: number;
 }
 
 interface Stall {
@@ -33,32 +33,38 @@ interface Stall {
   buys: string[];
 }
 
-const g = (id: string, n: number, price: number, day: number): Good => ({ id, n, price, day });
+const g = (id: string, n: number, price: number, day?: number): Good => ({ id, n, price, ...(day ? { day } : {}) });
 
-/** the four stalls: what each sells, for what, how many a day, and the kinds it buys (src/sim/items/ `category`) */
+/**
+ * The four stalls: what each sells, for what, and the kinds it buys (src/sim/items/ `category`). No daily limit on what is
+ * everyday (rounds, food, drink, medicine, building things, plain tools and clothes); a limit only on what would unbalance
+ * the game bought freely: the guns, the sight, grenades, the gas mask (the way under the gas) and the radio (a drop called
+ * in), the better the scarcer; and nails, which the owner wants looted ("they must be looted which is hard and time
+ * consuming"). The owner: "im not a big fan of the trader supply limits some of them dont make sense".
+ */
 export const STALLS: Record<StallId, Stall> = {
   building: {
     name: 'Building supplies',
     hello: 'Nails are dear and they stay dear. Everybody wants them.',
-    sells: [g('nails', 10, 50, 3), g('planks', 10, 15, 4), g('key_lock', 1, 40, 2), g('code_lock', 1, 150, 1), g('building_plan', 1, 10, 2), g('hardware', 1, 80, 1), g('stash_kit', 1, 50, 1)],
+    sells: [g('nails', 10, 50, 2), g('planks', 10, 15), g('key_lock', 1, 40), g('code_lock', 1, 150), g('building_plan', 1, 10), g('stash_kit', 1, 50)],
     buys: ['tool', 'misc'],
   },
   weapons: {
     name: 'Guns and rounds',
     hello: 'Plain guns and the rounds for them. The good ones you find yourself.',
-    sells: [g('ammo_9mm', 20, 20, 4), g('ammo_45', 20, 24, 4), g('ammo_12', 10, 24, 3), g('ammo_762', 10, 30, 3), g('ammo_739', 20, 60, 2), g('mag_colt', 1, 25, 1), g('mag_m9', 1, 25, 1), g('clip_mosin', 1, 15, 2), g('gun_light', 1, 50, 1), g('red_dot', 1, 100, 1), g('grenade', 1, 60, 2), g('db12', 1, 140, 1), g('colt', 1, 175, 1), g('mosin9130', 1, 260, 1)],
+    sells: [g('ammo_9mm', 20, 20), g('ammo_45', 20, 24), g('ammo_12', 10, 24), g('ammo_762', 10, 30), g('ammo_739', 20, 60), g('mag_colt', 1, 25), g('mag_m9', 1, 25), g('clip_mosin', 1, 15), g('gun_light', 1, 40), g('red_dot', 1, 100, 1), g('grenade', 1, 60, 2), g('mosin9130', 1, 120, 1), g('db12', 1, 140, 1), g('colt', 1, 150, 1)],
     buys: ['weapon', 'ammo', 'magazine', 'attachment', 'melee'],
   },
   medical: {
     name: 'Medicine and food',
     hello: 'Dressings, drips, a splint. And something to eat.',
-    sells: [g('bandage', 1, 12, 5), g('rags', 5, 8, 4), g('splint', 1, 15, 3), g('saline', 1, 35, 2), g('blood_bag', 1, 60, 1), g('aid_pouch', 1, 40, 2), g('rubbing_alcohol', 5, 15, 2), g('charcoal', 6, 12, 2), g('beans', 1, 8, 4), g('water_jug', 1, 8, 4)],
+    sells: [g('bandage', 1, 12), g('rags', 5, 8), g('splint', 1, 15), g('saline', 1, 35), g('blood_bag', 1, 60), g('aid_pouch', 1, 40), g('rubbing_alcohol', 5, 15), g('charcoal', 6, 12), g('beans', 1, 8), g('water_jug', 1, 8)],
     buys: ['medical', 'food', 'drink'],
   },
   clothing: {
     name: 'Clothes and gear',
     hello: 'Something warm, something to carry it in.',
-    sells: [g('field_jacket', 1, 40, 1), g('field_trousers', 1, 30, 1), g('patrol_cap', 1, 10, 2), g('fishermans_hat', 1, 10, 2), g('work_gloves', 1, 12, 2), g('rubber_boots', 1, 15, 2), g('sack_pack', 1, 60, 1), g('camping_pack', 1, 140, 1), g('flashlight', 1, 25, 2), g('compass', 1, 15, 1), g('binoculars', 1, 60, 1), g('gasmask', 1, 120, 1), g('radio', 1, 150, 1)],
+    sells: [g('field_jacket', 1, 40), g('field_trousers', 1, 30), g('patrol_cap', 1, 10), g('fishermans_hat', 1, 10), g('work_gloves', 1, 12), g('rubber_boots', 1, 15), g('sack_pack', 1, 60), g('camping_pack', 1, 140), g('flashlight', 1, 25), g('compass', 1, 15), g('binoculars', 1, 60), g('gasmask', 1, 120, 1), g('radio', 1, 150, 1)],
     buys: ['clothing', 'stash'],
   },
 };
@@ -114,8 +120,8 @@ export function dayFor(day: number, kept: Partial<TradeDay> | null | undefined):
   return { day, bought: {}, sold: 0, done: [], kills: 0, heads: 0 };
 }
 
-/** how many more sales of a good a player gets today */
-export const leftToday = (good: Good, d: TradeDay) => Math.max(0, good.day - (d.bought[good.id] ?? 0));
+/** how many more sales of a good a player gets today (no limit: Infinity) */
+export const leftToday = (good: Good, d: TradeDay) => (good.day === undefined ? Infinity : Math.max(0, good.day - (d.bought[good.id] ?? 0)));
 
 /** what the old book's credit comes to in scrap */
 export const bookScrap = (credit: number) => Math.min(CAMP.book.most, Math.max(0, Math.floor((Number(credit) || 0) / CAMP.book.per)));

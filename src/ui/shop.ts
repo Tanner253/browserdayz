@@ -1,5 +1,5 @@
 // A stall's counter at the trader camp (progression v3: "a trader camp with four stalls ... Paid in scrap"): what you
-// carry that it will take, and what it has to sell, for scrap, so many a day; at the shop, the day's work. One click
+// carry that it will take, and what it has to sell, for scrap, the few things that would unbalance the game so many a day; at the building stall, the day's work. One click
 // sells a thing or buys one. Everything it does it asks of the camp (`ShopHost`, src/game/camp.ts), whose answer may
 // come from the server: the screen waits for it, and holds nothing itself but what is on it.
 
@@ -146,7 +146,7 @@ export class ShopUI {
     const mine = wares.length
       ? wares.map((w, i) => row('sell', String(i), w.item.id, itemName(w.item) + (ITEMS[w.item.id].stack ? ` ×${w.item.qty ?? 1}` : ''), ITEMS[w.item.id].category, `+${coin}${Math.min(w.pays, left)}`, left <= 0)).join('')
       : '<div class="shop-none">Nothing on you that this stall deals in.</div>';
-    const his = stock.map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + (s.n > 1 ? ` ×${s.n}` : ''), s.left > 0 ? `${s.left} left today · ${ITEMS[s.id].desc ?? ''}` : 'None left today: so many a day', `${coin}${s.price}`, s.price > scrap || s.left <= 0)).join('');
+    const his = stock.map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + (s.n > 1 ? ` ×${s.n}` : ''), s.left === Infinity ? ITEMS[s.id].desc ?? '' : s.left > 0 ? `${s.left} left today · ${ITEMS[s.id].desc ?? ''}` : 'None left today: so many a day', `${coin}${s.price}`, s.price > scrap || s.left <= 0)).join('');
     const jobs = h.jobs();
     const work = jobs
       .map((j) => {
@@ -157,7 +157,7 @@ export class ShopUI {
     this.el.innerHTML = `<div class="shop-box">
       <div class="shop-top"><h2>${st.name}</h2><p>The trader camp · no shooting here</p><div class="shop-credit">Your scrap ${coin}<b>${scrap}</b></div></div>
       ${jobs.length ? `<div class="shop-jobs"><h3>Work today · the same for everybody, new at midnight UTC · paid in scrap</h3>${work}</div>` : ''}
-      <div class="shop-cols"><div class="shop-col"><h3>You sell · ${left > 0 ? `he pays out ${left} more scrap today` : 'he pays out no more today'}</h3>${mine}</div><div class="shop-col"><h3>He sells · for scrap, so many a day</h3>${his}</div></div>
+      <div class="shop-cols"><div class="shop-col"><h3>You sell · ${left > 0 ? `he pays out ${left} more scrap today` : 'he pays out no more today'}</h3>${mine}</div><div class="shop-col"><h3>He sells · for scrap</h3>${his}</div></div>
       <div class="shop-foot"><span class="shop-say">“${this.said}”</span><span><kbd>F</kbd> or <kbd>Esc</kbd> to leave</span><button data-close>Done</button></div>
     </div>`;
     this.el.querySelectorAll<HTMLElement>('[data-sell]').forEach((b) => {
