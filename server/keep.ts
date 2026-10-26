@@ -778,8 +778,9 @@ export function asAdmin(c: Client, fresh: boolean) {
 /** One of an admin's powers, put on or off: they are told which they have, and (vanishing) everybody else that they have left or come. */
 export function setPower(c: Client, k: keyof Client['power'], on: boolean) {
   // (asked for what it already is: told so, so that a panel showing it wrong comes right; the owner, 2026-10-25: "the
-  // admin panel creative tab ui is not updating when i click it")
-  if (c.power[k] === on) return void send(c, { t: 'powers', ...c.power });
+  // admin panel creative tab ui is not updating when i click it". To an admin only: somebody made a mod has their powers
+  // put off one by one, every one off already, and nobody who is no admin is told of powers)
+  if (c.power[k] === on) return void (roleOf(c) === 'admin' && send(c, { t: 'powers', ...c.power }));
   c.power[k] = on;
   if (roleOf(c) === 'admin') keepPowers(c);
   if (k === 'voidInv' || k === 'voidTag') {
