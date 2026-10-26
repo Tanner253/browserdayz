@@ -32,7 +32,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { M4, carry, legJoints, markRegions, padTexture, plainHands, straightenLegs, suitWeights } from './meshy.mjs';
+import { M4, at, carry, legJoints, markRegions, padTexture, plainHands, straightenLegs, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -56,7 +56,7 @@ const FEET = ['shin', 'foot'];
 const HANDS = ['forearm', 'hand'];
 const JACKET = { parts: TOP, core: ['chest', 'upperArm'], covers: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'], peeks: ['chest', 'belly', 'shoulder', 'upperArm', 'forearm'] };
 const TROUSERS = { parts: LEGS, core: ['thigh', 'shin'], covers: ['hips', 'thigh', 'aboveKnee', 'shin'], peeks: ['hips'] };
-const BOOTS = { parts: FEET, core: ['foot'], covers: ['foot'] };
+const BOOTS = { parts: FEET, core: ['foot'], covers: ['foot'], even: 8 };
 const PIECES = {
   m65: { src: 'wear_m65.glb', body: 0, ...JACKET, plain: true, tex: 2048 },
   telogreika: { src: 'wear_telogreika.glb', body: 1, ...JACKET, plain: true, tex: 2048 },
@@ -399,6 +399,23 @@ for (const [id, piece] of Object.entries(PIECES)) {
   // ---- which part of the body each of its points lies over (REGION): what is worn over it draws it in there (a
   // jacket's chest under a vest: Worn.under in src/game/survivors.ts)
   D.prim.setAttribute('_REGION', dressed.doc.createAccessor().setType('SCALAR').setArray(new Uint8Array(near.map((n) => (n >= 0 ? region.getScalar(n) : 0)))));
+  // ---- each point's height over the ankle's joint nearest it (the body's own units): a trouser leg's (`_HEM`) goes in
+  // below the top of what is worn on the foot with it, and a boot says how high its shaft comes (its material's `top`;
+  // src/game/survivors.ts Worn.tuck). Tucked by the parts of the body under it, a hem went in in a sawtooth, torn along
+  // it, and a boot's shaft drawn in under the trouser leg opened into strips as the ankle bent (the owner, 2026-10-26:
+  // "the player models' feet do not look right where the legs meet the shoes"): now a trouser leg goes smoothly into the
+  // shoe or the boot, as trousers are worn in boots
+  let top = null;
+  if (piece.parts.includes('shin')) {
+    const feet = ['foot_l', 'foot_r'].map((n) => at(M4(body.node.getSkin().listJoints().find((j) => j.getName() === n).getWorldMatrix())));
+    const over = D.P.map((p) => p.y - feet.reduce((m, f) => (Math.hypot(f.x - p.x, f.z - p.z) < Math.hypot(m.x - p.x, m.z - p.z) ? f : m)).y);
+    if (piece.parts.includes('thigh')) D.prim.setAttribute('_HEM', dressed.doc.createAccessor().setType('SCALAR').setArray(new Float32Array(over)));
+    else {
+      // (a boot's top: as high as nine in ten of its points over the ankle that are kept)
+      const kept = [...new Set(tris.flat())].map((i) => over[i]).sort((a, b) => a - b);
+      top = +kept[Math.floor(kept.length * 0.9)].toFixed(4);
+    }
+  }
   // ---- the picture padded from the piece's own cloth: what lies between its islands on the picture was the body's
   // (skin, the shirt), and came in at every island's edge as pink and light slivers, nearer at a distance as the
   // picture is drawn smaller. Everything of the picture the piece does not cover takes the colour of the nearest cloth.
@@ -435,7 +452,9 @@ for (const [id, piece] of Object.entries(PIECES)) {
       }
       W.set(i, w);
     }
-    for (let pass = 0; pass < 2; pass++) {
+    // (a boot evened more: its shaft and its foot bent apart at the ankle and the leather between folded over itself, in dark
+    // slashes, when the foot was pointed back crouching, the owner, 2026-10-26: "crouch walk animatiosn the anlkles are fucked")
+    for (let pass = 0; pass < (piece.even ?? 2); pass++) {
       const was = new Map(W);
       for (const i of mine) {
         const ns = [...next[i]].filter((j) => was.has(j));
@@ -577,7 +596,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
       const [s, t] = uv.getElement(i, e), o = (Math.round(t * (info.height - 1)) * info.width + Math.round(s * (info.width - 1))) * info.channels;
       sum += 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
     }
-    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(bulk ? { bulk } : {}) });
+    mat.setExtras({ light: +(sum / uv.getCount() / 255).toFixed(4), ...(bulk ? { bulk } : {}), ...(top !== null ? { top } : {}) });
   }
   await dressed.doc.transform(
     unpartition(),

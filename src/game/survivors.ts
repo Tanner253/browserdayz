@@ -76,7 +76,8 @@ export interface Worn {
   underBy?: number;
   /** the parts of it not drawn at all under what is over it (a high waist under a jacket) */
   underHide?: number;
-  /** the parts of it tucked in deep under something (TUCK: a trouser hem under a shoe) */
+  /** a trouser leg tucked into what is worn on the foot, below its top (`_hem`, each point's height over the ankle, and
+   * a shoe's `top`, scripts/wear.mjs): non-zero to do so */
   tuck?: number;
 }
 
@@ -129,10 +130,10 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
   // (and trousers in under a top over the hips, a little: a parka's hem stood behind the white of snow trousers' waist)
   // (and their waist above the hips not drawn at all: a gorka's high waist stood out through a parka's front)
   for (const w of legs) if (coat) (w.under = (w.under ?? 0) | coat), (w.underBy = coat & hides(['thigh']) ? UNDER : 0.008), (w.underHide = hides(['belly']));
-  // (and with shoes on, the trousers' hem over the foot tucked in under the shoe: it lay over the trainers to the floor,
-  // and they read as flat white wedges; it breaks at the ankle now (cut away there instead, its edge was torn). And a boot's shaft drawn in under the trouser leg: it stood out behind it.)
-  if (feet.length) for (const w of legs) w.tuck = hides(['foot']);
-  if (legs.length) for (const w of feet) (w.under = (w.under ?? 0) | hides(['shin'])), (w.underBy = 0.012);
+  // (and with shoes on, the trousers' legs tucked in under the shoe's top, smoothly by height (`_hem`): over trainers the
+  // hem lay to the floor as flat white wedges, a boot's shaft stood out behind the leg, and tucked by the body's parts a
+  // hem went in in a sawtooth and a boot's top opened into strips)
+  if (feet.length) for (const w of legs) w.tuck = 1;
   // (and under a suit over everything, nothing of what is under it drawn where it covers: it is whole, and jeans came
   // out through a ghillie suit's legs drawn in under it)
   if (suit) for (const w of inner) w.underHide = (w.underHide ?? 0) | suit;
@@ -299,13 +300,13 @@ function backPatch(shader: Shader, by: number) {
 }
 
 function regionPatch(shader: Shader, hide: Hidden) {
-  Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 } });
+  Object.assign(shader.uniforms, { uHide: hide.hide, uShrink: hide.shrink, uShrinkBy: hide.by, uTuck: hide.tuck ?? { value: 0 }, uTuckBy: hide.tuckBy ?? { value: 0 }, uTuckAt: hide.tuckAt ?? { value: 0 }, uTuckCut: hide.tuckCut ?? { value: 0 } });
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute float _region;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (((uTuck >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uTuckBy;');
+    .replace('#include <common>', '#include <common>\nattribute float _region;\nattribute float _hem;\nvarying float vHem;\nflat varying float vRegion;\nuniform int uShrink;\nuniform float uShrinkBy;\nuniform int uTuck;\nuniform float uTuckBy;\nuniform float uTuckAt;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRegion = _region;\nvHem = _hem;\nif (((uShrink >> int(_region + 0.5)) & 1) != 0) transformed -= normalize(normal) * uShrinkBy;\nif (uTuck != 0) transformed -= normalize(normal) * uTuckBy * (1.0 - smoothstep(uTuckAt - 0.04, uTuckAt, _hem));');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nuniform int uHide;\nflat varying float vRegion;')
-    .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (((uHide >> int(vRegion + 0.5)) & 1) != 0) discard;');
+    .replace('#include <common>', '#include <common>\nuniform int uHide;\nuniform float uTuckAt;\nuniform float uTuckCut;\nvarying float vHem;\nflat varying float vRegion;')
+    .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (((uHide >> int(vRegion + 0.5)) & 1) != 0) discard;\nif (uTuckCut > 0.0 && vHem < uTuckAt - uTuckCut) discard;');
 }
 
 /**
@@ -320,6 +321,11 @@ interface Hidden {
   /** and the parts tucked in deep, out of sight under something (a trouser hem into a shoe), by `tuckBy` */
   tuck?: { value: number };
   tuckBy?: { value: number };
+  /** how high over the ankle the tuck begins, in the garment's own units (a boot's top) */
+  tuckAt?: { value: number };
+  /** and how far under that it is not drawn at all (in a boot: the trouser leg tucked in it came out through its side as
+   * the ankle bent hard, crouching; nothing in a boot's shaft is seen), none for a low shoe */
+  tuckCut?: { value: number };
 }
 /** how deep a trouser hem is tucked in under a shoe, metres */
 const TUCK = 0.04;
@@ -500,6 +506,15 @@ export class Wardrobe {
     this.wornShown = now;
     this.hide.hide.value = this.hide.shrink.value = 0;
     const skin = this.skin, bulk: Bulk = {};
+    // (the top of what is worn on the foot, for the trouser legs tucked into it: a boot's shaft, or a shoe's collar)
+    let shoeTop = 0.01;
+    got.forEach((gltf, k) => {
+      if (ITEMS[worn[k].id ?? '']?.slot !== 'feet') return;
+      gltf?.scene.traverse((o) => {
+        const top = ((o as THREE.Mesh).material as THREE.Material | undefined)?.userData.top;
+        if (typeof top === 'number') shoeTop = Math.max(shoeTop, top - 0.01);
+      });
+    });
     got.forEach((gltf, k) => {
       const w = worn[k];
       // (a piece that did not come leaves the skin under it drawn)
@@ -523,7 +538,7 @@ export class Wardrobe {
         const space = new THREE.Matrix4().copy(s.skeleton.boneInverses[0]).multiply(s.bindMatrix);
         const at = new THREE.Matrix4().copy(skin.skeleton.boneInverses[0]).multiply(skin.bindMatrix).invert().multiply(space);
         // (its parts under a vest drawn in: see Worn.under, and the regions each of its points lies over, scripts/wear.mjs)
-        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 }, tuck: { value: w.tuck ?? 0 }, tuckBy: { value: 0 } };
+        const under: Hidden = { hide: { value: w.underHide ?? 0 }, shrink: { value: w.under ?? 0 }, by: { value: 0 }, tuck: { value: w.tuck ?? 0 }, tuckBy: { value: 0 }, tuckAt: { value: shoeTop }, tuckCut: { value: w.tuck && shoeTop > 0.03 ? 0.012 : 0 } };
         f.atmo.register(
           mat,
           (shader) => {
