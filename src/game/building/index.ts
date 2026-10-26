@@ -712,7 +712,7 @@ export class Building {
     if (!p) return;
     if (!scrap && this.boxes.byCid(`bbox:${base.id}:${id}`)?.container.serialize().items.length) return void this.h.note('Empty it first, or deconstruct it', 'warn');
     const still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
-    const up = PIECES[p.k].role === 'deploy' && p.k !== 'claim', name = PIECES[p.k].name.toLowerCase();
+    const up = (PIECES[p.k].role === 'deploy' && p.k !== 'claim') || !!PLACED[p.k], name = PIECES[p.k].name.toLowerCase();
     this.h.begin(scrap ? `Deconstructing the ${name}` : up ? `Picking the ${name} up` : `Taking the ${name} down`, 2, still, () => {
       if (!still()) return;
       if (this.h.online()) return void this.h.send({ t: 'bdel', b: base.id, p: id, u: hammer.uid, ...(scrap ? { scrap: 1 as const } : {}) });
@@ -787,7 +787,7 @@ export class Building {
       const w = pick >= 0 ? HAMMER_WHEEL[pick] : '';
       const t = this.target(), p = t ? t.base.pieces.get(t.id) : null;
       if (!w) return ['Hammer', p ? `${PIECES[p.k].name} · ${PIECES[p.k].levels ? `Level ${ROMAN[p.t]}` : TIERS[p.t]}` : 'Look at a piece'];
-      if (w === 'remove') return [PIECES[p?.k ?? '']?.role === 'deploy' && p?.k !== 'claim' ? 'Pick up' : 'Take down', p ? `Back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : ''];
+      if (w === 'remove') return [(PIECES[p?.k ?? '']?.role === 'deploy' && p?.k !== 'claim') || PLACED[p?.k ?? ''] ? 'Pick up' : 'Take down', p ? `Back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : ''];
       if (w === 'scrap') return ['Deconstruct', p && PLACED[p.k] ? `Back: ${Object.entries(this.store.salvage(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : 'Only what is set down from the hands'];
       if (w.startsWith('up') && p) {
         const to = Number(w.slice(2)) as Tier, why = this.store.canUpgrade(t!.base.id, t!.id, to, this.h.creative());

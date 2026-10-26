@@ -175,7 +175,11 @@ export const PIECE_IDS = Object.keys(PIECES);
  * place, not something gotten through the building plan"): each such kind's item. It costs that item; what the kind cost
  * to lay is now what its item costs to make (src/sim/craft/recipes.ts).
  */
-export const PLACED: Record<string, string> = { box_small: 'box_small', box_large: 'box_large', workbench: 'workbench', forge: 'forge', bed: 'bed', research_table: 'research_table', bedroll: 'sleeping_bag' };
+export const PLACED: Record<string, string> = {
+  box_small: 'box_small', box_large: 'box_large', workbench: 'workbench', forge: 'forge', bed: 'bed', research_table: 'research_table', bedroll: 'sleeping_bag',
+  // (and what hangs in a doorway or a high wall, as Rust's: the owner, 2026-10-25, "we should make doors and key locks craftable in your inventory as items, like rust. not in the build planner")
+  door_wood: 'door_wood', door_metal: 'door_metal', double_door_wood: 'double_door_wood', double_door_metal: 'double_door_metal', garage_door: 'garage_door', hatch: 'hatch', gate_wood: 'gate_wood', gate_stone: 'gate_stone', door_armoured: 'door_armoured', garage_door_armoured: 'garage_door_armoured',
+};
 /** and the kind each such item sets down */
 export const PLACES: Record<string, string> = Object.fromEntries(Object.entries(PLACED).map(([k, i]) => [i, k]));
 

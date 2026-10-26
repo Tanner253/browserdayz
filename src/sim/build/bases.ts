@@ -31,7 +31,9 @@ export const MEND = { share: 0.5, after: 30_000, turn: 10 * 60_000 };
 /** what mending a piece whole takes: `MEND.share` of what it cost (a workbench, its first level's), by the health it lost */
 export function repairOf(p: Piece): Record<string, number> {
   const lost = Math.max(0, 1 - p.hp / hpOf(p.k, p.t)), out: Record<string, number> = {};
-  for (const [id, n] of Object.entries(costOf(p.k, PIECES[p.k].levels ? laidAt(p.k) : p.t))) {
+  // (a thing set down from the hands is mended from what its item is made of, never from a share of the item)
+  const of = PLACED[p.k] ? PIECES[p.k].cost ?? {} : costOf(p.k, PIECES[p.k].levels ? laidAt(p.k) : p.t);
+  for (const [id, n] of Object.entries(of)) {
     const k = Math.ceil(n * lost * MEND.share - 1e-9);
     if (k > 0) out[id] = k;
   }
@@ -139,7 +141,7 @@ export class Bases {
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
     if (theirs && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";
-    if (K.bench && !free && !this.benchNear(wx, wz, K.bench)) return `It needs a ${K.bench > 1 ? `level ${ROMAN[K.bench]} ` : ''}workbench within ${BENCH_NEAR} m`;
+    if (K.bench && !free && !PLACED[ask.k] && !this.benchNear(wx, wz, K.bench)) return `It needs a ${K.bench > 1 ? `level ${ROMAN[K.bench]} ` : ''}workbench within ${BENCH_NEAR} m`;
     if (K.sleep && !base.claim?.members.some((m) => m.pid === by)) return 'A bed goes only in a base whose claim you are on';
     if (ask.k === 'claim') {
       if (base.claim) return 'This base has its claim already';
@@ -324,9 +326,10 @@ export class Bases {
     add(costOf(p.k, laidAt(p.k)));
     // (a workbench, every level it was brought up through)
     if (PIECES[p.k].levels) for (let l = laidAt(p.k) + 1; l <= p.t; l++) add(costOf(p.k, l as Tier));
-    else if (p.t !== laidAt(p.k)) add(costOf(p.k, p.t));
+    else if (p.t !== laidAt(p.k) && !PLACED[p.k]) add(costOf(p.k, p.t));
     // (a box or a bench is picked up whole, Rust's way: only what is built is half lost)
-    if (PIECES[p.k].role === 'deploy' && p.k !== 'claim') return out;
+    // (and so is anything hung from its own item, a door, a gate: PLACED)
+    if ((PIECES[p.k].role === 'deploy' && p.k !== 'claim') || PLACED[p.k]) return out;
     for (const k of Object.keys(out)) out[k] = Math.floor(out[k] / 2);
     for (const k of Object.keys(out)) if (!out[k]) delete out[k];
     return out;
