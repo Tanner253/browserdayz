@@ -179,9 +179,13 @@ function fitHand({ P, I, W, mine, u, wrist, elbow, sg, J, ours }) {
       const near = fingers.map((f) => 1 / (onSegment(q, f.J4[0], f.J4[3]).off ** 2 + (0.2 * u) ** 2));
       const all = near.reduce((a, b) => a + b, 0);
       fingers.forEach((f, n) => {
-        const t = onSegment(q, f.J4[0], f.J4[3]).t;
+        const { t, off } = onSegment(q, f.J4[0], f.J4[3]);
         let m = near[n] / all;
         if (mineF >= 0) m = THREE.MathUtils.lerp(m, n === mineF ? 1 : 0, smooth(t, 0, 0.3));
+        // (and nothing of the palm or the thumb's root that is not of a finger, a few centimetres off its line: the first
+        // finger's bone carried the web of the thumb, and a grip folded the palm with it, the owner, 2026-10-25: "the
+        // hands and fingers, more specifically fingertips ... seem bugged and inverted / inside out")
+        if (n !== mineF) m *= 1 - smooth(off, 1.3 * u, 2.4 * u);
         const w = m * smooth(t, -0.22, 0.04), w2 = smooth(t, MIDDLE - 0.07, MIDDLE + 0.07), w3 = smooth(t, LAST - 0.07, LAST + 0.07);
         add(f.bones[0], w * (1 - w2));
         add(f.bones[1], w * w2 * (1 - w3));
