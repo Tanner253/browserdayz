@@ -6,13 +6,19 @@ import * as THREE from 'three';
 import { POSE } from './pose';
 import { WORN, GEAR, hangFit, placeWorn } from './gear';
 import { _k6, _m1, _m2, Avatar } from '../avatar';
-import { proportion, type BodyFit, type Lengths } from '../survivors';
+import { proportion, type BodyFit, type Bulk, type Lengths } from '../survivors';
 import { BODY_SCALE } from '../avatar';
 
 export const dressMethods = {
   /** where a thing hung on this body goes on it, by its own head and chest (see hangFit in ./gear) */
   gearFit(this: Avatar, g: { bone: string; pack?: boolean }, inv: THREE.Matrix4): THREE.Matrix4 {
-    return hangFit(this.bodyFit, g, inv);
+    return hangFit(this.bodyFit, g, inv, this.wornBulk);
+  },
+
+  /** how far what is worn stands off the body (Wardrobe): what is hung over it hung again, that much further out */
+  setBulk(this: Avatar, bulk: Bulk) {
+    this.wornBulk = bulk;
+    for (const p of this.gearPlaced) p.holder.matrix.copy(p.rest.inv).multiply(this.gearFit(p.g, p.rest.inv)).multiply(p.m);
   },
 
   /**
@@ -63,7 +69,8 @@ export const dressMethods = {
     this.gearPlaced = [];
     this.packOut = 0;
     for (const p of this.pieces.values()) p.visible = false;
-    const ids = items.map(({ id }) => id);
+    // (and what is worn as clothes: a hat sits on a balaclava's knit, see placeWorn)
+    const ids = [...items.map(({ id }) => id), ...(this.wardrobe?.wornIds() ?? [])];
     const chest: { obj: THREE.Object3D; rest: THREE.Matrix4 }[] = [];
     for (const { id, obj } of items) {
       for (const name of WORN[id] ?? []) {

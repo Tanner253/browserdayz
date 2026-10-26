@@ -15,7 +15,8 @@
 //   &cols=4&view=q                  bodies across a block; the camera (q, side, front, back, top), framed on each body
 
 import * as THREE from 'three';
-import { Avatar } from '../game/avatar';
+import { Avatar, GEAR, GEAR_SHOWN, facepiece } from '../game/avatar';
+import { ItemModels } from '../game/loot';
 import { lookFor } from '../game/look';
 import { Weapons } from '../game/weapons';
 import { CLOTHES, ITEMS } from '../sim/items';
@@ -101,15 +102,32 @@ export async function stageBodies(o: Stage) {
     if (def?.weapon) return { obj, grips, kind: def.weapon.akimbo ? ('pistol' as const) : def.weapon.kind };
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
   };
+  // (the things hung on a body, made as the game makes them for its figure)
+  let models: ItemModels | null = null;
   // (each body on a spot of its own, far enough apart that one is not in another's picture)
   const bodies = await Promise.all(specs.map(async (s, i) => {
     const a = new Avatar();
     await a.load(atmo, 0, false, lookFor('Sable'));
+    const { worn, gear } = sortWorn(s.wear ?? (s.body !== null ? CLOTHES.map(([, id]) => id) : []));
     if (s.body !== null) {
       a.wardrobe.setBody(s.body);
       await a.wardrobe.ready();
-      a.wardrobe.setWorn(sortWorn(s.wear ?? CLOTHES.map(([, id]) => id)).worn);
+      a.wardrobe.setWorn(worn);
       await a.wardrobe.dressed();
+    }
+    // (and what is hung on the body, as the game's figure hangs it: Doll.wear, Avatar.setGear; on the old suit too)
+    if (gear.length) {
+      const items: { id: string; obj: THREE.Object3D }[] = [];
+      for (const id of gear) {
+        if (!GEAR_SHOWN.has(id)) continue;
+        if (!GEAR[id]) {
+          items.push({ id, obj: new THREE.Group() });
+          continue;
+        }
+        const model = (await (models ??= new ItemModels(atmo)).get(id)).group.clone();
+        items.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
+      }
+      a.setGear(items);
     }
     scene.add(a.root);
     a.root.traverse((m) => { if ((m as THREE.Mesh).isMesh) { m.castShadow = true; m.frustumCulled = false; } });

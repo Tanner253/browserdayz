@@ -464,6 +464,47 @@ function fitProportions(doc, fit) {
   return { said: `proportions ${JSON.stringify(said)} at x${s.toFixed(3)}`, scale: s };
 }
 
+/**
+ * A head against its Head joint at rest (metres, facing +z), by the points the head carries (its hair and its face):
+ * its crown, and the middle (x, z) of the top of its skull, the points over three quarters of the crown's height, where
+ * a hat or a hood sits. Hats and masks are hung by these (hangFit in src/game/avatar/gear.ts), against the old suit's
+ * (SUIT_HEAD): by the head's middle as a whole, which a beard draws forward, a gas mask stood off Grigori's face.
+ */
+export function headOf(node) {
+  const joints = node.getSkin().listJoints(), names = joints.map((j) => j.getName());
+  const head = at(M4(joints[names.indexOf('Head')].getWorldMatrix()));
+  const prim = node.getMesh().listPrimitives()[0], ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0'), a = [], w = [];
+  const pts = restPoints(node).filter((p, i) => {
+    ji.getElement(i, a), jw.getElement(i, w);
+    let lead = 0;
+    for (let c = 1; c < 4; c++) if (w[c] > w[lead]) lead = c;
+    return names[a[lead]] === 'Head' && p.y > head.y;
+  });
+  const crown = Math.max(...pts.map((p) => p.y)) - head.y, r = (v) => +v.toFixed(4);
+  const top = new THREE.Box3().setFromPoints(pts.filter((p) => p.y - head.y > crown * 0.75));
+  return { crown: r(crown), topX: r((top.min.x + top.max.x) / 2 - head.x), topZ: r((top.min.z + top.max.z) / 2 - head.z) };
+}
+
+/**
+ * A body's waist against its pelvis joint at rest (metres, facing +z): its back (min z), its front (max z) and its
+ * width, in a band 4 cm about the joint's height, of the points the hips and thighs carry (not the arms that hang
+ * there). What is worn round it is hung by it (hangFit in src/game/avatar/gear.ts, against the old suit's: SUIT_WAIST).
+ */
+export function waistOf(node) {
+  const joints = node.getSkin().listJoints(), names = joints.map((j) => j.getName());
+  const pelvis = at(M4(joints[names.indexOf('pelvis')].getWorldMatrix()));
+  const prim = node.getMesh().listPrimitives()[0], ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0'), a = [], w = [];
+  const band = restPoints(node).filter((p, i) => {
+    if (Math.abs(p.y - pelvis.y) >= 0.04) return false;
+    ji.getElement(i, a), jw.getElement(i, w);
+    let lead = 0;
+    for (let c = 1; c < 4; c++) if (w[c] > w[lead]) lead = c;
+    return /^(pelvis|spine_01|thigh_[lr])$/.test(names[a[lead]]);
+  });
+  const b = new THREE.Box3().setFromPoints(band), r = (v) => +v.toFixed(4);
+  return { waistMin: r(b.min.z - pelvis.z), waistMax: r(b.max.z - pelvis.z), waistWidth: r(b.max.x - b.min.x) };
+}
+
 /** a skinned shape's points as its skeleton stands at rest (THREE.Vector3[]) */
 export function restPoints(node) {
   const skin = node.getSkin(), joints = skin.listJoints(), ibm = skin.getInverseBindMatrices();

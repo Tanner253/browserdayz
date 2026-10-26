@@ -268,20 +268,20 @@ if (bb) {
       const worn: Worn[] = list('wear').map((w) => {
         const [model, c] = w.split('~');
         const own = dressOf(model);
-        return { model, hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
+        return { model, ...(own?.each ? { each: true } : {}), hides: q.has('hide') || !own ? hide : hides(own.hides), shrinks: hides((q.has('shrink') || !own ? list('shrink') : own.shrinks ?? []) as Parameters<typeof hides>[0]), ...(c && /^[0-9a-f]{6}$/i.test(c) ? { tint: Number(`0x${c}`) } : c ? { camo: c } : {}) };
       });
       const gearIds = list('gear');
       for (const id of gearIds) {
         const bare = bareWorn(id);
         if (bare) worn.push(bare);
       }
-      if (worn.length) await wearOn(o, body, worn);
+      if (worn.length) await wearOn(o, body, worn, n);
       for (const id of gearIds) {
         const g = GEAR[id], bone = g && o.getObjectByName(g.bone), inv = g && rest.get(g.bone);
         if (!g || !bone || !inv) continue;
         const item = (await assets.model(id)).clone();
         const holder = new THREE.Group(), m = new THREE.Matrix4();
-        placeWorn(id, item, gearIds, m);
+        placeWorn(id, item, [...gearIds, ...list('wear').map((w) => w.split('~')[0])], m);
         // (as the game hangs it: by the body's own head and chest, Avatar.gearFit)
         const gearInv = inv.clone().multiply(turned.clone().invert()), fit = body[0]?.userData.fit ?? null;
         holder.matrixAutoUpdate = false;
