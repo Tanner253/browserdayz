@@ -18,9 +18,13 @@ export const MAT = {
 /** fragments a bar takes at the forge (v3: "10 fragments make 1 bar, with time and fuel") */
 export const PER_BAR = 10;
 
-/** how many make a pile, and what one weighs, kg (a full pile of scrap 5 kg, of fragments 10: carried, they cost) */
+/**
+ * how many make a pile, and what one weighs, kg (a full pile of scrap 5 kg, of fragments 20: carried, they cost). Fragments
+ * and bars pile high, as Rust's 1000 a slot, so a claim's store holds days of a metal base's upkeep (the owner: "the sheet
+ * metal doesn't even fit in the flag's inventory, not well thought out")
+ */
 export const PILES = {
   scrap: { stack: 500, weight: 0.01 },
-  frags: { stack: 500, weight: 0.02 },
-  bar: { stack: 20, weight: 0.5 },
+  frags: { stack: 1000, weight: 0.02 },
+  bar: { stack: 100, weight: 0.5 },
 };

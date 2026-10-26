@@ -21,13 +21,13 @@ export const BUILD_ITEMS: ItemDef[] = [
   { id: 'log', name: 'Log', model: 'log', w: 2, h: 6, weight: 6, category: 'misc',
     desc: 'A length of trunk, from a tree you felled. Lay it down and saw it into six planks.',
   },
-  { id: 'planks', name: 'Planks', model: 'planks', w: 2, h: 4, weight: 0.3, stack: 20, fresh: 8, category: 'misc',
+  { id: 'planks', name: 'Planks', model: 'planks', w: 2, h: 4, weight: 0.3, stack: 100, fresh: 8, category: 'misc',
     desc: 'Sawn boards. Every frame of a base is made of them, and a wooden wall is nailed up out of more.',
     // (a few, sawn already, where wood was worked and kept. Each of these is kept off the outskirts, or nearly, whose sheds
     // are full of the tools, the firewood and the lights already, and found inland, where most of the works and yards are.)
     loot: { pair: 'WoodenPlank', at: [0, 4, 5, 0, 0], restock: 300, usage: SHEDS, favour: { Farm: 2, Industrial: 2 }, qty: [0.25, 0.5] },
   },
-  { id: 'stone', name: 'Stone', model: 'stone', pile: 3, w: 1, h: 2, weight: 0.15, stack: 50, fresh: 15, category: 'misc',
+  { id: 'stone', name: 'Stone', model: 'stone', pile: 3, w: 1, h: 2, weight: 0.15, stack: 250, fresh: 15, category: 'misc',
     desc: 'Rough stone broken off a boulder with a pickaxe. A stone wall is built of it.',
   },
   { id: 'nails', name: 'Nails', model: 'nails', w: 1, h: 1, weight: 0.01, stack: 99, fresh: 25, category: 'misc',
