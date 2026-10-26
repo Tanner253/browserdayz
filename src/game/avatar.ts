@@ -133,6 +133,17 @@ export const SHOULDER = {
  * little out, so its flame is at the shoulder's height and clear of the body (the navigator, of one held at the hip: "he
  * looks like his jacket is on fire ... Hold it as DayZ and Rust do"). From the head, as SHOULDER: forward, up, right.
  */
+/**
+ * A knife, only carried: held ready, low in front of the right hip, the elbow bent and the point forward and up, not hung
+ * at the side as a bigger thing is (the owner, 2026-10-25: "currently when a player holds a knife their hands are down at
+ * their side"). Where the fist is from the head (forward, up, right), and its fingers and palm, as RAISE says them.
+ */
+export const READY = {
+  at: [0.34, -0.66, 0.2] as [number, number, number],
+  fingers: [0.55, -0.8, -0.25] as [number, number, number],
+  palm: [0.05, 0.1, -1] as [number, number, number],
+};
+
 export const RAISE = {
   at: [0.4, -0.44, 0.32] as [number, number, number],
   fingers: [0.92, -0.18, -0.34] as [number, number, number],
@@ -472,11 +483,13 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean; head?: THREE.Vector3 } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean; ready?: boolean; head?: THREE.Vector3 } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** how far a torch is held up (0 at the side, 1 up: RAISE) */
   raiseT = 0;
+  /** how far a knife is held ready (0 hanging, 1 ready: READY) */
+  readyT = 0;
   /** how far what is in one fist is hung beside the leg (HANG), 0..1 */
   hangT = 0;
   /** the player's own body: its stride clock is the old clips' (see update.ts) */
