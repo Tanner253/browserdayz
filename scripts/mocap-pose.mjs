@@ -247,6 +247,33 @@ export function relax(doc, sk, name, { drop = 0, inward = 0 } = {}) {
   writeClip(doc, clip, Q, T, clip.dur);
 }
 
+/**
+ * A loop's planted feet laid flat: each foot turned, about its ankle, toward how it lies at rest (its own way about the
+ * up kept), by how near its ankle is to the lowest it goes in the loop (all of it within 3 cm of that, none from 8 cm).
+ * As captured, the walks and the crouch put the foot down and stood on it toes up, 17 to 23 degrees, the ball of it 8
+ * cm off the ground: the owner, 2026-10-25, "players feet still dont sit flat on the ground it seems they like to make
+ * the toes point up".
+ */
+export function plant(doc, sk, name) {
+  const clip = readClip(doc, sk, name), { Q, T } = frameOf(clip), n = clip.frames + 1;
+  const rest = sk.pose([], null), UP = new THREE.Vector3(0, 1, 0);
+  for (const s of ['l', 'r']) {
+    const [c, ball] = ['foot', 'ball'].map((x) => sk.index(`${x}_${s}`));
+    const restToe = posOf(rest[ball]).sub(posOf(rest[c])).setY(0).normalize(), restTurn = rotOf(rest[c]);
+    let low = Infinity;
+    for (let f = 0; f < n; f++) low = Math.min(low, posOf(sk.pose(Q[f], T[f])[c]).y);
+    for (let f = 0; f < n; f++) {
+      const W = sk.pose(Q[f], T[f]), y = posOf(W[c]).y - low;
+      const w = 1 - THREE.MathUtils.smoothstep(y, 0.03, 0.08);
+      if (w < 1e-3) continue;
+      const toe = posOf(W[ball]).sub(posOf(W[c])).setY(0).normalize();
+      const flatQ = new THREE.Quaternion().setFromAxisAngle(UP, Math.atan2(new THREE.Vector3().crossVectors(restToe, toe).y, restToe.dot(toe))).multiply(restTurn);
+      Q[f][c] = rotOf(W[sk.parent[c]]).invert().multiply(rotOf(W[c]).slerp(flatQ, w)).normalize();
+    }
+  }
+  writeClip(doc, clip, Q, T, clip.dur);
+}
+
 /** part of a movement done once: from `a` to `b` seconds */
 export function trim(doc, sk, name, a, b) {
   const clip = readClip(doc, sk, name);
