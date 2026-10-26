@@ -56,6 +56,8 @@ export interface HandGrip {
   shoulder?: boolean;
   /** held up before the chest, the forearm raised, what is in the fist standing up and a little out (a torch) */
   raise?: boolean;
+  /** a knife, carried ready: held low in front, the elbow bent (READY in avatar.ts) */
+  ready?: boolean;
 }
 
 export interface Grips {

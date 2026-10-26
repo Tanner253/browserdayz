@@ -116,7 +116,7 @@ function list(v: StoreView) {
       ${skin('deagle_gold')}
       <div class="st-more">${(['m9_nickel', 'colt_nickel'] as ItemId[]).map(skin).join('')}</div>
       <h2 class="st-head">Knives <em>a finish goes on any knife you carry</em></h2>
-      <div class="st-more">${(['karambit', 'knife_emerald', 'knife_ruby', 'knife_gold', 'knife_damascus', 'knife_carbon', 'knife_nightcamo'] as ItemId[]).map(skin).join('')}</div>
+      <div class="st-more">${(['karambit', 'karambit_fade', 'knife_emerald', 'knife_ruby', 'knife_gold', 'knife_damascus', 'knife_carbon', 'knife_nightcamo'] as ItemId[]).map(skin).join('')}</div>
       <article class="st-card noads">
         <h3>No ads <em>30 days</em></h3><p>${SHOP.noads.say}</p>
         <div class="st-row"><b class="st-price">${money(SHOP.noads.usd)}</b>${vip ? '<span class="st-owned">With VIP</span>' : `<button type="button" class="st-buy" data-buy="noads">${p.noads > now ? 'Add 30 days' : 'Buy'}</button>`}</div>

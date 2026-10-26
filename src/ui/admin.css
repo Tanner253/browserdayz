@@ -441,3 +441,5 @@ button.adm-p:hover { background: rgba(233, 228, 216, 0.07); }
 .hud-map .hm-who button { padding: 5px 9px; font-size: 14px; letter-spacing: 0.06em; text-transform: none; text-align: left; }
 .hud-map .hm-who button:disabled { opacity: 0.4; cursor: default; }
 body.touch .hm-adm { left: 22px; top: 22px; width: 216px; }
+.st-chip.finish.fade { border-color: #8a4ab0; } .st-chip.finish.fade > b { color: #e2a6ff; }
+.adm-store-grid button.held.fade { background: #3a1f4e; border-color: #e2a6ff; }

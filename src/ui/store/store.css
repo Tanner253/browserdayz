@@ -109,3 +109,5 @@
   .st-paygrid { grid-template-columns: 1fr; }
   .st-qr { justify-self: center; }
 }
+.st-card.fade .st-swatch { background: radial-gradient(circle at 30% 35%, #ffd36b 0 6px, #c04ad8 18px, #3a1f6e 60%); }
+.st-reveal.fade { border-color: #8a4ab0; box-shadow: 0 0 40px rgba(190, 90, 220, 0.35); }

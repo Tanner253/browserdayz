@@ -16,6 +16,7 @@
 // is paint, not plate: matte, lit by the sky as the rest of the knife is.
 
 import * as THREE from 'three';
+import { assets } from '../core/assets';
 import { lookOf, type Look } from '../../api/_lib/shop-items';
 
 export type Finish = Look;
@@ -32,6 +33,7 @@ const BALL: Record<Finish, string[] | null> = {
   damascus: ['#191b1e', '#3b3f45', '#767c85', '#b1b7bf', '#dce1e7', '#ffffff'],
   carbon: ['#060607', '#16171a', '#2c2f35', '#4d525a', '#80868f', '#c4c9d1'],
   nightcamo: null,
+  fade: null,
 };
 /** a pattern in the finish: how many times it goes along the thing's longest side, and how it is painted (see PAINT) */
 const PATTERN: Partial<Record<Finish, number>> = { emerald: 2.2, ruby: 2.2, damascus: 1.2, carbon: 5, nightcamo: 1.4 };
@@ -224,6 +226,8 @@ const made = new Map<string, THREE.Material>();
 
 /** a material plated: one copy for each material and finish, shared by every gun that wears it */
 function plated(m: THREE.Material, f: Finish, gun: string, picture = false, scale = 1): THREE.Material {
+  // (the fade is the karambit's own paint, kept under its steel: see steelKarambit)
+  if (f === 'fade') return (m.userData.fade as THREE.Material | undefined) ?? m;
   const key = `${m.uuid}|${f}${picture ? '|picture' : ''}|${scale.toPrecision(3)}`;
   let p = made.get(key);
   if (p) return p;
@@ -277,3 +281,29 @@ export function wearFinish(root: THREE.Object3D, gun: string, f: Finish | null, 
     mesh.material = f ? (Array.isArray(bare) ? bare.map((m) => plated(m, f, gun, picture, scale)) : plated(bare, f, gun, picture, scale)) : bare;
   });
 }
+
+/**
+ * The karambit everybody has is brushed steel (the owner, 2026-10-25: "make the default brushed steel"): the model they
+ * chose came painted with a fade, which is a store finish of its own (karambit_fade). Every copy of it, in the hands, on a
+ * body or on the ground, has its painted parts drawn as clean steel as it is loaded, the paint kept to be put back.
+ */
+const PAINTED = /^Fade/;
+assets.loaded.push((url, scene) => {
+  if (!/(^|\/)karambit(_lod1)?[.]/.test(url)) return;
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const swap = (m: THREE.Material) => {
+      const s = m as THREE.MeshStandardMaterial;
+      if (!s.isMeshStandardMaterial || !PAINTED.test(s.name)) return m;
+      const steel = s.clone();
+      steel.map = null;
+      steel.color.set('#b9bec4');
+      steel.metalness = 0.9;
+      steel.roughness = 0.32;
+      steel.userData = { ...s.userData, fade: s };
+      return steel;
+    };
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
+  });
+});

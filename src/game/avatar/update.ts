@@ -9,7 +9,7 @@ import { slashAt } from '../held-mocap';
 import { MOCAP_HANDS } from '../mocap-switch';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
-import { CLAW, CLAW_HIT, CUT, FP_BACK, HANG, HOLD_GONE, RAISE, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+import { CLAW, CLAW_HIT, CUT, FP_BACK, HANG, HOLD_GONE, RAISE, READY, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
 const _way = new THREE.Vector3();
 
@@ -723,10 +723,26 @@ export const updateMethods = {
       }
     }
 
+    // --- a knife, only carried: held ready (READY)
+    {
+      const up = !!this.inHand?.ready && !dead && !using && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02;
+      this.readyT += ((up ? 1 : 0) - this.readyT) * ease(up ? 6 : 14);
+      if (this.readyT > 0.02 && this.inHand && this.armR && this.neck.length) {
+        settle(this.root);
+        const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+        const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+        _right.set(1, 0, 0).applyQuaternion(aimQ);
+        const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+        const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r).normalize();
+        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, READY.at[0]).addScaledVector(UP, READY.at[1]).addScaledVector(_right, READY.at[2]);
+        this.reach(this.armR, to, dirOf(...READY.fingers), dirOf(...READY.palm), this.inHand.curl, aimQ, this.readyT);
+      }
+    }
+
     // --- a thing to strike with in one hand, only carried: hung beside the leg (HANG), the hand turned at the wrist
     {
       const h = this.inHand;
-      const hang = !!h?.head && !h.shoulder && !h.raise && !dead && !using && !ges && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02 && pr < 0.5;
+      const hang = !!h?.head && !h.shoulder && !h.raise && !h.ready && !dead && !using && !ges && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02 && pr < 0.5;
       this.hangT += ((hang ? 1 : 0) - this.hangT) * ease(hang ? 6 : 14);
       if (this.hangT > 0.02 && h?.head && this.armR) {
         const hand = this.armR.hand;
