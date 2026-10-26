@@ -27,6 +27,16 @@ export const TREE = {
   lands: 3800,
 };
 
+/**
+ * Where a felled tree's `n`th log lies, the tree fallen toward yaw `a`: end to end along the trunk's line from the stump,
+ * each turned along it (the log model's length is its x; the owner: "the logs that spawn are improperly rotated (currently
+ * spawning horizontal to the fallen tree rather than parallel)"). The loot lies on the ground's slope as any does.
+ */
+export function logAt(t: { x: number; z: number }, a: number, n: number): { x: number; z: number; rot: number } {
+  const d = 1.9 + n * 1.7;
+  return { x: t.x + Math.sin(a) * d, z: t.z + Math.cos(a) * d, rot: a + Math.PI / 2 };
+}
+
 /** how hard each tool bites into wood (blows a tree takes are its toughness over this) */
 export const CHOPS: Record<string, number> = { hatchet: 1, felling_axe: 2.5, stone_hatchet: 0.5 };
 /** and into stone */
