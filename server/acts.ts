@@ -419,7 +419,11 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
       if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes${ZONA_VOID ? ' in the Zona' : ''}.` : outside ? `No dog tag on ${c.name}: killed outside the Zona.` : `No dog tag on ${c.name}: an admin, at work.` });
     }
-    if (bare) log(`${c.name} left nothing they carried on their body: an admin, who chose so`);
+    if (bare) {
+      log(`${c.name} left nothing they carried on their body: an admin, who chose so`);
+      // (and they are told, or it is gear lost with no word why)
+      send(c, { t: 'tell', kind: 'warn', text: 'Nothing you carried is on your body: void inventory on death is on (/voidinv off and you leave it as anybody does)' });
+    }
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;

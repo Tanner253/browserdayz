@@ -7,7 +7,7 @@ import zlib from 'node:zlib';
 import { BODY_GRID, heldIn } from '../src/sim/inventory';
 import { type ItemInstance, ITEMS } from '../src/sim/items';
 import type { NewsKept } from '../src/sim/news';
-import { BOOT, CORPSE_LIFETIME, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
+import { BOOT, CORPSE_LIFETIME, LOCAL_ADMIN, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, stashItem, things, world, type Box } from './index';
 import { guardStashes } from './stash-guard';
 import { SITE_URL, keepTags, tagTime, takeTags, type TagsKept } from './tags';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
@@ -755,7 +755,10 @@ export function asAdmin(c: Client, fresh: boolean) {
     // (vanished when they left: everybody was told they had come, and is told now that they are gone)
     if (c.power.hidden) for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on: true } : { t: 'leave', id: c.id });
   }
-  Object.assign(c.power, ADMIN.voids.get(c.key) ?? (kept ? {} : { voidInv: true, voidTag: true }));
+  // (Not on a test server where everybody is an admin, LOCAL_ADMIN: there everybody dies as a player does and leaves
+  // what they carried on their body. Begun with nothing left, every death there lost the whole kit, the owner,
+  // 2026-10-26: "when I died and came back to my body and hit reclaim I lost most of my gear, all my items are gone".)
+  Object.assign(c.power, ADMIN.voids.get(c.key) ?? (kept || LOCAL_ADMIN ? {} : { voidInv: true, voidTag: true }));
   // (and their tag, where an admin above them has set it: see tagLock)
   const lock = tagLock(c.key);
   if (lock !== undefined) c.power.voidTag = !lock;

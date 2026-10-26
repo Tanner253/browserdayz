@@ -16,7 +16,7 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { PlayerInventory } from '../src/sim/inventory';
-import { ITEMS, makeItem } from '../src/sim/items';
+import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8331;
@@ -59,7 +59,7 @@ class Player {
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-reclaim-'));
 // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LOCAL_ADMIN: '1' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';
@@ -134,6 +134,54 @@ try {
   await sleep(200);
   const left = vic.got.filter((m): m is Extract<S2C, { t: 'cdata' }> => m.t === 'cdata' && m.cid === body.uid).at(-1);
   assert.deepEqual(new Set(left?.items.map((p) => p.uid)), new Set(fresh), 'what lies on the body is not the clothes she came back in');
+
+  // ---- a whole kit, as the server hands it, gone back on whole (the owner, 2026-10-26: "when I died and came back to
+  // my body and hit reclaim I lost most of my gear, all my items are gone"): every thing she had is on her after it, on
+  // the body still, or on the ground (the gun that was in her hands), and nowhere is anything lost
+  // (everybody is an admin on this server, as on the local one: and an admin there leaves what they carry as anybody does)
+  const kat = new Player('Kat');
+  await kat.join();
+  kat.at(140, 0);
+  kat.send({ t: 'chat', ch: 'global', text: '/kit assault' });
+  const kit = await kat.next('kit');
+  assert.ok(kit, 'no kit came');
+  const kitted = new PlayerInventory();
+  kitted.clear();
+  assert.deepEqual(kit.items.filter((it) => kitted.add(it)).map((it) => it.id), [], 'the kit did not all go on');
+  const rifle = kitted.find((it) => !!ITEMS[it.id].weapon && ITEMS[it.id].slot === 'long')!;
+  assert.ok(kitted.hold(rifle), 'the rifle did not come into the hands');
+  const deep = (its: (ItemInstance | null | undefined)[], out = new Set<string>()): Set<string> => {
+    for (const it of its) if (it && !out.has(it.uid)) (out.add(it.uid), deep((it.cargo ?? []).map((p) => p.item), out));
+    return out;
+  };
+  const owned = new Set(kitted.everything().keys());
+  kat.carry(kitted);
+  await sleep(300);
+  kat.send({ t: 'died', cause: 'test' });
+  const kBody = (await kat.next('death'))?.corpse;
+  assert.ok(kBody, 'no body was left of the kit');
+  kat.send({ t: 'respawn' });
+  assert.ok(await kat.next('spawn'), 'she did not come back');
+  const second = new PlayerInventory();
+  for (const id of ['beans', 'milk', 'bandage']) second.add(makeItem(id));
+  kat.carry(second);
+  kat.at(kBody.x - 1, kBody.z);
+  await sleep(300);
+  kat.send({ t: 'copen', cid: kBody.uid });
+  assert.ok(await kat.next('cdata', (m) => m.cid === kBody.uid), 'her body did not open');
+  kat.send({ t: 'reclaim', cid: kBody.uid });
+  const kBack = await kat.next('reclaimed');
+  assert.ok(kBack, 'her press did nothing');
+  await sleep(200);
+  // (as her game takes it: what it is told she carries put on, and what finds no room let fall at her feet)
+  const worn2 = new PlayerInventory(), atFeet = worn2.load(kBack.inv);
+  const onHer = new Set([...worn2.everything().keys(), ...deep(atFeet)]);
+  const kLeft = kat.got.filter((m): m is Extract<S2C, { t: 'cdata' }> => m.t === 'cdata' && m.cid === kBody.uid).at(-1)!;
+  const onBody = deep(kLeft.items);
+  const lost = [...owned].filter((uid) => uid !== rifle.uid && !onHer.has(uid) && !onBody.has(uid));
+  assert.deepEqual(lost, [], `${lost.length} of ${owned.size} things were lost: ${lost.map((u) => kitted.everything().get(u)?.id).join(', ')}`);
+  for (const s of ['vest', 'back', 'head', 'feet', 'holster'] as const) if (kitted.slots[s]) assert.equal(worn2.slots[s]?.uid, kitted.slots[s]!.uid, `${s} is not what she wore there`);
+  console.log(`reclaim: the kit (${owned.size} things) came back whole, ${onBody.size} left on the body`);
   console.log(`reclaim: ok (the gun in the hands wore ${optic?.id ?? 'nothing fitted'})`);
 } catch (e) {
   failed = e;
