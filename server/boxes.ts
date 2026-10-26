@@ -17,7 +17,7 @@ export function boxStore(b: Base, p: Piece, items: StoredItem[] = []) {
   const size = PIECES[p.k].store;
   if (!size) return;
   const [x, y, z] = toWorld(b, p.x, p.y, p.z);
-  boxes.set(cidOf(b.id, p.id), { cid: cidOf(b.id, p.id), kind: 'bbox', w: size[0], h: size[1], items, x, y: y + 0.3, z, rot: 0, emptiedAt: -1 });
+  boxes.set(cidOf(b.id, p.id), { cid: cidOf(b.id, p.id), kind: 'bbox', w: size[0], h: size[1], items, x, y: y + 0.3, z, rot: 0, emptiedAt: -1, ...(p.k === 'weapon_rack' ? { rack: true as const } : {}) });
 }
 
 /** what is in a box (for the save; none: not a box) */

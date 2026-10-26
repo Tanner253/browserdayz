@@ -4,6 +4,9 @@
 //   &bb=fell    a pine felled: standing, then moments of its fall (src/world/felling.ts, its own clock), lying with its
 //               logs by it, and the stump left
 
+import { atmosphereOf } from './sandbox-body';
+import { ItemModels } from '../game/loot';
+import { GunRacks, RACK_PLAN } from '../game/racks';
 import { leanAt } from '../sim/build/snap';
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -38,9 +41,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
+export const BUILD_CELLS: Record<string, number> = { rack: 1, tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+export const BUILD_COLS: Record<string, number> = { rack: 1, tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
 
 /** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
 async function drawnAll(draw: BaseDraw) {
@@ -289,6 +292,30 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     camera.lookAt(2.2, 0.2, 0);
     shoot(s, camera, cell, 'the stump and the logs, close');
     return { tree: kind, blows: k.blows, logs: k.logs };
+  }
+  if (name === 'rack') {
+    // a Weapon Rack set down with a gun in each of its five bays: four stood in its cups, a pistol on its top shelf (the
+    // owner, 2026-10-25: "5 gun slots that pair with the slots in the 3d model for guns")
+    const draw = new BaseDraw(s.scene, null), far = new THREE.Vector3(1e6, 0, 1e6);
+    const base: Base = { id: 1, ox: 0, oy: 0, oz: 0, yaw: 0, owner: '', pieces: new Map(), next: 2 };
+    const p = { id: 1, k: 'weapon_rack', t: 1 as Tier, x: 0, y: 0, z: 0, r: 0, hp: 1, at: 0, by: '', on: [] as number[] };
+    base.pieces.set(1, p);
+    draw.put(base, p);
+    const racks = new GunRacks(s.scene, new ItemModels(atmosphereOf(s.scene, new THREE.DirectionalLight())), RACK_PLAN);
+    racks.add('r', 0, 0, 0, 0);
+    racks.show('r', ['ak', 'mosin', 'ar15', 'benelli', 'colt']);
+    for (let i = 0; i < 40; i++) {
+      draw.update(0, far);
+      racks.update(new THREE.Vector3(0, 1.5, 3));
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await settle();
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    camera.position.set(0.5, 1.3, 2.6);
+    camera.lookAt(0, 0.95, 0);
+    shoot(s, camera, 0, 'Weapon Rack · a gun in each of its five bays');
+    return { rack: 5 };
   }
   if (name === 'tris') {
     // a square foundation with a triangle on two sides, walled all round: where a triangle's wall meets a square's at a

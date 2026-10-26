@@ -220,6 +220,8 @@ const SHAPES: Record<string, () => Shape> = {
     flame: [0, 2.26, 0.1],
   }),
   // ---- set down
+  // (the bunker's gun rack: its frame, 1.54 m across, 1.85 high, 0.6 deep, front to +z; a lock on its right post)
+  weapon_rack: () => ({ lockAt: { at: [0.62, 1.0, 0.31] }, solid: [box(-0.77, 0, -0.3, 0.77, 1.85, 0.3)] }),
   box_small: () => ({ lockAt: { at: [0, 0.38, 0.28] }, solid: [box(-0.4, 0, -0.28, 0.4, 0.5, 0.28)], dress: [box(-0.42, 0.5, -0.3, 0.42, 0.56, 0.3)] }),
   box_large: () => ({ lockAt: { at: [0, 0.56, 0.42] }, solid: [box(-0.7, 0, -0.42, 0.7, 0.75, 0.42)], dress: [box(-0.72, 0.75, -0.44, 0.72, 0.82, 0.44), box(-0.74, 0.1, -0.44, -0.7, 0.65, 0.44), box(0.7, 0.1, -0.44, 0.74, 0.65, 0.44)] }),
   // (a sleeping bag rolled out flat, its hood at the head; a bed of pallets with its bedding, as its model is,

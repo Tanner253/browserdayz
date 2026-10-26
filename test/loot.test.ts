@@ -23,7 +23,8 @@
 import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
 import { RNG } from '../src/core/noise';
-import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
+import { CRATE_SPECS, fillCrate, racked } from '../src/sim/crates';
+import { Container, bayOf, suitsBay } from '../src/sim/inventory';
 import { APART_KIND, Economy, TYPES, apartOf } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { MADE_ONLY } from '../src/sim/items/craft';
@@ -75,6 +76,21 @@ ok('every place for a thing is on a step, and every step has places: the camp an
   assert.ok(camp.some((p) => p.arms === 'guns'), 'nothing to fight with is kept at the camp');
   assert.ok(points.filter((p) => p.usage.includes('Bunker')).every((p) => p.tier === 5) && points.filter((p) => p.usage.includes('Gas')).every((p) => p.tier === 4) && points.filter((p) => p.usage.includes('East')).every((p) => p.tier === 3));
   assert.deepEqual(Object.keys(TIERS), ['1', '2', '3', '4', '5']);
+});
+
+ok('a gun rack is filled with its guns in its five bays, each in one that suits it, and nothing else in them', () => {
+  // (the owner, 2026-10-25: "guns spawn in the slots, never in the grid")
+  for (let n = 0; n < 40; n++) {
+    const spec = CRATE_SPECS.gun_rack, c = Object.assign(new Container('rack', spec.label, spec.w, spec.h, [], true), { rack: true });
+    fillCrate(c, 'gun_rack', Math.random, n % 2 === 0 ? 'bunker' : false);
+    racked(c);
+    for (const p of c.items) {
+      const bay = bayOf(p.y);
+      if (ITEMS[p.item.id].weapon) assert.ok(bay >= 0 && suitsBay(p.item.id, bay), `${p.item.id} in bay ${bay}`);
+      else assert.ok(bay < 0, `${p.item.id} in a bay`);
+    }
+    assert.ok(new Set(c.items.filter((p) => bayOf(p.y) >= 0).map((p) => bayOf(p.y))).size === c.items.filter((p) => bayOf(p.y) >= 0).length, 'one gun to a bay');
+  }
 });
 
 ok('every sort of thing has a rule, and gets what its rule says on every step it is kept on', () => {

@@ -44,10 +44,10 @@ export function releaseLock(c: Client, lying = true) {
 /** what each gun rack was last said to hold, by its crate's id */
 const racked = new Map<string, string>();
 /** the guns standing in every gun rack, as the welcome tells them */
-export const racksNow = (): [string, string[]][] => [...boxes.values()].filter((b) => RACKS.has(b.crate ?? '')).map((b) => [b.cid, rackShows(b.items)]);
+export const racksNow = (): [string, string[]][] => [...boxes.values()].filter((b) => RACKS.has(b.crate ?? '') || b.rack).map((b) => [b.cid, rackShows(b.items)]);
 /** A gun rack's guns, told to everybody when they are not what was last told (what else is in it is seen when it is opened). */
 export function rackChanged(b: Box) {
-  if (!RACKS.has(b.crate ?? '')) return;
+  if (!RACKS.has(b.crate ?? '') && !b.rack) return;
   const g = rackShows(b.items), was = racked.get(b.cid), now = g.join(',');
   racked.set(b.cid, now);
   if (was !== now) broadcast({ t: 'rack', cid: b.cid, g });

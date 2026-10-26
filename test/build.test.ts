@@ -9,6 +9,8 @@
 // on posts no longer than they are, and never in the ground; the save keeps every piece and works out again what each
 // rests on.
 
+import { CRATE_SPECS } from '../src/sim/crates';
+import { Container, RACK, RACK_ROWS } from '../src/sim/inventory';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -25,7 +27,7 @@ import { Bases, MEND, heard, heardPiece, mendOf, repairOf, said, saidPiece, type
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { leanAt, blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, STORE, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
-import { ITEMS } from '../src/sim/items';
+import { makeItem, ITEMS } from '../src/sim/items';
 import { inBase, inTheWay, swept } from '../src/sim/build/doors';
 import { BaseSolids } from '../src/sim/build/solid';
 import { inRoom, shutRoom } from '../src/sim/build/rooms';
@@ -400,6 +402,22 @@ ok('the metal fittings need a workbench II near, the armoured ones a III; the wo
   // (hung from its item: what it is made of is its recipe's now)
   assert.deepEqual(costOf('door_metal', 3), { door_metal: 1 });
   assert.deepEqual([hpOf('door_wood', 1), hpOf('door_metal', 3), hpOf('garage_door', 3), hpOf('door_armoured', 4)], [250, 500, 1000, 1000]);
+});
+
+ok('a Weapon Rack is set down from its item, its five bays over a store larger than a world rack; a bay takes only a gun that suits it', () => {
+  // (the owner, 2026-10-25: "users should be able to craft gun shelves ... 5 gun slots ... a high tier storage option")
+  assert.deepEqual(costOf('weapon_rack', 1), { weapon_rack: 1 });
+  const [w, h] = PIECES.weapon_rack.store!;
+  assert.ok(w * (h - RACK_ROWS) > CRATE_SPECS.gun_rack.w * (CRATE_SPECS.gun_rack.h - RACK_ROWS), 'its store larger than a world rack');
+  const c = Object.assign(new Container('r', 'Weapon Rack', w, h, [], true), { rack: true });
+  const ak = makeItem('ak', 1), colt = makeItem('colt', 1), box = makeItem('ammo_9mm', 10);
+  assert.ok(!c.fits(box, 0, 0, false), 'no rounds in a bay');
+  assert.ok(!c.fits(colt, 0, 0, false), 'no pistol in a cup');
+  assert.ok(c.place(ak, 0, 0, false) && !c.fits(makeItem('ak', 1), 0, 1, false), 'a long gun in the first cup, alone');
+  assert.ok(c.fits(colt, 0, 4 * RACK.deep, false), 'a pistol on the shelf');
+  assert.ok(c.fits(box, 0, RACK_ROWS, false), 'and rounds in the store under them');
+  const { bs, b } = hut();
+  assert.ok(typeof bs.lay({ b: b.id, k: 'weapon_rack', ...deployAt(b, 'weapon_rack', { x: 0.4, y: 0, z: 0.2 })! }, ME, 0) !== 'string', 'set down on a floor');
 });
 
 ok('a torch hangs anywhere on a wall face, at any height, with no places to snap to; not in the air', () => {

@@ -323,7 +323,7 @@ export const frameMethods = {
     // (offline a rack shows what is in it as it is; online the server says: see GunRacks)
     if (!this.online && (this.rackT += dt) > 0.5) {
       this.rackT = 0;
-      for (const st of this.loot.crates) if (this.racks.has(st.uid)) this.racks.show(st.uid, rackShows(st.container.items.map((p) => p.item)));
+      for (const st of [...this.loot.crates, ...this.build.boxes.racks()]) if (this.racks.has(st.uid)) this.racks.show(st.uid, rackShows(st.container.items.map((p) => ({ id: p.item.id, y: p.y }))));
     }
     this.racks.update(this.s.r.camera.position);
     for (const f of this.beside) f(dt, this.s.r.camera.position, this.s.r.camera);

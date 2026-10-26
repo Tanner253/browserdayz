@@ -808,6 +808,7 @@ export class Game {
       tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
       explode: (at, mine, w) => this.explode(at, mine, w === 'c4' || w === 'satchel' ? w : 'grenade'),
       myId: () => this.net.id || 1,
+      rack: (cid, at, rot) => (at ? this.racks?.add(cid, at[0], at[1], at[2], rot ?? 0) : this.racks?.remove(cid)),
       shove: (dx, dz, past) => this.player.shove(dx, dz, past),
       shown: () => (this.invUI.isOpen ? this.openStash : null),
       icons: () => this.invUI.icons,
@@ -895,7 +896,10 @@ export class Game {
       }
     }
     this.racks = new GunRacks(r.scene, this.loot.models, RACK_PLAN);
-    for (const st of this.loot.crates) if (RACKS.has(st.kind)) this.racks.add(st.uid, st.x, st.y, st.z, st.rot);
+    for (const st of this.loot.crates) if (RACKS.has(st.kind)) {
+      this.racks.add(st.uid, st.x, st.y, st.z, st.rot);
+      st.container.rack = true;
+    }
 
     progress('loading weapons');
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);

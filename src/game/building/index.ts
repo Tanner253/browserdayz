@@ -96,6 +96,8 @@ export interface BuildHost {
   /** chips and dust off a surface struck (Effects.impact, no mark) */
   impact: (surface: import('../../core/physics').Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
   myId: RaidHost['myId'];
+  /** a Weapon Rack set down or gone: drawn with its guns as the world's racks are (src/game/racks.ts) */
+  rack: (cid: string, at: [number, number, number] | null, rot?: number) => void;
   /** the player's own body pushed by a leaf swinging, through its controller (Player.shove) */
   shove: (dx: number, dz: number, past: ReadonlySet<number>) => number;
   /** the store open in the inventory now, and the pictures of things (the claim's screen beside its store) */
@@ -186,7 +188,7 @@ export class Building {
     const wheel = (per: number) => new Radial({ rings: RINGS, per, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
     this.wheels = { plan: wheel(PER), hammer: wheel(HAMMER_PER) };
     this.wheel = this.wheels.plan;
-    this.boxes = new BoxView(h.input, h.open);
+    this.boxes = new BoxView(h.input, h.open, h.rack);
     this.doors = new DoorView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, camera: h.camera }, () => this.store, this.draw);
     this.locks = new LockView({
       input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, who: () => this.me, keys: h.keys, count: h.count, take: h.take, give: h.give,

@@ -161,6 +161,10 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'door_armoured', name: 'Armoured Door', cat: 'doors', role: 'fit', fits: 'door', only: 4, cost: { steel_plate: 2, iron_bar: 4, hardware: 2, nails: 20 }, hp: 1000, bench: 3 },
     { id: 'garage_door_armoured', name: 'Armoured Garage Door', cat: 'doors', role: 'fit', fits: 'wide', only: 4, cost: { steel_plate: 4, iron_bar: 8, hardware: 3, nails: 40 }, hp: 2000, bench: 3 },
     // (crafting's research table, progression v3: "put a found item in with scrap, and the item is used up; you know it for good"; laid by a bench, as Bench I makes it; on the end, as every new piece goes)
+    // (a gun rack for a base, the bunker's racks' model: made at a level II bench, its five bays and a store larger than a
+    // world rack's under them, 21 rows deep in all: src/sim/inventory.ts RACK; the owner, 2026-10-25: "we should also make
+    // the gun rack inventory larger (when crafted) as a high tier storage option for the base")
+    { id: 'weapon_rack', name: 'Weapon Rack', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 40, metal_frags: 150, nails: 30, hardware: 2 }, hp: 600, bench: 2, store: [10, 21] },
     { id: 'research_table', name: 'Research Table', cat: 'deploy', role: 'deploy', only: 1, cost: { planks: 20, metal_frags: 75, scrap: 25 }, hp: 300, bench: 1 },
   ] satisfies PieceKind[] as PieceKind[]).map((k) => [k.id, k]),
 );
@@ -176,7 +180,7 @@ export const PIECE_IDS = Object.keys(PIECES);
  * to lay is now what its item costs to make (src/sim/craft/recipes.ts).
  */
 export const PLACED: Record<string, string> = {
-  box_small: 'box_small', box_large: 'box_large', workbench: 'workbench', forge: 'forge', bed: 'bed', research_table: 'research_table', bedroll: 'sleeping_bag',
+  box_small: 'box_small', box_large: 'box_large', weapon_rack: 'weapon_rack', workbench: 'workbench', forge: 'forge', bed: 'bed', research_table: 'research_table', bedroll: 'sleeping_bag',
   // (a torch held, hung on a wall anywhere: snap.ts FREE_LEAN)
   torch_wall: 'torch',
   // (and what hangs in a doorway or a high wall, as Rust's: the owner, 2026-10-25, "we should make doors and key locks craftable in your inventory as items, like rust. not in the build planner")

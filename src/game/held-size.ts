@@ -6,6 +6,7 @@
 export const HELD_FIT: Record<string, number> = {
   // (what is set down in a base, carried before it: src/sim/build/pieces.ts PLACED)
   box_small: 0.34,
+  weapon_rack: 0.45,
   box_large: 0.4,
   workbench: 0.42,
   forge: 0.4,

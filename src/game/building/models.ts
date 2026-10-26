@@ -315,6 +315,7 @@ const BODY: Record<string, (atmo: Atmosphere | null) => Promise<Built>> = {
   // (a sleeping bag, opened out, its loft over the solid's ten centimetres: made along x)
   bedroll: async (atmo) => built(into(moved(await partsOf('bb_bedroll', atmo), turnY(Math.PI / 2)), [[-0.4, 0, -1], [0.4, 0.16, 1]])),
   // (the bracket's plate on the wall behind it, -z: the model has it at +z)
+  weapon_rack: async (atmo) => built(into(await partsOf('gun_rack', atmo), [[-0.77, 0, -0.3], [0.77, 1.85, 0.3]])),
   torch_wall: async (atmo) => {
     const b = built(into(moved(await partsOf('bb_wall_torch', atmo), turnY(Math.PI)), [[-0.08, 1.62, -0.13], [0.08, 2.2, 0.17]]));
     torchHead = headOf(b.geo);

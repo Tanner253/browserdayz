@@ -8,6 +8,7 @@
 // turns up in the crates it belongs in with nothing more said. (Until 2026-10-17 each sort of crate had a list of its
 // own, which every new item had to be added to by hand.)
 
+import { RACK, bayOf } from './inventory';
 import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type Category } from './items';
 import { eastOnly, typeRule } from './items/rules';
 import type { Container } from './inventory';
@@ -70,7 +71,8 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // (in the bunker its own, the best; anywhere else, the military's of the step it stands on: see fillCrate's `at`)
   // (as full as its step is rich: a thing or two in a village's, three to five down the bunker, the owner: "loot density
   // depends on tier it spawns in"; ten across, as a .50 is long)
-  gun_rack: { label: 'Weapon Rack', w: 10, h: 5, count: [2, 4], countOn: { 1: [1, 2], 2: [1, 3], 3: [2, 3], 4: [2, 4], 5: [3, 5] }, usage: ['Military', 'Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
+  // (h: its store's five rows under its five bays, RACK_ROWS: src/sim/inventory.ts RACK)
+  gun_rack: { label: 'Weapon Rack', w: 10, h: 20, count: [2, 4], countOn: { 1: [1, 2], 2: [1, 3], 3: [2, 3], 4: [2, 4], 5: [3, 5] }, usage: ['Military', 'Bunker'], tier: 5, with: [4], only: ['weapon', 'ammo', 'magazine', 'attachment'], long: true, lean: { weapon: 2 } },
   bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, count: [1, 2], usage: ['Bunker'], tier: 5 },
   // (the furniture with no places of its own, filled as DayZ's cargo presets fill a container: a thing or two in a
   // cardboard box, a few in a large crate. See FURNITURE in storage.ts.)
@@ -91,7 +93,10 @@ export function stepNear(points: readonly { x: number; z: number; tier?: Tier }[
   }
   return best;
 }
-export const rackShows = (items: readonly { id: string }[]) => items.filter((it) => ITEMS[it.id]?.weapon).map((it) => it.id).slice(0, RACK_SHOWN);
+/** what stands in a rack, bay by bay ('' an empty one): what is in its grid, where each thing lies */
+export const rackShows = (items: readonly { id: string; y: number }[]) => Array.from({ length: RACK.bays }, (_, bay) => items.find((it) => bayOf(it.y) === bay && ITEMS[it.id]?.weapon)?.id ?? '');
+/** a rack just filled: its guns in its bays and nowhere else (the owner, 2026-10-25: "guns spawn in the slots, never in the grid") */
+export const racked = (c: Container) => void (c.items = c.items.filter((p) => !ITEMS[p.item.id]?.weapon || bayOf(p.y) >= 0));
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */

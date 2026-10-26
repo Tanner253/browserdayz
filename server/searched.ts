@@ -5,6 +5,7 @@
 // (src/sim/box-ops.ts), the server does each to the thing as it is now, and everybody who has it open is told what is
 // in it after. What could not be done is said back to whoever did it ('cno'), and their game puts it right.
 
+import { RACKS } from '../src/sim/crates';
 import { applyOps, diffOps, laidIn, type BoxOp, type Laid } from '../src/sim/box-ops';
 import { UPKEEP } from '../src/sim/build/upkeep';
 export { laidIn };
@@ -101,7 +102,9 @@ export function boxOps(c: Client, b: Box, ops: BoxOp[]) {
   // (and a claim's store takes what a base is kept with, and nothing else: server/claims.ts)
   const mayPut = (it: ItemInstance) => (body ? payingTags(it).every((t) => holdsTag(c.key, t.uid)) : !hasTag(it)) && !madeUp(c, it, `a ${b.kind}`) && (b.kind !== 'claim' || UPKEEP.has(it.id));
   const was = JSON.stringify(before);
-  const r = applyOps(before, b.w, b.h, ops, mayPut, clean, true);
+  // (a gun rack's grid keeps its bays' rules: a gun, alone, in a bay that suits it)
+  const rack = RACKS.has(b.crate ?? '') || !!b.rack;
+  const r = applyOps(before, b.w, b.h, ops, mayPut, clean, true, rack ? Object.assign(new Container('rack', 'rack', b.w, b.h, [], true), { rack: true }) : undefined);
   if (body) {
     for (const it of r.took) for (const t of payingTags(it)) came(c, t.uid);
     const onto = r.put.flatMap((it) => payingTags(it)).map((t) => t.uid);
