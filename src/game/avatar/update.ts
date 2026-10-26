@@ -9,7 +9,7 @@ import { slashAt } from '../held-mocap';
 import { MOCAP_HANDS } from '../mocap-switch';
 import type { HandGrip } from '../arms';
 import { POSE, type Clip, CLIPS, type Stride, STRIDES, SIT, PRONE, type Stance } from './pose';
-import { CLAW, CLAW_HIT, CUT, FP_BACK, HANG, HOLD_GONE, RAISE, READY, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
+import { CLAW, CLAW_HIT, CUT, FP_BACK, HANG, HOLD_GONE, RAISE, READY, READY_CLAW, SHOULDER, SICK_GAIT, THUMB_SEEN, UP, _X, _Z, _a, _aimQ, _b, _euler, _fwd, _head, _k1, _k2, _k3, _k4, _k5, _k6, _k7, _k8, _kq, _kr, _m1, _q1, _q2, _qa, _qb, _right, _slide, _v1, _v2, _w, settle, strikeAt, strikeShare, wrap, Avatar, type ArmRig } from '../avatar';
 
 const _way = new THREE.Vector3();
 
@@ -739,9 +739,13 @@ export const updateMethods = {
         _right.set(1, 0, 0).applyQuaternion(aimQ);
         const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
         const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r).normalize();
-        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, READY.at[0]).addScaledVector(UP, READY.at[1]).addScaledVector(_right, READY.at[2]);
-        this.reach(this.armR, to, dirOf(...READY.fingers), dirOf(...READY.palm), this.inHand.curl, aimQ, this.readyT);
+        const R = this.inHand.spin ? READY_CLAW : READY;
+        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, R.at[0]).addScaledVector(UP, R.at[1]).addScaledVector(_right, R.at[2]);
+        this.reach(this.armR, to, dirOf(...R.fingers), dirOf(...R.palm), this.inHand.curl, aimQ, this.readyT);
       }
+      // (a karambit looked over is spun twice round the finger in its ring, as its holder sees it: weapons.ts knifeLook)
+      const sp = this.inHand?.spin;
+      if (sp) sp.rotation.x = ges?.kind === 'check' ? -Math.PI * 4 * THREE.MathUtils.smootherstep(ges.t / ges.dur, 0.1, 0.38) : 0;
     }
 
     // --- a thing to strike with in one hand, only carried: hung beside the leg (HANG), the hand turned at the wrist
