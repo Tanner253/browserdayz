@@ -1844,6 +1844,8 @@ export class Game {
 
   /** what the server lets this player do out of the way: nothing (null), keep order, or everything */
   role: 'admin' | 'mod' | null = null;
+  /** a head admin, the top of the line (the server's word, with the role): their panel can restart the server */
+  top = false;
 
   /** the left button is being held on what the hands are at: let go, it is broken off */
   holding = false;

@@ -13,7 +13,7 @@ import { SITE_URL, keepTags, tagTime, takeTags, type TagsKept } from './tags';
 import { HUNTING_TOWERS, WATCHTOWERS } from '../src/sim/watchtowers';
 import { inPokrovCourt } from '../src/sim/towns';
 import { CHECK } from './checks';
-import { ADMIN, keyHash, roleOf, siteAdmin, tagLock, type AdminState } from './gate';
+import { ADMIN, keyHash, roleOf, roleSaid, siteAdmin, tagLock, type AdminState } from './gate';
 import { CARRY_KEPT, POWERS_KEPT, carryKeep, carryKept, keepPowers, noHold } from './admin';
 import { broadcast, cleanInventory, cleanItem, clients, info, isPose, num, records, send, type Client, type Record_ } from './players';
 import { fillFromQueue } from './queue';
@@ -651,7 +651,7 @@ export function tellRoles() {
     if (role === (c.roleTold ?? null)) continue;
     c.roleTold = role;
     if (!role) continue;
-    send(c, { t: 'role', role });
+    send(c, roleSaid(c));
     if (role === 'admin') asAdmin(c, true);
   }
 }

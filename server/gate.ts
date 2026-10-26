@@ -615,6 +615,11 @@ function topRole(k: string) {
 }
 /** whether somebody is at the top of the line (the owner, and nobody they made: see `over`) */
 export const isTop = (c: Client) => LOCAL_ADMIN || topRole(keyHash(c.key));
+/** what somebody's game is told of their role: and, a head admin, that they are one (their panel shows what is theirs alone, as the restart; the server asks isTop all the same) */
+export const roleSaid = (c: Client) => {
+  const role = roleOf(c);
+  return { t: 'role' as const, role, ...(role === 'admin' && isTop(c) ? { top: true as const } : {}) };
+};
 export const outranks = (c: Client, t: Client) => over(keyHash(c.key), keyHash(t.key));
 /** whether somebody leaves a dog tag, where an admin above them has set it (and they still have a role for it to bind), else undefined */
 export const tagLock = (key: string): boolean | undefined => {

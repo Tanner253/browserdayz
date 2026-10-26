@@ -582,6 +582,7 @@ export const onlineMethods = {
     // what the server says to this player alone: a role given or taken, and what came of an order (see `command` in server/index.ts)
     net.on('role', (m) => {
       this.role = m.role;
+      this.top = !!m.top;
       this.hud.role = m.role;
       if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press ${shown('Backquote')} for your panel, or / for your orders: they are listed as you type.`);
       // (a place right-clicked on the map is gone to: an admin's alone)

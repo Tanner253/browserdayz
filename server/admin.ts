@@ -13,12 +13,15 @@ import type { S2C } from '../src/net/protocol';
 import { ORDERS, written, entityBy, ENTITIES, GROUND } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
 import { type CarryPower, refill, carriedOf, refilledWords, CARRY_POWERS } from '../src/sim/powers';
-import { BANS, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log, news, standJeep, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
+import { BANS, PARKS, boxes, onMap, economy, horde, invented, issue, locks, log, news, standJeep, stopNow, takeOut, things, vehInfo, vehicles, world, type Veh } from './index';
+
+/** a head admin's restart under way: when it stops (ms), or 0 */
+const REBOOT = { at: 0 };
 import { ipOf, namesOf } from './tags';
 import { deviceOf, forgetDevice, shortDevice } from './device';
 import { CHECK, CHECKS } from './checks';
 import { stashLines } from './stash-list';
-import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, isTop, keptOffNow, keyHash, outranks, over, roleOf, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
+import { ADMIN, SIG_MS, TURNED, bannedFor, forgetShooter, ipHash, isTop, keptOffNow, keyHash, outranks, over, roleOf, roleSaid, siteAdmin, turnedAway, type AdminState, type Role } from './gate';
 import { KEPT, asAdmin, keepBefore, place, saveAdmin, savedWords, sayRestart, setPower, sys, whoIs } from './keep';
 import { broadcast, cleanName, clients, drop, send, type Client } from './players';
 import { kill } from './acts';
@@ -466,6 +469,31 @@ export async function command(c: Client, line: string) {
       sayRestart(why, secs);
       return void sys(c, `Everybody is told: the server restarts in ${secs} s${why ? ` (${why})` : ''}. Saying so restarts nothing.`);
     }
+    case 'reboot': {
+      // The server restarted by a head admin (the owner, 2026-10-26: "As admin I should be able to trigger a restart from
+      // the panel (head admins only)"): everybody is told, with the reason, and counted down; then everything kept is
+      // written as before a deploy (keepBefore), and only once it has been does it stop (stopNow), for the host to start
+      // it again. Not written, it is not stopped, and they are told.
+      if (!admin || !isTop(c)) return void sys(c, 'Only a head admin can restart the server.');
+      if (REBOOT.at) return void sys(c, `It restarts already, in ${Math.max(0, Math.ceil((REBOOT.at - Date.now()) / 1000))} s.`);
+      const secs = /^\d+$/.test(rest[0] ?? '') ? Math.max(3, Math.min(300, Number(rest[0]))) : 30;
+      const why = (/^\d+$/.test(rest[0] ?? '') ? rest.slice(1) : rest).join(' ').slice(0, 120) || 'Restarted by an admin';
+      REBOOT.at = Date.now() + secs * 1000;
+      sayRestart(why, secs);
+      log(`[admin] ${c.name} restarts the server in ${secs} s (${why})`);
+      setTimeout(async () => {
+        const r = await keepBefore('a head admin restarts it');
+        if (!r.ok) {
+          REBOOT.at = 0;
+          log(`[admin] the restart is called off: ${r.said}`);
+          for (const o of clients.values()) sys(o, 'The restart is called off: the server goes on.');
+          return void sys(c, `It could NOT be kept: ${r.said}. Not restarted.`);
+        }
+        log(`[admin] kept before the restart: ${r.said}`);
+        stopNow(why, 'a head admin restarted it');
+      }, secs * 1000);
+      return void sys(c, `Everybody is told: the server restarts in ${secs} s (${why}). Everything is kept first.`);
+    }
     case 'delc': {
       // a comment under the changelog taken down by its number; with no number, the newest of them are read out
       if (!admin) return need();
@@ -685,7 +713,7 @@ export async function command(c: Client, line: string) {
         // (and whoever has vanished is gone from their game, as from anybody's)
         if (was) for (const o of clients.values()) if (o !== t && o.power.hidden) send(t, { t: 'leave', id: o.id });
       }
-      send(t, { t: 'role', role: to });
+      send(t, roleSaid(t));
       if (to === 'admin' && !was) asAdmin(t, true);
       if (to) sys(t, `${c.name} has made you ${to === 'admin' ? 'an admin' : 'a mod'}: /help says what you can do.`);
       return void sys(c, `${t.name} is ${to ? (to === 'admin' ? 'an admin' : 'a mod') : 'no longer either'}.${savedWords(kept)}`);
@@ -944,7 +972,7 @@ export async function login(c: Client, pw: unknown) {
   }
   for (const n of namesOf(c.key, c.ip)) ADMIN.tries.delete(n);
   log(`[admin] ${c.name} (#${c.id}) is an admin, by the password`);
-  send(c, { t: 'role', role: 'admin' });
+  send(c, roleSaid(c));
   asAdmin(c, true);
   sys(c, 'You are an admin, on this and every game from now on. /help lists your orders.');
 }

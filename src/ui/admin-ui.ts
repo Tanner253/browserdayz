@@ -105,6 +105,8 @@ export type AdminPlayer = AdminLists['players'][number];
 /** what the panel is told of whoever has it open */
 export interface AdminSelf {
   role: Role | null;
+  /** a head admin (the server's word): the restart is theirs alone */
+  top?: boolean;
   id: number;
   god: boolean;
   hidden: boolean;
@@ -794,7 +796,7 @@ export class AdminUI {
     const p = this.pick(), s = this.self;
     const base = `${this.view}|${this.sub}|${this.target}|${s.role}|${this.sure?.key ?? ''}`;
     if (this.view === 'entities') return `${base}|${this.spawnAt}|${this.spawnBeast}|${JSON.stringify(this.spawnN)}|${JSON.stringify(this.looked ? [this.looked.what, Math.round(this.looked.x), Math.round(this.looked.z), Math.round(this.looked.dist)] : null)}|${JSON.stringify(this.lists.stats ?? {})}`;
-    if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}`;
+    if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}|${!!this.self.top}`;
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}|${JSON.stringify(this.lists.turned ?? [])}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
     if (this.view === 'store') return `${base}|${this.store.n}`;
@@ -1600,6 +1602,18 @@ export class AdminUI {
         this.line('Restarting in', warn(30), warn(60), warn(300)),
         el('div', 'dim', 'A banner across everybody’s screen, counting down. It only says so: nothing is restarted by it. (An update that restarts the server says so by itself.)'),
       ));
+      // (a head admin's alone, and the server asks so too: the owner, 2026-10-26, "As admin I should be able to trigger a restart from the panel (head admins only)")
+      if (this.self.top) {
+        const reboot = () => {
+          const why = this.restartWhy.trim();
+          if (!window.confirm(`Restart the server now? Everybody is told${why ? ` "${why}"` : ''} and counted down for 30 seconds; everything is kept first.`)) return;
+          this.send(`/reboot 30${why ? ` ${why}` : ''}`);
+        };
+        grid.append(this.card('Restart the server', 'clock',
+          this.line(this.button('Restart in 30 s', reboot, 'bad', 'clock')),
+          el('div', 'dim', 'It restarts: everybody is told, with the reason above, and counted down; everything kept is written as before an update, and then the server starts again. If what is kept cannot be written, it does not restart.'),
+        ));
+      }
     }
     const tiles = el('div', 'adm-tiles');
     const tile = (n: string | number, label: string, ic: string) => {

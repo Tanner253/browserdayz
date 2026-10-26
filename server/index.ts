@@ -1354,15 +1354,20 @@ export const stoppingNow = () => stopping;
 // (A test stops it as a host does, by a word on its input: on Windows a process cannot be asked to stop, only stopped.)
 if (process.env.STOP_BY_WORD) process.stdin.on('data', (d) => String(d).includes('stop') && process.emit('SIGTERM'));
 
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(sig, () => {
-    if (stopping) return;
-    stopping = true;
-    log('shutting down, saving world');
-    // (to whoever is still on: their game says so, and looks for the server that comes after this one)
-    sayRestart('', 0);
-    saveWorld();
-    // (and its last word to the site, where it outlasts this server: a few seconds are allowed for it)
-    void Promise.race([keepNow(true, 'this server is stopping'), pause(12_000)]).finally(() => process.exit(0));
-  });
+/**
+ * This server stops, as a host stops it or as a head admin asks (`reboot`, server/admin.ts): whoever is still on is told
+ * (`why` the line their game shows), the world is written, and its last word to the site; then it goes, and the host
+ * starts it again.
+ */
+export function stopNow(why: string, word: string) {
+  if (stopping) return;
+  stopping = true;
+  log(`shutting down, saving world${why ? ` (${why})` : ''}`);
+  // (to whoever is still on: their game says so, and looks for the server that comes after this one)
+  sayRestart(why, 0);
+  saveWorld();
+  // (and its last word to the site, where it outlasts this server: a few seconds are allowed for it)
+  void Promise.race([keepNow(true, word), pause(12_000)]).finally(() => process.exit(0));
 }
+
+for (const sig of ['SIGINT', 'SIGTERM'] as const) process.on(sig, () => stopNow('', 'this server is stopping'));

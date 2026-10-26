@@ -715,7 +715,8 @@ export type S2C =
   /** the arena only: a kill, for the kill feed (`ours`: the killer is on the hearer's side; `me`: the hearer killed or was killed) */
   | { t: 'kill'; by: string; who: string; w: string; head: boolean; ours: boolean; me: boolean }
   /** what this player may do on the server: nothing out of the way (null), keep order (mod), or everything (admin) */
-  | { t: 'role'; role: 'admin' | 'mod' | null }
+  /** this player's role; `top`: they are a head admin, the top of the line (server/gate.ts isTop), whose panel can restart the server */
+  | { t: 'role'; role: 'admin' | 'mod' | null; top?: true }
   /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */
   | { t: 'sys'; text: string }
   /** who is in your party (none: you are in none); a member away from the server has no id */

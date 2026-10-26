@@ -75,6 +75,7 @@ export const ORDERS: Order[] = [
   { name: 'delbody', args: ['[number]'], does: 'Take away a body and what is on it, a player’s or one of the infected’s: by its number, or the nearest. The Delete key does it for the one you are looking at', admin: true },
   { name: 'delbodies', args: ['[metres]'], does: 'Take away every body within so many metres of you (60 if not said), players’ and the infected’s, with what is on them', admin: true },
   { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
+  { name: 'reboot', args: ['[seconds]', '[why]'], does: 'Restart the server: everybody told and counted down (30 s), everything kept, then it starts again (head admins only)', admin: true },
   { name: 'save', args: [], does: 'Write everybody and every stash to the site now (a deploy does it by itself; this is for a restart made by hand)', admin: true },
   { name: 'delc', args: ['[number]'], does: 'Take a comment off the changelog by its number; with no number, the newest are read out', admin: true },
   { name: 'msg', args: ['who', 'words'], does: 'Say something to one player alone' },

@@ -14,7 +14,7 @@ import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors
 import { bunkerDoor, cardSeen, hitsBy, ipOf, seenOf, tagSeen, tagTime } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
-import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, sigOfWs, turnedAway } from './gate';
+import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWords, keyHash, roleOf, roleSaid, sigOfWs, turnedAway } from './gate';
 import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
@@ -448,7 +448,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''}${fp ? ` [dev ${shortDevice(fp)}]` : ''} — ${clients.size} online`);
   // (somebody with a role is told so as they come in: their game shows them what they may do)
   c.roleTold = roleOf(c);
-  if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
+  if (roleOf(c)) send(c, roleSaid(c));
   if (roleOf(c) === 'admin') asAdmin(c, false);
   // (and whoever comes in with an admin's hold and is none is told so: their game empties it)
   else noHold(c);
