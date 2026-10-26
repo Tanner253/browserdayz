@@ -22,8 +22,12 @@ export const UPKEEP = new Set(['planks', 'stone', MAT.frags, MAT.bar]);
 export const KEPT_IN: Record<string, number>[] = [{ planks: 4 }, { planks: 10 }, { stone: 30 }, { [MAT.frags]: 120 }, { [MAT.bar]: 15 }];
 /** what a store held before upkeep was paid in gathered things, cut up for them when they run short: a sheet of metal is its 30 fragments (2026-10-25) */
 const CUT: Record<string, [string, number]> = { [MAT.frags]: ['sheet_metal', 30] };
-/** a claim's store, places across and down: days of a mid-sized base's upkeep, its planks, stone, fragments and bars piled high (the owner: "the sheet metal doesn't even fit in the flag's inventory") */
-export const STORE = { w: 8, h: 6 };
+/**
+ * a claim's store, places across and down: full, two weeks or more of any tier's upkeep up to 200 pieces, its planks, stone
+ * and fragments 1000 a pile and bars 250 (the owner: "the sheet metal doesn't even fit in the flag's inventory"; "hold
+ * everything needed for multiple weeks of upkeep if optimally filled no matter the stage")
+ */
+export const STORE = { w: 10, h: 8 };
 /** whether a thing in a claim's store counts toward its upkeep */
 export const pays = (id: string) => UPKEEP.has(id) || Object.values(CUT).some(([c]) => c === id);
 

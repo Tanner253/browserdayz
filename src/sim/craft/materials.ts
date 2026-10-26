@@ -26,5 +26,5 @@ export const PER_BAR = 10;
 export const PILES = {
   scrap: { stack: 500, weight: 0.01 },
   frags: { stack: 1000, weight: 0.02 },
-  bar: { stack: 100, weight: 0.5 },
+  bar: { stack: 250, weight: 0.5 },
 };
