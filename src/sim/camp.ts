@@ -1,18 +1,18 @@
 // The trader camp (progression v3, the owner's yes 2026-10-25: "a trader camp with four stalls, like Rust's outpost ...
 // Paid in scrap, which you carry and can lose when killed, instead of the book"; "Never overpowered: no top-tier gun,
 // armour or steel plate on any shelf. A daily limit per player, and prices high enough that looting stays better"; "Jobs
-// (three a day, as today) pay in scrap"). The trading post east of the village made over: its shop is the building
-// stall, and three stalls stand on the yard before it (weapons, medical, clothing and gear), with a recycler. Within it
-// nobody is hurt by anybody (Rust's outpost: a safe zone). Every price is data, here; the server judges every trade on
+// (three a day, as today) pay in scrap"). Four stalls round a yard out in the south-west wilderness (building, weapons,
+// medical, clothing and gear), with a recycler; moved there from the trading post, which is in the Zona (the owner: "the
+// trader zone must be moved from the red zone on the map away from the center of the map because this can be exploited").
+// Within it nobody is hurt by anybody (Rust's outpost: a safe zone), and no base is laid near it. Every price is data, here; the server judges every trade on
 // its own copy of the pockets, and the game played alone by the same rules.
 
 import { RNG } from '../core/noise';
 import { ITEMS, type ItemInstance } from './items';
-import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
 import { roomOn, type LayerWorld } from './craft/layer';
-import type { World } from '../world/worldgen';
 import type { TradeDay } from '../net/protocol';
 import { MAT } from './craft/materials';
+import { CAMP_AT } from './camp-place';
 
 export type StallId = 'building' | 'weapons' | 'medical' | 'clothing';
 
@@ -147,27 +147,20 @@ export interface Camp {
 export const STALL = { model: 'trader_stall', scale: 1, l: 2.42, w: 2.8, behind: 0.15 };
 /** what a model whose front is its +x (the stall, the recycler: the sandbox's front camera looks from +x) is turned by, past the way it faces */
 export const FACE_TURN = -Math.PI / 2;
-/** the shop's trader, behind its counter facing the door (src/game/trader.ts had him so) */
-const SHOP_BEHIND = { x: -0.9, z: -0.45 };
 const SEED = 0x7c4a11;
+/** where each stall stands about the yard's middle, m (east, south), its counter to the middle; and the recycler */
+const RING: [StallId, number, number][] = [['building', 0, -10], ['weapons', 10, 0], ['medical', -10, 0], ['clothing', 0, 10]];
+const RECYCLER_AT: [number, number] = [12, -12];
 
-/** the trader camp, the same for the game and the server: the shop at the trading post, the stalls before it, its recycler */
-export function campLayer(world: LayerWorld & Pick<World, 'sites'>): Camp | null {
-  const post = world.sites.find((st) => st.kind === 'market');
-  const shop = post && world.buildings.find((b) => b.type === 'store' && Math.hypot(post.x - b.x, post.z - b.z) < 40);
-  if (!post || !shop) return null;
-  const room = roomOn(world, true), rng = new RNG(SEED);
-  const c = Math.cos(shop.rot), s = Math.sin(shop.rot), [, fd] = BUILDING_FOOTPRINT[shop.type] ?? [10, 10];
-  // (the shop's own frame to the world's: its door faces its +z)
-  const at = (lx: number, lz: number): [number, number] => [shop.x + lx * c + lz * s, shop.z - lx * s + lz * c];
-  const [cx, cz] = at(0, fd / 2 + 12);
+/** the trader camp, the same for the game and the server: four stalls round a yard out in the wilderness, and its recycler */
+export function campLayer(world: LayerWorld): Camp {
+  const room = roomOn(world, true), rng = new RNG(SEED), cx = CAMP_AT.x, cz = CAMP_AT.z;
   const face = (x: number, z: number) => Math.atan2(cx - x, cz - z);
-  const stalls: StallSpot[] = [{ id: 'building', x: shop.x, y: shop.floorY, z: shop.z, rot: shop.rot, at: [shop.x + SHOP_BEHIND.x * c + SHOP_BEHIND.z * s, shop.floorY, shop.z - SHOP_BEHIND.x * s + SHOP_BEHIND.z * c], yaw: shop.rot + Math.PI }];
   /** the nearest room to a place on the yard for a thing so big, facing the yard's middle */
   const lay = (lx: number, lz: number, l: number, w: number) => {
     for (let t = 0; t < 24; t++) {
       const j = t ? 1 + t * 0.35 : 0, a = rng.range(0, Math.PI * 2);
-      const [x, z] = at(lx + Math.sin(a) * j, lz + Math.cos(a) * j), rot = face(x, z);
+      const x = cx + lx + Math.sin(a) * j, z = cz + lz + Math.cos(a) * j, rot = face(x, z);
       const y = room.fit(x, z, l, w, rot, { margin: 1, road: 0.5, level: 0.5, sink: 0.05 });
       if (y === null) continue;
       room.stand(x, z, Math.hypot(l, w) / 2 + 0.6);
@@ -175,14 +168,15 @@ export function campLayer(world: LayerWorld & Pick<World, 'sites'>): Camp | null
     }
     return null;
   };
-  for (const [id, lx, lz] of [['weapons', -10, fd / 2 + 13], ['medical', 10, fd / 2 + 13], ['clothing', 0, fd / 2 + 22]] as [StallId, number, number][]) {
+  const stalls: StallSpot[] = [];
+  for (const [id, lx, lz] of RING) {
     const p = lay(lx, lz, STALL.l, STALL.w);
     if (!p) continue;
-    // (its trader behind the counter, facing out over it: the yaw a body faces +z of the stall by)
+    // (its trader behind the counter, facing out over it)
     const bx = p.x + Math.sin(p.rot) * STALL.behind, bz = p.z + Math.cos(p.rot) * STALL.behind;
     stalls.push({ id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
   }
-  const recycler = lay(-16, fd / 2 + 4, 1.6, 2.0);
+  const recycler = lay(...RECYCLER_AT, 2.0, 1.6);
   return { x: cx, z: cz, stalls, recycler };
 }
 

@@ -22,6 +22,8 @@ import { RECYCLE, recycleStep, recyclable, recycles } from '../src/sim/craft/rec
 import { MAT } from '../src/sim/craft/materials';
 import { PROTOCOL, type S2C, type StoredItem } from '../src/net/protocol';
 import { buildWorldData } from '../server/world';
+import { inZona, zonaDepth } from '../src/world/zona';
+import { noBuilding } from '../src/sim/build/land';
 
 let n = 0;
 const failed: string[] = [];
@@ -123,10 +125,16 @@ ok('a recycler breaks a thing at a time into fragments and scrap, never the meta
 });
 
 const data = buildWorldData(process.cwd());
-ok('the camp stands at the trading post: its shop and three stalls on its yard, clear of every building and road; five recyclers', () => {
+ok('the camp stands out in the wilderness, well clear of the Zona and the middle of the map, no base near it: four stalls on its yard; five recyclers', () => {
   const c = data.camp!;
   assert.ok(c, 'no camp');
   assert.deepEqual(c.stalls.map((s) => s.id), ['building', 'weapons', 'medical', 'clothing']);
+  // (the owner: "the trader zone must be moved from the red zone on the map away from the center of the map because this can be exploited")
+  assert.ok(zonaDepth(c.x, c.z) < -(CAMP.safe + 150), `the camp is ${(-zonaDepth(c.x, c.z)).toFixed(0)} m from the Zona`);
+  for (const s of c.stalls) assert.ok(!inZona(s.x, s.z, -CAMP.safe), `the ${s.id} stall is near the Zona`);
+  assert.ok(Math.hypot(c.x + 1536, c.z) > 700, 'the camp is near the middle of the map');
+  assert.equal(noBuilding(c.x + CAMP.safe, c.z, [], []), 'Too near the trader camp');
+  assert.equal(noBuilding(c.x, c.z + 60, [], []), 'Too near the trader camp');
   for (const s of c.stalls) assert.ok(Math.hypot(s.x - c.x, s.z - c.z) < CAMP.safe - 5, `the ${s.id} stall is ${Math.hypot(s.x - c.x, s.z - c.z).toFixed(0)} m out, past the safe zone`);
   for (let i = 1; i < c.stalls.length; i++) for (let j = i + 1; j < c.stalls.length; j++) assert.ok(Math.hypot(c.stalls[i].x - c.stalls[j].x, c.stalls[i].z - c.stalls[j].z) > 4, 'two stalls on top of each other');
   assert.deepEqual(data.recyclers.map((r) => r.at), ['Zavod', 'the army camp', 'the fort', 'the chemical works', 'the trader camp']);

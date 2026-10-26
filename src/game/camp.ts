@@ -59,9 +59,9 @@ export class TraderCamp {
     void this.draw();
   }
 
-  /** the stalls' models where the layer laid them, solid (the shop is a building of the map's own) */
+  /** the stalls' models where the layer laid them, solid */
   private async draw() {
-    const spots = this.camp?.stalls.filter((s) => s.id !== 'building') ?? [];
+    const spots = this.camp?.stalls ?? [];
     if (!spots.length) return;
     const model = await assets.model(STALL.model).catch(() => null);
     const e = assets.manifest.models[STALL.model];

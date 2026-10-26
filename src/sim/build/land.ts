@@ -8,6 +8,7 @@ import { SEA_LEVEL, onWorld } from '../../world/worldgen/places';
 import { inPlay } from '../../world/worldgen/layout';
 import { TREE_KINDS, treeOf } from '../gather';
 import { waterAt, type Waters } from '../water';
+import { CAMP_AT, CAMP_KEEP } from '../camp-place';
 
 export const KEEP_OFF = {
   /** metres past a named place's reach (a town, a camp, the fort), anywhere on the map */
@@ -33,6 +34,8 @@ export function noBuilding(x: number, z: number, places: { x: number; z: number;
   if (wet?.(x, z)) return 'Not in the water';
   // (the Zona's own word on where it is: it is to be made smaller, rounds about the towns joined by corridors)
   if (inPlay(x, z)) return 'Inside the Zona';
+  // (nor by the trader camp: a base beside a safe zone is a fight its owner always walks away from, src/sim/camp-place.ts)
+  if (Math.hypot(x - CAMP_AT.x, z - CAMP_AT.z) < CAMP_KEEP) return 'Too near the trader camp';
   const at = places.find((p) => Math.hypot(x - p.x, z - p.z) < p.radius + KEEP_OFF.place);
   if (at) return at.name ? `Too near ${at.name}` : 'Too near a town';
   for (const b of buildings) {
