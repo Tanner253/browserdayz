@@ -406,7 +406,7 @@ const SMG_CARRY = {
 const DIG_STROKE = 1.15;
 /** a saw's stroke at a log, there and back, seconds; and how far it goes along its blade, metres */
 const SAW_STROKE = { time: 0.7, reach: 0.12 };
-const _sawQ = new THREE.Quaternion(), _sawX = new THREE.Vector3(1, 0, 0);
+const _sawQ = new THREE.Quaternion(), _sawX = new THREE.Vector3(1, 0, 0), _sawY = new THREE.Vector3(0, 1, 0), _sawD = new THREE.Vector3();
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
 /**
@@ -855,7 +855,10 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // at the middle of its handle, which is the bottom 14 cm of it.)
   // (the saw held as the hammer is, its wooden handle in the fist where the hammer's is: the owner, 2026-10-25, "the hand
   // positionc an be the sam eas the hammer, the wooden handle goes in the hand where the base of the hammer would go")
-  styles.hand_saw = { ...styles.hatchet, grip: 0.07 };
+  // (held by its handle's bar, GRIP_AT: its blade is what the hatchet's edge is, and with the hatchet's stance it ran
+  // straight on from the eye, edge on, and only the handle was seen. Out to the left across the foot of the picture,
+  // below the sight, its flat turned partly to the eye: the owner, 2026-10-26, "it looks bad in first and third person")
+  styles.hand_saw = { ...styles.hatchet, grip: 0.07, idle: { p: [0.2, -0.15, -0.48], tip: [0.25, 0.95, 0.15], edge: [-0.7, -0.15, -0.7] } };
   styles.hammer = styles.hatchet;
   styles.felling_axe = { ...styles.bat, grip: 0.22 };
   styles.pickaxe = { ...styles.bat, grip: 0.22 };
@@ -4898,9 +4901,16 @@ export class Weapons {
       const s = Math.sin((this.sawT * Math.PI * 2) / SAW_STROKE.time);
       // (the hand and the arm with it drawn forward and back, the saw in the fist: "sawing animation is moving the hand
       // and arm forweward and backward with the saw attached", the owner, 2026-10-25)
-      quat.premultiply(_sawQ.setFromAxisAngle(_sawX, -0.6));
-      pos.z -= s * SAW_STROKE.reach;
-      elbow.z -= s * SAW_STROKE.reach;
+      // (brought up and in to the middle of the picture, where the eye looking down at the log has it, the blade turned
+      // to run more nearly ahead and tipped onto it, and drawn along its own length: tipped further down from where it
+      // is held, the saw went out at the foot of the picture and never met the log)
+      const w = Math.min(1, this.sawT / 0.25);
+      quat.premultiply(_sawQ.setFromAxisAngle(_sawY, -0.45 * w)).premultiply(_sawQ.setFromAxisAngle(_sawX, -0.3 * w));
+      pos.x -= 0.05 * w;
+      pos.y += 0.12 * w;
+      _sawD.set(0, 0, -1).applyQuaternion(quat);
+      pos.addScaledVector(_sawD, s * SAW_STROKE.reach * w);
+      elbow.addScaledVector(_sawD, s * SAW_STROKE.reach * w);
     } else this.sawT = 0;
     // looked over (knifeLook): brought in to the middle, turned, and a ring spun round the finger
     const spin = m.body?.getObjectByName('spin');
