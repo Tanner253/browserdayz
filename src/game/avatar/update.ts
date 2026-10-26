@@ -414,7 +414,10 @@ export const updateMethods = {
       // (and square again for a run, the gun carried across the chest)
       // (aimed, a gun with a butt has the chest come round to it a little: see POSE.hold.cheek)
       const weld = held?.butt ? this.aimT * (1 - pr) : 0;
-      const blade = held?.long ? THREE.MathUtils.lerp(POSE.hold.blade, POSE.hold.bladeAim, weld) * (1 - carry) * hold : 0;
+      // (not the player's own body, seen from its own eyes: the gun there is the first-person one, and the chest turned
+      // off it was the body seen turned to the right looking down, the owner, 2026-10-25: "when I'm running and then I
+      // look down at my legs my body turns to the right a bit")
+      const blade = held?.long && !firstPerson ? THREE.MathUtils.lerp(POSE.hold.blade, POSE.hold.bladeAim, weld) * (1 - carry) * hold : 0;
       // (the legs' turn and the blade are two turns of the one waist: together they are no more than it can turn.
       // Stepping one way with a long gun they came to 120 degrees.)
       const waist = THREE.MathUtils.clamp(-this.twist - blade, -POSE.maxTwist, POSE.maxTwist) * alive;
