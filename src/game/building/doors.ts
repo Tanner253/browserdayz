@@ -6,8 +6,8 @@ import type * as THREE from 'three';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import { PIECES } from '../../sim/build/pieces';
-import { toLocal, toWorld, type Base, type Piece } from '../../sim/build/snap';
-import { inTheWay, middleOf, swings } from '../../sim/build/doors';
+import { toWorld, type Base, type Piece } from '../../sim/build/snap';
+import { middleOf, swings } from '../../sim/build/doors';
 import type { Bases } from '../../sim/build/bases';
 import type { C2S, S2C } from '../../net/protocol';
 import type { BaseDraw } from './draw';
@@ -47,9 +47,6 @@ export class DoorView {
   /** a door swung, by whoever may (the server judges online; alone, nobody may be in its way) */
   toggle(base: Base, p: Piece) {
     if (this.h.online()) return void this.h.send({ t: 'bdoor', b: base.id, p: p.id, open: !p.open });
-    // (alone: the server's own rule, against the one body there is)
-    const me = this.h.me(), [x, y, z] = toLocal(base, me.x, me.y, me.z);
-    if (inTheWay(p, [{ x, y, z }])) return void this.h.note('Someone is in the way of it', 'warn');
     p.open = !p.open;
     this.draw.swing(base.id, p.id);
   }

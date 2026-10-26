@@ -413,7 +413,7 @@ export class HUD {
                 <kbd class="set-key" aria-hidden="true">E</kbd>
               </div>
               <div class="set-body">
-                <div class="set-page" role="tabpanel" data-set="controls"><div class="set-rows"></div><h4 class="set-h set-keys">Keys</h4><div class="kbs"></div></div>
+                <div class="set-page" role="tabpanel" data-set="controls"><button type="button" class="store-btn sm-guide-set" style="margin:0 0 10px">Build &amp; craft guide</button><div class="set-rows"></div><h4 class="set-h set-keys">Keys</h4><div class="kbs"></div></div>
                 <div class="set-page" role="tabpanel" data-set="audio"></div>
                 <div class="set-page" role="tabpanel" data-set="video"></div>
                 <div class="set-page" role="tabpanel" data-set="game"></div>
@@ -434,6 +434,7 @@ export class HUD {
     this.root.querySelector('.sm-store:not(.sm-guide)')!.addEventListener('click', () => void import('./store/panel').then((m) => m.openStore()));
     // (the building and crafting guide, at any time: src/ui/guide.ts)
     this.root.querySelector('.sm-guide')!.addEventListener('click', () => this.onGuide());
+    this.root.querySelector('.sm-guide-set')!.addEventListener('click', () => this.onGuide());
     for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'stance', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }

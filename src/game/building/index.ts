@@ -108,6 +108,10 @@ const RING = { reach: 260 };
 const NAIL = { blow: 0.55, lands: 0.45 };
 /** how far from the eye, along the ground, a foundation begun on its own is laid at most (see `alone`) */
 const PLACE = { reach: 6 };
+/** the ghost held steady (the owner, 2026-10-25: "when im placing with the building planner the ghost structure flashes in
+ * and out ALOT seems super buggy"): another place takes over only when it is this much nearer the aim (metres), the place
+ * held is let go of past `far`, and with nothing found the ghost stays where it was for `grace` ms */
+const GHOST = { stick: 0.35, far: 3.4, grace: 250 };
 /** a player who lays is told nothing of a refusal they have already been told, for this long */
 const SAID_AGAIN = 1500;
 
@@ -127,6 +131,8 @@ export class Building {
   /** the chosen piece, and the turn asked for (R) */
   kind = 'foundation';
   private turn = 0;
+  /** the place the ghost was last shown at on a base, and when: held until another is clearly nearer the aim (GHOST) */
+  private kept: { b: number; k: string; s: Spot; at: number } | null = null;
   /**
    * A thing being set down, Rust's way (the owner, 2026-10-24: "a click once to place then move mouse to rotate click
    * again to confirm ... rigid when using crates"): its spot, held since the first click, in its base's frame; how it is
@@ -379,6 +385,16 @@ export class Building {
       const [wx, wy, wz] = toWorld(b, s.x, s.y, s.z), d = Math.hypot(wx - at.x, wy - at.y, wz - at.z);
       if (!best || d < best.d) best = { base: b, s, d };
     }
+    // (the place held, while it is still a place for this piece and near the aim, unless another is clearly nearer)
+    const kept = this.kept, same = (q: Spot, s: Spot) => q.x === s.x && q.y === s.y && q.z === s.z && q.r === s.r;
+    if (kept && kept.k === this.kind && K.role !== 'deploy') {
+      const kb = this.store.bases.get(kept.b);
+      if (kb && near.includes(kb) && this.spotsOf(kb).some((q) => same(q, kept.s))) {
+        const [wx, wy, wz] = toWorld(kb, kept.s.x, kept.s.y, kept.s.z), d = Math.hypot(wx - at.x, wy - at.y, wz - at.z);
+        if (d < GHOST.far && (!best || d < best.d + GHOST.stick)) best = { base: kb, s: kept.s, d };
+      }
+    }
+    if (best && K.role !== 'deploy') this.kept = { b: best.base.id, k: this.kind, s: best.s, at: performance.now() };
     let ask: { b?: number; k: string; x: number; y: number; z: number; r: number; yaw?: number } | null = null;
     // (a thing set down goes where the aim meets a floor: its front to whoever sets it down, a box's back to the wall
     // behind it if there is one; R turns it on from there, a step, or a box a quarter)
@@ -400,6 +416,8 @@ export class Building {
       if (own) ask = { k: this.kind, x: own.x, y: K.ground ? own.y : 0, z: own.z, r: 0, yaw: this.h.yaw() + Math.PI + turned };
     }
     if (!ask) {
+      // (a frame or two with nothing found: the ghost stays where it was)
+      if (this.kept && performance.now() - this.kept.at < GHOST.grace) return;
       this.hideGhost();
       this.prompt = card(K.name, near.length ? 'aim at where it goes on your base' : K.ground ? 'aim at open ground' : 'lay a foundation first', 'hold the right button for the pieces');
       return;
@@ -561,6 +579,7 @@ export class Building {
       audio.click(420, 0.12, 0.02);
       return;
     }
+    this.kept = null;
     const [x, y, z] = this.ghost ? [this.ghost.position.x, this.ghost.position.y, this.ghost.position.z] : [ask.x, 0, ask.z];
     audio.impact('wood', { x, y, z }, 1);
     // (a frame nailed together; a sleeping bag or a bed's bedding laid out)

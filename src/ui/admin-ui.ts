@@ -642,7 +642,12 @@ export class AdminUI {
     b.append(icon(ic), text);
     if (key) b.append(el('kbd', '', key));
     b.append(el('i', 'adm-knob'));
-    b.onclick = toggle;
+    // (shown flipped at once; the server's word redraws it either way)
+    b.onclick = () => {
+      b.classList.toggle('on');
+      b.setAttribute('aria-checked', String(b.classList.contains('on')));
+      toggle();
+    };
     return b;
   }
 

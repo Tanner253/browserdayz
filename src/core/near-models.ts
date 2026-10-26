@@ -7,8 +7,10 @@ import { ITEMS, type Category } from '../sim/items';
 /** what is held in the hands or worn: guns and what goes on them, things to hit with, tools, clothes */
 const HELD = new Set<Category>(['weapon', 'magazine', 'attachment', 'melee', 'tool', 'clothing']);
 
-/** the places walked up to and used: the traders' stalls, the recyclers, a forge and a research table (the owner: "the trader stalls are too low quality ... it should be 1024") */
-const USED = ['trader_stall', 'recycler', 'forge_hf', 'research_table'];
+/** the places walked up to and used, and what is set down in a base without being one of its pieces' own models: the
+ * traders' stalls, the recyclers, a forge, a research table, a sleeping bag, a torch (the owner: "the trader stalls are too
+ * low quality ... it should be 1024"; "the workbench quality needs to be bumped up to 1024"; the bb_ models are a base's, below) */
+const USED = ['trader_stall', 'recycler', 'forge_hf', 'research_table', 'sleeping_bag', 'torch'];
 
 /** every body (survivors, their clothes, the infected) is under here */
 const BODIES = 'assets/characters/';

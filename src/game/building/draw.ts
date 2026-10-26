@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../../core/assets';
-import { BODY_QUERY, physics } from '../../core/physics';
+import { GLASS_GROUPS, BODY_QUERY, physics } from '../../core/physics';
 import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES } from '../../sim/build/pieces';
 import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
@@ -20,6 +20,22 @@ import { PieceModels } from './models';
 import { ClaimFlags } from './flags';
 
 /** what a blow or a bullet that lands on a piece struck */
+/**
+ * A piece's own drawing, a hair off where it stands: by its number, a millimetre or two along each of its own lines and
+ * up, and a shade smaller about its middle. No two pieces' faces then lie in one plane where they meet or overlap (two
+ * walls' tops at a corner, two foundations' edges, a wall's face along its neighbour's), so none of them flicker against
+ * each other (the owner, 2026-10-25: "building meshes and foundations and walls and things seem to overlap at the seams
+ * causing visual glitches"). Its solids and its leaves are where it stands.
+ */
+const SEAM = { step: 0.0012, shrink: 0.0005 };
+const _seam = new THREE.Matrix4(), _seamS = new THREE.Matrix4();
+function seamless(frame: THREE.Matrix4, id: number) {
+  const a = id % 3, b = Math.floor(id / 3) % 3, c = Math.floor(id / 9) % 4;
+  _seam.makeTranslation((a - 1) * SEAM.step, c * SEAM.step, (b - 1) * SEAM.step);
+  const k = 1 - SEAM.shrink * (1 + ((a + b + c) % 3));
+  return frame.clone().multiply(_seam).multiply(_seamS.makeScale(k, k, k));
+}
+
 export class PieceRef {
   constructor(readonly b: number, readonly p: number) {}
 }
@@ -137,8 +153,9 @@ export class BaseDraw {
     const frame = new THREE.Matrix4().compose(_p.set(x, y, z), _q, _one);
     // (a draw for the piece in its paint, one for what of it is in a paint of its own, and one for each leaf)
     const s = shapeOf(piece.k), t = drawnAt(piece.k, piece.t), parts: Part[] = [];
-    if (s.solid.length || s.dress?.length) parts.push({ key: `${piece.k}:${s.paint ?? t}`, matrix: frame, slot: 0 });
-    if (s.cloth) parts.push({ key: `${piece.k}:${s.cloth.paint}:C`, matrix: frame, slot: 0 });
+    const body = seamless(frame, piece.id);
+    if (s.solid.length || s.dress?.length) parts.push({ key: `${piece.k}:${s.paint ?? t}`, matrix: body, slot: 0 });
+    if (s.cloth) parts.push({ key: `${piece.k}:${s.cloth.paint}:C`, matrix: body, slot: 0 });
     // (its lock, if one is fitted: before the leaves, which are always the last of its parts)
     const lock: Part | null = piece.lock && s.lockAt ? { key: `__lock:steel:${piece.lock.k}`, matrix: new THREE.Matrix4(), slot: 0 } : null;
     if (lock) parts.push(lock);
@@ -339,6 +356,13 @@ export class BaseDraw {
       const desc = physics.R.ColliderDesc.convexHull(new Float32Array(pts));
       return desc ? physics.addStaticQuat(desc, surface, { x: d.at.x, y: d.at.y, z: d.at.z }, q, owner) : null;
     }).filter((c): c is RAPIER.Collider => !!c);
+    // (the slopes stairs are walked up on: felt by a body alone, never drawn)
+    for (const w of s.walk ?? []) {
+      if (!('hull' in w)) continue;
+      const desc = physics.R.ColliderDesc.convexHull(new Float32Array(w.hull.flat()));
+      const c = desc ? physics.addStaticQuat(desc, surface, { x: d.at.x, y: d.at.y, z: d.at.z }, q, owner, GLASS_GROUPS) : null;
+      if (c) d.colliders.push(c);
+    }
     // (each leaf a box or more, put where the leaf now is)
     d.leafCols = (s.leaves ?? []).map((l) => l.solid.map((b) => ('box' in b ? physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.box[3] / 2, b.box[4] / 2, b.box[5] / 2), surfaceOf(l.paint ?? t), { x: 0, y: 0, z: 0 }, q, owner) : null)).filter((c): c is RAPIER.Collider => !!c));
     if (d.leafCols.length) this.placeLeaves(d);
