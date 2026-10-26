@@ -260,6 +260,14 @@ export class Crafting {
   private alone(r: Recipe, n: number, u: string[]) {
     const q = plan(r, n, this.h.pockets(), u);
     if (typeof q === 'string') return void this.h.note(q, 'warn');
+    // (a key copied: cut to the number of the key it was copied from, which is kept and not worn)
+    if (r.id === 'key_copy') {
+      const from = q.wear.map((uid) => this.h.find(uid)).find((it) => it?.id === 'key' && it.key !== undefined);
+      if (!from) return void this.h.note('Hold the key to copy', 'warn');
+      for (const [id, k] of Object.entries(q.pay)) this.h.take(id, k);
+      this.h.changed();
+      return void this.h.give(madeItems('key', q.makes).map((k) => Object.assign(k, { key: from.key })), 'A copy of the key');
+    }
     for (const [id, k] of Object.entries(q.pay)) this.h.take(id, k);
     for (const uid of q.uids) this.h.remove(uid);
     for (const uid of q.wear) {

@@ -10,7 +10,7 @@
 import { LEVEL_NAME, MOST, NEAR, RECIPE, STILL, type Recipe } from '../src/sim/craft/recipes';
 import { madeItems, plan, pocketsOf, type Plan } from '../src/sim/craft/plan';
 import { placeNear } from '../src/sim/craft/places';
-import { ITEMS, type ItemInstance } from '../src/sim/items';
+import { makeItem, ITEMS, type ItemInstance } from '../src/sim/items';
 import type { C2S } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
 import { issue, things } from './index';
@@ -64,6 +64,14 @@ function made(c: Client, r: Recipe, n: number) {
 
 /** a plan carried out on a player's pockets: what it takes taken, the tools worn, what it makes given (and its uids gone) */
 function make(c: Client, q: Plan) {
+  // (a key copied: cut to the number of the key it was copied from, which is kept and not worn)
+  if (q.r.id === 'key_copy') {
+    const from = q.wear.map((uid) => find(c, uid)).find((it) => it?.id === 'key' && it.key !== undefined);
+    if (!from) return;
+    pay(c, q.pay);
+    const keys = Array.from({ length: q.makes }, () => Object.assign(makeItem('key', 1), { key: from.key }));
+    return void send(c, { t: 'kit', name: 'Key', items: keys, adds: true, gift: keys.length > 1 ? `${keys.length} copies of the key` : 'A copy of the key' });
+  }
   pay(c, q.pay);
   if (q.uids.length) refuse(c, q.uids);
   for (const uid of q.wear) {

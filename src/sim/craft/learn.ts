@@ -22,7 +22,7 @@ export const KNOWN_AT_START: ReadonlySet<string> = new Set([
 /** each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there (less what is held back: src/sim/build/raid.ts) */
 const TREE_ALL: Record<Level, readonly (readonly [string, number])[]> = {
   1: [['pickaxe', 20], ['hand_saw', 30], ['key_lock', 40], ['ammo_9mm', 50], ['ammo_45', 60]],
-  2: [['gun_light', 75], ['sheet_metal', 90], ['sledgehammer', 110], ['red_dot', 140], ['colt', 175], ['m9', 225], ['satchel', 300]],
+  2: [['gun_light', 75], ['code_lock', 85], ['sheet_metal', 90], ['sledgehammer', 110], ['red_dot', 140], ['colt', 175], ['m9', 225], ['satchel', 300]],
   3: [['ammo_762', 200], ['ammo_739', 225], ['suppressor_9', 260], ['pu_scope', 300], ['mosin9130', 350], ['mpa', 400], ['scorpion', 450], ['suppressor_739', 500], ['ak', 650], ['c4', 750]],
 };
 export const TREE = Object.fromEntries(Object.entries(TREE_ALL).map(([lv, list]) => [lv, list.filter(([id]) => !HELD_BACK.has(id))])) as unknown as Record<Level, readonly (readonly [string, number])[]>;
