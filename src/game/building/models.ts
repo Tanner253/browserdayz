@@ -106,6 +106,27 @@ function mirrored(parts: Part[]) {
   return parts;
 }
 const turnY = (a: number) => new THREE.Matrix4().makeRotationY(a);
+/**
+ * The wall torch's head as its model has it, in its piece's frame: the middle of its points within four centimetres of
+ * its top, at the top (the owner, 2026-10-25: "the fire animation on the torch for the buildings, it is floating above the
+ * stick and ember by a lot"; the flame of solids.ts stood six centimetres over the top of the box, beside the head of a
+ * torch that leans out). The held torch is found the same way (Weapons.heldTip). Null until the model has come.
+ */
+export let torchHead: [number, number, number] | null = null;
+function headOf(geo: THREE.BufferGeometry): [number, number, number] | null {
+  const P = geo.getAttribute('position');
+  let top = -Infinity;
+  for (let i = 0; i < P.count; i++) top = Math.max(top, P.getY(i));
+  let x = 0, z = 0, n = 0;
+  for (let i = 0; i < P.count; i++) if (P.getY(i) > top - 0.04) {
+    x += P.getX(i);
+    z += P.getZ(i);
+    n++;
+  }
+  // (a hair into the ember, where a flame comes out of it)
+  return n ? [x / n, top - 0.02, z / n] : null;
+}
+
 /** the parts as one thing to draw: one geometry, a group to each paint */
 function built(parts: Part[]): Built {
   const geo = parts.length === 1 ? parts[0].geo : mergeGeometries(parts.map((p) => p.geo), true)!;
@@ -294,7 +315,11 @@ const BODY: Record<string, (atmo: Atmosphere | null) => Promise<Built>> = {
   // (a sleeping bag, opened out, its loft over the solid's ten centimetres: made along x)
   bedroll: async (atmo) => built(into(moved(await partsOf('bb_bedroll', atmo), turnY(Math.PI / 2)), [[-0.4, 0, -1], [0.4, 0.16, 1]])),
   // (the bracket's plate on the wall behind it, -z: the model has it at +z)
-  torch_wall: async (atmo) => built(into(moved(await partsOf('bb_wall_torch', atmo), turnY(Math.PI)), [[-0.08, 1.62, -0.13], [0.08, 2.2, 0.17]])),
+  torch_wall: async (atmo) => {
+    const b = built(into(moved(await partsOf('bb_wall_torch', atmo), turnY(Math.PI)), [[-0.08, 1.62, -0.13], [0.08, 2.2, 0.17]]));
+    torchHead = headOf(b.geo);
+    return b;
+  },
   ladder: async (atmo) => built(into(upright(await partsOf('bb_ladder', atmo)), boxOf(shapeOf('ladder').solid))),
   // (a hatch's own ladder, down the far side of its hole)
   hatch: async (atmo) => built(into(upright(await partsOf('bb_ladder', atmo)), boxOf(shapeOf('hatch').solid))),

@@ -5,6 +5,7 @@
 // one lit in somebody else's hands burns at its head for everybody near (the navigator: "at night it's the biggest
 // tell there is").
 
+import { torchHead } from './models';
 import * as THREE from 'three';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
@@ -74,13 +75,18 @@ export class TorchView {
       const near = new Set<string>();
       for (const b of this.store().near(me.x, me.z, SEEN + 10)) {
         for (const p of b.pieces.values()) {
-          const f = shapeOf(p.k).flame;
+          // (the wall torch's flame on its model's head, once the model has come: models.ts torchHead)
+          const f = p.k === 'torch_wall' && torchHead ? torchHead : shapeOf(p.k).flame;
           if (!f) continue;
           const key = `${b.id}:${p.id}`;
           near.add(key);
           const at = new THREE.Vector3(...toWorld(b, ...inBase(p, f)));
           const w = this.walls.get(key);
-          if (w) w.at.copy(at);
+          if (w) {
+            w.at.copy(at);
+            // (and a flame lit before the model came moved onto its head)
+            w.fire?.at.copy(at);
+          }
           else this.walls.set(key, { at, fire: null });
         }
       }
