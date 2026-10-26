@@ -35,7 +35,7 @@ import { BUILDING_FOOTPRINT, CELL, SEA_LEVEL, SQUARE_HALF, WORLD_NX, WORLD_X0, W
 import type { MenuSpot } from './hud';
 import { vehicleMark } from './minimap';
 import { traderCoin, type TraderMark } from './minimap';
-import { CAMP, STALLS, STALL_MARK } from '../sim/camp';
+import { RECYCLER_MARK, STALLS, STALL_MARK } from '../sim/camp';
 
 type Pt = { x: number; z: number };
 /** what stands about the world now, as the corner map is told it */
@@ -663,7 +663,7 @@ export class BigMap {
           <div class="hm-frame" aria-hidden="true">
             <div class="hm-cart"><b>ZONA</b><span>SURVIVE · LOOT · EXTRACT</span></div>
             <svg class="hm-rose" viewBox="-60 -60 120 120"><circle r="44" class="o"/><circle r="36" class="d"/><polygon points="0,-40 6,0 0,40 -6,0" class="ns"/><polygon points="-40,0 0,-6 40,0 0,6" class="ew"/><polygon points="0,-40 6,0 -6,0" class="n"/><text y="-47">N</text><text y="57" class="s">S</text><text x="53" y="4" class="s">E</text><text x="-53" y="4" class="s">W</text></svg>
-            <div class="hm-legend"><button type="button" class="hm-fold">Key</button><div class="hm-rows"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div>${Object.entries(STALL_MARK).map(([k, m]) => `<div><i class="tc" style="background:${m.colour}">${m.letter}</i>Trader: ${STALLS[k as keyof typeof STALLS].name.toLowerCase()}</div>`).join('')}<div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div><div class="v"><i class="vk"><canvas data-k="0" width="48" height="32"></canvas></i>UAZ</div><div class="v"><i class="vk"><canvas data-k="1" width="48" height="32"></canvas></i>Police car</div><div class="v"><i class="vk"><canvas data-k="2" width="48" height="32"></canvas></i>Helicopter</div></div></div>
+            <div class="hm-legend"><button type="button" class="hm-fold">Key</button><div class="hm-rows"><div><i>⌂</i>Town</div><div><i>★</i>Police</div><div><i>✚</i>Medical</div><div><i>✦</i>Army</div><div><i>▲</i>Site</div><div><i>☣</i>Gas</div>${Object.entries(STALL_MARK).map(([k, m]) => `<div><i class="tc" style="background:${m.colour}">${m.letter}</i>Trader: ${STALLS[k as keyof typeof STALLS].name.toLowerCase()}</div>`).join('')}<div><i class="tc" style="background:${RECYCLER_MARK.colour}">${RECYCLER_MARK.letter}</i>Recycler</div><div><i class="rd"></i>Road</div><div><i class="tr"></i>Track</div><div class="v"><i class="vk"><canvas data-k="0" width="48" height="32"></canvas></i>UAZ</div><div class="v"><i class="vk"><canvas data-k="1" width="48" height="32"></canvas></i>Police car</div><div class="v"><i class="vk"><canvas data-k="2" width="48" height="32"></canvas></i>Helicopter</div></div></div>
             <div class="hm-sector"><span>SECTOR</span><b>—</b></div>
           </div>
           <div class="hm-tip" hidden></div></div>
@@ -938,7 +938,7 @@ export class BigMap {
     // (to an admin, somebody's dot before anything under it: who they are, and how they are)
     const who = this.personAt(wx, wz, reach), trader = this.live().traders.find((t) => Math.hypot(t.x - wx, t.z - wz) < reach * 1.4);
     if (trader && !who) {
-      this.tip.innerHTML = `<b>${trader.name}</b><i style="color:${trader.colour}">By ${trader.near}</i><p>Nobody is hurt within ${CAMP.safe} m of the stall. A recycler stands beside it where there was room.</p>`;
+      this.tip.innerHTML = `<b>${trader.name}</b><i style="color:${trader.colour}">By ${trader.near}</i><p>${trader.tip}</p>`;
     } else if (who) {
       const b = document.createElement('b'), i = document.createElement('i'), p = document.createElement('p');
       b.textContent = who.name;

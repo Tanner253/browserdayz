@@ -36,11 +36,14 @@ interface Stall {
 const g = (id: string, n: number, price: number, day?: number): Good => ({ id, n, price, ...(day ? { day } : {}) });
 
 /**
- * The four stalls: what each sells, for what, and the kinds it buys (src/sim/items/ `category`). No daily limit on what is
- * everyday (rounds, food, drink, medicine, building things, plain tools and clothes); a limit only on what would unbalance
- * the game bought freely: the guns, the sight, grenades, the gas mask (the way under the gas) and the radio (a drop called
- * in), the better the scarcer; and nails, which the owner wants looted ("they must be looted which is hard and time
- * consuming"). The owner: "im not a big fan of the trader supply limits some of them dont make sense".
+ * The four stalls: what each sells, for what, and the kinds it buys (src/sim/items/ `category`). Nothing above the third
+ * step of the map and only a few things of it, as Rust's outpost (the owner: "the traders dont sell the best or even ALL
+ * the medium tier supplies right? like rust nothing from traders is overpowered"): the basics, rounds for the common guns
+ * (the Mosin's, the pistols'), building things, and of the third step only the weapon light, the field jacket and trousers
+ * and the blood bag. Never what is found from the fourth step up (the AK's rounds, the radio), the way under the gas (the
+ * mask), explosives, or the biggest pack. No daily limit on what is everyday; a limit on the guns and the sight, and on
+ * nails, which the owner wants looted ("they must be looted which is hard and time consuming"). The owner: "im not a big
+ * fan of the trader supply limits some of them dont make sense". (test/camp.test.ts holds every good to its step.)
  */
 export const STALLS: Record<StallId, Stall> = {
   building: {
@@ -52,7 +55,7 @@ export const STALLS: Record<StallId, Stall> = {
   weapons: {
     name: 'Guns and rounds',
     hello: 'Plain guns and the rounds for them. The good ones you find yourself.',
-    sells: [g('ammo_9mm', 20, 20), g('ammo_45', 20, 24), g('ammo_12', 10, 24), g('ammo_762', 10, 30), g('ammo_739', 20, 60), g('mag_colt', 1, 25), g('mag_m9', 1, 25), g('clip_mosin', 1, 15), g('gun_light', 1, 40), g('red_dot', 1, 100, 1), g('grenade', 1, 60, 2), g('mosin9130', 1, 120, 1), g('db12', 1, 140, 1), g('colt', 1, 150, 1)],
+    sells: [g('ammo_9mm', 20, 20), g('ammo_45', 20, 24), g('ammo_762', 10, 30), g('mag_colt', 1, 25), g('mag_m9', 1, 25), g('clip_mosin', 1, 15), g('gun_light', 1, 40), g('red_dot', 1, 100, 1), g('mosin9130', 1, 120, 1), g('colt', 1, 150, 1)],
     buys: ['weapon', 'ammo', 'magazine', 'attachment', 'melee'],
   },
   medical: {
@@ -64,7 +67,7 @@ export const STALLS: Record<StallId, Stall> = {
   clothing: {
     name: 'Clothes and gear',
     hello: 'Something warm, something to carry it in.',
-    sells: [g('field_jacket', 1, 40), g('field_trousers', 1, 30), g('patrol_cap', 1, 10), g('fishermans_hat', 1, 10), g('work_gloves', 1, 12), g('rubber_boots', 1, 15), g('sack_pack', 1, 60), g('camping_pack', 1, 140), g('flashlight', 1, 25), g('compass', 1, 15), g('binoculars', 1, 60), g('gasmask', 1, 120, 1), g('radio', 1, 150, 1)],
+    sells: [g('tshirt', 1, 6), g('flannel_shirt', 1, 10), g('hoodie', 1, 20), g('quilted_jacket', 1, 30), g('field_jacket', 1, 40), g('jeans', 1, 12), g('work_trousers', 1, 20), g('field_trousers', 1, 30), g('beanie', 1, 6), g('fishermans_hat', 1, 10), g('leather_gloves', 1, 12), g('trainers', 1, 8), g('work_boots', 1, 15), g('hip_pack', 1, 30), g('sack_pack', 1, 60), g('flashlight', 1, 25), g('compass', 1, 15), g('binoculars', 1, 60)],
     buys: ['clothing', 'stash'],
   },
 };
@@ -144,7 +147,7 @@ export interface Camp {
   /** each trader's spot (the safe zone is round each) */
   spots: { id: StallId; x: number; z: number; near: string }[];
   stalls: StallSpot[];
-  /** the recyclers at the spots, where one fits */
+  /** the recyclers at the spots that have one (TRADER_SPOTS `recycler`), where it fits */
   recyclers: { x: number; y: number; z: number; rot: number; at: string }[];
 }
 
@@ -159,6 +162,8 @@ export const STALL_MARK: Record<StallId, { letter: string; colour: string }> = {
   medical: { letter: 'M', colour: '#5fc58e' },
   clothing: { letter: 'C', colour: '#7fb8ff' },
 };
+/** and a recycler's, where one stands away from a trader (src/sim/craft/recyclers.ts) */
+export const RECYCLER_MARK = { letter: 'R', colour: '#9aa3ab' };
 const SEED = 0x7c4a11;
 
 /** the traders' spots, the same for the game and the server: a stall at each facing the road, and a recycler beside it where one fits */
@@ -186,7 +191,7 @@ export function campLayer(world: LayerWorld): Camp {
     stalls.push({ id: q.id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
     // (the recycler to the stall's side and a little before it, facing the same way)
     const sx = Math.cos(face), sz = -Math.sin(face), fx = Math.sin(face), fz = Math.cos(face);
-    const rc = lay(p.x + sx * 5 + fx * 2, p.z + sz * 5 + fz * 2, 2.0, 1.6, face);
+    const rc = TRADER_SPOTS.some((t) => t.id === q.id && 'recycler' in t) && lay(p.x + sx * 5 + fx * 2, p.z + sz * 5 + fz * 2, 2.0, 1.6, face);
     if (rc) recyclers.push({ ...rc, at: `the ${STALLS[q.id].name.toLowerCase()} trader` });
   }
   return { spots, stalls, recyclers };

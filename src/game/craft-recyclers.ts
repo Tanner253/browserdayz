@@ -93,7 +93,7 @@ export class RecyclerView {
       el: () => {
         const el = document.createElement('div');
         el.className = `inv-machine ${on ? 'on' : ''}`;
-        el.innerHTML = `<span><b>${on ? 'Running' : 'Switched off'}</b><em>${on ? 'Breaking it down, a thing every few seconds · heard a long way off' : 'Put in parts, tools, guns, fittings, clothes or armour: out come fragments, scrap and rags'}</em></span><button>${on ? 'Switch off' : 'Switch on'}</button><i></i>`;
+        el.innerHTML = `<span><b>${on ? 'Running' : 'Switched off'}</b><em>${on ? 'Breaking it down, a thing every few seconds · heard a long way off' : 'Put in parts, junk, tools, guns, magazines, fittings, clothes or armour: out come fragments, scrap and rags'}</em></span><button>${on ? 'Switch off' : 'Switch on'}</button><i></i>`;
         el.querySelector('button')!.onclick = () => this.toggle(i);
         return el;
       },
@@ -124,13 +124,13 @@ export class RecyclerView {
     }
   }
 
-  /** metres to the nearest one running (-1: none) */
+  /** metres to the nearest one running within earshot (-1: none) */
   loudest(me: THREE.Vector3) {
     let d = -1;
     this.spots.forEach((r, i) => {
       if (!this.running(i)) return;
       const k = Math.hypot(r.x - me.x, r.y - me.y, r.z - me.z);
-      if (d < 0 || k < d) d = k;
+      if (k <= RECYCLE.heard && (d < 0 || k < d)) d = k;
     });
     return d;
   }

@@ -1880,18 +1880,19 @@ export class AudioEngine {
   }
 
   /**
-   * A recycler running near by (crafting, progression v3: "A run takes a minute and is loud"): a motor's rumble, and the
-   * crunch of metal in its teeth, heard a long way off. Made up until recordings come, but for the clank of metal.
-   * @param distance metres to the nearest one running (-1 = none near enough to hear)
+   * A recycler running near by (the owner: "they are loud and take time to process materials, like rust"): a motor's
+   * rumble and grind, and the crunch of metal in its teeth, carrying well round it (falling off with distance, not its
+   * square). Made up until recordings come, but for the clank of metal.
+   * @param distance metres to the nearest one running (-1 = none near enough to hear: RECYCLE.heard)
    */
   machine(dt: number, distance: number) {
-    if (!this.ready || distance < 0 || distance > 90) {
+    if (!this.ready || distance < 0) {
       this.machineT = 0.1;
       this.crunchT = 0.4;
       return;
     }
     const ctx = this.ctx, t = ctx.currentTime;
-    const near = 1 / (1 + (distance * distance) / 260);
+    const near = 1 / (1 + distance / 14);
     this.machineT -= dt;
     if (this.machineT <= 0) {
       // the motor: a low growl of noise, one length laid over the end of the last
@@ -1901,19 +1902,22 @@ export class AudioEngine {
       src.loop = true;
       src.start(t, Math.random());
       src.stop(t + 1);
-      const lo = this.filter('lowpass', 150, 1.4), g = ctx.createGain();
+      const lo = this.filter('lowpass', 150, 1.4), mid = this.filter('bandpass', 380, 3), g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.16 * near, t + 0.3);
+      g.gain.linearRampToValueAtTime(0.32 * near, t + 0.3);
       g.gain.linearRampToValueAtTime(0.0001, t + 0.95);
-      src.connect(lo).connect(g).connect(this.sfx);
+      src.connect(lo).connect(g);
+      // (and the grind of its gears over the rumble)
+      src.connect(mid).connect(g);
+      g.connect(this.sfx);
     }
     this.crunchT -= dt;
     if (this.crunchT <= 0) {
       // the teeth on metal: never at an even pace
       this.crunchT = 0.25 + Math.random() * 0.6;
-      if (this.rec('hit_metal', this.sfx, t, 0.55 * near, 0.55 + Math.random() * 0.35, false, true)) return;
+      if (this.rec('hit_metal', this.sfx, t, 0.85 * near, 0.55 + Math.random() * 0.35, false, true)) return;
       const src = this.noise(t, 0.08), bp = this.filter('bandpass', 900 + Math.random() * 900, 1.2), g = ctx.createGain();
-      this.env(g, t, 0.12 * near, 0.004, 0.07);
+      this.env(g, t, 0.22 * near, 0.004, 0.07);
       src.connect(bp).connect(g).connect(this.sfx);
     }
   }

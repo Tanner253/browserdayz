@@ -591,6 +591,8 @@ export interface TraderMark {
   letter: string;
   name: string;
   near: string;
+  /** what the big map's tip says of it under its name */
+  tip: string;
 }
 
 /** a trader's coin: its colour, a dark rim, its letter in the middle (the corner map's and the big map's alike) */

@@ -5,10 +5,13 @@
 // valley is all but all Zona: one there). Nothing here imports anything, so that the base rules (src/sim/build/land.ts)
 // and the camp (src/sim/camp.ts) may both read it.
 
-/** each trader's spot: which stall, where, and what it is near (to be said on the map) */
+/**
+ * each trader's spot: which stall, where, and what it is near (to be said on the map); `recycler`, one stands beside it:
+ * the green west's and the valley's (the owner: recyclers at "the desert ruins (Kalat), the green west, and the valley")
+ */
 export const TRADER_SPOTS = [
-  { id: 'building', x: -980, z: -40, near: 'the watchtower' },
-  { id: 'weapons', x: 140, z: 620, near: "the squatters' house" },
+  { id: 'building', x: -980, z: -40, near: 'the watchtower', recycler: true },
+  { id: 'weapons', x: 140, z: 620, near: "the squatters' house", recycler: true },
   { id: 'medical', x: -1620, z: -200, near: 'the hunting tower' },
   { id: 'clothing', x: -1660, z: 220, near: 'the Mokroye road' },
 ] as const;
