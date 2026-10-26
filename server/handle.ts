@@ -56,7 +56,7 @@ import { salvage } from './salvage';
 import { learn } from './learn';
 import { recycle } from './recycle';
 import { book, campKill, safe, trade } from './camp';
-import { hammer, lay, mend, owing, print, sightFor, takeDown } from './build';
+import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
 import { blow, throwCharge, stick, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
@@ -422,6 +422,8 @@ export function handle(c: Client, m: C2S) {
       return mend(c, m);
     case 'bprint':
       return print(c, m);
+    case 'bfill':
+      return fill(c, m);
     case 'bhit':
       return blow(c, m);
     case 'bthrow':

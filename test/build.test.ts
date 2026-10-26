@@ -29,7 +29,7 @@ import { inBase, inTheWay, pushedBy, swept } from '../src/sim/build/doors';
 import { BaseSolids } from '../src/sim/build/solid';
 import { inRoom, shutRoom } from '../src/sim/build/rooms';
 import { lockable, mayPass } from '../src/sim/build/locks';
-import { PRINTS, asksOf, layPrint, printCost } from '../src/sim/build/blueprints';
+import { PRINTS, asksOf, beginSite, fillSite, layPrint, printCost, restOf, wantOf } from '../src/sim/build/blueprints';
 
 let n = 0;
 const failed: string[] = [];
@@ -473,6 +473,28 @@ ok("a lock's code and its keys' number are kept in the save and never told to a 
 });
 
 console.log('Building: blueprints');
+ok('a blueprint is set down for nothing and filled a trip at a time, kept with its base, built as it fills, done whole', () => {
+  // (the owner, 2026-10-25: "you set up the build shadow/blueprint, then bring the resources needed to the blueprint")
+  const bs = new Bases(flat), begun = beginSite(bs, 'bp:hut', { x: 0, z: 0, yaw: 0 }, ME, 0, 'Me');
+  assert.ok(typeof begun !== 'string', String(begun));
+  const b: Base = begun;
+  assert.ok(b.pieces.size === 1 && b.site?.print === 'bp:hut', 'set down: its first frame, and the rest a plan');
+  const all = { ...printCost('bp:hut') };
+  const pocket: Record<string, number> = { planks: 20, log: 9, nails: 9 };
+  const trip = () => fillSite(bs, b, ME, 0, 'Me', (k) => pocket[k] ?? 0, (k, n) => (pocket[k] -= n));
+  const one = trip();
+  assert.ok(one.laid.length > 0 && !one.done && b.site, `a first trip builds what it pays for: ${one.laid.length}`);
+  assert.ok(Object.keys(wantOf(b)).length > 0, 'and it says what it still needs');
+  // (kept, and read back, with what was brought)
+  const back = heard(JSON.parse(JSON.stringify(bs.keep()))[0])!;
+  assert.deepEqual(back.site, b.site, 'the blueprint is kept with its base');
+  pocket.planks = 200;
+  const two = trip();
+  assert.ok(two.done && !restOf(b).length && b.site === undefined, 'a second trip finishes it');
+  assert.equal(b.pieces.size, asksOf('bp:hut').length, 'every piece built');
+  assert.ok(all.planks > 0);
+});
+
 ok('every blueprint is laid whole by the rules; short of planks one lays what it can in order, and laid again finishes', () => {
   for (const p of PRINTS) {
     const bs = new Bases(flat), r = layPrint(bs, p.id, { x: 0, z: 0, yaw: 0.4 }, ME, 0, 'Me', () => true);
