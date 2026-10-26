@@ -6,6 +6,7 @@
 //   &body=marksman                 the kit on the body beside (default: assault)
 //   &who=2                         the figure in the middle one of the survivors' bodies (default 0)
 //   &ui=hud                        the hot bar at the foot of the screen, as in play
+//   &ui=settings                   Settings, Controls, the controller on and its buttons to be put on others (&pad=xbox)
 //   &ui=wheel                      the wheel on T (src/ui/radial.ts) by itself: window.wheel is it, to be pointed by a script
 //   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
 //                                  a recipe's card (src/ui/craft-card.ts), whose Craft makes it at once here
@@ -90,6 +91,20 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   }
 
   const shown: Record<string, unknown> = { kit: kit.id };
+  // (Settings, Controls, with the controller on: its buttons each thing's to be put on another; &pad=xbox for Xbox's names)
+  if (q.get('ui') === 'settings') {
+    await import('../ui/hud.css');
+    const { HUD } = await import('../ui/hud');
+    const { controls, setControls } = await import('../core/keys');
+    setControls({ ...controls(), pad: true });
+    document.body.dataset.pad = q.get('pad') === 'xbox' ? 'xbox' : 'ps';
+    const hud = new HUD(icons);
+    ui.appendChild(hud.root);
+    hud.showStart(true, true);
+    hud.root.querySelector<HTMLButtonElement>('.start-tabs button[data-tab="gfx"]')?.click();
+    hud.root.querySelector<HTMLButtonElement>('.set-tabs button[data-set="controls"]')?.click();
+    return shown;
+  }
   if (q.get('ui') === 'wheel') {
     const hud = document.createElement('div');
     hud.id = 'hud';

@@ -7,7 +7,8 @@
 import { ITEMS } from '../sim/items';
 import { GUNS } from '../sim/gunplay';
 import { POLICE_CAR } from '../sim/vehicles';
-import { shown } from '../core/keys';
+import { controls, shown } from '../core/keys';
+import { buttonName, padButtons, type PadAction, type PadKind } from '../core/pad-layout';
 import { Heli } from './heli';
 import type { Game } from './game';
 
@@ -26,11 +27,14 @@ export interface KeyHints {
   mode: string;
 }
 
-/** a controller's buttons, as gamepad.ts reads them, named as the pad in the hands has them */
-const padNames = (xbox: boolean) => ({
-  r2: xbox ? 'RT' : 'R2', l2: xbox ? 'LT' : 'L2', x: xbox ? 'A' : '✕', o: xbox ? 'B' : '○', sq: xbox ? 'X' : '□', tri: xbox ? 'Y' : '△',
-  l1: xbox ? 'LB' : 'L1', r1: xbox ? 'RB' : 'R1', l3: xbox ? 'LS' : 'L3', r3: xbox ? 'RS' : 'R3', menu: xbox ? 'View' : 'Touchpad', stick: 'L stick',
-});
+/** a controller's buttons for each thing, as the player has put them (Settings, Controls), named as the pad in the hands has them */
+const padNames = (kind: PadKind) => {
+  const K = padButtons(controls().padKeys), n = (a: PadAction) => buttonName(K[a], kind).replace('D-pad ', '');
+  return {
+    r2: n('fire'), l2: n('aim'), x: n('jump'), o: n('crouch'), sq: n('use'), tri: n('swap'), l1: n('prev'), r1: n('next'), l3: n('sprint'), r3: n('light'),
+    menu: n('inventory'), up: n('map'), down: n('callout'), left: n('mode'), right: n('inspect'), stick: 'L stick',
+  };
+};
 
 export function keyHints(g: Game): KeyHints | null {
   const p = g.player, w = g.weapons;
@@ -38,7 +42,7 @@ export function keyHints(g: Game): KeyHints | null {
   if (g.invUI.isOpen || g.shop.isOpen || g.map.open || g.adminUI.isOpen || g.hud.emotes.isOpen || g.hud.chatOpen) return null;
   // (a controller's buttons only while it is the controller that is being used: one plugged in that was nudged once
   // left the corner naming its buttons to somebody flying on the keyboard, the owner, 2026-10-20: "heli controls dont show Q/E ?")
-  const pad = g.input.pad && g.input.padAt >= g.input.keyAt, P = padNames(document.body.dataset.pad === 'xbox');
+  const pad = g.input.pad && g.input.padAt >= g.input.keyAt, P = padNames(document.body.dataset.pad === 'xbox' ? 'xbox' : 'ps');
   const own: KeyRow[] = [], rest: KeyRow[] = [];
   /** a row with its keyboard keys and a controller's buttons (null: it has none there, and is left out) */
   const put = (to: KeyRow[], text: string, kb: string[] | null, pd: string[] | null) => {
@@ -88,8 +92,8 @@ export function keyHints(g: Game): KeyHints | null {
     // (how to change seat here, with the rest: the seats listed by the speed say who sits where, and no longer their keys)
     const seats = g.garage.seatList()?.length ?? 0;
     if (seats > 1) put(own, 'Change seat', ['Ctrl', `1–${Math.min(4, seats)}`], null);
-    put(rest, 'Map', [k('KeyM')], ['↑']);
-    put(rest, 'Talk (hold)', [k('KeyV')], ['→ held']);
+    put(rest, 'Map', [k('KeyM')], [P.up]);
+    put(rest, 'Talk (hold)', [k('KeyV')], [`${P.right} held`]);
     return done(`seat ${r.jeep.kind} ${r.seat === 0 ? 0 : 1}`);
   }
 
@@ -105,12 +109,12 @@ export function keyHints(g: Game): KeyHints | null {
     }
     put(own, 'Reload', [k('KeyR')], [P.sq]);
     const mode = w.modeKey(it);
-    if (mode) put(own, mode, [k('KeyB')], ['←']);
+    if (mode) put(own, mode, [k('KeyB')], [P.left]);
     if ((GUNS[it.id]?.zero?.length ?? 0) >= 2) put(own, 'Sights range', [k('PageUp'), k('PageDown')], null);
     if (w.scoped && w.zoom !== null) pad ? put(own, 'Zoom', null, [P.l1, P.r1]) : own.push({ keys: [], text: 'Zoom', mouse: 'w' });
     if (w.aiming) put(own, 'Hold breath', [k('ShiftLeft')], [`${P.l3} held`]);
     else {
-      put(own, 'Look it over', [k('KeyI')], ['→']);
+      put(own, 'Look it over', [k('KeyI')], [P.right]);
       pad ? put(own, 'Next gun', null, [P.tri]) : own.push({ keys: [], text: 'Next gun', mouse: 'w' });
     }
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
@@ -128,7 +132,7 @@ export function keyHints(g: Game): KeyHints | null {
   } else if (g.inHand) {
     // (the mouse for what is held is drawn above, by handActs)
     put(own, 'Empty hands', [k('KeyX')], [`${P.tri} held`]);
-    put(own, 'Drop it · held, throw it', [k('KeyG')], ['← held']);
+    put(own, 'Drop it · held, throw it', [k('KeyG')], [`${P.left} held`]);
   } else if (!it) {
     click(own, 'Punch', 'l', P.r2);
     click(own, 'Guard', 'r', P.l2);
@@ -149,8 +153,8 @@ export function keyHints(g: Game): KeyHints | null {
     put(rest, 'Inventory', [k('Tab')], [P.menu]);
     put(rest, 'Crafting', [k('KeyJ')], null);
   }
-  put(rest, 'Map', [k('KeyM')], ['↑']);
-  put(rest, 'Call out (hold)', [k('KeyT')], ['↓ held']);
+  put(rest, 'Map', [k('KeyM')], [P.up]);
+  put(rest, 'Call out (hold)', [k('KeyT')], [`${P.down} held`]);
   if (w.hasLamp || g.inv.count('flashlight') > 0) put(rest, 'Light', [k('KeyL')], w.aiming ? null : [P.r3]);
   // (the panel is anyone's with a role; N and K an admin's: frame.ts)
   if (g.role && g.online) put(rest, 'Admin panel', [k('Backquote')], null);

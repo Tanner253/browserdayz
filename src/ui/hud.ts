@@ -11,6 +11,7 @@ import { KeysView } from './keys-view';
 import type { KeyHints } from '../game/key-hints';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
+import { PadBinds } from './pad-binds';
 import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
 import { GROUPS, audio, type Group, type Mix } from '../core/audio';
 import { TOUCH } from '../core/device';
@@ -584,6 +585,7 @@ export class HUD {
     const gfx = this.root.querySelector('.start-gfx') as HTMLElement;
     gfx.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button');
+      if (b && this.padBinds.click(b)) return;
       if (b?.dataset.set) this.setTab(b.dataset.set as SetTab);
       else if (b?.dataset.k) this.setGraphic(b.dataset.k, b.dataset.v ?? '');
     });
@@ -1331,6 +1333,8 @@ export class HUD {
   private keysChanged: (c: Controls) => void = () => {};
   /** the thing that is waiting for a key to be pressed for it */
   private binding: string | null = null;
+  /** the controller's buttons, each thing's to be put on another (src/ui/pad-binds.ts) */
+  private padBinds = new PadBinds((c) => this.keysChanged(c), () => this.renderGraphics());
 
   /** what to do when the player puts a thing on another key, or moves the sensitivity */
   onControls(changed: (c: Controls) => void) {
@@ -1427,6 +1431,7 @@ export class HUD {
   }
 
   private setTab(tab: SetTab) {
+    this.padBinds.stop(false);
     // (a thing left waiting for a key is not left waiting on a page that is not shown)
     if (this.binding) {
       this.binding = null;
@@ -1464,7 +1469,7 @@ export class HUD {
         (c.pad
           ? slide('Controller look speed', 'padSens', c.padSens, [PAD_SENS.least, PAD_SENS.most, PAD_SENS.step], `${c.padSens.toFixed(2)}×`) +
             row('Invert look', 'padInvert', c.padInvert ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The right stick pushed up looks down') +
-            `<p class="pad-map">R2 fire · L2 aim · ✕ jump · ○ crouch, held lie down · □ reload, or take, doors and search · △ next gun, held empty hands · L1 R1 the hot bar, one slot along (aiming: a scope's zoom) · L3 sprint · R3 light · aiming, L3 or R3 clicked leans left or right (again: back), L3 held holds your breath · D-pad ↑ map, ↓ call-out wheel (held), ← single or automatic (held: drop), → look the gun over (held: talk) · touchpad inventory · options menu. In menus the left stick moves a cursor: ✕ clicks, ○ goes back, the right stick scrolls.</p>`
+            this.padBinds.html(c)
           : ''),
       audio:
         loud('Master', 'volume', g.volume, 'Everything') +
