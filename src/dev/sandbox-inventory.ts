@@ -6,6 +6,7 @@
 //   &body=marksman                 the kit on the body beside (default: assault)
 //   &who=2                         the figure in the middle one of the survivors' bodies (default 0)
 //   &ui=hud                        the hot bar at the foot of the screen, as in play
+//   &open=rack                     a Weapon Rack open beside them, a rifle and a pistol in its bays
 //   &ui=settings                   Settings, Controls, the controller on and its buttons to be put on others (&pad=xbox)
 //   &ui=wheel                      the wheel on T (src/ui/radial.ts) by itself: window.wheel is it, to be pointed by a script
 //   &craft=1                       and the things crafting is made of in the pockets: dragged onto each other they open
@@ -21,6 +22,7 @@
 
 import { claimPanelHtml, mountClaimPanel } from '../game/building/claim-panel';
 import { STORE } from '../sim/build/upkeep';
+import { PIECES } from '../sim/build/pieces';
 import '../ui/style.css';
 import '../ui/hud.css';
 import { InventoryUI, type InvActions } from '../ui/inventory-ui';
@@ -156,7 +158,15 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   const stashId = q.get('open'), room = stashId ? ITEMS[stashId]?.stash : undefined;
   // (`&open=claim`: a claim's store, as big as one is, with its upkeep beside it: src/game/building/claim-panel.ts)
   const claim = stashId === 'claim';
-  const opened = claim ? (() => {
+  // (`&open=rack`: a Weapon Rack, a rifle and a pistol in its bays and rounds in its store: src/sim/inventory.ts RACK)
+  const rack = stashId === 'rack';
+  // (nothing lying about, so the rack is at the top of its column)
+  if (rack) vicinity.length = 0;
+  const opened = rack ? (() => {
+    const [w, h] = PIECES.weapon_rack.store!, c = Object.assign(new Container('stage-rack', 'Weapon Rack', w, h, []), { rack: true });
+    for (const it of [made({ id: 'ak', mag: 'mag_ak', loaded: 31 }), made({ id: 'colt' }), makeItem('ammo_739', 60), makeItem('ammo_45', 40), made({ id: 'mag_ak', rounds: 30 })]) c.add(it);
+    return { uid: 'stage-rack', label: 'Weapon Rack', container: c, corpse: false, known: true } as unknown as Stash;
+  })() : claim ? (() => {
     const c = new Container('stage-claim', 'Claim', STORE.w, STORE.h, []);
     for (const [id, n] of [['planks', 60], ['planks', 60], ['stone', 80], ['metal_frags', 40], ['nails', 30]] as [string, number][]) c.add(makeItem(id, n));
     return { uid: 'stage-claim', label: 'Claim', container: c, corpse: false, known: true } as unknown as Stash;
