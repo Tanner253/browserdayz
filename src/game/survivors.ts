@@ -91,7 +91,7 @@ const BULK = 0.05;
  * Things hung as they are (GEAR) that close round the head: the hair that stands off the skull is not drawn under them
  * (Anya's bun stood out through a balaclava). As a Worn of no model, which only hides.
  */
-const BARE: Record<string, Region[]> = { ghillie_hood: ['hair'], gasmask: ['hair'] };
+const BARE: Record<string, Region[]> = { ghillie_hood: ['hair', 'scalp'], gasmask: ['hair'] };
 export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id]) } : null);
 /** the parts of the trousers that a top long enough lies over */
 const WAIST = hides(['belly', 'hips', 'thigh']);

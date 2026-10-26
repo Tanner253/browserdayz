@@ -106,7 +106,10 @@ export const GEAR: Record<string, Worn> = {
   // sat with its ear flaps over the brow and the nape, the owner, 2026-10-25: "the russian hat is not rotated properly")
   ushanka: { bone: 'Head', p: [0, 1.595, -0.016], r: [0, Math.PI / 2, 0], s: [0.88, 0.8, 0.88] },
   beret: { bone: 'Head', p: [0, 1.633, -0.016], r: [0, Math.PI, 0], s: [1.0, 0.6, 1.0] },
-  ghillie_hood: { bone: 'Head', p: [0, 1.48, 0.01], r: [0, Math.PI, 0], s: [1.0, 1.0, 1.0] },
+  // (the ghillie hood, a bell of strips 50 cm tall from its hem: it faced back and stood 17 cm over the crown with its
+  // hem at the mouth, the owner, 2026-10-25: "the ghillie hood is backwards and doesnt fit on the body properly"; now
+  // its front forward, its hem on the shoulders and its top 3 cm over the skull; the scalp hidden under it, see BARE in src/game/survivors.ts)
+  ghillie_hood: { bone: 'Head', p: [0, 1.45, 0.0], r: [0, 0, 0], s: [1.0, 0.78, 1.06] },
   // (round the waist: the belt's buckle and the hip pack in front)
   military_belt: { bone: 'pelvis', p: [0, 0.94, 0.0], r: [0, Math.PI, 0], s: [0.9, 1.0, 0.85] },
   hip_pack: { bone: 'pelvis', p: [0, 0.9, -0.03], r: [0, Math.PI, 0], s: [0.95, 0.95, 0.95] },
