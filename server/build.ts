@@ -285,9 +285,10 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   const at = atPiece(c, m.b, m.p, m.u);
   if (!at) return;
   if (at.why) return void send(c, { t: 'tell', kind: 'warn', text: at.why });
-  const all = bases(), back = all.refund(m.b, m.p), claimed = all.bases.get(m.b)?.claim?.p;
-  // (a box is picked up empty; what stood on a piece taken down spills what it held)
-  if (PIECES[all.bases.get(m.b)!.pieces.get(m.p)!.k].store && !emptyBox(m.b, m.p)) return void send(c, { t: 'tell', kind: 'warn', text: 'Empty it first' });
+  const all = bases(), k = all.bases.get(m.b)!.pieces.get(m.p)!.k, scrap = m.scrap === 1 && !!PLACED[k];
+  const back = scrap ? all.salvage(m.b, m.p) : all.refund(m.b, m.p), claimed = all.bases.get(m.b)?.claim?.p;
+  // (a box is picked up empty, as Rust's; broken up, what it held spills; what stood on a piece taken down spills too)
+  if (!scrap && PIECES[k].store && !emptyBox(m.b, m.p)) return void send(c, { t: 'tell', kind: 'warn', text: 'Empty it first, or deconstruct it' });
   const gone = all.remove(m.b, m.p);
   if (!gone.length) return;
   spillBoxes(m.b, gone);
@@ -299,7 +300,7 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   use(c, at.it);
   tellBase(m.b, { t: 'bout', b: m.b, ids: gone });
   const items = Object.entries(back).map(([id, n]) => makeItem(id, n));
-  if (items.length) send(c, { t: 'kit', name: 'Taken down', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
+  if (items.length) send(c, { t: 'kit', name: scrap ? 'Deconstructed' : 'Taken down', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
 }
 
 /** the hammer at a piece: mended whole for a share of what it cost (not within half a minute of a blow), or turned about */

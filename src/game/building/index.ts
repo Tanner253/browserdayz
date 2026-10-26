@@ -706,16 +706,17 @@ export class Building {
     this.bump(base.id);
   }
 
-  private takeDown(hammer: ItemInstance, base: Base, id: number) {
+  /** @param scrap broken up for some of its materials, not picked up whole (a thing set down from the hands) */
+  private takeDown(hammer: ItemInstance, base: Base, id: number, scrap = false) {
     const p = base.pieces.get(id);
     if (!p) return;
-    if (this.boxes.byCid(`bbox:${base.id}:${id}`)?.container.serialize().items.length) return void this.h.note('Empty it first', 'warn');
+    if (!scrap && this.boxes.byCid(`bbox:${base.id}:${id}`)?.container.serialize().items.length) return void this.h.note('Empty it first, or deconstruct it', 'warn');
     const still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
-    const up = PIECES[p.k].role === 'deploy' && p.k !== 'claim';
-    this.h.begin(up ? `Picking the ${PIECES[p.k].name.toLowerCase()} up` : `Taking the ${PIECES[p.k].name.toLowerCase()} down`, 2, still, () => {
+    const up = PIECES[p.k].role === 'deploy' && p.k !== 'claim', name = PIECES[p.k].name.toLowerCase();
+    this.h.begin(scrap ? `Deconstructing the ${name}` : up ? `Picking the ${name} up` : `Taking the ${name} down`, 2, still, () => {
       if (!still()) return;
-      if (this.h.online()) return void this.h.send({ t: 'bdel', b: base.id, p: id, u: hammer.uid });
-      const back = this.local.refund(base.id, id), gone = this.local.remove(base.id, id);
+      if (this.h.online()) return void this.h.send({ t: 'bdel', b: base.id, p: id, u: hammer.uid, ...(scrap ? { scrap: 1 as const } : {}) });
+      const back = scrap ? this.local.salvage(base.id, id) : this.local.refund(base.id, id), gone = this.local.remove(base.id, id);
       this.draw.remove(base.id, gone);
       this.synced(base);
       this.bump(base.id);
@@ -787,6 +788,7 @@ export class Building {
       const t = this.target(), p = t ? t.base.pieces.get(t.id) : null;
       if (!w) return ['Hammer', p ? `${PIECES[p.k].name} · ${PIECES[p.k].levels ? `Level ${ROMAN[p.t]}` : TIERS[p.t]}` : 'Look at a piece'];
       if (w === 'remove') return [PIECES[p?.k ?? '']?.role === 'deploy' && p?.k !== 'claim' ? 'Pick up' : 'Take down', p ? `Back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : ''];
+      if (w === 'scrap') return ['Deconstruct', p && PLACED[p.k] ? `Back: ${Object.entries(this.store.salvage(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : 'Only what is set down from the hands'];
       if (w.startsWith('up') && p) {
         const to = Number(w.slice(2)) as Tier, why = this.store.canUpgrade(t!.base.id, t!.id, to, this.h.creative());
         return [PIECES[p.k].levels ? `Level ${ROMAN[to] ?? ''}` : TIERS[to], why && !why.startsWith('It is') ? why : costs(costOf(p.k, to))];
@@ -819,8 +821,10 @@ export class Building {
     }
     const w = HAMMER_WHEEL[pick], held = this.h.held(), t = this.target();
     if (!w || !held || !t) return false;
-    if (w === 'remove') {
-      this.takeDown(held, t.base, t.id);
+    if (w === 'remove' || w === 'scrap') {
+      const p = t.base.pieces.get(t.id);
+      if (w === 'scrap' && !(p && PLACED[p.k])) return false;
+      this.takeDown(held, t.base, t.id, w === 'scrap');
       return true;
     }
     if (w === 'unlock') {
