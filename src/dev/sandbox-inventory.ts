@@ -90,6 +90,8 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   }
 
   const shown: Record<string, unknown> = { kit: kit.id };
+  // (the portraits a list of people shows: src/dev/sandbox-heads.ts)
+  if (q.get('ui') === 'heads' && env) return { ...shown, ...(await (await import('./sandbox-heads')).stageHeads(q, renderer, env, ui)) };
   if (q.get('ui') === 'wheel') {
     const hud = document.createElement('div');
     hud.id = 'hud';

@@ -11,7 +11,7 @@ import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUnif
 import { BODY_SCALE, GEAR, WORN, placeWorn } from '../game/avatar';
 import { hangFit } from '../game/avatar/gear';
 import { MOVE_FILE } from '../game/avatar/gait';
-import { sortWorn, wearBody, wearOn, type BodyFit } from '../game/survivors';
+import { bulkOf, sortWorn, wearBody, wearOn, type BodyFit } from '../game/survivors';
 import { made, programsOf } from '../core/renderer';
 
 const PX = 64; // pixels per grid cell
@@ -376,6 +376,11 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
   model.updateMatrixWorld(true);
   // (the body put on first, its own lengths on the bones, so that what is hung on it is hung where it is: see Avatar.gearFit)
+  // (where the bones that carry gear stand at rest before a body is put on, as the game measures them once on the
+  // skeleton it makes (Avatar.gearRest): measured after, on the body's own lengths and size, what is hung there was moved
+  // twice, and a hat stood a hand over the head, the owner, 2026-10-25: "did we fix equipment and clothing items not
+  // fitting right in the admin panel pfp?")
+  const restOf = new Map(['Head', 'spine_03', 'pelvis'].map((n) => [n, model.getObjectByName(n)?.matrixWorld.clone().invert()] as const));
   const skin = body === null ? null : await wearBody(model, body);
   const fit = (skin?.[0]?.userData.fit as BodyFit | undefined) ?? null;
   model.updateMatrixWorld(true);
@@ -384,8 +389,10 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   // a pack hangs where it hangs on a body in the world: set on the body as it stands at rest, and carried by the spine from there
   const carried: THREE.Object3D[] = [];
   if (models) {
-    for (const id of worn) {
-      const g = GEAR[id], bone = g && model.getObjectByName(g.bone);
+    // (and over what is worn, not at the skin: see Bulk)
+    const bulk = skin ? await bulkOf(sortWorn(worn).worn, body ?? 0) : null;
+    for (const key of worn) {
+      const id = key.split('~')[0], g = GEAR[id], bone = g && model.getObjectByName(g.bone);
       if (!g || !bone) continue;
       const holder = new THREE.Group();
       holder.matrixAutoUpdate = false;
@@ -396,8 +403,8 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
       const place = placeWorn(id, thing, worn);
       if (!place) continue;
       const toFile = new THREE.Matrix4().makeScale(1 / BODY_SCALE, 1 / BODY_SCALE, 1 / BODY_SCALE).multiply(new THREE.Matrix4().makeRotationY(Math.PI));
-      const inv = bone.matrixWorld.clone().invert().multiply(toFile);
-      holder.matrix.copy(inv).multiply(hangFit(fit, g, inv)).multiply(place);
+      const inv = (restOf.get(g.bone) ?? bone.matrixWorld.clone().invert()).clone().multiply(toFile);
+      holder.matrix.copy(inv).multiply(hangFit(fit, g, inv, bulk)).multiply(place);
       holder.add(thing);
       bone.add(holder);
       carried.push(holder);

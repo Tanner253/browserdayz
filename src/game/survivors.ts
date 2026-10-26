@@ -374,6 +374,24 @@ export async function wearBody(model: THREE.Object3D, n: number, hide = 0): Prom
 
 /** a thing worn's file: its body's own where it is made for each (Worn.each) */
 const wornFile = (w: Worn, n: number) => `assets/characters/wear/${w.model}${w.each ? `_${n}` : ''}.glb`;
+
+/** how far what is worn stands off a body, the most of it each way, as the Wardrobe hands it on (see Bulk): for a body
+ * dressed by itself, the portrait in a list of people */
+export async function bulkOf(worn: Worn[], n: number): Promise<Bulk> {
+  const bulk: Bulk = {};
+  for (const w of worn) {
+    if (!w.model) continue;
+    const gltf = await load(wornFile(w, n)).catch(() => null);
+    gltf?.scene.traverse((o) => {
+      const own = ((o as THREE.Mesh).material as THREE.Material | undefined)?.userData.bulk as Bulk | undefined;
+      for (const band of ['chest', 'waist'] as const) {
+        const b = own?.[band];
+        if (b) bulk[band] = (bulk[band] ?? [0, 0, 0]).map((v, i) => Math.max(v, Math.min(BULK, b[i]))) as [number, number, number];
+      }
+    });
+  }
+  return bulk;
+}
 /** a part of a thing worn that keeps its own colours whatever the thing's are (the eyes in a balaclava: `own` in its material) */
 const ownColour = (w: Worn, mat: THREE.Material): Worn => (mat.userData.own ? { ...w, tint: undefined, camo: undefined } : w);
 
