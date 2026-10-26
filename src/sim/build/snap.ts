@@ -103,6 +103,45 @@ const isWall = (p: Piece) => kindOf(p).role === 'wall';
 /** a wall a floor can be laid on: a whole storey high */
 const bears = (p: Piece) => isWall(p) && (kindOf(p).h ?? 0) >= STOREY - 1e-6;
 
+/**
+ * What hangs on a wall anywhere along its face and at any height, with no places to snap to: a wall torch (the owner,
+ * 2026-10-25: "should be no snapping for placing torch either, should free place on walls"). Checked for room alone.
+ */
+export const FREE_LEAN: ReadonlySet<string> = new Set(['torch_wall']);
+/** how far it stands off its wall's face, and how far up and down from its wall's foot its own foot may be put, m */
+const HANG = { off: 0.12, low: -1.2, high: 0.8, lift: 1.9 };
+
+/** a wall a free-hung thing may go on, and where along it and how far out from its middle line a point is */
+function onWall(p: Piece, x: number, z: number) {
+  const W = kindOf(p);
+  if (!(bears(p) || (W.role === 'free' && !W.id.startsWith('gate_')))) return null;
+  const a = p.r * STEP, dx = x - p.x, dz = z - p.z;
+  return { along: dx * Math.cos(a) - dz * Math.sin(a), across: dx * Math.sin(a) + dz * Math.cos(a), half: W.role === 'free' ? (W.id === 'high_wall_stone' ? 0.4 : 0.25) : WALL_T / 2, long: W.long ?? CELL, h: W.h ?? STOREY, a };
+}
+
+/** where the aim (`at`, in the base's frame, on a wall's face) hangs a free-hung thing: on the nearest wall face there,
+ * its foot so far below the aim that what it holds up is at the aim, facing out (null: no wall there) */
+export function leanAt(base: Base, kind: string, at: { x: number; y: number; z: number }): Spot | null {
+  let best: { p: Piece; w: NonNullable<ReturnType<typeof onWall>>; d: number } | null = null;
+  for (const p of base.pieces.values()) {
+    const w = onWall(p, at.x, at.z);
+    if (!w || Math.abs(w.along) > w.long / 2 - 0.12 || at.y < p.y + 0.4 || at.y > p.y + w.h - 0.2) continue;
+    const d = Math.abs(Math.abs(w.across) - w.half);
+    if (d < 0.35 && (!best || d < best.d)) best = { p, w, d };
+  }
+  if (!best) return null;
+  const { p, w } = best, side = w.across >= 0 ? 1 : -1, out = w.half + HANG.off;
+  const s: Spot = {
+    x: r3(p.x + w.along * Math.cos(w.a) + side * out * Math.sin(w.a)),
+    y: r3(Math.min(p.y + HANG.high, Math.max(p.y + HANG.low, at.y - HANG.lift))),
+    z: r3(p.z - w.along * Math.sin(w.a) + side * out * Math.cos(w.a)),
+    r: mod12(p.r + (side < 0 ? 6 : 0)),
+    on: [],
+  };
+  s.on = restsOn(base, kind, s);
+  return s.on.length ? s : null;
+}
+
 export interface Edge {
   x: number;
   z: number;
@@ -347,6 +386,10 @@ export function restsOn(base: Base, kind: string, s: { x: number; y: number; z: 
       if (isFloor(p) && !P.roof && near(p, s)) on.push(p.id);
     } else if (K.role === 'fit') {
       if (P.hole === K.fits && near(p, s)) on.push(p.id);
+    } else if (K.role === 'lean' && FREE_LEAN.has(kind)) {
+      // (hung anywhere on a wall's face: the wall it is against, along its length and within its reach up and down)
+      const w = onWall(p, s.x, s.z);
+      if (w && Math.abs(w.along) <= w.long / 2 - 0.1 && Math.abs(Math.abs(w.across) - (w.half + HANG.off)) < SAME && s.y - p.y >= HANG.low - SAME && s.y - p.y <= HANG.high + SAME && mod12(s.r - (w.across >= 0 ? p.r : p.r + 6)) === 0) on.push(p.id);
     } else if (K.role === 'lean') {
       // (the wall behind it, or the ladder under it)
       const bx = s.x - sin(s.r) * 0.6, bz = s.z - cos(s.r) * 0.6;
@@ -486,6 +529,12 @@ export function offered(base: Base, kind: string, want: { x: number; y: number; 
   if (PIECES[kind].role === 'deploy') {
     const s = deployAt(base, kind, want, want.r);
     return s && Math.abs(s.x - want.x) < SAME && Math.abs(s.z - want.z) < SAME ? s : null;
+  }
+  // (and what hangs anywhere on a wall: where the game says, if a wall's face is there for it)
+  if (FREE_LEAN.has(kind)) {
+    const s: Spot = { x: want.x, y: want.y, z: want.z, r: mod12(want.r), on: [] };
+    s.on = restsOn(base, kind, s);
+    return s.on.length ? s : null;
   }
   for (const turn of [0, 1, 2, 3]) {
     for (const s of spots(base, kind, turn)) if (near(s, want) && sameTurn(kind, s.r, want.r)) return s;

@@ -319,7 +319,7 @@ export class Bases {
       for (const [k, n] of Object.entries(c)) out[k] = (out[k] ?? 0) + n;
     };
     // (a sleeping bag is its own material: it comes back whole)
-    if (PLACED[p.k] === 'sleeping_bag') return { sleeping_bag: 1 };
+    if (PLACED[p.k] === 'sleeping_bag' || PLACED[p.k] === 'torch') return { [PLACED[p.k]]: 1 };
     add(PIECES[p.k].cost ?? {});
     if (PIECES[p.k].levels) for (let l = laidAt(p.k) + 1; l <= p.t; l++) add(costOf(p.k, l as Tier));
     for (const k of Object.keys(out)) out[k] = Math.ceil(out[k] / 2);

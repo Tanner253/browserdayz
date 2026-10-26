@@ -19,7 +19,7 @@ import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
 import { mendOf, Bases, heard, heardClaim, heardPiece, heardSite, repairOf, said, type KeptBase } from '../../sim/build/bases';
 import { PLACED, PLACES, PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
-import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Piece, type Spot } from '../../sim/build/snap';
+import { FREE_LEAN, leanAt, deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Piece, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../../sim/items';
@@ -403,14 +403,22 @@ export class Building {
     }
     // (the place held, while it is still a place for this piece and near the aim, unless another is clearly nearer)
     const kept = this.kept, same = (q: Spot, s: Spot) => q.x === s.x && q.y === s.y && q.z === s.z && q.r === s.r;
-    if (kept && kept.k === this.kind && K.role !== 'deploy') {
+    if (kept && kept.k === this.kind && K.role !== 'deploy' && !FREE_LEAN.has(this.kind)) {
       const kb = this.store.bases.get(kept.b);
       if (kb && near.includes(kb) && this.spotsOf(kb).some((q) => same(q, kept.s))) {
         const [wx, wy, wz] = toWorld(kb, kept.s.x, kept.s.y, kept.s.z), d = Math.hypot(wx - at.x, wy - at.y, wz - at.z);
         if (d < GHOST.far && (!best || d < best.d + GHOST.stick)) best = { base: kb, s: kept.s, d };
       }
     }
-    if (best && K.role !== 'deploy') this.kept = { b: best.base.id, k: this.kind, s: best.s, at: performance.now() };
+    // (a torch held: hung where the aim meets a wall's face, anywhere on it, with no places to snap to)
+    if (FREE_LEAN.has(this.kind)) {
+      best = null;
+      for (const b of near) {
+        const [lx, ly, lz] = toLocal(b, at.x, at.y, at.z), s = leanAt(b, this.kind, { x: lx, y: ly, z: lz });
+        if (s) best = { base: b, s, d: 0 };
+      }
+    }
+    if (best && K.role !== 'deploy' && !FREE_LEAN.has(this.kind)) this.kept = { b: best.base.id, k: this.kind, s: best.s, at: performance.now() };
     let ask: { b?: number; k: string; x: number; y: number; z: number; r: number; yaw?: number } | null = null;
     // (a thing set down goes where the aim meets a floor: its front to whoever sets it down, a box's back to the wall
     // behind it if there is one; R turns it on from there, a step, or a box a quarter)

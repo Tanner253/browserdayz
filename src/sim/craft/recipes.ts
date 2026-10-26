@@ -93,7 +93,7 @@ export const RECIPES: Recipe[] = [
   bench(1, 'pickaxe', 'pickaxe', 1, [{ id: F, n: 100 }, { id: 'planks', n: 1 }], 12, 'tools'),
   bench(1, 'building_plan', 'building_plan', 1, [{ id: 'rags', n: 2 }, { id: MAT.coal, n: 1 }], 5, 'build'),
   // (what is set down from the hands, made from what it cost to lay, at the workbench level it asked for: src/sim/build/pieces.ts PLACED)
-  ...Object.entries(PLACED).filter(([, item]) => item !== 'sleeping_bag').map(([k, item]) => {
+  ...Object.entries(PLACED).filter(([, item]) => item !== 'sleeping_bag' && item !== 'torch').map(([k, item]) => {
     const needs = Object.entries(PIECES[k].cost ?? {}).map(([id, n]) => ({ id, n })), lv = PIECES[k].bench;
     return lv ? bench(Math.min(3, lv) as Level, item, item, 1, needs, 20, 'build') : hand(item, item, 1, needs, 6, 'build');
   }),

@@ -23,7 +23,7 @@ import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
 import { inPlay } from '../src/world/worldgen/layout';
 import { Bases, MEND, heard, heardPiece, mendOf, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
-import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
+import { leanAt, blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, STORE, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 import { ITEMS } from '../src/sim/items';
 import { inBase, inTheWay, swept } from '../src/sim/build/doors';
@@ -400,6 +400,18 @@ ok('the metal fittings need a workbench II near, the armoured ones a III; the wo
   // (hung from its item: what it is made of is its recipe's now)
   assert.deepEqual(costOf('door_metal', 3), { door_metal: 1 });
   assert.deepEqual([hpOf('door_wood', 1), hpOf('door_metal', 3), hpOf('garage_door', 3), hpOf('door_armoured', 4)], [250, 500, 1000, 1000]);
+});
+
+ok('a torch hangs anywhere on a wall face, at any height, with no places to snap to; not in the air', () => {
+  // (the owner, 2026-10-25: "should be no snapping for placing torch either, should free place on walls")
+  const { bs, b } = hut(), w = [...b.pieces.values()].find((q) => q.k === 'wall')!;
+  const a = (w.r * Math.PI) / 6, along = 0.7, across = 0.1;
+  const at = { x: w.x + along * Math.cos(a) + across * Math.sin(a), y: w.y + 1.3, z: w.z - along * Math.sin(a) + across * Math.cos(a) };
+  const s = leanAt(b, 'torch_wall', at);
+  assert.ok(s && s.on.includes(w.id), `hung on the wall: ${JSON.stringify(s)}`);
+  const r = bs.lay({ b: b.id, k: 'torch_wall', x: s!.x, y: s!.y, z: s!.z, r: s!.r }, ME, 0);
+  assert.ok(typeof r !== 'string', String(r));
+  assert.equal(leanAt(b, 'torch_wall', { x: w.x + 9, y: w.y + 1.3, z: w.z + 9 }), null, 'nowhere off a wall');
 });
 
 ok('a piece is mended for a share of its cost, nails and all, by the health it lost; not within half a minute of a blow', () => {
