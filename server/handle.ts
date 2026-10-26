@@ -1046,7 +1046,7 @@ export function handle(c: Client, m: C2S) {
       const from = lootedTags.get(tag.uid);
       const now = Date.now();
       // (a tag this server knows nothing of: taken before tags were kept through a restart, see keepTags)
-      const why = buried(c, now) ? 'it was cashed in from under the ground' : voided.has(tag.uid) ? 'it was carried out of the Zona or under the ground' : from ? notEarned(c, from, seenAt, now) : 'the server restarted while you were carrying it';
+      const why = buried(c, now) ? 'it was cashed in from under the ground' : voided.has(tag.uid) ? 'it was carried out of the Zona or under the ground, or taken on claimed land' : from ? notEarned(c, from, seenAt, now) : 'the server restarted while you were carrying it';
       log(`${c.name} cashed in ${owner}'s dog tag${why ? ` (not listed for a reward: ${why})` : ''}`);
       lootedTags.delete(tag.uid);
       tagSeen.delete(seenOf(c.key) + tag.uid);

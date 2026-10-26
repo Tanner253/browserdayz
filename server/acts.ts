@@ -14,13 +14,14 @@ import { CORPSE_LIFETIME, CORPSE_WEST, PARKS, WEST_FROM, boxes, economy, issue, 
 import { idleMs } from './west-cars';
 import { lieAt } from './custody';
 import { shutIt } from './searched';
-import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, tagTime, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn } from './tags';
+import { TAG_CAUSE_MS, TAG_FRESH_MS, TAG_NEEDS_KILLER, tagTime, carriedTags, lootedFrom, lootedTags, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast, tagLock } from './gate';
 import { inPlay } from '../src/world/worldgen';
 import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
 import { scoreOf, sendBoard } from './queue';
 import { bodyInfo, fellWay, zedBody } from './bodies';
+import { bases } from './build';
 import type { Body } from '../src/sim/infected';
 
 // ------------------------------------------------------------------ gameplay
@@ -372,7 +373,14 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
   const lock = tagLock(c.key);
   // (nor anybody's who dies outside the Zona: the owner, 2026-10-19, "people cannot earn tags west of the wall")
   const outside = ZONA_VOID && !inPlay(c.pose[0], c.pose[2]);
-  const noTag = fresh || nobody || outside || (lock === undefined ? c.power.voidTag : !lock), bare = c.power.voidInv;
+  // (nor on a base's claimed land, or from it: the owner, 2026-10-26, "we need a way to prevent roof campers from earning
+  // dogtags when killing people from their bases ... dogtags should be void if dropped on a body when in a claimed zone ...
+  // a player who kills another player while inside a claimed land area will void the killed player's tag")
+  const killer = hitter ? clients.get(hitter.id) : undefined, B = bases();
+  const claimed = !!B.claimAt(c.pose[0], c.pose[2]) || (!!killer && !!B.claimAt(killer.pose[0], killer.pose[2]));
+  // (and the tags they had taken off other people go void with it: nothing that pays is had off a body there)
+  if (claimed && inv) for (const t of carriedTags(inv)) { const from = lootedTags.get(t.uid); if (from && !theirOwn(from, c.key)) voided.add(t.uid); }
+  const noTag = fresh || nobody || outside || claimed || (lock === undefined ? c.power.voidTag : !lock), bare = c.power.voidInv;
   /** a tag that is on a body whoever's body it is: one taken off somebody else */
   const taken = (t: ItemInstance) => {
     const from = lootedTags.get(t.uid);
@@ -415,9 +423,9 @@ function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null
     }
     if (own && !noTag) lootedTags.set(own.uid, lootedFrom(c, lived));
     else if (own || older) {
-      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s${ZONA_VOID ? ' in the Zona' : ''}` : nobody ? 'no other player killed them' : outside ? 'outside the Zona' : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
+      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s${ZONA_VOID ? ' in the Zona' : ''}` : nobody ? 'no other player killed them' : outside ? 'outside the Zona' : claimed ? 'killed on or from claimed land' : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
-      if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes${ZONA_VOID ? ' in the Zona' : ''}.` : outside ? `No dog tag on ${c.name}: killed outside the Zona.` : `No dog tag on ${c.name}: an admin, at work.` });
+      if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes${ZONA_VOID ? ' in the Zona' : ''}.` : outside ? `No dog tag on ${c.name}: killed outside the Zona.` : claimed ? `No dog tag on ${c.name}: killed on or from a base's claimed land.` : `No dog tag on ${c.name}: an admin, at work.` });
     }
     if (bare) {
       log(`${c.name} left nothing they carried on their body: an admin, who chose so`);
