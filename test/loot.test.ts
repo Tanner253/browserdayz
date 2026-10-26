@@ -522,4 +522,18 @@ ok('nothing of the fourth step and up west of the Zona’s line, not at a guard 
   assert.deepEqual([...got].filter((id) => eastOnly(ITEMS[id])), [], 'a crate west of the line held something of the fourth step and up');
 });
 
+ok('the ghillie suit and hood are the rarest clothing, and the suit the roomiest top (the owner, 2026-10-25: "ghillie is the best clothing you can get in the game, most rare in the game now")', () => {
+  const ghillie = ['ghillie_suit', 'ghillie_hood'], cloth = Object.values(ITEMS).filter((d) => d.category === 'clothing' && d.loot);
+  const many = (d: (typeof cloth)[number]) => (d.loot!.at ?? []).reduce((a: number, b) => a + Number(b), 0);
+  for (const id of ghillie) {
+    const l = ITEMS[id].loot!;
+    assert.deepEqual(l.at, [0, 0, 0, 0, 1], `${id}: one, on the top step only`);
+    assert.deepEqual([...(l.usage ?? [])].sort(), ['Bunker', 'Military'], `${id}: in the fort and the bunker`);
+    for (const d of cloth) if (!ghillie.includes(d.id)) assert.ok(many(d) > 1 || (d.loot!.restock ?? 0) < (l.restock ?? 0), `${d.id} is as rare as the ${id}`);
+  }
+  const room = (id: string) => (ITEMS[id].wear?.cargo ? ITEMS[id].wear!.cargo![0] * ITEMS[id].wear!.cargo![1] : 0);
+  assert.equal(ITEMS.ghillie_suit.slot, 'top', 'the ghillie suit is worn as the top, a pack over it');
+  for (const d of cloth) if (d.id !== 'ghillie_suit' && d.slot !== 'back') assert.ok(room(d.id) < room('ghillie_suit'), `${d.id} holds as much as the ghillie suit`);
+});
+
 console.log(`\n${n} checks passed`);

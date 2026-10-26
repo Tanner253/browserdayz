@@ -309,16 +309,19 @@ export const WEAR_ITEMS: ItemDef[] = [
   {
     id: 'ghillie_hood', name: 'Ghillie Hood', model: 'ghillie_hood', w: 2, h: 2, weight: 0.4, category: 'clothing', slot: 'head',
     desc: 'A hood of burlap strips: the head of a ghillie suit, a bush where a head was.', wear: {},
-    loot: { pair: 'GhillieHood_Woodland', at: [0, 0, 0, 0, 2], restock: 1800, usage: ARMY },
+    loot: { pair: 'GhillieHood_Woodland', at: [0, 0, 0, 0, 1], restock: 3600, usage: ['Military', 'Bunker'] },
     worth: 10,
   },
   {
-    // (worn on the back, as DayZ has it: no pack with it. A shape in the grass, not a survivor.)
-    id: 'ghillie_suit', name: 'Ghillie Suit', model: 'folded_blanket', tint: 0x4f5a34, scale: 1.2, w: 4, h: 3, weight: 2.5, category: 'clothing', slot: 'back',
-    desc: 'A sniper\'s suit of burlap strips, head to ankle. Worn on the back: there is no pack with it, and nothing in its pockets.', wear: {},
+    // (the best clothing in the game and the rarest, the owner, 2026-10-25: "make it so it takes the clothing slot with max
+    // inventory for now, can wear backpack with ghillie and doesnt have reduced inventory slots. ghillie is the best
+    // clothing you can get in the game, most rare in the game now": worn as the top, more room than any, a pack over it;
+    // one at a time on the top step, in the fort and the bunker, an hour coming back)
+    id: 'ghillie_suit', name: 'Ghillie Suit', model: 'folded_blanket', tint: 0x4f5a34, scale: 1.2, w: 4, h: 3, weight: 2.5, category: 'clothing', slot: 'top',
+    desc: 'A sniper\'s suit of burlap strips, head to ankle, its pockets the deepest of any. A shape in the grass, not a survivor; a pack goes on over it. 35 slots.', wear: { cargo: [7, 5] },
     dress: { model: 'ghillie_suit', hides: ['chest', 'belly', 'hips', 'shoulder', 'upperArm', 'forearm', 'thigh', 'aboveKnee', 'shin'] },
     colours: [{ name: 'Woodland' }, { name: 'Mossy', tint: 0x55663a }, { name: 'Desert', tint: 0xb39d70 }, { name: 'Winter', tint: 0xd8dcd6 }],
-    loot: { pair: 'GhillieSuit_Woodland', at: [0, 0, 0, 0, 2], restock: 1800, usage: ['Military', 'Hunting'] },
+    loot: { pair: 'GhillieSuit_Woodland', at: [0, 0, 0, 0, 1], restock: 3600, usage: ['Military', 'Bunker'] },
     worth: 20,
   },
   {
