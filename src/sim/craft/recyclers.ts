@@ -3,7 +3,10 @@
 // and is loud"; "Every component you don't need goes in a recycler for fragments and scrap, so nothing found is
 // worthless"). Rust's: a machine anybody may use, its store open to whoever is there; switched on, it breaks what is in
 // it down a thing at a time, into fragments, scrap, rags and now and then a steel plate, and is heard far off while it
-// runs. What each thing gives is data, here; the server runs every recycler, the game played alone its own.
+// runs. What each thing gives is data, here; the server runs every recycler, the game played alone its own. Every part,
+// bit of junk and tool goes through, and whatever Rust would break down, into what it is made of: an early source of
+// fragments and scrap (the owner: "are all viable items supported by the recycler?"; "they are loud and take time to
+// process materials, like rust").
 
 import { RNG } from '../../core/noise';
 import { Container } from '../inventory';
@@ -13,18 +16,19 @@ import type { World } from '../../world/worldgen';
 import { castleLoose } from '../castle/ask';
 import { castleClear, castleHomes } from '../castle/loot';
 import { castleLocal } from '../castle/plan';
+import { ruinFoot, ruinLocal, ruinsPlan, inside as inRuin, outside as offRuin } from '../ruins';
 import { MAT } from './materials';
 import { RECIPES, RAGS, optionsOf } from './recipes';
 import { roomOn, type LayerWorld } from './layer';
 import type { Camp } from '../camp';
 
 export const RECYCLE = {
-  /** seconds a thing takes (a store of ten, a minute and a half) */
-  each: 6,
+  /** seconds a thing takes (Rust's five: a store of ten, nearly a minute) */
+  each: 5,
   /** its store */
   store: [10, 6] as [number, number],
-  /** how far off one running is heard, m */
-  heard: 90,
+  /** how far off one running is heard, m (src/core/audio.ts `machine`) */
+  heard: 140,
   /** its size, m: across its front and from front to back (its model's z and x: its front is its +x) */
   w: 1.6,
   l: 2.0,
@@ -44,9 +48,22 @@ const PARTS: Record<string, Gives> = {
   hardware: [[MAT.frags, 20], [MAT.scrap, 8]],
   jerrycan: [[MAT.frags, 8]],
   code_lock: [[MAT.frags, 20], [MAT.scrap, 10], ['spring', 1]],
+  // (junk and gear: what it is made of, as Rust's)
+  radio: [[MAT.frags, 30], [MAT.scrap, 15]],
+  watch: [[MAT.frags, 2], [MAT.scrap, 2]],
+  compass: [[MAT.frags, 3], [MAT.scrap, 1]],
+  grenade: [[MAT.frags, 10], ['gunpowder', 8]],
+  frag: [[MAT.frags, 8], ['gunpowder', 6]],
+  flask: [[MAT.frags, 4]],
+  thermos: [[MAT.frags, 3]],
+  rope: [['rags', 3]],
+  stash_kit: [[MAT.frags, 6], ['rags', 4]],
+  old_suitcase: [[MAT.frags, 4], ['rags', 3]],
+  black_bag: [['rags', 1]],
+  loot_bag: [['rags', 1]],
 };
-/** never put through: the metals themselves, nails (looted, and wanted), what is eaten or bled, the Zone's own */
-const NEVER = new Set([MAT.scrap, MAT.frags, MAT.bar, MAT.coal, 'nails', 'dogtag', 'keycard', 'gunpowder', 'rags']);
+/** never put through: the metals themselves, nails (looted, and wanted), steel plate (loot only, the top tier's), what is eaten or bled, the Zone's own */
+const NEVER = new Set([MAT.scrap, MAT.frags, MAT.bar, MAT.coal, 'nails', 'steel_plate', 'dogtag', 'keycard', 'gunpowder', 'rags']);
 
 /**
  * What one of a thing breaks down into (empty: it is not taken). A part, by its own list; a thing that is made, half of
@@ -81,6 +98,12 @@ export function recycles(id: string, rnd: () => number = Math.random): Gives {
   }
   if (def.category === 'clothing') return [['rags', RAGS[id] ?? 2]];
   if (def.category === 'attachment') return [[MAT.frags, Math.max(5, Math.round(def.weight * 40))], [MAT.scrap, Math.max(1, Math.round((def.worth ?? 4) / 4))]];
+  // (a magazine: its steel, and the spring that feeds it one time in three)
+  if (def.category === 'magazine') {
+    const out: Gives = [[MAT.frags, Math.max(3, Math.round(def.weight * 30))], [MAT.scrap, Math.max(1, Math.round((def.worth ?? 4) / 6))]];
+    if (rnd() < 0.34) out.push(['spring', 1]);
+    return out;
+  }
   if (def.category === 'tool' && def.weight >= 0.2) return [[MAT.frags, Math.max(3, Math.round(def.weight * 10))]];
   return [];
 }
@@ -159,16 +182,21 @@ export interface Recycler {
 
 const SEED = 0x2ec7c1;
 
-/** the recyclers' layer: Zavod, the army camp, the fort, the chemical works, the trader camp; the same for the game and the server */
-export function recyclerLayer(world: LayerWorld & Pick<World, 'sites' | 'towns' | 'castle'>, camp: Camp | null): Recycler[] {
+/**
+ * the recyclers' layer, the same for the game and the server: the desert ruins (Kalat), the fort, the chemical works, and
+ * beside the green west's and the valley's traders (the owner: "Recyclers in three places: the desert ruins (Kalat), the
+ * green west, and the valley"; Zavod's and the army camp's moved there; the fort's and the works' kept, far from those)
+ */
+export function recyclerLayer(world: LayerWorld & Pick<World, 'sites' | 'castle' | 'kalat'>, camp: Camp | null): Recycler[] {
   const room = roomOn(world, true), rng = new RNG(SEED), out: Recycler[] = [];
-  // (keep clear of the camp's stalls and its own recycler: laid before these)
-  for (const s of camp?.stalls ?? []) room.stand(s.x, s.z, 2.5);
-  const near = (at: string, cx: number, cz: number, from = 8) => {
-    for (let d = from; d < 80; d += 3) {
+  // (keep clear of the traders' stalls and their recyclers: laid before these)
+  for (const s of [...(camp?.stalls ?? []), ...(camp?.recyclers ?? [])]) room.stand(s.x, s.z, 2.5);
+  const near = (at: string, cx: number, cz: number, from = 8, to = 80, clear = (_x: number, _z: number) => true) => {
+    for (let d = from; d < to; d += 3) {
       const a0 = rng.range(0, Math.PI * 2);
       for (let k = 0; k < 10; k++) {
         const a = a0 + (k / 10) * Math.PI * 2, x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d, rot = Math.atan2(cx - x, cz - z);
+        if (!clear(x, z)) continue;
         const y = room.fit(x, z, RECYCLE.l, RECYCLE.w, rot, { margin: 1.2, road: 0.5, level: 0.45, sink: 0.05 });
         if (y === null) continue;
         room.stand(x, z, 2.5);
@@ -177,16 +205,22 @@ export function recyclerLayer(world: LayerWorld & Pick<World, 'sites' | 'towns' 
       }
     }
   };
-  const town = (world.towns ?? []).find((t) => t.town.name === 'Zavod')?.town;
-  if (town) near('Zavod', town.x, town.z, 14);
+  // (Kalat's walls are not buildings to the room: kept 4 m off every piece of the ruins, facing into the town)
+  if (world.kalat) {
+    const plan = ruinsPlan(world.kalat);
+    const clear = (x: number, z: number) => plan.every(({ piece, place }) => {
+      if (Math.hypot(x - place.x, z - place.z) > 160) return true;
+      const [lx, lz] = ruinLocal(place, x, place.y, z), foot = ruinFoot(piece);
+      return !inRuin(lx, lz, foot) && offRuin(lx, lz, foot) >= 4;
+    });
+    near('Kalat', world.kalat.x, world.kalat.z, 30, 200, clear);
+  }
   const site = (k: string) => world.sites.find((s) => s.kind === k);
-  const army = site('tents');
-  if (army) near('the army camp', army.x, army.z, 10);
   const fort = world.castle && fortSpot(world, room);
   if (fort) out.push(fort);
   const works = site('works');
   if (works) near('the chemical works', works.x, works.z, 12);
-  if (camp?.recycler) out.push({ at: 'the trader camp', ...camp.recycler });
+  for (const r of camp?.recyclers ?? []) out.push(r);
   return out;
 }
 

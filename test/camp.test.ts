@@ -22,6 +22,8 @@ import { RECYCLE, recycleStep, recyclable, recycles } from '../src/sim/craft/rec
 import { MAT } from '../src/sim/craft/materials';
 import { PROTOCOL, type S2C, type StoredItem } from '../src/net/protocol';
 import { buildWorldData } from '../server/world';
+import { zonaDepth } from '../src/world/zona';
+import { noBuilding } from '../src/sim/build/land';
 
 let n = 0;
 const failed: string[] = [];
@@ -46,13 +48,26 @@ ok('four stalls, every good a real thing at a price in scrap, so many a day; no 
     assert.ok(STALLS[s].sells.length >= 5, `${s} sells ${STALLS[s].sells.length} things`);
     for (const g of STALLS[s].sells) {
       assert.ok(ITEMS[g.id], `${g.id} is not an item`);
-      assert.ok(g.price > 0 && g.n > 0 && g.day > 0, `${g.id}: ${JSON.stringify(g)}`);
+      assert.ok(g.price > 0 && g.n > 0 && (g.day === undefined || g.day > 0), `${g.id}: ${JSON.stringify(g)}`);
       assert.ok(!top.includes(g.id), `${s} sells ${g.id}`);
     }
   }
   // (nails are dear: the owner, "they must be looted which is hard and time consuming")
   const nails = STALLS.building.sells.find((g) => g.id === 'nails')!;
-  assert.ok(nails.price / nails.n >= 4 && nails.day <= 3, 'nails are cheap');
+  assert.ok(nails.price / nails.n >= 4 && (nails.day ?? 99) <= 3, 'nails are cheap');
+  // (nothing above the third step of the map, and only a few things of it: the owner, "like rust nothing from traders is
+  // overpowered"; a sort kept mostly from the fourth step up counts as the fourth, but for the rounds of a gun sold)
+  const fed = new Set(STALL_IDS.flatMap((s) => STALLS[s].sells.map((g) => ITEMS[g.id].weapon?.ammo ?? '')));
+  const step = (id: string) => {
+    const a = ITEMS[id].loot?.at;
+    return !a ? 1 : a[3] + a[4] > a[0] + a[1] + a[2] && !fed.has(id) ? 4 : a.findIndex((n) => n > 0) + 1;
+  };
+  const third: string[] = [];
+  for (const s of STALL_IDS) for (const g of STALLS[s].sells) {
+    assert.ok(step(g.id) <= 3, `${s} sells ${g.id}, of the step ${step(g.id)}`);
+    if (step(g.id) === 3) third.push(g.id);
+  }
+  assert.ok(third.length <= 5, `so much of the third step: ${third.join(', ')}`);
 });
 
 ok('nothing bought is sold back for a profit, at any stall, nor recycled for more scrap than it cost', () => {
@@ -69,7 +84,7 @@ ok('a day: so many sales of a thing, scrap enough or not, and a most of scrap pa
   const d = day0(), good = STALLS.weapons.sells.find((g) => g.id === 'colt')!;
   assert.equal(typeof mayBuy('weapons', 'colt', d, good.price - 1), 'string', 'a pistol bought with too little scrap');
   assert.equal(mayBuy('weapons', 'colt', d, good.price), good);
-  d.bought.colt = good.day;
+  d.bought.colt = good.day!;
   assert.equal(leftToday(good, d), 0);
   assert.match(mayBuy('weapons', 'colt', d, 9999) as string, /tomorrow/);
   assert.match(mayBuy('medical', 'colt', d, 9999) as string, /not sell/, 'the medical stall sold a pistol');
@@ -111,6 +126,11 @@ ok('a recycler breaks a thing at a time into fragments and scrap, never the meta
   // (a gun that is crafted gives back half of what it is made of: Rust's)
   assert.deepEqual(recycles('ak', () => 1).find(([x]) => x === MAT.bar), [MAT.bar, 6]);
   assert.ok(recycles('field_jacket').some(([x]) => x === 'rags'), 'a jacket gives no rags');
+  // (every part, bit of junk, tool, magazine and fitting goes through: the owner, "are all viable items supported by the recycler?")
+  for (const [id, d] of Object.entries(ITEMS)) {
+    if (!['tool', 'magazine', 'attachment', 'weapon', 'melee'].includes(d.category) && !['radio', 'grenade', 'frag', 'rope', 'jerrycan', 'tin_can', 'sheet_metal', 'hardware'].includes(id)) continue;
+    if (ITEMS[id] && id !== 'keycard') assert.ok(recycles(id, () => 0).length, `${id} does not go through`);
+  }
   const items: StoredItem[] = [{ ...makeItem('spring', 1), x: 0, y: 0, rot: false }, { ...makeItem('nails', 20), x: 1, y: 0, rot: false }];
   const run = { on: true, done: 0 };
   let t = 0;
@@ -123,18 +143,28 @@ ok('a recycler breaks a thing at a time into fragments and scrap, never the meta
 });
 
 const data = buildWorldData(process.cwd());
-ok('the camp stands at the trading post: its shop and three stalls on its yard, clear of every building and road; five recyclers', () => {
+ok('the traders spread over the green west and the valley: a stall at each of four spots, out of the Zona, the desert and the mountain, apart; a safe zone and no base round each', () => {
   const c = data.camp!;
   assert.ok(c, 'no camp');
   assert.deepEqual(c.stalls.map((s) => s.id), ['building', 'weapons', 'medical', 'clothing']);
-  for (const s of c.stalls) assert.ok(Math.hypot(s.x - c.x, s.z - c.z) < CAMP.safe - 5, `the ${s.id} stall is ${Math.hypot(s.x - c.x, s.z - c.z).toFixed(0)} m out, past the safe zone`);
-  for (let i = 1; i < c.stalls.length; i++) for (let j = i + 1; j < c.stalls.length; j++) assert.ok(Math.hypot(c.stalls[i].x - c.stalls[j].x, c.stalls[i].z - c.stalls[j].z) > 4, 'two stalls on top of each other');
-  assert.deepEqual(data.recyclers.map((r) => r.at), ['Zavod', 'the army camp', 'the fort', 'the chemical works', 'the trader camp']);
+  // (the owner: "the trader zone must be moved from the red zone"; "the traders should be spread out across the map (green west and the valley only)")
+  for (const q of c.spots) {
+    assert.ok(zonaDepth(q.x, q.z) < -(CAMP.safe + 30), `the ${q.id} trader is ${(-zonaDepth(q.x, q.z)).toFixed(0)} m from the Zona`);
+    assert.ok(q.x > -1950 && !(q.x > 250 && q.z < -150), `the ${q.id} trader is in the desert or on the mountain`);
+    assert.equal(noBuilding(q.x + CAMP.safe, q.z, [], []), 'Too near a trader');
+    const s = c.stalls.find((t) => t.id === q.id)!;
+    assert.ok(Math.hypot(s.x - q.x, s.z - q.z) < CAMP.safe - 5, `the ${q.id} stall is laid past its safe zone`);
+  }
+  for (let i = 0; i < c.spots.length; i++) for (let j = i + 1; j < c.spots.length; j++) assert.ok(Math.hypot(c.spots[i].x - c.spots[j].x, c.spots[i].z - c.spots[j].z) > 300, 'two traders close together');
+  // (recyclers at "the desert ruins (Kalat), the green west, and the valley", the fort's and the works' kept)
+  assert.deepEqual(data.recyclers.map((r) => r.at), ['Kalat', 'the fort', 'the chemical works', 'the building supplies trader', 'the guns and rounds trader']);
+  const kalat = data.recyclers[0];
+  assert.ok(kalat.x < -3000, `Kalat's recycler at ${kalat.x.toFixed(0)},${kalat.z.toFixed(0)}`);
   // (the same for the game: the layers are the world's, laid the same each time)
   const again = buildWorldData(process.cwd());
   assert.deepEqual(again.recyclers, data.recyclers);
   assert.deepEqual(again.camp, data.camp);
-  console.log(`      the yard at ${c.x.toFixed(0)}, ${c.z.toFixed(0)}; recyclers at ${data.recyclers.map((r) => `${r.at} ${r.x.toFixed(0)},${r.z.toFixed(0)}`).join('; ')}`);
+  console.log(`      traders at ${c.spots.map((q) => `${q.id} ${q.x},${q.z}`).join('; ')}; recyclers at ${data.recyclers.map((r) => `${r.at} ${r.x.toFixed(0)},${r.z.toFixed(0)}`).join('; ')}`);
 });
 
 if (process.argv.includes('--server')) await serverTest();
@@ -204,6 +234,7 @@ async function serverTest() {
 
     // at the weapons stall's counter: a pistol bought for its scrap; the scrap taken as building's costs are, the pistol issued
     const camp = data.camp!, w = camp.stalls.find((s) => s.id === 'weapons')!;
+    const sp = camp.spots.find((q) => q.id === 'weapons')!;
     const scrap = await kit(a, '/give scrap 400');
     me(a, scrap);
     await tp(a, w.at[0] + Math.sin(w.rot) * 1.6, w.at[2] + Math.cos(w.rot) * 1.6);
@@ -230,7 +261,7 @@ async function serverTest() {
     const back = (await until(a, 'kit', (m) => m.items.some((it) => it.id === MAT.scrap), 5000, g1))?.items.find((it) => it.id === MAT.scrap);
     assert.ok(back && back.qty < 20, `paid ${back?.qty} scrap for a pistol it sold for ${STALLS.weapons.sells.find((x) => x.id === 'colt')!.price}`);
     // (from far off: not believed)
-    await tp(a, camp.x + 60, camp.z);
+    await tp(a, sp.x + 60, sp.z);
     const g2 = a.got.length;
     a.send({ t: 'trade', s: 'weapons', op: 'buy', id: 'ammo_9mm' });
     assert.ok(await until(a, 'trade', (m) => !m.ok && /counter/.test(m.say), 5000, g2), 'a trade from 60 m off was let through');
@@ -248,22 +279,22 @@ async function serverTest() {
     // the safe zone: a punch out on the meadow lands; the same at the camp hurts nobody
     const pa = a.got.filter((m) => m.t === 'welcome')[0] as { you: number };
     const punch = () => b.send({ t: 'hit', to: pa.you, w: 'fists', zone: 'torso', dist: 1, sup: false, bonus: 0 });
-    await tp(a, camp.x + CAMP.safe + 30.6, camp.z);
-    await tp(b, camp.x + CAMP.safe + 30, camp.z);
+    await tp(a, sp.x + CAMP.safe + 30.6, sp.z);
+    await tp(b, sp.x + CAMP.safe + 30, sp.z);
     const g4 = b.got.length;
     punch();
     assert.ok(await until(b, 'hitok', () => true, 3000, g4), 'a punch out on the meadow did not land (the check of the safe zone proves nothing)');
-    await tp(a, camp.x + 0.6, camp.z);
-    await tp(b, camp.x, camp.z);
+    await tp(a, sp.x + 0.6, sp.z);
+    await tp(b, sp.x, sp.z);
     await sleep(1200);
     const g5h = b.got.length;
     punch();
     await sleep(600);
     assert.equal(b.got.slice(g5h).filter((m) => m.t === 'hitok').length, 0, 'a punch at the camp hurt somebody');
-    console.log('  ok  a punch lands on the meadow, and nobody is hurt at the trader camp');
+    console.log('  ok  a punch lands on the meadow, and nobody is hurt at a trader');
 
     // a recycler: a spring in it, switched on, broken down into fragments and scrap, and switched itself off
-    const r = data.recyclers.findIndex((q) => q.at === 'the trader camp'), R = data.recyclers[r];
+    const r = data.recyclers.findIndex((q) => q.at.endsWith('trader')), R = data.recyclers[r];
     await tp(a, R.x + Math.sin(R.rot) * 1.8, R.z + Math.cos(R.rot) * 1.8);
     const cid = `recy:${r}`, g5 = a.got.length;
     a.send({ t: 'copen', cid });

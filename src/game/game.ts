@@ -102,6 +102,7 @@ import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
 import { TraderCamp } from './camp';
+import { CAMP, RECYCLER_MARK, STALLS, STALL_MARK } from '../sim/camp';
 import { RecyclerView } from './craft-recyclers';
 import { recyclerLayer } from '../sim/craft/recyclers';
 import type { MenuSpot } from '../ui/hud';
@@ -1522,7 +1523,7 @@ export class Game {
         this.save();
       },
     });
-    // (the recyclers: the trader camp's and four more, a layer of their own; src/game/craft-recyclers.ts)
+    // (the recyclers: Kalat's, the fort's, the works' and two traders', a layer of their own; src/game/craft-recyclers.ts)
     this.recyclers = new RecyclerView(
       {
         scene: r.scene,
@@ -1541,7 +1542,13 @@ export class Game {
       recyclerLayer(world, this.camp.camp),
     );
     this.traders = new Traders(this.camp.camp?.stalls ?? []);
-    if (this.camp.camp) this.minimap.setTraders([new THREE.Vector3(this.camp.camp.x, 0, this.camp.camp.z)]);
+    // (each trader's spot, marked by what it sells: the owner, "We need to mark these on the map and which type")
+    // (and the recyclers away from a trader: "each on the map"; one beside a trader is said in its tip)
+    const camp = this.camp.camp, besides = (q: { x: number; z: number }) => this.recyclers.spots.some((r) => Math.hypot(r.x - q.x, r.z - q.z) < CAMP.safe);
+    this.minimap.setTraders([
+      ...(camp?.spots ?? []).map((q) => ({ x: q.x, z: q.z, ...STALL_MARK[q.id], name: `Trader: ${STALLS[q.id].name}`, near: q.near, tip: `Nobody is hurt within ${CAMP.safe} m of the stall.${besides(q) ? ' A recycler stands beside it.' : ''}` })),
+      ...this.recyclers.spots.filter((r) => !(camp?.spots ?? []).some((q) => Math.hypot(r.x - q.x, r.z - q.z) < CAMP.safe)).map((r) => ({ x: r.x, z: r.z, ...RECYCLER_MARK, name: 'Recycler', near: r.at, tip: 'Breaks parts, junk, tools and guns down into fragments and scrap, a thing every few seconds. Loud while it runs.' })),
+    ]);
     this.wells = wellSpots(world);
     this.minimap.setWells(this.wells);
     void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));

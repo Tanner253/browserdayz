@@ -1,27 +1,27 @@
 // The trader camp (progression v3, the owner's yes 2026-10-25: "a trader camp with four stalls, like Rust's outpost ...
 // Paid in scrap, which you carry and can lose when killed, instead of the book"; "Never overpowered: no top-tier gun,
 // armour or steel plate on any shelf. A daily limit per player, and prices high enough that looting stays better"; "Jobs
-// (three a day, as today) pay in scrap"). The trading post east of the village made over: its shop is the building
-// stall, and three stalls stand on the yard before it (weapons, medical, clothing and gear), with a recycler. Within it
-// nobody is hurt by anybody (Rust's outpost: a safe zone). Every price is data, here; the server judges every trade on
+// (three a day, as today) pay in scrap"). Its four stalls (building, weapons, medical, clothing and gear) each at a spot
+// of its own out of the Zona, in the green west and the valley, with a recycler where one fits (the owner: "the trader
+// zone must be moved from the red zone ... because this can be exploited"; "the traders should be spread out across the
+// map (green west and the valley only)"). At each nobody is hurt by anybody (Rust's outpost), and no base is laid near. Every price is data, here; the server judges every trade on
 // its own copy of the pockets, and the game played alone by the same rules.
 
 import { RNG } from '../core/noise';
 import { ITEMS, type ItemInstance } from './items';
-import { BUILDING_FOOTPRINT } from '../world/worldgen/layout';
 import { roomOn, type LayerWorld } from './craft/layer';
-import type { World } from '../world/worldgen';
 import type { TradeDay } from '../net/protocol';
 import { MAT } from './craft/materials';
+import { TRADER_SPOTS } from './camp-place';
 
 export type StallId = 'building' | 'weapons' | 'medical' | 'clothing';
 
-/** a thing a stall sells: how many a sale hands over, its price in scrap, and how many sales of it a player gets a day */
+/** a thing a stall sells: how many a sale hands over, its price in scrap, and how many sales of it a player gets a day (unsaid: no limit) */
 export interface Good {
   id: string;
   n: number;
   price: number;
-  day: number;
+  day?: number;
 }
 
 interface Stall {
@@ -33,32 +33,41 @@ interface Stall {
   buys: string[];
 }
 
-const g = (id: string, n: number, price: number, day: number): Good => ({ id, n, price, day });
+const g = (id: string, n: number, price: number, day?: number): Good => ({ id, n, price, ...(day ? { day } : {}) });
 
-/** the four stalls: what each sells, for what, how many a day, and the kinds it buys (src/sim/items/ `category`) */
+/**
+ * The four stalls: what each sells, for what, and the kinds it buys (src/sim/items/ `category`). Nothing above the third
+ * step of the map and only a few things of it, as Rust's outpost (the owner: "the traders dont sell the best or even ALL
+ * the medium tier supplies right? like rust nothing from traders is overpowered"): the basics, rounds for the common guns
+ * (the Mosin's, the pistols'), building things, and of the third step only the weapon light, the field jacket and trousers
+ * and the blood bag. Never what is found from the fourth step up (the AK's rounds, the radio), the way under the gas (the
+ * mask), explosives, or the biggest pack. No daily limit on what is everyday; a limit on the guns and the sight, and on
+ * nails, which the owner wants looted ("they must be looted which is hard and time consuming"). The owner: "im not a big
+ * fan of the trader supply limits some of them dont make sense". (test/camp.test.ts holds every good to its step.)
+ */
 export const STALLS: Record<StallId, Stall> = {
   building: {
     name: 'Building supplies',
     hello: 'Nails are dear and they stay dear. Everybody wants them.',
-    sells: [g('nails', 10, 50, 3), g('planks', 10, 15, 4), g('key_lock', 1, 40, 2), g('code_lock', 1, 150, 1), g('building_plan', 1, 10, 2), g('hardware', 1, 80, 1), g('stash_kit', 1, 50, 1)],
+    sells: [g('nails', 10, 50, 2), g('planks', 10, 15), g('key_lock', 1, 40), g('code_lock', 1, 150), g('building_plan', 1, 10), g('stash_kit', 1, 50)],
     buys: ['tool', 'misc'],
   },
   weapons: {
     name: 'Guns and rounds',
     hello: 'Plain guns and the rounds for them. The good ones you find yourself.',
-    sells: [g('ammo_9mm', 20, 20, 4), g('ammo_45', 20, 24, 4), g('ammo_12', 10, 24, 3), g('ammo_762', 10, 30, 3), g('ammo_739', 20, 60, 2), g('mag_colt', 1, 25, 1), g('mag_m9', 1, 25, 1), g('clip_mosin', 1, 15, 2), g('gun_light', 1, 50, 1), g('red_dot', 1, 100, 1), g('grenade', 1, 60, 2), g('db12', 1, 140, 1), g('colt', 1, 175, 1), g('mosin9130', 1, 260, 1)],
+    sells: [g('ammo_9mm', 20, 20), g('ammo_45', 20, 24), g('ammo_762', 10, 30), g('mag_colt', 1, 25), g('mag_m9', 1, 25), g('clip_mosin', 1, 15), g('gun_light', 1, 40), g('red_dot', 1, 100, 1), g('mosin9130', 1, 120, 1), g('colt', 1, 150, 1)],
     buys: ['weapon', 'ammo', 'magazine', 'attachment', 'melee'],
   },
   medical: {
     name: 'Medicine and food',
     hello: 'Dressings, drips, a splint. And something to eat.',
-    sells: [g('bandage', 1, 12, 5), g('rags', 5, 8, 4), g('splint', 1, 15, 3), g('saline', 1, 35, 2), g('blood_bag', 1, 60, 1), g('aid_pouch', 1, 40, 2), g('rubbing_alcohol', 5, 15, 2), g('charcoal', 6, 12, 2), g('beans', 1, 8, 4), g('water_jug', 1, 8, 4)],
+    sells: [g('bandage', 1, 12), g('rags', 5, 8), g('splint', 1, 15), g('saline', 1, 35), g('blood_bag', 1, 60), g('aid_pouch', 1, 40), g('rubbing_alcohol', 5, 15), g('charcoal', 6, 12), g('beans', 1, 8), g('water_jug', 1, 8)],
     buys: ['medical', 'food', 'drink'],
   },
   clothing: {
     name: 'Clothes and gear',
     hello: 'Something warm, something to carry it in.',
-    sells: [g('field_jacket', 1, 40, 1), g('field_trousers', 1, 30, 1), g('patrol_cap', 1, 10, 2), g('fishermans_hat', 1, 10, 2), g('work_gloves', 1, 12, 2), g('rubber_boots', 1, 15, 2), g('sack_pack', 1, 60, 1), g('camping_pack', 1, 140, 1), g('flashlight', 1, 25, 2), g('compass', 1, 15, 1), g('binoculars', 1, 60, 1), g('gasmask', 1, 120, 1), g('radio', 1, 150, 1)],
+    sells: [g('tshirt', 1, 6), g('flannel_shirt', 1, 10), g('hoodie', 1, 20), g('quilted_jacket', 1, 30), g('field_jacket', 1, 40), g('jeans', 1, 12), g('work_trousers', 1, 20), g('field_trousers', 1, 30), g('beanie', 1, 6), g('fishermans_hat', 1, 10), g('leather_gloves', 1, 12), g('trainers', 1, 8), g('work_boots', 1, 15), g('hip_pack', 1, 30), g('sack_pack', 1, 60), g('flashlight', 1, 25), g('compass', 1, 15), g('binoculars', 1, 60)],
     buys: ['clothing', 'stash'],
   },
 };
@@ -75,10 +84,10 @@ export const CAMP = {
   soldADay: 150,
   /** the old book: credit paid out in scrap once, at so much a scrap, to so much at most */
   book: { per: 2, most: 250 },
-  /** the safe zone: how far out from the yard's middle, m */
-  safe: 40,
+  /** each trader's safe zone: how far out from its spot, m (the stall, its recycler and a little round them) */
+  safe: 30,
   /** how near a stall's counter a player must stand to trade, m (as near as to speak) */
-  reach: 4.7,
+  reach: 6,
 };
 
 /** what is never bought, from anybody (the Zone's own, and the money itself) */
@@ -114,8 +123,8 @@ export function dayFor(day: number, kept: Partial<TradeDay> | null | undefined):
   return { day, bought: {}, sold: 0, done: [], kills: 0, heads: 0 };
 }
 
-/** how many more sales of a good a player gets today */
-export const leftToday = (good: Good, d: TradeDay) => Math.max(0, good.day - (d.bought[good.id] ?? 0));
+/** how many more sales of a good a player gets today (no limit: Infinity) */
+export const leftToday = (good: Good, d: TradeDay) => (good.day === undefined ? Infinity : Math.max(0, good.day - (d.bought[good.id] ?? 0)));
 
 /** what the old book's credit comes to in scrap */
 export const bookScrap = (credit: number) => Math.min(CAMP.book.most, Math.max(0, Math.floor((Number(credit) || 0) / CAMP.book.per)));
@@ -135,59 +144,72 @@ export interface StallSpot {
 }
 
 export interface Camp {
-  /** the yard's middle (the safe zone is round it) */
-  x: number;
-  z: number;
+  /** each trader's spot (the safe zone is round each) */
+  spots: { id: StallId; x: number; z: number; near: string }[];
   stalls: StallSpot[];
-  /** the camp's recycler */
-  recycler: { x: number; y: number; z: number; rot: number } | null;
+  /** the recyclers at the spots that have one (TRADER_SPOTS `recycler`), where it fits */
+  recyclers: { x: number; y: number; z: number; rot: number; at: string }[];
 }
 
-/** a stall's model (made again from three pictures, the owner: "the trader stand looks very low quality") at the size it was made; how deep it is from its counter back, roof and all (its x), and how wide (its z); its trader behind its counter */
-export const STALL = { model: 'trader_stall', scale: 1, l: 2.42, w: 2.8, behind: 0.15 };
+/** a stall's model (made again from three pictures, the owner: "the trader stand looks very low quality") half as big again as it was made ("too small, should be like 50% larger at least"); how deep it is from its counter back, roof and all (its x), and how wide (its z); its trader behind its counter */
+export const STALL = { model: 'trader_stall', scale: 1.5, l: 3.63, w: 4.2, behind: 0.225 };
 /** what a model whose front is its +x (the stall, the recycler: the sandbox's front camera looks from +x) is turned by, past the way it faces */
 export const FACE_TURN = -Math.PI / 2;
-/** the shop's trader, behind its counter facing the door (src/game/trader.ts had him so) */
-const SHOP_BEHIND = { x: -0.9, z: -0.45 };
+/** each stall's mark on the maps: a coin of its colour with its letter (src/ui/minimap.ts, bigmap.ts) */
+export const STALL_MARK: Record<StallId, { letter: string; colour: string }> = {
+  building: { letter: 'B', colour: '#d1a654' },
+  weapons: { letter: 'G', colour: '#e0703c' },
+  medical: { letter: 'M', colour: '#5fc58e' },
+  clothing: { letter: 'C', colour: '#7fb8ff' },
+};
+/** and a recycler's, where one stands away from a trader (src/sim/craft/recyclers.ts) */
+export const RECYCLER_MARK = { letter: 'R', colour: '#9aa3ab' };
 const SEED = 0x7c4a11;
 
-/** the trader camp, the same for the game and the server: the shop at the trading post, the stalls before it, its recycler */
-export function campLayer(world: LayerWorld & Pick<World, 'sites'>): Camp | null {
-  const post = world.sites.find((st) => st.kind === 'market');
-  const shop = post && world.buildings.find((b) => b.type === 'store' && Math.hypot(post.x - b.x, post.z - b.z) < 40);
-  if (!post || !shop) return null;
+/** the traders' spots, the same for the game and the server: a stall at each facing the road, and a recycler beside it where one fits */
+export function campLayer(world: LayerWorld): Camp {
   const room = roomOn(world, true), rng = new RNG(SEED);
-  const c = Math.cos(shop.rot), s = Math.sin(shop.rot), [, fd] = BUILDING_FOOTPRINT[shop.type] ?? [10, 10];
-  // (the shop's own frame to the world's: its door faces its +z)
-  const at = (lx: number, lz: number): [number, number] => [shop.x + lx * c + lz * s, shop.z - lx * s + lz * c];
-  const [cx, cz] = at(0, fd / 2 + 12);
-  const face = (x: number, z: number) => Math.atan2(cx - x, cz - z);
-  const stalls: StallSpot[] = [{ id: 'building', x: shop.x, y: shop.floorY, z: shop.z, rot: shop.rot, at: [shop.x + SHOP_BEHIND.x * c + SHOP_BEHIND.z * s, shop.floorY, shop.z - SHOP_BEHIND.x * s + SHOP_BEHIND.z * c], yaw: shop.rot + Math.PI }];
-  /** the nearest room to a place on the yard for a thing so big, facing the yard's middle */
-  const lay = (lx: number, lz: number, l: number, w: number) => {
-    for (let t = 0; t < 24; t++) {
-      const j = t ? 1 + t * 0.35 : 0, a = rng.range(0, Math.PI * 2);
-      const [x, z] = at(lx + Math.sin(a) * j, lz + Math.cos(a) * j), rot = face(x, z);
-      const y = room.fit(x, z, l, w, rot, { margin: 1, road: 0.5, level: 0.5, sink: 0.05 });
-      if (y === null) continue;
-      room.stand(x, z, Math.hypot(l, w) / 2 + 0.6);
-      return { x, y, z, rot };
-    }
-    return null;
-  };
-  for (const [id, lx, lz] of [['weapons', -10, fd / 2 + 13], ['medical', 10, fd / 2 + 13], ['clothing', 0, fd / 2 + 22]] as [StallId, number, number][]) {
-    const p = lay(lx, lz, STALL.l, STALL.w);
+  const spots = TRADER_SPOTS.map((q) => ({ id: q.id as StallId, x: q.x, z: q.z, near: q.near }));
+  const stalls: StallSpot[] = [], recyclers: Camp['recyclers'] = [];
+  for (const q of spots) {
+    // (its counter to the nearest road: the way people come)
+    const r = nearestRoad(world, q.x, q.z), face = Math.atan2(r[0] - q.x, r[1] - q.z);
+    /** the nearest room to a place for a thing so big, facing `rot` */
+    const lay = (x0: number, z0: number, l: number, w: number, rot: number) => {
+      for (let t = 0; t < 24; t++) {
+        const j = t ? 1 + t * 0.4 : 0, a = rng.range(0, Math.PI * 2), x = x0 + Math.sin(a) * j, z = z0 + Math.cos(a) * j;
+        const y = room.fit(x, z, l, w, rot, { margin: 1, road: 0.5, level: 0.6, sink: 0.05 });
+        if (y === null) continue;
+        room.stand(x, z, Math.hypot(l, w) / 2 + 0.6);
+        return { x, y, z, rot };
+      }
+      return null;
+    };
+    const p = lay(q.x, q.z, STALL.l, STALL.w, face);
     if (!p) continue;
-    // (its trader behind the counter, facing out over it: the yaw a body faces +z of the stall by)
     const bx = p.x + Math.sin(p.rot) * STALL.behind, bz = p.z + Math.cos(p.rot) * STALL.behind;
-    stalls.push({ id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
+    stalls.push({ id: q.id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
+    // (the recycler to the stall's side and a little before it, facing the same way)
+    const sx = Math.cos(face), sz = -Math.sin(face), fx = Math.sin(face), fz = Math.cos(face);
+    const rc = TRADER_SPOTS.some((t) => t.id === q.id && 'recycler' in t) && lay(p.x + sx * 6.5 + fx * 2, p.z + sz * 6.5 + fz * 2, 2.0, 1.6, face);
+    if (rc) recyclers.push({ ...rc, at: `the ${STALLS[q.id].name.toLowerCase()} trader` });
   }
-  const recycler = lay(-16, fd / 2 + 4, 1.6, 2.0);
-  return { x: cx, z: cz, stalls, recycler };
+  return { spots, stalls, recyclers };
 }
 
-/** whether a place is within the camp's safe zone */
-export const inSafe = (camp: Camp | null, x: number, z: number) => !!camp && Math.hypot(x - camp.x, z - camp.z) < CAMP.safe;
+/** the nearest point of a road to a place */
+function nearestRoad(world: LayerWorld, x: number, z: number): [number, number] {
+  let best: [number, number] = [x, z + 1], d = Infinity;
+  for (const r of world.roads) for (let i = 0; i + 5 < r.points.length; i += 3) {
+    const ax = r.points[i], az = r.points[i + 2], vx = r.points[i + 3] - ax, vz = r.points[i + 5] - az, l2 = vx * vx + vz * vz;
+    const t = l2 ? Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / l2)) : 0, px = ax + vx * t, pz = az + vz * t, k = Math.hypot(px - x, pz - z);
+    if (k < d && k > 1) (d = k), (best = [px, pz]);
+  }
+  return best;
+}
+
+/** whether a place is within a trader's safe zone */
+export const inSafe = (camp: Camp | null, x: number, z: number) => !!camp && camp.spots.some((q) => Math.hypot(x - q.x, z - q.z) < CAMP.safe);
 
 // ---------------------------------------------------------------- a trade, judged (the server's, and the game's played alone)
 

@@ -5,7 +5,7 @@
 // round the crosshair a moment after each blow.
 
 import * as THREE from 'three';
-import { CHOPS, MINES, SAW, SAWS, TREE, TREE_KINDS, Woods, condition, rockOf, rockReach, treeOf, treeReach, worn } from '../sim/gather';
+import { CHOPS, MINES, SAW, SAWS, TREE, TREE_KINDS, Woods, condition, logAt, rockOf, rockReach, treeOf, treeReach, worn } from '../sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../sim/items';
 import type { WorldLoot } from '../sim/economy';
 import type { C2S, S2C } from '../net/protocol';
@@ -135,7 +135,8 @@ export class Gathering {
       if (this.h.online()) return void this.h.send({ t: 'saw', l: l.uid, u: it.uid, go: 2 });
       if (!this.h.takeUp(l.uid)) return;
       this.wearAlone(it);
-      this.h.give([makeItem('planks', SAW.planks)], `${SAW.planks} Planks`);
+      // (the planks lie where the log lay: the owner, "when sawing logs the planks should go on the ground")
+      this.h.lay(makeItem('planks', SAW.planks), new THREE.Vector3(l.x, l.y, l.z), 0);
     }, 'You stopped sawing: the log is where you left it');
   }
 
@@ -200,8 +201,8 @@ export class Gathering {
     this.onFell({ t: 'fell', i, a, by: 0 });
     setTimeout(() => {
       for (let n = 0; n < r.logs; n++) {
-        const d = 2.2 + n * 2.1 * t.scale;
-        this.h.lay(makeItem('log', 1), new THREE.Vector3(t.x + Math.sin(a) * d, t.y + 2, t.z + Math.cos(a) * d), a);
+        const l = logAt(t, a, n);
+        this.h.lay(makeItem('log', 1), new THREE.Vector3(l.x, t.y + 2, l.z), l.rot);
       }
     }, TREE.lands);
   }
