@@ -18,7 +18,7 @@ import type { Atmosphere } from '../../world/atmosphere';
 import { heightAt, type World } from '../../world/worldgen';
 import { Radial } from '../../ui/radial';
 import { Bases, heard, heardClaim, heardPiece, repairOf, said, type KeptBase } from '../../sim/build/bases';
-import { PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
+import { PLACED, PLACES, PIECES, TIERS, TIER_S, costOf, hpOf, laidAt, topOf, type Tier } from '../../sim/build/pieces';
 import { deployAt, deployTurn, footOf, nearestSpot, nearestToRay, restsOn, rigid, spots, toLocal, toWorld, worldYaw, type Base, type Spot } from '../../sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../../sim/build/land';
 import { HAMMERS, condition, worn } from '../../sim/gather';
@@ -100,7 +100,7 @@ export interface BuildHost {
 }
 
 /** what in the hands has its left button here, not the hands' (the plan lays, a lock is fitted, a charge stuck) */
-export const LEFT_HELD = new Set(['building_plan', 'code_lock', 'key_lock', 'c4', 'satchel']);
+export const LEFT_HELD = new Set(['building_plan', 'code_lock', 'key_lock', 'c4', 'satchel', ...Object.keys(PLACES)]);
 
 /** how far the mouse moves for the pointer to cross the wheel, px */
 const RING = { reach: 260 };
@@ -302,7 +302,11 @@ export class Building {
 
   update(dt: number, ok: boolean) {
     const held = this.h.held();
-    const plan = ok && held?.id === 'building_plan', hammer = ok && !!held && !!HAMMERS[held.id];
+    // (a box, a bench, a forge, a bed in the hands: set down as the plan sets down a thing, that kind and no other)
+    const placing = ok && !!held && !!PLACES[held.id];
+    if (placing) this.kind = PLACES[held.id];
+    else if (PLACED[this.kind]) this.kind = 'foundation';
+    const plan = (ok && held?.id === 'building_plan') || placing, hammer = ok && !!held && !!HAMMERS[held.id];
     this.prompt = null;
     // (building's sounds asked for once a building tool is first in the hands)
     if (plan || hammer) void buildRecordings();
@@ -325,7 +329,7 @@ export class Building {
     if (this.placing && (!plan || this.placing.k !== this.kind || (this.placing.locked && !this.h.input.locked))) this.placing = null;
     if (this.wheel.isOpen) this.wheelFrame(ok && (plan || hammer));
     // (the right button, while a thing is being turned, takes it back to its first click instead: `turnFrame`)
-    else if (ok && (plan || hammer) && !this.placing && this.h.input.pressed('Mouse2') && !this.h.busy()) this.openWheel(plan ? 'plan' : 'hammer');
+    else if (ok && ((plan && !placing) || hammer) && !this.placing && this.h.input.pressed('Mouse2') && !this.h.busy()) this.openWheel(plan ? 'plan' : 'hammer');
     if (plan && !this.wheel.isOpen) this.planFrame(held!);
     else {
       this.hideGhost();

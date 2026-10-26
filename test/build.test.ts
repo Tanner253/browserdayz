@@ -428,13 +428,13 @@ ok('nothing is set down where a door swings, nor a door hung to swing into what 
   assert.equal(blocked(h.b, 'door_wood', { ...spots(h.b, 'door_wood', 0)[0], on: [2] }), null, 'swinging out, it is clear');
 });
 
-ok('a box picked up gives back all it cost; kept with what was in its store and whether its door stood open', () => {
+ok('a box picked up gives back the box itself (set down from the hands: PLACED); kept with what was in its store and whether its door stood open', () => {
   const { bs, b } = hut();
   const d = at(bs, b, 'door_wood', 0, 1.2, 1.5);
   d.open = true;
   const box = bs.lay({ b: b.id, k: 'box_small', ...deployAt(b, 'box_small', { x: -0.5, y: 0, z: -0.5 })! }, ME, 0);
   assert.ok(typeof box !== 'string');
-  assert.deepEqual(bs.refund(b.id, box.piece.id), { planks: 12, nails: 8 });
+  assert.deepEqual(bs.refund(b.id, box.piece.id), { box_small: 1 });
   assert.deepEqual(bs.refund(b.id, d.id), { planks: 6, nails: 4 }, 'a door is built: half back');
   const kept = JSON.parse(JSON.stringify(bs.keep(undefined, (_b, p) => (p.k === 'box_small' ? [{ id: 'nails', qty: 3 }] : undefined))));
   const again = heard(kept[0])!;

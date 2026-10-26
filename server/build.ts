@@ -8,7 +8,7 @@
 
 import { Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
 import { struckAt } from './raid';
-import { PIECES, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
+import { PIECES, PLACED, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { toWorld } from '../src/sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { HAMMERS, condition } from '../src/sim/gather';
@@ -186,8 +186,9 @@ export function forgetBases(c: Client) {
 
 export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
   if (!c.alive || typeof m.k !== 'string' || !PIECES[m.k] || ![m.x, m.y, m.z, m.r].every(Number.isFinite)) return;
-  const plan = [...things(c.inv)].find((it) => it.uid === m.u && it.id === 'building_plan');
-  if (!plan) return void send(c, { t: 'tell', kind: 'warn', text: 'You need a building plan' });
+  // (a box, a bench, a forge, a bed: set down from its own item in the hands, not with the plan)
+  const from = PLACED[m.k] ?? 'building_plan', plan = [...things(c.inv)].find((it) => it.uid === m.u && it.id === from);
+  if (!plan) return void send(c, { t: 'tell', kind: 'warn', text: PLACED[m.k] ? `Hold the ${PIECES[m.k].name.toLowerCase()} to set it down` : 'You need a building plan' });
   const all = bases();
   const where = m.b === undefined ? [m.x, 0, m.z] : (() => {
     const b = all.bases.get(m.b);

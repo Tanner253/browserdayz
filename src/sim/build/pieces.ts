@@ -169,9 +169,20 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
 export const PIECE_IDS = Object.keys(PIECES);
 
 /** what bringing a piece to tier `t` takes (a frame: what laying it takes; the workbench: its level `t`) */
+/**
+ * What is set down from an item carried in the hands, not laid with the building plan (the owner, 2026-10-25: "the forge,
+ * storage crates, and other things that get placed in the base would be inventory items that you hold in your hand to
+ * place, not something gotten through the building plan"): each such kind's item. It costs that item; what the kind cost
+ * to lay is now what its item costs to make (src/sim/craft/recipes.ts).
+ */
+export const PLACED: Record<string, string> = { box_small: 'box_small', box_large: 'box_large', workbench: 'workbench', forge: 'forge', bed: 'bed', research_table: 'research_table', bedroll: 'sleeping_bag' };
+/** and the kind each such item sets down */
+export const PLACES: Record<string, string> = Object.fromEntries(Object.entries(PLACED).map(([k, i]) => [i, k]));
+
 export function costOf(kind: string, t: Tier): Record<string, number> {
   const k = PIECES[kind];
   if (k.levels && t > (k.only ?? 0)) return { ...BENCH_LEVELS[t] };
+  if (PLACED[kind]) return { [PLACED[kind]]: 1 };
   // (one made in one tier is laid whole, at its own cost)
   if (k.cost) return { ...k.cost };
   const of = TIER_COST[t], out: Record<string, number> = {};
