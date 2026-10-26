@@ -110,9 +110,10 @@ export const GEAR: Record<string, Worn> = {
   // hem at the mouth, the owner, 2026-10-25: "the ghillie hood is backwards and doesnt fit on the body properly"; now
   // its front forward, its hem on the shoulders and its top 3 cm over the skull; the scalp hidden under it, see BARE in src/game/survivors.ts)
   ghillie_hood: { bone: 'Head', p: [0, 1.45, 0.0], r: [0, 0, 0], s: [1.0, 0.78, 1.06] },
-  // (round the waist: the belt's buckle and the hip pack in front)
-  military_belt: { bone: 'pelvis', p: [0, 0.94, 0.0], r: [0, Math.PI, 0], s: [0.9, 1.0, 0.85] },
-  hip_pack: { bone: 'pelvis', p: [0, 0.9, -0.03], r: [0, Math.PI, 0], s: [0.95, 0.95, 0.95] },
+  // (round the waist: the belt's buckle and the hip pack's pouch in front. Both face +x as they came: turned a quarter,
+  // not a half, which hung them at the hip side on, the owner, 2026-10-25: "the fanny pack item is not properly rotated")
+  military_belt: { bone: 'pelvis', p: [0, 0.94, 0.0], r: [0, Math.PI / 2, 0], s: [0.85, 1.0, 0.9] },
+  hip_pack: { bone: 'pelvis', p: [0, 0.9, -0.03], r: [0, Math.PI / 2, 0], s: [0.95, 0.95, 0.95] },
   // (the field bag at the right hip, its strap over the left shoulder; the assault pack as the other packs)
   field_bag: { bone: 'pelvis', p: [0.2, 0.8, 0.02], r: [0, -Math.PI / 2, 0], s: [1, 1, 1] },
   assault_pack: { bone: 'spine_03', p: [0, 0.98, 0.17], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
