@@ -19,6 +19,8 @@ import type { C2S, S2C } from '../net/protocol';
 
 export interface CraftHost {
   online: () => boolean;
+  /** an admin in creative, online: everything known, no bench asked, made at once and for nothing by the server */
+  creative: () => boolean;
   send: (m: C2S) => void;
   note: (text: string, kind: 'good' | 'warn' | 'info') => void;
   /** what is carried, as the rule reads it */
@@ -74,7 +76,7 @@ export class Crafting {
 
   /** whether a recipe may be made: known from the start, or learned */
   knows(id: string) {
-    return knows(this.known, id);
+    return this.h.creative() || knows(this.known, id);
   }
 
   /** whether a workbench or a forge is near enough to make its recipes (by hand: always) */
@@ -92,6 +94,7 @@ export class Crafting {
 
   /** why a recipe cannot be made where this player stands (null: it can) */
   where(r: Recipe): string | null {
+    if (this.h.creative()) return null;
     if (r.at === 'hand') return null;
     if (r.at === 'forge') return this.near('forge') ? null : 'Smelted at a forge';
     const need = r.lv ?? 1;
@@ -167,8 +170,10 @@ export class Crafting {
     const r = RECIPE[rid];
     if (!r) return false;
     if (!this.knows(r.id)) return void this.h.note('You have not learned it', 'warn'), false;
-    if (r.at === 'bench') return this.enqueue(r, n);
-    if (r.at !== 'hand') return void this.h.note('That is smelted at a forge', 'info'), false;
+    if (r.at === 'bench' && !this.h.creative()) return this.enqueue(r, n);
+    if (r.at !== 'hand' && r.at !== 'bench') return void this.h.note('That is smelted at a forge', 'info'), false;
+    // (creative: the server makes it at once, for nothing)
+    if (this.h.creative()) return this.h.send(r.at === 'bench' ? { t: 'cq', r: r.id, n } : { t: 'craft', r: r.id, n, go: 1, u: [] }), true;
     if (this.h.busy()) return void this.h.note('Your hands are busy', 'info'), false;
     const q = plan(r, n, this.h.pockets(), u);
     if (typeof q === 'string') return void this.h.note(q, 'warn'), false;

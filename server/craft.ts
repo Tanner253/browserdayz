@@ -14,7 +14,7 @@ import { ITEMS, type ItemInstance } from '../src/sim/items';
 import type { C2S } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
 import { issue, things } from './index';
-import { bases, pay } from './build';
+import { bases, creative, pay } from './build';
 import { use } from './gather';
 import { mayMake } from './learn';
 import { refuse } from './searched';
@@ -30,6 +30,8 @@ export function craft(c: Client, m: Extract<C2S, { t: 'craft' }>) {
   const no = (why: string) => send(c, { t: 'craft', r: r.id, ok: false, why });
   // (a workbench's are queued: 'cq'; the forge's are its own)
   if (r.at !== 'hand') return void no(r.at === 'bench' ? 'Made at a workbench' : 'Smelted at a forge');
+  // (an admin in creative: made at once, for nothing, learned or not)
+  if (creative(c)) return void made(c, r, Number(m.n));
   if (!mayMake(c, r.id)) return void no('You have not learned it');
   const u = Array.isArray(m.u) ? m.u.filter((x): x is string => typeof x === 'string').slice(0, 4) : [];
   if (m.go === 1) {
@@ -51,6 +53,13 @@ export function craft(c: Client, m: Extract<C2S, { t: 'craft' }>) {
   if (Math.hypot(c.pose[0] - d.x, c.pose[2] - d.z) > STILL + 0.4) return void no('You moved, and stopped what you were making');
   make(c, q);
   send(c, { t: 'craft', r: r.id, ok: true, done: true, n: q.n, used: q.uids });
+}
+
+/** made for an admin in creative: so many of what a recipe makes, at once, out of nothing */
+function made(c: Client, r: Recipe, n: number) {
+  const k = Math.max(1, Math.min(99, Math.floor(n) || 1));
+  give(c, r.makes, r.qty * k);
+  send(c, { t: 'craft', r: r.id, ok: true, done: true, n: k, used: [] });
 }
 
 /** a plan carried out on a player's pockets: what it takes taken, the tools worn, what it makes given (and its uids gone) */
@@ -100,6 +109,7 @@ export function enqueue(c: Client, m: Extract<C2S, { t: 'cq' }>) {
   const r = typeof m.r === 'string' ? RECIPE[m.r] : undefined;
   if (!c.alive || !r || r.at !== 'bench') return;
   const no = (why: string) => send(c, { t: 'craft', r: r.id, ok: false, why });
+  if (creative(c)) return void made(c, r, Number(m.n));
   if (!mayMake(c, r.id)) return void no('You have not learned it');
   if (!atBench(c, r, 1)) return void no(r.lv && r.lv > 1 ? `Needs a ${LEVEL_NAME[r.lv]} within ${NEAR.bench} m` : `Needs a workbench within ${NEAR.bench} m`);
   const q = queues.get(c) ?? { jobs: [], done: 0, paused: false };

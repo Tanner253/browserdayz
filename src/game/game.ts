@@ -717,6 +717,7 @@ export class Game {
     });
     this.craft = new Crafting({
       online: () => this.online,
+      creative: () => this.powers.creative && this.online,
       send: (m) => this.net.send(m),
       note: (text, kind) => this.hud.note(text, kind),
       pockets: () => pocketsOf(this.inv.serialize()),
@@ -752,6 +753,7 @@ export class Game {
       begin: (label, dur, valid, done, lost) => (this.use = { label, t: 0, dur, sound: null, soundT: 0, valid, lost, done }),
       busy: () => !!this.use || this.weapons.working,
       work: (dur) => this.weapons.work(dur),
+      creative: () => this.powers.creative && this.online,
       breakOff: () => this.breakOff(),
       changed: () => this.inventoryChanged(),
       felled: (i) => this.gather.felling.isDown(i),
@@ -1115,6 +1117,7 @@ export class Game {
       unlock: (rid) => this.craft.unlock(rid),
       research: (uid) => this.craft.research(uid),
       knows: (id) => this.craft.knows(id),
+      free: () => this.powers.creative && this.online,
       level: () => this.craft.level(),
       atTable: () => this.craft.atTable(),
       queue: () => this.craft.queue.jobs,
@@ -1713,7 +1716,7 @@ export class Game {
 
   /** an admin's night vision: it is day in this game alone, whatever the hour (the hour itself goes on as it does) */
   nightSight = false;
-  powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false };
+  powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false, creative: false };
   /** the view has left the body: where it is, and which way it looks */
   freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
   /** how fast the free camera flies, metres a second (the wheel changes it) */

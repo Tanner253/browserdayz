@@ -8,7 +8,7 @@
 
 import { Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
 import { struckAt } from './raid';
-import { PIECES, TIER_S, costOf, type Tier } from '../src/sim/build/pieces';
+import { PIECES, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { toWorld } from '../src/sim/build/snap';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { HAMMERS, condition } from '../src/sim/gather';
@@ -22,6 +22,10 @@ import { pidOf } from './acts';
 import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
 import { boxStore, boxesBack, emptyBox, heldIn, spillBoxes } from './boxes';
 import { asksOf, layPrint, printOf } from '../src/sim/build/blueprints';
+import { roleOf } from './gate';
+
+/** an admin in creative: what they lay, nail up, mend or turn costs nothing and takes no time, and no bench is asked for (server/admin.ts) */
+export const creative = (c: Client) => !!c.power.creative && roleOf(c) === 'admin';
 
 /** how far off a base is told to a game, and how far off it is forgotten again */
 export const SIGHT = { tell: 450, forget: 650 };
@@ -191,12 +195,12 @@ export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
   })();
   if (!where || Math.hypot(where[0] - c.pose[0], where[2] - c.pose[2]) > REACH.lay) return;
   const ask = { b: m.b, k: m.k, x: m.x, y: m.y, z: m.z, r: m.r, yaw: m.yaw };
-  const ok = all.check(ask, own(c));
+  const free = creative(c), ok = all.check(ask, own(c), free);
   if (typeof ok === 'string') return void send(c, { t: 'tell', kind: 'warn', text: ok });
-  const cost = costOf(m.k, PIECES[m.k].only ?? 0);
+  const cost = free ? {} : costOf(m.k, PIECES[m.k].only ?? 0);
   const no = short(c.inv, cost);
   if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
-  const r = all.lay(ask, own(c), Date.now(), c.name);
+  const r = all.lay(ask, own(c), Date.now(), c.name, free);
   if (typeof r === 'string') return void send(c, { t: 'tell', kind: 'warn', text: r });
   pay(c, cost);
   if (PIECES[m.k].store) boxStore(r.base, r.piece);
@@ -221,7 +225,9 @@ export function print(c: Client, m: Extract<C2S, { t: 'bprint' }>) {
   if (m.b !== undefined && !b) return;
   const [x, , z] = b ? toWorld(b, 0, 0, 0) : [m.x, 0, m.z];
   if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.lay + 6) return;
+  const free = creative(c);
   const r = layPrint(all, m.id, { b: m.b, x: m.x, z: m.z, yaw: m.yaw }, own(c), Date.now(), c.name, (cost) => {
+    if (free) return true;
     if (short(c.inv, cost)) return false;
     pay(c, cost);
     return true;
@@ -252,18 +258,18 @@ export function hammer(c: Client, m: Extract<C2S, { t: 'bup' }>) {
   if (!Number.isInteger(m.b) || !Number.isInteger(m.p) || ![1, 2, 3, 4].includes(m.to)) return;
   const at = atPiece(c, m.b, m.p, m.u);
   if (!at) return;
-  const d = of(c), all = bases(), to = m.to as Tier;
-  const why = at.why ?? all.canUpgrade(m.b, m.p, to) ?? short(c.inv, costOf(all.bases.get(m.b)!.pieces.get(m.p)!.k, to));
+  const d = of(c), all = bases(), to = m.to as Tier, free = creative(c);
+  const why = at.why ?? all.canUpgrade(m.b, m.p, to, free) ?? (free ? null : short(c.inv, costOf(all.bases.get(m.b)!.pieces.get(m.p)!.k, to)));
   if (m.go === 1) {
     d.up = why ? null : { b: m.b, p: m.p, to, at: Date.now() };
     return void send(c, { t: 'bup', b: m.b, p: m.p, ok: !why, ...(why ? { why } : {}) });
   }
   const begun = d.up;
   d.up = null;
-  if (why || !begun || begun.b !== m.b || begun.p !== m.p || begun.to !== to || Date.now() - begun.at < TIER_S[to] * 850) return;
+  if (why || ((!begun || begun.b !== m.b || begun.p !== m.p || begun.to !== to || Date.now() - begun.at < TIER_S[to] * 850) && !free)) return;
   const piece = all.bases.get(m.b)!.pieces.get(m.p)!;
-  pay(c, costOf(piece.k, to));
-  all.upgrade(m.b, m.p, to);
+  if (!free) pay(c, costOf(piece.k, to));
+  all.upgrade(m.b, m.p, to, free);
   use(c, at.it);
   tellBase(m.b, { t: 'bpc', b: m.b, p: saidPiece(piece) });
 }
@@ -295,16 +301,17 @@ export function mend(c: Client, m: Extract<C2S, { t: 'bfix' }>) {
   if (!Number.isInteger(m.b) || !Number.isInteger(m.p)) return;
   const at = atPiece(c, m.b, m.p, m.u);
   if (!at) return;
-  const all = bases(), now = Date.now();
-  const why = at.why ?? (m.turn ? all.canTurn(m.b, m.p, now) : all.canRepair(m.b, m.p, struckAt(m.b, m.p), now));
+  const all = bases(), now = Date.now(), free = creative(c);
+  const why = at.why ?? (free ? null : m.turn ? all.canTurn(m.b, m.p, now) : all.canRepair(m.b, m.p, struckAt(m.b, m.p), now));
   if (why) return void send(c, { t: 'tell', kind: 'warn', text: why });
   const piece = all.bases.get(m.b)!.pieces.get(m.p)!;
   if (m.turn) all.turn(m.b, m.p);
   else {
-    const cost = repairOf(piece), no = short(c.inv, cost);
+    const cost = free ? {} : repairOf(piece), no = short(c.inv, cost);
     if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
     pay(c, cost);
-    all.repair(m.b, m.p);
+    if (free) piece.hp = hpOf(piece.k, piece.t);
+    else all.repair(m.b, m.p);
   }
   use(c, at.it);
   tellBase(m.b, { t: 'bpc', b: m.b, p: saidPiece(piece) });

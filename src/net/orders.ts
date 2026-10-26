@@ -94,6 +94,7 @@ export const ORDERS: Order[] = [
   { name: 'slay', args: ['who'], does: 'Kill somebody where they stand', admin: true },
   { name: 'die', args: [], does: 'Kill yourself where you stand', admin: true },
   { name: 'god', args: ['[who]'], does: 'Nothing hurts you, or another admin (again, to put it off)', admin: true },
+  { name: 'creative', args: ['[who]'], does: 'Build, upgrade, mend and make anything for nothing and at once, no bench or blueprint asked (again, to put it off)', admin: true },
   { name: 'vanish', args: ['[who]'], does: 'Nobody but an admin sees you, or another admin (again, to be seen)', admin: true },
   { name: 'noclip', args: ['[who]'], does: 'You fly, and through anything; or another admin does (again, to walk)', admin: true },
   { name: 'voidinv', args: ['[who]'], does: 'Dying, an admin leaves nothing they carried on their body (again, to leave it)', admin: true },

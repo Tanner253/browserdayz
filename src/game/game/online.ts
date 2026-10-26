@@ -628,7 +628,7 @@ export const onlineMethods = {
       this.hud.note(`${m.role === 'admin' ? 'An admin' : 'A mod'} (${m.from}) to you: ${m.text}`, 'warn');
     });
     net.on('powers', (m) => {
-      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless, bottomless: !!m.bottomless };
+      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless, bottomless: !!m.bottomless, creative: !!m.creative };
       this.player.god = m.god;
       // (God mode is proof against every state a body can be in, not only against dying of it: 2026-10-13, an
       // admin with it on: "i am still being choked out by the gas, i should be immune to all status efects in

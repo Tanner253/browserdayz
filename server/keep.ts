@@ -782,6 +782,10 @@ export function setPower(c: Client, k: keyof Client['power'], on: boolean) {
     return void send(c, { t: 'powers', ...c.power });
   }
   if (k === 'weightless' || k === 'endless' || k === 'bottomless') return void carryKeep(c);
+  if (k === 'creative') {
+    send(c, { t: 'powers', ...c.power });
+    return void log(`[admin] ${c.name} has ${on ? 'put on' : 'put off'} creative`);
+  }
   const now = Date.now();
   // (vanished: gone from everybody's game but an admin's, where they are drawn faintly)
   if (k === 'hidden') for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on } : on ? { t: 'leave', id: c.id } : { t: 'join', p: info(c) });

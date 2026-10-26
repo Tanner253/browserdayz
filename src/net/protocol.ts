@@ -727,7 +727,7 @@ export type S2C =
    * Which of an admin's powers this player has on: nothing hurts them, nobody sees them, they fly through things.
    * And what they have chosen for their own death: nothing they carried is left on the body, no tag of theirs is.
    */
-  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts). Not said by a server from before 2026-10-13: not said is off */ weightless?: boolean; endless?: boolean; /** their inventory never fills: the hold takes what their pockets cannot (src/sim/inventory.ts). Said off to somebody who has things in a hold and is no admin, who is told nothing else of powers: their game empties it. Not said: off */ bottomless?: boolean }
+  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts). Not said by a server from before 2026-10-13: not said is off */ weightless?: boolean; endless?: boolean; /** their inventory never fills: the hold takes what their pockets cannot (src/sim/inventory.ts). Said off to somebody who has things in a hold and is no admin, who is told nothing else of powers: their game empties it. Not said: off */ bottomless?: boolean; /** an admin's creative mode: building, upgrading, mending and making for nothing and at once (server/build.ts). Not said: off */ creative?: boolean }
   /**
    * An admin's refill (`/refill`): every magazine and every gun this player carries is to be full. Their own game
    * fills them (`refill` in src/sim/powers.ts: it alone knows what is carried at this moment) and says what it

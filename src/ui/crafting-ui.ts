@@ -24,6 +24,8 @@ export interface CraftScreenHost extends CardHost {
   unqueue: (i: number) => void;
   /** whether a recipe is known (from the start, or learned) */
   knows: (id: string) => boolean;
+  /** an admin in creative: whatever there is can be made */
+  free?: () => boolean;
   /** the best bench level within reach (0: none), and whether a research table is */
   level: () => number;
   atTable: () => boolean;
@@ -157,7 +159,7 @@ export class CraftingScreen {
 
   /** a recipe's tile: bright if it can be made here now, a lock if not learned, the place and its level marked */
   private tile(r: Recipe, p: Pockets, icons: Record<string, string>) {
-    const known = this.h.knows(r.id), place = !this.h.where?.(r), can = known && place && most(r, p) > 0;
+    const known = this.h.knows(r.id), place = !this.h.where?.(r), can = !!this.h.free?.() || (known && place && most(r, p) > 0);
     const qty = r.by ? '' : r.qty > 1 ? `<em>×${r.qty}</em>` : '';
     const lv = r.at === 'bench' && r.lv && r.lv > 1 ? `<b class="ic-lv">${ROMAN[r.lv]}</b>` : '';
     const title = r.at === 'bench' ? `At a ${LEVEL_NAME[r.lv ?? 1]}` : 'At a forge';

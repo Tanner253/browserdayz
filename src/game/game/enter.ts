@@ -263,7 +263,7 @@ export const enterMethods = {
     this.remotes.clear();
     this.weapons.take(null);
     this.inv.clear();
-    this.powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false };
+    this.powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false, creative: false };
     this.player.god = false;
     this.player.setFly(false);
     this.carryPowers();

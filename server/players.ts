@@ -94,7 +94,7 @@ export interface Client {
    * And two things chosen for their own death: nothing they carried is left on the body (what an admin makes for
    * themselves is not found on them by whoever kills them), and no dog tag of their own is.
    */
-  power: { god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing, and their gun spends no rounds: their own game's to honour (see `carryOrder`) */ weightless: boolean; endless: boolean; /** their inventory never fills: things are kept in their hold (see `carryOrder`) */ bottomless: boolean };
+  power: { god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing, and their gun spends no rounds: their own game's to honour (see `carryOrder`) */ weightless: boolean; endless: boolean; /** their inventory never fills: things are kept in their hold (see `carryOrder`) */ bottomless: boolean; /** creative: an admin builds, upgrades, mends and makes for nothing and at once (server/build.ts, server/craft.ts) */ creative?: boolean };
   /** this player's grenades: the one whose pin is out in their hand, and those that have left it and not long gone off, with what each has been said to reach (src/sim/grenades.ts) */
   nades: Thrower;
   /** the fuel drums this player has just set off, and how many hits have been claimed for each */

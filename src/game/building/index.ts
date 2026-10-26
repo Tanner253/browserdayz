@@ -62,6 +62,8 @@ export interface BuildHost {
   busy: () => boolean;
   /** a blow of what is in the hands at the work, hitting nobody (false: the hands are at something else) */
   work: (dur: number) => boolean;
+  /** an admin in creative, online: nothing costs, nothing is held for, no bench is asked (server/build.ts) */
+  creative: () => boolean;
   breakOff: () => void;
   changed: () => void;
   /** the felled trees (a stump is no trunk) */
@@ -390,7 +392,7 @@ export class Building {
       this.prompt = card(K.name, near.length ? 'aim at where it goes on your base' : K.ground ? 'aim at open ground' : 'lay a foundation first', 'hold the right button for the pieces');
       return;
     }
-    const c = this.store.check(ask, this.me);
+    const c = this.store.check(ask, this.me, this.h.creative());
     let why = typeof c === 'string' ? c : null;
     const cost = costOf(this.kind, laidAt(this.kind));
     if (!why) why = this.short(cost);
@@ -458,7 +460,7 @@ export class Building {
       }
     }
     const ask = { b: pl.b, k: pl.k, x: pl.x, y: pl.y, z: pl.z, r: pl.r };
-    const c = this.store.check(ask, this.me);
+    const c = this.store.check(ask, this.me, this.h.creative());
     let why = typeof c === 'string' ? c : null;
     const cost = costOf(pl.k, laidAt(pl.k));
     if (!why) why = this.short(cost);
@@ -529,10 +531,12 @@ export class Building {
 
   /** a cost against what is carried, each thing in green when there is enough of it and in red when not */
   private costHtml(cost: Record<string, number>) {
+    if (this.h.creative()) return '<span class="ok">Creative</span>';
     return Object.entries(cost).map(([id, n]) => `<span class="${this.h.count(id) >= n ? 'ok' : 'no'}">${amount(id, n)}</span> <small>(${this.h.count(id)})</small>`).join(' · ');
   }
 
   private short(cost: Record<string, number>): string | null {
+    if (this.h.creative()) return null;
     const missing = Object.entries(cost).filter(([id, n]) => this.h.count(id) < n);
     return missing.length ? `Needs ${missing.map(([id, n]) => `${amount(id, n - this.h.count(id), 'more ')}`).join(' and ')}` : null;
   }
@@ -618,7 +622,7 @@ export class Building {
       this.prompt = card(head, '', 'hold the right button to take it down');
       return;
     }
-    const cost = costOf(p.k, next), why = this.store.canUpgrade(t.base.id, p.id, next) ?? this.short(cost);
+    const cost = costOf(p.k, next), why = this.store.canUpgrade(t.base.id, p.id, next, this.h.creative()) ?? this.short(cost);
     this.prompt = card(head, `${why ? `<span class="no">${why}</span> · ` : ''}up to ${said(next)}: ${this.costHtml(cost)}`, 'hold the right button for more', why ? undefined : 'LMB');
     if (this.h.input.pressed('Mouse0') && !this.h.busy() && !why) this.upgrade(hammer, t.base, t.id, next);
   }
@@ -630,6 +634,8 @@ export class Building {
     if (!p) return;
     const still = () => this.h.held()?.uid === hammer.uid && this.target()?.id === id && this.target()?.base === base;
     if (this.h.online()) this.h.send({ t: 'bup', b: base.id, p: id, to, go: 1, u: hammer.uid });
+    // (creative: at once, no hold)
+    if (this.h.creative()) return void this.h.send({ t: 'bup', b: base.id, p: id, to, go: 2, u: hammer.uid });
     this.nail(base, p);
     this.h.begin(PIECES[p.k].levels ? `Bringing the ${PIECES[p.k].name.toLowerCase()} up to level ${ROMAN[to]}` : `Nailing the ${PIECES[p.k].name.toLowerCase()} up to ${TIERS[to].toLowerCase()}`, TIER_S[to], still, () => {
       if (!still()) return;
@@ -744,7 +750,7 @@ export class Building {
       if (!w) return ['Hammer', p ? `${PIECES[p.k].name} · ${PIECES[p.k].levels ? `Level ${ROMAN[p.t]}` : TIERS[p.t]}` : 'Look at a piece'];
       if (w === 'remove') return [PIECES[p?.k ?? '']?.role === 'deploy' && p?.k !== 'claim' ? 'Pick up' : 'Take down', p ? `Back: ${Object.entries(this.store.refund(t!.base.id, t!.id)).map(([k, n]) => amount(k, n)).join(' · ') || 'nothing'}` : ''];
       if (w.startsWith('up') && p) {
-        const to = Number(w.slice(2)) as Tier, why = this.store.canUpgrade(t!.base.id, t!.id, to);
+        const to = Number(w.slice(2)) as Tier, why = this.store.canUpgrade(t!.base.id, t!.id, to, this.h.creative());
         return [PIECES[p.k].levels ? `Level ${ROMAN[to] ?? ''}` : TIERS[to], why && !why.startsWith('It is') ? why : costs(costOf(p.k, to))];
       }
       if (w === 'unlock') return ['Take the lock off', p?.lock ? `The ${p.lock.k === 'code' ? 'code' : 'key'} lock back in your pockets` : 'There is no lock on it'];
@@ -787,7 +793,7 @@ export class Building {
     }
     if (w.startsWith('up')) {
       const to = Number(w.slice(2)) as Tier, p = t.base.pieces.get(t.id)!;
-      const why = this.store.canUpgrade(t.base.id, t.id, to) ?? this.short(costOf(p.k, to));
+      const why = this.store.canUpgrade(t.base.id, t.id, to, this.h.creative()) ?? this.short(costOf(p.k, to));
       if (why) {
         this.h.note(why, 'warn');
         return false;
@@ -802,12 +808,16 @@ export class Building {
   private mend(hammer: ItemInstance, base: Base, id: number, turn: boolean): boolean {
     const p = base.pieces.get(id);
     if (!p) return false;
-    const now = Date.now(), why = turn ? this.store.canTurn(base.id, id, now) : this.store.canRepair(base.id, id, this.raid.struckAt(base.id, id), now) ?? this.short(repairOf(p));
+    const now = Date.now(), why = this.h.creative() ? null : turn ? this.store.canTurn(base.id, id, now) : this.store.canRepair(base.id, id, this.raid.struckAt(base.id, id), now) ?? this.short(repairOf(p));
     if (why) {
       this.h.note(why, 'warn');
       return false;
     }
     const name = PIECES[p.k].name.toLowerCase(), still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(id);
+    if (this.h.creative()) {
+      this.h.send({ t: 'bfix', b: base.id, p: id, u: hammer.uid, ...(turn ? { turn: true } : {}) });
+      return true;
+    }
     this.nail(base, p);
     this.h.begin(turn ? `Turning the ${name} about` : `Mending the ${name}`, turn ? 1.5 : 3, still, () => {
       if (!still()) return;

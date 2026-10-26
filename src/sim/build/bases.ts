@@ -98,7 +98,8 @@ export class Bases {
    * Whether a piece may be laid as asked, and where it would go: the spot, the base (made now, for a first piece, but
    * not kept until `lay`), or why not.
    */
-  check(ask: Ask, by: string): { base: Base; spot: Spot; fresh: boolean } | string {
+  /** @param free an admin in creative: no bench is asked for (server/build.ts) */
+  check(ask: Ask, by: string, free = false): { base: Base; spot: Spot; fresh: boolean } | string {
     const K = PIECES[ask.k];
     if (!K) return 'No such piece';
     if (this.count >= LIMITS.all) return 'The server holds no more pieces';
@@ -138,7 +139,7 @@ export class Bases {
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
     if (theirs && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";
-    if (K.bench && !this.benchNear(wx, wz, K.bench)) return `It needs a ${K.bench > 1 ? `level ${ROMAN[K.bench]} ` : ''}workbench within ${BENCH_NEAR} m`;
+    if (K.bench && !free && !this.benchNear(wx, wz, K.bench)) return `It needs a ${K.bench > 1 ? `level ${ROMAN[K.bench]} ` : ''}workbench within ${BENCH_NEAR} m`;
     if (K.sleep && !base.claim?.members.some((m) => m.pid === by)) return 'A bed goes only in a base whose claim you are on';
     if (ask.k === 'claim') {
       if (base.claim) return 'This base has its claim already';
@@ -196,8 +197,8 @@ export class Bases {
   }
 
   /** a piece laid (`check` first said it may): the base, and the piece */
-  lay(ask: Ask, by: string, now: number, name = ''): { base: Base; piece: Piece; fresh: boolean } | string {
-    const c = this.check(ask, by);
+  lay(ask: Ask, by: string, now: number, name = '', free = false): { base: Base; piece: Piece; fresh: boolean } | string {
+    const c = this.check(ask, by, free);
     if (typeof c === 'string') return c;
     const { base, spot, fresh } = c;
     if (fresh) {
@@ -213,7 +214,7 @@ export class Bases {
   }
 
   /** why a piece may not be brought up to tier `t` (null: it may) */
-  canUpgrade(b: number, id: number, t: Tier): string | null {
+  canUpgrade(b: number, id: number, t: Tier, free = false): string | null {
     const base = this.bases.get(b), p = base?.pieces.get(id);
     if (!base || !p) return 'It is gone';
     const K = PIECES[p.k];
@@ -222,7 +223,7 @@ export class Bases {
     if (t > topOf(p.k)) return 'It goes no higher';
     if (K.levels && t !== p.t + 1) return 'A level at a time';
     // (metal is nailed up near a workbench II, armoured near a III: the progression plan)
-    const need = K.levels ? 0 : TIER_BENCH[t];
+    const need = K.levels || free ? 0 : TIER_BENCH[t];
     if (need) {
       const [x, , z] = toWorld(base, p.x, p.y, p.z);
       if (!this.benchNear(x, z, need)) return `It needs a level ${ROMAN[need]} workbench within ${BENCH_NEAR} m`;
@@ -231,9 +232,9 @@ export class Bases {
   }
 
   /** nailed up to tier `t`, and whole again */
-  upgrade(b: number, id: number, t: Tier): Piece | null {
+  upgrade(b: number, id: number, t: Tier, free = false): Piece | null {
     const p = this.bases.get(b)?.pieces.get(id);
-    if (!p || this.canUpgrade(b, id, t)) return null;
+    if (!p || this.canUpgrade(b, id, t, free)) return null;
     p.t = t;
     p.hp = hpOf(p.k, t);
     return p;

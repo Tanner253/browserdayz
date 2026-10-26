@@ -116,6 +116,7 @@ export interface AdminSelf {
   endless: boolean;
   /** their inventory never fills: what their pockets cannot take goes into the hold (not said by a game from before it: off) */
   bottomless?: boolean;
+  creative?: boolean;
   /** it is day in this game alone, whatever the hour */
   night: boolean;
   /** everybody's name is shown where they are */
@@ -1159,6 +1160,8 @@ export class AdminUI {
       this.flip('God mode', 'Nothing hurts you', s.god, () => this.send(`/god ${s.god ? 'off' : 'on'}`), 'shield'),
       this.flip('Vanish', 'Nobody but an admin sees you; the infected ignore you', s.hidden, () => this.send(`/vanish ${s.hidden ? 'off' : 'on'}`), 'ghost'),
       this.flip('Noclip', 'Fly, through anything', s.clip, () => this.send(`/noclip ${s.clip ? 'off' : 'on'}`), 'fly', 'N'),
+      // (the owner, 2026-10-25: "as admin i want to build and upgrade instantly and spawn anything i want")
+      this.flip('Creative', 'Build, upgrade, mend and make for nothing and at once, no bench or blueprint asked', !!s.creative, () => this.send(`/creative ${s.creative ? 'off' : 'on'}`), 'bolt'),
       this.flip('Free camera', 'The view leaves your body (H brings the body to it)', s.freecam, () => {
         this.act.freecam(!s.freecam);
         this.act.close();

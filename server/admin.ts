@@ -897,6 +897,20 @@ export async function command(c: Client, line: string) {
       }
       return void sys(c, k === 'voidInv' ? (on ? 'When you die, nothing you carried is left on your body.' : 'When you die, what you carried is on your body, as anybody\'s is.') : k === 'voidTag' ? (on ? 'When you die, no dog tag of your own is left.' : 'When you die, your dog tag is on your body, as anybody\'s is.') : k === 'god' ? (on ? 'Nothing hurts you now.' : 'You can be hurt again.') : k === 'hidden' ? (on ? 'Nobody but an admin sees you now: to everybody else you have left.' : 'You can be seen again.') : on ? 'You fly, and through anything: W A S D, Space up, Ctrl down, Shift fast.' : 'You walk again.');
     }
+    case 'creative': {
+      // (an admin's creative mode, the owner, 2026-10-25: "as admin i want to build and upgrade instantly and spawn
+      // anything i want": theirs, or another admin's, put on or off as god mode is)
+      if (!admin) return need();
+      const say = rest.find((w) => w === 'on' || w === 'off'), whom = rest.find((w) => w !== 'on' && w !== 'off');
+      const t = whom ? whoIs(whom) : c;
+      if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
+      if (roleOf(t) !== 'admin') return void sys(c, `${t.name} is not an admin: creative is an admin's.`);
+      if (!outranks(c, t)) return void above(t.name);
+      const on = say ? say === 'on' : !t.power.creative;
+      setPower(t, 'creative', on);
+      if (t !== c) sys(t, `${c.name} has put creative ${on ? 'on' : 'off'} for you.`);
+      return void sys(c, on ? `Creative is on${t === c ? '' : ` for ${t.name}`}: building, upgrading, mending and making cost nothing and take no time, and no bench or blueprint is asked for. /give spawns anything.` : `Creative is off${t === c ? '' : ` for ${t.name}`}: things cost what they cost again.`);
+    }
     case 'weightless':
     case 'ammo':
     case 'bottomless':
