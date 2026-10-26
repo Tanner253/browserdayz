@@ -395,7 +395,8 @@ export type C2S =
   | { t: 'blay'; k: string; b?: number; x: number; y: number; z: number; r: number; yaw?: number; u: string }
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
   | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
-  | { t: 'bdel'; b: number; p: number; u: string }
+  /** `scrap`: a thing set down from the hands broken up for some of its materials, not picked up whole */
+  | { t: 'bdel'; b: number; p: number; u: string; scrap?: 1 }
   /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
   | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean }
   /** joining a base's claim, or leaving it (stood at it) */

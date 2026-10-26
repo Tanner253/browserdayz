@@ -435,6 +435,8 @@ ok('a box picked up gives back the box itself (set down from the hands: PLACED);
   const box = bs.lay({ b: b.id, k: 'box_small', ...deployAt(b, 'box_small', { x: -0.5, y: 0, z: -0.5 })! }, ME, 0);
   assert.ok(typeof box !== 'string');
   assert.deepEqual(bs.refund(b.id, box.piece.id), { box_small: 1 });
+  // (or broken up: half of what it took to make, the owner, 2026-10-25: "deconstruct and grab should be 2 different options")
+  assert.deepEqual(bs.salvage(b.id, box.piece.id), { planks: 6, nails: 4 });
   assert.deepEqual(bs.refund(b.id, d.id), { planks: 6, nails: 4 }, 'a door is built: half back');
   const kept = JSON.parse(JSON.stringify(bs.keep(undefined, (_b, p) => (p.k === 'box_small' ? [{ id: 'nails', qty: 3 }] : undefined))));
   const again = heard(kept[0])!;

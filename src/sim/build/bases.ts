@@ -2,7 +2,7 @@
 // (src/game/building/index.ts): laid, nailed up, taken down, and kept in the save as short as it can be said. The rules
 // of where a piece goes are src/sim/build/snap.ts; what it is and costs, src/sim/build/pieces.ts.
 
-import { BENCH_NEAR, FOUND, PIECES, PIECE_IDS, TIER_BENCH, benchLevel, costOf, hpOf, laidAt, topOf, type Tier } from './pieces';
+import { PLACED, BENCH_NEAR, FOUND, PIECES, PIECE_IDS, TIER_BENCH, benchLevel, costOf, hpOf, laidAt, topOf, type Tier } from './pieces';
 import { blocked, cornersOf, deployTurn, offered, restsOn, standing, toLocal, toWorld, type Base, type Claim, type Piece, type Spot } from './snap';
 import { ROT } from './upkeep';
 import { heardLock, saidLock, type KeptLock } from './locks';
@@ -294,6 +294,26 @@ export class Bases {
   }
 
   /** what taking a piece down gives back: half of what laying it and bringing it to its tier took */
+  /**
+   * What a thing set down from the hands gives broken up (the owner, 2026-10-25: "deconstruct and grab should be 2
+   * different options"): half of what its item took to make, and of every workbench level it was brought up through,
+   * rounded up. Anything else gives what refund does.
+   */
+  salvage(b: number, id: number): Record<string, number> {
+    const p = this.bases.get(b)?.pieces.get(id);
+    if (!p || !PLACED[p.k]) return this.refund(b, id);
+    const out: Record<string, number> = {};
+    const add = (c: Record<string, number>) => {
+      for (const [k, n] of Object.entries(c)) out[k] = (out[k] ?? 0) + n;
+    };
+    // (a sleeping bag is its own material: it comes back whole)
+    if (PLACED[p.k] === 'sleeping_bag') return { sleeping_bag: 1 };
+    add(PIECES[p.k].cost ?? {});
+    if (PIECES[p.k].levels) for (let l = laidAt(p.k) + 1; l <= p.t; l++) add(costOf(p.k, l as Tier));
+    for (const k of Object.keys(out)) out[k] = Math.ceil(out[k] / 2);
+    return out;
+  }
+
   refund(b: number, id: number): Record<string, number> {
     const p = this.bases.get(b)?.pieces.get(id);
     if (!p) return {};
