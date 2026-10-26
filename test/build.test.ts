@@ -249,7 +249,8 @@ console.log('Building: claims, upkeep and rot');
 ok('a claim is set down on a floor, wholly on it, never over its edge; one to a base, one a player', () => {
   const bs = new Bases(flat), b = start(bs);
   const s = deployAt(b, 'claim', { x: 0.1, y: 0, z: 0.2 })!;
-  assert.deepEqual([s.x, s.z], [0, 0.25], 'to a quarter metre');
+  // (where the aim is, to a centimetre: no squares to snap to, the owner, 2026-10-26)
+  assert.deepEqual([s.x, s.z], [0.1, 0.2], 'where it is aimed');
   assert.equal(deployAt(b, 'claim', { x: 1.4, y: 0, z: 0 }), null, 'over the edge');
   const r = bs.lay({ b: b.id, k: 'claim', ...s }, ME, 0, 'Me');
   assert.ok(typeof r !== 'string' && b.claim?.p === r.piece.id && b.claim.members[0].pid === ME, `the claim: ${typeof r === 'string' ? r : 'laid'}`);
@@ -420,6 +421,20 @@ ok('a Weapon Rack is set down from its item, its five bays over a store larger t
   assert.ok(c.fits(box, 0, RACK_ROWS, false), 'and rounds in the store under them');
   const { bs, b } = hut();
   assert.ok(typeof bs.lay({ b: b.id, k: 'weapon_rack', ...deployAt(b, 'weapon_rack', { x: 0.4, y: 0, z: 0.2 })! }, ME, 0) !== 'string', 'set down on a floor');
+});
+
+ok('a thing set down goes beside stairs, only not into their own steps; nor into a wall; and across two floors', () => {
+  // (the owner, 2026-10-26: "the stairs should not block placement unless trying to place inside the actual collision of the stairs")
+  const bs = new Bases(flat), b = start(bs);
+  const st = bs.lay({ b: b.id, k: 'stairs_l', ...spots(b, 'stairs_l')[0] }, ME, 0);
+  assert.ok(typeof st !== 'string', String(st));
+  // (L stairs climb along their -x side and come back along their far side: their near +x corner is free floor)
+  const free = deployAt(b, 'box_small', { x: 0.9, y: 0, z: 1.0 })!, on = deployAt(b, 'box_small', { x: -1.0, y: 0, z: 0.8 })!;
+  assert.equal(blocked(b, 'box_small', free, bs.groundIn(b)), null, 'beside the stairs, in their square');
+  assert.match(String(blocked(b, 'box_small', on, bs.groundIn(b))), /stairs are in the way/, 'on their steps');
+  const two = new Bases(flat), b2 = start(two);
+  two.lay({ b: b2.id, k: 'foundation', ...nearestSpot(spots(b2, 'foundation'), 'foundation', { x: 3, y: 0, z: 0 }, 1)! }, ME, 0);
+  assert.ok(deployAt(b2, 'workbench', { x: 1.5, y: 0, z: 0 }), 'across the join of two foundations');
 });
 
 ok('a torch hangs anywhere on a wall face, at any height, with no places to snap to; not in the air', () => {
@@ -657,15 +672,16 @@ ok('a room shut all round in stone keeps its light in: its door open, a wall of 
   assert.equal(shutRoom(h3.b, ...h3.w(0, 0.1, 0)), null, 'a window open');
 });
 
-ok('a thing set down is turned any way, to a degree, and kept so; a box in quarter turns, squared to its base', () => {
+ok('a thing set down is turned any way, to a degree, and kept so; a box too', () => {
   const bs = new Bases(flat), b = start(bs);
   const at = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 }, 1.37)!;
   assert.ok(Math.abs(at.r - 41 / 30) < 1e-9, `a workbench turned 41.1 degrees is turned 41: ${at.r * 30}`);
   const r = bs.lay({ b: b.id, k: 'workbench', ...at }, ME, 0);
   assert.ok(typeof r !== 'string', `not laid: ${r}`);
   assert.equal(heardPiece(saidPiece(r.piece))!.r, r.piece.r, 'its turn told and kept to the degree');
-  assert.equal(deployAt(b, 'box_small', { x: 1, y: 0, z: 1 }, 1.4)!.r, 0, 'a box a little turned: square');
-  assert.equal(deployAt(b, 'box_small', { x: 1, y: 0, z: 1 }, 4.6)!.r, 6, 'a box near half round: half round');
+  // (a box as freely as anything: "I should be able to free place EVERYTHING like the torch", the owner, 2026-10-26)
+  assert.ok(Math.abs(deployAt(b, 'box_small', { x: 0.7, y: 0, z: 0.7 }, 1.4)!.r - 1.4) < 1e-9, 'a box a little turned, as turned');
+  assert.ok(Math.abs(deployAt(b, 'box_small', { x: 0.7, y: 0, z: 0.7 }, 4.6)!.r - 4.6) < 1e-9, 'a box near half round, as turned');
   // (a piece of a building keeps whole steps)
   const wall = at && spots(b, 'wall')[0];
   assert.ok(Number.isInteger(wall.r), 'a wall in whole steps');

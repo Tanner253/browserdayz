@@ -75,6 +75,8 @@ const POSED: Record<string, { pivot?: [number, number, number]; frame?: [number,
   c4: { pivot: [0.15, -Math.PI / 2 + 0.35, 0] },
   hand_saw: { pivot: [Math.PI / 2 - 0.2, 0, 0], frame: [0, 0, Math.PI] },
   building_plan: { pivot: [Math.PI / 2 - 0.25, 0, 0], frame: [0, 0, -Math.PI / 2] },
+  // (stood up, its front to the eye: the owner, 2026-10-26, "the weapon rack icon in inventory is backwards and upside down")
+  weapon_rack: { pivot: [0.1, 0.3, 0] },
 };
 
 /** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */
