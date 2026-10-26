@@ -8,13 +8,21 @@
 // and r2 is the best for switching items ... more important than leaning left and right"; their tester, with food,
 // drink and a bandage on 4 to 6: "i have no way to switch to the items").
 //
+// Each thing is on the button the player puts it on in Settings (src/core/pad-layout.ts, src/ui/pad-binds.ts), and a
+// PlayStation pad the browser does not lay out as standard is read into the standard's places (the owner, 2026-10-26:
+// "controllers have asked for key remapping"; "the playstation control has been not working, the ps4 pad").
+//
 // In play the sticks move and look. Anywhere else (the menu, the inventory, the map, Emotes, the dead screen) the left
 // stick steers a cursor of its own: ✕ clicks, held it drags, ○ goes back, the right stick scrolls.
 
-/** the standard layout's buttons, by the place they are in (PlayStation names; Xbox has A B X Y, LB RB LT RT) */
-const B = { cross: 0, circle: 1, square: 2, triangle: 3, l1: 4, r1: 5, l2: 6, r2: 7, create: 8, options: 9, l3: 10, r3: 11, up: 12, down: 13, left: 14, right: 15, pad: 17 };
-/** how far a stick is pushed before it counts; past `walk` it jogs; how far a trigger is pulled before it fires */
-const DEAD = 0.16, WALK = 0.62, PULL = 0.3;
+import { B, PAD_BUTTONS, buttonName, padButtons, padKind, pickPad, readPad, type PadKind, type PadRead } from './pad-layout';
+import { controls } from './keys';
+
+/** how far a stick is pushed before it counts; past `walk` it jogs */
+const DEAD = 0.16, WALK = 0.62;
+
+/** a thing in Settings waiting for a button to be put on (src/ui/pad-binds.ts): the next button pressed is its, and nothing else hears of it */
+export const padCapture: { want: ((btn: number) => void) | null } = { want: null };
 /** a button held this long (seconds) does its second thing */
 const HOLD = 0.32;
 /** the right stick all the way over: pixels of mouse a second; and how much more it gives held there a while */
@@ -67,7 +75,11 @@ export class Gamepad {
   /** L3 went down with the sights up (a click of it then leans; a sprint begun before is not a lean) */
   private l3Aimed = false;
   /** whose names the buttons go by, on the screen */
-  private kind: 'ps' | 'xbox' = 'ps';
+  private kind: PadKind = 'ps';
+  /** a button taken for Settings is let go before the pad acts again */
+  private swallow = false;
+  /** the bindings the hot bar's ends were last written for */
+  private ends: Record<string, number> | null = null;
   private full = 0;
   private cursor: HTMLElement | null = null;
   private at = { x: innerWidth / 2, y: innerHeight / 2 };
@@ -91,21 +103,47 @@ export class Gamepad {
 
   /** read the pad and press what it says; called at the head of each frame, before anything reads the input */
   update(dt: number) {
-    const gp = this.host.on() ? [...(navigator.getGamepads?.() ?? [])].find((g) => g?.connected) : null;
+    // (the pad in the hands, of what the browser lists, read into the standard layout whatever it made of it: a
+    // PlayStation pad over Bluetooth or under Firefox is laid out its own way, and was read as if it were not)
+    const gp = this.host.on() ? pickPad([...(navigator.getGamepads?.() ?? [])]) : null;
     if (!gp) {
       if (this.holding.size) this.letGo();
       this.showCursor(false);
       return;
     }
-    const pressed = gp.buttons.map((b, i) => b.pressed || b.value > (i === B.l2 || i === B.r2 ? PULL : 0.5));
-    const any = pressed.some(Boolean) || gp.axes.some((a) => Math.abs(a) > 0.5);
+    const read = readPad(gp, navigator.platform), pressed = read.pressed;
+    const any = pressed.some(Boolean) || read.axes.some((a) => Math.abs(a) > 0.5);
     if (any) this.input.padAt = performance.now();
+    // (Sony's vendor id or names: the buttons go by PlayStation's names on the screen, Xbox's otherwise)
+    const kind = padKind(gp.id), keys = controls().padKeys;
+    if (kind !== this.kind || keys !== this.ends || document.body.dataset.pad !== kind) {
+      document.body.dataset.pad = this.kind = kind;
+      this.ends = keys;
+      // (the hot bar's ends say the buttons that go along it, wherever the player has put them)
+      const K = padButtons(keys), st = document.body.style;
+      st.setProperty('--pad-prev', JSON.stringify(buttonName(K.prev, kind)));
+      st.setProperty('--pad-next', JSON.stringify(buttonName(K.next, kind)));
+    }
     if (any && !this.input.pad) {
       this.input.pad = true;
       document.body.classList.add('pad');
-      // (Microsoft's vendor id, or its name: the hot bar's ends then say LB and RB)
-      this.kind = /xbox|xinput|045e/i.test(gp.id) ? 'xbox' : 'ps';
-      document.body.dataset.pad = this.kind;
+    }
+    // (Settings waiting for a button: the next one pressed is its, and the pad does nothing more until it is let go)
+    if (padCapture.want) {
+      const i = PAD_BUTTONS.find((k) => pressed[k] && !this.was[k]);
+      if (i !== undefined) {
+        const want = padCapture.want;
+        padCapture.want = null;
+        this.swallow = true;
+        want(i);
+      }
+      this.was = pressed;
+      return;
+    }
+    if (this.swallow) {
+      this.was = pressed;
+      if (pressed.some(Boolean)) return;
+      this.swallow = false;
     }
     if (!this.input.pad) return;
     const now = performance.now() / 1000;
@@ -117,10 +155,10 @@ export class Gamepad {
     if (this.host.playing()) {
       this.showCursor(false);
       if (!this.input.locked) this.input.lock();
-      this.play(gp, dt, down, went, up, heldFor);
+      this.play(read.axes, dt, down, went, up, heldFor);
     } else {
       if (this.holding.size) this.letGo();
-      this.menus(gp, dt, went, up);
+      this.menus(read.axes, dt, went, up);
     }
     this.was = pressed;
   }
@@ -144,8 +182,10 @@ export class Gamepad {
     this.lean = 0;
   }
 
-  private play(gp: globalThis.Gamepad, dt: number, down: (i: number) => boolean, went: (i: number) => boolean, up: (i: number) => boolean, heldFor: (i: number) => number) {
-    const [lx = 0, ly = 0, rx = 0, ry = 0] = gp.axes;
+  private play(axes: PadRead['axes'], dt: number, down: (i: number) => boolean, went: (i: number) => boolean, up: (i: number) => boolean, heldFor: (i: number) => number) {
+    const [lx, ly, rx, ry] = axes;
+    // (each thing on the button the player put it on: Settings, Controls)
+    const K = padButtons(controls().padKeys);
     // the left stick: where it is pushed, a little to walk, all the way to jog
     const push = Math.hypot(lx, ly), moving = push > DEAD;
     this.hold('KeyW', moving && ly < -0.35);
@@ -162,66 +202,66 @@ export class Gamepad {
     const k = (LOOK * sens * ramp * dt) / Math.max(0.05, this.host.mouseSens());
     if (cx || cy) this.input.look(cx * k, (invert ? -cy : cy) * k);
     // triggers: aim and fire
-    this.hold('Mouse2', down(B.l2));
-    this.hold('Mouse0', down(B.r2));
-    const riding = this.host.riding(), aiming = down(B.l2);
+    this.hold('Mouse2', down(K.aim));
+    this.hold('Mouse0', down(K.fire));
+    const riding = this.host.riding(), aiming = down(K.aim);
     // L3: sprint, kept up until the stick comes back or the sights go up. In a seat, the horn. Aiming, as Siege leans, a
     // click of either stick leans to its side and stays leaned until it is clicked again, the other is, or the sights
     // come down (held in, a stick is no stick to aim or walk with). L3 held instead holds the breath, as Call of Duty's
     // does (a full pull of L2 held it, which nearly every pull of an aim is).
-    if (riding) this.hold('KeyH', down(B.l3));
+    if (riding) this.hold('KeyH', down(K.sprint));
     else {
-      if (went(B.l3)) {
+      if (went(K.sprint)) {
         this.sprint = !aiming;
         this.l3Aimed = aiming;
       }
       if (!moving || ly > -0.3 || aiming) this.sprint = false;
-      if (heldFor(B.l3) > HOLD) this.second.add(B.l3);
-      if (up(B.l3) && this.l3Aimed && aiming && !this.second.has(B.l3)) this.lean = this.lean === -1 ? 0 : -1;
-      this.hold('ShiftLeft', this.sprint || (aiming && down(B.l3) && this.second.has(B.l3)));
+      if (heldFor(K.sprint) > HOLD) this.second.add(K.sprint);
+      if (up(K.sprint) && this.l3Aimed && aiming && !this.second.has(K.sprint)) this.lean = this.lean === -1 ? 0 : -1;
+      this.hold('ShiftLeft', this.sprint || (aiming && down(K.sprint) && this.second.has(K.sprint)));
     }
     // R3: the light; aiming, the lean to the right; in a seat, the siren
-    if (went(B.r3)) {
+    if (went(K.light)) {
       if (riding) this.tap('KeyJ');
       else if (aiming) this.lean = this.lean === 1 ? 0 : 1;
       else this.tap('KeyL');
     }
     if (!aiming || riding) this.lean = 0;
     // ✕ jump (the helicopter: up)
-    this.hold('Space', down(B.cross));
+    this.hold('Space', down(K.jump));
     // ○ crouch, held lie down (the helicopter: down)
-    if (riding) this.hold('KeyC', down(B.circle));
+    if (riding) this.hold('KeyC', down(K.crouch));
     else {
-      if (went(B.circle)) this.tap('KeyC');
-      this.second2(B.circle, heldFor, () => this.tap('KeyZ'));
+      if (went(K.crouch)) this.tap('KeyC');
+      this.second2(K.crouch, heldFor, () => this.tap('KeyZ'));
     }
     // □ reload, or take · doors · search when there is something in front (held, as the key is held)
-    if (went(B.square)) this.squareDoes = this.host.facing() ? 'KeyF' : 'KeyR';
+    if (went(K.use)) this.squareDoes = this.host.facing() ? 'KeyF' : 'KeyR';
     if (this.squareDoes) {
       if (this.squareDoes === 'KeyR') {
         this.tap('KeyR');
         this.squareDoes = 'done';
-      } else if (this.squareDoes === 'KeyF') this.hold('KeyF', down(B.square));
-      if (up(B.square)) {
+      } else if (this.squareDoes === 'KeyF') this.hold('KeyF', down(K.use));
+      if (up(K.use)) {
         this.hold('KeyF', false);
         this.squareDoes = null;
       }
     }
     // △ the next gun carried, gun to gun as Call of Duty's and the phone's button go (it went by the wheel, which stops
     // on empty hands: the tester, "if i press it again it just unselects it"); held, empty hands
-    const [l1, r1] = this.kind === 'xbox' ? ['LB', 'RB'] : ['L1', 'R1'];
-    if (up(B.triangle) && !this.second.has(B.triangle) && !this.host.swap()) this.host.note(`No gun carried: ${l1} and ${r1} go along your hot bar`);
-    this.second2(B.triangle, heldFor, () => this.tap('KeyX'));
+    const [l1, r1] = [buttonName(K.prev, this.kind), buttonName(K.next, this.kind)];
+    if (up(K.swap) && !this.second.has(K.swap) && !this.host.swap()) this.host.note(`No gun carried: ${l1} and ${r1} go along your hot bar`);
+    this.second2(K.swap, heldFor, () => this.tap('KeyX'));
     // bumpers: along the hot bar to the next slot with something on it (R1) or the one before (L1), guns and things
     // alike, as the number keys bring them up (the wheel only goes through the guns). Aiming, they turn a scope that
     // turns, as the wheel does, R1 nearer. In a seat they roll the helicopter, as Q and E do.
     if (riding) {
-      this.hold('KeyQ', down(B.l1));
-      this.hold('KeyE', down(B.r1));
+      this.hold('KeyQ', down(K.prev));
+      this.hold('KeyE', down(K.next));
     } else {
       this.hold('KeyQ', this.lean === -1);
       this.hold('KeyE', this.lean === 1);
-      for (const [i, dir] of [[B.l1, -1], [B.r1, 1]] as const) {
+      for (const [i, dir] of [[K.prev, -1], [K.next, 1]] as const) {
         if (!went(i)) continue;
         if (aiming) this.input.wheel -= dir;
         else {
@@ -232,18 +272,18 @@ export class Gamepad {
     }
     // the D-pad: ↑ the map; ↓ the call-out wheel, held (the right stick picks); ← single shots or automatic, held drops
     // what is held; → look the gun over, held talks
-    if (went(B.up)) this.tap('KeyM');
-    this.hold('KeyT', down(B.down));
-    if (up(B.left) && !this.second.has(B.left)) this.tap('KeyB');
-    this.hold('KeyG', down(B.left) && heldFor(B.left) > 0.15);
-    if (up(B.right) && !this.second.has(B.right)) this.tap('KeyI');
-    this.hold('KeyV', down(B.right) && heldFor(B.right) > 0.2);
-    if (heldFor(B.left) > HOLD) this.second.add(B.left);
-    if (heldFor(B.right) > 0.2) this.second.add(B.right);
-    // the inventory; the menu
-    if (went(B.pad) || went(B.create)) this.tap('Tab');
-    if (went(B.options)) this.input.unlock();
-    for (const i of [B.triangle, B.circle, B.left, B.right, B.l3]) if (up(i)) this.second.delete(i);
+    if (went(K.map)) this.tap('KeyM');
+    this.hold('KeyT', down(K.callout));
+    if (up(K.mode) && !this.second.has(K.mode)) this.tap('KeyB');
+    this.hold('KeyG', down(K.mode) && heldFor(K.mode) > 0.15);
+    if (up(K.inspect) && !this.second.has(K.inspect)) this.tap('KeyI');
+    this.hold('KeyV', down(K.inspect) && heldFor(K.inspect) > 0.2);
+    if (heldFor(K.mode) > HOLD) this.second.add(K.mode);
+    if (heldFor(K.inspect) > 0.2) this.second.add(K.inspect);
+    // the inventory (and the touchpad, while nothing else is put on it); the menu
+    if (went(K.inventory) || (went(B.pad) && !Object.values(K).includes(B.pad))) this.tap('Tab');
+    if (went(K.menu)) this.input.unlock();
+    for (const i of [K.swap, K.crouch, K.mode, K.inspect, K.sprint]) if (up(i)) this.second.delete(i);
   }
   private squareDoes: 'KeyF' | 'KeyR' | 'done' | null = null;
   /** a button held past HOLD: its second thing, once */
@@ -268,9 +308,9 @@ export class Gamepad {
     this.cursor.classList.add('on');
   }
 
-  private menus(gp: globalThis.Gamepad, dt: number, went: (i: number) => boolean, up: (i: number) => boolean) {
+  private menus(axes: PadRead['axes'], dt: number, went: (i: number) => boolean, up: (i: number) => boolean) {
     this.showCursor(true);
-    const [lx = 0, ly = 0, rx = 0, ry = 0] = gp.axes;
+    const [lx, ly, rx, ry] = axes;
     const curve = (v: number) => (Math.abs(v) < DEAD ? 0 : Math.sign(v) * ((Math.abs(v) - DEAD) / (1 - DEAD)) ** 1.6);
     this.at.x = Math.min(innerWidth - 2, Math.max(0, this.at.x + curve(lx) * CURSOR * dt));
     this.at.y = Math.min(innerHeight - 2, Math.max(0, this.at.y + curve(ly) * CURSOR * dt));

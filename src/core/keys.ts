@@ -7,6 +7,8 @@
 // test either. What is shown of a key on the screen is asked of `shown()` (or, for words already written with a
 // key in them, of `relabel`).
 
+import { PAD_ACTIONS, PAD_BUTTONS, padButtons } from './pad-layout';
+
 export type KeyGroup = 'Move' | 'Fight' | 'Gear' | 'Talk' | 'Admin';
 export interface Action {
   /** the key it was given, and the name it is asked for by */
@@ -69,6 +71,8 @@ export interface Controls {
   padInvert: boolean;
   /** what has been put on another key: the name it is asked for by, to the key that answers to it now */
   keys: Record<string, string>;
+  /** what has been put on another of a controller's buttons: its id to the button (src/core/pad-layout.ts) */
+  padKeys: Record<string, number>;
 }
 /** keys nothing may be put on: the menu's own, the browser's (the admin panel's ` was one until it could be moved:
  * it is a key like any other now, its own changing places with whatever is put on it) */
@@ -76,7 +80,7 @@ const KEPT = /^(Escape|F\d+|MetaLeft|MetaRight|ContextMenu|PrintScreen|ControlLe
 export const bindable = (key: string) => !KEPT.test(key);
 
 const STORE = 'zona.controls.v1';
-const DEFAULTS = (): Controls => ({ sens: 1, aim: 1, pad: false, padSens: 1, padInvert: false, keys: {} });
+const DEFAULTS = (): Controls => ({ sens: 1, aim: 1, pad: false, padSens: 1, padInvert: false, keys: {}, padKeys: {} });
 
 export function loadControls(): Controls {
   const c = DEFAULTS();
@@ -92,6 +96,14 @@ export function loadControls(): Controls {
         const key = raw.keys?.[a.code];
         if (typeof key === 'string' && key && key !== a.code && bindable(key)) c.keys[a.code] = key;
       }
+      // (a controller's, kept only whole: two things on one button, as a damaged entry could have, and it is as made)
+      const pk: Record<string, number> = {};
+      for (const a of PAD_ACTIONS) {
+        const b = raw.padKeys?.[a.id];
+        if (typeof b === 'number' && b !== a.btn && PAD_BUTTONS.includes(b)) pk[a.id] = b;
+      }
+      const on = Object.values(padButtons(pk));
+      if (new Set(on).size === on.length) c.padKeys = pk;
     }
   } catch {
     /* private mode or a damaged entry: as the game was made */

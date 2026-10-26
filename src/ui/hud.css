@@ -2064,10 +2064,8 @@ body.pad .tc { display: none; }
 .pad-cursor { position: fixed; left: -11px; top: -11px; z-index: 10000; display: none; width: 22px; height: 22px; border: 2px solid #ffd35a; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255, 211, 90, 0.2), 0 0 8px rgba(0, 0, 0, 0.6); pointer-events: none; }
 .pad-cursor.on { display: block; }
 /* the bumpers step along the hot bar: they are named at its two ends */
-body.pad .hud-hotbar::before, body.pad .hud-hotbar::after { content: 'L1'; align-self: center; padding: 2px 5px; border: 1px solid rgba(233, 228, 216, 0.25); border-radius: 3px; background: rgba(10, 12, 11, 0.42); font-family: var(--mono); font-size: 10px; color: var(--ink-dim); }
-body.pad .hud-hotbar::after { content: 'R1'; }
-body.pad[data-pad='xbox'] .hud-hotbar::before { content: 'LB'; }
-body.pad[data-pad='xbox'] .hud-hotbar::after { content: 'RB'; }
+body.pad .hud-hotbar::before, body.pad .hud-hotbar::after { content: var(--pad-prev, 'L1'); align-self: center; padding: 2px 5px; border: 1px solid rgba(233, 228, 216, 0.25); border-radius: 3px; background: rgba(10, 12, 11, 0.42); font-family: var(--mono); font-size: 10px; color: var(--ink-dim); }
+body.pad .hud-hotbar::after { content: var(--pad-next, 'R1'); }
 .pad-map { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-dim); }
 .tc-e:active { color: #121413; background: var(--accent); border-color: var(--accent); }
 .tc-close { display: none; right: calc(14px + env(safe-area-inset-right)); bottom: 12px; width: auto; height: 40px; padding: 0 20px; border-radius: 0; color: #121413; background: var(--accent); border-color: var(--accent); }
