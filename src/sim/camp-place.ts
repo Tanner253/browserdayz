@@ -16,4 +16,4 @@ export const TRADER_SPOTS = [
   { id: 'clothing', x: -1660, z: 220, near: 'the Mokroye road' },
 ] as const;
 /** how far from a spot no base is laid: its safe zone and a margin besides (src/sim/build/land.ts) */
-export const CAMP_KEEP = 60;
+export const CAMP_KEEP = 70;

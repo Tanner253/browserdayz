@@ -85,9 +85,9 @@ export const CAMP = {
   /** the old book: credit paid out in scrap once, at so much a scrap, to so much at most */
   book: { per: 2, most: 250 },
   /** each trader's safe zone: how far out from its spot, m (the stall, its recycler and a little round them) */
-  safe: 20,
+  safe: 30,
   /** how near a stall's counter a player must stand to trade, m (as near as to speak) */
-  reach: 4.7,
+  reach: 6,
 };
 
 /** what is never bought, from anybody (the Zone's own, and the money itself) */
@@ -151,8 +151,8 @@ export interface Camp {
   recyclers: { x: number; y: number; z: number; rot: number; at: string }[];
 }
 
-/** a stall's model (made again from three pictures, the owner: "the trader stand looks very low quality") at the size it was made; how deep it is from its counter back, roof and all (its x), and how wide (its z); its trader behind its counter */
-export const STALL = { model: 'trader_stall', scale: 1, l: 2.42, w: 2.8, behind: 0.15 };
+/** a stall's model (made again from three pictures, the owner: "the trader stand looks very low quality") half as big again as it was made ("too small, should be like 50% larger at least"); how deep it is from its counter back, roof and all (its x), and how wide (its z); its trader behind its counter */
+export const STALL = { model: 'trader_stall', scale: 1.5, l: 3.63, w: 4.2, behind: 0.225 };
 /** what a model whose front is its +x (the stall, the recycler: the sandbox's front camera looks from +x) is turned by, past the way it faces */
 export const FACE_TURN = -Math.PI / 2;
 /** each stall's mark on the maps: a coin of its colour with its letter (src/ui/minimap.ts, bigmap.ts) */
@@ -191,7 +191,7 @@ export function campLayer(world: LayerWorld): Camp {
     stalls.push({ id: q.id, ...p, at: [bx, p.y + 0.05, bz], yaw: p.rot + Math.PI });
     // (the recycler to the stall's side and a little before it, facing the same way)
     const sx = Math.cos(face), sz = -Math.sin(face), fx = Math.sin(face), fz = Math.cos(face);
-    const rc = TRADER_SPOTS.some((t) => t.id === q.id && 'recycler' in t) && lay(p.x + sx * 5 + fx * 2, p.z + sz * 5 + fz * 2, 2.0, 1.6, face);
+    const rc = TRADER_SPOTS.some((t) => t.id === q.id && 'recycler' in t) && lay(p.x + sx * 6.5 + fx * 2, p.z + sz * 6.5 + fz * 2, 2.0, 1.6, face);
     if (rc) recyclers.push({ ...rc, at: `the ${STALLS[q.id].name.toLowerCase()} trader` });
   }
   return { spots, stalls, recyclers };
