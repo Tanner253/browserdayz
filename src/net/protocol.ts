@@ -92,7 +92,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // 70 never says which bench it uses and could make nothing at one)
 // (72, 2026-10-26: things set down at any angle anywhere on a floor, a head admin's 'top' on 'role', a code's 'bcoded', a
 // gun rack's bays: a page of 71 sets things down squared and shows a rack's bays as dead cells)
-export const PROTOCOL = 72;
+// (73, 2026-10-26: a thing set down in one's own base picked up by hand, F held at it, 'bdel' with `hand`: a server of 72
+// asks for a hammer and picks nothing up)
+export const PROTOCOL = 73;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -402,7 +404,7 @@ export type C2S =
   /** the hammer `u` at piece `p` of base `b`: bringing it up to tier `to` (begun, go 1, and done, go 2), or taking it down */
   | { t: 'bup'; b: number; p: number; to: number; go: 1 | 2; u: string }
   /** `scrap`: a thing set down from the hands broken up for some of its materials, not picked up whole */
-  | { t: 'bdel'; b: number; p: number; u: string; scrap?: 1 }
+  | { t: 'bdel'; b: number; p: number; u: string; scrap?: 1; hand?: 1 }
   /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
   | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean; bit?: 1 }
   /** joining a base's claim, or leaving it (stood at it) */

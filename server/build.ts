@@ -8,7 +8,7 @@
 
 import { mendOf, Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
 import { struckAt } from './raid';
-import { PIECES, PLACED, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
+import { PIECES, PLACED, TIER_S, byHand, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { toWorld, type Base } from '../src/sim/build/snap';
 import { bedsFull } from '../src/sim/build/beds';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
@@ -305,12 +305,25 @@ export function hammer(c: Client, m: Extract<C2S, { t: 'bup' }>) {
   tellBase(m.b, { t: 'bpc', b: m.b, p: saidPiece(piece) });
 }
 
+/** a thing of a base reached for by hand (F held at it): near, and the hand's to work as the hammer's would be */
+function byHandAt(c: Client, b: number, p: number): { it: null; why: string | null } | null {
+  if (!c.alive) return null;
+  const base = bases().bases.get(b), piece = base?.pieces.get(p);
+  if (!base || !piece) return { it: null, why: 'It is gone' };
+  const [x, , z] = toWorld(base, piece.x, piece.y, piece.z);
+  if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.hammer) return { it: null, why: 'Too far off' };
+  if (!byHand(piece.k)) return { it: null, why: 'That is taken down with a hammer' };
+  if (!bases().mayWork(base, own(c))) return { it: null, why: base.claim ? 'You are not on its claim' : 'It is not yours' };
+  return { it: null, why: null };
+}
+
 export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   if (!Number.isInteger(m.b) || !Number.isInteger(m.p)) return;
-  const at = atPiece(c, m.b, m.p, m.u);
+  // (by hand, F held at it: picked up whole, never broken up)
+  const hand = m.hand === 1, at = hand ? byHandAt(c, m.b, m.p) : atPiece(c, m.b, m.p, m.u);
   if (!at) return;
   if (at.why) return void send(c, { t: 'tell', kind: 'warn', text: at.why });
-  const all = bases(), k = all.bases.get(m.b)!.pieces.get(m.p)!.k, scrap = m.scrap === 1 && !!PLACED[k];
+  const all = bases(), k = all.bases.get(m.b)!.pieces.get(m.p)!.k, scrap = !hand && m.scrap === 1 && !!PLACED[k];
   const back = scrap ? all.salvage(m.b, m.p) : all.refund(m.b, m.p), claimed = all.bases.get(m.b)?.claim?.p;
   // (a box is picked up empty, as Rust's; broken up, what it held spills; what stood on a piece taken down spills too)
   if (!scrap && PIECES[k].store && !emptyBox(m.b, m.p)) return void send(c, { t: 'tell', kind: 'warn', text: 'Empty it first, or deconstruct it' });
@@ -322,7 +335,7 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
     const b = all.bases.get(m.b);
     if (b) tellClaim(b);
   }
-  use(c, at.it);
+  if (at.it) use(c, at.it);
   tellBase(m.b, { t: 'bout', b: m.b, ids: gone });
   const items = Object.entries(back).map(([id, n]) => makeItem(id, n));
   if (items.length) send(c, { t: 'kit', name: scrap ? 'Deconstructed' : 'Taken down', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });

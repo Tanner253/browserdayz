@@ -769,10 +769,10 @@ export class Game {
       },
       // (crafting's research table: F opens the Crafting tab on what it would teach; a workbench: F uses it, the Crafting
       // tab open with its level's recipes and those below, as Rust's)
-      use: (free, t) => {
+      use: (free, t, tap) => {
         const piece = t?.base.pieces.get(t.id);
         if (piece?.k === 'workbench') {
-          if (free && this.input.pressed('KeyF')) {
+          if (free && (tap || this.input.pressed('KeyF'))) {
             this.craft.useBench(t!.base.id, piece.id);
             (this.invUI.craftPane as CraftingScreen | null)?.showView('all');
             this.toggleInventory(true);
@@ -781,7 +781,7 @@ export class Game {
           return `<kbd>F</kbd>Use ${LEVEL_NAME[levelOf(piece)].toLowerCase()}`;
         }
         if (piece?.k !== 'research_table') return null;
-        if (free && this.input.pressed('KeyF')) {
+        if (free && (tap || this.input.pressed('KeyF'))) {
           (this.invUI.craftPane as CraftingScreen | null)?.showView('research');
           this.toggleInventory(true);
           if (this.invUI.isOpen) this.invUI.setMode('craft');

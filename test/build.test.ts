@@ -864,9 +864,36 @@ async function serverTest() {
     o.send({ t: 'bup', b: b.id, p: 2, to: 2, go: 1, u: oham.uid });
     assert.match((await o.until('bup'))?.why ?? '', /not yours/);
     console.log('  ok  a base is told to whoever comes near it and not to whoever is far off; it is not theirs to work');
+    // a Weapon Rack set down from the hands, picked up whole with the hammer when it is empty (the owner: "I am unable to pick up the weapon rack")
+    const rackIt = await a.give('weapon_rack'), rackAt = deployAt(b, 'weapon_rack', { x: 0, y: 0, z: 0.6 })!;
+    a.hold('weapon_rack');
+    a.send({ t: 'blay', k: 'weapon_rack', b: b.id, ...rackAt, u: rackIt.uid });
+    const laidRack = await a.until('bpc', (m) => m.p[1] === PIECE_IDS.indexOf('weapon_rack'));
+    assert.ok(laidRack, `no weapon rack: ${JSON.stringify(a.of('tell').slice(-2))}`);
+    a.hold('hammer');
+    const k0 = a.of('kit').length;
+    a.send({ t: 'bdel', b: b.id, p: laidRack!.p[0], u: ham.uid });
+    assert.ok(await a.until('bout', (m) => m.ids.includes(laidRack!.p[0])), `the rack was not picked up: ${JSON.stringify(a.of('tell').slice(-2))}`);
+    assert.ok(a.of('kit').slice(k0).some((m) => m.items.some((it) => it.id === 'weapon_rack')), 'the rack did not come back whole');
+    // (and by hand, F held at it, nothing in the hands: the owner, "I should be able to pick up placeable items in my base without a hammer")
+    const rackBack = a.of('kit').slice(k0).flatMap((m) => m.items).find((it) => it.id === 'weapon_rack')!;
+    a.pockets = [...a.pockets.filter((it) => it.uid !== rackIt.uid), rackBack];
+    a.me(a.of('spent').at(-1)?.n ?? 0);
+    await sleep(100);
+    a.hold(null);
+    a.send({ t: 'blay', k: 'weapon_rack', b: b.id, ...rackAt, u: rackBack.uid });
+    const rackAgain = await a.until('bpc', (m) => m.p[1] === PIECE_IDS.indexOf('weapon_rack') && m.p[0] !== laidRack!.p[0]);
+    assert.ok(rackAgain, `the rack was not set down again: ${JSON.stringify(a.of('tell').slice(-2))}`);
+    a.send({ t: 'bdel', b: b.id, p: rackAgain!.p[0], u: '', hand: 1 });
+    assert.ok(await a.until('bout', (m) => m.ids.includes(rackAgain!.p[0])), `the rack was not picked up by hand: ${JSON.stringify(a.of('tell').slice(-2))}`);
+    // (a wall is no thing set down: by hand, it stands)
+    a.send({ t: 'bdel', b: b.id, p: 2, u: '', hand: 1 });
+    assert.match((await a.until('tell', (m) => /hammer/.test(m.text)))?.text ?? '', /taken down with a hammer/);
+    a.hold('hammer');
+    console.log('  ok  a Weapon Rack set down, and picked up whole when empty: with the hammer, and by hand (F held); a wall not by hand');
     // taken down: half back; the foundation taken away takes its walls with it
     a.send({ t: 'bdel', b: b.id, p: 2, u: ham.uid });
-    const out = await a.until('bout');
+    const out = await a.until('bout', (m) => m.ids.includes(2));
     assert.deepEqual(out?.ids, [2]);
     assert.match(a.of('kit').at(-1)?.gift ?? '', /Planks/);
     a.send({ t: 'bdel', b: b.id, p: 1, u: ham.uid });
@@ -976,7 +1003,8 @@ async function serverTest() {
     me.send({ t: 'bdel', b: B.id, p: 2, u: ham3.uid });
     assert.ok(await me.until('bclaim', (m) => m.b === B.id && m.c === null, 5000), `the claim did not go: ${JSON.stringify(me.of('tell').slice(-2))}`);
     await sleep(300);
-    assert.ok(me.of('loot+').slice(lootBefore).some((m) => m.l.item.id === 'planks'), 'its store did not spill');
+    // (spilt in a bag of its own, as a broken box's is: server/boxes.ts bagged)
+    assert.ok(me.of('loot+').slice(lootBefore).some((m) => m.l.item.id === 'planks' || !!m.l.item.cargo?.some((q) => q.item.id === 'planks')), 'its store did not spill');
     console.log('  ok  the claim taken down: what was in its store lies on the ground');
     // a claim again, with nothing in its store: run dry, its base rots, and what comes to nothing breaks
     await me.give('log', 1);
@@ -1014,7 +1042,9 @@ async function serverTest() {
     const wp = heardPiece(way!.p)!;
     D.pieces.set(wp.id, wp);
     const ds = spots(D, 'door_wood', 0)[0];
-    me.send({ t: 'blay', k: 'door_wood', b: D.id, ...ds, u: plan3.uid });
+    // (a door is hung from its own item: base building's PLACED)
+    const doorIt = await me.give('door_wood');
+    me.send({ t: 'blay', k: 'door_wood', b: D.id, ...ds, u: doorIt.uid });
     const door = await me.until('bpc', (m) => m.b === D.id && PIECE_IDS[m.p[1]] === 'door_wood', 4000, sinceD);
     assert.ok(door, `no door: ${JSON.stringify(me.of('tell').slice(-2))}`);
     const P = door!.p[0];

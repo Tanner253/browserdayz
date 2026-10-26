@@ -189,6 +189,8 @@ export const PLACED: Record<string, string> = {
 };
 /** and the kind each such item sets down */
 export const PLACES: Record<string, string> = Object.fromEntries(Object.entries(PLACED).map(([k, i]) => [i, k]));
+/** what is picked up whole by hand, F held at it, with no hammer (the owner, 2026-10-26: "I should be able to pick up placeable items in my base without a hammer in my hand, like the weapon rack, bed, forge, chest etc"): what was set down from an item and stands or hangs by itself, not a door in its frame */
+export const byHand = (k: string) => !!PLACED[k] && (PIECES[k]?.role === 'deploy' || PIECES[k]?.role === 'lean');
 
 export function costOf(kind: string, t: Tier): Record<string, number> {
   const k = PIECES[kind];

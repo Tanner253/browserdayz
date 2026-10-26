@@ -1386,7 +1386,8 @@ export class InventoryUI {
   private bayTiles(c: Container): HTMLElement {
     const row = document.createElement('div');
     row.className = 'inv-strip inv-rack-bays';
-    row.style.width = `${c.w * CELL}px`;
+    // (as wide as the store under it at most, narrower with the column: the tiles are square, and shrink with it)
+    row.style.maxWidth = `${c.w * CELL}px`;
     for (let bay = 0; bay < RACK.bays; bay++) {
       const s = document.createElement('div'), p = c.items.find((q) => bayOf(q.y) === bay);
       s.className = 'inv-slot slot-bay' + (p ? '' : ' empty');
@@ -1408,12 +1409,14 @@ export class InventoryUI {
     return row;
   }
 
-  /** a gun rack's store under its bays: its grid, its bays' rows kept out of sight above the frame (a thing let go there lands as in any grid) */
+  /**
+   * A gun rack's store under its bays: its grid, its bays' rows kept out of sight above the frame (a thing let go there
+   * lands as in any grid). The frame is as wide as its column, so the grid is drawn smaller to fit it as any is (`fitGrids`,
+   * the owner: "the weapon rack grid is not shrinking to fit the viewport"), the rows above it shrinking with it.
+   */
   private rackStore(c: Container): HTMLElement {
     const frame = document.createElement('div'), g = this.gridEl(c, c.h);
     frame.className = 'inv-rack-store';
-    frame.style.width = `${c.w * CELL}px`;
-    frame.style.height = `${(c.h - RACK_ROWS) * CELL}px`;
     g.style.marginTop = `-${RACK_ROWS * CELL}px`;
     frame.appendChild(g);
     return frame;
