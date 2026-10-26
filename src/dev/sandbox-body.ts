@@ -9,7 +9,7 @@
 //     each body's words, by dots: what is held (free, or an item: ak, m9, hatchet...), b0..b3 (a survivor's body, as
 //     the game puts it on: none, the old suit), aim, crouch or prone, idle /
 //     walk / jog / sprint / run (the hurried crouch) or a pace (v2.5, m/s), a way (F B L R FL FR BL BR), turn (on the
-//     spot), up / down (the aim pitched), noise (the way gone jittered 8 degrees, as another player's is), limp, prod (production's steps: the body's own clips), swing (a blow with what is in the fist, the moments drawn across it),
+//     spot), up / down (the aim pitched), noise (the way gone jittered 8 degrees, as another player's is), lag (the way gone following the facing a beat late, as another player's does turning), limp, prod (production's steps: the body's own clips), swing (a blow with what is in the fist, the moments drawn across it),
 //     saw / arm / eat / drink / bandage (the hands at that work, as the game's act shows it to everybody)
 //   &frames=12&fps=15&settle=1.2    moments drawn (after so many seconds of going), how many a second
 //   &across=4                       moments to a row of blocks (a picture is drawn no more than 8192 a side)
@@ -44,7 +44,7 @@ const ACTS: Gesture[] = ['saw', 'arm', 'eat', 'drink', 'bandage'];
 /** the ways, radians to the body's left of ahead */
 const WAYS: Record<string, number> = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 };
 
-export interface BodySpec { words: string; held: string | null; body: number | null; wear: string[] | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean; prod: boolean; noise: boolean; act: Gesture | null }
+export interface BodySpec { words: string; held: string | null; body: number | null; wear: string[] | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean; prod: boolean; noise: boolean; lag: boolean; act: Gesture | null }
 
 /** what a cell's words ask for, at the pace the game would go at (src/game/player.ts: 1.7 walking, 4.0 at a jog, 6.2 flat out, 1.9 crouched) */
 export function specOf(words: string): BodySpec {
@@ -68,7 +68,7 @@ export function specOf(words: string): BodySpec {
   const body = w.find((k) => /^b\d$/.test(k));
   // (wear-parka-smock_pants: what it wears instead of a new life's clothes)
   const wear = w.find((k) => k.startsWith('wear-'))?.slice(5).split('-') ?? null;
-  return { words, held, body: body ? +body.slice(1) : null, wear, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing'), prod: has('prod'), noise: has('noise'), act: (w.find((k) => ACTS.includes(k as Gesture)) as Gesture | undefined) ?? null };
+  return { words, held, body: body ? +body.slice(1) : null, wear, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing'), prod: has('prod'), noise: has('noise'), lag: has('lag'), act: (w.find((k) => ACTS.includes(k as Gesture)) as Gesture | undefined) ?? null };
 }
 
 /** a stand-in for the game's sky and sun: what a body and a gun ask of it */
@@ -152,7 +152,7 @@ export async function stageBodies(o: Stage) {
     // (every body from the same moment of its stride, so that two builds drawn side by side step together)
     (a as unknown as { phase: number }).phase = 0;
     if ((a as { gait?: { phase: number } }).gait) (a as unknown as { gait: { phase: number } }).gait.phase = 0;
-    return { a, s, pos: new THREE.Vector3((i % 8) * 12, 0, Math.floor(i / 8) * 12), face: 0, side: 0 };
+    return { a, s, pos: new THREE.Vector3((i % 8) * 12, 0, Math.floor(i / 8) * 12), face: 0, goes: 0, side: 0 };
   }));
   const vel = new THREE.Vector3();
   const step = (dt: number) => {
@@ -160,7 +160,8 @@ export async function stageBodies(o: Stage) {
       const { a, s } = b;
       if (s.turn) b.face += dt * 1.6;
       const jit = s.noise ? (Math.random() - 0.5) * THREE.MathUtils.degToRad(16) : 0;
-      vel.set(-Math.sin(b.face + s.way + jit) * s.speed, 0, -Math.cos(b.face + s.way + jit) * s.speed);
+      b.goes += (b.face - b.goes) * (s.lag ? 1 - Math.exp(-2.5 * dt) : 1);
+      vel.set(-Math.sin(b.goes + s.way + jit) * s.speed, 0, -Math.cos(b.goes + s.way + jit) * s.speed);
       b.pos.addScaledVector(vel, dt);
       a.update(dt, b.pos, vel, b.face, s.crouch, false, false, s.pitch, true, s.aim);
       // (the most of any clip of a gait's other ways that plays while it goes ahead: a strafe that shows)
