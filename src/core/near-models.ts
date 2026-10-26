@@ -7,6 +7,10 @@ import { ITEMS, type Category } from '../sim/items';
 /** what is held in the hands or worn: guns and what goes on them, things to hit with, tools, clothes */
 const HELD = new Set<Category>(['weapon', 'magazine', 'attachment', 'melee', 'tool', 'clothing']);
 
+/** what is set down in a base without being one of its pieces' own models (the owner, 2026-10-25: "the workbench quality
+ * needs to be bumped up to 1024"; the bb_ models are a base's, below) */
+const DEPLOYED = ['forge_hf', 'research_table', 'recycler', 'sleeping_bag', 'torch'];
+
 /** every body (survivors, their clothes, the infected) is under here */
 const BODIES = 'assets/characters/';
 
@@ -24,6 +28,7 @@ export function nearModels(models: Record<string, { url: string; tags: string[] 
     if (e) near.add(e.url);
   }
   for (const e of Object.values(models)) if (e.tags.includes('viewmodel') || e.tags.includes('base')) near.add(e.url);
+  for (const id of DEPLOYED) if (models[id]) near.add(models[id].url);
   return near;
 }
 
