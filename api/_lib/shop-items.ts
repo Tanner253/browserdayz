@@ -3,10 +3,10 @@
 // optional (sol) ... and a gold plated desert eagle for 4.99 (sol)", and yes to no-ads alone, the three other finishes
 // and the gold dog tag in VIP. Cosmetic and convenience only: a finish only ever makes a gun easier to see, never harder.
 
-export type ItemId = 'vip' | 'noads' | 'deagle_gold' | 'm9_nickel' | 'colt_nickel' | 'knife_gold' | 'knife_emerald' | 'knife_ruby' | 'knife_damascus' | 'knife_carbon' | 'knife_nightcamo' | 'karambit' | 'coffee';
+export type ItemId = 'vip' | 'noads' | 'deagle_gold' | 'm9_nickel' | 'colt_nickel' | 'knife_gold' | 'knife_emerald' | 'knife_ruby' | 'knife_damascus' | 'knife_carbon' | 'knife_nightcamo' | 'karambit' | 'karambit_fade' | 'coffee';
 
 /** how a finish looks (src/game/finish.ts paints each) */
-export type Look = 'gold' | 'nickel' | 'emerald' | 'ruby' | 'damascus' | 'carbon' | 'nightcamo';
+export type Look = 'gold' | 'nickel' | 'emerald' | 'ruby' | 'damascus' | 'carbon' | 'nightcamo' | 'fade';
 
 /** every knife a knife's finish goes on (the owner, 2026-10-25: "high quality knives ... in the store as cosmetics") */
 export const KNIVES: readonly string[] = ['knife', 'hunting_knife', 'bayonet', 'karambit'];
@@ -42,6 +42,9 @@ export const SHOP: Record<ItemId, ShopItem> = {
   knife_damascus: { name: 'Damascus blade', usd: 2.99, skin: { gun: 'knife', finish: 'damascus' }, say: 'Apply it to any knife you carry: folded steel, its layers waving down the blade.' },
   knife_carbon: { name: 'Carbon fibre blade', usd: 2.99, skin: { gun: 'knife', finish: 'carbon' }, say: 'Apply it to any knife you carry: a black woven blade.' },
   knife_nightcamo: { name: 'Night camo blade', usd: 4.99, limit: 200, skin: { gun: 'knife', finish: 'nightcamo' }, say: 'Apply it to any knife you carry: dark greens, matte, for the night.' },
+  // (the owner, 2026-10-25, of the karambit they chose: "the one I have in assets comes with a cosmetic which we will keep as
+  // a cosmetic, make the default brushed steel". Its own painted fade, on a karambit only, at the reflective finishes' price)
+  karambit_fade: { name: 'Fade karambit', usd: 9.99, limit: 50, skin: { gun: 'karambit', finish: 'fade' }, say: 'Apply it to a karambit you carry: its blade the fade it was made with, violet into gold, for good.' },
   // (the owner, 2026-10-25: "karambit is not a finish type its a knife type, the circular claw one like from cs:go")
   karambit: { name: 'Karambit', usd: 4.99, skin: { gun: 'knife', form: 'karambit' }, say: 'The curved claw, a finger through its ring. Apply it to any knife you carry: that knife is a karambit for good, its finish kept. It hits as every knife does.' },
   noads: { name: 'No ads', usd: 1.99, days: 30, say: 'The site and the game with no ads (VIP has this too).' },

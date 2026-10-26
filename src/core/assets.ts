@@ -496,12 +496,16 @@ export class Assets {
     }
   }
 
+  /** told of every model as it is read, before anything draws it (its address and its scene) */
+  loaded: ((url: string, scene: THREE.Group) => void)[] = [];
   loadGLTF(url: string): Promise<GLTF> {
     let p = this.models.get(url);
     if (!p) {
       const file = this.bytes(this.leanOf(url)).then((data) =>
         this.turn(async () => {
           const g = await this.gltf.parseAsync(data, '');
+          // (what the game does to a model as it comes, whoever asked for it: src/game/finish.ts, the karambit's steel)
+          for (const f of this.loaded) f(url, g.scene);
           // (on a phone its pictures are made small before anything is drawn with them: see PHONE_FAR)
           if (TOUCH) return shrinkModel(g, this.far.has(url) ? PHONE_FAR : PHONE_BODY);
           // (and on a computer to DESK_CAP: kept small in the page, so that a picture taken off the card can be put back; a
