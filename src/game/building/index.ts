@@ -96,6 +96,9 @@ export interface BuildHost {
   /** chips and dust off a surface struck (Effects.impact, no mark) */
   impact: (surface: import('../../core/physics').Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
   myId: RaidHost['myId'];
+  /** the store open in the inventory now, and the pictures of things (the claim's screen beside its store) */
+  shown: () => import('../loot').Stash | null;
+  icons: () => Record<string, string>;
   charge: RaidHost['charge'];
 }
 
@@ -177,7 +180,7 @@ export class Building {
     this.local = new Bases(land);
     this.seen = new Bases(land);
     this.draw = new BaseDraw(h.scene, h.atmo);
-    this.claims = new ClaimView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, who: () => this.me, name: h.name, open: h.open, hud: h.hud, broke: (b, ids) => this.draw.remove(b.id, ids), changed: (b) => this.bump(b.id) }, () => this.store);
+    this.claims = new ClaimView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, who: () => this.me, name: h.name, open: h.open, shown: h.shown, icons: h.icons, hud: h.hud, broke: (b, ids) => this.draw.remove(b.id, ids), changed: (b) => this.bump(b.id) }, () => this.store);
     const wheel = (per: number) => new Radial({ rings: RINGS, per, className: 'hud-wheel', tick: () => audio.click(2600, 0.05, 0.008), chose: () => audio.click(1500, 0.12, 0.018) });
     this.wheels = { plan: wheel(PER), hammer: wheel(HAMMER_PER) };
     this.wheel = this.wheels.plan;
