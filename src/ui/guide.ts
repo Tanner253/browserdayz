@@ -7,7 +7,6 @@
 
 import { BENCH_NEAR, TIERS, TIER_BENCH, costOf, type Tier } from '../sim/build/pieces';
 import { KEEP_OFF } from '../sim/build/land';
-import { CHARGES } from '../sim/build/charges';
 import { ITEMS } from '../sim/items';
 
 const KEY = 'zona.guide.hide';
@@ -19,75 +18,99 @@ interface Step { tab: 'Building' | 'Crafting'; title: string; pic?: string; line
 function steps(): Step[] {
   const wall = (t: Tier) => cost(costOf('wall', t));
   return [
-    { tab: 'Building', title: 'What you need', pic: '/changelog/media/bb-hut-flag.jpg', lines: [
-      `<b>${name('building_plan')}</b>: lays pieces. Made at a workbench (2 rags and coal), or bought from a trader.`,
-      `<b>${name('hammer')}</b>: nails pieces up, mends them, turns them, takes them down. Found in sheds and garages, or made at a workbench.`,
-      `<b>Planks</b>: saw a log with a <b>${name('hand_saw')}</b> (fell trees with an axe for logs). <b>Nails</b>: found, or bought from a trader.`,
+    { tab: 'Building', title: 'Where to find what you need', pic: '/guide/map.webp', lines: [
+      '<b>Tools</b> (axes, pickaxe, saw, hammer) lie in <b>farms</b>, <b>hunting</b> spots and <b>industrial</b> places: barns, sheds, garages, works.',
+      '<b>Nails</b> and <b>sheet metal</b>: sheds, garages, farms, most of all <b>industrial</b> places. Nails are never made.',
+      'The <b>trader camp</b> (on the map, <b>M</b>) sells nails, planks, the building plan and locks.',
     ] },
-    { tab: 'Building', title: 'Where you may build', lines: [
-      `Out in the wilderness: at least ${KEEP_OFF.place} m past any town, camp or the fort, and ${KEEP_OFF.building} m from any building.`,
-      'Never inside the Zona (the dotted line on the map), on a road or in water.',
-      'The plan\'s ghost turns red where you may not build, and says why.',
+    { tab: 'Building', title: 'The tools', pic: '/guide/tools.webp', lines: [
+      '<b>Felling axe</b>: trees into logs. <b>Pickaxe</b>: rock into stone. <b>Hand saw</b>: logs into planks.',
+      '<b>Hammer</b>: nails pieces up, upgrades, mends, turns and takes them down. <b>Building plan</b>: lays pieces.',
+      'The plan, hammer and saw are also made at a workbench.',
     ] },
-    { tab: 'Building', title: 'Claim, foundation, walls', pic: '/changelog/media/wheel-icons-cancel.jpg', lines: [
-      'Hold the plan and <b>right-click</b> for the wheel: pick a piece, let go. <b>Left-click</b> lays it, <b>R</b> turns it.',
-      'Lay a <b>claim</b> first: nobody else can build near it, and it keeps your base from decay while it holds upkeep.',
-      'Then a <b>foundation</b>, <b>walls</b> on its edges, a <b>doorway</b>, a <b>door</b> in it and a <b>lock</b> on the door.',
+    { tab: 'Building', title: 'Chop a tree', pic: '/guide/chop.webp', lines: [
+      'Hold the axe, walk up to a tree and <b>hold the left button</b>: it swings until the tree comes down.',
+      'Its <b>logs</b> fall beside it. Pick them up with <b>F</b>.',
     ] },
-    { tab: 'Building', title: 'Upgrade: wood, stone, metal, armoured', pic: '/changelog/media/bb-doors-remade.jpg', lines: [
-      'Hold the hammer, look at a piece and <b>right-click</b>: pick its new tier. A wall costs:',
-      ...([1, 2, 3, 4] as Tier[]).map((t) => `<b>${TIERS[t]}</b>: ${wall(t)}${TIER_BENCH[t] ? ` (workbench level ${TIER_BENCH[t]} within ${BENCH_NEAR} m)` : ''}`),
-      'Wood falls to axes; stone and above take far more, metal and armoured need charges.',
+    { tab: 'Building', title: 'Break rock', pic: '/guide/mine.webp', lines: [
+      'Hold the pickaxe at a rock and <b>hold the left button</b>: <b>stone</b> breaks off into your pockets.',
+      'A rock gives out after a while; it comes back later.',
     ] },
-    { tab: 'Building', title: 'Nails and materials', lines: [
-      '<b>Nails</b> are never made: search sheds, garages, farms and above all industrial places, or buy them from a trader.',
-      '<b>Stone</b>: mine rocks with a pickaxe. <b>Sheet metal</b> and <b>steel plate</b>: loot, or the forge and the trader.',
-      'Every wooden and metal tier is nailed up: carry nails before you start.',
+    { tab: 'Building', title: 'Saw planks', pic: '/guide/saw.webp', lines: [
+      'Drop a log on the ground, hold the saw, look at the log and press the <b>left button</b>.',
+      'It is sawn into <b>planks</b> where it lies.',
     ] },
-    { tab: 'Building', title: 'Workbench, upkeep and the flag', pic: '/changelog/media/bb-hut-flag.jpg', lines: [
-      'A <b>workbench</b> (levels I, II, III) makes more things the higher it is, and lets metal and armoured go up.',
-      'Put upkeep in the <b>claim</b>: its flag stands at the top of the pole while it is paid and comes down as it runs out.',
-      'When the flag reaches the ground the base begins to decay.',
+    { tab: 'Building', title: 'Pick a piece', pic: '/guide/wheel.webp', lines: [
+      'Hold the building plan and <b>hold the right button</b>: the wheel of pieces opens.',
+      'Move the mouse onto a group, then onto a piece, and let go. The bottom of the wheel is Cancel.',
+      `Build in the wilderness only: ${KEEP_OFF.place} m past any town or camp, ${KEEP_OFF.building} m from any building, never in the Zona. A red ghost says why not.`,
     ] },
-    { tab: 'Crafting', title: 'Gathering', pic: '/changelog/media/craft-v3.jpg', lines: [
-      '<b>Axe</b> on a tree: logs. <b>Saw</b> on a log on the ground: planks. <b>Pickaxe</b> on a rock: stone and ore.',
-      'Every tool wears with use; a broken one is mended at a bench.',
+    { tab: 'Building', title: 'Foundation and claim', pic: '/guide/found.webp', lines: [
+      `Aim at the ground: the ghost shows where. <b>Left-click</b> lays it, <b>R</b> turns it. A foundation costs ${cost(costOf('foundation', 0))}.`,
+      'Lay a <b>claim</b> on it (click to set it, move to turn it, click again). Nobody else may build near your claim.',
     ] },
-    { tab: 'Crafting', title: 'Benches, forge and recycler', pic: '/changelog/media/craft-v3.jpg', lines: [
-      'Open your inventory and its <b>Crafting</b> tab: what you can make by hand, and what needs a bench.',
-      'Three <b>workbench</b> levels, each making more. The <b>forge</b> smelts ore into iron. The <b>recycler</b> breaks junk into parts.',
-      'Learn new things from <b>blueprints</b> at the research table.',
+    { tab: 'Building', title: 'Walls and a doorway', pic: '/guide/walls.webp', lines: [
+      'Pick <b>Wall</b> and aim at a foundation\'s edge: it snaps there. Pick <b>Doorway</b> for the way in.',
+      'Pieces go up as bare frames, to be nailed up with the hammer.',
     ] },
-    { tab: 'Crafting', title: 'Traders', pic: '/changelog/media/trader-stall.jpg', lines: [
-      'Traders stand at their stalls, marked on the map: each buys and sells its own kinds of things.',
-      'Open the map (<b>M</b>) to find them.',
+    { tab: 'Building', title: 'Upgrade with the hammer', pic: '/guide/upgrade.webp', lines: [
+      'Hold the hammer, look at a piece, <b>hold the right button</b> and pick its new tier. The hammer nails it up.',
+      ...([1, 2, 3, 4] as Tier[]).map((t) => `<b>${TIERS[t]}</b>: ${wall(t)}${TIER_BENCH[t] ? ` (a level ${TIER_BENCH[t]} workbench within ${BENCH_NEAR} m)` : ''}`),
     ] },
-    { tab: 'Crafting', title: 'Raiding (soon)', lines: [
-      `C4 and satchel charges are coming with the raiding update: armed in the hand, thrown, stuck where they land, a C4 going off ${CHARGES.c4.fuse[0]} s after.`,
-      'Until then, build without fear of them.',
+    { tab: 'Building', title: 'A door and a lock', pic: '/guide/door.webp', lines: [
+      'With the plan, pick a <b>door</b> and aim at the doorway: it hangs there.',
+      'Hold a <b>code lock</b> or <b>key lock</b>, look at the door and <b>left-click</b> to fit it, then set the code.',
+    ] },
+    { tab: 'Building', title: 'The flag and upkeep', pic: '/changelog/media/bb-hut-flag.jpg', lines: [
+      'Press <b>F</b> at your claim and put upkeep in it. Its flag stands at the top of the pole while it is paid.',
+      'As upkeep runs out the flag comes down; when it reaches the ground the base begins to decay.',
+    ] },
+    { tab: 'Crafting', title: 'The workbench', pic: '/guide/bench.webp', lines: [
+      'Open your inventory (<b>Tab</b>) and its <b>Crafting</b> page: what you can make by hand, and what needs a bench.',
+      'Stand by a <b>workbench</b> to make the rest. Upgrade it with the hammer to <b>level II</b> and <b>III</b> for more, and for metal and armoured walls.',
+    ] },
+    { tab: 'Crafting', title: 'The forge', pic: '/changelog/media/trader-stall.jpg', lines: [
+      'Build a <b>forge</b> in your base and press <b>F</b> at it: metal fragments go in, <b>iron bars</b> come out (armoured walls take them).',
+    ] },
+    { tab: 'Crafting', title: 'The recycler', pic: '/changelog/media/craft-v3.jpg', lines: [
+      'Recyclers stand at the works (Zavod), the army camp, the fort, the chemical works and the trader camp.',
+      'Press <b>F</b>, put in what you don\'t need and switch it on: it breaks it into fragments, scrap and rags. It is loud.',
+    ] },
+    { tab: 'Crafting', title: 'The research table', pic: '/changelog/media/craft-v3.jpg', lines: [
+      'You start knowing the basics; everything else is learned. Build a <b>research table</b> beside a workbench, press <b>F</b>, and put in an item you found with some scrap: it is used up, and you know how to make it for good.',
+    ] },
+    { tab: 'Crafting', title: 'Traders', pic: '/guide/traders.webp', lines: [
+      'The trader camp is on the map (<b>M</b>). Each stall buys and sells its own kinds of things: building, weapons, medical, clothing.',
     ] },
   ];
 }
 
+// (a fixed frame: the same size on every step, the picture in a fixed-ratio box, the words scrolling in theirs, and
+// Back, Next and the dots pinned at the foot, so nothing moves under the pointer from step to step: the owner,
+// 2026-10-25, "the ui container keeps jumping around as its size is defined by the content within it")
 const CSS = `
-.gd-veil{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(6,8,8,.72);padding:16px}
-.gd{width:min(760px,100%);max-height:calc(100vh - 32px);overflow:auto;background:#121514;color:#e8e6df;border:1px solid #2c332f;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.6);font:14px/1.45 inherit;display:flex;flex-direction:column}
-.gd header{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
+.gd-veil{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:rgba(6,8,8,.72);padding:16px}
+.gd{width:min(760px,100%);height:min(680px,calc(100vh - 32px));background:#121514;color:#e8e6df;border:1px solid #2c332f;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.6);font:14px/1.45 inherit;display:flex;flex-direction:column;overflow:hidden}
+.gd header{display:flex;align-items:center;gap:10px;padding:14px 16px 0;flex:none}
 .gd header b{font-size:18px;letter-spacing:.04em;text-transform:uppercase}
 .gd .gd-tabs{display:flex;gap:6px;margin-left:auto}
 .gd .gd-tabs button,.gd footer button{background:#1d2220;color:#e8e6df;border:1px solid #333b37;border-radius:4px;padding:8px 14px;font:inherit;cursor:pointer;min-height:40px}
 .gd .gd-tabs button.on{background:#c9a24a;color:#111;border-color:#c9a24a}
 .gd .gd-x{background:none;border:0;color:#aaa;font-size:24px;cursor:pointer;min-width:40px;min-height:40px}
-.gd figure{margin:12px 16px 0;aspect-ratio:16/8;background:#0b0c0c;overflow:hidden;border-radius:4px}
+.gd figure{margin:12px 16px 0;aspect-ratio:16/9;max-height:46%;flex:none;background:#0b0c0c;overflow:hidden;border-radius:4px;align-self:center;width:calc(100% - 32px)}
 .gd figure img{width:100%;height:100%;object-fit:cover;display:block}
-.gd h3{margin:14px 16px 6px;font-size:17px}
-.gd ul{margin:0 16px;padding-left:18px}
+.gd .gd-words{flex:1;min-height:0;overflow:auto;padding:0 16px}
+.gd h3{margin:14px 0 6px;font-size:17px}
+.gd ul{margin:0;padding-left:18px}
 .gd li{margin:6px 0}
-.gd footer{display:flex;align-items:center;gap:10px;padding:14px 16px;margin-top:auto;flex-wrap:wrap}
+.gd footer{display:flex;align-items:center;gap:10px;padding:12px 16px;flex:none;border-top:1px solid #222826}
 .gd footer label{display:flex;align-items:center;gap:8px;color:#bbb;cursor:pointer;min-height:40px}
-.gd footer .gd-n{margin-left:auto;color:#999}
-.gd footer .gd-next{background:#c9a24a;color:#111;border-color:#c9a24a}
-@media (max-width:600px){.gd header{flex-wrap:wrap}.gd .gd-tabs{margin-left:0;order:3;width:100%}.gd .gd-tabs button{flex:1}.gd figure{aspect-ratio:16/9}.gd footer .gd-n{order:-1;width:100%;margin:0}}
+.gd .gd-dots{display:flex;gap:5px;margin-left:auto}
+.gd .gd-dots i{width:7px;height:7px;border-radius:50%;background:#3a423e}
+.gd .gd-dots i.on{background:#c9a24a}
+.gd footer .gd-next{background:#c9a24a;color:#111;border-color:#c9a24a;min-width:84px}
+.gd footer .gd-back{min-width:84px}
+@media (max-width:600px){.gd{height:calc(100vh - 32px)}.gd header{flex-wrap:wrap}.gd .gd-tabs{margin-left:0;order:3;width:100%}.gd .gd-tabs button{flex:1}.gd footer{flex-wrap:wrap}.gd footer label{width:100%}.gd .gd-dots{margin-left:0;flex:1}}
 `;
 
 export class Guide {
@@ -173,10 +196,9 @@ export class Guide {
     } catch {}
     this.el.innerHTML = `<div class="gd" role="dialog" aria-modal="true" aria-label="Building and crafting guide">
       <header><b>Build &amp; craft</b><div class="gd-tabs">${(['Building', 'Crafting'] as const).map((t) => `<button type="button" data-tab="${t}" class="${s.tab === t ? 'on' : ''}">${t}</button>`).join('')}</div><button type="button" class="gd-x" aria-label="Close">×</button></header>
-      ${s.pic ? `<figure><img src="${s.pic}" alt="" loading="lazy" decoding="async"></figure>` : ''}
-      <h3>${s.title}</h3>
-      <ul>${s.lines.map((l) => `<li>${l}</li>`).join('')}</ul>
-      <footer><label><input type="checkbox" ${hide ? 'checked' : ''}> Don't show this again</label><span class="gd-n">${this.at + 1} / ${this.list.length}</span>
+      <figure>${s.pic ? `<img src="${s.pic}" alt="" decoding="async">` : ''}</figure>
+      <div class="gd-words"><h3>${s.title}</h3><ul>${s.lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>
+      <footer><label><input type="checkbox" ${hide ? 'checked' : ''}> Don't show this again</label><span class="gd-dots" aria-label="Step ${this.at + 1} of ${this.list.length}">${this.list.map((_, i) => `<i class="${i === this.at ? 'on' : ''}"></i>`).join('')}</span>
       <button type="button" class="gd-back" ${this.at ? '' : 'disabled'}>Back</button><button type="button" class="gd-next">${last ? 'Done' : 'Next'}</button></footer>
     </div>`;
   }
