@@ -127,13 +127,30 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
  * to the left).
  */
 const LOOK_OVER = {
-  dur: 2.6, turn: 0.46, ease: 0.42,
+  dur: 6.6, turn: 0.46, ease: 0.42,
   long: { at: [-0.035, 0.03, 0.02], first: [0.16, 0.36, -0.3], second: [0.2, -0.1, 0.42] },
   // (The AK's pack, which the AR-15 is held in too. Its sleeves end not far below the picture: turned top to the
   // right at all, the end of the left one came up into it. So it is only ever turned top to the left: a little, with
   // the muzzle up and across, and then well over.)
   auto: { at: [-0.02, 0, -0.03], first: [0.1, 0.17, 0.16], second: [0.08, -0.05, 0.36] },
 };
+/**
+ * The look over in stages, as long and as full as the pistols' drawn one (the owner, 2026-10-25: "the inspect animation
+ * should be longer and more involved, think about the m9 animation inspect, its pretty good"), seconds into it: its
+ * near side shown, turned over to its other side or top, its magazine checked (the pack's own reload, the hand to the
+ * magazine and a start at pulling it, played up to `pull` of the way and back: the magazine seated again), its chamber
+ * checked (a bolt rifle's bolt lifted and drawn back to `bolt` of the way and home; any other rolled onto its ejection
+ * side and jolted), and brought back to the hold. Each stage eased into the next.
+ */
+const INSPECT = {
+  side: [0.25, 1.7], top: [1.5, 3.1], mag: [3.0, 4.7], chamber: [4.6, 6.0], ease: 0.45,
+  pull: 0.42, bolt: 0.4,
+  // (the gun, while its magazine is checked: canted a little with the magazine toward the eye; while its chamber is:
+  // rolled onto its ejection side, the right, muzzle up a touch)
+  magTurn: [0.12, 0.08, 0.32], chamberTurn: [0.14, 0.12, -0.45], chamberAt: [0.02, 0.025, 0.02],
+};
+/** the guns whose chamber is looked at through their bolt, worked part way (their packs draw the bolt) */
+const BOLT_CHECK = new Set(['mosin', 'mosin9130', 'sniper50']);
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
 /**
@@ -4364,15 +4381,19 @@ export class Weapons {
     if (m.rig) this.poseRig(m, dt);
     // looked over, with no drawing of it: the gun is brought up before the eye and turned, its near side and then its top
     if (a?.name === 'check' && !this.checkDrawn(m)) {
-      const L = LOOK_OVER, s = THREE.MathUtils.smoothstep, half = a.dur * L.turn, how = m.kind === 'auto' ? L.auto : L.long;
-      const first = s(a.t, 0, L.ease) * (1 - s(a.t, half, half + L.ease));
-      const second = s(a.t, half, half + L.ease) * (1 - s(a.t, a.dur - L.ease, a.dur));
-      pos.x += how.at[0] * (first + second);
-      pos.y += how.at[1] * (first + second);
-      pos.z += how.at[2] * (first + second);
-      rot.x += how.first[0] * first + how.second[0] * second;
-      rot.y += how.first[1] * first + how.second[1] * second;
-      rot.z += how.first[2] * first + how.second[2] * second;
+      const L = LOOK_OVER, I = INSPECT, how = m.kind === 'auto' ? L.auto : L.long;
+      const stage = ([a0, a1]: number[]) => THREE.MathUtils.smoothstep(a.t, a0, a0 + I.ease) * (1 - THREE.MathUtils.smoothstep(a.t, a1 - I.ease, a1));
+      const first = stage(I.side), second = stage(I.top), mag = stage(I.mag), chamber = stage(I.chamber);
+      const up = first + second + mag * 0.6 + chamber * 0.8;
+      pos.x += how.at[0] * up + I.chamberAt[0] * chamber;
+      pos.y += how.at[1] * up + I.chamberAt[1] * chamber;
+      pos.z += how.at[2] * up + I.chamberAt[2] * chamber;
+      // (jolted as the magazine is seated, and as the chamber is let go)
+      const jolt = (at: number) => Math.exp(-(((a.t - at) / 0.06) ** 2)) * 0.012;
+      pos.y += jolt((I.mag[0] + I.mag[1]) / 2 + 0.25) + (BOLT_CHECK.has(this.currentItem?.id ?? '') ? 0 : jolt((I.chamber[0] + I.chamber[1]) / 2));
+      rot.x += how.first[0] * first + how.second[0] * second + I.magTurn[0] * mag + I.chamberTurn[0] * chamber;
+      rot.y += how.first[1] * first + how.second[1] * second + I.magTurn[1] * mag + I.chamberTurn[1] * chamber;
+      rot.z += how.first[2] * first + how.second[2] * second + I.magTurn[2] * mag + I.chamberTurn[2] * chamber;
     }
     // (a stock folding or opening: the gun off the shoulder and rolled over while it swings, back once it is locked)
     if (a?.name === 'fold') {
@@ -4609,7 +4630,13 @@ export class Weapons {
         if (a.data?.empty && m.slideOn) rig.slide(m.slideOn, -SLIDE_LOCK * (1 - THREE.MathUtils.smoothstep(kk, 0.7, 0.76)));
       }
       else if (a.name === 'check' && this.checkDrawn(m)) rig.pose('check', k);
-      else rig.rest();
+      else if (a.name === 'check') {
+        // (the hands at the magazine and at the bolt, in the stages of INSPECT: up to the most of each and back)
+        const there = ([a0, a1]: number[], most: number) => most * Math.sin(Math.PI * THREE.MathUtils.clamp((a.t - a0) / (a1 - a0), 0, 1)) ** 2;
+        if (a.t >= INSPECT.mag[0] && a.t < INSPECT.mag[1] && rig.has('reload')) rig.pose('reload', there(INSPECT.mag, INSPECT.pull));
+        else if (a.t >= INSPECT.chamber[0] && a.t < INSPECT.chamber[1] && BOLT_CHECK.has(this.currentItem?.id ?? '') && rig.has('bolt')) rig.pose('bolt', there(INSPECT.chamber, INSPECT.bolt));
+        else rig.rest();
+      } else rig.rest();
       if (m.slideOn && this.chamberEmpty && a.name !== 'magswap') rig.slide(m.slideOn, -SLIDE_LOCK);
       this.cockHammer(m);
       this.reseat(m);
