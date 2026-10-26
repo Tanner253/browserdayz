@@ -16,8 +16,8 @@ export const PER = 9;
 /** the outer ring's wedge the radial gives Cancel */
 const CANCEL_K = Math.floor(PER / 2);
 export const RINGS: RadialRing[] = [{ r0: 46, r1: 120, text: 84 }, { r0: 126, r1: 205, text: 166 }];
-/** the groups round the inside ring */
-export const CATS: { cat: Cat; label: string; icon: string }[] = [
+/** the groups there are (CATS: those with something left to lay) */
+const ALL_CATS: { cat: Cat; label: string; icon: string }[] = [
   { cat: 'found', label: 'Ground', icon: 'foundation' },
   { cat: 'walls', label: 'Walls', icon: 'wall' },
   { cat: 'floors', label: 'Floors', icon: 'floor' },
@@ -38,6 +38,10 @@ export const ROMAN = ['', 'I', 'II', 'III'];
 export const piecesOf = (cat: Cat) => Object.values(PIECES).filter((k) => k.cat === cat && !PLACED[k.id]);
 /** what a group offers round the outside: its pieces, and with the foundations the blueprints (starting spots for a base) */
 export const itemsOf = (cat: Cat) => [...piecesOf(cat).map((k) => k.id), ...(cat === 'found' ? PRINTS.map((p) => p.id) : [])];
+/** the groups round the inside ring: only those with something the plan lays (doors became things made and hung by hand,
+ * and an empty Doors group left on the wheel crashed the game when picked: the owner, 2026-10-26, "why is the door option on
+ * the build plan radial menu still? it crashed my game") */
+export const CATS = ALL_CATS.filter((c) => itemsOf(c.cat).length > 0);
 /** a piece's or a blueprint's name */
 export const nameOf = (id: string) => printOf(id)?.name ?? PIECES[id].name;
 
