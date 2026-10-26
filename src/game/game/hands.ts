@@ -2,6 +2,7 @@
 // (Methods of Game cut out of game.ts whole on 2026-10-14, so that they can be read and worked on alone: put back on
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
+import { PLACES } from '../../sim/build/pieces';
 import { basementUnder } from '../../sim/basements';
 import { inCave } from '../../world/caves-carved';
 import * as THREE from 'three';
@@ -124,7 +125,7 @@ export const handsMethods = {
   autoHot(this: Game) {
     this.inv.autoBind();
     for (const it of this.inv.carried()) {
-      const d = ITEMS[it.id], handy = d.use || d.melee || d.category === 'tool' || ['key', 'satchel'].includes(d.id);
+      const d = ITEMS[it.id], handy = d.use || d.melee || d.category === 'tool' || ['key', 'satchel'].includes(d.id) || !!PLACES[d.id];
       if (!handy || this.inv.autoGiven.has(it.id) || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
       for (let i = HOT_FREE; i < this.inv.hot.length; i++) {
         if (this.inv.hot[i]) continue;

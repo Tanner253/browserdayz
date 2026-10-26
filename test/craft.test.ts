@@ -143,7 +143,7 @@ ok('two things dragged onto each other find their recipes: a knife on a jacket, 
   assert.deepEqual(ids('field_jacket', 'bone_knife'), ['rags']);
   assert.deepEqual(ids('rags', 'rubbing_alcohol'), ['bandage', 'aid_pouch']);
   assert.ok(ids('rags', 'rags').includes('rope'));
-  assert.deepEqual(ids('stone', 'planks'), ['stone_hatchet']);
+  assert.deepEqual(ids('stone', 'planks'), ['stone_hatchet', 'forge']);
   assert.deepEqual(ids('knife', 'apple'), []);
   // (a workbench's recipes are not made by dragging)
   assert.deepEqual(ids('iron_bar', 'planks'), []);

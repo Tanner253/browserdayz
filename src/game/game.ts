@@ -795,6 +795,8 @@ export class Game {
       tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
       explode: (at, mine, w) => this.explode(at, mine, w === 'c4' || w === 'satchel' ? w : 'grenade'),
       myId: () => this.net.id || 1,
+      shown: () => (this.invUI.isOpen ? this.openStash : null),
+      icons: () => this.invUI.icons,
       charge: {
         arm: (w, dur) => {
           this.weapons.beginUse(w, 'arm', dur);

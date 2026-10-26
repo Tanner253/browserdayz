@@ -67,17 +67,18 @@ function steps(): Step[] {
     ] },
     { tab: 'Crafting', title: 'The workbench', pic: '/guide/bench.webp', lines: [
       'Open your inventory (<b>Tab</b>) and its <b>Crafting</b> page: what you can make by hand, and what needs a bench.',
-      'Stand by a <b>workbench</b> to make the rest. Upgrade it with the hammer to <b>level II</b> and <b>III</b> for more, and for metal and armoured walls.',
+      'Make a <b>workbench</b> by hand, take it in your hands and <b>left-click</b> on a floor of your base to set it down (<b>R</b> turns it). Stand by it to make the rest.',
+      'Nail it up with the hammer to <b>level II</b> and <b>III</b> for more, and for metal and armoured walls.',
     ] },
     { tab: 'Crafting', title: 'The forge', pic: '/changelog/media/trader-stall.jpg', lines: [
-      'Build a <b>forge</b> in your base and press <b>F</b> at it: metal fragments go in, <b>iron bars</b> come out (armoured walls take them).',
+      'Make a <b>forge</b> by hand, hold it and set it down on a floor of your base. Press <b>F</b> at it: metal fragments go in, <b>iron bars</b> come out (armoured walls take them).',
     ] },
     { tab: 'Crafting', title: 'The recycler', pic: '/changelog/media/craft-v3.jpg', lines: [
       'Recyclers stand at the works (Zavod), the army camp, the fort, the chemical works and the trader camp.',
       'Press <b>F</b>, put in what you don\'t need and switch it on: it breaks it into fragments, scrap and rags. It is loud.',
     ] },
     { tab: 'Crafting', title: 'The research table', pic: '/changelog/media/craft-v3.jpg', lines: [
-      'You start knowing the basics; everything else is learned. Build a <b>research table</b> beside a workbench, press <b>F</b>, and put in an item you found with some scrap: it is used up, and you know how to make it for good.',
+      'You start knowing the basics; everything else is learned. Make a <b>research table</b> at a workbench, set it down beside it, press <b>F</b>, and put in an item you found with some scrap: it is used up, and you know how to make it for good.',
     ] },
     { tab: 'Crafting', title: 'Traders', pic: '/guide/traders.webp', lines: [
       'The trader camp is on the map (<b>M</b>). Each stall buys and sells its own kinds of things: building, weapons, medical, clothing.',

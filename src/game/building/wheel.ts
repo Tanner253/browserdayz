@@ -5,7 +5,7 @@
 // six o'clock itself: no wheel here has one of its own).
 
 import type { RadialEntry, RadialRing } from '../../ui/radial';
-import { PIECES, TIERS, hpOf, type Cat, type Tier } from '../../sim/build/pieces';
+import { PIECES, PLACED, TIERS, hpOf, type Cat, type Tier } from '../../sim/build/pieces';
 import { MEND } from '../../sim/build/bases';
 import type { Piece } from '../../sim/build/snap';
 import { TIER_INK, actionIcon, pieceIcon, printIcon } from './icons';
@@ -34,7 +34,7 @@ export const HAMMER_WHEEL = ['up1', 'up2', 'up3', 'up4', 'repair', 'remove', 'ro
 /** a workbench's level, as it is said */
 export const ROMAN = ['', 'I', 'II', 'III'];
 
-export const piecesOf = (cat: Cat) => Object.values(PIECES).filter((k) => k.cat === cat);
+export const piecesOf = (cat: Cat) => Object.values(PIECES).filter((k) => k.cat === cat && !PLACED[k.id]);
 /** what a group offers round the outside: its pieces, and with the foundations the blueprints (starting spots for a base) */
 export const itemsOf = (cat: Cat) => [...piecesOf(cat).map((k) => k.id), ...(cat === 'found' ? PRINTS.map((p) => p.id) : [])];
 /** a piece's or a blueprint's name */

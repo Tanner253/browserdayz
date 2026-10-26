@@ -112,8 +112,9 @@ function rail(n: number, c: number, along: [number, number], y0: number, y1: num
 
 const SHAPES: Record<string, () => Shape> = {
   // (a block reaching down into the ground however the ground falls away under it, its slab's edge standing proud)
-  foundation: () => ({ solid: [box(-H, -FOUND.deep - FOUND.skirt, -H, H, 0, H)], dress: [box(-H - 0.04, -0.14, -H - 0.04, H + 0.04, 0, H + 0.04)] }),
-  foundation_tri: () => ({ solid: [TRI(-FOUND.deep - FOUND.skirt, 0)], dress: [TRI(-0.14, 0, -0.07)] }),
+  // (its slab's edge a hair under its top, so that the two never share the top's plane)
+  foundation: () => ({ solid: [box(-H, -FOUND.deep - FOUND.skirt, -H, H, 0, H)], dress: [box(-H - 0.04, -0.14, -H - 0.04, H + 0.04, -0.004, H + 0.04)] }),
+  foundation_tri: () => ({ solid: [TRI(-FOUND.deep - FOUND.skirt, 0)], dress: [TRI(-0.14, -0.004, -0.07)] }),
   // (against a foundation's edge: its back at the edge, going down away from it)
   foundation_steps: () => ({ solid: [0, 1, 2].map((i) => box(-H, -0.2 * (i + 1) - 1.2, -0.75 + i * 0.5, H, -0.2 * (i + 1) + 0.0, -0.25 + i * 0.5)) }),
   ramp: () => ({ solid: [{ hull: [[-H, 0, -H], [H, 0, -H], [-H, -1.2, -H], [H, -1.2, -H], [-H, -1.2, H], [H, -1.2, H]] }] }),
@@ -275,8 +276,10 @@ function rivets([x0, x1]: [number, number], [a0, a1]: [number, number], at: numb
 
 /** an opening's frame of dark timber, standing proud of both faces: its jambs at +-`half`, from `y0` (a sill too, a window's) to `y1` */
 function frame(half: number, y0: number, y1: number, sill: boolean): { paint: Paint; solid: Solid[] } {
-  const t = 0.12, d = WALL_T / 2 + 0.04;
-  return { paint: 'trim', solid: [box(-half - t, y0, -d, -half, y1 + t, d), box(half, y0, -d, half + t, y1 + t, d), box(-half - t, y1, -d, half + t, y1 + t, d), ...(sill ? [box(-half - t - 0.04, y0 - t, -d - 0.04, half + t + 0.04, y0, d + 0.04)] : [])] };
+  // (a hair into the opening, so that its faces never lie on the jambs' and the lintel's: the owner, 2026-10-25, "theres
+  // a lot of textures arguing at the seams, where the door frames are")
+  const t = 0.12, d = WALL_T / 2 + 0.04, e = 0.012;
+  return { paint: 'trim', solid: [box(-half - t, y0, -d, -half + e, y1 + t, d), box(half - e, y0, -d, half + t, y1 + t, d), box(-half - t, y1 - e, -d, half + t, y1 + t, d), ...(sill ? [box(-half - t - 0.04, y0 - t, -d - 0.04, half + t + 0.04, y0, d + 0.04)] : [])] };
 }
 
 /**

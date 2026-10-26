@@ -4,6 +4,13 @@
 // drawn with its longest side this long, metres, in first person (src/game/weapons.ts) and in the inventory's figure
 // (src/game/doll.ts) alike.
 export const HELD_FIT: Record<string, number> = {
+  // (what is set down in a base, carried before it: src/sim/build/pieces.ts PLACED)
+  box_small: 0.34,
+  box_large: 0.4,
+  workbench: 0.42,
+  forge: 0.4,
+  bed: 0.45,
+  research_table: 0.42,
   planks: 0.2,
   log: 0.22,
   sheet_metal: 0.18,

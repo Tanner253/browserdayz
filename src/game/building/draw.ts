@@ -30,7 +30,8 @@ import { ClaimFlags } from './flags';
 const SEAM = { step: 0.0012, shrink: 0.0005 };
 const _seam = new THREE.Matrix4(), _seamS = new THREE.Matrix4();
 function seamless(frame: THREE.Matrix4, id: number) {
-  const a = id % 3, b = Math.floor(id / 3) % 3, c = Math.floor(id / 9) % 4;
+  // (pieces laid one after another have numbers one apart: each of them stands at another height, whatever else)
+  const c = id % 4, a = Math.floor(id / 4) % 3, b = Math.floor(id / 12) % 3;
   _seam.makeTranslation((a - 1) * SEAM.step, c * SEAM.step, (b - 1) * SEAM.step);
   const k = 1 - SEAM.shrink * (1 + ((a + b + c) % 3));
   return frame.clone().multiply(_seam).multiply(_seamS.makeScale(k, k, k));
