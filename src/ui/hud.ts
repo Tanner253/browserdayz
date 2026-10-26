@@ -1715,6 +1715,22 @@ export class HUD {
     this.toggle(n, 'show', !!text);
   }
 
+  /**
+   * An admin whose death leaves nothing they carried (void inventory): a small mark by the vitals for as long as the
+   * server says it is on. The owner, 2026-10-26, of it put on again by a restart with nothing to show it: "the ui needs
+   * to reflect that though".
+   */
+  setVoid(on: boolean) {
+    let n = this.root.querySelector('.hud-void') as HTMLElement | null;
+    if (!n && !on) return;
+    if (!n) {
+      n = Object.assign(document.createElement('div'), { className: 'hud-void', textContent: 'VOID INV' });
+      n.title = 'Void inventory is on: when you die, nothing you carry is left on your body. /voidinv off, and you leave it as anybody does.';
+      this.root.appendChild(n);
+    }
+    this.toggle(n, 'show', on);
+  }
+
   private suggest() {
     const box = this.root.querySelector('.chat-input') as HTMLInputElement;
     this.offered = this.passMode || !this.chatOpen ? null : offer(box.value, this.role, this.people(), this.gone, THINGS);

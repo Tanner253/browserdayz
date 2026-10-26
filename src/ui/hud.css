@@ -2557,6 +2557,9 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
    that it has to be read. Under the menu, the death screen and the map it is not there at all.) */
 .hud-vitals { position: absolute; right: 16px; bottom: 16px; z-index: 1; display: flex; align-items: flex-start; justify-content: flex-end; transition: opacity 0.4s; }
 .hud-vitals.gone, #hud:has(> .hud-fatal.show) > .hud-vitals { opacity: 0; }
+/* an admin's void inventory, on: steady above the vitals, its meaning on hover (src/ui/hud.ts setVoid) */
+.hud-void { position: absolute; right: 18px; bottom: 60px; padding: 2px 8px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: #ffb4a6; background: rgba(60, 14, 8, 0.72); border: 1px solid rgba(255, 122, 98, 0.65); border-radius: 3px; pointer-events: auto; cursor: help; display: none; }
+.hud-void.show { display: block; }
 .st-badges, .st-stats { display: flex; align-items: flex-start; }
 .st-stat, .st-badge { --c: #f3f0e6; display: grid; grid-template-columns: 32px 11px; margin-left: 5px; color: var(--c); animation: st-in 0.3s ease-out; }
 .st-badge { grid-template-columns: 28px; margin: 2px 7px 0 0; }
