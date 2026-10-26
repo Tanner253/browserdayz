@@ -118,7 +118,9 @@ export async function film(frames: { url: string; t: number }[], o: { fps?: numb
     const frame = new VideoFrame(c, { timestamp: Math.round((i * 1e6) / FPS), duration: Math.round(1e6 / FPS) });
     enc.encode(frame, { keyFrame: i % (FPS * 2) === 0 });
     frame.close();
-    if (enc.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 10));
+    // (waited on by the encoder's own word, not a timer: a page out of sight has its timers held to a second, and a film
+    // of 131 frames took two minutes)
+    while (enc.encodeQueueSize > 8) await new Promise((r) => enc.addEventListener('dequeue', r, { once: true }));
   }
   bmp.close();
   await enc.flush();

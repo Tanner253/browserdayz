@@ -18,69 +18,71 @@ interface Step { tab: 'Building' | 'Crafting'; title: string; pic?: string; line
 function steps(): Step[] {
   const wall = (t: Tier) => cost(costOf('wall', t));
   return [
-    { tab: 'Building', title: 'Where to find what you need', pic: '/guide/map.webp', lines: [
+    { tab: 'Building', title: 'Where to find what you need', pic: '/guide/map.mp4', lines: [
       '<b>Tools</b> (axes, pickaxe, saw, hammer) lie in <b>farms</b>, <b>hunting</b> spots and <b>industrial</b> places: barns, sheds, garages, works.',
       '<b>Nails</b> and <b>sheet metal</b>: sheds, garages, farms, most of all <b>industrial</b> places. Nails are never made.',
-      'The <b>trader camp</b> (on the map, <b>M</b>) sells nails, planks, the building plan and locks.',
+      'The <b>trader camps</b> (on the map, <b>M</b>) sell nails, planks, the building plan and locks.',
     ] },
-    { tab: 'Building', title: 'The tools', pic: '/guide/tools.webp', lines: [
+    { tab: 'Building', title: 'The tools', pic: '/guide/tools.mp4', lines: [
       '<b>Felling axe</b>: trees into logs. <b>Pickaxe</b>: rock into stone. <b>Hand saw</b>: logs into planks.',
       '<b>Hammer</b>: nails pieces up, upgrades, mends, turns and takes them down. <b>Building plan</b>: lays pieces.',
       'The plan, hammer and saw are also made at a workbench.',
     ] },
-    { tab: 'Building', title: 'Chop a tree', pic: '/guide/chop.webp', lines: [
+    { tab: 'Building', title: 'Chop a tree', pic: '/guide/chop.mp4', lines: [
       'Hold the axe, walk up to a tree and <b>hold the left button</b>: it swings until the tree comes down.',
       'Its <b>logs</b> fall beside it. Pick them up with <b>F</b>.',
     ] },
-    { tab: 'Building', title: 'Break rock', pic: '/guide/mine.webp', lines: [
+    { tab: 'Building', title: 'Break rock', pic: '/guide/mine.mp4', lines: [
       'Hold the pickaxe at a rock and <b>hold the left button</b>: <b>stone</b> breaks off into your pockets.',
       'A rock gives out after a while; it comes back later.',
     ] },
-    { tab: 'Building', title: 'Saw planks', pic: '/guide/saw.webp', lines: [
+    { tab: 'Building', title: 'Saw planks', pic: '/guide/saw.mp4', lines: [
       'Drop a log on the ground, hold the saw, look at the log and press the <b>left button</b>.',
       'It is sawn into <b>planks</b> where it lies.',
     ] },
-    { tab: 'Building', title: 'Pick a piece', pic: '/guide/wheel.webp', lines: [
+    { tab: 'Building', title: 'Pick a piece', pic: '/guide/wheel.mp4', lines: [
       'Hold the building plan and <b>hold the right button</b>: the wheel of pieces opens.',
       'Move the mouse onto a group, then onto a piece, and let go. The bottom of the wheel is Cancel.',
       `Build in the wilderness only: ${KEEP_OFF.place} m past any town or camp, ${KEEP_OFF.building} m from any building, never in the Zona. A red ghost says why not.`,
     ] },
-    { tab: 'Building', title: 'Foundation and claim', pic: '/guide/found.webp', lines: [
+    { tab: 'Building', title: 'Foundation and claim', pic: '/guide/found.mp4', lines: [
       `Aim at the ground: the ghost shows where. <b>Left-click</b> lays it, <b>R</b> turns it. A foundation costs ${cost(costOf('foundation', 0))}.`,
       'Lay a <b>claim</b> on it (click to set it, move to turn it, click again). Nobody else may build near your claim.',
     ] },
-    { tab: 'Building', title: 'Walls and a doorway', pic: '/guide/walls.webp', lines: [
+    { tab: 'Building', title: 'Walls and a doorway', pic: '/guide/walls.mp4', lines: [
       'Pick <b>Wall</b> and aim at a foundation\'s edge: it snaps there. Pick <b>Doorway</b> for the way in.',
       'Pieces go up as bare frames, to be nailed up with the hammer.',
     ] },
-    { tab: 'Building', title: 'Upgrade with the hammer', pic: '/guide/upgrade.webp', lines: [
+    { tab: 'Building', title: 'Upgrade with the hammer', pic: '/guide/upgrade.mp4', lines: [
       'Hold the hammer, look at a piece, <b>hold the right button</b> and pick its new tier. The hammer nails it up.',
+      'A damaged piece: <b>hold the left button</b> on it with the hammer to mend it, paid from your pockets in what it is made of and nails. The same wheel picks up or deconstructs.',
       ...([1, 2, 3, 4] as Tier[]).map((t) => `<b>${TIERS[t]}</b>: ${wall(t)}${TIER_BENCH[t] ? ` (a level ${TIER_BENCH[t]} workbench within ${BENCH_NEAR} m)` : ''}`),
     ] },
-    { tab: 'Building', title: 'A door and a lock', pic: '/guide/door.webp', lines: [
+    { tab: 'Building', title: 'A door and a lock', pic: '/guide/door.mp4', lines: [
       'Make a <b>door</b> at the crafting screen, hold it and aim at the doorway: the <b>left button</b> hangs it there, <b>R</b> turns its swing.',
-      'Hold a <b>code lock</b> or <b>key lock</b>, look at the door and <b>left-click</b> to fit it, then set the code.',
+      'Hold a <b>key lock</b> or <b>code lock</b>, look at the door and <b>left-click</b> to fit it (a code lock asks for its code).',
+      'A key lock comes with its key. Copy the key at the crafting screen to give to friends.',
     ] },
     { tab: 'Building', title: 'The flag and upkeep', pic: '/changelog/media/bb-hut-flag.jpg', lines: [
-      'Press <b>F</b> at your claim and put upkeep in it. Its flag stands at the top of the pole while it is paid.',
+      'Press <b>F</b> at your claim and put upkeep in its store: each day the base takes what it is built of, <b>planks</b> for wood, <b>stone</b>, <b>metal fragments</b> for metal and <b>iron bars</b> for armoured. Its flag stands at the top of the pole while it is paid.',
       'As upkeep runs out the flag comes down; when it reaches the ground the base begins to decay.',
     ] },
-    { tab: 'Crafting', title: 'The workbench', pic: '/guide/bench.webp', lines: [
+    { tab: 'Crafting', title: 'The workbench', pic: '/guide/bench.mp4', lines: [
       'Open your inventory (<b>Tab</b>) and its <b>Crafting</b> page: what you can make by hand, and what needs a bench.',
-      'Make a <b>workbench</b> by hand, take it in your hands and <b>left-click</b> on a floor of your base to set it down (<b>R</b> turns it). Stand by it to make the rest.',
+      'Make a <b>workbench</b> by hand, take it in your hands and <b>left-click</b> on a floor of your base to set it down (<b>R</b> turns it). Press <b>F</b> at it to craft with it: everything of its level and below.',
       'Nail it up with the hammer to <b>level II</b> and <b>III</b> for more, and for metal and armoured walls.',
     ] },
     { tab: 'Crafting', title: 'The forge', pic: '/changelog/media/trader-stall.jpg', lines: [
       'Make a <b>forge</b> by hand, hold it and set it down on a floor of your base. Press <b>F</b> at it: metal fragments go in, <b>iron bars</b> come out (armoured walls take them).',
     ] },
-    { tab: 'Crafting', title: 'The recycler', pic: '/changelog/media/craft-v3.jpg', lines: [
+    { tab: 'Crafting', title: 'The recycler', pic: '/guide/recycler.mp4', lines: [
       'Recyclers stand at the works (Zavod), the army camp, the fort, the chemical works and the trader camp.',
       'Press <b>F</b>, put in what you don\'t need and switch it on: it breaks it into fragments, scrap and rags. It is loud.',
     ] },
     { tab: 'Crafting', title: 'The research table', pic: '/changelog/media/craft-v3.jpg', lines: [
       'You start knowing the basics; everything else is learned. Make a <b>research table</b> at a workbench, set it down beside it, press <b>F</b>, and put in an item you found with some scrap: it is used up, and you know how to make it for good.',
     ] },
-    { tab: 'Crafting', title: 'Traders', pic: '/guide/traders.webp', lines: [
+    { tab: 'Crafting', title: 'Traders', pic: '/guide/traders.mp4', lines: [
       'The trader camp is on the map (<b>M</b>). Each stall buys and sells its own kinds of things: building, weapons, medical, clothing.',
     ] },
   ];
@@ -99,7 +101,7 @@ const CSS = `
 .gd .gd-tabs button.on{background:#c9a24a;color:#111;border-color:#c9a24a}
 .gd .gd-x{background:none;border:0;color:#aaa;font-size:24px;cursor:pointer;min-width:40px;min-height:40px}
 .gd figure{margin:12px 16px 0;aspect-ratio:16/9;max-height:46%;flex:none;background:#0b0c0c;overflow:hidden;border-radius:4px;align-self:center;width:calc(100% - 32px)}
-.gd figure img{width:100%;height:100%;object-fit:cover;display:block}
+.gd figure img,.gd figure video{width:100%;height:100%;object-fit:cover;display:block}
 .gd .gd-words{flex:1;min-height:0;overflow:auto;padding:0 16px}
 .gd h3{margin:14px 0 6px;font-size:17px}
 .gd ul{margin:0;padding-left:18px}
@@ -197,7 +199,7 @@ export class Guide {
     } catch {}
     this.el.innerHTML = `<div class="gd" role="dialog" aria-modal="true" aria-label="Building and crafting guide">
       <header><b>Build &amp; craft</b><div class="gd-tabs">${(['Building', 'Crafting'] as const).map((t) => `<button type="button" data-tab="${t}" class="${s.tab === t ? 'on' : ''}">${t}</button>`).join('')}</div><button type="button" class="gd-x" aria-label="Close">×</button></header>
-      <figure>${s.pic ? `<img src="${s.pic}" alt="" decoding="async">` : ''}</figure>
+      <figure>${!s.pic ? '' : s.pic.endsWith('.mp4') ? `<video src="${s.pic}" autoplay muted loop playsinline preload="auto"></video>` : `<img src="${s.pic}" alt="" decoding="async">`}</figure>
       <div class="gd-words"><h3>${s.title}</h3><ul>${s.lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>
       <footer><label><input type="checkbox" ${hide ? 'checked' : ''}> Don't show this again</label><span class="gd-dots" aria-label="Step ${this.at + 1} of ${this.list.length}">${this.list.map((_, i) => `<i class="${i === this.at ? 'on' : ''}"></i>`).join('')}</span>
       <button type="button" class="gd-back" ${this.at ? '' : 'disabled'}>Back</button><button type="button" class="gd-next">${last ? 'Done' : 'Next'}</button></footer>
