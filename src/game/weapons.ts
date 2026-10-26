@@ -703,7 +703,14 @@ function cigarette() {
 }
 
 /** melee weapons whose model is drawn with its edge toward whoever holds it */
-const EDGE_IN = new Set(['machete', 'hand_saw']);
+const EDGE_IN = new Set(['machete']);
+/**
+ * Held by a bar that is not the foot of the thing's longest side, at this point of its model: the saw's fingers close
+ * on the upright bar behind its hand-hole, and its blade runs on from the top of the fist along +z (the owner,
+ * 2026-10-26: "the saw is not in the hand properly ... it looks bad in first and third person"; found from its points,
+ * progress/saw/sawgeo.mjs). Laid with the bar upright and the blade away from the eye, teeth down.
+ */
+const GRIP_AT: Record<string, [number, number, number]> = { hand_saw: [0, 0.065, -0.28] };
 /** and those whose striking face leads, not the side of the head furthest off the handle: a claw hammer's claw stands
  * further off than its face, and it was held claw first (the owner, 2026-10-25: "building hammer is backwards in hand") */
 const FACE_LEADS = new Set(['hammer']);
@@ -1906,7 +1913,12 @@ export class Weapons {
       // Which way the head faces. An axe's edge, a crowbar's claw: the side of the head that
       // stands furthest off the handle leads the swing, away from whoever holds it. Two of the
       // models are drawn the other way round and were held edge-first toward the face.
-      if (longAxis === 'y') {
+      const at = GRIP_AT[id];
+      if (at) for (const mesh of body.children) {
+        mesh.rotation.y = Math.PI;
+        mesh.position.set(at[0], MELEE_STYLE[id].grip - at[1], at[2]);
+      }
+      if (longAxis === 'y' && !at) {
         const L = size.y;
         let hx = 0, hz = 0, n = 0, far = -1e9, near = 1e9;
         const each = (fn: (x: number, y: number, z: number) => void) => {
@@ -1946,8 +1958,8 @@ export class Weapons {
           body.add(turn);
         }
       }
-      if (longAxis === 'x') body.rotation.z = Math.PI / 2;
-      if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
+      if (longAxis === 'x' && !at) body.rotation.z = Math.PI / 2;
+      if (longAxis === 'z' && !at) body.rotation.x = -Math.PI / 2;
       // (held point down: turned end over end about its flat, still standing from the floor up, and hung from the
       // middle of its ring, `spin`, which it is spun round when looked over)
       if (MELEE_STYLE[id]?.flip) {
@@ -2000,12 +2012,12 @@ export class Weapons {
         });
         return x0 <= x1 ? new THREE.Vector3((x0 + x1) / 2, h - held, (z0 + z1) / 2) : new THREE.Vector3(0, h - held, 0);
       };
-      const mid = handleAt(held);
+      const mid = at ? new THREE.Vector3() : handleAt(held);
       holder.position.set(-mid.x, 0, -mid.z);
       root.updateMatrixWorld(true);
       // (the grips are said in the thing's own space: where the handle is there, at each hand)
       const inBody = (h: number) => body.worldToLocal(handleAt(h));
-      const rightAt = inBody(held), leftAt = inBody(under);
+      const rightAt = at ? new THREE.Vector3(0, held, 0) : inBody(held), leftAt = inBody(under);
       const flash = mkFlash();
       this.models.set(id, {
         root, kind: 'melee', flash, body, melee: style,

@@ -99,7 +99,9 @@ export const updateMethods = {
     } else this.backing = false;
     this.twist += (twistTo - this.twist) * ease(9);
 
-    this.crouchT += ((crouched && !dead ? 1 : 0) - this.crouchT) * ease(10);
+    // (down over a log to saw it, as DayZ goes down for work on the ground: stood, the hands stopped at the belt, an arm's
+    // length short of it)
+    this.crouchT += (((crouched || ges?.kind === 'saw') && !dead ? 1 : 0) - this.crouchT) * ease(10);
     this.airT += ((grounded || dead ? 0 : 1) - this.airT) * ease(9);
     this.moveT += (THREE.MathUtils.smoothstep(speed, 0.12, 0.8) - this.moveT) * ease(14);
     // (killed lying down, a body is down already: it does not stand up to fall)
