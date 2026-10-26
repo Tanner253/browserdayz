@@ -50,6 +50,8 @@ const FOLLOW_MAX = 1.035;
 const FOLLOW_NY = 0.69;
 /** how far above its resting height the body is carried over level ground (see alongGround) */
 const HOVER = 0.004;
+/** how high over level ground the body's place is, and so its drawn feet: the controller's gap and the hover */
+export const STANDS_OVER = SKIN + HOVER;
 /** what pulls a body down (m/s²): more than the world's, as every game's is, or a jump hangs in the air */
 const GRAVITY = 9.81 * 1.35;
 /** stamina at which a sprint gives out, and how much has to come back before the next one */

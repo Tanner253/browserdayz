@@ -149,7 +149,7 @@ export const PIECES: Record<string, PieceKind> = Object.fromEntries(
     { id: 'workbench', name: 'Workbench', cat: 'deploy', role: 'deploy', only: 1, cost: { log: 2, planks: 20, nails: 20 }, hp: 500, levels: true },
     // (crafting's forge, plan-crafting: "an oil drum lined with stone, laid in your claim; feed it wood, it smelts while it
     // burns, even while you are away": 40 stone, 10 planks; its store takes the wood (six wide: a log lies in it on its side), the fragments and what comes out, src/sim/craft/forge.ts)
-    { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 4] },
+    { id: 'forge', name: 'Forge', cat: 'deploy', role: 'deploy', only: 1, cost: { stone: 40, planks: 10 }, hp: 500, store: [6, 6] },
     // (the owner, 2026-10-24: "players can place a bed or bedroll in their base when they have a TC down like rust". Plan
     // v2: "Sleeping bag: found ... Wake here after a death, with nothing, at most every 10 min"; a bed, Rust's, sooner)
     { id: 'bedroll', name: 'Sleeping Bag', cat: 'deploy', role: 'deploy', only: 1, cost: { sleeping_bag: 1 }, hp: 100, sleep: true },

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-26T02:02:06.217Z",
+ "generated": "2026-10-26T10:02:41.939Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -13572,20 +13572,27 @@
    "tags": [
     "loot"
    ],
-   "bytes": 431316,
+   "bytes": 430992,
    "srcTris": 2950,
    "tris": 2950,
    "min": [
-    -0.0645,
+    -0.0402,
     0,
-    -0.1966
+    -0.1083
    ],
    "max": [
-    0.0645,
-    0.9,
-    0.1966
+    0.0402,
+    0.8,
+    0.1083
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/felling_axe_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "430992:1793008961937"
+    }
+   ]
   },
   "hammer": {
    "url": "assets/models/hammer.glb",

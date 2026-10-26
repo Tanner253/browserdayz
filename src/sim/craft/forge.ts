@@ -14,7 +14,8 @@ export const FORGE = {
   smelt: 30,
   frags: PER_BAR,
   /** seconds each fuel burns, and the charcoal it leaves */
-  fuel: { log: 120, firewood: 60, coal: 40 } as Record<string, number>,
+  // (planks too, a short fire each: the owner, 2026-10-26, "it won't fire with planks?")
+  fuel: { log: 120, firewood: 60, coal: 40, planks: 30 } as Record<string, number>,
   ash: { log: 2, firewood: 1 } as Record<string, number>,
 };
 

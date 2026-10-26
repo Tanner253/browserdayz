@@ -307,6 +307,14 @@ export function paintsOf(atmo: Atmosphere | null): THREE.MeshStandardMaterial[] 
     // drawn so it mirrored the sky and went black under a dull one, so a little under half as much)
     pbr('metal_plate_02', { metalnessMap: assets.pbr('metal_plate_02').armMap, metalness: 0.45, name: 'build-armour' }),
   ];
+  // (each tier drawn a step nearer the eye than the one under it, where two lie in one place: a metal wall's end and a
+  // stone wall's at a corner flickered between the two, the owner, 2026-10-26: "getting z overlap glitching when metal
+  // meets stone texture on base". One always wins now, the higher tier)
+  paints.forEach((m, i) => {
+    m.polygonOffset = true;
+    m.polygonOffsetFactor = -0.5 * i;
+    m.polygonOffsetUnits = -2 * i;
+  });
   if (atmo) for (const m of paints) atmo.register(m);
   return paints;
 }
