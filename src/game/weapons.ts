@@ -1443,8 +1443,8 @@ function hangKnife(rig: WeaponRig, thing: THREE.Object3D) {
   rig.root.updateMatrixWorld(true);
   const held = new THREE.Group();
   held.scale.setScalar(rig.root.getWorldScale(new THREE.Vector3()).x / node.getWorldScale(new THREE.Vector3()).x);
-  // (the pack's knife has its edge on the node's +z: a thing to hit with stands edge to -z)
-  held.rotation.y = Math.PI;
+  // (as the pack's own knife: its edge where the pack's was, down and out of the fist. Turned half round, as it was at
+  // first, the knives were held with their spines leading: the owner, 2026-10-25, "the knife in hand is backwards")
   held.add(thing);
   node.add(held);
   return held;
