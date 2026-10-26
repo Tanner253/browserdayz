@@ -21,7 +21,7 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
 import { inPlay } from '../src/world/worldgen/layout';
-import { Bases, MEND, heard, heardPiece, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
+import { Bases, MEND, heard, heardPiece, mendOf, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, STORE, UPKEEP, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
@@ -404,6 +404,8 @@ ok('a piece is mended for a share of its cost, nails and all, by the health it l
   assert.equal(bs.canRepair(b.id, p.id, 0, 1e9), 'It is whole');
   p.hp = 250;
   assert.deepEqual(repairOf(p), { planks: 3, nails: 3 }, 'half its health: a quarter of what it cost');
+  // (or a bit a blow of the hammer, out of the pockets: the owner, 2026-10-25)
+  assert.deepEqual(mendOf(p), { gain: 100, cost: { planks: 1, nails: 2 } }, 'a blow: a fifth of its health, for its share');
   assert.equal(bs.canRepair(b.id, p.id, 1e9 - 10_000, 1e9), 'It was struck: in a while');
   assert.equal(bs.canRepair(b.id, p.id, 1e9 - MEND.after - 1, 1e9), null);
   bs.repair(b.id, p.id);
