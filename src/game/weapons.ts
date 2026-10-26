@@ -127,7 +127,7 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
  * to the left).
  */
 const LOOK_OVER = {
-  dur: 6.6, turn: 0.46, ease: 0.42,
+  dur: 7.3, turn: 0.46, ease: 0.42,
   long: { at: [-0.035, 0.03, 0.02], first: [0.16, 0.36, -0.3], second: [0.2, -0.1, 0.42] },
   // (The AK's pack, which the AR-15 is held in too. Its sleeves end not far below the picture: turned top to the
   // right at all, the end of the left one came up into it. So it is only ever turned top to the left: a little, with
@@ -143,7 +143,7 @@ const LOOK_OVER = {
  * side and jolted), and brought back to the hold. Each stage eased into the next.
  */
 const INSPECT = {
-  side: [0.25, 1.7], top: [1.5, 3.1], mag: [3.0, 4.7], chamber: [4.6, 6.0], ease: 0.45,
+  side: [0.3, 1.9], top: [1.7, 3.4], mag: [3.3, 5.2], chamber: [5.1, 6.6], ease: 0.5,
   pull: 0.42, bolt: 0.4,
   // (the gun, while its magazine is checked: canted a little with the magazine toward the eye; while its chamber is:
   // rolled onto its ejection side, the right, muzzle up a touch)
@@ -1537,7 +1537,8 @@ export class Weapons {
    */
   /** Has this gun's pack a drawing of it being looked over? (Those that carry a walk of their own: the submachine gun's pack and the pistols held in its hands.) */
   private checkDrawn(m: VmModel) {
-    return !!m.gait && !!m.rig?.has('check');
+    // (and drawn as long as the M9's, its 7.3 s the bar: the MP7's 2.8 s is not, and is looked over as the rifles are)
+    return !!m.gait && !!m.rig?.has('check') && m.rig.seconds('check') >= 5;
   }
   /** Is there a light on the gun in the hands? */
   get hasLamp(): boolean {
