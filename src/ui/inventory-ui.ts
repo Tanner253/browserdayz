@@ -1674,7 +1674,10 @@ export class InventoryUI {
           return out;
         });
     if (st) this.gridsNow.set(st.container.id, st.container);
-    this.fill(sk.vic, [sk.vicHead, ...ground, ...stashPart]);
+    // (a claim's store first, at the top of the column, as Rust's cupboard is: what lies about under it; the owner,
+    // 2026-10-25, of a store that had to be scrolled down to)
+    const claim = !!st && (st.uid.startsWith('claim:') || st.label === 'Claim');
+    this.fill(sk.vic, claim ? [sk.vicHead, ...stashPart, ...ground] : [sk.vicHead, ...ground, ...stashPart]);
 
     // ---- character: the survivor, HANDS under them, the hot keys under those, and the tags (the plan the owner said
     // yes to, 2026-10-23: what is worn is a strip at the top of the right, and the guns slung are panels there)
