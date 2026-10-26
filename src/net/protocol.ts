@@ -88,7 +88,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // a page of 68 would draw the camp where it was and could not throw a charge)
 // (70, 2026-10-26: the death screen's map of beds: a bed's wakes left on 'beds', a bag one and a bed two, then half an hour,
 // and so many a player may have, src/sim/build/beds.ts. A page of 69 shows a bed as ready that has none left.)
-export const PROTOCOL = 70;
+// (71, 2026-10-26: a workbench used by F at it, 'bench', its recipes made and its tree unlocked only while it is: a page of
+// 70 never says which bench it uses and could make nothing at one)
+export const PROTOCOL = 71;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -381,6 +383,8 @@ export type C2S =
   /** `n` of a workbench's recipe `r` put on its queue; or the queue's job `i` taken off it (src/sim/craft) */
   | { t: 'cq'; r: string; n: number }
   | { t: 'cqx'; i: number }
+  /** workbench `p` of base `b` used (F at it): its level's recipes made and its tree unlocked while it is within reach (src/sim/craft/places.ts benchAt) */
+  | { t: 'bench'; b: number; p: number }
   /** a blow that landed on salvage spot `i` with the tool `u` (src/sim/craft/salvage.ts) */
   | { t: 'salvage'; i: number; u: string }
   /** a blueprint learned: at a research table from the thing `u`, or recipe `r` of a bench's tech tree (src/sim/craft/learn.ts) */

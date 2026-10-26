@@ -24,7 +24,7 @@ import { inPlay } from '../src/world/worldgen/layout';
 import { Bases, MEND, heard, heardPiece, mendOf, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
-import { ROT, STORE, UPKEEP, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
+import { ROT, STORE, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 import { ITEMS } from '../src/sim/items';
 import { inBase, inTheWay, swept } from '../src/sim/build/doors';
 import { BaseSolids } from '../src/sim/build/solid';
@@ -297,11 +297,15 @@ ok("upkeep by Rust's brackets, in gathered things: a wood 1x1 costs 6 planks a d
   assert.equal(pay(metal, 1, due, store), true);
   assert.equal(store.sheet_metal, 0);
   assert.ok(due.metal_frags < -26, JSON.stringify(due));
-  // (what upkeep asks for fits and piles high in the claim's store, three days of a 40-piece metal base and more: the owner, "the sheet metal doesn't even fit in the flag's inventory")
-  for (const id of UPKEEP) assert.ok(ITEMS[id].w <= STORE.w && ITEMS[id].h <= STORE.h && ITEMS[id].stack! >= 100, id);
-  const forty = { ...b, pieces: new Map(Array.from({ length: 40 }, (_, i) => [i + 1, { ...b.pieces.get(2)!, id: i + 1, t: 3 as Tier }])) };
-  const fr = ITEMS.metal_frags, slots = Math.floor(STORE.w / fr.w) * Math.floor(STORE.h / fr.h);
-  assert.ok(slots * fr.stack! >= 3 * perDay(forty).metal_frags, `${slots} piles of ${fr.stack} for ${perDay(forty).metal_frags} a day`);
+  // (what upkeep asks for fits and piles high in the claim's store: full, two weeks of any tier up to 200 pieces (the owner,
+  // "the sheet metal doesn't even fit in the flag's inventory"; "multiple weeks of upkeep if optimally filled no matter the stage")
+  const two = { ...b, pieces: new Map(Array.from({ length: 200 }, (_, i) => [i + 1, { ...b.pieces.get(2)!, id: i + 1 }])) };
+  for (const t of [1, 2, 3, 4] as Tier[]) {
+    for (const p of two.pieces.values()) p.t = t;
+    const [[id, n]] = Object.entries(perDay(two)), it = ITEMS[id];
+    const piles = Math.max(Math.floor(STORE.w / it.w) * Math.floor(STORE.h / it.h), Math.floor(STORE.w / it.h) * Math.floor(STORE.h / it.w));
+    assert.ok(piles * it.stack! >= 14 * n, `tier ${t}: ${piles} piles of ${it.stack} ${id} for ${n} a day`);
+  }
   // (a big stone base: 90 pieces)
   const big = { ...b, pieces: new Map(Array.from({ length: 90 }, (_, i) => [i + 1, { ...b.pieces.get(2)!, id: i + 1, t: 2 as Tier }])) };
   const d = perDay(big);

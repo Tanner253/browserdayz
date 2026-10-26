@@ -53,7 +53,7 @@ import { animalHit, animalSkin, animalsHear, herd } from './animals';
 import { chop, keepWear, mine, saw } from './gather';
 import { craft, enqueue, unqueue } from './craft';
 import { salvage } from './salvage';
-import { learn } from './learn';
+import { learn, useBench } from './learn';
 import { recycle } from './recycle';
 import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, fill, sightFor, takeDown } from './build';
@@ -406,6 +406,8 @@ export function handle(c: Client, m: C2S) {
       return salvage(c, m);
     case 'learn':
       return learn(c, m);
+    case 'bench':
+      return useBench(c, m);
     case 'recy':
       return recycle(c, m);
     case 'trade':

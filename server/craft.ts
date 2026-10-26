@@ -9,14 +9,13 @@
 
 import { LEVEL_NAME, MOST, NEAR, RECIPE, STILL, type Recipe } from '../src/sim/craft/recipes';
 import { madeItems, plan, pocketsOf, type Plan } from '../src/sim/craft/plan';
-import { placeNear } from '../src/sim/craft/places';
 import { makeItem, ITEMS, type ItemInstance } from '../src/sim/items';
 import type { C2S } from '../src/net/protocol';
 import { clients, send, type Client } from './players';
 import { issue, things } from './index';
-import { bases, creative, pay } from './build';
+import { creative, pay } from './build';
 import { use } from './gather';
-import { mayMake } from './learn';
+import { mayMake, usedBench } from './learn';
 import { refuse } from './searched';
 // (every forge runs on its own clock from here: server/forge.ts)
 import './forge';
@@ -102,11 +101,8 @@ const queues = new Map<Client, { jobs: { r: string; n: number }[]; done: number;
 const STEP = 0.25;
 let timer: ReturnType<typeof setInterval> | null = null;
 
-/** a bench within reach of a player (a little more than its recipes light up within, for the lateness of their word), of a recipe's level */
-const atBench = (c: Client, r: Recipe, slack = 0) => {
-  const near = placeNear(bases(), 'bench', c.pose[0], c.pose[1], c.pose[2], NEAR.bench + slack);
-  return !!near && near.lv >= (r.lv ?? 1);
-};
+/** the workbench a player uses (F at it) within reach (a little more than its recipes light up within, for the lateness of their word), of a recipe's level or above */
+const atBench = (c: Client, r: Recipe, slack = 0) => usedBench(c, slack) >= (r.lv ?? 1);
 
 const tellQueue = (c: Client) => {
   const q = queues.get(c);
@@ -119,7 +115,7 @@ export function enqueue(c: Client, m: Extract<C2S, { t: 'cq' }>) {
   const no = (why: string) => send(c, { t: 'craft', r: r.id, ok: false, why });
   if (creative(c)) return void made(c, r, Number(m.n));
   if (!mayMake(c, r.id)) return void no('You have not learned it');
-  if (!atBench(c, r, 1)) return void no(r.lv && r.lv > 1 ? `Needs a ${LEVEL_NAME[r.lv]} within ${NEAR.bench} m` : `Needs a workbench within ${NEAR.bench} m`);
+  if (!atBench(c, r, 1)) return void no(r.lv && r.lv > 1 ? `Use a ${LEVEL_NAME[r.lv]} or better: F at it` : 'Use a workbench: F at it');
   const q = queues.get(c) ?? { jobs: [], done: 0, paused: false };
   if (q.jobs.length >= MOST.queue) return void no(`The bench takes ${MOST.queue} jobs at a time`);
   const p = plan(r, Math.max(1, Math.min(99, Math.floor(Number(m.n)) || 1)), pocketsOf(c.inv));

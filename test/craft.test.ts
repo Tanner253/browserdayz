@@ -430,7 +430,9 @@ async function serverTest() {
     };
     const [sx, sz] = site!;
     const planPaper = (await kit('/give building_plan'))[0];
-    pockets = [planPaper, ...(await kit('/give planks 50')), ...(await kit('/give log 4')), ...(await kit('/give nails 20')), ...(await kit('/give metal_frags 75')), ...(await kit('/give scrap 25'))];
+    // (a workbench and a research table are set down from the hands, made as items: base building's PLACED)
+    const bench = (await kit('/give workbench'))[0], table = (await kit('/give research_table'))[0];
+    pockets = [planPaper, bench, table, ...(await kit('/give planks 50')), ...(await kit('/give log 4')), ...(await kit('/give nails 20')), ...(await kit('/give metal_frags 75')), ...(await kit('/give scrap 25'))];
     me();
     await go(sx - 2, sz);
     send({ t: 's', p: [pos[0], pos[1], pos[2], 0, 0, 0], w: 'building_plan', m: [] });
@@ -440,19 +442,26 @@ async function serverTest() {
     assert.ok(told, `no base: ${JSON.stringify(of('tell').slice(-2))}`);
     const b = heard(told.b)!;
     const spot = deployAt(b, 'workbench', { x: 0, y: 0, z: 0 })!;
-    send({ t: 'blay', k: 'workbench', b: b.id, ...spot, u: planPaper.uid });
-    assert.ok(await until('bpc'), `no workbench: ${JSON.stringify(of('tell').slice(-2))}`);
+    send({ t: 'blay', k: 'workbench', b: b.id, ...spot, u: bench.uid });
+    const wb = await until('bpc');
+    assert.ok(wb, `no workbench: ${JSON.stringify(of('tell').slice(-2))}`);
     const [bx, , bz] = toWorld(b, spot.x, spot.y, spot.z);
     // (and a research table beside it: by a bench, as Bench I makes it)
     const tspot = deployAt(b, 'research_table', { x: 0, y: 0, z: 1.05 });
     assert.ok(tspot, 'no room on the foundation for a research table beside the bench');
-    send({ t: 'blay', k: 'research_table', b: b.id, ...tspot, u: planPaper.uid });
+    send({ t: 'blay', k: 'research_table', b: b.id, ...tspot, u: table.uid });
     assert.ok(await until('bpc', (m) => m.p[1] === PIECE_IDS.indexOf('research_table')), `no research table: ${JSON.stringify(of('tell').slice(-2))}`);
 
     // hammers, queued at the bench: two lots; made one after the other while the maker stays, the fragments taken as each is
     pockets = [makeItem(MAT.frags, 150), makeItem('planks', 3)];
     me();
     await go(bx + 2, bz);
+    // (standing by it is not using it: F at it is, as Rust's; the owner, "I should have to press F on the workbench to use it")
+    const c0 = got.length;
+    send({ t: 'cq', r: 'hammer', n: 1 });
+    assert.ok((await until('craft', (m) => !m.ok, 3000, c0))?.why?.includes('F at it'), `queued at a bench not used: ${JSON.stringify(of('craft').slice(-1))}`);
+    send({ t: 'bench', b: b.id, p: wb!.p[0] });
+    await sleep(80);
     const k0 = of('kit').length, g0 = got.length;
     send({ t: 'cq', r: 'hammer', n: 2 });
     const q1 = await until('cq', (m) => m.q.length === 1);
