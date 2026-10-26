@@ -40,9 +40,17 @@ function* all(inv: SerializedInventory | null): Generator<ItemInstance> {
 
 export const plating = {
   /** a thing, and everything in it, made to wear what the record says and nothing else */
-  stamp<T extends ItemInstance | null>(it: T, now = Date.now()): T {
+  stamp<T extends ItemInstance | null>(it: T, now = Date.now(), owns?: (f: ItemId) => boolean): T {
     if (!it) return it;
-    const p = plates.get(it.uid);
+    let p = plates.get(it.uid);
+    // No record of it, but its holder bought at the store what it says it is: the record is made again, not the thing
+    // made a plain knife (the owner, 2026-10-25: "i logged out with a karambit in my hand, emerald and logged back in
+    // with a nickel plated combat knife"). A form's shop item is named as what it makes (the karambit).
+    if (!p && owns) {
+      const form = FORMS.has(it.id) && owns(it.id as ItemId) ? (it.id as ItemId) : undefined;
+      const f = it.finish && SHOP[it.finish as ItemId]?.skin && owns(it.finish as ItemId) ? (it.finish as ItemId) : undefined;
+      if (form || f) plates.set(it.uid, (p = { ...(form ? { form } : {}), ...(f ? { f } : {}), seen: now }));
+    }
     delete it.finish;
     // (a knife made a karambit is one, wherever it is read in; one this has no record of is the knife it was, as a game's
     // own word on a finish is not taken)
@@ -57,11 +65,12 @@ export const plating = {
       it.finish = p.f;
       p.seen = now;
     }
-    for (const c of it.cargo ?? []) plating.stamp(c.item, now);
+    for (const c of it.cargo ?? []) plating.stamp(c.item, now, owns);
     return it;
   },
-  stampAll<T extends SerializedInventory | null>(inv: T): T {
-    if (inv) for (const it of [...Object.values(inv.slots), ...inv.containers.flatMap((c) => c.items)]) plating.stamp(it);
+  /** @param owns whether the holder bought this at the store (a lost record is made again from it: see stamp) */
+  stampAll<T extends SerializedInventory | null>(inv: T, owns?: (f: ItemId) => boolean): T {
+    if (inv) for (const it of [...Object.values(inv.slots), ...inv.containers.flatMap((c) => c.items)]) plating.stamp(it, Date.now(), owns);
     return inv;
   },
   /**

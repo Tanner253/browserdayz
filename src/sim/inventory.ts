@@ -1098,6 +1098,9 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   if (!isItem(r.id) || typeof r.uid !== 'string' || r.uid.length > 64) return null;
   const def = ITEMS[r.id];
   const it: ItemInstance = { uid: r.uid, id: r.id, qty: def.stack ? Math.max(1, Math.min(def.stack, Math.floor(Number(r.qty) || 1))) : 1 };
+  // (a store finish the thing says it wears: the server believes it only from its own record, or what the holder
+  // bought, server/plates.ts stamp)
+  if (typeof r.finish === 'string' && r.finish.length <= 32) it.finish = r.finish;
   if (def.weapon) {
     // (how many it may really have in it is said by what feeds it: sanitizeItem holds it to that)
     it.loaded = Math.max(0, Math.min(200, Math.floor(Number(r.loaded) || 0)));

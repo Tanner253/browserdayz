@@ -657,7 +657,7 @@ export function handle(c: Client, m: C2S) {
     case 'me': {
       if (!c.alive) return;
       const had = c.inv;
-      c.inv = cleanInventory(m.inv);
+      c.inv = cleanInventory(m.inv, (f) => perks.skins(c.key).includes(f));
       // (of the tags that can pay, only those the server has seen this player take: one they dropped, put on a body,
       // or had trashed, said to be in their pockets still, is not: custody.ts)
       const notTheirs = keepToTheirs(c.key, c.inv);
