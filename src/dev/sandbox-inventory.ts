@@ -91,6 +91,22 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   }
 
   const shown: Record<string, unknown> = { kit: kit.id };
+  // (&ui=void: an admin whose void inventory is on, as the server says: the mark by the vitals, and the panel's switch)
+  if (q.get('ui') === 'void') {
+    await import('../ui/hud.css');
+    const { HUD } = await import('../ui/hud');
+    const { AdminUI } = await import('../ui/admin-ui');
+    const hud = new HUD(icons);
+    ui.appendChild(hud.root);
+    hud.setVoid(true);
+    const none = new Proxy({}, { get: () => () => undefined }) as ConstructorParameters<typeof AdminUI>[1];
+    const panel = new AdminUI([], none);
+    ui.appendChild(panel.root);
+    panel.open({ role: 'admin', id: 1, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: false, endless: false, night: false, names: false, tint: null, freecam: false, x: 0, z: 0 });
+    // (the switch is low in the powers: scrolled to)
+    [...panel.root.querySelectorAll<HTMLElement>('*')].find((e) => e.childElementCount === 0 && e.textContent === 'Void inventory when you die')?.scrollIntoView({ block: 'center' });
+    return shown;
+  }
   // (Settings, Controls, with the controller on: its buttons each thing's to be put on another; &pad=xbox for Xbox's names)
   if (q.get('ui') === 'settings') {
     await import('../ui/hud.css');

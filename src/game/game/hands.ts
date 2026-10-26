@@ -227,6 +227,8 @@ export const handsMethods = {
     const seen = this.watching ? this.remotes.get(this.watching.id)?.name : '';
     const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.powers.weightless && 'WEIGHTLESS', this.powers.endless && 'ENDLESS AMMO', this.powers.bottomless && 'BOTTOMLESS', this.powers.creative && 'CREATIVE', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
     this.hud.setPowers(on.join('  ·  '));
+    // (void inventory: its own mark by the vitals, for as long as it is on)
+    this.hud.setVoid(this.powers.voidInv);
     this.adminUI?.setSelf(this.adminSelf());
   },
 
