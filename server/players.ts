@@ -299,8 +299,8 @@ export function cleanStored(list: unknown): StoredItem[] {
  * kept from before the jacket and the trousers were things has them on after this, with what was in its pockets in
  * theirs (upgradeInventory in src/sim/inventory.ts, the same the game itself reads a save with).
  */
-export function cleanInventory(raw: unknown): SerializedInventory | null {
-  return plating.stampAll(cleanCarried(raw, cleanName));
+export function cleanInventory(raw: unknown, owns?: (f: ItemId) => boolean): SerializedInventory | null {
+  return plating.stampAll(cleanCarried(raw, cleanName), owns);
 }
 
 export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
