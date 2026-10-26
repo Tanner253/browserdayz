@@ -409,6 +409,8 @@ ok('a Weapon Rack is set down from its item, its five bays over a store larger t
   assert.deepEqual(costOf('weapon_rack', 1), { weapon_rack: 1 });
   const [w, h] = PIECES.weapon_rack.store!;
   assert.ok(w * (h - RACK_ROWS) > CRATE_SPECS.gun_rack.w * (CRATE_SPECS.gun_rack.h - RACK_ROWS), 'its store larger than a world rack');
+  const big = PIECES.box_large.store!;
+  assert.ok(w * (h - RACK_ROWS) > big[0] * big[1], 'its store, under its bays, the largest a base has');
   const c = Object.assign(new Container('r', 'Weapon Rack', w, h, [], true), { rack: true });
   const ak = makeItem('ak', 1), colt = makeItem('colt', 1), box = makeItem('ammo_9mm', 10);
   assert.ok(!c.fits(box, 0, 0, false), 'no rounds in a bay');
