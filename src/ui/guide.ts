@@ -73,7 +73,7 @@ function steps(): Step[] {
       'Nail it up with the hammer to <b>level II</b> and <b>III</b> for more, and for metal and armoured walls.',
     ] },
     { tab: 'Crafting', title: 'The forge', pic: '/changelog/media/trader-stall.jpg', lines: [
-      'Make a <b>forge</b> by hand, hold it and set it down on a floor of your base. Press <b>F</b> at it: metal fragments go in, <b>iron bars</b> come out (armoured walls take them).',
+      'Make a <b>forge</b> by hand, hold it and set it down on a floor of your base. Press <b>F</b> at it: put in metal fragments (ten make a bar) and something to burn, logs, firewood, charcoal or planks, and <b>iron bars</b> come out (armoured walls take them).',
     ] },
     { tab: 'Crafting', title: 'The recycler', pic: '/guide/recycler.mp4', lines: [
       'Recyclers stand at the works (Zavod), the army camp, the fort, the chemical works and the trader camp.',
