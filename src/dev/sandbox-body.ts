@@ -72,7 +72,7 @@ export function specOf(words: string): BodySpec {
 }
 
 /** a stand-in for the game's sky and sun: what a body and a gun ask of it */
-function atmosphereOf(scene: THREE.Scene, sun: THREE.DirectionalLight): Atmosphere {
+export function atmosphereOf(scene: THREE.Scene, sun: THREE.DirectionalLight): Atmosphere {
   const daylight = { value: 1 };
   const register = (mat: THREE.Material, patch?: (s: THREE.WebGLProgramParametersWithUniforms) => void, key?: string) => {
     if (!patch) return mat;
@@ -199,7 +199,10 @@ export async function stageBodies(o: Stage) {
       left.set(-Math.cos(b.face), 0, Math.sin(b.face));
       const dir = { q: ahead.clone().multiplyScalar(0.8).addScaledVector(left, -0.6), side: left.clone().negate(), left: left.clone(), front: ahead.clone(), back: ahead.clone().negate(), top: ahead.clone().multiplyScalar(0.2) }[view] ?? ahead.clone();
       at.copy(b.pos).setY(low).addScaledVector(left, near?.[2] ?? 0).addScaledVector(ahead, near?.[3] ?? 0);
-      camera.position.copy(at).addScaledVector(dir.normalize(), d).setY(low + (view === 'top' ? 6 : 0.35));
+      // (&on=hand_r: on that bone, wherever it is: a hand on a grip)
+      const bone = q.get('on') ? b.a.root.getObjectByName(q.get('on')!) : null;
+      if (bone) bone.getWorldPosition(at);
+      camera.position.copy(at).addScaledVector(dir.normalize(), d).setY(at.y + (view === 'top' ? 6 : bone ? 0.1 : 0.35));
       camera.lookAt(at);
       sun.position.copy(b.pos).add(new THREE.Vector3(6, 9, 4));
       sun.target.position.copy(b.pos);

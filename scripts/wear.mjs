@@ -32,7 +32,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { M4, carry, legJoints, markRegions, padTexture, straightenLegs, suitWeights } from './meshy.mjs';
+import { M4, carry, legJoints, markRegions, padTexture, plainHands, straightenLegs, suitWeights } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -72,8 +72,10 @@ const PIECES = {
   combat_boots: { src: 'wear_combat_boots.glb', body: 0, ...BOOTS, tex: 1024 },
   work_boots: { src: 'wear_work_boots.glb', body: 1, ...BOOTS, tex: 1024 },
   hiking_boots: { src: 'wear_hiking_boots.glb', body: 2, ...BOOTS, tex: 1024 },
-  leather_gloves: { src: 'wear_leather_gloves.glb', body: 2, parts: HANDS, core: ['hand'], covers: ['hand'], tex: 1024, fingers: true },
-  fingerless: { src: 'wear_fingerless.glb', body: 0, parts: HANDS, core: ['hand'], covers: [], tex: 1024, fingers: true },
+  // (their hands the skeleton's own, as the bodies' are (plainHands), a few millimetres over the skin, all of one colour;
+  // the fingerless only over the palm and the fingers' first joints)
+  leather_gloves: { src: 'wear_leather_gloves.glb', body: 2, parts: HANDS, core: ['hand'], covers: ['hand'], tex: 1024, fingers: true, hands: { lift: 0.003 } },
+  fingerless: { src: 'wear_fingerless.glb', body: 0, parts: HANDS, core: ['hand'], covers: [], tex: 1024, fingers: true, hands: { lift: 0.003, bones: /^(hand|(thumb|index|middle|ring|pinky)_01)_[lr]$/ } },
   // (the basics every life begins in: src/sim/items.ts, CLOTHES)
   // (all of it over the chest, the belly and the shoulders is the shirt: white over the body's own grey shirt, it was
   // taken for the body there by its colour, and had holes)
@@ -169,6 +171,8 @@ async function plainCloth(prim, own, least = 0.45) {
   return `plain: ${((bad / N) * 100).toFixed(1)}% of its picture painted from the cloth`;
 }
 
+/** the skeleton's own body, for the gloves' hands (see plainHands) */
+const PLAIN = await io.read(TEMPLATE);
 for (const [id, piece] of Object.entries(PIECES)) {
   if (ONLY.length && !ONLY.includes(id)) continue;
   const body = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, BODIES[piece.body])), fingers: true });
@@ -552,6 +556,16 @@ for (const [id, piece] of Object.entries(PIECES)) {
   }
   prim.setIndices(dressed.doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(tris.flat().map((i) => used.get(i)))));
   dressed.node.setName('wear').getMesh().setName('wear');
+  // (a glove's hand all of its own colour: at the place on its picture of the point most like the colour it is, see own)
+  if (piece.hands) {
+    let at = 0, near = Infinity;
+    for (const [i, j] of used) {
+      const c = D.C[i], d = Math.hypot(c[0] - own[0], c[1] - own[1], c[2] - own[2]);
+      if (d < near) (near = d), (at = j);
+    }
+    const flat = D.prim.getAttribute('TEXCOORD_0').getElement(at, []);
+    console.log(`  ${plainHands(dressed.node, PLAIN, { ...piece.hands, flat })}`);
+  }
   const mat = prim.getMaterial().setName(`wear_${id}`).setDoubleSided(true);
   // (how light its picture is where it is drawn, on average: a colour put on it is laid on in proportion to this, so that
   // its folds and wear stay as they are; see src/game/survivors.ts)

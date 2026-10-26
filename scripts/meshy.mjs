@@ -509,6 +509,157 @@ export function waistOf(node) {
   return { waistMin: r(b.min.z - pelvis.z), waistMax: r(b.max.z - pelvis.z), waistWidth: r(b.max.x - b.min.x) };
 }
 
+/**
+ * Each hand made the skeleton's own (the owner, 2026-10-25: "the hands and fingers, more specifically fingertips, for all
+ * player models seem bugged and inverted / inside out"; and the thumb "should close over the fingers"). Meshy's rig has
+ * no fingers: its hands are hung on the hand alone, its fingers half joined, a little curled and bent back at the wrist,
+ * and found by their shape (fitHand) they bent about joints that were not in them, the tips left where a straight
+ * finger's would be, in shards, and the thumb stood straight out of every grip. So from a little up the forearm each hand
+ * is the template's (assets-src/characters/plain.glb, the skeleton's own body, every finger weighted on these bones by
+ * hand), set at this body's wrist and painted with this body's own hand, a triangle at a time from the nearest of it.
+ * @param plain the template's document; `lift` (metres): that far off the skin, with a cuff flared over the forearm's end
+ * (a glove, over the hand under it); `bones`: only what those bones lead (a fingerless glove: the palm and the fingers'
+ * first joints); `flat`: all of it the colour at that place [u, v] on its picture (a glove's picture is in pieces, and a
+ * hand painted from them by nearness was a patchwork)
+ * @returns a line for the build
+ */
+export function plainHands(node, plain, { lift = 0, bones = null, flat = null } = {}) {
+  // (from 3 cm up the forearm: inside the body's own there, or a glove's cuff over it)
+  const FROM = -0.03;
+  const skin = node.getSkin(), joints = skin.listJoints(), names = joints.map((j) => j.getName()), ibm = skin.getInverseBindMatrices();
+  const prim = node.getMesh().listPrimitives()[0], idx = prim.getIndices().getArray();
+  const pos = prim.getAttribute('POSITION'), nor = prim.getAttribute('NORMAL'), uv = prim.getAttribute('TEXCOORD_0');
+  const ji = prim.getAttribute('JOINTS_0'), jw = prim.getAttribute('WEIGHTS_0'), reg = prim.getAttribute('_REGION');
+  const M = joints.map((j, k) => M4(j.getWorldMatrix()).multiply(M4(ibm.getElement(k, []))));
+  const P = restPoints(node), n0 = pos.getCount();
+  const pn = plain.getRoot().listNodes().find((x) => x.getName() === 'body');
+  const pp = pn.getMesh().listPrimitives()[0], pidx = pp.getIndices().getArray(), PP = restPoints(pn);
+  const pjoints = pn.getSkin().listJoints(), pnames = pjoints.map((j) => j.getName()), pibm = pn.getSkin().getInverseBindMatrices();
+  const PM = pjoints.map((j, k) => M4(j.getWorldMatrix()).multiply(M4(pibm.getElement(k, []))));
+  const pji = pp.getAttribute('JOINTS_0'), pjw = pp.getAttribute('WEIGHTS_0'), pnor = pp.getAttribute('NORMAL');
+  const a = [], w = [], lead = (J, W, i, out) => {
+    J.getElement(i, a), W.getElement(i, w);
+    let l = 0;
+    for (let c = 1; c < 4; c++) if (w[c] > w[l]) l = c;
+    return out[a[l]];
+  };
+  const HAND = (s) => new RegExp(`^(hand|thumb|index|middle|ring|pinky)(_0[1-4](_leaf)?)?${s}$`), ARM = (s) => new RegExp(`^(lowerarm|hand|thumb|index|middle|ring|pinky)(_0[1-4](_leaf)?)?${s}$`);
+  const drop = new Set(), add = { P: [], N: [], UV: [], J: [], W: [], T: [] }, told = [];
+  for (const s of ['_l', '_r']) {
+    const hand = at(M4(joints[names.indexOf(`hand${s}`)].getWorldMatrix())), elbow = at(M4(joints[names.indexOf(`lowerarm${s}`)].getWorldMatrix()));
+    const phand = at(M4(pjoints[pnames.indexOf(`hand${s}`)].getWorldMatrix()));
+    const dir = hand.clone().sub(elbow).normalize(), past = (p, h) => p.clone().sub(h).dot(dir);
+    // (the hand it replaces, its triangles, for their picture)
+    const own = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      const c = [idx[t], idx[t + 1], idx[t + 2]];
+      if (!c.every((i) => reg.getScalar(i) === 9 && HAND(s).test(lead(ji, jw, i, names) ?? '') && past(P[i], hand) > -0.02)) continue;
+      own.push(c);
+    }
+    // (what is kept of it on the hand and the forearm alone: the fingers' share of it, as Meshy's were found, stretched it
+    // into shards when they curled)
+    const fingers = new Set(names.flatMap((nm, k) => (HAND(s).test(nm) && !nm.startsWith('hand') ? [k] : []))), h = names.indexOf(`hand${s}`);
+    // (and the forearm's end, by the wrist, wholly on the forearm: the hand's share of it tore into shards as the wrist bent
+    // hard, and the new hand brings its own wrist)
+    const arm = names.indexOf(`lowerarm${s}`);
+    for (let i = 0; i < n0; i++) {
+      if (P[i].distanceTo(hand) > 0.3) continue;
+      ji.getElement(i, a), jw.getElement(i, w);
+      const to = past(P[i], hand) > -0.035 ? arm : h;
+      if (!a.some((j, c) => w[c] > 0 && (fingers.has(j) || (to === arm && j === h)))) continue;
+      let moved = 0;
+      for (let c = 0; c < 4; c++) if (fingers.has(a[c]) || (to === arm && a[c] === h)) (moved += w[c]), (w[c] = 0);
+      const at_ = a.indexOf(to) >= 0 ? a.indexOf(to) : w.indexOf(Math.min(...w));
+      (a[at_] = to), (w[at_] += moved);
+      ji.setElement(i, a), jw.setElement(i, w);
+    }
+    // (and all of it from a centimetre before the wrist, whatever bone leads it; a glove's from its cuff: Meshy's hand is
+    // bent back at the wrist, and a glove's back and cuff lay behind it, a brown lump that tore into shards as it turned)
+    for (let t = 0; t < idx.length; t += 3) {
+      const c = [idx[t], idx[t + 1], idx[t + 2]];
+      if (c.every((i) => P[i].distanceTo(hand) < 0.3 && past(P[i], hand) > (lift > 0 ? -0.08 : -0.01))) drop.add(t);
+    }
+    // (the template's hand, moved to this one's wrist; where it meets the forearm, drawn a little in toward the arm's line,
+    // under the body's own, or a glove's flared out over it)
+    const keep = new Set(), pt = new Map(), e = [];
+    for (let i = 0; i < PP.length; i++) {
+      const by = lead(pji, pjw, i, pnames) ?? '';
+      if (ARM(s).test(by) && (!bones || HAND(s).test(by) && bones.test(by) || /^lowerarm/.test(by)) && past(PP[i], phand) > FROM) keep.add(i);
+    }
+    for (const i of keep) {
+      pji.getElement(i, a), pjw.getElement(i, w);
+      const PB = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      for (let c = 0; c < 4; c++) if (w[c] > 0) PB.elements.forEach((v, k) => (PB.elements[k] += PM[a[c]].elements[k] * w[c]));
+      const nw = new THREE.Vector3().fromArray(pnor.getElement(i, e)).transformDirection(PB);
+      const p = PP[i].clone().sub(phand).add(hand).addScaledVector(nw, lift), along = past(p, hand);
+      const axis = hand.clone().addScaledVector(dir, along);
+      if (!lift) p.sub(axis).multiplyScalar(THREE.MathUtils.lerp(0.93, 1, smooth(along, -0.012, 0.012))).add(axis);
+      // (a glove's cuff flared out over the forearm's end, which stood through it at the wrist)
+      else p.sub(axis).multiplyScalar(THREE.MathUtils.lerp(1.22, 1, smooth(along, -0.02, 0.025))).add(axis);
+      // (its weights, on this body's joints by name)
+      pji.getElement(i, a), pjw.getElement(i, w);
+      const J = [0, 0, 0, 0], W = [0, 0, 0, 0];
+      for (let c = 0; c < 4; c++) if (w[c] > 0) (J[c] = names.indexOf(pnames[a[c]])), (W[c] = w[c]);
+      if (J.some((j, c) => W[c] > 0 && j < 0)) throw new Error(`hands: ${pnames[a[J.findIndex((j) => j < 0)]]} is not on the body's skeleton`);
+      // (where it is in the body's own frame, by the matrices that carry it there: their mean, undone)
+      const B = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      J.forEach((j, c) => W[c] > 0 && B.elements.forEach((v, k) => (B.elements[k] += M[j].elements[k] * W[c])));
+      const Bi = B.clone().invert();
+      // (its normal turned as the template's skin turns it, then back through this body's)
+      const nr = nw.clone().transformDirection(Bi);
+      pt.set(i, { p, raw: p.clone().applyMatrix4(Bi).toArray(), nr: nr.toArray(), J, W });
+    }
+    // (its picture, a triangle at a time from one triangle of the hand it replaces, the nearest to its middle: each
+    // point alone took the nearest place, and a triangle across two pieces of the picture drew the dark between them)
+    const tri = new THREE.Triangle(), q = new THREE.Vector3(), bary = new THREE.Vector3(), mid = new THREE.Vector3();
+    let made = 0;
+    for (let t = 0; t < pidx.length; t += 3) {
+      const c = [pidx[t], pidx[t + 1], pidx[t + 2]];
+      if (!c.every((i) => keep.has(i))) continue;
+      mid.set(0, 0, 0);
+      for (const i of c) mid.add(pt.get(i).p);
+      mid.divideScalar(3);
+      let best = null, bd = Infinity;
+      for (const o of own) {
+        tri.set(P[o[0]], P[o[1]], P[o[2]]).closestPointToPoint(mid, q);
+        const d = q.distanceToSquared(mid);
+        if (d < bd) (bd = d), (best = o);
+      }
+      tri.set(P[best[0]], P[best[1]], P[best[2]]);
+      for (const i of c) {
+        const v = pt.get(i);
+        tri.getBarycoord(v.p, bary);
+        // (a corner far past that triangle takes its nearest place on it instead: the picture beyond is another piece's)
+        if (Math.min(bary.x, bary.y, bary.z) < -0.6) tri.getBarycoord(tri.closestPointToPoint(v.p, q), bary);
+        const u = flat ?? [0, 1].map((k) => best.reduce((sum, b, m) => sum + uv.getElement(b, e)[k] * bary.getComponent(m), 0));
+        add.T.push(n0 + add.P.length);
+        add.P.push(v.raw), add.N.push(v.nr), add.UV.push(u), add.J.push(v.J), add.W.push(v.W);
+      }
+      made++;
+    }
+    told.push(`${s === '_l' ? 'left' : 'right'} ${made} triangles for ${own.length}`);
+  }
+  // ---- written: the body's own points and the hands' after them; its triangles but its hands', and the hands'
+  const n = n0 + add.P.length, cat = (acc, size, extra, Kind = Float32Array) => {
+    const out = new Kind(n * size), e = [];
+    for (let i = 0; i < n0; i++) out.set(acc.getElement(i, e), i * size);
+    extra.forEach((v, k) => out.set(v, (n0 + k) * size));
+    return out;
+  };
+  const acc = (src, type, array) => src.clone().setType(type).setNormalized(false).setArray(array);
+  prim.setAttribute('POSITION', acc(pos, 'VEC3', cat(pos, 3, add.P)));
+  prim.setAttribute('NORMAL', acc(nor, 'VEC3', cat(nor, 3, add.N)));
+  prim.setAttribute('TEXCOORD_0', acc(uv, 'VEC2', cat(uv, 2, add.UV)));
+  prim.setAttribute('JOINTS_0', acc(ji, 'VEC4', cat(ji, 4, add.J, Uint16Array)));
+  prim.setAttribute('WEIGHTS_0', acc(jw, 'VEC4', cat(jw, 4, add.W)));
+  prim.setAttribute('_REGION', acc(reg, 'SCALAR', cat(reg, 1, add.P.map(() => [9]), Uint8Array)));
+  const T = [];
+  for (let t = 0; t < idx.length; t += 3) if (!drop.has(t)) T.push(idx[t], idx[t + 1], idx[t + 2]);
+  T.push(...add.T);
+  prim.setIndices(prim.getIndices().clone().setArray(new Uint32Array(T)));
+  return `hands the skeleton's own: ${told.join(', ')}`;
+}
+
 /** a skinned shape's points as its skeleton stands at rest (THREE.Vector3[]) */
 export function restPoints(node) {
   const skin = node.getSkin(), joints = skin.listJoints(), ibm = skin.getInverseBindMatrices();

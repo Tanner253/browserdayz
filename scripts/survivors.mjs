@@ -31,7 +31,7 @@ import { dedup, prune, unpartition, textureCompress, meshopt } from '@gltf-trans
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import * as THREE from 'three';
-import { carry, headOf, legJoints, markRegions, padTexture, restPoints, straightenLegs, suitWeights, waistOf } from './meshy.mjs';
+import { carry, headOf, legJoints, markRegions, padTexture, restPoints, plainHands, straightenLegs, suitWeights, waistOf } from './meshy.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 // (assets-src lives in the main checkout only: a session's worktree reads it from there)
@@ -167,6 +167,8 @@ async function cleanCloth(doc, node) {
 await fs.access(TEMPLATE).catch(() => {
   throw new Error('survivors: run "node scripts/build-character.mjs --infected" first (it makes assets-src/characters/plain.glb)');
 });
+/** the skeleton's own body, for its hands (see plainHands) */
+const PLAIN = await io.read(TEMPLATE);
 for (const [n, file] of BODIES.entries()) {
   if (ONLY.length && !ONLY.includes(n)) continue;
   const { doc, node, hands, worn, proportions } = await carry({ io, template: TEMPLATE, src: await io.read(path.join(SRC, file)), fingers: true });
@@ -176,6 +178,7 @@ for (const [n, file] of BODIES.entries()) {
   const moved = straightenLegs(node, legJoints(node));
   // (weighted as the old suit is, not as Meshy rigged it: see suitWeights)
   const weighted = suitWeights(node, SUIT);
+  console.log(`  ${plainHands(node, PLAIN)}`);
   // (the picture between its islands filled from them first: what lay there came in at every island's edge; then the
   // cloth mended, as its strips are narrower than what the filling shaves off an island's edge)
   {
