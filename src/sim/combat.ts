@@ -2,6 +2,7 @@
 // client can say "I hit player 7 in the head with a Mosin" but never "for 5000 damage".
 
 import { CARTRIDGES, GUNS, damageKept, speedAt } from './gunplay';
+import { CHARGES } from './build/charges';
 
 /** `arms`: hit like the legs (less than the body, and nothing worn covers them), and no leg is broken by it */
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
@@ -93,10 +94,9 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   // should be larger with damage gradient": more than a grenade's at its middle, and reaching half as far again,
   // less with every metre as every blast is (see `hitDamage`): 132 at 3 m, 73 at 7, 35 at 10, 5 at 13, none at 14.)
   barrel: { damage: 180, melee: false, range: 900, interval: 0, falloff: 1, blast: 14, car: 0.2 },
-  // a charge stuck to a base's wall (src/sim/build/raid.ts): the C4's blast kills at arm's length, as Rust's does, and
-  // a wall between stops it (server/solid.ts); the satchel's is smaller
-  c4: { damage: 260, melee: false, range: 70, interval: 0, falloff: 1, blast: 7, car: 0.8 },
-  satchel: { damage: 160, melee: false, range: 70, interval: 0, falloff: 1, blast: 5, car: 0.4 },
+  // a charge (tuned in src/sim/build/charges.ts, the one place): a wall between stops its blast (server/solid.ts)
+  c4: { damage: CHARGES.c4.body.damage, melee: false, range: 70, interval: 0, falloff: 1, blast: CHARGES.c4.body.blast, car: CHARGES.c4.body.car },
+  satchel: { damage: CHARGES.satchel.body.damage, melee: false, range: 70, interval: 0, falloff: 1, blast: CHARGES.satchel.body.blast, car: CHARGES.satchel.body.car },
   // run down by a jeep (see src/sim/vehicles.ts): how much it hurts is how fast the jeep was going
   jeep: { damage: 0, melee: true, range: 8, interval: 0.4, falloff: 1 },
   // the arms of one of the infected (see src/sim/infected.ts): never a player's to hit with

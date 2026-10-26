@@ -37,7 +37,7 @@ import { BedsView } from './beds';
 import { LadderView, type Climber } from './ladders';
 import { PrintView } from './prints';
 import { TorchView, type TorchHost } from './torches';
-import { RaidView } from './raid';
+import { RaidView, type RaidHost } from './raid';
 import { printCost, printOf } from '../../sim/build/blueprints';
 import { BaseSolids } from '../../sim/build/solid';
 import { inRoom, shutRoom, type Room } from '../../sim/build/rooms';
@@ -95,6 +95,8 @@ export interface BuildHost {
   explode: (at: THREE.Vector3, mine: boolean, w: string) => void;
   /** chips and dust off a surface struck (Effects.impact, no mark) */
   impact: (surface: import('../../core/physics').Surface, at: THREE.Vector3, normal: THREE.Vector3) => void;
+  myId: RaidHost['myId'];
+  charge: RaidHost['charge'];
 }
 
 /** what in the hands has its left button here, not the hands' (the plan lays, a lock is fitted, a charge stuck) */
@@ -192,6 +194,7 @@ export class Building {
     this.raid = new RaidView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, camera: h.camera, player: h.player, me: h.me, take: h.take,
       changed: h.changed, flames: h.flames, glow: h.glow, explode: h.explode, broken: (b, ids) => this.brokeAlone(b, ids), impact: h.impact,
+      myId: h.myId, charge: h.charge,
     }, () => this.store, this.solids);
     this.prints = new PrintView({
       scene: h.scene, input: h.input, online: h.online, send: h.send, note: h.note, yaw: h.yaw, who: () => this.me, name: h.name, count: h.count, take: h.take,

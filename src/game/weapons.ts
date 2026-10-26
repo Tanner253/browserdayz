@@ -30,11 +30,12 @@ import { KNIVES } from '../../api/_lib/shop-items';
 import { HELD_FIT } from './held-size';
 import { handMove, jabAt, lengthOf, mouthAt, slashAt } from './held-mocap';
 import { MOCAP_HANDS } from './mocap-switch';
+import { CHARGES } from '../sim/build/charges';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
-// ('live': a grenade with its pin out, in the one fist that is about to throw it: see LIVE)
-export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unload' | 'unbox' | 'live' | 'drip';
+// ('live': a grenade with its pin out, in the one fist that is about to throw it: see LIVE; 'arm': a charge's keys pressed: see ARM)
+export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unload' | 'unbox' | 'live' | 'drip' | 'arm';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
 export type FireMode = 'semi' | 'auto';
@@ -502,6 +503,26 @@ export const LIVE = {
     thumb: 0.8,
     tuck: 0.3,
   },
+};
+
+/**
+ * A charge in the hands (the owner, 2026-10-25: "the c4 in hand does not look right, the animation should be touching the
+ * c4 multiple times like input buttons, and then throwing the C4 like a grenade"), in the eye's space. Its front (the
+ * model's +x: the C4's keypad, the satchel's flap) is turned to the eye: held low on the right (`rest`, `restTurn`);
+ * brought up and in to be armed (`at`, `turn`), the right hand round its right end, the left's first finger coming down
+ * on its keys a beat at a time (src/sim/build/charges.ts `arm`, `taps`) at the places `keys` (across its face from its
+ * left end, up it from its foot); then up in the one fist to throw, as a grenade (LIVE).
+ *   lift  – how far off the face the fingertip comes up between keys, metres
+ *   reach – how far the wrist is behind the fingertip, along the finger
+ */
+export const ARM = {
+  rest: [0.15, -0.16, -0.42] as [number, number, number],
+  restTurn: [-0.3, -1.3, 0.12] as [number, number, number],
+  at: [0.07, -0.12, -0.35] as [number, number, number],
+  turn: [-0.5, -1.5, 0.05] as [number, number, number],
+  keys: [[0.35, 0.35], [0.6, 0.6], [0.45, 0.75], [0.7, 0.3], [0.5, 0.5]] as [number, number][],
+  lift: 0.018,
+  reach: 0.15,
 };
 
 /**
@@ -5122,6 +5143,12 @@ export class Weapons {
         pos.lerpVectors(h.from.pos, pos, k);
         rot.setFromQuaternion(h.from.quat.clone().slerp(new THREE.Quaternion().setFromEuler(rot), k));
       }
+    } else if (CHARGES[h.id] && h.kind !== 'live') {
+      // A charge: held low on the right, its keys to the eye; brought up and in while they are pressed (see ARM)
+      const up = h.kind === 'arm' && !h.wait ? THREE.MathUtils.smoothstep(t, 0, 0.25) : 0;
+      pos.set(...ARM.rest).lerp(_cardV.set(...ARM.at), up);
+      pos.y += Math.sin(h.age * 1.9) * 0.002;
+      rot.set(THREE.MathUtils.lerp(ARM.restTurn[0], ARM.turn[0], up), THREE.MathUtils.lerp(ARM.restTurn[1], ARM.turn[1], up), THREE.MathUtils.lerp(ARM.restTurn[2], ARM.turn[2], up));
     } else if (stickRest) {
       // A grenade on a handle, its cord not yet pulled: held as a thing to hit with is (see LIVE.stick.rest).
       const S = LIVE.stick;
@@ -5287,6 +5314,24 @@ export class Weapons {
         curl: [0.5 + w * 0.3, 0.6 + w * 0.3, 0.9, 1.0],
         thumb: 0.4,
       };
+    }
+    if (CHARGES[h.id] && h.kind !== 'live') {
+      // (the right round its right end, which is toward the right hand as it is turned to the eye: the model's -z)
+      const sx = h.size.x, sy2 = h.size.y, sz = h.size.z;
+      right = { pos: new THREE.Vector3(-sx * 0.1, -sy2 * 0.15, -(sz / 2 + 0.035)), fingers: new THREE.Vector3(-0.9, 0.2, 0.35).normalize(), palm: new THREE.Vector3(0, 0, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 0.6 };
+      if (h.kind === 'arm' && !h.wait) {
+        // The left's first finger on its keys, a beat at a time: down on one, up, over to the next. (Its wrist toward
+        // the eye, the left and below; the other fingers closed.)
+        const n = Math.max(1, CHARGES[h.id].taps), per = Math.max(0.05, h.dur) / n;
+        const k = Math.min(n - 1, Math.floor(t / per)), p = Math.min(1, (t - k * per) / per);
+        const down = THREE.MathUtils.smoothstep(p, 0.3, 0.5) * (1 - THREE.MathUtils.smoothstep(p, 0.58, 0.85));
+        const a = ARM.keys[k % ARM.keys.length], b = ARM.keys[(k + 1) % ARM.keys.length], over = k < n - 1 ? THREE.MathUtils.smoothstep(p, 0.85, 1) : 0;
+        const kz = THREE.MathUtils.lerp(a[0], b[0], over), ky = THREE.MathUtils.lerp(a[1], b[1], over);
+        const lift = ARM.lift * (1 - down) + 0.05 * (1 - THREE.MathUtils.smoothstep(t, 0, 0.3));
+        const tip = new THREE.Vector3(sx / 2 + lift, (ky - 0.5) * sy2 * 0.85, (0.5 - kz) * sz * 0.85);
+        const fingers = new THREE.Vector3(-0.62, 0.3, -0.72).normalize();
+        left = { pos: tip.addScaledVector(fingers, -ARM.reach), fingers, palm: new THREE.Vector3(-0.22, -0.95, -0.2).normalize(), curl: [0.05, 1.3, 1.4, 1.45], thumb: 0.8, spread: 0.3 };
+      }
     }
     if ((h.kind === 'live' || stickRest) && h.size.z > 0.2) {
       // A fist round the end of its handle, the thumb's side toward its head. The handle runs through the middle of

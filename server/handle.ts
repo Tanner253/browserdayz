@@ -57,7 +57,7 @@ import { learn } from './learn';
 import { recycle } from './recycle';
 import { book, campKill, safe, trade } from './camp';
 import { hammer, lay, mend, owing, print, sightFor, takeDown } from './build';
-import { blow, plant, relight } from './raid';
+import { blow, throwCharge, stick, relight } from './raid';
 import { blastFrom, blastWalled, stepWalled, walled, zoneAt } from './solid';
 import { knock, swing } from './doors';
 import { tellBeds, wakeAt } from './beds';
@@ -424,8 +424,10 @@ export function handle(c: Client, m: C2S) {
       return print(c, m);
     case 'bhit':
       return blow(c, m);
-    case 'bplant':
-      return plant(c, m);
+    case 'bthrow':
+      return throwCharge(c, m);
+    case 'bstick':
+      return stick(c, m);
     case 'blight':
       return relight(c, m);
     case 'bjoin':

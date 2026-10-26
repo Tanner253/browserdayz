@@ -792,6 +792,19 @@ export class Game {
       glow: (at, color, power, reach) => this.lamps.glow(at, color, power, reach),
       tip: (out) => this.weapons.heldTip(this.s.r.camera as THREE.PerspectiveCamera, out),
       explode: (at, mine, w) => this.explode(at, mine, w === 'c4' || w === 'satchel' ? w : 'grenade'),
+      myId: () => this.net.id || 1,
+      charge: {
+        arm: (w, dur) => {
+          this.weapons.beginUse(w, 'arm', dur);
+          this.act('arm', dur);
+        },
+        ready: (w) => this.weapons.beginUse(w, 'live', 1e6),
+        unarm: () => {
+          this.act('stop');
+          this.rest();
+        },
+        toss: () => this.tossCharge(),
+      },
       impact: (surface, at, normal) => this.effects.impact(surface, at, normal, false),
     });
     this.forges = new ForgeView({
@@ -2023,6 +2036,8 @@ export interface Game {
   setHold: Methods<typeof itemsMethods>['setHold'];
   updateWheel: Methods<typeof itemsMethods>['updateWheel'];
   letGo: Methods<typeof itemsMethods>['letGo'];
+  throwArc: Methods<typeof itemsMethods>['throwArc'];
+  tossCharge: Methods<typeof itemsMethods>['tossCharge'];
   updateSaid: Methods<typeof itemsMethods>['updateSaid'];
   blowBarrel: Methods<typeof itemsMethods>['blowBarrel'];
   updateBarrels: Methods<typeof itemsMethods>['updateBarrels'];
