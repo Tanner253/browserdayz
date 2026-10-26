@@ -176,8 +176,6 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Scaled to life size (50 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - "Trainers" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Scaled to life size (30 cm at its longest) and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
-- "Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
-  Changes made: Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.
 - "Combat knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood head up, 30 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and more); geometry compressed.
 - "Hunting knife" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
@@ -325,6 +323,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
 - "Trader stall" made for ZONA with Higgsfield (Meshy multi-image-to-3D, from three pictures made for it), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms
   Changes made: Stood on the ground about its own middle, 2.8 m across as made, turned so its counter faces +x; textures re-encoded as WebP at 2048; geometry compressed.
   Also: Stood on the ground about its own middle, 2.8 m across as made, turned so its counter faces +x; the holes in its texture atlas filled from their neighbours; textures re-encoded as WebP at 2048; geometry compressed.
+- This work is based on "Karambit fade" (https://sketchfab.com/3d-models/karambit-fade-b4ead4fae7e940489f62db71aac62c9e) by Niilo Poutanen (https://sketchfab.com/niilo.poutanen) licensed under CC-BY-ND-4.0 (http://creativecommons.org/licenses/by-nd/4.0/)
+  Changes made: Stood point up, its ring at the foot, scaled to its real 20 cm; textures re-encoded as WebP at the size they came; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Crouch To Prone" (https://sketchfab.com/3d-models/crouch-to-prone-2f89619f6b994a61a7fa68be73085913) by TarkovMarck (https://sketchfab.com/Marck_TK) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

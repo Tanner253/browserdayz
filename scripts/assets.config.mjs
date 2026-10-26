@@ -861,9 +861,10 @@ export const LOCAL_MODELS = {
   // brought in at 20 cm long (progress/tools/intake.mjs). Stood with its point up and its ring at the foot, as the other
   // things to hit with stand.
   karambit: {
-    dir: '../incoming/higgsfield/melee', file: 'karambit_sized.glb', size: 0.2, rot: [-Math.PI / 2, 0, 0], tex: 1024, tags: ['loot'],
-    changes: 'Stood point up, 20 cm long as made; textures re-encoded as WebP at 1024 (they came at 2048 and 4096); geometry compressed.',
-    credit: { name: 'Karambit', author: 'ZONA (Higgsfield, Tripo H3.1 image to 3D)', url: 'https://higgsfield.ai', line: '"Karambit" made for ZONA with Higgsfield (gpt_image_2_5 and Tripo H3.1), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms' },
+    // (the owner's own pick, 2026-10-25: "Karambit fade" by Niilo Poutanen, CC-BY-ND-4.0, credited from its licence.txt.
+    // Only changed as the licence lets a format be changed: scaled to its real length, stood point up, ring at the foot)
+    dir: 'karambit_fade', file: 'scene.gltf', size: 0.2, rot: [0, 0, Math.PI / 2], tex: 2048, tags: ['loot'],
+    changes: 'Stood point up, its ring at the foot, scaled to its real 20 cm; textures re-encoded as WebP at the size they came; geometry compressed.',
   },
   // The melee remodels and the knives (2026-10-25, the owner: "we should remodel our melee weapons and I want high
   // quality knives"): made as the karambit was, a picture first (with no stamped words) then Tripo H3.1 image to 3D,

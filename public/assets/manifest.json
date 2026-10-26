@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-25T20:59:35.479Z",
+ "generated": "2026-10-26T02:02:06.217Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr",
@@ -12855,27 +12855,30 @@
    "tags": [
     "loot"
    ],
-   "bytes": 271700,
-   "srcTris": 3740,
-   "tris": 3740,
+   "bytes": 212720,
+   "srcTris": 12958,
+   "tris": 12958,
    "min": [
-    -0.0103,
+    -0.0369,
     0,
-    -0.0374
+    -0.006
    ],
    "max": [
-    0.0103,
+    0.0369,
     0.2,
-    0.0374
+    0.006
    ],
    "lods": [
     {
      "url": "assets/models/karambit_lod1.glb",
-     "tris": 1600,
+     "tris": 2038,
      "far": 2,
-     "of": "271700:1792903843795"
+     "of": "212720:1792980127653"
     }
-   ]
+   ],
+   "hi": "assets/models/hi/karambit.glb",
+   "hiBytes": 278504,
+   "hiCard": 48
   },
   "combat_knife": {
    "url": "assets/models/combat_knife.glb",
