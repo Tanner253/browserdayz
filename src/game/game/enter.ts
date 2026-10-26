@@ -12,7 +12,7 @@ import { heightAt, inPlay } from '../../world/worldgen';
 import { basementUnder } from '../../sim/basements';
 import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, ZONA_VOID, tagOwner, TAG_HOLD_MIN, TAG_HOLD, TAG_FRESH, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
-import { fillCrate, RACKS, stepNear, type Keeps } from '../../sim/crates';
+import { racked, fillCrate, RACKS, stepNear, type Keeps } from '../../sim/crates';
 import { inCave } from '../../world/caves-carved';
 import type { Economy } from '../../sim/economy';
 
@@ -373,7 +373,9 @@ export const enterMethods = {
       return;
     }
     const e = this.economy, keeps = keepsOf.get(e) ?? keepsOf.set(e, (id, t) => e.written(id, t)).get(e)!;
+    c.container.rack = RACKS.has(c.kind);
     fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z) || inCave(c.x, c.y + 0.5, c.z), keeps, RACKS.has(c.kind) ? stepNear(e.points, c.x, c.z) : undefined, !inPlay(c.x, c.z));
+    if (c.container.rack) racked(c.container);
   },
 
   fresh(this: Game) {

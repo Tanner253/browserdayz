@@ -17,7 +17,7 @@ import { type SerializedInventory, Container, keepHotHeld } from '../src/sim/inv
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { PLAN, inPlay, onRidgeWall, onWorld } from '../src/world/worldgen';
 import { inCave } from '../src/world/caves-carved';
-import { CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
+import { racked, CRATE_SPECS, fillCrate, CRATE_RESTOCK, RACKS, stepNear, type Keeps } from '../src/sim/crates';
 import { FURNITURE } from '../src/sim/storage';
 import { hidden } from './storages';
 import { News } from '../src/sim/news';
@@ -128,6 +128,8 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 export interface Box {
   cid: string;
   kind: 'crate' | 'stash' | 'corpse' | 'drop' | 'furniture' | 'claim' | 'bbox' | 'recycler';
+  /** a base's Weapon Rack: its grid has a rack's bays (src/sim/inventory.ts RACK) */
+  rack?: true;
   /** furniture: where in its grid each of the economy's things inside it was last put, by uid (server/storages.ts) */
   layout?: Record<string, [number, number, boolean]>;
   /** a drop that is the cargo of a helicopter that came down */
@@ -330,8 +332,10 @@ function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
+  c.rack = RACKS.has(b.crate ?? '');
   // (a crate under the gas, down in the bunker, on a basement's second level, or in one of the pass's caves, is filled with the best of everything)
   fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z) || inCave(b.x, b.y + 0.5, b.z), keeps, RACKS.has(b.crate!) ? stepNear(world.lootPoints, b.x, b.z) : undefined, !inPlay(b.x, b.z));
+  if (c.rack) racked(c);
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;

@@ -4,7 +4,6 @@
 // the server online (`racks` in the welcome, then 'rack'), and by the rack's own contents offline (RACKS, rackShows).
 
 import * as THREE from 'three';
-import { ITEMS } from '../sim/items';
 import type { ItemModels } from './loot';
 
 /**
@@ -29,6 +28,9 @@ interface Rack {
 
 const _box = new THREE.Box3();
 
+/** the shelf the fifth bay's gun lies on: the top one (RACK_PLAN.shelves, by height) */
+const TOP_SHELF = 2;
+
 export class GunRacks {
   private racks = new Map<string, Rack>();
   /** how each sort is turned to stand, worked out once: the turn that stands it butt down with its side to the front */
@@ -45,17 +47,27 @@ export class GunRacks {
 
   /** a rack in the world, by its crate's id: where it stands and which way it faces */
   add(cid: string, x: number, y: number, z: number, rot: number) {
-    if (!this.racks.has(cid)) this.racks.set(cid, { at: new THREE.Vector3(x, y, z), rot, ids: [], group: null, drawn: '', making: false });
+    if (!this.racks.has(cid)) this.racks.set(cid, { at: new THREE.Vector3(x, y, z), rot, ids: this.told.get(cid) ?? [], group: null, drawn: '', making: false });
   }
+  /** what was told of racks not yet in the world (a base's, told in the welcome before its base) */
+  private told = new Map<string, string[]>();
 
   has(cid: string) {
     return this.racks.has(cid);
+  }
+
+  /** a rack gone (a base's taken up or broken) */
+  remove(cid: string) {
+    const r = this.racks.get(cid);
+    if (r?.group) this.scene.remove(r.group);
+    this.racks.delete(cid);
   }
 
   /** what stands in it now (see rackShows) */
   show(cid: string, ids: readonly string[]) {
     const r = this.racks.get(cid);
     if (r) r.ids = [...ids];
+    else this.told.set(cid, [...ids]);
   }
 
   update(eye: THREE.Vector3) {
@@ -81,9 +93,10 @@ export class GunRacks {
     g.position.copy(r.at);
     g.rotation.y = r.rot;
     try {
-      const long = ids.filter((id) => standsUp(id)).slice(0, this.plan.cups.length);
-      const small = ids.filter((id) => !standsUp(id)).slice(0, this.plan.shelves.length);
+      // (bay by bay: the first four stood in its cups, the fifth on its top shelf: src/sim/inventory.ts RACK)
+      const long = ids.slice(0, this.plan.cups.length), small = ids[this.plan.cups.length] ? [ids[this.plan.cups.length]] : [];
       for (const [k, id] of long.entries()) {
+        if (!id) continue;
         const obj = await this.stood(id);
         if (!obj) continue;
         const [x, z] = this.plan.cups[k];
@@ -99,7 +112,7 @@ export class GunRacks {
       for (const [k, id] of small.entries()) {
         const tpl = await this.models.get(id);
         const obj = tpl.group.clone();
-        const [x, y, z] = this.plan.shelves[k];
+        const [x, y, z] = this.plan.shelves[TOP_SHELF + k];
         // (laid on the board as it lies on the ground: across it if it fits that way, else front to back)
         const across = Math.max(tpl.size.x, tpl.size.z) <= 0.36;
         if (across === tpl.size.z > tpl.size.x) obj.rotation.y = Math.PI / 2;
@@ -145,12 +158,6 @@ export class GunRacks {
     obj.updateMatrixWorld(true);
     return obj;
   }
-}
-
-/** the long guns stand in the cups; pistols and pairs lie on the shelves */
-function standsUp(id: string) {
-  const d = ITEMS[id];
-  return !!d?.weapon && d.slot === 'long' && !d.weapon.akimbo;
 }
 
 /**

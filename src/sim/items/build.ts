@@ -92,6 +92,8 @@ export const BUILD_ITEMS: ItemDef[] = [
     desc: 'A small wooden box to keep things in. Hold it and left-click on a floor of your base to set it down; R turns it.' },
   { id: 'box_large', name: 'Large Box', model: 'bb_large_box', w: 4, h: 3, weight: 8, category: 'misc',
     desc: 'A large wooden box to keep things in. Hold it and left-click on a floor of your base to set it down; R turns it.' },
+  { id: 'weapon_rack', name: 'Weapon Rack', model: 'gun_rack', w: 4, h: 5, weight: 18, category: 'misc',
+    desc: 'A gun rack for a base: five guns stood in it, seen by all, and a large store under them. Made at a level II workbench; set down on a floor of your base, and locked as a box is.' },
   { id: 'workbench', name: 'Workbench', model: 'bb_workbench', w: 4, h: 3, weight: 12, category: 'misc',
     desc: 'A workbench, to make what cannot be made by hand. Hold it and left-click on a floor of your base to set it down; nail it up with the hammer to levels II and III.' },
   { id: 'forge', name: 'Forge', model: 'forge_hf', w: 4, h: 4, weight: 15, category: 'misc',

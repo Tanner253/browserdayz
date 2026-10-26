@@ -3,7 +3,7 @@
 
 import { Stash } from '../loot';
 import { PIECES } from '../../sim/build/pieces';
-import { toWorld, type Base } from '../../sim/build/snap';
+import { toWorld, worldYaw, type Base } from '../../sim/build/snap';
 import type { Input } from '../../core/input';
 import { audio } from '../../core/audio';
 
@@ -11,21 +11,39 @@ export class BoxView {
   /** each box's store, by its server name (`bbox:<base>:<piece>`) */
   private stores = new Map<string, Stash>();
 
-  constructor(private input: Input, private open: (s: Stash) => void) {}
+  /** @param rack a Weapon Rack set down (where, which way it faces) or gone (null): drawn with its guns as the world's are (src/game/racks.ts) */
+  constructor(private input: Input, private open: (s: Stash) => void, private rack: (cid: string, at: [number, number, number] | null, rot?: number) => void = () => {}) {}
+
+  /** the Weapon Racks' stores (what they show, played alone) */
+  *racks() {
+    for (const st of this.stores.values()) if (st.container.rack) yield st;
+  }
 
   /** a base's boxes as it is now: their stores made, or taken away with them */
   sync(b: Base) {
     const pre = `bbox:${b.id}:`;
-    for (const cid of [...this.stores.keys()]) if (cid.startsWith(pre) && !b.pieces.has(Number(cid.slice(pre.length)))) this.stores.delete(cid);
+    for (const cid of [...this.stores.keys()]) if (cid.startsWith(pre) && !b.pieces.has(Number(cid.slice(pre.length)))) {
+      this.stores.delete(cid);
+      this.rack(cid, null);
+    }
     for (const p of b.pieces.values()) {
       const size = PIECES[p.k].store, cid = `${pre}${p.id}`;
       if (!size || this.stores.has(cid)) continue;
       const [x, y, z] = toWorld(b, p.x, p.y, p.z);
-      this.stores.set(cid, new Stash(cid, x, y + 0.3, z, 0, size[0], size[1], PIECES[p.k].name));
+      const st = new Stash(cid, x, y + 0.3, z, 0, size[0], size[1], PIECES[p.k].name);
+      // (a Weapon Rack's grid has a rack's bays, and it is drawn with its guns as the world's are)
+      if (p.k === 'weapon_rack') {
+        st.container.rack = true;
+        this.rack(cid, [x, y, z], worldYaw(b, p.r));
+      }
+      this.stores.set(cid, st);
     }
   }
   forget(b: number) {
-    for (const cid of [...this.stores.keys()]) if (cid.startsWith(`bbox:${b}:`)) this.stores.delete(cid);
+    for (const cid of [...this.stores.keys()]) if (cid.startsWith(`bbox:${b}:`)) {
+      this.stores.delete(cid);
+      this.rack(cid, null);
+    }
   }
   clear() {
     this.stores.clear();

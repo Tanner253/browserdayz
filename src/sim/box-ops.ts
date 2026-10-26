@@ -81,7 +81,7 @@ const anywhere = (items: ItemInstance[], uid: string) => !!bagIn(items, uid);
  * @returns what is in it now, what was taken out of it and put into it, and what could not be done
  */
 export function applyOps(items: Laid[], w: number, h: number, ops: BoxOp[], mayPut: (it: ItemInstance) => boolean, clean: (raw: unknown) => ItemInstance | null, loose = false, like?: Container): { items: Laid[]; took: ItemInstance[]; put: ItemInstance[]; refused: Refused } {
-  const top = Object.assign(new Container('box', 'box', w, h, [], like?.holdsBags ?? true), { depth: like?.depth ?? 0, of: like?.of });
+  const top = Object.assign(new Container('box', 'box', w, h, [], like?.holdsBags ?? true), { depth: like?.depth ?? 0, of: like?.of, rack: like?.rack ?? false });
   for (const s of items) {
     const { x, y, rot, ...it } = s;
     // (where it lies, or wherever there is room; never lost, whatever the grid's rules now)

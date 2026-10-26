@@ -47,11 +47,32 @@ export type { Placed };
 /** A pile gone into another of its kind (topped up into it, combined, let go on it): its hot key goes with it (`forgetGone`). */
 export const poured = new WeakMap<ItemInstance, ItemInstance>();
 
+/**
+ * A gun rack's grid (src/sim/crates.ts RACKS, and the base's Weapon Rack): over its store, five bays a gun each, laid
+ * across, `deep` rows each (the owner, 2026-10-25: "they should have 5 gun slots that pair with the slots in the 3d model
+ * for guns ... plus the inventory that already exists for them"): the first four a long gun's, stood in the rack's cups,
+ * the fifth a pistol's or a submachine gun's, on its top shelf (src/game/racks.ts). Nothing but a gun goes in a bay, one
+ * to a bay; the store under them takes what it always took.
+ */
+export const RACK = { bays: 5, deep: 3 };
+export const RACK_ROWS = RACK.bays * RACK.deep;
+/** the bay a row is in (-1: the store under them) */
+export const bayOf = (y: number) => (y < RACK_ROWS ? Math.floor(y / RACK.deep) : -1);
+/** whether a thing may stand in a bay: a long gun in a cup, a pistol or a submachine gun on the shelf */
+export function suitsBay(id: string, bay: number): boolean {
+  const d = ITEMS[id];
+  if (!d?.weapon) return false;
+  if (bay < RACK.bays - 1) return d.slot === 'long';
+  return d.slot === 'holster' || (d.weapon.kind === 'auto' && d.w <= 5);
+}
+
 export class Container {
   /**
    * @param items backing array (a bag's own `cargo`), so the container is a live view of the item
    * @param holdsBags world containers (crates, stashes, bodies) accept bags that still have things in them
    */
+  /** a gun rack's grid: its first RACK_ROWS rows are its bays (see RACK) */
+  rack = false;
   constructor(public id: string, public name: string, public w: number, public h: number, public items: Placed[] = [], public holdsBags = false) {}
 
   /**
@@ -142,6 +163,12 @@ export class Container {
   free(item: ItemInstance, x: number, y: number, rot: boolean, ignore?: ItemInstance): boolean {
     const [w, h] = Container.size(item, rot);
     if (x < 0 || y < 0 || x + w > this.w || y + h > this.deep) return false;
+    // (a rack's bays: a gun that suits it, inside it, alone in it)
+    if (this.rack && y < RACK_ROWS) {
+      const bay = bayOf(y);
+      if (!suitsBay(item.id, bay) || y + h > (bay + 1) * RACK.deep) return false;
+      for (const p of this.items) if (p.item !== ignore && p.item !== item && bayOf(p.y) === bay) return false;
+    }
     for (const p of this.items) {
       if (p.item === ignore) continue;
       const [pw, ph] = Container.size(p.item, p.rot);
