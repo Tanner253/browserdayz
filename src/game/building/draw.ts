@@ -14,7 +14,7 @@ import type { Atmosphere } from '../../world/atmosphere';
 import { PIECES } from '../../sim/build/pieces';
 import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
-import { DOOR } from '../../sim/build/doors';
+import { DOOR, leafPoint } from '../../sim/build/doors';
 import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
 import { PieceModels } from './models';
 import { ClaimFlags } from './flags';
@@ -36,6 +36,10 @@ function seamless(frame: THREE.Matrix4, id: number) {
   const k = 1 - SEAM.shrink * (1 + ((a + b + c) % 3));
   return frame.clone().multiply(_seam).multiply(_seamS.makeScale(k, k, k));
 }
+
+/** how far a door shutting puts a body back into its room each frame, m */
+const PUSH_STEP = 0.06;
+const _push = new THREE.Vector3(), _inv = new THREE.Matrix4();
 
 export class PieceRef {
   constructor(readonly b: number, readonly p: number) {}
@@ -289,6 +293,20 @@ export class BaseDraw {
    * where the body stands from it, a little over (null: a leaf that tips, a hatch's, which only stops) */
   private pushOf(d: Drawn, was: number): THREE.Vector3 | null {
     const leaves = shapeOf(d.piece.k).leaves ?? [], first = d.parts.length - leaves.length, me = this.me(), out = new THREE.Vector3();
+    // Shutting on somebody on the side it opens into, the room it stands in, it puts them back into that room, a few
+    // centimetres a frame through the leaf, never on through the doorway and out (the owner, 2026-10-25, of an airlock:
+    // "sometimes I get stuck between the wall and the door, it opts to push me through the wall, it should push me
+    // through the door instead so I don't get teleported outside of my airlock").
+    const swing = leaves.find((l) => l.axis === 'y');
+    if (swing && d.a < was) {
+      const local = _push.copy(me).applyMatrix4(_inv.copy(d.frame).invert());
+      const mid = swing.solid.find((q) => 'box' in q), room = mid && 'box' in mid ? Math.sign(leafPoint(swing, swing.open, [mid.box[0], mid.box[1], mid.box[2]])[2]) || 1 : 1;
+      if (room * local.z > -0.05) {
+        const want = room * (DOOR.body + 0.2) - local.z, step = Math.sign(want) * Math.min(Math.abs(want), PUSH_STEP);
+        d.frame.decompose(_s, _q, _p);
+        return out.set(0, 0, step).applyQuaternion(_q);
+      }
+    }
     let any = false;
     leaves.forEach((l, i) => {
       if (l.axis !== 'y') return;
