@@ -110,10 +110,11 @@ export function saw(c: Client, m: Extract<C2S, { t: 'saw' }>) {
   }
   const begun = d.saw;
   d.saw = null;
-  if (!begun || begun.l !== m.l || Date.now() - begun.at < SAW.time * 850 || !it || !near || !economy.take(m.l)) return;
+  const at = log && { x: log.x, y: log.y, z: log.z, rot: log.rot ?? 0 };
+  if (!begun || begun.l !== m.l || Date.now() - begun.at < SAW.time * 850 || !it || !near || !at || !economy.take(m.l)) return;
   use(c, it);
-  const planks = makeItem('planks', SAW.planks);
-  send(c, { t: 'kit', name: 'Planks', items: [planks], adds: true, gift: `${SAW.planks} Planks` });
+  // (the planks lie where the log lay, to be picked up as anything is: the owner, "when sawing logs the planks should go on the ground")
+  economy.drop(makeItem('planks', SAW.planks), at.x, world.standAt(at.x, at.y + 0.3, at.z) + 0.03, at.z, at.rot);
   send(c, { t: 'saw', l: m.l, ok: true, done: true });
 }
 

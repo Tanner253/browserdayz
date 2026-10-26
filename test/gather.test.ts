@@ -383,11 +383,13 @@ async function serverTest() {
     const k0 = a.of('kit').length;
     a.send({ t: 'saw', l: log.uid, u: saw.uid, go: 2 });
     assert.ok(await a.until('saw', (m) => !!m.done), 'the sawing was never done');
-    const planks = a.of('kit').slice(k0).flatMap((m) => m.items).find((it) => it.id === 'planks');
-    assert.equal(planks?.qty, SAW.planks);
+    // (the planks on the ground where the log lay, not in the pockets: the owner, "when sawing logs the planks should go on the ground")
+    assert.ok(!a.of('kit').slice(k0).flatMap((m) => m.items).some((it) => it.id === 'planks'), 'the planks went into the pockets');
+    const laid = await a.until('loot+', (m) => m.l.item.id === 'planks' && Math.hypot(m.l.x - log.x, m.l.z - log.z) < 2);
+    assert.equal(laid?.l.item.qty, SAW.planks, 'the planks were not laid where the log lay');
     assert.ok(await a.until('loot-', (m) => m.uid === log.uid), 'the log was not taken away');
     assert.ok(a.of('wear').some((m) => m.u === saw.uid && Math.abs(m.c - worn('hand_saw', 1)) < 1e-6), 'the saw did not wear');
-    console.log(`  ok  a log is sawn in ${SAW.time} s into ${SAW.planks} planks, not at once; it is gone and the saw worn`);
+    console.log(`  ok  a log is sawn in ${SAW.time} s into ${SAW.planks} planks laid where it lay, not at once; it is gone and the saw worn`);
   } catch (e) {
     fail = e;
   } finally {

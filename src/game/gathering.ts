@@ -135,7 +135,8 @@ export class Gathering {
       if (this.h.online()) return void this.h.send({ t: 'saw', l: l.uid, u: it.uid, go: 2 });
       if (!this.h.takeUp(l.uid)) return;
       this.wearAlone(it);
-      this.h.give([makeItem('planks', SAW.planks)], `${SAW.planks} Planks`);
+      // (the planks lie where the log lay: the owner, "when sawing logs the planks should go on the ground")
+      this.h.lay(makeItem('planks', SAW.planks), new THREE.Vector3(l.x, l.y, l.z), 0);
     }, 'You stopped sawing: the log is where you left it');
   }
 
