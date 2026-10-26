@@ -231,6 +231,8 @@ interface VmModel {
   ads: THREE.Vector3;
   /** the object holding the weapon in its original model space (grip points live here) */
   body?: THREE.Object3D;
+  /** a pack's own right wrist, what a knife in it is turned about when looked over */
+  wrist?: THREE.Object3D | null;
   /** something held to strike with: how it stands in the picture and how it is swung */
   melee?: MeleeStyle;
   /** what a finish is worn on, where that is not the whole of what is drawn (a knife in the pack's hands: not the hands) */
@@ -704,6 +706,10 @@ interface MeleeStyle {
   two: boolean;
   /** how far up from its butt the (right) hand closes round it, metres: the middle of the part that is made to be held */
   grip: number;
+  /** held point down (a karambit): stood on its head before it is measured, and hung by its ring (`spin`) */
+  flip?: boolean;
+  /** how much bigger it is drawn in one's own hands than it is (the eye's lens shrinks a short blade to nothing) */
+  fpScale?: number;
 }
 /**
  * A blow lands 0.35 of the way through it (see actionTick): by then the arm is thrown out in
@@ -817,7 +823,10 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   // own grip; the karambit's between its ring and its blade)
   styles.hunting_knife = { ...styles.knife, grip: 0.06 };
   styles.bayonet = { ...styles.knife, grip: 0.06 };
-  styles.karambit = { ...styles.knife, grip: 0.075 };
+  // (the karambit as CS:GO's, the owner's reference, 2026-10-25: the fist low on the right, the first finger through the
+  // ring at the bottom of the grip, the claw sweeping up and forward out of the top of the fist, edge forward; drawn a
+  // third bigger than it is, "the karambit knife is way too small in hand")
+  styles.karambit = { ...styles.knife, grip: 0.14, flip: true, fpScale: 1.35, idle: { p: [0.18, -0.14, -0.4], tip: [0.05, -0.95, -0.3], edge: [0, 0.25, -1] } };
   return styles;
 })();
 /**
@@ -854,6 +863,40 @@ const BLADE = {
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
 const _bh = new THREE.Vector3();
+/** the middle of what is at the top of a thing stood on its head (a karambit's ring): its points in the top fifth */
+function ringOf(o: THREE.Object3D, tall: number) {
+  o.updateMatrixWorld(true);
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  o.traverse((m) => {
+    const mesh = m as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const P = mesh.geometry.getAttribute('position');
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
+      if (v.y > tall * 0.8) box.expandByPoint(v);
+    }
+  });
+  return box.isEmpty() ? new THREE.Vector3(0, tall, 0) : box.getCenter(v.clone());
+}
+/**
+ * A knife looked over (I), long and slow as CS:GO's (the owner, 2026-10-25: "we need to make knife inspect animations too
+ * and they should be long"): brought up to the middle, turned to show one face, over to the other, round to show its edge,
+ * and home; a karambit first spun twice round the finger in its ring and caught. `k` how far through, 0..1. Any blow, the
+ * guard or a run breaks it off (the input).
+ */
+const KNIFE_LOOK = { dur: 5 };
+function knifeLook(k: number, ring: boolean) {
+  const s = THREE.MathUtils.smoothstep, w = s(k, 0, 0.08) * (1 - s(k, 0.92, 1));
+  // (a karambit's spin takes the first part; the faces and the edge are shown in what is left)
+  const a = ring ? 0.42 : 0.1, span = 0.9 - a, at = (f: number) => a + span * f;
+  return {
+    w,
+    spin: ring ? -Math.PI * 4 * THREE.MathUtils.smootherstep(k, 0.1, 0.38) : 0,
+    yaw: 1.15 * s(k, at(0), at(0.18)) - 2.3 * s(k, at(0.3), at(0.5)) + 1.15 * s(k, at(0.62), at(0.75)),
+    roll: 1.25 * s(k, at(0.62), at(0.75)) * (1 - s(k, at(0.85), at(1))),
+    tilt: -0.35 * w,
+  };
+}
 /** a stance as a place and a turn: the thing's own up is toward its head, and its edge is on its far side (-z) */
 function stanceQuat(s: Stance, out: THREE.Quaternion) {
   _sy.set(...s.tip).normalize();
@@ -1866,6 +1909,22 @@ export class Weapons {
       }
       if (longAxis === 'x') body.rotation.z = Math.PI / 2;
       if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
+      // (held point down: turned end over end about its flat, still standing from the floor up, and hung from the
+      // middle of its ring, `spin`, which it is spun round when looked over)
+      if (MELEE_STYLE[id]?.flip) {
+        const tall = longAxis === 'y' ? size.y : longAxis === 'x' ? size.x : size.z;
+        const over = new THREE.Group();
+        over.rotation.x = Math.PI;
+        over.position.y = tall;
+        for (const mesh of [...body.children]) over.add(mesh);
+        const ring = ringOf(over, tall);
+        const spin = new THREE.Group();
+        spin.name = 'spin';
+        spin.position.copy(ring);
+        over.position.sub(ring);
+        spin.add(over);
+        body.add(spin);
+      }
       // Where along it the fist closes: a hand's width up from the butt of a long handle, the
       // middle of a short one. That point is what is held out in front: the fist is in the
       // picture whatever the length of the thing.
@@ -1933,7 +1992,7 @@ export class Weapons {
     const bladeFp = assets.manifest.models.knife_fp;
     for (const id of KNIVES) {
       const m = this.models.get(id);
-      if (!m || !bladeFp?.rig) continue;
+      if (!m || !bladeFp?.rig || MELEE_STYLE[id]?.flip) continue;
       const rig = new WeaponRig(await assets.gltfOf('knife_fp'), bladeFp.rig, packMaterial);
       if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
       m.worn = hangKnife(rig, m.root);
@@ -3245,6 +3304,14 @@ export class Weapons {
         this.guardHeld = input.held('Mouse2') && !this.action;
         if (this.guardHeld) this.guardHold = 0.12;
         if (input.pressed('Mouse0') && !this.action && this.fireCooldown <= 0) this.swing(def.melee, camera);
+        if (input.pressed('KeyI') && !this.action && this.sprintT < 0.2 && KNIVES.includes(item.id)) {
+          this.start('check', KNIFE_LOOK.dur);
+          this.onAct('check', KNIFE_LOOK.dur);
+        } else if (this.action?.name === 'check' && (input.pressed('Mouse0') || input.held('Mouse2') || this.sprintT > 0.5)) {
+          this.action = null;
+          this.onAct('stop', 0);
+          if (input.pressed('Mouse0') && this.fireCooldown <= 0) this.swing(def.melee, camera);
+        }
       }
     } else if (enabled && !m && !p.dead && !this.held) {
       // bare hands
@@ -4774,8 +4841,17 @@ export class Weapons {
       pos.z -= s * SAW_STROKE.reach;
       elbow.z -= s * SAW_STROKE.reach;
     } else this.sawT = 0;
+    // looked over (knifeLook): brought in to the middle, turned, and a ring spun round the finger
+    const spin = m.body?.getObjectByName('spin');
+    if (a?.name === 'check') {
+      const l = knifeLook(Math.min(1, a.t / a.dur), !!spin);
+      pos.lerp(_mv.set(0.07, -0.12, -0.5), l.w);
+      quat.premultiply(_mq2.setFromEuler(_me.set(l.tilt, l.yaw, l.roll, 'YXZ')));
+      if (spin) spin.rotation.x = l.spin;
+    } else if (spin) spin.rotation.x = 0;
     m.root.position.copy(pos);
     m.root.quaternion.copy(quat);
+    if (st.fpScale) m.root.scale.setScalar(st.fpScale);
     m.root.visible = true;
     // The forearm lies from the elbow to the fist: said to the arms in the thing's own space,
     // which is where they are told everything. (The whole arm is drawn: thrown out at the end
@@ -4865,6 +4941,21 @@ export class Weapons {
       R.r[1] * sp + G.r[1] * g,
       R.r[2] * sp + G.r[2] * g + Math.cos(ph) * 0.025 * amp + kr.z * 0.01 - p.strafe * 0.03,
     );
+    // looked over (knifeLook): the hands, knife and all, turned about the wrist (about the pack's own origin, a hand's
+    // length behind it, the arm swept across the picture)
+    if (a?.name === 'check') {
+      const l = knifeLook(Math.min(1, a.t / a.dur), false);
+      m.root.position.x -= 0.05 * l.w;
+      m.root.position.y += 0.04 * l.w;
+      m.wrist ??= m.root.getObjectByName('R_wrist_027') ?? null;
+      if (m.wrist && m.root.parent) {
+        m.root.updateMatrixWorld(true);
+        const piv = m.root.parent.worldToLocal(m.wrist.getWorldPosition(_bh));
+        _mq2.setFromEuler(_me.set(l.tilt, l.yaw, l.roll, 'YXZ'));
+        m.root.quaternion.premultiply(_mq2);
+        m.root.position.sub(piv).applyQuaternion(_mq2).add(piv);
+      }
+    }
     m.root.visible = true;
     // (a pack brings its own arms)
     this.arms.update(null, null, this.vmCamera.quaternion, false);
