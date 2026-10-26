@@ -531,6 +531,28 @@ export const itemsMethods = {
     this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.danced ?? this.hold, EMOTE[this.lastCall]?.say ?? '', chose);
   },
 
+  /**
+   * Focus gone (another window, the tab hidden, the mouse let go: Input.onLetGo): nothing opened by a held key or button
+   * stays open, as its key-up will never come. The wheels shut choosing nothing, a throw wound up and an emote's hands
+   * are let down, and a grenade whose pin is not out yet is not pulled (one whose pin is out is thrown, as on the button
+   * let go: the rule of 2026-10-13).
+   */
+  letGo(this: Game) {
+    this.build.letGo();
+    if (this.wheelOn) {
+      this.wheelOn = false;
+      this.hud.wheel(false);
+    }
+    this.throwing.cancel();
+    if (this.hold) this.setHold(null);
+    if (this.cook && this.cook.live < 0) {
+      this.cook = null;
+      this.act('stop');
+      if (this.inHand) this.rest();
+      else this.weapons.endUse();
+    }
+  },
+
   /** The words people near have called out, over their heads: for whoever is close and can see them. */
   updateSaid(this: Game, now: number) {
     if (!this.said.size) return;

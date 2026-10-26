@@ -336,6 +336,8 @@ export class RaidView {
     const d = this.charges.get(m.i);
     if (d) this.drop(d);
   }
+  /** focus gone (Game.letGo) */
+  letGo() {}
   /** the server gone (back alone): its charges with it */
   clear() {
     for (const d of [...this.charges.values()]) if (!d.mine) this.drop(d);

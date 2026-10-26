@@ -27,6 +27,9 @@ export class Input {
   keyAt = 0;
   padAt = 0;
   onLockChange: (locked: boolean) => void = () => {};
+  /** the game has lost the player's attention (another window, the tab hidden, the mouse let go): whatever the game
+   * holds open on a held key or button is let go of here too, as no key-up will come for it */
+  onLetGo: () => void = () => {};
   /** keys the player has put things on: each to the name the game asks for that thing by ('' for a key that now does nothing). See src/core/keys.ts. */
   private via = new Map<string, string>();
   /** the keys as the player has set them (anything held is let go: it may not be the same thing any more) */
@@ -60,10 +63,16 @@ export class Input {
       this.down.delete(k);
       this.releasedSet.add(k);
     });
-    window.addEventListener('blur', () => {
+    // (the owner, 2026-10-25: "when i tab out of my browser then click back into the game my inputs are being
+    // disconnected ... when i refresh and reload all the functionality comes back")
+    const away = () => {
       for (const k of this.down) this.releasedSet.add(k);
       this.down.clear();
-    });
+      this.mouseDX = this.mouseDY = 0;
+      this.onLetGo();
+    };
+    window.addEventListener('blur', away);
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && away());
     el.addEventListener('mousedown', (e) => {
       // a tap also arrives as a mouse click: on a touch screen the buttons do the shooting
       if (this.touch) return;
@@ -124,6 +133,7 @@ export class Input {
       for (const k of [...this.down]) if (k.startsWith('Mouse')) this.down.delete(k);
     }
     this.onLockChange(locked);
+    if (!locked) this.onLetGo();
   }
 
   /** Aim input from a finger dragging across the screen, in mouse pixels. */

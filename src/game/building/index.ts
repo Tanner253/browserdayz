@@ -250,6 +250,15 @@ export class Building {
   get wheelOpen() {
     return this.wheel.isOpen;
   }
+  /** focus gone (Game.letGo): a wheel up shuts choosing nothing, a piece being turned goes back to its first click */
+  letGo() {
+    if (this.wheel.isOpen) {
+      this.wheelFor = null;
+      this.wheel.close(-1);
+    }
+    this.placing = null;
+    this.raid.letGo();
+  }
 
   /** who the player is to a base: their public id online (as their dog tag has it), 'me' alone */
   private get me() {

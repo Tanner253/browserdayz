@@ -1536,6 +1536,7 @@ export class Game {
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
+    this.input.onLetGo = () => this.letGo();
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
@@ -2021,6 +2022,7 @@ export interface Game {
   emote: Methods<typeof itemsMethods>['emote'];
   setHold: Methods<typeof itemsMethods>['setHold'];
   updateWheel: Methods<typeof itemsMethods>['updateWheel'];
+  letGo: Methods<typeof itemsMethods>['letGo'];
   updateSaid: Methods<typeof itemsMethods>['updateSaid'];
   blowBarrel: Methods<typeof itemsMethods>['blowBarrel'];
   updateBarrels: Methods<typeof itemsMethods>['updateBarrels'];
