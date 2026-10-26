@@ -8,7 +8,7 @@ import { ITEMS } from '../../sim/items';
 import * as THREE from 'three';
 import { Stash } from '../loot';
 import { toWorld, type Base } from '../../sim/build/snap';
-import { perDay, pay, pays, protectedFor, rot, saidTime, toward } from '../../sim/build/upkeep';
+import { STORE, perDay, pay, pays, protectedFor, rot, saidTime, toward } from '../../sim/build/upkeep';
 import type { Bases } from '../../sim/build/bases';
 import type { S2C, C2S, StoredItem } from '../../net/protocol';
 import type { Input } from '../../core/input';
@@ -82,7 +82,7 @@ export class ClaimView {
     }
     const [x, y, z] = toWorld(b, p.x, p.y, p.z);
     if (had && Math.hypot(had.x - x, had.z - z) < 0.05) return;
-    const s = new Stash(`claim:${b.id}`, x, y + 0.4, z, 0, 6, 4, 'Claim');
+    const s = new Stash(`claim:${b.id}`, x, y + 0.4, z, 0, STORE.w, STORE.h, 'Claim');
     if (had) s.container.load({ items: had.container.serialize().items });
     this.stores.set(b.id, s);
   }
