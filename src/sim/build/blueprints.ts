@@ -6,7 +6,10 @@
 // in order, as far as what is carried pays and the ground allows. Laid again on that base, it lays what is still missing.
 
 import { Bases, type Ask } from './bases';
-import { STOREY, costOf, laidAt } from './pieces';
+import { PIECES, PLACED, STOREY, costOf, laidAt } from './pieces';
+
+/** what a blueprint's piece costs: its door from the materials the door's item is made of (the blueprint hangs it whole) */
+const printPiece = (k: string) => (PLACED[k] ? { ...(PIECES[k].cost ?? {}) } : costOf(k, laidAt(k)));
 import { nearestSpot, spots, type Base, type Piece } from './snap';
 
 export interface Print {
@@ -69,7 +72,7 @@ export function asksOf(id: string): Ask[] {
 /** what a whole print costs, laid as frames (and its fittings whole) */
 export function printCost(id: string): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const a of asksOf(id)) for (const [k, n] of Object.entries(costOf(a.k, laidAt(a.k)))) out[k] = (out[k] ?? 0) + n;
+  for (const a of asksOf(id)) for (const [k, n] of Object.entries(printPiece(a.k))) out[k] = (out[k] ?? 0) + n;
   return out;
 }
 
@@ -94,8 +97,8 @@ export function layPrint(bases: Bases, id: string, at: { b?: number; x: number; 
       why ??= c;
       continue;
     }
-    if (!pays(costOf(a.k, laidAt(a.k)))) {
-      return { base, laid, fresh, why: 'Short of materials for the rest', need: costOf(a.k, laidAt(a.k)) };
+    if (!pays(printPiece(a.k))) {
+      return { base, laid, fresh, why: 'Short of materials for the rest', need: printPiece(a.k) };
     }
     const r = bases.lay(ask, by, now, name);
     if (typeof r === 'string') {

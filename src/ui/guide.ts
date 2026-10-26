@@ -58,7 +58,7 @@ function steps(): Step[] {
       ...([1, 2, 3, 4] as Tier[]).map((t) => `<b>${TIERS[t]}</b>: ${wall(t)}${TIER_BENCH[t] ? ` (a level ${TIER_BENCH[t]} workbench within ${BENCH_NEAR} m)` : ''}`),
     ] },
     { tab: 'Building', title: 'A door and a lock', pic: '/guide/door.webp', lines: [
-      'With the plan, pick a <b>door</b> and aim at the doorway: it hangs there.',
+      'Make a <b>door</b> at the crafting screen, hold it and aim at the doorway: the <b>left button</b> hangs it there, <b>R</b> turns its swing.',
       'Hold a <b>code lock</b> or <b>key lock</b>, look at the door and <b>left-click</b> to fit it, then set the code.',
     ] },
     { tab: 'Building', title: 'The flag and upkeep', pic: '/changelog/media/bb-hut-flag.jpg', lines: [

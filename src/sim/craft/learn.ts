@@ -4,6 +4,7 @@
 // in order, cheaper ones first"). What a player knows is kept with them for good, through death, as Rust keeps it until a
 // wipe: by the server, or by the browser played alone. Shared by both, which judge alike.
 
+import { PLACED } from '../build/pieces';
 import { RECIPE, RECIPES, type Level, type Recipe } from './recipes';
 import { ITEMS, type ItemInstance } from '../items';
 import { count } from './plan';
@@ -13,7 +14,9 @@ import { HELD_BACK } from '../build/raid';
 /** known from the start: everything made by hand, the forge's bar, and a bench's first tools, bed and plan */
 export const KNOWN_AT_START: ReadonlySet<string> = new Set([
   ...RECIPES.filter((r) => r.at !== 'bench').map((r) => r.id),
-  'hammer', 'hatchet', 'building_plan', 'sleeping_bag', 'research_table',
+  'hammer', 'hatchet', 'building_plan', 'sleeping_bag',
+  // (whatever is set down from the hands: a base needs its doors and its benches from the first)
+  ...Object.values(PLACED),
 ]);
 
 /** each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there (less what is held back: src/sim/build/raid.ts) */

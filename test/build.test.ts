@@ -364,18 +364,21 @@ ok('a fitting hangs in an opening of its sort, one to an opening, either way rou
 ok('the metal fittings need a workbench II near, the armoured ones a III; the wooden ones none', () => {
   const { bs, b } = hut();
   const s = spots(b, 'door_metal')[0];
-  assert.match(String(bs.lay({ b: b.id, k: 'door_metal', ...s }, ME, 0)), /needs a level II workbench/);
+  // (a door is hung from its item, made at the bench it needs: hung anywhere; bars are laid with the plan, by a bench)
+  assert.ok(typeof bs.lay({ b: b.id, k: 'door_metal', ...s }, ME, 0) !== 'string', 'a metal door hung from its item, no bench by');
+  assert.match(String(bs.lay({ b: b.id, k: 'bars_metal', ...spots(b, 'bars_metal')[0] }, ME, 0)), /needs a level II workbench/);
   assert.ok(typeof bs.lay({ b: b.id, k: 'bars_wood', ...spots(b, 'bars_wood')[0] }, ME, 0) !== 'string');
   const h = hut(true), bench = [...h.b.pieces.values()].find((p) => p.k === 'workbench')!;
   // (a level I bench is not enough; brought up a level at a time, for its own cost, it is)
-  assert.match(String(h.bs.lay({ b: h.b.id, k: 'door_metal', ...spots(h.b, 'door_metal')[0] }, ME, 0)), /needs a level II workbench/);
+  assert.match(String(h.bs.lay({ b: h.b.id, k: 'bars_metal', ...spots(h.b, 'bars_metal')[0] }, ME, 0)), /needs a level II workbench/);
   assert.equal(h.bs.canUpgrade(h.b.id, bench.id, 3), 'A level at a time');
   assert.deepEqual(costOf('workbench', 2), { iron_bar: 10, nails: 40, hardware: 2 });
   assert.ok(h.bs.upgrade(h.b.id, bench.id, 2));
   assert.equal(benchLevel(bench), 2);
   assert.ok(typeof h.bs.lay({ b: h.b.id, k: 'door_metal', ...spots(h.b, 'door_metal')[0] }, ME, 0) !== 'string');
   assert.match(String(h.bs.canUpgrade(h.b.id, 2, 4)), /level III workbench/, 'a wall up to armoured');
-  assert.deepEqual(costOf('door_metal', 3), { sheet_metal: 4, nails: 20, hardware: 1 });
+  // (hung from its item: what it is made of is its recipe's now)
+  assert.deepEqual(costOf('door_metal', 3), { door_metal: 1 });
   assert.deepEqual([hpOf('door_wood', 1), hpOf('door_metal', 3), hpOf('garage_door', 3), hpOf('door_armoured', 4)], [250, 500, 1000, 1000]);
 });
 
@@ -437,7 +440,7 @@ ok('a box picked up gives back the box itself (set down from the hands: PLACED);
   assert.deepEqual(bs.refund(b.id, box.piece.id), { box_small: 1 });
   // (or broken up: half of what it took to make, the owner, 2026-10-25: "deconstruct and grab should be 2 different options")
   assert.deepEqual(bs.salvage(b.id, box.piece.id), { planks: 6, nails: 4 });
-  assert.deepEqual(bs.refund(b.id, d.id), { planks: 6, nails: 4 }, 'a door is built: half back');
+  assert.deepEqual(bs.refund(b.id, d.id), { door_wood: 1 }, 'a door is hung from its item: picked up whole');
   const kept = JSON.parse(JSON.stringify(bs.keep(undefined, (_b, p) => (p.k === 'box_small' ? [{ id: 'nails', qty: 3 }] : undefined))));
   const again = heard(kept[0])!;
   assert.equal(again.pieces.get(d.id)?.open, true);

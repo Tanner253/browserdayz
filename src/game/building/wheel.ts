@@ -85,7 +85,7 @@ export function planEntries(cat: number, kind: string): RadialEntry[] {
 export function hammerEntries(p: Piece | null): RadialEntry[] {
   return HAMMER_WHEEL.map((w): RadialEntry => {
     if (w === 'unlock') return { id: w, label: 'Lock off', icon: actionIcon('lock'), mark: p?.lock ? undefined : 'dim' };
-    if (w === 'remove') return { id: w, label: p && PIECES[p.k].role === 'deploy' && p.k !== 'claim' ? 'Pick up' : 'Take down', icon: actionIcon('remove', '#ee7a6e'), mark: p ? undefined : 'dim' };
+    if (w === 'remove') return { id: w, label: p && ((PIECES[p.k].role === 'deploy' && p.k !== 'claim') || PLACED[p.k]) ? 'Pick up' : 'Take down', icon: actionIcon('remove', '#ee7a6e'), mark: p ? undefined : 'dim' };
     if (w === 'scrap') return { id: w, label: 'Deconstruct', icon: actionIcon('remove', '#c9a24a'), mark: p && PLACED[p.k] ? undefined : 'dim' };
     // (mended when it has lost health; turned about within ten minutes of being laid: src/sim/build/bases.ts MEND)
     if (w === 'repair') return { id: w, label: 'Repair', icon: actionIcon('repair'), mark: p && p.hp < hpOf(p.k, p.t) - 0.5 ? undefined : 'dim' };
