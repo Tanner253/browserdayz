@@ -21,6 +21,7 @@
 
 import { claimPanelHtml, mountClaimPanel } from '../game/building/claim-panel';
 import { STORE } from '../sim/build/upkeep';
+import { PIECES } from '../sim/build/pieces';
 import '../ui/style.css';
 import '../ui/hud.css';
 import { InventoryUI, type InvActions } from '../ui/inventory-ui';
@@ -158,7 +159,7 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   const claim = stashId === 'claim';
   // (`&open=rack`: the Weapon Rack's store, its bays as squares over it: guns on two cups and the shelf, rounds under)
   const opened = stashId === 'rack' ? (() => {
-    const c = Object.assign(new Container('stage-rack', 'Weapon Rack', 10, 21, []), { rack: true });
+    const [w, h] = PIECES.weapon_rack.store!, c = Object.assign(new Container('stage-rack', 'Weapon Rack', w, h, []), { rack: true });
     const longs = Object.values(ITEMS).filter((d) => d.slot === 'long' && d.weapon).map((d) => d.id);
     c.place(made({ id: 'ak', mag: 'mag_ak', loaded: 31 }), 0, 0, false);
     c.place(makeItem(longs.find((id) => id !== 'ak')!), 0, 6, false);
