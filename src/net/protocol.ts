@@ -90,7 +90,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // and so many a player may have, src/sim/build/beds.ts. A page of 69 shows a bed as ready that has none left.)
 // (71, 2026-10-26: a workbench used by F at it, 'bench', its recipes made and its tree unlocked only while it is: a page of
 // 70 never says which bench it uses and could make nothing at one)
-export const PROTOCOL = 71;
+// (72, 2026-10-26: things set down at any angle anywhere on a floor, a head admin's 'top' on 'role', a code's 'bcoded', a
+// gun rack's bays: a page of 71 sets things down squared and shows a rack's bays as dead cells)
+export const PROTOCOL = 72;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
