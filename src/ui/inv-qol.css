@@ -97,3 +97,8 @@
    sometimes"): the browser's own width, not its thin one. (Where a browser still draws them by the older rules, 13 px.) */
 .inv-col, .inv-ground, .inv-cargo > .inv-scroll, .inv-cargo > .inv-inspect, .inv-gridbox.wide { scrollbar-width: auto; }
 .inv-col::-webkit-scrollbar, .inv-ground::-webkit-scrollbar, .inv-scroll::-webkit-scrollbar, .inv-inspect::-webkit-scrollbar { width: 13px; height: 13px; }
+
+/* a gun rack's bays: five square tiles as the worn strip's, a gun each, over the store's own rows (inventory-ui.ts bayTiles, rackStore) */
+.inv-strip.inv-rack-bays { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 4px 0 10px; }
+.inv-strip.inv-rack-bays .inv-slot { height: auto; aspect-ratio: 1; }
+.inv-rack-store { overflow: hidden; }
