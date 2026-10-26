@@ -75,7 +75,8 @@ ok('every recipe makes a real thing out of real things; by hand in 2 to 6 s; the
   assert.ok(RECIPES.some((r) => r.at === 'bench') && RECIPES.some((r) => r.at === 'forge'));
   // (found, never made: the plan; nails loot-only, the owner: "they must be looted which is hard and time consuming";
   // the best guns loot-only, v3: "The best guns stay loot-only (gas, bunker, airdrops)")
-  for (const id of ['code_lock', 'rubbing_alcohol', 'ammo_556', 'nails', 'metal_pipe', 'spring', 'gun_body_pistol', 'gun_body_rifle', 'deagle', 'benelli', 'barrett', 'sniper50', 'vssk', 'ar15', 'mp7a1', 'm32', 'scope_50'])
+  // (the code lock is made now, at a level II bench, and found rarely: the owner, 2026-10-25)
+  for (const id of ['rubbing_alcohol', 'ammo_556', 'nails', 'metal_pipe', 'spring', 'gun_body_pistol', 'gun_body_rifle', 'deagle', 'benelli', 'barrett', 'sniper50', 'vssk', 'ar15', 'mp7a1', 'm32', 'scope_50'])
     assert.ok(!RECIPES.some((r) => r.makes === id), `${id} is made`);
   for (const r of RECIPES) if (r.at === 'bench') assert.ok(r.lv && r.lv >= 1 && r.lv <= 3, `${r.id} has no bench level`);
   assert.ok(ITEMS.rubbing_alcohol.loot && ITEMS.tin_can.loot, 'rubbing alcohol and the tin can are not found');

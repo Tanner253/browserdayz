@@ -53,9 +53,11 @@ const REACH = TOUCH ? 6.5 : 5.4;
  * as it is from a few steps further off, until there is. The nearest thing of all is never left out, and what
  * is in the hands or looked at is not this file's to refuse: it is taken off what is left for the rest.
  */
-// (A computer's sharper pictures are a size up from 512 (DESK_NEAR), for bodies and what is held or worn, close: the
-// owner, 2026-10-25, "we need to be more performant". Room for one's own body, the gear on it and three or four others.)
-const SHARP_BUDGET_MB = TOUCH ? 900 : 160;
+// (A computer's sharper pictures are what each file holds up to 2048 (DESK_NEAR), for bodies, what is held or worn and
+// what a base and the traders are made of, close. 160 MB held the 1024s of the owner's body, gear and three or four
+// others; the 2048s of the same want twice that, and nearest goes first: "proximity based so further away the textures
+// are downscaled but up close nice and HD", 2026-10-25.)
+const SHARP_BUDGET_MB = TOUCH ? 900 : 320;
 
 const _v = new THREE.Vector3(), _m = new THREE.Matrix4();
 /** whether it and everything it hangs from are shown */

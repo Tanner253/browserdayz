@@ -398,7 +398,7 @@ export type C2S =
   /** `scrap`: a thing set down from the hands broken up for some of its materials, not picked up whole */
   | { t: 'bdel'; b: number; p: number; u: string; scrap?: 1 }
   /** the hammer `u` mending piece `p` of base `b` whole, or turning it about (src/sim/build/bases.ts MEND) */
-  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean }
+  | { t: 'bfix'; b: number; p: number; u: string; turn?: boolean; bit?: 1 }
   /** joining a base's claim, or leaving it (stood at it) */
   | { t: 'bjoin'; b: number }
   /** a base's door (a hatch, shutters, a gate) opened or shut; knocked on */
@@ -413,6 +413,8 @@ export type C2S =
   | { t: 'bunlock'; b: number; p: number; u: string }
   /** a blueprint laid with the plan `u` (src/sim/build/blueprints.ts): begun on the ground, or carried on with on base `b` */
   | { t: 'bprint'; id: string; b?: number; x: number; z: number; yaw: number; u: string }
+  /** what is carried put into the blueprint on base `b` (src/sim/build/blueprints.ts fillSite), or the blueprint called off */
+  | { t: 'bfill'; b: number; cancel?: 1 }
   /** raiding (src/sim/build/raid.ts): a blow of the tool in the hands `u` landed on piece `p` of base `b` at `at`; a charge
    * (item `u`, `w` 'c4' or 'satchel') stuck at `at` on a face turned to `n`; a charge that did not go off, lit again */
   | { t: 'bhit'; b: number; p: number; u: string; at: [number, number, number] }
@@ -528,6 +530,8 @@ export type S2C =
   | { t: 'base'; b: KeptBase }
   | { t: 'bgone'; b: number }
   | { t: 'bpc'; b: number; p: KeptPiece }
+  /** the blueprint on base `b` as it is now: which, and what has been brought (null: none, or it is done) */
+  | { t: 'bsite'; b: number; s: [string, Record<string, number>] | null }
   | { t: 'bout'; b: number; ids: number[] }
   /** a base's claim as it is now (null: gone), with no store; the health of its pieces rotting */
   | { t: 'bclaim'; b: number; c: KeptClaim | null }

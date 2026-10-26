@@ -18,6 +18,8 @@
 //   &touch=1                       as a phone has it
 // What is done in it (a drag, a key, a drop) is done to these pockets alone, and nothing is kept.
 
+import { claimPanelHtml, mountClaimPanel } from '../game/building/claim-panel';
+import { STORE } from '../sim/build/upkeep';
 import '../ui/style.css';
 import '../ui/hud.css';
 import { InventoryUI, type InvActions } from '../ui/inventory-ui';
@@ -119,7 +121,13 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   const body = { uid: 'stage-body', label: 'Body of Sam', container: box, corpse: true, known: true } as unknown as Stash;
   // (`&open=stash_kit`: a stash of that kind open beside them instead, the guns of a kit in it: its width against the screen's)
   const stashId = q.get('open'), room = stashId ? ITEMS[stashId]?.stash : undefined;
-  const opened = room ? (() => {
+  // (`&open=claim`: a claim's store, as big as one is, with its upkeep beside it: src/game/building/claim-panel.ts)
+  const claim = stashId === 'claim';
+  const opened = claim ? (() => {
+    const c = new Container('stage-claim', 'Claim', STORE.w, STORE.h, []);
+    for (const [id, n] of [['planks', 60], ['planks', 60], ['stone', 80], ['metal_frags', 40], ['nails', 30]] as [string, number][]) c.add(makeItem(id, n));
+    return { uid: 'stage-claim', label: 'Claim', container: c, corpse: false, known: true } as unknown as Stash;
+  })() : room ? (() => {
     const c = new Container('stage-stash', ITEMS[stashId!].name, room[0], room[1], []);
     for (const th of kitOf('heavy').things.map(made)) c.add(th);
     return { uid: 'stage-stash', label: ITEMS[stashId!].name, container: c, corpse: false, known: true } as unknown as Stash;
@@ -212,6 +220,12 @@ export async function stageScreen(q: URLSearchParams, renderer: THREE.WebGLRende
   // (the figure as the game draws it still: one of the survivors' bodies, &who=0..3, the first unsaid)
   if (env) screen.doll = await renderDoll(renderer, env, lookFor('Stage'), Object.values(inv.slots).flatMap((it) => (it ? [wornKey(it)] : [])), undefined, false, +(q.get('who') ?? 0));
   screen.open(vicinity, opened ?? body, freshVitals());
+  if (claim) {
+    const panel = document.createElement('div');
+    mountClaimPanel(panel);
+    const had: Record<string, number> = { planks: 120, stone: 80, metal_frags: 40 };
+    panel.innerHTML = claimPanelHtml({ left: 2 * 86400 + 14 * 3600, dry: false, day: [['planks', 42], ['stone', 18], ['metal_frags', 6]], have: (id) => had[id] ?? 0, names: ['Survivor753', 'Kasia'], on: true }, icons);
+  }
   const view = q.get('view');
   if (view) (screen.craftPane as CraftingScreen).showView(view as Parameters<CraftingScreen['showView']>[0]);
   if (q.get('tab') === 'craft') screen.setMode('craft');

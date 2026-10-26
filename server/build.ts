@@ -6,10 +6,10 @@
 // they go far off (the owner: "imagine 100's of bases on the map, how will we handle this without pickup a performance
 // cost"). Kept in the one save (server/keep.ts), with no write of its own.
 
-import { Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
+import { mendOf, Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/sim/build/bases';
 import { struckAt } from './raid';
 import { PIECES, PLACED, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
-import { toWorld } from '../src/sim/build/snap';
+import { toWorld, type Base } from '../src/sim/build/snap';
 import { bedsFull } from '../src/sim/build/beds';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { HAMMERS, condition } from '../src/sim/gather';
@@ -22,7 +22,7 @@ import { tool, use, woods } from './gather';
 import { pidOf } from './acts';
 import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
 import { boxStore, boxesBack, emptyBox, heldIn, spillBoxes } from './boxes';
-import { asksOf, layPrint, printOf } from '../src/sim/build/blueprints';
+import { asksOf, beginSite, fillSite, layPrint, printOf, wantOf } from '../src/sim/build/blueprints';
 import { roleOf } from './gate';
 import { CAMP_KEEP, TRADER_SPOTS } from '../src/sim/camp-place';
 
@@ -231,20 +231,45 @@ export function print(c: Client, m: Extract<C2S, { t: 'bprint' }>) {
   if (m.b !== undefined && !b) return;
   const [x, , z] = b ? toWorld(b, 0, 0, 0) : [m.x, 0, m.z];
   if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.lay + 6) return;
-  const free = creative(c);
-  const r = layPrint(all, m.id, { b: m.b, x: m.x, z: m.z, yaw: m.yaw }, own(c), Date.now(), c.name, (cost) => {
-    if (free) return true;
-    if (short(c.inv, cost)) return false;
-    pay(c, cost);
-    return true;
-  });
-  if (!r.base || !r.laid.length) return void send(c, { t: 'tell', kind: 'warn', text: (r.need && short(c.inv, r.need)) || r.why || 'Nothing more of it to lay' });
-  if (r.fresh) sighting();
-  else for (const p of r.laid) tellBase(r.base.id, { t: 'bpc', b: r.base.id, p: saidPiece(p) });
-  const left = asksOf(m.id).length - r.base.pieces.size;
-  const why = (r.need && short(c.inv, r.need)) || r.why;
-  send(c, { t: 'tell', kind: left > 0 ? 'info' : 'good', text: `${printOf(m.id)!.name}: ${r.laid.length} laid${left > 0 && why ? `; ${why.toLowerCase()}` : ''}` });
-  log(`[build] ${c.name} laid ${r.laid.length} pieces of a ${m.id} in base ${r.base.id}`);
+  // (set down for nothing, its first piece a frame to mark it out; then filled from what is carried: blueprints.ts)
+  const site = beginSite(all, m.id, { b: m.b, x: m.x, z: m.z, yaw: m.yaw }, own(c), Date.now(), c.name);
+  if (typeof site === 'string') return void send(c, { t: 'tell', kind: 'warn', text: site });
+  if (!b) sighting();
+  log(`[build] ${c.name} set down a ${m.id} in base ${site.id}`);
+  fillFrom(c, site);
+}
+
+/** what is carried put into a base's blueprint, and built as far as it goes; or the blueprint called off */
+export function fill(c: Client, m: Extract<C2S, { t: 'bfill' }>) {
+  if (!c.alive || !Number.isInteger(m.b)) return;
+  const b = bases().bases.get(m.b);
+  if (!b?.site) return;
+  if (Math.hypot(b.ox - c.pose[0], b.oz - c.pose[2]) > REACH.lay + 8) return void send(c, { t: 'tell', kind: 'warn', text: 'Too far off' });
+  if (!allowed(c, b)) return void send(c, { t: 'tell', kind: 'warn', text: 'It is not your blueprint' });
+  if (m.cancel === 1) {
+    const back = { ...b.site.have }, name = printOf(b.site.print)?.name ?? 'blueprint';
+    b.site = undefined;
+    tellBase(b.id, { t: 'bsite', b: b.id, s: null });
+    const items = Object.entries(back).map(([id, n]) => makeItem(id, n));
+    if (items.length) send(c, { t: 'kit', name: 'Called off', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
+    return void send(c, { t: 'tell', kind: 'info', text: `The ${name.toLowerCase()} is called off: what was brought to it is back` });
+  }
+  fillFrom(c, b);
+}
+
+/** whoever may fill a base's blueprint: whoever may build there (its claim's members, or anybody with none) */
+const allowed = (c: Client, b: Base) => !b.claim || b.claim.members.some((m) => m.pid === own(c));
+
+function fillFrom(c: Client, b: Base) {
+  const free = creative(c), print = b.site!.print, name = printOf(print)?.name ?? 'Blueprint';
+  const count = (id: string) => (free ? 1e9 : [...things(c.inv)].filter((t) => t.id === id).reduce((n, t) => n + (t.qty ?? 1), 0));
+  const r = fillSite(bases(), b, own(c), Date.now(), c.name, count, (id, n) => (free ? undefined : pay(c, { [id]: n })));
+  for (const p of r.laid) tellBase(b.id, { t: 'bpc', b: b.id, p: saidPiece(p) });
+  tellBase(b.id, { t: 'bsite', b: b.id, s: b.site ? [b.site.print, { ...b.site.have }] : null });
+  const items = Object.entries(r.back).map(([id, n]) => makeItem(id, n));
+  if (items.length) send(c, { t: 'kit', name: 'Left over', items, adds: true, gift: Object.entries(r.back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
+  const want = wantOf(b), still = Object.entries(want).map(([id, n]) => `${n} ${ITEMS[id]?.name.toLowerCase() ?? id}`).join(', ');
+  send(c, { t: 'tell', kind: r.done ? 'good' : 'info', text: r.done ? `${name}: built` : `${name}: ${r.laid.length} built${still ? `; it still needs ${still}` : ''}` });
 }
 
 function atPiece(c: Client, b: number, p: number, u: unknown): { it: ItemInstance; why: string | null } | null {
@@ -303,6 +328,9 @@ export function takeDown(c: Client, m: Extract<C2S, { t: 'bdel' }>) {
   if (items.length) send(c, { t: 'kit', name: scrap ? 'Deconstructed' : 'Taken down', items, adds: true, gift: Object.entries(back).map(([id, n]) => `${n} ${ITEMS[id].name}`).join(', ') });
 }
 
+/** blows of the hammer mending, by player: when each last landed (a blow comes no faster than this, ms) */
+const lastMend = new WeakMap<Client, number>(), MEND_GAP = 420;
+
 /** the hammer at a piece: mended whole for a share of what it cost (not within half a minute of a blow), or turned about */
 export function mend(c: Client, m: Extract<C2S, { t: 'bfix' }>) {
   if (!Number.isInteger(m.b) || !Number.isInteger(m.p)) return;
@@ -313,7 +341,15 @@ export function mend(c: Client, m: Extract<C2S, { t: 'bfix' }>) {
   if (why) return void send(c, { t: 'tell', kind: 'warn', text: why });
   const piece = all.bases.get(m.b)!.pieces.get(m.p)!;
   if (m.turn) all.turn(m.b, m.p);
-  else {
+  else if (m.bit === 1) {
+    // (a blow of the hammer: a bit of its health back for a bit of its cost, no faster than a hammer swings)
+    if (now - (lastMend.get(c) ?? 0) < MEND_GAP) return;
+    lastMend.set(c, now);
+    const bit = mendOf(piece), no = free ? null : short(c.inv, bit.cost);
+    if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
+    if (!free) pay(c, bit.cost);
+    piece.hp = Math.min(hpOf(piece.k, piece.t), piece.hp + bit.gain);
+  } else {
     const cost = free ? {} : repairOf(piece), no = short(c.inv, cost);
     if (no) return void send(c, { t: 'tell', kind: 'warn', text: no });
     pay(c, cost);

@@ -309,6 +309,22 @@ export class Player {
    * at the top it steps off forward onto what the ladder leans on, at the foot it lets go; Space jumps off backward.
    * What is overhead (a hatch shut) stops it, as anything stops a body.
    */
+  /**
+   * Pushed along the ground by something moving into the body (a door's leaf: src/game/building/draw.ts), through the
+   * character controller, so that walls and foundations stop it as they stop a step: what of the push was had (0 to 1).
+   * `past`: colliders that do the pushing, and so are not what stops it.
+   */
+  shove(dx: number, dz: number, past?: ReadonlySet<number>): number {
+    const want = Math.hypot(dx, dz);
+    if (!this.kcc || this.dead || want < 1e-6) return want < 1e-6 ? 1 : 0;
+    const t = this.body.translation();
+    this.kcc.computeColliderMovement(this.collider, { x: dx, y: 0, z: dz }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, past ? (c) => !past.has(c.handle) : undefined);
+    const mv = this.kcc.computedMovement(), next = { x: t.x + mv.x, y: t.y, z: t.z + mv.z };
+    this.body.setTranslation(next, true);
+    this.pos.set(next.x, this.pos.y, next.z);
+    return Math.hypot(mv.x, mv.z) / want;
+  }
+
   private climbStep(h: number, input: MoveInput) {
     const c = this.climb!, t = this.body.translation(), feet = t.y - this.half() - RADIUS;
     const up = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);

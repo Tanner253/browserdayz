@@ -53,8 +53,10 @@ export const gesturesMethods = {
         }
       }
 
-      // --- hands busy with something that is not a weapon
-      if (using && ges && this.armR && this.armL && this.neck.length) {
+      // --- hands busy with something that is not a weapon (and a saw at a log, a charge armed: what they hold stays in
+      // the fist for those, so they are not `using`, but the arms are at the work all the same. Kept out of this, the saw
+      // stood still in the hand while a log was sawn: the owner, 2026-10-26)
+      if (ges && (using || ges.kind === 'saw' || ges.kind === 'arm') && this.armR && this.armL && this.neck.length) {
         settle(this.root);
         const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
         const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
@@ -83,9 +85,11 @@ export const gesturesMethods = {
         } else if (ges.kind === 'saw') {
           // a log sawn at the feet: the left hand braced on it, the right and its saw drawn forward and back (the owner,
           // 2026-10-25: "sawing animation is moving the hand and arm forweward and backward with the saw attached")
-          this.reach(this.armL, near(at(0.42, -0.95, -0.18), this.armL), dirOf(1, -0.3, 0.2), dirOf(0, -1, 0), [0.5, 0.55, 0.6, 0.65], aimQ, wgt);
-          const r = at(0.5 + Math.sin((ges.t * Math.PI * 2) / 0.7) * 0.14, -0.85, 0.16);
-          this.reach(this.armR, near(r, this.armR), dirOf(1, -0.4, 0), dirOf(-0.2, 0, -1), [1.4, 1.45, 1.5, 1.5], aimQ, wgt);
+          // (crouched over it: the head is under a metre up, the log's top a fifth of one)
+          this.reach(this.armL, near(at(0.42, -0.72, -0.18), this.armL), dirOf(1, -0.3, 0.2), dirOf(0, -1, 0), [0.5, 0.55, 0.6, 0.65], aimQ, wgt);
+          const r = at(0.5 + Math.sin((ges.t * Math.PI * 2) / 0.7) * 0.14, -0.62, 0.16);
+          // (the fingers pointed down at the log: the blade runs on from them a little above, teeth to the wood)
+          this.reach(this.armR, near(r, this.armR), dirOf(1, -0.95, 0), dirOf(-0.2, 0, -1), [1.4, 1.45, 1.5, 1.5], aimQ, wgt);
         } else if (ges.kind === 'arm') {
           // a charge armed in front of the chest: in the right hand, its keys pressed by the left's first finger a beat at
           // a time (the owner, 2026-10-25: "touching the c4 multiple times like input buttons")

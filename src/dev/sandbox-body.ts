@@ -9,13 +9,15 @@
 //     each body's words, by dots: what is held (free, or an item: ak, m9, hatchet...), b0..b3 (a survivor's body, as
 //     the game puts it on: none, the old suit), aim, crouch or prone, idle /
 //     walk / jog / sprint / run (the hurried crouch) or a pace (v2.5, m/s), a way (F B L R FL FR BL BR), turn (on the
-//     spot), up / down (the aim pitched), limp, prod (production's steps: the body's own clips), swing (a blow with what is in the fist, the moments drawn across it)
+//     spot), up / down (the aim pitched), limp, prod (production's steps: the body's own clips), swing (a blow with what is in the fist, the moments drawn across it),
+//     saw / arm / eat / drink / bandage (the hands at that work, as the game's act shows it to everybody)
 //   &frames=12&fps=15&settle=1.2    moments drawn (after so many seconds of going), how many a second
 //   &across=4                       moments to a row of blocks (a picture is drawn no more than 8192 a side)
 //   &cols=4&view=q                  bodies across a block; the camera (q, side, front, back, top), framed on each body
 
 import * as THREE from 'three';
 import { Avatar, GEAR, GEAR_SHOWN, facepiece } from '../game/avatar';
+import type { Gesture } from '../game/avatar/pose';
 import { ItemModels } from '../game/loot';
 import { lookFor } from '../game/look';
 import { Weapons } from '../game/weapons';
@@ -36,10 +38,13 @@ interface Stage {
   say: (i: number, text: string) => void;
 }
 
+/** the hands' work a cell can be shown at (src/game/avatar/pose.ts Gesture) */
+const ACTS: Gesture[] = ['saw', 'arm', 'eat', 'drink', 'bandage'];
+
 /** the ways, radians to the body's left of ahead */
 const WAYS: Record<string, number> = { F: 0, FL: 45, L: 90, BL: 135, B: 180, BR: -135, R: -90, FR: -45 };
 
-export interface BodySpec { words: string; held: string | null; body: number | null; wear: string[] | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean; prod: boolean }
+export interface BodySpec { words: string; held: string | null; body: number | null; wear: string[] | null; aim: boolean; crouch: boolean; prone: boolean; speed: number; way: number; turn: boolean; pitch: number; limp: boolean; swing: boolean; prod: boolean; act: Gesture | null }
 
 /** what a cell's words ask for, at the pace the game would go at (src/game/player.ts: 1.7 walking, 4.0 at a jog, 6.2 flat out, 1.9 crouched) */
 export function specOf(words: string): BodySpec {
@@ -63,7 +68,7 @@ export function specOf(words: string): BodySpec {
   const body = w.find((k) => /^b\d$/.test(k));
   // (wear-parka-smock_pants: what it wears instead of a new life's clothes)
   const wear = w.find((k) => k.startsWith('wear-'))?.slice(5).split('-') ?? null;
-  return { words, held, body: body ? +body.slice(1) : null, wear, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing'), prod: has('prod') };
+  return { words, held, body: body ? +body.slice(1) : null, wear, aim, crouch, prone, speed, way: THREE.MathUtils.degToRad(WAYS[way ?? 'F']), turn: has('turn'), pitch: has('up') ? 0.45 : has('down') ? -0.45 : 0, limp: has('limp'), swing: has('swing'), prod: has('prod'), act: (w.find((k) => ACTS.includes(k as Gesture)) as Gesture | undefined) ?? null };
 }
 
 /** a stand-in for the game's sky and sun: what a body and a gun ask of it */
@@ -161,6 +166,8 @@ export async function stageBodies(o: Stage) {
   };
   // (gone on a while first, so what is shown is the going and not the start of it, at most a sixtieth at a step)
   const sub = (t: number) => { for (let k = Math.ceil(t * 60); k > 0; k--) step(t / Math.ceil(t * 60)); };
+  // (the hands' work begun before the going, so it is under way in the first moment drawn)
+  for (const b of bodies) if (b.s.act) b.a.act(b.s.act, 30);
   sub(settle);
   // (a blow begun as the first moment is drawn: the moments are across it)
   for (const b of bodies) if (b.s.swing) b.a.swing();

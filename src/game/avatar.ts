@@ -144,6 +144,13 @@ export const READY = {
   palm: [0.05, 0.1, -1] as [number, number, number],
 };
 
+/** and a karambit, carried as a claw: the fist level, its fingers forward, the ring up at its top and the blade under it */
+export const READY_CLAW = {
+  at: [0.36, -0.62, 0.2] as [number, number, number],
+  fingers: [0.95, -0.1, -0.25] as [number, number, number],
+  palm: [0.05, 0.1, -1] as [number, number, number],
+};
+
 export const RAISE = {
   at: [0.4, -0.44, 0.32] as [number, number, number],
   fingers: [0.92, -0.18, -0.34] as [number, number, number],
@@ -483,7 +490,7 @@ export class Avatar {
   /** what is to be in the hands once what is in them now has been lowered */
   nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
-  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean; ready?: boolean; head?: THREE.Vector3 } | null = null;
+  inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean; raise: boolean; ready?: boolean; head?: THREE.Vector3; /** a karambit's ring, spun round when it is looked over */ spin?: THREE.Object3D | null } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   shoulderT = 0;
   /** how far a torch is held up (0 at the side, 1 up: RAISE) */

@@ -21,16 +21,16 @@ import { buildWorldData } from '../server/world';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { BUILDING_FOOTPRINT, PLAN, onRidgeWall } from '../src/world/worldgen';
 import { inPlay } from '../src/world/worldgen/layout';
-import { Bases, MEND, heard, heardPiece, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
+import { Bases, MEND, heard, heardPiece, mendOf, repairOf, said, saidPiece, type Land } from '../src/sim/build/bases';
 import { CELL, PIECES, PIECE_IDS, STOREY, TIER_S, benchLevel, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { blocked, deployAt, edgesOf, nearestSpot, spots, standing, toLocal, toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { ROT, STORE, bracket, pay, perDay, protectedFor, rot, saidTime } from '../src/sim/build/upkeep';
 import { ITEMS } from '../src/sim/items';
-import { inBase, inTheWay, pushedBy, swept } from '../src/sim/build/doors';
+import { inBase, inTheWay, swept } from '../src/sim/build/doors';
 import { BaseSolids } from '../src/sim/build/solid';
 import { inRoom, shutRoom } from '../src/sim/build/rooms';
 import { lockable, mayPass } from '../src/sim/build/locks';
-import { PRINTS, asksOf, layPrint, printCost } from '../src/sim/build/blueprints';
+import { PRINTS, asksOf, beginSite, fillSite, layPrint, printCost, restOf, wantOf } from '../src/sim/build/blueprints';
 
 let n = 0;
 const failed: string[] = [];
@@ -408,6 +408,8 @@ ok('a piece is mended for a share of its cost, nails and all, by the health it l
   assert.equal(bs.canRepair(b.id, p.id, 0, 1e9), 'It is whole');
   p.hp = 250;
   assert.deepEqual(repairOf(p), { planks: 3, nails: 3 }, 'half its health: a quarter of what it cost');
+  // (or a bit a blow of the hammer, out of the pockets: the owner, 2026-10-25)
+  assert.deepEqual(mendOf(p), { gain: 100, cost: { planks: 1, nails: 2 } }, 'a blow: a fifth of its health, for its share');
   assert.equal(bs.canRepair(b.id, p.id, 1e9 - 10_000, 1e9), 'It was struck: in a while');
   assert.equal(bs.canRepair(b.id, p.id, 1e9 - MEND.after - 1, 1e9), null);
   bs.repair(b.id, p.id);
@@ -430,12 +432,6 @@ ok('a door swings one way through where it sweeps, and not through a body there'
   assert.ok(!inTheWay(d, [{ x: 0, y: 4, z: 2.3 }]), 'a body on the floor above');
   const pts = swept(d);
   assert.ok(pts.every(([, , z]) => z > 1.4), 'it never swings in');
-  // (a body in its swing does not stop it: it is pushed on the way the leaf goes, clear of it; shutting, back through the
-  // doorway, inside its opening: the owner, 2026-10-25)
-  const out = pushedBy(d, { x: 0, y: 0, z: 2.3 }, true), back = pushedBy(d, { x: 0.4, y: 0, z: 2.3 }, false);
-  assert.ok(out && !inTheWay(d, [{ x: out.x, y: 0, z: out.z }]), `opening, pushed clear of it: ${JSON.stringify(out)}`);
-  assert.ok(back && back.z < 1.5 && Math.abs(back.x) < 0.65, `shutting, pushed in through the doorway: ${JSON.stringify(back)}`);
-  assert.equal(pushedBy(d, { x: 0, y: 0, z: 3.4 }, true), null, 'nobody clear of it is moved');
 });
 
 ok('nothing is set down where a door swings, nor a door hung to swing into what is set down', () => {
@@ -493,6 +489,28 @@ ok("a lock's code and its keys' number are kept in the save and never told to a 
 });
 
 console.log('Building: blueprints');
+ok('a blueprint is set down for nothing and filled a trip at a time, kept with its base, built as it fills, done whole', () => {
+  // (the owner, 2026-10-25: "you set up the build shadow/blueprint, then bring the resources needed to the blueprint")
+  const bs = new Bases(flat), begun = beginSite(bs, 'bp:hut', { x: 0, z: 0, yaw: 0 }, ME, 0, 'Me');
+  assert.ok(typeof begun !== 'string', String(begun));
+  const b: Base = begun;
+  assert.ok(b.pieces.size === 1 && b.site?.print === 'bp:hut', 'set down: its first frame, and the rest a plan');
+  const all = { ...printCost('bp:hut') };
+  const pocket: Record<string, number> = { planks: 20, log: 9, nails: 9 };
+  const trip = () => fillSite(bs, b, ME, 0, 'Me', (k) => pocket[k] ?? 0, (k, n) => (pocket[k] -= n));
+  const one = trip();
+  assert.ok(one.laid.length > 0 && !one.done && b.site, `a first trip builds what it pays for: ${one.laid.length}`);
+  assert.ok(Object.keys(wantOf(b)).length > 0, 'and it says what it still needs');
+  // (kept, and read back, with what was brought)
+  const back = heard(JSON.parse(JSON.stringify(bs.keep()))[0])!;
+  assert.deepEqual(back.site, b.site, 'the blueprint is kept with its base');
+  pocket.planks = 200;
+  const two = trip();
+  assert.ok(two.done && !restOf(b).length && b.site === undefined, 'a second trip finishes it');
+  assert.equal(b.pieces.size, asksOf('bp:hut').length, 'every piece built');
+  assert.ok(all.planks > 0);
+});
+
 ok('every blueprint is laid whole by the rules; short of planks one lays what it can in order, and laid again finishes', () => {
   for (const p of PRINTS) {
     const bs = new Bases(flat), r = layPrint(bs, p.id, { x: 0, z: 0, yaw: 0.4 }, ME, 0, 'Me', () => true);

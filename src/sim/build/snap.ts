@@ -55,6 +55,8 @@ export interface Base {
   next: number;
   /** its claim, if one is set down in it (src/sim/build/upkeep.ts): which piece, who is on it, what is owed over */
   claim?: Claim;
+  /** a blueprint laid on it and still being filled (src/sim/build/blueprints.ts fillSite): which, and what has been brought */
+  site?: { print: string; have: Record<string, number> };
 }
 
 export interface Claim {

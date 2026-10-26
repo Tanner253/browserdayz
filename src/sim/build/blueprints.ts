@@ -77,13 +77,73 @@ export function printCost(id: string): Record<string, number> {
 }
 
 /** whether a base has a piece of a kind where a print's piece goes (laid already) */
-const has = (b: Base, a: Ask) => [...b.pieces.values()].some((p) => p.k === a.k && Math.abs(p.x - a.x) < 0.05 && Math.abs(p.y - a.y) < 0.05 && Math.abs(p.z - a.z) < 0.05);
+export const has = (b: Base, a: Ask) => [...b.pieces.values()].some((p) => p.k === a.k && Math.abs(p.x - a.x) < 0.05 && Math.abs(p.y - a.y) < 0.05 && Math.abs(p.z - a.z) < 0.05);
 
 /**
  * A print laid: begun on the ground at (x, z) turned `yaw` (a new base), or carried on with on base `b` (what is still
  * missing). Each piece in order, while what is carried pays for it (`pays` takes what it costs, or says no); one the
  * rules or the ground refuse is passed over. What was laid, why the rest was not, and what the piece it stopped at costs.
  */
+/**
+ * A blueprint set down to be filled (the owner, 2026-10-25: "I should be able to place the blueprint down and then come back
+ * with resources to fill it ... dayz does this right: you set up the build shadow/blueprint, then bring the resources needed
+ * to the blueprint, then when they're all there you can build"): its first piece laid as a frame for nothing, to mark it
+ * out and begin its base; the rest a plan kept with the base (Base.site), filled a trip at a time (`fillSite`).
+ */
+export function beginSite(bases: Bases, id: string, at: { b?: number; x: number; z: number; yaw: number }, by: string, now: number, name: string): Base | string {
+  if (at.b !== undefined) {
+    const b = bases.bases.get(at.b);
+    if (!b) return 'It is gone';
+    if (b.site && b.site.print !== id) return 'It has a blueprint on it already: fill it or call it off';
+    b.site ??= { print: id, have: {} };
+    return b;
+  }
+  let first = true;
+  const r = layPrint(bases, id, at, by, now, name, () => {
+    if (!first) return false;
+    first = false;
+    return true;
+  });
+  if (!r.base) return r.why ?? 'It cannot be begun here';
+  r.base.site = { print: id, have: {} };
+  return r.base;
+}
+
+/** a site's pieces not yet laid */
+export const restOf = (b: Base) => (b.site ? asksOf(b.site.print).filter((a) => !has(b, a)) : []);
+
+/** what a site's pieces not yet laid still want, after what has been brought to it */
+export function wantOf(b: Base): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const a of restOf(b)) for (const [k, n] of Object.entries(printPiece(a.k))) out[k] = (out[k] ?? 0) + n;
+  for (const [k, n] of Object.entries(b.site?.have ?? {})) if (out[k] !== undefined) out[k] -= n;
+  for (const k of Object.keys(out)) if (out[k] <= 0) delete out[k];
+  return out;
+}
+
+/**
+ * A site filled from what is carried (`carried` says how many, `take` takes them) and built as far as what has been
+ * brought goes, a piece at a time in its order (foundations first). Done, the site goes, and anything over is handed back.
+ */
+export function fillSite(bases: Bases, b: Base, by: string, now: number, name: string, carried: (id: string) => number, take: (id: string, n: number) => void): { laid: Piece[]; done: boolean; back: Record<string, number> } {
+  const s = b.site;
+  if (!s) return { laid: [], done: true, back: {} };
+  for (const [k, n] of Object.entries(wantOf(b))) {
+    const t = Math.min(n, Math.floor(carried(k)));
+    if (t <= 0) continue;
+    take(k, t);
+    s.have[k] = (s.have[k] ?? 0) + t;
+  }
+  const r = layPrint(bases, s.print, { b: b.id, x: b.ox, z: b.oz, yaw: b.yaw }, by, now, name, (cost) => {
+    if (Object.entries(cost).some(([k, n]) => (s.have[k] ?? 0) < n)) return false;
+    for (const [k, n] of Object.entries(cost)) if (!(s.have[k] -= n)) delete s.have[k];
+    return true;
+  });
+  const done = !restOf(b).length, back = done ? { ...s.have } : {};
+  if (done) b.site = undefined;
+  return { laid: r.laid, done, back };
+}
+
 export function layPrint(bases: Bases, id: string, at: { b?: number; x: number; z: number; yaw: number }, by: string, now: number, name: string, pays: (cost: Record<string, number>) => boolean): { base: Base | null; laid: Piece[]; fresh: boolean; why: string | null; need?: Record<string, number> } {
   const asks = asksOf(id), laid: Piece[] = [];
   let base = at.b !== undefined ? bases.bases.get(at.b) ?? null : null, fresh = false, why: string | null = null;

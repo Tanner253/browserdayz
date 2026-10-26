@@ -4,7 +4,7 @@
 // how long its store keeps it; run dry, it says so in red. Played alone, this game's own claims pay their upkeep from
 // their stores and the bases rot as the server would have them.
 
-import { ITEMS } from '../../sim/items';
+import { claimPanelHtml, mountClaimPanel, unmountClaimPanel } from './claim-panel';
 import * as THREE from 'three';
 import { Stash } from '../loot';
 import { toWorld, type Base } from '../../sim/build/snap';
@@ -41,23 +41,6 @@ interface Kept {
   /** when it was heard (performance.now): the time left counts down from it */
   at?: number;
 }
-
-/** the claim's screen, beside its store (the owner, 2026-10-25: "when I open my claim the ui is terrible, I have no idea
- * what resources I need, how much I need and what the upkeep cost of my base is or how long till my base starts to
- * decay, think like rust"): Rust's tool cupboard */
-const PANEL_CSS = `
-.cl-panel{position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:900;width:min(340px,calc(100vw - 32px));background:rgba(14,17,16,.96);color:#e8e6df;border:1px solid #2c332f;border-radius:6px;padding:16px;font:14px/1.4 inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)}
-.cl-panel h4{margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#a9b0ab}
-.cl-left{font-size:24px;font-weight:700;margin:0 0 8px}
-.cl-left.dry{color:#ff5a4a}.cl-left.low{color:#f0b44a}
-.cl-panel p{margin:0 0 12px;color:#bfc4c0;font-size:13px}
-.cl-row{display:grid;grid-template-columns:36px 1fr auto;gap:8px;align-items:center;padding:5px 0;border-top:1px solid #222826}
-.cl-row i{width:36px;height:36px;background:#0b0c0c center/contain no-repeat;border-radius:3px}
-.cl-row b{font-size:15px}.cl-row span{font-size:13px;color:#bfc4c0;text-align:right}
-.cl-row span.short{color:#ff7a6a}
-.cl-who{margin-top:12px;font-size:13px;color:#bfc4c0}
-@media (max-width:700px){.cl-panel{top:16px;transform:none}}
-`;
 
 /** F held this long joins the claim or leaves it; let go before, it opens the store */
 const HOLD = 0.8;
@@ -117,31 +100,25 @@ export class ClaimView {
   private panelFrame(dt: number) {
     const open = this.h.shown(), b = open ? [...this.store().bases.values()].find((x) => this.stores.get(x.id) === open) : undefined;
     if (!b?.claim) {
-      this.panel?.remove();
+      unmountClaimPanel(this.panel);
       this.panel = null;
       return;
     }
-    if ((this.panelT -= dt) > 0 && this.panel) return;
+    this.panel ??= document.createElement('div');
+    // (kept in the inventory each frame: it is drawn afresh as things are moved about)
+    const placed = mountClaimPanel(this.panel);
+    if ((this.panelT -= dt) > 0 && placed && this.panel.childElementCount) return;
     this.panelT = 0.5;
-    if (!this.panel) {
-      if (!document.getElementById('cl-css')) document.head.appendChild(Object.assign(document.createElement('style'), { id: 'cl-css', textContent: PANEL_CSS }));
-      this.panel = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'cl-panel' }));
-    }
-    const k = this.kept.get(b.id) ?? this.alonesKeep(b), icons = this.h.icons();
-    const day = k ? k.day : Object.entries(perDay(b)), have = counts(open!.container.serialize().items);
+    const k = this.kept.get(b.id) ?? this.alonesKeep(b), have = counts(open!.container.serialize().items);
     const left = !k ? null : k.s < 0 ? Infinity : Math.max(0, k.s - (k.at ? (performance.now() - k.at) / 1000 : 0));
-    const dry = !!(k?.dry || b.claim.dry) || left === 0;
-    const head = dry ? 'Decaying' : left === null ? '…' : left === Infinity ? 'No upkeep needed' : `Protected for ${saidTime(left)}`;
-    const rows = day.filter(([, n]) => n > 0).map(([id, n]) => {
-      const got = toward(have, id);
-      return `<div class="cl-row"><i style="background-image:url(${icons[id] ?? ''})"></i><b>${ITEMS[id]?.name ?? id}</b><span class="${got < n ? 'short' : ''}">${Math.ceil(n)} a day · ${got} in store</span></div>`;
-    }).join('');
-    const names = b.claim.members.map((m) => m.name || 'someone');
-    const on = b.claim.members.some((m) => m.pid === this.h.who());
-    this.panel.innerHTML = `<h4>Claim · upkeep</h4><div class="cl-left ${dry ? 'dry' : left !== null && left < 12 * 3600 ? 'low' : ''}">${head}</div>
-      <p>Every day each piece of the base takes its upkeep from this store, in what its tier is gathered as: planks for wood, stone for stone, metal fragments for metal, iron bars for armoured. The bigger the base, the more each piece takes. When it runs dry, the base decays.</p>
-      ${rows || '<p>Nothing to pay: the base costs no upkeep.</p>'}
-      <div class="cl-who"><b>Authorised:</b> ${names.length ? names.join(', ') : 'nobody'}<br>${on ? 'Hold <kbd>F</kbd> at the claim to leave it.' : 'Hold <kbd>F</kbd> at the claim to join it and build here.'}</div>`;
+    this.panel.innerHTML = claimPanelHtml({
+      left,
+      dry: !!(k?.dry || b.claim.dry) || left === 0,
+      day: k ? k.day : Object.entries(perDay(b)),
+      have: (id) => toward(have, id),
+      names: b.claim.members.map((m) => m.name || 'someone'),
+      on: b.claim.members.some((m) => m.pid === this.h.who()),
+    }, this.h.icons());
   }
 
   /** the player looks at a piece (`at`): if it is a claim within reach, what F does to it */

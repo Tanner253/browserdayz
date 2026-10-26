@@ -26,11 +26,21 @@ const ROMAN = ['', 'I', 'II', 'III'];
  * `share` of what it cost, by the health it has lost; one struck within `after` ms is not; a piece is turned about only
  * within `turn` ms of being laid, as Rust's.
  */
-export const MEND = { share: 0.5, after: 30_000, turn: 10 * 60_000 };
+/** `bit`: the share of a piece's health one blow of the hammer mends (the owner, 2026-10-25: "if I have my building hammer in
+ * hand I should be able to repair my base with resources from my inventory"; Rust's hammer, a bit a blow) */
+export const MEND = { share: 0.5, after: 30_000, turn: 10 * 60_000, bit: 0.2 };
 
-/** what mending a piece whole takes: `MEND.share` of what it cost (a workbench, its first level's), by the health it lost */
-export function repairOf(p: Piece): Record<string, number> {
-  const lost = Math.max(0, 1 - p.hp / hpOf(p.k, p.t)), out: Record<string, number> = {};
+/** one blow of the hammer at a hurt piece: the health it gives back (MEND.bit of the whole, at most what was lost), and
+ * what that costs, the same share of mending it whole */
+export function mendOf(p: Piece): { gain: number; cost: Record<string, number> } {
+  const max = hpOf(p.k, p.t), gain = Math.max(0, Math.min(max * MEND.bit, max - p.hp));
+  return { gain, cost: repairOf(p, gain / max) };
+}
+
+/** what mending a piece whole takes: `MEND.share` of what it cost (a workbench, its first level's), by the health it lost
+ * (`part`: only so much of its whole health, a blow's) */
+export function repairOf(p: Piece, part?: number): Record<string, number> {
+  const lost = part ?? Math.max(0, 1 - p.hp / hpOf(p.k, p.t)), out: Record<string, number> = {};
   // (a thing set down from the hands is mended from what its item is made of, never from a share of the item)
   const of = PLACED[p.k] ? PIECES[p.k].cost ?? {} : costOf(p.k, PIECES[p.k].levels ? laidAt(p.k) : p.t);
   for (const [id, n] of Object.entries(of)) {
@@ -354,7 +364,9 @@ export class Bases {
 }
 
 /** a base said short: [id, x, y, z, yaw, owner, next piece's number, pieces, and its claim] */
-export type KeptBase = [number, number, number, number, number, string, number, KeptPiece[], KeptClaim?];
+export type KeptBase = [number, number, number, number, number, string, number, KeptPiece[], (KeptClaim | null)?, KeptSite?];
+/** a blueprint being filled on it: [which, what has been brought] */
+export type KeptSite = [string, Record<string, number>];
 /** a claim: [its piece, its members [public id, name], what is owed over, dry, what is in its store (the save's only, never a game's)] */
 export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, (unknown[] | null)?, number?];
 /** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s), and what more there is of it] */
@@ -372,7 +384,8 @@ const cm = (v: number) => Math.round(v * 100);
 /** a base said short: for a game, or with `secret` for the save (its locks' codes and keys) */
 export function said(b: Base, stock?: unknown[], held?: (b: Base, p: Piece) => unknown[] | undefined, secret = false): KeptBase {
   const k: KeptBase = [b.id, Math.round(b.ox * 1000) / 1000, Math.round(b.oy * 1000) / 1000, Math.round(b.oz * 1000) / 1000, Math.round(b.yaw * 1e5) / 1e5, b.owner, b.next, [...b.pieces.values()].map((p) => saidPiece(p, held?.(b, p), secret))];
-  if (b.claim) k.push(saidClaim(b.claim, stock));
+  if (b.claim || b.site) k.push(b.claim ? saidClaim(b.claim, stock) : null);
+  if (b.site) k.push([b.site.print, { ...b.site.have }]);
   return k;
 }
 export const saidClaim = (c: Claim, stock?: unknown[]): KeptClaim => [c.p, c.members.map((m) => [m.pid, m.name]), Object.fromEntries(Object.entries(c.due).map(([k, n]) => [k, Math.round(n * 1000) / 1000])), c.dry, stock ?? null, c.until ?? -1] as KeptClaim;
@@ -392,7 +405,7 @@ export function saidPiece(p: Piece, store?: unknown[], secret = false): KeptPiec
 
 /** a base read back from what it was said as; null if it is not one */
 export function heard(k: KeptBase): Base | null {
-  if (!Array.isArray(k) || (k.length !== 8 && k.length !== 9) || !Array.isArray(k[7])) return null;
+  if (!Array.isArray(k) || k.length < 8 || k.length > 10 || !Array.isArray(k[7])) return null;
   const [id, ox, oy, oz, yaw, owner, next, ps] = k;
   if (![id, ox, oy, oz, yaw, next].every(Number.isFinite) || typeof owner !== 'string') return null;
   const b: Base = { id, ox, oy, oz, yaw, owner, pieces: new Map(), next };
@@ -404,7 +417,17 @@ export function heard(k: KeptBase): Base | null {
   for (const p of [...b.pieces.values()].sort((a, c) => a.id - c.id)) p.on = restsOn(b, p.k, p).filter((id) => id !== p.id);
   const claim = heardClaim(k[8]);
   if (claim && b.pieces.get(claim.p)?.k === 'claim') b.claim = claim;
+  const site = heardSite(k[9]);
+  if (site) b.site = site;
   return b.pieces.size ? b : null;
+}
+
+/** a blueprint being filled, as it was kept or told */
+export function heardSite(k: unknown): Base['site'] {
+  if (!Array.isArray(k) || typeof k[0] !== 'string' || !k[1] || typeof k[1] !== 'object') return undefined;
+  const have: Record<string, number> = {};
+  for (const [id, n] of Object.entries(k[1] as Record<string, unknown>)) if (Number.isFinite(n) && Number(n) > 0) have[id] = Number(n);
+  return { print: k[0], have };
 }
 
 export function heardPiece(q: KeptPiece, by = ''): Piece | null {
