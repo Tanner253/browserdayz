@@ -1394,6 +1394,8 @@ export class Game {
       this.map.ahead();
       this.map.onClose = () => this.toggleMap(false);
       document.getElementById('ui')!.appendChild(this.map.root);
+      // (the death screen's map of beds is drawn on the same sheet: src/ui/spawn-map.ts)
+      this.build.beds.paint = (g, W, H, x, z, k) => this.map.paintSheet(g, W, H, x, z, k);
       // the panel of whoever has a role (shut and empty for everybody else)
       // (the starts are all "A start" on the map: in the panel each is told by the side of the valley it is on and
       // the nearest place with a name. 2026-10-13: "we need to rename the starts locations theyre all A start".)

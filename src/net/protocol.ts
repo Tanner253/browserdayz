@@ -86,7 +86,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // 'cdata' that answers 'copen': src/sim/reclaim.ts). A page of 67 shows no button and is never told it can.)
 // (69, 2026-10-26: admins' creative mode, the C4 armed by hand and thrown, the trader spots spread and marked, the recyclers moved:
 // a page of 68 would draw the camp where it was and could not throw a charge)
-export const PROTOCOL = 69;
+// (70, 2026-10-26: the death screen's map of beds: a bed's wakes left on 'beds', a bag one and a bed two, then half an hour,
+// and so many a player may have, src/sim/build/beds.ts. A page of 69 shows a bed as ready that has none left.)
+export const PROTOCOL = 70;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -603,7 +605,8 @@ export type S2C =
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number; /** at a bed: how high (none: on the ground) */ y?: number }
   /** one's beds: [base, piece, kind, x, z, seconds until it may be woken at] */
-  | { t: 'beds'; list: [number, number, string, number, number, number][] }
+  /** this player's beds: [base, piece, kind, x, z, seconds until it gives wakes again, wakes it has now (src/sim/build/beds.ts)] */
+  | { t: 'beds'; list: [number, number, string, number, number, number, number][] }
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean; /** [VIP] before their name, and a cup by it for a week after a coffee (the store: server/perks.ts) */ vip?: boolean; cup?: boolean }
   /** what a player has from the store, said when they come in and whenever it changes (this player's own too) */
   | { t: 'perks'; id: number; sk: string[]; vip?: true }

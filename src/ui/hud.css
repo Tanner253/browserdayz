@@ -2673,6 +2673,11 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 
 /* the death screen's beds (src/game/building/beds.ts): under Respawn, each bed of the player's, ready or not yet */
 .dead-beds { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: -14px 0 18px; }
+/* the map to pick where to wake (src/ui/spawn-map.ts): the sheet, and a line for each choice under it */
+.dead-map { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: -6px 0 16px; pointer-events: auto; }
+.dead-map canvas { width: min(720px, 92vw); height: min(340px, 42vh); border: 1px solid var(--line); background: #15170f; cursor: pointer; }
+.dead-spots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: min(720px, 92vw); }
+.dead-bed.on { background: rgba(201, 178, 124, 0.22); border-color: #f0c419; }
 .dead-bed { padding: 7px 22px; font-family: var(--font); font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); background: rgba(18, 20, 19, 0.7); border: 1px solid var(--accent); cursor: pointer; }
 .dead-bed small { margin-left: 8px; letter-spacing: 0.04em; text-transform: none; color: rgba(233, 228, 216, 0.6); }
 .dead-bed:disabled { opacity: 0.5; cursor: default; border-color: var(--line); }

@@ -837,6 +837,24 @@ export class BigMap {
     this.root.hidden = true;
   }
 
+  /**
+   * The printed sheet drawn into another canvas, `k` pixels a metre with the world's x, z at its middle (the death
+   * screen's map of beds: src/ui/spawn-map.ts). Printed first if it is not yet.
+   */
+  paintSheet(g: CanvasRenderingContext2D, W: number, H: number, x: number, z: number, k: number) {
+    this.sheet ??= this.print();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#15170f';
+    g.fillRect(0, 0, W, H);
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    for (const s of this.sheet) {
+      g.setTransform(k / s.S, 0, 0, k / s.S, W / 2 + (s.x0 - x) * k, H / 2 + (s.z0 - z) * k);
+      g.drawImage(s.c, 0, 0);
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
   private keep() {
     try {
       localStorage.setItem(KEPT, JSON.stringify(this.shown));

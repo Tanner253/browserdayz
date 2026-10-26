@@ -10,6 +10,7 @@ import { Bases, LIMITS, repairOf, said, saidPiece, type KeptBase } from '../src/
 import { struckAt } from './raid';
 import { PIECES, PLACED, TIER_S, costOf, hpOf, type Tier } from '../src/sim/build/pieces';
 import { toWorld } from '../src/sim/build/snap';
+import { bedsFull } from '../src/sim/build/beds';
 import { Solids, noBuilding, wetAt } from '../src/sim/build/land';
 import { HAMMERS, condition } from '../src/sim/gather';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
@@ -197,6 +198,9 @@ export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
   })();
   if (!where || Math.hypot(where[0] - c.pose[0], where[2] - c.pose[2]) > REACH.lay) return;
   const ask = { b: m.b, k: m.k, x: m.x, y: m.y, z: m.z, r: m.r, yaw: m.yaw };
+  // (so many beds and bags a player may have at once, wherever they lie: src/sim/build/beds.ts)
+  const full = bedsFull(m.k, [...all.bases.values()].flatMap((b) => [...b.pieces.values()].filter((p) => p.by === own(c))));
+  if (full) return void send(c, { t: 'tell', kind: 'warn', text: full });
   const free = creative(c), ok = all.check(ask, own(c), free);
   if (typeof ok === 'string') return void send(c, { t: 'tell', kind: 'warn', text: ok });
   const cost = free ? {} : costOf(m.k, PIECES[m.k].only ?? 0);

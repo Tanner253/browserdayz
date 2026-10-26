@@ -336,12 +336,13 @@ export type KeptBase = [number, number, number, number, number, string, number, 
 export type KeptClaim = [number, [string, string][], Record<string, number>, boolean, (unknown[] | null)?, number?];
 /** a piece: [id, kind's number, tier, x, y, z (cm), turn, health, laid (s), and what more there is of it] */
 export type KeptPiece = [number, number, number, number, number, number, number, number, number, KeptMore?];
-/** what more there is of a piece: `o` it stands open; `s` what is in its store (the save's only, never a game's); `l` its lock; `w` whose bed it is */
+/** what more there is of a piece: `o` it stands open; `s` what is in its store (the save's only, never a game's); `l` its lock; `w` whose bed it is, `z` its wakes (Piece.slept) */
 export interface KeptMore {
   o?: 1;
   s?: unknown[];
   l?: KeptLock;
   w?: string;
+  z?: [number, number];
 }
 
 const cm = (v: number) => Math.round(v * 100);
@@ -362,7 +363,7 @@ export function heardClaim(k: unknown): Claim | undefined {
 export function saidPiece(p: Piece, store?: unknown[], secret = false): KeptPiece {
   const k: KeptPiece = [p.id, PIECE_IDS.indexOf(p.k), p.t, cm(p.x), cm(p.y), cm(p.z), p.r, Math.round(p.hp), Math.round(p.at / 1000)];
   const bed = !!PIECES[p.k].sleep;
-  if (p.open || store?.length || p.lock || bed) k.push({ ...(p.open ? { o: 1 as const } : {}), ...(store?.length ? { s: store } : {}), ...(p.lock ? { l: saidLock(p.lock, secret) } : {}), ...(bed ? { w: p.by } : {}) });
+  if (p.open || store?.length || p.lock || bed) k.push({ ...(p.open ? { o: 1 as const } : {}), ...(store?.length ? { s: store } : {}), ...(p.lock ? { l: saidLock(p.lock, secret) } : {}), ...(bed ? { w: p.by, ...(p.slept ? { z: p.slept } : {}) } : {}) });
   return k;
 }
 
@@ -397,6 +398,7 @@ export function heardPiece(q: KeptPiece, by = ''): Piece | null {
     const l = heardLock(more.l);
     if (l) p.lock = l;
     if (typeof more.w === 'string') p.by = more.w;
+    if (Array.isArray(more.z) && more.z.length === 2 && more.z.every(Number.isFinite)) p.slept = [more.z[0], more.z[1]];
   }
   return p;
 }
