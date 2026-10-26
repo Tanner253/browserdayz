@@ -685,12 +685,16 @@ export class Building {
     // (a workbench goes up in levels, the rest in tiers to armoured: the progression plan)
     const top = topOf(p.k), next = Math.min(top, p.t + 1) as Tier, said = (n: number) => (K.levels ? `level ${ROMAN[n]}` : TIERS[n]);
     const head = `${K.name} · ${K.levels ? `Level ${ROMAN[p.t]} · ` : K.only !== undefined ? '' : `${TIERS[p.t]} · `}${Math.round(p.hp)}/${hpOf(p.k, p.t)}`;
-    if (this.mendFrame(hammer, t.base, p, head)) return;
-    if ((K.only !== undefined && !K.levels) || p.t >= top) {
+    const goesUp = !((K.only !== undefined && !K.levels) || p.t >= top);
+    const cost = costOf(p.k, next), why = goesUp ? (this.store.canUpgrade(t.base.id, p.id, next, this.h.creative()) ?? this.short(cost)) : null;
+    // (an upgrade that can be had is offered before mending: it leaves the piece whole anyway, and a base left without
+    // upkeep wears every piece a little, so that mending was all the hammer offered and nothing went up, the owner,
+    // 2026-10-26: "building hammer upgrade in creative is not working now, on walls and windows")
+    if (!(goesUp && !why) && this.mendFrame(hammer, t.base, p, head)) return;
+    if (!goesUp) {
       this.prompt = card(head, '', 'hold the right button to take it down');
       return;
     }
-    const cost = costOf(p.k, next), why = this.store.canUpgrade(t.base.id, p.id, next, this.h.creative()) ?? this.short(cost);
     this.prompt = card(head, `${why ? `<span class="no">${why}</span> · ` : ''}up to ${said(next)}: ${this.costHtml(cost)}`, 'hold the right button for more', why ? undefined : 'LMB');
     if (this.h.input.pressed('Mouse0') && !this.h.busy() && !why) this.upgrade(hammer, t.base, t.id, next);
   }
