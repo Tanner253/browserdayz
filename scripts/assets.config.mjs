@@ -1112,7 +1112,7 @@ export const LOCAL_MODELS = {
       // 2026-10-25: "the handsaw looks so short"), came at no size and 17 degrees off level: laid level, its handle
       // to -z where the hands hold it by the butt, and made a panel saw's length; its blade came polished as a mirror, which drew near black with no bright sky in it ("this
       // does not look good"): two fifths as much metal, so its grey steel shows)
-      ...({ felling_axe: { rot: [0.714, 0, 0], size: 0.9 }, hammer: { rot: [-0.577, 0, -0.148], size: 0.33 }, pickaxe: { rot: [0.834, 0, -0.298], size: 0.9 }, building_plan: { rot: [0, 0, Math.PI / 2] }, hand_saw: { file: 'hand_saw3.glb', size: 0.62, rot: [-0.3005, Math.PI, 0], metalBy: 0.4 } }[id] ?? {}),
+      ...({ felling_axe: { rot: [0.714, 0, 0], size: 0.8, squash: [0.7, 1, 0.62] }, hammer: { rot: [-0.577, 0, -0.148], size: 0.33 }, pickaxe: { rot: [0.834, 0, -0.298], size: 0.9 }, building_plan: { rot: [0, 0, Math.PI / 2] }, hand_saw: { file: 'hand_saw3.glb', size: 0.62, rot: [-0.3005, Math.PI, 0], metalBy: 0.4 } }[id] ?? {}),
       ...(['felling_axe', 'hammer', 'pickaxe', 'hand_saw'].includes(id) ? { scale: undefined } : {}),
       changes: 'Kept at the real size it was made to, stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
       credit: { name, author: 'ZONA (Higgsfield text-to-3D)', url: 'https://higgsfield.ai', line: `"${name}" made for ZONA with Higgsfield (text-to-3D), 2026-10-25, on the owner’s account: commercial use under Higgsfield’s terms` },
