@@ -1665,6 +1665,16 @@ export class Game {
     if (finish) wearFinish(obj, id, finish);
     // (a pair is held out as two pistols are, one in each hand)
     if (def?.weapon) return { obj, grips, kind: def.weapon.akimbo ? ('pistol' as const) : def.weapon.kind };
+    // (the saw turned half round its handle in the fist as others see it, blade forward and teeth down: the owner,
+    // 2026-10-25, "the saw is backwards in other players hands in 3rd person". The model's parts are turned, not the
+    // model, whose frame its grip is said in)
+    if (id === 'hand_saw' && grips.right) {
+      const g = grips.right, axis = new THREE.Vector3().crossVectors(g.fingers, g.palm).normalize(), q = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI);
+      for (const c of obj.children) {
+        c.position.sub(g.pos).applyQuaternion(q).add(g.pos);
+        c.quaternion.premultiply(q);
+      }
+    }
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
   };
 
