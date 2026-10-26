@@ -9,7 +9,7 @@ import { prune, cloneDocument, resample } from '@gltf-transform/functions';
 import * as THREE from 'three';
 import { readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop, flat, relax } from './mocap-pose.mjs';
+import { heelFirst, leftOf, reshape, trim, wayOf, facing, readClip, goes, stoop, flat, relax, plant } from './mocap-pose.mjs';
 import { ROOT, SRC, io, loadBody, carry as carryOnto } from './mocap-carry.mjs';
 export { meshyBone } from './mocap-carry.mjs';
 import { INFECTED_MOVES, warp } from './mocap-infected.mjs';
@@ -120,6 +120,8 @@ if (!cands) {
     if (m.stoop) stoop(doc, sk, name, m.stoop);
     if (m.relax) relax(doc, sk, name, m.relax);
     if (m.flat) flat(doc, sk, name, { soft: m.soft ?? null });
+    // (the planted feet of the walking loops laid flat: see mocap-pose.mjs plant)
+    if (m.way && /^(walk|aim|crouch|limp)/.test(name) && !m.arms) plant(doc, sk, name);
     if (m.way) said.start = +heelFirst(doc, sk, name, wayOf(m.way, left)).toFixed(3);
     if (m.cut) trim(doc, sk, name, m.cut[0], m.cut[1]);
     if (m.blow) warp(doc, sk, name, m.blow);
