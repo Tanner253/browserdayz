@@ -11,10 +11,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../../core/assets';
 import { GLASS_GROUPS, BODY_QUERY, physics } from '../../core/physics';
 import type { Atmosphere } from '../../world/atmosphere';
-import { PIECES } from '../../sim/build/pieces';
+import { CELL, PIECES, WALL_T } from '../../sim/build/pieces';
 import { shapeOf, type Leaf, type Paint } from '../../sim/build/solids';
 import { toWorld, worldYaw, type Base, type Piece } from '../../sim/build/snap';
-import { DOOR, leafPoint } from '../../sim/build/doors';
+import { DOOR, inBase, leafPoint } from '../../sim/build/doors';
 import { clothGeometry, drawnAt, geometryOf, leafGeometry, paintFor, surfaceOf } from './look';
 import { PieceModels } from './models';
 import { ClaimFlags } from './flags';
@@ -40,6 +40,37 @@ function seamless(frame: THREE.Matrix4, id: number) {
 /** how far a door shutting puts a body back into its room each frame, m */
 const PUSH_STEP = 0.06;
 const _push = new THREE.Vector3(), _inv = new THREE.Matrix4();
+
+/**
+ * A wall's drawing at a corner where a triangle's wall meets a square's at a slant (the owner, 2026-10-25: "if the triangle
+ * foundation has walls they clip into the walls of the square foundation"). Every wall reaches half its thickness past
+ * its corners, which closes a square's corner; where a wall on a triangle meets, at a slant, one on a square, that end is
+ * drawn only to the corner, inside the square's wall, not out through its face. Its solids are as they were.
+ */
+const triOf = (b: Base, p: Piece) => p.on.some((id) => /_tri$/.test(b.pieces.get(id)?.k ?? ''));
+const _cut = new THREE.Matrix4(), _cutS = new THREE.Matrix4();
+/** (put off in the sandbox, to show the walls as they were: `&trim=0`) */
+export const WALL_TRIM = { on: true };
+function trimmed(frame: THREE.Matrix4, b: Base, p: Piece) {
+  if (!WALL_TRIM.on || PIECES[p.k].role !== 'wall' || !triOf(b, p)) return frame;
+  const a = (p.r * Math.PI) / 6, ux = Math.cos(a), uz = -Math.sin(a), cut = [0, 0];
+  [-1, 1].forEach((side, i) => {
+    const [cx, , cz] = inBase(p, [(side * CELL) / 2, 0, 0]);
+    for (const q of b.pieces.values()) {
+      if (q === p || PIECES[q.k].role !== 'wall' || Math.abs(q.y - p.y) > 0.05 || triOf(b, q)) continue;
+      const qa = (q.r * Math.PI) / 6, along = Math.abs(ux * Math.cos(qa) - uz * Math.sin(qa));
+      // (one at a right angle closes the corner with it, as a square's do)
+      if (along < 0.2) continue;
+      if ([-1, 1].some((qs) => {
+        const [ex, , ez] = inBase(q, [(qs * CELL) / 2, 0, 0]);
+        return Math.hypot(ex - cx, ez - cz) < 0.06;
+      })) cut[i] = WALL_T / 2;
+    }
+  });
+  if (!cut[0] && !cut[1]) return frame;
+  const long = CELL + WALL_T, k = (long - cut[0] - cut[1]) / long;
+  return frame.clone().multiply(_cut.makeTranslation((cut[0] - cut[1]) / 2, 0, 0)).multiply(_cutS.makeScale(k, 1, 1));
+}
 
 export class PieceRef {
   constructor(readonly b: number, readonly p: number) {}
@@ -85,6 +116,7 @@ export class BaseDraw {
   private dirty = new Set<string>();
   /** the doors part way between shut and open */
   private moving = new Set<Drawn>();
+  private again = false;
   private solidT = 0;
   /** a door swung by somebody (its first move), and one held by the player's own body */
   onSwing: (b: Base, p: Piece, at: THREE.Vector3) => void = () => {};
@@ -150,6 +182,12 @@ export class BaseDraw {
 
   /** a piece laid or changed (its tier, where it is, whether it stands open) */
   put(base: Base, piece: Piece) {
+    // (a wall's neighbours at its corners drawn again with it: where a wall ends depends on the walls it meets, `trimmed`)
+    if (PIECES[piece.k].role === 'wall' && !this.again) {
+      this.again = true;
+      for (const q of base.pieces.values()) if (q !== piece && PIECES[q.k].role === 'wall' && Math.hypot(q.x - piece.x, q.z - piece.z) < CELL + 0.2 && this.drawn.has(this.id(base.id, q.id))) this.put(base, q);
+      this.again = false;
+    }
     const id = this.id(base.id, piece.id);
     const was = this.drawn.get(id);
     if (was) {
@@ -162,7 +200,7 @@ export class BaseDraw {
     const frame = new THREE.Matrix4().compose(_p.set(x, y, z), _q, _one);
     // (a draw for the piece in its paint, one for what of it is in a paint of its own, and one for each leaf)
     const s = shapeOf(piece.k), t = drawnAt(piece.k, piece.t), parts: Part[] = [];
-    const body = seamless(frame, piece.id);
+    const body = seamless(trimmed(frame, base, piece), piece.id);
     if (s.solid.length || s.dress?.length) parts.push({ key: `${piece.k}:${s.paint ?? t}`, matrix: body, slot: 0 });
     if (s.cloth) parts.push({ key: `${piece.k}:${s.cloth.paint}:C`, matrix: body, slot: 0 });
     // (its lock, if one is fitted: before the leaves, which are always the last of its parts)
@@ -334,6 +372,15 @@ export class BaseDraw {
   /** a door's leaves, as `pose` left them, put where they are drawn and where they stop things */
   private placeLeaves(d: Drawn) {
     const leaves = shapeOf(d.piece.k).leaves ?? [], first = d.parts.length - leaves.length;
+    // (its lock rides on the leaf it is fitted to, and swings with it: the owner, 2026-10-25, "when I put a codelock on
+    // the door it doesn't stay on the door when it is opened and closed")
+    if (d.lock) {
+      const m = this.meshes.get(d.lock.key);
+      if (m && d.lock.slot < m.count) {
+        m.setMatrixAt(d.lock.slot, d.lock.matrix);
+        m.instanceMatrix.needsUpdate = true;
+      }
+    }
     leaves.forEach((l, i) => {
       const q = d.parts[first + i], m = this.meshes.get(q.key);
       if (m && q.slot < m.count) {

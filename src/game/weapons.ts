@@ -2,6 +2,7 @@
 // recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated
 // in sub-steps against the physics world, zeroing, scope + iron sights, melee.
 
+import { LOCK_ITEMS } from '../sim/build/locks';
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
@@ -3889,8 +3890,14 @@ export class Weapons {
             root.add(round);
           }
         } else {
+          // (a lock held as it is fitted, upright with its front to the eye: its model faces +x, its back plate at -x;
+          // the owner, 2026-10-25: "codelock when in hand is upside down")
+          if (LOCK_ITEMS[id]) {
+            obj.rotation.y = -Math.PI / 2;
+            size.set(size.z, size.y, size.x);
+          }
           // long side points away from the camera so the hand wraps the narrow side
-          if (size.x > size.z * 1.15) {
+          else if (size.x > size.z * 1.15) {
             obj.rotation.y = Math.PI / 2;
             size.set(size.z, size.y, size.x);
           }

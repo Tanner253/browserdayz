@@ -355,6 +355,7 @@ export const onlineMethods = {
     net.on('bgone', (m) => this.build.onGone(m));
     net.on('bpc', (m) => this.build.onPiece(m));
     net.on('bsite', (m) => this.build.onSite(m));
+    net.on('bcoded', (m) => this.build.locks.onCoded(m));
     net.on('bout', (m) => this.build.onOut(m));
     net.on('spent', (m) => this.build.onSpent(m));
     net.on('bup', (m) => this.build.onUp(m));

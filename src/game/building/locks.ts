@@ -5,16 +5,17 @@
 // it lets in, locked or unlocked, its code changed, a key cut, its claim joined or left. Online the server says; alone,
 // this game keeps its own locks by the same rules.
 
+import * as THREE from 'three';
 import type { Input } from '../../core/input';
-import { audio } from '../../core/audio';
+import { buildRecordings, audio } from '../../core/audio';
 import { Keypad } from '../../ui/keypad';
-import { LOCK, LOCK_ITEMS, goodCode, lockable, mayPass, mayWorkLock } from '../../sim/build/locks';
+import { lockPoint, LOCK, LOCK_ITEMS, goodCode, lockable, mayPass, mayWorkLock } from '../../sim/build/locks';
 import { PIECES } from '../../sim/build/pieces';
 import { swings } from '../../sim/build/doors';
 import { toWorld, type Base, type Piece } from '../../sim/build/snap';
 import type { Bases } from '../../sim/build/bases';
 import { makeItem, type ItemInstance } from '../../sim/items';
-import type { C2S } from '../../net/protocol';
+import type { S2C, C2S } from '../../net/protocol';
 import type { DoorView } from './doors';
 import { doorWord } from './doors';
 import type { BoxView } from './boxes';
@@ -36,6 +37,9 @@ export interface LockHost {
   panel: (open: boolean) => void;
   /** played alone: a wrong code's shock */
   hurt: (n: number) => void;
+  /** sparks off metal at a point (a lock's shock), and this player's number online */
+  spark: (at: THREE.Vector3) => void;
+  myId: () => number;
   /** what is looked at, for a thing taking a while to be still the one looked at */
   looked: () => { base: Base; id: number } | null;
   /** a base's piece changed, played alone (drawn again, its stores and spots made again) */
@@ -72,6 +76,8 @@ export class LockView {
   constructor(private h: LockHost, private store: () => Bases, private doors: DoorView, private boxes: BoxView) {
     document.body.appendChild(this.pad.el);
     this.pad.onClose = () => h.panel(false);
+    // (its beeps and its buzz had before the first figure is pressed: the building's sounds come when first asked for)
+    this.pad.onOpen = () => void buildRecordings();
   }
 
   get padOpen() {
@@ -83,6 +89,8 @@ export class LockView {
    * says (null: nothing of a lock's here, and F is the door's, the box's or the claim's own).
    */
   frame(dt: number, ok: boolean, t: { base: Base; id: number } | null): string | null {
+    // (a controller works the keypad while it is open)
+    this.pad.padFrame();
     const held = this.h.held(), p = t?.base.pieces.get(t.id);
     if (held && LOCK_ITEMS[held.id]) return this.fitFrame(ok, held, t, p);
     if (!t || !p?.lock) {
@@ -188,6 +196,17 @@ export class LockView {
     this.pad.open({ title: 'Code lock', status: 'Whoever enters its code may open it', code: 'Choose its code', onCode: (c) => go(c) });
   }
 
+  /** a code put into a lock near: its beep, or its buzz and the shock's crack and sparks (heard by all near; the one
+   * shocked hears theirs with the hurt: 'dmg' shock) */
+  onCoded(m: Extract<S2C, { t: 'bcoded' }>) {
+    const at = new THREE.Vector3(m.x, m.y, m.z);
+    if (m.ok) return void audio.built('code_ok', at, 0.8);
+    this.h.spark(at);
+    if (m.by === this.h.myId()) return;
+    audio.built('code_wrong', at, 0.8);
+    audio.built('shock', at, 0.8);
+  }
+
   private enter(base: Base, p: Piece, code: string) {
     if (!goodCode(code)) return;
     if (this.h.online()) return void this.h.send({ t: 'bcode', b: base.id, p: p.id, code });
@@ -206,7 +225,9 @@ export class LockView {
     }
     this.tries.set(key, t);
     shocked();
-    this.h.hurt(LOCK.shock);
+    const [sx, sy, sz] = toWorld(base, ...lockPoint(p));
+    this.h.spark(new THREE.Vector3(sx, sy, sz));
+    this.h.hurt(LOCK.shock + (t.n - 1) * LOCK.more);
     this.h.note(t.out > now ? `Wrong code: it will take none for ${LOCK.out / 1000} s` : 'Wrong code', 'warn');
   }
 

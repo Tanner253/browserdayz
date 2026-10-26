@@ -28,8 +28,13 @@ export class Keypad {
   private o: PadOptions | null = null;
   private typed = '';
   private openedAt = 0;
-  /** said when it is put away, by any means */
+  /** said when it is put away, by any means; and when it is opened */
   onClose: () => void = () => {};
+  onOpen: () => void = () => {};
+  /** a controller's: the button the d-pad or the stick is on, what was down last frame, and when the stick may move it again */
+  private focus = 0;
+  private was: boolean[] = [];
+  private stickAt = 0;
 
   constructor() {
     this.el = document.createElement('div');
@@ -40,15 +45,7 @@ export class Keypad {
       const b = t.closest('button');
       if (!b) return;
       e.preventDefault();
-      if (b.dataset.d !== undefined) this.digit(b.dataset.d);
-      else if (b.dataset.k === 'back') this.back();
-      else if (b.dataset.k === 'ok') this.enter();
-      else if (b.dataset.k === 'x') this.close();
-      else if (b.dataset.a) {
-        const id = b.dataset.a, o = this.o;
-        this.close();
-        o?.onAction?.(id);
-      }
+      this.press(b);
     });
     window.addEventListener('keydown', (e) => {
       if (!this.isOpen || e.repeat) return;
@@ -62,13 +59,64 @@ export class Keypad {
     }, true);
   }
 
+  /** a button of it pressed: a figure, back, enter, put away, or one of what may be done */
+  private press(b: HTMLButtonElement) {
+    {
+      if (b.dataset.d !== undefined) this.digit(b.dataset.d);
+      else if (b.dataset.k === 'back') this.back();
+      else if (b.dataset.k === 'ok') this.enter();
+      else if (b.dataset.k === 'x') this.close();
+      else if (b.dataset.a) {
+        const id = b.dataset.a, o = this.o;
+        this.close();
+        o?.onAction?.(id);
+      }
+    }
+  }
+
+  /**
+   * Each frame while it is open, a controller's say (the owner, 2026-10-25: "controller needs to be able to enter code
+   * too"): the d-pad or the left stick over its buttons, three to a row and what may be done under them, A (Cross)
+   * presses the one it is on, B (Circle) puts it away.
+   */
+  padFrame() {
+    if (!this.isOpen) return;
+    const g = [...(navigator.getGamepads?.() ?? [])].find((q) => q?.connected);
+    if (!g) return;
+    const btns = [...this.el.querySelectorAll<HTMLButtonElement>('.kp-keys button, .kp-acts button')];
+    if (!btns.length) return;
+    const edge = (i: number) => {
+      const now = !!g.buttons[i]?.pressed, was = this.was[i];
+      this.was[i] = now;
+      return now && !was;
+    };
+    const keys = this.el.querySelectorAll('.kp-keys button').length;
+    let dx = (edge(15) ? 1 : 0) - (edge(14) ? 1 : 0), dy = (edge(13) ? 1 : 0) - (edge(12) ? 1 : 0);
+    const ax = g.axes[0] ?? 0, ay = g.axes[1] ?? 0, now = performance.now();
+    if (!dx && !dy && now > this.stickAt && Math.max(Math.abs(ax), Math.abs(ay)) > 0.6) {
+      this.stickAt = now + 220;
+      if (Math.abs(ax) > Math.abs(ay)) dx = Math.sign(ax);
+      else dy = Math.sign(ay);
+    }
+    let f = Math.min(this.focus, btns.length - 1);
+    if (dx) f += dx;
+    if (dy) f += f < keys ? dy * 3 : dy;
+    if (dy > 0 && f >= keys && this.focus < keys) f = keys;
+    this.focus = Math.max(0, Math.min(btns.length - 1, f));
+    btns.forEach((b, i) => b.classList.toggle('kp-focus', i === this.focus));
+    if (edge(0)) this.press(btns[this.focus]);
+    else if (edge(1)) this.close();
+  }
+
   open(o: PadOptions) {
     this.o = o;
     this.typed = '';
     this.isOpen = true;
     this.openedAt = performance.now();
+    this.focus = 0;
     this.render();
     this.el.classList.add('on');
+    this.onOpen();
   }
 
   close() {

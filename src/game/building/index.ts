@@ -190,7 +190,8 @@ export class Building {
     this.doors = new DoorView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, camera: h.camera }, () => this.store, this.draw);
     this.locks = new LockView({
       input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, who: () => this.me, keys: h.keys, count: h.count, take: h.take, give: h.give,
-      begin: h.begin, panel: h.panel, hurt: h.hurt, looked: () => this.target(),
+      begin: h.begin, panel: h.panel, hurt: h.hurt, looked: () => this.target(), myId: h.myId,
+      spark: (at) => h.impact('metal', at, new THREE.Vector3(0, 1, 0)),
       changed: (b) => {
         for (const p of b.pieces.values()) this.draw.put(b, p);
         this.synced(b);

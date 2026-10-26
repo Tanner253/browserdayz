@@ -2668,6 +2668,8 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .kp-keys { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; }
 .kp-keys button, .kp-acts button { height: 44px; font: inherit; font-size: 22px; color: var(--ink); background: rgba(233, 228, 216, 0.06); border: 1px solid var(--line); cursor: pointer; }
 .kp-keys button:hover, .kp-acts button:hover { background: rgba(201, 178, 124, 0.18); border-color: var(--accent); }
+/* (the button a controller is on) */
+.kp-keys button.kp-focus, .kp-acts button.kp-focus { background: rgba(201, 178, 124, 0.28); border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
 .kp-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 320px; }
 .kp-acts button { height: 36px; padding: 0 14px; font-size: 17px; letter-spacing: 0.04em; }
 

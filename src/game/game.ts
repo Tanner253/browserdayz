@@ -1587,7 +1587,7 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.guide.isOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen && !this.guide.isOpen && !this.build.locks.padOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
       // (an Arena match over: the mouse is let go for its result's card, which is no pause, and nothing takes it
       // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
       // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")

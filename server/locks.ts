@@ -4,14 +4,14 @@
 // code. What a lock bars: a door swung (server/doors.ts), a box or the claim's store opened (`lockLets`), a claim joined.
 
 import { randomInt } from 'node:crypto';
-import { LOCK, LOCK_ITEMS, goodCode, lockable, mayPass, mayWorkLock } from '../src/sim/build/locks';
+import { lockPoint, LOCK, LOCK_ITEMS, goodCode, lockable, mayPass, mayWorkLock } from '../src/sim/build/locks';
 import { saidPiece } from '../src/sim/build/bases';
 import { toWorld, type Base, type Piece } from '../src/sim/build/snap';
 import { middleOf } from '../src/sim/build/doors';
 import { HAMMERS, condition } from '../src/sim/gather';
 import { ITEMS, makeItem } from '../src/sim/items';
 import type { C2S } from '../src/net/protocol';
-import { send, type Client } from './players';
+import { broadcastNear, send, type Client } from './players';
 import { log, things } from './index';
 import { bases, known, pay, short, tellBase } from './build';
 import { tool, use } from './gather';
@@ -26,7 +26,7 @@ const keysOf = (c: Client) => [...things(c.inv)].filter((it) => it.id === 'key' 
 export const passes = (c: Client, p: Piece) => mayPass(p.lock, pidOf(c.key), keysOf(c));
 
 /** wrong codes tried, by whom and at which lock, and when they were shut out till */
-const tries = new WeakMap<Client, Map<string, { n: number; out: number }>>();
+const tries = new WeakMap<Client, Map<string, { n: number; out: number; at: number }>>();
 
 /** the piece asked for, if the player stands at it */
 function at(c: Client, b: unknown, p: unknown): { base: Base; piece: Piece } | null {
@@ -74,22 +74,29 @@ export function code(c: Client, m: Extract<C2S, { t: 'bcode' }>) {
     told(a.base, a.piece);
     return tell(c, 'Its code is changed: whoever knew the old one must be told the new', 'good');
   }
-  const key = `${m.b}:${m.p}`, mine = tries.get(c) ?? new Map<string, { n: number; out: number }>(), t = mine.get(key) ?? { n: 0, out: 0 }, now = Date.now();
+  const key = `${m.b}:${m.p}`, mine = tries.get(c) ?? new Map<string, { n: number; out: number; at: number }>(), t = mine.get(key) ?? { n: 0, out: 0, at: 0 }, now = Date.now();
   tries.set(c, mine);
   if (now < t.out) return tell(c, `It takes no code for ${Math.ceil((t.out - now) / 1000)} s`);
+  // (heard by whoever is near, right or wrong: the keypad's beep, or its buzz and the shock)
+  const [hx, hy, hz] = toWorld(a.base, ...lockPoint(a.piece));
+  broadcastNear({ t: 'bcoded', x: hx, y: hy, z: hz, ok: m.code === l.code, by: c.id }, hx, hz, 30);
   if (m.code === l.code) {
     mine.delete(key);
     if (!l.who.includes(pid)) l.who.push(pid);
     told(a.base, a.piece);
     return tell(c, 'The code is right: it lets you in', 'good');
   }
+  // (each wrong code within a minute of the last hurts more: no code is guessed by trying them all)
+  const shock = LOCK.shock + (now - t.at < LOCK.again ? t.n * LOCK.more : 0);
+  if (now - t.at >= LOCK.again) t.n = 0;
+  t.at = now;
   t.n++;
   if (t.n >= LOCK.tries) {
     t.n = 0;
     t.out = now + LOCK.out;
   }
   mine.set(key, t);
-  send(c, { t: 'dmg', from: 0, amount: LOCK.shock, zone: 'torso', w: 'shock', dir: [0, 0, 0] });
+  send(c, { t: 'dmg', from: 0, amount: shock, zone: 'torso', w: 'shock', dir: [0, 0, 0] });
   tell(c, t.out > now ? `Wrong code: it will take none for ${LOCK.out / 1000} s` : 'Wrong code');
 }
 

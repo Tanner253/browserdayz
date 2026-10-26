@@ -20,7 +20,7 @@ import { Radial } from '../ui/radial';
 import { Bases } from '../sim/build/bases';
 import { PIECES, TIERS, hpOf, type Tier } from '../sim/build/pieces';
 import { blocked, deployAt, nearestSpot, spots, toWorld, worldYaw, type Base } from '../sim/build/snap';
-import { BaseDraw } from '../game/building/draw';
+import { BaseDraw, WALL_TRIM } from '../game/building/draw';
 import { ghostGeometry } from '../game/building/look';
 import { layPrint } from '../sim/build/blueprints';
 import { HAMMER_PER, PER, RINGS, hammerEntries, outerEntry, outerOf, planEntries } from '../game/building/wheel';
@@ -38,9 +38,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
+export const BUILD_CELLS: Record<string, number> = { tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+export const BUILD_COLS: Record<string, number> = { tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
 
 /** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
 async function drawnAll(draw: BaseDraw) {
@@ -289,6 +289,46 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     camera.lookAt(2.2, 0.2, 0);
     shoot(s, camera, cell, 'the stump and the logs, close');
     return { tree: kind, blows: k.blows, logs: k.logs };
+  }
+  if (name === 'tris') {
+    // a square foundation with a triangle on two sides, walled all round: where a triangle's wall meets a square's at a
+    // slant (the owner, 2026-10-25: "if the triangle foundation has walls they clip into the walls of the square
+    // foundation"), close from outside and in; `&trim=0` as it was
+    WALL_TRIM.on = s.q.get('trim') !== '0';
+    const bs = new Bases({ ground: () => 0, why: () => null });
+    const first = bs.lay({ k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+    if (typeof first === 'string') throw new Error(first);
+    const b = first.base;
+    for (const x of [-2.4, 2.4]) {
+      const sp = nearestSpot(spots(b, 'foundation_tri'), 'foundation_tri', { x, y: 0, z: 0 }, 2);
+      if (sp) bs.lay({ b: b.id, k: 'foundation_tri', ...sp }, 'me', 0);
+    }
+    // (walls on every edge but those the triangles share with the square)
+    for (const sp of spots(b, 'wall')) {
+      if (Math.abs(Math.abs(sp.x) - 1.5) < 0.05 && Math.abs(sp.z) < 0.05) continue;
+      bs.lay({ b: b.id, k: 'wall', ...sp }, 'me', 0);
+    }
+    for (const p of b.pieces.values()) bs.upgrade(b.id, p.id, 1);
+    const draw = new BaseDraw(s.scene, null), far = new THREE.Vector3(1e6, 0, 1e6);
+    draw.setBase(b);
+    draw.update(0, far);
+    await settle();
+    await new Promise((r) => setTimeout(r, 800));
+    draw.update(0, far);
+    const views: [[number, number, number], [number, number, number], string][] = [
+      [[3.2, 2.2, 3.4], [1.5, 1.2, 1.5], 'a corner from outside'],
+      [[0.4, 1.7, 0.2], [1.5, 1.4, 1.5], 'the same corner from inside'],
+      [[-3.2, 2.2, -3.4], [-1.5, 1.2, -1.5], 'the far corner from outside'],
+      [[-0.4, 1.7, -0.2], [-1.5, 1.4, -1.5], 'and from inside'],
+    ];
+    views.forEach(([c, t, say], i) => {
+      camera.fov = 50;
+      camera.updateProjectionMatrix();
+      camera.position.set(...c);
+      camera.lookAt(...t);
+      shoot(s, camera, i, `${WALL_TRIM.on ? 'trimmed' : 'as it was'} · ${say}`);
+    });
+    return { pieces: [...b.pieces.values()].map((p) => p.k).join(',') };
   }
   if (name === 'torches') {
     // wall torches hung where the aim met a wall's face, off its middle and at three heights (the owner, 2026-10-25:
