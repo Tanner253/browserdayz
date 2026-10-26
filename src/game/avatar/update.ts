@@ -55,7 +55,7 @@ export const updateMethods = {
     // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
     this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
     // (and sat in a jeep it is slung)
-    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload' && ges.kind !== 'check') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25 || this.groundT > 0.25;
+    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload' && ges.kind !== 'check' && ges.kind !== 'saw' && ges.kind !== 'arm') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25 || this.groundT > 0.25;
     // (the hands come off a gun and go back onto it over a fifth of a second, and one gun is lowered before the next is taken up)
     const busy = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload' && ges.kind !== 'check') || !!mv || this.hold !== null || this.seated;
     const wantHold = !!this.held && !busy && !dead && !this.nextHeld;

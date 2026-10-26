@@ -230,6 +230,8 @@ export class HUD {
   /** the voice your calls are said in (src/sim/survivor.ts VOICES), and a new one picked in Settings */
   callVoice = 0;
   onVoice: (n: number) => void = () => {};
+  /** the menu's Build & craft button (src/ui/guide.ts) */
+  onGuide: () => void = () => {};
   private el: Record<string, HTMLElement> = {};
   private notes: HTMLDivElement;
   private last: Record<string, string> = {};
@@ -337,6 +339,7 @@ export class HUD {
             <button type="button" data-tab="gfx">Settings</button>
           </nav>
           <div class="sm-status">
+            <button type="button" class="store-btn sm-store sm-guide">Build &amp; craft</button>
             <button type="button" class="store-btn sm-store">Store</button>
             <a class="sm-out sm-arena" href="/">All games</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
@@ -428,7 +431,9 @@ export class HUD {
     `;
     document.getElementById('ui')!.appendChild(this.root);
     // (the store, over the menu: src/ui/store/)
-    this.root.querySelector('.sm-store')!.addEventListener('click', () => void import('./store/panel').then((m) => m.openStore()));
+    this.root.querySelector('.sm-store:not(.sm-guide)')!.addEventListener('click', () => void import('./store/panel').then((m) => m.openStore()));
+    // (the building and crafting guide, at any time: src/ui/guide.ts)
+    this.root.querySelector('.sm-guide')!.addEventListener('click', () => this.onGuide());
     for (const k of ['cross', 'hit', 'prompt', 'acts', 'keys', 'stance', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
