@@ -4,6 +4,7 @@
 //   &bb=fell    a pine felled: standing, then moments of its fall (src/world/felling.ts, its own clock), lying with its
 //               logs by it, and the stump left
 
+import { leanAt } from '../sim/build/snap';
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { assets } from '../core/assets';
@@ -37,9 +38,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
+export const BUILD_CELLS: Record<string, number> = { torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+export const BUILD_COLS: Record<string, number> = { torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
 
 /** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
 async function drawnAll(draw: BaseDraw) {
@@ -288,6 +289,36 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     camera.lookAt(2.2, 0.2, 0);
     shoot(s, camera, cell, 'the stump and the logs, close');
     return { tree: kind, blows: k.blows, logs: k.logs };
+  }
+  if (name === 'torches') {
+    // wall torches hung where the aim met a wall's face, off its middle and at three heights (the owner, 2026-10-25:
+    // "should be no snapping for placing torch either, should free place on walls")
+    const draw = new BaseDraw(s.scene, null), far = new THREE.Vector3(1e6, 0, 1e6);
+    const base: Base = { id: 1, ox: 0, oy: 0, oz: 0, yaw: 0, owner: '', pieces: new Map(), next: 1 };
+    const add = (k: string, x: number, y: number, z: number, r: number) => {
+      const p = { id: base.next++, k, t: 1 as Tier, x, y, z, r, hp: 1, at: 0, by: '', on: [] as number[] };
+      base.pieces.set(p.id, p);
+      return p;
+    };
+    add('foundation', 0, 0, 0, 0);
+    const wall = add('wall', 0, 0, -1.5, 0);
+    for (const [along, h] of [[-1.0, 1.0], [0.15, 1.9], [1.05, 1.45]]) {
+      const sp = leanAt(base, 'torch_wall', { x: along, y: h, z: -1.5 + 0.1 });
+      if (sp) add('torch_wall', sp.x, sp.y, sp.z, sp.r);
+    }
+    for (const p of base.pieces.values()) draw.put(base, p);
+    draw.update(0, far);
+    await settle();
+    // (drawn again once the torch's model has come)
+    await new Promise((r) => setTimeout(r, 1500));
+    draw.update(0, far);
+    await settle();
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    camera.position.set(0.6, 1.7, 2.6);
+    camera.lookAt(0, 1.4, wall.z);
+    shoot(s, camera, 0, `${[...base.pieces.values()].filter((p) => p.k === 'torch_wall').length} wall torches hung freely`);
+    return { torches: [...base.pieces.values()].filter((p) => p.k === 'torch_wall').map((p) => [p.x, p.y]) };
   }
   if (name === 'window') {
     // a window wall in each tier, close and along its sill: where its trim meets the opening (the owner, 2026-10-25: "the

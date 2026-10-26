@@ -22,8 +22,9 @@ const POINTS = 5;
  * 15 to 35 ms, and half a millisecond of every frame on average, 2026-10-18). Lit with nothing to light, they cost little.
  */
 const KEEP = 30;
-/** over how many metres the furthest of the real lights dims before it is given to a nearer lamp */
-const FADE = 3;
+/** a real light given to another lamp fades out and in again over this, seconds; and it keeps its lamp while that is among
+ * the nearest POINTS + KEEP_OVER */
+const SWITCH = 0.35, KEEP_OVER = 2;
 /** (every street lamp within LAMP_SEEN and the rest: at 96 the furthest were dropped, and came and went as the eye moved) */
 const GLARES = 160;
 /**
@@ -73,6 +74,10 @@ export class Lamps {
   private waited = 0;
   private spots: THREE.SpotLight[] = [];
   private points: THREE.PointLight[] = [];
+  /** each real light's lamp (where it stood last frame), and how far up it is faded (0..1): see `update` */
+  private kept: (THREE.Vector3 | null)[] = [];
+  private keptPower: number[] = [];
+  private faded: number[] = [];
   private beams: Beam[] = [];
   private glows: Glow[] = [];
   private flares: Flare[] = [];
@@ -308,16 +313,47 @@ export class Lamps {
       l.angle = Math.min(1.2, BEAM.half * b.wide);
       l.distance = BEAM.reach * Math.sqrt(b.power);
     });
-    // (a lamp is not put out the moment a nearer one is found: it dims as it falls back toward the first that has no real light,
-    // so that walking down a row of them none is seen to go out)
-    const next = glows[POINTS], edge = next && next.d2 < 70 * 70 ? Math.sqrt(next.d2) : Infinity;
+    // Each real light keeps the lamp it has (found again where it stood, as a carried one moves) while that lamp is
+    // among the nearest few, and the rest go to the nearest without one; a light given to another lamp fades out first
+    // and in again, so walking about a base its torches' lights never jump from one to another (the owner, 2026-10-25:
+    // "when I move around my base the torch lighting is really inconsistent, I think we need simpler lighting").
+    const near = glows.filter((w) => w.d2 < 70 * 70).slice(0, POINTS + KEEP_OVER), mine: (Glow | null)[] = this.points.map(() => null), taken = new Set<Glow>();
+    this.points.forEach((_, i) => {
+      const was = this.kept[i];
+      const w = was ? near.find((q) => !taken.has(q) && q.pos.distanceToSquared(was) < 0.25) : undefined;
+      if (w) {
+        mine[i] = w;
+        taken.add(w);
+      }
+    });
+    for (const w of near.slice(0, POINTS)) {
+      if (taken.has(w)) continue;
+      const i = mine.findIndex((m) => !m);
+      if (i < 0) break;
+      mine[i] = w;
+      taken.add(w);
+    }
     this.points.forEach((l, i) => {
-      const w = glows[i];
-      // (only a lamp near enough to light what the eye can see of the ground about it)
-      if (!w || w.d2 > 70 * 70) return void (l.intensity = 0);
+      const w = mine[i], was = this.kept[i];
+      const same = !!w && !!was && w.pos.distanceToSquared(was) < 0.25;
+      if (!same && was && (this.faded[i] ?? 0) > 0.02) {
+        // (going to another lamp, or to none: out first, where it was)
+        this.faded[i] = Math.max(0, (this.faded[i] ?? 0) - dt / SWITCH);
+        l.intensity = 42 * (this.keptPower[i] ?? 1) * this.faded[i];
+        return;
+      }
+      if (!w) {
+        this.kept[i] = null;
+        this.faded[i] = 0;
+        return void (l.intensity = 0);
+      }
+      if (!same) this.faded[i] = 0;
+      this.kept[i] = (this.kept[i] ?? new THREE.Vector3()).copy(w.pos);
+      this.keptPower[i] = w.power;
+      this.faded[i] = Math.min(1, (this.faded[i] ?? 0) + dt / SWITCH);
       l.position.copy(w.pos);
       l.color.copy(w.color);
-      l.intensity = 42 * w.power * (edge === Infinity ? 1 : Math.min(1, Math.max(0, (edge - Math.sqrt(w.d2)) / FADE)));
+      l.intensity = 42 * w.power * this.faded[i];
       l.distance = w.reach;
     });
 

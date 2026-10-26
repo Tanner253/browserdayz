@@ -13,7 +13,7 @@ import { PILES } from '../craft/materials';
 export const MADE_ONLY = [
   'rags', 'rope', 'gunpowder', 'metal_frags', 'iron_bar', 'coal', 'stone_hatchet', 'bone_knife', 'sledgehammer', 'satchel',
   // (what is set down from the hands, and the doors: made at the crafting screen, never found; the sleeping bag is found)
-  ...Object.values(PLACED).filter((id) => id !== 'sleeping_bag'),
+  ...Object.values(PLACED).filter((id) => id !== 'sleeping_bag' && id !== 'torch'),
 ];
 
 export const CRAFT_ITEMS: ItemDef[] = [

@@ -16,7 +16,7 @@ export const KNOWN_AT_START: ReadonlySet<string> = new Set([
   ...RECIPES.filter((r) => r.at !== 'bench').map((r) => r.id),
   'hammer', 'hatchet', 'building_plan', 'sleeping_bag',
   // (whatever is set down from the hands: a base needs its doors and its benches from the first)
-  ...Object.values(PLACED),
+  ...Object.values(PLACED).filter((id) => id !== 'torch'),
 ]);
 
 /** each bench level's tech tree: its recipes in the order they are unlocked, and the scrap each costs there (less what is held back: src/sim/build/raid.ts) */

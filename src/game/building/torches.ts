@@ -12,7 +12,7 @@ import type { Input } from '../../core/input';
 import type { Flames, Fire } from '../flames';
 import { shapeOf } from '../../sim/build/solids';
 import { inBase } from '../../sim/build/doors';
-import { toWorld } from '../../sim/build/snap';
+import { worldYaw, toWorld } from '../../sim/build/snap';
 import type { Bases } from '../../sim/build/bases';
 
 export interface TorchHost {
@@ -33,11 +33,13 @@ const SEEN = 70;
 const TORCH = { size: 0.15, hand: 0.07, power: 0.55, reach: 11 };
 const WARM = new THREE.Color(1, 0.62, 0.3);
 
+const _side = new THREE.Vector3();
+
 export class TorchView {
   /** the torch in the hands is lit */
   lit = false;
   private hand: Fire | null = null;
-  private walls = new Map<string, { at: THREE.Vector3; fire: Fire | null }>();
+  private walls = new Map<string, { at: THREE.Vector3; fire: Fire | null; out: THREE.Vector3 }>();
   /** the torches lit in other players' hands, by who */
   private theirs = new Map<number, Fire>();
   private their = new THREE.Vector3();
@@ -81,13 +83,16 @@ export class TorchView {
           const key = `${b.id}:${p.id}`;
           near.add(key);
           const at = new THREE.Vector3(...toWorld(b, ...inBase(p, f)));
+          // (the way it faces out from its wall: its light is for that side alone)
+          const a = worldYaw(b, p.r), out = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
           const w = this.walls.get(key);
           if (w) {
             w.at.copy(at);
+            w.out.copy(out);
             // (and a flame lit before the model came moved onto its head)
             w.fire?.at.copy(at);
           }
-          else this.walls.set(key, { at, fire: null });
+          else this.walls.set(key, { at, fire: null, out });
         }
       }
       for (const [key, w] of this.walls) {
@@ -105,7 +110,10 @@ export class TorchView {
         this.h.flames().remove(w.fire);
         w.fire = null;
       }
-      if (close && !this.h.shut(w.at)) this.h.glow(w.at, WARM, TORCH.power, TORCH.reach);
+      // (lit for the side of the wall it hangs on: from the other side its light would come through the wall, as a lamp's
+      // has no shadow; the owner, 2026-10-25: "make sure it doesn't bleed through walls". A shut room keeps it in too)
+      const ours = _side.copy(me).sub(w.at).dot(w.out) > -0.15;
+      if (close && ours && !this.h.shut(w.at)) this.h.glow(w.at, WARM, TORCH.power, TORCH.reach);
     }
   }
 
