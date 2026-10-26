@@ -41,9 +41,9 @@ interface Stage {
 }
 
 /** the cells a scene draws (the page is laid out for them before it is begun) */
-export const BUILD_CELLS: Record<string, number> = { rack: 1, tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
+export const BUILD_CELLS: Record<string, number> = { free: 1, rack: 1, tris: 4, torches: 1, window: 4, items: 2, fell: 8, pieces: 4, base: 4, wheel: 1, doors: 6, slope: 3, part2: 6, models: 6 };
 /** and how many to a row */
-export const BUILD_COLS: Record<string, number> = { rack: 1, tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
+export const BUILD_COLS: Record<string, number> = { free: 1, rack: 1, tris: 2, torches: 1, window: 2, fell: 4, doors: 3, slope: 3, part2: 3, models: 3 };
 
 /** a base drawn, with every piece of it drawn from a model once its model has come (src/game/building/models.ts) */
 async function drawnAll(draw: BaseDraw) {
@@ -292,6 +292,41 @@ export async function stageBuild(name: string, s: Stage): Promise<unknown> {
     camera.lookAt(2.2, 0.2, 0);
     shoot(s, camera, cell, 'the stump and the logs, close');
     return { tree: kind, blows: k.blows, logs: k.logs };
+  }
+  if (name === 'free') {
+    // things set down wherever the aim met the floor, at any angle, beside L stairs in their own square and across the
+    // join of two foundations (the owner, 2026-10-26: "I should be able to free place EVERYTHING like the torch")
+    const bs = new Bases({ ground: () => 0, why: () => null });
+    const first = bs.lay({ k: 'foundation', x: 0, y: 0, z: 0, r: 0, yaw: 0 }, 'me', 0);
+    if (typeof first === 'string') throw new Error(first);
+    const b = first.base;
+    const lay = (k: string, at: { x: number; z: number }, turn = 0) => {
+      const sp = k === 'foundation' || k.startsWith('stairs') ? nearestSpot(spots(b, k), k, { ...at, y: 0 }, 2) : deployAt(b, k, { ...at, y: 0 }, turn);
+      if (!sp) return `${k}: no spot`;
+      const r = bs.lay({ b: b.id, k, ...sp }, 'me', 0);
+      return typeof r === 'string' ? `${k}: ${r}` : `${k}: laid`;
+    };
+    const said = [
+      lay('foundation', { x: 3, z: 0 }),
+      lay('stairs_l', { x: 0, z: 0 }),
+      lay('box_small', { x: 0.95, z: 1.0 }, 1.3),
+      lay('forge', { x: 3.8, z: -0.2 }, 2.6),
+      lay('weapon_rack', { x: 2.4, z: -0.85 }, 0.4),
+      lay('box_large', { x: 2.35, z: 1.0 }, 0.6),
+    ];
+    const draw = new BaseDraw(s.scene, null), far = new THREE.Vector3(1e6, 0, 1e6);
+    draw.setBase(b);
+    draw.update(0, far);
+    await settle();
+    await new Promise((r) => setTimeout(r, 1500));
+    draw.update(0, far);
+    await settle();
+    camera.fov = 50;
+    camera.updateProjectionMatrix();
+    camera.position.set(1.6, 4.6, 5.6);
+    camera.lookAt(1.6, 0.6, 0);
+    shoot(s, camera, 0, 'set down freely beside the stairs and across the join');
+    return { said };
   }
   if (name === 'rack') {
     // a Weapon Rack set down with a gun in each of its five bays: four stood in its cups, a pistol on its top shelf (the

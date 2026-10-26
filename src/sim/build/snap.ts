@@ -333,16 +333,31 @@ export function footOf(kind: string, x: number, z: number, r: number, grow = 0):
   return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + a * (hx + grow) * c + b * (hz + grow) * s, z - a * (hx + grow) * s + b * (hz + grow) * c]);
 }
 
-/** the floor a thing set down at a place would stand on: a foundation's or a floor's top, the whole of its oblong on it */
+/** the floor a thing set down at a place would stand on: the one under its middle, the whole of its oblong on the floors
+ * of that level (across the joins between them: the owner, 2026-10-26, "free place EVERYTHING like the torch") */
 function floorUnder(base: Base, kind: string, x: number, y: number, z: number, r: number): Piece | null {
-  const foot = footOf(kind, x, z, r);
-  for (const p of base.pieces.values()) {
-    const P = kindOf(p);
-    if (!isFloor(p) || P.roof || Math.abs(p.y - y) > 0.7) continue;
-    const under = cornersOf(P.shape!, p.x, p.z, p.r, 0.03);
-    if (foot.every(([fx, fz]) => within(under, fx, fz))) return p;
-  }
-  return null;
+  const floors = [...base.pieces.values()].filter((p) => isFloor(p) && !kindOf(p).roof && Math.abs(p.y - y) <= 0.7);
+  // (a hair past each floor's edge, so that the join between two floors is on both)
+  const on = (p: Piece, fx: number, fz: number) => within(cornersOf(kindOf(p).shape!, p.x, p.z, p.r, -0.03), fx, fz);
+  const mid = floors.find((p) => on(p, x, z));
+  if (!mid) return null;
+  const level = floors.filter((p) => Math.abs(p.y - mid.y) < SAME);
+  return footOf(kind, x, z, r).every(([fx, fz]) => level.some((p) => on(p, fx, fz))) ? mid : null;
+}
+
+/** the ground plan of a piece's own solids, each box's oblong in the base's frame (what stops a thing set down beside it,
+ * not its whole square: the owner, 2026-10-26, "the stairs should not block placement unless trying to place inside the
+ * actual collision of the stairs") */
+function solidFeet(p: Piece): [number, number][][] {
+  const c = cos(p.r), s = sin(p.r);
+  return shapeOf(p.k).solid.flatMap((q) => {
+    if (!('box' in q)) return [];
+    const [cx, , cz, sx, , sz] = q.box;
+    return [[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]): [number, number] => {
+      const lx = cx + (a * sx) / 2, lz = cz + (b * sz) / 2;
+      return [p.x + lx * c + lz * s, p.z - lx * s + lz * c];
+    })];
+  });
 }
 
 /**
@@ -350,7 +365,8 @@ function floorUnder(base: Base, kind: string, x: number, y: number, z: number, r
  * to a quarter of a metre, turned as the player turns it. Null: no floor there for it.
  */
 export function deployAt(base: Base, kind: string, aim: { x: number; y: number; z: number }, turn = 0): Spot | null {
-  const x = Math.round(aim.x * 4) / 4, z = Math.round(aim.z * 4) / 4, r = deployTurn(kind, turn);
+  // (where the aim is, to a centimetre: no squares to snap to)
+  const x = Math.round(aim.x * 100) / 100, z = Math.round(aim.z * 100) / 100, r = deployTurn(kind, turn);
   const f = floorUnder(base, kind, x, aim.y, z, r);
   return f ? { x, y: f.y, z, r, on: [f.id] } : null;
 }
@@ -360,7 +376,9 @@ export function deployAt(base: Base, kind: string, aim: { x: number; y: number; 
  * click again to confirm when placing forges, rigid when using crates"): a box squared to its base, in quarter turns;
  * anything else any way at all, to a degree (a thirtieth of a step).
  */
-export const rigid = (kind: string) => !!PIECES[kind].store;
+// (and since 2026-10-26 a box too: "I should be able to free place EVERYTHING like the torch ... all things should be
+// placed like this. simple")
+export const rigid = (_kind: string) => false;
 export function deployTurn(kind: string, turn: number): number {
   if (rigid(kind)) return mod12(Math.round(turn / 3) * 3);
   const r = Math.round(turn * 30) / 30;
@@ -396,7 +414,8 @@ export function restsOn(base: Base, kind: string, s: { x: number; y: number; z: 
       if ((bears(p) || P.role === 'free') && Math.abs(p.y - s.y) < SAME && Math.hypot(p.x - (s.x + bx) / 2, p.z - (s.z + bz) / 2) < 0.45 && mod12(p.r - s.r) % 6 === 0) on.push(p.id);
       if (p.k === 'ladder' && Math.abs(p.x - s.x) < SAME && Math.abs(p.z - s.z) < SAME && Math.abs(p.y + STOREY - s.y) < SAME) on.push(p.id);
     } else if (K.role === 'deploy') {
-      if (isFloor(p) && !P.roof && Math.abs(p.y - s.y) < SAME && footOf(kind, s.x, s.z, s.r).every(([fx, fz]) => within(cornersOf(P.shape!, p.x, p.z, p.r, 0.03), fx, fz))) on.push(p.id);
+      // (the floor under its middle: its oblong may lie across the joins to the floors beside it, floorUnder)
+      if (isFloor(p) && !P.roof && Math.abs(p.y - s.y) < SAME && within(cornersOf(P.shape!, p.x, p.z, p.r, 0.03), s.x, s.z)) on.push(p.id);
     } else if (K.role === 'steps') {
       const back = K.half ? CELL / 4 : CELL / 2;
       if (P.ground && edgesOf(P.shape!, p.x, p.y, p.z, p.r).some((e) => near(e, { x: s.x - sin(s.r) * back, y: s.y, z: s.z - cos(s.r) * back }))) on.push(p.id);
@@ -421,7 +440,8 @@ export function blocked(base: Base, kind: string, s: Spot, ground?: (x: number, 
     if (P.role === 'steps' && K.role === 'steps' && near(p, s)) return 'Something stands there already';
     if (P.role === 'free' && K.role === 'free' && Math.hypot(p.x - s.x, p.z - s.z) < 1 && Math.abs(p.y - s.y) < 2) return 'A wall stands there already';
     if (K.role === 'deploy' && P.role === 'deploy' && Math.abs(p.y - s.y) < 1 && overlaps(footOf(kind, s.x, s.z, s.r), footOf(p.k, p.x, p.z, p.r))) return `The ${P.name.toLowerCase()} is in the way`;
-    if (K.role === 'deploy' && P.role === 'stairs' && Math.abs(p.y - s.y) < 0.3 && overlaps(footOf(kind, s.x, s.z, s.r), cornersOf(P.shape!, p.x, p.z, p.r))) return 'The stairs are in the way';
+    if (K.role === 'deploy' && P.role === 'stairs' && Math.abs(p.y - s.y) < 0.3 && solidFeet(p).some((q) => overlaps(footOf(kind, s.x, s.z, s.r), q))) return 'The stairs are in the way';
+    if (K.role === 'deploy' && P.role === 'wall' && Math.abs(p.y - s.y) < 0.3 && solidFeet(p).some((q) => overlaps(footOf(kind, s.x, s.z, s.r), q))) return `The ${P.name.toLowerCase()} is in the way`;
     if (K.role === 'fit' && P.role === 'fit' && near(p, s)) return 'Something is hung there already';
     if (K.role === 'lean' && P.role === 'lean' && near(p, s)) return `The ${P.name.toLowerCase()} is there already`;
     // (nothing is set down where a door swings, nor a door hung to swing through what is set down: it would never move)
