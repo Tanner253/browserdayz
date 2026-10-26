@@ -88,15 +88,17 @@ const OVER: Record<string, Region[]> = { chest_rig: ['chest'], armor_vest: ['che
 /** the most that what is hung on a body is moved out over what is worn, metres (see Bulk) */
 const BULK = 0.05;
 /**
- * Things hung as they are (GEAR) that close round the head: the hair that stands off the skull is not drawn under them
- * (Anya's bun stood out through a balaclava). As a Worn of no model, which only hides.
+ * Things hung as they are (GEAR) that close round the head: the hair and the scalp are not drawn under them, and under
+ * the gas mask the face is drawn a little in (Anya's hair came through a gas mask's front, Grigori's beard through its
+ * chin). As a Worn of no model, which only hides and draws in.
  */
-const BARE: Record<string, Region[]> = { ghillie_hood: ['hair', 'scalp'], gasmask: ['hair'] };
-export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id]) } : null);
+const BARE: Record<string, { hides: Region[]; shrinks?: Region[] }> = { ghillie_hood: { hides: ['hair', 'scalp'] }, gasmask: { hides: ['hair', 'scalp'], shrinks: ['face'] } };
+export const bareWorn = (id: string): Worn | null => (BARE[id] ? { model: '', hides: hides(BARE[id].hides), shrinks: hides(BARE[id].shrinks ?? []) } : null);
 /** the parts of the trousers that a top long enough lies over */
 const WAIST = hides(['belly', 'hips', 'thigh']);
-/** worn over the clothes: a vest, or a suit over everything (the ghillie) */
-const outer = (id: string) => ITEMS[id]?.slot === 'vest' || ITEMS[id]?.slot === 'back';
+/** worn over the clothes: a vest, or a suit over everything (the ghillie: a top that covers the shins too) */
+const suitOf = (id: string) => ITEMS[id]?.slot === 'top' && !!ITEMS[id]?.dress?.hides.includes('shin');
+const outer = (id: string) => ITEMS[id]?.slot === 'vest' || ITEMS[id]?.slot === 'back' || suitOf(id);
 
 /** how a thing worn is said to everybody: its id, and its colour after a ~ where that is not its kind's first */
 export const wornKey = (it: { id: string; c?: number }) => (it.c ? `${it.id}~${it.c}` : it.id);
@@ -104,7 +106,7 @@ export const wornKey = (it: { id: string; c?: number }) => (it.c ? `${it.id}~${i
 /** What is said of a body's things worn, sorted: those drawn as they are worn (`dress`: Worn), and the rest by their ids (GEAR in avatar.ts). */
 export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
   const worn: Worn[] = [], gear: string[] = [], inner: Worn[] = [], legs: Worn[] = [], feet: Worn[] = [];
-  let over = 0, coat = 0;
+  let over = 0, coat = 0, suit = 0;
   for (const k of keys) {
     const [id, c] = k.split('~'), d = ITEMS[id];
     if (!d?.dress) {
@@ -117,7 +119,7 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
     const col = d.colours?.[Number(c) || 0];
     const w: Worn = { id, model: d.dress.model, ...(d.dress.each ? { each: true } : {}), hides: hides(d.dress.hides), shrinks: hides(d.dress.shrinks ?? []), ...(col?.tint !== undefined ? { tint: col.tint } : {}), ...(col?.camo ? { camo: col.camo } : {}) };
     worn.push(w);
-    if (outer(id)) over |= w.hides;
+    if (outer(id)) (over |= w.hides), suitOf(id) && (suit |= w.hides);
     else inner.push(w);
     if (d.slot === 'top') coat |= (w.hides | (w.shrinks ?? 0)) & WAIST;
     if (d.slot === 'legs') legs.push(w);
@@ -131,6 +133,9 @@ export function sortWorn(keys: string[]): { worn: Worn[]; gear: string[] } {
   // and they read as flat white wedges; it breaks at the ankle now (cut away there instead, its edge was torn). And a boot's shaft drawn in under the trouser leg: it stood out behind it.)
   if (feet.length) for (const w of legs) w.tuck = hides(['foot']);
   if (legs.length) for (const w of feet) (w.under = (w.under ?? 0) | hides(['shin'])), (w.underBy = 0.012);
+  // (and under a suit over everything, nothing of what is under it drawn where it covers: it is whole, and jeans came
+  // out through a ghillie suit's legs drawn in under it)
+  if (suit) for (const w of inner) w.underHide = (w.underHide ?? 0) | suit;
   return { worn, gear };
 }
 
