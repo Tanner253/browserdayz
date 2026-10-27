@@ -96,7 +96,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // asks for a hammer and picks nothing up)
 // (74, 2026-10-26: blueprints learned in any order, foundations reaching 4.5 m down and the ground 0.3 m into a corner,
 // posts 3 m: a page of 73 refuses what a server of 74 lays, and the other way)
-export const PROTOCOL = 74;
+// (75, 2026-10-27: the party's chat ('party' on 'chat'), a bed given to a party member ('bgive'): a page of 74 has no Party
+// channel and a server of 74 hears none)
+export const PROTOCOL = 75;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
