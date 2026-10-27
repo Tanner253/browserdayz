@@ -39,6 +39,15 @@ export const roster = {
     const hits = [...known.values()].filter((p) => (dev ? p.fp.startsWith(dev) : t.length > 1 && p.names.some((n) => n.toLowerCase().includes(t))));
     return hits.sort((a, b) => exact(b) - exact(a) || b.last - a.last).slice(0, most);
   },
+  /**
+   * Somebody known from before the roster was kept: added if not on it, by what is known of them (a name, when).
+   * Everybody who cashed a tag is (pinned.ts), so the payouts' names are found (the owner, 2026-10-27: "i search for
+   * player quati but says nobody played with that name, but if you check payouts osmeone clearly did").
+   */
+  seed(key: string, name: string, at: number) {
+    if (!key || !name || known.has(key)) return;
+    known.set(key, { key, ip: '', fp: '', names: [name], first: at, last: at });
+  },
   /** the one whose key's hash starts so (the panel's All players bans by it: /ban k:xxxx) */
   byKey(start: string): Known | null {
     for (const p of known.values()) if (p.key.startsWith(start)) return p;

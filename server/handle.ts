@@ -856,7 +856,8 @@ export function handle(c: Client, m: C2S) {
     }
     case 'adm': {
       const role = roleOf(c), now = Date.now();
-      if (!role || now - (ADMIN.asked.get(c.id) ?? 0) < 600) return;
+      // (a search from the panel's All players is answered at once, as it is typed)
+      if (!role || now - (ADMIN.asked.get(c.id) ?? 0) < (typeof m.find === 'string' ? 200 : 600)) return;
       ADMIN.asked.set(c.id, now);
       const admin = role === 'admin';
       // (the panel's All players and Reports, an admin's: server/roster.ts, server/reports.ts)

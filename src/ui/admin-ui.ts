@@ -984,7 +984,7 @@ export class AdminUI {
     if (this.view !== 'who') {
       const t = el('div', 'adm-head-t');
       const [ic, title, sub] = this.view === 'entities' ? ['car', 'Entities', 'Cars, the infected and animals: put them in the world, and take them out of it. Everybody sees what is done here.']
-        : this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'store' ? ['coin', 'Store', 'What was bought, checked on chain as it was paid. A payment that came short or late needs a look: pass it, or refund it from the store’s wallet yourself and mark it so.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
+        : this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'store' ? ['coin', 'Store', 'What was bought, checked on chain as it was paid. A payment that came short or late needs a look: pass it, or refund it from the store’s wallet yourself and mark it so.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : this.view === 'people' ? ['search', 'All players', 'Anybody who has played since the list began, or ever cashed a tag, on or not: found by a name or dev:, and banned by their game.'] : this.view === 'reports' ? ['flag', 'Reports', 'Reports from the death screen, newest first, each with how that death went as the server knew it.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
       const text = el('div', 'adm-head-text');
       text.append(el('b', '', title), el('small', '', sub));
       t.append(icon(ic, 'huge'), text);
@@ -1675,8 +1675,8 @@ export class AdminUI {
     find.append(icon('search'), this.input(this.findAll, 'Find anybody who has played: a name, or dev:xxxxxxxx', (v) => {
       this.findAll = v;
       window.clearTimeout(this.findT);
-      this.findT = window.setTimeout(() => this.askLists(), 300);
-    }, '', undefined, 'find-all'));
+      this.findT = window.setTimeout(() => this.askLists(), 250);
+    }, '', () => this.askLists(), 'find-all'), this.button('Search', () => this.askLists(), 'small', 'search'));
     const list = el('div', 'adm-table people'), q = this.findAll.trim(), got = this.lists.found;
     if (q.length < 2) list.append(el('div', 'adm-none', 'Two or more letters of a name, or dev: and a device: anybody who has played in the last 90 days, on or not.'));
     else if (!got) list.append(el('div', 'adm-none', 'Looking…'));

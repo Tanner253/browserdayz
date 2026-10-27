@@ -22,4 +22,10 @@ const kept = JSON.parse(JSON.stringify(roster.keep()));
 roster.restore(kept);
 assert.equal(roster.keep().length, 3, 'read back over itself: nobody twice');
 
+// whoever cashed a tag before the roster began is put on it (pinned.ts), and found; one on it already is left as is
+roster.seed('k-quati', 'Quati', Date.now() - 3 * 86400_000);
+roster.seed('k-bob', 'Someone else', Date.now());
+assert.equal(roster.find('quati')[0]?.key, 'k-quati', 'a payouts name is found');
+assert.deepEqual(roster.find('robert')[0].names, ['Bob', 'Robert'], 'a seed does not overwrite');
+
 console.log('roster ok');

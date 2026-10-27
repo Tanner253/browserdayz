@@ -311,6 +311,8 @@ function takeInLate(save: KeptFile) {
   reports.restore(snap.reports);
   proofs.restore(snap.proofs);
   pinned.restore(snap.pinned);
+  // (and whoever cashed a tag is on the roster, if they have not played since it began: roster.ts seed)
+  for (const [k, p] of pinned.keep()) roster.seed(k, p.name, p.at);
   elite.restore(snap.elite);
   plating.restore(snap.plates);
   restoreBases(snap.bases);
@@ -620,6 +622,8 @@ export async function loadKept() {
     reports.restore(snap.reports);
     proofs.restore(snap.proofs);
     pinned.restore(snap.pinned);
+    // (and whoever cashed a tag is on the roster, if they have not played since it began: roster.ts seed)
+    for (const [k, p] of pinned.keep()) roster.seed(k, p.name, p.at);
     elite.restore(snap.elite);
     takePowers(snap.powers);
     // (Whose tags were whose only from a last word, written as the server stopped and after its last cash-in. Any
