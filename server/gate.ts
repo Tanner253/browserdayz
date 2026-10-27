@@ -599,6 +599,15 @@ const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|1
 export const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash('sha256').update(`${ADMIN.pepper} ${ip}`).digest('hex').slice(0, 40) : '');
 
 export const roleOf = (c: Client): Role | null => (LOCAL_ADMIN ? 'admin' : ADMIN.state.roles[keyHash(c.key)]?.role ?? null);
+/** on a LOCAL_ADMIN server, where everybody is an admin, the games `boss` is not true of: the strangers of test/build.test.ts */
+const STRANGERS = new Set(listOf(process.env.LOCAL_STRANGERS));
+/**
+ * An admin, whom every lock lets through and who works, builds in and takes down every base, claim or none (the owner,
+ * 2026-10-27: "as admin i should be able to access peoples keylocks and codes without claim, and i should be able to open
+ * doors etc. even if theyre locked with a code"; "admins should be able to remove locks as well, and deconstruct etc...
+ * admin can do everything always").
+ */
+export const boss = (c: Client) => roleOf(c) === 'admin' && !(LOCAL_ADMIN && STRANGERS.has(c.key));
 
 /**
  * Whether one may act against another, by their keys' hashes (the owner, 2026-10-18: "admin is like heierchy, only can

@@ -110,8 +110,11 @@ export class Bases {
    * Whether a piece may be laid as asked, and where it would go: the spot, the base (made now, for a first piece, but
    * not kept until `lay`), or why not.
    */
-  /** @param free an admin in creative: no bench is asked for (server/build.ts) */
-  check(ask: Ask, by: string, free = false): { base: Base; spot: Spot; fresh: boolean } | string {
+  /**
+   * @param free an admin in creative: no bench is asked for (server/build.ts)
+   * @param admin an admin: nobody's claim blocks them (the owner, 2026-10-27: "admin can do everything always")
+   */
+  check(ask: Ask, by: string, free = false, admin = false): { base: Base; spot: Spot; fresh: boolean } | string {
     const K = PIECES[ask.k];
     if (!K) return 'No such piece';
     if (this.count >= LIMITS.all) return 'The server holds no more pieces';
@@ -150,9 +153,9 @@ export class Bases {
     if (no) return no;
     // (nor inside somebody else's claim: Rust's building blocked)
     const theirs = this.claimAt(wx, wz);
-    if (theirs && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";
+    if (theirs && !admin && !theirs.claim!.members.some((m) => m.pid === by) && !K.anywhere) return "Building blocked: someone else's claim";
     if (K.bench && !free && !PLACED[ask.k] && !this.benchNear(wx, wz, K.bench)) return `It needs a ${K.bench > 1 ? `level ${ROMAN[K.bench]} ` : ''}workbench within ${BENCH_NEAR} m`;
-    if (K.sleep && !base.claim?.members.some((m) => m.pid === by)) return 'A bed goes only in a base whose claim you are on';
+    if (K.sleep && !admin && !base.claim?.members.some((m) => m.pid === by)) return 'A bed goes only in a base whose claim you are on';
     if (ask.k === 'claim') {
       if (base.claim) return 'This base has its claim already';
       if ([...this.bases.values()].filter((b) => b.claim?.members[0]?.pid === by).length >= LIMITS.claims) return 'You hold a claim already: one a player';

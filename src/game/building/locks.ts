@@ -29,6 +29,8 @@ export interface LockHost {
   /** who the player is to a base, the numbers of the keys they carry */
   who: () => string;
   keys: () => number[];
+  /** an admin: every lock lets them through (server/locks.ts `boss`) */
+  admin: () => boolean;
   count: (id: string) => number;
   take: (id: string, n: number) => void;
   give: (items: ItemInstance[], gift: string) => void;
@@ -97,7 +99,7 @@ export class LockView {
       this.fT = -1;
       return null;
     }
-    const pass = mayPass(p.lock, this.h.who(), this.h.keys()), input = this.h.input;
+    const pass = this.h.admin() || mayPass(p.lock, this.h.who(), this.h.keys()), input = this.h.input;
     if (ok && input.pressed('KeyF')) {
       this.fT = 0;
       this.fDone = false;
@@ -124,7 +126,7 @@ export class LockView {
   private fitFrame(ok: boolean, held: ItemInstance, t: { base: Base; id: number } | null, p: Piece | undefined): string {
     const name = held.id === 'code_lock' ? 'code lock' : 'key lock';
     if (!t || !p) return card(`Fit the ${name}`, '', 'look at a door, a gate, a hatch, a box or a claim');
-    const why = !lockable(p.k) ? 'That takes no lock' : p.lock ? 'It has a lock already' : !this.store().mayWork(t.base, this.h.who()) ? (t.base.claim ? 'You are not on its claim' : 'It is not yours') : null;
+    const why = !lockable(p.k) ? 'That takes no lock' : p.lock ? 'It has a lock already' : !this.h.admin() && !this.store().mayWork(t.base, this.h.who()) ? (t.base.claim ? 'You are not on its claim' : 'It is not yours') : null;
     if (why) return card(PIECES[p.k].name, `<span class="no">${why}</span>`, '');
     if (ok && this.h.input.pressed('Mouse0')) this.fit(t.base, p, held);
     return card(`Fit the ${name}`, `to the ${PIECES[p.k].name.toLowerCase()}`, held.id === 'code_lock' ? 'you choose its code first' : 'its key is yours', 'LMB');
@@ -147,7 +149,7 @@ export class LockView {
   // ---- the panel
 
   private openPanel(base: Base, p: Piece) {
-    const l = p.lock!, who = this.h.who(), keys = this.h.keys(), mine = mayWorkLock(l, who, keys);
+    const l = p.lock!, who = this.h.who(), keys = this.h.keys(), mine = this.h.admin() || mayWorkLock(l, who, keys);
     const status = `${l.on ? 'Locked' : 'Unlocked'} · ${l.k === 'code' ? `${l.who.length} ${l.who.length === 1 ? 'knows' : 'know'} its code${l.who.includes(who) ? ', you among them' : ''}` : mine ? 'it lets you in' : 'you have no key to it'}`;
     const title = l.k === 'code' ? 'Code lock' : 'Key lock';
     this.h.panel(true);
@@ -262,7 +264,7 @@ export class LockView {
   unfit(base: Base, p: Piece, hammer: ItemInstance) {
     const l = p.lock;
     if (!l) return;
-    if (!mayWorkLock(l, this.h.who(), this.h.keys())) return this.h.note('It is not yours to take off', 'warn');
+    if (!this.h.admin() && !mayWorkLock(l, this.h.who(), this.h.keys())) return this.h.note('It is not yours to take off', 'warn');
     const still = () => this.h.held()?.uid === hammer.uid && !!base.pieces.get(p.id)?.lock;
     this.h.begin('Taking the lock off', 2, still, () => {
       if (!still()) return;

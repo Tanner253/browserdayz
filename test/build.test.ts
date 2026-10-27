@@ -724,7 +724,8 @@ async function serverTest() {
   // (stopped by a word on its input, as a deploy stops it: it writes its world on the way out)
   const start = (more: Record<string, string> = {}) => {
     const s = spawn(process.execPath, ['--env-file=.env.local-server', path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-      env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', INFECTED: 'off', ANIMALS: 'off', STOP_BY_WORD: '1', ...more },
+      // (everybody an admin, for /give and /tp; but the other and the stranger are not let through locks and claims as an admin is: server/gate.ts `boss`)
+      env: { ...process.env, PORT: String(PORT), SITE_URL: SITE, DATA_DIR: dir, BOTCHECK: 'off', LINGER_S: '0', LOCAL_ADMIN: '1', LOCAL_STRANGERS: ['Other', 'Stranger'].map((n) => `build-test-key-${n}-`.padEnd(40, '0')).join(','), INFECTED: 'off', ANIMALS: 'off', STOP_BY_WORD: '1', ...more },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     s.stdout!.on('data', (d) => (logged += d));
@@ -1108,6 +1109,17 @@ async function serverTest() {
     for (const c of ['1', '2', '3']) them.send({ t: 'bcode', b: D.id, p: P, code: c.repeat(4) });
     assert.ok(await them.until('tell', (m) => /take none for 60 s/.test(m.text), 3000, sinceT), 'three wrong codes did not shut them out');
     console.log('  ok  a code lock: a stranger is shut out, shocked by a wrong code, let in by the right one; three wrong shut them out a minute');
+    // (an admin who is not on its list opens it with no code: server/gate.ts `boss`, "admin can do everything always")
+    const warden = new Player('Warden');
+    await warden.join();
+    await stand(warden, 2.2, 3.4);
+    await sleep(600);
+    const sinceA = warden.got.length;
+    warden.send({ t: 'bdoor', b: D.id, p: P, open: true });
+    assert.ok(await warden.until('bdoor', (m) => m.b === D.id && m.p === P && m.o === 1, 3000, sinceA), `an admin was kept out by a code lock: ${JSON.stringify(warden.got.slice(sinceA).filter((m) => m.t === 'tell'))}`);
+    warden.send({ t: 'bdoor', b: D.id, p: P, open: false });
+    await sleep(600);
+    console.log('  ok  an admin opens a code-locked door with no code');
     // a key lock on a box: its key given to whoever fitted it; the box opens for them and not for the stranger
     await me.give('planks', 12);
     await me.give('nails', 8);

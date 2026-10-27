@@ -23,7 +23,7 @@ import { pidOf } from './acts';
 import { spill, stockOf, storeFor, storesBack, tellClaim } from './claims';
 import { boxStore, boxesBack, emptyBox, heldIn, spillBoxes } from './boxes';
 import { asksOf, beginSite, fillSite, layPrint, printOf, wantOf } from '../src/sim/build/blueprints';
-import { roleOf } from './gate';
+import { boss, roleOf } from './gate';
 import { CAMP_KEEP, TRADER_SPOTS } from '../src/sim/camp-place';
 
 /** an admin in creative: what they lay, nail up, mend or turn costs nothing and takes no time, and no bench is asked for (server/admin.ts) */
@@ -201,7 +201,7 @@ export function lay(c: Client, m: Extract<C2S, { t: 'blay' }>) {
   // (so many beds and bags a player may have at once, wherever they lie: src/sim/build/beds.ts)
   const full = bedsFull(m.k, [...all.bases.values()].flatMap((b) => [...b.pieces.values()].filter((p) => p.by === own(c))));
   if (full) return void send(c, { t: 'tell', kind: 'warn', text: full });
-  const free = creative(c), ok = all.check(ask, own(c), free);
+  const free = creative(c), ok = all.check(ask, own(c), free, boss(c));
   if (typeof ok === 'string') return void send(c, { t: 'tell', kind: 'warn', text: ok });
   const cost = free ? {} : costOf(m.k, PIECES[m.k].only ?? 0);
   const no = short(c.inv, cost);
@@ -281,7 +281,8 @@ function atPiece(c: Client, b: number, p: number, u: unknown): { it: ItemInstanc
   if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.hammer) return { it, why: 'Too far off' };
   if (condition(it.cond).ruined) return { it, why: 'Your hammer is ruined' };
   // (its claim's members' to work; with no claim, its first builder's)
-  if (!bases().mayWork(base, own(c))) return { it, why: base.claim ? 'You are not on its claim' : 'It is not yours' };
+  // (an admin works every base, claim or none: server/gate.ts `boss`)
+  if (!boss(c) && !bases().mayWork(base, own(c))) return { it, why: base.claim ? 'You are not on its claim' : 'It is not yours' };
   return { it, why: null };
 }
 
@@ -313,7 +314,7 @@ function byHandAt(c: Client, b: number, p: number): { it: null; why: string | nu
   const [x, , z] = toWorld(base, piece.x, piece.y, piece.z);
   if (Math.hypot(x - c.pose[0], z - c.pose[2]) > REACH.hammer) return { it: null, why: 'Too far off' };
   if (!byHand(piece.k)) return { it: null, why: 'That is taken down with a hammer' };
-  if (!bases().mayWork(base, own(c))) return { it: null, why: base.claim ? 'You are not on its claim' : 'It is not yours' };
+  if (!boss(c) && !bases().mayWork(base, own(c))) return { it: null, why: base.claim ? 'You are not on its claim' : 'It is not yours' };
   return { it: null, why: null };
 }
 

@@ -83,6 +83,8 @@ export interface BuildHost {
   mates: () => { id: number; name: string }[];
   /** the numbers of the keys carried (src/sim/build/locks.ts) */
   keys: () => number[];
+  /** an admin: every lock lets them through and every base is theirs to work, claim or none (server/locks.ts `boss`) */
+  admin: () => boolean;
   /** a panel of the building's up (the mouse freed) or put away */
   panel: (open: boolean) => void;
   /** played alone: hurt (a code lock's shock) */
@@ -197,7 +199,7 @@ export class Building {
     this.give = new BedGive(h.input, h.mates, h.send);
     this.doors = new DoorView({ input: h.input, online: h.online, send: h.send, note: h.note, me: h.me, camera: h.camera }, () => this.store, this.draw);
     this.locks = new LockView({
-      input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, who: () => this.me, keys: h.keys, count: h.count, take: h.take, give: h.give,
+      input: h.input, online: h.online, send: h.send, note: h.note, held: h.held, who: () => this.me, keys: h.keys, admin: h.admin, count: h.count, take: h.take, give: h.give,
       begin: h.begin, panel: h.panel, hurt: h.hurt, looked: () => this.target(), myId: h.myId,
       spark: (at) => h.impact('metal', at, new THREE.Vector3(0, 1, 0)),
       changed: (b) => {
@@ -480,7 +482,7 @@ export class Building {
       this.prompt = card(K.name, near.length ? 'aim at where it goes on your base' : K.ground ? 'aim at open ground' : 'lay a foundation first', 'hold the right button for the pieces');
       return;
     }
-    const c = this.store.check(ask, this.me, this.h.creative());
+    const c = this.store.check(ask, this.me, this.h.creative(), this.h.admin());
     let why = typeof c === 'string' ? c : null;
     const cost = costOf(this.kind, laidAt(this.kind));
     if (!why) why = this.short(cost);
@@ -548,7 +550,7 @@ export class Building {
       }
     }
     const ask = { b: pl.b, k: pl.k, x: pl.x, y: pl.y, z: pl.z, r: pl.r };
-    const c = this.store.check(ask, this.me, this.h.creative());
+    const c = this.store.check(ask, this.me, this.h.creative(), this.h.admin());
     let why = typeof c === 'string' ? c : null;
     const cost = costOf(pl.k, laidAt(pl.k));
     if (!why) why = this.short(cost);
@@ -791,7 +793,7 @@ export class Building {
   /** whether a thing looked at is picked up by hand: set down from an item, in a base the player may work */
   private mineByHand(t: { base: Base; id: number }) {
     const p = t.base.pieces.get(t.id);
-    return !!p && byHand(p.k) && this.store.mayWork(t.base, this.me);
+    return !!p && byHand(p.k) && (this.h.admin() || this.store.mayWork(t.base, this.me));
   }
 
   /** a thing set down, picked up whole by hand (F held at it): a box only when it is empty, a workbench with its levels */

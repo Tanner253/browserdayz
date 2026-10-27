@@ -3,6 +3,7 @@
 // are kept here and in the save, and told to no game: a game is told a lock's kind, whether it is locked and who has its
 // code. What a lock bars: a door swung (server/doors.ts), a box or the claim's store opened (`lockLets`), a claim joined.
 
+import { boss } from './gate';
 import { randomInt } from 'node:crypto';
 import { lockPoint, LOCK, LOCK_ITEMS, goodCode, lockable, mayPass, mayWorkLock } from '../src/sim/build/locks';
 import { saidPiece } from '../src/sim/build/bases';
@@ -23,7 +24,7 @@ const REACH = 3.2;
 /** the numbers of the keys somebody carries */
 const keysOf = (c: Client) => [...things(c.inv)].filter((it) => it.id === 'key' && Number.isInteger(it.key)).map((it) => it.key!);
 /** whether a piece's lock lets somebody through */
-export const passes = (c: Client, p: Piece) => mayPass(p.lock, pidOf(c.key), keysOf(c));
+export const passes = (c: Client, p: Piece) => boss(c) || mayPass(p.lock, pidOf(c.key), keysOf(c));
 
 /** wrong codes tried, by whom and at which lock, and when they were shut out till */
 const tries = new WeakMap<Client, Map<string, { n: number; out: number; at: number }>>();
@@ -48,7 +49,7 @@ export function fit(c: Client, m: Extract<C2S, { t: 'block' }>) {
   if (!it) return tell(c, 'You need a lock');
   if (!lockable(a.piece.k)) return tell(c, 'That takes no lock');
   if (a.piece.lock) return tell(c, 'It has a lock already');
-  if (!bases().mayWork(a.base, pidOf(c.key))) return tell(c, a.base.claim ? 'You are not on its claim' : 'It is not yours');
+  if (!boss(c) && !bases().mayWork(a.base, pidOf(c.key))) return tell(c, a.base.claim ? 'You are not on its claim' : 'It is not yours');
   const k = LOCK_ITEMS[it.id];
   if (k === 'code' && !goodCode(m.code)) return tell(c, `A code is ${LOCK.digits} figures`);
   pay(c, { [it.id]: 1 });
@@ -68,7 +69,7 @@ export function code(c: Client, m: Extract<C2S, { t: 'bcode' }>) {
   if (!a || !l || l.k !== 'code' || !goodCode(m.code)) return;
   const pid = pidOf(c.key);
   if (m.set) {
-    if (!l.who.includes(pid)) return tell(c, 'Only somebody who has its code may change it');
+    if (!l.who.includes(pid) && !boss(c)) return tell(c, 'Only somebody who has its code may change it');
     l.code = m.code;
     l.who = [pid];
     told(a.base, a.piece);
@@ -104,7 +105,7 @@ export function code(c: Client, m: Extract<C2S, { t: 'bcode' }>) {
 export function onOff(c: Client, m: Extract<C2S, { t: 'blockon' }>) {
   const a = at(c, m.b, m.p), l = a?.piece.lock;
   if (!a || !l) return;
-  if (!mayWorkLock(l, pidOf(c.key), keysOf(c))) return tell(c, 'It is locked');
+  if (!boss(c) && !mayWorkLock(l, pidOf(c.key), keysOf(c))) return tell(c, 'It is locked');
   l.on = !!m.on;
   told(a.base, a.piece);
 }
@@ -113,7 +114,7 @@ export function onOff(c: Client, m: Extract<C2S, { t: 'blockon' }>) {
 export function cutKey(c: Client, m: Extract<C2S, { t: 'bkey' }>) {
   const a = at(c, m.b, m.p), l = a?.piece.lock;
   if (!a || !l || l.k !== 'key' || l.key === undefined) return;
-  if (!mayWorkLock(l, pidOf(c.key), keysOf(c))) return tell(c, 'It is locked');
+  if (!boss(c) && !mayWorkLock(l, pidOf(c.key), keysOf(c))) return tell(c, 'It is locked');
   const no = short(c.inv, LOCK.cut);
   if (no) return tell(c, no);
   pay(c, LOCK.cut);
@@ -128,7 +129,7 @@ export function unfit(c: Client, m: Extract<C2S, { t: 'bunlock' }>) {
   const it = tool(c, m.u, HAMMERS);
   if (!a || !l || !it) return;
   if (condition(it.cond).ruined) return tell(c, 'Your hammer is ruined');
-  if (!mayWorkLock(l, pidOf(c.key), keysOf(c)) || !bases().mayWork(a.base, pidOf(c.key))) return tell(c, 'It is not yours to take off');
+  if (!boss(c) && (!mayWorkLock(l, pidOf(c.key), keysOf(c)) || !bases().mayWork(a.base, pidOf(c.key)))) return tell(c, 'It is not yours to take off');
   delete a.piece.lock;
   use(c, it);
   const back = makeItem(l.k === 'code' ? 'code_lock' : 'key_lock', 1);
