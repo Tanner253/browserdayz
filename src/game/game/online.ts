@@ -276,6 +276,8 @@ export const onlineMethods = {
         if (!(s[6] & F_DEAD)) r.seenAlive(now);
         else r.seenDead(now);
       }
+      // (those gone out of this page's sight: server/sight.ts)
+      for (const id of m.out ?? []) this.remotes.get(id)?.goAway();
     });
     net.on('i+', (m) => this.horde.add(m.b));
     net.on('i-', (m) => this.horde.remove(m.i));

@@ -1,3 +1,5 @@
+// (first of all: three.js's inspector hook is taken away before three loads, src/net/hook-trap.ts)
+import './net/hook-trap';
 import './ui/style.css';
 import { EMBED } from './core/embed';
 import './ui/hud.css';

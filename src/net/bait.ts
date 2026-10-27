@@ -15,17 +15,18 @@ export function layBait(names: string[]) {
       configurable: false,
       enumerable: false,
       get() {
-        sprung(name);
+        spring(name);
         return undefined;
       },
       set() {
-        sprung(name);
+        spring(name);
       },
     });
   }
 }
 
-function sprung(name: string) {
+/** a trap sprung: the first only is told (src/net/hook-trap.ts springs one of its own) */
+export function spring(name: string) {
   if (read) return;
   read = name;
   tell?.(name);

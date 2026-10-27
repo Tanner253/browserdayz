@@ -38,6 +38,8 @@ import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
 import { broadcast, cleanName, clients, join, num, perksChanged, records, round2, send, type Client } from './players';
+import { inSight } from './sight';
+import { partyMates } from './party';
 import { perks } from './perks';
 import { tagsWorn } from './worn';
 import { stashesSeen } from './stash-sight';
@@ -635,21 +637,23 @@ setInterval(() => {
 
 setInterval(() => {
   if (clients.size < 2) return;
-  const s: Extract<S2C, { t: 'ps' }>['s'] = [];
-  // (where everybody is, for everybody; and for admins, where the vanished are as well)
-  const all: typeof s = [];
+  // (where everybody is, each row written once: each page is sent those within its sight, server/sight.ts; the
+  // vanished only to admins, who are told of everybody)
+  const rows: { id: number; x: number; z: number; hidden: boolean; json: string }[] = [];
   for (const c of clients.values()) {
     const p = c.pose;
-    const row: (typeof s)[number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m, c.n ?? null];
+    const row: Extract<S2C, { t: 'ps' }>['s'][number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m, c.n ?? null];
     // (the finish on the gun in their hands, said only of a plated one)
     if (c.f) row.push(c.f);
-    all.push(row);
-    if (!c.power.hidden) s.push(row);
+    rows.push({ id: c.id, x: p[0], z: p[2], hidden: !!c.power.hidden, json: JSON.stringify(row) });
   }
-  if (all.length === s.length) broadcast({ t: 'ps', s });
-  else {
-    const plain = JSON.stringify({ t: 'ps', s } satisfies S2C), whole = JSON.stringify({ t: 'ps', s: all } satisfies S2C);
-    for (const c of clients.values()) if (c.ws.readyState === 1) c.ws.send(roleOf(c) === 'admin' ? whole : plain);
+  const shown = rows.filter((r) => !r.hidden);
+  for (const c of clients.values()) {
+    if (c.ws.readyState !== 1) continue;
+    const admin = roleOf(c) === 'admin';
+    const { see, out } = inSight({ id: c.id, x: c.pose[0], z: c.pose[2] }, admin ? rows : shown, (c.told ??= new Set()), new Set(partyMates(c).map((m) => m.id)), admin);
+    // (as JSON.stringify({ t: 'ps', s, out }) would write it, of rows already written)
+    c.ws.send(`{"t":"ps","s":[${see.map((r) => r.json).join(',')}]${out.length ? `,"out":${JSON.stringify(out)}` : ''}}`);
   }
 }, 1000 / TICK_HZ);
 

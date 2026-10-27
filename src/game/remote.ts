@@ -225,6 +225,13 @@ export class RemotePlayer implements Damageable {
    *   server does not: it is then kept by when it came, as all were)
    */
   push(p: Pose, now: number, stamp?: number) {
+    if (this.away) {
+      // (back in sight: from where they are now, a jump and not a walk, see update)
+      this.away = false;
+      this.applyZones();
+      this.blocker.setEnabled(this.alive && !this.sat);
+      this.avatar.root.visible = this.fall < 4;
+    }
     let last: Snap | undefined = this.snaps[this.snaps.length - 1];
     let at: number;
     if (stamp !== undefined && stamp === this.stamped) {
@@ -342,7 +349,20 @@ export class RemotePlayer implements Damageable {
     this.fall = 0;
     this.avatar.root.visible = true;
     this.applyZones();
-    this.blocker.setEnabled(alive && !this.sat);
+    this.blocker.setEnabled(alive && !this.sat && !this.away);
+  }
+
+  /** out of this page's sight (server/sight.ts): not drawn, and nothing of them to bump into or hit, till they are told of again */
+  private away = false;
+
+  /** gone out of sight: not left standing where they were last told of */
+  goAway() {
+    this.away = true;
+    this.snaps.length = 0;
+    this.lit = false;
+    this.avatar.root.visible = false;
+    this.applyZones();
+    this.blocker.setEnabled(false);
   }
 
   /**
@@ -392,9 +412,10 @@ export class RemotePlayer implements Damageable {
   }
 
   private applyZones() {
-    for (const c of this.stand) c.setEnabled(this.alive && !this.crouched && !this.lying);
-    for (const c of this.crouch) c.setEnabled(this.alive && this.crouched && !this.lying);
-    for (const c of this.flat) c.setEnabled(this.alive && this.lying);
+    const on = this.alive && !this.away;
+    for (const c of this.stand) c.setEnabled(on && !this.crouched && !this.lying);
+    for (const c of this.crouch) c.setEnabled(on && this.crouched && !this.lying);
+    for (const c of this.flat) c.setEnabled(on && this.lying);
   }
 
   /**
@@ -507,6 +528,10 @@ export class RemotePlayer implements Damageable {
 
   update(dt: number, now: number, listener: THREE.Vector3) {
     if (!this.ready) return;
+    if (this.away) {
+      this.avatar.root.visible = false;
+      return;
+    }
     this.heard.copy(listener);
     // --- between the two poses either side of the moment being shown: a little in the past, by their clock
     const t = this.line.at(now, dt);

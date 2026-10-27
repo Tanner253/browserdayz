@@ -62,7 +62,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gate.ts` | 774 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
 | `gather.ts` | 143 | The server: gathering (2026-10-24, base building's first step; the rules are src/sim/gather.ts). |
 | `handle.ts` | 1089 | The server: handle, every message a player sends, checked and acted on. |
-| `index.ts` | 1374 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
+| `index.ts` | 1378 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 810 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `learn.ts` | 101 | The server: blueprints (progression v3; the rules are src/sim/craft/learn.ts). |
 | `locks.ts` | 147 | Locks on a base as the server keeps them (2026-10-24, base building's fourth step; the rules are src/sim/build/locks.ts). |
@@ -70,7 +70,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `perks.ts` | 97 | What players have bought at the store (2026-10-22), as the site's who-has-what list says it (api/store.ts): |
 | `pinned.ts` | 52 | A player's name and payout wallet are fixed at their first cashed tag (the owner, 2026-10-22: |
 | `plates.ts` | 121 | A store finish put on one gun (2026-10-22), Rust's way. |
-| `players.ts` | 507 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
+| `players.ts` | 509 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `queue.ts` | 149 | The server: the line to get in when it is full, and the leaderboard. |
 | `raid.ts` | 162 | The server: raiding (base building's fifth step; the rules are src/sim/build/raid.ts). |
 | `recycle.ts` | 61 | The server: recyclers (progression v3; the rules are src/sim/craft/recyclers.ts). |
@@ -78,6 +78,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `salvage.ts` | 45 | The server: salvage (2026-10-25, plan-crafting; the rules are src/sim/craft/salvage.ts). |
 | `searched.ts` | 220 | Crates, bodies, stashes, drops, furniture and bags lying about, gone through by several at once (2026-10-23, the owner's list: the "Opening…" wait and "Someone else is searching that"; "We should not have cut any... |
 | `seen.ts` | 40 | Who has played lately, for the door's "N played today" (the owner, offered a true number in place of fake players to fill the count: |
+| `sight.ts` | 27 | Where everybody is, told only to those who could see them (the owner, 2026-10-27: |
 | `solid.ts` | 134 | A base's pieces as solid as the game has them, where the server judges (2026-10-24). |
 | `stash-guard.ts` | 49 | The players' stashes against what this release changed on the map (2026-10-23, the owner: |
 | `stash-list.ts` | 19 | Where every stash kept on the map lies, told to the owner alone by /stashes (server/admin.ts), so that a release that changes the map can be checked against them first (scripts/stash-guard.ts; the owner, 2026-10-23: |
@@ -239,13 +240,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `drops.ts` | 606 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 797 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 786 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 792 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 505 | The game: attachments and magazines. |
 | `hands.ts` | 760 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `hunt.ts` | 73 | The game: gutting and skinning an animal (2026-10-23). |
 | `interact.ts` | 442 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 797 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 1066 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 1068 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 | `reclaim.ts` | 40 | The game: a survivor's gear taken back off their own body at one press (the owner, 2026-10-25: |
 
 ## src/game/
@@ -254,7 +255,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `garage.ts` | 1124 | Every jeep in this game, and the one the player is sitting in: getting in and out, the view from behind it, who it runs over, what it sounds like, how it burns, and keeping the server (and through it everybody else)... |
 | `gas.ts` | 341 | The gas as the game has it. |
-| `gathering.ts` | 230 | Gathering as the game has it (2026-10-24, base building's first step; the rules are src/sim/gather.ts, the server's side server/gather.ts). |
+| `gathering.ts` | 239 | Gathering as the game has it (2026-10-24, base building's first step; the rules are src/sim/gather.ts, the server's side server/gather.ts). |
 | `grenades.ts` | 130 | Thrown grenades. A grenade is a point flying under gravity that bounces off the world and goes off when its fuse runs out. Everyone is told where it left the hand and how fast (see the 'nade' message), and every game... |
 | `hands-on.ts` | 285 | Our own arms on a pack drawn round another maker's arms (2026-10-17). |
 | `held-mocap.ts` | 76 | First person on the motion capture (the owner, 2026-10-25: |
@@ -278,11 +279,11 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `muzzle.ts` | 131 | The flash at a muzzle: burning gas, seen for two or three frames. |
 | `my-perks.ts` | 31 | What this player has from the store, as their server says it (S2C 'perks', server/perks.ts): the finishes they may put on their guns (Apply in the inventory: server/plates.ts), VIP (a gold dog tag round their neck),... |
 | `near.ts` | 174 | What is near is drawn with its pictures at the size they came; what is far, with the world's copies. |
-| `party.ts` | 108 | Your party (2026-10-19, the lite first one: see server/party.ts). |
+| `party.ts` | 175 | Your party (2026-10-19, the lite first one: see server/party.ts). |
 | `player.ts` | 1468 | First-person survivor: kinematic character controller (Rapier), movement model, stamina / vitals, camera feel (bob, lean, landing dip) and footsteps. |
 | `procedural.ts` | 326 | The few meshes that have no scanned model: small machined parts built from a lathe profile, with a parkerised-steel material, and the stamped dog tag. |
 | `racks.ts` | 208 | Gun racks that show what stands in them (the owner, 2026-10-17: |
-| `remote.ts` | 730 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
+| `remote.ts` | 755 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
 | `riders.ts` | 67 | The dead who ride on (2026-10-14). |
 | `rig.ts` | 561 | A weapon pack in the hands of whoever holds the gun: the pack's own arms and its own gun, moved by its own animation. |
 | `survivors.ts` | 629 | The survivors a player can be, and what they wear over their own skin (the owner, 2026-10-24: |
@@ -290,7 +291,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `trader.ts` | 91 | The traders as they are seen: a body behind each counter of the trader camp, the shop at the trading post and the stalls before it (src/sim/camp.ts says where they stand, what each sells and for what). |
 | `vehicle.ts` | 623 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
-| `weapons.ts` | 5495 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
+| `weapons.ts` | 5501 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `worn-tag.ts` | 150 | The dog tag worn on the chest (2026-10-22), so that a tag is seen on everybody: steel, or gold on a VIP. |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
 
@@ -298,17 +299,18 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 379 |  |
+| `main.ts` | 381 | (first of all: three.js's inspector hook is taken away before three loads, src/net/hook-trap.ts) |
 
 ## src/net/
 
 | file | lines | what it is |
 |---|---:|---|
-| `bait.ts` | 39 | window.__game was the whole game, open to the console of every player's page, until 2026-10-20: a script passed round among players reached through it to draw everybody through walls and light the night (the owner,... |
+| `bait.ts` | 40 | window.__game was the whole game, open to the console of every player's page, until 2026-10-20: a script passed round among players reached through it to draw everybody through walls and light the night (the owner,... |
 | `client.ts` | 485 | Client side of the game connection. |
 | `device.ts` | 150 | The device this game runs on, boiled down to one hash and sent with `hello` (PROTOCOL 44). |
+| `hook-trap.ts` | 19 | three.js hands every scene and renderer it makes to window.__THREE_DEVTOOLS__ when a page has one (its inspector's hook): a script that sets it before the game loads is given the whole world, and can draw everybody... |
 | `orders.ts` | 236 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 806 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 810 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -531,7 +533,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `arena-hud.ts` | 174 | The arena's own screen (2026-10-14). |
 | `arena-menu.ts` | 233 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
 | `bigmap-names.ts` | 158 | Where the big map's names go, so that none lies on another (the owner, 2026-10-19, of the whole map: |
-| `bigmap.ts` | 1646 | The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: |
+| `bigmap.ts` | 1677 | The map, opened large (M), drawn as the owner's picture of it is (2026-10-17: |
 | `bookmark.ts` | 83 | A place the player marks on the map for themself (double-click or double-tap the sheet opened large, M): a pin there, and the same pin on the corner map, on its rim when the place is out of its view, with how far it is. |
 
 ## src/ui/br/
@@ -554,7 +556,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `emotes-menu.ts` | 241 | Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched first on the survivor (the owner, 2026-10-14: |
 | `guide.ts` | 209 | The building and crafting guide (the owner, 2026-10-25: |
 | `howto-more.ts` | 87 | The How to Play card's second half (the owner, 2026-10-19: |
-| `hud.ts` | 2213 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
+| `hud.ts` | 2224 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 555 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inv-card.ts` | 107 | What a thing is, and what to do with it (idea 15 of Fettah, a contributor, 2026-10-18). |
 | `inv-piles.ts` | 166 | The inventory's tidying (Fettah's inventory pull request, a contributor's, 2026-10-18): a grid sorted kind by kind, piles of one thing joined, a bag's weight, and which things feed one another. |

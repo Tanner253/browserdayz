@@ -98,7 +98,9 @@ import type { KeptBase, KeptClaim, KeptPiece } from '../sim/build/bases';
 // posts 3 m: a page of 73 refuses what a server of 74 lays, and the other way)
 // (75, 2026-10-27: the party's chat ('party' on 'chat'), a bed given to a party member ('bgive'): a page of 74 has no Party
 // channel and a server of 74 hears none)
-export const PROTOCOL = 75;
+// (76, 2026-10-27: 'ps' tells a page only of those within its sight, and with `out` who went out of it: a page of 75
+// leaves them standing where they were last)
+export const PROTOCOL = 76;
 
 /** a player's day at the trader camp (src/sim/camp.ts) */
 export interface TradeDay {
@@ -499,7 +501,7 @@ export type S2C =
   | { t: 'join'; p: PlayerInfo }
   | { t: 'leave'; id: number }
   /** each: who, where, what is in their hands and on it, and when their game said so by its own clock (ms) */
-  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ string?][] }
+  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?, /** the held gun's finish ('gold', 'nickel'): not said, none */ string?][]; /** who went out of this page's sight since the last (server/sight.ts) */ out?: number[] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
   /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
