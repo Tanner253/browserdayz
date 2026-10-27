@@ -24,6 +24,8 @@ export interface Fire {
   burn: number;
   of: string;
   done: number;
+  /** charcoal made with no room for it in the store: put there as soon as there is */
+  ash?: number;
 }
 
 export const cold = (): Fire => ({ burn: 0, of: '', done: 0 });
@@ -70,6 +72,12 @@ function put(items: StoredItem[], w: number, h: number, id: string, n: number): 
  */
 export function forgeStep(f: Fire, items: StoredItem[], w: number, h: number, dt: number): boolean {
   let changed = false;
+  // (charcoal that found no room when it was made, put in as soon as there is: it was lost, and a log burned to bars left
+  // nothing, the owner, 2026-10-27, "I made metal bars and did not get charcoal")
+  if (f.ash && put(items, w, h, MAT.coal, f.ash)) {
+    f.ash = 0;
+    changed = true;
+  }
   const fuel = () => Object.keys(FORGE.fuel).find((id) => count(items, id) > 0);
   if (f.burn <= 0) {
     const next = count(items, MAT.frags) >= FORGE.frags ? fuel() : undefined;
@@ -90,7 +98,11 @@ export function forgeStep(f: Fire, items: StoredItem[], w: number, h: number, dt
   }
   if (f.burn <= 0) {
     // (what it burned is spent: its charcoal, and the next if there are still fragments to smelt)
-    if (FORGE.ash[f.of]) changed = put(items, w, h, MAT.coal, FORGE.ash[f.of]) || changed;
+    const ash = FORGE.ash[f.of] ?? 0;
+    if (ash) {
+      if (put(items, w, h, MAT.coal, ash)) changed = true;
+      else f.ash = (f.ash ?? 0) + ash;
+    }
     f.burn = 0;
     if (count(items, MAT.frags) < FORGE.frags) f.done = 0;
   }
