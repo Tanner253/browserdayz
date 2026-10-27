@@ -34,7 +34,7 @@ import { Hearths } from '../src/sim/fires';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
+import { ADMIN, BOTCHECK, passDevice, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, botName, comingBack, deviceRules, sigOf, sigOfWs, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, shooterOf, personOf, refusedAgent, persons, roleOf, shooters, spoofedRenderer, standing, turnedAway } from './gate';
 import { DEVICE, cleanDevice, deviceOf } from './device';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, place, reachedHere, sayRestart, sys } from './keep';
 import { broadcast, cleanName, clients, join, num, perksChanged, records, round2, send, type Client } from './players';
@@ -682,7 +682,7 @@ setInterval(() => {
           broadcast({ t: 'v+', v: vehInfo(standJeep(v.home)) });
         }
       }
-    } else if (v.sim !== null && v.seats[0] !== v.sim && now - v.heard > 6000) {
+    } else if (v.sim !== null && v.seats[0] !== v.sim && now - v.heard > 6000 && !clients.get(v.sim)?.seatHeld) {
       // the game that was letting it roll to a stop has gone quiet (a wreck it was letting fall: set down under it)
       v.sim = null;
       v.s = v.falling ? restState(v.s[0], world.standAt(v.s[0], v.s[1], v.s[2]), v.s[2], 0) : [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
@@ -1203,7 +1203,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       // (Shown to be a person's browser, or not asked: now the range, for whoever has not lately passed it.
       // Not for somebody who is to be turned away whatever they shoot: they are told so at once, by `join`.)
       const enter = (h: Extract<C2S, { t: 'hello' }>) => {
-        if (h.v !== PROTOCOL || knownShooter(key, ip, passDevice(fp, h.gl), cleanName(h.name)) || bannedFor(key || 'nobody', ip, fp, sigOfWs.get(ws)) || addressFull(key, ip)) return void letIn(h);
+        if (h.v !== PROTOCOL || knownShooter(key, ip, passDevice(fp, h.gl), cleanName(h.name)) || comingBack(key, fp) || bannedFor(key || 'nobody', ip, fp, sigOfWs.get(ws)) || addressFull(key, ip)) return void letIn(h);
         const deal = (go: number) => {
           // (the server's own dice, from the system's: the game sees the yard's turn, and nothing it could work the
           // figures' walks out from)
@@ -1244,7 +1244,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           deal(r.go + 1);
         }, 500);
       };
-      if (m.v !== PROTOCOL || knownPerson(key, ip)) return void enter(m);
+      if (m.v !== PROTOCOL || knownPerson(key, ip) || comingBack(key, fp)) return void enter(m);
       // (not known for a person: the slip, or the asking for one)
       const again = (reason: string) => {
         TURNED.captcha++;

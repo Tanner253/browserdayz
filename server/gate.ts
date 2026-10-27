@@ -16,7 +16,7 @@ import { SITE_URL, ipsTellApart } from './tags';
 import { CHECK, CHECKS, dealt, flag } from './checks';
 import { DEVICE, cameWith, deviceName, isFarm, shortDevice } from './device';
 import { broadcast, clients, drop, send, type Client } from './players';
-import { hurtJeep, infectedBody, kill, leaveSeat, releaseLock } from './acts';
+import { hurtJeep, infectedBody, kill, leaveSeat, releaseLock, seatOf } from './acts';
 import { animalsBlast } from './animals';
 import { blastWalled } from './solid';
 
@@ -41,6 +41,24 @@ import { blastWalled } from './solid';
 const SILENT_MS = 1500;
 
 const LINGER_MS = (process.env.LINGER_S === undefined ? 300 : Math.max(0, Number(process.env.LINGER_S) || 0)) * 1000;
+
+/**
+ * A seat kept this long for whoever's line dropped in it, the vehicle held where it was if their game moved it: the page
+ * is back in by itself in 4 to 11 s (live, 2026-10-27), and back in its seat. Out of it at once, a pilot's body fell
+ * from the sky and they came back to die of it (bouncer, 84 m; the owner: "killed when flying a heli").
+ */
+const SEAT_HOLD_MS = 30_000;
+
+/**
+ * Whether this is a game back for the body its dropped line left, on the device it left from: not asked again whether
+ * it is a person, nor sent to the range (every one of the six in-page rejoins after the 2026-10-27 deploy was asked for
+ * the captcha again: the owner, "players kicked to the bot check"). The body is only there for what passed both.
+ */
+export function comingBack(key: string, fp: string): boolean {
+  if (!key || !fp) return false;
+  for (const c of clients.values()) if (c.asleep && c.key === key && c.fp === fp) return true;
+  return false;
+}
 
 export const LOGOUT_MS = (process.env.LOGOUT_S === undefined ? 60 : Math.max(0, Number(process.env.LOGOUT_S) || 0)) * 1000;
 
@@ -269,6 +287,10 @@ export function keeping(now: number) {
       drop(c);
       continue;
     }
+    if (c.seatHeld && now - c.seatHeld >= SEAT_HOLD_MS) {
+      c.seatHeld = 0;
+      leaveSeat(c, true);
+    }
     if (!c.spoke && !c.asleep && now - c.since > NEVER_SPOKE_MS) {
       log(`${c.name} (#${c.id}) has said nothing of where they are in ${Math.round(NEVER_SPOKE_MS / 1000)} s: not a game, and gone`);
       TURNED.silent++;
@@ -332,7 +354,8 @@ export function gone(c: Client, why = '') {
   c.asleep = Date.now();
   c.logoutAt = 0;
   releaseLock(c);
-  leaveSeat(c, true);
+  if (seatOf(c)) c.seatHeld = c.asleep;
+  else leaveSeat(c, true);
   c.w = null;
   c.m = [];
   c.pose[5] = F_SIT | F_GROUND | (c.vitals?.bleeding ? F_BLEED : 0);

@@ -10,7 +10,7 @@ import type { HitZone } from '../src/sim/combat';
 import { type Thrower, newThrower } from '../src/sim/grenades';
 import { BLOOD } from '../src/sim/blood';
 import { type Pose, type Slung, type Vitals, type S2C, type PlayerInfo, type StoredItem, type C2S, PROTOCOL, F_GROUND, MAX_STAMINA } from '../src/net/protocol';
-import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, vehInfo, vehicles, world } from './index';
+import { MAX_PLAYERS, RECORD_LIFETIME, RESTART, onMap, barrelsGone, boxes, doors, economy, hearths, horde, locks, log, tellSeats, vehInfo, vehicles, world, type Veh } from './index';
 import { bunkerDoor, cardSeen, hitsBy, ipOf, seenOf, tagSeen, tagTime } from './tags';
 import { CHECK } from './checks';
 import { BodyWatch } from './bodywatch';
@@ -18,7 +18,7 @@ import { ADMIN, PER_ADDRESS, TURNED, addressFull, bannedFor, deviceFull, doorWor
 import { DEVICE, deviceOf, shortDevice } from './device';
 import { KEPT, asAdmin, claim } from './keep';
 import { noHold } from './admin';
-import { leaveSeat, pidOf, racksNow, releaseLock } from './acts';
+import { leaveSeat, pidOf, racksNow, releaseLock, seatOf } from './acts';
 import { fillFromQueue, keyOf, scores, sendBoard } from './queue';
 import { dropInfo, flightNow, flights } from './drops';
 import { partyIn, partyOut } from './party';
@@ -71,6 +71,8 @@ export interface Client {
   /** when a round of theirs last hit a jeep, and when they got into the seat they are in (0: on foot) */
   lastVHit: number;
   seatAt: number;
+  /** their line dropped while seated: since when the seat (and the vehicle, if their game moved it) is held for them (gate.ts, SEAT_HOLD_MS) */
+  seatHeld?: number;
   /** when they were first seen outside the Zona with a tag they took (0: they are not) */
   outAt: number;
   /** when they were first seen under the ground this time (0: they are not): see `underCheck` */
@@ -342,8 +344,16 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     drop(o);
   }
   // the same character can only be in the world once
+  // (a seat held for the body their dropped line left goes to them, taken from it before it goes: gate.ts, SEAT_HOLD_MS)
+  let held: { v: Veh; seat: number; sim: boolean; o: Client } | null = null;
   for (const o of clients.values()) {
     if (o.key === key) {
+      const at = o.asleep && o.seatHeld ? seatOf(o) : null;
+      if (at) {
+        held = { ...at, sim: at.v.sim === o.id, o };
+        at.v.seats[at.seat] = null;
+        if (held.sim) at.v.sim = null;
+      }
       send(o, { t: 'kick', reason: 'You connected from another tab.' });
       o.ws.close();
       drop(o);
@@ -385,6 +395,23 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
+  if (held && resume && vehicles.get(held.v.i) === held.v && !held.v.goneAt && held.v.seats[held.seat] === null) {
+    held.v.seats[held.seat] = c.id;
+    if (held.sim) {
+      held.v.sim = c.id;
+      held.v.heard = Date.now();
+    }
+    c.seatAt = Date.now();
+  } else if (held) {
+    // (not to be had after all: let go as a line that dropped for good lets go of it, see leaveSeat)
+    if (vehicles.get(held.v.i) === held.v && held.v.seats[held.seat] === null) {
+      held.v.seats[held.seat] = held.o.id;
+      if (held.sim) held.v.sim = held.o.id;
+      held.o.seatAt = Date.now();
+      leaveSeat(held.o, true);
+    }
+    held = null;
+  }
   const others = [...clients.values()].filter((o) => shown(o, c)).map(info);
   clients.set(c.id, c);
   claim();
@@ -431,6 +458,8 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   // (a restart is on its way: whoever comes in before it happens is told as the others were)
   if (RESTART.pending !== null) send(c, { t: 'restart', why: RESTART.pending, in: Math.max(0, Math.round(RESTART.about - (Date.now() - RESTART.seen) / 1000)) });
   broadcast({ t: 'join', p: info(c) }, c);
+  // (after the welcome: their game, ready, sits itself in it on this, and moves it again if it did)
+  if (held) tellSeats(held.v);
   // (and they are told their own: their guns' finishes, VIP, the gold of their own dog tag)
   c.perkKey = perkKey(c.key);
   if (c.perkKey !== '{}') send(c, { t: 'perks', id: c.id, sk: perks.skins(c.key), ...(perks.vip(c.key) ? { vip: true as const } : {}) });
