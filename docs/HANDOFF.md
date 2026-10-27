@@ -28,23 +28,26 @@ ones; you are the quality filter for anything the owner sees; you assemble and r
 ## 2. Where things stand right now
 - **NEXT CHAT, START HERE (2026-10-27 ~09:50 UTC)**: live is `a195ca18` (PROTOCOL 74, boot dcd010cf9b3d3b5c; every knife
   skins, sharp tools cut clothes into rags incl. survivors' clothes, forge charcoal kept until room, meat 3 h / 3 days).
-  On battle-royale, NOT deployed: party chat (96d78ef5, a 'party' ChatChannel, Tab in the chat box), the server half of
-  giving a bed/bag to a party member (aaa3984e, 'bgive' in server/beds.ts giveBed). Open, in the owner's order:
-  1. LIVE CONNECTION DROPS: players kicked to the bot check (captcha), killed when flying a heli, back to the menu and
-     reconnecting. The server did NOT restart (uptime matched the deploy), so it is the socket closing: read Render's
-     logs for closes/kicks (the Render MCP needs the owner to confirm the workspace first: list_workspaces, then ask),
-     and look at the 12 s silence watchdog (live-drops-2026-10-20 note), the bot check on rejoin, and heli flight load.
-  2. RECYCLER DUPLICATION (owner report, no steps yet: ask them how). server/recycle.ts and recycleStep look atomic; the
-     page runs no recycler online; suspect item moves into/out of the recycler's box ('recy:i') while it ticks.
-  3. Bed/bag give: the game's prompt (src/game/building/index.ts: look at one's own bed/bag, tap G to pick a party member,
-     hold G to give; a host `mates()` from this.party.members), then deploy with party chat.
-  4. Party: owner said yes to map/compass marks for members, names over their heads, a size cap (PARTY_MAX 6 exists);
-     party dots in the world and a list exist (src/game/party.ts). Ask before turning friendly fire off.
-  5. Multi-language UI + automatic chat translation: plan first with costs (a paid translation service and key in Vercel).
-  6. Hold to keep chopping (and mining): the owner, "hold trigger to keep chopping instead of having to click". The guide
-     says holding the left button swings until the tree falls; check the melee hold repeat for axes and the pickaxe, and
-     the controller's trigger (src/core/gamepad.ts hold('Mouse0')).
-  7. Still open from before: the bear ("nonfunctional", no detail), gates on slopes, meat models, forge On/Off.
+  On battle-royale, NOT deployed (all type-checked; the owner to test on 5173 + zona-server-local, then deploy the
+  server and site together): party chat (96d78ef5), giving a bed/bag to a party member (server aaa3984e, game 81fd95ba),
+  and from 2026-10-27 ~10:20 UTC:
+  - DONE 99d6eff0, LIVE CONNECTION DROPS. Render's logs (workspace "My Workspace", service srv-davb8bek1f9s739ksgb0):
+    every drop since the deploy was the socket cut on the way (server saw 1005/1006, 25-43 min into a game, none of our
+    closes: the page's own give-up sends 4000), and the page was back in by itself in 4-11 s. What it cost was ours:
+    each rejoin was asked for the captcha again (CAPTCHA_HOURS unset: a pass holds for no time; 13 passes for 7 joins +
+    6 rejoins), and a seated player was taken out of the seat at once (bouncer came back 84 m up and died). Now a game
+    back for its lingering body on the same device skips captcha and range (gate.ts comingBack), and a dropped seat is
+    held 30 s and handed back with the controls (SEAT_HOLD_MS; test/seat-hold.test.ts, port 8405). The cuts themselves
+    are Render's/Cloudflare's; not fixable from here.
+  - DONE b87d8c9e, party marks: green dots on the corner map, big map and compass, names over heads within 250 m
+    (src/game/party.ts marks/nameTag). Not looked at in a game (needs two players in a party). Friendly fire untouched.
+  - DONE bff43f7f, hold to keep chopping/mining: the button (or trigger) held swings again while the last blow was work
+    on a tree or rock (Weapons.keepSwinging from Gathering.whack).
+  Open, in the owner's order:
+  1. RECYCLER DUPLICATION (owner report, no steps yet: asked them how). server/recycle.ts and recycleStep look atomic;
+     the page runs no recycler online; suspect item moves into/out of the recycler's box ('recy:i') while it ticks.
+  2. Multi-language UI + automatic chat translation: plan first with costs (a paid translation service and key in Vercel).
+  3. Still open from before: the bear ("nonfunctional", no detail), gates on slopes, meat models, forge On/Off.
 - **LIVE 2026-10-27 ~02:38 UTC**: site, server and `main` from `47036b92` (PROTOCOL 74, boot
   2c3e4a1f6ef42ca4; 857 characters and 123 stashes kept), `site-live` and `hotfix` there too, battle-royale the same.
   Since 2026-10-25 everything the side paths built is merged and live: base building (blueprints, deployables placed
