@@ -32,6 +32,7 @@ import { pinned } from './pinned';
 import { bodyOrder, zedLying } from './admin-bodies';
 import { payingTags, wentFrom } from './custody';
 import { goneFrom } from './searched';
+import { roster, type Known } from './roster';
 
 // ------------------------------------------------------------------ what an admin carries, and fires (2026-10-13)
 //
@@ -254,6 +255,16 @@ export async function command(c: Client, line: string) {
     case 'who':
     case 'list':
       return void sys(c, `${clients.size} online:`, ...[...clients.values()].map((o) => `${label(o)}  at ${o.pose[0].toFixed(0)}, ${o.pose[2].toFixed(0)}${o.alive ? '' : ' (dead)'}${o.check.flags ? `  ${o.check.flags} flagged` : ''}`));
+    case 'find': {
+      // (everybody who has played in the last 90 days, on or not: server/roster.ts)
+      const d = devOf(who), q = rest.join(' ').trim(), found = roster.find(d ? '' : q, d);
+      if (!d && q.length < 2) return void sys(c, 'Find whom? /find and two or more letters of a name, or dev:xxxxxxxx.');
+      if (!found.length) return void sys(c, `Nobody who has played in the last 90 days ${d ? `is on device ${d}` : `went by a name with "${q}" in it`}.`);
+      const ago = (ms: number) => (ms < 3600_000 ? `${Math.round(ms / 60000)} min` : ms < 48 * 3600_000 ? `${Math.round(ms / 3600_000)} h` : `${Math.round(ms / 86400_000)} days`);
+      const on = new Set([...clients.values()].map((o) => keyHash(o.key)));
+      const banned = (p: Known) => ADMIN.state.bans.some((b) => b.key === p.key || (!!p.fp && b.fp === p.fp));
+      return void sys(c, `${found.length} found (latest first; /ban takes the first name):`, ...found.map((p) => `${p.names.slice().reverse().join(' / ')}  ${on.has(p.key) ? 'playing' : `last ${ago(Date.now() - p.last)} ago`}${p.fp ? `  dev:${shortDevice(p.fp)}` : ''}${banned(p) ? '  BANNED' : ''}`));
+    }
     case 'recent':
       return void sys(c, ADMIN.gone.length ? 'Left lately (newest last):' : 'Nobody has left lately.', ...ADMIN.gone.slice(-15).map((g) => `${g.name}  ${Math.round((Date.now() - g.at) / 60000)} min ago${g.fp ? `  dev:${shortDevice(g.fp)}` : ''}`));
     case 'same': {
@@ -576,9 +587,11 @@ export async function command(c: Client, line: string) {
       const d = devOf(who);
       const t = d ? [...clients.values()].find((o) => o.fp.startsWith(d) && o !== c) ?? null : whoIs(who);
       const left = t ? null : d ? [...ADMIN.gone].reverse().find((g) => g.fp.startsWith(d)) : (/^#\d+$/.test(who) ? ADMIN.gone.find((g) => g.id === Number(who.slice(1))) : undefined) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
-      if (!t && !left) return void sys(c, d ? `Nobody online or lately gone is on device ${d}: see /players and /recent.` : `Nobody online or lately gone is "${who}": see /players and /recent.`);
-      if (t === c) return void sys(c, 'That is you.');
-      const name = t ? t.name : left!.name, key = keyHash(t ? t.key : left!.key), ip = ipHash(t ? t.ip : left!.ip), fp = t ? t.fp : left!.fp, sig = (t ? t.sig : left!.sig) ?? '';
+      // (and anybody who has played in the last 90 days, by the name they went by or their device: server/roster.ts)
+      const known = t || left ? null : (roster.find(d ? '' : who, d, 1)[0] ?? null);
+      if (!t && !left && !known) return void sys(c, d ? `Nobody who has played lately is on device ${d}: see /find.` : `Nobody who has played lately went by "${who}": see /find.`);
+      if (t === c || (known && known.key === keyHash(c.key))) return void sys(c, 'That is you.');
+      const name = t ? t.name : left ? left.name : known!.names[known!.names.length - 1], key = t || left ? keyHash(t ? t.key : left!.key) : known!.key, ip = t || left ? ipHash(t ? t.ip : left!.ip) : known!.ip, fp = t ? t.fp : left ? left.fp : known!.fp, sig = (t ? t.sig : left?.sig) ?? '';
       if (!over(keyHash(c.key), key)) return above(name);
       if (ADMIN.state.roles[key]?.role === 'admin') return void sys(c, `${name} is an admin: /demote first.`);
       // (the owner, 2026-10-16: "can i ban this computr or browser at the source?": the device goes on the ban with the key and the address;
@@ -587,7 +600,7 @@ export async function command(c: Client, line: string) {
       log(`[admin] ${c.name} banned ${name}${why ? `: ${why}` : ''}${ip ? '' : ' (by key only: no address is known)'}${fp ? ` [dev ${shortDevice(fp)}]` : ''}`);
       if (t) eject(t, 'You are banned from this server.');
       // (and off the panel's "Left lately": the owner, 2026-10-16, "when i ban someone their name should be removed")
-      const rawKey = t ? t.key : left!.key;
+      const rawKey = t ? t.key : left?.key;
       for (let i = ADMIN.gone.length - 1; i >= 0; i--) if (ADMIN.gone[i].key === rawKey) ADMIN.gone.splice(i, 1);
       // (it holds from this line on: see saveAdmin. And whoever else it covers goes now.)
       const saving = saveAdmin(next);

@@ -60,6 +60,7 @@ export interface Order {
 export const ORDERS: Order[] = [
   { name: 'players', args: [], does: 'Who is online: their numbers, where they are, who is flagged' },
   { name: 'recent', args: [], does: 'Who has left lately' },
+  { name: 'find', args: ['name'], does: 'Everybody who has played in the last 90 days with that in a name (or dev:xxxxxxxx), on or not: /ban takes them by name' },
   { name: 'flagged', args: [], does: 'Who the cheat checks have flagged' },
   { name: 'same', args: ['who'], does: 'Who else plays, or lately played, on the same device as somebody (who may be dev:xxxxxxxx from /players)' },
   { name: 'kick', args: ['who', '[why]'], does: 'Put somebody off the server (they can come straight back)' },

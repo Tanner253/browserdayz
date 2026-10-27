@@ -22,7 +22,7 @@ import { FUEL } from '../src/sim/cooking';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, log, stashItem, stoppingNow, takeOut, tellSeats, things, vehicles, world } from './index';
 import { TAG_FRESH_MS, tagTime, CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, seenOf, tagSeen, theirOwn, voided } from './tags';
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
-import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
+import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, ipHash, keptOffNow, keyHash, pockets, roleOf, stayOn } from './gate';
 import { shortDevice } from './device';
 import { KEPT, sys } from './keep';
 import { elite } from './elite';
@@ -43,6 +43,7 @@ import { scores } from './queue';
 import { partyAct, partyCommand, partyMates } from './party';
 import { sendDrop } from './drops';
 import { seen } from './seen';
+import { roster } from './roster';
 import { pinned } from './pinned';
 import { stashBuriedNear } from './stash-sight';
 import { hidden } from './storages';
@@ -101,7 +102,10 @@ export function handle(c: Client, m: C2S) {
       }
       c.heardAt = Date.now();
       // (their first move in the world: they have played today, for the door's count)
-      if (!c.spoke) seen.mark(c.key);
+      if (!c.spoke) {
+        seen.mark(c.key);
+        roster.mark({ key: keyHash(c.key), ip: ipHash(c.ip), fp: c.fp, name: c.name });
+      }
       c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
